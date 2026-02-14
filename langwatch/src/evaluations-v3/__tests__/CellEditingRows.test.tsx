@@ -21,6 +21,55 @@ vi.mock("~/optimization_studio/hooks/useWorkflowStore", () => ({
   useWorkflowStore: vi.fn(() => ({})),
 }));
 
+// Mock heavy sub-components that row tests don't need
+vi.mock("~/evaluations-v3/components/DatasetSuperHeader", () => ({
+  DatasetSuperHeader: () => null,
+}));
+vi.mock("~/evaluations-v3/components/TargetSuperHeader", () => ({
+  TargetSuperHeader: () => null,
+}));
+vi.mock("~/evaluations-v3/components/SelectionToolbar", () => ({
+  SelectionToolbar: () => null,
+}));
+
+// Mock heavy hooks that row tests don't exercise
+// NOTE: useDatasetSync is NOT mocked here — row tests verify DB sync behavior
+vi.mock("~/evaluations-v3/hooks/useExecuteEvaluation", () => ({
+  useExecuteEvaluation: () => ({
+    status: "idle",
+    runId: null,
+    progress: { completed: 0, total: 0 },
+    totalCost: 0,
+    error: null,
+    isAborting: false,
+    execute: vi.fn(),
+    rerunEvaluator: vi.fn(),
+    abort: vi.fn(),
+    reset: vi.fn(),
+  }),
+}));
+vi.mock("~/evaluations-v3/hooks/useOpenTargetEditor", () => ({
+  useOpenTargetEditor: () => ({
+    openTargetEditor: vi.fn(),
+    buildAvailableSources: vi.fn(() => []),
+    isDatasetSource: vi.fn(() => false),
+  }),
+  buildUIMappings: vi.fn(() => ({})),
+  scrollToTargetColumn: vi.fn(),
+}));
+vi.mock("~/evaluations-v3/hooks/useSavedDatasetLoader", () => ({
+  useSavedDatasetRecords: () => ({ isLoading: false }),
+  useSavedDatasetLoader: () => ({
+    isLoading: false,
+    loadingCount: 0,
+    datasetsToLoad: [],
+  }),
+  useDatasetSelectionLoader: () => ({
+    loadSavedDataset: vi.fn(),
+    isLoading: false,
+  }),
+}));
+
 import { EvaluationsV3Table } from "../components/EvaluationsV3Table";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 
