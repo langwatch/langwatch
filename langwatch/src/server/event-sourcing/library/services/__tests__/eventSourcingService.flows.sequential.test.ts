@@ -9,11 +9,8 @@ import { buildCheckpointKey } from "../../utils/checkpointKey";
 import { EventSourcingService } from "../eventSourcingService";
 import {
   cleanupTestEnvironment,
-  createMockEventHandler,
-  createMockEventHandlerDefinition,
-  createMockEventReactionHandler,
-  createMockProjectionDefinition,
-  createMockProjectionStore,
+  createMockFoldProjectionDefinition,
+  createMockMapProjectionDefinition,
   createTestContext,
   createTestEvent,
   createTestProjection,
@@ -38,7 +35,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       const eventStore = new EventStoreMemory<Event>(
         new EventRepositoryMemory(),
       );
-      const handler = createMockEventReactionHandler<Event>();
+      const mapDef = createMockMapProjectionDefinition("handler");
       const checkpointStore = new ProcessorCheckpointStoreMemory(
         new CheckpointRepositoryMemory(),
       );
@@ -46,9 +43,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        eventHandlers: {
-          handler: createMockEventHandlerDefinition("handler", handler),
-        },
+        mapProjections: [mapDef],
         checkpointStore: checkpointStore,
       });
 
@@ -74,21 +69,21 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       await service.storeEvents([event2], context);
 
       // Handler processes event2 independently
-      expect(handler.handle).toHaveBeenCalledTimes(1);
-      expect(handler.handle).toHaveBeenCalledWith(event2);
+      expect(mapDef.map).toHaveBeenCalledTimes(1);
+      expect(mapDef.map).toHaveBeenCalledWith(event2);
 
       // Process event1 - also succeeds
       await service.storeEvents([event1], context);
 
-      expect(handler.handle).toHaveBeenCalledTimes(2);
-      expect(handler.handle).toHaveBeenCalledWith(event1);
+      expect(mapDef.map).toHaveBeenCalledTimes(2);
+      expect(mapDef.map).toHaveBeenCalledWith(event1);
     });
 
     it("processes events out of order without blocking", async () => {
       const eventStore = new EventStoreMemory<Event>(
         new EventRepositoryMemory(),
       );
-      const handler = createMockEventReactionHandler<Event>();
+      const mapDef = createMockMapProjectionDefinition("handler");
       const checkpointStore = new ProcessorCheckpointStoreMemory(
         new CheckpointRepositoryMemory(),
       );
@@ -96,9 +91,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        eventHandlers: {
-          handler: createMockEventHandlerDefinition("handler", handler),
-        },
+        mapProjections: [mapDef],
         checkpointStore: checkpointStore,
       });
 
@@ -133,23 +126,23 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
 
       // Process events out of order: event3, event1, event2 - all succeed
       await service.storeEvents([event3], context);
-      expect(handler.handle).toHaveBeenCalledTimes(1);
-      expect(handler.handle).toHaveBeenCalledWith(event3);
+      expect(mapDef.map).toHaveBeenCalledTimes(1);
+      expect(mapDef.map).toHaveBeenCalledWith(event3);
 
       await service.storeEvents([event1], context);
-      expect(handler.handle).toHaveBeenCalledTimes(2);
-      expect(handler.handle).toHaveBeenCalledWith(event1);
+      expect(mapDef.map).toHaveBeenCalledTimes(2);
+      expect(mapDef.map).toHaveBeenCalledWith(event1);
 
       await service.storeEvents([event2], context);
-      expect(handler.handle).toHaveBeenCalledTimes(3);
-      expect(handler.handle).toHaveBeenCalledWith(event2);
+      expect(mapDef.map).toHaveBeenCalledTimes(3);
+      expect(mapDef.map).toHaveBeenCalledWith(event2);
     });
 
     it("processes first event without any prerequisite checks", async () => {
       const eventStore = new EventStoreMemory<Event>(
         new EventRepositoryMemory(),
       );
-      const handler = createMockEventReactionHandler<Event>();
+      const mapDef = createMockMapProjectionDefinition("handler");
       const checkpointStore = new ProcessorCheckpointStoreMemory(
         new CheckpointRepositoryMemory(),
       );
@@ -157,9 +150,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        eventHandlers: {
-          handler: createMockEventHandlerDefinition("handler", handler),
-        },
+        mapProjections: [mapDef],
         checkpointStore: checkpointStore,
       });
 
@@ -178,8 +169,8 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       await service.storeEvents([event1], context);
 
       // Verify handler was called
-      expect(handler.handle).toHaveBeenCalledTimes(1);
-      expect(handler.handle).toHaveBeenCalledWith(event1);
+      expect(mapDef.map).toHaveBeenCalledTimes(1);
+      expect(mapDef.map).toHaveBeenCalledWith(event1);
 
       // Handlers no longer create checkpoints
       const checkpointKey1 = buildCheckpointKey(
@@ -197,7 +188,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       const eventStore = new EventStoreMemory<Event>(
         new EventRepositoryMemory(),
       );
-      const handler = createMockEventReactionHandler<Event>();
+      const mapDef = createMockMapProjectionDefinition("handler");
       const checkpointStore = new ProcessorCheckpointStoreMemory(
         new CheckpointRepositoryMemory(),
       );
@@ -205,9 +196,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        eventHandlers: {
-          handler: createMockEventHandlerDefinition("handler", handler),
-        },
+        mapProjections: [mapDef],
         checkpointStore: checkpointStore,
       });
 
@@ -246,7 +235,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       await service.storeEvents([event3], context);
 
       // Verify handler was called for all events
-      expect(handler.handle).toHaveBeenCalledTimes(3);
+      expect(mapDef.map).toHaveBeenCalledTimes(3);
 
       // Verify no handler checkpoint was created
       const checkpointKey = buildCheckpointKey(
@@ -264,7 +253,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       const eventStore = new EventStoreMemory<Event>(
         new EventRepositoryMemory(),
       );
-      const handler = createMockEventReactionHandler<Event>();
+      const mapDef = createMockMapProjectionDefinition("handler");
       const checkpointStore = new ProcessorCheckpointStoreMemory(
         new CheckpointRepositoryMemory(),
       );
@@ -272,9 +261,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        eventHandlers: {
-          handler: createMockEventHandlerDefinition("handler", handler),
-        },
+        mapProjections: [mapDef],
         checkpointStore: checkpointStore,
       });
 
@@ -323,10 +310,10 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       await service.storeEvents([event2], context);
       await service.storeEvents([event3], context);
 
-      expect(handler.handle).toHaveBeenCalledTimes(3);
-      expect(handler.handle).toHaveBeenCalledWith(event1);
-      expect(handler.handle).toHaveBeenCalledWith(event2);
-      expect(handler.handle).toHaveBeenCalledWith(event3);
+      expect(mapDef.map).toHaveBeenCalledTimes(3);
+      expect(mapDef.map).toHaveBeenCalledWith(event1);
+      expect(mapDef.map).toHaveBeenCalledWith(event2);
+      expect(mapDef.map).toHaveBeenCalledWith(event3);
 
       // Verify no handler checkpoint was created
       const checkpointKey = buildCheckpointKey(
@@ -346,8 +333,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       const eventStore = new EventStoreMemory<Event>(
         new EventRepositoryMemory(),
       );
-      const projectionHandler = createMockEventHandler<Event, any>();
-      const projectionStore = createMockProjectionStore<any>();
+      const foldDef = createMockFoldProjectionDefinition("projection");
       const checkpointStore = new ProcessorCheckpointStoreMemory(
         new CheckpointRepositoryMemory(),
       );
@@ -355,13 +341,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        projections: {
-          projection: createMockProjectionDefinition(
-            "projection",
-            projectionHandler,
-            projectionStore,
-          ),
-        },
+        foldProjections: [foldDef],
         checkpointStore: checkpointStore,
       });
 
@@ -383,26 +363,27 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       // Store all events
       await eventStore.storeEvents([event1, event2], context, aggregateType);
 
-      // Mock projection handler to return a projection
-      projectionHandler.handle = vi
-        .fn()
-        .mockResolvedValue(
+      // Mock fold apply to return a projection-like state
+      (foldDef.apply as ReturnType<typeof vi.fn>).mockImplementation(
+        (_state: any) =>
           createTestProjection(TEST_CONSTANTS.AGGREGATE_ID, tenantId),
-        );
+      );
 
       // Try to process event2 before event1 - should fail
       await expect(service.storeEvents([event2], context)).rejects.toThrow(
         "Previous event (sequence 1) has not been processed yet",
       );
 
-      // Verify projection handler was not called
-      expect(projectionHandler.handle).not.toHaveBeenCalled();
+      // Verify fold apply was not called
+      expect(foldDef.apply).not.toHaveBeenCalled();
 
       // Process event1 - should succeed
       await service.storeEvents([event1], context);
 
-      // Verify projection was updated
-      expect(projectionHandler.handle).toHaveBeenCalledTimes(1);
+      // Verify fold was applied (rebuild replays ALL events in the aggregate)
+      // Both event1 and event2 are in the event store (stored at line 364),
+      // so the fold executor applies both events during rebuild
+      expect(foldDef.apply).toHaveBeenCalledTimes(2);
       const checkpointKey1 = buildCheckpointKey(
         tenantId,
         TEST_CONSTANTS.PIPELINE_NAME,
@@ -418,8 +399,8 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       // Now process event2 - should succeed
       await service.storeEvents([event2], context);
 
-      // Verify projection was updated again
-      expect(projectionHandler.handle).toHaveBeenCalledTimes(2);
+      // Verify fold was applied again (another full rebuild of 2 events)
+      expect(foldDef.apply).toHaveBeenCalledTimes(4);
       const checkpointKey2 = buildCheckpointKey(
         tenantId,
         TEST_CONSTANTS.PIPELINE_NAME,
@@ -437,8 +418,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       const eventStore = new EventStoreMemory<Event>(
         new EventRepositoryMemory(),
       );
-      const projectionHandler = createMockEventHandler<Event, any>();
-      const projectionStore = createMockProjectionStore<any>();
+      const foldDef = createMockFoldProjectionDefinition("projection");
       const checkpointStore = new ProcessorCheckpointStoreMemory(
         new CheckpointRepositoryMemory(),
       );
@@ -446,13 +426,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        projections: {
-          projection: createMockProjectionDefinition(
-            "projection",
-            projectionHandler,
-            projectionStore,
-          ),
-        },
+        foldProjections: [foldDef],
         checkpointStore: checkpointStore,
       });
 
@@ -467,18 +441,17 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       // Store event
       await eventStore.storeEvents([event1], context, aggregateType);
 
-      // Mock projection handler
-      projectionHandler.handle = vi
-        .fn()
-        .mockResolvedValue(
+      // Mock fold apply
+      (foldDef.apply as ReturnType<typeof vi.fn>).mockImplementation(
+        (_state: any) =>
           createTestProjection(TEST_CONSTANTS.AGGREGATE_ID, tenantId),
-        );
+      );
 
       // Process first event - should succeed without checking for previous
       await service.storeEvents([event1], context);
 
-      // Verify projection handler was called
-      expect(projectionHandler.handle).toHaveBeenCalledTimes(1);
+      // Verify fold was applied
+      expect(foldDef.apply).toHaveBeenCalledTimes(1);
 
       // Verify checkpoint was saved
       const checkpointKey1 = buildCheckpointKey(
@@ -500,8 +473,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       const eventStore = new EventStoreMemory<Event>(
         new EventRepositoryMemory(),
       );
-      const projectionHandler = createMockEventHandler<Event, any>();
-      const projectionStore = createMockProjectionStore<any>();
+      const foldDef = createMockFoldProjectionDefinition("projection");
       const checkpointStore = new ProcessorCheckpointStoreMemory(
         new CheckpointRepositoryMemory(),
       );
@@ -509,13 +481,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        projections: {
-          projection: createMockProjectionDefinition(
-            "projection",
-            projectionHandler,
-            projectionStore,
-          ),
-        },
+        foldProjections: [foldDef],
         checkpointStore: checkpointStore,
       });
 
@@ -559,12 +525,11 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         aggregateType,
       );
 
-      // Mock projection handler
-      projectionHandler.handle = vi
-        .fn()
-        .mockResolvedValue(
+      // Mock fold apply
+      (foldDef.apply as ReturnType<typeof vi.fn>).mockImplementation(
+        (_state: any) =>
           createTestProjection(TEST_CONSTANTS.AGGREGATE_ID, tenantId),
-        );
+      );
 
       // Process events and verify projection sequence numbers after each
       const checkpointKey = buildCheckpointKey(
@@ -601,8 +566,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       const eventStore = new EventStoreMemory<Event>(
         new EventRepositoryMemory(),
       );
-      const projectionHandler = createMockEventHandler<Event, any>();
-      const projectionStore = createMockProjectionStore<any>();
+      const foldDef = createMockFoldProjectionDefinition("projection");
       const checkpointStore = new ProcessorCheckpointStoreMemory(
         new CheckpointRepositoryMemory(),
       );
@@ -610,22 +574,15 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        projections: {
-          projection: createMockProjectionDefinition(
-            "projection",
-            projectionHandler,
-            projectionStore,
-          ),
-        },
+        foldProjections: [foldDef],
         checkpointStore: checkpointStore,
       });
 
-      // Mock projection handler
-      projectionHandler.handle = vi
-        .fn()
-        .mockResolvedValue(
+      // Mock fold apply
+      (foldDef.apply as ReturnType<typeof vi.fn>).mockImplementation(
+        (_state: any) =>
           createTestProjection(TEST_CONSTANTS.AGGREGATE_ID, tenantId),
-        );
+      );
 
       const event1 = createTestEvent(
         TEST_CONSTANTS.AGGREGATE_ID,
@@ -669,23 +626,16 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       // Create a new service instance and process same events
       const eventStore2 = new EventStoreMemory<Event>();
       const checkpointStore2 = new ProcessorCheckpointStoreMemory();
-      const projectionHandler2 = createMockEventHandler<Event, any>();
-      projectionHandler2.handle = vi
-        .fn()
-        .mockResolvedValue(
+      const foldDef2 = createMockFoldProjectionDefinition("projection");
+      (foldDef2.apply as ReturnType<typeof vi.fn>).mockImplementation(
+        (_state: any) =>
           createTestProjection(TEST_CONSTANTS.AGGREGATE_ID, tenantId),
-        );
+      );
       const service2 = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore: eventStore2,
-        projections: {
-          projection: createMockProjectionDefinition(
-            "projection",
-            projectionHandler2,
-            createMockProjectionStore(),
-          ),
-        },
+        foldProjections: [foldDef2],
         checkpointStore: checkpointStore2,
       });
 
@@ -712,8 +662,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       const eventStore = new EventStoreMemory<Event>(
         new EventRepositoryMemory(),
       );
-      const projectionHandler = createMockEventHandler<Event, any>();
-      const projectionStore = createMockProjectionStore<any>();
+      const foldDef = createMockFoldProjectionDefinition("projection");
       const checkpointStore = new ProcessorCheckpointStoreMemory(
         new CheckpointRepositoryMemory(),
       );
@@ -721,13 +670,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        projections: {
-          projection: createMockProjectionDefinition(
-            "projection",
-            projectionHandler,
-            projectionStore,
-          ),
-        },
+        foldProjections: [foldDef],
         checkpointStore: checkpointStore,
       });
 
@@ -749,12 +692,11 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       // Store events
       await eventStore.storeEvents([event1, event2], context, aggregateType);
 
-      // Mock projection handler
-      projectionHandler.handle = vi
-        .fn()
-        .mockResolvedValue(
+      // Mock fold apply
+      (foldDef.apply as ReturnType<typeof vi.fn>).mockImplementation(
+        (_state: any) =>
           createTestProjection(TEST_CONSTANTS.AGGREGATE_ID, tenantId),
-        );
+      );
 
       // Process events and get sequence numbers after each
       const checkpointKey = buildCheckpointKey(
@@ -796,8 +738,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       const eventStore = new EventStoreMemory<Event>(
         new EventRepositoryMemory(),
       );
-      const projectionHandler = createMockEventHandler<Event, any>();
-      const projectionStore = createMockProjectionStore<any>();
+      const foldDef = createMockFoldProjectionDefinition("projection");
       const checkpointStore = new ProcessorCheckpointStoreMemory(
         new CheckpointRepositoryMemory(),
       );
@@ -805,22 +746,15 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        projections: {
-          projection: createMockProjectionDefinition(
-            "projection",
-            projectionHandler,
-            projectionStore,
-          ),
-        },
+        foldProjections: [foldDef],
         checkpointStore: checkpointStore,
       });
 
-      // Mock projection handler
-      projectionHandler.handle = vi
-        .fn()
-        .mockResolvedValue(
+      // Mock fold apply
+      (foldDef.apply as ReturnType<typeof vi.fn>).mockImplementation(
+        (_state: any) =>
           createTestProjection(TEST_CONSTANTS.AGGREGATE_ID, tenantId),
-        );
+      );
 
       const sameTimestamp = TEST_CONSTANTS.BASE_TIMESTAMP;
       const event1 = createTestEvent(
@@ -891,8 +825,12 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       expect(checkpoint3?.sequenceNumber).toBe(3);
       expect(checkpoint3?.status).toBe("processed");
 
-      // Verify projection handler was called for all events
-      expect(projectionHandler.handle).toHaveBeenCalledTimes(3);
+      // Verify fold was applied for all events
+      // Fold rebuild strategy replays ALL events each time:
+      // storeEvents([event1]): replays 3 events → 3 apply calls (total: 3)
+      // storeEvents([event2]): replays 3 events → 3 apply calls (total: 6)
+      // storeEvents([event3]): replays 3 events → 3 apply calls (total: 9)
+      expect(foldDef.apply).toHaveBeenCalledTimes(9);
     });
   });
 
@@ -901,7 +839,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       const eventStore = new EventStoreMemory<Event>(
         new EventRepositoryMemory(),
       );
-      const handler = createMockEventReactionHandler<Event>();
+      const mapDef = createMockMapProjectionDefinition("handler");
       const checkpointStore = new ProcessorCheckpointStoreMemory(
         new CheckpointRepositoryMemory(),
       );
@@ -909,9 +847,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        eventHandlers: {
-          handler: createMockEventHandlerDefinition("handler", handler),
-        },
+        mapProjections: [mapDef],
         checkpointStore: checkpointStore,
       });
 
@@ -940,14 +876,14 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
 
       // Handlers no longer use checkpoints - they process each event independently
       // Event is dispatched twice (once per storeEvents call), so handler is called twice
-      expect(handler.handle).toHaveBeenCalledTimes(2);
+      expect(mapDef.map).toHaveBeenCalledTimes(2);
     });
 
     it("prevents duplicate when event stored directly then via service", async () => {
       const eventStore = new EventStoreMemory<Event>(
         new EventRepositoryMemory(),
       );
-      const handler = createMockEventReactionHandler<Event>();
+      const mapDef = createMockMapProjectionDefinition("handler");
       const checkpointStore = new ProcessorCheckpointStoreMemory(
         new CheckpointRepositoryMemory(),
       );
@@ -955,9 +891,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        eventHandlers: {
-          handler: createMockEventHandlerDefinition("handler", handler),
-        },
+        mapProjections: [mapDef],
         checkpointStore: checkpointStore,
       });
 
@@ -985,8 +919,8 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       expect(event1Count).toBe(1);
 
       // Handler is called once (from the service.storeEvents call)
-      expect(handler.handle).toHaveBeenCalledTimes(1);
-      expect(handler.handle).toHaveBeenCalledWith(event1);
+      expect(mapDef.map).toHaveBeenCalledTimes(1);
+      expect(mapDef.map).toHaveBeenCalledWith(event1);
 
       // Handlers no longer create checkpoints
       const checkpointKey1 = buildCheckpointKey(
@@ -1004,7 +938,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       const eventStore = new EventStoreMemory<Event>(
         new EventRepositoryMemory(),
       );
-      const handler = createMockEventReactionHandler<Event>();
+      const mapDef = createMockMapProjectionDefinition("handler");
       const checkpointStore = new ProcessorCheckpointStoreMemory(
         new CheckpointRepositoryMemory(),
       );
@@ -1012,9 +946,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        eventHandlers: {
-          handler: createMockEventHandlerDefinition("handler", handler),
-        },
+        mapProjections: [mapDef],
         checkpointStore: checkpointStore,
       });
 
@@ -1048,17 +980,17 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
 
       // Verify handler was called for each event in the batch (including duplicate)
       // Handlers no longer use checkpoints for idempotency - they process each event independently
-      expect(handler.handle).toHaveBeenCalledTimes(3);
-      expect(handler.handle).toHaveBeenCalledWith(event1);
-      expect(handler.handle).toHaveBeenCalledWith(event2);
+      expect(mapDef.map).toHaveBeenCalledTimes(3);
+      expect(mapDef.map).toHaveBeenCalledWith(event1);
+      expect(mapDef.map).toHaveBeenCalledWith(event2);
     });
 
     it("prevents duplicates with multiple handlers correctly", async () => {
       const eventStore = new EventStoreMemory<Event>(
         new EventRepositoryMemory(),
       );
-      const handler1 = createMockEventReactionHandler<Event>();
-      const handler2 = createMockEventReactionHandler<Event>();
+      const mapDef1 = createMockMapProjectionDefinition("handler1");
+      const mapDef2 = createMockMapProjectionDefinition("handler2");
       const checkpointStore = new ProcessorCheckpointStoreMemory(
         new CheckpointRepositoryMemory(),
       );
@@ -1066,10 +998,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        eventHandlers: {
-          handler1: createMockEventHandlerDefinition("handler1", handler1),
-          handler2: createMockEventHandlerDefinition("handler2", handler2),
-        },
+        mapProjections: [mapDef1, mapDef2],
         checkpointStore: checkpointStore,
       });
 
@@ -1098,17 +1027,17 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
 
       // Handlers no longer use checkpoints - they process each event independently
       // Event is dispatched twice (once per storeEvents call), so each handler is called twice
-      expect(handler1.handle).toHaveBeenCalledTimes(2);
-      expect(handler2.handle).toHaveBeenCalledTimes(2);
-      expect(handler1.handle).toHaveBeenCalledWith(event1);
-      expect(handler2.handle).toHaveBeenCalledWith(event1);
+      expect(mapDef1.map).toHaveBeenCalledTimes(2);
+      expect(mapDef2.map).toHaveBeenCalledTimes(2);
+      expect(mapDef1.map).toHaveBeenCalledWith(event1);
+      expect(mapDef2.map).toHaveBeenCalledWith(event1);
     });
 
     it("stores events in different aggregates separately (partition isolation)", async () => {
       const eventStore = new EventStoreMemory<Event>(
         new EventRepositoryMemory(),
       );
-      const handler = createMockEventReactionHandler<Event>();
+      const mapDef = createMockMapProjectionDefinition("handler");
       const checkpointStore = new ProcessorCheckpointStoreMemory(
         new CheckpointRepositoryMemory(),
       );
@@ -1116,9 +1045,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        eventHandlers: {
-          handler: createMockEventHandlerDefinition("handler", handler),
-        },
+        mapProjections: [mapDef],
         checkpointStore: checkpointStore,
       });
 
@@ -1168,9 +1095,9 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       expect(events_agg2[0]?.id).toBe(event1_agg2.id);
 
       // Verify both handlers were called (different aggregates = different partitions)
-      expect(handler.handle).toHaveBeenCalledTimes(2);
-      expect(handler.handle).toHaveBeenCalledWith(event1_agg1);
-      expect(handler.handle).toHaveBeenCalledWith(event1_agg2);
+      expect(mapDef.map).toHaveBeenCalledTimes(2);
+      expect(mapDef.map).toHaveBeenCalledWith(event1_agg1);
+      expect(mapDef.map).toHaveBeenCalledWith(event1_agg2);
 
       // Handlers no longer create checkpoints - verify they're absent
       const checkpoint1 = await checkpointStore.loadCheckpoint(
@@ -1199,7 +1126,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       const eventStore = new EventStoreMemory<Event>(
         new EventRepositoryMemory(),
       );
-      const handler = createMockEventReactionHandler<Event>();
+      const mapDef = createMockMapProjectionDefinition("handler");
       const checkpointStore = new ProcessorCheckpointStoreMemory(
         new CheckpointRepositoryMemory(),
       );
@@ -1207,9 +1134,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        eventHandlers: {
-          handler: createMockEventHandlerDefinition("handler", handler),
-        },
+        mapProjections: [mapDef],
         checkpointStore: checkpointStore,
       });
 
@@ -1237,7 +1162,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
 
       // Store event1 first
       await service.storeEvents([event1], context);
-      expect(handler.handle).toHaveBeenCalledTimes(1);
+      expect(mapDef.map).toHaveBeenCalledTimes(1);
 
       // Store batch with event1 (duplicate), event2 (new), event3 (new)
       await service.storeEvents([event1, event2, event3], context);
@@ -1255,10 +1180,10 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
 
       // Handlers process all dispatched events independently - no checkpoint-based idempotency
       // Total calls: 1 (initial event1) + 3 (event1 duplicate + event2 + event3) = 4
-      expect(handler.handle).toHaveBeenCalledTimes(4);
-      expect(handler.handle).toHaveBeenCalledWith(event1);
-      expect(handler.handle).toHaveBeenCalledWith(event2);
-      expect(handler.handle).toHaveBeenCalledWith(event3);
+      expect(mapDef.map).toHaveBeenCalledTimes(4);
+      expect(mapDef.map).toHaveBeenCalledWith(event1);
+      expect(mapDef.map).toHaveBeenCalledWith(event2);
+      expect(mapDef.map).toHaveBeenCalledWith(event3);
 
       // Handlers no longer create checkpoints
       const checkpointKey = buildCheckpointKey(

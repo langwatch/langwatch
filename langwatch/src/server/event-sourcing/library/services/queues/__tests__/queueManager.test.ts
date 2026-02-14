@@ -6,16 +6,60 @@ import { defineCommandSchema } from "../../../commands/commandSchema";
 import type { CommandType } from "../../../domain/commandType";
 import { EVENT_TYPES } from "../../../domain/eventType";
 import type { Event } from "../../../domain/types";
+import type { DeduplicationStrategy } from "../../../queues";
 import type { EventSourcedQueueProcessor } from "../../../queues";
 import {
-  createMockEventHandlerDefinition,
-  createMockProjectionDefinition,
   createTestAggregateType,
   createTestEvent,
   createTestTenantId,
   TEST_CONSTANTS,
 } from "../../__tests__/testHelpers";
 import { QueueManager } from "../queueManager";
+
+/**
+ * Creates a mock event handler definition in the shape expected by QueueManager.initializeHandlerQueues.
+ */
+function createMockEventHandlerDefinition(
+  name: string,
+  handler?: { handle: (event: Event) => Promise<void> },
+  options?: {
+    eventTypes?: readonly string[];
+    delay?: number;
+    deduplication?: DeduplicationStrategy<Event>;
+    concurrency?: number;
+    spanAttributes?: (event: Event) => Record<string, string | number | boolean>;
+    disabled?: boolean;
+  },
+) {
+  return {
+    name,
+    handler: handler ?? { handle: vi.fn().mockResolvedValue(void 0) },
+    options: {
+      eventTypes: EVENT_TYPES,
+      ...options,
+    },
+  };
+}
+
+/**
+ * Creates a mock projection definition in the shape expected by QueueManager.initializeProjectionQueues.
+ */
+function createMockProjectionDefinition(
+  name: string,
+  _handler?: any,
+  _store?: any,
+  options?: {
+    delay?: number;
+    deduplication?: DeduplicationStrategy<Event>;
+  },
+) {
+  return {
+    name,
+    store: _store ?? { getProjection: vi.fn(), storeProjection: vi.fn() },
+    handler: _handler ?? { handle: vi.fn().mockResolvedValue(null) },
+    options,
+  };
+}
 
 /**
  * Creates a mock command handler class for testing.

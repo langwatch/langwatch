@@ -2,18 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Event } from "../../domain/types";
 import { EventSourcingService } from "../eventSourcingService";
 import {
-  createMockEventHandler,
-  createMockEventHandlerDefinition,
-  createMockEventPublisher,
-  createMockEventReactionHandler,
-  createMockEventStore,
   createMockCheckpointStore,
-  createMockProjectionDefinition,
-  createMockProjectionStore,
+  createMockEventPublisher,
+  createMockEventStore,
+  createMockFoldProjectionDefinition,
+  createMockFoldProjectionStore,
+  createMockMapProjectionDefinition,
   createTestAggregateType,
   createTestEvent,
   createTestEventStoreReadContext,
-  createTestProjection,
   createTestTenantId,
   TEST_CONSTANTS,
 } from "./testHelpers";
@@ -62,9 +59,8 @@ describe("EventSourcingService - Error Handling Flows", () => {
     it("downstream operations don't execute if storage fails", async () => {
       const eventStore = createMockEventStore<Event>();
       const eventPublisher = createMockEventPublisher<Event>();
-      const handler = createMockEventReactionHandler<Event>();
-      const projectionHandler = createMockEventHandler<Event, any>();
-      const projectionStore = createMockProjectionStore<any>();
+      const mapDef = createMockMapProjectionDefinition("handler");
+      const foldDef = createMockFoldProjectionDefinition("projection");
 
       const storageError = new Error("Storage failed");
       eventStore.storeEvents = vi.fn().mockRejectedValue(storageError);
@@ -74,16 +70,8 @@ describe("EventSourcingService - Error Handling Flows", () => {
         aggregateType,
         eventStore,
         eventPublisher,
-        eventHandlers: {
-          handler: createMockEventHandlerDefinition("handler", handler),
-        },
-        projections: {
-          projection: createMockProjectionDefinition(
-            "projection",
-            projectionHandler,
-            projectionStore,
-          ),
-        },
+        mapProjections: [mapDef],
+        foldProjections: [foldDef],
 
       });
 
@@ -100,8 +88,8 @@ describe("EventSourcingService - Error Handling Flows", () => {
       );
 
       expect(eventPublisher.publish).not.toHaveBeenCalled();
-      expect(handler.handle).not.toHaveBeenCalled();
-      expect(projectionHandler.handle).not.toHaveBeenCalled();
+      expect(mapDef.map).not.toHaveBeenCalled();
+      expect(foldDef.apply).not.toHaveBeenCalled();
     });
   });
 
@@ -234,10 +222,10 @@ describe("EventSourcingService - Error Handling Flows", () => {
     });
   });
 
-  describe("handler errors", () => {
-    it("individual handler errors are caught and logged", async () => {
+  describe("map projection (handler) errors", () => {
+    it("individual map projection errors are caught and logged", async () => {
       const eventStore = createMockEventStore<Event>();
-      const handler = createMockEventReactionHandler<Event>();
+      const mapDef = createMockMapProjectionDefinition("handler");
       const logger = {
         debug: vi.fn(),
         info: vi.fn(),
@@ -251,16 +239,16 @@ describe("EventSourcingService - Error Handling Flows", () => {
       };
 
       const handlerError = new Error("Handler failed");
-      handler.handle = vi.fn().mockRejectedValue(handlerError);
+      (mapDef.map as ReturnType<typeof vi.fn>).mockImplementation(() => {
+        throw handlerError;
+      });
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
 
-        eventHandlers: {
-          handler: createMockEventHandlerDefinition("handler", handler),
-        },
+        mapProjections: [mapDef],
         logger: logger as any,
       });
 
@@ -274,29 +262,24 @@ describe("EventSourcingService - Error Handling Flows", () => {
         service.storeEvents([event], context),
       ).resolves.not.toThrow();
 
-      // Error handling uses standardized error handling in EventHandlerDispatcher
-      // which uses its own logger, so we can't verify the exact log call here
-      // But we can verify the operation completed successfully (error was handled)
-      expect(handler.handle).toHaveBeenCalled();
+      expect(mapDef.map).toHaveBeenCalled();
     });
 
-    it("other handlers continue execution", async () => {
+    it("other map projections continue execution", async () => {
       const eventStore = createMockEventStore<Event>();
-      const handler1 = createMockEventReactionHandler<Event>();
-      const handler2 = createMockEventReactionHandler<Event>();
+      const mapDef1 = createMockMapProjectionDefinition("handler1");
+      const mapDef2 = createMockMapProjectionDefinition("handler2");
 
-      handler1.handle = vi.fn().mockRejectedValue(new Error("Handler1 failed"));
-      handler2.handle = vi.fn().mockResolvedValue(void 0);
+      (mapDef1.map as ReturnType<typeof vi.fn>).mockImplementation(() => {
+        throw new Error("Handler1 failed");
+      });
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
 
-        eventHandlers: {
-          handler1: createMockEventHandlerDefinition("handler1", handler1),
-          handler2: createMockEventHandlerDefinition("handler2", handler2),
-        },
+        mapProjections: [mapDef1, mapDef2],
       });
 
       const event = createTestEvent(
@@ -309,24 +292,24 @@ describe("EventSourcingService - Error Handling Flows", () => {
         service.storeEvents([event], context),
       ).resolves.not.toThrow();
 
-      expect(handler1.handle).toHaveBeenCalledTimes(1);
-      expect(handler2.handle).toHaveBeenCalledTimes(1);
+      expect(mapDef1.map).toHaveBeenCalledTimes(1);
+      expect(mapDef2.map).toHaveBeenCalledTimes(1);
     });
 
-    it("handler errors don't fail storage", async () => {
+    it("map projection errors don't fail storage", async () => {
       const eventStore = createMockEventStore<Event>();
-      const handler = createMockEventReactionHandler<Event>();
+      const mapDef = createMockMapProjectionDefinition("handler");
 
-      handler.handle = vi.fn().mockRejectedValue(new Error("Handler failed"));
+      (mapDef.map as ReturnType<typeof vi.fn>).mockImplementation(() => {
+        throw new Error("Handler failed");
+      });
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
 
-        eventHandlers: {
-          handler: createMockEventHandlerDefinition("handler", handler),
-        },
+        mapProjections: [mapDef],
       });
 
       const event = createTestEvent(
@@ -343,11 +326,10 @@ describe("EventSourcingService - Error Handling Flows", () => {
     });
   });
 
-  describe("projection update errors", () => {
-    it("individual projection errors are caught and logged", async () => {
+  describe("fold projection update errors", () => {
+    it("individual fold projection errors are caught and logged", async () => {
       const eventStore = createMockEventStore<Event>();
-      const projectionHandler = createMockEventHandler<Event, any>();
-      const projectionStore = createMockProjectionStore<any>();
+      const foldDef = createMockFoldProjectionDefinition("projection");
       const logger = {
         debug: vi.fn(),
         info: vi.fn(),
@@ -368,13 +350,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         aggregateType,
         eventStore,
 
-        projections: {
-          projection: createMockProjectionDefinition(
-            "projection",
-            projectionHandler,
-            projectionStore,
-          ),
-        },
+        foldProjections: [foldDef],
         logger: logger as any,
       });
 
@@ -387,20 +363,12 @@ describe("EventSourcingService - Error Handling Flows", () => {
       ];
 
       await expect(service.storeEvents(events, context)).resolves.not.toThrow();
-
-      // Error handling uses standardized error handling in ProjectionUpdater
-      // which uses its own logger, so we can't verify the exact log call here
-      // The error occurs when getting events, so the handler is never called
-      // But we can verify the operation completed successfully (error was handled)
-      // The projection update fails at the event store level, so handler is not called
     });
 
-    it("other projections continue updating", async () => {
+    it("other fold projections continue updating", async () => {
       const eventStore = createMockEventStore<Event>();
-      const projectionHandler1 = createMockEventHandler<Event, any>();
-      const projectionHandler2 = createMockEventHandler<Event, any>();
-      const projectionStore1 = createMockProjectionStore<any>();
-      const projectionStore2 = createMockProjectionStore<any>();
+      const foldDef1 = createMockFoldProjectionDefinition("projection1");
+      const foldDef2 = createMockFoldProjectionDefinition("projection2");
       const events = [
         createTestEvent(
           TEST_CONSTANTS.AGGREGATE_ID,
@@ -410,45 +378,28 @@ describe("EventSourcingService - Error Handling Flows", () => {
       ];
 
       eventStore.getEvents = vi.fn().mockResolvedValue(events);
-      projectionHandler1.handle = vi
-        .fn()
-        .mockRejectedValue(new Error("Projection1 failed"));
-      projectionHandler2.handle = vi
-        .fn()
-        .mockResolvedValue(
-          createTestProjection(TEST_CONSTANTS.AGGREGATE_ID, tenantId),
-        );
+      (foldDef1.apply as ReturnType<typeof vi.fn>).mockImplementation(() => {
+        throw new Error("Projection1 failed");
+      });
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
 
-        projections: {
-          projection1: createMockProjectionDefinition(
-            "projection1",
-            projectionHandler1,
-            projectionStore1,
-          ),
-          projection2: createMockProjectionDefinition(
-            "projection2",
-            projectionHandler2,
-            projectionStore2,
-          ),
-        },
+        foldProjections: [foldDef1, foldDef2],
       });
 
       await expect(service.storeEvents(events, context)).resolves.not.toThrow();
 
-      expect(projectionHandler1.handle).toHaveBeenCalledTimes(1);
-      expect(projectionHandler2.handle).toHaveBeenCalledTimes(1);
-      expect(projectionStore2.storeProjection).toHaveBeenCalledTimes(1);
+      expect(foldDef1.apply).toHaveBeenCalledTimes(1);
+      expect(foldDef2.apply).toHaveBeenCalledTimes(1);
+      expect(foldDef2.store.store).toHaveBeenCalledTimes(1);
     });
 
-    it("projection errors don't fail storage", async () => {
+    it("fold projection errors don't fail storage", async () => {
       const eventStore = createMockEventStore<Event>();
-      const projectionHandler = createMockEventHandler<Event, any>();
-      const projectionStore = createMockProjectionStore<any>();
+      const foldDef = createMockFoldProjectionDefinition("projection");
       const events = [
         createTestEvent(
           TEST_CONSTANTS.AGGREGATE_ID,
@@ -466,13 +417,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         aggregateType,
         eventStore,
 
-        projections: {
-          projection: createMockProjectionDefinition(
-            "projection",
-            projectionHandler,
-            projectionStore,
-          ),
-        },
+        foldProjections: [foldDef],
       });
 
       await expect(service.storeEvents(events, context)).resolves.not.toThrow();
@@ -482,8 +427,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
 
     it("errors for one aggregate don't affect others", async () => {
       const eventStore = createMockEventStore<Event>();
-      const projectionHandler = createMockEventHandler<Event, any>();
-      const projectionStore = createMockProjectionStore<any>();
+      const foldDef = createMockFoldProjectionDefinition("projection");
       const aggregate1 = "aggregate-1";
       const aggregate2 = "aggregate-2";
       const events = [
@@ -497,22 +441,13 @@ describe("EventSourcingService - Error Handling Flows", () => {
         }
         return Promise.resolve(events.filter((e) => e.aggregateId === aggId));
       });
-      projectionHandler.handle = vi
-        .fn()
-        .mockResolvedValue(createTestProjection(aggregate2, tenantId));
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
 
-        projections: {
-          projection: createMockProjectionDefinition(
-            "projection",
-            projectionHandler,
-            projectionStore,
-          ),
-        },
+        foldProjections: [foldDef],
       });
 
       await expect(service.storeEvents(events, context)).resolves.not.toThrow();
@@ -529,14 +464,14 @@ describe("EventSourcingService - Error Handling Flows", () => {
         aggregateType,
       );
       // Should succeed for aggregate2
-      expect(projectionHandler.handle).toHaveBeenCalledTimes(1);
+      expect(foldDef.apply).toHaveBeenCalledTimes(1);
     });
   });
 
   describe("checkpoint errors", () => {
     it("checkpoint save errors are caught and logged", async () => {
       const eventStore = createMockEventStore<Event>();
-      const handler = createMockEventReactionHandler<Event>();
+      const mapDef = createMockMapProjectionDefinition("handler");
       const checkpointStore = createMockCheckpointStore();
       const logger = {
         debug: vi.fn(),
@@ -560,9 +495,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         aggregateType,
         eventStore,
 
-        eventHandlers: {
-          handler: createMockEventHandlerDefinition("handler", handler),
-        },
+        mapProjections: [mapDef],
         checkpointStore: checkpointStore,
         logger: logger as any,
       });
@@ -577,14 +510,13 @@ describe("EventSourcingService - Error Handling Flows", () => {
         service.storeEvents([event], context),
       ).resolves.not.toThrow();
 
-      // Checkpoint errors are logged by CheckpointManager (which uses its own logger)
-      // but don't prevent handler execution - verify handler was called
-      expect(handler.handle).toHaveBeenCalledTimes(1);
+      // Map projections dispatch events independently, verify map was called
+      expect(mapDef.map).toHaveBeenCalledTimes(1);
     });
 
-    it("handler execution succeeds despite checkpoint failure", async () => {
+    it("map projection execution succeeds despite checkpoint failure", async () => {
       const eventStore = createMockEventStore<Event>();
-      const handler = createMockEventReactionHandler<Event>();
+      const mapDef = createMockMapProjectionDefinition("handler");
       const checkpointStore = createMockCheckpointStore();
 
       checkpointStore.saveCheckpoint = vi
@@ -596,9 +528,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         aggregateType,
         eventStore,
 
-        eventHandlers: {
-          handler: createMockEventHandlerDefinition("handler", handler),
-        },
+        mapProjections: [mapDef],
         checkpointStore: checkpointStore,
       });
 
@@ -612,7 +542,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         service.storeEvents([event], context),
       ).resolves.not.toThrow();
 
-      expect(handler.handle).toHaveBeenCalledTimes(1);
+      expect(mapDef.map).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -644,7 +574,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         aggregateType,
         eventStore,
 
-        // No eventPublisher, eventHandlers, projections, etc.
+        // No eventPublisher, mapProjections, foldProjections, etc.
       });
 
       const events = [
@@ -666,13 +596,9 @@ describe("EventSourcingService - Error Handling Flows", () => {
         aggregateType,
         eventStore,
 
-        projections: {
-          projection: createMockProjectionDefinition(
-            "projection",
-            createMockEventHandler(),
-            createMockProjectionStore(),
-          ),
-        },
+        foldProjections: [
+          createMockFoldProjectionDefinition("projection"),
+        ],
       });
 
       await expect(
@@ -681,7 +607,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
           TEST_CONSTANTS.AGGREGATE_ID,
           context,
         ),
-      ).rejects.toThrow('Projection "nonexistent" not found');
+      ).rejects.toThrow(/nonexistent/);
     });
   });
 });

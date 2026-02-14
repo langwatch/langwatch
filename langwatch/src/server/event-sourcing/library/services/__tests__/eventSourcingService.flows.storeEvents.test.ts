@@ -2,13 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Event } from "../../domain/types";
 import { EventSourcingService } from "../eventSourcingService";
 import {
-  createMockEventHandler,
-  createMockEventHandlerDefinition,
   createMockEventPublisher,
-  createMockEventReactionHandler,
   createMockEventStore,
-  createMockProjectionDefinition,
-  createMockProjectionStore,
+  createMockFoldProjectionDefinition,
+  createMockMapProjectionDefinition,
   createTestAggregateType,
   createTestEvent,
   createTestEventStoreReadContext,
@@ -109,14 +106,12 @@ describe("EventSourcingService - Store Events Flow", () => {
   describe("event handler dispatch", () => {
     it("dispatches events to handlers after storage when configured", async () => {
       const eventStore = createMockEventStore<Event>();
-      const handler = createMockEventReactionHandler<Event>();
+      const mapDef = createMockMapProjectionDefinition("handler");
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        eventHandlers: {
-          handler: createMockEventHandlerDefinition("handler", handler),
-        },
+        mapProjections: [mapDef],
       });
 
       const events = [
@@ -130,27 +125,20 @@ describe("EventSourcingService - Store Events Flow", () => {
       await service.storeEvents(events, context);
 
       expect(eventStore.storeEvents).toHaveBeenCalledTimes(1);
-      expect(handler.handle).toHaveBeenCalledTimes(1);
-      expect(handler.handle).toHaveBeenCalledWith(events[0]);
+      expect(mapDef.map).toHaveBeenCalledTimes(1);
+      expect(mapDef.map).toHaveBeenCalledWith(events[0]);
     });
   });
 
   describe("projection updates", () => {
     it("updates projections after storage when configured", async () => {
       const eventStore = createMockEventStore<Event>();
-      const projectionHandler = createMockEventHandler<Event, any>();
-      const projectionStore = createMockProjectionStore<any>();
+      const foldDef = createMockFoldProjectionDefinition("projection");
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        projections: {
-          projection: createMockProjectionDefinition(
-            "projection",
-            projectionHandler,
-            projectionStore,
-          ),
-        },
+        foldProjections: [foldDef],
       });
 
       const events = [
@@ -163,13 +151,15 @@ describe("EventSourcingService - Store Events Flow", () => {
 
       // Mock getEvents for projection update
       eventStore.getEvents = vi.fn().mockResolvedValue(events);
-      projectionHandler.handle = vi.fn().mockResolvedValue({
-        id: "proj-id",
-        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
-        tenantId: tenantId,
-        version: TEST_CONSTANTS.BASE_TIMESTAMP,
-        data: {},
-      });
+      (foldDef.apply as ReturnType<typeof vi.fn>).mockImplementation(
+        (_state: any) => ({
+          id: "proj-id",
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          tenantId: tenantId,
+          version: TEST_CONSTANTS.BASE_TIMESTAMP,
+          data: {},
+        }),
+      );
 
       await service.storeEvents(events, context);
 
@@ -179,25 +169,18 @@ describe("EventSourcingService - Store Events Flow", () => {
         context,
         aggregateType,
       );
-      expect(projectionHandler.handle).toHaveBeenCalledTimes(1);
-      expect(projectionStore.storeProjection).toHaveBeenCalledTimes(1);
+      expect(foldDef.apply).toHaveBeenCalledTimes(1);
+      expect(foldDef.store.store).toHaveBeenCalledTimes(1);
     });
 
     it("groups events by aggregateId and updates each aggregate once", async () => {
       const eventStore = createMockEventStore<Event>();
-      const projectionHandler = createMockEventHandler<Event, any>();
-      const projectionStore = createMockProjectionStore<any>();
+      const foldDef = createMockFoldProjectionDefinition("projection");
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        projections: {
-          projection: createMockProjectionDefinition(
-            "projection",
-            projectionHandler,
-            projectionStore,
-          ),
-        },
+        foldProjections: [foldDef],
       });
 
       const aggregate1 = "aggregate-1";
@@ -212,13 +195,15 @@ describe("EventSourcingService - Store Events Flow", () => {
       eventStore.getEvents = vi.fn().mockImplementation((aggId) => {
         return Promise.resolve(events.filter((e) => e.aggregateId === aggId));
       });
-      projectionHandler.handle = vi.fn().mockResolvedValue({
-        id: "proj-id",
-        aggregateId: aggregate1,
-        tenantId: tenantId,
-        version: TEST_CONSTANTS.BASE_TIMESTAMP,
-        data: {},
-      });
+      (foldDef.apply as ReturnType<typeof vi.fn>).mockImplementation(
+        (_state: any) => ({
+          id: "proj-id",
+          aggregateId: aggregate1,
+          tenantId: tenantId,
+          version: TEST_CONSTANTS.BASE_TIMESTAMP,
+          data: {},
+        }),
+      );
 
       await service.storeEvents(events, context);
 
@@ -238,26 +223,13 @@ describe("EventSourcingService - Store Events Flow", () => {
 
     it("updates all projections for affected aggregates", async () => {
       const eventStore = createMockEventStore<Event>();
-      const projectionHandler1 = createMockEventHandler<Event, any>();
-      const projectionHandler2 = createMockEventHandler<Event, any>();
-      const projectionStore1 = createMockProjectionStore<any>();
-      const projectionStore2 = createMockProjectionStore<any>();
+      const foldDef1 = createMockFoldProjectionDefinition("projection1");
+      const foldDef2 = createMockFoldProjectionDefinition("projection2");
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        projections: {
-          projection1: createMockProjectionDefinition(
-            "projection1",
-            projectionHandler1,
-            projectionStore1,
-          ),
-          projection2: createMockProjectionDefinition(
-            "projection2",
-            projectionHandler2,
-            projectionStore2,
-          ),
-        },
+        foldProjections: [foldDef1, foldDef2],
       });
 
       const events = [
@@ -269,27 +241,31 @@ describe("EventSourcingService - Store Events Flow", () => {
       ];
 
       eventStore.getEvents = vi.fn().mockResolvedValue(events);
-      projectionHandler1.handle = vi.fn().mockResolvedValue({
-        id: "proj1-id",
-        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
-        tenantId: tenantId,
-        version: TEST_CONSTANTS.BASE_TIMESTAMP,
-        data: {},
-      });
-      projectionHandler2.handle = vi.fn().mockResolvedValue({
-        id: "proj2-id",
-        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
-        tenantId: tenantId,
-        version: TEST_CONSTANTS.BASE_TIMESTAMP,
-        data: {},
-      });
+      (foldDef1.apply as ReturnType<typeof vi.fn>).mockImplementation(
+        (_state: any) => ({
+          id: "proj1-id",
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          tenantId: tenantId,
+          version: TEST_CONSTANTS.BASE_TIMESTAMP,
+          data: {},
+        }),
+      );
+      (foldDef2.apply as ReturnType<typeof vi.fn>).mockImplementation(
+        (_state: any) => ({
+          id: "proj2-id",
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          tenantId: tenantId,
+          version: TEST_CONSTANTS.BASE_TIMESTAMP,
+          data: {},
+        }),
+      );
 
       await service.storeEvents(events, context);
 
-      expect(projectionHandler1.handle).toHaveBeenCalledTimes(1);
-      expect(projectionHandler2.handle).toHaveBeenCalledTimes(1);
-      expect(projectionStore1.storeProjection).toHaveBeenCalledTimes(1);
-      expect(projectionStore2.storeProjection).toHaveBeenCalledTimes(1);
+      expect(foldDef1.apply).toHaveBeenCalledTimes(1);
+      expect(foldDef2.apply).toHaveBeenCalledTimes(1);
+      expect(foldDef1.store.store).toHaveBeenCalledTimes(1);
+      expect(foldDef2.store.store).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -338,9 +314,8 @@ describe("EventSourcingService - Store Events Flow", () => {
     it("executes all components in correct order", async () => {
       const eventStore = createMockEventStore<Event>();
       const eventPublisher = createMockEventPublisher<Event>();
-      const handler = createMockEventReactionHandler<Event>();
-      const projectionHandler = createMockEventHandler<Event, any>();
-      const projectionStore = createMockProjectionStore<any>();
+      const mapDef = createMockMapProjectionDefinition("handler");
+      const foldDef = createMockFoldProjectionDefinition("projection");
 
       const callOrder: string[] = [];
 
@@ -352,10 +327,12 @@ describe("EventSourcingService - Store Events Flow", () => {
         callOrder.push("publish");
         return Promise.resolve();
       });
-      handler.handle = vi.fn().mockImplementation(async () => {
-        callOrder.push("handler");
-        return Promise.resolve();
-      });
+      (mapDef.map as ReturnType<typeof vi.fn>).mockImplementation(
+        (event: any) => {
+          callOrder.push("handler");
+          return event;
+        },
+      );
       eventStore.getEvents = vi
         .fn()
         .mockResolvedValue([
@@ -365,36 +342,32 @@ describe("EventSourcingService - Store Events Flow", () => {
             tenantId,
           ),
         ]);
-      projectionHandler.handle = vi.fn().mockImplementation(async () => {
-        callOrder.push("projection");
-        return {
-          id: "proj-id",
-          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
-          tenantId: tenantId,
-          version: TEST_CONSTANTS.BASE_TIMESTAMP,
-          data: {},
-        };
-      });
-      projectionStore.storeProjection = vi.fn().mockImplementation(async () => {
-        callOrder.push("storeProjection");
-        return Promise.resolve();
-      });
+      (foldDef.apply as ReturnType<typeof vi.fn>).mockImplementation(
+        (_state: any) => {
+          callOrder.push("projection");
+          return {
+            id: "proj-id",
+            aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+            tenantId: tenantId,
+            version: TEST_CONSTANTS.BASE_TIMESTAMP,
+            data: {},
+          };
+        },
+      );
+      (foldDef.store.store as ReturnType<typeof vi.fn>).mockImplementation(
+        async () => {
+          callOrder.push("storeProjection");
+          return Promise.resolve();
+        },
+      );
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
         eventPublisher,
-        eventHandlers: {
-          handler: createMockEventHandlerDefinition("handler", handler),
-        },
-        projections: {
-          projection: createMockProjectionDefinition(
-            "projection",
-            projectionHandler,
-            projectionStore,
-          ),
-        },
+        mapProjections: [mapDef],
+        foldProjections: [foldDef],
       });
 
       const events = [
@@ -410,21 +383,21 @@ describe("EventSourcingService - Store Events Flow", () => {
 
       await service.storeEvents(events, context);
 
-      // Verify order: store → publish → handler → projection
+      // Verify order: store -> publish -> projection (fold) -> storeProjection -> handler (map)
+      // Note: fold projections are dispatched before map projections in the ProjectionRouter
       expect(callOrder[0]).toBe("store");
       expect(callOrder[1]).toBe("publish");
-      expect(callOrder[2]).toBe("handler");
-      expect(callOrder[3]).toBe("projection");
-      expect(callOrder[4]).toBe("storeProjection");
+      expect(callOrder[2]).toBe("projection");
+      expect(callOrder[3]).toBe("storeProjection");
+      expect(callOrder[4]).toBe("handler");
       expect(callOrder.length).toBeGreaterThanOrEqual(5);
     });
 
     it("works with all components configured together", async () => {
       const eventStore = createMockEventStore<Event>();
       const eventPublisher = createMockEventPublisher<Event>();
-      const handler = createMockEventReactionHandler<Event>();
-      const projectionHandler = createMockEventHandler<Event, any>();
-      const projectionStore = createMockProjectionStore<any>();
+      const mapDef = createMockMapProjectionDefinition("handler");
+      const foldDef = createMockFoldProjectionDefinition("projection");
 
       eventStore.getEvents = vi
         .fn()
@@ -435,29 +408,23 @@ describe("EventSourcingService - Store Events Flow", () => {
             tenantId,
           ),
         ]);
-      projectionHandler.handle = vi.fn().mockResolvedValue({
-        id: "proj-id",
-        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
-        tenantId: tenantId,
-        version: TEST_CONSTANTS.BASE_TIMESTAMP,
-        data: {},
-      });
+      (foldDef.apply as ReturnType<typeof vi.fn>).mockImplementation(
+        (_state: any) => ({
+          id: "proj-id",
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          tenantId: tenantId,
+          version: TEST_CONSTANTS.BASE_TIMESTAMP,
+          data: {},
+        }),
+      );
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
         eventPublisher,
-        eventHandlers: {
-          handler: createMockEventHandlerDefinition("handler", handler),
-        },
-        projections: {
-          projection: createMockProjectionDefinition(
-            "projection",
-            projectionHandler,
-            projectionStore,
-          ),
-        },
+        mapProjections: [mapDef],
+        foldProjections: [foldDef],
       });
 
       const events = [
@@ -475,9 +442,9 @@ describe("EventSourcingService - Store Events Flow", () => {
 
       expect(eventStore.storeEvents).toHaveBeenCalledTimes(1);
       expect(eventPublisher.publish).toHaveBeenCalledTimes(1);
-      expect(handler.handle).toHaveBeenCalledTimes(1);
-      expect(projectionHandler.handle).toHaveBeenCalledTimes(1);
-      expect(projectionStore.storeProjection).toHaveBeenCalledTimes(1);
+      expect(mapDef.map).toHaveBeenCalledTimes(1);
+      expect(foldDef.apply).toHaveBeenCalledTimes(1);
+      expect(foldDef.store.store).toHaveBeenCalledTimes(1);
     });
   });
 });

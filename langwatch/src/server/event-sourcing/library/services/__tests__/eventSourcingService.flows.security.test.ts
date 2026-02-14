@@ -8,17 +8,14 @@ import type { Event } from "../../domain/types";
 import { buildCheckpointKey } from "../../utils/checkpointKey";
 import { EventSourcingService } from "../eventSourcingService";
 import {
-  createMockEventHandler,
-  createMockEventHandlerDefinition,
-  createMockEventReactionHandler,
-  createMockEventStore,
   createMockCheckpointStore,
-  createMockProjectionDefinition,
-  createMockProjectionStore,
+  createMockEventStore,
+  createMockFoldProjectionDefinition,
+  createMockFoldProjectionStore,
+  createMockMapProjectionDefinition,
   createTestAggregateType,
   createTestEvent,
   createTestEventStoreReadContext,
-  createTestProjection,
   createTestTenantId,
   TEST_CONSTANTS,
 } from "./testHelpers";
@@ -121,23 +118,17 @@ describe("EventSourcingService - Security Flows", () => {
 
     it("projections are scoped to tenantId", async () => {
       const eventStore = createMockEventStore<Event>();
-      const projectionStore = {
-        getProjection: vi.fn().mockResolvedValue(null),
-        storeProjection: vi.fn().mockResolvedValue(void 0),
-      };
+      const foldStore = createMockFoldProjectionStore();
+      const foldDef = createMockFoldProjectionDefinition("projection", {
+        store: foldStore,
+      });
       const context1 = createTestEventStoreReadContext(tenantId1);
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        projections: {
-          projection: createMockProjectionDefinition(
-            "projection",
-            createMockEventHandler(),
-            projectionStore,
-          ),
-        },
+        foldProjections: [foldDef],
       });
 
       await service.getProjectionByName(
@@ -146,20 +137,18 @@ describe("EventSourcingService - Security Flows", () => {
         context1,
       );
 
-      expect(projectionStore.getProjection).toHaveBeenCalledWith(
+      expect(foldStore.get).toHaveBeenCalledWith(
         TEST_CONSTANTS.AGGREGATE_ID,
-        context1,
-      );
-      expect(projectionStore.getProjection).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({ tenantId: tenantId1 }),
+        expect.objectContaining({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          tenantId: tenantId1,
+        }),
       );
     });
 
     it("projection checkpoints are scoped to tenantId", async () => {
       const eventStore = createMockEventStore<Event>();
-      const projectionHandler = createMockEventHandler();
-      const projectionStore = createMockProjectionStore();
+      const foldDef = createMockFoldProjectionDefinition("projection");
       const checkpointStore = createMockCheckpointStore();
       const context1 = createTestEventStoreReadContext(tenantId1);
 
@@ -178,13 +167,7 @@ describe("EventSourcingService - Security Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        projections: {
-          projection: createMockProjectionDefinition(
-            "projection",
-            projectionHandler,
-            projectionStore,
-          ),
-        },
+        foldProjections: [foldDef],
         checkpointStore: checkpointStore,
       });
 
@@ -213,9 +196,9 @@ describe("EventSourcingService - Security Flows", () => {
       });
     });
 
-    it("handlers do not create checkpoints (no checkpoint scoping needed)", async () => {
+    it("map projections do not create checkpoints (no checkpoint scoping needed)", async () => {
       const eventStore = createMockEventStore<Event>();
-      const handler = createMockEventReactionHandler<Event>();
+      const mapDef = createMockMapProjectionDefinition("handler");
       const checkpointStore = createMockCheckpointStore();
       const context1 = createTestEventStoreReadContext(tenantId1);
 
@@ -223,9 +206,7 @@ describe("EventSourcingService - Security Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        eventHandlers: {
-          handler: createMockEventHandlerDefinition("handler", handler),
-        },
+        mapProjections: [mapDef],
         checkpointStore: checkpointStore,
       });
 
@@ -238,11 +219,11 @@ describe("EventSourcingService - Security Flows", () => {
       ];
       await service.storeEvents(events, context1);
 
-      // Handlers no longer save checkpoints
+      // Map projections no longer save checkpoints
       expect(checkpointStore.saveCheckpoint).not.toHaveBeenCalled();
 
-      // But handler was still called with the event
-      expect(handler.handle).toHaveBeenCalledWith(
+      // But map was still called with the event
+      expect(mapDef.map).toHaveBeenCalledWith(
         expect.objectContaining({ tenantId: tenantId1 }),
       );
     });
@@ -302,10 +283,10 @@ describe("EventSourcingService - Security Flows", () => {
 
     it("context is passed correctly to stores", async () => {
       const eventStore = createMockEventStore<Event>();
-      const projectionStore = {
-        getProjection: vi.fn().mockResolvedValue(null),
-        storeProjection: vi.fn().mockResolvedValue(void 0),
-      };
+      const foldStore = createMockFoldProjectionStore();
+      const foldDef = createMockFoldProjectionDefinition("projection", {
+        store: foldStore,
+      });
       const context = createTestEventStoreReadContext(tenantId1, {
         custom: "metadata",
       });
@@ -314,13 +295,7 @@ describe("EventSourcingService - Security Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        projections: {
-          projection: createMockProjectionDefinition(
-            "projection",
-            createMockEventHandler(),
-            projectionStore,
-          ),
-        },
+        foldProjections: [foldDef],
       });
 
       await service.getProjectionByName(
@@ -329,9 +304,12 @@ describe("EventSourcingService - Security Flows", () => {
         context,
       );
 
-      expect(projectionStore.getProjection).toHaveBeenCalledWith(
+      expect(foldStore.get).toHaveBeenCalledWith(
         TEST_CONSTANTS.AGGREGATE_ID,
-        context,
+        expect.objectContaining({
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          tenantId: tenantId1,
+        }),
       );
     });
   });
@@ -448,18 +426,16 @@ describe("EventSourcingService - Security Flows", () => {
       );
     });
 
-    it("handlers receive tenant-scoped events", async () => {
+    it("map projections receive tenant-scoped events", async () => {
       const eventStore = createMockEventStore<Event>();
-      const handler = createMockEventReactionHandler<Event>();
+      const mapDef = createMockMapProjectionDefinition("handler");
       const context1 = createTestEventStoreReadContext(tenantId1);
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        eventHandlers: {
-          handler: createMockEventHandlerDefinition("handler", handler),
-        },
+        mapProjections: [mapDef],
       });
 
       const events = [
@@ -471,18 +447,18 @@ describe("EventSourcingService - Security Flows", () => {
       ];
       await service.storeEvents(events, context1);
 
-      // Handler should receive event with correct tenantId
-      expect(handler.handle).toHaveBeenCalledWith(
+      // Map should receive event with correct tenantId
+      expect(mapDef.map).toHaveBeenCalledWith(
         expect.objectContaining({ tenantId: tenantId1 }),
       );
     });
 
-    it("projections are tenant-scoped", async () => {
+    it("fold projections are tenant-scoped", async () => {
       const eventStore = createMockEventStore<Event>();
-      const projectionStore = {
-        getProjection: vi.fn().mockResolvedValue(null),
-        storeProjection: vi.fn().mockResolvedValue(void 0),
-      };
+      const foldStore = createMockFoldProjectionStore();
+      const foldDef = createMockFoldProjectionDefinition("projection", {
+        store: foldStore,
+      });
       const context1 = createTestEventStoreReadContext(tenantId1);
       const context2 = createTestEventStoreReadContext(tenantId2);
 
@@ -490,13 +466,7 @@ describe("EventSourcingService - Security Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        projections: {
-          projection: createMockProjectionDefinition(
-            "projection",
-            createMockEventHandler(),
-            projectionStore,
-          ),
-        },
+        foldProjections: [foldDef],
       });
 
       await service.getProjectionByName(
@@ -510,12 +480,12 @@ describe("EventSourcingService - Security Flows", () => {
         context2,
       );
 
-      // Verify different tenantIds are passed to projection store
-      expect(projectionStore.getProjection).toHaveBeenCalledWith(
+      // Verify different tenantIds are passed to fold store
+      expect(foldStore.get).toHaveBeenCalledWith(
         TEST_CONSTANTS.AGGREGATE_ID,
         expect.objectContaining({ tenantId: tenantId1 }),
       );
-      expect(projectionStore.getProjection).toHaveBeenCalledWith(
+      expect(foldStore.get).toHaveBeenCalledWith(
         TEST_CONSTANTS.AGGREGATE_ID,
         expect.objectContaining({ tenantId: tenantId2 }),
       );
@@ -523,7 +493,7 @@ describe("EventSourcingService - Security Flows", () => {
 
     it("events from different tenants are isolated", async () => {
       const eventStore = createMockEventStore<Event>();
-      const handler = createMockEventReactionHandler<Event>();
+      const mapDef = createMockMapProjectionDefinition("handler");
       const context1 = createTestEventStoreReadContext(tenantId1);
       const context2 = createTestEventStoreReadContext(tenantId2);
 
@@ -531,9 +501,7 @@ describe("EventSourcingService - Security Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        eventHandlers: {
-          handler: createMockEventHandlerDefinition("handler", handler),
-        },
+        mapProjections: [mapDef],
       });
 
       const events1 = [
@@ -575,8 +543,7 @@ describe("EventSourcingService - Security Flows", () => {
       const eventStore = new EventStoreMemory<Event>(
         new EventRepositoryMemory(),
       );
-      const projectionHandler = createMockEventHandler();
-      const projectionStore = createMockProjectionStore();
+      const foldDef = createMockFoldProjectionDefinition("projection");
       const checkpointStore = new ProcessorCheckpointStoreMemory(
         new CheckpointRepositoryMemory(),
       );
@@ -584,13 +551,7 @@ describe("EventSourcingService - Security Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        projections: {
-          projection: createMockProjectionDefinition(
-            "projection",
-            projectionHandler,
-            projectionStore,
-          ),
-        },
+        foldProjections: [foldDef],
         checkpointStore: checkpointStore,
       });
 
@@ -610,10 +571,10 @@ describe("EventSourcingService - Security Flows", () => {
         tenantId2,
       );
 
-      // Make projection handler fail for both events
-      projectionHandler.handle = vi
-        .fn()
-        .mockRejectedValue(new Error("Projection failed"));
+      // Make fold projection fail for both events
+      (foldDef.apply as ReturnType<typeof vi.fn>).mockImplementation(() => {
+        throw new Error("Projection failed");
+      });
 
       // Process events for both tenants
       await service.storeEvents([event1], context1);
@@ -650,8 +611,7 @@ describe("EventSourcingService - Security Flows", () => {
       const eventStore = new EventStoreMemory<Event>(
         new EventRepositoryMemory(),
       );
-      const projectionHandler = createMockEventHandler();
-      const projectionStore = createMockProjectionStore();
+      const foldDef = createMockFoldProjectionDefinition("projection");
       const checkpointStore = new ProcessorCheckpointStoreMemory(
         new CheckpointRepositoryMemory(),
       );
@@ -659,13 +619,7 @@ describe("EventSourcingService - Security Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        projections: {
-          projection: createMockProjectionDefinition(
-            "projection",
-            projectionHandler,
-            projectionStore,
-          ),
-        },
+        foldProjections: [foldDef],
         checkpointStore: checkpointStore,
       });
 
@@ -685,10 +639,10 @@ describe("EventSourcingService - Security Flows", () => {
         tenantId2,
       );
 
-      // Make projection handler fail for both events
-      projectionHandler.handle = vi
-        .fn()
-        .mockRejectedValue(new Error("Projection failed"));
+      // Make fold projection fail for both events
+      (foldDef.apply as ReturnType<typeof vi.fn>).mockImplementation(() => {
+        throw new Error("Projection failed");
+      });
 
       // Process events for both tenants
       await service.storeEvents([event1], context1);
@@ -749,15 +703,13 @@ describe("EventSourcingService - Security Flows", () => {
 
     it("cross-tenant access attempts in recovery are prevented", async () => {
       const eventStore = createMockEventStore<Event>();
-      const handler = createMockEventReactionHandler<Event>();
+      const mapDef = createMockMapProjectionDefinition("handler");
       const checkpointStore = createMockCheckpointStore();
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        eventHandlers: {
-          handler: createMockEventHandlerDefinition("handler", handler),
-        },
+        mapProjections: [mapDef],
         checkpointStore: checkpointStore,
       });
 
@@ -771,8 +723,10 @@ describe("EventSourcingService - Security Flows", () => {
         tenantId1,
       );
 
-      // Make handler fail
-      handler.handle = vi.fn().mockRejectedValue(new Error("Handler failed"));
+      // Make map fail
+      (mapDef.map as ReturnType<typeof vi.fn>).mockImplementation(() => {
+        throw new Error("Handler failed");
+      });
 
       // Process event for tenant1
       await service.storeEvents([event1], context1);
@@ -795,15 +749,13 @@ describe("EventSourcingService - Security Flows", () => {
       const eventStore = new EventStoreMemory<Event>(
         new EventRepositoryMemory(),
       );
-      const handler = createMockEventReactionHandler<Event>();
+      const mapDef = createMockMapProjectionDefinition("handler");
       const checkpointStore = createMockCheckpointStore();
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        eventHandlers: {
-          handler: createMockEventHandlerDefinition("handler", handler),
-        },
+        mapProjections: [mapDef],
         checkpointStore: checkpointStore,
       });
 

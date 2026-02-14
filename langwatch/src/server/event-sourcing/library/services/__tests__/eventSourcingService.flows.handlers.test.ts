@@ -1,11 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { EVENT_TYPES } from "../../domain/eventType";
 import type { Event } from "../../domain/types";
 import { EventSourcingService } from "../eventSourcingService";
 import {
   cleanupTestEnvironment,
-  createMockEventHandlerDefinition,
-  createMockEventReactionHandler,
+  createMockMapProjectionDefinition,
   createMockEventStore,
   createTestContext,
   createTestEvent,
@@ -25,9 +23,9 @@ describe("EventSourcingService - Handler Flows", () => {
   });
 
   describe("error handling", () => {
-    it("handler errors are logged", async () => {
+    it("map projection errors are logged", async () => {
       const eventStore = createMockEventStore<Event>();
-      const handler = createMockEventReactionHandler<Event>();
+      const mapDef = createMockMapProjectionDefinition("handler");
       const logger = {
         debug: vi.fn(),
         info: vi.fn(),
@@ -41,15 +39,15 @@ describe("EventSourcingService - Handler Flows", () => {
       };
 
       const handlerError = new Error("Handler failed");
-      handler.handle = vi.fn().mockRejectedValue(handlerError);
+      (mapDef.map as ReturnType<typeof vi.fn>).mockImplementation(() => {
+        throw handlerError;
+      });
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        eventHandlers: {
-          handler: createMockEventHandlerDefinition("handler", handler),
-        },
+        mapProjections: [mapDef],
         logger: logger as any,
       });
 
@@ -63,28 +61,26 @@ describe("EventSourcingService - Handler Flows", () => {
         service.storeEvents([event], context),
       ).resolves.not.toThrow();
 
-      // Error handling uses standardized error handling in EventHandlerDispatcher
+      // Error handling uses standardized error handling in ProjectionRouter
       // which uses its own logger, so we can't verify the exact log call here
       // But we can verify the operation completed successfully (error was handled)
-      expect(handler.handle).toHaveBeenCalled();
+      expect(mapDef.map).toHaveBeenCalled();
     });
 
-    it("handler errors don't stop other handlers", async () => {
+    it("map projection errors don't stop other map projections", async () => {
       const eventStore = createMockEventStore<Event>();
-      const handler1 = createMockEventReactionHandler<Event>();
-      const handler2 = createMockEventReactionHandler<Event>();
+      const mapDef1 = createMockMapProjectionDefinition("handler1");
+      const mapDef2 = createMockMapProjectionDefinition("handler2");
 
-      handler1.handle = vi.fn().mockRejectedValue(new Error("Handler1 failed"));
-      handler2.handle = vi.fn().mockResolvedValue(void 0);
+      (mapDef1.map as ReturnType<typeof vi.fn>).mockImplementation(() => {
+        throw new Error("Handler1 failed");
+      });
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        eventHandlers: {
-          handler1: createMockEventHandlerDefinition("handler1", handler1),
-          handler2: createMockEventHandlerDefinition("handler2", handler2),
-        },
+        mapProjections: [mapDef1, mapDef2],
       });
 
       const event = createTestEvent(
@@ -97,15 +93,15 @@ describe("EventSourcingService - Handler Flows", () => {
         service.storeEvents([event], context),
       ).resolves.not.toThrow();
 
-      expect(handler1.handle).toHaveBeenCalledTimes(1);
-      expect(handler2.handle).toHaveBeenCalledTimes(1);
+      expect(mapDef1.map).toHaveBeenCalledTimes(1);
+      expect(mapDef2.map).toHaveBeenCalledTimes(1);
     });
   });
 
   describe("when using queue-based processing", () => {
-    it("calls handler.handle directly without checkpoints", async () => {
+    it("calls map function directly via queue", async () => {
       const eventStore = createMockEventStore<Event>();
-      const handler = createMockEventReactionHandler<Event>();
+      const mapDef = createMockMapProjectionDefinition("handler");
 
       const mockQueueFactory = {
         create: vi.fn().mockImplementation((definition: any) => {
@@ -124,9 +120,7 @@ describe("EventSourcingService - Handler Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        eventHandlers: {
-          handler: createMockEventHandlerDefinition("handler", handler),
-        },
+        mapProjections: [mapDef],
         queueFactory: mockQueueFactory,
       });
 
@@ -138,7 +132,7 @@ describe("EventSourcingService - Handler Flows", () => {
 
       await service.storeEvents([event], context);
 
-      expect(handler.handle).toHaveBeenCalledWith(event);
+      expect(mapDef.map).toHaveBeenCalledWith(event);
     });
   });
 });

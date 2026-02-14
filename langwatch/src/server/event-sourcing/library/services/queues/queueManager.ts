@@ -1,14 +1,16 @@
 import { makeQueueName } from "~/server/background/queues/makeQueueName";
 import { createLogger } from "~/utils/logger/server";
 import type { FeatureFlagServiceInterface } from "../../../../featureFlag/types";
-import type { QueueProcessorFactory } from "../../queues";
+import type {
+  DeduplicationStrategy,
+  EventSourcedQueueProcessor,
+  QueueProcessorFactory,
+} from "../../queues";
+import { resolveDeduplicationStrategy } from "../../queues";
 import type { CommandHandlerClass } from "../../commands/commandHandlerClass";
 import type { AggregateType } from "../../domain/aggregateType";
 import type { Event } from "../../domain/types";
-import type { EventHandlerDefinitions } from "../../eventHandler.types";
-import type { ProjectionDefinition } from "../../projection.types";
-import type { EventSourcedQueueProcessor } from "../../queues";
-import { resolveDeduplicationStrategy } from "../../queues";
+import type { KillSwitchOptions } from "../../pipeline/types";
 import type { EventStoreReadContext } from "../../stores/eventStore.types";
 import {
   createCommandDispatcher,
@@ -70,7 +72,19 @@ export class QueueManager<EventType extends Event = Event> {
   }
 
   initializeHandlerQueues(
-    eventHandlers: EventHandlerDefinitions<EventType>,
+    eventHandlers: Record<string, {
+      name: string;
+      handler: { handle: (event: EventType) => Promise<void> };
+      options: {
+        eventTypes?: readonly string[];
+        delay?: number;
+        deduplication?: DeduplicationStrategy<EventType>;
+        concurrency?: number;
+        spanAttributes?: (event: EventType) => Record<string, string | number | boolean>;
+        disabled?: boolean;
+        killSwitch?: KillSwitchOptions;
+      };
+    }>,
     onEvent: (
       handlerName: string,
       event: EventType,
@@ -115,7 +129,16 @@ export class QueueManager<EventType extends Event = Event> {
   }
 
   initializeProjectionQueues(
-    projections: Record<string, ProjectionDefinition<EventType, any>>,
+    projections: Record<string, {
+      name: string;
+      store: any;
+      handler: { handle: (stream: any) => any };
+      options?: {
+        delay?: number;
+        deduplication?: DeduplicationStrategy<EventType>;
+        killSwitch?: KillSwitchOptions;
+      };
+    }>,
     onEvent: (
       projectionName: string,
       event: EventType,

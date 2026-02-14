@@ -5,14 +5,9 @@ import type {
   ExtractCommandHandlerPayload,
 } from "../commands/commandHandlerClass";
 import type { AggregateType } from "../domain/aggregateType";
-import type { EventHandlerClass } from "../domain/handlers/eventHandlerClass";
-import type {
-  ExtractProjectionHandlerProjection,
-  ProjectionHandlerClass,
-} from "../domain/handlers/projectionHandlerClass";
-import type { Event, ParentLink } from "../domain/types";
-import type { EventHandlerOptions } from "../eventHandler.types";
-import type { ProjectionOptions, ProjectionTypeMap } from "../projection.types";
+import type { Event, ParentLink, Projection } from "../domain/types";
+import type { FoldProjectionDefinition, FoldProjectionOptions } from "../projections/foldProjection.types";
+import type { MapProjectionDefinition, MapProjectionOptions } from "../projections/mapProjection.types";
 import { ConfigurationError } from "../services/errorHandling";
 import type {
   CommandHandlerOptions,
@@ -30,7 +25,8 @@ import type {
  * const pipeline = definePipeline<MyEvent>()
  *   .withName("my-pipeline")
  *   .withAggregateType("entity")
- *   .withProjection("summary", SummaryHandler)
+ *   .withFoldProjection("summary", summaryProjection)
+ *   .withMapProjection("spanStorage", spanStorageProjection)
  *   .build();
  * ```
  */
@@ -54,7 +50,7 @@ export class StaticPipelineBuilderWithName<EventType extends Event = Event> {
     aggregateType: AggregateType,
   ): StaticPipelineBuilderWithNameAndType<
     EventType,
-    ProjectionTypeMap,
+    Record<string, Projection>,
     NoCommands
   > {
     return new StaticPipelineBuilderWithNameAndType(this.name, aggregateType);
@@ -70,22 +66,21 @@ export class StaticPipelineBuilderWithName<EventType extends Event = Event> {
 
 export class StaticPipelineBuilderWithNameAndType<
   EventType extends Event = Event,
-  RegisteredProjections extends ProjectionTypeMap = ProjectionTypeMap,
+  RegisteredProjections extends Record<string, Projection> = Record<string, Projection>,
   RegisteredCommands extends RegisteredCommand = NoCommands,
-  RegisteredHandlers extends string = never,
 > {
-  private projections = new Map<
+  private foldProjections = new Map<
     string,
     {
-      handlerClass: ProjectionHandlerClass<EventType, any>;
-      options?: ProjectionOptions;
+      definition: FoldProjectionDefinition<any, EventType>;
+      options?: FoldProjectionOptions<EventType>;
     }
   >();
-  private eventHandlers = new Map<
+  private mapProjections = new Map<
     string,
     {
-      handlerClass: EventHandlerClass<EventType>;
-      options?: EventHandlerOptions<EventType>;
+      definition: MapProjectionDefinition<any, EventType>;
+      options?: MapProjectionOptions;
     }
   >();
   private commands: Array<{
@@ -102,44 +97,63 @@ export class StaticPipelineBuilderWithNameAndType<
   ) {}
 
   /**
-   * Register a projection handler class with a unique name.
+   * Register a fold projection (stateful, reduces events into accumulated state).
    *
    * @param name - Unique name for this projection within the pipeline
-   * @param handlerClass - Projection handler class to register
+   * @param definition - Fold projection definition with init(), apply(), and store
    * @param options - Optional configuration for projection processing
    * @returns Builder instance for method chaining
    */
-  withProjection<
-    handlerClass extends ProjectionHandlerClass<EventType, any>,
-    ProjectionName extends string,
-  >(
+  withFoldProjection<ProjectionName extends string>(
     name: ProjectionName,
-    handlerClass: handlerClass,
-    options?: ProjectionOptions,
+    definition: FoldProjectionDefinition<any, EventType>,
+    options?: FoldProjectionOptions<EventType>,
   ): StaticPipelineBuilderWithNameAndType<
     EventType,
-    RegisteredProjections & {
-      [K in ProjectionName]: ExtractProjectionHandlerProjection<handlerClass>;
-    },
+    RegisteredProjections,
     RegisteredCommands
   > {
-    if (this.projections.has(name)) {
+    if (this.foldProjections.has(name)) {
       throw new ConfigurationError(
         "StaticPipelineBuilder",
-        `Projection with name "${name}" already exists`,
+        `Fold projection with name "${name}" already exists`,
         { projectionName: name },
       );
     }
 
-    this.projections.set(name, { handlerClass: handlerClass, options });
+    this.foldProjections.set(name, { definition, options });
 
-    return this as unknown as StaticPipelineBuilderWithNameAndType<
-      EventType,
-      RegisteredProjections & {
-        [K in ProjectionName]: ExtractProjectionHandlerProjection<handlerClass>;
-      },
-      RegisteredCommands
-    >;
+    return this;
+  }
+
+  /**
+   * Register a map projection (stateless, transforms individual events into records).
+   *
+   * @param name - Unique name for this projection within the pipeline
+   * @param definition - Map projection definition with map() and store
+   * @param options - Optional configuration for projection processing
+   * @returns Builder instance for method chaining
+   */
+  withMapProjection<MapName extends string>(
+    name: MapName,
+    definition: MapProjectionDefinition<any, EventType>,
+    options?: MapProjectionOptions,
+  ): StaticPipelineBuilderWithNameAndType<
+    EventType,
+    RegisteredProjections,
+    RegisteredCommands
+  > {
+    if (this.mapProjections.has(name)) {
+      throw new ConfigurationError(
+        "StaticPipelineBuilder",
+        `Map projection with name "${name}" already exists`,
+        { projectionName: name },
+      );
+    }
+
+    this.mapProjections.set(name, { definition, options });
+
+    return this;
   }
 
   /**
@@ -172,44 +186,6 @@ export class StaticPipelineBuilderWithNameAndType<
   ): this {
     this.featureFlagService = featureFlagService;
     return this;
-  }
-
-  /**
-   * Register an event handler class that reacts to individual events.
-   *
-   * @param name - Unique name for this handler within the pipeline
-   * @param handlerClass - Event handler class to register
-   * @param options - Options for configuring the handler
-   * @returns Builder instance for method chaining
-   */
-  withEventHandler<
-    handlerClass extends EventHandlerClass<EventType>,
-    HandlerName extends string,
-  >(
-    name: HandlerName,
-    handlerClass: handlerClass,
-    options?: EventHandlerOptions<EventType>,
-  ): StaticPipelineBuilderWithNameAndType<
-    EventType,
-    RegisteredProjections,
-    RegisteredCommands,
-    RegisteredHandlers | HandlerName
-  > {
-    if (this.eventHandlers.has(name)) {
-      throw new ConfigurationError(
-        "StaticPipelineBuilder",
-        `Event handler with name "${name}" already exists`,
-        { handlerName: name },
-      );
-    }
-
-    this.eventHandlers.set(name, { handlerClass: handlerClass, options });
-    return this as StaticPipelineBuilderWithNameAndType<
-      EventType,
-      RegisteredProjections,
-      RegisteredCommands,
-      RegisteredHandlers | HandlerName
-    >;
   }
 
   /**
@@ -252,7 +228,7 @@ export class StaticPipelineBuilderWithNameAndType<
 
   /**
    * Build the static pipeline definition.
-   * This creates metadata and stores handler classes but does not connect to runtime infrastructure.
+   * This creates metadata and stores projection definitions but does not connect to runtime infrastructure.
    *
    * @returns Static pipeline definition that can be registered at runtime
    */
@@ -265,17 +241,17 @@ export class StaticPipelineBuilderWithNameAndType<
     const metadata: PipelineMetadata = {
       name: this.name,
       aggregateType: this.aggregateType,
-      projections: Array.from(this.projections.entries()).map(
+      projections: Array.from(this.foldProjections.entries()).map(
         ([name, def]) => ({
           name,
-          handlerClassName: def.handlerClass.name,
+          handlerClassName: `FoldProjection(${def.definition.name})`,
         }),
       ),
-      eventHandlers: Array.from(this.eventHandlers.entries()).map(
+      eventHandlers: Array.from(this.mapProjections.entries()).map(
         ([name, def]) => ({
           name,
-          handlerClassName: def.handlerClass.name,
-          eventTypes: def.options?.eventTypes as string[] | undefined,
+          handlerClassName: `MapProjection(${def.definition.name})`,
+          eventTypes: def.definition.eventTypes as string[],
         }),
       ),
       commands: this.commands.map((cmd) => ({
@@ -286,8 +262,8 @@ export class StaticPipelineBuilderWithNameAndType<
 
     return {
       metadata,
-      projections: this.projections,
-      eventHandlers: this.eventHandlers,
+      foldProjections: this.foldProjections,
+      mapProjections: this.mapProjections,
       commands: this.commands,
       parentLinks: this.parentLinks,
       featureFlagService: this.featureFlagService,
@@ -304,7 +280,8 @@ export class StaticPipelineBuilderWithNameAndType<
  * export const myPipeline = definePipeline<MyEvent>()
  *   .withName("my-pipeline")
  *   .withAggregateType("entity")
- *   .withProjection("summary", SummaryHandler)
+ *   .withFoldProjection("summary", summaryProjection)
+ *   .withMapProjection("spanStorage", spanStorageProjection)
  *   .build();
  * ```
  */

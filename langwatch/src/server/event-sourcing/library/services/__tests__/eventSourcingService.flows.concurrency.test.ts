@@ -2,14 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Event } from "../../domain/types";
 import { EventSourcingService } from "../eventSourcingService";
 import {
-  createMockEventHandler,
   createMockEventStore,
-  createMockProjectionDefinition,
-  createMockProjectionStore,
+  createMockFoldProjectionDefinition,
   createTestAggregateType,
   createTestEvent,
   createTestEventStoreReadContext,
-  createTestProjection,
   createTestTenantId,
   TEST_CONSTANTS,
 } from "./testHelpers";
@@ -32,8 +29,7 @@ describe("EventSourcingService - Concurrency Flows", () => {
   describe("without queue-based ordering", () => {
     it("service works without queue-based ordering", async () => {
       const eventStore = createMockEventStore<Event>();
-      const projectionHandler = createMockEventHandler<Event, any>();
-      const projectionStore = createMockProjectionStore<any>();
+      const foldDef = createMockFoldProjectionDefinition("projection");
       const events = [
         createTestEvent(
           TEST_CONSTANTS.AGGREGATE_ID,
@@ -43,23 +39,12 @@ describe("EventSourcingService - Concurrency Flows", () => {
       ];
 
       eventStore.getEvents = vi.fn().mockResolvedValue(events);
-      projectionHandler.handle = vi
-        .fn()
-        .mockResolvedValue(
-          createTestProjection(TEST_CONSTANTS.AGGREGATE_ID, tenantId),
-        );
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        projections: {
-          projection: createMockProjectionDefinition(
-            "projection",
-            projectionHandler,
-            projectionStore,
-          ),
-        },
+        foldProjections: [foldDef],
       });
 
       const result = await service.updateProjectionByName(
@@ -69,13 +54,12 @@ describe("EventSourcingService - Concurrency Flows", () => {
       );
 
       expect(result).not.toBeNull();
-      expect(projectionHandler.handle).toHaveBeenCalledTimes(1);
+      expect(foldDef.apply).toHaveBeenCalled();
     });
 
     it("concurrent updates to same aggregate both succeed (GroupQueue handles ordering)", async () => {
       const eventStore = createMockEventStore<Event>();
-      const projectionHandler = createMockEventHandler<Event, any>();
-      const projectionStore = createMockProjectionStore<any>();
+      const foldDef = createMockFoldProjectionDefinition("projection");
       const events = [
         createTestEvent(
           TEST_CONSTANTS.AGGREGATE_ID,
@@ -85,23 +69,12 @@ describe("EventSourcingService - Concurrency Flows", () => {
       ];
 
       eventStore.getEvents = vi.fn().mockResolvedValue(events);
-      projectionHandler.handle = vi
-        .fn()
-        .mockResolvedValue(
-          createTestProjection(TEST_CONSTANTS.AGGREGATE_ID, tenantId),
-        );
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        projections: {
-          projection: createMockProjectionDefinition(
-            "projection",
-            projectionHandler,
-            projectionStore,
-          ),
-        },
+        foldProjections: [foldDef],
       });
 
       // Both concurrent updates succeed - GroupQueue enforces per-aggregate ordering at the queue level
@@ -120,13 +93,12 @@ describe("EventSourcingService - Concurrency Flows", () => {
       const succeeded = results.filter((r) => r.status === "fulfilled").length;
 
       expect(succeeded).toBe(2);
-      expect(projectionHandler.handle).toHaveBeenCalledTimes(2);
+      expect(foldDef.apply).toHaveBeenCalledTimes(2);
     });
 
     it("different aggregates can update concurrently", async () => {
       const eventStore = createMockEventStore<Event>();
-      const projectionHandler = createMockEventHandler<Event, any>();
-      const projectionStore = createMockProjectionStore<any>();
+      const foldDef = createMockFoldProjectionDefinition("projection");
       const aggregate1 = "aggregate-1";
       const aggregate2 = "aggregate-2";
 
@@ -135,21 +107,12 @@ describe("EventSourcingService - Concurrency Flows", () => {
         .mockResolvedValue([
           createTestEvent(aggregate1, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
         ]);
-      projectionHandler.handle = vi
-        .fn()
-        .mockResolvedValue(createTestProjection(aggregate1, tenantId));
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
-        projections: {
-          projection: createMockProjectionDefinition(
-            "projection",
-            projectionHandler,
-            projectionStore,
-          ),
-        },
+        foldProjections: [foldDef],
       });
 
       const update1 = service.updateProjectionByName(
@@ -165,7 +128,7 @@ describe("EventSourcingService - Concurrency Flows", () => {
 
       await Promise.all([update1, update2]);
 
-      expect(projectionHandler.handle).toHaveBeenCalledTimes(2);
+      expect(foldDef.apply).toHaveBeenCalledTimes(2);
     });
   });
 });
