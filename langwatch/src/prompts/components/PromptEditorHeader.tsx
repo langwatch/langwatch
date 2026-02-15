@@ -21,6 +21,12 @@ export type PromptEditorHeaderProps = {
   isSaving?: boolean;
   /** Callback when a version is restored from history */
   onVersionRestore?: (prompt: VersionedPrompt) => Promise<void>;
+  /**
+   * Controls which elements are rendered.
+   * - "full" (default): model selector + history, API, and save buttons
+   * - "model-only": only the model selector (for use in drawers where buttons move to a footer)
+   */
+  variant?: "full" | "model-only";
 };
 
 /**
@@ -39,6 +45,7 @@ export function PromptEditorHeader({
   isValid = true,
   isSaving = false,
   onVersionRestore,
+  variant = "full",
 }: PromptEditorHeaderProps) {
   const { project } = useOrganizationTeamProject();
   const formMethods = useFormContext<PromptConfigFormValues>();
@@ -48,30 +55,34 @@ export function PromptEditorHeader({
   return (
     <Box width="full" display="flex" gap={8} justifyContent="space-between">
       <ModelSelectFieldMini />
-      <HStack gap={2} flexShrink={0}>
-        {configId && onVersionRestore && (
-          <VersionHistoryButton
-            configId={configId}
-            currentVersionId={formMethods.watch("versionMetadata")?.versionId}
-            onRestoreSuccess={onVersionRestore}
+      {variant === "full" && (
+        <HStack gap={2} flexShrink={0}>
+          {configId && onVersionRestore && (
+            <VersionHistoryButton
+              configId={configId}
+              currentVersionId={
+                formMethods.watch("versionMetadata")?.versionId
+              }
+              onRestoreSuccess={onVersionRestore}
+              hasUnsavedChanges={hasUnsavedChanges}
+            />
+          )}
+          <GeneratePromptApiSnippetDialog
+            promptHandle={handle}
+            apiKey={project?.apiKey}
+          >
+            <GeneratePromptApiSnippetDialog.Trigger>
+              <GenerateApiSnippetButton hasHandle={!!handle} />
+            </GeneratePromptApiSnippetDialog.Trigger>
+          </GeneratePromptApiSnippetDialog>
+          <SavePromptButton
+            onSave={onSave}
             hasUnsavedChanges={hasUnsavedChanges}
+            isValid={isValid}
+            isSaving={isSaving}
           />
-        )}
-        <GeneratePromptApiSnippetDialog
-          promptHandle={handle}
-          apiKey={project?.apiKey}
-        >
-          <GeneratePromptApiSnippetDialog.Trigger>
-            <GenerateApiSnippetButton hasHandle={!!handle} />
-          </GeneratePromptApiSnippetDialog.Trigger>
-        </GeneratePromptApiSnippetDialog>
-        <SavePromptButton
-          onSave={onSave}
-          hasUnsavedChanges={hasUnsavedChanges}
-          isValid={isValid}
-          isSaving={isSaving}
-        />
-      </HStack>
+        </HStack>
+      )}
     </Box>
   );
 }

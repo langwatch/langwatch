@@ -518,6 +518,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           outputs: t.outputs,
           mappings: t.mappings,
           localPromptConfig: t.localPromptConfig,
+          localEvaluatorConfig: t.localEvaluatorConfig,
         })),
         evaluators: evaluators.map((e) => ({
           id: e.id,
@@ -525,6 +526,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           inputs: e.inputs,
           mappings: e.mappings,
           dbEvaluatorId: e.dbEvaluatorId,
+          localEvaluatorConfig: e.localEvaluatorConfig,
         })),
         scope,
         concurrency,

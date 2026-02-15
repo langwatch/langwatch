@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { MODULES } from "../registry";
 
 describe("Optimization Studio Registry", () => {
-  describe("signature (LLM Node) defaults", () => {
+  describe("signature (Prompt) defaults", () => {
     const { signature } = MODULES;
 
     it("has input field named 'input'", () => {

@@ -1,4 +1,4 @@
-import { PopoverContent } from "@chakra-ui/react";
+import { type BoxProps, PopoverContent } from "@chakra-ui/react";
 import { EmojiStyle, SkinTonePickerLocation } from "emoji-picker-react";
 import dynamic from "next/dynamic";
 import { ConfigModal } from "./ConfigModal";
@@ -15,14 +15,15 @@ export function EmojiPickerModal({
   open,
   onClose,
   onChange,
+  ...props
 }: {
   open: boolean;
   onClose: () => void;
   onChange: (emoji: string) => void;
-}) {
+} & Omit<BoxProps, "onChange">) {
   return (
     <ConfigModal open={open} onClose={onClose} title="Workflow Icon" unstyled>
-      <PopoverContent marginRight={4} position="absolute" marginTop="72px">
+      <PopoverContent marginRight={4} position="absolute" marginTop="72px" {...props}>
         <EmojiPicker
           emojiStyle={EmojiStyle.NATIVE}
           skinTonePickerLocation={SkinTonePickerLocation.PREVIEW}

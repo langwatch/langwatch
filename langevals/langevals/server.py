@@ -140,44 +140,58 @@ def main():
             f.write(json.dumps(app.openapi(), indent=2))
         print("openapi.json exported")
         return
-    import gunicorn.app.base
-
     host = "0.0.0.0"
     port = int(os.getenv("PORT", 5562))
-    workers = get_cpu_count()
 
-    class StandaloneApplication(gunicorn.app.base.BaseApplication):
-        def __init__(self, app, options=None):
-            self.options = options or {}
-            self.application = app
-            super().__init__()
+    if sys.platform == "darwin":
+        import uvicorn
 
-        def load_config(self):
-            config = {
-                key: value
-                for key, value in self.options.items()
-                if key in self.cfg.settings and value is not None
-            }  # type: ignore
-            for key, value in config.items():
-                self.cfg.set(key.lower(), value)  # type: ignore
+        print(f"LangEvals listening at http://{host}:{port}")
 
-        def load(self):
-            print(f"LangEvals listening at http://{host}:{port}")
-            return self.application
+        uvicorn.run(
+            app,
+            host=host,
+            port=port,
+            log_level="warning",
+            timeout_keep_alive=900,
+        )
+    else:
+        import gunicorn.app.base
 
-    print(f"Starting server with {workers} workers")
+        workers = get_cpu_count()
 
-    options = {
-        "bind": f"{host}:{port}",
-        "workers": workers,
-        "worker_class": "uvicorn.workers.UvicornWorker",
-        "preload_app": True,
-        "forwarded_allow_ips": "*",
-        "loglevel": "warning",
-        "timeout": 900,
-    }
+        class StandaloneApplication(gunicorn.app.base.BaseApplication):
+            def __init__(self, app, options=None):
+                self.options = options or {}
+                self.application = app
+                super().__init__()
 
-    StandaloneApplication(app, options).run()
+            def load_config(self):
+                config = {
+                    key: value
+                    for key, value in self.options.items()
+                    if key in self.cfg.settings and value is not None
+                }  # type: ignore
+                for key, value in config.items():
+                    self.cfg.set(key.lower(), value)  # type: ignore
+
+            def load(self):
+                print(f"LangEvals listening at http://{host}:{port}")
+                return self.application
+
+        print(f"Starting server with {workers} workers")
+
+        options = {
+            "bind": f"{host}:{port}",
+            "workers": workers,
+            "worker_class": "uvicorn.workers.UvicornWorker",
+            "preload_app": True,
+            "forwarded_allow_ips": "*",
+            "loglevel": "warning",
+            "timeout": 900,
+        }
+
+        StandaloneApplication(app, options).run()
 
 
 if __name__ == "__main__":

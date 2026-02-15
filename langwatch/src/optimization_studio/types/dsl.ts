@@ -1,6 +1,7 @@
 import type { Edge, Node } from "@xyflow/react";
 import { z } from "zod";
 
+import type { LocalPromptConfig } from "~/evaluations-v3/types";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
 
@@ -56,7 +57,9 @@ export type ComponentType =
   | "retriever"
   | "prompting_technique"
   | "custom"
-  | "evaluator";
+  | "evaluator"
+  | "http"
+  | "agent";
 
 // Define the execution state type
 export interface ExecutionState {
@@ -115,7 +118,14 @@ export const llmConfigSchema = z.object({
 
 export type LLMConfig = z.infer<typeof llmConfigSchema>;
 
-export type Signature = BaseComponent;
+export type Signature = BaseComponent & {
+  /** Local prompt config for unsaved prompt changes */
+  localPromptConfig?: LocalPromptConfig;
+  /** Reference to saved DB prompt */
+  promptId?: string;
+  /** Specific version reference */
+  promptVersionId?: string;
+};
 
 type StronglyTypedFieldBase = Omit<Field, "value" | "type" | "identifier">;
 /**
@@ -232,6 +242,17 @@ export type Evaluator = Omit<BaseComponent, "cls"> & {
   evaluator?: EvaluatorTypes | `custom/${string}` | `evaluators/${string}`;
   workflowId?: string;
   data?: any;
+  /** Local config for unsaved evaluator changes */
+  localConfig?: { name?: string; settings?: Record<string, unknown> };
+};
+
+export type AgentComponent = BaseComponent & {
+  /** Reference to DB agent: "agents/<id>" */
+  agent?: string;
+  /** Agent sub-type for backend execution delegation */
+  agentType?: "http" | "code" | "workflow";
+  /** Local config for unsaved changes */
+  localConfig?: { name?: string; settings?: Record<string, unknown> };
 };
 
 export type End = BaseComponent & {

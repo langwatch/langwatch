@@ -137,6 +137,7 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
   const onClose = props.onClose ?? closeDrawer;
   const onSave =
     props.onSave ??
+    flowCallbacks?.onSave ??
     (complexProps.onSave as AgentCodeEditorDrawerProps["onSave"]);
   const agentId =
     props.agentId ??

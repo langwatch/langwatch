@@ -2,6 +2,7 @@ import { DEFAULT_FORM_VALUES } from "~/prompts/utils/buildDefaultFormValues";
 import { AVAILABLE_EVALUATORS } from "../server/evaluations/evaluators.generated";
 
 import type {
+  BaseComponent,
   Code,
   Evaluator,
   Field,
@@ -24,7 +25,7 @@ const defaultOutput = defaults.outputs[0];
  * Playground, Evaluations V3, and Optimization Studio.
  */
 const signature: Signature = {
-  name: "LLM Node",
+  name: "Prompt",
   description: "LLM calling node",
   parameters: [
     {
@@ -144,9 +145,35 @@ const evaluators: Evaluator[] = [
   ),
 ];
 
+const http: Code = {
+  name: "HTTP Call",
+  description: "Make an HTTP request to an external API",
+  parameters: [
+    { identifier: "url", type: "str", value: "https://api.example.com/endpoint" },
+    { identifier: "method", type: "str", value: "POST" },
+    {
+      identifier: "body_template",
+      type: "str",
+      value: '{\n  "input": "{{input}}"\n}',
+    },
+    { identifier: "output_path", type: "str", value: "" },
+  ],
+  inputs: [{ identifier: "input", type: "str" }] as Field[],
+  outputs: [{ identifier: "output", type: "str" }] as Field[],
+};
+
+const agent: BaseComponent = {
+  name: "Agent",
+  description: "Connect to an agent (HTTP, code, or workflow)",
+  inputs: [{ identifier: "input", type: "str" }] as Field[],
+  outputs: [{ identifier: "output", type: "str" }] as Field[],
+};
+
 export const MODULES = {
   signature,
   code,
+  http,
+  agent,
   promptingTechniques,
   evaluators,
 };

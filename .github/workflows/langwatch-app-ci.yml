@@ -62,7 +62,7 @@ jobs:
       REDIS_URL: "redis://localhost:6379"
       BUILD_TIME: "true"
 
-    runs-on: arm64-runner-32gb
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v6

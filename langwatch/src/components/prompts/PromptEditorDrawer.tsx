@@ -15,6 +15,7 @@ import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
+import { useRegisterDrawerFooter } from "~/optimization_studio/components/drawers/useInsideDrawer";
 import {
   type AvailableSource,
   type FieldMapping,
@@ -30,6 +31,7 @@ import {
 } from "~/hooks/useDrawer";
 import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { PromptEditorFooter } from "~/prompts/components/PromptEditorFooter";
 import { PromptEditorHeader } from "~/prompts/components/PromptEditorHeader";
 import { VersionBadge } from "~/prompts/components/ui/VersionBadge";
 import { ChangeHandleDialog } from "~/prompts/forms/ChangeHandleDialog";
@@ -109,6 +111,8 @@ export type PromptEditorDrawerProps = {
     inputs?: Array<{ identifier: string; type: string }>;
     outputs?: Array<{ identifier: string; type: string }>;
   }) => void;
+  /** When true, renders form content without Drawer shell (for embedding in external drawer) */
+  headless?: boolean;
 };
 
 /**
@@ -259,7 +263,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     props.promptVersionId ??
     drawerParams.promptVersionId ??
     (complexProps.promptVersionId as string | undefined);
-  const isOpen = props.open !== false && props.open !== undefined;
+  const isOpen = props.headless ? true : (props.open !== false && props.open !== undefined);
 
   // Load existing prompt if editing
   // If promptVersionId is provided, fetch that specific version instead of latest
@@ -368,6 +372,29 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       methods.reset(formValues);
       initializedTargetIdRef.current = targetId;
       setIsFormInitialized(true);
+
+      // Sync inputs/outputs to bridge AFTER the watch subscription settles.
+      // The watch fires synchronously from methods.reset and may call
+      // onLocalConfigChange(undefined) for saved prompts. We queue our
+      // sync after that so the bridge receives the full config with inputs,
+      // allowing it to update node handles and edges to match the prompt.
+      if (onLocalConfigChange) {
+        const config = extractLocalConfig(
+          formValues as PromptConfigFormValues,
+        );
+        queueMicrotask(() => {
+          onLocalConfigChangeRef.current?.(config);
+          // If there are no actual unsaved changes (no initialLocalConfig),
+          // clear localPromptConfig after syncing. The sync already updated
+          // the node's inputs/outputs via shallow merge.
+          if (!props.initialLocalConfig) {
+            queueMicrotask(() => {
+              onLocalConfigChangeRef.current?.(undefined);
+            });
+          }
+        });
+      }
+
     } else if (!promptId && modelMetadata) {
       // New prompt - use defaults with model's max tokens
       // Wait for modelMetadata to be loaded before initializing
@@ -385,8 +412,41 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
           },
         },
       });
-      setConfigValues(defaults);
-      methods.reset(defaults);
+
+      // Merge initialLocalConfig over defaults to restore previous edits
+      const formValues = props.initialLocalConfig
+        ? {
+            ...defaults,
+            version: {
+              ...defaults.version,
+              configData: {
+                ...defaults.version.configData,
+                llm: {
+                  ...defaults.version.configData.llm,
+                  ...props.initialLocalConfig.llm,
+                },
+                messages:
+                  props.initialLocalConfig.messages.length > 0
+                    ? (props.initialLocalConfig
+                        .messages as typeof defaults.version.configData.messages)
+                    : defaults.version.configData.messages,
+                inputs:
+                  props.initialLocalConfig.inputs.length > 0
+                    ? (props.initialLocalConfig
+                        .inputs as typeof defaults.version.configData.inputs)
+                    : defaults.version.configData.inputs,
+                outputs:
+                  props.initialLocalConfig.outputs.length > 0
+                    ? (props.initialLocalConfig
+                        .outputs as typeof defaults.version.configData.outputs)
+                    : defaults.version.configData.outputs,
+              },
+            },
+          }
+        : defaults;
+
+      setConfigValues(formValues);
+      methods.reset(formValues);
       initializedTargetIdRef.current = targetId;
       setIsFormInitialized(true);
 
@@ -493,7 +553,6 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       // with target-A's stale form values before the form reinitializes.
       if (
         onLocalConfigChangeRef.current &&
-        promptIdRef.current &&
         targetIdRef.current === initializedTargetIdRef.current
       ) {
         if (isUnsaved) {
@@ -949,12 +1008,141 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   // Get configId for version history
   const _configId = promptQuery.data?.id;
 
+  // Get current version ID for footer
+  const _currentVersionId = methods.watch("versionMetadata")?.versionId;
+
+  // Build the footer element (shared between headless and drawer modes).
+  // The footer is rendered outside the main FormProvider (in Drawer.Footer or
+  // StudioDrawerWrapper footer slot), so we wrap it in its own FormProvider
+  // to give child components (SavePromptButton, etc.) access to form context.
+  const footerElement = (
+    <FormProvider {...methods}>
+      <PromptEditorFooter
+        onSave={() => void handleSave()}
+        hasUnsavedChanges={hasUnsavedChanges}
+        isValid={isValid}
+        isSaving={isSaving}
+        onVersionRestore={handleVersionRestore}
+        configId={_configId}
+        handle={promptQuery.data?.handle ?? undefined}
+        currentVersionId={_currentVersionId}
+        onApply={targetId || props.headless ? handleClose : undefined}
+      />
+    </FormProvider>
+  );
+
+  // In headless mode, register the footer with the parent StudioDrawerWrapper.
+  // The hook must be called unconditionally (React rules of hooks).
+  // When not in headless mode, we pass null so nothing is registered.
+  useRegisterDrawerFooter(props.headless ? footerElement : null);
+
+  // Extract the form body into a variable for reuse in both headless and drawer modes
+  const formBodyContent = (
+    <FormProvider {...methods}>
+      <VStack
+        as="form"
+        gap={4}
+        align="stretch"
+        flex={1}
+        overflowY="auto"
+      >
+        {/* Header bar - shared with prompt playground */}
+        <Box
+          borderBottomWidth="1px"
+          borderColor="border"
+          paddingX={4}
+          paddingY={3}
+          position="sticky"
+          top={0}
+          zIndex={1}
+        >
+          <PromptEditorHeader
+            onSave={() => void handleSave()}
+            hasUnsavedChanges={hasUnsavedChanges}
+            isValid={isValid}
+            isSaving={isSaving}
+            onVersionRestore={handleVersionRestore}
+            variant="model-only"
+          />
+        </Box>
+
+        {/* Save Version Dialog - asks for commit message when updating */}
+        <SaveVersionDialog
+          isOpen={saveVersionDialogOpen}
+          onClose={() => setSaveVersionDialogOpen(false)}
+          onSubmit={handleSaveVersionSubmit}
+          nextVersion={nextVersion}
+        />
+
+        {/* Save Prompt Dialog - asks for handle when creating new prompt */}
+        <ChangeHandleDialog
+          isOpen={savePromptDialogOpen}
+          onClose={() => setSavePromptDialogOpen(false)}
+          onSubmit={handleSavePromptSubmit}
+        />
+
+        {/* Change Handle Dialog - for renaming existing prompts */}
+        <ChangeHandleDialog
+          isOpen={changeHandleDialogOpen}
+          onClose={() => setChangeHandleDialogOpen(false)}
+          currentHandle={promptQuery.data?.handle}
+          currentScope={promptQuery.data?.scope}
+          onSubmit={handleChangeHandleSubmit}
+        />
+
+        {/* Messages (includes system prompt + user messages) */}
+        <Box paddingX={4}>
+          <PromptMessagesField
+            messageFields={messageFields}
+            availableFields={availableFields}
+            otherNodesFields={{}}
+            availableSources={availableSources}
+            onSetVariableMapping={handleSetVariableMapping}
+          />
+        </Box>
+
+        {/* Variables */}
+        <Box paddingX={4} paddingBottom={4}>
+          <FormVariablesSection
+            title="Variables"
+            showMappings={
+              !!availableSources && availableSources.length > 0
+            }
+            availableSources={availableSources}
+            mappings={inputMappings}
+            onMappingChange={onInputMappingsChange}
+            missingMappingIds={missingMappingIds}
+            showMissingMappingsError={!props.headless}
+            lockedVariables={new Set(["input"])}
+            variableInfo={{
+              input:
+                "This is the user message input. It will be sent as the user message to the LLM.",
+            }}
+            showAddButton={false}
+          />
+        </Box>
+      </VStack>
+    </FormProvider>
+  );
+
+  // Handle loading state (shared between headless and drawer modes)
+  const loadingContent = promptId && promptQuery.isLoading ? (
+    <HStack justify="center" paddingY={8}>
+      <Spinner size="md" />
+    </HStack>
+  ) : null;
+
+  // Headless mode - render without Drawer shell (for embedding in external drawer)
+  if (props.headless) {
+    return loadingContent ?? formBodyContent;
+  }
+
+  // Full mode with Drawer shell
   return (
     <Drawer.Root
       open={isOpen}
       onOpenChange={({ open }) => !open && handleClose()}
       size="sm"
-      closeOnInteractOutside={false}
       modal={false}
     >
       <Drawer.Content>
@@ -1027,113 +1215,18 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
           overflow="hidden"
           padding={0}
         >
-          {promptId && promptQuery.isLoading ? (
-            <HStack justify="center" paddingY={8}>
-              <Spinner size="md" />
-            </HStack>
-          ) : (
-            <FormProvider {...methods}>
-              <VStack
-                as="form"
-                gap={4}
-                align="stretch"
-                flex={1}
-                overflowY="auto"
-              >
-                {/* Header bar - shared with prompt playground */}
-                <Box
-                  borderBottomWidth="1px"
-                  borderColor="border"
-                  paddingX={4}
-                  paddingY={3}
-                  position="sticky"
-                  top={0}
-                  zIndex={1}
-                  background="bg.panel"
-                >
-                  <PromptEditorHeader
-                    onSave={() => void handleSave()}
-                    hasUnsavedChanges={hasUnsavedChanges}
-                    isValid={isValid}
-                    isSaving={isSaving}
-                    onVersionRestore={handleVersionRestore}
-                  />
-                </Box>
-
-                {/* Save Version Dialog - asks for commit message when updating */}
-                <SaveVersionDialog
-                  isOpen={saveVersionDialogOpen}
-                  onClose={() => setSaveVersionDialogOpen(false)}
-                  onSubmit={handleSaveVersionSubmit}
-                  nextVersion={nextVersion}
-                />
-
-                {/* Save Prompt Dialog - asks for handle when creating new prompt */}
-                <ChangeHandleDialog
-                  isOpen={savePromptDialogOpen}
-                  onClose={() => setSavePromptDialogOpen(false)}
-                  onSubmit={handleSavePromptSubmit}
-                />
-
-                {/* Change Handle Dialog - for renaming existing prompts */}
-                <ChangeHandleDialog
-                  isOpen={changeHandleDialogOpen}
-                  onClose={() => setChangeHandleDialogOpen(false)}
-                  currentHandle={promptQuery.data?.handle}
-                  currentScope={promptQuery.data?.scope}
-                  onSubmit={handleChangeHandleSubmit}
-                />
-
-                {/* Messages (includes system prompt + user messages) */}
-                <Box paddingX={4}>
-                  <PromptMessagesField
-                    messageFields={messageFields}
-                    availableFields={availableFields}
-                    otherNodesFields={{}}
-                    availableSources={availableSources}
-                    onSetVariableMapping={handleSetVariableMapping}
-                  />
-                </Box>
-
-                {/* Variables */}
-                <Box paddingX={4} paddingBottom={4}>
-                  <FormVariablesSection
-                    title="Variables"
-                    showMappings={
-                      !!availableSources && availableSources.length > 0
-                    }
-                    availableSources={availableSources}
-                    mappings={inputMappings}
-                    onMappingChange={onInputMappingsChange}
-                    missingMappingIds={missingMappingIds}
-                    lockedVariables={new Set(["input"])}
-                    variableInfo={{
-                      input:
-                        "This is the user message input. It will be sent as the user message to the LLM.",
-                    }}
-                    showAddButton={false}
-                  />
-                </Box>
-              </VStack>
-            </FormProvider>
-          )}
+          {loadingContent ?? formBodyContent}
         </Drawer.Body>
 
-        {/* Footer with Apply button - only shown in evaluations context */}
-        {targetId && (
-          <Drawer.Footer
-            borderTopWidth="1px"
-            borderColor="border"
-            paddingX={4}
-            paddingY={3}
-          >
-            <HStack justify="flex-end" width="full">
-              <Button colorPalette="blue" onClick={handleClose}>
-                Apply
-              </Button>
-            </HStack>
-          </Drawer.Footer>
-        )}
+        {/* Footer with History, API, Save, and optionally Apply buttons */}
+        <Drawer.Footer
+          borderTopWidth="1px"
+          borderColor="border"
+          paddingX={4}
+          paddingY={3}
+        >
+          {footerElement}
+        </Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>
   );
