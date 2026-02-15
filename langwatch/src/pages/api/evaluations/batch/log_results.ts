@@ -401,6 +401,7 @@ const dispatchToClickHouse = async (
       experimentId,
       total: batchEvaluation.total ?? batchEvaluation.dataset.length,
       targets,
+      occurredAt: Date.now(),
     });
 
     // Dispatch target and evaluator results in parallel
@@ -418,6 +419,7 @@ const dispatchToClickHouse = async (
           duration: entry.duration ?? undefined,
           error: entry.error ?? undefined,
           traceId: entry.trace_id ?? undefined,
+          occurredAt: Date.now(),
         }),
       ),
       ...batchEvaluation.evaluations.map((evaluation) =>
@@ -435,6 +437,7 @@ const dispatchToClickHouse = async (
           passed: evaluation.passed ?? undefined,
           details: evaluation.details ?? undefined,
           cost: evaluation.cost ?? undefined,
+          occurredAt: Date.now(),
         }),
       ),
     ]);
@@ -449,6 +452,7 @@ const dispatchToClickHouse = async (
         runId,
         finishedAt: batchEvaluation.timestamps.finished_at ?? undefined,
         stoppedAt: batchEvaluation.timestamps.stopped_at ?? undefined,
+        occurredAt: Date.now(),
       });
     }
   } catch (error) {
