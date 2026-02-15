@@ -52,6 +52,8 @@ export const EventSchema = z.object({
   tenantId: TenantIdSchema,
   /** When this event occurred (Unix timestamp in milliseconds) */
   timestamp: z.number().int().nonnegative(),
+  /** When the business action was initiated (Unix timestamp in milliseconds). Set by createEvent/recordToEvent. */
+  occurredAt: z.number().int().nonnegative(),
   /** Event type for routing and processing */
   type: EventTypeSchema,
   /** The version of the event data schema */
@@ -78,12 +80,14 @@ type EventBase = z.infer<typeof EventSchema>;
  */
 export type Event<Payload = unknown, Metadata = EventMetadataBase> = Omit<
   EventBase,
-  "data" | "metadata"
+  "data" | "metadata" | "occurredAt"
 > & {
   /** Event-specific data */
   data: Payload;
   /** Metadata about the event, optional */
   metadata?: Metadata;
+  /** When the business action was initiated (Unix timestamp in milliseconds). Always present at runtime. */
+  occurredAt: number;
 };
 
 /**

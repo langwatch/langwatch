@@ -27,6 +27,7 @@ function createStartedEvent(
     aggregateType: "experiment_run",
     tenantId: TEST_TENANT_ID,
     timestamp: 1000,
+    occurredAt: 1000,
     type: EXPERIMENT_RUN_EVENT_TYPES.STARTED,
     version: EXPERIMENT_RUN_EVENT_VERSIONS.STARTED,
     data: {
@@ -49,6 +50,7 @@ function createTargetResultEvent(
     aggregateType: "experiment_run",
     tenantId: TEST_TENANT_ID,
     timestamp: 2000,
+    occurredAt: 2000,
     type: EXPERIMENT_RUN_EVENT_TYPES.TARGET_RESULT,
     version: EXPERIMENT_RUN_EVENT_VERSIONS.TARGET_RESULT,
     data: {
@@ -74,6 +76,7 @@ function createEvaluatorResultEvent(
     aggregateType: "experiment_run",
     tenantId: TEST_TENANT_ID,
     timestamp: 3000,
+    occurredAt: 3000,
     type: EXPERIMENT_RUN_EVENT_TYPES.EVALUATOR_RESULT,
     version: EXPERIMENT_RUN_EVENT_VERSIONS.EVALUATOR_RESULT,
     data: {
@@ -99,6 +102,7 @@ function createCompletedEvent(
     aggregateType: "experiment_run",
     tenantId: TEST_TENANT_ID,
     timestamp: 4000,
+    occurredAt: 4000,
     type: EXPERIMENT_RUN_EVENT_TYPES.COMPLETED,
     version: EXPERIMENT_RUN_EVENT_VERSIONS.COMPLETED,
     data: {

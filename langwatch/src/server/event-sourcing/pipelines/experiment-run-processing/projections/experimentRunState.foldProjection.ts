@@ -31,8 +31,7 @@ export interface ExperimentRunStateData {
   AvgScore: number | null;
   PassRate: number | null;
   Targets: string;
-  CreatedAt: number;
-  UpdatedAt: number;
+  StartedAt: number | null;
   FinishedAt: number | null;
   StoppedAt: number | null;
 
@@ -75,8 +74,7 @@ export const experimentRunStateFoldProjection: FoldProjectionDefinition<
       AvgScore: null,
       PassRate: null,
       Targets: "[]",
-      CreatedAt: 0,
-      UpdatedAt: 0,
+      StartedAt: null,
       FinishedAt: null,
       StoppedAt: null,
       TotalScoreSum: 0,
@@ -98,8 +96,7 @@ export const experimentRunStateFoldProjection: FoldProjectionDefinition<
         WorkflowVersionId: event.data.workflowVersionId ?? null,
         Total: event.data.total,
         Targets: JSON.stringify(event.data.targets),
-        CreatedAt: event.timestamp,
-        UpdatedAt: event.timestamp,
+        StartedAt: event.occurredAt,
       };
     }
 
@@ -132,7 +129,6 @@ export const experimentRunStateFoldProjection: FoldProjectionDefinition<
         Progress: progress,
         TotalCost: totalCost,
         TotalDurationMs: totalDurationMs,
-        UpdatedAt: event.timestamp,
       };
     }
 
@@ -166,7 +162,6 @@ export const experimentRunStateFoldProjection: FoldProjectionDefinition<
         TotalCost: totalCost,
         AvgScore: avgScore,
         PassRate: passRate,
-        UpdatedAt: event.timestamp,
       };
     }
 
@@ -175,7 +170,6 @@ export const experimentRunStateFoldProjection: FoldProjectionDefinition<
         ...state,
         FinishedAt: event.data.finishedAt ?? null,
         StoppedAt: event.data.stoppedAt ?? null,
-        UpdatedAt: event.timestamp,
       };
     }
 

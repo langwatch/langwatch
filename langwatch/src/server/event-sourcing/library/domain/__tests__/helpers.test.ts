@@ -21,6 +21,7 @@ function createValidEvent(
     aggregateType,
     tenantId,
     timestamp,
+    occurredAt: timestamp,
     type,
     data,
     version,

@@ -21,6 +21,7 @@ function createTestEvent(
     aggregateType: "test-aggregate" as AggregateType,
     tenantId,
     timestamp,
+    occurredAt: timestamp,
     version,
     type,
     data: { value: `event-${id}` },

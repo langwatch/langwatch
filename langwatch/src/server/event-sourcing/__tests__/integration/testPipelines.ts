@@ -1,4 +1,3 @@
-import type { ClickHouseClient } from "@clickhouse/client";
 import { z } from "zod";
 import { createLogger } from "~/utils/logger/server";
 import {
@@ -53,6 +52,7 @@ export interface TestEvent {
   aggregateType: "test_aggregate";
   tenantId: TenantId;
   timestamp: number;
+  occurredAt: number;
   version: string;
   type: typeof TEST_EVENT_TYPE;
   data: TestEventData;
@@ -85,17 +85,17 @@ export class TestCommandHandler implements CommandHandler<
 
   async handle(command: Command<TestCommandPayload>): Promise<TestEvent[]> {
     const tenantId = createTenantId(command.tenantId);
-    const event = EventUtils.createEvent(
-      "test_aggregate" as AggregateType,
-      command.data.aggregateId,
+    const event = EventUtils.createEvent({
+      aggregateType: "test_aggregate" as AggregateType,
+      aggregateId: command.data.aggregateId,
       tenantId,
-      TEST_EVENT_TYPE as EventType,
-      "2025-12-17",
-      {
+      type: TEST_EVENT_TYPE as EventType,
+      version: "2025-12-17",
+      data: {
         value: command.data.value,
         message: command.data.message,
       } satisfies TestEventData,
-    );
+    });
 
     return [event as unknown as TestEvent];
   }
@@ -125,19 +125,14 @@ export interface TestEventHandlerRecord {
  * AppendStore that writes mapped records to a ClickHouse table.
  */
 class TestEventHandlerAppendStore implements AppendStore<TestEventHandlerRecord> {
-  private clickHouseClient: ClickHouseClient | null = null;
-
-  constructor() {
-    this.clickHouseClient = getTestClickHouseClient();
-  }
-
   async append(record: TestEventHandlerRecord, _context: ProjectionStoreContext): Promise<void> {
-    if (!this.clickHouseClient) {
+    const clickHouseClient = getTestClickHouseClient();
+    if (!clickHouseClient) {
       throw new Error("ClickHouse client not available");
     }
 
     // Ensure table exists
-    await this.clickHouseClient.exec({
+    await clickHouseClient.exec({
       query: `
         CREATE TABLE IF NOT EXISTS "test_langwatch".test_event_handler_log (
           TenantId String,
@@ -153,7 +148,7 @@ class TestEventHandlerAppendStore implements AppendStore<TestEventHandlerRecord>
     });
 
     // Insert processed event
-    await this.clickHouseClient.insert({
+    await clickHouseClient.insert({
       table: "test_langwatch.test_event_handler_log",
       values: [record],
       format: "JSONEachRow",

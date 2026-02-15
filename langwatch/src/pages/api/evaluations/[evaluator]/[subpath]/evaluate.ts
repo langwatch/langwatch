@@ -359,6 +359,7 @@ export async function handleEvaluatorCall(
           evaluatorName ?? monitor?.name ?? params.name ?? undefined,
         traceId: params.trace_id ?? undefined,
         isGuardrail: isGuardrail ?? undefined,
+        occurredAt: Date.now(),
       });
     } catch (eventError) {
       captureException(eventError, {
@@ -419,6 +420,7 @@ export async function handleEvaluatorCall(
         passed: "passed" in result ? result.passed : undefined,
         label: "label" in result ? result.label : undefined,
         details: "details" in result ? result.details : undefined,
+        occurredAt: Date.now(),
         error:
           result.status === "error"
             ? "details" in result

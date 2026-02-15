@@ -108,5 +108,5 @@ export type {
 export { ProjectionStoreReadContextSchema } from "./stores/projectionStore.types";
 export type { EventStreamMetadata } from "./streams/eventStream";
 export { EventStream, EventStreamMetadataSchema } from "./streams/eventStream";
-export type { CreateEventOptions } from "./utils/event.utils";
+export type { CreateEventParams } from "./utils/event.utils";
 export { EventUtils } from "./utils/event.utils";

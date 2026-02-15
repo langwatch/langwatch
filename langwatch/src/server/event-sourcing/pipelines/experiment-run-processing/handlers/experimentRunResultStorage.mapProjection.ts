@@ -30,7 +30,7 @@ export interface ClickHouseExperimentRunResultRecord {
   Passed: number | null;
   EvaluationDetails: string | null;
   EvaluationCost: number | null;
-  CreatedAt: string;
+  OccurredAt: Date;
 }
 
 type ExperimentRunResultEvent = TargetResultEvent | EvaluatorResultEvent;
@@ -73,7 +73,7 @@ function mapTargetResultToRecord(
     Passed: null,
     EvaluationDetails: null,
     EvaluationCost: null,
-    CreatedAt: new Date(event.timestamp).toISOString(),
+    OccurredAt: new Date(event.occurredAt),
   };
 }
 
@@ -120,7 +120,7 @@ function mapEvaluatorResultToRecord(
           : 0,
     EvaluationDetails: event.data.details ?? null,
     EvaluationCost: event.data.cost ?? null,
-    CreatedAt: new Date(event.timestamp).toISOString(),
+    OccurredAt: new Date(event.occurredAt),
   };
 }
 

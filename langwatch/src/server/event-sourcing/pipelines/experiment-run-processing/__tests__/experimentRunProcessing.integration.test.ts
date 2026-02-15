@@ -240,6 +240,7 @@ describe.skipIf(!hasTestcontainers)(
         // Start
         await pipeline.commands.startExperimentRun.send({
           tenantId: tenantIdString,
+          occurredAt: Date.now(),
           runId,
           experimentId,
           total: 2,
@@ -250,6 +251,7 @@ describe.skipIf(!hasTestcontainers)(
         // Target results
         await pipeline.commands.recordTargetResult.send({
           tenantId: tenantIdString,
+          occurredAt: Date.now(),
           runId,
           experimentId,
           index: 0,
@@ -263,6 +265,7 @@ describe.skipIf(!hasTestcontainers)(
 
         await pipeline.commands.recordTargetResult.send({
           tenantId: tenantIdString,
+          occurredAt: Date.now(),
           runId,
           experimentId,
           index: 1,
@@ -277,6 +280,7 @@ describe.skipIf(!hasTestcontainers)(
         // Evaluator results
         await pipeline.commands.recordEvaluatorResult.send({
           tenantId: tenantIdString,
+          occurredAt: Date.now(),
           runId,
           experimentId,
           index: 0,
@@ -291,6 +295,7 @@ describe.skipIf(!hasTestcontainers)(
 
         await pipeline.commands.recordEvaluatorResult.send({
           tenantId: tenantIdString,
+          occurredAt: Date.now(),
           runId,
           experimentId,
           index: 1,
@@ -307,6 +312,7 @@ describe.skipIf(!hasTestcontainers)(
         const finishedAt = Date.now();
         await pipeline.commands.completeExperimentRun.send({
           tenantId: tenantIdString,
+          occurredAt: Date.now(),
           runId,
           finishedAt,
         });
@@ -346,6 +352,7 @@ describe.skipIf(!hasTestcontainers)(
 
         await pipeline.commands.startExperimentRun.send({
           tenantId: tenantIdString,
+          occurredAt: Date.now(),
           runId,
           experimentId,
           total: 3,
@@ -356,6 +363,7 @@ describe.skipIf(!hasTestcontainers)(
         // Two successes
         await pipeline.commands.recordTargetResult.send({
           tenantId: tenantIdString,
+          occurredAt: Date.now(),
           runId,
           experimentId,
           index: 0,
@@ -367,6 +375,7 @@ describe.skipIf(!hasTestcontainers)(
 
         await pipeline.commands.recordTargetResult.send({
           tenantId: tenantIdString,
+          occurredAt: Date.now(),
           runId,
           experimentId,
           index: 1,
@@ -379,6 +388,7 @@ describe.skipIf(!hasTestcontainers)(
         // One failure
         await pipeline.commands.recordTargetResult.send({
           tenantId: tenantIdString,
+          occurredAt: Date.now(),
           runId,
           experimentId,
           index: 2,
@@ -415,6 +425,7 @@ describe.skipIf(!hasTestcontainers)(
 
         await pipeline.commands.startExperimentRun.send({
           tenantId: tenantIdString,
+          occurredAt: Date.now(),
           runId,
           experimentId,
           total: 2,
@@ -425,6 +436,7 @@ describe.skipIf(!hasTestcontainers)(
         // Evaluator: score=0.8, passed
         await pipeline.commands.recordEvaluatorResult.send({
           tenantId: tenantIdString,
+          occurredAt: Date.now(),
           runId,
           experimentId,
           index: 0,
@@ -439,6 +451,7 @@ describe.skipIf(!hasTestcontainers)(
         // Evaluator: score=0.4, failed
         await pipeline.commands.recordEvaluatorResult.send({
           tenantId: tenantIdString,
+          occurredAt: Date.now(),
           runId,
           experimentId,
           index: 1,
@@ -476,6 +489,7 @@ describe.skipIf(!hasTestcontainers)(
 
         await pipeline.commands.startExperimentRun.send({
           tenantId: tenantIdString,
+          occurredAt: Date.now(),
           runId,
           experimentId,
           total: 1,
@@ -485,6 +499,7 @@ describe.skipIf(!hasTestcontainers)(
 
         await pipeline.commands.recordTargetResult.send({
           tenantId: tenantIdString,
+          occurredAt: Date.now(),
           runId,
           experimentId,
           index: 0,
@@ -498,6 +513,7 @@ describe.skipIf(!hasTestcontainers)(
 
         await pipeline.commands.recordEvaluatorResult.send({
           tenantId: tenantIdString,
+          occurredAt: Date.now(),
           runId,
           experimentId,
           index: 0,
@@ -523,6 +539,7 @@ describe.skipIf(!hasTestcontainers)(
 
         await pipeline.commands.startExperimentRun.send({
           tenantId: tenantIdString,
+          occurredAt: Date.now(),
           runId,
           experimentId,
           total: 10,
@@ -533,6 +550,7 @@ describe.skipIf(!hasTestcontainers)(
         const stoppedAt = Date.now();
         await pipeline.commands.completeExperimentRun.send({
           tenantId: tenantIdString,
+          occurredAt: Date.now(),
           runId,
           stoppedAt,
         });

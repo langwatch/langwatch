@@ -612,6 +612,7 @@ export async function* runOrchestrator(
         workflowVersionId: workflowVersionId ?? null,
         total: totalCells,
         targets: targetMetadata,
+        occurredAt: Date.now(),
       });
     }
   }
@@ -681,6 +682,7 @@ export async function* runOrchestrator(
           duration: event.duration ?? null,
           error: event.error ?? null,
           traceId: event.traceId ?? null,
+          occurredAt: Date.now(),
         });
       }
     } else if (event.type === "error") {
@@ -714,6 +716,7 @@ export async function* runOrchestrator(
             duration: null,
             error: event.message,
             traceId: null,
+            occurredAt: Date.now(),
           });
         }
       }
@@ -767,6 +770,7 @@ export async function* runOrchestrator(
               : result.status === "processed"
                 ? result.details
                 : null,
+          occurredAt: Date.now(),
           cost:
             result.status === "processed" && result.cost
               ? result.cost.amount
@@ -1008,6 +1012,7 @@ export async function* runOrchestrator(
             runId,
             finishedAt: aborted ? null : finishedAt,
             stoppedAt: aborted ? finishedAt : null,
+            occurredAt: Date.now(),
           });
         }
       } catch (error) {

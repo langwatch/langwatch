@@ -451,6 +451,9 @@ export class EventStoreClickHouse<
       aggregateType: record.AggregateType as AggregateType,
       tenantId: createTenantId(record.TenantId),
       timestamp: timestampMs,
+      occurredAt: record.EventOccurredAt != null && record.EventOccurredAt > 0
+        ? record.EventOccurredAt
+        : timestampMs,
       type: record.EventType as EventType["type"],
       version: record.EventVersion,
       data: payload,
@@ -474,6 +477,7 @@ export class EventStoreClickHouse<
       AggregateId: String(event.aggregateId),
       EventId: event.id,
       EventTimestamp: event.timestamp,
+      EventOccurredAt: event.occurredAt,
       EventType: event.type,
       EventVersion: event.version,
       EventPayload: event.data ?? {},

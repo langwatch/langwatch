@@ -89,6 +89,14 @@ export class ProjectionRegistry<EventType extends Event = Event> {
     }
   }
 
+  get isInitialized(): boolean {
+    return this.router !== undefined;
+  }
+
+  get hasProjections(): boolean {
+    return this.foldProjections.size > 0 || this.mapProjections.size > 0;
+  }
+
   /**
    * Dispatch events from any pipeline. Called by EventSourcingService after local dispatch.
    */
@@ -96,6 +104,9 @@ export class ProjectionRegistry<EventType extends Event = Event> {
     events: readonly EventType[],
     context: EventStoreReadContext<EventType>,
   ): Promise<void> {
+    if (!this.hasProjections) {
+      return;
+    }
     if (!this.router) {
       this.logger.warn(
         "ProjectionRegistry.dispatch called before initialize(). Events will be dropped.",

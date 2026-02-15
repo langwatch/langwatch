@@ -298,22 +298,22 @@ describe("Event Sourcing", () => {
       it("dispatches to fold and map projections", async () => {
         const aggregateId = generateTestAggregateId("direct-store");
 
-        const event1 = EventUtils.createEvent(
-          "test_aggregate" as AggregateType,
+        const event1 = EventUtils.createEvent({
+          aggregateType: "test_aggregate" as AggregateType,
           aggregateId,
           tenantId,
-          "test.integration.event" as const,
-          "2025-12-17",
-          { value: 5 },
-        );
-        const event2 = EventUtils.createEvent(
-          "test_aggregate" as AggregateType,
+          type: "test.integration.event" as const,
+          version: "2025-12-17",
+          data: { value: 5 },
+        });
+        const event2 = EventUtils.createEvent({
+          aggregateType: "test_aggregate" as AggregateType,
           aggregateId,
           tenantId,
-          "test.integration.event" as const,
-          "2025-12-17",
-          { value: 10 },
-        );
+          type: "test.integration.event" as const,
+          version: "2025-12-17",
+          data: { value: 10 },
+        });
 
         await pipeline.service.storeEvents([event1, event2] as TestEvent[], {
           tenantId,

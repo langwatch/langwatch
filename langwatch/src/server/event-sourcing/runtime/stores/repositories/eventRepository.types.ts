@@ -8,6 +8,7 @@ export interface EventRecord {
   AggregateId: string;
   EventId: string;
   EventTimestamp: number;
+  EventOccurredAt: number | null;
   EventType: string;
   EventVersion: string;
   EventPayload: unknown;

@@ -8,6 +8,7 @@ export const startExperimentRunCommandDataSchema = z.object({
   workflowVersionId: z.string().nullable().optional(),
   total: z.number(),
   targets: z.array(targetSchema),
+  occurredAt: z.number(),
 });
 
 export type StartExperimentRunCommandData = z.infer<
@@ -26,6 +27,7 @@ export const recordTargetResultCommandDataSchema = z.object({
   duration: z.number().nullable().optional(),
   error: z.string().nullable().optional(),
   traceId: z.string().nullable().optional(),
+  occurredAt: z.number(),
 });
 
 export type RecordTargetResultCommandData = z.infer<
@@ -46,6 +48,7 @@ export const recordEvaluatorResultCommandDataSchema = z.object({
   passed: z.boolean().nullable().optional(),
   details: z.string().nullable().optional(),
   cost: z.number().nullable().optional(),
+  occurredAt: z.number(),
 });
 
 export type RecordEvaluatorResultCommandData = z.infer<
@@ -57,6 +60,7 @@ export const completeExperimentRunCommandDataSchema = z.object({
   runId: z.string(),
   finishedAt: z.number().nullable().optional(),
   stoppedAt: z.number().nullable().optional(),
+  occurredAt: z.number(),
 });
 
 export type CompleteExperimentRunCommandData = z.infer<
