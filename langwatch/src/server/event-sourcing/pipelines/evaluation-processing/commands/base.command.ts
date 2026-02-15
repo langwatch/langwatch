@@ -32,7 +32,7 @@ export interface EvaluationCommandConfig<TCommandData, TEventData> {
  * @returns A command handler that processes commands and emits events
  */
 export function createEvaluationCommandHandler<
-  TCommandData extends { tenantId: string; evaluationId: string },
+  TCommandData extends { tenantId: string; evaluationId: string; occurredAt: number },
   TEvent extends EvaluationProcessingEvent,
   TEventData,
 >(
@@ -65,6 +65,9 @@ export function createEvaluationCommandHandler<
       config.eventType as TEvent["type"],
       config.eventVersion as TEvent["version"],
       config.mapToEventData(commandData) as TEvent["data"],
+      undefined,
+      undefined,
+      { occurredAt: commandData.occurredAt },
     );
 
     logger.debug(

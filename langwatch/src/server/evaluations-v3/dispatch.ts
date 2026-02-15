@@ -65,7 +65,10 @@ export class ExperimentRunDispatcher {
   async startRun(payload: StartExperimentRunCommandData): Promise<void> {
     try {
       const pipeline = this.getPipeline();
-      await pipeline.commands.startExperimentRun.send(payload);
+      await pipeline.commands.startExperimentRun.send({
+        ...payload,
+        occurredAt: payload.occurredAt ?? Date.now(),
+      });
     } catch (error) {
       logger.warn(
         { error, runId: payload.runId },
@@ -83,7 +86,10 @@ export class ExperimentRunDispatcher {
   ): Promise<void> {
     try {
       const pipeline = this.getPipeline();
-      await pipeline.commands.recordTargetResult.send(payload);
+      await pipeline.commands.recordTargetResult.send({
+        ...payload,
+        occurredAt: payload.occurredAt ?? Date.now(),
+      });
     } catch (error) {
       logger.warn(
         { error, runId: payload.runId },
@@ -101,7 +107,10 @@ export class ExperimentRunDispatcher {
   ): Promise<void> {
     try {
       const pipeline = this.getPipeline();
-      await pipeline.commands.recordEvaluatorResult.send(payload);
+      await pipeline.commands.recordEvaluatorResult.send({
+        ...payload,
+        occurredAt: payload.occurredAt ?? Date.now(),
+      });
     } catch (error) {
       logger.warn(
         { error, runId: payload.runId },
@@ -119,7 +128,10 @@ export class ExperimentRunDispatcher {
   ): Promise<void> {
     try {
       const pipeline = this.getPipeline();
-      await pipeline.commands.completeExperimentRun.send(payload);
+      await pipeline.commands.completeExperimentRun.send({
+        ...payload,
+        occurredAt: payload.occurredAt ?? Date.now(),
+      });
     } catch (error) {
       logger.warn(
         { error, runId: payload.runId },

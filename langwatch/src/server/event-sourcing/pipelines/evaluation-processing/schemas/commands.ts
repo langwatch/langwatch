@@ -11,6 +11,7 @@ const baseEvaluationSchema = z.object({
   evaluatorName: z.string().optional(),
   traceId: z.string().optional(),
   isGuardrail: z.boolean().optional(),
+  occurredAt: z.number(),
 });
 
 /**
@@ -46,6 +47,7 @@ export const completeEvaluationCommandDataSchema = z.object({
   label: z.string().nullable().optional(),
   details: z.string().nullable().optional(),
   error: z.string().nullable().optional(),
+  occurredAt: z.number(),
 });
 
 export type CompleteEvaluationCommandData = z.infer<
