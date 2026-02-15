@@ -22,7 +22,7 @@ export function buildAvailableSources({
   const toVisit = [nodeId];
   while (toVisit.length > 0) {
     const currentNode = toVisit.shift();
-    if (!currentNode) continue;
+    if (!currentNode || downstreamNodes.has(currentNode)) continue;
     downstreamNodes.add(currentNode);
     toVisit.push(
       ...edges

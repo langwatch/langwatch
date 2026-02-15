@@ -7,7 +7,6 @@ import {
   Input,
   Spacer,
   Spinner,
-  Tabs,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -19,12 +18,8 @@ import { useDebouncedCallback } from "use-debounce";
 import { useShallow } from "zustand/react/shallow";
 
 import {
-  AuthConfigSection,
-  BodyTemplateEditor,
-  HeadersConfigSection,
-  HttpMethodSelector,
-  HttpTestPanel,
-  OutputPathInput,
+  HttpConfigEditor,
+  useHttpTest,
 } from "~/components/agents/http";
 import { CodeBlockEditor } from "~/components/blocks/CodeBlockEditor";
 import {
@@ -246,8 +241,6 @@ function DbAgentPanel({
   const [auth, setAuth] = useState<HttpAuth | undefined>(
     (localSettings?.auth as HttpAuth) ?? httpConfig?.auth ?? { type: "none" },
   );
-  const [activeTab, setActiveTab] = useState("body");
-
   // ---- Code state ----
   const codeConfig = agentType === "code" && dbConfig ? dbConfig : undefined;
   const [code, setCode] = useState(
@@ -331,24 +324,12 @@ function DbAgentPanel({
     return () => subscription.unsubscribe();
   }, [form, debouncedSetLocalConfig]);
 
-  const handleUrlChange = useCallback((newUrl: string) => {
-    setUrl(newUrl);
-  }, []);
-  const handleMethodChange = useCallback((newMethod: HttpMethod) => {
-    setMethod(newMethod);
-  }, []);
-  const handleBodyTemplateChange = useCallback((newBody: string) => {
-    setBodyTemplate(newBody);
-  }, []);
-  const handleOutputPathChange = useCallback((newPath: string) => {
-    setOutputPath(newPath);
-  }, []);
-  const handleAuthChange = useCallback((newAuth: HttpAuth | undefined) => {
-    setAuth(newAuth);
-  }, []);
-  const handleHeadersChange = useCallback((newHeaders: HttpHeader[]) => {
-    setHeaders(newHeaders);
-  }, []);
+  const handleUrlChange = useCallback((newUrl: string) => setUrl(newUrl), []);
+  const handleMethodChange = useCallback((newMethod: HttpMethod) => setMethod(newMethod), []);
+  const handleBodyTemplateChange = useCallback((newBody: string) => setBodyTemplate(newBody), []);
+  const handleOutputPathChange = useCallback((newPath: string) => setOutputPath(newPath), []);
+  const handleAuthChange = useCallback((newAuth: HttpAuth | undefined) => setAuth(newAuth), []);
+  const handleHeadersChange = useCallback((newHeaders: HttpHeader[]) => setHeaders(newHeaders), []);
 
   // Track HTTP changes for localConfig persistence
   useEffect(() => {
@@ -535,51 +516,8 @@ function DbAgentPanel({
 
   const hasLocalChanges = !!localConfig;
 
-  // HTTP proxy mutation for testing
-  const httpProxyMutation = api.httpProxy.execute.useMutation();
-
-  const handleTest = useCallback(
-    async (requestBody: string) => {
-      if (!project?.id) {
-        return { success: false, error: "No project selected" };
-      }
-      try {
-        const result = await httpProxyMutation.mutateAsync({
-          projectId: project.id,
-          url,
-          method,
-          headers: headers.map((h) => ({ key: h.key, value: h.value })),
-          auth: auth
-            ? {
-                type: auth.type,
-                token: auth.type === "bearer" ? auth.token : undefined,
-                headerName: auth.type === "api_key" ? auth.header : undefined,
-                apiKeyValue: auth.type === "api_key" ? auth.value : undefined,
-                username: auth.type === "basic" ? auth.username : undefined,
-                password: auth.type === "basic" ? auth.password : undefined,
-              }
-            : undefined,
-          body: requestBody,
-          outputPath,
-        });
-        return {
-          success: result.success,
-          response: result.response,
-          extractedOutput: result.extractedOutput,
-          error: result.error,
-          status: result.status,
-          duration: result.duration,
-          responseHeaders: result.responseHeaders,
-        };
-      } catch (err) {
-        return {
-          success: false,
-          error: err instanceof Error ? err.message : "Test request failed",
-        };
-      }
-    },
-    [project?.id, url, method, headers, auth, outputPath, httpProxyMutation],
-  );
+  // HTTP test via shared hook
+  const { handleTest } = useHttpTest({ url, method, headers, auth, outputPath });
 
   // Register footer
   const footerContent = useMemo(
@@ -664,81 +602,26 @@ function DbAgentPanel({
 
       {/* Inline HTTP editor */}
       {agentType === "http" && (
-        <>
-          <Box paddingX={4}>
-            <VStack align="stretch" gap={2} width="full">
-              <Text fontWeight="medium" fontSize="sm">
-                Endpoint
-              </Text>
-              <HStack gap={2}>
-                <HttpMethodSelector value={method} onChange={handleMethodChange} />
-                <Input
-                  flex={1}
-                  value={url}
-                  onChange={(e) => handleUrlChange(e.target.value)}
-                  placeholder="https://api.example.com/endpoint"
-                  fontFamily="mono"
-                  fontSize="13px"
-                  size="sm"
-                />
-              </HStack>
-            </VStack>
-          </Box>
-
-          <Tabs.Root
-            value={activeTab}
-            onValueChange={(e) => setActiveTab(e.value)}
-            width="full"
-            colorPalette="blue"
-          >
-            <Tabs.List paddingX={4} borderBottomWidth="1px" borderColor="border">
-              <Tabs.Trigger value="body">Body</Tabs.Trigger>
-              <Tabs.Trigger value="auth">Auth</Tabs.Trigger>
-              <Tabs.Trigger value="headers">Headers</Tabs.Trigger>
-              <Tabs.Trigger value="test">Test</Tabs.Trigger>
-            </Tabs.List>
-
-            <Tabs.Content value="body" paddingX={4} paddingY={3}>
-              <VStack gap={4} align="stretch">
-                <Field.Root>
-                  <Field.Label fontSize="sm">Request Body Template</Field.Label>
-                  <BodyTemplateEditor
-                    value={bodyTemplate}
-                    onChange={handleBodyTemplateChange}
-                  />
-                </Field.Root>
-                <Field.Root>
-                  <Field.Label fontSize="sm">Output Path (JSONPath)</Field.Label>
-                  <OutputPathInput value={outputPath} onChange={handleOutputPathChange} />
-                </Field.Root>
-              </VStack>
-            </Tabs.Content>
-
-            <Tabs.Content value="auth" paddingX={4} paddingY={3}>
-              <AuthConfigSection value={auth} onChange={handleAuthChange} />
-            </Tabs.Content>
-
-            <Tabs.Content value="headers" paddingX={4} paddingY={3}>
-              <HeadersConfigSection value={headers} onChange={handleHeadersChange} />
-            </Tabs.Content>
-
-            <Tabs.Content value="test" paddingX={4} paddingY={3}>
-              <HttpTestPanel
-                onTest={handleTest}
-                url={url}
-                method={method}
-                headers={headers}
-                outputPath={outputPath}
-                bodyTemplate={bodyTemplate}
-              />
-            </Tabs.Content>
-          </Tabs.Root>
-        </>
+        <HttpConfigEditor
+          url={url}
+          onUrlChange={handleUrlChange}
+          method={method}
+          onMethodChange={handleMethodChange}
+          bodyTemplate={bodyTemplate}
+          onBodyTemplateChange={handleBodyTemplateChange}
+          outputPath={outputPath}
+          onOutputPathChange={handleOutputPathChange}
+          auth={auth}
+          onAuthChange={handleAuthChange}
+          headers={headers}
+          onHeadersChange={handleHeadersChange}
+          onTest={handleTest}
+        />
       )}
 
       {/* Inline Code editor */}
       {agentType === "code" && (
-        <VStack gap={4} align="stretch" paddingX={4}>
+        <VStack gap={4} align="stretch" paddingX={4} width="full">
           <Field.Root>
             <Field.Label fontSize="sm">Python Code</Field.Label>
             <Text fontSize="xs" color="fg.muted" marginBottom={1}>

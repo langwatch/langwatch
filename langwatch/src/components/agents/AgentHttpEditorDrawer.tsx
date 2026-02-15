@@ -48,6 +48,7 @@ import {
   HttpMethodSelector,
   HttpTestPanel,
   OutputPathInput,
+  useHttpTest,
 } from "./http";
 
 // ============================================================================
@@ -409,54 +410,8 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
     onClose();
   };
 
-  // HTTP proxy mutation for testing
-  const httpProxyMutation = api.httpProxy.execute.useMutation();
-
-  // Test handler - calls the backend API
-  const handleTest = useCallback(
-    async (requestBody: string) => {
-      if (!project?.id) {
-        return { success: false, error: "No project selected" };
-      }
-
-      try {
-        const result = await httpProxyMutation.mutateAsync({
-          projectId: project.id,
-          url,
-          method,
-          headers: headers.map((h) => ({ key: h.key, value: h.value })),
-          auth: auth
-            ? {
-                type: auth.type,
-                token: auth.type === "bearer" ? auth.token : undefined,
-                headerName: auth.type === "api_key" ? auth.header : undefined,
-                apiKeyValue: auth.type === "api_key" ? auth.value : undefined,
-                username: auth.type === "basic" ? auth.username : undefined,
-                password: auth.type === "basic" ? auth.password : undefined,
-              }
-            : undefined,
-          body: requestBody,
-          outputPath,
-        });
-
-        return {
-          success: result.success,
-          response: result.response,
-          extractedOutput: result.extractedOutput,
-          error: result.error,
-          status: result.status,
-          duration: result.duration,
-          responseHeaders: result.responseHeaders,
-        };
-      } catch (err) {
-        return {
-          success: false,
-          error: err instanceof Error ? err.message : "Test request failed",
-        };
-      }
-    },
-    [project?.id, url, method, headers, auth, outputPath, httpProxyMutation],
-  );
+  // HTTP test via shared hook
+  const { handleTest } = useHttpTest({ url, method, headers, auth, outputPath });
 
   return (
     <>

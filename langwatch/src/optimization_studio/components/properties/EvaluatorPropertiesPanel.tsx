@@ -264,8 +264,10 @@ function DbEvaluatorPanel({
         },
       },
       {
-        onSuccess: () =>
-          setNode({ id: node.id, data: { localConfig: undefined } }),
+        onSuccess: () => {
+          setNode({ id: node.id, data: { localConfig: undefined } });
+          void evaluatorQuery.refetch();
+        },
       },
     );
   }, [

@@ -1,17 +1,10 @@
-import { Box, Field, HStack, Input, Tabs, Text, VStack } from "@chakra-ui/react";
+import { Box } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
 import { useUpdateNodeInternals } from "@xyflow/react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 
-import {
-  AuthConfigSection,
-  BodyTemplateEditor,
-  HeadersConfigSection,
-  HttpMethodSelector,
-  HttpTestPanel,
-  OutputPathInput,
-} from "~/components/agents/http";
+import { HttpConfigEditor, useHttpTest } from "~/components/agents/http";
 import {
   CODE_OUTPUT_TYPES,
   type Output,
@@ -20,13 +13,11 @@ import {
 } from "~/components/outputs/OutputsSection";
 import type { FieldMapping } from "~/components/variables";
 import { type Variable, VariablesSection } from "~/components/variables";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type {
   HttpAuth,
   HttpHeader,
   HttpMethod,
 } from "~/optimization_studio/types/dsl";
-import { api } from "~/utils/api";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import type { Component, Field as DslField } from "../../types/dsl";
 import {
@@ -90,11 +81,10 @@ function parseHeadersFromParams(parameters: DslField[] | undefined): HttpHeader[
 /**
  * Properties panel for HTTP Call nodes in the optimization studio.
  *
- * Uses the same tabbed layout and components as AgentHttpEditorDrawer:
- * Body / Auth / Headers / Test tabs, plus studio-specific input mappings.
+ * Uses the shared HttpConfigEditor for the endpoint + tabs UI,
+ * plus studio-specific input mappings and outputs.
  */
 export function HttpPropertiesPanel({ node }: { node: Node<Component> }) {
-  const { project } = useOrganizationTeamProject();
   const { nodes, edges, setNode, setNodeParameter, setEdges, getWorkflow } =
     useWorkflowStore(
       useShallow((state) => ({
@@ -107,8 +97,6 @@ export function HttpPropertiesPanel({ node }: { node: Node<Component> }) {
       })),
     );
   const updateNodeInternals = useUpdateNodeInternals();
-
-  const [activeTab, setActiveTab] = useState("body");
 
   // Read HTTP config from parameters
   const url = (getParam(node.data.parameters, "url") as string) ?? "";
@@ -246,134 +234,26 @@ export function HttpPropertiesPanel({ node }: { node: Node<Component> }) {
     [node.id, setNode, updateNodeInternals],
   );
 
-  // HTTP proxy mutation for testing
-  const httpProxyMutation = api.httpProxy.execute.useMutation();
-
-  const handleTest = useCallback(
-    async (requestBody: string) => {
-      if (!project?.id) {
-        return { success: false, error: "No project selected" };
-      }
-
-      try {
-        const result = await httpProxyMutation.mutateAsync({
-          projectId: project.id,
-          url,
-          method,
-          headers: headers.map((h) => ({ key: h.key, value: h.value })),
-          auth: auth
-            ? {
-                type: auth.type,
-                token: auth.type === "bearer" ? auth.token : undefined,
-                headerName: auth.type === "api_key" ? auth.header : undefined,
-                apiKeyValue: auth.type === "api_key" ? auth.value : undefined,
-                username: auth.type === "basic" ? auth.username : undefined,
-                password: auth.type === "basic" ? auth.password : undefined,
-              }
-            : undefined,
-          body: requestBody,
-          outputPath,
-        });
-
-        return {
-          success: result.success,
-          response: result.response,
-          extractedOutput: result.extractedOutput,
-          error: result.error,
-          status: result.status,
-          duration: result.duration,
-          responseHeaders: result.responseHeaders,
-        };
-      } catch (err) {
-        return {
-          success: false,
-          error: err instanceof Error ? err.message : "Test request failed",
-        };
-      }
-    },
-    [project?.id, url, method, headers, auth, outputPath, httpProxyMutation],
-  );
+  // HTTP test via shared hook
+  const { handleTest } = useHttpTest({ url, method, headers, auth, outputPath });
 
   return (
     <BasePropertiesPanel node={node} hideParameters hideInputs hideOutputs paddingX={0}>
-      {/* URL + Method */}
-      <Box paddingX={4}>
-        <VStack align="stretch" gap={2} width="full">
-          <Text fontWeight="medium" fontSize="sm">
-            Endpoint
-          </Text>
-          <HStack gap={2}>
-            <HttpMethodSelector value={method} onChange={handleMethodChange} />
-            <Input
-              flex={1}
-              value={url}
-              onChange={(e) => handleUrlChange(e.target.value)}
-              placeholder="https://api.example.com/endpoint"
-              fontFamily="mono"
-              fontSize="13px"
-              size="sm"
-            />
-          </HStack>
-        </VStack>
-      </Box>
-
-      {/* Tabbed Content — same layout as AgentHttpEditorDrawer */}
-      <Tabs.Root
-        value={activeTab}
-        onValueChange={(e) => setActiveTab(e.value)}
-        width="full"
-        colorPalette="blue"
-      >
-        <Tabs.List
-          paddingX={4}
-          borderBottomWidth="1px"
-          borderColor="border"
-        >
-          <Tabs.Trigger value="body">Body</Tabs.Trigger>
-          <Tabs.Trigger value="auth">Auth</Tabs.Trigger>
-          <Tabs.Trigger value="headers">Headers</Tabs.Trigger>
-          <Tabs.Trigger value="test">Test</Tabs.Trigger>
-        </Tabs.List>
-
-        {/* Body Tab */}
-        <Tabs.Content value="body" paddingX={4} paddingY={3}>
-          <VStack gap={4} align="stretch">
-            <Field.Root>
-              <Field.Label fontSize="sm">Request Body Template</Field.Label>
-              <BodyTemplateEditor
-                value={bodyTemplate}
-                onChange={handleBodyTemplateChange}
-              />
-            </Field.Root>
-            <Field.Root>
-              <Field.Label fontSize="sm">Output Path (JSONPath)</Field.Label>
-              <OutputPathInput value={outputPath} onChange={handleOutputPathChange} />
-            </Field.Root>
-          </VStack>
-        </Tabs.Content>
-
-        {/* Auth Tab */}
-        <Tabs.Content value="auth" paddingX={4} paddingY={3}>
-          <AuthConfigSection value={auth} onChange={handleAuthChange} />
-        </Tabs.Content>
-
-        {/* Headers Tab */}
-        <Tabs.Content value="headers" paddingX={4} paddingY={3}>
-          <HeadersConfigSection value={headers} onChange={handleHeadersChange} />
-        </Tabs.Content>
-
-        {/* Test Tab */}
-        <Tabs.Content value="test" paddingX={4} paddingY={3}>
-          <HttpTestPanel
-            onTest={handleTest}
-            url={url}
-            method={method}
-            headers={headers}
-            outputPath={outputPath}
-            bodyTemplate={bodyTemplate}
-          />
-        </Tabs.Content>
-      </Tabs.Root>
+      <HttpConfigEditor
+        url={url}
+        onUrlChange={handleUrlChange}
+        method={method}
+        onMethodChange={handleMethodChange}
+        bodyTemplate={bodyTemplate}
+        onBodyTemplateChange={handleBodyTemplateChange}
+        outputPath={outputPath}
+        onOutputPathChange={handleOutputPathChange}
+        auth={auth}
+        onAuthChange={handleAuthChange}
+        headers={headers}
+        onHeadersChange={handleHeadersChange}
+        onTest={handleTest}
+      />
 
       {/* Inputs with mappings */}
       <Box width="full" paddingX={4}>
