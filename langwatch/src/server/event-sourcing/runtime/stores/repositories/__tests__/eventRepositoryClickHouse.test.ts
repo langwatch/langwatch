@@ -9,6 +9,7 @@ function createMockClient(payload: unknown) {
         {
           EventId: "evt",
           EventTimestamp: 1700000000000,
+          EventOccurredAt: 1700000000000,
           EventType: "test.integration.event",
           EventPayload: payload,
           ProcessingTraceparent: "",

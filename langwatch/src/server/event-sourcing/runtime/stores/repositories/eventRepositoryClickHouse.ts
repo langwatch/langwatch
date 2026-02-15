@@ -65,6 +65,7 @@ export class EventRepositoryClickHouse implements EventRepository {
           SELECT
             EventId,
             EventTimestamp,
+            EventOccurredAt,
             EventType,
             EventPayload,
             ProcessingTraceparent
@@ -85,6 +86,7 @@ export class EventRepositoryClickHouse implements EventRepository {
       const rows = await result.json<{
         EventId: string;
         EventTimestamp: number;
+        EventOccurredAt: number;
         EventType: string;
         EventPayload: unknown; // Can be object (when ClickHouse parses JSON) or string (when serialized)
         EventVersion: string;
@@ -99,6 +101,7 @@ export class EventRepositoryClickHouse implements EventRepository {
         AggregateId: String(aggregateId),
         EventId: row.EventId,
         EventTimestamp: row.EventTimestamp,
+        EventOccurredAt: row.EventOccurredAt || null,
         EventType: row.EventType,
         EventVersion: row.EventVersion,
         EventPayload: normalizePayloadValue(row.EventPayload),
@@ -133,6 +136,7 @@ export class EventRepositoryClickHouse implements EventRepository {
           SELECT
             EventId,
             EventTimestamp,
+            EventOccurredAt,
             EventType,
             EventPayload,
             EventVersion,
@@ -163,6 +167,7 @@ export class EventRepositoryClickHouse implements EventRepository {
       const rows = await result.json<{
         EventId: string;
         EventTimestamp: number;
+        EventOccurredAt: number;
         EventType: string;
         EventPayload: unknown;
         EventVersion: string;
@@ -177,6 +182,7 @@ export class EventRepositoryClickHouse implements EventRepository {
         AggregateId: String(aggregateId),
         EventId: row.EventId,
         EventTimestamp: row.EventTimestamp,
+        EventOccurredAt: row.EventOccurredAt || null,
         EventType: row.EventType,
         EventVersion: row.EventVersion,
         EventPayload: normalizePayloadValue(row.EventPayload),
