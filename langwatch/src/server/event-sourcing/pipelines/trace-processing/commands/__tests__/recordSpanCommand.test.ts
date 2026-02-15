@@ -131,6 +131,45 @@ describe("RecordSpanCommand", () => {
       });
     });
 
+    describe("when pre-processing steps fail", () => {
+      it("throws when PII redaction rejects", async () => {
+        const { deps, mockRedactSpan } = createMockDependencies();
+        mockRedactSpan.mockRejectedValue(new Error("PII service unavailable"));
+        const cmd = new RecordSpanCommand(deps);
+
+        const command = createMockCommand("project-123", "trace-1", "span-1");
+
+        await expect(cmd.handle(command)).rejects.toThrow(
+          "PII service unavailable",
+        );
+      });
+
+      it("returns events normally when cost enrichment rejects", async () => {
+        const { deps, mockEnrichSpan } = createMockDependencies();
+        mockEnrichSpan.mockRejectedValue(new Error("Cost API timeout"));
+        const cmd = new RecordSpanCommand(deps);
+
+        const command = createMockCommand("project-123", "trace-1", "span-1");
+
+        const events = await cmd.handle(command);
+
+        expect(events).toHaveLength(1);
+        expect(events[0]!.type).toBe(SPAN_RECEIVED_EVENT_TYPE);
+      });
+
+      it("throws the PII error when both reject", async () => {
+        const { deps, mockRedactSpan, mockEnrichSpan } =
+          createMockDependencies();
+        mockRedactSpan.mockRejectedValue(new Error("PII failure"));
+        mockEnrichSpan.mockRejectedValue(new Error("Cost failure"));
+        const cmd = new RecordSpanCommand(deps);
+
+        const command = createMockCommand("project-123", "trace-1", "span-1");
+
+        await expect(cmd.handle(command)).rejects.toThrow("PII failure");
+      });
+    });
+
     describe("event creation", () => {
       it("creates SpanReceivedEvent with redacted span data", async () => {
         // Mock redactSpan to mutate the span (simulating redaction)

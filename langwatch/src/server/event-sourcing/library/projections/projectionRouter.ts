@@ -186,14 +186,39 @@ export class ProjectionRouter<
       async () => {
         EventUtils.validateTenantId(context, "ProjectionRouter.dispatch");
 
+        const errors: Error[] = [];
+
         // Dispatch to fold projections
         if (this.foldProjections.size > 0) {
-          await this.dispatchToFoldProjections(events, context);
+          try {
+            await this.dispatchToFoldProjections(events, context);
+          } catch (e) {
+            if (e instanceof AggregateError) {
+              errors.push(...(e.errors as Error[]));
+            } else {
+              errors.push(e instanceof Error ? e : new Error(String(e)));
+            }
+          }
         }
 
         // Dispatch to map projections
         if (this.mapProjections.size > 0) {
-          await this.dispatchToMapProjections(events, context);
+          try {
+            await this.dispatchToMapProjections(events, context);
+          } catch (e) {
+            if (e instanceof AggregateError) {
+              errors.push(...(e.errors as Error[]));
+            } else {
+              errors.push(e instanceof Error ? e : new Error(String(e)));
+            }
+          }
+        }
+
+        if (errors.length > 0) {
+          throw new AggregateError(
+            errors,
+            `${errors.length} projection(s) failed during dispatch`,
+          );
         }
       },
     );
@@ -406,6 +431,7 @@ export class ProjectionRouter<
     projectionName: ProjectionName,
     aggregateId: string,
     context: EventStoreReadContext<EventType>,
+    options?: { key?: string },
   ): Promise<ProjectionTypes[ProjectionName] | null> {
     EventUtils.validateTenantId(context, "getProjectionByName");
 
@@ -419,12 +445,13 @@ export class ProjectionRouter<
       );
     }
 
+    const lookupKey = options?.key ?? aggregateId;
     const storeContext: ProjectionStoreContext = {
       aggregateId,
       tenantId: context.tenantId,
     };
 
-    const state = await fold.store.get(aggregateId, storeContext);
+    const state = await fold.store.get(lookupKey, storeContext);
     if (state === null) return null;
 
     return {
@@ -443,8 +470,9 @@ export class ProjectionRouter<
     projectionName: ProjectionName,
     aggregateId: string,
     context: EventStoreReadContext<EventType>,
+    options?: { key?: string },
   ): Promise<boolean> {
-    const projection = await this.getProjectionByName(projectionName, aggregateId, context);
+    const projection = await this.getProjectionByName(projectionName, aggregateId, context, options);
     return projection !== null;
   }
 

@@ -115,7 +115,7 @@ export class RecordSpanCommand implements CommandHandler<
 
         // Run PII redaction and cost enrichment in parallel.
         // Safe: PII modifies existing attr values; cost pushes new entries.
-        const results = await Promise.allSettled([
+        const [piiResult, costResult] = await Promise.allSettled([
           this.deps.piiRedactionService.redactSpan(
             spanToProcess,
             piiRedactionLevel,
@@ -126,13 +126,23 @@ export class RecordSpanCommand implements CommandHandler<
           ),
         ]);
 
-        for (const result of results) {
-          if (result.status === "rejected") {
-            this.logger.warn(
-              { error: result.reason },
-              "Span pre-processing step failed",
-            );
-          }
+        // Cost enrichment is non-critical — log and continue
+        if (costResult.status === "rejected") {
+          this.logger.warn(
+            { error: costResult.reason },
+            "Cost enrichment failed, continuing without cost data",
+          );
+        }
+
+        // PII redaction is critical — unredacted spans must not be emitted
+        if (piiResult.status === "rejected") {
+          this.logger.error(
+            { error: piiResult.reason },
+            "PII redaction failed, aborting span processing to prevent PII leak",
+          );
+          throw piiResult.reason instanceof Error
+            ? piiResult.reason
+            : new Error(String(piiResult.reason));
         }
 
         const spanReceivedEvent = EventUtils.createEvent<SpanReceivedEvent>(

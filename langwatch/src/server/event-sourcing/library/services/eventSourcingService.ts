@@ -281,11 +281,13 @@ export class EventSourcingService<
     projectionName: ProjectionName,
     aggregateId: string,
     context: EventStoreReadContext<EventType>,
+    options?: { key?: string },
   ): Promise<ProjectionTypes[ProjectionName] | null> {
     return this.router.getProjectionByName(
       projectionName,
       aggregateId,
       context,
+      options,
     );
   }
 
@@ -298,11 +300,13 @@ export class EventSourcingService<
     projectionName: ProjectionName,
     aggregateId: string,
     context: EventStoreReadContext<EventType>,
+    options?: { key?: string },
   ): Promise<boolean> {
     return await this.router.hasProjectionByName(
       projectionName,
       aggregateId,
       context,
+      options,
     );
   }
 
