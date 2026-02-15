@@ -29,12 +29,6 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
     hardcodedDefault: 30,
   },
   {
-    table: "processor_checkpoints",
-    ttlColumn: "UpdatedAt",
-    envVar: "TIERED_PROCESSOR_CHECKPOINTS_TABLE_HOT_DAYS",
-    hardcodedDefault: 30,
-  },
-  {
     table: "stored_spans",
     ttlColumn: "EndTime",
     envVar: "TIERED_STORED_SPANS_TABLE_HOT_DAYS",
