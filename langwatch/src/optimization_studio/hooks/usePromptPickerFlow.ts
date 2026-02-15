@@ -48,6 +48,8 @@ export function usePromptPickerFlow() {
               id: nodeId,
               data: {
                 name: prompt.name,
+                promptId: prompt.id,
+                promptVersionId: prompt.versionId,
                 configId: prompt.id,
                 versionMetadata: prompt.versionId
                   ? {

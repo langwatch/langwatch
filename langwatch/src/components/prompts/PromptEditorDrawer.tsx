@@ -305,6 +305,11 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     buildDefaultFormValues,
   );
   const [isFormInitialized, setIsFormInitialized] = useState(false);
+  // Ref set directly in init/reset effects so the watch subscription
+  // can read it without stale closures or React batching issues.
+  // DO NOT mirror from state — state batching causes the reset effect
+  // to override the init effect's setIsFormInitialized(true) on mount.
+  const isFormInitializedRef = useRef(false);
 
   // Form setup using the prompts module hook
   const { methods } = usePromptConfigForm({
@@ -369,6 +374,10 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       // If we have local changes (initialLocalConfig), form will differ from saved,
       // which keeps hasUnsavedChanges=true and doesn't clear the local config.
       savedFormValuesRef.current = serverValues;
+      // Set ref BEFORE methods.reset() — reset triggers the watch subscription
+      // synchronously, and the watch needs to see isFormInitializedRef=true to
+      // allow syncing the correct values (not block them as pre-init defaults).
+      isFormInitializedRef.current = true;
       methods.reset(formValues);
       initializedTargetIdRef.current = targetId;
       setIsFormInitialized(true);
@@ -446,6 +455,8 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
         : defaults;
 
       setConfigValues(formValues);
+      // Set ref BEFORE methods.reset() — see comment in DB prompt branch above.
+      isFormInitializedRef.current = true;
       methods.reset(formValues);
       initializedTargetIdRef.current = targetId;
       setIsFormInitialized(true);
@@ -499,12 +510,22 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   // Reset when drawer closes
   useEffect(() => {
     if (!isOpen) {
+      isFormInitializedRef.current = false;
       setIsFormInitialized(false);
     }
   }, [isOpen]);
 
-  // Reset when switching prompts, versions, or targets
+  // Reset when switching prompts, versions, or targets.
+  // Skip the initial mount — on mount, this effect fires unconditionally and
+  // its setIsFormInitialized(false) would be batched with the init effect's
+  // setIsFormInitialized(true), causing the last-write (false) to win.
+  const promptResetMountRef = useRef(true);
   useEffect(() => {
+    if (promptResetMountRef.current) {
+      promptResetMountRef.current = false;
+      return;
+    }
+    isFormInitializedRef.current = false;
     setIsFormInitialized(false);
   }, [promptId, promptVersionId, targetId]);
 
@@ -546,6 +567,9 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       });
 
       // Update local config for evaluations context.
+      // IMPORTANT: Don't push form values to the node until the form is initialized.
+      // Before initialization, the form contains defaults ("You are a helpful assistant.")
+      // which would overwrite the node's localPromptConfig (real user data) via the bridge.
       // IMPORTANT: Only call the callback if the current targetId matches what we
       // initialized with. This prevents race conditions when switching targets:
       // the callback ref is updated during render (before effects), so without this
@@ -553,6 +577,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       // with target-A's stale form values before the form reinitializes.
       if (
         onLocalConfigChangeRef.current &&
+        isFormInitializedRef.current &&
         targetIdRef.current === initializedTargetIdRef.current
       ) {
         if (isUnsaved) {
