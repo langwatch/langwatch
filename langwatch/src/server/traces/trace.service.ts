@@ -95,7 +95,12 @@ export class TraceService {
             [traceId],
             protections,
           );
-          return traces?.[0];
+          if (traces === null) {
+            throw new Error(
+              "ClickHouse is enabled but returned null for getById — check ClickHouse client configuration",
+            );
+          }
+          return traces[0];
         }
 
         return this.elasticsearchService.getById(
@@ -138,7 +143,12 @@ export class TraceService {
             traceIds,
             protections,
           );
-          return traces ?? [];
+          if (traces === null) {
+            throw new Error(
+              "ClickHouse is enabled but returned null for getTracesWithSpans — check ClickHouse client configuration",
+            );
+          }
+          return traces;
         }
 
         return this.elasticsearchService.getTracesWithSpans(
@@ -433,13 +443,12 @@ export class TraceService {
               startDate,
               endDate,
             );
-          if (result !== null) {
-            return result;
+          if (result === null) {
+            throw new Error(
+              "ClickHouse is enabled but returned null for getDistinctFieldNames — check ClickHouse client configuration",
+            );
           }
-          this.logger.warn(
-            { projectId },
-            "ClickHouse enabled but returned null for getDistinctFieldNames, falling back to Elasticsearch",
-          );
+          return result;
         }
 
         return this.elasticsearchService.getDistinctFieldNames(
