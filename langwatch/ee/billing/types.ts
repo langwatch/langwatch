@@ -23,3 +23,20 @@ export type PlanLimitNotifierInput = {
   organizationId: string;
   planName: string;
 };
+
+export type PlanLimitNotificationContext = {
+  organizationId: string;
+  organizationName: string;
+  adminName?: string;
+  adminEmail?: string;
+  planName: string;
+};
+
+export type PlanLimitNotificationHandlers = {
+  sendSlackNotification?: (
+    context: PlanLimitNotificationContext,
+  ) => Promise<void> | void;
+  sendHubspotNotification?: (
+    context: PlanLimitNotificationContext,
+  ) => Promise<void> | void;
+};

@@ -98,7 +98,7 @@ const baseAppRouter = createTRPCRouter({
   ...coreRouters,
 });
 
-const saasBillingRouters = env.IS_SAAS
+const eeRouters = env.IS_SAAS
   ? ({ subscription: subscriptionRouter } as const)
   : {};
 /**
@@ -108,7 +108,7 @@ const saasBillingRouters = env.IS_SAAS
  */
 export const appRouter = createTRPCRouter({
   ...coreRouters,
-  ...(saasBillingRouters as any),
+  ...(eeRouters as any),
   ...(dependencies.extraTRPCRoutes?.() ?? {}),
 }) as typeof baseAppRouter;
 
