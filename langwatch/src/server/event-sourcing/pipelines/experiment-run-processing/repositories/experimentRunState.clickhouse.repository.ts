@@ -46,7 +46,6 @@ interface ClickHouseExperimentRunRecord {
   StartedAt: number | null;
   FinishedAt: number | null;
   StoppedAt: number | null;
-  LastProcessedEventId: string;
   TotalScoreSum: number;
   ScoreCount: number;
   PassedCount: number;
@@ -97,7 +96,6 @@ export class ExperimentRunStateRepositoryClickHouse<
     tenantId: string,
     projectionId: string,
     projectionVersion: string,
-    lastProcessedEventId: string,
   ): ClickHouseExperimentRunWriteRecord {
     return {
       Id: projectionId,
@@ -118,7 +116,6 @@ export class ExperimentRunStateRepositoryClickHouse<
       StartedAt: data.StartedAt != null ? new Date(data.StartedAt) : null,
       FinishedAt: data.FinishedAt != null ? new Date(data.FinishedAt) : null,
       StoppedAt: data.StoppedAt != null ? new Date(data.StoppedAt) : null,
-      LastProcessedEventId: lastProcessedEventId,
       TotalScoreSum: data.TotalScoreSum,
       ScoreCount: data.ScoreCount,
       PassedCount: data.PassedCount,
@@ -150,7 +147,6 @@ export class ExperimentRunStateRepositoryClickHouse<
             toUnixTimestamp64Milli(StartedAt) AS StartedAt,
             toUnixTimestamp64Milli(FinishedAt) AS FinishedAt,
             toUnixTimestamp64Milli(StoppedAt) AS StoppedAt,
-            LastProcessedEventId,
             TotalScoreSum, ScoreCount, PassedCount, PassFailCount
           FROM ${TABLE_NAME} FINAL
           WHERE TenantId = {tenantId:String} AND RunId = {runId:String}
@@ -223,7 +219,6 @@ export class ExperimentRunStateRepositoryClickHouse<
         String(context.tenantId),
         projection.id,
         projection.version,
-        projection.id,
       );
 
       await this.clickHouseClient.insert({

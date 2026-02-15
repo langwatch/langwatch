@@ -52,7 +52,6 @@ interface ClickHouseEvaluationStateRecord {
   StartedAt: number | null;   // DateTime64(3)
   CompletedAt: number | null; // DateTime64(3)
 
-  LastProcessedEventId: string;
 }
 
 type ClickHouseEvaluationStateWriteRecord = WithDateWrites<
@@ -95,7 +94,6 @@ export class EvaluationStateRepositoryClickHouse<
     tenantId: string,
     projectionId: string,
     projectionVersion: string,
-    lastProcessedEventId: string,
   ): ClickHouseEvaluationStateWriteRecord {
     return {
       Id: projectionId,
@@ -120,8 +118,6 @@ export class EvaluationStateRepositoryClickHouse<
       ScheduledAt: data.ScheduledAt != null ? new Date(data.ScheduledAt) : null,
       StartedAt: data.StartedAt != null ? new Date(data.StartedAt) : null,
       CompletedAt: data.CompletedAt != null ? new Date(data.CompletedAt) : null,
-
-      LastProcessedEventId: lastProcessedEventId,
     };
   }
 
@@ -157,8 +153,7 @@ export class EvaluationStateRepositoryClickHouse<
             Error,
             toUnixTimestamp64Milli(ScheduledAt) AS ScheduledAt,
             toUnixTimestamp64Milli(StartedAt) AS StartedAt,
-            toUnixTimestamp64Milli(CompletedAt) AS CompletedAt,
-            LastProcessedEventId
+            toUnixTimestamp64Milli(CompletedAt) AS CompletedAt
           FROM ${TABLE_NAME} FINAL
           WHERE TenantId = {tenantId:String}
             AND EvaluationId = {evaluationId:String}
@@ -244,7 +239,6 @@ export class EvaluationStateRepositoryClickHouse<
         String(context.tenantId),
         projection.id,
         projection.version,
-        projection.id, // Use projection ID as lastProcessedEventId for now
       );
 
       await this.clickHouseClient.insert({

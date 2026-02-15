@@ -54,7 +54,6 @@ interface ClickHouseSimulationRunRecord {
   UpdatedAt: number | null; // DateTime64(3)
   FinishedAt: number | null; // DateTime64(3)
 
-  LastProcessedEventId: string;
 }
 
 type ClickHouseSimulationRunWriteRecord = WithDateWrites<
@@ -100,7 +99,6 @@ export class SimulationRunStateRepositoryClickHouse<
     tenantId: string,
     projectionId: string,
     projectionVersion: string,
-    lastProcessedEventId: string,
   ): ClickHouseSimulationRunWriteRecord {
     return {
       Id: projectionId,
@@ -127,8 +125,6 @@ export class SimulationRunStateRepositoryClickHouse<
       CreatedAt: data.CreatedAt ? new Date(data.CreatedAt) : new Date(0),
       UpdatedAt: data.UpdatedAt ? new Date(data.UpdatedAt) : new Date(0),
       FinishedAt: data.FinishedAt != null ? new Date(data.FinishedAt) : null,
-
-      LastProcessedEventId: lastProcessedEventId,
     };
   }
 
@@ -167,8 +163,7 @@ export class SimulationRunStateRepositoryClickHouse<
             DurationMs,
             toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
             toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
-            toUnixTimestamp64Milli(FinishedAt) AS FinishedAt,
-            LastProcessedEventId
+            toUnixTimestamp64Milli(FinishedAt) AS FinishedAt
           FROM ${TABLE_NAME} FINAL
           WHERE TenantId = {tenantId:String}
             AND ScenarioRunId = {scenarioRunId:String}
@@ -254,7 +249,6 @@ export class SimulationRunStateRepositoryClickHouse<
         String(context.tenantId),
         projection.id,
         projection.version,
-        projection.id,
       );
 
       await this.clickHouseClient.insert({

@@ -23,7 +23,6 @@ export interface ClickHouseEvaluationStateRow {
   ScheduledAt: string | null; // DateTime64(3) as string
   StartedAt: string | null;
   CompletedAt: string | null;
-  LastProcessedEventId: string;
   UpdatedAt: string;
 }
 

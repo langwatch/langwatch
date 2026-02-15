@@ -39,7 +39,6 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.simulation_runs
     CreatedAt DateTime64(3) CODEC(Delta(8), ZSTD(1)),
     UpdatedAt DateTime64(3) CODEC(Delta(8), ZSTD(1)),
     FinishedAt Nullable(DateTime64(3)) CODEC(Delta(8), ZSTD(1)),
-    LastProcessedEventId String CODEC(ZSTD(1)),
 
     INDEX idx_scenario_id ScenarioId TYPE bloom_filter(0.001) GRANULARITY 1,
     INDEX idx_batch_run_id BatchRunId TYPE bloom_filter(0.001) GRANULARITY 1,
