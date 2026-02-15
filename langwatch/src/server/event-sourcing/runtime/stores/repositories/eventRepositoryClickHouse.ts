@@ -101,7 +101,9 @@ export class EventRepositoryClickHouse implements EventRepository {
         AggregateId: String(aggregateId),
         EventId: row.EventId,
         EventTimestamp: row.EventTimestamp,
-        EventOccurredAt: row.EventOccurredAt || null,
+        EventOccurredAt: row.EventOccurredAt != null && row.EventOccurredAt > 0
+          ? row.EventOccurredAt
+          : null,
         EventType: row.EventType,
         EventVersion: row.EventVersion,
         EventPayload: normalizePayloadValue(row.EventPayload),
@@ -182,7 +184,9 @@ export class EventRepositoryClickHouse implements EventRepository {
         AggregateId: String(aggregateId),
         EventId: row.EventId,
         EventTimestamp: row.EventTimestamp,
-        EventOccurredAt: row.EventOccurredAt || null,
+        EventOccurredAt: row.EventOccurredAt != null && row.EventOccurredAt > 0
+          ? row.EventOccurredAt
+          : null,
         EventType: row.EventType,
         EventVersion: row.EventVersion,
         EventPayload: normalizePayloadValue(row.EventPayload),

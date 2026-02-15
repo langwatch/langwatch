@@ -296,7 +296,9 @@ export class EventStoreMemory<EventType extends Event = Event>
       aggregateType: record.AggregateType as AggregateType,
       tenantId: createTenantId(record.TenantId),
       timestamp: timestampMs,
-      occurredAt: record.EventOccurredAt || timestampMs,
+      occurredAt: record.EventOccurredAt != null && record.EventOccurredAt > 0
+        ? record.EventOccurredAt
+        : timestampMs,
       type: record.EventType as EventType["type"],
       version: record.EventVersion,
       data: payload,
