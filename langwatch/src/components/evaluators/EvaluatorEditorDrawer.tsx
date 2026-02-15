@@ -1,6 +1,7 @@
 import {
   Box,
   Button,
+  Circle,
   Field,
   Heading,
   HStack,
@@ -20,6 +21,7 @@ import { WorkflowCardDisplay } from "~/optimization_studio/components/workflow/W
 import { z } from "zod";
 import DynamicZodForm from "~/components/checks/DynamicZodForm";
 import { Drawer } from "~/components/ui/drawer";
+import { Tooltip } from "~/components/ui/tooltip";
 import {
   type AvailableSource,
   type FieldMapping as UIFieldMapping,
@@ -548,6 +550,16 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
               </Button>
             )}
             <Heading>{evaluatorDef?.name ?? "Configure Evaluator"}</Heading>
+            {hasUnsavedChanges && onLocalConfigChange && (
+              <Tooltip
+                content="Unpublished modifications"
+                positioning={{ placement: "top" }}
+                openDelay={0}
+                showArrow
+              >
+                <Circle size="10px" bg="orange.400" />
+              </Tooltip>
+            )}
           </HStack>
         </Drawer.Header>
         <Drawer.Body
