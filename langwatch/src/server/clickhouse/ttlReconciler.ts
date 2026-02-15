@@ -158,6 +158,11 @@ export async function reconcileTTL(
     return;
   }
 
+  if (!options.connectionUrl && process.env.ENABLE_CLICKHOUSE_TTL !== "true") {
+    logger.info("ENABLE_CLICKHOUSE_TTL is not set, skipping TTL reconciliation.");
+    return;
+  }
+
   const connectionUrl = options.connectionUrl ?? process.env.CLICKHOUSE_URL;
   if (!connectionUrl) {
     logger.info("CLICKHOUSE_URL not configured, skipping TTL reconciliation.");

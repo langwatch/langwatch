@@ -160,8 +160,10 @@ describe("ttlReconciler", () => {
 
     beforeEach(() => {
       savedEnv.ENABLE_CLICKHOUSE = process.env.ENABLE_CLICKHOUSE;
+      savedEnv.ENABLE_CLICKHOUSE_TTL = process.env.ENABLE_CLICKHOUSE_TTL;
       savedEnv.CLICKHOUSE_URL = process.env.CLICKHOUSE_URL;
       delete process.env.ENABLE_CLICKHOUSE;
+      delete process.env.ENABLE_CLICKHOUSE_TTL;
       delete process.env.CLICKHOUSE_URL;
     });
 
@@ -181,9 +183,17 @@ describe("ttlReconciler", () => {
       });
     });
 
+    describe("when ENABLE_CLICKHOUSE is 'true' but ENABLE_CLICKHOUSE_TTL is not set", () => {
+      it("skips reconciliation", async () => {
+        process.env.ENABLE_CLICKHOUSE = "true";
+        await expect(reconcileTTL()).resolves.toBeUndefined();
+      });
+    });
+
     describe("when ENABLE_CLICKHOUSE is 'true' but CLICKHOUSE_URL is missing", () => {
       it("skips reconciliation", async () => {
         process.env.ENABLE_CLICKHOUSE = "true";
+        process.env.ENABLE_CLICKHOUSE_TTL = "true";
         await expect(reconcileTTL()).resolves.toBeUndefined();
       });
     });
@@ -219,7 +229,6 @@ describe("ttlReconciler", () => {
       const tableNames = TABLE_TTL_CONFIG.map((c) => c.table);
       expect(tableNames).toEqual([
         "event_log",
-        "processor_checkpoints",
         "stored_spans",
         "trace_summaries",
         "evaluation_states",
