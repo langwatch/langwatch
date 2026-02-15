@@ -515,6 +515,9 @@ importers:
       ts-pattern:
         specifier: ^5.9.0
         version: 5.9.0
+      tslib:
+        specifier: ^2.6.0
+        version: 2.8.1
       undici:
         specifier: ^7.19.2
         version: 7.19.2

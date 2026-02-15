@@ -134,6 +134,7 @@
     "@bull-board/hono": "^6.16.2",
     "bullmq": "^5.66.2",
     "bullmq-otel": "^1.0.1",
+    "tslib": "^2.6.0",
     "chakra-react-select": "^6.0.1",
     "clsx": "1.2.1",
     "cookie": "^0.7.0",
