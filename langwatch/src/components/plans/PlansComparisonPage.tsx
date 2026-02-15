@@ -125,7 +125,7 @@ function PlanCardActions({
     if (currentPlan === "growth") {
       return (
         <VStack width="full" gap={2}>
-          <Button asChild width="full" colorPalette="orange" variant="solid">
+          <Button asChild width="full" color="bg.emphasized" backgroundColor="orange.600" variant="solid">
             <Link href="/settings/members">Add Members</Link>
           </Button>
         </VStack>

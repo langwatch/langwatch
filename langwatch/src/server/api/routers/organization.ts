@@ -930,21 +930,9 @@ export const organizationRouter = createTRPCRouter({
     .input(z.object({ inviteId: z.string(), organizationId: z.string() }))
     .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input, ctx }) => {
-      const prisma = ctx.prisma;
-      await prisma.organizationInvite.delete({
+      await ctx.prisma.organizationInvite.delete({
         where: { id: input.inviteId, organizationId: input.organizationId },
       });
-
-      if (dependencies.onSeatsChanged) {
-        const licenseRepo = new LicenseEnforcementRepository(prisma);
-        const currentFullMembers = await licenseRepo.getMemberCount(
-          input.organizationId
-        );
-        await dependencies.onSeatsChanged({
-          organizationId: input.organizationId,
-          newTotalSeats: currentFullMembers,
-        });
-      }
     }),
   getOrganizationPendingInvites: protectedProcedure
     .input(
