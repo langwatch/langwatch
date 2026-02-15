@@ -11,6 +11,7 @@ import type {
   NodeDataset,
   Signature,
 } from "~/optimization_studio/types/dsl";
+import { DEFAULT_MODEL } from "~/utils/constants";
 import {
   formSchema,
   handleSchema,
@@ -286,10 +287,14 @@ export function nodeDataToLocalPromptConfig(
     return undefined;
   }
 
-  // Handle legacy string format for LLM config
+  // Handle missing or legacy string format for LLM config
   const rawLlmValue = llmParameter.value;
   let llmConfig: LLMConfig;
-  if (typeof rawLlmValue === "string") {
+  if (!rawLlmValue) {
+    // LLM parameter exists but has no value (e.g., templates using workflow default_llm).
+    // Use DEFAULT_MODEL so we still extract instructions/messages from the node.
+    llmConfig = { model: DEFAULT_MODEL };
+  } else if (typeof rawLlmValue === "string") {
     console.warn(
       `Migrating legacy LLM format in nodeDataToLocalPromptConfig: string "${rawLlmValue}" -> object`,
     );
@@ -327,21 +332,39 @@ export function nodeDataToLocalPromptConfig(
     ...(o.json_schema && { json_schema: o.json_schema }),
   }));
 
-  return {
-    llm: {
-      model: llmConfig.model,
+  // Build LLM config, omitting undefined fields so they don't override
+  // defaults during merge in PromptEditorDrawer (e.g., maxTokens from project)
+  const llm: LocalPromptConfig["llm"] = {
+    model: llmConfig.model,
+    ...(llmConfig.temperature !== undefined && {
       temperature: llmConfig.temperature,
+    }),
+    ...(llmConfig.max_tokens !== undefined && {
       maxTokens: llmConfig.max_tokens,
-      topP: llmConfig.top_p,
+    }),
+    ...(llmConfig.top_p !== undefined && { topP: llmConfig.top_p }),
+    ...(llmConfig.frequency_penalty !== undefined && {
       frequencyPenalty: llmConfig.frequency_penalty,
+    }),
+    ...(llmConfig.presence_penalty !== undefined && {
       presencePenalty: llmConfig.presence_penalty,
-      seed: llmConfig.seed,
-      topK: llmConfig.top_k,
-      minP: llmConfig.min_p,
+    }),
+    ...(llmConfig.seed !== undefined && { seed: llmConfig.seed }),
+    ...(llmConfig.top_k !== undefined && { topK: llmConfig.top_k }),
+    ...(llmConfig.min_p !== undefined && { minP: llmConfig.min_p }),
+    ...(llmConfig.repetition_penalty !== undefined && {
       repetitionPenalty: llmConfig.repetition_penalty,
+    }),
+    ...(llmConfig.reasoning !== undefined && {
       reasoning: llmConfig.reasoning,
+    }),
+    ...(llmConfig.verbosity !== undefined && {
       verbosity: llmConfig.verbosity,
-    },
+    }),
+  };
+
+  return {
+    llm,
     messages,
     inputs,
     outputs,
