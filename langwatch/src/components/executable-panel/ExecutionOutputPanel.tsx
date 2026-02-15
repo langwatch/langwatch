@@ -44,8 +44,8 @@ export const ExecutionOutputPanel = ({
       <HStack align="center" width="full" paddingBottom={3}>
         <Heading
           as="h3"
-          fontSize="16px"
-          fontWeight="bold"
+          fontSize="14px"
+          fontWeight="600"
           textTransform="uppercase"
           color="fg.muted"
           paddingBottom={4}

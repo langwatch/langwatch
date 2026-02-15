@@ -1,7 +1,5 @@
-import { Box } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
 import { useShallow } from "zustand/react/shallow";
-import { useDrawer } from "~/hooks/useDrawer";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import type { Component, ComponentType, Evaluator } from "../../types/dsl";
 import { CodePropertiesPanel } from "../properties/CodePropertiesPanel";
@@ -11,10 +9,10 @@ import { EntryPointPropertiesPanel } from "../properties/EntryPointPropertiesPan
 import { EvaluatorPropertiesPanel } from "../properties/EvaluatorPropertiesPanel";
 import { PromptingTechniquePropertiesPanel } from "../properties/PromptingTechniquePropertiesPanel";
 import { RetrievePropertiesPanel } from "../properties/RetrievePropertiesPanel";
-import { WorkflowPropertiesPanel } from "../properties/WorkflowPropertiesPanel";
 import { SignaturePromptEditorBridge } from "./SignaturePromptEditorBridge";
 import { StudioDrawerWrapper } from "./StudioDrawerWrapper";
 import { InsideDrawerProvider } from "./useInsideDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 
 /**
  * Panel map for all node types. Every node type goes through
@@ -39,19 +37,14 @@ const ComponentPropertiesPanelMap: Partial<
  *
  * All node types (including signature/LLM) go through StudioDrawerWrapper
  * for unified play/expand/close controls.
- *
- * When no node is selected but the workflow background was clicked, it falls
- * back to rendering the WorkflowPropertiesPanel in a plain sidebar.
  */
 export function StudioNodeDrawer() {
-  const { selectedNode, workflowSelected, deselectAllNodes } =
-    useWorkflowStore(
-      useShallow((state) => ({
-        selectedNode: state.nodes.find((n) => n.selected),
-        workflowSelected: state.workflowSelected,
-        deselectAllNodes: state.deselectAllNodes,
-      })),
-    );
+  const { selectedNode, deselectAllNodes } = useWorkflowStore(
+    useShallow((state) => ({
+      selectedNode: state.nodes.find((n) => n.selected),
+      deselectAllNodes: state.deselectAllNodes,
+    })),
+  );
 
   const { currentDrawer } = useDrawer();
 
@@ -76,37 +69,12 @@ export function StudioNodeDrawer() {
     : undefined;
 
   return (
-    <>
-      {/* Workflow-level settings panel (no node selected, background clicked) */}
-      {!selectedNode && workflowSelected && (
-        <Box
-          position="relative"
-          top={0}
-          right={0}
-          background="white"
-          border="1px solid"
-          borderColor="border.emphasized"
-          borderTopWidth={0}
-          borderBottomWidth={0}
-          borderRightWidth={0}
-          zIndex={100}
-          height="full"
-        >
-          <WorkflowPropertiesPanel />
-        </Box>
-      )}
-
-      {/* All node types go through StudioDrawerWrapper */}
-      <InsideDrawerProvider>
-        <StudioDrawerWrapper
-          node={effectiveNode}
-          onClose={deselectAllNodes}
-        >
-          {effectiveNode && PanelComponent && (
-            <PanelComponent key={effectiveNode.id} node={effectiveNode} />
-          )}
-        </StudioDrawerWrapper>
-      </InsideDrawerProvider>
-    </>
+    <InsideDrawerProvider>
+      <StudioDrawerWrapper node={effectiveNode} onClose={deselectAllNodes}>
+        {effectiveNode && PanelComponent && (
+          <PanelComponent key={effectiveNode.id} node={effectiveNode} />
+        )}
+      </StudioDrawerWrapper>
+    </InsideDrawerProvider>
   );
 }

@@ -190,7 +190,6 @@ export function WorkflowSelectorForEvaluatorDrawer(
         open={isOpen}
         onOpenChange={({ open }) => !open && onClose()}
         size="md"
-        closeOnInteractOutside={false}
         modal={false}
       >
         <Drawer.Content>

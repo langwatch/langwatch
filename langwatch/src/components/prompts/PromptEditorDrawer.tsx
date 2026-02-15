@@ -1143,7 +1143,6 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       open={isOpen}
       onOpenChange={({ open }) => !open && handleClose()}
       size="sm"
-      closeOnInteractOutside={false}
       modal={false}
     >
       <Drawer.Content>

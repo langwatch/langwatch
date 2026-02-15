@@ -40,6 +40,7 @@ import { Link } from "../../components/ui/link";
 import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { useDrawer } from "../../hooks/useDrawer";
 import { titleCase } from "../../utils/stringCasing";
 import { useAskBeforeLeaving } from "../hooks/useAskBeforeLeaving";
 import { PostEventProvider, usePostEvent } from "../hooks/usePostEvent";
@@ -62,6 +63,7 @@ import { Publish } from "./Publish";
 import { StudioNodeDrawer } from "./drawers/StudioNodeDrawer";
 import { ResultsPanel } from "./ResultsPanel";
 import { UndoRedo } from "./UndoRedo";
+import { WorkflowNamePopover } from "./WorkflowNamePopover";
 
 function DragDropArea({ children }: { children: React.ReactNode }) {
   const [_, drop] = useDrop(() => ({
@@ -96,7 +98,6 @@ export default function OptimizationStudio() {
     onNodesDelete,
     onEdgesChange,
     onConnect,
-    setWorkflowSelected,
     openResultsPanelRequest,
     setOpenResultsPanelRequest,
     executionStatus,
@@ -114,7 +115,6 @@ export default function OptimizationStudio() {
         onNodesDelete: state.onNodesDelete,
         onEdgesChange: state.onEdgesChange,
         onConnect: state.onConnect,
-        setWorkflowSelected: state.setWorkflowSelected,
         openResultsPanelRequest: state.openResultsPanelRequest,
         setOpenResultsPanelRequest: state.setOpenResultsPanelRequest,
         executionStatus: state.state.execution?.status,
@@ -124,6 +124,7 @@ export default function OptimizationStudio() {
 
   const { project } = useOrganizationTeamProject();
   const { socketStatus } = usePostEvent();
+  const { closeDrawer, currentDrawer } = useDrawer();
 
   const [nodeSelectionPanelIsOpen, setNodeSelectionPanelIsOpen] =
     useState(true);
@@ -184,15 +185,7 @@ export default function OptimizationStudio() {
 
   useAskBeforeLeaving();
 
-  // Add body class so global drawer styles can target studio context.
-  // Drawer portals render at document.body level so they can't inherit
-  // styles from the React component tree.
-  useEffect(() => {
-    document.body.classList.add("studio-drawer-offset");
-    return () => {
-      document.body.classList.remove("studio-drawer-offset");
-    };
-  }, []);
+
 
   return (
     <div style={{ width: "100vw", height: "100vh" }}>
@@ -222,9 +215,7 @@ export default function OptimizationStudio() {
                     ) && <AutoSave />}
                   </HStack>
                   <HStack width="full" justify="center">
-                    <Text lineClamp={1} fontSize="15px" wordBreak="break-all">
-                      Optimization Studio - {name}
-                    </Text>
+                    <WorkflowNamePopover />
                     <StatusCircle
                       status={socketStatus}
                       tooltip={
@@ -319,7 +310,10 @@ export default function OptimizationStudio() {
                               }
                             }}
                             onPaneClick={() => {
-                              setWorkflowSelected(true);
+                              if (currentDrawer) closeDrawer();
+                            }}
+                            onNodeClick={() => {
+                              if (currentDrawer) closeDrawer();
                             }}
                             fitView
                             fitViewOptions={{
@@ -386,16 +380,8 @@ export default function OptimizationStudio() {
           </WizardProvider>
         </DndProvider>
       </ReactFlowProvider>
-      {/* Offset URL-based drawers (rendered via CurrentDrawer portals) to
-          sit below the studio header bar. StudioDrawerWrapper already has
-          marginTop="56px" inline; this CSS handles the same offset for
-          URL-based drawers (PromptListDrawer, EvaluatorListDrawer, etc.). */}
-      <style>{`
-        body.studio-drawer-offset [data-scope="drawer"][data-part="content"] {
-          margin-top: 56px;
-        }
-      `}</style>
-      <CurrentDrawer />
+
+      <CurrentDrawer marginTop={56} />
     </div>
   );
 }

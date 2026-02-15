@@ -335,7 +335,6 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
         open={isOpen}
         onOpenChange={({ open }) => !open && handleClose()}
         size="lg"
-        closeOnInteractOutside={false}
         modal={false}
         preventScroll={false}
       >

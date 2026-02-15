@@ -96,8 +96,8 @@ export const ExecutionInputPanel = ({
       <VStack align="start" gap={3} width="full">
         <Heading
           as="h3"
-          fontSize="16px"
-          fontWeight="bold"
+          fontSize="14px"
+          fontWeight="600"
           textTransform="uppercase"
           color="fg.muted"
           paddingBottom={4}

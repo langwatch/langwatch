@@ -530,7 +530,6 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
       open={isOpen}
       onOpenChange={({ open }) => !open && handleClose()}
       size="lg"
-      closeOnInteractOutside={false}
       modal={false}
     >
       <Drawer.Content>

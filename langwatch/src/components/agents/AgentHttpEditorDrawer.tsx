@@ -464,7 +464,6 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
         open={isOpen}
         onOpenChange={({ open }) => !open && handleClose()}
         size="lg"
-        closeOnInteractOutside={false}
         modal={false}
         preventScroll={false}
     >

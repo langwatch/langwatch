@@ -14,11 +14,9 @@ import type { Component, ComponentType } from "../../types/dsl";
 import { ComponentIcon } from "../ColorfulBlockIcons";
 import { InputPanel } from "../component_execution/InputPanel";
 import { OutputPanel } from "../component_execution/OutputPanel";
-import {
-  ComponentExecutionButton,
-  getNodeDisplayName,
-} from "../nodes/Nodes";
+import { ComponentExecutionButton, getNodeDisplayName } from "../nodes/Nodes";
 import { DrawerFooterContext } from "./useInsideDrawer";
+import { Tooltip } from "~/components/ui/tooltip";
 
 /**
  * Determines whether a node type supports the expand (Input/Output panels)
@@ -54,17 +52,14 @@ export function StudioDrawerWrapper({
   onClose,
   footer,
 }: StudioDrawerWrapperProps) {
-  const {
-    deselectAllNodes,
-    propertiesExpanded,
-    setPropertiesExpanded,
-  } = useWorkflowStore(
-    useShallow((state) => ({
-      deselectAllNodes: state.deselectAllNodes,
-      propertiesExpanded: state.propertiesExpanded,
-      setPropertiesExpanded: state.setPropertiesExpanded,
-    })),
-  );
+  const { deselectAllNodes, propertiesExpanded, setPropertiesExpanded } =
+    useWorkflowStore(
+      useShallow((state) => ({
+        deselectAllNodes: state.deselectAllNodes,
+        propertiesExpanded: state.propertiesExpanded,
+        setPropertiesExpanded: state.setPropertiesExpanded,
+      })),
+    );
 
   // Footer registered by child components via useRegisterDrawerFooter
   const [registeredFooter, setRegisteredFooter] =
@@ -146,22 +141,28 @@ export function StudioDrawerWrapper({
       <HStack gap={0} flexShrink={0}>
         {showControls && (
           <>
-            <ComponentExecutionButton
-              node={node}
-              size="sm"
-              iconSize={16}
-            />
+            <ComponentExecutionButton node={node} size="sm" iconSize={16} />
 
-            <Button
-              variant="ghost"
-              size="sm"
-              color="fg.muted"
-              onClick={() =>
-                setPropertiesExpanded(!propertiesExpanded)
+            <Tooltip
+              content={
+                propertiesExpanded
+                  ? "Collapse input and output panels"
+                  : "Expand input and output panels"
               }
+              showArrow
+              positioning={{ placement: "top" }}
+              openDelay={0}
+              closeDelay={0}
             >
-              <Columns size={16} />
-            </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                color="fg.muted"
+                onClick={() => setPropertiesExpanded(!propertiesExpanded)}
+              >
+                <Columns size={16} />
+              </Button>
+            </Tooltip>
           </>
         )}
         <Button
@@ -190,7 +191,12 @@ export function StudioDrawerWrapper({
       >
         <Drawer.Content marginTop="56px">
           {node && (
-            <Drawer.Header paddingTop={4} paddingBottom={3} paddingLeft={4} paddingRight={3}>
+            <Drawer.Header
+              paddingTop={4}
+              paddingBottom={3}
+              paddingLeft={4}
+              paddingRight={3}
+            >
               {headerContent}
             </Drawer.Header>
           )}
@@ -274,11 +280,7 @@ export function StudioDrawerWrapper({
               </Box>
 
               {/* Body */}
-              <Box
-                flex={1}
-                overflowY="auto"
-                overflowX="hidden"
-              >
+              <Box flex={1} overflowY="auto" overflowX="hidden">
                 <DrawerFooterContext.Provider value={setRegisteredFooter}>
                   {children}
                 </DrawerFooterContext.Provider>
@@ -336,9 +338,7 @@ export function StudioDrawerWrapper({
                 className="js-outer-box"
                 onClick={(e: React.MouseEvent<HTMLDivElement>) => {
                   if (
-                    (e.target as HTMLElement).classList.contains(
-                      "js-outer-box"
-                    )
+                    (e.target as HTMLElement).classList.contains("js-outer-box")
                   ) {
                     setPropertiesExpanded(false);
                   }
@@ -373,9 +373,7 @@ export function StudioDrawerWrapper({
                 className="js-outer-box"
                 onClick={(e: React.MouseEvent<HTMLDivElement>) => {
                   if (
-                    (e.target as HTMLElement).classList.contains(
-                      "js-outer-box"
-                    )
+                    (e.target as HTMLElement).classList.contains("js-outer-box")
                   ) {
                     setPropertiesExpanded(false);
                   }
@@ -385,7 +383,7 @@ export function StudioDrawerWrapper({
               </MotionDiv>
             </Box>
           </Box>,
-          document.body
+          document.body,
         )}
     </>
   );
