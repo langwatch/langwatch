@@ -934,17 +934,6 @@ export const organizationRouter = createTRPCRouter({
       await ctx.prisma.organizationInvite.delete({
         where: { id: input.inviteId, organizationId: input.organizationId },
       });
-
-      if (dependencies.onSeatsChanged) {
-        const licenseRepo = new LicenseEnforcementRepository(prisma);
-        const currentFullMembers = await licenseRepo.getMemberCount(
-          input.organizationId
-        );
-        await dependencies.onSeatsChanged({
-          organizationId: input.organizationId,
-          newTotalSeats: currentFullMembers,
-        });
-      }
     }),
   getOrganizationPendingInvites: protectedProcedure
     .input(

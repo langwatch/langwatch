@@ -51,10 +51,6 @@ export interface Dependencies {
     model: string;
     modelProvider: MaybeStoredModelProvider;
   }) => Promise<Record<string, string>>;
-  onSeatsChanged?: (args: {
-    organizationId: string;
-    newTotalSeats: number;
-  }) => Promise<boolean>;
 }
 
 const dependencies: Dependencies = {};
