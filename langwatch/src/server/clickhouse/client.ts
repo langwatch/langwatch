@@ -38,7 +38,12 @@ export function getClickHouseClient(): ClickHouseClient | null {
       );
     }
 
-    clickHouseClient = createClient({ url });
+    clickHouseClient = createClient({
+      url,
+      clickhouse_settings: {
+        date_time_input_format: "best_effort",
+      },
+    });
   }
 
   return clickHouseClient;
