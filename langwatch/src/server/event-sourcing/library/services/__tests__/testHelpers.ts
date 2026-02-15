@@ -200,6 +200,7 @@ export function createTestEvent(
     aggregateType,
     tenantId,
     timestamp,
+    occurredAt: timestamp,
     version,
     type,
     data,

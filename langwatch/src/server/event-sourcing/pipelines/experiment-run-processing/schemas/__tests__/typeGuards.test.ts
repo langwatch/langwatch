@@ -20,6 +20,7 @@ const baseEvent = {
   aggregateType: "experiment_run" as const,
   tenantId: TEST_TENANT_ID,
   timestamp: 1000,
+  occurredAt: 1000,
 };
 
 describe("typeGuards", () => {

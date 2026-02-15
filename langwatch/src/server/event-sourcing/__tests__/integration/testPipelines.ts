@@ -53,6 +53,7 @@ export interface TestEvent {
   aggregateType: "test_aggregate";
   tenantId: TenantId;
   timestamp: number;
+  occurredAt: number;
   version: string;
   type: typeof TEST_EVENT_TYPE;
   data: TestEventData;
