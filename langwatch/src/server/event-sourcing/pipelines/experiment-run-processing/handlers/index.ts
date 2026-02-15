@@ -1,1 +1,1 @@
-export { ExperimentRunResultStorageHandler } from "./experimentRunResultStorage.handler";
+export { experimentRunResultStorageMapProjection } from "./experimentRunResultStorage.mapProjection";

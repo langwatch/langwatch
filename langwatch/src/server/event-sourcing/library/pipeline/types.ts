@@ -1,11 +1,9 @@
 import type { FeatureFlagServiceInterface } from "../../../featureFlag/types";
 import type { PipelineMetadata } from "../../runtime/pipeline/types";
 import type { CommandHandlerClass } from "../commands/commandHandlerClass";
-import type { EventHandlerClass } from "../domain/handlers/eventHandlerClass";
-import type { ProjectionHandlerClass } from "../domain/handlers/projectionHandlerClass";
 import type { Event, ParentLink, Projection } from "../domain/types";
-import type { EventHandlerOptions } from "../eventHandler.types";
-import type { ProjectionOptions } from "../projection.types";
+import type { FoldProjectionDefinition, FoldProjectionOptions } from "../projections/foldProjection.types";
+import type { MapProjectionDefinition, MapProjectionOptions } from "../projections/mapProjection.types";
 
 /**
  * Kill switch options for event sourcing components.
@@ -46,14 +44,14 @@ export type NoCommands = never;
 
 /**
  * Static pipeline definition that can be imported without runtime dependencies.
- * Contains metadata and handler classes but no connection to infrastructure.
+ * Contains metadata and projection/handler definitions but no connection to infrastructure.
  *
  * @example
  * ```typescript
  * const definition = definePipeline<MyEvent>()
  *   .withName("my-pipeline")
  *   .withAggregateType("entity")
- *   .withProjection("summary", SummaryHandler)
+ *   .withFoldProjection("summary", summaryProjection)
  *   .build();
  * ```
  */
@@ -68,21 +66,21 @@ export interface StaticPipelineDefinition<
   /** Pipeline metadata for introspection and tooling */
   metadata: PipelineMetadata;
 
-  /** Projection handlers registered in this pipeline */
-  projections: Map<
+  /** Fold projections (stateful, reduce events into state) registered in this pipeline */
+  foldProjections: Map<
     string,
     {
-      handlerClass: ProjectionHandlerClass<EventType, any>;
-      options?: ProjectionOptions;
+      definition: FoldProjectionDefinition<any, EventType>;
+      options?: FoldProjectionOptions;
     }
   >;
 
-  /** Event handlers registered in this pipeline */
-  eventHandlers: Map<
+  /** Map projections (stateless, transform individual events) registered in this pipeline */
+  mapProjections: Map<
     string,
     {
-      handlerClass: EventHandlerClass<EventType>;
-      options?: EventHandlerOptions<EventType>;
+      definition: MapProjectionDefinition<any, EventType>;
+      options?: MapProjectionOptions;
     }
   >;
 

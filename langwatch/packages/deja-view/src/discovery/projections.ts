@@ -3,9 +3,8 @@ import { discoverPipelines } from "./pipelines";
 import type { DiscoveredProjection } from "./projections.types";
 
 /**
- * Discovers projection handler classes by reading static pipeline definitions.
- * The static pipeline definitions already contain the handler classes, so we just
- * extract them directly without needing to scan files or match by name.
+ * Discovers fold projections by reading static pipeline definitions.
+ * The static pipeline definitions contain the projection definitions directly.
  *
  * This approach works even when runtime dependencies (ClickHouse, Redis) are unavailable.
  *
@@ -13,7 +12,6 @@ import type { DiscoveredProjection } from "./projections.types";
  * const projections = await discoverProjections();
  */
 export async function discoverProjections(): Promise<DiscoveredProjection[]> {
-  // Discover all pipelines to get their static definitions
   const pipelines = await discoverPipelines();
 
   const results: DiscoveredProjection[] = [];
@@ -22,18 +20,17 @@ export async function discoverProjections(): Promise<DiscoveredProjection[]> {
     const pipelineName = pipeline.pipeline.metadata.name;
     const pipelineDir = path.dirname(pipeline.pipelineFilePath);
 
-    // The static pipeline definition already has the handler classes in the projections Map!
-    // Just iterate over them directly
-    for (const [projectionName, projectionDef] of pipeline.pipeline
-      .projections) {
+    // Read fold projections from the static pipeline definition
+    for (const [projectionName, { definition }] of pipeline.pipeline
+      .foldProjections) {
       const id = `${pipelineName}:${projectionName}`;
 
       results.push({
         id,
         pipelineName,
         projectionName,
-        filePath: path.join(pipelineDir, "projections"), // Approximate path to projections directory
-        HandlerClass: projectionDef.handlerClass,
+        filePath: path.join(pipelineDir, "projections"),
+        definition,
       });
     }
   }

@@ -93,6 +93,9 @@ export class ClickHouseAnalyticsService {
           if (estimatedBuckets > MAX_TIMESERIES_BUCKETS) {
             adjustedTimeScale = MINUTES_PER_DAY;
           }
+        } else if (input.timeScale === undefined) {
+          // Default to daily granularity to match ES behavior (fixed_interval: "1d")
+          adjustedTimeScale = MINUTES_PER_DAY;
         }
 
         // Build the query

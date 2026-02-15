@@ -74,6 +74,13 @@ export const ATTR_KEYS = {
   OTEL_SPAN_KIND: "otel.span.kind",
   INCOMING_SPAN_KIND: "incomingSpan.kind",
 
+  // LangWatch cost and estimation attributes
+  LANGWATCH_SPAN_COST: "langwatch.span.cost",
+  LANGWATCH_TOKENS_ESTIMATED: "langwatch.tokens.estimated",
+  LANGWATCH_METRICS: "langwatch.metrics",
+  LANGWATCH_MODEL_INPUT_COST_PER_TOKEN: "langwatch.model.inputCostPerToken",
+  LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN: "langwatch.model.outputCostPerToken",
+
   // LangWatch attributes
   LANGWATCH_INPUT: "langwatch.input",
   LANGWATCH_OUTPUT: "langwatch.output",

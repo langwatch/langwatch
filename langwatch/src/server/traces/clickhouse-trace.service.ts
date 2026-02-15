@@ -1275,6 +1275,8 @@ export class ClickHouseTraceService {
       TokensEstimated: row.ts_TokensEstimated,
       TotalPromptTokenCount: row.ts_TotalPromptTokenCount,
       TotalCompletionTokenCount: row.ts_TotalCompletionTokenCount,
+      OutputFromRootSpan: row.ts_OutputFromRootSpan ?? false,
+      OutputSpanEndTimeMs: row.ts_OutputSpanEndTimeMs ?? 0,
       TopicId: row.ts_TopicId,
       SubTopicId: row.ts_SubTopicId,
       HasAnnotation: row.ts_HasAnnotation,
@@ -1475,6 +1477,8 @@ export class ClickHouseTraceService {
       TokensEstimated: row.ts_TokensEstimated,
       TotalPromptTokenCount: row.ts_TotalPromptTokenCount,
       TotalCompletionTokenCount: row.ts_TotalCompletionTokenCount,
+      OutputFromRootSpan: row.ts_OutputFromRootSpan ?? false,
+      OutputSpanEndTimeMs: row.ts_OutputSpanEndTimeMs ?? 0,
       TopicId: row.ts_TopicId,
       SubTopicId: row.ts_SubTopicId,
       HasAnnotation: row.ts_HasAnnotation,
@@ -1597,6 +1601,8 @@ interface TraceSummaryRecord {
   TokensEstimated: boolean;
   TotalPromptTokenCount: number | null;
   TotalCompletionTokenCount: number | null;
+  OutputFromRootSpan: boolean;
+  OutputSpanEndTimeMs: number;
   TopicId: string | null;
   SubTopicId: string | null;
   HasAnnotation: boolean | null;
@@ -1627,6 +1633,8 @@ interface TraceSummaryRow {
   ts_TokensEstimated: boolean;
   ts_TotalPromptTokenCount: number | null;
   ts_TotalCompletionTokenCount: number | null;
+  ts_OutputFromRootSpan?: boolean;
+  ts_OutputSpanEndTimeMs?: number;
   ts_TopicId: string | null;
   ts_SubTopicId: string | null;
   ts_HasAnnotation: boolean | null;

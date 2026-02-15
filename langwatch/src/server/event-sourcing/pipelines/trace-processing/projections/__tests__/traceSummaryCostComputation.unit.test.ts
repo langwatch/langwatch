@@ -1,0 +1,175 @@
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import type { NormalizedSpan } from "../../schemas/spans";
+import { NormalizedSpanKind, NormalizedStatusCode } from "../../schemas/spans";
+import { TraceIOExtractionService } from "../../services/traceIOExtractionService";
+import {
+  applySpanToSummary,
+  traceSummaryFoldProjection,
+  type TraceSummaryData,
+} from "../traceSummary.foldProjection";
+
+function createInitState(): TraceSummaryData {
+  return traceSummaryFoldProjection.init();
+}
+
+function createTestSpan(overrides: Partial<NormalizedSpan> = {}): NormalizedSpan {
+  return {
+    id: "span-1",
+    traceId: "trace-1",
+    spanId: "span-1",
+    tenantId: "tenant-1",
+    parentSpanId: "parent-1",
+    parentTraceId: null,
+    parentIsRemote: null,
+    sampled: true,
+    startTimeUnixMs: 1000,
+    endTimeUnixMs: 2000,
+    durationMs: 1000,
+    name: "test-span",
+    kind: NormalizedSpanKind.INTERNAL,
+    resourceAttributes: {},
+    spanAttributes: {},
+    events: [],
+    links: [],
+    statusMessage: null,
+    statusCode: NormalizedStatusCode.UNSET,
+    instrumentationScope: { name: "test", version: null },
+    droppedAttributesCount: 0 as const,
+    droppedEventsCount: 0 as const,
+    droppedLinksCount: 0 as const,
+    ...overrides,
+  };
+}
+
+describe("applySpanToSummary cost computation", () => {
+  let extractSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    extractSpy = vi.spyOn(
+      TraceIOExtractionService.prototype,
+      "extractRichIOFromSpan",
+    );
+    extractSpy.mockReturnValue(null);
+  });
+
+  afterEach(() => {
+    extractSpy.mockRestore();
+  });
+
+  describe("when span has custom cost rates and tokens", () => {
+    it("computes cost from custom rates", () => {
+      const span = createTestSpan({
+        spanAttributes: {
+          "gen_ai.request.model": "gpt-4o",
+          "gen_ai.usage.input_tokens": 100,
+          "gen_ai.usage.output_tokens": 50,
+          "langwatch.model.inputCostPerToken": 0.000005,
+          "langwatch.model.outputCostPerToken": 0.000015,
+        },
+      });
+
+      const result = applySpanToSummary(createInitState(), span);
+
+      // 100 * 0.000005 + 50 * 0.000015 = 0.0005 + 0.00075 = 0.00125
+      expect(result.TotalCost).toBeCloseTo(0.00125, 6);
+    });
+  });
+
+  describe("when span has model and tokens but no custom rates", () => {
+    it("uses static registry for cost computation", () => {
+      const span = createTestSpan({
+        spanAttributes: {
+          "gen_ai.request.model": "gpt-4o",
+          "gen_ai.usage.input_tokens": 1000,
+          "gen_ai.usage.output_tokens": 500,
+        },
+      });
+
+      const result = applySpanToSummary(createInitState(), span);
+
+      // gpt-4o is in the static registry, so cost should be computed
+      // The exact value depends on the JSON file, but it should be > 0
+      expect(result.TotalCost).not.toBeNull();
+      expect(result.TotalCost).toBeGreaterThan(0);
+    });
+  });
+
+  describe("when model is not in static registry", () => {
+    it("returns cost as 0 (null in state)", () => {
+      const span = createTestSpan({
+        spanAttributes: {
+          "gen_ai.request.model": "totally-unknown-model-xyz-12345",
+          "gen_ai.usage.input_tokens": 100,
+          "gen_ai.usage.output_tokens": 50,
+        },
+      });
+
+      const result = applySpanToSummary(createInitState(), span);
+
+      expect(result.TotalCost).toBeNull();
+    });
+  });
+
+  describe("when no tokens are present", () => {
+    it("returns cost as null", () => {
+      const span = createTestSpan({
+        spanAttributes: {
+          "gen_ai.request.model": "gpt-4o",
+        },
+      });
+
+      const result = applySpanToSummary(createInitState(), span);
+
+      expect(result.TotalCost).toBeNull();
+    });
+  });
+
+  describe("when no model is present", () => {
+    it("falls back to SDK cost if available", () => {
+      const span = createTestSpan({
+        spanAttributes: {
+          "gen_ai.usage.input_tokens": 100,
+          "gen_ai.usage.output_tokens": 50,
+          "langwatch.span.cost": 0.005,
+        },
+      });
+
+      const result = applySpanToSummary(createInitState(), span);
+
+      expect(result.TotalCost).toBeCloseTo(0.005, 6);
+    });
+  });
+
+  describe("when no model and no SDK cost", () => {
+    it("returns cost as null", () => {
+      const span = createTestSpan({
+        spanAttributes: {
+          "gen_ai.usage.input_tokens": 100,
+          "gen_ai.usage.output_tokens": 50,
+        },
+      });
+
+      const result = applySpanToSummary(createInitState(), span);
+
+      expect(result.TotalCost).toBeNull();
+    });
+  });
+
+  describe("when custom rates have only inputCostPerToken", () => {
+    it("computes cost using only input rate", () => {
+      const span = createTestSpan({
+        spanAttributes: {
+          "gen_ai.request.model": "gpt-4o",
+          "gen_ai.usage.input_tokens": 100,
+          "gen_ai.usage.output_tokens": 50,
+          "langwatch.model.inputCostPerToken": 0.00001,
+        },
+      });
+
+      const result = applySpanToSummary(createInitState(), span);
+
+      // 100 * 0.00001 + 50 * 0 = 0.001
+      expect(result.TotalCost).toBeCloseTo(0.001, 6);
+    });
+  });
+});

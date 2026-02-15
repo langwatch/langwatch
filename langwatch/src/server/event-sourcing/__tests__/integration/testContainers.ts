@@ -219,13 +219,6 @@ export async function cleanupTestData(tenantId?: string): Promise<void> {
 
     await clickHouseClient.exec({
       query: `
-        ALTER TABLE "${TEST_DATABASE}".processor_checkpoints DELETE WHERE TenantId = {tenantId:String}
-      `,
-      query_params: { tenantId },
-    });
-
-    await clickHouseClient.exec({
-      query: `
         ALTER TABLE "${TEST_DATABASE}".stored_spans DELETE WHERE TenantId = {tenantId:String}
       `,
       query_params: { tenantId },
@@ -254,10 +247,6 @@ export async function cleanupTestData(tenantId?: string): Promise<void> {
     // Clean up all test data using TRUNCATE (synchronous and faster)
     await clickHouseClient.exec({
       query: `TRUNCATE TABLE IF EXISTS "${TEST_DATABASE}".event_log`,
-    });
-
-    await clickHouseClient.exec({
-      query: `TRUNCATE TABLE IF EXISTS "${TEST_DATABASE}".processor_checkpoints`,
     });
 
     await clickHouseClient.exec({

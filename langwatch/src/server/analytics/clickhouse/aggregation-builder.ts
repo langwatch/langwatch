@@ -142,16 +142,15 @@ const groupByExpressions: Partial<
     usesArrayJoin: true,
   }),
 
-  // For span-level grouping, convert empty/missing to 'unknown' to match
-  // ES terms aggregation with `missing: "unknown"` configuration.
+  // Use trace-level Models array instead of span-level model to avoid
+  // double-counting trace metrics. When joining stored_spans, non-LLM spans
+  // (without a model) would create "unknown" entries that duplicate the
+  // trace's TotalPromptTokenCount/TotalCost across model groups.
+  // trace_summaries.Models only contains actual LLM models, matching ES behavior.
   "metadata.model": () => ({
-    column: `if(
-      ${tableAliases.stored_spans}.SpanAttributes['gen_ai.request.model'] = '' OR
-      ${tableAliases.stored_spans}.SpanAttributes['gen_ai.request.model'] IS NULL,
-      'unknown',
-      ${tableAliases.stored_spans}.SpanAttributes['gen_ai.request.model']
-    )`,
-    requiredJoins: ["stored_spans"],
+    column: `arrayJoin(if(empty(${tableAliases.trace_summaries}.Models), ['unknown'], ${tableAliases.trace_summaries}.Models))`,
+    requiredJoins: [],
+    usesArrayJoin: true,
     handlesUnknown: true,
   }),
 

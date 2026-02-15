@@ -11,9 +11,9 @@ vi.mock("~/server/clickhouse/client", () => ({
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { Event } from "../../library";
-import type { TenantId } from "../../library/domain/tenantId";
+import { definePipeline } from "../../library";
 import { createMockEventStore } from "../../library/services/__tests__/testHelpers";
-import { DisabledPipelineBuilder } from "../disabledPipeline";
+import { DisabledPipeline } from "../disabledPipeline";
 import { EventSourcing } from "../eventSourcing";
 import {
   EventSourcingRuntime,
@@ -21,9 +21,18 @@ import {
   initializeEventSourcingForTesting,
   resetEventSourcingRuntime,
 } from "../eventSourcingRuntime";
-import { PipelineBuilder } from "../index";
 import { EventStoreClickHouse } from "../stores/eventStoreClickHouse";
 import { EventStoreMemory } from "../stores/eventStoreMemory";
+
+/**
+ * Creates a minimal static pipeline definition for testing.
+ */
+function createTestPipelineDefinition() {
+  return definePipeline<Event>()
+    .withName("test-pipeline")
+    .withAggregateType("trace")
+    .build();
+}
 
 describe("EventSourcing", () => {
   beforeEach(() => {
@@ -114,19 +123,7 @@ describe("EventSourcing", () => {
       expect(eventStore).toBe(mockEventStore);
     });
 
-    it("returns PipelineBuilder when event sourcing is enabled", () => {
-      const mockEventStore = createMockEventStore<Event>();
-      const runtime = EventSourcingRuntime.createForTesting({
-        eventStore: mockEventStore,
-      });
-
-      const instance = new EventSourcing(runtime);
-      const builder = instance.registerPipeline<Event>();
-
-      expect(builder).toBeInstanceOf(PipelineBuilder);
-    });
-
-    it("returns disabled status from runtime", () => {
+    it("returns enabled status from runtime", () => {
       const mockEventStore = createMockEventStore<Event>();
       const runtime = EventSourcingRuntime.createForTesting({
         eventStore: mockEventStore,
@@ -184,66 +181,29 @@ describe("EventSourcing", () => {
     });
   });
 
-  describe("registerPipeline", () => {
-    it("returns a new PipelineBuilder instance", () => {
-      const mockEventStore = createMockEventStore<Event>();
-      const runtime = EventSourcingRuntime.createForTesting({
-        eventStore: mockEventStore,
-      });
-
-      const instance = new EventSourcing(runtime);
-      const builder = instance.registerPipeline<Event>();
-
-      expect(builder).toBeInstanceOf(PipelineBuilder);
-    });
-
-    it("preserves generic type parameters for EventType and ProjectionType", () => {
-      interface TestEvent extends Event {
-        data: { test: string };
-      }
-      interface _TestProjection {
-        id: string;
-        aggregateId: string;
-        tenantId: TenantId;
-        version: number;
-        data: { result: string };
-      }
-
-      const mockEventStore = createMockEventStore<TestEvent>();
-      const runtime = EventSourcingRuntime.createForTesting({
-        eventStore: mockEventStore,
-      });
-
-      const instance = new EventSourcing(runtime);
-      const builder = instance.registerPipeline<TestEvent>();
-
-      expect(builder).toBeInstanceOf(PipelineBuilder);
-    });
-
-    it("creates new builder instance on each call", () => {
-      const mockEventStore = createMockEventStore<Event>();
-      const runtime = EventSourcingRuntime.createForTesting({
-        eventStore: mockEventStore,
-      });
-
-      const instance = new EventSourcing(runtime);
-      const builder1 = instance.registerPipeline<Event>();
-      const builder2 = instance.registerPipeline<Event>();
-
-      expect(builder1).toBeInstanceOf(PipelineBuilder);
-      expect(builder2).toBeInstanceOf(PipelineBuilder);
-      expect(builder1).not.toBe(builder2);
-    });
-
-    it("returns DisabledPipelineBuilder when runtime has no event store", () => {
+  describe("register", () => {
+    it("returns a DisabledPipeline when runtime has no event store", () => {
       const runtime = EventSourcingRuntime.createForTesting({
         eventStore: void 0,
       });
 
       const instance = new EventSourcing(runtime);
-      const builder = instance.registerPipeline<Event>();
+      const pipeline = instance.register(createTestPipelineDefinition());
 
-      expect(builder).toBeInstanceOf(DisabledPipelineBuilder);
+      expect(pipeline).toBeInstanceOf(DisabledPipeline);
+    });
+
+    it("registers a pipeline with a static definition", () => {
+      const mockEventStore = createMockEventStore<Event>();
+      const runtime = EventSourcingRuntime.createForTesting({
+        eventStore: mockEventStore,
+      });
+
+      const instance = new EventSourcing(runtime);
+      const pipeline = instance.register(createTestPipelineDefinition());
+
+      expect(pipeline.name).toBe("test-pipeline");
+      expect(pipeline.aggregateType).toBe("trace");
     });
   });
 

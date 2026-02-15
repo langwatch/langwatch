@@ -326,5 +326,50 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
         ctx.recordRule(`${this.id}:output`);
       }
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Metrics (cost, tokens, estimated flag)
+    // SDK sends: { type: "json", value: { promptTokens, completionTokens, cost } }
+    // ─────────────────────────────────────────────────────────────────────────
+    const rawMetrics = attrs.take(ATTR_KEYS.LANGWATCH_METRICS);
+    if (rawMetrics !== undefined) {
+      const parsed = safeJsonParse(rawMetrics);
+      if (isLangWatchStructuredValue(parsed) && isRecord(parsed.value)) {
+        const metricsValue = parsed.value as Record<string, unknown>;
+
+        // Extract token counts (setAttrIfAbsent — GenAI extractor may have set these)
+        const promptTokens = metricsValue.promptTokens;
+        if (typeof promptTokens === "number" && promptTokens > 0) {
+          ctx.setAttrIfAbsent(
+            ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS,
+            promptTokens,
+          );
+          ctx.recordRule(`${this.id}:metrics.promptTokens`);
+        }
+
+        const completionTokens = metricsValue.completionTokens;
+        if (typeof completionTokens === "number" && completionTokens > 0) {
+          ctx.setAttrIfAbsent(
+            ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS,
+            completionTokens,
+          );
+          ctx.recordRule(`${this.id}:metrics.completionTokens`);
+        }
+
+        // Extract cost (setAttrIfAbsent — custom cost rates from enrichment take precedence)
+        const cost = metricsValue.cost;
+        if (typeof cost === "number" && cost > 0) {
+          ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_SPAN_COST, cost);
+          ctx.recordRule(`${this.id}:metrics.cost`);
+        }
+
+        // Extract estimated flag
+        const tokensEstimated = metricsValue.tokensEstimated;
+        if (tokensEstimated === true) {
+          ctx.setAttr(ATTR_KEYS.LANGWATCH_TOKENS_ESTIMATED, true);
+          ctx.recordRule(`${this.id}:metrics.tokensEstimated`);
+        }
+      }
+    }
   }
 }

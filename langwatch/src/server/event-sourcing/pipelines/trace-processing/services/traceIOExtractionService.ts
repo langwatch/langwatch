@@ -362,7 +362,7 @@ export class TraceIOExtractionService {
    *
    * @returns ExtractedIO with both raw JSON and text representation
    */
-  private extractRichIOFromSpan(
+  extractRichIOFromSpan(
     span: NormalizedSpan,
     type: "input" | "output",
   ): ExtractedIO | null {

@@ -20,6 +20,7 @@ import {
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
 } from "../schemas/constants";
 import type { SpanReceivedEvent } from "../schemas/events";
+import { OtlpSpanCostEnrichmentService } from "../services/otlpSpanCostEnrichmentService";
 import { OtlpSpanPiiRedactionService } from "../services/otlpSpanPiiRedactionService";
 import { TraceRequestUtils } from "../utils/traceRequest.utils";
 
@@ -34,6 +35,10 @@ export interface RecordSpanCommandDependencies {
       piiRedactionLevel: PIIRedactionLevel,
     ) => Promise<void>;
   };
+  /** Service for enriching spans with custom LLM cost rates. */
+  costEnrichmentService: {
+    enrichSpan: (span: OtlpSpan, tenantId: string) => Promise<void>;
+  };
 }
 
 /** Cached default dependencies, lazily initialized */
@@ -43,6 +48,7 @@ function getDefaultDependencies(): RecordSpanCommandDependencies {
   if (!cachedDefaultDependencies) {
     cachedDefaultDependencies = {
       piiRedactionService: new OtlpSpanPiiRedactionService(),
+      costEnrichmentService: new OtlpSpanCostEnrichmentService(),
     };
   }
   return cachedDefaultDependencies;
@@ -102,14 +108,42 @@ export class RecordSpanCommand implements CommandHandler<
           "Handling record span command",
         );
 
-        // Clone span before redaction to preserve command immutability
-        const spanToRedact = structuredClone(commandData.span);
+        // Clone span before mutation to preserve command immutability
+        const spanToProcess = structuredClone(commandData.span);
         const piiRedactionLevel =
           commandData.piiRedactionLevel ?? DEFAULT_PII_REDACTION_LEVEL;
-        await this.deps.piiRedactionService.redactSpan(
-          spanToRedact,
-          piiRedactionLevel,
-        );
+
+        // Run PII redaction and cost enrichment in parallel.
+        // Safe: PII modifies existing attr values; cost pushes new entries.
+        const [piiResult, costResult] = await Promise.allSettled([
+          this.deps.piiRedactionService.redactSpan(
+            spanToProcess,
+            piiRedactionLevel,
+          ),
+          this.deps.costEnrichmentService.enrichSpan(
+            spanToProcess,
+            tenantIdStr,
+          ),
+        ]);
+
+        // Cost enrichment is non-critical — log and continue
+        if (costResult.status === "rejected") {
+          this.logger.warn(
+            { error: costResult.reason },
+            "Cost enrichment failed, continuing without cost data",
+          );
+        }
+
+        // PII redaction is critical — unredacted spans must not be emitted
+        if (piiResult.status === "rejected") {
+          this.logger.error(
+            { error: piiResult.reason },
+            "PII redaction failed, aborting span processing to prevent PII leak",
+          );
+          throw piiResult.reason instanceof Error
+            ? piiResult.reason
+            : new Error(String(piiResult.reason));
+        }
 
         const spanReceivedEvent = EventUtils.createEvent<SpanReceivedEvent>(
           "trace",
@@ -118,7 +152,7 @@ export class RecordSpanCommand implements CommandHandler<
           SPAN_RECEIVED_EVENT_TYPE,
           SPAN_RECEIVED_EVENT_VERSION_LATEST,
           {
-            span: spanToRedact,
+            span: spanToProcess,
             resource: commandData.resource,
             instrumentationScope: commandData.instrumentationScope,
             piiRedactionLevel,

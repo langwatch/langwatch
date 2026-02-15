@@ -1,5 +1,5 @@
-export {
-  type EvaluationState,
-  type EvaluationStateData,
-  EvaluationStateProjectionHandler,
-} from "./evaluationState.projection.handler";
+export type {
+  EvaluationState,
+  EvaluationStateData,
+} from "./evaluationState.foldProjection";
+export { evaluationStateFoldProjection } from "./evaluationState.foldProjection";

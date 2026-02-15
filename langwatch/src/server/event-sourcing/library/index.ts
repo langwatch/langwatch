@@ -31,19 +31,20 @@ export type { CommandType } from "./domain/commandType";
 export { CommandTypeSchema } from "./domain/commandType";
 export type { EventType } from "./domain/eventType";
 export { EventTypeSchema } from "./domain/eventType";
-export type { EventHandler } from "./domain/handlers/eventHandler";
 export type {
-  EventHandlerClass,
-  EventHandlerClassStatic,
-  ExtractEventHandlerEvent,
-} from "./domain/handlers/eventHandlerClass";
-export type { ProjectionHandler } from "./domain/handlers/projectionHandler";
+  FoldProjectionDefinition,
+  FoldProjectionOptions,
+  FoldProjectionStore,
+} from "./projections/foldProjection.types";
 export type {
-  ExtractProjectionHandlerEvent,
-  ExtractProjectionHandlerProjection,
-  ProjectionHandlerClass,
-  ProjectionHandlerClassStatic,
-} from "./domain/handlers/projectionHandlerClass";
+  AppendStore,
+  MapProjectionDefinition,
+  MapProjectionOptions,
+} from "./projections/mapProjection.types";
+export type { ProjectionStoreContext } from "./projections/projectionStoreContext";
+export { FoldProjectionExecutor } from "./projections/foldProjectionExecutor";
+export { MapProjectionExecutor } from "./projections/mapProjectionExecutor";
+export { ProjectionRouter } from "./projections/projectionRouter";
 export type {
   ExtractEventPayload,
   ExtractProjectionData,
@@ -60,7 +61,6 @@ export type {
   EventMetadataBase,
   EventOrderingStrategy,
   ParentLink,
-  ProcessorCheckpoint,
   Projection,
   ProjectionEnvelope,
   ProjectionMetadata,
@@ -70,7 +70,6 @@ export {
   createProjectionEnvelopeSchema,
   EventMetadataBaseSchema,
   EventSchema,
-  ProcessorCheckpointSchema,
   ProjectionEnvelopeSchema,
   ProjectionMetadataSchema,
   ProjectionSchema,
@@ -82,10 +81,6 @@ export type {
   RegisteredCommand,
   StaticPipelineDefinition,
 } from "./pipeline/types";
-export type {
-  ProjectionDefinition,
-  ProjectionDefinitions,
-} from "./projection.types";
 export type { EventPublisher } from "./eventPublisher.types";
 export type {
   DeduplicationConfig,
@@ -98,13 +93,7 @@ export type {
 export { EventSourcingService } from "./services/eventSourcingService";
 export type {
   EventSourcingOptions,
-  UpdateProjectionOptions,
 } from "./services/eventSourcingService.types";
-export type { CheckpointStore } from "./stores/checkpointStore.types";
-/**
- * @deprecated Use CheckpointStore instead
- */
-export type { CheckpointStore as ProcessorCheckpointStore } from "./stores/checkpointStore.types";
 export type {
   EventStore,
   EventStoreReadContext,

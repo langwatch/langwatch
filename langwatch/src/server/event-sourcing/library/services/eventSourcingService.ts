@@ -4,31 +4,29 @@ import type { FeatureFlagServiceInterface } from "~/server/featureFlag";
 import { createLogger } from "~/utils/logger/server";
 import type { AggregateType } from "../domain/aggregateType";
 import type { Event, Projection } from "../domain/types";
-import type { EventHandlerDefinition } from "../eventHandler.types";
-import type { ProjectionDefinition } from "../projection.types";
 import type { EventPublisher } from "../eventPublisher.types";
+import type { FoldProjectionDefinition } from "../projections/foldProjection.types";
+import type { MapProjectionDefinition } from "../projections/mapProjection.types";
+import type { ProjectionRegistry } from "../projections/projectionRegistry";
+import { ProjectionRouter } from "../projections/projectionRouter";
 import type { EventSourcedQueueProcessor } from "../queues";
-import type { CheckpointStore } from "../stores/checkpointStore.types";
 import type {
   EventStore,
   EventStoreReadContext,
 } from "../stores/eventStore.types";
 import { EventUtils } from "../utils/event.utils";
-import { ProjectionBatchProcessor } from "./batch/projectionBatchProcessor";
 import { ConfigurationError } from "./errorHandling";
 import type {
   EventSourcingOptions,
   EventSourcingServiceOptions,
-  UpdateProjectionOptions,
 } from "./eventSourcingService.types";
-import { EventHandlerDispatcher } from "./handlers/eventHandlerDispatcher";
-import { ProjectionUpdater } from "./projections/projectionUpdater";
 import { QueueManager } from "./queues/queueManager";
-import { ProjectionValidator } from "./validation/projectionValidator";
 
 /**
  * Main service that orchestrates event sourcing.
  * Coordinates between event stores, projection stores, and event handlers.
+ *
+ * Uses ProjectionRouter for unified dispatch to both FoldProjections and MapProjections.
  */
 export class EventSourcingService<
   EventType extends Event = Event,
@@ -45,95 +43,50 @@ export class EventSourcingService<
   private readonly pipelineName: string;
   private readonly aggregateType: AggregateType;
   private readonly eventStore: EventStore<EventType>;
-  private readonly projections?: Map<
-    string,
-    ProjectionDefinition<EventType, any>
-  >;
   private readonly eventPublisher?: EventPublisher<EventType>;
-  private readonly eventHandlers?: Map<
-    string,
-    EventHandlerDefinition<EventType>
-  >;
   private readonly options: EventSourcingOptions<EventType>;
   private readonly queueManager: QueueManager<EventType>;
-  private readonly handlerDispatcher: EventHandlerDispatcher<EventType>;
-  private readonly projectionUpdater: ProjectionUpdater<
-    EventType,
-    ProjectionTypes
-  >;
+  private readonly router: ProjectionRouter<EventType, ProjectionTypes>;
   private readonly featureFlagService?: FeatureFlagServiceInterface;
-  private readonly checkpointStore?: CheckpointStore;
+  private readonly globalRegistry?: ProjectionRegistry<Event>;
 
   constructor({
     pipelineName,
     aggregateType,
     eventStore,
-    projections,
+    foldProjections,
+    mapProjections,
     eventPublisher,
-    eventHandlers,
-    checkpointStore,
     serviceOptions,
     logger,
     queueFactory,
     featureFlagService,
     commandRegistrations,
-  }: EventSourcingServiceOptions<EventType, ProjectionTypes> & {
-    checkpointStore?: CheckpointStore;
-  }) {
+    globalRegistry,
+  }: EventSourcingServiceOptions<EventType, ProjectionTypes>) {
     this.pipelineName = pipelineName;
     this.aggregateType = aggregateType;
     this.eventStore = eventStore;
-    this.projections = projections
-      ? new Map(Object.entries(projections))
-      : void 0;
     this.eventPublisher = eventPublisher;
-    this.eventHandlers = eventHandlers
-      ? new Map(Object.entries(eventHandlers))
-      : void 0;
     this.options = serviceOptions ?? {};
     this.logger =
       logger ??
       createLogger("langwatch.trace-processing.event-sourcing-service");
     this.featureFlagService = featureFlagService;
-    this.checkpointStore = checkpointStore;
+    this.globalRegistry = globalRegistry;
 
-    // Warn in production if queue factory is not provided (handlers will be synchronous)
+    // Warn in production if queue factory is not provided
     if (
       process.env.NODE_ENV === "production" &&
       !queueFactory &&
-      eventHandlers &&
-      Object.keys(eventHandlers).length > 0
+      ((foldProjections && foldProjections.length > 0) ||
+        (mapProjections && mapProjections.length > 0))
     ) {
       this.logger.warn(
-        {
-          aggregateType,
-        },
-        "[PERFORMANCE] EventSourcingService initialized without queue processor factory in production. Event handlers will be executed synchronously, blocking event storage. Consider providing a QueueProcessorFactory for async processing.",
+        { aggregateType },
+        "[PERFORMANCE] EventSourcingService initialized without queue processor factory in production. Projections will be executed synchronously.",
       );
     }
-
-    // Warn in production if queue factory is not provided (projections will be synchronous)
-    if (
-      process.env.NODE_ENV === "production" &&
-      !queueFactory &&
-      projections &&
-      Object.keys(projections).length > 0
-    ) {
-      this.logger.warn(
-        {
-          aggregateType,
-        },
-        "[PERFORMANCE] EventSourcingService initialized without queue processor factory in production. Projections will be executed synchronously, blocking event storage. Consider providing a QueueProcessorFactory for async processing.",
-      );
-    }
-
-    // Initialize components
-    const validator = new ProjectionValidator({
-      eventStore,
-      aggregateType,
-      checkpointStore,
-      pipelineName: this.pipelineName,
-    });
 
     this.queueManager = new QueueManager<EventType>({
       aggregateType,
@@ -142,54 +95,36 @@ export class EventSourcingService<
       featureFlagService: this.featureFlagService,
     });
 
-    this.handlerDispatcher = new EventHandlerDispatcher<EventType>({
+    // Create ProjectionRouter (no event store needed — incremental only)
+    this.router = new ProjectionRouter<EventType, ProjectionTypes>(
       aggregateType,
-      eventHandlers: this.eventHandlers,
-      queueManager: this.queueManager,
-      featureFlagService: this.featureFlagService,
-    });
+      pipelineName,
+      this.queueManager,
+      featureFlagService,
+    );
 
-    this.projectionUpdater = new ProjectionUpdater<EventType, ProjectionTypes>({
-      aggregateType,
-      eventStore,
-      projections: this.projections,
-      checkpointStore,
-      pipelineName: this.pipelineName,
-      ordering: this.options.ordering ?? "timestamp",
-      validator,
-      queueManager: this.queueManager,
-      featureFlagService: this.featureFlagService,
-    });
-
-    // Initialize queue processors for event handlers if factory is provided
-    // Handler queues use SimpleBullmqQueueProcessor (no groupKey) - each event
-    // is processed independently with no checkpoints or batch processing
-    if (queueFactory && eventHandlers) {
-      this.queueManager.initializeHandlerQueues(
-        eventHandlers,
-        async (handlerName, event, _context) => {
-          const handlerDef = this.eventHandlers?.get(handlerName);
-          if (!handlerDef) {
-            throw new ConfigurationError(
-              "EventSourcingService",
-              `Handler "${handlerName}" not found`,
-              { handlerName },
-            );
-          }
-          await handlerDef.handler.handle(event);
-        },
-      );
+    // Register fold projections
+    if (foldProjections) {
+      for (const fold of foldProjections) {
+        this.router.registerFoldProjection(fold);
+      }
     }
 
-    // Initialize queue processors for projections if factory is provided
-    if (queueFactory && projections) {
-      const batchProcessor = new ProjectionBatchProcessor<EventType>(
-        eventStore,
-        checkpointStore,
-        this.pipelineName,
-        aggregateType,
-      );
-      this.projectionUpdater.initializeQueues(batchProcessor);
+    // Register map projections
+    if (mapProjections) {
+      for (const mapProj of mapProjections) {
+        this.router.registerMapProjection(mapProj);
+      }
+    }
+
+    // Initialize queue processors for map projections (handler queues)
+    if (queueFactory && mapProjections && mapProjections.length > 0) {
+      this.router.initializeMapQueues();
+    }
+
+    // Initialize queue processors for fold projections (projection queues)
+    if (queueFactory && foldProjections && foldProjections.length > 0) {
+      this.router.initializeFoldQueues();
     }
 
     // Initialize command queues (after all fields are set so storeEvents works)
@@ -209,29 +144,10 @@ export class EventSourcingService<
   /**
    * Stores events using the pipeline's aggregate type.
    *
-   * This method automatically uses the aggregate type configured for this pipeline,
-   * preventing copy/paste mistakes where the wrong aggregate type is passed.
-   *
    * **Execution Flow:**
    * 1. Events are stored in the event store (must succeed)
    * 2. Events are published to the event publisher (if configured) - errors are logged but don't fail
-   * 3. Events are dispatched to event handlers (if configured) - errors are logged but don't fail
-   * 4. Projections are automatically updated - errors are logged but don't fail
-   *
-   * **Concurrency:** Safe for concurrent calls with different aggregateIds. Concurrent calls for the same
-   * aggregateId are safe at the event store level. Per-group ordering in GroupQueue serializes processing per aggregate.
-   *
-   * **Failure Modes:**
-   * - Event store failures throw and prevent storage
-   * - Publisher/handler/projection failures are logged but don't prevent storage
-   * - Invalid tenantId throws before any operations
-   *
-   * **Performance:** O(n) where n is the number of events. Projection updates are O(m) where m is the
-   * number of projections × number of unique aggregateIds in the event batch.
-   *
-   * @param events - Events to store
-   * @param context - Security context with required tenantId
-   * @throws {Error} If tenantId is invalid or event store operation fails
+   * 3. Events are dispatched to all projections via ProjectionRouter - errors are logged but don't fail
    */
   async storeEvents(
     events: readonly EventType[],
@@ -260,7 +176,6 @@ export class EventSourcingService<
           if (enrichedMetadata === event.metadata) {
             return event;
           }
-          // Only add metadata property if enrichedMetadata has content
           const hasMetadata =
             enrichedMetadata &&
             Object.keys(enrichedMetadata as Record<string, unknown>).length > 0;
@@ -292,7 +207,6 @@ export class EventSourcingService<
               "error.message":
                 error instanceof Error ? error.message : String(error),
             });
-            // Log publishing errors but don't fail the storage operation
             if (this.logger) {
               this.logger.error(
                 {
@@ -306,67 +220,70 @@ export class EventSourcingService<
           }
         }
 
-        // Dispatch events to handlers after successful storage
-        if (this.eventHandlers && enrichedEvents.length > 0) {
-          span.addEvent("handler.dispatch.start");
-          await this.handlerDispatcher.dispatchEventsToHandlers(
-            enrichedEvents,
-            context,
-          );
-          span.addEvent("handler.dispatch.complete");
+        // Dispatch events to all projections (fold + map) via unified router
+        if (
+          enrichedEvents.length > 0 &&
+          (this.router.hasFoldProjections || this.router.hasMapProjections)
+        ) {
+          span.addEvent("projection.dispatch.start");
+          try {
+            await this.router.dispatch(enrichedEvents, context);
+            span.addEvent("projection.dispatch.complete");
+          } catch (error) {
+            span.addEvent("projection.dispatch.error", {
+              "error.message":
+                error instanceof Error ? error.message : String(error),
+            });
+            if (this.logger) {
+              this.logger.error(
+                {
+                  aggregateType: this.aggregateType,
+                  eventCount: enrichedEvents.length,
+                  error: error instanceof Error ? error.message : String(error),
+                },
+                "Failed to dispatch events to projections",
+              );
+            }
+          }
         }
 
-        if (this.projections && enrichedEvents.length > 0) {
-          span.addEvent("projection.update.start");
-          await this.projectionUpdater.updateProjectionsForAggregates(
-            enrichedEvents,
-            context,
-          );
-          span.addEvent("projection.update.complete");
+        // Dispatch to global projection registry (cross-pipeline projections)
+        if (this.globalRegistry && enrichedEvents.length > 0) {
+          span.addEvent("global_projection.dispatch.start");
+          try {
+            await this.globalRegistry.dispatch(enrichedEvents, context);
+            span.addEvent("global_projection.dispatch.complete");
+          } catch (error) {
+            span.addEvent("global_projection.dispatch.error", {
+              "error.message":
+                error instanceof Error ? error.message : String(error),
+            });
+            this.logger.error(
+              {
+                aggregateType: this.aggregateType,
+                eventCount: enrichedEvents.length,
+                error: error instanceof Error ? error.message : String(error),
+              },
+              "Failed to dispatch events to global projection registry",
+            );
+          }
         }
       },
     );
   }
 
   /**
-   * Updates a specific projection by name for a given aggregate.
-   *
-   * This method processes all events for the aggregate and updates the projection state.
-   * Projections are automatically updated after events are stored via storeEvents(),
-   * but this method can be used for manual updates (e.g., recovery or reprocessing).
-   *
-   * **Concurrency:** When using GroupQueue, per-aggregate ordering is enforced at the queue level,
-   * ensuring projections for the same aggregate are updated serially. Different aggregates
-   * can be updated concurrently. Without queue-based processing, concurrent updates for the
-   * same aggregate may result in lost updates (last write wins).
-   *
-   * **Performance:** O(n) where n is the number of events for the aggregate.
-   *
-   * **Failure Modes:**
-   * - Throws if projection name not found
-   * - Throws if no events found for aggregate
-   * - Throws if tenantId is invalid
-   * - Projection store errors propagate (not caught)
-   *
-   * @param projectionName - The name of the projection to update
-   * @param aggregateId - The aggregate to update projection for
-   * @param context - Security context with required tenantId for event store access
-   * @param options - Optional options including projection store context override
-   * @returns Object containing both the updated projection and the events that were processed
-   * @throws {Error} If projection name not found, no events found, or tenantId is invalid
+   * Gets a specific fold projection by name for a given aggregate.
    */
-  async updateProjectionByName<
+  async getProjectionByName<
     ProjectionName extends keyof ProjectionTypes & string,
   >(
     projectionName: ProjectionName,
     aggregateId: string,
     context: EventStoreReadContext<EventType>,
-    options?: UpdateProjectionOptions<EventType>,
-  ): Promise<{
-    projection: ProjectionTypes[ProjectionName];
-    events: readonly EventType[];
-  } | null> {
-    return await this.projectionUpdater.updateProjectionByName(
+    options?: { key?: string },
+  ): Promise<ProjectionTypes[ProjectionName] | null> {
+    return this.router.getProjectionByName(
       projectionName,
       aggregateId,
       context,
@@ -375,36 +292,7 @@ export class EventSourcingService<
   }
 
   /**
-   * Gets a specific projection by name for a given aggregate.
-   *
-   * @param projectionName - The name of the projection to retrieve
-   * @param aggregateId - The aggregate to get projection for
-   * @param context - Security context with required tenantId
-   * @returns The projection, or null if not found
-   * @throws Error if projection name not found or not configured
-   */
-  async getProjectionByName<
-    ProjectionName extends keyof ProjectionTypes & string,
-  >(
-    projectionName: ProjectionName,
-    aggregateId: string,
-    context: EventStoreReadContext<EventType>,
-  ): Promise<ProjectionTypes[ProjectionName] | null> {
-    return this.projectionUpdater.getProjectionByName(
-      projectionName,
-      aggregateId,
-      context,
-    );
-  }
-
-  /**
-   * Checks if a specific projection exists for a given aggregate.
-   *
-   * @param projectionName - The name of the projection to check
-   * @param aggregateId - The aggregate to check projection for
-   * @param context - Security context with required tenantId
-   * @returns True if the projection exists, false otherwise
-   * @throws Error if projection name not found or not configured
+   * Checks if a specific fold projection exists for a given aggregate.
    */
   async hasProjectionByName<
     ProjectionName extends keyof ProjectionTypes & string,
@@ -412,34 +300,32 @@ export class EventSourcingService<
     projectionName: ProjectionName,
     aggregateId: string,
     context: EventStoreReadContext<EventType>,
+    options?: { key?: string },
   ): Promise<boolean> {
-    return await this.projectionUpdater.hasProjectionByName(
+    return await this.router.hasProjectionByName(
       projectionName,
       aggregateId,
       context,
+      options,
     );
   }
 
   /**
    * Gets the list of available projection names.
-   *
-   * @returns Array of projection names
    */
   getProjectionNames(): string[] {
-    return this.projectionUpdater.getProjectionNames();
+    return this.router.getProjectionNames();
   }
 
   /**
    * Gets the command queue dispatchers created during initialization.
-   * Returns a map of command name to queue processor.
    */
   getCommandQueues(): Map<string, EventSourcedQueueProcessor<any>> {
     return this.queueManager.getCommandQueues();
   }
 
   /**
-   * Gracefully closes all queue processors for event handlers, projections, and commands.
-   * Should be called during application shutdown to ensure all queued jobs complete.
+   * Gracefully closes all queue processors.
    */
   async close(): Promise<void> {
     await this.queueManager.close();
@@ -447,8 +333,6 @@ export class EventSourcingService<
 
   /**
    * Waits for all queue processors to be ready to accept jobs.
-   * For BullMQ, this waits for workers to connect to Redis.
-   * Should be called before sending commands in tests.
    */
   async waitUntilReady(): Promise<void> {
     await this.queueManager.waitUntilReady();

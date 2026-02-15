@@ -1,5 +1,4 @@
 import {
-  DelayedError,
   type Job,
   type JobsOptions,
   Queue,
@@ -31,10 +30,9 @@ import type {
 } from "../../library/queues";
 import {
   ConfigurationError,
-  isNoEventsFoundError,
   QueueError,
 } from "../../library/services/errorHandling";
-import { calculateExponentialBackoff } from "./calculateDelays";
+
 import { trace } from "@opentelemetry/api";
 
 /**
@@ -44,7 +42,7 @@ const JOB_RETRY_CONFIG = {
   maxAttempts: 15,
   backoffDelayMs: 2000,
   removeOnCompleteAgeSec: 3600,
-  removeOnCompleteCount: 1000,
+  removeOnCompleteCount: 100,
   removeOnFailAgeSec: 60 * 60 * 24 * 7, // 7 days
 } as const;
 
@@ -53,7 +51,7 @@ const JOB_RETRY_CONFIG = {
  */
 const SIMPLE_QUEUE_CONFIG = {
   /** Default concurrency */
-  defaultConcurrency: 5,
+  defaultConcurrency: 20,
   /** Interval for collecting queue metrics in milliseconds */
   metricsIntervalMs: 15000,
   /** Maximum time to wait for graceful shutdown in milliseconds */
@@ -79,9 +77,9 @@ type LegacyJobContainer<Payload> = {
  * Use for event handlers that process individual events independently
  * (no sequential ordering needed).
  */
-export class SimpleBullmqQueueProcessor<Payload>
-  implements EventSourcedQueueProcessor<Payload>
-{
+export class SimpleBullmqQueueProcessor<
+  Payload,
+> implements EventSourcedQueueProcessor<Payload> {
   private readonly logger = createLogger(
     "langwatch:event-sourcing:simple-queue",
   );
@@ -168,18 +166,6 @@ export class SimpleBullmqQueueProcessor<Payload>
     });
 
     this.worker.on("failed", (job, error) => {
-      if (isNoEventsFoundError(error)) {
-        this.logger.debug(
-          {
-            queueName: this.queueName,
-            jobId: job?.id,
-            error: error instanceof Error ? error.message : String(error),
-          },
-          "Job delayed due to events not yet visible in ClickHouse",
-        );
-        return;
-      }
-
       this.logger.error(
         {
           queueName: this.queueName,
@@ -247,10 +233,7 @@ export class SimpleBullmqQueueProcessor<Payload>
       opts,
     );
 
-    this.logger.debug(
-      { queueName: this.queueName },
-      "Job sent to BullMQ",
-    );
+    this.logger.debug({ queueName: this.queueName }, "Job sent to BullMQ");
   }
 
   /**
@@ -325,28 +308,7 @@ export class SimpleBullmqQueueProcessor<Payload>
           "Simple queue job processed successfully",
         );
       } catch (error) {
-        // For "no events found" errors (ClickHouse replication lag), use exponential backoff
-        if (isNoEventsFoundError(error)) {
-          const exponentialDelayMs = calculateExponentialBackoff(
-            job.attemptsStarted,
-          );
-
-          this.logger.debug(
-            {
-              queueName: this.queueName,
-              jobId: job.id,
-              delayMs: exponentialDelayMs,
-              attemptsStarted: job.attemptsStarted,
-            },
-            "Re-queuing job with exponential backoff due to events not yet visible in ClickHouse",
-          );
-
-          const targetTimestamp = Date.now() + exponentialDelayMs;
-          await job.moveToDelayed(targetTimestamp, token);
-          throw new DelayedError();
-        }
-
-        // All other errors: let BullMQ's retry mechanism handle them
+        // Let BullMQ's retry mechanism handle errors
         throw error;
       }
     });

@@ -1,2 +1,5 @@
-export type { TraceSummary, TraceSummaryData } from "./traceSummaryProjection";
-export { TraceSummaryProjectionHandler } from "./traceSummaryProjection";
+export type {
+  TraceSummary,
+  TraceSummaryData,
+} from "./traceSummary.foldProjection";
+export { traceSummaryFoldProjection } from "./traceSummary.foldProjection";

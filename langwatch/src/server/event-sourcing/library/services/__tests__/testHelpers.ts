@@ -3,18 +3,19 @@ import { vi } from "vitest";
 import type { AggregateType } from "../../domain/aggregateType";
 import type { EventType } from "../../domain/eventType";
 import { EVENT_TYPES } from "../../domain/eventType";
-import type { EventHandler } from "../../domain/handlers/eventHandler";
-import type { ProjectionHandler } from "../../domain/handlers/projectionHandler";
 import type { TenantId } from "../../domain/tenantId";
 import { createTenantId } from "../../domain/tenantId";
 import type { Event, Projection } from "../../domain/types";
-import type { EventHandlerDefinition } from "../../eventHandler.types";
 import type {
-  ProjectionDefinition,
-  ProjectionOptions,
-} from "../../projection.types";
+  FoldProjectionDefinition,
+  FoldProjectionStore,
+} from "../../projections/foldProjection.types";
+import type {
+  AppendStore,
+  MapProjectionDefinition,
+} from "../../projections/mapProjection.types";
+import type { ProjectionStoreContext } from "../../projections/projectionStoreContext";
 import type { EventPublisher } from "../../eventPublisher.types";
-import type { CheckpointStore } from "../../stores/checkpointStore.types";
 import type {
   EventStore,
   EventStoreReadContext,
@@ -59,6 +60,7 @@ export function createMockEventStore<T extends Event>(): EventStore<T> {
 
 /**
  * Creates a mock ProjectionStore with default implementations.
+ * (Legacy interface, used where QueueManager compatibility is needed)
  */
 export function createMockProjectionStore<
   T extends Projection,
@@ -66,6 +68,25 @@ export function createMockProjectionStore<
   return {
     getProjection: vi.fn().mockResolvedValue(null),
     storeProjection: vi.fn().mockResolvedValue(void 0),
+  };
+}
+
+/**
+ * Creates a mock FoldProjectionStore with default implementations.
+ */
+export function createMockFoldProjectionStore<State>(): FoldProjectionStore<State> {
+  return {
+    get: vi.fn().mockResolvedValue(null),
+    store: vi.fn().mockResolvedValue(void 0),
+  };
+}
+
+/**
+ * Creates a mock AppendStore with default implementations.
+ */
+export function createMockAppendStore<Record>(): AppendStore<Record> {
+  return {
+    append: vi.fn().mockResolvedValue(void 0),
   };
 }
 
@@ -79,85 +100,60 @@ export function createMockEventPublisher<T extends Event>(): EventPublisher<T> {
 }
 
 /**
- * Creates a mock ProjectionHandler (for projections) with default implementations.
+ * Creates a mock FoldProjectionDefinition for testing.
+ *
+ * The apply function acts as a pass-through by default: it returns the state unchanged.
+ * Tests can override apply behavior by mocking the returned definition's apply function.
  */
-export function createMockEventHandler<
-  TEvent extends Event,
-  TProjection extends Projection,
->(): ProjectionHandler<TEvent, TProjection> {
-  return {
-    handle: vi.fn().mockResolvedValue({
-      id: "test-projection-id",
-      aggregateId: "test-aggregate",
-      tenantId: createTenantId("test-tenant"),
-      version: "2025-12-17",
-      data: {},
-    } as TProjection),
-  };
-}
-
-/**
- * Creates a mock EventHandler (for event handlers) with default implementations.
- */
-export function createMockEventReactionHandler<
-  T extends Event,
->(): EventHandler<T> {
-  return {
-    handle: vi.fn().mockResolvedValue(void 0),
-    getEventTypes: vi.fn().mockReturnValue(void 0),
-  };
-}
-
-/**
- * Creates a mock EventHandlerDefinition.
- */
-export function createMockEventHandlerDefinition<T extends Event>(
-  name: string,
-  handler?: EventHandler<T>,
-  options?: Partial<EventHandlerDefinition<T>["options"]>,
-): EventHandlerDefinition<T> {
-  return {
-    name,
-    handler: handler ?? createMockEventReactionHandler<T>(),
-    options: {
-      eventTypes: void 0,
-      ...options,
-    },
-  };
-}
-
-/**
- * Creates a mock ProjectionDefinition.
- */
-export function createMockProjectionDefinition<
-  TEvent extends Event,
-  TProjection extends Projection,
+export function createMockFoldProjectionDefinition<
+  TEvent extends Event = Event,
 >(
   name: string,
-  handler?: ProjectionHandler<TEvent, TProjection>,
-  store?: ProjectionStore<TProjection>,
-  options?: ProjectionOptions<TEvent>,
-): ProjectionDefinition<TEvent, TProjection> {
+  overrides?: {
+    store?: FoldProjectionStore<any>;
+    init?: () => any;
+    apply?: (state: any, event: TEvent) => any;
+    eventTypes?: readonly string[];
+    version?: string;
+    options?: FoldProjectionDefinition<any, TEvent>["options"];
+  },
+): FoldProjectionDefinition<any, TEvent> {
+  const store = overrides?.store ?? createMockFoldProjectionStore();
   return {
     name,
-    handler: handler ?? createMockEventHandler<TEvent, TProjection>(),
-    store: store ?? createMockProjectionStore<TProjection>(),
-    options,
+    version: overrides?.version ?? "2025-01-01",
+    eventTypes: overrides?.eventTypes ?? EVENT_TYPES,
+    init: overrides?.init ?? vi.fn().mockReturnValue({}),
+    apply: overrides?.apply ?? vi.fn().mockImplementation((state: any) => state),
+    store,
+    options: overrides?.options,
   };
 }
 
 /**
- * Creates a mock CheckpointStore with default implementations.
+ * Creates a mock MapProjectionDefinition for testing.
+ *
+ * The map function returns the event by default (pass-through).
+ * Tests can override map behavior by mocking the returned definition's map function.
  */
-export function createMockCheckpointStore(): CheckpointStore {
+export function createMockMapProjectionDefinition<
+  TEvent extends Event = Event,
+>(
+  name: string,
+  overrides?: {
+    store?: AppendStore<any>;
+    map?: (event: TEvent) => any;
+    eventTypes?: readonly string[];
+    options?: MapProjectionDefinition<any, TEvent>["options"];
+  },
+): MapProjectionDefinition<any, TEvent> {
+  const store = overrides?.store ?? createMockAppendStore();
   return {
-    saveCheckpoint: vi.fn().mockResolvedValue(void 0),
-    loadCheckpoint: vi.fn().mockResolvedValue(null),
-    getLastProcessedEvent: vi.fn().mockResolvedValue(null),
-    getCheckpointBySequenceNumber: vi.fn().mockResolvedValue(null),
-    hasFailedEvents: vi.fn().mockResolvedValue(false),
-    getFailedEvents: vi.fn().mockResolvedValue([]),
-    clearCheckpoint: vi.fn().mockResolvedValue(void 0),
+    name,
+    eventTypes: overrides?.eventTypes ?? [],
+    map: overrides?.map ?? vi.fn().mockImplementation((event: TEvent) => event),
+    store,
+    options: overrides?.options,
   };
 }
 

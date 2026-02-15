@@ -38,7 +38,6 @@ export {
 export {
   EventSourcingRuntime,
   EventSourcingPipeline,
-  PipelineBuilder,
   getEventSourcing,
   getTraceProcessingPipeline,
   getEvaluationProcessingPipeline,
@@ -47,7 +46,6 @@ export {
 export type {
   EventSourcingConfig,
   EventSourcingConfigOptions,
-  PipelineBuilderOptions,
   EventSourcingPipelineDefinition,
   PipelineMetadata,
   PipelineWithCommandHandlers,

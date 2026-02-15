@@ -1,14 +1,16 @@
 import { makeQueueName } from "~/server/background/queues/makeQueueName";
 import { createLogger } from "~/utils/logger/server";
 import type { FeatureFlagServiceInterface } from "../../../../featureFlag/types";
-import type { QueueProcessorFactory } from "../../queues";
+import type {
+  DeduplicationStrategy,
+  EventSourcedQueueProcessor,
+  QueueProcessorFactory,
+} from "../../queues";
+import { resolveDeduplicationStrategy } from "../../queues";
 import type { CommandHandlerClass } from "../../commands/commandHandlerClass";
 import type { AggregateType } from "../../domain/aggregateType";
 import type { Event } from "../../domain/types";
-import type { EventHandlerDefinitions } from "../../eventHandler.types";
-import type { ProjectionDefinition } from "../../projection.types";
-import type { EventSourcedQueueProcessor } from "../../queues";
-import { resolveDeduplicationStrategy } from "../../queues";
+import type { KillSwitchOptions } from "../../pipeline/types";
 import type { EventStoreReadContext } from "../../stores/eventStore.types";
 import {
   createCommandDispatcher,
@@ -70,7 +72,19 @@ export class QueueManager<EventType extends Event = Event> {
   }
 
   initializeHandlerQueues(
-    eventHandlers: EventHandlerDefinitions<EventType>,
+    eventHandlers: Record<string, {
+      name: string;
+      handler: { handle: (event: EventType) => Promise<void> };
+      options: {
+        eventTypes?: readonly string[];
+        delay?: number;
+        deduplication?: DeduplicationStrategy<EventType>;
+        concurrency?: number;
+        spanAttributes?: (event: EventType) => Record<string, string | number | boolean>;
+        disabled?: boolean;
+        killSwitch?: KillSwitchOptions;
+      };
+    }>,
     onEvent: (
       handlerName: string,
       event: EventType,
@@ -115,7 +129,13 @@ export class QueueManager<EventType extends Event = Event> {
   }
 
   initializeProjectionQueues(
-    projections: Record<string, ProjectionDefinition<EventType, any>>,
+    projections: Record<string, {
+      name: string;
+      groupKeyFn?: (event: EventType) => string;
+      options?: {
+        killSwitch?: KillSwitchOptions;
+      };
+    }>,
     onEvent: (
       projectionName: string,
       event: EventType,
@@ -138,19 +158,15 @@ export class QueueManager<EventType extends Event = Event> {
 
       const queueProcessor = this.queueFactory.create<EventType>({
         name: queueName,
-        delay: projectionDef.options?.delay,
-        deduplication: resolveDeduplicationStrategy(
-          projectionDef.options?.deduplication,
-          this.createDefaultDeduplicationId.bind(this),
-        ),
         spanAttributes: (event) => ({
           "projection.name": projectionName,
           "event.type": event.type,
           "event.id": event.id,
           "event.aggregate_id": String(event.aggregateId),
         }),
-        groupKey: (event: EventType) =>
-          `${String(event.tenantId)}:${event.aggregateType}:${String(event.aggregateId)}`,
+        groupKey: projectionDef.groupKeyFn
+          ? (event: EventType) => `${String(event.tenantId)}:${projectionDef.groupKeyFn!(event)}`
+          : (event: EventType) => `${String(event.tenantId)}:${event.aggregateType}:${String(event.aggregateId)}`,
         process: async (event: EventType) => {
           await onEvent(projectionName, event, {
             tenantId: event.tenantId,

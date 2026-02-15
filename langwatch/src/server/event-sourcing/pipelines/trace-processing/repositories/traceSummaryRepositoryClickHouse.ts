@@ -17,7 +17,7 @@ import { createTenantId, EventUtils } from "../../../library";
 import type {
   TraceSummary,
   TraceSummaryData,
-} from "../projections/traceSummaryProjection";
+} from "../projections/traceSummary.foldProjection";
 import type { TraceSummaryRepository } from "./traceSummaryRepository";
 
 const TABLE_NAME = "trace_summaries" as const;
@@ -32,9 +32,9 @@ interface ClickHouseSummaryRecord {
   Version: string;
   Attributes: Record<string, string>;
 
-  OccurredAt: string; // DateTime64(3) - trace execution start time
-  CreatedAt: string; // DateTime64(3) - record creation time
-  LastUpdatedAt: string; // DateTime64(3) - record update time
+  OccurredAt: number; // toUnixTimestamp64Milli() - trace execution start time (ms)
+  CreatedAt: number; // toUnixTimestamp64Milli() - record creation time (ms)
+  LastUpdatedAt: number; // toUnixTimestamp64Milli() - record update time (ms)
 
   // I/O
   ComputedIOSchemaVersion: string;
@@ -60,33 +60,16 @@ interface ClickHouseSummaryRecord {
   TotalPromptTokenCount: number | null;
   TotalCompletionTokenCount: number | null;
 
+  // Output tracking
+  OutputFromRootSpan: number; // stored as Bool in ClickHouse
+  OutputSpanEndTimeMs: number;
+
   // Trace intelligence
   TopicId: string | null;
   SubTopicId: string | null;
   HasAnnotation: number | null; // stored as UInt8 in ClickHouse: 0 or 1
 }
 
-/**
- * Converts a Unix millisecond timestamp to ClickHouse DateTime64(3) format.
- * DateTime64(3) expects milliseconds since epoch.
- *
- * @param timestampMs - Unix timestamp in milliseconds
- * @returns Millisecond timestamp as string for ClickHouse DateTime64(3)
- */
-function timestampToDateTime64(timestampMs: number): string {
-  // DateTime64(3) uses milliseconds precision
-  return timestampMs.toString();
-}
-
-/**
- * Converts a ClickHouse DateTime64(3) string to Unix millisecond timestamp.
- *
- * @param dateTime64 - Millisecond timestamp string from ClickHouse DateTime64(3)
- * @returns Unix timestamp in milliseconds
- */
-function dateTime64ToTimestamp(dateTime64: string): number {
-  return parseInt(dateTime64, 10);
-}
 
 /**
  * ClickHouse repository for trace summaries.
@@ -129,6 +112,9 @@ export class TraceSummaryRepositoryClickHouse<
       TotalPromptTokenCount: record.TotalPromptTokenCount,
       TotalCompletionTokenCount: record.TotalCompletionTokenCount,
 
+      OutputFromRootSpan: record.OutputFromRootSpan === 1,
+      OutputSpanEndTimeMs: record.OutputSpanEndTimeMs,
+
       TopicId: record.TopicId,
       SubTopicId: record.SubTopicId,
       HasAnnotation:
@@ -136,9 +122,9 @@ export class TraceSummaryRepositoryClickHouse<
 
       Attributes: record.Attributes ?? {},
 
-      OccurredAt: dateTime64ToTimestamp(record.OccurredAt),
-      CreatedAt: dateTime64ToTimestamp(record.CreatedAt),
-      LastUpdatedAt: dateTime64ToTimestamp(record.LastUpdatedAt),
+      OccurredAt: record.OccurredAt,
+      CreatedAt: record.CreatedAt,
+      LastUpdatedAt: record.LastUpdatedAt,
     };
   }
 
@@ -156,9 +142,9 @@ export class TraceSummaryRepositoryClickHouse<
       Version: projectionVersion,
       Attributes: data.Attributes,
 
-      OccurredAt: timestampToDateTime64(data.OccurredAt),
-      CreatedAt: timestampToDateTime64(data.CreatedAt),
-      LastUpdatedAt: timestampToDateTime64(data.LastUpdatedAt),
+      OccurredAt: data.OccurredAt,
+      CreatedAt: data.CreatedAt,
+      LastUpdatedAt: data.LastUpdatedAt,
 
       ComputedIOSchemaVersion: data.ComputedIOSchemaVersion,
       ComputedInput: data.ComputedInput,
@@ -179,6 +165,9 @@ export class TraceSummaryRepositoryClickHouse<
       TokensEstimated: data.TokensEstimated,
       TotalPromptTokenCount: data.TotalPromptTokenCount,
       TotalCompletionTokenCount: data.TotalCompletionTokenCount,
+
+      OutputFromRootSpan: data.OutputFromRootSpan ? 1 : 0,
+      OutputSpanEndTimeMs: data.OutputSpanEndTimeMs,
 
       TopicId: data.TopicId,
       SubTopicId: data.SubTopicId,
@@ -216,9 +205,9 @@ export class TraceSummaryRepositoryClickHouse<
                 TraceId,
                 Version,
                 Attributes,
-                toString(OccurredAt) AS OccurredAt,
-                toString(CreatedAt) AS CreatedAt,
-                toString(LastUpdatedAt) AS LastUpdatedAt,
+                toUnixTimestamp64Milli(OccurredAt) AS OccurredAt,
+                toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
+                toUnixTimestamp64Milli(LastUpdatedAt) AS LastUpdatedAt,
                 ComputedIOSchemaVersion,
                 ComputedInput,
                 ComputedOutput,
@@ -235,6 +224,8 @@ export class TraceSummaryRepositoryClickHouse<
                 TokensEstimated,
                 TotalPromptTokenCount,
                 TotalCompletionTokenCount,
+                OutputFromRootSpan,
+                OutputSpanEndTimeMs,
                 TopicId,
                 SubTopicId,
                 HasAnnotation

@@ -2,11 +2,8 @@ import type { FeatureFlagServiceInterface } from "../../../featureFlag/types";
 import type { CommandHandlerClass } from "../../library/commands/commandHandlerClass";
 import type { AggregateType } from "../../library/domain/aggregateType";
 import type { Event, ParentLink, Projection } from "../../library/domain/types";
-import type { EventHandlerDefinitions } from "../../library/eventHandler.types";
-import type {
-  ProjectionDefinitions,
-  ProjectionTypeMap,
-} from "../../library/projection.types";
+import type { FoldProjectionDefinition } from "../../library/projections/foldProjection.types";
+import type { MapProjectionDefinition } from "../../library/projections/mapProjection.types";
 import type { EventPublisher } from "../../library/eventPublisher.types";
 import type {
   EventSourcedQueueProcessor,
@@ -14,11 +11,11 @@ import type {
 } from "../../library/queues";
 import type { CommandHandlerOptions } from "../../library/services/commands/commandDispatcher";
 import type { EventSourcingService } from "../../library/services/eventSourcingService";
-import type { CheckpointStore } from "../../library/stores/checkpointStore.types";
+import type { ProjectionRegistry } from "../../library/projections/projectionRegistry";
 import type { EventStore } from "../../library/stores/eventStore.types";
+
 /**
  * Static metadata about a pipeline for tooling and introspection.
- * This metadata is captured during pipeline building and exposed on the pipeline instance.
  */
 export interface PipelineMetadata {
   name: string;
@@ -40,60 +37,23 @@ export interface PipelineMetadata {
 
 export interface EventSourcingPipelineDefinition<
   EventType extends Event = Event,
-  ProjectionTypes extends ProjectionTypeMap = ProjectionTypeMap,
+  _ProjectionTypes extends Record<string, Projection> = Record<string, Projection>,
 > {
-  /**
-   * Logical name for this pipeline, used for logging/metrics.
-   */
   name: string;
-  /**
-   * Aggregate type for this pipeline (e.g., "trace", "user").
-   */
   aggregateType: AggregateType;
   eventStore: EventStore<EventType>;
-  /**
-   * Map of projection definitions for multiple projections support.
-   * Each projection has a unique name, store, and handler.
-   */
-  projections?: ProjectionDefinitions<EventType, ProjectionTypes>;
-  /**
-   * Optional event publisher for publishing events to external systems.
-   */
+  foldProjections?: FoldProjectionDefinition<any, EventType>[];
+  mapProjections?: MapProjectionDefinition<any, EventType>[];
   eventPublisher?: EventPublisher<EventType>;
-  /**
-   * Map of event handler definitions for reacting to events.
-   * Each handler processes individual events asynchronously via queues.
-   */
-  eventHandlers?: EventHandlerDefinitions<EventType>;
-  /**
-   * Optional queue processor factory for creating queues for event handlers.
-   * If not provided, event handlers will be executed synchronously (not recommended for production).
-   */
   queueProcessorFactory?: QueueProcessorFactory;
-  /**
-   * Optional preconfigured checkpoint store. When provided we skip automatic
-   * selection (memory vs ClickHouse) and use the supplied implementation as-is.
-   */
-  processorCheckpointStore?: CheckpointStore;
-  /**
-   * Parent links defining relationships to other aggregate types.
-   * Used by tools like deja-view to navigate between related aggregates.
-   */
   parentLinks?: ParentLink<EventType>[];
-  /**
-   * Optional feature flag service for kill switches.
-   * When provided, enables automatic feature flag-based kill switches for components.
-   */
   featureFlagService?: FeatureFlagServiceInterface;
-  /**
-   * Command handler registrations for this pipeline.
-   * Requires queueProcessorFactory to be set.
-   */
   commandRegistrations?: Array<{
     name: string;
     handlerClass: CommandHandlerClass<any, any, EventType>;
     options?: CommandHandlerOptions<unknown>;
   }>;
+  globalRegistry?: ProjectionRegistry<Event>;
 }
 
 export interface RegisteredPipeline<
@@ -106,21 +66,12 @@ export interface RegisteredPipeline<
   name: string;
   aggregateType: AggregateType;
   service: EventSourcingService<EventType, ProjectionTypes>;
-  /**
-   * Parent links defining relationships to other aggregate types.
-   * Used by tools like deja-view to navigate between related aggregates.
-   */
   parentLinks: ParentLink<EventType>[];
-  /**
-   * Static metadata about this pipeline for tooling and introspection.
-   * Available without triggering runtime initialization.
-   */
   metadata: PipelineMetadata;
 }
 
 /**
  * Pipeline with command handlers attached under a `commands` property.
- * Dispatchers are accessible via `pipeline.commands.dispatcherName`.
  */
 export type PipelineWithCommandHandlers<
   Pipeline extends RegisteredPipeline<any, any>,
