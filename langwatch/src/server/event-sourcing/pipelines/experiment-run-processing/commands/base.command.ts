@@ -61,17 +61,15 @@ export function createExperimentRunCommandHandler<
       config.handleLogMessage,
     );
 
-    const event = EventUtils.createEvent<TEvent>(
-      "experiment_run",
-      runId,
+    const event = EventUtils.createEvent<TEvent>({
+      aggregateType: "experiment_run",
+      aggregateId: runId,
       tenantId,
-      config.eventType as TEvent["type"],
-      config.eventVersion as TEvent["version"],
-      config.mapToEventData(commandData) as TEvent["data"],
-      undefined,
-      undefined,
-      { occurredAt: commandData.occurredAt },
-    );
+      type: config.eventType as TEvent["type"],
+      version: config.eventVersion as TEvent["version"],
+      data: config.mapToEventData(commandData) as TEvent["data"],
+      occurredAt: commandData.occurredAt,
+    });
 
     logger.debug(
       {

@@ -42,13 +42,30 @@ function generateEventId(
 }
 
 /**
- * Options for event creation.
+ * Parameters for creating an event.
  */
-export interface CreateEventOptions {
-  /**
-   * Whether to automatically enrich metadata with current OpenTelemetry trace context.
-   * Defaults to false (trace context is not included by default).
-   */
+export interface CreateEventParams<
+  TData = unknown,
+  TMetadata extends EventMetadataBase = EventMetadataBase,
+  TType extends EventType = EventType,
+> {
+  /** The aggregate type (used for event ID generation) */
+  aggregateType: AggregateType;
+  /** The aggregate this event belongs to */
+  aggregateId: string;
+  /** Tenant identifier for multi-tenant isolation */
+  tenantId: TenantId;
+  /** Event type identifier */
+  type: TType;
+  /** Event version */
+  version: string;
+  /** Event-specific payload data */
+  data: TData;
+  /** Optional metadata (e.g., trace context) */
+  metadata?: TMetadata;
+  /** Optional timestamp in ms (defaults to current time) */
+  timestamp?: number;
+  /** Whether to automatically enrich metadata with current OpenTelemetry trace context */
   includeTraceContext?: boolean;
   /**
    * When the business action was initiated (Unix ms).
@@ -59,30 +76,14 @@ export interface CreateEventOptions {
 }
 
 /**
- * Creates an event with the given payload and metadata.
+ * Creates an event with the given parameters.
  *
- * @param aggregateType - The aggregate type (used for event ID generation)
- * @param aggregateId - The aggregate this event belongs to
- * @param tenantId - Tenant identifier for multi-tenant isolation
- * @param type - Event type identifier
- * @param data - Event-specific payload data
- * @param version - Event version
- * @param metadata - Optional metadata (e.g., trace context)
- * @param timestamp - Optional timestamp (defaults to current time)
- * @param options - Optional configuration (e.g., includeTraceContext)
+ * @param params - Named parameters for event creation
  * @returns A new event with timestamp set to current time (or provided timestamp)
  */
 // Overload for full Event type
 function createEvent<TEvent extends Event>(
-  aggregateType: AggregateType,
-  aggregateId: string,
-  tenantId: TenantId,
-  type: TEvent["type"],
-  version: TEvent["version"],
-  data: TEvent["data"],
-  metadata?: TEvent["metadata"],
-  timestamp?: number,
-  options?: CreateEventOptions,
+  params: CreateEventParams<TEvent["data"], NonNullable<TEvent["metadata"]>, TEvent["type"]>,
 ): TEvent;
 
 // Implementation
@@ -91,20 +92,25 @@ function createEvent<
   Metadata extends EventMetadataBase = EventMetadataBase,
   TEventType extends EventType = EventType,
 >(
-  aggregateType: AggregateType,
-  aggregateId: string,
-  tenantId: TenantId,
-  type: TEventType,
-  version: string,
-  data: Payload,
-  metadata?: Metadata,
-  timestamp?: number,
-  options?: CreateEventOptions,
+  params: CreateEventParams<Payload, Metadata, TEventType>,
 ): Event<Payload, Metadata> {
+  const {
+    aggregateType,
+    aggregateId,
+    tenantId,
+    type,
+    version,
+    data,
+    metadata,
+    timestamp,
+    includeTraceContext,
+    occurredAt,
+  } = params;
+
   const eventTimestamp = timestamp ?? Date.now();
 
   let finalMetadata = metadata;
-  if (options?.includeTraceContext === true) {
+  if (includeTraceContext === true) {
     finalMetadata =
       buildEventMetadataWithCurrentProcessingTraceparent<Metadata>(metadata);
   }
@@ -125,7 +131,7 @@ function createEvent<
     aggregateType,
     tenantId,
     timestamp: eventTimestamp,
-    occurredAt: options?.occurredAt ?? eventTimestamp,
+    occurredAt: occurredAt ?? eventTimestamp,
     type,
     data,
     ...(hasMetadata && { metadata: finalMetadata }),

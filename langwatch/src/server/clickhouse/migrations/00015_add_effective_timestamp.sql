@@ -38,6 +38,9 @@ ALTER TABLE ${CLICKHOUSE_DATABASE}.evaluation_states ADD COLUMN IF NOT EXISTS
 
 -- +goose Down
 -- +goose ENVSUB ON
+-- NOTE: MODIFY COLUMN DEFAULT changes from the Up migration are not reverted here.
+-- ClickHouse does not support removing a DEFAULT once set, and the now64(3) defaults
+-- are harmless if left in place.
 
 -- +goose StatementBegin
 ALTER TABLE ${CLICKHOUSE_DATABASE}.evaluation_states DROP COLUMN IF EXISTS CreatedAt;

@@ -86,17 +86,17 @@ export class TestCommandHandler implements CommandHandler<
 
   async handle(command: Command<TestCommandPayload>): Promise<TestEvent[]> {
     const tenantId = createTenantId(command.tenantId);
-    const event = EventUtils.createEvent(
-      "test_aggregate" as AggregateType,
-      command.data.aggregateId,
+    const event = EventUtils.createEvent({
+      aggregateType: "test_aggregate" as AggregateType,
+      aggregateId: command.data.aggregateId,
       tenantId,
-      TEST_EVENT_TYPE as EventType,
-      "2025-12-17",
-      {
+      type: TEST_EVENT_TYPE as EventType,
+      version: "2025-12-17",
+      data: {
         value: command.data.value,
         message: command.data.message,
       } satisfies TestEventData,
-    );
+    });
 
     return [event as unknown as TestEvent];
   }

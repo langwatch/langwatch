@@ -145,20 +145,20 @@ export class RecordSpanCommand implements CommandHandler<
             : new Error(String(piiResult.reason));
         }
 
-        const spanReceivedEvent = EventUtils.createEvent<SpanReceivedEvent>(
-          "trace",
-          traceId,
+        const spanReceivedEvent = EventUtils.createEvent<SpanReceivedEvent>({
+          aggregateType: "trace",
+          aggregateId: traceId,
           tenantId,
-          SPAN_RECEIVED_EVENT_TYPE,
-          SPAN_RECEIVED_EVENT_VERSION_LATEST,
-          {
+          type: SPAN_RECEIVED_EVENT_TYPE,
+          version: SPAN_RECEIVED_EVENT_VERSION_LATEST,
+          data: {
             span: spanToProcess,
             resource: commandData.resource,
             instrumentationScope: commandData.instrumentationScope,
             piiRedactionLevel,
           },
-          { traceId, spanId },
-        );
+          metadata: { traceId, spanId },
+        });
 
         this.logger.debug(
           {
