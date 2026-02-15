@@ -325,18 +325,17 @@ export class ClickHouseAnalyticsService {
     currentPeriod: TimeseriesBucket[],
     groupBy?: string,
   ): void {
-    // Collect all metric keys from both periods (including nested grouped metrics)
+    // Collect all top-level metric keys from both periods
     const allMetricKeys = new Set<string>();
-    const allGroupedMetricKeys = new Map<string, Set<string>>(); // groupBy key -> metric keys
+    // Collect all metric sub-keys across all groups (union of metric names)
+    const allGroupedMetricSubKeys = new Set<string>();
 
     for (const bucket of [...previousPeriod, ...currentPeriod]) {
       for (const key of Object.keys(bucket)) {
-        // Skip 'date' key
         if (key === "date") continue;
 
         const value = bucket[key];
 
-        // Handle grouped metrics (nested objects)
         if (
           groupBy &&
           key === groupBy &&
@@ -344,13 +343,9 @@ export class ClickHouseAnalyticsService {
           value !== null
         ) {
           const groupData = value as Record<string, Record<string, number>>;
-          for (const [groupKey, metrics] of Object.entries(groupData)) {
-            if (!allGroupedMetricKeys.has(groupKey)) {
-              allGroupedMetricKeys.set(groupKey, new Set());
-            }
-            const keySet = allGroupedMetricKeys.get(groupKey)!;
+          for (const metrics of Object.values(groupData)) {
             for (const metricKey of Object.keys(metrics)) {
-              keySet.add(metricKey);
+              allGroupedMetricSubKeys.add(metricKey);
             }
           }
         } else {
@@ -368,20 +363,18 @@ export class ClickHouseAnalyticsService {
         }
       }
 
-      // Normalize grouped metrics
+      // Normalize grouped metrics: only fill in missing metric sub-keys
+      // for groups that already exist in this bucket. Do NOT create new
+      // groups from the other period — that would bleed stale dimension
+      // values across periods.
       if (groupBy && bucket[groupBy] && typeof bucket[groupBy] === "object") {
         const groupData = bucket[groupBy] as Record<
           string,
           Record<string, number>
         >;
 
-        // Ensure all group keys exist
-        for (const [groupKey, metricKeys] of allGroupedMetricKeys) {
-          if (!groupData[groupKey]) {
-            groupData[groupKey] = {};
-          }
-          // Ensure all metric keys exist within each group
-          for (const metricKey of metricKeys) {
+        for (const groupKey of Object.keys(groupData)) {
+          for (const metricKey of allGroupedMetricSubKeys) {
             if (groupData[groupKey]![metricKey] === undefined) {
               groupData[groupKey]![metricKey] = 0;
             }
