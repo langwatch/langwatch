@@ -50,6 +50,12 @@ export interface CreateEventOptions {
    * Defaults to false (trace context is not included by default).
    */
   includeTraceContext?: boolean;
+  /**
+   * When the business action was initiated (Unix ms).
+   * Captures the moment the user/system triggered the action, before any queue delay.
+   * Defaults to the event timestamp when not provided.
+   */
+  occurredAt?: number;
 }
 
 /**
@@ -119,6 +125,7 @@ function createEvent<
     aggregateType,
     tenantId,
     timestamp: eventTimestamp,
+    occurredAt: options?.occurredAt ?? eventTimestamp,
     type,
     data,
     ...(hasMetadata && { metadata: finalMetadata }),

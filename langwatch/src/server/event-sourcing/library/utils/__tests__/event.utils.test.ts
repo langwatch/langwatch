@@ -90,6 +90,60 @@ describe("EventUtils - Event ID", () => {
     });
   });
 
+  describe("createEvent - occurredAt", () => {
+    it("defaults occurredAt to timestamp when not provided", () => {
+      const timestamp = 5000000;
+      const event = EventUtils.createEvent(
+        aggregateType,
+        aggregateId,
+        tenantId,
+        eventType,
+        eventVersion,
+        { test: "data" },
+        void 0,
+        timestamp,
+      );
+
+      expect(event.occurredAt).toBe(timestamp);
+    });
+
+    it("uses provided occurredAt from options", () => {
+      const timestamp = 5000000;
+      const occurredAt = 4000000;
+      const event = EventUtils.createEvent(
+        aggregateType,
+        aggregateId,
+        tenantId,
+        eventType,
+        eventVersion,
+        { test: "data" },
+        void 0,
+        timestamp,
+        { occurredAt },
+      );
+
+      expect(event.occurredAt).toBe(occurredAt);
+      expect(event.timestamp).toBe(timestamp);
+    });
+
+    it("sets occurredAt to auto-generated timestamp when neither is provided", () => {
+      const before = Date.now();
+      const event = EventUtils.createEvent(
+        aggregateType,
+        aggregateId,
+        tenantId,
+        eventType,
+        eventVersion,
+        { test: "data" },
+      );
+      const after = Date.now();
+
+      expect(event.occurredAt).toBe(event.timestamp);
+      expect(event.occurredAt).toBeGreaterThanOrEqual(before);
+      expect(event.occurredAt).toBeLessThanOrEqual(after);
+    });
+  });
+
   describe("createEvent with trace context - event ID format", () => {
     it("generates event ID in correct format", () => {
       const timestamp = 2000000;
