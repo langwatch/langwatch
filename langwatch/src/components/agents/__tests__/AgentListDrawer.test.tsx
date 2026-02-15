@@ -24,6 +24,7 @@ vi.mock("~/hooks/useDrawer", () => ({
     drawerOpen: vi.fn(() => false),
   }),
   getComplexProps: () => ({}),
+  getFlowCallbacks: () => null,
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
