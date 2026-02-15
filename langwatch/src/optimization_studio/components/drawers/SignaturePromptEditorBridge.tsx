@@ -11,9 +11,9 @@ import { useSmartSetNode } from "../../hooks/useSmartSetNode";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import type { Component, Field, Signature } from "../../types/dsl";
 import {
-  applyMappingChangeToEdges,
+  applyMappingChange,
   buildAvailableSources,
-  buildInputMappingsFromEdges,
+  buildInputMappings,
 } from "../../utils/edgeMappingUtils";
 
 /**
@@ -57,23 +57,32 @@ export function SignaturePromptEditorBridge({
   );
 
   const inputMappings = useMemo(
-    () => buildInputMappingsFromEdges({ nodeId: node.id, edges }),
-    [edges, node.id],
+    () =>
+      buildInputMappings({
+        nodeId: node.id,
+        edges,
+        inputs: signatureNode.data.inputs ?? [],
+      }),
+    [edges, node.id, signatureNode.data.inputs],
   );
 
   const handleInputMappingsChange = useCallback(
     (identifier: string, mapping: FieldMapping | undefined) => {
-      const currentEdges = getWorkflow().edges;
-      const newEdges = applyMappingChangeToEdges({
+      const workflow = getWorkflow();
+      const currentInputs =
+        workflow.nodes.find((n) => n.id === node.id)?.data.inputs ?? [];
+      const result = applyMappingChange({
         nodeId: node.id,
         identifier,
         mapping,
-        currentEdges,
+        currentEdges: workflow.edges,
+        currentInputs,
       });
-      setEdges(newEdges);
+      setEdges(result.edges);
+      setNode({ id: node.id, data: { inputs: result.inputs } });
       updateNodeInternals(node.id);
     },
-    [getWorkflow, node.id, setEdges, updateNodeInternals],
+    [getWorkflow, node.id, setEdges, setNode, updateNodeInternals],
   );
 
   /**
@@ -114,10 +123,17 @@ export function SignaturePromptEditorBridge({
         const oldInputs = signatureNode.data.inputs ?? [];
         const newInputs = config.inputs;
 
-        data.inputs = newInputs.map((i) => ({
-          identifier: i.identifier,
-          type: i.type as Field["type"],
-        }));
+        data.inputs = newInputs.map((i) => {
+          // Preserve field.value from existing input (hardcoded value mappings)
+          const existing = oldInputs.find(
+            (e) => e.identifier === i.identifier,
+          );
+          return {
+            identifier: i.identifier,
+            type: i.type as Field["type"],
+            ...(existing?.value != null ? { value: existing.value } : {}),
+          };
+        });
 
         // When input identifiers change (e.g. prompt loads with "input" but
         // node had "question"), update existing edge targetHandles to match
@@ -172,18 +188,25 @@ export function SignaturePromptEditorBridge({
     ],
   );
 
-  /** Maps prompt I/O arrays to DSL Field format. */
+  /** Maps prompt I/O arrays to DSL Field format, preserving field.value from existing inputs. */
   const mapIOToFields = useCallback(
     (
       items?: Array<{ identifier: string; type: string }>,
     ): Field[] | undefined => {
       if (!items) return undefined;
-      return items.map((item) => ({
-        identifier: item.identifier,
-        type: item.type as Field["type"],
-      }));
+      const currentInputs = signatureNode.data.inputs ?? [];
+      return items.map((item) => {
+        const existing = currentInputs.find(
+          (e) => e.identifier === item.identifier,
+        );
+        return {
+          identifier: item.identifier,
+          type: item.type as Field["type"],
+          ...(existing?.value != null ? { value: existing.value } : {}),
+        };
+      });
     },
-    [],
+    [signatureNode.data.inputs],
   );
 
   const handleSave = useCallback(

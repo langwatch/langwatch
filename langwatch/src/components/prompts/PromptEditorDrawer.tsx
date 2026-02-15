@@ -1025,7 +1025,6 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
           position="sticky"
           top={0}
           zIndex={1}
-          background="bg.panel"
         >
           <PromptEditorHeader
             onSave={() => void handleSave()}

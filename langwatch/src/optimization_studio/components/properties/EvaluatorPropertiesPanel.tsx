@@ -21,8 +21,8 @@ import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import type { Evaluator, Field } from "../../types/dsl";
 import {
   buildAvailableSources,
-  buildInputMappingsFromEdges,
-  applyMappingChangeToEdges,
+  buildInputMappings,
+  applyMappingChange,
 } from "../../utils/edgeMappingUtils";
 import { useRegisterDrawerFooter } from "../drawers/useInsideDrawer";
 import { BasePropertiesPanel } from "./BasePropertiesPanel";
@@ -214,23 +214,32 @@ function DbEvaluatorPanel({
   );
 
   const inputMappings = useMemo(
-    () => buildInputMappingsFromEdges({ nodeId: node.id, edges }),
-    [edges, node.id],
+    () =>
+      buildInputMappings({
+        nodeId: node.id,
+        edges,
+        inputs: node.data.inputs ?? [],
+      }),
+    [edges, node.id, node.data.inputs],
   );
 
   const handleInputMappingChange = useCallback(
     (identifier: string, mapping: any) => {
-      const currentEdges = getWorkflow().edges;
-      const newEdges = applyMappingChangeToEdges({
+      const workflow = getWorkflow();
+      const currentInputs =
+        workflow.nodes.find((n) => n.id === node.id)?.data.inputs ?? [];
+      const result = applyMappingChange({
         nodeId: node.id,
         identifier,
         mapping,
-        currentEdges,
+        currentEdges: workflow.edges,
+        currentInputs,
       });
-      setEdges(newEdges);
+      setEdges(result.edges);
+      setNode({ id: node.id, data: { inputs: result.inputs } });
       updateNodeInternals(node.id);
     },
-    [getWorkflow, node.id, setEdges, updateNodeInternals],
+    [getWorkflow, node.id, setEdges, setNode, updateNodeInternals],
   );
 
   const mappingsConfig: EvaluatorMappingsConfig = useMemo(

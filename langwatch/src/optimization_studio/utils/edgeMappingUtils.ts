@@ -3,7 +3,7 @@ import type {
   AvailableSource,
   FieldMapping,
 } from "~/components/variables";
-import type { Component } from "../types/dsl";
+import type { Component, Field } from "../types/dsl";
 
 /**
  * Builds available sources for variable mapping from the workflow graph.
@@ -120,4 +120,105 @@ export function applyMappingChangeToEdges({
   }
 
   return filteredEdges;
+}
+
+/**
+ * Builds complete input mappings by reading both edges (source mappings)
+ * and field.value (value mappings). Edge mappings take priority over
+ * field.value when both exist for the same input.
+ */
+export function buildInputMappings({
+  nodeId,
+  edges,
+  inputs,
+}: {
+  nodeId: string;
+  edges: Edge[];
+  inputs: Field[];
+}): Record<string, FieldMapping> {
+  const mappings: Record<string, FieldMapping> = {};
+
+  // Source mappings from edges
+  edges
+    .filter((e) => e.target === nodeId)
+    .forEach((edge) => {
+      const targetHandle = edge.targetHandle?.split(".")[1];
+      const sourceField = edge.sourceHandle?.split(".")[1];
+      if (targetHandle && sourceField && edge.source) {
+        mappings[targetHandle] = {
+          type: "source",
+          sourceId: edge.source,
+          path: [sourceField],
+        };
+      }
+    });
+
+  // Value mappings from field.value (for inputs without an edge)
+  inputs.forEach((input) => {
+    if (
+      input.value != null &&
+      input.value !== "" &&
+      !mappings[input.identifier]
+    ) {
+      mappings[input.identifier] = {
+        type: "value",
+        value: String(input.value),
+      };
+    }
+  });
+
+  return mappings;
+}
+
+/**
+ * Applies a mapping change for a single input field. Handles both source
+ * mappings (creates/removes edges) and value mappings (sets/clears field.value).
+ * Returns the updated edges and inputs arrays.
+ */
+export function applyMappingChange({
+  nodeId,
+  identifier,
+  mapping,
+  currentEdges,
+  currentInputs,
+}: {
+  nodeId: string;
+  identifier: string;
+  mapping: FieldMapping | undefined;
+  currentEdges: Edge[];
+  currentInputs: Field[];
+}): { edges: Edge[]; inputs: Field[] } {
+  // Remove existing edge for this input
+  const filteredEdges = currentEdges.filter(
+    (edge) =>
+      !(
+        edge.target === nodeId &&
+        edge.targetHandle === `inputs.${identifier}`
+      ),
+  );
+
+  // Update field.value on the matching input
+  const updatedInputs = currentInputs.map((input) => {
+    if (input.identifier !== identifier) return input;
+    if (mapping?.type === "value") {
+      return { ...input, value: mapping.value };
+    }
+    // Clear value for source mapping or no mapping
+    const { value: _value, ...rest } = input;
+    return rest;
+  });
+
+  if (mapping?.type === "source") {
+    const newEdge: Edge = {
+      id: `edge-${identifier}-${Date.now()}`,
+      source: mapping.sourceId,
+      target: nodeId,
+      sourceHandle: `outputs.${mapping.path.join(".")}`,
+      targetHandle: `inputs.${identifier}`,
+      type: "default",
+    };
+    return { edges: [...filteredEdges, newEdge], inputs: updatedInputs };
+  }
+
+  return { edges: filteredEdges, inputs: updatedInputs };
 }

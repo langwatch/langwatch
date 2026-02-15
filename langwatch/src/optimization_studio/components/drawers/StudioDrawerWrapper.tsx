@@ -184,13 +184,13 @@ export function StudioDrawerWrapper({
         onOpenChange={({ open }) => {
           if (!open) handleClose();
         }}
-        size="lg"
+        size="md"
         closeOnInteractOutside={false}
         modal={false}
       >
-        <Drawer.Content>
+        <Drawer.Content marginTop="56px">
           {node && (
-            <Drawer.Header paddingY={2} paddingX={3}>
+            <Drawer.Header paddingY={2} paddingLeft={3} paddingRight={1}>
               {headerContent}
             </Drawer.Header>
           )}

@@ -82,8 +82,8 @@ export function EvaluatorEditorContent({
         gap={4}
         align="stretch"
         flex={1}
-        paddingX={6}
-        paddingY={4}
+        paddingX={4}
+        paddingY={2}
         overflowY="auto"
       >
         {/* Description */}
@@ -151,7 +151,7 @@ export function EvaluatorEditorContent({
 
         {/* Mappings section - shown when caller provides mappingsConfig */}
         {mappingsConfig && (
-          <Box paddingTop={4}>
+          <Box>
             <EvaluatorMappingsSection
               evaluatorDef={effectiveEvaluatorDef}
               level={mappingsConfig.level}

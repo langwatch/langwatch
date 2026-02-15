@@ -1,7 +1,7 @@
 import { Box } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
 import { useUpdateNodeInternals } from "@xyflow/react";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { CodeBlockEditor } from "~/components/blocks/CodeBlockEditor";
 import {
@@ -10,9 +10,15 @@ import {
   OutputsSection,
   type OutputType,
 } from "~/components/outputs/OutputsSection";
+import type { FieldMapping } from "~/components/variables";
 import { type Variable, VariablesSection } from "~/components/variables";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import type { Component, Field } from "../../types/dsl";
+import {
+  applyMappingChange,
+  buildAvailableSources,
+  buildInputMappings,
+} from "../../utils/edgeMappingUtils";
 import { BasePropertiesPanel } from "./BasePropertiesPanel";
 
 /**
@@ -20,12 +26,17 @@ import { BasePropertiesPanel } from "./BasePropertiesPanel";
  * Uses VariablesSection for inputs and OutputsSection for outputs.
  */
 export function CodePropertiesPanel({ node }: { node: Node<Component> }) {
-  const { setNode, setNodeParameter } = useWorkflowStore(
-    useShallow((state) => ({
-      setNode: state.setNode,
-      setNodeParameter: state.setNodeParameter,
-    })),
-  );
+  const { nodes, edges, setNode, setNodeParameter, setEdges, getWorkflow } =
+    useWorkflowStore(
+      useShallow((state) => ({
+        nodes: state.getWorkflow().nodes,
+        edges: state.getWorkflow().edges,
+        setNode: state.setNode,
+        setNodeParameter: state.setNodeParameter,
+        setEdges: state.setEdges,
+        getWorkflow: state.getWorkflow,
+      })),
+    );
   const updateNodeInternals = useUpdateNodeInternals();
 
   // Get code from parameters
@@ -46,6 +57,41 @@ export function CodePropertiesPanel({ node }: { node: Node<Component> }) {
     type: output.type as OutputType,
   }));
 
+  // Build mapping data from workflow graph
+  const availableSources = useMemo(
+    () => buildAvailableSources({ nodeId: node.id, nodes, edges }),
+    [edges, nodes, node.id],
+  );
+
+  const inputMappings = useMemo(
+    () =>
+      buildInputMappings({
+        nodeId: node.id,
+        edges,
+        inputs: node.data.inputs ?? [],
+      }),
+    [edges, node.id, node.data.inputs],
+  );
+
+  const handleMappingChange = useCallback(
+    (identifier: string, mapping: FieldMapping | undefined) => {
+      const workflow = getWorkflow();
+      const currentInputs =
+        workflow.nodes.find((n) => n.id === node.id)?.data.inputs ?? [];
+      const result = applyMappingChange({
+        nodeId: node.id,
+        identifier,
+        mapping,
+        currentEdges: workflow.edges,
+        currentInputs,
+      });
+      setEdges(result.edges);
+      setNode({ id: node.id, data: { inputs: result.inputs } });
+      updateNodeInternals(node.id);
+    },
+    [getWorkflow, node.id, setEdges, setNode, updateNodeInternals],
+  );
+
   // Handle code change
   const handleCodeChange = useCallback(
     (newCode: string) => {
@@ -58,13 +104,21 @@ export function CodePropertiesPanel({ node }: { node: Node<Component> }) {
     [node.id, setNodeParameter],
   );
 
-  // Handle inputs change
+  // Handle inputs change (preserves field.value for existing inputs)
   const handleInputsChange = useCallback(
     (newVariables: Variable[]) => {
-      const newInputs: Field[] = newVariables.map((v) => ({
-        identifier: v.identifier,
-        type: v.type as Field["type"],
-      }));
+      const existingInputs = node.data.inputs ?? [];
+      const newInputs: Field[] = newVariables.map((v) => {
+        // Preserve field.value from existing input with same identifier
+        const existing = existingInputs.find(
+          (i) => i.identifier === v.identifier,
+        );
+        return {
+          identifier: v.identifier,
+          type: v.type as Field["type"],
+          ...(existing?.value != null ? { value: existing.value } : {}),
+        };
+      });
 
       setNode({
         id: node.id,
@@ -72,7 +126,7 @@ export function CodePropertiesPanel({ node }: { node: Node<Component> }) {
       });
       updateNodeInternals(node.id);
     },
-    [node.id, setNode, updateNodeInternals],
+    [node.id, node.data.inputs, setNode, updateNodeInternals],
   );
 
   // Handle outputs change
@@ -93,7 +147,7 @@ export function CodePropertiesPanel({ node }: { node: Node<Component> }) {
   );
 
   return (
-    <BasePropertiesPanel node={node} hideParameters hideInputs hideOutputs>
+    <BasePropertiesPanel node={node} hideParameters hideInputs hideOutputs paddingX={4}>
       {/* Code Editor */}
       <CodeBlockEditor
         code={code}
@@ -106,8 +160,10 @@ export function CodePropertiesPanel({ node }: { node: Node<Component> }) {
         <VariablesSection
           variables={inputs}
           onChange={handleInputsChange}
-          showMappings={false}
-          isMappingDisabled={true}
+          showMappings={true}
+          mappings={inputMappings}
+          onMappingChange={handleMappingChange}
+          availableSources={availableSources}
           canAddRemove={true}
           readOnly={false}
           title="Inputs"

@@ -123,9 +123,6 @@ const addLiteLLMParams = async ({
       `${provider} model provider is disabled, go to settings to enable it`,
     );
   }
-  if (customKeysOnly && !modelProvider.customKeys) {
-    throw new Error(`Custom API key required for ${provider}`);
-  }
 
   // Normalize to snake_case format and preserve all parameters (OCP compliant)
   const normalizedLLM = normalizeToSnakeCase(llm);
