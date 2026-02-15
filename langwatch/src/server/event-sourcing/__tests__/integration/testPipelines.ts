@@ -1,4 +1,3 @@
-import type { ClickHouseClient } from "@clickhouse/client";
 import { z } from "zod";
 import { createLogger } from "~/utils/logger/server";
 import {
@@ -126,19 +125,14 @@ export interface TestEventHandlerRecord {
  * AppendStore that writes mapped records to a ClickHouse table.
  */
 class TestEventHandlerAppendStore implements AppendStore<TestEventHandlerRecord> {
-  private clickHouseClient: ClickHouseClient | null = null;
-
-  constructor() {
-    this.clickHouseClient = getTestClickHouseClient();
-  }
-
   async append(record: TestEventHandlerRecord, _context: ProjectionStoreContext): Promise<void> {
-    if (!this.clickHouseClient) {
+    const clickHouseClient = getTestClickHouseClient();
+    if (!clickHouseClient) {
       throw new Error("ClickHouse client not available");
     }
 
     // Ensure table exists
-    await this.clickHouseClient.exec({
+    await clickHouseClient.exec({
       query: `
         CREATE TABLE IF NOT EXISTS "test_langwatch".test_event_handler_log (
           TenantId String,
@@ -154,7 +148,7 @@ class TestEventHandlerAppendStore implements AppendStore<TestEventHandlerRecord>
     });
 
     // Insert processed event
-    await this.clickHouseClient.insert({
+    await clickHouseClient.insert({
       table: "test_langwatch.test_event_handler_log",
       values: [record],
       format: "JSONEachRow",
