@@ -19,7 +19,6 @@ import {
 } from "react-icons/lu";
 
 import { Menu } from "~/components/ui/menu";
-import { Tooltip } from "~/components/ui/tooltip";
 import {
   EVALUATION_STATUS_COLORS,
   getStatusLabel,
@@ -137,17 +136,6 @@ export function EvaluatorChip({
             >
               {evaluatorName}
             </Text>
-            {/* Orange dot for unsaved local changes */}
-            {evaluator.localEvaluatorConfig && (
-              <Tooltip
-                content="Unpublished modifications"
-                positioning={{ placement: "top" }}
-                openDelay={0}
-                showArrow
-              >
-                <Circle size="6px" bg="orange.solid" flexShrink={0} />
-              </Tooltip>
-            )}
             {/* Inline result (score, label, or error icon) */}
             {status !== "running" && getInlineResult()}
             {/* Missing mapping alert icon - on the right side like prompts */}

@@ -54,8 +54,13 @@ async def execute_component(event: ExecuteComponentPayload):
                 ) as Module:
                     instance = Module(**kwargs)
                     # HTTP nodes need all inputs for template interpolation, bypass autoparse
-                    # which would filter to only defined fields and stringify arrays
-                    if node.type == "http":
+                    # which would filter to only defined fields and stringify arrays.
+                    # Agent nodes with HTTP sub-type also need this bypass.
+                    agent_type_param = next(
+                        (f.value for f in (node.data.parameters or []) if f.identifier == "agent_type"),
+                        None,
+                    )
+                    if node.type == "http" or (node.type == "agent" and agent_type_param == "http"):
                         forward_inputs = event.inputs
                     else:
                         forward_inputs = autoparse_fields(node.data.inputs or [], event.inputs)  # type: ignore

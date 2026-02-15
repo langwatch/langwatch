@@ -60,14 +60,6 @@ export function WorkflowNamePopover() {
 
   return (
     <>
-      <EmojiPickerModal
-        open={emojiPicker.open}
-        onClose={emojiPicker.onClose}
-        onChange={(emoji) => {
-          setWorkflow({ icon: emoji });
-          emojiPicker.onClose();
-        }}
-      />
       <Popover.Root
         open={isOpen}
         onOpenChange={({ open }) => {
@@ -78,7 +70,7 @@ export function WorkflowNamePopover() {
       >
         <Popover.Trigger asChild>
           <HStack cursor="pointer" _hover={{ opacity: 0.8 }} gap={1.5}>
-            <WorkflowIcon icon={icon} size="xs" />
+            <WorkflowIcon icon={icon} size="md" background="none" border="none" />
             <Text lineClamp={1} fontSize="15px" wordBreak="break-all">
               {name}
             </Text>
@@ -93,6 +85,15 @@ export function WorkflowNamePopover() {
                   Name and Icon
                 </Field.Label>
                 <HStack>
+                  <EmojiPickerModal
+                    open={emojiPicker.open}
+                    onClose={emojiPicker.onClose}
+                    onChange={(emoji) => {
+                      setWorkflow({ icon: emoji });
+                      emojiPicker.onClose();
+                    }}
+                    transform="translateY(48%)"
+                  />
                   <Tooltip
                     content="Change icon"
                     positioning={{ placement: "top" }}

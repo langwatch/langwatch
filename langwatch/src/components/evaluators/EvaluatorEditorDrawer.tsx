@@ -1,17 +1,14 @@
 import {
   Box,
   Button,
-  Circle,
   Field,
   Heading,
   HStack,
   Input,
-  Spacer,
   Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import debounce from "lodash-es/debounce";
 import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FormProvider, useForm } from "react-hook-form";
@@ -21,13 +18,11 @@ import { WorkflowCardDisplay } from "~/optimization_studio/components/workflow/W
 import { z } from "zod";
 import DynamicZodForm from "~/components/checks/DynamicZodForm";
 import { Drawer } from "~/components/ui/drawer";
-import { Tooltip } from "~/components/ui/tooltip";
 import {
   type AvailableSource,
   type FieldMapping as UIFieldMapping,
   VariablesSection,
 } from "~/components/variables";
-import type { LocalEvaluatorConfig } from "~/evaluations-v3/types";
 import { validateEvaluatorMappingsWithFields } from "~/evaluations-v3/utils/mappingValidation";
 import {
   getComplexProps,
@@ -108,17 +103,6 @@ export type EvaluatorEditorDrawerProps = {
    * Useful for flows like Online Evaluation where we're "selecting" rather than "saving".
    */
   saveButtonText?: string;
-  /**
-   * For evaluations context: callback to persist local changes when closing without save.
-   * If provided, closing with unsaved changes will NOT show a confirmation dialog.
-   * Pass undefined to clear local changes (when form matches saved state).
-   */
-  onLocalConfigChange?: (config: LocalEvaluatorConfig | undefined) => void;
-  /**
-   * Initial local config to load (for resuming unpublished changes).
-   * When provided, overrides DB data for form initialization.
-   */
-  initialLocalConfig?: LocalEvaluatorConfig;
 };
 
 /**
@@ -154,13 +138,6 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
   // Get custom save button text from props or complexProps
   const saveButtonText =
     props.saveButtonText ?? (complexProps.saveButtonText as string | undefined);
-
-  // Get local config callbacks from props or flow callbacks
-  const onLocalConfigChange =
-    props.onLocalConfigChange ?? flowCallbacks?.onLocalConfigChange;
-  const initialLocalConfig =
-    props.initialLocalConfig ??
-    (complexProps.initialLocalConfig as LocalEvaluatorConfig | undefined);
 
   const isOpen = props.open !== false && props.open !== undefined;
 
@@ -254,95 +231,25 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
     forceUserToDecideAName,
   ]);
 
-  // Ref to track the saved (DB) form values for comparison with current form values.
-  // Used by the debounced watch to determine if local changes differ from saved state.
-  const savedFormValuesRef = useRef<{
-    name: string;
-    settings: Record<string, unknown>;
-  } | null>(null);
-  const onLocalConfigChangeRef = useRef(onLocalConfigChange);
-  onLocalConfigChangeRef.current = onLocalConfigChange;
-
-  // Initialize form with evaluator data (merging local config if present)
+  // Initialize form with evaluator data
   useEffect(() => {
     if (evaluatorQuery.data) {
       const config = evaluatorQuery.data.config as {
         settings?: Record<string, unknown>;
       } | null;
-      const savedValues = {
+      form.reset({
         name: evaluatorQuery.data.name,
         settings: config?.settings ?? {},
-      };
-      savedFormValuesRef.current = savedValues;
-
-      // Merge local config over DB data if present
-      const formValues = initialLocalConfig
-        ? {
-            name: initialLocalConfig.name,
-            settings: initialLocalConfig.settings ?? savedValues.settings,
-          }
-        : savedValues;
-
-      form.reset(formValues);
-      setHasUnsavedChanges(!!initialLocalConfig);
+      });
+      setHasUnsavedChanges(false);
     }
-  }, [evaluatorQuery.data, form, initialLocalConfig]);
+  }, [evaluatorQuery.data, form]);
 
-  // Debounced function to update local config (avoids flooding store on every keystroke)
-  const debouncedUpdateLocalConfig = useMemo(
-    () =>
-      debounce(
-        (config: LocalEvaluatorConfig | undefined) => {
-          onLocalConfigChangeRef.current?.(config);
-        },
-        300,
-        { leading: true },
-      ),
-    [],
-  );
-
-  // Watch form changes, track unsaved state, and persist local config
+  // Track form changes
   useEffect(() => {
-    const subscription = form.watch((formValues) => {
-      // Determine if form differs from saved DB state
-      const saved = savedFormValuesRef.current;
-      let isUnsaved = false;
-
-      if (saved) {
-        const nameChanged = formValues.name?.trim() !== saved.name.trim();
-        const settingsChanged =
-          JSON.stringify(formValues.settings) !==
-          JSON.stringify(saved.settings);
-        isUnsaved = nameChanged || settingsChanged;
-      } else {
-        // No saved state yet (new evaluator or still loading)
-        isUnsaved = true;
-      }
-
-      setHasUnsavedChanges(isUnsaved);
-
-      // Persist local config if callback is provided
-      if (onLocalConfigChangeRef.current) {
-        if (isUnsaved) {
-          debouncedUpdateLocalConfig({
-            name: formValues.name ?? "",
-            settings: formValues.settings as
-              | Record<string, unknown>
-              | undefined,
-          });
-        } else {
-          // Clear local config when back to saved state
-          debouncedUpdateLocalConfig.cancel();
-          onLocalConfigChangeRef.current(undefined);
-        }
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-      debouncedUpdateLocalConfig.cancel();
-    };
-  }, [form, debouncedUpdateLocalConfig]);
+    const subscription = form.watch(() => setHasUnsavedChanges(true));
+    return () => subscription.unsubscribe();
+  }, [form]);
 
   // Mutations
   // IMPORTANT: Navigation after save is the CALLER'S responsibility!
@@ -355,8 +262,6 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
   const createMutation = api.evaluators.create.useMutation({
     onSuccess: (evaluator) => {
       void utils.evaluators.getAll.invalidate({ projectId: project?.id ?? "" });
-      // Clear local config on successful save
-      onLocalConfigChangeRef.current?.(undefined);
       // Get fresh callback from flow callbacks (might have been set after component rendered)
       const freshOnSave = getFlowCallbacks("evaluatorEditor")?.onSave ?? onSave;
       // If onSave returns true, it handled navigation - don't do default navigation
@@ -389,17 +294,6 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
         id: evaluator.id,
         projectId: project?.id ?? "",
       });
-      // Clear local config on successful save
-      onLocalConfigChangeRef.current?.(undefined);
-      // Update saved values ref so form watch correctly detects no unsaved changes
-      const config = evaluator.config as {
-        settings?: Record<string, unknown>;
-      } | null;
-      savedFormValuesRef.current = {
-        name: evaluator.name,
-        settings: config?.settings ?? {},
-      };
-      setHasUnsavedChanges(false);
       // Get fresh callback from flow callbacks (might have been set after component rendered)
       const freshOnSave = getFlowCallbacks("evaluatorEditor")?.onSave ?? onSave;
       // If onSave returns true, it handled navigation - don't do default navigation
@@ -488,13 +382,6 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
 
   const handleClose = () => {
     if (hasUnsavedChanges) {
-      // If onLocalConfigChange is provided (evaluations context), just close.
-      // Local config is already being updated on every change.
-      if (onLocalConfigChange) {
-        onClose();
-        return;
-      }
-      // Otherwise, warn about losing changes
       if (
         !window.confirm(
           "You have unsaved changes. Are you sure you want to close?",
@@ -512,15 +399,6 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
     }
   };
 
-  const handleDiscard = useCallback(() => {
-    if (savedFormValuesRef.current) {
-      debouncedUpdateLocalConfig.cancel();
-      form.reset(savedFormValuesRef.current);
-      setHasUnsavedChanges(false);
-      onLocalConfigChange?.(undefined);
-    }
-  }, [form, onLocalConfigChange, debouncedUpdateLocalConfig]);
-
   const hasSettings =
     settingsSchema instanceof z.ZodObject &&
     Object.keys(settingsSchema.shape).length > 0;
@@ -530,6 +408,7 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
       open={isOpen}
       onOpenChange={({ open }) => !open && handleClose()}
       size="lg"
+      closeOnInteractOutside={false}
       modal={false}
     >
       <Drawer.Content>
@@ -549,16 +428,6 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
               </Button>
             )}
             <Heading>{evaluatorDef?.name ?? "Configure Evaluator"}</Heading>
-            {hasUnsavedChanges && onLocalConfigChange && (
-              <Tooltip
-                content="Unpublished modifications"
-                positioning={{ placement: "top" }}
-                openDelay={0}
-                showArrow
-              >
-                <Circle size="10px" bg="orange.400" />
-              </Tooltip>
-            )}
           </HStack>
         </Drawer.Header>
         <Drawer.Body
@@ -662,55 +531,21 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
           )}
         </Drawer.Body>
         <Drawer.Footer borderTopWidth="1px" borderColor="border">
-          {onLocalConfigChange ? (
-            <HStack width="full">
-              {hasUnsavedChanges && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleDiscard}
-                  data-testid="evaluator-discard-button"
-                >
-                  Discard
-                </Button>
-              )}
-              <Spacer />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSave}
-                disabled={!isValid}
-                loading={isSaving}
-                data-testid="evaluator-save-button"
-              >
-                Save
-              </Button>
-              <Button
-                colorPalette="blue"
-                size="sm"
-                onClick={onClose}
-                data-testid="evaluator-apply-button"
-              >
-                Apply
-              </Button>
-            </HStack>
-          ) : (
-            <HStack gap={3}>
-              <Button variant="outline" onClick={handleClose}>
-                Cancel
-              </Button>
-              <Button
-                colorPalette="green"
-                onClick={handleSave}
-                disabled={!isValid || isSaving}
-                loading={isSaving}
-                data-testid="save-evaluator-button"
-              >
-                {saveButtonText ??
-                  (evaluatorId ? "Save Changes" : "Create Evaluator")}
-              </Button>
-            </HStack>
-          )}
+          <HStack gap={3}>
+            <Button variant="outline" onClick={handleClose}>
+              Cancel
+            </Button>
+            <Button
+              colorPalette="green"
+              onClick={handleSave}
+              disabled={!isValid || isSaving}
+              loading={isSaving}
+              data-testid="save-evaluator-button"
+            >
+              {saveButtonText ??
+                (evaluatorId ? "Save Changes" : "Create Evaluator")}
+            </Button>
+          </HStack>
         </Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>

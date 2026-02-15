@@ -118,7 +118,6 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
       open={isOpen}
       onOpenChange={({ open }) => !open && onClose()}
       size="md"
-      modal={false}
     >
       <Drawer.Content>
         <Drawer.CloseTrigger />

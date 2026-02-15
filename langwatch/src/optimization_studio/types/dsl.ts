@@ -57,7 +57,9 @@ export type ComponentType =
   | "retriever"
   | "prompting_technique"
   | "custom"
-  | "evaluator";
+  | "evaluator"
+  | "http"
+  | "agent";
 
 // Define the execution state type
 export interface ExecutionState {
@@ -241,6 +243,15 @@ export type Evaluator = Omit<BaseComponent, "cls"> & {
   workflowId?: string;
   data?: any;
   /** Local config for unsaved evaluator changes */
+  localConfig?: { name?: string; settings?: Record<string, unknown> };
+};
+
+export type AgentComponent = BaseComponent & {
+  /** Reference to DB agent: "agents/<id>" */
+  agent?: string;
+  /** Agent sub-type for backend execution delegation */
+  agentType?: "http" | "code" | "workflow";
+  /** Local config for unsaved changes */
   localConfig?: { name?: string; settings?: Record<string, unknown> };
 };
 

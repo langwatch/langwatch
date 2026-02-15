@@ -17,7 +17,7 @@ import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
-import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
+import { getComplexProps, getFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { checkCompoundLimits } from "~/hooks/useCompoundLicenseCheck";
 import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -61,8 +61,10 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
   const emojiPicker = useDisclosure();
 
   const onClose = props.onClose ?? closeDrawer;
+  const flowCallbacks = getFlowCallbacks("workflowSelector");
   const onSave =
     props.onSave ??
+    flowCallbacks?.onSave ??
     (complexProps.onSave as WorkflowSelectorDrawerProps["onSave"]);
   const isOpen = props.open !== false && props.open !== undefined;
 
@@ -187,7 +189,6 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
         open={isOpen}
         onOpenChange={({ open }) => !open && onClose()}
         size="md"
-        modal={false}
       >
         <Drawer.Content>
           <Drawer.CloseTrigger />

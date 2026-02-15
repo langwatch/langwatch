@@ -94,7 +94,6 @@ export function EvaluatorCategorySelectorDrawer(
       open={isOpen}
       onOpenChange={({ open }) => !open && onClose()}
       size="md"
-      modal={false}
     >
       <Drawer.Content>
         <Drawer.CloseTrigger />

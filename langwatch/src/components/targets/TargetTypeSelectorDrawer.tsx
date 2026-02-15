@@ -77,7 +77,6 @@ export function TargetTypeSelectorDrawer(props: TargetTypeSelectorDrawerProps) {
       open={isOpen}
       onOpenChange={({ open }) => !open && onClose()}
       size="md"
-      modal={false}
     >
       <Drawer.Content>
         <Drawer.CloseTrigger />

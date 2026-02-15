@@ -17,12 +17,14 @@ import { IconWrapper } from "../../../components/IconWrapper";
 import { DiscordOutlineIcon } from "../../../components/icons/DiscordOutline";
 import { Tooltip } from "../../../components/ui/tooltip";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
+import { useAgentPickerFlow } from "../../hooks/useAgentPickerFlow";
 import { usePromptPickerFlow } from "../../hooks/usePromptPickerFlow";
 import { useEvaluatorPickerFlow } from "../../hooks/useEvaluatorPickerFlow";
 import { MODULES } from "../../registry";
 import type { ComponentType, Custom, Field } from "../../types/dsl";
 import { getInputsOutputs } from "../../utils/nodeUtils";
 import { NodeComponents } from "../nodes";
+import { AgentNodeDraggable } from "./AgentNodeDraggable";
 import { EvaluatorNodeDraggable } from "./EvaluatorNodeDraggable";
 import { LlmSignatureNodeDraggable } from "./LlmSignatureNodeDraggable";
 import { NodeDraggable } from "./NodeDraggable";
@@ -70,6 +72,7 @@ export const NodeSelectionPanel = ({
   const { project } = useOrganizationTeamProject();
   const { handlePromptDragEnd } = usePromptPickerFlow();
   const { handleEvaluatorDragEnd } = useEvaluatorPickerFlow();
+  const { handleAgentDragEnd } = useAgentPickerFlow();
 
   const { data: components } = api.optimization.getComponents.useQuery(
     {
@@ -139,6 +142,10 @@ export const NodeSelectionPanel = ({
           <LlmSignatureNodeDraggable onDragEnd={handlePromptDragEnd} />
 
           <NodeDraggable component={MODULES.code} type="code" />
+
+          <NodeDraggable component={MODULES.http} type="http" />
+
+          <AgentNodeDraggable onDragEnd={handleAgentDragEnd} />
 
           <EvaluatorNodeDraggable onDragEnd={handleEvaluatorDragEnd} />
 

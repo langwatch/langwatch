@@ -1,12 +1,14 @@
 import type { Node } from "@xyflow/react";
 import { useShallow } from "zustand/react/shallow";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
-import type { Component, ComponentType, Evaluator } from "../../types/dsl";
+import type { AgentComponent, Component, ComponentType, Evaluator } from "../../types/dsl";
+import { AgentPropertiesPanel } from "../properties/AgentPropertiesPanel";
 import { CodePropertiesPanel } from "../properties/CodePropertiesPanel";
 import { CustomPropertiesPanel } from "../properties/CustomPropertiesPanel";
 import { EndPropertiesPanel } from "../properties/EndPropertiesPanel";
 import { EntryPointPropertiesPanel } from "../properties/EntryPointPropertiesPanel";
 import { EvaluatorPropertiesPanel } from "../properties/EvaluatorPropertiesPanel";
+import { HttpPropertiesPanel } from "../properties/HttpPropertiesPanel";
 import { PromptingTechniquePropertiesPanel } from "../properties/PromptingTechniquePropertiesPanel";
 import { RetrievePropertiesPanel } from "../properties/RetrievePropertiesPanel";
 import { SignaturePromptEditorBridge } from "./SignaturePromptEditorBridge";
@@ -25,6 +27,8 @@ const ComponentPropertiesPanelMap: Partial<
   end: EndPropertiesPanel as React.FC<{ node: Node<Component> }>,
   signature: SignaturePromptEditorBridge as React.FC<{ node: Node<Component> }>,
   code: CodePropertiesPanel,
+  http: HttpPropertiesPanel,
+  agent: AgentPropertiesPanel as React.FC<{ node: Node<Component> }>,
   custom: CustomPropertiesPanel,
   retriever: RetrievePropertiesPanel,
   prompting_technique: PromptingTechniquePropertiesPanel,
@@ -48,11 +52,14 @@ export function StudioNodeDrawer() {
 
   const { currentDrawer } = useDrawer();
 
-  // Don't open the drawer for evaluator nodes without an evaluator set
-  // (they're still in the "Choose Evaluator" flow)
+  // Don't open the drawer for evaluator/agent nodes without an entity set
+  // (they're still in the picker flow)
   const isEmptyEvaluator =
     selectedNode?.type === "evaluator" &&
     !(selectedNode.data as Evaluator).evaluator;
+  const isEmptyAgent =
+    selectedNode?.type === "agent" &&
+    !(selectedNode.data as AgentComponent).agent;
 
   // Suppress the StudioDrawerWrapper when a URL-based drawer (e.g.
   // PromptListDrawer, EvaluatorListDrawer) is active. This prevents
@@ -62,7 +69,7 @@ export function StudioNodeDrawer() {
   const hasUrlDrawer = !!currentDrawer;
 
   const effectiveNode =
-    !hasUrlDrawer && !isEmptyEvaluator ? selectedNode : undefined;
+    !hasUrlDrawer && !isEmptyEvaluator && !isEmptyAgent ? selectedNode : undefined;
 
   const PanelComponent = effectiveNode
     ? ComponentPropertiesPanelMap[effectiveNode.type as ComponentType]

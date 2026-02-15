@@ -21,6 +21,8 @@ export const NodeComponents: Record<
   evaluator: EvaluatorNode,
   end: EndNode,
   code: ComponentNode,
+  http: ComponentNode,
+  agent: ComponentNode,
   retriever: ComponentNode,
   prompting_technique: PromptingTechniqueNode,
   custom: CustomNode,

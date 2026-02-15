@@ -54,6 +54,7 @@ class ComponentType(str, Enum):
     prompting_technique = "prompting_technique"
     evaluator = "evaluator"
     http = "http"
+    agent = "agent"
 
 
 class Timestamps(BaseModel):
@@ -218,6 +219,18 @@ class Http(BaseComponent):
     pass
 
 
+class Agent(BaseComponent):
+    """Agent node component.
+
+    Agent nodes reference a DB-backed agent via `agent: "agents/<id>"`.
+    The agent's underlying type (http, code, workflow) is determined by the
+    `agent_type` parameter. The parser delegates to the appropriate executor
+    based on this parameter.
+    """
+    agent: Optional[str] = None
+    agent_type: Optional[str] = None
+
+
 class End(BaseComponent):
     pass
 
@@ -228,7 +241,7 @@ class Evaluator(BaseComponent):
 
 
 Component = Union[
-    BaseComponent, Entry, Signature, PromptingTechnique, Code, Evaluator, End, Http
+    BaseComponent, Entry, Signature, PromptingTechnique, Code, Evaluator, End, Http, Agent
 ]
 
 
@@ -282,6 +295,11 @@ class HttpNode(BaseNode):
     data: Http
 
 
+class AgentNode(BaseNode):
+    type: Literal["agent"] = "agent"
+    data: Agent
+
+
 Node = Union[
     SignatureNode,
     PromptingTechniqueNode,
@@ -292,6 +310,7 @@ Node = Union[
     EvaluatorNode,
     EndNode,
     HttpNode,
+    AgentNode,
 ]
 
 
