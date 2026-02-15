@@ -4,6 +4,8 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+packageExtensionsChecksum: sha256-1UYZ2Ij73JaVOuwxbK0xKBDMvdHIvqeov2YveuIrYqg=
+
 importers:
 
   .:
@@ -22327,6 +22329,7 @@ snapshots:
     dependencies:
       '@opentelemetry/api': 1.9.0
       bullmq: 5.67.1
+      tslib: 2.8.1
     transitivePeerDependencies:
       - supports-color
 
