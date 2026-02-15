@@ -170,6 +170,8 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
         open={isOpen}
         onOpenChange={({ open }) => !open && onClose()}
         size="md"
+        closeOnInteractOutside={false}
+        modal={false}
       >
         <Drawer.Content>
           <Drawer.CloseTrigger />
