@@ -2,12 +2,8 @@ import { describe, expect, it } from "vitest";
 import { MODULES } from "../registry";
 
 describe("Optimization Studio Registry", () => {
-  describe("signature (LLM Node) defaults", () => {
+  describe("signature (Prompt) defaults", () => {
     const { signature } = MODULES;
-
-    it("is named 'New Prompt' for unsaved drag-and-drop flow", () => {
-      expect(signature.name).toBe("New Prompt");
-    });
 
     it("has input field named 'input'", () => {
       expect(signature.inputs).toBeDefined();

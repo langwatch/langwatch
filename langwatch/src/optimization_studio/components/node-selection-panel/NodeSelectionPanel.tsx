@@ -8,26 +8,22 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { Node, XYPosition } from "@xyflow/react";
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useDragLayer } from "react-dnd";
 import { BookOpen, Box as BoxIcon, ChevronsLeft, GitHub } from "react-feather";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useDrawer, setFlowCallbacks } from "~/hooks/useDrawer";
 import { api } from "~/utils/api";
 import { IconWrapper } from "../../../components/IconWrapper";
 import { DiscordOutlineIcon } from "../../../components/icons/DiscordOutline";
 import { Tooltip } from "../../../components/ui/tooltip";
-import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
-import {
-  AVAILABLE_EVALUATORS,
-  type EvaluatorTypes,
-} from "~/server/evaluations/evaluators.generated";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
-import { EVALUATOR_PLACEHOLDER, MODULES } from "../../registry";
-import type { ComponentType, Custom, Evaluator, Field } from "../../types/dsl";
+import { usePromptPickerFlow } from "../../hooks/usePromptPickerFlow";
+import { useEvaluatorPickerFlow } from "../../hooks/useEvaluatorPickerFlow";
+import { MODULES } from "../../registry";
+import type { ComponentType, Custom, Field } from "../../types/dsl";
 import { getInputsOutputs } from "../../utils/nodeUtils";
-import { buildEvaluatorFromType } from "../../utils/registryUtils";
 import { NodeComponents } from "../nodes";
+import { EvaluatorNodeDraggable } from "./EvaluatorNodeDraggable";
 import { LlmSignatureNodeDraggable } from "./LlmSignatureNodeDraggable";
 import { NodeDraggable } from "./NodeDraggable";
 
@@ -65,38 +61,15 @@ export const NodeSelectionPanel = ({
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
 }) => {
-  const { propertiesExpanded, getWorkflow, setNode, deleteNode, setSelectedNode } =
-    useWorkflowStore((state) => ({
-      propertiesExpanded: state.propertiesExpanded,
-      getWorkflow: state.getWorkflow,
-      setNode: state.setNode,
-      deleteNode: state.deleteNode,
-      setSelectedNode: state.setSelectedNode,
-    }));
+  const { propertiesExpanded, getWorkflow } = useWorkflowStore((state) => ({
+    propertiesExpanded: state.propertiesExpanded,
+    getWorkflow: state.getWorkflow,
+  }));
 
   const workflow = getWorkflow();
   const { project } = useOrganizationTeamProject();
-  const { openDrawer, closeDrawer, currentDrawer } = useDrawer();
-
-  // Track the placeholder node ID so we can clean it up if the drawer
-  // flow is cancelled without saving.
-  const pendingPlaceholderRef = useRef<string | null>(null);
-  // Tracks whether the evaluator drag-to-drawer flow is actively in progress.
-  const evaluatorFlowActiveRef = useRef(false);
-
-  // When the drawer closes (currentDrawer becomes undefined) and we still
-  // have a pending placeholder, the user cancelled -- remove the node.
-  useEffect(() => {
-    if (
-      pendingPlaceholderRef.current &&
-      evaluatorFlowActiveRef.current &&
-      !currentDrawer
-    ) {
-      deleteNode(pendingPlaceholderRef.current);
-      pendingPlaceholderRef.current = null;
-      evaluatorFlowActiveRef.current = false;
-    }
-  }, [currentDrawer, deleteNode]);
+  const { handlePromptDragEnd } = usePromptPickerFlow();
+  const { handleEvaluatorDragEnd } = useEvaluatorPickerFlow();
 
   const { data: components } = api.optimization.getComponents.useQuery(
     {
@@ -129,109 +102,6 @@ export const NodeSelectionPanel = ({
       version_id: publishedId,
     };
   };
-
-  const configureEvaluatorNode = useCallback(
-    (placeholderNodeId: string, nodeData: Evaluator) => {
-      pendingPlaceholderRef.current = null;
-      evaluatorFlowActiveRef.current = false;
-      setNode({ id: placeholderNodeId, data: nodeData });
-      closeDrawer();
-    },
-    [closeDrawer, setNode],
-  );
-
-  /**
-   * When an evaluator placeholder is dropped on the canvas, open the
-   * EvaluatorListDrawer so the user can pick an existing evaluator.
-   * From the list they can also click "New Evaluator" to create one.
-   * On close without selection: remove the placeholder node via the effect above.
-   */
-  const handleEvaluatorDragEnd = useCallback(
-    (item: { node?: { id?: string } }) => {
-      const placeholderNodeId = item.node?.id;
-      if (!placeholderNodeId) return;
-
-      pendingPlaceholderRef.current = placeholderNodeId;
-      evaluatorFlowActiveRef.current = true;
-
-      // When user selects an existing evaluator from the list
-      setFlowCallbacks("evaluatorList", {
-        onSelect: (evaluator: EvaluatorWithFields) => {
-          const config = evaluator.config as { evaluatorType?: string } | null;
-          const evaluatorType = config?.evaluatorType;
-
-          let nodeData: Evaluator;
-          if (evaluatorType && evaluatorType in AVAILABLE_EVALUATORS) {
-            // Built-in evaluator: use buildEvaluatorFromType for correct inputs/outputs
-            nodeData = buildEvaluatorFromType(
-              evaluatorType as EvaluatorTypes,
-              AVAILABLE_EVALUATORS,
-            );
-            nodeData.name = evaluator.name;
-            nodeData.evaluator =
-              `evaluators/${evaluator.id}` as `evaluators/${string}`;
-          } else {
-            // Workflow evaluator: map fields directly
-            nodeData = {
-              cls: "Evaluator",
-              name: evaluator.name,
-              evaluator:
-                `evaluators/${evaluator.id}` as `evaluators/${string}`,
-              inputs: evaluator.fields.map((f) => ({
-                identifier: f.identifier,
-                type: f.type === "list" ? "list[str]" : f.type,
-                ...(f.optional ? { optional: true } : {}),
-              })) as Field[],
-              outputs: evaluator.outputFields.map((f) => ({
-                identifier: f.identifier,
-                type: f.type,
-              })) as Field[],
-            };
-          }
-          configureEvaluatorNode(placeholderNodeId, nodeData);
-        },
-      });
-
-      // When user creates a new evaluator via the editor (list -> category -> type -> editor)
-      setFlowCallbacks("evaluatorEditor", {
-        onSave: (evaluator) => {
-          let nodeData: Evaluator;
-          if (
-            evaluator.evaluatorType &&
-            evaluator.evaluatorType in AVAILABLE_EVALUATORS
-          ) {
-            nodeData = buildEvaluatorFromType(
-              evaluator.evaluatorType as EvaluatorTypes,
-              AVAILABLE_EVALUATORS,
-            );
-          } else {
-            nodeData = { ...EVALUATOR_PLACEHOLDER };
-          }
-          nodeData.name = evaluator.name;
-          nodeData.evaluator =
-            `evaluators/${evaluator.id}` as `evaluators/${string}`;
-          configureEvaluatorNode(placeholderNodeId, nodeData);
-          return true;
-        },
-      });
-
-      openDrawer("evaluatorList", undefined, { resetStack: true });
-    },
-    [openDrawer, configureEvaluatorNode],
-  );
-
-  /**
-   * When an LLM signature node is dropped on the canvas, automatically
-   * select it so the PromptEditorDrawer opens for editing.
-   */
-  const handleLlmDragEnd = useCallback(
-    (item: { node?: { id?: string } }) => {
-      const nodeId = item.node?.id;
-      if (!nodeId) return;
-      setSelectedNode(nodeId);
-    },
-    [setSelectedNode],
-  );
 
   return (
     <Box
@@ -266,15 +136,11 @@ export const NodeSelectionPanel = ({
             Components
           </Text>
 
-          <LlmSignatureNodeDraggable onDragEnd={handleLlmDragEnd} />
+          <LlmSignatureNodeDraggable onDragEnd={handlePromptDragEnd} />
 
           <NodeDraggable component={MODULES.code} type="code" />
 
-          <NodeDraggable
-            component={EVALUATOR_PLACEHOLDER}
-            type="evaluator"
-            onDragEnd={handleEvaluatorDragEnd}
-          />
+          <EvaluatorNodeDraggable onDragEnd={handleEvaluatorDragEnd} />
 
           {components &&
             components.length > 0 &&
@@ -293,31 +159,6 @@ export const NodeSelectionPanel = ({
                         key={custom.id}
                         component={createCustomComponent(custom as Custom)}
                         type="custom"
-                        disableDrag={isCurrentWorkflow}
-                      />
-                    );
-                  })}
-              </>
-            )}
-
-          {components &&
-            components.length > 0 &&
-            components.some((custom) => custom.isEvaluator) && (
-              <>
-                <Text fontWeight="500" padding={1}>
-                  Custom Evaluators
-                </Text>
-                {components
-                  .filter((custom) => custom.isEvaluator)
-                  .map((custom) => {
-                    const isCurrentWorkflow =
-                      custom.id === workflow?.workflow_id;
-                    return (
-                      <NodeDraggable
-                        key={custom.id}
-                        component={createCustomComponent(custom as Custom)}
-                        type="custom"
-                        behave_as="evaluator"
                         disableDrag={isCurrentWorkflow}
                       />
                     );

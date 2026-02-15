@@ -184,6 +184,16 @@ export default function OptimizationStudio() {
 
   useAskBeforeLeaving();
 
+  // Add body class so global drawer styles can target studio context.
+  // Drawer portals render at document.body level so they can't inherit
+  // styles from the React component tree.
+  useEffect(() => {
+    document.body.classList.add("studio-drawer-offset");
+    return () => {
+      document.body.classList.remove("studio-drawer-offset");
+    };
+  }, []);
+
   return (
     <div style={{ width: "100vw", height: "100vh" }}>
       <Head>
@@ -376,6 +386,15 @@ export default function OptimizationStudio() {
           </WizardProvider>
         </DndProvider>
       </ReactFlowProvider>
+      {/* Offset URL-based drawers (rendered via CurrentDrawer portals) to
+          sit below the studio header bar. StudioDrawerWrapper already has
+          marginTop="56px" inline; this CSS handles the same offset for
+          URL-based drawers (PromptListDrawer, EvaluatorListDrawer, etc.). */}
+      <style>{`
+        body.studio-drawer-offset [data-scope="drawer"][data-part="content"] {
+          margin-top: 56px;
+        }
+      `}</style>
       <CurrentDrawer />
     </div>
   );

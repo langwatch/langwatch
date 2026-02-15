@@ -1,21 +1,19 @@
 import { merge } from "lodash-es";
 
+import type { Component } from "~/optimization_studio/types/dsl";
 import { useWorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
 import { MODULES } from "~/optimization_studio/registry";
 import type { NodeWithOptionalPosition } from "~/types";
-import type { Component } from "~/optimization_studio/types/dsl";
 
 import { NodeDraggable } from "./NodeDraggable";
 
-/**
- * Draggable component for LLM Signature nodes. Merges the workflow's
- * default LLM config into the signature template before creating the node.
- */
+type LlmSignatureNodeDraggableProps = {
+  onDragEnd?: (item: { node: NodeWithOptionalPosition<Component> }) => void;
+};
+
 export function LlmSignatureNodeDraggable({
   onDragEnd,
-}: {
-  onDragEnd?: (item: { node: NodeWithOptionalPosition<Component> }) => void;
-}) {
+}: LlmSignatureNodeDraggableProps) {
   const { getWorkflow } = useWorkflowStore((state) => ({
     getWorkflow: state.getWorkflow,
   }));

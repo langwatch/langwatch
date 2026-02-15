@@ -1,6 +1,7 @@
 import { Box } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
 import { useShallow } from "zustand/react/shallow";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import type { Component, ComponentType, Evaluator } from "../../types/dsl";
 import { CodePropertiesPanel } from "../properties/CodePropertiesPanel";
@@ -52,16 +53,27 @@ export function StudioNodeDrawer() {
       })),
     );
 
+  const { currentDrawer } = useDrawer();
+
   // Don't open the drawer for evaluator nodes without an evaluator set
   // (they're still in the "Choose Evaluator" flow)
   const isEmptyEvaluator =
     selectedNode?.type === "evaluator" &&
     !(selectedNode.data as Evaluator).evaluator;
 
-  const PanelComponent =
-    selectedNode && !isEmptyEvaluator
-      ? ComponentPropertiesPanelMap[selectedNode.type as ComponentType]
-      : undefined;
+  // Suppress the StudioDrawerWrapper when a URL-based drawer (e.g.
+  // PromptListDrawer, EvaluatorListDrawer) is active. This prevents
+  // two drawers from rendering simultaneously. The URL drawer takes
+  // priority; once it closes, the StudioDrawerWrapper will naturally
+  // appear for the selected node.
+  const hasUrlDrawer = !!currentDrawer;
+
+  const effectiveNode =
+    !hasUrlDrawer && !isEmptyEvaluator ? selectedNode : undefined;
+
+  const PanelComponent = effectiveNode
+    ? ComponentPropertiesPanelMap[effectiveNode.type as ComponentType]
+    : undefined;
 
   return (
     <>
@@ -87,11 +99,11 @@ export function StudioNodeDrawer() {
       {/* All node types go through StudioDrawerWrapper */}
       <InsideDrawerProvider>
         <StudioDrawerWrapper
-          node={isEmptyEvaluator ? undefined : selectedNode}
+          node={effectiveNode}
           onClose={deselectAllNodes}
         >
-          {selectedNode && PanelComponent && (
-            <PanelComponent key={selectedNode.id} node={selectedNode} />
+          {effectiveNode && PanelComponent && (
+            <PanelComponent key={effectiveNode.id} node={effectiveNode} />
           )}
         </StudioDrawerWrapper>
       </InsideDrawerProvider>

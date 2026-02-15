@@ -27,6 +27,7 @@ import {
   convertFromUIMapping,
   convertToUIMapping,
 } from "../utils/fieldMappingConverters";
+import { createEvaluatorEditorCallbacks } from "../utils/evaluatorEditorCallbacks";
 import { createPromptEditorCallbacks } from "../utils/promptEditorCallbacks";
 import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
 
@@ -310,6 +311,16 @@ export const useOpenTargetEditor = () => {
         const availableSources = buildAvailableSources();
         const uiMappings = buildUIMappings(target, activeDatasetId);
 
+        // Set flow callbacks for the evaluator editor using the centralized helper
+        // This ensures we never forget a required callback
+        setFlowCallbacks(
+          "evaluatorEditor",
+          createEvaluatorEditorCallbacks({
+            targetId: target.id,
+            updateTarget,
+          }),
+        );
+
         // Build mappings config for the evaluator editor
         const mappingsConfig = {
           availableSources,
@@ -341,9 +352,13 @@ export const useOpenTargetEditor = () => {
           },
         };
 
+        // Pass initialLocalConfig from target state so drawer resumes unsaved changes
+        const initialLocalConfig = target.localEvaluatorConfig;
+
         openDrawer("evaluatorEditor", {
           evaluatorId: target.targetEvaluatorId,
           mappingsConfig,
+          initialLocalConfig,
           urlParams: { targetId: target.id },
         });
 

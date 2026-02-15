@@ -15,6 +15,7 @@ import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
+import { useRegisterDrawerFooter } from "~/optimization_studio/components/drawers/useInsideDrawer";
 import {
   type AvailableSource,
   type FieldMapping,
@@ -30,6 +31,7 @@ import {
 } from "~/hooks/useDrawer";
 import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { PromptEditorFooter } from "~/prompts/components/PromptEditorFooter";
 import { PromptEditorHeader } from "~/prompts/components/PromptEditorHeader";
 import { VersionBadge } from "~/prompts/components/ui/VersionBadge";
 import { ChangeHandleDialog } from "~/prompts/forms/ChangeHandleDialog";
@@ -1006,6 +1008,34 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   // Get configId for version history
   const _configId = promptQuery.data?.id;
 
+  // Get current version ID for footer
+  const _currentVersionId = methods.watch("versionMetadata")?.versionId;
+
+  // Build the footer element (shared between headless and drawer modes).
+  // The footer is rendered outside the main FormProvider (in Drawer.Footer or
+  // StudioDrawerWrapper footer slot), so we wrap it in its own FormProvider
+  // to give child components (SavePromptButton, etc.) access to form context.
+  const footerElement = (
+    <FormProvider {...methods}>
+      <PromptEditorFooter
+        onSave={() => void handleSave()}
+        hasUnsavedChanges={hasUnsavedChanges}
+        isValid={isValid}
+        isSaving={isSaving}
+        onVersionRestore={handleVersionRestore}
+        configId={_configId}
+        handle={promptQuery.data?.handle ?? undefined}
+        currentVersionId={_currentVersionId}
+        onApply={targetId || props.headless ? handleClose : undefined}
+      />
+    </FormProvider>
+  );
+
+  // In headless mode, register the footer with the parent StudioDrawerWrapper.
+  // The hook must be called unconditionally (React rules of hooks).
+  // When not in headless mode, we pass null so nothing is registered.
+  useRegisterDrawerFooter(props.headless ? footerElement : null);
+
   // Extract the form body into a variable for reuse in both headless and drawer modes
   const formBodyContent = (
     <FormProvider {...methods}>
@@ -1032,6 +1062,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
             isValid={isValid}
             isSaving={isSaving}
             onVersionRestore={handleVersionRestore}
+            variant="model-only"
           />
         </Box>
 
@@ -1188,21 +1219,15 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
           {loadingContent ?? formBodyContent}
         </Drawer.Body>
 
-        {/* Footer with Apply button - only shown in evaluations context */}
-        {targetId && (
-          <Drawer.Footer
-            borderTopWidth="1px"
-            borderColor="border"
-            paddingX={4}
-            paddingY={3}
-          >
-            <HStack justify="flex-end" width="full">
-              <Button colorPalette="blue" onClick={handleClose}>
-                Apply
-              </Button>
-            </HStack>
-          </Drawer.Footer>
-        )}
+        {/* Footer with History, API, Save, and optionally Apply buttons */}
+        <Drawer.Footer
+          borderTopWidth="1px"
+          borderColor="border"
+          paddingX={4}
+          paddingY={3}
+        >
+          {footerElement}
+        </Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>
   );

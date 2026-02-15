@@ -73,16 +73,14 @@ function DbEvaluatorPanel({
   const updateNodeInternals = useUpdateNodeInternals();
   const { nodes, edges, setNode, setEdges, getWorkflow, deselectAllNodes } =
     useWorkflowStore(
-      useShallow(
-        ({ setNode, setEdges, getWorkflow, deselectAllNodes }) => ({
-          nodes: getWorkflow().nodes,
-          edges: getWorkflow().edges,
-          setNode,
-          setEdges,
-          getWorkflow,
-          deselectAllNodes,
-        }),
-      ),
+      useShallow(({ setNode, setEdges, getWorkflow, deselectAllNodes }) => ({
+        nodes: getWorkflow().nodes,
+        edges: getWorkflow().edges,
+        setNode,
+        setEdges,
+        getWorkflow,
+        deselectAllNodes,
+      })),
     );
   const evaluatorId = extractEvaluatorId(evaluatorRef);
 
@@ -164,9 +162,7 @@ function DbEvaluatorPanel({
       form.reset({
         name: lc?.name ?? evaluatorQuery.data.name,
         settings:
-          lc?.settings ??
-          (evaluatorQuery.data.config as any)?.settings ??
-          {},
+          lc?.settings ?? (evaluatorQuery.data.config as any)?.settings ?? {},
       });
     }
   }, [evaluatorQuery.data, form]);
@@ -252,10 +248,7 @@ function DbEvaluatorPanel({
   );
 
   // Action handlers
-  const handleApply = useCallback(
-    () => deselectAllNodes(),
-    [deselectAllNodes],
-  );
+  const handleApply = useCallback(() => deselectAllNodes(), [deselectAllNodes]);
 
   const handleSave = useCallback(() => {
     if (!project?.id || !evaluatorType) return;
@@ -311,23 +304,29 @@ function DbEvaluatorPanel({
         <Button
           variant="outline"
           size="sm"
-          onClick={handleApply}
-          data-testid="evaluator-apply-button"
-        >
-          Apply
-        </Button>
-        <Button
-          colorPalette="blue"
-          size="sm"
           onClick={handleSave}
           loading={updateMutation.isPending}
           data-testid="evaluator-save-button"
         >
           Save
         </Button>
+        <Button
+          colorPalette="blue"
+          size="sm"
+          onClick={handleApply}
+          data-testid="evaluator-apply-button"
+        >
+          Apply
+        </Button>
       </HStack>
     ),
-    [hasLocalChanges, handleDiscard, handleApply, handleSave, updateMutation.isPending],
+    [
+      hasLocalChanges,
+      handleDiscard,
+      handleApply,
+      handleSave,
+      updateMutation.isPending,
+    ],
   );
   useRegisterDrawerFooter(footerContent);
 

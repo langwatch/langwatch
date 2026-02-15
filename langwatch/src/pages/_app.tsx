@@ -965,6 +965,10 @@ export const system = createSystem(defaultConfig, {
           body: {
             pt: "3",
           },
+          title: {
+            textStyle: "md",
+            fontWeight: "500",
+          },
           content: {
             background: "bg.surface",
             "& button:not([data-variant=ghost]):not([data-part])": {

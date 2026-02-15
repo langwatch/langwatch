@@ -190,7 +190,7 @@ export function StudioDrawerWrapper({
       >
         <Drawer.Content marginTop="56px">
           {node && (
-            <Drawer.Header paddingY={2} paddingLeft={3} paddingRight={1}>
+            <Drawer.Header paddingTop={4} paddingBottom={3} paddingLeft={4} paddingRight={3}>
               {headerContent}
             </Drawer.Header>
           )}
