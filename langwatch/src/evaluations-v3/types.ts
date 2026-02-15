@@ -184,6 +184,8 @@ export const evaluatorConfigSchema = z.object({
   ),
   /** Reference to the database evaluator - settings are fetched from here */
   dbEvaluatorId: z.string().optional(),
+  /** Local unsaved evaluator settings that override DB values during execution */
+  localEvaluatorConfig: localEvaluatorConfigSchema.optional(),
 });
 export type EvaluatorConfig = Omit<
   z.infer<typeof evaluatorConfigSchema>,

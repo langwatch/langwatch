@@ -136,6 +136,10 @@ export function EvaluatorChip({
             >
               {evaluatorName}
             </Text>
+            {/* Orange dot for unsaved local changes */}
+            {evaluator.localEvaluatorConfig && (
+              <Circle size="6px" bg="orange.solid" flexShrink={0} />
+            )}
             {/* Inline result (score, label, or error icon) */}
             {status !== "running" && getInlineResult()}
             {/* Missing mapping alert icon - on the right side like prompts */}

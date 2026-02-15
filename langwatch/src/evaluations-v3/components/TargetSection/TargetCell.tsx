@@ -21,7 +21,7 @@ import { Tooltip } from "~/components/ui/tooltip";
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";
 import { parseLLMError } from "~/utils/formatLLMError";
 import { formatTargetOutput } from "~/utils/formatTargetOutput";
-import { useDrawer } from "~/hooks/useDrawer";
+import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
 import { useTargetName } from "../../hooks/useTargetName";
 import type { EvaluatorConfig, TargetConfig } from "../../types";
@@ -84,6 +84,7 @@ export function TargetCellContent({
     activeDatasetId,
     datasets,
     removeEvaluator,
+    updateEvaluator,
     setEvaluatorMapping,
     removeEvaluatorMapping,
   } = useEvaluationsV3Store((state) => ({
@@ -91,6 +92,7 @@ export function TargetCellContent({
     activeDatasetId: state.activeDatasetId,
     datasets: state.datasets,
     removeEvaluator: state.removeEvaluator,
+    updateEvaluator: state.updateEvaluator,
     setEvaluatorMapping: state.setEvaluatorMapping,
     removeEvaluatorMapping: state.removeEvaluatorMapping,
   }));
@@ -387,10 +389,21 @@ export function TargetCellContent({
           isRunning={isEvaluatorRunning?.(evaluator.id) ?? false}
           onEdit={() => {
             const mappingsConfig = createMappingsConfig(evaluator);
+
+            // Set up local state callbacks for the evaluator editor
+            setFlowCallbacks("evaluatorEditor", {
+              onLocalConfigChange: (config: unknown) => {
+                updateEvaluator(evaluator.id, {
+                  localEvaluatorConfig: config as EvaluatorConfig["localEvaluatorConfig"],
+                });
+              },
+            });
+
             openDrawer("evaluatorEditor", {
               evaluatorId: evaluator.dbEvaluatorId,
               evaluatorType: evaluator.evaluatorType,
               mappingsConfig,
+              initialLocalConfig: evaluator.localEvaluatorConfig,
             });
           }}
           onRemove={() => removeEvaluator(evaluator.id)}
