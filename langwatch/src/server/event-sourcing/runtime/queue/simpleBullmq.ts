@@ -42,7 +42,7 @@ const JOB_RETRY_CONFIG = {
   maxAttempts: 15,
   backoffDelayMs: 2000,
   removeOnCompleteAgeSec: 3600,
-  removeOnCompleteCount: 1000,
+  removeOnCompleteCount: 100,
   removeOnFailAgeSec: 60 * 60 * 24 * 7, // 7 days
 } as const;
 
@@ -51,7 +51,7 @@ const JOB_RETRY_CONFIG = {
  */
 const SIMPLE_QUEUE_CONFIG = {
   /** Default concurrency */
-  defaultConcurrency: 5,
+  defaultConcurrency: 20,
   /** Interval for collecting queue metrics in milliseconds */
   metricsIntervalMs: 15000,
   /** Maximum time to wait for graceful shutdown in milliseconds */
@@ -77,9 +77,9 @@ type LegacyJobContainer<Payload> = {
  * Use for event handlers that process individual events independently
  * (no sequential ordering needed).
  */
-export class SimpleBullmqQueueProcessor<Payload>
-  implements EventSourcedQueueProcessor<Payload>
-{
+export class SimpleBullmqQueueProcessor<
+  Payload,
+> implements EventSourcedQueueProcessor<Payload> {
   private readonly logger = createLogger(
     "langwatch:event-sourcing:simple-queue",
   );
@@ -233,10 +233,7 @@ export class SimpleBullmqQueueProcessor<Payload>
       opts,
     );
 
-    this.logger.debug(
-      { queueName: this.queueName },
-      "Job sent to BullMQ",
-    );
+    this.logger.debug({ queueName: this.queueName }, "Job sent to BullMQ");
   }
 
   /**
