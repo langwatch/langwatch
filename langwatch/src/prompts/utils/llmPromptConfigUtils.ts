@@ -288,6 +288,9 @@ export function nodeDataToLocalPromptConfig(
 
   // Handle legacy string format for LLM config
   const rawLlmValue = llmParameter.value;
+  if (!rawLlmValue) {
+    return undefined;
+  }
   let llmConfig: LLMConfig;
   if (typeof rawLlmValue === "string") {
     console.warn(
