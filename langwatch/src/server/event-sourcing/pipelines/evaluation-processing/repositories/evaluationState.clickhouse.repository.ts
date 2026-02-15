@@ -1,5 +1,4 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import { parse } from "date-fns";
 import {
   ErrorCategory,
   SecurityError,
@@ -48,29 +47,11 @@ interface ClickHouseEvaluationStateRecord {
   Details: string | null;
   Error: string | null;
 
-  ScheduledAt: string | null; // DateTime64(3) as string
-  StartedAt: string | null;
-  CompletedAt: string | null;
+  ScheduledAt: number | null; // DateTime64(3) as unix ms
+  StartedAt: number | null;
+  CompletedAt: number | null;
 
   LastProcessedEventId: string;
-}
-
-/**
- * Converts a Unix millisecond timestamp to ClickHouse DateTime64(3) format.
- */
-function timestampToDateTime64(timestampMs: number | null): string | null {
-  if (timestampMs === null) return null;
-  return timestampMs.toString();
-}
-
-/**
- * Converts a ClickHouse DateTime64(3) string to Unix millisecond timestamp.
- */
-const CLICKHOUSE_DATETIME64_FORMAT = "yyyy-MM-dd HH:mm:ss.SSSX";
-
-function dateTime64ToTimestamp(dateTime64: string | null): number | null {
-  if (dateTime64 === null) return null;
-  return parse(`${dateTime64}Z`, CLICKHOUSE_DATETIME64_FORMAT, new Date(0)).getTime();
 }
 
 /**
@@ -97,9 +78,9 @@ export class EvaluationStateRepositoryClickHouse<
       Label: record.Label,
       Details: record.Details,
       Error: record.Error,
-      ScheduledAt: dateTime64ToTimestamp(record.ScheduledAt),
-      StartedAt: dateTime64ToTimestamp(record.StartedAt),
-      CompletedAt: dateTime64ToTimestamp(record.CompletedAt),
+      ScheduledAt: record.ScheduledAt === null ? null : Number(record.ScheduledAt),
+      StartedAt: record.StartedAt === null ? null : Number(record.StartedAt),
+      CompletedAt: record.CompletedAt === null ? null : Number(record.CompletedAt),
     };
   }
 
@@ -130,9 +111,9 @@ export class EvaluationStateRepositoryClickHouse<
       Details: data.Details,
       Error: data.Error,
 
-      ScheduledAt: timestampToDateTime64(data.ScheduledAt),
-      StartedAt: timestampToDateTime64(data.StartedAt),
-      CompletedAt: timestampToDateTime64(data.CompletedAt),
+      ScheduledAt: data.ScheduledAt,
+      StartedAt: data.StartedAt,
+      CompletedAt: data.CompletedAt,
 
       LastProcessedEventId: lastProcessedEventId,
     };
@@ -168,9 +149,9 @@ export class EvaluationStateRepositoryClickHouse<
             Label,
             Details,
             Error,
-            toString(ScheduledAt) AS ScheduledAt,
-            toString(StartedAt) AS StartedAt,
-            toString(CompletedAt) AS CompletedAt,
+            toUnixTimestamp64Milli(ScheduledAt) AS ScheduledAt,
+            toUnixTimestamp64Milli(StartedAt) AS StartedAt,
+            toUnixTimestamp64Milli(CompletedAt) AS CompletedAt,
             LastProcessedEventId
           FROM ${TABLE_NAME} FINAL
           WHERE TenantId = {tenantId:String}

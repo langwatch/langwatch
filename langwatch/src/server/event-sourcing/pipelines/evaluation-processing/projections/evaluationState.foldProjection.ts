@@ -92,7 +92,7 @@ export const evaluationStateFoldProjection: FoldProjectionDefinition<
         TraceId: event.data.traceId ?? null,
         IsGuardrail: event.data.isGuardrail ?? false,
         Status: "scheduled",
-        ScheduledAt: event.timestamp,
+        ScheduledAt: event.occurredAt,
       };
     }
 
@@ -105,7 +105,7 @@ export const evaluationStateFoldProjection: FoldProjectionDefinition<
         TraceId: state.TraceId ?? (event.data.traceId ?? null),
         IsGuardrail: event.data.isGuardrail ?? state.IsGuardrail,
         Status: "in_progress",
-        StartedAt: event.timestamp,
+        StartedAt: event.occurredAt,
       };
     }
 
@@ -118,7 +118,7 @@ export const evaluationStateFoldProjection: FoldProjectionDefinition<
         Label: event.data.label ?? null,
         Details: event.data.details ?? null,
         Error: event.data.error ?? null,
-        CompletedAt: event.timestamp,
+        CompletedAt: event.occurredAt,
       };
     }
 
