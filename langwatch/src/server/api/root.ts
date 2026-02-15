@@ -1,4 +1,5 @@
 import { createTRPCRouter } from "~/server/api/trpc";
+import { env } from "~/env.mjs";
 
 import { dependencies } from "../../injection/dependencies.server";
 
@@ -33,6 +34,7 @@ import { projectRouter } from "./routers/project";
 import { promptsRouter } from "./routers/prompts";
 import { publicEnvRouter } from "./routers/publicEnv";
 import { roleRouter } from "./routers/role";
+import { subscriptionRouter } from "./routers/subscription";
 import { scenarioRouter } from "./routers/scenarios";
 import { sdkRadarRouter } from "./routers/sdkRadar";
 import { suiteRouter } from "./routers/suites";
@@ -45,12 +47,8 @@ import { translateRouter } from "./routers/translate";
 import { automationRouter } from "./routers/automations";
 import { userRouter } from "./routers/user";
 import { workflowRouter } from "./routers/workflows";
-/**
- * This is the primary router for your server.
- *
- * All routers added in /api/routers should be manually added here.
- */
-export const appRouter = createTRPCRouter({
+
+const coreRouters = {
   agents: agentsRouter,
   evaluators: evaluatorsRouter,
   httpProxy: httpProxyRouter,
@@ -94,8 +92,25 @@ export const appRouter = createTRPCRouter({
   sdkRadar: sdkRadarRouter,
   license: licenseRouter,
   licenseEnforcement: licenseEnforcementRouter,
-  ...(dependencies.extraTRPCRoutes?.() ?? {}),
+};
+
+const baseAppRouter = createTRPCRouter({
+  ...coreRouters,
 });
 
+const saasBillingRouters = env.IS_SAAS
+  ? ({ subscription: subscriptionRouter } as const)
+  : {};
+/**
+ * This is the primary router for your server.
+ *
+ * All routers added in /api/routers should be manually added here.
+ */
+export const appRouter = createTRPCRouter({
+  ...coreRouters,
+  ...(saasBillingRouters as any),
+  ...(dependencies.extraTRPCRoutes?.() ?? {}),
+}) as typeof baseAppRouter;
+
 // export type definition of API
-export type AppRouter = typeof appRouter;
+export type AppRouter = typeof baseAppRouter;
