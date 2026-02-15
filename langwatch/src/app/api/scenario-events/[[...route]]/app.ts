@@ -12,7 +12,9 @@ import {
   tracerMiddleware,
 } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
+import { SimulationDispatcher } from "~/server/simulations/dispatch";
 import { ScenarioEventService } from "./scenario-event.service";
+import { ScenarioEventType } from "./enums";
 import { responseSchemas, scenarioEventSchema } from "./schemas";
 
 const logger = createLogger("langwatch:api:scenario-events");
@@ -76,6 +78,27 @@ app.post(
       projectId: project.id,
       ...event,
     });
+
+    // Dual-write to ClickHouse (fire-and-forget, feature-flagged)
+    const dispatcher = SimulationDispatcher.create();
+    if (await dispatcher.isClickHouseEnabled(project.id)) {
+      const basePayload = {
+        tenantId: project.id,
+        scenarioRunId: event.scenarioRunId,
+        scenarioId: event.scenarioId,
+        batchRunId: event.batchRunId,
+        scenarioSetId: event.scenarioSetId ?? "default",
+        occurredAt: event.timestamp,
+      };
+
+      if (event.type === ScenarioEventType.RUN_STARTED) {
+        await dispatcher.startRun({ ...basePayload, metadata: event.metadata });
+      } else if (event.type === ScenarioEventType.MESSAGE_SNAPSHOT) {
+        await dispatcher.messageSnapshot({ ...basePayload, messages: event.messages });
+      } else if (event.type === ScenarioEventType.RUN_FINISHED) {
+        await dispatcher.finishRun({ ...basePayload, status: event.status, results: event.results });
+      }
+    }
 
     const path = `/${project.slug}/simulations/${
       event.scenarioSetId ?? "default"
