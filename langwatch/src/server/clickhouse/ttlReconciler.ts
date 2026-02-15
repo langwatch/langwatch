@@ -1,6 +1,7 @@
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 
 import { createLogger } from "../../utils/logger/server";
+import { parseConnectionUrl } from "./goose";
 
 const logger = createLogger("langwatch:clickhouse:ttl-reconciler");
 
@@ -53,12 +54,20 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
     hardcodedDefault: 30,
   },
   {
-    table: "experiment_run_results",
+    table: "experiment_run_items",
     ttlColumn: "CreatedAt",
     envVar: "TIERED_BATCH_EVAL_RESULTS_TABLE_HOT_DAYS",
     hardcodedDefault: 30,
   },
 ] as const;
+
+function parseNonNegativeInt(value: string, label: string): number {
+  const num = Number(value);
+  if (!Number.isInteger(num) || num < 0) {
+    throw new Error(`${label} must be a non-negative integer, got: "${value}"`);
+  }
+  return num;
+}
 
 /**
  * Resolves the desired hot-storage days for a table.
@@ -71,24 +80,15 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
 export function resolveHotDays(config: TableTTLEntry): number {
   const perTable = process.env[config.envVar];
   if (perTable !== undefined && perTable !== "") {
-    const num = parseInt(perTable, 10);
-    if (Number.isNaN(num) || num < 0) {
-      throw new Error(
-        `${config.envVar} must be a non-negative integer, got: "${perTable}"`,
-      );
-    }
-    return num;
+    return parseNonNegativeInt(perTable, config.envVar);
   }
 
   const globalDefault = process.env.TIERED_STORAGE_DEFAULT_HOT_DAYS;
   if (globalDefault !== undefined && globalDefault !== "") {
-    const num = parseInt(globalDefault, 10);
-    if (Number.isNaN(num) || num < 0) {
-      throw new Error(
-        `TIERED_STORAGE_DEFAULT_HOT_DAYS must be a non-negative integer, got: "${globalDefault}"`,
-      );
-    }
-    return num;
+    return parseNonNegativeInt(
+      globalDefault,
+      "TIERED_STORAGE_DEFAULT_HOT_DAYS",
+    );
   }
 
   return config.hardcodedDefault;
@@ -112,10 +112,13 @@ export function parseTTLDaysFromEngineMetadata(
 /**
  * Builds the desired TTL SQL expression for a table.
  */
-export function buildDesiredTTLExpression(
-  config: TableTTLEntry,
-  days: number,
-): string {
+export function buildDesiredTTLExpression({
+  config,
+  days,
+}: {
+  config: TableTTLEntry;
+  days: number;
+}): string {
   return `toDateTime(${config.ttlColumn}) + INTERVAL ${days} DAY TO VOLUME 'cold'`;
 }
 
@@ -169,26 +172,15 @@ export async function reconcileTTL(
     return;
   }
 
-  const parsed = new URL(connectionUrl);
-  const database = options.database ?? parsed.pathname.replace(/^\//, "");
-  if (!database) {
-    logger.warn("No database specified, skipping TTL reconciliation.");
-    return;
-  }
-
-  const clusterName = process.env.CLICKHOUSE_CLUSTER || undefined;
-
-  // Point client at the target database
-  const dbParsed = new URL(connectionUrl);
-  dbParsed.pathname = `/${database}`;
-  const client = createClient({ url: dbParsed.toString() });
+  const config = parseConnectionUrl(connectionUrl, options.database);
+  const client = createClient({ url: config.databaseUrl });
 
   try {
     // Fetch current engine metadata + storage policy for all managed tables
     const tableNames = TABLE_TTL_CONFIG.map((c) => c.table);
     const result = await client.query({
       query: `SELECT name, engine_full, storage_policy FROM system.tables WHERE database = {database:String} AND name IN {tables:Array(String)}`,
-      query_params: { database, tables: tableNames },
+      query_params: { database: config.database, tables: tableNames },
       format: "JSONEachRow",
     });
     const rows = (await result.json()) as TableEngineInfo[];
@@ -198,12 +190,12 @@ export async function reconcileTTL(
     let updatedCount = 0;
     let skippedCount = 0;
 
-    for (const config of TABLE_TTL_CONFIG) {
-      const tableInfo = tableInfoByName.get(config.table);
+    for (const tableConfig of TABLE_TTL_CONFIG) {
+      const tableInfo = tableInfoByName.get(tableConfig.table);
       if (!tableInfo) {
         if (options.verbose) {
           logger.info(
-            { table: config.table },
+            { table: tableConfig.table },
             "Table not found, skipping TTL reconciliation",
           );
         }
@@ -215,7 +207,7 @@ export async function reconcileTTL(
       if (tableInfo.storage_policy !== TIERED_STORAGE_POLICY) {
         if (options.verbose) {
           logger.info(
-            { table: config.table, policy: tableInfo.storage_policy },
+            { table: tableConfig.table, policy: tableInfo.storage_policy },
             `Table uses '${tableInfo.storage_policy}' policy (not '${TIERED_STORAGE_POLICY}'), skipping TTL`,
           );
         }
@@ -225,27 +217,32 @@ export async function reconcileTTL(
 
       const engineFull = tableInfo.engine_full;
 
-      const desiredDays = resolveHotDays(config);
+      const desiredDays = resolveHotDays(tableConfig);
       const currentDays = parseTTLDaysFromEngineMetadata(engineFull);
 
       if (currentDays === desiredDays) {
         skippedCount++;
         if (options.verbose) {
           logger.debug(
-            { table: config.table, days: currentDays },
+            { table: tableConfig.table, days: currentDays },
             "TTL already in sync",
           );
         }
         continue;
       }
 
-      const ttlExpr = buildDesiredTTLExpression(config, desiredDays);
-      const onCluster = clusterName ? ` ON CLUSTER ${clusterName}` : "";
-      const alterQuery = `ALTER TABLE ${database}.${config.table}${onCluster} MODIFY TTL ${ttlExpr} SETTINGS materialize_ttl_after_modify = 0`;
+      const ttlExpr = buildDesiredTTLExpression({
+        config: tableConfig,
+        days: desiredDays,
+      });
+      const onCluster = config.clusterName
+        ? ` ON CLUSTER \`${config.clusterName}\``
+        : "";
+      const alterQuery = `ALTER TABLE \`${config.database}\`.\`${tableConfig.table}\`${onCluster} MODIFY TTL ${ttlExpr} SETTINGS materialize_ttl_after_modify = 0`;
 
       if (options.verbose) {
         logger.info(
-          { table: config.table, from: currentDays, to: desiredDays },
+          { table: tableConfig.table, from: currentDays, to: desiredDays },
           "Updating TTL",
         );
       }

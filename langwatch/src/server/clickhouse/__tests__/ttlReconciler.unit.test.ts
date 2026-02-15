@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   resolveHotDays,
   parseTTLDaysFromEngineMetadata,
@@ -64,6 +64,13 @@ describe("ttlReconciler", () => {
 
       it("throws on non-numeric value", () => {
         process.env[sampleEntry.envVar] = "abc";
+        expect(() => resolveHotDays(sampleEntry)).toThrow(
+          /must be a non-negative integer/,
+        );
+      });
+
+      it("throws on fractional value", () => {
+        process.env[sampleEntry.envVar] = "3.5";
         expect(() => resolveHotDays(sampleEntry)).toThrow(
           /must be a non-negative integer/,
         );
@@ -135,7 +142,10 @@ describe("ttlReconciler", () => {
 
   describe("buildDesiredTTLExpression()", () => {
     it("builds correct TTL expression", () => {
-      const result = buildDesiredTTLExpression(sampleEntry, 14);
+      const result = buildDesiredTTLExpression({
+        config: sampleEntry,
+        days: 14,
+      });
       expect(result).toBe(
         "toDateTime(EndTime) + INTERVAL 14 DAY TO VOLUME 'cold'",
       );
@@ -148,7 +158,7 @@ describe("ttlReconciler", () => {
         envVar: "TIERED_EVENT_LOG_TABLE_HOT_DAYS",
         hardcodedDefault: 30,
       };
-      const result = buildDesiredTTLExpression(entry, 7);
+      const result = buildDesiredTTLExpression({ config: entry, days: 7 });
       expect(result).toBe(
         "toDateTime(CreatedAt) + INTERVAL 7 DAY TO VOLUME 'cold'",
       );
@@ -199,10 +209,10 @@ describe("ttlReconciler", () => {
     });
 
     describe("when connectionUrl is provided but has no database path", () => {
-      it("skips reconciliation", async () => {
+      it("throws a configuration error", async () => {
         await expect(
           reconcileTTL({ connectionUrl: "http://localhost:8123" }),
-        ).resolves.toBeUndefined();
+        ).rejects.toThrow(/Database name must be specified/);
       });
     });
 
@@ -233,7 +243,7 @@ describe("ttlReconciler", () => {
         "trace_summaries",
         "evaluation_states",
         "experiment_runs",
-        "experiment_run_results",
+        "experiment_run_items",
       ]);
     });
 
