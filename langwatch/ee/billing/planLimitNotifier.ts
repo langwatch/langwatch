@@ -1,88 +1,27 @@
 import type { Organization, PrismaClient, User } from "@prisma/client";
-import { IncomingWebhook } from "@slack/webhook";
 import { env } from "../../src/env.mjs";
 import { prisma } from "../../src/server/db";
 import { captureException } from "../../src/utils/posthogErrorCapture";
+import type {
+  PlanLimitNotificationContext,
+  PlanLimitNotificationHandlers,
+  PlanLimitNotifierInput,
+} from "./types";
 
 const DAYS_SINCE_LAST_ALERT = 30;
 
 type OrganizationWithAdmins = Organization & { members: { user: User }[] };
 
-export type PlanLimitNotifierInput = {
-  organizationId: string;
-  planName: string;
-};
+let notificationHandlers: PlanLimitNotificationHandlers = {};
 
-const sendSlackNotification = async (
-  organization: OrganizationWithAdmins,
-  planName: string,
+export const setPlanLimitNotificationHandlers = (
+  handlers: PlanLimitNotificationHandlers,
 ) => {
-  const url = process.env.SLACK_PLAN_LIMIT_CHANNEL;
-  if (!url) {
-    return;
-  }
-
-  const webhook = new IncomingWebhook(url);
-
-  try {
-    await webhook.send({
-      text: `Plan limit reached: ${organization.name}, ${organization?.members[0]?.user?.email}, Plan: ${planName}`,
-    });
-  } catch (error) {
-    captureException(error);
-  }
+  notificationHandlers = { ...notificationHandlers, ...handlers };
 };
 
-const sendHubspotNotification = async (organization: OrganizationWithAdmins) => {
-  const hubspotPortalId = process.env.HUBSPOT_PORTAL_ID;
-  const hubspotFormId = process.env.HUBSPOT_REACHED_LIMIT_FORM_ID;
-
-  if (!hubspotPortalId || !hubspotFormId) {
-    return;
-  }
-
-  const formData = {
-    submittedAt: Date.now(),
-    fields: [
-      {
-        objectTypeId: "0-1",
-        name: "firstname",
-        value: organization.members[0]?.user?.name,
-      },
-      {
-        objectTypeId: "0-1",
-        name: "company",
-        value: organization.name,
-      },
-      {
-        objectTypeId: "0-1",
-        name: "email",
-        value: organization.members[0]?.user?.email,
-      },
-    ],
-    context: {
-      pageUri: "app.langwatch.ai",
-      pageName: "Plan Limit Reached",
-    },
-  };
-
-  const url = `https://api.hsforms.com/submissions/v3/integration/submit/${hubspotPortalId}/${hubspotFormId}`;
-
-  try {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(formData),
-    });
-
-    if (!response.ok) {
-      captureException(new Error(`HubSpot request failed: ${response.status}`));
-    }
-  } catch (error) {
-    captureException(error);
-  }
+export const clearPlanLimitNotificationHandlers = () => {
+  notificationHandlers = {};
 };
 
 const updatePlanLimitMessages = async (
@@ -137,13 +76,42 @@ export const createPlanLimitNotifier = (db: PrismaClient = prisma) => {
       captureException(error);
     }
 
-    try {
-      await Promise.allSettled([
-        sendSlackNotification(organization, planName),
-        sendHubspotNotification(organization),
-      ]);
-    } catch (error) {
-      captureException(error);
+    if (
+      !notificationHandlers.sendSlackNotification &&
+      !notificationHandlers.sendHubspotNotification
+    ) {
+      return;
     }
+
+    const admin = organization.members[0]?.user;
+
+    const context: PlanLimitNotificationContext = {
+      organizationId,
+      organizationName: organization.name,
+      adminName: admin?.name ?? undefined,
+      adminEmail: admin?.email ?? undefined,
+      planName,
+    };
+
+    const runHandler = async (
+      handler:
+        | ((context: PlanLimitNotificationContext) => Promise<void> | void)
+        | undefined,
+    ) => {
+      if (!handler) {
+        return;
+      }
+
+      try {
+        await handler(context);
+      } catch (error) {
+        captureException(error);
+      }
+    };
+
+    await Promise.all([
+      runHandler(notificationHandlers.sendSlackNotification),
+      runHandler(notificationHandlers.sendHubspotNotification),
+    ]);
   };
 };
