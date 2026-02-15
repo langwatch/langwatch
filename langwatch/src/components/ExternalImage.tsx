@@ -22,7 +22,7 @@ export const getImageUrl = (str: unknown): string | null => {
   if (str_.startsWith("data:image/")) {
     const base64Regex =
       /^data:image\/(jpeg|jpg|gif|png|webp|svg\+xml|bmp);base64,/i;
-    return str_.match(base64Regex)?.[0] ?? null;
+    return base64Regex.test(str_) ? str_ : null;
   }
 
   try {
