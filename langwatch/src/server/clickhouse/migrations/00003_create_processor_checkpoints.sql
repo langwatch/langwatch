@@ -52,7 +52,7 @@ SETTINGS index_granularity = 8192, storage_policy = 'local_primary';
 -- +goose ENVSUB ON
 -- +goose StatementBegin
 
-DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.processor_checkpoints SYNC;
+-- DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.processor_checkpoints SYNC;
 
 -- +goose StatementEnd
 -- +goose ENVSUB OFF

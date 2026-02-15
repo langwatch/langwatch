@@ -92,7 +92,7 @@ SETTINGS index_granularity = 8192, storage_policy = 'local_primary';
 -- +goose ENVSUB ON
 -- +goose StatementBegin
 
-DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.stored_spans SYNC;
+-- DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.stored_spans SYNC;
 
 -- +goose StatementEnd
 -- +goose ENVSUB OFF
