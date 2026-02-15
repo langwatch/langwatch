@@ -18,9 +18,15 @@ import type {
   TraceSummary,
   TraceSummaryData,
 } from "../projections/traceSummary.foldProjection";
+import type { WithDateWrites } from "~/server/clickhouse/types";
 import type { TraceSummaryRepository } from "./traceSummaryRepository";
 
 const TABLE_NAME = "trace_summaries" as const;
+
+type ClickHouseSummaryWriteRecord = WithDateWrites<
+  ClickHouseSummaryRecord,
+  "OccurredAt" | "CreatedAt" | "LastUpdatedAt"
+>;
 
 /**
  * ClickHouse record matching the trace_summaries table schema exactly.
@@ -92,7 +98,7 @@ export class TraceSummaryRepositoryClickHouse<
     return {
       TraceId: record.TraceId,
       SpanCount: record.SpanCount,
-      TotalDurationMs: record.TotalDurationMs,
+      TotalDurationMs: Number(record.TotalDurationMs),
 
       ComputedIOSchemaVersion: record.ComputedIOSchemaVersion,
       ComputedInput: record.ComputedInput,
@@ -102,23 +108,24 @@ export class TraceSummaryRepositoryClickHouse<
       TimeToLastTokenMs: record.TimeToLastTokenMs,
       TokensPerSecond: record.TokensPerSecond,
 
-      ContainsErrorStatus: record.ContainsErrorStatus === 1,
-      ContainsOKStatus: record.ContainsOKStatus === 1,
+      // ClickHouse Bool columns return as JSON booleans (true/false), not numbers
+      ContainsErrorStatus: !!record.ContainsErrorStatus,
+      ContainsOKStatus: !!record.ContainsOKStatus,
       ErrorMessage: record.ErrorMessage,
       Models: record.Models,
 
       TotalCost: record.TotalCost,
-      TokensEstimated: record.TokensEstimated,
+      TokensEstimated: !!record.TokensEstimated,
       TotalPromptTokenCount: record.TotalPromptTokenCount,
       TotalCompletionTokenCount: record.TotalCompletionTokenCount,
 
-      OutputFromRootSpan: record.OutputFromRootSpan === 1,
-      OutputSpanEndTimeMs: record.OutputSpanEndTimeMs,
+      OutputFromRootSpan: !!record.OutputFromRootSpan,
+      OutputSpanEndTimeMs: Number(record.OutputSpanEndTimeMs),
 
       TopicId: record.TopicId,
       SubTopicId: record.SubTopicId,
       HasAnnotation:
-        record.HasAnnotation != null ? record.HasAnnotation === 1 : null,
+        record.HasAnnotation != null ? !!record.HasAnnotation : null,
 
       Attributes: record.Attributes ?? {},
 
@@ -134,7 +141,7 @@ export class TraceSummaryRepositoryClickHouse<
     traceId: string,
     projectionId: string,
     projectionVersion: string,
-  ): ClickHouseSummaryRecord {
+  ): ClickHouseSummaryWriteRecord {
     return {
       Id: projectionId,
       TenantId: tenantId,
@@ -142,9 +149,9 @@ export class TraceSummaryRepositoryClickHouse<
       Version: projectionVersion,
       Attributes: data.Attributes,
 
-      OccurredAt: data.OccurredAt,
-      CreatedAt: data.CreatedAt,
-      LastUpdatedAt: data.LastUpdatedAt,
+      OccurredAt: new Date(data.OccurredAt),
+      CreatedAt: new Date(data.CreatedAt),
+      LastUpdatedAt: new Date(data.LastUpdatedAt),
 
       ComputedIOSchemaVersion: data.ComputedIOSchemaVersion,
       ComputedInput: data.ComputedInput,
