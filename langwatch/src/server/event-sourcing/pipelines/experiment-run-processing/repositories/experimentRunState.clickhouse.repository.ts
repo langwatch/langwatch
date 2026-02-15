@@ -16,6 +16,7 @@ import type {
   ExperimentRunState,
   ExperimentRunStateData,
 } from "../projections/experimentRunState.foldProjection";
+import type { WithDateWrites } from "~/server/clickhouse/types";
 import type { ExperimentRunStateRepository } from "./experimentRunState.repository";
 
 const TABLE_NAME = "experiment_runs" as const;
@@ -51,6 +52,11 @@ interface ClickHouseExperimentRunRecord {
   PassedCount: number;
   PassFailCount: number;
 }
+
+type ClickHouseExperimentRunWriteRecord = WithDateWrites<
+  Omit<ClickHouseExperimentRunRecord, "CreatedAt" | "UpdatedAt">,
+  "StartedAt" | "FinishedAt" | "StoppedAt"
+>;
 
 export class ExperimentRunStateRepositoryClickHouse<
   ProjectionType extends Projection = Projection,
@@ -92,7 +98,7 @@ export class ExperimentRunStateRepositoryClickHouse<
     projectionId: string,
     projectionVersion: string,
     lastProcessedEventId: string,
-  ): Omit<ClickHouseExperimentRunRecord, "CreatedAt" | "UpdatedAt"> {
+  ): ClickHouseExperimentRunWriteRecord {
     return {
       Id: projectionId,
       TenantId: tenantId,
@@ -109,9 +115,9 @@ export class ExperimentRunStateRepositoryClickHouse<
       AvgScore: data.AvgScore,
       PassRate: data.PassRate,
       Targets: data.Targets,
-      StartedAt: data.StartedAt,
-      FinishedAt: data.FinishedAt,
-      StoppedAt: data.StoppedAt,
+      StartedAt: data.StartedAt != null ? new Date(data.StartedAt) : null,
+      FinishedAt: data.FinishedAt != null ? new Date(data.FinishedAt) : null,
+      StoppedAt: data.StoppedAt != null ? new Date(data.StoppedAt) : null,
       LastProcessedEventId: lastProcessedEventId,
       TotalScoreSum: data.TotalScoreSum,
       ScoreCount: data.ScoreCount,

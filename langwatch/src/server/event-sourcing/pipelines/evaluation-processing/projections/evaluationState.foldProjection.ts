@@ -29,9 +29,9 @@ export interface EvaluationStateData {
   Label: string | null;
   Details: string | null;
   Error: string | null;
-  ScheduledAt: number | null;
-  StartedAt: number | null;
-  CompletedAt: number | null;
+  ScheduledAt: number | null; // unix ms
+  StartedAt: number | null; // unix ms
+  CompletedAt: number | null; // unix ms
 }
 
 /**

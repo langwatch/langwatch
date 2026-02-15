@@ -16,6 +16,7 @@ import type {
   EvaluationState,
   EvaluationStateData,
 } from "../projections/evaluationState.foldProjection";
+import type { WithDateWrites } from "~/server/clickhouse/types";
 import type { EvaluationStateRepository } from "./evaluationState.repository";
 
 const TABLE_NAME = "evaluation_states" as const;
@@ -47,12 +48,17 @@ interface ClickHouseEvaluationStateRecord {
   Details: string | null;
   Error: string | null;
 
-  ScheduledAt: number | null; // DateTime64(3) as unix ms
-  StartedAt: number | null;
-  CompletedAt: number | null;
+  ScheduledAt: number | null; // DateTime64(3) — read back as ms via toUnixTimestamp64Milli
+  StartedAt: number | null;   // DateTime64(3)
+  CompletedAt: number | null; // DateTime64(3)
 
   LastProcessedEventId: string;
 }
+
+type ClickHouseEvaluationStateWriteRecord = WithDateWrites<
+  ClickHouseEvaluationStateRecord,
+  "ScheduledAt" | "StartedAt" | "CompletedAt"
+>;
 
 /**
  * ClickHouse repository for evaluation states.
@@ -90,7 +96,7 @@ export class EvaluationStateRepositoryClickHouse<
     projectionId: string,
     projectionVersion: string,
     lastProcessedEventId: string,
-  ): ClickHouseEvaluationStateRecord {
+  ): ClickHouseEvaluationStateWriteRecord {
     return {
       Id: projectionId,
       TenantId: tenantId,
@@ -111,9 +117,9 @@ export class EvaluationStateRepositoryClickHouse<
       Details: data.Details,
       Error: data.Error,
 
-      ScheduledAt: data.ScheduledAt,
-      StartedAt: data.StartedAt,
-      CompletedAt: data.CompletedAt,
+      ScheduledAt: data.ScheduledAt != null ? new Date(data.ScheduledAt) : null,
+      StartedAt: data.StartedAt != null ? new Date(data.StartedAt) : null,
+      CompletedAt: data.CompletedAt != null ? new Date(data.CompletedAt) : null,
 
       LastProcessedEventId: lastProcessedEventId,
     };
