@@ -98,14 +98,6 @@ function LimitContent({
   );
 }
 
-function formatCents(cents: string | number): string {
-  const value = typeof cents === "string" ? parseInt(cents, 10) : cents;
-  if (isNaN(value)) return "$0.00";
-  const abs = Math.abs(value);
-  const sign = value < 0 ? "-" : "";
-  return `${sign}$${(abs / 100).toFixed(2)}`;
-}
-
 function SeatsContent({
   variant,
   onClose,
@@ -129,9 +121,9 @@ function SeatsContent({
   ) as
     | {
         data?: {
-          lineItems?: { description: string; amount: string }[];
-          amountDue: string;
-          recurringTotal: string;
+          formattedAmountDue: string;
+          formattedRecurringTotal: string;
+          billingInterval: string;
         };
         isLoading: boolean;
         isError: boolean;
@@ -205,19 +197,31 @@ function SeatsContent({
             <Separator />
 
             {data && (
-              <HStack justify="space-between" paddingX={2}>
-                <HStack gap={2}>
-                  <Text fontWeight="normal" fontSize="md">
-                    Due now
+              <>
+                <HStack justify="space-between" paddingX={2}>
+                  <HStack gap={2}>
+                    <Text fontWeight="normal" fontSize="md">
+                      Due now
+                    </Text>
+                    <Badge colorPalette="blue" variant="subtle" size="sm">
+                      prorated
+                    </Badge>
+                  </HStack>
+                  <Text fontWeight="semibold" fontSize="lg">
+                    {data.formattedAmountDue}
                   </Text>
-                  <Badge colorPalette="blue" variant="subtle" size="sm">
-                    prorated
-                  </Badge>
                 </HStack>
-                <Text fontWeight="semibold" fontSize="lg">
-                  {formatCents(data.amountDue)}
-                </Text>
-              </HStack>
+                <HStack justify="space-between" paddingX={2}>
+                  <Text fontWeight="normal" fontSize="md" color="gray.500">
+                    {data.billingInterval === "year"
+                      ? "Next year"
+                      : "Next month"}
+                  </Text>
+                  <Text fontWeight="normal" fontSize="md" color="gray.500">
+                    {data.formattedRecurringTotal}
+                  </Text>
+                </HStack>
+              </>
             )}
           </VStack>
         )}

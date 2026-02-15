@@ -3,57 +3,16 @@ import type { SubmitHandler } from "react-hook-form";
 import type { MembersForm } from "../components/AddMembersForm";
 import { toaster } from "../components/ui/toaster";
 import { useUpgradeModalStore } from "../stores/upgradeModalStore";
-import { checkCompoundLimits } from "./useCompoundLicenseCheck";
 import { useLicenseEnforcement } from "./useLicenseEnforcement";
 import { api } from "../utils/api";
-
-/**
- * Determines whether inviting new core members requires a proration preview
- * (seat expansion) before proceeding. Only applies to SEAT_USAGE organizations
- * when the new total would exceed the current maxMembers.
- */
-export function needsSeatProration({
-  pricingModel,
-  currentMaxMembers,
-  currentCoreMembers,
-  newCoreInviteCount,
-  hasNewFullMembers,
-}: {
-  pricingModel?: string;
-  currentMaxMembers?: number;
-  currentCoreMembers?: number;
-  newCoreInviteCount: number;
-  hasNewFullMembers: boolean;
-}): boolean {
-  if (pricingModel !== "SEAT_USAGE") return false;
-  if (!hasNewFullMembers) return false;
-  if (typeof currentMaxMembers !== "number") return false;
-  if (typeof currentCoreMembers !== "number") return false;
-
-  const projectedCoreCount = currentCoreMembers + newCoreInviteCount;
-  return projectedCoreCount > currentMaxMembers;
-}
-
-/**
- * Calculates the new seat total when expanding seats.
- * Uses maxMembers (what is already paid for) as the base, then adds new core invites.
- */
-export function calculateNewSeatTotal({
-  currentMaxMembers,
-  newCoreInviteCount,
-}: {
-  currentMaxMembers: number;
-  newCoreInviteCount: number;
-}): number {
-  return currentMaxMembers + newCoreInviteCount;
-}
 
 /**
  * Encapsulates invite mutation handlers: create invite (admin), create invite request (non-admin),
  * approve, reject, and delete. Keeps MembersList focused on rendering.
  *
- * When `pricingModel` is "SEAT_USAGE" and inviting core members would exceed
- * `currentMaxMembers`, opens the proration preview modal before proceeding.
+ * All pricing models go through enforcement first. When `pricingModel` is "SEAT_USAGE"
+ * and the user has an active subscription, exceeding the limit opens the proration
+ * preview modal. Otherwise, the standard upgrade modal is shown.
  */
 export function useInviteActions({
   organizationId,
@@ -63,8 +22,7 @@ export function useInviteActions({
   onClose,
   refetchInvites,
   pricingModel,
-  currentMaxMembers,
-  currentCoreMembers,
+  activePlanFree,
 }: {
   organizationId: string;
   isAdmin: boolean;
@@ -74,14 +32,18 @@ export function useInviteActions({
   refetchInvites: () => void;
   /** Pricing model of the organization (e.g. "SEAT_USAGE", "TIERED"). */
   pricingModel?: string;
-  /** Current maxMembers from the active plan (seats already paid for). */
-  currentMaxMembers?: number;
-  /** Current count of core (non-EXTERNAL) members in the organization. */
-  currentCoreMembers?: number;
+  /** Whether the active plan is a free plan (no paid subscription). */
+  activePlanFree: boolean;
 }) {
   const membersEnforcement = useLicenseEnforcement("members");
   const membersLiteEnforcement = useLicenseEnforcement("membersLite");
   const openSeats = useUpgradeModalStore((s) => s.openSeats);
+  const queryClient = api.useContext();
+
+  /** Invalidate license-limit cache so the next check uses fresh seat counts. */
+  const invalidateLimits = () => {
+    void queryClient.licenseEnforcement.checkLimit.invalidate();
+  };
 
   // SaaS-only: subscription API for seat expansion (not available in OSS builds).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -144,6 +106,7 @@ export function useInviteActions({
           });
           onClose();
           refetchInvites();
+          invalidateLimits();
         },
         onError: (error) => {
           toaster.create({
@@ -190,6 +153,7 @@ export function useInviteActions({
           });
           onClose();
           refetchInvites();
+          invalidateLimits();
         },
         onError: (error) => {
           toaster.create({
@@ -211,61 +175,73 @@ export function useInviteActions({
     const hasNewLiteMembers = data.invites.some(
       (invite) => invite.orgRole === OrganizationUserRole.EXTERNAL,
     );
-
-    const performMutation = isAdmin ? performAdminInvite : performInviteRequest;
-
-    const proceed = () => {
-      const enforcements = [
-        ...(hasNewFullMembers ? [membersEnforcement] : []),
-        ...(hasNewLiteMembers ? [membersLiteEnforcement] : []),
-      ];
-      checkCompoundLimits(enforcements, () => performMutation(data));
-    };
-
-    const newCoreInviteCount = data.invites.filter(
+    const newFullMemberInviteCount = data.invites.filter(
       (invite) => invite.orgRole !== OrganizationUserRole.EXTERNAL,
     ).length;
 
-    if (
-      needsSeatProration({
-        pricingModel,
-        currentMaxMembers,
-        currentCoreMembers,
-        newCoreInviteCount,
-        hasNewFullMembers,
-      })
-    ) {
-      if (!expandSeatsMutation) {
-        // Fallback: proceed without proration if SaaS API not available
-        proceed();
-        return;
+    const performMutation = isAdmin ? performAdminInvite : performInviteRequest;
+
+    // Check lite member limits, then perform the mutation
+    const proceedAfterLiteCheck = () => {
+      if (hasNewLiteMembers) {
+        membersLiteEnforcement.checkAndProceed(() => performMutation(data));
+      } else {
+        performMutation(data);
       }
+    };
 
-      const newTotal = calculateNewSeatTotal({
-        currentMaxMembers: currentMaxMembers!,
-        newCoreInviteCount,
-      });
+    // No full members being invited — only check lite limits
+    if (!hasNewFullMembers) {
+      proceedAfterLiteCheck();
+      return;
+    }
 
+    const limitInfo = membersEnforcement.limitInfo;
+    // Data not loaded yet — allow optimistically (server is final guard)
+    if (!limitInfo) {
+      proceedAfterLiteCheck();
+      return;
+    }
+
+    const projectedCount = limitInfo.current + newFullMemberInviteCount;
+
+    if (projectedCount <= limitInfo.max) {
+      // Within limits — proceed directly
+      proceedAfterLiteCheck();
+      return;
+    }
+
+    // Over limit — decide which modal to show
+    if (
+      pricingModel === "SEAT_USAGE" &&
+      !activePlanFree &&
+      expandSeatsMutation
+    ) {
+      // SEAT_USAGE with active subscription — proration modal
+      const newSeats = limitInfo.current + newFullMemberInviteCount;
       openSeats({
         organizationId,
-        currentSeats: currentMaxMembers!,
-        newSeats: newTotal,
+        currentSeats: limitInfo.max,
+        newSeats,
         onConfirm: async () => {
           await expandSeatsMutation.mutateAsync({
             organizationId,
             plan: "GROWTH_SEAT_USAGE",
             upgradeMembers: true,
             upgradeTraces: false,
-            totalMembers: newTotal,
+            totalMembers: newSeats,
             totalTraces: 0,
           });
-          proceed();
+          performMutation(data);
         },
       });
-      return;
+    } else {
+      // TIERED, free plan, self-hosted, no subscription — upgrade modal
+      membersEnforcement.checkAndProceed(() => {
+        // Won't execute since we know it's over limit,
+        // but checkAndProceed will open the upgrade modal
+      });
     }
-
-    proceed();
   };
 
   const approveInvite = (inviteId: string) => {
@@ -281,6 +257,7 @@ export function useInviteActions({
             meta: { closable: true },
           });
           refetchInvites();
+          invalidateLimits();
         },
         onError: () => {
           toaster.create({
@@ -308,6 +285,7 @@ export function useInviteActions({
             meta: { closable: true },
           });
           refetchInvites();
+          invalidateLimits();
         },
         onError: () => {
           toaster.create({
@@ -335,6 +313,7 @@ export function useInviteActions({
             meta: { closable: true },
           });
           refetchInvites();
+          invalidateLimits();
         },
         onError: (error) => {
           toaster.create({

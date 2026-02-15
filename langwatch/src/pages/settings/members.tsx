@@ -148,12 +148,8 @@ function MembersList({
     onInviteCreated: setSelectedInvites,
     onClose: onAddMembersClose,
     refetchInvites: () => void pendingInvites.refetch(),
-    // SaaS-only: proration check for SEAT_USAGE organizations
     pricingModel: (organization as { pricingModel?: string }).pricingModel,
-    currentMaxMembers: activePlan.maxMembers,
-    currentCoreMembers: organization.members.filter(
-      (m) => m.role !== "EXTERNAL",
-    ).length,
+    activePlanFree: activePlan.free,
   });
 
   const deleteMember = (userId: string) => {
@@ -183,6 +179,7 @@ function MembersList({
                 },
               });
             });
+          void queryClient.licenseEnforcement.checkLimit.invalidate();
         },
         onError: () => {
           toaster.create({
