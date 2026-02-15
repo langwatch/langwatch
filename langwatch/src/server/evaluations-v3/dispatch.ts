@@ -67,7 +67,7 @@ export class ExperimentRunDispatcher {
       const pipeline = this.getPipeline();
       await pipeline.commands.startExperimentRun.send({
         ...payload,
-        occurredAt: payload.occurredAt ?? Date.now(),
+        occurredAt: payload.occurredAt,
       });
     } catch (error) {
       logger.warn(
@@ -88,7 +88,7 @@ export class ExperimentRunDispatcher {
       const pipeline = this.getPipeline();
       await pipeline.commands.recordTargetResult.send({
         ...payload,
-        occurredAt: payload.occurredAt ?? Date.now(),
+        occurredAt: payload.occurredAt,
       });
     } catch (error) {
       logger.warn(
@@ -109,7 +109,7 @@ export class ExperimentRunDispatcher {
       const pipeline = this.getPipeline();
       await pipeline.commands.recordEvaluatorResult.send({
         ...payload,
-        occurredAt: payload.occurredAt ?? Date.now(),
+        occurredAt: payload.occurredAt,
       });
     } catch (error) {
       logger.warn(
@@ -130,7 +130,7 @@ export class ExperimentRunDispatcher {
       const pipeline = this.getPipeline();
       await pipeline.commands.completeExperimentRun.send({
         ...payload,
-        occurredAt: payload.occurredAt ?? Date.now(),
+        occurredAt: payload.occurredAt,
       });
     } catch (error) {
       logger.warn(
