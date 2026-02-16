@@ -5,7 +5,7 @@ import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { useLabelFilter } from "../useLabelFilter";
 
-describe("useLabelFilter", () => {
+describe("useLabelFilter()", () => {
   describe("allLabels extraction", () => {
     it("returns empty array when scenarios is undefined", () => {
       const { result } = renderHook(() => useLabelFilter(undefined));
