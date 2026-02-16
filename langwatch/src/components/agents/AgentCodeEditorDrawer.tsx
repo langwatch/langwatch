@@ -420,6 +420,7 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
                     canAddRemove={true}
                     readOnly={false}
                     title="Inputs"
+                    isMappingDisabled={!showMappings}
                   />
                 </Box>
 
