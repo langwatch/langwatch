@@ -67,9 +67,11 @@ export class ClickHouseSimulationService {
     );
   }
 
-  async getScenarioSetsData(
-    projectId: string,
-  ): Promise<ScenarioSetData[] | null> {
+  async getScenarioSetsData({
+    projectId,
+  }: {
+    projectId: string;
+  }): Promise<ScenarioSetData[] | null> {
     return tracer.withActiveSpan(
       "ClickHouseSimulationService.getScenarioSetsData",
       { attributes: { "tenant.id": projectId } },

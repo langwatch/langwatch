@@ -95,12 +95,17 @@ export class SimulationRunStateRepositoryClickHouse<
     };
   }
 
-  private mapProjectionDataToClickHouseRecord(
-    data: SimulationRunStateData,
-    tenantId: string,
-    projectionId: string,
-    projectionVersion: string,
-  ): ClickHouseSimulationRunWriteRecord {
+  private mapProjectionDataToClickHouseRecord({
+    data,
+    tenantId,
+    projectionId,
+    projectionVersion,
+  }: {
+    data: SimulationRunStateData;
+    tenantId: string;
+    projectionId: string;
+    projectionVersion: string;
+  }): ClickHouseSimulationRunWriteRecord {
     return {
       Id: projectionId,
       TenantId: tenantId,
@@ -247,12 +252,12 @@ export class SimulationRunStateRepositoryClickHouse<
 
     try {
       const scenarioRunId = String(projection.aggregateId);
-      const projectionRecord = this.mapProjectionDataToClickHouseRecord(
-        projection.data as SimulationRunStateData,
-        String(context.tenantId),
-        projection.id,
-        projection.version,
-      );
+      const projectionRecord = this.mapProjectionDataToClickHouseRecord({
+        data: projection.data as SimulationRunStateData,
+        tenantId: String(context.tenantId),
+        projectionId: projection.id,
+        projectionVersion: projection.version,
+      });
 
       await this.clickHouseClient.insert({
         table: TABLE_NAME,

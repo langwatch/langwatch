@@ -144,12 +144,9 @@ export const route = app.delete(
       projectId: project.id,
     });
 
-    // Soft-delete from ClickHouse if ingestion is enabled (data exists in CH)
-    const dispatcher = SimulationDispatcher.create();
-    if (await dispatcher.isClickHouseEnabled(project.id)) {
-      const chService = ClickHouseSimulationService.create();
-      await chService.softDeleteAllForProject(project.id);
-    }
+    // Soft-delete from ClickHouse (no-op when client unavailable)
+    const chService = ClickHouseSimulationService.create();
+    await chService.softDeleteAllForProject(project.id);
 
     return c.json({ success: true }, 200);
   },

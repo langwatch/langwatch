@@ -53,6 +53,7 @@ export interface SimulationRunState extends Projection<SimulationRunStateData> {
  * - SimulationRunStartedEvent -> status: "IN_PROGRESS"
  * - SimulationMessageSnapshotEvent -> messages overwritten with latest snapshot
  * - SimulationRunFinishedEvent -> final status + results
+ * - SimulationRunDeletedEvent -> soft-delete with DeletedAt timestamp
  */
 export const simulationRunStateFoldProjection: FoldProjectionDefinition<
   SimulationRunStateData,

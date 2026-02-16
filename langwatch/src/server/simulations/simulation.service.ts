@@ -81,7 +81,7 @@ export class SimulationService {
       spanName: "SimulationService.getScenarioSetsDataForProject",
       attributes: { "tenant.id": projectId },
       projectId,
-      chFn: () => this.clickHouseService.getScenarioSetsData(projectId),
+      chFn: () => this.clickHouseService.getScenarioSetsData({ projectId }),
       esFn: () =>
         this.esService.getScenarioSetsDataForProject({ projectId }),
     });
