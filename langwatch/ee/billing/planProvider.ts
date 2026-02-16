@@ -13,22 +13,6 @@ type MinimalUser = {
   };
 };
 
-const GROWTH_ORGANIZATION_IDS = new Set([
-  "organization_lVWdCVtaqNXSKXtQYwU-y",
-  "organization_wGxIz2Tiwl8BFDHFHZMz_",
-  "organization_NW_jBe8d0CCKSnK8FW8UD",
-  "organization_z0JEOAFun8ldnzTQgFxVA",
-  "organization_3ko1Hf2jnsH8ElKJflyoS",
-  "organization_GkOKv2yG8QnVk6GLoWYRX",
-  "organization_T682QXSkRKv5_mKL2bMgi",
-  "organization_-jXj8RDPHXCOneoHJCsKF",
-]);
-
-const ENTERPRISE_ORGANIZATION_IDS = new Set([
-  "organization_erk6Bmlfzxw2YMyzWdo8O",
-  "organization_Kx6Yhg2CNw7Vvc9XifSf9",
-  "organization_0XObFvKWp0G6-v6fwqphq",
-]);
 
 const isAdmin = (user?: { email?: string | null }) => {
   if (!user?.email) {
@@ -52,20 +36,6 @@ export const createSaaSPlanProvider = (
         !!user?.impersonator && isAdmin(user.impersonator);
 
       if (!env.IS_SAAS) {
-        return {
-          ...PLAN_LIMITS[PlanTypes.ENTERPRISE],
-          overrideAddingLimitations,
-        };
-      }
-
-      if (GROWTH_ORGANIZATION_IDS.has(organizationId)) {
-        return {
-          ...PLAN_LIMITS[PlanTypes.GROWTH],
-          overrideAddingLimitations,
-        };
-      }
-
-      if (ENTERPRISE_ORGANIZATION_IDS.has(organizationId)) {
         return {
           ...PLAN_LIMITS[PlanTypes.ENTERPRISE],
           overrideAddingLimitations,

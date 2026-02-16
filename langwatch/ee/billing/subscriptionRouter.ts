@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import Stripe from "stripe";
+import type Stripe from "stripe";
 import { z } from "zod";
 import { prisma } from "../../src/server/db";
 import { checkOrganizationPermission } from "../../src/server/api/rbac";
@@ -7,36 +7,20 @@ import {
   createTRPCRouter,
   protectedProcedure,
 } from "../../src/server/api/trpc";
+import { notifySubscriptionEvent } from "./notificationHandlers";
 import {
   createItemsToAdd,
   getItemsToUpdate,
   prices,
 } from "./stripeHelpers";
+import { createStripeClient } from "./stripeClient";
 import {
-  sendSubscriptionSlackNotification,
-} from "./subscriptionSlackService";
-import { PlanTypes, type PlanTypes as PlanType } from "./planTypes";
+  type PlanTypes as PlanType,
+  SUBSCRIBABLE_PLANS,
+  SubscriptionStatus,
+} from "./planTypes";
 
-const subscriptionPlanEnum = z.enum([
-  "FREE",
-  "PRO",
-  "GROWTH",
-  "LAUNCH",
-  "ACCELERATE",
-  "LAUNCH_ANNUAL",
-  "ACCELERATE_ANNUAL",
-]);
-
-const createStripeClient = () => {
-  const secretKey = process.env.STRIPE_SECRET_KEY;
-  if (!secretKey) {
-    throw new Error("STRIPE_SECRET_KEY is required for SaaS billing runtime");
-  }
-
-  return new Stripe(secretKey, {
-    apiVersion: "2024-04-10",
-  });
-};
+const subscriptionPlanEnum = z.enum(SUBSCRIBABLE_PLANS);
 
 export const createSubscriptionRouter = () => {
   const stripe = createStripeClient();
@@ -62,7 +46,7 @@ export const createSubscriptionRouter = () => {
         if (
           lastSubscription &&
           lastSubscription.stripeSubscriptionId &&
-          lastSubscription.status !== "PENDING"
+          lastSubscription.status !== SubscriptionStatus.PENDING
         ) {
           const subscription = await stripe.subscriptions.retrieve(
             lastSubscription.stripeSubscriptionId,
@@ -117,7 +101,7 @@ export const createSubscriptionRouter = () => {
         if (
           lastSubscription &&
           lastSubscription.stripeSubscriptionId &&
-          lastSubscription.status !== "PENDING"
+          lastSubscription.status !== SubscriptionStatus.PENDING
         ) {
           if (input.plan === "FREE") {
             const response = await stripe.subscriptions.cancel(
@@ -127,7 +111,7 @@ export const createSubscriptionRouter = () => {
             if (response.status === "canceled") {
               await prisma.subscription.update({
                 where: { id: lastSubscription.id },
-                data: { status: "CANCELLED" },
+                data: { status: SubscriptionStatus.CANCELLED },
               });
             }
 
@@ -175,7 +159,7 @@ export const createSubscriptionRouter = () => {
         const subscription = await prisma.subscription.create({
           data: {
             organizationId: input.organizationId,
-            status: "PENDING",
+            status: SubscriptionStatus.PENDING,
             plan: input.plan,
           },
         });
@@ -263,7 +247,7 @@ export const createSubscriptionRouter = () => {
           });
         }
 
-        await sendSubscriptionSlackNotification({
+        await notifySubscriptionEvent({
           type: "prospective",
           organizationId: organization.id,
           organizationName: organization.name,
@@ -284,7 +268,7 @@ const getLastNonCancelledSubscription = async (organizationId: string) => {
     where: {
       organizationId,
       status: {
-        not: "CANCELLED",
+        not: SubscriptionStatus.CANCELLED,
       },
     },
     orderBy: { createdAt: "desc" },

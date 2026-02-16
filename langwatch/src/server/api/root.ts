@@ -1,8 +1,5 @@
 import { createTRPCRouter } from "~/server/api/trpc";
 import { env } from "~/env.mjs";
-
-import { dependencies } from "../../injection/dependencies.server";
-
 import { agentsRouter } from "./routers/agents";
 import { analyticsRouter } from "./routers/analytics";
 import { annotationRouter } from "./routers/annotation";
@@ -109,7 +106,6 @@ const eeRouters = env.IS_SAAS
 export const appRouter = createTRPCRouter({
   ...coreRouters,
   ...(eeRouters as any),
-  ...(dependencies.extraTRPCRoutes?.() ?? {}),
 }) as typeof baseAppRouter;
 
 // export type definition of API

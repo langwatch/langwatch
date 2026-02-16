@@ -15,6 +15,16 @@ export const PlanTypes = {
 
 export type PlanTypes = (typeof PlanTypes)[keyof typeof PlanTypes];
 
+export const SUBSCRIBABLE_PLANS = [
+  PlanTypes.FREE,
+  PlanTypes.PRO,
+  PlanTypes.GROWTH,
+  PlanTypes.LAUNCH,
+  PlanTypes.ACCELERATE,
+  PlanTypes.LAUNCH_ANNUAL,
+  PlanTypes.ACCELERATE_ANNUAL,
+] as const satisfies readonly PlanTypes[];
+
 export const SubscriptionStatus = {
   PENDING: "PENDING",
   FAILED: "FAILED",

@@ -1,9 +1,12 @@
 import { prisma } from "../../src/server/db";
+import { createPlanLimitNotifier } from "./planLimitNotifier";
 import {
+  clearBillingNotificationHandlers,
   clearPlanLimitNotificationHandlers,
-  createPlanLimitNotifier,
+  notifySubscriptionEvent,
+  setBillingNotificationHandlers,
   setPlanLimitNotificationHandlers,
-} from "./planLimitNotifier";
+} from "./notificationHandlers";
 import { createSaaSPlanProvider } from "./planProvider";
 import { createSubscriptionRouter } from "./subscriptionRouter";
 import { createStripeWebhookHandler } from "./stripeWebhook";
@@ -12,12 +15,20 @@ export { PlanTypes, SubscriptionStatus } from "./planTypes";
 export { PLAN_LIMITS } from "./planLimits";
 export { prices } from "./stripeHelpers";
 export type {
+  BillingNotificationHandlers,
   BillingPlanProvider,
   PlanLimitNotificationContext,
   PlanLimitNotificationHandlers,
   PlanLimitNotifierInput,
+  SubscriptionNotificationPayload,
 } from "./types";
-export { clearPlanLimitNotificationHandlers, setPlanLimitNotificationHandlers };
+export {
+  clearBillingNotificationHandlers,
+  clearPlanLimitNotificationHandlers,
+  notifySubscriptionEvent,
+  setBillingNotificationHandlers,
+  setPlanLimitNotificationHandlers,
+};
 
 export { createSubscriptionRouter, createStripeWebhookHandler };
 

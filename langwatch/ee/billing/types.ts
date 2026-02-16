@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import type { PlanInfo } from "../licensing/planInfo";
+import type { PlanTypes } from "./planTypes";
 
 export type BillingDeps = {
   prisma: PrismaClient;
@@ -38,5 +39,39 @@ export type PlanLimitNotificationHandlers = {
   ) => Promise<void> | void;
   sendHubspotNotification?: (
     context: PlanLimitNotificationContext,
+  ) => Promise<void> | void;
+};
+
+type SubscriptionPlan = PlanTypes | string;
+
+type SubscriptionNotificationBase = {
+  organizationId: string;
+  organizationName: string;
+  plan: SubscriptionPlan;
+};
+
+type ProspectiveSubscriptionNotification = SubscriptionNotificationBase & {
+  type: "prospective";
+  customerName?: string;
+  customerEmail?: string;
+  note?: string;
+  actorEmail?: string;
+};
+
+type ConfirmedSubscriptionNotification = SubscriptionNotificationBase & {
+  type: "confirmed";
+  subscriptionId: string;
+  startDate?: Date | null;
+  maxMembers?: number | null;
+  maxMessagesPerMonth?: number | null;
+};
+
+export type SubscriptionNotificationPayload =
+  | ProspectiveSubscriptionNotification
+  | ConfirmedSubscriptionNotification;
+
+export type BillingNotificationHandlers = PlanLimitNotificationHandlers & {
+  sendSubscriptionNotification?: (
+    payload: SubscriptionNotificationPayload,
   ) => Promise<void> | void;
 };

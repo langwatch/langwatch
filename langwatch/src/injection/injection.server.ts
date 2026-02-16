@@ -1,4 +1,3 @@
-import type { ProcedureRouterRecord } from "@trpc/server";
 import type {
   GetServerSidePropsContext,
   NextApiRequest,
@@ -45,12 +44,10 @@ export interface Dependencies {
       res: NextApiResponse,
     ) => Promise<void | NextApiResponse<any>>
   >;
-  extraTRPCRoutes?: () => ProcedureRouterRecord;
   postRegistrationCallback?: (
     user: RegistrationCbUser,
     org: RegistrationCbOrganization,
   ) => void | Promise<void>;
-  planLimits?: (organizationId: string, plan: string) => void | Promise<void>;
   managedModelProviderLitellmParams?: (args: {
     params: Record<string, string>;
     projectId: string;
