@@ -144,4 +144,24 @@ export const scenarioEventsRouter = createTRPCRouter({
       });
       return data;
     }),
+
+  // Get run data for all suites (cross-suite view)
+  getAllSuiteRunData: protectedProcedure
+    .input(
+      projectSchema.extend({
+        limit: z.number().min(1).max(100).default(20),
+        cursor: z.string().optional(),
+      }),
+    )
+    .use(checkProjectPermission("scenarios:view"))
+    .query(async ({ input, ctx }) => {
+      logger.debug({ projectId: input.projectId, limit: input.limit, hasCursor: !!input.cursor }, "Fetching all suite run data");
+      const scenarioRunnerService = new ScenarioEventService();
+      const data = await scenarioRunnerService.getRunDataForAllSuites({
+        projectId: input.projectId,
+        limit: input.limit,
+        cursor: input.cursor,
+      });
+      return data;
+    }),
 });

@@ -244,6 +244,7 @@ model Project {
     agents                   Agent[]
     evaluators               Evaluator[]
     scenarios                Scenario[]
+    suiteConfigurations      SimulationSuite[]
 
     featureEventSourcingTraceIngestion      Boolean @default(false)
     featureEventSourcingSimulationIngestion Boolean @default(false)
@@ -981,4 +982,23 @@ model Scenario {
     updatedAt       DateTime  @default(now()) @updatedAt
 
     @@index([projectId])
+}
+
+model SimulationSuite {
+    id          String    @id @default(nanoid())
+    projectId   String
+    project     Project   @relation(fields: [projectId], references: [id])
+    name        String
+    slug        String
+    description String?
+    scenarioIds String[]
+    targets     Json      // Array of { type: "prompt" | "http", referenceId: string }
+    repeatCount Int       @default(1)
+    labels      String[]
+    archivedAt  DateTime?
+    createdAt   DateTime  @default(now())
+    updatedAt   DateTime  @default(now()) @updatedAt
+
+    @@index([projectId])
+    @@unique([projectId, slug])
 }

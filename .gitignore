@@ -34,6 +34,9 @@ prompts/**
 **/.claude/settings.local.json
 **/.claude/agent-memory/
 
+# Browser test screenshots
+.browser-test-screenshots/
+
 # Playwright E2E tests
 agentic-e2e-tests/test-results/
 agentic-e2e-tests/playwright-report/
