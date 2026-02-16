@@ -53,12 +53,12 @@ interface ClickHouseSimulationRunRecord {
   CreatedAt: number | null; // DateTime64(3) — read back as ms via toUnixTimestamp64Milli
   UpdatedAt: number | null; // DateTime64(3)
   FinishedAt: number | null; // DateTime64(3)
-
+  DeletedAt: number | null; // Nullable(DateTime64(3))
 }
 
 type ClickHouseSimulationRunWriteRecord = WithDateWrites<
   Omit<ClickHouseSimulationRunRecord, "DurationMs"> & { DurationMs: number | null },
-  "CreatedAt" | "UpdatedAt" | "FinishedAt"
+  "CreatedAt" | "UpdatedAt" | "FinishedAt" | "DeletedAt"
 >;
 
 /**
@@ -91,6 +91,7 @@ export class SimulationRunStateRepositoryClickHouse<
       CreatedAt: record.CreatedAt === null ? 0 : Number(record.CreatedAt),
       UpdatedAt: record.UpdatedAt === null ? 0 : Number(record.UpdatedAt),
       FinishedAt: record.FinishedAt === null ? null : Number(record.FinishedAt),
+      DeletedAt: record.DeletedAt === null ? null : Number(record.DeletedAt),
     };
   }
 
@@ -125,6 +126,7 @@ export class SimulationRunStateRepositoryClickHouse<
       CreatedAt: data.CreatedAt ? new Date(data.CreatedAt) : new Date(0),
       UpdatedAt: data.UpdatedAt ? new Date(data.UpdatedAt) : new Date(0),
       FinishedAt: data.FinishedAt != null ? new Date(data.FinishedAt) : null,
+      DeletedAt: data.DeletedAt != null ? new Date(data.DeletedAt) : null,
     };
   }
 
@@ -163,7 +165,8 @@ export class SimulationRunStateRepositoryClickHouse<
             DurationMs,
             toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
             toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
-            toUnixTimestamp64Milli(FinishedAt) AS FinishedAt
+            toUnixTimestamp64Milli(FinishedAt) AS FinishedAt,
+            toUnixTimestamp64Milli(DeletedAt) AS DeletedAt
           FROM ${TABLE_NAME} FINAL
           WHERE TenantId = {tenantId:String}
             AND ScenarioRunId = {scenarioRunId:String}

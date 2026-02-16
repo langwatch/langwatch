@@ -12,6 +12,7 @@ import {
   tracerMiddleware,
 } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
+import { ClickHouseSimulationService } from "~/server/simulations/clickhouse-simulation.service";
 import { SimulationDispatcher } from "~/server/simulations/dispatch";
 import { ScenarioEventService } from "./scenario-event.service";
 import { ScenarioEventType } from "./enums";
@@ -142,6 +143,13 @@ export const route = app.delete(
     await scenarioRunnerService.deleteAllEventsForProject({
       projectId: project.id,
     });
+
+    // Soft-delete from ClickHouse if ingestion is enabled (data exists in CH)
+    const dispatcher = SimulationDispatcher.create();
+    if (await dispatcher.isClickHouseEnabled(project.id)) {
+      const chService = ClickHouseSimulationService.create();
+      await chService.softDeleteAllForProject(project.id);
+    }
 
     return c.json({ success: true }, 200);
   },

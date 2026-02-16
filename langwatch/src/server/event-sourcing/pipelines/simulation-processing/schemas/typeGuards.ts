@@ -2,6 +2,7 @@ import { SIMULATION_EVENT_TYPES } from "./constants";
 import type {
   SimulationMessageSnapshotEvent,
   SimulationProcessingEvent,
+  SimulationRunDeletedEvent,
   SimulationRunFinishedEvent,
   SimulationRunStartedEvent,
 } from "./events";
@@ -22,4 +23,10 @@ export function isSimulationRunFinishedEvent(
   event: SimulationProcessingEvent,
 ): event is SimulationRunFinishedEvent {
   return event.type === SIMULATION_EVENT_TYPES.RUN_FINISHED;
+}
+
+export function isSimulationRunDeletedEvent(
+  event: SimulationProcessingEvent,
+): event is SimulationRunDeletedEvent {
+  return event.type === SIMULATION_EVENT_TYPES.RUN_DELETED;
 }

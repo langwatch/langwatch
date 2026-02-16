@@ -16,6 +16,7 @@ import type {
   StartRunCommandData,
   MessageSnapshotCommandData,
   FinishRunCommandData,
+  DeleteRunCommandData,
 } from "~/server/event-sourcing/pipelines/simulation-processing/schemas/commands";
 import { createLogger } from "~/utils/logger/server";
 
@@ -94,6 +95,21 @@ export class SimulationDispatcher {
       logger.warn(
         { error, scenarioRunId: payload.scenarioRunId },
         "Failed to dispatch finish simulation run event to ClickHouse",
+      );
+    }
+  }
+
+  async deleteRun(payload: DeleteRunCommandData): Promise<void> {
+    try {
+      const pipeline = this.getPipeline();
+      await pipeline.commands.deleteRun.send({
+        ...payload,
+        occurredAt: payload.occurredAt,
+      });
+    } catch (error) {
+      logger.warn(
+        { error, scenarioRunId: payload.scenarioRunId },
+        "Failed to dispatch delete simulation run event to ClickHouse",
       );
     }
   }

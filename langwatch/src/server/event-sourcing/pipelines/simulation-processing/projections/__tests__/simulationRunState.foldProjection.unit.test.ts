@@ -7,6 +7,7 @@ import type {
   SimulationRunStartedEvent,
   SimulationMessageSnapshotEvent,
   SimulationRunFinishedEvent,
+  SimulationRunDeletedEvent,
   SimulationProcessingEvent,
 } from "../../schemas/events";
 import { SIMULATION_EVENT_TYPES } from "../../schemas/constants";
@@ -86,6 +87,20 @@ function createFinishedEvent(
   };
 }
 
+function createDeletedEvent(): SimulationRunDeletedEvent {
+  return {
+    ...createBaseEvent(),
+    timestamp: 1700000010000,
+    type: SIMULATION_EVENT_TYPES.RUN_DELETED,
+    data: {
+      scenarioRunId: "run-1",
+      scenarioId: "scenario-1",
+      batchRunId: "batch-1",
+      scenarioSetId: "set-1",
+    },
+  };
+}
+
 const { init, apply } = simulationRunStateFoldProjection;
 
 describe("simulationRunStateFoldProjection", () => {
@@ -117,6 +132,7 @@ describe("simulationRunStateFoldProjection", () => {
       expect(state.Error).toBeNull();
       expect(state.DurationMs).toBeNull();
       expect(state.FinishedAt).toBeNull();
+      expect(state.DeletedAt).toBeNull();
     });
   });
 
@@ -253,6 +269,46 @@ describe("simulationRunStateFoldProjection", () => {
         expect(JSON.parse(state.MetCriteria)).toEqual([]);
         expect(JSON.parse(state.UnmetCriteria)).toEqual([]);
         expect(state.Error).toBeNull();
+      });
+    });
+
+    describe("when applying SimulationRunDeletedEvent", () => {
+      it("sets DeletedAt and UpdatedAt timestamps", () => {
+        const started = apply(createInitState(), createStartedEvent());
+        const finished = apply(started, createFinishedEvent());
+        const state = apply(finished, createDeletedEvent());
+
+        expect(state.DeletedAt).toBe(1700000010000);
+        expect(state.UpdatedAt).toBe(1700000010000);
+      });
+
+      it("wipes all data fields", () => {
+        const started = apply(createInitState(), createStartedEvent());
+        const finished = apply(started, createFinishedEvent());
+        const state = apply(finished, createDeletedEvent());
+
+        expect(state.Messages).toBe("[]");
+        expect(state.TraceIds).toBe("[]");
+        expect(state.MetCriteria).toBe("[]");
+        expect(state.UnmetCriteria).toBe("[]");
+        expect(state.Verdict).toBeNull();
+        expect(state.Reasoning).toBeNull();
+        expect(state.Error).toBeNull();
+        expect(state.Name).toBeNull();
+        expect(state.Description).toBeNull();
+        expect(state.DurationMs).toBeNull();
+      });
+
+      it("preserves original IDs and Status", () => {
+        const started = apply(createInitState(), createStartedEvent());
+        const finished = apply(started, createFinishedEvent());
+        const state = apply(finished, createDeletedEvent());
+
+        expect(state.ScenarioRunId).toBe("run-1");
+        expect(state.ScenarioId).toBe("scenario-1");
+        expect(state.BatchRunId).toBe("batch-1");
+        expect(state.ScenarioSetId).toBe("set-1");
+        expect(state.Status).toBe("SUCCESS");
       });
     });
 

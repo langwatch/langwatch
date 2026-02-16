@@ -1,4 +1,5 @@
 import { definePipeline } from "../../library";
+import { DeleteRunCommand } from "./commands/deleteRun.command";
 import { FinishRunCommand } from "./commands/finishRun.command";
 import { MessageSnapshotCommand } from "./commands/messageSnapshot.command";
 import { StartRunCommand } from "./commands/startRun.command";
@@ -24,4 +25,5 @@ export const simulationProcessingPipelineDefinition =
     .withCommand("startRun", StartRunCommand)
     .withCommand("messageSnapshot", MessageSnapshotCommand)
     .withCommand("finishRun", FinishRunCommand)
+    .withCommand("deleteRun", DeleteRunCommand)
     .build();

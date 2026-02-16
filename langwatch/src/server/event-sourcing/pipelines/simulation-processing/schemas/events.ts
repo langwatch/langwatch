@@ -83,15 +83,39 @@ export type SimulationRunFinishedEvent = z.infer<
 >;
 
 /**
+ * Simulation run deleted event data.
+ */
+export const simulationRunDeletedEventDataSchema = z.object({
+  scenarioRunId: z.string(),
+  scenarioId: z.string(),
+  batchRunId: z.string(),
+  scenarioSetId: z.string(),
+});
+
+export const simulationRunDeletedEventSchema = EventSchema.extend({
+  type: z.literal(SIMULATION_EVENT_TYPES.RUN_DELETED),
+  data: simulationRunDeletedEventDataSchema,
+});
+
+export type SimulationRunDeletedEventData = z.infer<
+  typeof simulationRunDeletedEventDataSchema
+>;
+export type SimulationRunDeletedEvent = z.infer<
+  typeof simulationRunDeletedEventSchema
+>;
+
+/**
  * Union of all simulation processing event types.
  */
 export type SimulationProcessingEvent =
   | SimulationRunStartedEvent
   | SimulationMessageSnapshotEvent
-  | SimulationRunFinishedEvent;
+  | SimulationRunFinishedEvent
+  | SimulationRunDeletedEvent;
 
 export {
   isSimulationRunStartedEvent,
   isSimulationMessageSnapshotEvent,
   isSimulationRunFinishedEvent,
+  isSimulationRunDeletedEvent,
 } from "./typeGuards";

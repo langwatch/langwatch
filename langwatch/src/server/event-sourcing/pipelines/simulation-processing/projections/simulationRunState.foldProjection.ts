@@ -9,6 +9,7 @@ import {
   isSimulationRunStartedEvent,
   isSimulationMessageSnapshotEvent,
   isSimulationRunFinishedEvent,
+  isSimulationRunDeletedEvent,
 } from "../schemas/events";
 import { simulationRunStateFoldStore } from "../repositories/simulationRunStateFoldStore";
 
@@ -38,6 +39,7 @@ export interface SimulationRunStateData {
   CreatedAt: number;
   UpdatedAt: number;
   FinishedAt: number | null;
+  DeletedAt: number | null;
 }
 
 export interface SimulationRunState extends Projection<SimulationRunStateData> {
@@ -80,6 +82,7 @@ export const simulationRunStateFoldProjection: FoldProjectionDefinition<
       CreatedAt: 0,
       UpdatedAt: 0,
       FinishedAt: null,
+      DeletedAt: null,
     };
   },
 
@@ -126,6 +129,24 @@ export const simulationRunStateFoldProjection: FoldProjectionDefinition<
         Error: event.data.results?.error ?? null,
         DurationMs: state.CreatedAt ? event.timestamp - state.CreatedAt : null,
         FinishedAt: event.timestamp,
+        UpdatedAt: event.timestamp,
+      };
+    }
+
+    if (isSimulationRunDeletedEvent(event)) {
+      return {
+        ...state,
+        Messages: "[]",
+        TraceIds: "[]",
+        MetCriteria: "[]",
+        UnmetCriteria: "[]",
+        Verdict: null,
+        Reasoning: null,
+        Error: null,
+        Name: null,
+        Description: null,
+        DurationMs: null,
+        DeletedAt: event.timestamp,
         UpdatedAt: event.timestamp,
       };
     }

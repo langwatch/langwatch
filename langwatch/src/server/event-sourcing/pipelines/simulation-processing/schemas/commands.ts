@@ -46,3 +46,10 @@ export const finishRunCommandDataSchema = baseSimulationSchema.extend({
 });
 
 export type FinishRunCommandData = z.infer<typeof finishRunCommandDataSchema>;
+
+/**
+ * Command data for deleting a simulation run (soft-delete).
+ */
+export const deleteRunCommandDataSchema = baseSimulationSchema;
+
+export type DeleteRunCommandData = z.infer<typeof deleteRunCommandDataSchema>;

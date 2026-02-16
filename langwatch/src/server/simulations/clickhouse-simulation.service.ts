@@ -78,6 +78,7 @@ export class ClickHouseSimulationService {
                 toUnixTimestamp64Milli(max(CreatedAt)) AS lastRunAt
               FROM simulation_runs FINAL
               WHERE TenantId = {tenantId:String}
+                AND DeletedAt IS NULL
               GROUP BY ScenarioSetId
             `,
             query_params: { tenantId: projectId },
@@ -136,6 +137,7 @@ export class ClickHouseSimulationService {
               FROM simulation_runs FINAL
               WHERE TenantId = {tenantId:String}
                 AND BatchRunId = {batchRunId:String}
+                AND DeletedAt IS NULL
             `,
             query_params: { tenantId: projectId, batchRunId },
             format: "JSONEachRow",
@@ -185,6 +187,7 @@ export class ClickHouseSimulationService {
               FROM simulation_runs FINAL
               WHERE TenantId = {tenantId:String}
                 AND ScenarioRunId = {scenarioRunId:String}
+                AND DeletedAt IS NULL
               LIMIT 1
             `,
             query_params: { tenantId: projectId, scenarioRunId },
@@ -237,6 +240,7 @@ export class ClickHouseSimulationService {
               FROM simulation_runs FINAL
               WHERE TenantId = {tenantId:String}
                 AND ScenarioId = {scenarioId:String}
+                AND DeletedAt IS NULL
             `,
             query_params: { tenantId: projectId, scenarioId },
             format: "JSONEachRow",
@@ -294,6 +298,7 @@ export class ClickHouseSimulationService {
               FROM simulation_runs FINAL
               WHERE TenantId = {tenantId:String}
                 AND ScenarioSetId = {scenarioSetId:String}
+                AND DeletedAt IS NULL
               GROUP BY BatchRunId
               ORDER BY latestCreatedAt DESC
               LIMIT {limit:UInt32}
@@ -356,6 +361,7 @@ export class ClickHouseSimulationService {
               FROM simulation_runs FINAL
               WHERE TenantId = {tenantId:String}
                 AND ScenarioSetId = {scenarioSetId:String}
+                AND DeletedAt IS NULL
             `,
             query_params: { tenantId: projectId, scenarioSetId },
             format: "JSONEachRow",
@@ -372,6 +378,44 @@ export class ClickHouseSimulationService {
         }
       },
     );
+  }
+
+  async softDeleteAllForProject(projectId: string): Promise<void> {
+    if (!this.clickHouseClient) return;
+
+    try {
+      await this.clickHouseClient.command({
+        query: `
+          ALTER TABLE simulation_runs
+            UPDATE
+              DeletedAt = now64(3),
+              UpdatedAt = now64(3),
+              Messages = '[]',
+              TraceIds = '[]',
+              MetCriteria = '[]',
+              UnmetCriteria = '[]',
+              Verdict = NULL,
+              Reasoning = NULL,
+              Error = NULL,
+              Name = NULL,
+              Description = NULL,
+              DurationMs = NULL
+            WHERE TenantId = {tenantId:String} AND DeletedAt IS NULL
+        `,
+        query_params: { tenantId: projectId },
+      });
+
+      logger.info(
+        { projectId },
+        "Soft-deleted all simulation runs for project in ClickHouse",
+      );
+    } catch (error) {
+      logger.error(
+        { projectId, error: error instanceof Error ? error.message : error },
+        "Failed to soft-delete simulation runs in ClickHouse",
+      );
+      throw new Error("Failed to soft-delete simulation runs");
+    }
   }
 
   async getRunDataForBatchIds({
@@ -406,6 +450,7 @@ export class ClickHouseSimulationService {
               FROM simulation_runs FINAL
               WHERE TenantId = {tenantId:String}
                 AND BatchRunId IN ({batchRunIds:Array(String)})
+                AND DeletedAt IS NULL
             `,
             query_params: { tenantId: projectId, batchRunIds },
             format: "JSONEachRow",
