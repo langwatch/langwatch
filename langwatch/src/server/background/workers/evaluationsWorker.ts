@@ -667,6 +667,7 @@ export const runEvaluation = async ({
     );
   } catch (error) {
     if (error instanceof Error && error.message.includes("fetch failed")) {
+      console.error({ error, path: `${env.LANGEVALS_ENDPOINT}/${builtInEvaluatorType}/evaluate` });
       throw new Error("Evaluator cannot be reached");
     }
     throw error;

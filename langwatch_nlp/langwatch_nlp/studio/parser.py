@@ -312,6 +312,54 @@ def parse_component(
                 "HttpNode",
                 params,
             )
+        case "agent":
+            # Agent nodes delegate to the correct executor based on agent_type
+            params = parse_fields(node.data.parameters or [], autoparse=True)
+            agent_type = params.pop("agent_type", None)
+
+            match agent_type:
+                case "http":
+                    if not params.get("url"):
+                        raise ValueError(
+                            f"HTTP url not specified for agent {node.data.name}"
+                        )
+                    return (
+                        "from langwatch_nlp.studio.dspy.http_node import HttpNode",
+                        "HttpNode",
+                        params,
+                    )
+                case "code":
+                    code = params.pop("code", None)
+                    if not code:
+                        raise ValueError(
+                            f"Code not specified for agent {node.data.name}"
+                        )
+                    pattern = r"class (.*?)\(dspy\.Module\):"
+                    match_result = re.search(pattern, code)
+                    if not match_result:
+                        raise ValueError(
+                            f"Could not find a class that inherits from dspy.Module for agent {node.data.name}"
+                        )
+                    class_name = match_result.group(1)
+                    try:
+                        code = black.format_str(code, mode=black.Mode())
+                    except Exception as e:
+                        raise ValueError(f"Agent {node.data.name} has invalid code: {e}")
+                    return code, class_name, {}
+                case "workflow":
+                    return (
+                        "from langwatch_nlp.studio.dspy.custom_node import CustomNode",
+                        "CustomNode",
+                        {
+                            "api_key": workflow.api_key,
+                            "endpoint": langwatch.get_endpoint(),
+                            **{k: v for k, v in params.items() if k in ("workflow_id", "version_id")},
+                        },
+                    )
+                case _:
+                    raise ValueError(
+                        f"Unknown agent_type '{agent_type}' for agent {node.data.name}"
+                    )
         case "entry":
             return "", "None", {}
         case "end":

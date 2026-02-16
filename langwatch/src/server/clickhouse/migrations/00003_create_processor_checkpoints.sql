@@ -43,7 +43,6 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.processor_checkpoints
 ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}SequenceNumber)
 PARTITION BY (AggregateType, toYearWeek(UpdatedAt))
 ORDER BY (TenantId, CheckpointKey, Status)
-TTL toDateTime(UpdatedAt) + INTERVAL ${TIERED_PROCESSOR_CHECKPOINTS_TABLE_HOT_DAYS:-2} DAY TO VOLUME 'cold'
 SETTINGS index_granularity = 8192, storage_policy = 'local_primary';
 
 -- +goose StatementEnd
@@ -53,7 +52,7 @@ SETTINGS index_granularity = 8192, storage_policy = 'local_primary';
 -- +goose ENVSUB ON
 -- +goose StatementBegin
 
-DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.processor_checkpoints SYNC;
+-- DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.processor_checkpoints SYNC;
 
 -- +goose StatementEnd
 -- +goose ENVSUB OFF

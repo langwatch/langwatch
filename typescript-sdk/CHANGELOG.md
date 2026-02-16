@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.16.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.15.0...typescript-sdk@v0.16.0) (2026-02-15)
+
+
+### Features
+
+* add POST /api/evaluators to create evaluators via REST API ([#1574](https://github.com/langwatch/langwatch/issues/1574)) ([3084655](https://github.com/langwatch/langwatch/commit/308465566db22345663ba78135338ad587e8d84d))
+* full Liquid template support with autocomplete ([#1583](https://github.com/langwatch/langwatch/issues/1583)) ([00863a7](https://github.com/langwatch/langwatch/commit/00863a7643c8f6af48582bf82512fd37391902a7))
+
+
+### Bug Fixes
+
+* typescript sdk labels not configured correctly ([#1550](https://github.com/langwatch/langwatch/issues/1550)) ([13b07a4](https://github.com/langwatch/langwatch/commit/13b07a4b4d3abb281bdbfb49aadc367808a16391))
+
+
+### Miscellaneous
+
+* **deps-dev:** bump esbuild from 0.25.10 to 0.27.3 in /typescript-sdk ([#1469](https://github.com/langwatch/langwatch/issues/1469)) ([07561c4](https://github.com/langwatch/langwatch/commit/07561c49fe4ddbd054c9abac169c3ffa263a040e))
+* **deps:** bump @opentelemetry/instrumentation from 0.205.0 to 0.211.0 in /typescript-sdk ([#1460](https://github.com/langwatch/langwatch/issues/1460)) ([4e1efe1](https://github.com/langwatch/langwatch/commit/4e1efe16405301666115a5a5d1f3fd246c05736f))
+* **deps:** bump @opentelemetry/instrumentation in /typescript-sdk ([4e1efe1](https://github.com/langwatch/langwatch/commit/4e1efe16405301666115a5a5d1f3fd246c05736f))
+* **deps:** bump @opentelemetry/resources from 2.1.0 to 2.5.0 in /typescript-sdk ([#1468](https://github.com/langwatch/langwatch/issues/1468)) ([e5530d3](https://github.com/langwatch/langwatch/commit/e5530d3902f4470f772123ec9fce502b2d3cdd43))
+* **deps:** bump @opentelemetry/resources in /typescript-sdk ([e5530d3](https://github.com/langwatch/langwatch/commit/e5530d3902f4470f772123ec9fce502b2d3cdd43))
+* **deps:** bump @opentelemetry/semantic-conventions from 1.37.0 to 1.39.0 in /typescript-sdk ([#1471](https://github.com/langwatch/langwatch/issues/1471)) ([1e04306](https://github.com/langwatch/langwatch/commit/1e0430631a63ef286cd1d0735082bb995ef5b80b))
+* **deps:** bump @opentelemetry/semantic-conventions in /typescript-sdk ([1e04306](https://github.com/langwatch/langwatch/commit/1e0430631a63ef286cd1d0735082bb995ef5b80b))
+* **deps:** bump dotenv from 16.6.1 to 17.2.4 in /typescript-sdk ([#1464](https://github.com/langwatch/langwatch/issues/1464)) ([4155d51](https://github.com/langwatch/langwatch/commit/4155d51cbf9b501f38571a96e29b21f825d8745b))
+* **deps:** bump js-yaml from 4.1.0 to 4.1.1 in /typescript-sdk ([#1474](https://github.com/langwatch/langwatch/issues/1474)) ([72b4af2](https://github.com/langwatch/langwatch/commit/72b4af24bd78ebad4580fda6188e83bc9244d5e6))
+* **deps:** bump open from 10.2.0 to 11.0.0 in /typescript-sdk ([#1472](https://github.com/langwatch/langwatch/issues/1472)) ([092b2e9](https://github.com/langwatch/langwatch/commit/092b2e91021700ca784230822f52e1beae07f221))
+* **deps:** bump openapi-fetch from 0.14.0 to 0.16.0 in /typescript-sdk ([#1456](https://github.com/langwatch/langwatch/issues/1456)) ([99c04ef](https://github.com/langwatch/langwatch/commit/99c04ef67676c5f328f3055bbeaf41c7ec3b5031))
+* **deps:** bump the npm_and_yarn group across 3 directories with 5 updates ([#1522](https://github.com/langwatch/langwatch/issues/1522)) ([fbb5dfd](https://github.com/langwatch/langwatch/commit/fbb5dfdc54ea42a80e24044ba2d5924c832ec5f1))
+* **deps:** bump zod from 4.1.11 to 4.3.6 in /typescript-sdk ([#1450](https://github.com/langwatch/langwatch/issues/1450)) ([7e3e901](https://github.com/langwatch/langwatch/commit/7e3e90100f8da6b8a74e98acb1553a0c806c0466))
+
 ## [0.15.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.14.0...typescript-sdk@v0.15.0) (2026-02-12)
 
 

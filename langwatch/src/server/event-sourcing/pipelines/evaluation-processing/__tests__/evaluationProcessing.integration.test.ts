@@ -73,6 +73,7 @@ function createTestSchedulePayload(
     evaluatorName: "Test Evaluator",
     traceId: `trace-${Date.now()}`,
     isGuardrail: false,
+    occurredAt: Date.now(),
     ...overrides,
   };
 }
@@ -92,6 +93,7 @@ function createTestStartPayload(
     evaluatorName: "Test Evaluator",
     traceId: `trace-${Date.now()}`,
     isGuardrail: false,
+    occurredAt: Date.now(),
     ...overrides,
   };
 }
@@ -108,6 +110,7 @@ function createTestCompletePayload(
     tenantId,
     evaluationId: generateTestEvaluationId(),
     status,
+    occurredAt: Date.now(),
   };
 
   if (status === "processed") {
@@ -763,6 +766,7 @@ describe.skipIf(!hasTestcontainers)(
         // Send events with consistency delays
         await pipeline.commands.scheduleEvaluation.send({
           tenantId: tenantIdString,
+          occurredAt: Date.now(),
           evaluationId,
           evaluatorId,
           evaluatorType,
@@ -774,6 +778,7 @@ describe.skipIf(!hasTestcontainers)(
 
         await pipeline.commands.startEvaluation.send({
           tenantId: tenantIdString,
+          occurredAt: Date.now(),
           evaluationId,
           evaluatorId,
           evaluatorType,
@@ -894,6 +899,7 @@ describe.skipIf(!hasTestcontainers)(
 
         await pipeline.commands.completeEvaluation.send({
           tenantId: tenantIdString,
+          occurredAt: Date.now(),
           evaluationId,
           status: "error",
           error: errorMessage,

@@ -106,6 +106,7 @@ export const scheduleEvaluation = async ({
         evaluatorName: check.name,
         traceId: trace.trace_id,
         isGuardrail: false,
+        occurredAt: Date.now(),
       });
     }
   } catch (error) {
@@ -366,6 +367,7 @@ export const updateEvaluationStatusInES = async ({
               evaluatorName: check.name,
               traceId: trace.trace_id,
               isGuardrail: is_guardrail,
+              occurredAt: Date.now(),
             },
           );
         } else if (
@@ -384,6 +386,7 @@ export const updateEvaluationStatusInES = async ({
               label,
               details,
               error: extractErrorMessage(error),
+              occurredAt: Date.now(),
             },
           );
         }

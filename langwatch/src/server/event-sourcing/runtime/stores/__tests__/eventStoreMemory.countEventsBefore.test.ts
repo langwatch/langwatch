@@ -23,16 +23,15 @@ describe("EventStoreMemory - countEventsBefore", () => {
       const context = { tenantId };
       const timestamp = 1000;
 
-      const event1 = EventUtils.createEvent(
+      const event1 = EventUtils.createEvent({
         aggregateType,
         aggregateId,
         tenantId,
-        eventType,
-        eventVersion,
-        { value: 1 },
-        void 0,
+        type: eventType,
+        version: eventVersion,
+        data: { value: 1 },
         timestamp,
-      );
+      });
 
       await store.storeEvents([event1], context, aggregateType);
 
@@ -50,36 +49,33 @@ describe("EventStoreMemory - countEventsBefore", () => {
     it("counts events with earlier timestamps", async () => {
       const context = { tenantId };
 
-      const event1 = EventUtils.createEvent(
+      const event1 = EventUtils.createEvent({
         aggregateType,
         aggregateId,
         tenantId,
-        eventType,
-        eventVersion,
-        { value: 1 },
-        void 0,
-        1000,
-      );
-      const event2 = EventUtils.createEvent(
+        type: eventType,
+        version: eventVersion,
+        data: { value: 1 },
+        timestamp: 1000,
+      });
+      const event2 = EventUtils.createEvent({
         aggregateType,
         aggregateId,
         tenantId,
-        eventType,
-        eventVersion,
-        { value: 2 },
-        void 0,
-        2000,
-      );
-      const event3 = EventUtils.createEvent(
+        type: eventType,
+        version: eventVersion,
+        data: { value: 2 },
+        timestamp: 2000,
+      });
+      const event3 = EventUtils.createEvent({
         aggregateType,
         aggregateId,
         tenantId,
-        eventType,
-        eventVersion,
-        { value: 3 },
-        void 0,
-        3000,
-      );
+        type: eventType,
+        version: eventVersion,
+        data: { value: 3 },
+        timestamp: 3000,
+      });
 
       await store.storeEvents([event1, event2, event3], context, aggregateType);
 
@@ -103,43 +99,40 @@ describe("EventStoreMemory - countEventsBefore", () => {
       // Create events with same timestamp but different IDs (sorted by ID)
       // Manually set IDs to ensure predictable ordering (event IDs now include KSUID)
       const event1 = {
-        ...EventUtils.createEvent(
+        ...EventUtils.createEvent({
           aggregateType,
           aggregateId,
           tenantId,
-          eventType,
-          eventVersion,
-          { value: 1 },
-          void 0,
-          sameTimestamp,
-        ),
+          type: eventType,
+          version: eventVersion,
+          data: { value: 1 },
+          timestamp: sameTimestamp,
+        }),
         id: `${sameTimestamp}:${tenantId}:${aggregateId}:${aggregateType}:a`, // Earliest ID
       };
       // Manually create event2 with same timestamp but later ID
       const event2 = {
-        ...EventUtils.createEvent(
+        ...EventUtils.createEvent({
           aggregateType,
           aggregateId,
           tenantId,
-          eventType,
-          eventVersion,
-          { value: 2 },
-          void 0,
-          sameTimestamp,
-        ),
+          type: eventType,
+          version: eventVersion,
+          data: { value: 2 },
+          timestamp: sameTimestamp,
+        }),
         id: `${sameTimestamp}:${tenantId}:${aggregateId}:${aggregateType}:b`, // Later ID
       };
       const event3 = {
-        ...EventUtils.createEvent(
+        ...EventUtils.createEvent({
           aggregateType,
           aggregateId,
           tenantId,
-          eventType,
-          eventVersion,
-          { value: 3 },
-          void 0,
-          sameTimestamp,
-        ),
+          type: eventType,
+          version: eventVersion,
+          data: { value: 3 },
+          timestamp: sameTimestamp,
+        }),
         id: `${sameTimestamp}:${tenantId}:${aggregateId}:${aggregateType}:c`, // Latest ID
       };
 
@@ -180,26 +173,24 @@ describe("EventStoreMemory - countEventsBefore", () => {
       const context1 = { tenantId: tenantId1 };
       const context2 = { tenantId: tenantId2 };
 
-      const event1 = EventUtils.createEvent(
+      const event1 = EventUtils.createEvent({
         aggregateType,
         aggregateId,
-        tenantId1,
-        eventType,
-        eventVersion,
-        { value: 1 },
-        void 0,
-        1000,
-      );
-      const event2 = EventUtils.createEvent(
+        tenantId: tenantId1,
+        type: eventType,
+        version: eventVersion,
+        data: { value: 1 },
+        timestamp: 1000,
+      });
+      const event2 = EventUtils.createEvent({
         aggregateType,
         aggregateId,
-        tenantId2,
-        eventType,
-        eventVersion,
-        { value: 2 },
-        void 0,
-        1000,
-      );
+        tenantId: tenantId2,
+        type: eventType,
+        version: eventVersion,
+        data: { value: 2 },
+        timestamp: 1000,
+      });
 
       await store.storeEvents([event1], context1, aggregateType);
       await store.storeEvents([event2], context2, aggregateType);
@@ -238,42 +229,39 @@ describe("EventStoreMemory - countEventsBefore", () => {
       // Create events with same timestamp, IDs determine order
       // Manually set IDs to ensure predictable ordering (event IDs now include KSUID)
       const event1 = {
-        ...EventUtils.createEvent(
+        ...EventUtils.createEvent({
           aggregateType,
           aggregateId,
           tenantId,
-          eventType,
-          eventVersion,
-          { value: 1 },
-          void 0,
-          sameTimestamp,
-        ),
+          type: eventType,
+          version: eventVersion,
+          data: { value: 1 },
+          timestamp: sameTimestamp,
+        }),
         id: `${sameTimestamp}:${tenantId}:${aggregateId}:${aggregateType}:a`, // Earliest ID
       };
       const event2 = {
-        ...EventUtils.createEvent(
+        ...EventUtils.createEvent({
           aggregateType,
           aggregateId,
           tenantId,
-          eventType,
-          eventVersion,
-          { value: 2 },
-          void 0,
-          sameTimestamp,
-        ),
+          type: eventType,
+          version: eventVersion,
+          data: { value: 2 },
+          timestamp: sameTimestamp,
+        }),
         id: `${sameTimestamp}:${tenantId}:${aggregateId}:${aggregateType}:b`,
       };
       const event3 = {
-        ...EventUtils.createEvent(
+        ...EventUtils.createEvent({
           aggregateType,
           aggregateId,
           tenantId,
-          eventType,
-          eventVersion,
-          { value: 3 },
-          void 0,
-          sameTimestamp,
-        ),
+          type: eventType,
+          version: eventVersion,
+          data: { value: 3 },
+          timestamp: sameTimestamp,
+        }),
         id: `${sameTimestamp}:${tenantId}:${aggregateId}:${aggregateType}:c`,
       };
 
@@ -296,49 +284,45 @@ describe("EventStoreMemory - countEventsBefore", () => {
     it("counts correctly when events have mixed timestamps", async () => {
       const context = { tenantId };
 
-      const event1 = EventUtils.createEvent(
+      const event1 = EventUtils.createEvent({
         aggregateType,
         aggregateId,
         tenantId,
-        eventType,
-        eventVersion,
-        { value: 1 },
-        void 0,
-        1000,
-      );
-      const event2 = EventUtils.createEvent(
+        type: eventType,
+        version: eventVersion,
+        data: { value: 1 },
+        timestamp: 1000,
+      });
+      const event2 = EventUtils.createEvent({
         aggregateType,
         aggregateId,
         tenantId,
-        eventType,
-        eventVersion,
-        { value: 2 },
-        void 0,
-        2000,
-      );
-      const event3 = EventUtils.createEvent(
+        type: eventType,
+        version: eventVersion,
+        data: { value: 2 },
+        timestamp: 2000,
+      });
+      const event3 = EventUtils.createEvent({
         aggregateType,
         aggregateId,
         tenantId,
-        eventType,
-        eventVersion,
-        { value: 3 },
-        void 0,
-        2000, // Same timestamp as event2
-      );
+        type: eventType,
+        version: eventVersion,
+        data: { value: 3 },
+        timestamp: 2000, // Same timestamp as event2
+      });
       // Manually set different IDs to prevent deduplication (since they have same timestamp)
       event2.id = `${event2.id}-event2`;
       event3.id = `${event3.id}-event3`;
-      const event4 = EventUtils.createEvent(
+      const event4 = EventUtils.createEvent({
         aggregateType,
         aggregateId,
         tenantId,
-        eventType,
-        eventVersion,
-        { value: 4 },
-        void 0,
-        3000,
-      );
+        type: eventType,
+        version: eventVersion,
+        data: { value: 4 },
+        timestamp: 3000,
+      });
 
       await store.storeEvents(
         [event1, event2, event3, event4],

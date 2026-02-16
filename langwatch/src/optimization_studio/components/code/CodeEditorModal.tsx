@@ -70,6 +70,9 @@ export function CodeEditorModal({
         height="calc(100vh - 128px)"
         background="#272822"
         color="white"
+        positionerProps={{
+          zIndex: 1502,
+        }}
       >
         <Dialog.Header>
           <Dialog.Title>Edit Code</Dialog.Title>

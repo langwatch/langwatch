@@ -372,6 +372,65 @@ describe("TargetHeader alert icon", () => {
     ).not.toBeInTheDocument();
     expect(screen.getByTestId("unpublished-indicator")).toBeInTheDocument();
   });
+
+  it("shows unpublished indicator for evaluator target with localEvaluatorConfig", () => {
+    const target: TargetConfig = {
+      id: "eval-target-1",
+      type: "evaluator",
+      targetEvaluatorId: "db-eval-1",
+      inputs: [{ identifier: "output", type: "str" }],
+      outputs: [],
+      mappings: {
+        [DEFAULT_TEST_DATA_ID]: {
+          output: {
+            type: "source",
+            source: "dataset",
+            sourceId: DEFAULT_TEST_DATA_ID,
+            sourceField: "input",
+          },
+        },
+      },
+      localEvaluatorConfig: {
+        name: "Modified Evaluator",
+        settings: { threshold: 0.5 },
+      },
+    };
+
+    renderWithProviders(
+      <TargetHeader
+        target={target}
+        onEdit={vi.fn()}
+        onRemove={vi.fn()}
+        onRun={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("unpublished-indicator")).toBeInTheDocument();
+  });
+
+  it("does not show unpublished indicator for evaluator target without localEvaluatorConfig", () => {
+    const target: TargetConfig = {
+      id: "eval-target-2",
+      type: "evaluator",
+      targetEvaluatorId: "db-eval-2",
+      inputs: [{ identifier: "output", type: "str" }],
+      outputs: [],
+      mappings: {},
+    };
+
+    renderWithProviders(
+      <TargetHeader
+        target={target}
+        onEdit={vi.fn()}
+        onRemove={vi.fn()}
+        onRun={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.queryByTestId("unpublished-indicator"),
+    ).not.toBeInTheDocument();
+  });
 });
 
 // ============================================================================

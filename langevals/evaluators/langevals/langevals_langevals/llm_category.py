@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Optional, cast
+from typing import Optional, Union, cast
 from langevals_core.base_evaluator import (
     MAX_TOKENS_HARD_LIMIT,
     BaseEvaluator,
@@ -11,6 +11,7 @@ from langevals_core.base_evaluator import (
     EvaluationResultSkipped,
     Money,
 )
+from langevals_core.image_support import build_content_parts, ContentPart
 from pydantic import BaseModel, Field
 import litellm
 from litellm import Choices, Message
@@ -78,28 +79,31 @@ class CustomLLMCategoryEvaluator(
             for key, env in self.env.items():
                 os.environ[key] = env
 
-        content = ""
-        if entry.input:
-            content += f"# Input\n{entry.input}\n\n"
-        if entry.output:
-            content += f"# Output\n{entry.output}\n\n"
-        if entry.contexts:
-            content += f"# Contexts\n{'1. '.join(entry.contexts)}\n\n"
-
-        if not content:
+        if not entry.input and not entry.output and not entry.contexts:
             return EvaluationResultSkipped(details="No content to evaluate")
 
-        content += f"# Task\n{self.settings.prompt}"
-
-        content += "\n\n# Categories\n" + "\n".join(
+        categories_text = "\n\n# Categories\n" + "\n".join(
             [
                 f"- {category.name}: {category.description}"
                 for category in self.settings.categories
             ]
         )
 
+        task_with_categories = f"{self.settings.prompt}{categories_text}"
+
+        content: Union[str, list[ContentPart]] = build_content_parts(
+            input=entry.input,
+            output=entry.output,
+            contexts=entry.contexts,
+            task=task_with_categories,
+        )
+
+        # Token counting uses the plain-text version for estimation
+        content_text = content if isinstance(content, str) else " ".join(
+            p["text"] for p in content if p.get("type") == "text"  # type: ignore
+        )
         total_tokens = len(
-            encode(model=self.settings.model, text=f"{self.settings.prompt} {content}")
+            encode(model=self.settings.model, text=f"{self.settings.prompt} {content_text}")
         )
         max_tokens = min(self.settings.max_tokens, MAX_TOKENS_HARD_LIMIT)
         if total_tokens > max_tokens:

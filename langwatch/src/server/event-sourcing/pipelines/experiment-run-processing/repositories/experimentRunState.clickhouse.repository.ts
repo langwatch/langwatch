@@ -16,6 +16,7 @@ import type {
   ExperimentRunState,
   ExperimentRunStateData,
 } from "../projections/experimentRunState.foldProjection";
+import type { WithDateWrites } from "~/server/clickhouse/types";
 import type { ExperimentRunStateRepository } from "./experimentRunState.repository";
 
 const TABLE_NAME = "experiment_runs" as const;
@@ -40,10 +41,11 @@ interface ClickHouseExperimentRunRecord {
   AvgScore: number | null;
   PassRate: number | null;
   Targets: string;
-  CreatedAt: string;
-  UpdatedAt: string;
-  FinishedAt: string | null;
-  StoppedAt: string | null;
+  CreatedAt: number;
+  UpdatedAt: number;
+  StartedAt: number | null;
+  FinishedAt: number | null;
+  StoppedAt: number | null;
   LastProcessedEventId: string;
   TotalScoreSum: number;
   ScoreCount: number;
@@ -51,15 +53,10 @@ interface ClickHouseExperimentRunRecord {
   PassFailCount: number;
 }
 
-function timestampToDateTime64(timestampMs: number | null): string | null {
-  if (timestampMs === null) return null;
-  return new Date(timestampMs).toISOString();
-}
-
-function dateTime64ToTimestamp(dateTime64: string | null): number | null {
-  if (dateTime64 === null) return null;
-  return new Date(dateTime64).getTime();
-}
+type ClickHouseExperimentRunWriteRecord = WithDateWrites<
+  Omit<ClickHouseExperimentRunRecord, "CreatedAt" | "UpdatedAt">,
+  "StartedAt" | "FinishedAt" | "StoppedAt"
+>;
 
 export class ExperimentRunStateRepositoryClickHouse<
   ProjectionType extends Projection = Projection,
@@ -85,10 +82,9 @@ export class ExperimentRunStateRepositoryClickHouse<
       AvgScore: record.AvgScore,
       PassRate: record.PassRate,
       Targets: record.Targets,
-      CreatedAt: dateTime64ToTimestamp(record.CreatedAt) ?? 0,
-      UpdatedAt: dateTime64ToTimestamp(record.UpdatedAt) ?? 0,
-      FinishedAt: dateTime64ToTimestamp(record.FinishedAt),
-      StoppedAt: dateTime64ToTimestamp(record.StoppedAt),
+      StartedAt: record.StartedAt === null ? null : Number(record.StartedAt),
+      FinishedAt: record.FinishedAt === null ? null : Number(record.FinishedAt),
+      StoppedAt: record.StoppedAt === null ? null : Number(record.StoppedAt),
       TotalScoreSum: record.TotalScoreSum ?? 0,
       ScoreCount: record.ScoreCount ?? 0,
       PassedCount: record.PassedCount ?? 0,
@@ -102,7 +98,7 @@ export class ExperimentRunStateRepositoryClickHouse<
     projectionId: string,
     projectionVersion: string,
     lastProcessedEventId: string,
-  ): ClickHouseExperimentRunRecord {
+  ): ClickHouseExperimentRunWriteRecord {
     return {
       Id: projectionId,
       TenantId: tenantId,
@@ -119,10 +115,9 @@ export class ExperimentRunStateRepositoryClickHouse<
       AvgScore: data.AvgScore,
       PassRate: data.PassRate,
       Targets: data.Targets,
-      CreatedAt: timestampToDateTime64(data.CreatedAt) ?? "0",
-      UpdatedAt: timestampToDateTime64(data.UpdatedAt) ?? "0",
-      FinishedAt: timestampToDateTime64(data.FinishedAt),
-      StoppedAt: timestampToDateTime64(data.StoppedAt),
+      StartedAt: data.StartedAt != null ? new Date(data.StartedAt) : null,
+      FinishedAt: data.FinishedAt != null ? new Date(data.FinishedAt) : null,
+      StoppedAt: data.StoppedAt != null ? new Date(data.StoppedAt) : null,
       LastProcessedEventId: lastProcessedEventId,
       TotalScoreSum: data.TotalScoreSum,
       ScoreCount: data.ScoreCount,
@@ -150,10 +145,11 @@ export class ExperimentRunStateRepositoryClickHouse<
             Total, Progress, CompletedCount, FailedCount, TotalCost,
             toString(TotalDurationMs) AS TotalDurationMs,
             AvgScore, PassRate, Targets,
-            toString(CreatedAt) AS CreatedAt,
-            toString(UpdatedAt) AS UpdatedAt,
-            toString(FinishedAt) AS FinishedAt,
-            toString(StoppedAt) AS StoppedAt,
+            toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
+            toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
+            toUnixTimestamp64Milli(StartedAt) AS StartedAt,
+            toUnixTimestamp64Milli(FinishedAt) AS FinishedAt,
+            toUnixTimestamp64Milli(StoppedAt) AS StoppedAt,
             LastProcessedEventId,
             TotalScoreSum, ScoreCount, PassedCount, PassFailCount
           FROM ${TABLE_NAME} FINAL

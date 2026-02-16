@@ -8,6 +8,7 @@ import type {
   NormalizedLink,
   NormalizedSpan,
 } from "../schemas/spans";
+import type { WithDateWrites } from "~/server/clickhouse/types";
 import type { SpanRepository } from "./spanRepository";
 
 const TABLE_NAME = "stored_spans" as const;
@@ -261,7 +262,7 @@ export class SpanRepositoryClickHouse implements SpanRepository {
 
   private transformNormalizedSpan(
     normalizedSpan: NormalizedSpan,
-  ): ClickHouseSpan {
+  ): ClickHouseSpanWriteRecord {
     // Extract service name from resource attributes
     const serviceNameAny =
       normalizedSpan.spanAttributes["service.name"] ??
@@ -278,8 +279,8 @@ export class SpanRepositoryClickHouse implements SpanRepository {
       ParentTraceId: normalizedSpan.parentTraceId,
       ParentIsRemote: normalizedSpan.parentIsRemote,
       Sampled: normalizedSpan.sampled,
-      StartTime: normalizedSpan.startTimeUnixMs,
-      EndTime: normalizedSpan.endTimeUnixMs,
+      StartTime: new Date(normalizedSpan.startTimeUnixMs),
+      EndTime: new Date(normalizedSpan.endTimeUnixMs),
       DurationMs: Math.round(normalizedSpan.durationMs),
       SpanName: normalizedSpan.name,
       SpanKind: normalizedSpan.kind,
@@ -291,7 +292,7 @@ export class SpanRepositoryClickHouse implements SpanRepository {
       ScopeName: normalizedSpan.instrumentationScope.name,
       ScopeVersion: normalizedSpan.instrumentationScope.version,
       "Events.Timestamp": normalizedSpan.events.map(
-        (event) => event.timeUnixMs,
+        (event) => new Date(event.timeUnixMs),
       ),
       "Events.Name": normalizedSpan.events.map((event) => event.name),
       "Events.Attributes": normalizedSpan.events.map(
@@ -303,9 +304,9 @@ export class SpanRepositoryClickHouse implements SpanRepository {
       DroppedAttributesCount: normalizedSpan.droppedAttributesCount,
       DroppedEventsCount: normalizedSpan.droppedEventsCount,
       DroppedLinksCount: normalizedSpan.droppedLinksCount,
-      CreatedAt: Date.now(),
-      UpdatedAt: Date.now(),
-    } satisfies ClickHouseSpan;
+      CreatedAt: new Date(),
+      UpdatedAt: new Date(),
+    } satisfies ClickHouseSpanWriteRecord;
   }
 
   private transformClickHouseSpanToNormalizedSpan(
@@ -415,6 +416,11 @@ type ClickHouseAttributeValue =
   | Array<string | number | boolean | bigint>;
 
 type ClickHouseAttributes = Record<string, ClickHouseAttributeValue>;
+
+type ClickHouseSpanWriteRecord = WithDateWrites<
+  ClickHouseSpan,
+  "StartTime" | "EndTime" | "Events.Timestamp" | "CreatedAt" | "UpdatedAt"
+>;
 
 interface ClickHouseSpan {
   Id: string;

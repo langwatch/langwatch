@@ -63,20 +63,20 @@ export class AssignTopicCommand implements CommandHandler<
           "Handling assign topic command",
         );
 
-        const topicAssignedEvent = EventUtils.createEvent<TopicAssignedEvent>(
-          "trace",
-          commandData.traceId,
+        const topicAssignedEvent = EventUtils.createEvent<TopicAssignedEvent>({
+          aggregateType: "trace",
+          aggregateId: commandData.traceId,
           tenantId,
-          TOPIC_ASSIGNED_EVENT_TYPE,
-          TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
-          {
+          type: TOPIC_ASSIGNED_EVENT_TYPE,
+          version: TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
+          data: {
             topicId: commandData.topicId,
             topicName: commandData.topicName,
             subtopicId: commandData.subtopicId,
             subtopicName: commandData.subtopicName,
             isIncremental: commandData.isIncremental,
           },
-        );
+        });
 
         this.logger.debug(
           {

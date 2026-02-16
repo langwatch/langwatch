@@ -2,13 +2,16 @@ import { PromptScope } from "@prisma/client";
 import type { Node } from "@xyflow/react";
 import type { DeepPartial } from "react-hook-form";
 
+import type { LocalPromptConfig } from "~/evaluations-v3/types";
 import type {
   Component,
   LlmConfigParameter,
+  LLMConfig,
   LlmPromptConfigComponent,
   NodeDataset,
   Signature,
 } from "~/optimization_studio/types/dsl";
+import { DEFAULT_MODEL } from "~/utils/constants";
 import {
   formSchema,
   handleSchema,
@@ -253,6 +256,119 @@ function safeOutputs(
       };
     }) ?? []
   );
+}
+
+/**
+ * Converts inline node data (parameters array) to LocalPromptConfig format.
+ *
+ * Used for backward compatibility when old workflow nodes have inline LLM config
+ * (parameters array with llm, instructions, messages) but no promptId.
+ * This allows the PromptEditorDrawer to display the inline config for editing.
+ *
+ * Returns undefined if the node has no meaningful inline config (no parameters
+ * or empty parameters array).
+ *
+ * @param nodeData - Raw node data from the workflow (Signature or LlmPromptConfigComponent)
+ * @returns LocalPromptConfig if inline config exists, undefined otherwise
+ */
+export function nodeDataToLocalPromptConfig(
+  nodeData: Node<Signature | LlmPromptConfigComponent>["data"],
+): LocalPromptConfig | undefined {
+  if (!nodeData.parameters || nodeData.parameters.length === 0) {
+    return undefined;
+  }
+
+  const parametersMap = Object.fromEntries(
+    nodeData.parameters.map((p) => [p.identifier, p]),
+  );
+
+  const llmParameter = parametersMap.llm as LlmConfigParameter | undefined;
+  if (!llmParameter) {
+    return undefined;
+  }
+
+  // Handle missing or legacy string format for LLM config
+  const rawLlmValue = llmParameter.value;
+  let llmConfig: LLMConfig;
+  if (!rawLlmValue) {
+    // LLM parameter exists but has no value (e.g., templates using workflow default_llm).
+    // Use DEFAULT_MODEL so we still extract instructions/messages from the node.
+    llmConfig = { model: DEFAULT_MODEL };
+  } else if (typeof rawLlmValue === "string") {
+    console.warn(
+      `Migrating legacy LLM format in nodeDataToLocalPromptConfig: string "${rawLlmValue}" -> object`,
+    );
+    llmConfig = { model: rawLlmValue };
+  } else {
+    llmConfig = rawLlmValue;
+  }
+
+  // Build messages: system message from instructions + other messages
+  const instructions = (parametersMap.instructions?.value as string) ?? "";
+  const otherMessages = Array.isArray(parametersMap.messages?.value)
+    ? (parametersMap.messages.value as Array<{
+        role: string;
+        content: string;
+      }>)
+    : [];
+
+  const messages: LocalPromptConfig["messages"] = [
+    { role: "system" as const, content: instructions },
+    ...otherMessages.map((m) => ({
+      role: m.role as "user" | "assistant" | "system",
+      content: m.content,
+    })),
+  ];
+
+  // Map inputs/outputs, defaulting to empty arrays
+  const inputs = (nodeData.inputs ?? []).map((i) => ({
+    identifier: i.identifier,
+    type: i.type as LocalPromptConfig["inputs"][number]["type"],
+  }));
+
+  const outputs = (nodeData.outputs ?? []).map((o) => ({
+    identifier: o.identifier,
+    type: o.type as LocalPromptConfig["outputs"][number]["type"],
+    ...(o.json_schema && { json_schema: o.json_schema }),
+  }));
+
+  // Build LLM config, omitting undefined fields so they don't override
+  // defaults during merge in PromptEditorDrawer (e.g., maxTokens from project)
+  const llm: LocalPromptConfig["llm"] = {
+    model: llmConfig.model,
+    ...(llmConfig.temperature !== undefined && {
+      temperature: llmConfig.temperature,
+    }),
+    ...(llmConfig.max_tokens !== undefined && {
+      maxTokens: llmConfig.max_tokens,
+    }),
+    ...(llmConfig.top_p !== undefined && { topP: llmConfig.top_p }),
+    ...(llmConfig.frequency_penalty !== undefined && {
+      frequencyPenalty: llmConfig.frequency_penalty,
+    }),
+    ...(llmConfig.presence_penalty !== undefined && {
+      presencePenalty: llmConfig.presence_penalty,
+    }),
+    ...(llmConfig.seed !== undefined && { seed: llmConfig.seed }),
+    ...(llmConfig.top_k !== undefined && { topK: llmConfig.top_k }),
+    ...(llmConfig.min_p !== undefined && { minP: llmConfig.min_p }),
+    ...(llmConfig.repetition_penalty !== undefined && {
+      repetitionPenalty: llmConfig.repetition_penalty,
+    }),
+    ...(llmConfig.reasoning !== undefined && {
+      reasoning: llmConfig.reasoning,
+    }),
+    ...(llmConfig.verbosity !== undefined && {
+      verbosity: llmConfig.verbosity,
+    }),
+  };
+
+  return {
+    llm,
+    messages,
+    inputs,
+    outputs,
+  };
 }
 
 export function inputsAndOutputsToDemostrationColumns(
@@ -558,6 +674,9 @@ export function versionedPromptToOptimizationStudioNodeData(
     | "execution_state"
     | "id"
     | "description"
+    | "localPromptConfig"
+    | "promptId"
+    | "promptVersionId"
   >
 > {
   return {

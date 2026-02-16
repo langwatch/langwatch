@@ -76,6 +76,7 @@ describe("events schemas", () => {
         type: TOPIC_ASSIGNED_EVENT_TYPE,
         version: "2025-02-01",
         timestamp: Date.now(),
+        occurredAt: Date.now(),
         data: {
           topicId: "topic-123",
           topicName: "Customer Support",
@@ -104,6 +105,7 @@ describe("events schemas", () => {
         type: TOPIC_ASSIGNED_EVENT_TYPE,
         version: "2025-02-01",
         timestamp: Date.now(),
+        occurredAt: Date.now(),
         data: {
           topicId: "topic-123",
           topicName: "Customer Support",
@@ -137,6 +139,7 @@ describe("events schemas", () => {
         type: TOPIC_ASSIGNED_EVENT_TYPE,
         version: "2025-02-01",
         timestamp: Date.now(),
+        occurredAt: Date.now(),
         data: {
           topicId: "topic-123",
           topicName: "Customer Support",
@@ -178,6 +181,7 @@ describe("events schemas", () => {
         type: TOPIC_ASSIGNED_EVENT_TYPE,
         version: "2025-02-01",
         timestamp: Date.now(),
+        occurredAt: Date.now(),
         data: {
           topicId: "topic-123",
           topicName: "Customer Support",

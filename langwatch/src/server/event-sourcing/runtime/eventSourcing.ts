@@ -147,6 +147,16 @@ export class EventSourcing {
               }))
             : undefined;
 
+        // Initialize the global projection registry if it has projections and hasn't been initialized yet
+        const globalRegistry = getGlobalProjectionRegistry();
+        if (
+          globalRegistry.hasProjections &&
+          !globalRegistry.isInitialized &&
+          this.runtime.queueProcessorFactory
+        ) {
+          globalRegistry.initialize(this.runtime.queueProcessorFactory);
+        }
+
         // Create the pipeline using the new service options
         const pipeline = new EventSourcingPipeline<EventType, ProjectionTypes>({
           name: definition.metadata.name,
@@ -162,7 +172,7 @@ export class EventSourcing {
           metadata: definition.metadata,
           featureFlagService: definition.featureFlagService,
           commandRegistrations,
-          globalRegistry: getGlobalProjectionRegistry(),
+          globalRegistry,
         });
 
         // Get command dispatchers

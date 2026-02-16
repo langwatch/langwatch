@@ -70,7 +70,12 @@ export async function startTestContainers(): Promise<{
     const urlWithDatabase = new URL(clickHouseUrl);
     urlWithDatabase.pathname = `/${TEST_DATABASE}`;
 
-    clickHouseClient = createClient({ url: urlWithDatabase });
+    clickHouseClient = createClient({
+      url: urlWithDatabase,
+      clickhouse_settings: {
+        date_time_input_format: "best_effort",
+      },
+    });
 
     return {
       clickHouseClient,
@@ -95,7 +100,12 @@ export async function startTestContainers(): Promise<{
     // Don't run migrations - globalSetup already did that
     // globalSetup provides URL with correct database already in pathname
     if (!clickHouseClient) {
-      clickHouseClient = createClient({ url: new URL(clickHouseUrl) });
+      clickHouseClient = createClient({
+        url: new URL(clickHouseUrl),
+        clickhouse_settings: {
+          date_time_input_format: "best_effort",
+        },
+      });
     }
 
     return {

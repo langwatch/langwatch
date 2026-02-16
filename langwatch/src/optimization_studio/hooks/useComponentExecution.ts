@@ -5,6 +5,7 @@ import { toaster } from "../../components/ui/toaster";
 import { generateOtelTraceId } from "../../utils/trace";
 import type { BaseComponent, Component, Field } from "../types/dsl";
 import type { StudioClientEvent } from "../types/events";
+import { mergeLocalConfigsIntoDsl } from "../utils/mergeLocalConfigs";
 import { useAlertOnComponent } from "./useAlertOnComponent";
 import { usePostEvent } from "./usePostEvent";
 import { useWorkflowStore } from "./useWorkflowStore";
@@ -100,11 +101,15 @@ export const useComponentExecution = () => {
         timestamps: undefined,
       });
 
+      const workflow = getWorkflow();
       const payload: StudioClientEvent = {
         type: "execute_component",
         payload: {
           trace_id,
-          workflow: getWorkflow(),
+          workflow: {
+            ...workflow,
+            nodes: mergeLocalConfigsIntoDsl(workflow.nodes),
+          },
           node_id: node.id,
           inputs: inputs_,
         },

@@ -11,6 +11,7 @@ from langevals_core.base_evaluator import (
     EvaluationResultSkipped,
     Money,
 )
+from langevals_core.image_support import build_content_parts
 from pydantic import Field
 import litellm
 from litellm import Choices, Message
@@ -56,22 +57,23 @@ class CustomLLMScoreEvaluator(
             for key, env in self.env.items():
                 os.environ[key] = env
 
-        content = ""
-        if entry.input:
-            content += f"# Input\n{entry.input}\n\n"
-        if entry.output:
-            content += f"# Output\n{entry.output}\n\n"
-        if entry.contexts:
-            content += f"# Contexts\n{'1. '.join(entry.contexts)}\n\n"
-
-        if not content:
+        if not entry.input and not entry.output and not entry.contexts:
             return EvaluationResultSkipped(details="No content to evaluate")
 
-        content += f"# Task\n{self.settings.prompt}"
+        content = build_content_parts(
+            input=entry.input,
+            output=entry.output,
+            contexts=entry.contexts,
+            task=self.settings.prompt,
+        )
 
+        # Token counting uses the plain-text version for estimation
+        content_text = content if isinstance(content, str) else " ".join(
+            p["text"] for p in content if p.get("type") == "text"  # type: ignore
+        )
         total_tokens = len(
             litellm.encode(  # type: ignore
-                model=self.settings.model, text=f"{self.settings.prompt} {content}"
+                model=self.settings.model, text=f"{self.settings.prompt} {content_text}"
             )
         )
         max_tokens = min(self.settings.max_tokens, MAX_TOKENS_HARD_LIMIT)
@@ -91,7 +93,9 @@ class CustomLLMScoreEvaluator(
 
             judge = dspy.Predict(LLMJudge.with_instructions(self.settings.prompt))
             judge.set_lm(lm=dspy.LM(model=self.settings.model))
-            arguments = judge(content=content)
+            # dspy path always uses plain text
+            dspy_content = content if isinstance(content, str) else content_text
+            arguments = judge(content=dspy_content)
 
         else:
             response = litellm.completion(

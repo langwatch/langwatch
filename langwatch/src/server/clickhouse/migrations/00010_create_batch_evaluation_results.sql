@@ -53,7 +53,6 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.batch_evaluation_results
 ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}CreatedAt)
 PARTITION BY toYearWeek(CreatedAt)
 ORDER BY (TenantId, ExperimentId, RunId, Id)
-TTL toDateTime(CreatedAt) + INTERVAL ${TIERED_BATCH_EVAL_RESULTS_TABLE_HOT_DAYS:-60} DAY TO VOLUME 'cold'
 SETTINGS index_granularity = 8192, storage_policy = 'local_primary';
 
 -- +goose StatementEnd
@@ -63,7 +62,7 @@ SETTINGS index_granularity = 8192, storage_policy = 'local_primary';
 -- +goose ENVSUB ON
 -- +goose StatementBegin
 
-DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.batch_evaluation_results SYNC;
+-- DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.batch_evaluation_results SYNC;
 
 -- +goose StatementEnd
 -- +goose ENVSUB OFF

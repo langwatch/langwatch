@@ -32,7 +32,7 @@ export interface ExperimentRunCommandConfig<TCommandData, TEventData> {
  * @returns A command handler that processes commands and emits events
  */
 export function createExperimentRunCommandHandler<
-  TCommandData extends { tenantId: string; runId: string },
+  TCommandData extends { tenantId: string; runId: string; occurredAt: number },
   TEvent extends ExperimentRunProcessingEvent,
   TEventData,
 >(
@@ -61,14 +61,15 @@ export function createExperimentRunCommandHandler<
       config.handleLogMessage,
     );
 
-    const event = EventUtils.createEvent<TEvent>(
-      "experiment_run",
-      runId,
+    const event = EventUtils.createEvent<TEvent>({
+      aggregateType: "experiment_run",
+      aggregateId: runId,
       tenantId,
-      config.eventType as TEvent["type"],
-      config.eventVersion as TEvent["version"],
-      config.mapToEventData(commandData) as TEvent["data"],
-    );
+      type: config.eventType as TEvent["type"],
+      version: config.eventVersion as TEvent["version"],
+      data: config.mapToEventData(commandData) as TEvent["data"],
+      occurredAt: commandData.occurredAt,
+    });
 
     logger.debug(
       {

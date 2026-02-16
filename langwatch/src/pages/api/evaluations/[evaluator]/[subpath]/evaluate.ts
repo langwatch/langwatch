@@ -36,6 +36,14 @@ import {
 
 const logger = createLogger("langwatch:evaluations:evaluate");
 
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: "30mb",
+    },
+  },
+};
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
@@ -359,6 +367,7 @@ export async function handleEvaluatorCall(
           evaluatorName ?? monitor?.name ?? params.name ?? undefined,
         traceId: params.trace_id ?? undefined,
         isGuardrail: isGuardrail ?? undefined,
+        occurredAt: Date.now(),
       });
     } catch (eventError) {
       captureException(eventError, {
@@ -419,6 +428,7 @@ export async function handleEvaluatorCall(
         passed: "passed" in result ? result.passed : undefined,
         label: "label" in result ? result.label : undefined,
         details: "details" in result ? result.details : undefined,
+        occurredAt: Date.now(),
         error:
           result.status === "error"
             ? "details" in result

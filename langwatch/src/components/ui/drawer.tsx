@@ -3,6 +3,15 @@ import { Drawer as ChakraDrawer, Portal } from "@chakra-ui/react";
 import * as React from "react";
 import { CloseButton } from "./close-button";
 
+/**
+ * Context to provide a margin-top offset to all Drawer.Content descendants.
+ * Used by CurrentDrawer in the studio to push drawers below the header bar.
+ * Works with portaled content because React context follows the React tree,
+ * not the DOM tree.
+ */
+const DrawerOffsetContext = React.createContext<{ marginTop?: number }>({});
+export const DrawerOffsetProvider = DrawerOffsetContext.Provider;
+
 interface DrawerContentProps extends ChakraDrawer.ContentProps {
   portalled?: boolean;
   portalRef?: React.RefObject<HTMLElement>;
@@ -14,6 +23,12 @@ export const DrawerContent = React.forwardRef<
   DrawerContentProps
 >(function DrawerContent(props, ref) {
   const { children, portalled = true, portalRef, offset, ...rest } = props;
+  const { marginTop: contextMarginTop } = React.useContext(DrawerOffsetContext);
+
+  // Apply context marginTop only if the component doesn't already have one
+  const marginTopProp =
+    rest.marginTop ?? (contextMarginTop ? `${contextMarginTop}px` : undefined);
+
   return (
     <Portal disabled={!portalled} container={portalRef}>
       <ChakraDrawer.Positioner padding={offset} pointerEvents="none">
@@ -25,6 +40,7 @@ export const DrawerContent = React.forwardRef<
           backdropFilter="blur(8px)"
           pointerEvents="auto"
           {...rest}
+          marginTop={marginTopProp}
           asChild={false}
         >
           {children}

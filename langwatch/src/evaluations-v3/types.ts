@@ -147,6 +147,17 @@ export const localPromptConfigSchema = z.object({
 export type LocalPromptConfig = z.infer<typeof localPromptConfigSchema>;
 
 /**
+ * Zod schema for local evaluator config validation.
+ * Stores unsaved evaluator changes (name, settings) locally until the user clicks "Save".
+ * Mirrors the localPromptConfig pattern for prompts.
+ */
+export const localEvaluatorConfigSchema = z.object({
+  name: z.string(),
+  settings: z.record(z.string(), z.unknown()).optional(),
+});
+export type LocalEvaluatorConfig = z.infer<typeof localEvaluatorConfigSchema>;
+
+/**
  * Zod schema for evaluator config validation.
  *
  * Note: Settings are NOT used at execution time - they are always fetched
@@ -173,6 +184,8 @@ export const evaluatorConfigSchema = z.object({
   ),
   /** Reference to the database evaluator - settings are fetched from here */
   dbEvaluatorId: z.string().optional(),
+  /** Local unsaved evaluator settings that override DB values during execution */
+  localEvaluatorConfig: localEvaluatorConfigSchema.optional(),
 });
 export type EvaluatorConfig = Omit<
   z.infer<typeof evaluatorConfigSchema>,
@@ -250,6 +263,13 @@ export const targetConfigSchema = z.object({
    * Only set when type === "evaluator".
    */
   targetEvaluatorId: z.string().optional(),
+  /**
+   * Local evaluator config for unsaved changes.
+   * Stores name and settings modifications until the user clicks "Save".
+   * When present, the target header shows an orange dot indicator.
+   * Only set when type === "evaluator".
+   */
+  localEvaluatorConfig: localEvaluatorConfigSchema.optional(),
   inputs: z.array(fieldSchema).optional(),
   outputs: z.array(fieldSchema).optional(),
   // Per-dataset mappings: datasetId -> inputFieldName -> FieldMapping
