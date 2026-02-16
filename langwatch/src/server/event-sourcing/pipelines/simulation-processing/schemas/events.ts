@@ -2,6 +2,7 @@ import { z } from "zod";
 import { EventSchema } from "../../../library/domain/types";
 import {
   SIMULATION_RUN_STATUS,
+  simulationMessageSchema,
   simulationResultsSchema,
 } from "./shared";
 import {
@@ -37,10 +38,6 @@ export type SimulationRunStartedEvent = z.infer<
 /**
  * Simulation message snapshot event data.
  */
-const simulationMessageSchema = z.object({
-  trace_id: z.string().optional(),
-}).passthrough();
-
 export const simulationMessageSnapshotEventDataSchema = z.object({
   scenarioRunId: z.string(),
   scenarioId: z.string(),

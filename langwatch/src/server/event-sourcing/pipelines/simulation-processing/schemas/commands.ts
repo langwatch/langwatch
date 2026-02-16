@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   SIMULATION_RUN_STATUS,
+  simulationMessageSchema,
   simulationResultsSchema,
 } from "./shared";
 
@@ -28,10 +29,6 @@ export type StartRunCommandData = z.infer<typeof startRunCommandDataSchema>;
 /**
  * Command data for recording a message snapshot.
  */
-const simulationMessageSchema = z.object({
-  trace_id: z.string().optional(),
-}).passthrough();
-
 export const messageSnapshotCommandDataSchema = baseSimulationSchema.extend({
   messages: z.array(simulationMessageSchema),
 });

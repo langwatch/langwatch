@@ -28,36 +28,63 @@ export class SimulationService {
     return new SimulationService(prisma);
   }
 
+  private async routeToBackend<T>({
+    spanName,
+    attributes,
+    projectId,
+    chFn,
+    esFn,
+  }: {
+    spanName: string;
+    attributes: Record<string, string>;
+    projectId: string;
+    chFn: () => Promise<T | null>;
+    esFn: () => Promise<T>;
+  }): Promise<T> {
+    return tracer.withActiveSpan(spanName, { attributes }, async (span) => {
+      const useClickHouse =
+        await this.clickHouseService.isClickHouseEnabled(projectId);
+      span.setAttribute(
+        "backend",
+        useClickHouse ? "clickhouse" : "elasticsearch",
+      );
+
+      if (useClickHouse) {
+        const result = await chFn();
+        if (result === null) {
+          throw new Error(
+            `ClickHouse is enabled but returned null for ${spanName} — check ClickHouse client configuration`,
+          );
+        }
+        return result;
+      }
+
+      return esFn();
+    });
+  }
+
+  private requireResult<T>(result: T | null, methodName: string): T {
+    if (result === null) {
+      throw new Error(
+        `ClickHouse is enabled but returned null for ${methodName} — check ClickHouse client configuration`,
+      );
+    }
+    return result;
+  }
+
   async getScenarioSetsDataForProject({
     projectId,
   }: {
     projectId: string;
   }): Promise<ScenarioSetData[]> {
-    return tracer.withActiveSpan(
-      "SimulationService.getScenarioSetsDataForProject",
-      { attributes: { "tenant.id": projectId } },
-      async (span) => {
-        const useClickHouse =
-          await this.clickHouseService.isClickHouseEnabled(projectId);
-        span.setAttribute(
-          "backend",
-          useClickHouse ? "clickhouse" : "elasticsearch",
-        );
-
-        if (useClickHouse) {
-          const result =
-            await this.clickHouseService.getScenarioSetsData(projectId);
-          if (result === null) {
-            throw new Error(
-              "ClickHouse is enabled but returned null for getScenarioSetsData — check ClickHouse client configuration",
-            );
-          }
-          return result;
-        }
-
-        return this.esService.getScenarioSetsDataForProject({ projectId });
-      },
-    );
+    return this.routeToBackend({
+      spanName: "SimulationService.getScenarioSetsDataForProject",
+      attributes: { "tenant.id": projectId },
+      projectId,
+      chFn: () => this.clickHouseService.getScenarioSetsData(projectId),
+      esFn: () =>
+        this.esService.getScenarioSetsDataForProject({ projectId }),
+    });
   }
 
   async getRunDataForScenarioSet({
@@ -75,67 +102,52 @@ export class SimulationService {
     nextCursor: string | undefined;
     hasMore: boolean;
   }> {
-    return tracer.withActiveSpan(
-      "SimulationService.getRunDataForScenarioSet",
-      {
-        attributes: {
-          "tenant.id": projectId,
-          "scenario.set.id": scenarioSetId,
-        },
+    return this.routeToBackend({
+      spanName: "SimulationService.getRunDataForScenarioSet",
+      attributes: {
+        "tenant.id": projectId,
+        "scenario.set.id": scenarioSetId,
       },
-      async (span) => {
-        const useClickHouse =
-          await this.clickHouseService.isClickHouseEnabled(projectId);
-        span.setAttribute(
-          "backend",
-          useClickHouse ? "clickhouse" : "elasticsearch",
+      projectId,
+      chFn: async () => {
+        const validatedLimit = Math.min(Math.max(1, limit), 100);
+
+        const paginationResult = this.requireResult(
+          await this.clickHouseService.getBatchRunIdsForScenarioSet({
+            projectId,
+            scenarioSetId,
+            limit: validatedLimit,
+            cursor,
+          }),
+          "getBatchRunIdsForScenarioSet",
         );
 
-        if (useClickHouse) {
-          const validatedLimit = Math.min(Math.max(1, limit), 100);
-
-          const paginationResult =
-            await this.clickHouseService.getBatchRunIdsForScenarioSet({
-              projectId,
-              scenarioSetId,
-              limit: validatedLimit,
-              cursor,
-            });
-          if (paginationResult === null) {
-            throw new Error(
-              "ClickHouse is enabled but returned null for getBatchRunIdsForScenarioSet — check ClickHouse client configuration",
-            );
-          }
-
-          if (paginationResult.batchRunIds.length === 0) {
-            return { runs: [], nextCursor: undefined, hasMore: false };
-          }
-
-          const runs = await this.clickHouseService.getRunDataForBatchIds({
-            projectId,
-            batchRunIds: paginationResult.batchRunIds,
-          });
-          if (runs === null) {
-            throw new Error(
-              "ClickHouse is enabled but returned null for getRunDataForBatchIds — check ClickHouse client configuration",
-            );
-          }
-
-          return {
-            runs,
-            nextCursor: paginationResult.nextCursor,
-            hasMore: paginationResult.hasMore,
-          };
+        if (paginationResult.batchRunIds.length === 0) {
+          return { runs: [], nextCursor: undefined, hasMore: false };
         }
 
-        return this.esService.getRunDataForScenarioSet({
+        const runs = this.requireResult(
+          await this.clickHouseService.getRunDataForBatchIds({
+            projectId,
+            batchRunIds: paginationResult.batchRunIds,
+          }),
+          "getRunDataForBatchIds",
+        );
+
+        return {
+          runs,
+          nextCursor: paginationResult.nextCursor,
+          hasMore: paginationResult.hasMore,
+        };
+      },
+      esFn: () =>
+        this.esService.getRunDataForScenarioSet({
           projectId,
           scenarioSetId,
           limit,
           cursor,
-        });
-      },
-    );
+        }),
+    });
   }
 
   async getAllRunDataForScenarioSet({
@@ -145,77 +157,64 @@ export class SimulationService {
     projectId: string;
     scenarioSetId: string;
   }): Promise<ScenarioRunData[]> {
-    return tracer.withActiveSpan(
-      "SimulationService.getAllRunDataForScenarioSet",
-      {
-        attributes: {
-          "tenant.id": projectId,
-          "scenario.set.id": scenarioSetId,
-        },
+    return this.routeToBackend({
+      spanName: "SimulationService.getAllRunDataForScenarioSet",
+      attributes: {
+        "tenant.id": projectId,
+        "scenario.set.id": scenarioSetId,
       },
-      async (span) => {
-        const useClickHouse =
-          await this.clickHouseService.isClickHouseEnabled(projectId);
-        span.setAttribute(
-          "backend",
-          useClickHouse ? "clickhouse" : "elasticsearch",
-        );
+      projectId,
+      chFn: async () => {
+        // Paginate through all batch run IDs, then fetch all runs
+        const allBatchRunIds: string[] = [];
+        let cursor: string | undefined = undefined;
+        const pageLimit = 100;
+        const maxPages = 200;
 
-        if (useClickHouse) {
-          // Paginate through all batch run IDs, then fetch all runs
-          const allBatchRunIds: string[] = [];
-          let cursor: string | undefined = undefined;
-          const pageLimit = 100;
-          const maxPages = 200;
+        for (let i = 0; i < maxPages; i++) {
+          const page: {
+            batchRunIds: string[];
+            nextCursor: string | undefined;
+            hasMore: boolean;
+          } = this.requireResult(
+            await this.clickHouseService.getBatchRunIdsForScenarioSet({
+              projectId,
+              scenarioSetId,
+              limit: pageLimit,
+              cursor,
+            }),
+            "getBatchRunIdsForScenarioSet",
+          );
 
-          for (let i = 0; i < maxPages; i++) {
-            const page =
-              await this.clickHouseService.getBatchRunIdsForScenarioSet({
-                projectId,
-                scenarioSetId,
-                limit: pageLimit,
-                cursor,
-              });
-            if (page === null) {
-              throw new Error(
-                "ClickHouse is enabled but returned null for getBatchRunIdsForScenarioSet — check ClickHouse client configuration",
-              );
-            }
+          if (page.batchRunIds.length === 0) break;
+          allBatchRunIds.push(...page.batchRunIds);
 
-            if (page.batchRunIds.length === 0) break;
-            allBatchRunIds.push(...page.batchRunIds);
-
-            if (!page.nextCursor || page.nextCursor === cursor) break;
-            if (i === maxPages - 1 && page.nextCursor) {
-              throw new Error(
-                `Too many runs to fetch exhaustively (cap ${maxPages * pageLimit}). ` +
-                  "Refine filters or use the paginated API.",
-              );
-            }
-            cursor = page.nextCursor;
-          }
-
-          if (allBatchRunIds.length === 0) return [];
-
-          const runs = await this.clickHouseService.getRunDataForBatchIds({
-            projectId,
-            batchRunIds: allBatchRunIds,
-          });
-          if (runs === null) {
+          if (!page.nextCursor || page.nextCursor === cursor) break;
+          if (i === maxPages - 1 && page.nextCursor) {
             throw new Error(
-              "ClickHouse is enabled but returned null for getRunDataForBatchIds — check ClickHouse client configuration",
+              `Too many runs to fetch exhaustively (cap ${maxPages * pageLimit}). ` +
+                "Refine filters or use the paginated API.",
             );
           }
-
-          return runs;
+          cursor = page.nextCursor;
         }
 
-        return this.esService.getAllRunDataForScenarioSet({
+        if (allBatchRunIds.length === 0) return [];
+
+        return this.requireResult(
+          await this.clickHouseService.getRunDataForBatchIds({
+            projectId,
+            batchRunIds: allBatchRunIds,
+          }),
+          "getRunDataForBatchIds",
+        );
+      },
+      esFn: () =>
+        this.esService.getAllRunDataForScenarioSet({
           projectId,
           scenarioSetId,
-        });
-      },
-    );
+        }),
+    });
   }
 
   async getRunDataForBatchRun({
@@ -227,46 +226,36 @@ export class SimulationService {
     scenarioSetId: string;
     batchRunId: string;
   }): Promise<ScenarioRunData[]> {
-    return tracer.withActiveSpan(
-      "SimulationService.getRunDataForBatchRun",
-      {
-        attributes: {
-          "tenant.id": projectId,
-          "scenario.set.id": scenarioSetId,
-          "batch.run.id": batchRunId,
-        },
+    return this.routeToBackend({
+      spanName: "SimulationService.getRunDataForBatchRun",
+      attributes: {
+        "tenant.id": projectId,
+        "scenario.set.id": scenarioSetId,
+        "batch.run.id": batchRunId,
       },
-      async (span) => {
-        const useClickHouse =
-          await this.clickHouseService.isClickHouseEnabled(projectId);
-        span.setAttribute(
-          "backend",
-          useClickHouse ? "clickhouse" : "elasticsearch",
-        );
-
-        if (useClickHouse) {
-          const result =
-            await this.clickHouseService.getRunDataForBatchRun({
-              projectId,
-              batchRunId,
-            });
-          if (result === null) {
-            throw new Error(
-              "ClickHouse is enabled but returned null for getRunDataForBatchRun — check ClickHouse client configuration",
-            );
-          }
-          return result;
-        }
-
-        return this.esService.getRunDataForBatchRun({
+      projectId,
+      chFn: () =>
+        this.clickHouseService.getRunDataForBatchRun({
+          projectId,
+          batchRunId,
+        }),
+      esFn: () =>
+        this.esService.getRunDataForBatchRun({
           projectId,
           scenarioSetId,
           batchRunId,
-        });
-      },
-    );
+        }),
+    });
   }
 
+  /**
+   * Fetch a single scenario run by its ID.
+   *
+   * Unlike other methods, this intentionally returns `null` (not throws) when
+   * the ClickHouse backend is enabled but the run is not found.
+   *
+   * @returns null when the run is not found
+   */
   async getScenarioRunData({
     projectId,
     scenarioRunId,
@@ -314,42 +303,24 @@ export class SimulationService {
     projectId: string;
     scenarioId: string;
   }): Promise<ScenarioRunData[] | null> {
-    return tracer.withActiveSpan(
-      "SimulationService.getScenarioRunDataByScenarioId",
-      {
-        attributes: {
-          "tenant.id": projectId,
-          "scenario.id": scenarioId,
-        },
+    return this.routeToBackend({
+      spanName: "SimulationService.getScenarioRunDataByScenarioId",
+      attributes: {
+        "tenant.id": projectId,
+        "scenario.id": scenarioId,
       },
-      async (span) => {
-        const useClickHouse =
-          await this.clickHouseService.isClickHouseEnabled(projectId);
-        span.setAttribute(
-          "backend",
-          useClickHouse ? "clickhouse" : "elasticsearch",
-        );
-
-        if (useClickHouse) {
-          const result =
-            await this.clickHouseService.getScenarioRunDataByScenarioId({
-              projectId,
-              scenarioId,
-            });
-          if (result === null) {
-            throw new Error(
-              "ClickHouse is enabled but returned null for getScenarioRunDataByScenarioId — check ClickHouse client configuration",
-            );
-          }
-          return result;
-        }
-
-        return this.esService.getScenarioRunDataByScenarioId({
+      projectId,
+      chFn: () =>
+        this.clickHouseService.getScenarioRunDataByScenarioId({
           projectId,
           scenarioId,
-        });
-      },
-    );
+        }),
+      esFn: () =>
+        this.esService.getScenarioRunDataByScenarioId({
+          projectId,
+          scenarioId,
+        }),
+    });
   }
 
   async getBatchRunCountForScenarioSet({
@@ -359,41 +330,23 @@ export class SimulationService {
     projectId: string;
     scenarioSetId: string;
   }): Promise<number> {
-    return tracer.withActiveSpan(
-      "SimulationService.getBatchRunCountForScenarioSet",
-      {
-        attributes: {
-          "tenant.id": projectId,
-          "scenario.set.id": scenarioSetId,
-        },
+    return this.routeToBackend({
+      spanName: "SimulationService.getBatchRunCountForScenarioSet",
+      attributes: {
+        "tenant.id": projectId,
+        "scenario.set.id": scenarioSetId,
       },
-      async (span) => {
-        const useClickHouse =
-          await this.clickHouseService.isClickHouseEnabled(projectId);
-        span.setAttribute(
-          "backend",
-          useClickHouse ? "clickhouse" : "elasticsearch",
-        );
-
-        if (useClickHouse) {
-          const result =
-            await this.clickHouseService.getBatchRunCountForScenarioSet({
-              projectId,
-              scenarioSetId,
-            });
-          if (result === null) {
-            throw new Error(
-              "ClickHouse is enabled but returned null for getBatchRunCountForScenarioSet — check ClickHouse client configuration",
-            );
-          }
-          return result;
-        }
-
-        return this.esService.getBatchRunCountForScenarioSet({
+      projectId,
+      chFn: () =>
+        this.clickHouseService.getBatchRunCountForScenarioSet({
           projectId,
           scenarioSetId,
-        });
-      },
-    );
+        }),
+      esFn: () =>
+        this.esService.getBatchRunCountForScenarioSet({
+          projectId,
+          scenarioSetId,
+        }),
+    });
   }
 }

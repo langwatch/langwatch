@@ -1,6 +1,14 @@
 import { z } from "zod";
 
 /**
+ * Schema for a single simulation message.
+ * Used by both commands and events for message snapshots.
+ */
+export const simulationMessageSchema = z.object({
+  trace_id: z.string().optional(),
+}).passthrough();
+
+/**
  * Simulation run status values.
  * Mirrors ScenarioRunStatus from the scenario-events API but avoids
  * importing from the [[...route]] directory which breaks Node module resolution.
