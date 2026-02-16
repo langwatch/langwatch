@@ -1,7 +1,9 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
+import { ClickHouseSimulationService } from "~/server/simulations/clickhouse-simulation.service";
+import { SimulationDispatcher } from "~/server/simulations/dispatch";
 import { createLogger } from "~/utils/logger/server";
-import { ScenarioRunStatus } from "./enums";
+import { ScenarioEventType, ScenarioRunStatus } from "./enums";
 import { ScenarioEventRepository } from "./scenario-event.repository";
 import type { ScenarioEvent, ScenarioRunData } from "./types";
 
@@ -20,24 +22,15 @@ export class ScenarioEventService {
   }
 
   /**
-   * Saves a scenario event to the repository.
-   * @param {Object} params - The parameters for saving the event
-   * @param {string} params.projectId - The ID of the project
-   * @param {string} params.type - The type of event
-   * @param {string} params.scenarioId - The ID of the scenario
-   * @param {string} params.scenarioRunId - The ID of the scenario run
-   * @param {Object} [params.metadata] - Additional metadata for the event
+   * Saves a scenario event to the repository and dual-writes to ClickHouse
+   * when the event-sourcing ingestion flag is enabled for the project.
    */
   async saveScenarioEvent({
     projectId,
     ...event
   }: {
     projectId: string;
-    type: string;
-    scenarioId: string;
-    scenarioRunId: string;
-    [key: string]: any;
-  }) {
+  } & ScenarioEvent) {
     return tracer.withActiveSpan(
       "ScenarioEventService.saveScenarioEvent",
       {
@@ -58,6 +51,27 @@ export class ScenarioEventService {
           projectId,
           ...(event as ScenarioEvent),
         });
+
+        // Dual-write to ClickHouse (feature-flagged, errors swallowed by dispatcher)
+        const dispatcher = SimulationDispatcher.create();
+        if (await dispatcher.isClickHouseEnabled(projectId)) {
+          const basePayload = {
+            tenantId: projectId,
+            scenarioRunId: event.scenarioRunId,
+            scenarioId: event.scenarioId,
+            batchRunId: event.batchRunId,
+            scenarioSetId: event.scenarioSetId ?? "default",
+            occurredAt: event.timestamp,
+          };
+
+          if (event.type === ScenarioEventType.RUN_STARTED) {
+            await dispatcher.startRun({ ...basePayload, metadata: event.metadata });
+          } else if (event.type === ScenarioEventType.MESSAGE_SNAPSHOT) {
+            await dispatcher.messageSnapshot({ ...basePayload, messages: event.messages });
+          } else if (event.type === ScenarioEventType.RUN_FINISHED) {
+            await dispatcher.finishRun({ ...basePayload, status: event.status, results: event.results });
+          }
+        }
       },
     );
   }
@@ -137,10 +151,8 @@ export class ScenarioEventService {
   }
 
   /**
-   * Deletes all events associated with a specific project.
-   * @param {Object} params - The parameters for deletion
-   * @param {string} params.projectId - The ID of the project
-   * @returns {Promise<void>}
+   * Deletes all events associated with a specific project from both
+   * Elasticsearch and ClickHouse (no-op when CH client unavailable).
    */
   async deleteAllEventsForProject({ projectId }: { projectId: string }) {
     return tracer.withActiveSpan(
@@ -153,9 +165,13 @@ export class ScenarioEventService {
       },
       async () => {
         logger.debug({ projectId }, "Deleting all events for project");
-        return await this.eventRepository.deleteAllEvents({
+        await this.eventRepository.deleteAllEvents({
           projectId,
         });
+
+        // Soft-delete from ClickHouse (no-op when client unavailable)
+        const chService = ClickHouseSimulationService.create();
+        await chService.softDeleteAllForProject(projectId);
       },
     );
   }
