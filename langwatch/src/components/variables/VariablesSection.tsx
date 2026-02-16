@@ -207,7 +207,7 @@ export const VariablesSection = ({
                 Add
               </Button>
             </Menu.Trigger>
-            <Menu.Content>
+            <Menu.Content portalled={false}>
               {INPUT_TYPE_OPTIONS.map((option) => (
                 <Menu.Item
                   key={option.value}
