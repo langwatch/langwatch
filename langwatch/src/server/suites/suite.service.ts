@@ -430,7 +430,7 @@ export class SuiteService {
               target: { type: target.type, referenceId: target.referenceId },
               setId,
               batchRunId,
-              trialIndex: repeat,
+              index: repeat,
             }),
           );
         }
