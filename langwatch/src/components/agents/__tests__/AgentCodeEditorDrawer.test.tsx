@@ -173,61 +173,64 @@ describe("AgentCodeEditorDrawer", () => {
     );
   };
 
-  describe("basic rendering", () => {
-    it("renders drawer when open", async () => {
+  describe("when opened standalone (no mapping sources)", () => {
+    it("renders the drawer with title and form fields", async () => {
       renderDrawer();
 
       await waitFor(() => {
         expect(screen.getByText("New Code Agent")).toBeInTheDocument();
+        expect(screen.getByTestId("code-editor")).toBeInTheDocument();
+        expect(screen.getByText("Inputs")).toBeInTheDocument();
+        expect(screen.getByText("Outputs")).toBeInTheDocument();
       });
     });
 
-    it("renders code editor", async () => {
+    it("displays default input and output variables", async () => {
       renderDrawer();
 
       await waitFor(() => {
-        expect(screen.getByTestId("code-editor")).toBeInTheDocument();
+        expect(screen.getByTestId("variable-name-input")).toBeInTheDocument();
+        expect(screen.getByTestId("output-name-output")).toBeInTheDocument();
       });
     });
-  });
 
-  describe("inputs section", () => {
-    it("renders Inputs title", async () => {
+    it("does not render value inputs for variables (regression: #1640)", async () => {
       renderDrawer();
 
       await waitFor(() => {
         expect(screen.getByText("Inputs")).toBeInTheDocument();
       });
+
+      // The "=" sign and value input should NOT appear when there are no mapping sources.
+      // Before the fix, a controlled input with no onChange was rendered, making it
+      // impossible to type.
+      const equalsSign = screen.queryByText("=");
+      expect(equalsSign).not.toBeInTheDocument();
     });
 
-    it("shows default input variable", async () => {
+    it("allows renaming an input variable", async () => {
+      const user = userEvent.setup();
       renderDrawer();
 
       await waitFor(() => {
-        expect(screen.getByText("input")).toBeInTheDocument();
+        expect(screen.getByTestId("variable-name-input")).toBeInTheDocument();
+      });
+
+      // Click the variable name to start editing
+      await user.click(screen.getByTestId("variable-name-input"));
+
+      const nameInput = screen.getByTestId("variable-name-input-input");
+      await user.clear(nameInput);
+      await user.type(nameInput, "query");
+      await user.keyboard("{Enter}");
+
+      await waitFor(() => {
+        expect(screen.getByTestId("variable-name-query")).toBeInTheDocument();
       });
     });
   });
 
-  describe("outputs section", () => {
-    it("renders Outputs title", async () => {
-      renderDrawer();
-
-      await waitFor(() => {
-        expect(screen.getByText("Outputs")).toBeInTheDocument();
-      });
-    });
-
-    it("shows default output variable", async () => {
-      renderDrawer();
-
-      await waitFor(() => {
-        expect(screen.getByText("output")).toBeInTheDocument();
-      });
-    });
-  });
-
-  describe("with Evaluations V3 mappings", () => {
+  describe("when opened with Evaluations V3 mapping sources", () => {
     const mockAvailableSources: AvailableSource[] = [
       {
         id: "dataset-1",
@@ -248,7 +251,7 @@ describe("AgentCodeEditorDrawer", () => {
       },
     };
 
-    it("shows mappings section when availableSources provided", async () => {
+    it("shows mapping UI with = sign and source tag", async () => {
       renderDrawer({
         availableSources: mockAvailableSources,
         inputMappings: mockMappings,
@@ -256,38 +259,57 @@ describe("AgentCodeEditorDrawer", () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText("Inputs")).toBeInTheDocument();
+        expect(screen.getByText("=")).toBeInTheDocument();
       });
 
-      // With available sources, mapping dropdowns should be rendered
-      // The exact content depends on the VariablesSection implementation
+      // The existing mapping should show as a tag
+      expect(screen.getByTestId("source-mapping-tag")).toBeInTheDocument();
     });
 
-    it("renders input variable with mapping capability", async () => {
+    it("calls onInputMappingsChange when a mapping is cleared", async () => {
+      const user = userEvent.setup();
+      const onMappingsChange = vi.fn();
+
       renderDrawer({
         availableSources: mockAvailableSources,
+        inputMappings: mockMappings,
+        onInputMappingsChange: onMappingsChange,
       });
 
       await waitFor(() => {
-        expect(screen.getByText("input")).toBeInTheDocument();
+        expect(screen.getByTestId("source-mapping-tag")).toBeInTheDocument();
       });
+
+      // Clear the mapping
+      await user.click(screen.getByTestId("clear-mapping-button"));
+
+      expect(onMappingsChange).toHaveBeenCalledWith("input", undefined);
     });
   });
 
   describe("save functionality", () => {
-    it("shows Create Agent button for new agent", async () => {
+    it("disables Create Agent button when name is empty", async () => {
       renderDrawer();
 
       await waitFor(() => {
-        expect(screen.getByText("Create Agent")).toBeInTheDocument();
+        const saveButton = screen.getByTestId("save-agent-button");
+        expect(saveButton).toBeDisabled();
       });
     });
 
-    it("shows New Code Agent title for new agent", async () => {
+    it("enables Create Agent button after entering a name", async () => {
+      const user = userEvent.setup();
       renderDrawer();
 
       await waitFor(() => {
-        expect(screen.getByText("New Code Agent")).toBeInTheDocument();
+        expect(screen.getByTestId("agent-name-input")).toBeInTheDocument();
+      });
+
+      await user.type(screen.getByTestId("agent-name-input"), "My Agent");
+
+      await waitFor(() => {
+        const saveButton = screen.getByTestId("save-agent-button");
+        expect(saveButton).not.toBeDisabled();
       });
     });
   });
