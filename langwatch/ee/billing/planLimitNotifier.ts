@@ -1,28 +1,14 @@
-import type { Organization, PrismaClient, User } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 import { env } from "../../src/env.mjs";
 import { prisma } from "../../src/server/db";
 import { captureException } from "../../src/utils/posthogErrorCapture";
+import { notifyPlanLimit } from "./notificationHandlers";
 import type {
   PlanLimitNotificationContext,
-  PlanLimitNotificationHandlers,
   PlanLimitNotifierInput,
 } from "./types";
 
 const DAYS_SINCE_LAST_ALERT = 30;
-
-type OrganizationWithAdmins = Organization & { members: { user: User }[] };
-
-let notificationHandlers: PlanLimitNotificationHandlers = {};
-
-export const setPlanLimitNotificationHandlers = (
-  handlers: PlanLimitNotificationHandlers,
-) => {
-  notificationHandlers = { ...notificationHandlers, ...handlers };
-};
-
-export const clearPlanLimitNotificationHandlers = () => {
-  notificationHandlers = {};
-};
 
 const updatePlanLimitMessages = async (
   db: PrismaClient,
@@ -76,13 +62,6 @@ export const createPlanLimitNotifier = (db: PrismaClient = prisma) => {
       captureException(error);
     }
 
-    if (
-      !notificationHandlers.sendSlackNotification &&
-      !notificationHandlers.sendHubspotNotification
-    ) {
-      return;
-    }
-
     const admin = organization.members[0]?.user;
 
     const context: PlanLimitNotificationContext = {
@@ -93,25 +72,6 @@ export const createPlanLimitNotifier = (db: PrismaClient = prisma) => {
       planName,
     };
 
-    const runHandler = async (
-      handler:
-        | ((context: PlanLimitNotificationContext) => Promise<void> | void)
-        | undefined,
-    ) => {
-      if (!handler) {
-        return;
-      }
-
-      try {
-        await handler(context);
-      } catch (error) {
-        captureException(error);
-      }
-    };
-
-    await Promise.all([
-      runHandler(notificationHandlers.sendSlackNotification),
-      runHandler(notificationHandlers.sendHubspotNotification),
-    ]);
+    await notifyPlanLimit(context);
   };
 };
