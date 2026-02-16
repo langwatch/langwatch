@@ -16,6 +16,9 @@ import { QueueWithFallback } from "../background/queues/queueWithFallback";
 import { connection } from "../redis";
 import { SCENARIO_QUEUE } from "./scenario.constants";
 import { processScenarioJob } from "./scenario.processor";
+import { buildScenarioJobId } from "./scenario.queue.jobId";
+
+export { buildScenarioJobId } from "./scenario.queue.jobId";
 
 const logger = createLogger("langwatch:scenarios:queue");
 
@@ -82,16 +85,22 @@ export function generateBatchRunId(): string {
 /**
  * Schedule a scenario for execution.
  *
- * @param params - Scenario execution parameters
+ * @param params - Scenario execution parameters (includes index for uniqueness)
  * @param options - Optional job configuration (delay, priority, etc.)
  */
 export async function scheduleScenarioRun(
-  params: ScenarioJob,
+  params: ScenarioJob & { index: number },
   options?: { delay?: number; priority?: number },
 ): Promise<Job<ScenarioJob, ScenarioJobResult, string>> {
-  const { projectId, scenarioId, batchRunId } = params;
+  const { projectId, scenarioId, batchRunId, target, index } = params;
 
-  const jobId = `scenario_${projectId}_${scenarioId}_${batchRunId}`;
+  const jobId = buildScenarioJobId({
+    projectId,
+    scenarioId,
+    targetReferenceId: target.referenceId,
+    batchRunId,
+    index,
+  });
 
   logger.info(
     { scenarioId, projectId, batchRunId, jobId },
