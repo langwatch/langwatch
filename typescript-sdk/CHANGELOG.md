@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.16.1](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.16.0...typescript-sdk@v0.16.1) (2026-02-16)
+
+
+### Bug Fixes
+
+* CLI sync now properly sends structured outputs to backend ([#1645](https://github.com/langwatch/langwatch/issues/1645)) ([9b57d7a](https://github.com/langwatch/langwatch/commit/9b57d7a9ffbc2d525261d3b509f12a1c01ccdda0))
+* use local monorepo path for evaluators types in SDK publish ([#1643](https://github.com/langwatch/langwatch/issues/1643)) ([60412ce](https://github.com/langwatch/langwatch/commit/60412ce8668d9ff4ea507c21e4c8e79d47b6fe01))
+* use local monorepo path for evaluators.generated.ts ([60412ce](https://github.com/langwatch/langwatch/commit/60412ce8668d9ff4ea507c21e4c8e79d47b6fe01))
+
 ## [0.16.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.15.0...typescript-sdk@v0.16.0) (2026-02-15)
 
 
