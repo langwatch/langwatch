@@ -13,6 +13,17 @@ dotenv.config({
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Poll a TCP port until it accepts connections.
+ *
+ * Each attempt has a 5-second socket timeout; on failure we wait 1 second
+ * before retrying. The overall deadline defaults to 30 seconds so the CI
+ * server has time to finish starting up.
+ *
+ * IMPORTANT: these helpers must not throw during normal startup delays.
+ * In vitest 3.2.4, a throwing globalSetup produces the misleading
+ * "No test files found" message instead of the real error.
+ */
 const waitForTcp = async (host: string, port: number, timeoutMs = 30_000) => {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -35,6 +46,15 @@ const waitForTcp = async (host: string, port: number, timeoutMs = 30_000) => {
   throw new Error(`Timeout waiting for TCP ${host}:${port} after ${timeoutMs}ms`);
 };
 
+/**
+ * Poll an HTTP endpoint until it returns a 2xx response.
+ *
+ * Each attempt has a 5-second fetch timeout; on failure (connection
+ * refused, non-2xx, timeout) we wait 2 seconds before retrying.
+ * The overall deadline defaults to 30 seconds.
+ *
+ * See waitForTcp for why these retries matter.
+ */
 const waitForHttp = async (url: string, timeoutMs = 30_000) => {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -48,7 +68,7 @@ const waitForHttp = async (url: string, timeoutMs = 30_000) => {
         clearTimeout(id);
       }
     } catch {
-      // retry
+      // Connection refused, aborted, or non-2xx — retry after a short delay.
     }
     await sleep(2_000);
   }
@@ -65,11 +85,9 @@ const ensureEnv = (key: string, fallback?: string) => {
 };
 
 const main = async () => {
-  // Ensure endpoint and API key
   const endpoint = ensureEnv("LANGWATCH_ENDPOINT", DEFAULT_ENDPOINT);
   ensureEnv("LANGWATCH_API_KEY");
 
-  // Ensure services are reachable
   console.log("Waiting for endpoint to be reachable:", endpoint);
   await waitForHttp(endpoint.replace(/\/$/, ""));
 
@@ -81,8 +99,10 @@ const main = async () => {
 };
 
 /**
- * Vitest globalSetup entry point.
- * This function is awaited before any tests run.
+ * Vitest globalSetup entry point — awaited before any test files run.
+ *
+ * Verifies that the LangWatch server and database are accepting
+ * connections so tests don't fail with cryptic network errors.
  */
 export default async function setup(): Promise<void> {
   await main();
