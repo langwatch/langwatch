@@ -199,39 +199,6 @@ jobs:
       - name: Build SDK
         run: pnpm run build
 
-      - name: Verify services are reachable
-        working-directory: langwatch
-        run: |
-          echo "--- OpenSearch ---"
-          curl -s http://127.0.0.1:9200/ || echo "FAILED to reach OpenSearch"
-          echo ""
-          echo "--- OpenSearch cluster health ---"
-          curl -s http://127.0.0.1:9200/_cluster/health || echo "FAILED"
-          echo ""
-          echo "--- LangWatch server ---"
-          curl -s http://127.0.0.1:5560/api/health || echo "FAILED to reach LangWatch"
-          echo ""
-          echo "--- Test trace API with Node.js ---"
-          node -e "
-            const http = require('http');
-            const req = http.get('http://127.0.0.1:9200/', (res) => {
-              let data = '';
-              res.on('data', d => data += d);
-              res.on('end', () => console.log('Node.js HTTP to 127.0.0.1:9200 OK:', data.substring(0, 100)));
-            });
-            req.on('error', (e) => console.error('Node.js HTTP to 127.0.0.1:9200 FAILED:', e.message));
-            req.end();
-          "
-          echo ""
-          echo "--- Test localhost resolution ---"
-          node -e "
-            const dns = require('dns');
-            dns.lookup('localhost', { all: true }, (err, addrs) => {
-              if (err) console.error('DNS lookup failed:', err);
-              else console.log('localhost resolves to:', JSON.stringify(addrs));
-            });
-          "
-
       - name: Run e2e tests
         if: github.actor != 'dependabot[bot]' || github.event_name == 'pull_request_target'
         env:
