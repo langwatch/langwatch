@@ -1,0 +1,528 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-02-16T15:06:38.043Z",
+  "mapping": {
+    "PRO": {
+      "test": "price_1P6bSyIMsTw08cudmzoqwBVN",
+      "live": "price_1P6fvzIMsTw08cudWCwqfEjq"
+    },
+    "GROWTH": {
+      "test": "price_1P6fbyIMsTw08cudKh5L8w8x",
+      "live": "price_1P6fw2IMsTw08cudFUkOX7jV"
+    },
+    "LAUNCH": {
+      "test": "price_1R9LHnIMsTw08cudoc9eO4L8",
+      "live": "price_1QRflaIMsTw08cudIMK1ai2x"
+    },
+    "LAUNCH_ANNUAL": {
+      "test": "price_1R9LIcIMsTw08cudk2QB7qfD",
+      "live": "price_1QRfmKIMsTw08cud2FNGkopZ"
+    },
+    "ACCELERATE": {
+      "test": "price_1R9LMvIMsTw08cudDvep2CIz",
+      "live": "price_1R9QlPIMsTw08cudEupEEivx"
+    },
+    "ACCELERATE_ANNUAL": {
+      "test": "price_1R9LNbIMsTw08cudIBv5n38r",
+      "live": "price_1R9QmNIMsTw08cudpk6UDhZg"
+    },
+    "LAUNCH_USERS": {
+      "test": "price_1QRby4IMsTw08cud0IDctQuX",
+      "live": "price_1QHNZ1IMsTw08cudbfSO8xOt"
+    },
+    "ACCELERATE_USERS": {
+      "test": "price_1R6nx1IMsTw08cudjSeT6Qoj",
+      "live": "price_1QeC8uIMsTw08cudqxcFMrCd"
+    },
+    "LAUNCH_TRACES_10K": {
+      "test": "price_1R6YYpIMsTw08cudI2IEMIkk",
+      "live": "price_1R55Y9IMsTw08cudoJBCK9Zq"
+    },
+    "ACCELERATE_TRACES_100K": {
+      "test": "price_1R6nttIMsTw08cudaPXCFRPc",
+      "live": "price_1R9R7CIMsTw08cudFKXaCUjK"
+    },
+    "LAUNCH_ANNUAL_TRACES_10K": {
+      "test": "price_1R9LLeIMsTw08cudK3be8XZ7",
+      "live": "price_1R9R1FIMsTw08cudjyrUQ2de"
+    },
+    "ACCELERATE_ANNUAL_TRACES_100K": {
+      "test": "price_1R9LAVIMsTw08cudVWx5aKLY",
+      "live": "price_1R9RAGIMsTw08cudG1qutTQi"
+    },
+    "LAUNCH_ANNUAL_USERS": {
+      "test": "price_1R9LJfIMsTw08cudLqdRyQX8",
+      "live": "price_1R9QseIMsTw08cudNuAgREET"
+    },
+    "ACCELERATE_ANNUAL_USERS": {
+      "test": "price_1R9LKfIMsTw08cudopZOEoto",
+      "live": "price_1R9QtYIMsTw08cud2pHVq7XK"
+    }
+  },
+  "prices": {
+    "price_1P6biaIMsTw08cud1XOOmKk7": {
+      "id": "price_1P6biaIMsTw08cud1XOOmKk7",
+      "active": true,
+      "livemode": false,
+      "product": "prod_PwURbUIVBuXVRq",
+      "unitAmount": null,
+      "currency": "eur",
+      "type": "recurring",
+      "recurring": {
+        "interval": "month",
+        "intervalCount": 1
+      },
+      "nickname": null,
+      "lookupKey": null,
+      "metadata": {}
+    },
+    "price_1P6bSyIMsTw08cudmzoqwBVN": {
+      "id": "price_1P6bSyIMsTw08cudmzoqwBVN",
+      "active": true,
+      "livemode": false,
+      "product": "prod_PwURbUIVBuXVRq",
+      "unitAmount": 9900,
+      "currency": "eur",
+      "type": "recurring",
+      "recurring": {
+        "interval": "month",
+        "intervalCount": 1
+      },
+      "nickname": null,
+      "lookupKey": "PRO",
+      "metadata": {}
+    },
+    "price_1P6fbyIMsTw08cudKh5L8w8x": {
+      "id": "price_1P6fbyIMsTw08cudKh5L8w8x",
+      "active": true,
+      "livemode": false,
+      "product": "prod_PwYjPJyrRryLuZ",
+      "unitAmount": 39900,
+      "currency": "eur",
+      "type": "recurring",
+      "recurring": {
+        "interval": "month",
+        "intervalCount": 1
+      },
+      "nickname": null,
+      "lookupKey": "GROWTH",
+      "metadata": {}
+    },
+    "price_1P6ffXIMsTw08cud20SxDMVg": {
+      "id": "price_1P6ffXIMsTw08cud20SxDMVg",
+      "active": true,
+      "livemode": false,
+      "product": "prod_PwYjPJyrRryLuZ",
+      "unitAmount": null,
+      "currency": "eur",
+      "type": "recurring",
+      "recurring": {
+        "interval": "month",
+        "intervalCount": 1
+      },
+      "nickname": null,
+      "lookupKey": null,
+      "metadata": {}
+    },
+    "price_1QISHaIMsTw08cud6mkt89rk": {
+      "id": "price_1QISHaIMsTw08cud6mkt89rk",
+      "active": true,
+      "livemode": false,
+      "product": "prod_RAntC2jdV2ukUu",
+      "unitAmount": 14900,
+      "currency": "eur",
+      "type": "recurring",
+      "recurring": {
+        "interval": "month",
+        "intervalCount": 1
+      },
+      "nickname": null,
+      "lookupKey": null,
+      "metadata": {}
+    },
+    "price_1QIt9lIMsTw08cudt4Kue39f": {
+      "id": "price_1QIt9lIMsTw08cudt4Kue39f",
+      "active": true,
+      "livemode": false,
+      "product": "prod_RBFfox7UwPJzC7",
+      "unitAmount": 49900,
+      "currency": "eur",
+      "type": "recurring",
+      "recurring": {
+        "interval": "month",
+        "intervalCount": 1
+      },
+      "nickname": null,
+      "lookupKey": null,
+      "metadata": {}
+    },
+    "price_1QIxuwIMsTw08cudjAK7BmNH": {
+      "id": "price_1QIxuwIMsTw08cudjAK7BmNH",
+      "active": true,
+      "livemode": false,
+      "product": "prod_RBFfox7UwPJzC7",
+      "unitAmount": 526900,
+      "currency": "eur",
+      "type": "recurring",
+      "recurring": {
+        "interval": "year",
+        "intervalCount": 1
+      },
+      "nickname": null,
+      "lookupKey": null,
+      "metadata": {}
+    },
+    "price_1QIxvQIMsTw08cudPTtDHuCa": {
+      "id": "price_1QIxvQIMsTw08cudPTtDHuCa",
+      "active": true,
+      "livemode": false,
+      "product": "prod_RAntC2jdV2ukUu",
+      "unitAmount": 164400,
+      "currency": "eur",
+      "type": "recurring",
+      "recurring": {
+        "interval": "year",
+        "intervalCount": 1
+      },
+      "nickname": null,
+      "lookupKey": null,
+      "metadata": {}
+    },
+    "price_1QRby4IMsTw08cud0IDctQuX": {
+      "id": "price_1QRby4IMsTw08cud0IDctQuX",
+      "active": true,
+      "livemode": false,
+      "product": "prod_RKGVfjsMHyiMVU",
+      "unitAmount": 1900,
+      "currency": "eur",
+      "type": "recurring",
+      "recurring": {
+        "interval": "month",
+        "intervalCount": 1
+      },
+      "nickname": null,
+      "lookupKey": "LAUNCH_USERS",
+      "metadata": {}
+    },
+    "price_1QRcy9IMsTw08cud2x0FMy2f": {
+      "id": "price_1QRcy9IMsTw08cud2x0FMy2f",
+      "active": false,
+      "livemode": false,
+      "product": "prod_RKHXdC3kbJa2fL",
+      "unitAmount": 5000,
+      "currency": "eur",
+      "type": "recurring",
+      "recurring": {
+        "interval": "month",
+        "intervalCount": 1
+      },
+      "nickname": null,
+      "lookupKey": null,
+      "metadata": {}
+    },
+    "price_1R6nttIMsTw08cudaPXCFRPc": {
+      "id": "price_1R6nttIMsTw08cudaPXCFRPc",
+      "active": true,
+      "livemode": false,
+      "product": "prod_RKHXdC3kbJa2fL",
+      "unitAmount": 2900,
+      "currency": "eur",
+      "type": "recurring",
+      "recurring": {
+        "interval": "month",
+        "intervalCount": 1
+      },
+      "nickname": null,
+      "lookupKey": "ACCELERATE_TRACES_100K",
+      "metadata": {}
+    },
+    "price_1R6nx1IMsTw08cudjSeT6Qoj": {
+      "id": "price_1R6nx1IMsTw08cudjSeT6Qoj",
+      "active": true,
+      "livemode": false,
+      "product": "prod_S0pcAGoNP7utLM",
+      "unitAmount": 1000,
+      "currency": "eur",
+      "type": "recurring",
+      "recurring": {
+        "interval": "month",
+        "intervalCount": 1
+      },
+      "nickname": null,
+      "lookupKey": "ACCELERATE_USERS",
+      "metadata": {}
+    },
+    "price_1R6oIFIMsTw08cudLaJQ2IFx": {
+      "id": "price_1R6oIFIMsTw08cudLaJQ2IFx",
+      "active": true,
+      "livemode": false,
+      "product": "prod_S0pyX72pOXxZH8",
+      "unitAmount": 3900,
+      "currency": "eur",
+      "type": "recurring",
+      "recurring": {
+        "interval": "month",
+        "intervalCount": 1
+      },
+      "nickname": null,
+      "lookupKey": null,
+      "metadata": {}
+    },
+    "price_1R6YYpIMsTw08cudI2IEMIkk": {
+      "id": "price_1R6YYpIMsTw08cudI2IEMIkk",
+      "active": true,
+      "livemode": false,
+      "product": "prod_S0ZiMo7Tpt7FzN",
+      "unitAmount": 500,
+      "currency": "eur",
+      "type": "recurring",
+      "recurring": {
+        "interval": "month",
+        "intervalCount": 1
+      },
+      "nickname": null,
+      "lookupKey": "LAUNCH_TRACES_10K",
+      "metadata": {}
+    },
+    "price_1R9L9JIMsTw08cuddDNKp74b": {
+      "id": "price_1R9L9JIMsTw08cuddDNKp74b",
+      "active": true,
+      "livemode": false,
+      "product": "prod_RKHXdC3kbJa2fL",
+      "unitAmount": 4500,
+      "currency": "eur",
+      "type": "recurring",
+      "recurring": {
+        "interval": "month",
+        "intervalCount": 1
+      },
+      "nickname": null,
+      "lookupKey": null,
+      "metadata": {}
+    },
+    "price_1R9LAVIMsTw08cudVWx5aKLY": {
+      "id": "price_1R9LAVIMsTw08cudVWx5aKLY",
+      "active": true,
+      "livemode": false,
+      "product": "prod_RKHXdC3kbJa2fL",
+      "unitAmount": 49900,
+      "currency": "eur",
+      "type": "recurring",
+      "recurring": {
+        "interval": "year",
+        "intervalCount": 1
+      },
+      "nickname": null,
+      "lookupKey": "ACCELERATE_ANNUAL_TRACES_100K",
+      "metadata": {}
+    },
+    "price_1R9LHnIMsTw08cudoc9eO4L8": {
+      "id": "price_1R9LHnIMsTw08cudoc9eO4L8",
+      "active": true,
+      "livemode": false,
+      "product": "prod_RAntC2jdV2ukUu",
+      "unitAmount": 5900,
+      "currency": "eur",
+      "type": "recurring",
+      "recurring": {
+        "interval": "month",
+        "intervalCount": 1
+      },
+      "nickname": null,
+      "lookupKey": "LAUNCH",
+      "metadata": {}
+    },
+    "price_1R9LIcIMsTw08cudk2QB7qfD": {
+      "id": "price_1R9LIcIMsTw08cudk2QB7qfD",
+      "active": true,
+      "livemode": false,
+      "product": "prod_RAntC2jdV2ukUu",
+      "unitAmount": 64900,
+      "currency": "eur",
+      "type": "recurring",
+      "recurring": {
+        "interval": "year",
+        "intervalCount": 1
+      },
+      "nickname": null,
+      "lookupKey": "LAUNCH_ANNUAL",
+      "metadata": {}
+    },
+    "price_1R9LJfIMsTw08cudLqdRyQX8": {
+      "id": "price_1R9LJfIMsTw08cudLqdRyQX8",
+      "active": true,
+      "livemode": false,
+      "product": "prod_RKGVfjsMHyiMVU",
+      "unitAmount": 21000,
+      "currency": "eur",
+      "type": "recurring",
+      "recurring": {
+        "interval": "year",
+        "intervalCount": 1
+      },
+      "nickname": null,
+      "lookupKey": "LAUNCH_ANNUAL_USERS",
+      "metadata": {}
+    },
+    "price_1R9LKfIMsTw08cudopZOEoto": {
+      "id": "price_1R9LKfIMsTw08cudopZOEoto",
+      "active": true,
+      "livemode": false,
+      "product": "prod_S0pcAGoNP7utLM",
+      "unitAmount": 11000,
+      "currency": "eur",
+      "type": "recurring",
+      "recurring": {
+        "interval": "year",
+        "intervalCount": 1
+      },
+      "nickname": null,
+      "lookupKey": "ACCELERATE_ANNUAL_USERS",
+      "metadata": {}
+    },
+    "price_1R9LLeIMsTw08cudK3be8XZ7": {
+      "id": "price_1R9LLeIMsTw08cudK3be8XZ7",
+      "active": true,
+      "livemode": false,
+      "product": "prod_S0ZiMo7Tpt7FzN",
+      "unitAmount": 5500,
+      "currency": "eur",
+      "type": "recurring",
+      "recurring": {
+        "interval": "year",
+        "intervalCount": 1
+      },
+      "nickname": null,
+      "lookupKey": "LAUNCH_ANNUAL_TRACES_10K",
+      "metadata": {}
+    },
+    "price_1R9LMvIMsTw08cudDvep2CIz": {
+      "id": "price_1R9LMvIMsTw08cudDvep2CIz",
+      "active": true,
+      "livemode": false,
+      "product": "prod_RBFfox7UwPJzC7",
+      "unitAmount": 19900,
+      "currency": "eur",
+      "type": "recurring",
+      "recurring": {
+        "interval": "month",
+        "intervalCount": 1
+      },
+      "nickname": null,
+      "lookupKey": "ACCELERATE",
+      "metadata": {}
+    },
+    "price_1R9LNbIMsTw08cudIBv5n38r": {
+      "id": "price_1R9LNbIMsTw08cudIBv5n38r",
+      "active": true,
+      "livemode": false,
+      "product": "prod_RBFfox7UwPJzC7",
+      "unitAmount": 219900,
+      "currency": "eur",
+      "type": "recurring",
+      "recurring": {
+        "interval": "year",
+        "intervalCount": 1
+      },
+      "nickname": null,
+      "lookupKey": "ACCELERATE_ANNUAL",
+      "metadata": {}
+    },
+    "price_1R9LPJIMsTw08cud22Rd0oYi": {
+      "id": "price_1R9LPJIMsTw08cud22Rd0oYi",
+      "active": true,
+      "livemode": false,
+      "product": "prod_S3SJGorELhb61u",
+      "unitAmount": 30000,
+      "currency": "eur",
+      "type": "recurring",
+      "recurring": {
+        "interval": "month",
+        "intervalCount": 1
+      },
+      "nickname": null,
+      "lookupKey": null,
+      "metadata": {}
+    },
+    "price_1R9LQ7IMsTw08cudcEoX88N9": {
+      "id": "price_1R9LQ7IMsTw08cudcEoX88N9",
+      "active": true,
+      "livemode": false,
+      "product": "prod_S3SJGorELhb61u",
+      "unitAmount": 330000,
+      "currency": "eur",
+      "type": "recurring",
+      "recurring": {
+        "interval": "year",
+        "intervalCount": 1
+      },
+      "nickname": null,
+      "lookupKey": null,
+      "metadata": {}
+    },
+    "price_1SyxCwIMsTw08cudPPOqniRl": {
+      "id": "price_1SyxCwIMsTw08cudPPOqniRl",
+      "active": true,
+      "livemode": false,
+      "product": "prod_Twquw4VLPAoYC1",
+      "unitAmount": 2900,
+      "currency": "eur",
+      "type": "recurring",
+      "recurring": {
+        "interval": "month",
+        "intervalCount": 1
+      },
+      "nickname": "Growth Seat Usage - EUR Monthly",
+      "lookupKey": null,
+      "metadata": {}
+    },
+    "price_1SzO35IMsTw08cudeQVCGzHQ": {
+      "id": "price_1SzO35IMsTw08cudeQVCGzHQ",
+      "active": true,
+      "livemode": false,
+      "product": "prod_Twquw4VLPAoYC1",
+      "unitAmount": 32000,
+      "currency": "eur",
+      "type": "recurring",
+      "recurring": {
+        "interval": "year",
+        "intervalCount": 1
+      },
+      "nickname": "Growth Seat Usage - EUR Annual",
+      "lookupKey": null,
+      "metadata": {}
+    },
+    "price_1SzP11IMsTw08cudRhGETYNa": {
+      "id": "price_1SzP11IMsTw08cudRhGETYNa",
+      "active": true,
+      "livemode": false,
+      "product": "prod_Twquw4VLPAoYC1",
+      "unitAmount": 3200,
+      "currency": "usd",
+      "type": "recurring",
+      "recurring": {
+        "interval": "month",
+        "intervalCount": 1
+      },
+      "nickname": "Growth Seat Usage - USD Monthly",
+      "lookupKey": null,
+      "metadata": {}
+    },
+    "price_1SzP12IMsTw08cudD89W6g0v": {
+      "id": "price_1SzP12IMsTw08cudD89W6g0v",
+      "active": true,
+      "livemode": false,
+      "product": "prod_Twquw4VLPAoYC1",
+      "unitAmount": 35400,
+      "currency": "usd",
+      "type": "recurring",
+      "recurring": {
+        "interval": "year",
+        "intervalCount": 1
+      },
+      "nickname": "Growth Seat Usage - USD Annual",
+      "lookupKey": null,
+      "metadata": {}
+    }
+  }
+}

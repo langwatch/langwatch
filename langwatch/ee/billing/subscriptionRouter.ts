@@ -5,6 +5,7 @@ import {
   createTRPCRouter,
   protectedProcedure,
 } from "../../src/server/api/trpc";
+import { notifySubscriptionEvent } from "./notificationHandlers";
 import {
   type PlanTypes as PlanType,
   SUBSCRIBABLE_PLANS,
