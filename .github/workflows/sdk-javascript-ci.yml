@@ -179,12 +179,18 @@ jobs:
         working-directory: langwatch
         run: pnpm elastic:migrate
 
-      # Start LangWatch server in background
+      # Build the app so we can run a production server (dev mode is
+      # unreliable in CI — turbopack JIT compilation can hang under
+      # memory pressure, causing the server to become unresponsive).
+      - name: Build LangWatch app
+        working-directory: langwatch
+        run: NODE_ENV=test pnpm build
+
       - name: Start LangWatch server
         working-directory: langwatch
         run: |
           START_WORKERS=true pnpm run start &
-          # Wait for server to be ready (check Next.js is responding)
+          # Wait for server to be ready
           timeout 60 bash -c 'until curl -f http://localhost:5560 2>/dev/null | grep -q "LangWatch\|<!DOCTYPE"; do sleep 2; done'
           echo "✅ LangWatch server is ready"
 
