@@ -11,43 +11,48 @@ dotenv.config({
   override: true,
 });
 
-const waitForTcp = (host: string, port: number, timeoutMs = 5_000) =>
-  new Promise<void>((resolve, reject) => {
-    const socket = net.connect({ host, port });
-    const onError = (err: Error) => {
-      cleanup();
-      reject(err);
-    };
-    const onReady = () => {
-      cleanup();
-      resolve();
-    };
-    const onTimeout = () => {
-      cleanup();
-      reject(new Error(`Timeout waiting for TCP ${host}:${port}`));
-    };
-    const cleanup = () => {
-      socket.off("error", onError);
-      socket.off("connect", onReady);
-      socket.setTimeout(0);
-      socket.destroy();
-    };
-    socket.on("error", onError);
-    socket.on("connect", onReady);
-    socket.setTimeout(timeoutMs, onTimeout);
-  });
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-const waitForHttp = async (url: string, timeoutMs = 5_000) => {
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, { signal: controller.signal });
-    if (!res.ok) {
-      throw new Error(`Health check failed: ${res.status} ${res.statusText}`);
+const waitForTcp = async (host: string, port: number, timeoutMs = 30_000) => {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const socket = net.connect({ host, port });
+        const cleanup = () => {
+          socket.removeAllListeners();
+          socket.destroy();
+        };
+        socket.on("connect", () => { cleanup(); resolve(); });
+        socket.on("error", (err) => { cleanup(); reject(err); });
+        socket.setTimeout(5_000, () => { cleanup(); reject(new Error("timeout")); });
+      });
+      return;
+    } catch {
+      await sleep(1_000);
     }
-  } finally {
-    clearTimeout(id);
   }
+  throw new Error(`Timeout waiting for TCP ${host}:${port} after ${timeoutMs}ms`);
+};
+
+const waitForHttp = async (url: string, timeoutMs = 30_000) => {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), 5_000);
+      try {
+        const res = await fetch(url, { signal: controller.signal });
+        if (res.ok) return;
+      } finally {
+        clearTimeout(id);
+      }
+    } catch {
+      // retry
+    }
+    await sleep(2_000);
+  }
+  throw new Error(`Timeout waiting for HTTP ${url} after ${timeoutMs}ms`);
 };
 
 const ensureEnv = (key: string, fallback?: string) => {
@@ -69,7 +74,10 @@ const main = async () => {
   await waitForHttp(endpoint.replace(/\/$/, ""));
 
   const dbUrl = new URL(process.env.DATABASE_URL ?? DEFAULT_DATABASE_URL);
+  console.log(`Waiting for database at ${dbUrl.hostname}:${dbUrl.port || 5432}...`);
   await waitForTcp(dbUrl.hostname, Number(dbUrl.port) || 5432);
+
+  console.log("All services reachable, starting tests.");
 };
 
 /**
