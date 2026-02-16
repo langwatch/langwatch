@@ -537,7 +537,6 @@ export function formValuesToTriggerSaveVersionParams(
     verbosity: llm.verbosity,
     promptingTechnique: formValues.version.configData.promptingTechnique,
     demonstrations: formValues.version.configData.demonstrations,
-    responseFormat: formValues.version.configData.responseFormat,
   };
 }
 

@@ -39,7 +39,7 @@ describe("pushPrompts", () => {
   });
 
   describe("when local config has response_format with schema", () => {
-    it("sends outputs with json_schema type and response_format to sync", async () => {
+    it("sends outputs with json_schema type (response_format derived server-side)", async () => {
       const responseSchema = {
         type: "object",
         properties: {
@@ -104,14 +104,8 @@ describe("pushPrompts", () => {
         },
       ]);
 
-      // Verify response_format is included
-      expect(syncCall.configData.response_format).toEqual({
-        type: "json_schema",
-        json_schema: {
-          name: "requirement_to_column_mapping",
-          schema: responseSchema,
-        },
-      });
+      // response_format should NOT be sent (server derives it from outputs)
+      expect(syncCall.configData.response_format).toBeUndefined();
     });
 
     it("uses response_format name as output identifier", async () => {
@@ -147,9 +141,6 @@ describe("pushPrompts", () => {
       expect(syncCall.configData.outputs[0].identifier).toBe(
         "custom_output_name"
       );
-      expect(syncCall.configData.response_format.json_schema.name).toBe(
-        "custom_output_name"
-      );
     });
 
     it("defaults to 'output' when response_format has no name", async () => {
@@ -182,14 +173,11 @@ describe("pushPrompts", () => {
 
       const syncCall = mockSync.mock.calls[0]![0];
       expect(syncCall.configData.outputs[0].identifier).toBe("output");
-      expect(syncCall.configData.response_format.json_schema.name).toBe(
-        "output"
-      );
     });
   });
 
   describe("when local config has no response_format", () => {
-    it("sends default str output and no response_format", async () => {
+    it("sends default str output", async () => {
       vi.mocked(FileManager.loadLocalPrompt).mockReturnValue({
         model: "openai/gpt-4o",
         modelParameters: { temperature: 0.7 },
@@ -230,7 +218,7 @@ describe("pushPrompts", () => {
   });
 
   describe("when response_format has no schema", () => {
-    it("falls back to default str output but still sends response_format", async () => {
+    it("falls back to default str output", async () => {
       vi.mocked(FileManager.loadLocalPrompt).mockReturnValue({
         model: "openai/gpt-4o",
         messages: [{ role: "system", content: "test" }],
@@ -263,14 +251,8 @@ describe("pushPrompts", () => {
         { identifier: "output", type: "str" },
       ]);
 
-      // response_format is still sent (with empty schema) since responseFormat object exists
-      expect(syncCall.configData.response_format).toEqual({
-        type: "json_schema",
-        json_schema: {
-          name: "my_format",
-          schema: {},
-        },
-      });
+      // No response_format sent
+      expect(syncCall.configData.response_format).toBeUndefined();
     });
   });
 });

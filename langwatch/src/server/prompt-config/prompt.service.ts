@@ -5,11 +5,12 @@ import type {
   PromptScope,
 } from "@prisma/client";
 import type { z } from "zod";
-import type {
-  inputsSchema,
-  messageSchema,
-  outputsSchema,
-  promptingTechniqueSchema,
+import {
+  deriveResponseFormatFromOutputs,
+  type inputsSchema,
+  type messageSchema,
+  type outputsSchema,
+  type promptingTechniqueSchema,
 } from "~/prompts/schemas/field-schemas";
 import { SchemaVersion } from "./enums";
 import { NotFoundError, SystemPromptConflictError } from "./errors";
@@ -248,7 +249,6 @@ export class PromptService {
     verbosity?: string;
     promptingTechnique?: z.infer<typeof promptingTechniqueSchema>;
     demonstrations?: LatestConfigVersionSchema["configData"]["demonstrations"];
-    responseFormat?: LatestConfigVersionSchema["configData"]["response_format"];
     commitMessage?: string | null;
   }): Promise<VersionedPrompt> {
     const organizationId =
@@ -266,8 +266,7 @@ export class PromptService {
         params.temperature !== undefined ||
         params.maxTokens !== undefined ||
         params.promptingTechnique !== undefined ||
-        params.demonstrations !== undefined ||
-        params.responseFormat !== undefined,
+        params.demonstrations !== undefined,
     );
 
     shouldCreateVersion &&
@@ -331,7 +330,6 @@ export class PromptService {
               verbosity: params.verbosity,
               promptingTechnique: params.promptingTechnique,
               demonstrations: params.demonstrations,
-              responseFormat: params.responseFormat,
             }) as LatestConfigVersionSchema["configData"],
             schemaVersion: LATEST_SCHEMA_VERSION,
             commitMessage: params.commitMessage ?? "Initial version",
@@ -678,7 +676,7 @@ export class PromptService {
       messages: existingPrompt.messages.filter((msg) => msg.role !== "system"),
       inputs: existingPrompt.inputs,
       outputs: existingPrompt.outputs,
-      response_format: existingPrompt.responseFormat,
+      // response_format is derived from outputs, not stored separately
     };
 
     // Case 2: Same version - check content
@@ -844,7 +842,7 @@ export class PromptService {
       ],
       inputs: configData.inputs,
       outputs: configData.outputs,
-      responseFormat: configData.response_format,
+      responseFormat: deriveResponseFormatFromOutputs(configData.outputs),
       authorId: config.latestVersion.authorId ?? null,
       author: config.latestVersion.author
         ? {

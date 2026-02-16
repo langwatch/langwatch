@@ -127,17 +127,7 @@ export const pushPrompts = async ({
           max_tokens: localConfig.modelParameters?.max_tokens,
           inputs: [{ identifier: "input", type: "str" }],
           outputs,
-          ...(responseFormat
-            ? {
-                response_format: {
-                  type: "json_schema" as const,
-                  json_schema: {
-                    name: responseFormat.name ?? "output",
-                    schema: responseFormat.schema ?? {},
-                  },
-                },
-              }
-            : {}),
+          // response_format is derived from outputs on the server side
         };
 
         const syncResult = await promptsApiService.sync({
