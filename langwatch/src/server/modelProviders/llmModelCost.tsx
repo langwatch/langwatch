@@ -30,7 +30,9 @@ const getImportedModelCosts = () => {
       const escapedModelName = escapeStringRegexp(modelName)
         .replaceAll("\\x2d", "-")
         // Fix for langchain using vertexai while litellm uses vertex_ai
-        .replace("vertex_ai", "(vertex_ai|vertexai)");
+        .replace("vertex_ai", "(vertex_ai|vertexai)")
+        // Allow version numbers to use either dots or hyphens (e.g., "4.6" or "4-6")
+        .replaceAll("\\.", "[.-]");
 
       const regex = hasVendorPrefix
         ? `^(${escapeStringRegexp(vendorPrefix!)}\\/)?${escapedModelName}$`
