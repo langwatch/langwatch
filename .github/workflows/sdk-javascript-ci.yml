@@ -80,15 +80,19 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      # LangWatch server config
+      # LangWatch server config (aligned with e2e-ci.yml)
       DATABASE_URL: "postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_test"
       BASE_HOST: "localhost:5560"
       NEXTAUTH_SECRET: "nextauth-secret-for-ci-testing"
       NEXTAUTH_URL: "http://localhost:5560"
       API_TOKEN_JWT_SECRET: "api-jwt-secret-for-ci-testing"
       ELASTICSEARCH_NODE_URL: "http://localhost:9200"
+      IS_OPENSEARCH: "true"
       REDIS_URL: "redis://localhost:6379"
       NODE_ENV: "test"
+      SKIP_ENV_VALIDATION: "true"
+      DISABLE_PII_REDACTION: "true"
+      SKIP_CLICKHOUSE_MIGRATE: "true"
 
     services:
       redis:
@@ -101,19 +105,22 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
-      elasticsearch:
-        image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+      opensearch:
+        image: langwatch/opensearch-lite:latest
         ports:
           - 9200:9200
         env:
           discovery.type: single-node
-          xpack.security.enabled: false
-          ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+          DISABLE_SECURITY_PLUGIN: "true"
+          OPENSEARCH_JAVA_OPTS: "-Xms256m -Xmx256m"
+          cluster.routing.allocation.disk.threshold_enabled: "false"
+          bootstrap.memory_lock: "false"
+          node.store.allow_mmap: "false"
         options: >-
-          --health-cmd "curl -f http://localhost:9200/_cluster/health || exit 1"
+          --health-cmd "curl -s http://localhost:9200 || exit 1"
           --health-interval 30s
-          --health-timeout 10s
-          --health-retries 5
+          --health-timeout 30s
+          --health-retries 3
 
       postgres:
         image: postgres:16
@@ -175,7 +182,7 @@ jobs:
         working-directory: langwatch
         run: pnpm prisma:seed
 
-      - name: Setup Elasticsearch
+      - name: Setup OpenSearch
         working-directory: langwatch
         run: pnpm elastic:migrate
 
