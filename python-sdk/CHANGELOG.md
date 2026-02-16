@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.13.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.12.0...python-sdk@v0.13.0) (2026-02-15)
+
+
+### Features
+
+* add POST /api/evaluators to create evaluators via REST API ([#1574](https://github.com/langwatch/langwatch/issues/1574)) ([3084655](https://github.com/langwatch/langwatch/commit/308465566db22345663ba78135338ad587e8d84d))
+* full Liquid template support with autocomplete ([#1583](https://github.com/langwatch/langwatch/issues/1583)) ([00863a7](https://github.com/langwatch/langwatch/commit/00863a7643c8f6af48582bf82512fd37391902a7))
+
 ## [0.12.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.11.0...python-sdk@v0.12.0) (2026-02-13)
 
 
