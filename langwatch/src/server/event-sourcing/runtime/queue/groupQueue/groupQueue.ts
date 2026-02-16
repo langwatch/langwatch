@@ -182,7 +182,6 @@ export class GroupQueueProcessorBullMq<
     // BullMQ Queue for job persistence
     const queueOptions: QueueOptions = {
       connection: this.redisConnection,
-      telemetry: new BullMQOtel(this.queueName),
       defaultJobOptions: {
         attempts: JOB_RETRY_CONFIG.maxAttempts,
         backoff: {
