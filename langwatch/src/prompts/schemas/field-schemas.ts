@@ -96,7 +96,7 @@ export const responseFormatSchema = z.object({
   json_schema: z
     .object({
       name: z.string(),
-      schema: z.object({}),
+      schema: z.object({}).passthrough(),
     })
     .nullable(),
 });

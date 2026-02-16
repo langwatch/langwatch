@@ -101,6 +101,19 @@ export const pushPrompts = async ({
 
         const currentVersion = lock.prompts[promptName]?.version;
 
+        // Build outputs based on response_format if present
+        const responseFormat = (localConfig as any).response_format;
+        let outputs: ConfigData["outputs"] = [{ identifier: "output", type: "str" }];
+        if (responseFormat?.schema) {
+          outputs = [
+            {
+              identifier: responseFormat.name ?? "output",
+              type: "json_schema",
+              json_schema: responseFormat.schema,
+            },
+          ];
+        }
+
         const configData: ConfigData = {
           model: localConfig.model,
           prompt: PromptConverter.extractSystemPrompt(localConfig.messages),
@@ -113,7 +126,18 @@ export const pushPrompts = async ({
           temperature: localConfig.modelParameters?.temperature,
           max_tokens: localConfig.modelParameters?.max_tokens,
           inputs: [{ identifier: "input", type: "str" }],
-          outputs: [{ identifier: "output", type: "str" }],
+          outputs,
+          ...(responseFormat
+            ? {
+                response_format: {
+                  type: "json_schema" as const,
+                  json_schema: {
+                    name: responseFormat.name ?? "output",
+                    schema: responseFormat.schema ?? {},
+                  },
+                },
+              }
+            : {}),
         };
 
         const syncResult = await promptsApiService.sync({
