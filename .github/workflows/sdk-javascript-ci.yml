@@ -90,23 +90,13 @@ jobs:
       API_TOKEN_JWT_SECRET: "api-jwt-secret-for-ci-testing"
       ELASTICSEARCH_NODE_URL: "http://127.0.0.1:9200"
       IS_OPENSEARCH: "true"
-      REDIS_URL: "redis://localhost:6379"
       NODE_ENV: "test"
       SKIP_ENV_VALIDATION: "true"
       DISABLE_PII_REDACTION: "true"
       SKIP_CLICKHOUSE_MIGRATE: "true"
+      SKIP_REDIS: "true"
 
     services:
-      redis:
-        image: redis:alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
       opensearch:
         image: langwatch/opensearch-lite:latest
         ports:
@@ -114,7 +104,7 @@ jobs:
         env:
           discovery.type: single-node
           DISABLE_SECURITY_PLUGIN: "true"
-          OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+          OPENSEARCH_JAVA_OPTS: "-Xms256m -Xmx256m"
           cluster.routing.allocation.disk.threshold_enabled: "false"
           bootstrap.memory_lock: "false"
           node.store.allow_mmap: "false"
@@ -198,7 +188,7 @@ jobs:
       - name: Start LangWatch server
         working-directory: langwatch
         run: |
-          NODE_ENV=production START_WORKERS=true pnpm run start &
+          NODE_ENV=production pnpm run start &
           # Wait for server to be ready
           timeout 60 bash -c 'until curl -f http://localhost:5560 2>/dev/null | grep -q "LangWatch\|<!DOCTYPE"; do sleep 2; done'
           echo "✅ LangWatch server is ready"
