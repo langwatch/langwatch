@@ -57,10 +57,7 @@ export class SimulationDispatcher {
   async startRun(payload: StartRunCommandData): Promise<void> {
     try {
       const pipeline = this.getPipeline();
-      await pipeline.commands.startRun.send({
-        ...payload,
-        occurredAt: payload.occurredAt,
-      });
+      await pipeline.commands.startRun.send(payload);
     } catch (error) {
       logger.warn(
         { error, scenarioRunId: payload.scenarioRunId },
@@ -72,10 +69,7 @@ export class SimulationDispatcher {
   async messageSnapshot(payload: MessageSnapshotCommandData): Promise<void> {
     try {
       const pipeline = this.getPipeline();
-      await pipeline.commands.messageSnapshot.send({
-        ...payload,
-        occurredAt: payload.occurredAt,
-      });
+      await pipeline.commands.messageSnapshot.send(payload);
     } catch (error) {
       logger.warn(
         { error, scenarioRunId: payload.scenarioRunId },
@@ -87,10 +81,7 @@ export class SimulationDispatcher {
   async finishRun(payload: FinishRunCommandData): Promise<void> {
     try {
       const pipeline = this.getPipeline();
-      await pipeline.commands.finishRun.send({
-        ...payload,
-        occurredAt: payload.occurredAt,
-      });
+      await pipeline.commands.finishRun.send(payload);
     } catch (error) {
       logger.warn(
         { error, scenarioRunId: payload.scenarioRunId },
@@ -102,10 +93,7 @@ export class SimulationDispatcher {
   async deleteRun(payload: DeleteRunCommandData): Promise<void> {
     try {
       const pipeline = this.getPipeline();
-      await pipeline.commands.deleteRun.send({
-        ...payload,
-        occurredAt: payload.occurredAt,
-      });
+      await pipeline.commands.deleteRun.send(payload);
     } catch (error) {
       logger.warn(
         { error, scenarioRunId: payload.scenarioRunId },

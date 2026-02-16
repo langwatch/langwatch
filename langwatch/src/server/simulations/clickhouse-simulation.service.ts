@@ -4,13 +4,20 @@ import { getLangWatchTracer } from "langwatch";
 import { getClickHouseClient } from "~/server/clickhouse/client";
 import { prisma as defaultPrisma } from "~/server/db";
 import { createLogger } from "~/utils/logger/server";
-import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/types";
-import type { ScenarioSetData } from "~/app/api/scenario-events/[[...route]]/types";
+import type { ScenarioRunData, ScenarioSetData } from "~/app/api/scenario-events/[[...route]]/types";
 import type { ClickHouseSimulationRunRow } from "./simulation-run.mappers";
 import { mapClickHouseRowToScenarioRunData } from "./simulation-run.mappers";
 
 const logger = createLogger("langwatch:simulations:clickhouse-service");
 const tracer = getLangWatchTracer("langwatch.simulations.clickhouse-service");
+
+const SIMULATION_RUN_SELECT_COLUMNS = `
+  ScenarioRunId, ScenarioId, BatchRunId, ScenarioSetId,
+  Status, Name, Description, Messages,
+  Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
+  DurationMs,
+  toUnixTimestamp64Milli(CreatedAt) AS CreatedAt
+` as const;
 
 /**
  * Service for fetching simulation run data from ClickHouse.
@@ -128,12 +135,7 @@ export class ClickHouseSimulationService {
         try {
           const result = await this.clickHouseClient.query({
             query: `
-              SELECT
-                ScenarioRunId, ScenarioId, BatchRunId, ScenarioSetId,
-                Status, Name, Description, Messages,
-                Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
-                DurationMs,
-                toUnixTimestamp64Milli(CreatedAt) AS CreatedAt
+              SELECT ${SIMULATION_RUN_SELECT_COLUMNS}
               FROM simulation_runs FINAL
               WHERE TenantId = {tenantId:String}
                 AND BatchRunId = {batchRunId:String}
@@ -178,12 +180,7 @@ export class ClickHouseSimulationService {
         try {
           const result = await this.clickHouseClient.query({
             query: `
-              SELECT
-                ScenarioRunId, ScenarioId, BatchRunId, ScenarioSetId,
-                Status, Name, Description, Messages,
-                Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
-                DurationMs,
-                toUnixTimestamp64Milli(CreatedAt) AS CreatedAt
+              SELECT ${SIMULATION_RUN_SELECT_COLUMNS}
               FROM simulation_runs FINAL
               WHERE TenantId = {tenantId:String}
                 AND ScenarioRunId = {scenarioRunId:String}
@@ -231,12 +228,7 @@ export class ClickHouseSimulationService {
         try {
           const result = await this.clickHouseClient.query({
             query: `
-              SELECT
-                ScenarioRunId, ScenarioId, BatchRunId, ScenarioSetId,
-                Status, Name, Description, Messages,
-                Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
-                DurationMs,
-                toUnixTimestamp64Milli(CreatedAt) AS CreatedAt
+              SELECT ${SIMULATION_RUN_SELECT_COLUMNS}
               FROM simulation_runs FINAL
               WHERE TenantId = {tenantId:String}
                 AND ScenarioId = {scenarioId:String}
@@ -287,7 +279,8 @@ export class ClickHouseSimulationService {
       async () => {
         if (!this.clickHouseClient) return null;
 
-        const offset = cursor ? Number(cursor) : 0;
+        const parsed = cursor ? Number(cursor) : 0;
+        const offset = Number.isNaN(parsed) ? 0 : parsed;
 
         try {
           const result = await this.clickHouseClient.query({
@@ -441,12 +434,7 @@ export class ClickHouseSimulationService {
         try {
           const result = await this.clickHouseClient.query({
             query: `
-              SELECT
-                ScenarioRunId, ScenarioId, BatchRunId, ScenarioSetId,
-                Status, Name, Description, Messages,
-                Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
-                DurationMs,
-                toUnixTimestamp64Milli(CreatedAt) AS CreatedAt
+              SELECT ${SIMULATION_RUN_SELECT_COLUMNS}
               FROM simulation_runs FINAL
               WHERE TenantId = {tenantId:String}
                 AND BatchRunId IN ({batchRunIds:Array(String)})

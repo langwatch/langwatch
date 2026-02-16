@@ -80,7 +80,7 @@ app.post(
       ...event,
     });
 
-    // Dual-write to ClickHouse (fire-and-forget, feature-flagged)
+    // Dual-write to ClickHouse (errors swallowed by dispatcher, feature-flagged)
     const dispatcher = SimulationDispatcher.create();
     if (await dispatcher.isClickHouseEnabled(project.id)) {
       const basePayload = {

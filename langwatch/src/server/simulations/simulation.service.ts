@@ -102,6 +102,8 @@ export class SimulationService {
     nextCursor: string | undefined;
     hasMore: boolean;
   }> {
+    const validatedLimit = Math.min(Math.max(1, limit), 100);
+
     return this.routeToBackend({
       spanName: "SimulationService.getRunDataForScenarioSet",
       attributes: {
@@ -110,8 +112,6 @@ export class SimulationService {
       },
       projectId,
       chFn: async () => {
-        const validatedLimit = Math.min(Math.max(1, limit), 100);
-
         const paginationResult = this.requireResult(
           await this.clickHouseService.getBatchRunIdsForScenarioSet({
             projectId,
@@ -144,7 +144,7 @@ export class SimulationService {
         this.esService.getRunDataForScenarioSet({
           projectId,
           scenarioSetId,
-          limit,
+          limit: validatedLimit,
           cursor,
         }),
     });
@@ -303,24 +303,35 @@ export class SimulationService {
     projectId: string;
     scenarioId: string;
   }): Promise<ScenarioRunData[] | null> {
-    return this.routeToBackend({
-      spanName: "SimulationService.getScenarioRunDataByScenarioId",
-      attributes: {
-        "tenant.id": projectId,
-        "scenario.id": scenarioId,
+    return tracer.withActiveSpan(
+      "SimulationService.getScenarioRunDataByScenarioId",
+      {
+        attributes: {
+          "tenant.id": projectId,
+          "scenario.id": scenarioId,
+        },
       },
-      projectId,
-      chFn: () =>
-        this.clickHouseService.getScenarioRunDataByScenarioId({
+      async (span) => {
+        const useClickHouse =
+          await this.clickHouseService.isClickHouseEnabled(projectId);
+        span.setAttribute(
+          "backend",
+          useClickHouse ? "clickhouse" : "elasticsearch",
+        );
+
+        if (useClickHouse) {
+          return this.clickHouseService.getScenarioRunDataByScenarioId({
+            projectId,
+            scenarioId,
+          });
+        }
+
+        return this.esService.getScenarioRunDataByScenarioId({
           projectId,
           scenarioId,
-        }),
-      esFn: () =>
-        this.esService.getScenarioRunDataByScenarioId({
-          projectId,
-          scenarioId,
-        }),
-    });
+        });
+      },
+    );
   }
 
   async getBatchRunCountForScenarioSet({
