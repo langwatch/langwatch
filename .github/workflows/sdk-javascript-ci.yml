@@ -7,11 +7,13 @@ on:
   pull_request:
     paths:
       - "typescript-sdk/**"
+      - ".github/workflows/sdk-javascript-ci.yml"
       - ".github/.release-please-manifest.json"
   pull_request_target:
     types: [labeled]
     paths:
       - "typescript-sdk/**"
+      - ".github/workflows/sdk-javascript-ci.yml"
       - ".github/.release-please-manifest.json"
   workflow_dispatch:
 
