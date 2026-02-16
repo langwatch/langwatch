@@ -189,7 +189,7 @@ jobs:
       - name: Start LangWatch server
         working-directory: langwatch
         run: |
-          START_WORKERS=true pnpm run start &
+          NODE_ENV=production START_WORKERS=true pnpm run start &
           # Wait for server to be ready
           timeout 60 bash -c 'until curl -f http://localhost:5560 2>/dev/null | grep -q "LangWatch\|<!DOCTYPE"; do sleep 2; done'
           echo "✅ LangWatch server is ready"
