@@ -2,6 +2,7 @@ import { Box, Button, Grid, HStack } from "@chakra-ui/react";
 import type React from "react";
 import { createContext, useContext, useLayoutEffect, useState } from "react";
 import { ZoomIn, ZoomOut } from "react-feather";
+import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/types";
 import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
 import { useZoom } from "~/hooks/useZoom";
 import { SimulationChatViewer } from "./SimulationChatViewer";
@@ -64,10 +65,10 @@ function Controls({ showScale = true }: ControlsProps) {
 
 // Grid component that renders the scaled simulation grid
 interface GridProps {
-  scenarioRunIds: string[];
+  runs: ScenarioRunData[];
 }
 
-function GridComponent({ scenarioRunIds }: GridProps) {
+function GridComponent({ runs }: GridProps) {
   const { scale, containerRef } = useZoomContext();
   const { goToSimulationRun, scenarioSetId, batchRunId } =
     useSimulationRouter();
@@ -153,20 +154,20 @@ function GridComponent({ scenarioRunIds }: GridProps) {
           height: `${100 / scale}%`,
         }}
       >
-        {scenarioRunIds?.map((scenarioRunId) => (
+        {runs.map((run) => (
           <Box
-            key={scenarioRunId}
+            key={run.scenarioRunId}
             width="full"
             height="400px"
             cursor="pointer"
-            onClick={() => handleExpandToggle(scenarioRunId)}
+            onClick={() => handleExpandToggle(run.scenarioRunId)}
             overflow="auto"
             style={{
               minWidth: 0,
               minHeight: 0,
             }}
           >
-            <SimulationChatViewer scenarioRunId={scenarioRunId} />
+            <SimulationChatViewer data={run} />
           </Box>
         ))}
       </Grid>

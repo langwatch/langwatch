@@ -34,11 +34,6 @@ export default function SimulationSetPage() {
     });
   }, [scenarioSetData]);
 
-  const scenarioRunIds = useMemo(
-    () => sortedScenarioSetData?.map((scenario) => scenario.scenarioRunId),
-    [sortedScenarioSetData],
-  );
-
   useEffect(() => {
     if (!scenarioSetId) return;
     if (!batchRunId) {
@@ -63,8 +58,8 @@ export default function SimulationSetPage() {
             <Box mb={4}>
               <SimulationZoomGrid.Controls />
             </Box>
-            {scenarioRunIds && scenarioRunIds.length > 0 && (
-              <SimulationZoomGrid.Grid scenarioRunIds={scenarioRunIds} />
+            {sortedScenarioSetData.length > 0 && (
+              <SimulationZoomGrid.Grid runs={sortedScenarioSetData} />
             )}
           </Box>
         </SimulationZoomGrid.Root>
