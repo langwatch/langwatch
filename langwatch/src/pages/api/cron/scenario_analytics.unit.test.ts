@@ -39,13 +39,13 @@ beforeAll(() => {
   process.env.CRON_API_KEY = "test-cron-api-key";
 });
 
-describe("Scenario Analytics Cron Job - Unit Tests", () => {
+describe("handler()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   describe("getYesterdayDateRange", () => {
-    it("should calculate yesterday's date range correctly", async () => {
+    it("calculates yesterday's date range correctly", async () => {
       // Mock the current date to a known value for testing
       const mockDate = new Date("2024-01-15T12:00:00Z");
       vi.useFakeTimers();
@@ -117,7 +117,7 @@ describe("Scenario Analytics Cron Job - Unit Tests", () => {
   });
 
   describe("getHitCount", () => {
-    it("should extract hit count from Elasticsearch response", async () => {
+    it("extracts hit count from Elasticsearch response", async () => {
       const mockProjects = [{ id: "test-project-1" }];
       const mockEsClient = {
         msearch: vi.fn().mockResolvedValue({
@@ -162,7 +162,7 @@ describe("Scenario Analytics Cron Job - Unit Tests", () => {
       expect(responseData.analyticsCreated).toBe(4); // All 4 event types should be created
     });
 
-    it("should handle missing hits in response", async () => {
+    it("handles missing hits in response", async () => {
       const mockProjects = [{ id: "test-project-1" }];
       const mockEsClient = {
         msearch: vi.fn().mockResolvedValue({
@@ -209,7 +209,7 @@ describe("Scenario Analytics Cron Job - Unit Tests", () => {
   });
 
   describe("filterExistingAnalytics", () => {
-    it("should filter out existing analytics", async () => {
+    it("filters out existing analytics", async () => {
       const mockProjects = [{ id: "test-project-1" }];
       const mockEsClient = {
         msearch: vi.fn().mockResolvedValue({
@@ -290,7 +290,7 @@ describe("Scenario Analytics Cron Job - Unit Tests", () => {
   });
 
   describe("Error Handling", () => {
-    it("should handle database errors", async () => {
+    it("handles database errors", async () => {
       (prisma.project.findMany as any).mockRejectedValue(
         new Error("Database connection failed"),
       );
@@ -310,7 +310,7 @@ describe("Scenario Analytics Cron Job - Unit Tests", () => {
       expect(responseData.error).toBe("Failed to process scenario analytics");
     });
 
-    it("should handle Elasticsearch errors", async () => {
+    it("handles Elasticsearch errors", async () => {
       const mockProjects = [{ id: "test-project-1" }];
       const mockEsClient = {
         msearch: vi
@@ -338,7 +338,7 @@ describe("Scenario Analytics Cron Job - Unit Tests", () => {
       expect(responseData.error).toBe("Failed to process scenario analytics");
     });
 
-    it("should handle analytics creation errors", async () => {
+    it("handles analytics creation errors", async () => {
       const mockProjects = [{ id: "test-project-1" }];
       const mockEsClient = {
         msearch: vi.fn().mockResolvedValue({
@@ -388,7 +388,7 @@ describe("Scenario Analytics Cron Job - Unit Tests", () => {
   });
 
   describe("Multiple Projects", () => {
-    it("should process multiple projects correctly", async () => {
+    it("processes multiple projects correctly", async () => {
       const mockProjects = [{ id: "test-project-1" }, { id: "test-project-2" }];
 
       const mockEsClient = {
