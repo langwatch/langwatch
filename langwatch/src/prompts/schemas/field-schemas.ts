@@ -112,6 +112,28 @@ export const modelNameSchema = z.string();
 export const schemaVersionSchema = z.nativeEnum(SchemaVersion);
 
 /**
+ * Derives response_format from the outputs array.
+ * This is the single source of truth: if an output has type "json_schema",
+ * we construct the OpenAI-compatible response_format from it.
+ */
+export function deriveResponseFormatFromOutputs(
+  outputs: z.infer<typeof outputsSchema>[],
+): z.infer<typeof responseFormatSchema> | undefined {
+  const jsonSchemaOutput = outputs.find(
+    (o) => o.type === "json_schema" && o.json_schema,
+  );
+  if (!jsonSchemaOutput?.json_schema) return undefined;
+
+  return {
+    type: "json_schema",
+    json_schema: {
+      name: jsonSchemaOutput.identifier,
+      schema: jsonSchemaOutput.json_schema,
+    },
+  };
+}
+
+/**
  * Extended runtime input schema including a value for execution time.
  * Single Responsibility: Add value-carrying variant of inputs for runtime usage.
  */

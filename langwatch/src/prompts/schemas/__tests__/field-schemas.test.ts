@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { responseFormatSchema, outputsSchema } from "../field-schemas";
+import {
+  responseFormatSchema,
+  outputsSchema,
+  deriveResponseFormatFromOutputs,
+} from "../field-schemas";
 
 describe("responseFormatSchema", () => {
   describe("when json_schema contains a full schema with properties", () => {
@@ -144,5 +148,75 @@ describe("outputsSchema", () => {
       expect(result.type).toBe("str");
       expect(result.json_schema).toBeUndefined();
     });
+  });
+});
+
+describe("deriveResponseFormatFromOutputs", () => {
+  it("derives response_format from output with json_schema type", () => {
+    const outputs = [
+      {
+        identifier: "mapping_result",
+        type: "json_schema" as const,
+        json_schema: {
+          type: "object",
+          properties: {
+            items: { type: "array", items: { type: "string" } },
+          },
+          required: ["items"],
+          additionalProperties: false,
+        },
+      },
+    ];
+
+    const result = deriveResponseFormatFromOutputs(outputs);
+
+    expect(result).toEqual({
+      type: "json_schema",
+      json_schema: {
+        name: "mapping_result",
+        schema: outputs[0]!.json_schema,
+      },
+    });
+  });
+
+  it("returns undefined when no output has json_schema type", () => {
+    const outputs = [
+      { identifier: "output", type: "str" as const },
+    ];
+
+    const result = deriveResponseFormatFromOutputs(outputs);
+    expect(result).toBeUndefined();
+  });
+
+  it("returns undefined when json_schema output has no json_schema field", () => {
+    const outputs = [
+      { identifier: "output", type: "json_schema" as const },
+    ];
+
+    const result = deriveResponseFormatFromOutputs(outputs);
+    expect(result).toBeUndefined();
+  });
+
+  it("uses the first json_schema output when multiple exist", () => {
+    const outputs = [
+      {
+        identifier: "first_output",
+        type: "json_schema" as const,
+        json_schema: { type: "object", properties: { a: { type: "string" } } },
+      },
+      {
+        identifier: "second_output",
+        type: "json_schema" as const,
+        json_schema: { type: "object", properties: { b: { type: "number" } } },
+      },
+    ];
+
+    const result = deriveResponseFormatFromOutputs(outputs);
+    expect(result!.json_schema!.name).toBe("first_output");
+  });
+
+  it("returns undefined for empty outputs array", () => {
+    const result = deriveResponseFormatFromOutputs([]);
+    expect(result).toBeUndefined();
   });
 });
