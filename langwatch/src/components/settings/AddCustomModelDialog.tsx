@@ -6,7 +6,8 @@ import {
   VStack,
   Wrap,
 } from "@chakra-ui/react";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
+import { titleCase } from "../../utils/stringCasing";
 import type { CustomModelEntry, SupportedParameter, MultimodalInput } from "../../server/modelProviders/customModel.schema";
 import { customModelEntrySchema, multimodalInputValues } from "../../server/modelProviders/customModel.schema";
 import {
@@ -64,6 +65,22 @@ export function AddCustomModelDialog({
   const [supportedParameters, setSupportedParameters] = useState<SupportedParameter[]>([...DEFAULT_PARAMETERS]);
   const [multimodalInputs, setMultimodalInputs] = useState<MultimodalInput[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const displayNameTouched = useRef(false);
+
+  const deriveDisplayName = (id: string) =>
+    titleCase(id.replace(/[-_]/g, " ").trim());
+
+  const handleModelIdChange = useCallback((value: string) => {
+    setModelId(value);
+    if (!displayNameTouched.current) {
+      setDisplayName(deriveDisplayName(value));
+    }
+  }, []);
+
+  const handleDisplayNameChange = useCallback((value: string) => {
+    displayNameTouched.current = true;
+    setDisplayName(value);
+  }, []);
 
   const resetForm = useCallback(() => {
     setModelId("");
@@ -72,6 +89,7 @@ export function AddCustomModelDialog({
     setSupportedParameters([...DEFAULT_PARAMETERS]);
     setMultimodalInputs([]);
     setErrors({});
+    displayNameTouched.current = false;
   }, []);
 
   const handleClose = useCallback(() => {
@@ -154,7 +172,7 @@ export function AddCustomModelDialog({
               <Input
                 placeholder="e.g. gpt-5-custom"
                 value={modelId}
-                onChange={(e) => setModelId(e.target.value)}
+                onChange={(e) => handleModelIdChange(e.target.value)}
                 aria-label="Model ID"
               />
               {errors.modelId && (
@@ -167,7 +185,7 @@ export function AddCustomModelDialog({
               <Input
                 placeholder="e.g. GPT-5 Custom"
                 value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
+                onChange={(e) => handleDisplayNameChange(e.target.value)}
                 aria-label="Display Name"
               />
               {errors.displayName && (
