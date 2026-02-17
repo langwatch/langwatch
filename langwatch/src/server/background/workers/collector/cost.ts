@@ -131,7 +131,7 @@ async function countTokens(
   if (!text) return 0;
 
   const model = llmModelCost.model.includes("/")
-    ? llmModelCost.model.split("/")[1]!
+    ? llmModelCost.model.substring(llmModelCost.model.indexOf("/") + 1)
     : llmModelCost.model;
 
   const tiktoken = await initTikToken(model);
