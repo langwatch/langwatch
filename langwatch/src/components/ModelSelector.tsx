@@ -53,7 +53,6 @@ export type ModelOptionGroup = {
   provider: string;
   icon: React.ReactNode;
   models: ModelOption[];
-  isCustom?: boolean;
 };
 
 export type GroupedModelOptions = ModelOptionGroup[];
@@ -103,21 +102,9 @@ export const useModelSelectionOptions = (
     };
   });
 
-  // Group models by provider, with custom models in a separate group at the top
-  const customOptions = selectOptions.filter((o) => o.isCustom);
-  const registryOptions = selectOptions.filter((o) => !o.isCustom);
-
-  const customGroup: GroupedModelOptions = customOptions.length > 0
-    ? [{
-        provider: "Custom Models",
-        icon: undefined as unknown as React.ReactNode,
-        models: customOptions,
-        isCustom: true,
-      }]
-    : [];
-
-  const registryGroups: GroupedModelOptions = Object.entries(
-    registryOptions.reduce(
+  // Group models by provider, with custom models at the top of each group
+  const groupedByProvider: GroupedModelOptions = Object.entries(
+    selectOptions.reduce(
       (acc, option) => {
         const provider = option.value.split("/")[0]!;
         if (!acc[provider]) {
@@ -131,13 +118,12 @@ export const useModelSelectionOptions = (
   ).map(([provider, models]) => ({
     provider,
     icon: modelProviderIcons[provider as keyof typeof modelProviderIcons],
-    models,
+    // Custom models first, then registry models
+    models: [
+      ...models.filter((m) => m.isCustom),
+      ...models.filter((m) => !m.isCustom),
+    ],
   }));
-
-  const groupedByProvider: GroupedModelOptions = [
-    ...customGroup,
-    ...registryGroups,
-  ];
 
   const modelOption = selectOptions.find((opt) => opt.value === model);
 
@@ -281,41 +267,57 @@ export const ModelSelector = React.memo(function ModelSelector({
             </InputGroup>
           </Box>
         </Field.Root>
-        {filteredGroups.map((group, groupIndex) => (
-          <React.Fragment key={group.provider}>
+        {filteredGroups.map((group) => {
+          const hasCustom = group.models.some((m) => m.isCustom);
+          const hasRegistry = group.models.some((m) => !m.isCustom);
+
+          return (
             <Select.ItemGroup
+              key={group.provider}
               label={
-                group.isCustom ? undefined : (
-                  <HStack gap={2} paddingX={2}>
-                    <Text fontWeight="medium">{titleCase(group.provider)}</Text>
-                  </HStack>
-                )
+                <HStack gap={2} paddingX={2}>
+                  <Text fontWeight="medium">{titleCase(group.provider)}</Text>
+                </HStack>
               }
             >
-              {group.models.map((item) => (
-                <Select.Item key={item.value} item={item}>
-                  <HStack gap={2}>
-                    {item.icon && (
-                      <Box width={MODEL_ICON_SIZE} minWidth={MODEL_ICON_SIZE}>
-                        {item.icon}
-                      </Box>
+              {group.models.map((item, itemIndex) => {
+                // Add a subtle divider between custom and registry models
+                const prevItem = group.models[itemIndex - 1];
+                const showDivider =
+                  hasCustom && hasRegistry && !item.isCustom && prevItem?.isCustom;
+
+                return (
+                  <React.Fragment key={item.value}>
+                    {showDivider && (
+                      <Box
+                        borderBottom="1px solid"
+                        borderColor="blackAlpha.100"
+                        marginX={2}
+                        marginY={1}
+                      />
                     )}
-                    <Box
-                      fontSize={size === "sm" ? 12 : 14}
-                      fontFamily="mono"
-                      paddingY={size === "sm" ? 0 : "2px"}
-                    >
-                      {item.label}
-                    </Box>
-                  </HStack>
-                </Select.Item>
-              ))}
+                    <Select.Item item={item}>
+                      <HStack gap={2}>
+                        {item.icon && (
+                          <Box width={MODEL_ICON_SIZE} minWidth={MODEL_ICON_SIZE}>
+                            {item.icon}
+                          </Box>
+                        )}
+                        <Box
+                          fontSize={size === "sm" ? 12 : 14}
+                          fontFamily="mono"
+                          paddingY={size === "sm" ? 0 : "2px"}
+                        >
+                          {item.label}
+                        </Box>
+                      </HStack>
+                    </Select.Item>
+                  </React.Fragment>
+                );
+              })}
             </Select.ItemGroup>
-            {group.isCustom && groupIndex < filteredGroups.length - 1 && (
-              <Box borderBottom="1px solid" borderColor="border" />
-            )}
-          </React.Fragment>
-        ))}
+          );
+        })}
         {showConfigureAction && (
           <Box
             position="sticky"
