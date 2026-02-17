@@ -9,10 +9,15 @@ import { createLogger } from "../../src/utils/logger";
 import { notifySubscriptionEvent } from "./notificationHandlers";
 import {
   type PlanTypes as PlanType,
+  PlanTypes,
   SUBSCRIBABLE_PLANS,
 } from "./planTypes";
 import type { CustomerService } from "./services/customerService";
 import type { SubscriptionService } from "./services/subscriptionService";
+
+const logger = createLogger("langwatch:billing:subscriptionRouter");
+
+const maskCustomerId = (id: string) => `${id.slice(0, 7)}...${id.slice(-4)}`;
 
 const logger = createLogger("langwatch:billing:subscriptionRouter");
 

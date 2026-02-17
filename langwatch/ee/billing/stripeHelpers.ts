@@ -1,7 +1,7 @@
 import Stripe from "stripe";
 import { PLAN_LIMITS } from "./planLimits";
 import { PlanTypes, type PlanTypes as PlanType } from "./planTypes";
-import { prices } from "./stripePriceCatalog";
+import { isStripePriceName, prices } from "./stripePriceCatalog";
 
 export { prices };
 
@@ -58,15 +58,24 @@ const hasConfigForPlan = (plan: PlanType): plan is AddOnPlan =>
 const getPlanConfig = (plan: PlanType) =>
   hasConfigForPlan(plan) ? STRIPE_PLAN_CONFIG[plan] : undefined;
 
-const getBasePrice = (plan: PlanType) =>
-  prices[plan as keyof typeof prices];
+const getBasePrice = (plan: PlanType): string | undefined => {
+  if (hasConfigForPlan(plan)) {
+    return prices[STRIPE_PLAN_CONFIG[plan].basePriceKey];
+  }
+  return isStripePriceName(plan) ? prices[plan] : undefined;
+};
 
-export const getItemsToUpdate = (
-  currentItems: Stripe.SubscriptionItem[],
-  plan: PlanType,
-  tracesToAdd: number,
-  membersToAdd: number,
-): UpdateItem[] => {
+export const getItemsToUpdate = ({
+  currentItems,
+  plan,
+  tracesToAdd,
+  membersToAdd,
+}: {
+  currentItems: Stripe.SubscriptionItem[];
+  plan: PlanType;
+  tracesToAdd: number;
+  membersToAdd: number;
+}): UpdateItem[] => {
   const planConfig = getPlanConfig(plan);
   const itemsToUpdate: UpdateItem[] = [];
 
@@ -83,7 +92,7 @@ export const getItemsToUpdate = (
     ]);
 
     const keepItems = currentItems.filter((item) => {
-      return keepPriceIds.has(item.plan.id);
+      return keepPriceIds.has(item.price.id);
     });
 
     deleteItems = currentItems.filter((item) => {
@@ -91,18 +100,22 @@ export const getItemsToUpdate = (
     });
 
     tracesItem = keepItems.find(
-      (item) => item.plan.id === prices[planConfig.tracesPriceKey],
+      (item) => item.price.id === prices[planConfig.tracesPriceKey],
     );
     userItem = keepItems.find(
-      (item) => item.plan.id === prices[planConfig.userPriceKey],
+      (item) => item.price.id === prices[planConfig.userPriceKey],
     );
     planItem = keepItems.find(
-      (item) => item.plan.id === prices[planConfig.basePriceKey],
+      (item) => item.price.id === prices[planConfig.basePriceKey],
     );
   }
 
-  const totalTraces = Math.max(0, tracesToAdd - PLAN_LIMITS[plan].maxMessagesPerMonth);
-  const totalMembers = Math.max(0, membersToAdd - PLAN_LIMITS[plan].maxMembers);
+  const planLimits = PLAN_LIMITS[plan];
+  if (!planLimits) {
+    return [];
+  }
+  const totalTraces = Math.max(0, tracesToAdd - planLimits.maxMessagesPerMonth);
+  const totalMembers = Math.max(0, membersToAdd - planLimits.maxMembers);
 
   if (tracesItem && planConfig) {
     itemsToUpdate.push({
@@ -119,7 +132,7 @@ export const getItemsToUpdate = (
     }
   }
 
-  if (userItem && totalMembers > 0) {
+  if (userItem) {
     itemsToUpdate.push({
       id: userItem.id,
       quantity: totalMembers,
@@ -137,10 +150,13 @@ export const getItemsToUpdate = (
       quantity: 1,
     });
   } else {
-    itemsToUpdate.push({
-      price: getBasePrice(plan),
-      quantity: 1,
-    });
+    const basePrice = getBasePrice(plan);
+    if (basePrice) {
+      itemsToUpdate.push({
+        price: basePrice,
+        quantity: 1,
+      });
+    }
   }
 
   if (deleteItems.length > 0) {
@@ -161,11 +177,15 @@ export const getItemsToUpdate = (
   return itemsToUpdate;
 };
 
-export const calculateQuantityForPrice = (
-  priceId: string,
-  quantity: number,
-  plan: string | undefined,
-) => {
+export const calculateQuantityForPrice = ({
+  priceId,
+  quantity,
+  plan,
+}: {
+  priceId: string;
+  quantity: number;
+  plan: string | undefined;
+}) => {
   const planLimits = plan ? PLAN_LIMITS[plan as PlanType] : undefined;
   const config = Object.values(STRIPE_PLAN_CONFIG).find((planConfig) => {
     return (
@@ -193,11 +213,16 @@ export const createItemsToAdd = (
   const planConfig = getPlanConfig(planType);
   const itemsToAdd: UpdateItem[] = [];
 
+  const planLimits = PLAN_LIMITS[planType];
+  if (!planLimits) {
+    return [];
+  }
+
   const totalTraces = Math.max(
     0,
-    traces.quantity - PLAN_LIMITS[planType].maxMessagesPerMonth,
+    traces.quantity - planLimits.maxMessagesPerMonth,
   );
-  const totalMembers = Math.max(0, users.quantity - PLAN_LIMITS[planType].maxMembers);
+  const totalMembers = Math.max(0, users.quantity - planLimits.maxMembers);
 
   if (!planConfig) {
     return itemsToAdd;
