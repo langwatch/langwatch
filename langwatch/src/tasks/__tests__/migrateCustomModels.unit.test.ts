@@ -84,12 +84,9 @@ describe("migrateCustomModelsRow()", () => {
           modelId: "ft:gpt-4o:my-org:custom:abc123",
           displayName: "ft:gpt-4o:my-org:custom:abc123",
           mode: "chat",
-          maxTokens: null,
+          maxTokens: 8192,
           supportedParameters: [
             "temperature",
-            "top_p",
-            "frequency_penalty",
-            "presence_penalty",
           ],
         },
       ]);
@@ -174,12 +171,9 @@ describe("migrateCustomModelsRow()", () => {
           modelId: "my-custom-chat-model",
           displayName: "my-custom-chat-model",
           mode: "chat",
-          maxTokens: null,
+          maxTokens: 8192,
           supportedParameters: [
             "temperature",
-            "top_p",
-            "frequency_penalty",
-            "presence_penalty",
           ],
         },
       ]);

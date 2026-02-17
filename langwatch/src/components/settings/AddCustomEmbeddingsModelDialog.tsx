@@ -70,7 +70,7 @@ export function AddCustomEmbeddingsModelDialog({
   }, [modelId, displayName, onSubmit, onClose, resetForm]);
 
   return (
-    <DialogRoot open={open} onOpenChange={(e) => !e.open && handleClose()} closeOnInteractOutside={false}>
+    <DialogRoot open={open} onOpenChange={(e) => !e.open && handleClose()}>
       <DialogContent positionerProps={{ zIndex: 1502 }}>
         <DialogHeader>
           <DialogTitle>Add Embeddings Model</DialogTitle>

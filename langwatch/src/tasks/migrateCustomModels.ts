@@ -47,16 +47,13 @@ type MigrationResult = {
 // ============================================================================
 
 const CHAT_DEFAULTS = {
-  supportedParameters: [
-    "temperature",
-    "top_p",
-    "frequency_penalty",
-    "presence_penalty",
-  ],
+  supportedParameters: ["temperature"],
+  maxTokens: 8192,
 } as const;
 
 const EMBEDDING_DEFAULTS = {
-  supportedParameters: [],
+  supportedParameters: [] as string[],
+  maxTokens: null,
 } as const;
 
 // ============================================================================
@@ -79,7 +76,7 @@ function convertStringToEntry({
     modelId,
     displayName: modelId,
     mode,
-    maxTokens: null,
+    maxTokens: defaults.maxTokens,
     supportedParameters: [...defaults.supportedParameters] as CustomModelEntry["supportedParameters"],
   };
 }

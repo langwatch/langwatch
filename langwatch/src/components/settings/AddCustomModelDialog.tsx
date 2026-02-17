@@ -8,7 +8,7 @@ import {
 } from "@chakra-ui/react";
 import { useCallback, useState } from "react";
 import type { CustomModelEntry, SupportedParameter, MultimodalInput } from "../../server/modelProviders/customModel.schema";
-import { customModelEntrySchema, supportedParameterValues, multimodalInputValues } from "../../server/modelProviders/customModel.schema";
+import { customModelEntrySchema, multimodalInputValues } from "../../server/modelProviders/customModel.schema";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -21,19 +21,20 @@ import {
 import { Checkbox } from "../ui/checkbox";
 import { SmallLabel } from "../SmallLabel";
 
-const PARAMETER_LABELS: Record<SupportedParameter, string> = {
-  temperature: "Temperature",
-  max_tokens: "Max Tokens",
-  top_p: "Top P",
-  frequency_penalty: "Frequency Penalty",
-  presence_penalty: "Presence Penalty",
-  top_k: "Top K",
-  min_p: "Min P",
-  repetition_penalty: "Repetition Penalty",
-  seed: "Seed",
-  reasoning: "Reasoning",
-  verbosity: "Verbosity",
-};
+/**
+ * Parameters shown in the dialog — only the ones we actually
+ * render in LLMConfigPopover. Max tokens is handled separately
+ * at the form level.
+ */
+const DIALOG_PARAMETERS: { value: SupportedParameter; label: string }[] = [
+  { value: "temperature", label: "Temperature" },
+  { value: "top_p", label: "Top P" },
+  { value: "top_k", label: "Top K" },
+  { value: "reasoning", label: "Reasoning" },
+];
+
+const DEFAULT_PARAMETERS: SupportedParameter[] = ["temperature"];
+const DEFAULT_MAX_TOKENS = 8192;
 
 const MULTIMODAL_LABELS: Record<MultimodalInput, string> = {
   image: "Images",
@@ -48,8 +49,8 @@ type AddCustomModelDialogProps = {
 };
 
 /**
- * Dialog for adding a custom chat model with full metadata configuration.
- * Includes fields for Model ID, Display Name, Max Tokens, supported parameters,
+ * Dialog for adding a custom chat model with metadata configuration.
+ * Includes fields for Model ID, Display Name, supported parameters,
  * and multimodal input types.
  */
 export function AddCustomModelDialog({
@@ -59,16 +60,14 @@ export function AddCustomModelDialog({
 }: AddCustomModelDialogProps) {
   const [modelId, setModelId] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [maxTokens, setMaxTokens] = useState("");
-  const [supportedParameters, setSupportedParameters] = useState<SupportedParameter[]>([]);
+  const [supportedParameters, setSupportedParameters] = useState<SupportedParameter[]>([...DEFAULT_PARAMETERS]);
   const [multimodalInputs, setMultimodalInputs] = useState<MultimodalInput[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const resetForm = useCallback(() => {
     setModelId("");
     setDisplayName("");
-    setMaxTokens("");
-    setSupportedParameters([]);
+    setSupportedParameters([...DEFAULT_PARAMETERS]);
     setMultimodalInputs([]);
     setErrors({});
   }, []);
@@ -95,18 +94,11 @@ export function AddCustomModelDialog({
   }, []);
 
   const handleSubmit = useCallback(() => {
-    const parsedMaxTokens = maxTokens.trim()
-      ? Number(maxTokens.trim())
-      : null;
-
     const entry: CustomModelEntry = {
       modelId: modelId.trim(),
       displayName: displayName.trim(),
       mode: "chat",
-      maxTokens:
-        parsedMaxTokens !== null && !isNaN(parsedMaxTokens)
-          ? parsedMaxTokens
-          : null,
+      maxTokens: DEFAULT_MAX_TOKENS,
       supportedParameters:
         supportedParameters.length > 0 ? supportedParameters : undefined,
       multimodalInputs:
@@ -132,7 +124,6 @@ export function AddCustomModelDialog({
   }, [
     modelId,
     displayName,
-    maxTokens,
     supportedParameters,
     multimodalInputs,
     onSubmit,
@@ -145,7 +136,6 @@ export function AddCustomModelDialog({
       open={open}
       onOpenChange={(e) => !e.open && handleClose()}
       size="lg"
-      closeOnInteractOutside={false}
     >
       <DialogContent positionerProps={{ zIndex: 1502 }}>
         <DialogHeader>
@@ -181,30 +171,16 @@ export function AddCustomModelDialog({
             </VStack>
 
             <VStack gap={1} align="stretch">
-              <SmallLabel>Max Tokens</SmallLabel>
-              <Input
-                type="number"
-                placeholder="e.g. 4096"
-                value={maxTokens}
-                onChange={(e) => setMaxTokens(e.target.value)}
-                aria-label="Max Tokens"
-              />
-              {errors.maxTokens && (
-                <SmallLabel color="red.500">{errors.maxTokens}</SmallLabel>
-              )}
-            </VStack>
-
-            <VStack gap={1} align="stretch">
               <SmallLabel>Supported Parameters</SmallLabel>
               <Wrap gap={3}>
-                {supportedParameterValues.map((param) => (
+                {DIALOG_PARAMETERS.map((param) => (
                   <Checkbox
-                    key={param}
-                    checked={supportedParameters.includes(param)}
-                    onCheckedChange={() => toggleParameter(param)}
+                    key={param.value}
+                    checked={supportedParameters.includes(param.value)}
+                    onCheckedChange={() => toggleParameter(param.value)}
                     size="sm"
                   >
-                    <Text fontSize="sm">{PARAMETER_LABELS[param]}</Text>
+                    <Text fontSize="sm">{param.label}</Text>
                   </Checkbox>
                 ))}
               </Wrap>

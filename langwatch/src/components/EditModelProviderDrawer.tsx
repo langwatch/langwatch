@@ -47,7 +47,15 @@ export const EditModelProviderDrawer = (
           closeDrawer();
         }
       }}
-      onInteractOutside={closeDrawer}
+      onInteractOutside={(e) => {
+        const target = (e as unknown as { originalEvent?: { target?: Element } })
+          .originalEvent?.target;
+        if (target instanceof Element && target.closest("[data-scope='dialog']")) {
+          e.preventDefault();
+          return;
+        }
+        closeDrawer();
+      }}
     >
       <Drawer.Content>
         <Drawer.Header>
