@@ -60,6 +60,7 @@ export function AddCustomModelDialog({
 }: AddCustomModelDialogProps) {
   const [modelId, setModelId] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [maxTokens, setMaxTokens] = useState(String(DEFAULT_MAX_TOKENS));
   const [supportedParameters, setSupportedParameters] = useState<SupportedParameter[]>([...DEFAULT_PARAMETERS]);
   const [multimodalInputs, setMultimodalInputs] = useState<MultimodalInput[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -67,6 +68,7 @@ export function AddCustomModelDialog({
   const resetForm = useCallback(() => {
     setModelId("");
     setDisplayName("");
+    setMaxTokens(String(DEFAULT_MAX_TOKENS));
     setSupportedParameters([...DEFAULT_PARAMETERS]);
     setMultimodalInputs([]);
     setErrors({});
@@ -94,11 +96,13 @@ export function AddCustomModelDialog({
   }, []);
 
   const handleSubmit = useCallback(() => {
+    const parsedMaxTokens = parseInt(maxTokens, 10);
+
     const entry: CustomModelEntry = {
       modelId: modelId.trim(),
       displayName: displayName.trim(),
       mode: "chat",
-      maxTokens: DEFAULT_MAX_TOKENS,
+      maxTokens: Number.isNaN(parsedMaxTokens) ? DEFAULT_MAX_TOKENS : parsedMaxTokens,
       supportedParameters:
         supportedParameters.length > 0 ? supportedParameters : undefined,
       multimodalInputs:
@@ -124,6 +128,7 @@ export function AddCustomModelDialog({
   }, [
     modelId,
     displayName,
+    maxTokens,
     supportedParameters,
     multimodalInputs,
     onSubmit,
@@ -135,6 +140,7 @@ export function AddCustomModelDialog({
     <DialogRoot
       open={open}
       onOpenChange={(e) => !e.open && handleClose()}
+      closeOnInteractOutside={false}
       size="lg"
     >
       <DialogContent positionerProps={{ zIndex: 1502 }}>
@@ -167,6 +173,20 @@ export function AddCustomModelDialog({
               />
               {errors.displayName && (
                 <SmallLabel color="red.500">{errors.displayName}</SmallLabel>
+              )}
+            </VStack>
+
+            <VStack gap={1} align="stretch">
+              <SmallLabel>Max Tokens</SmallLabel>
+              <Input
+                type="number"
+                placeholder="e.g. 8192"
+                value={maxTokens}
+                onChange={(e) => setMaxTokens(e.target.value)}
+                aria-label="Max Tokens"
+              />
+              {errors.maxTokens && (
+                <SmallLabel color="red.500">{errors.maxTokens}</SmallLabel>
               )}
             </VStack>
 
