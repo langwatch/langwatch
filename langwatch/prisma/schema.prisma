@@ -1017,3 +1017,15 @@ model ProjectDailySdkUsage {
     @@unique([projectId, date, sdkName, sdkVersion, sdkLanguage])
     @@index([projectId, date])
 }
+
+model ProjectDailyBillableEvents {
+    id                 String   @id
+    projectId          String
+    date               String   // UTC date "YYYY-MM-DD"
+    count              Int      @default(0)
+    lastEventTimestamp BigInt?
+    updatedAt          DateTime @default(now()) @updatedAt
+
+    @@unique([projectId, date])
+    @@index([projectId, date])
+}
