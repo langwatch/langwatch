@@ -97,6 +97,7 @@ export const EditModelProviderForm = ({
     provider,
     projectId,
     project,
+    enabledProvidersCount,
     isUsingEnvVars,
     onSuccess: () => {
       closeDrawer();

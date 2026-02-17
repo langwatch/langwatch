@@ -151,6 +151,7 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     provider,
     projectId,
     project: projectForForm,
+    enabledProvidersCount: 1, // Onboarding always sets up the first provider
     isUsingEnvVars,
     onSuccess: () => {
       if (variant === "evaluations") {

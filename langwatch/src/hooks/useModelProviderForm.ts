@@ -16,7 +16,8 @@ import {
   getSchemaShape,
   hasUserEnteredNewApiKey,
   hasUserModifiedNonApiKeyFields,
-  isProviderDefaultModel,
+  resolveModelForProvider,
+  shouldAutoEnableAsDefault,
 } from "../utils/modelProviderHelpers";
 
 type SelectOption = { value: string; label: string };
@@ -34,6 +35,7 @@ export type UseModelProviderFormParams = {
       }
     | null
     | undefined;
+  enabledProvidersCount: number;
   isUsingEnvVars?: boolean;
   onSuccess?: () => void;
   onError?: (error: unknown) => void;
@@ -81,19 +83,64 @@ export type UseModelProviderFormActions = {
 export function useModelProviderForm(
   params: UseModelProviderFormParams,
 ): [UseModelProviderFormState, UseModelProviderFormActions] {
-  const { provider, projectId, project, isUsingEnvVars, onSuccess, onError } =
-    params;
+  const {
+    provider,
+    projectId,
+    project,
+    enabledProvidersCount,
+    isUsingEnvVars,
+    onSuccess,
+    onError,
+  } = params;
 
   // Compute effective defaults using unified helper
   const effectiveDefaults = useMemo(
     () => getEffectiveDefaults(project),
     [project],
   );
+  // When this is the only enabled provider, resolve defaults to models from this provider
+  // so the state is correct from initialization (no downstream useEffect needed)
+  const resolvedDefaults = useMemo(() => {
+    const { defaultModel, topicClusteringModel, embeddingsModel } =
+      effectiveDefaults;
+
+    if (enabledProvidersCount !== 1) {
+      return { defaultModel, topicClusteringModel, embeddingsModel };
+    }
+
+    return {
+      defaultModel: resolveModelForProvider({
+        current: defaultModel,
+        providerKey: provider.provider,
+        storedModels: provider.models,
+        mode: "chat",
+      }),
+      topicClusteringModel: resolveModelForProvider({
+        current: topicClusteringModel,
+        providerKey: provider.provider,
+        storedModels: provider.models,
+        mode: "chat",
+      }),
+      embeddingsModel: resolveModelForProvider({
+        current: embeddingsModel,
+        providerKey: provider.provider,
+        storedModels: provider.embeddingsModels,
+        mode: "embedding",
+      }),
+    };
+  }, [
+    effectiveDefaults,
+    enabledProvidersCount,
+    provider.provider,
+    provider.models,
+    provider.embeddingsModels,
+  ]);
+
   const {
     defaultModel: initialProjectDefaultModel,
     topicClusteringModel: initialProjectTopicClusteringModel,
     embeddingsModel: initialProjectEmbeddingsModel,
-  } = effectiveDefaults;
+  } = resolvedDefaults;
 
   const utils = api.useContext();
   const updateMutation = api.modelProvider.update.useMutation();
@@ -182,8 +229,14 @@ export function useModelProviderForm(
   );
 
   // Auto-enable toggle if this provider is used for the Default Model (matching badge logic)
+  // Also auto-enable when this is the only enabled provider (first provider setup)
   const [useAsDefaultProvider, setUseAsDefaultProvider] = useState<boolean>(
-    () => isProviderDefaultModel(provider.provider, project),
+    () =>
+      shouldAutoEnableAsDefault({
+        providerKey: provider.provider,
+        project,
+        enabledProvidersCount,
+      }),
   );
   const [projectDefaultModel, setProjectDefaultModel] = useState<string | null>(
     initialProjectDefaultModel,
@@ -261,11 +314,14 @@ export function useModelProviderForm(
     );
 
     // Auto-enable the toggle if this provider is used for the Default Model (matching badge logic)
-    const isUsedForDefaultModel = isProviderDefaultModel(
-      provider.provider,
-      project,
+    // Also auto-enable when this is the only enabled provider (first provider setup)
+    setUseAsDefaultProvider(
+      shouldAutoEnableAsDefault({
+        providerKey: provider.provider,
+        project,
+        enabledProvidersCount,
+      }),
     );
-    setUseAsDefaultProvider(isUsedForDefaultModel);
 
     setProjectDefaultModel(initialProjectDefaultModel);
     setProjectTopicClusteringModel(initialProjectTopicClusteringModel);
@@ -283,6 +339,7 @@ export function useModelProviderForm(
     initialProjectTopicClusteringModel,
     initialProjectEmbeddingsModel,
     project,
+    enabledProvidersCount,
   ]);
 
   const setEnabled = useCallback(

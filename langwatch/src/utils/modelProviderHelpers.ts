@@ -1,3 +1,4 @@
+import { getProviderModelOptions } from "../server/modelProviders/registry";
 import {
   DEFAULT_EMBEDDINGS_MODEL,
   DEFAULT_MODEL,
@@ -230,5 +231,63 @@ export function filterMaskedApiKeys(
     Object.entries(customKeys).filter(
       ([_, value]) => value !== MASKED_KEY_PLACEHOLDER,
     ),
+  );
+}
+
+/**
+ * Resolves a model string for a specific provider.
+ * If the current model already belongs to the provider, returns it unchanged.
+ * Otherwise, picks the first available model from stored models or registry.
+ *
+ * @param params.current - The current model string (e.g., "openai/gpt-4o")
+ * @param params.providerKey - The provider key (e.g., "openai")
+ * @param params.storedModels - Provider's stored models (custom or persisted)
+ * @param params.mode - Whether to look up "chat" or "embedding" models
+ * @returns A model string prefixed with the provider key
+ */
+export function resolveModelForProvider({
+  current,
+  providerKey,
+  storedModels,
+  mode,
+}: {
+  current: string;
+  providerKey: string;
+  storedModels: string[] | null | undefined;
+  mode: "chat" | "embedding";
+}): string {
+  if (current.startsWith(`${providerKey}/`)) return current;
+  if (storedModels?.length)
+    return `${providerKey}/${storedModels[0]}`;
+  const registryModels = getProviderModelOptions(providerKey, mode);
+  if (registryModels.length > 0)
+    return `${providerKey}/${registryModels[0]!.value}`;
+  return current;
+}
+
+/**
+ * Determines whether the "Use as Default Provider" toggle should be auto-enabled.
+ * Returns true when the provider is already the project's default model provider,
+ * or when this is the only enabled provider (first-provider setup).
+ *
+ * @param params.providerKey - The provider key (e.g., "openai")
+ * @param params.project - The project object containing default model info
+ * @param params.enabledProvidersCount - Number of currently enabled providers
+ */
+export function shouldAutoEnableAsDefault({
+  providerKey,
+  project,
+  enabledProvidersCount,
+}: {
+  providerKey: string;
+  project:
+    | { defaultModel?: string | null }
+    | null
+    | undefined;
+  enabledProvidersCount: number;
+}): boolean {
+  return (
+    isProviderDefaultModel(providerKey, project) ||
+    enabledProvidersCount <= 1
   );
 }
