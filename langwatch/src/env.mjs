@@ -15,9 +15,7 @@ export const env = createEnv({
     DATABASE_URL: optionalIfBuildTime(z.string().url()),
     CLICKHOUSE_URL: z.string().url().optional(),
     NODE_ENV: z.enum(["development", "test", "production"]),
-    ENVIRONMENT: z
-      .enum(["production", "staging", "development", "local"])
-      .default("production"),
+    ENVIRONMENT: z.string().default("local"),
     BASE_HOST: optionalIfBuildTime(z.string().min(1)),
     NEXTAUTH_PROVIDER: z.string().optional(),
     NEXTAUTH_SECRET: optionalIfBuildTime(z.string().min(1)),
