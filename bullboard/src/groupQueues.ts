@@ -33,17 +33,20 @@ local signalKey  = KEYS[5]
 local groupId    = ARGV[1]
 
 local wasBlocked = redis.call("SREM", blockedKey, groupId)
-redis.call("DEL", activeKey)
 
-local pendingCount = redis.call("ZCARD", jobsKey)
-if pendingCount > 0 then
-  local score = math.sqrt(pendingCount)
-  redis.call("ZADD", readyKey, score, groupId)
-else
-  redis.call("ZREM", readyKey, groupId)
+if wasBlocked > 0 then
+  redis.call("DEL", activeKey)
+
+  local pendingCount = redis.call("ZCARD", jobsKey)
+  if pendingCount > 0 then
+    local score = math.sqrt(pendingCount)
+    redis.call("ZADD", readyKey, score, groupId)
+  else
+    redis.call("ZREM", readyKey, groupId)
+  end
+
+  redis.call("LPUSH", signalKey, "1")
 end
-
-redis.call("LPUSH", signalKey, "1")
 
 return wasBlocked
 `;
