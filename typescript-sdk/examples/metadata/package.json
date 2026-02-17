@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "start": "tsc && dotenv -- node dist/index.js"
+    "start": "tsc && dotenv -- node dist/index.js",
+    "start:rest-api": "tsc && dotenv -- node dist/rest-api.js"
   },
   "keywords": ["langwatch", "metadata", "labels", "opentelemetry"],
   "author": "LangWatch",
