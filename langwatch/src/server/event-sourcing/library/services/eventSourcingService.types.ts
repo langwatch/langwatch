@@ -1,3 +1,5 @@
+import type IORedis from "ioredis";
+import type { Cluster } from "ioredis";
 import type { createLogger } from "../../../../utils/logger/server";
 import type { FeatureFlagServiceInterface } from "../../../featureFlag/types";
 import type { CommandHandlerClass } from "../commands/commandHandlerClass";
@@ -83,4 +85,9 @@ export interface EventSourcingServiceOptions<
    * Uses base Event type because the registry receives events from all pipelines.
    */
   globalRegistry?: ProjectionRegistry<Event>;
+  /**
+   * Optional Redis connection for projection replay marker checks.
+   * Falls back to the global singleton if not provided.
+   */
+  redisConnection?: IORedis | Cluster;
 }

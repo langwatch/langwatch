@@ -1,3 +1,4 @@
+import type { PrismaClient } from "@prisma/client";
 import { prisma } from "~/server/db";
 import type { FoldProjectionStore } from "../../library/projections/foldProjection.types";
 import type { ProjectionStoreContext } from "../../library/projections/projectionStoreContext";
@@ -19,7 +20,11 @@ export interface ProjectDailySdkUsageState {
  * init() → apply() → store(). The apply function passes through state;
  * the real work happens in store() via the Prisma upsert.
  */
-class ProjectDailySdkUsageStore implements FoldProjectionStore<ProjectDailySdkUsageState> {
+export class ProjectDailySdkUsageStore
+  implements FoldProjectionStore<ProjectDailySdkUsageState>
+{
+  constructor(private readonly db: PrismaClient = prisma) {}
+
   async store(
     state: ProjectDailySdkUsageState,
     context: ProjectionStoreContext,
@@ -33,7 +38,12 @@ class ProjectDailySdkUsageStore implements FoldProjectionStore<ProjectDailySdkUs
         ? BigInt(state.lastEventTimestamp)
         : null;
 
-    await prisma.projectDailySdkUsage.upsert({
+    // Live processing: get() returns null → init() (count=0) → apply() once → count=1.
+    //   → create inserts count=1, update increments by 1. One event = one increment.
+    //
+    // Replay (coalesced): multiple apply() calls accumulate → count=N.
+    //   → create inserts count=N, update increments by N. One store call for N events.
+    await this.db.projectDailySdkUsage.upsert({
       where: { id, projectId: state.projectId },
       create: {
         id,
@@ -42,14 +52,22 @@ class ProjectDailySdkUsageStore implements FoldProjectionStore<ProjectDailySdkUs
         sdkName: state.sdkName,
         sdkVersion: state.sdkVersion,
         sdkLanguage: state.sdkLanguage,
-        count: 1,
+        count: state.count,
         lastEventTimestamp,
       },
       update: {
-        count: { increment: 1 },
+        count: { increment: state.count },
         lastEventTimestamp,
       },
     });
+  }
+
+  async storeBatch(
+    entries: Array<{ state: ProjectDailySdkUsageState; context: ProjectionStoreContext }>,
+  ): Promise<void> {
+    for (const { state, context } of entries) {
+      await this.store(state, context);
+    }
   }
 
   async get(
