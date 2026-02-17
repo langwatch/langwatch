@@ -214,7 +214,6 @@ const normalizeModelName = (model: string): string => {
     "-gguf",
     "-int4",
     "-int8",
-    "-turbo",
   ];
 
   for (const suffix of suffixesToRemove) {
