@@ -253,4 +253,61 @@ export class ExperimentRunStateRepositoryClickHouse<
       );
     }
   }
+
+  async storeProjectionBatch(
+    projections: ProjectionType[],
+    context: ProjectionStoreWriteContext,
+  ): Promise<void> {
+    if (projections.length === 0) return;
+
+    EventUtils.validateTenantId(
+      context,
+      "ExperimentRunStateRepositoryClickHouse.storeProjectionBatch",
+    );
+
+    const records = projections.map((projection) => {
+      if (!EventUtils.isValidProjection(projection)) {
+        throw new ValidationError(
+          "Invalid projection in batch",
+          "projection",
+          projection,
+        );
+      }
+      return this.mapProjectionDataToClickHouseRecord(
+        projection.data as ExperimentRunStateData,
+        String(context.tenantId),
+        projection.id,
+        projection.version,
+        projection.id,
+      );
+    });
+
+    try {
+      await this.clickHouseClient.insert({
+        table: TABLE_NAME,
+        values: records,
+        format: "JSONEachRow",
+      });
+
+      logger.debug(
+        { tenantId: context.tenantId, count: records.length },
+        "Batch stored experiment run state projections to ClickHouse",
+      );
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      logger.error(
+        { tenantId: context.tenantId, count: records.length, error: errorMessage },
+        "Failed to batch store projections in ClickHouse",
+      );
+      throw new StoreError(
+        "storeProjectionBatch",
+        "ExperimentRunStateRepositoryClickHouse",
+        `Failed to batch store ${records.length} projections: ${errorMessage}`,
+        ErrorCategory.CRITICAL,
+        { count: records.length },
+        error,
+      );
+    }
+  }
 }

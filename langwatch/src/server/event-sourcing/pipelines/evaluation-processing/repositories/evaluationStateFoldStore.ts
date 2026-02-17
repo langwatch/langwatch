@@ -37,6 +37,34 @@ export const evaluationStateFoldStore: FoldProjectionStore<EvaluationStateData> 
     await repository.storeProjection(projection, { tenantId: context.tenantId });
   },
 
+  async storeBatch(
+    entries: Array<{ state: EvaluationStateData; context: ProjectionStoreContext }>,
+  ): Promise<void> {
+    const projections: EvaluationState[] = entries.map(({ state, context }) => {
+      const projectionId = state.ScheduledAt
+        ? IdUtils.generateDeterministicEvaluationStateId(
+            String(context.tenantId),
+            state.EvaluationId,
+            state.ScheduledAt,
+          )
+        : `evaluation_state:${context.tenantId}:${state.EvaluationId}`;
+      return {
+        id: projectionId,
+        aggregateId: context.aggregateId,
+        tenantId: context.tenantId,
+        version: EVALUATION_PROJECTION_VERSIONS.STATE,
+        data: state,
+      };
+    });
+
+    if (projections.length > 0) {
+      const repository = getEvaluationStateRepository();
+      await repository.storeProjectionBatch(projections, {
+        tenantId: entries[0]!.context.tenantId,
+      });
+    }
+  },
+
   async get(
     aggregateId: string,
     context: ProjectionStoreContext,

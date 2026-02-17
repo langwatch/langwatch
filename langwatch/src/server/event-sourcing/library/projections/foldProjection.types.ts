@@ -84,4 +84,14 @@ export interface FoldProjectionStore<State> {
 
   /** Retrieves the stored state for an aggregate, or null if not found. */
   get(aggregateId: string, context: ProjectionStoreContext): Promise<State | null>;
+
+  /**
+   * Persists multiple fold states in a single operation.
+   *
+   * Required because ClickHouse creates one "part" per INSERT — calling store()
+   * N times produces N parts and quickly hits the TOO_MANY_PARTS limit (~300).
+   * storeBatch() batches all rows into a single INSERT (1 part), which is critical
+   * for replay and any bulk-write path.
+   */
+  storeBatch(entries: Array<{ state: State; context: ProjectionStoreContext }>): Promise<void>;
 }

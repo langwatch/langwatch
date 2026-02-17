@@ -217,6 +217,7 @@ export function createMockFoldProjection<
     store: config?.store ?? {
       store: vi.fn().mockResolvedValue(void 0),
       get: vi.fn().mockResolvedValue(null),
+      storeBatch: vi.fn().mockResolvedValue(void 0),
     },
   };
 }

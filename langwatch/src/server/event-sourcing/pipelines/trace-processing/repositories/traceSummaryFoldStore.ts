@@ -41,6 +41,36 @@ export const traceSummaryFoldStore: FoldProjectionStore<TraceSummaryData> = {
     });
   },
 
+  async storeBatch(
+    entries: Array<{ state: TraceSummaryData; context: ProjectionStoreContext }>,
+  ): Promise<void> {
+    const projections: TraceSummary[] = [];
+
+    for (const { state, context } of entries) {
+      if (state.SpanCount === 0) continue;
+
+      const projectionId = IdUtils.generateDeterministicTraceSummaryIdFromData(
+        String(context.tenantId),
+        state.TraceId,
+        state.OccurredAt,
+      );
+
+      projections.push({
+        id: projectionId,
+        aggregateId: context.aggregateId,
+        tenantId: context.tenantId,
+        version: TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
+        data: state,
+      });
+    }
+
+    if (projections.length > 0) {
+      await traceSummaryRepository.storeProjectionBatch(projections, {
+        tenantId: entries[0]!.context.tenantId,
+      });
+    }
+  },
+
   async get(
     aggregateId: string,
     context: ProjectionStoreContext,

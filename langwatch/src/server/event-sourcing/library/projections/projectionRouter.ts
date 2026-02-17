@@ -22,6 +22,7 @@ import { FoldProjectionExecutor } from "./foldProjectionExecutor";
 import type { MapProjectionDefinition } from "./mapProjection.types";
 import { MapProjectionExecutor } from "./mapProjectionExecutor";
 import type { ProjectionStoreContext } from "./projectionStoreContext";
+import { checkReplayMarker } from "./replayMarkerCheck";
 
 /**
  * Central router that registers fold and map projections and dispatches events.
@@ -412,6 +413,9 @@ export class ProjectionRouter<
           logger: this.logger,
         });
         if (disabled) return;
+
+        // Check if projection-replay is active for this aggregate
+        await checkReplayMarker(this.redisConnection, projectionName, event);
 
         const key = fold.key ? fold.key(event) : undefined;
         const storeContext: ProjectionStoreContext = {
