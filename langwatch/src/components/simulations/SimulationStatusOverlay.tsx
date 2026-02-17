@@ -2,6 +2,7 @@ import { Box, Text, VStack } from "@chakra-ui/react";
 import type { FC } from "react";
 import { AlertCircle, AlertTriangle, Check, X } from "react-feather";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { SCENARIO_RUN_STATUS_CONFIG } from "~/server/scenarios/status-config";
 import { useColorModeValue } from "../ui/color-mode";
 
 interface OverlayConfig {
@@ -66,59 +67,54 @@ const GRADIENT_DARK = {
   `,
 } as const;
 
+type GradientKey = keyof typeof GRADIENT_LIGHT;
+
+const OVERLAY_ICONS: Record<
+  ScenarioRunStatus,
+  FC<{ size: number; color: string; strokeWidth: number }>
+> = {
+  [ScenarioRunStatus.SUCCESS]: Check,
+  [ScenarioRunStatus.FAILED]: X,
+  [ScenarioRunStatus.ERROR]: X,
+  [ScenarioRunStatus.CANCELLED]: AlertCircle,
+  [ScenarioRunStatus.STALLED]: AlertTriangle,
+  [ScenarioRunStatus.IN_PROGRESS]: Check,
+  [ScenarioRunStatus.PENDING]: Check,
+};
+
+const OVERLAY_STATUS_TEXT: Record<ScenarioRunStatus, string> = {
+  [ScenarioRunStatus.SUCCESS]: "Pass",
+  [ScenarioRunStatus.FAILED]: "Fail",
+  [ScenarioRunStatus.ERROR]: "Fail",
+  [ScenarioRunStatus.CANCELLED]: "Cancelled",
+  [ScenarioRunStatus.STALLED]: "Stalled",
+  [ScenarioRunStatus.IN_PROGRESS]: "",
+  [ScenarioRunStatus.PENDING]: "",
+};
+
+const OVERLAY_GRADIENTS: Record<ScenarioRunStatus, GradientKey> = {
+  [ScenarioRunStatus.SUCCESS]: "pass",
+  [ScenarioRunStatus.FAILED]: "fail",
+  [ScenarioRunStatus.ERROR]: "fail",
+  [ScenarioRunStatus.CANCELLED]: "cancelled",
+  [ScenarioRunStatus.STALLED]: "stalled",
+  [ScenarioRunStatus.IN_PROGRESS]: "pass",
+  [ScenarioRunStatus.PENDING]: "pass",
+};
+
 /**
  * Returns overlay configuration for a given scenario run status.
- * Uses an exhaustive switch to ensure compile-time errors when new statuses are added.
+ * Uses exhaustive Record types to ensure compile-time errors when new statuses are added.
  */
 export function getOverlayConfig(status: ScenarioRunStatus): OverlayConfig {
-  switch (status) {
-    case ScenarioRunStatus.SUCCESS:
-      return {
-        isComplete: true,
-        icon: Check,
-        statusText: "Pass",
-        gradientLight: GRADIENT_LIGHT.pass,
-        gradientDark: GRADIENT_DARK.pass,
-      };
-    case ScenarioRunStatus.FAILED:
-    case ScenarioRunStatus.ERROR:
-      return {
-        isComplete: true,
-        icon: X,
-        statusText: "Fail",
-        gradientLight: GRADIENT_LIGHT.fail,
-        gradientDark: GRADIENT_DARK.fail,
-      };
-    case ScenarioRunStatus.CANCELLED:
-      return {
-        isComplete: true,
-        icon: AlertCircle,
-        statusText: "Cancelled",
-        gradientLight: GRADIENT_LIGHT.cancelled,
-        gradientDark: GRADIENT_DARK.cancelled,
-      };
-    case ScenarioRunStatus.STALLED:
-      return {
-        isComplete: true,
-        icon: AlertTriangle,
-        statusText: "Stalled",
-        gradientLight: GRADIENT_LIGHT.stalled,
-        gradientDark: GRADIENT_DARK.stalled,
-      };
-    case ScenarioRunStatus.IN_PROGRESS:
-    case ScenarioRunStatus.PENDING:
-      return {
-        isComplete: false,
-        icon: Check,
-        statusText: "",
-        gradientLight: GRADIENT_LIGHT.pass,
-        gradientDark: GRADIENT_DARK.pass,
-      };
-    default: {
-      const _exhaustive: never = status;
-      throw new Error(`Unhandled ScenarioRunStatus: ${_exhaustive}`);
-    }
-  }
+  const gradientKey = OVERLAY_GRADIENTS[status];
+  return {
+    isComplete: SCENARIO_RUN_STATUS_CONFIG[status].isComplete,
+    icon: OVERLAY_ICONS[status],
+    statusText: OVERLAY_STATUS_TEXT[status],
+    gradientLight: GRADIENT_LIGHT[gradientKey],
+    gradientDark: GRADIENT_DARK[gradientKey],
+  };
 }
 
 export function SimulationStatusOverlay({

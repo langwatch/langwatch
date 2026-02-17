@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ScenarioRunStatus } from "../enums";
+import { ScenarioRunStatus } from "../scenario-event.enums";
 import {
   resolveRunStatus,
   STALL_THRESHOLD_MS,

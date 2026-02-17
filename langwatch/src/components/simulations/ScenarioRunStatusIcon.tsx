@@ -1,39 +1,41 @@
 import { Icon, type IconProps } from "@chakra-ui/react";
-import { AlertTriangle, Check, Clock, XCircle } from "lucide-react";
+import {
+  AlertTriangle,
+  Check,
+  Clock,
+  XCircle,
+  type LucideIcon,
+} from "lucide-react";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { SCENARIO_RUN_STATUS_CONFIG } from "~/server/scenarios/status-config";
 
 interface ScenarioRunStatusIconProps extends Omit<IconProps, "as" | "color"> {
   status?: ScenarioRunStatus;
   color?: string;
 }
 
+const SCENARIO_RUN_STATUS_ICONS: Record<ScenarioRunStatus, LucideIcon> = {
+  [ScenarioRunStatus.SUCCESS]: Check,
+  [ScenarioRunStatus.FAILED]: XCircle,
+  [ScenarioRunStatus.ERROR]: XCircle,
+  [ScenarioRunStatus.CANCELLED]: XCircle,
+  [ScenarioRunStatus.STALLED]: AlertTriangle,
+  [ScenarioRunStatus.IN_PROGRESS]: Clock,
+  [ScenarioRunStatus.PENDING]: Clock,
+};
+
 function getIconAndColor(status: ScenarioRunStatus | undefined): {
-  icon: typeof Check;
+  icon: LucideIcon;
   color: string;
 } {
   if (status === undefined) {
     return { icon: Clock, color: "green.fg" };
   }
 
-  switch (status) {
-    case ScenarioRunStatus.SUCCESS:
-      return { icon: Check, color: "green.fg" };
-    case ScenarioRunStatus.FAILED:
-    case ScenarioRunStatus.ERROR:
-      return { icon: XCircle, color: "red.fg" };
-    case ScenarioRunStatus.IN_PROGRESS:
-      return { icon: Clock, color: "orange.fg" };
-    case ScenarioRunStatus.PENDING:
-      return { icon: Clock, color: "fg.muted" };
-    case ScenarioRunStatus.CANCELLED:
-      return { icon: XCircle, color: "fg.muted" };
-    case ScenarioRunStatus.STALLED:
-      return { icon: AlertTriangle, color: "yellow.fg" };
-    default: {
-      const _exhaustive: never = status;
-      throw new Error(`Unhandled ScenarioRunStatus: ${_exhaustive}`);
-    }
-  }
+  return {
+    icon: SCENARIO_RUN_STATUS_ICONS[status],
+    color: SCENARIO_RUN_STATUS_CONFIG[status].fgColor,
+  };
 }
 
 export function ScenarioRunStatusIcon({

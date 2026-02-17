@@ -1,13 +1,31 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "~/utils/logger/server";
-import { ScenarioRunStatus } from "./scenario-event.enums";
 import { ScenarioEventRepository } from "./scenario-event.repository";
 import type { ScenarioEvent, ScenarioRunData } from "./scenario-event.types";
 import { resolveRunStatus } from "./stall-detection";
 
 const tracer = getLangWatchTracer("langwatch.scenario-events.service");
 const logger = createLogger("langwatch:scenario-events:service");
+
+/**
+ * Computes the most recent event timestamp across all event types for a scenario run.
+ */
+function computeLastEventTimestamp({
+  runStartedTimestamp,
+  messageTimestamp,
+  runFinishedTimestamp,
+}: {
+  runStartedTimestamp: number;
+  messageTimestamp: number | undefined;
+  runFinishedTimestamp: number | undefined;
+}): number {
+  return Math.max(
+    runStartedTimestamp,
+    messageTimestamp ?? 0,
+    runFinishedTimestamp ?? 0,
+  );
+}
 
 /**
  * Service responsible for managing scenario events and their associated data.
@@ -119,11 +137,11 @@ export class ScenarioEventService {
         span.setAttribute("scenario.id", runStartedEvent.scenarioId);
 
         // Determine the most recent event timestamp across all event types
-        const lastEventTimestamp = Math.max(
-          runStartedEvent.timestamp,
-          latestMessageEvent?.timestamp ?? 0,
-          latestRunFinishedEvent?.timestamp ?? 0,
-        );
+        const lastEventTimestamp = computeLastEventTimestamp({
+          runStartedTimestamp: runStartedEvent.timestamp,
+          messageTimestamp: latestMessageEvent?.timestamp,
+          runFinishedTimestamp: latestRunFinishedEvent?.timestamp,
+        });
 
         return {
           scenarioId: runStartedEvent.scenarioId,
@@ -138,10 +156,9 @@ export class ScenarioEventService {
           timestamp: latestMessageEvent?.timestamp ?? runStartedEvent.timestamp,
           name: runStartedEvent?.metadata?.name ?? null,
           description: runStartedEvent?.metadata?.description ?? null,
-          durationInMs:
-            runStartedEvent?.timestamp && latestRunFinishedEvent?.timestamp
-              ? latestRunFinishedEvent.timestamp - runStartedEvent.timestamp
-              : 0,
+          durationInMs: latestRunFinishedEvent
+            ? latestRunFinishedEvent.timestamp - runStartedEvent.timestamp
+            : lastEventTimestamp - runStartedEvent.timestamp,
         };
       },
     );
@@ -540,6 +557,10 @@ export class ScenarioEventService {
         // Dedupe to reduce payload and ensure stable, unique iteration order
         const uniqueScenarioRunIds = Array.from(new Set(scenarioRunIds));
 
+        // Snapshot current time once so every run in the batch is evaluated
+        // against the same clock (avoids per-iteration drift).
+        const now = Date.now();
+
         // Fetch all data in 3 batch queries instead of 3N individual queries
         const [runStartedEvents, messageEvents, runFinishedEvents] =
           await Promise.all([
@@ -571,11 +592,11 @@ export class ScenarioEventService {
           }
 
           // Determine the most recent event timestamp across all event types
-          const lastEventTimestamp = Math.max(
-            runStartedEvent.timestamp,
-            messageEvent?.timestamp ?? 0,
-            runFinishedEvent?.timestamp ?? 0,
-          );
+          const lastEventTimestamp = computeLastEventTimestamp({
+            runStartedTimestamp: runStartedEvent.timestamp,
+            messageTimestamp: messageEvent?.timestamp,
+            runFinishedTimestamp: runFinishedEvent?.timestamp,
+          });
 
           runs.push({
             scenarioId: runStartedEvent.scenarioId,
@@ -584,19 +605,16 @@ export class ScenarioEventService {
             status: resolveRunStatus({
               finishedStatus: runFinishedEvent?.status,
               lastEventTimestamp,
+              now,
             }),
             results: runFinishedEvent?.results ?? null,
             messages: messageEvent?.messages ?? [],
             timestamp: messageEvent?.timestamp ?? runStartedEvent.timestamp,
             name: runStartedEvent?.metadata?.name ?? null,
             description: runStartedEvent?.metadata?.description ?? null,
-            durationInMs:
-              runStartedEvent?.timestamp && runFinishedEvent?.timestamp
-                ? Math.max(
-                    0,
-                    runFinishedEvent.timestamp - runStartedEvent.timestamp,
-                  )
-                : 0,
+            durationInMs: runFinishedEvent
+              ? Math.max(0, runFinishedEvent.timestamp - runStartedEvent.timestamp)
+              : Math.max(0, lastEventTimestamp - runStartedEvent.timestamp),
           });
         }
 

@@ -12,7 +12,7 @@
  * @see specs/scenarios/stalled-scenario-runs.feature - UI Display integration scenarios
  */
 import { describe, expect, it } from "vitest";
-import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { getStatusBadgeProps } from "../PreviousRunsList";
 import { getOverlayConfig } from "../SimulationStatusOverlay";
 import { STATUS_DISPLAY_TEXT_MAP } from "../simulation-console/constants";

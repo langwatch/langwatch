@@ -11,7 +11,6 @@ import {
   AlertCircle,
   Calendar,
   CheckCircle,
-  ChevronDown,
   Clock,
   XCircle,
 } from "react-feather";
@@ -29,7 +28,7 @@ export const RunAccordionItem = ({
   isOpen: boolean;
   onRunClick: (batchRunId: string) => void;
 }) => {
-  const { passedCount, failedCount } = run.items.reduce(
+  const { passedCount, failedCount, stalledCount } = run.items.reduce(
     (acc, item) => {
       if (item.status === ScenarioRunStatus.SUCCESS) {
         acc.passedCount++;
@@ -38,12 +37,12 @@ export const RunAccordionItem = ({
         item.status === ScenarioRunStatus.ERROR
       ) {
         acc.failedCount++;
-      } else {
-        // do nothing for other statuses like IN_PROGRESS, PENDING, CANCELLED, STALLED
+      } else if (item.status === ScenarioRunStatus.STALLED) {
+        acc.stalledCount++;
       }
       return acc;
     },
-    { passedCount: 0, failedCount: 0 },
+    { passedCount: 0, failedCount: 0, stalledCount: 0 },
   );
 
   return (
@@ -78,18 +77,22 @@ export const RunAccordionItem = ({
             <HStack flex="1" textAlign="left" gap={2}>
               <Icon
                 as={
-                  passedCount > 0 && failedCount === 0
-                    ? CheckCircle
-                    : failedCount > 0
-                      ? XCircle
-                      : AlertCircle
+                  failedCount > 0
+                    ? XCircle
+                    : stalledCount > 0
+                      ? AlertCircle
+                      : passedCount > 0
+                        ? CheckCircle
+                        : AlertCircle
                 }
                 color={
-                  passedCount > 0 && failedCount === 0
-                    ? "green.fg"
-                    : failedCount > 0
-                      ? "red.fg"
-                      : "yellow.fg"
+                  failedCount > 0
+                    ? "red.fg"
+                    : stalledCount > 0
+                      ? "yellow.fg"
+                      : passedCount > 0
+                        ? "green.fg"
+                        : "yellow.fg"
                 }
                 boxSize={3}
               />
@@ -106,6 +109,7 @@ export const RunAccordionItem = ({
             <HStack gap={1} color="fg.muted" fontSize="2xs" align="center">
               <Text fontWeight="semibold">
                 {passedCount} passed, {failedCount} failed
+                {stalledCount > 0 ? `, ${stalledCount} stalled` : ""}
               </Text>
             </HStack>
           </VStack>

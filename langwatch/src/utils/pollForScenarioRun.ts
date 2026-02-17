@@ -86,7 +86,7 @@ export async function pollForScenarioRun(
         ) {
           logger.info(
             { status: run.status, scenarioRunId: run.scenarioRunId },
-            "Run terminated with error or cancelled",
+            "Run terminated with error, cancelled, or stalled",
           );
           return {
             success: false,
