@@ -75,10 +75,9 @@ export function RegistryModelsModal({
     <DialogRoot
       open={open}
       onOpenChange={(e) => !e.open && handleClose()}
-      closeOnInteractOutside={false}
       size="lg"
     >
-      <DialogContent positionerProps={{ zIndex: 1502 }}>
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Registry Models</DialogTitle>
         </DialogHeader>
