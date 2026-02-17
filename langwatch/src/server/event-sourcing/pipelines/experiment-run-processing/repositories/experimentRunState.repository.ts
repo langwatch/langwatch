@@ -17,4 +17,9 @@ export interface ExperimentRunStateRepository<
     projection: ProjectionType,
     context: ProjectionStoreWriteContext,
   ): Promise<void>;
+
+  storeProjectionBatch(
+    projections: ProjectionType[],
+    context: ProjectionStoreWriteContext,
+  ): Promise<void>;
 }

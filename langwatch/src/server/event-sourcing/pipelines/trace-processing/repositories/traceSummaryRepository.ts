@@ -29,4 +29,13 @@ export interface TraceSummaryRepository<
     projection: ProjectionType,
     context: ProjectionStoreWriteContext,
   ): Promise<void>;
+
+  /**
+   * Stores multiple projections in a single operation.
+   * ClickHouse: single INSERT (1 part instead of N). Memory: loops.
+   */
+  storeProjectionBatch(
+    projections: ProjectionType[],
+    context: ProjectionStoreWriteContext,
+  ): Promise<void>;
 }

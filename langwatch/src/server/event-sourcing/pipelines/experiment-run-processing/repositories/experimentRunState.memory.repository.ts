@@ -39,4 +39,13 @@ export class ExperimentRunStateRepositoryMemory<
   protected getKey(tenantId: string, aggregateId: string): string {
     return `${tenantId}:${aggregateId}`;
   }
+
+  async storeProjectionBatch(
+    projections: ProjectionType[],
+    context: ProjectionStoreWriteContext,
+  ): Promise<void> {
+    for (const projection of projections) {
+      await this.storeProjection(projection, context);
+    }
+  }
 }

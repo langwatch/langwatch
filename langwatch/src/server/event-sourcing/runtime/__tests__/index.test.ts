@@ -72,7 +72,7 @@ describe("EventSourcingPipeline", () => {
         eventTypes: ["test.event"],
         init: () => ({}),
         apply: (state) => state,
-        store: { store: vi.fn(), get: vi.fn() },
+        store: { store: vi.fn(), get: vi.fn(), storeBatch: vi.fn() },
       };
 
       const mockMapProjection: MapProjectionDefinition<any, Event> = {
@@ -235,7 +235,7 @@ describe("EventSourcingPipeline", () => {
         eventTypes: ["test.event"],
         init: () => ({}),
         apply: (state) => state,
-        store: { store: vi.fn(), get: vi.fn() },
+        store: { store: vi.fn(), get: vi.fn(), storeBatch: vi.fn() },
       };
 
       const mockMapProjection: MapProjectionDefinition<any, Event> = {

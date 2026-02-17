@@ -204,6 +204,12 @@ class TestFoldProjectionStore implements FoldProjectionStore<TestProjectionData>
     const key = `${context.tenantId}:${context.aggregateId}`;
     this.data.set(key, state);
   }
+
+  async storeBatch(entries: Array<{ state: TestProjectionData; context: ProjectionStoreContext }>): Promise<void> {
+    for (const { state, context } of entries) {
+      await this.store(state, context);
+    }
+  }
 }
 
 /**

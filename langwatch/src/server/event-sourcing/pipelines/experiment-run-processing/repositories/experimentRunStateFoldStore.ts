@@ -30,6 +30,28 @@ export const experimentRunStateFoldStore: FoldProjectionStore<ExperimentRunState
     await repository.storeProjection(projection, { tenantId: context.tenantId });
   },
 
+  async storeBatch(
+    entries: Array<{ state: ExperimentRunStateData; context: ProjectionStoreContext }>,
+  ): Promise<void> {
+    const projections: ExperimentRunState[] = entries.map(({ state, context }) => {
+      const projectionId = `experiment_run_state:${context.tenantId}:${state.RunId}`;
+      return {
+        id: projectionId,
+        aggregateId: context.aggregateId,
+        tenantId: context.tenantId,
+        version: EXPERIMENT_RUN_PROJECTION_VERSIONS.RUN_STATE,
+        data: state,
+      };
+    });
+
+    if (projections.length > 0) {
+      const repository = getExperimentRunStateRepository();
+      await repository.storeProjectionBatch(projections, {
+        tenantId: entries[0]!.context.tenantId,
+      });
+    }
+  },
+
   async get(
     aggregateId: string,
     context: ProjectionStoreContext,

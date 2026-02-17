@@ -78,6 +78,7 @@ export function createMockFoldProjectionStore<State>(): FoldProjectionStore<Stat
   return {
     get: vi.fn().mockResolvedValue(null),
     store: vi.fn().mockResolvedValue(void 0),
+    storeBatch: vi.fn().mockResolvedValue(void 0),
   };
 }
 

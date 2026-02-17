@@ -1,4 +1,4 @@
-import type { Projection } from "../../../library";
+import type { Projection, ProjectionStoreWriteContext } from "../../../library";
 import { BaseMemoryProjectionStore } from "./baseMemoryRepository";
 import type { TraceSummaryRepository } from "./traceSummaryRepository";
 
@@ -14,5 +14,14 @@ export class TraceSummaryRepositoryMemory<
 {
   protected getKey(tenantId: string, aggregateId: string): string {
     return `${tenantId}:${aggregateId}`;
+  }
+
+  async storeProjectionBatch(
+    projections: ProjectionType[],
+    context: ProjectionStoreWriteContext,
+  ): Promise<void> {
+    for (const projection of projections) {
+      await this.storeProjection(projection, context);
+    }
   }
 }
