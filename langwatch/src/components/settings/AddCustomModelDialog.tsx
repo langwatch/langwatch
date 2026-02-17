@@ -7,7 +7,6 @@ import {
   Wrap,
 } from "@chakra-ui/react";
 import { useCallback, useRef, useState } from "react";
-import { titleCase } from "../../utils/stringCasing";
 import type { CustomModelEntry, SupportedParameter, MultimodalInput } from "../../server/modelProviders/customModel.schema";
 import { customModelEntrySchema, multimodalInputValues } from "../../server/modelProviders/customModel.schema";
 import {
@@ -67,13 +66,10 @@ export function AddCustomModelDialog({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const displayNameTouched = useRef(false);
 
-  const deriveDisplayName = (id: string) =>
-    titleCase(id.replace(/[-_]/g, " ").trim());
-
   const handleModelIdChange = useCallback((value: string) => {
     setModelId(value);
     if (!displayNameTouched.current) {
-      setDisplayName(deriveDisplayName(value));
+      setDisplayName(value);
     }
   }, []);
 
