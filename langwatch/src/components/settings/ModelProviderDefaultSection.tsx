@@ -87,8 +87,8 @@ export const DefaultProviderSection = ({
       (model) => `${provider.provider}/${model.modelId}`,
     );
 
-    // Combine and deduplicate
-    return [...new Set([...registryModels, ...customModels])];
+    // Combine and deduplicate — custom models first
+    return [...new Set([...customModels, ...registryModels])];
   }, [provider.provider, state.customModels]);
 
   // Get all embedding models from registry and custom embeddings from all enabled providers
@@ -119,8 +119,8 @@ export const DefaultProviderSection = ({
       customEmbeddings.push(`${provider.provider}/${model.modelId}`);
     });
 
-    // Combine and deduplicate
-    return [...new Set([...registryModels, ...customEmbeddings])];
+    // Combine and deduplicate — custom models first
+    return [...new Set([...customEmbeddings, ...registryModels])];
   }, [providers, provider.provider, state.customEmbeddingsModels]);
 
   return (
