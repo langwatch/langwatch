@@ -113,7 +113,10 @@ interface SdkSectionProps {
 function SdkSection({ sdk }: SdkSectionProps) {
   const hasOutdated = sdk.versions.some((v) => v.isOutdated);
   const hasVersionAhead = sdk.versions.some(
-    (v) => semver.valid(v.version) && semver.gt(v.version, sdk.latestVersion),
+    (v) =>
+      semver.valid(v.version) &&
+      semver.valid(sdk.latestVersion) &&
+      semver.gt(v.version, sdk.latestVersion),
   );
 
   return (
