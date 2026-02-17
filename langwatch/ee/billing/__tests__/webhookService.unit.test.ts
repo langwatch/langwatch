@@ -36,6 +36,14 @@ const createMockItemCalculator = () => ({
     ACCELERATE_TRACES_100K: "price_acc_traces",
     LAUNCH_ANNUAL_TRACES_10K: "price_launch_annual_traces",
     ACCELERATE_ANNUAL_TRACES_100K: "price_acc_annual_traces",
+    GROWTH_SEAT_EUR_MONTHLY: "price_growth_seat_eur_monthly",
+    GROWTH_SEAT_EUR_ANNUAL: "price_growth_seat_eur_annual",
+    GROWTH_SEAT_USD_MONTHLY: "price_growth_seat_usd_monthly",
+    GROWTH_SEAT_USD_ANNUAL: "price_growth_seat_usd_annual",
+    GROWTH_EVENTS_EUR_MONTHLY: "price_growth_events_eur_monthly",
+    GROWTH_EVENTS_EUR_ANNUAL: "price_growth_events_eur_annual",
+    GROWTH_EVENTS_USD_MONTHLY: "price_growth_events_usd_monthly",
+    GROWTH_EVENTS_USD_ANNUAL: "price_growth_events_usd_annual",
   },
 });
 
