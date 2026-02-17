@@ -15,7 +15,7 @@ import {
   Clock,
   XCircle,
 } from "react-feather";
-import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { RunHistoryItem } from "./RunHistoryItem";
 import type { Run } from "./types";
 

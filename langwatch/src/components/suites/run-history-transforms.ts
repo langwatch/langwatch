@@ -5,8 +5,8 @@
  * computes pass rates, and calculates totals.
  */
 
-import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
-import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/types";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 
 /** A batch run groups all scenario runs that share the same batchRunId. */
 export type BatchRun = {

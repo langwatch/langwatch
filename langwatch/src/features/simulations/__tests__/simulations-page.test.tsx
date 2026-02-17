@@ -10,7 +10,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { sortScenarioSets } from "../sort-scenario-sets";
-import type { ScenarioSetData } from "~/app/api/scenario-events/[[...route]]/types";
+import type { ScenarioSetData } from "~/server/scenarios/scenario-event.types";
 
 describe("sortScenarioSets()", () => {
 

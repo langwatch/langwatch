@@ -8,8 +8,8 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import React, { useMemo } from "react";
-import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
-import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/types";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { ScenarioRunStatusIcon } from "~/components/simulations/ScenarioRunStatusIcon";
 
 import "@copilotkit/react-ui/styles.css";

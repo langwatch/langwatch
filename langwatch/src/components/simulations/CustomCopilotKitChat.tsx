@@ -8,7 +8,7 @@ import {
   type TextMessage,
 } from "@copilotkit/runtime-client-gql";
 import { useEffect } from "react";
-import type { ScenarioMessageSnapshotEvent } from "~/app/api/scenario-events/[[...route]]/types";
+import type { ScenarioMessageSnapshotEvent } from "~/server/scenarios/scenario-event.types";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { createLogger } from "~/utils/logger";
 import { TraceMessage } from "../copilot-kit/TraceMessage";

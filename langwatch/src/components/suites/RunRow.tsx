@@ -10,7 +10,7 @@ import { CheckCircle, ChevronDown, ChevronRight, XCircle, Loader } from "lucide-
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import type { BatchRun, BatchRunSummary } from "./run-history-transforms";
 import { ScenarioTargetRow } from "./ScenarioTargetRow";
-import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/types";
+import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 
 type RunRowProps = {
   batchRun: BatchRun;

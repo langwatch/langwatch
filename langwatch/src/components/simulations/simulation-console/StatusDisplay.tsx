@@ -2,7 +2,7 @@ import { HStack, Text } from "@chakra-ui/react";
 import {
   ScenarioRunStatus,
   Verdict,
-} from "~/app/api/scenario-events/[[...route]]/enums";
+} from "~/server/scenarios/scenario-event.enums";
 import { CONSOLE_COLORS, STATUS_DISPLAY_TEXT_MAP } from "./constants";
 
 interface StatusDisplayProps {

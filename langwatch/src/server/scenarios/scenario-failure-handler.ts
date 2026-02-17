@@ -15,8 +15,8 @@ import {
   ScenarioEventType,
   ScenarioRunStatus,
   Verdict,
-} from "~/app/api/scenario-events/[[...route]]/enums";
-import { ScenarioEventService } from "~/app/api/scenario-events/[[...route]]/scenario-event.service";
+} from "~/server/scenarios/scenario-event.enums";
+import { ScenarioEventService } from "~/server/scenarios/scenario-event.service";
 import { createLogger } from "~/utils/logger/server";
 
 const tracer = getLangWatchTracer("langwatch.scenarios.failure-handler");

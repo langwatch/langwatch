@@ -12,8 +12,8 @@ import {
   tracerMiddleware,
 } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
-import { ScenarioEventService } from "./scenario-event.service";
-import { responseSchemas, scenarioEventSchema } from "./schemas";
+import { ScenarioEventService } from "~/server/scenarios/scenario-event.service";
+import { responseSchemas, scenarioEventSchema } from "~/server/scenarios/schemas";
 
 const logger = createLogger("langwatch:api:scenario-events");
 

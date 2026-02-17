@@ -1,9 +1,9 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "~/utils/logger/server";
-import { ScenarioRunStatus } from "./enums";
+import { ScenarioRunStatus } from "./scenario-event.enums";
 import { ScenarioEventRepository } from "./scenario-event.repository";
-import type { ScenarioEvent, ScenarioRunData } from "./types";
+import type { ScenarioEvent, ScenarioRunData } from "./scenario-event.types";
 
 const tracer = getLangWatchTracer("langwatch.scenario-events.service");
 const logger = createLogger("langwatch:scenario-events:service");

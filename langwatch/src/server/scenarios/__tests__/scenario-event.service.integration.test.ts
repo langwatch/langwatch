@@ -20,8 +20,8 @@ import {
   ScenarioEventType,
   ScenarioRunStatus,
   Verdict,
-} from "~/app/api/scenario-events/[[...route]]/enums";
-import { ScenarioEventService } from "~/app/api/scenario-events/[[...route]]/scenario-event.service";
+} from "~/server/scenarios/scenario-event.enums";
+import { ScenarioEventService } from "~/server/scenarios/scenario-event.service";
 import { prisma } from "~/server/db";
 import { esClient, SCENARIO_EVENTS_INDEX } from "~/server/elasticsearch";
 import { getTestProject } from "~/utils/testUtils";

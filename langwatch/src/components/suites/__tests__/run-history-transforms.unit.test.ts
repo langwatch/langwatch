@@ -5,7 +5,7 @@ import {
   computeRunHistoryTotals,
   type BatchRun,
 } from "../run-history-transforms";
-import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { makeScenarioRunData } from "./test-helpers";
 
 describe("groupRunsByBatchId()", () => {

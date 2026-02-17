@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { ScenarioEventService } from "~/app/api/scenario-events/[[...route]]/scenario-event.service";
+import { ScenarioEventService } from "~/server/scenarios/scenario-event.service";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { createLogger } from "~/utils/logger/server";
 import { checkProjectPermission } from "../../rbac";

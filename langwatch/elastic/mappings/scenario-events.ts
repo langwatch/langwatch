@@ -9,7 +9,7 @@ import type {
   ScenarioMessageSnapshotEvent,
   ScenarioRunFinishedEvent,
   ScenarioRunStartedEvent,
-} from "~/app/api/scenario-events/[[...route]]/types";
+} from "~/server/scenarios/scenario-event.types";
 import { FLATENNED_TYPE } from "~/server/elasticsearch";
 import type { ElasticSearchMappingFrom } from "../schema";
 

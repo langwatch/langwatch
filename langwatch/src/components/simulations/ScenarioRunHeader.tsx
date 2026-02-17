@@ -1,6 +1,6 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 
-import type { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
+import type { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { ScenarioRunStatusIcon } from "./ScenarioRunStatusIcon";
 
 interface ScenarioRunHeaderProps {

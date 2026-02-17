@@ -7,8 +7,8 @@
 import {
   ScenarioRunStatus,
   Verdict,
-} from "~/app/api/scenario-events/[[...route]]/enums";
-import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/types";
+} from "~/server/scenarios/scenario-event.enums";
+import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import type { BatchRun, BatchRunSummary } from "../run-history-transforms";
 
 export function makeScenarioRunData(
