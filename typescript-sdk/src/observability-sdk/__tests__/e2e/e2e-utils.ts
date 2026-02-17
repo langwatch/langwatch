@@ -63,6 +63,7 @@ export function setupE2EObservability(): [LangWatchExporter, SimpleSpanProcessor
 
   console.debug("🔧 Calling setupObservability...");
   setupObservability({
+    langwatch: 'disabled', // Disable built-in LangWatch exporter to avoid duplicate exports
     spanProcessors: [spanProcessor],
     langwatch: 'disabled',
     debug: { logLevel: "debug" },

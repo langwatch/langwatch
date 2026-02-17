@@ -74,6 +74,16 @@ export interface SetupObservabilityOptions {
          * @default 'simple'
          */
         processorType?: "simple" | "batch";
+
+        /**
+         * Enable automatic instrumentation for Vercel AI SDK.
+         *
+         * When enabled, AI SDK spans (ai.generateText, ai.tool Call, etc.) are automatically
+         * captured and transformed into LangWatch traces with proper parent-child relationships.
+         *
+         * @default true
+         */
+        enableAISDK?: boolean;
       }
     | "disabled";
 

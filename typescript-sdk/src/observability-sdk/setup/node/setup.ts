@@ -15,6 +15,7 @@ import { ConsoleLogger, type Logger } from "../../../logger";
 import { initializeObservabilitySdkConfig } from "../../config";
 import { setLangWatchLoggerProvider } from "../../logger";
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
+import { AISDKSpanProcessor } from "../../instrumentation/vercel-ai-sdk";
 
 // Helper functions
 const createNoOpHandle = (logger: Logger): ObservabilityHandle => ({
@@ -31,7 +32,8 @@ const getLangWatchConfig = (options: SetupObservabilityOptions) => {
     disabled: isDisabled,
     apiKey: isDisabled ? void 0 : (config.apiKey ?? process.env.LANGWATCH_API_KEY),
     endpoint: isDisabled ? void 0 : (config.endpoint ?? process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT),
-    processorType: config.processorType ?? 'simple'
+    processorType: config.processorType ?? 'simple',
+    enableAISDK: config.enableAISDK ?? true, // Enable by default
   };
 };
 
@@ -172,6 +174,12 @@ export function createAndStartNodeSdk(
   if (options.debug?.consoleLogging) {
     logProcessors.push(new SimpleLogRecordProcessor(new ConsoleLogRecordExporter()));
     logger.debug("Console recording of logs enabled; adding console log record processor");
+  }
+
+  // AI SDK instrumentation processor (runs first to transform spans before export)
+  if (!langwatch.disabled && langwatch.enableAISDK) {
+    spanProcessors.push(new AISDKSpanProcessor());
+    logger.debug("AI SDK instrumentation enabled; adding AISDKSpanProcessor");
   }
 
   if (!langwatch.disabled) {

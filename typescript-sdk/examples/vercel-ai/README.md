@@ -6,6 +6,7 @@ This example demonstrates how to use the Vercel AI SDK with LangWatch observabil
 
 - 🤖 Interactive AI chatbot using Vercel AI SDK
 - 📊 LangWatch observability integration
+- ✨ **Native AI SDK instrumentation** for automatic span enrichment
 - 🔄 Support for both LangWatch and Vercel OTEL instrumentation
 - 🎨 Markdown formatting for AI responses
 - 🧵 Thread-based conversation tracking
@@ -71,6 +72,10 @@ The application automatically switches based on the `VERCEL` environment variabl
 
 ## Observability Features
 
+- **Native AI SDK Instrumentation**: LangWatch automatically enriches Vercel AI SDK spans with proper metadata
+  - Spans from `ai.streamText`, `ai.generateText`, `ai.toolCall`, etc. are automatically categorized
+  - Tool calls, embeddings, and LLM operations are properly typed for dashboard visualization
+  - No manual span creation needed - just enable `experimental_telemetry` in AI SDK
 - **Thread Tracking**: Each conversation session gets a unique thread ID
 - **Span Creation**: Each iteration creates a new span for tracing
 - **Error Handling**: Errors are captured and logged
@@ -92,8 +97,68 @@ src/
 - `VERCEL`: Set to "1" to enable Vercel OTEL mode
 - `LANGWATCH_API_KEY`: Your LangWatch API key (optional)
 
+## AI SDK Instrumentation
+
+LangWatch now provides native instrumentation for the Vercel AI SDK. When you enable `experimental_telemetry` in AI SDK calls, LangWatch automatically:
+
+1. **Detects AI SDK spans** by their `ai.*` prefix
+2. **Enriches spans** with `langwatch.span.type` for proper categorization:
+   - `ai.streamText`, `ai.generateText` → `llm` type
+   - `ai.toolCall` → `tool` type
+   - `ai.embed`, `ai.embedMany` → `component` type
+3. **Preserves all AI SDK attributes** like model info, usage metrics, and metadata
+
+### Example with Native Instrumentation
+
+```typescript
+import { streamText } from 'ai';
+import { openai } from '@ai-sdk/openai';
+
+const result = streamText({
+  model: openai('gpt-4'),
+  prompt: 'What is 5 + 3? Use the calculator tool.',
+  tools: {
+    calculator: {
+      description: 'Performs arithmetic',
+      parameters: z.object({ operation: z.enum(['add', 'subtract']), a: z.number(), b: z.number() }),
+      execute: async ({ operation, a, b }) => {
+        return { result: operation === 'add' ? a + b : a - b };
+      }
+    }
+  },
+  experimental_telemetry: {
+    isEnabled: true,
+    functionId: 'my-ai-function',
+    metadata: {
+      'langwatch.metadata.thread_id': 'thread-123',
+      'custom.key': 'value'
+    }
+  }
+});
+```
+
+LangWatch will automatically capture:
+- The main `ai.streamText` span as type `llm`
+- Any `ai.toolCall` spans as type `tool`
+- Model usage, tokens, and all AI SDK metadata
+
+### Configuration
+
+Enable AI SDK instrumentation in your `setupObservability` call:
+
+```typescript
+setupObservability({
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY,
+    enableAISDK: true, // Enable native AI SDK instrumentation (default: false)
+  }
+});
+```
+
 ## Troubleshooting
 
 - **TypeScript errors**: Run `npm run build` to check for compilation errors
 - **Missing dependencies**: Run `npm install` to install all dependencies
 - **Environment issues**: Ensure your `.env` file is properly configured
+- **Spans not appearing**: Ensure `experimental_telemetry.isEnabled: true` is set in AI SDK calls
+- **Spans missing metadata**: Verify `enableAISDK: true` is set in `setupObservability` configuration
