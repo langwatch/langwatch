@@ -240,7 +240,7 @@ export const matchingLLMModelCost = (
   });
 
   if (!llmModelCost && normalizedModel.includes("/")) {
-    const model_ = normalizedModel.split("/")[1]!;
+    const model_ = normalizedModel.substring(normalizedModel.indexOf("/") + 1);
     return matchingLLMModelCost(model_, llmModelCosts);
   }
   return llmModelCost;
