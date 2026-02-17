@@ -40,6 +40,11 @@ export const MainMenu = React.memo(function MainMenu({
     { projectId: project?.id, organizationId: organization?.id },
   );
 
+  const { enabled: showSuites } = useFeatureFlag(
+    "release_ui_suites_enabled",
+    { projectId: project?.id, organizationId: organization?.id },
+  );
+
   // In compact mode, show expanded view on hover
   const showExpanded = !isCompact || isHovered;
   const currentWidth = showExpanded ? MENU_WIDTH_EXPANDED : MENU_WIDTH_COMPACT;
@@ -162,6 +167,21 @@ export const MainMenu = React.memo(function MainMenu({
                       router.pathname.includes("/simulations") &&
                       !router.pathname.includes("/simulations/scenarios"),
                   },
+                  ...(showSuites
+                    ? [
+                        {
+                          icon: featureIcons.suites.icon,
+                          label: projectRoutes.suites.title,
+                          href: project
+                            ? projectRoutes.suites.path.replace(
+                                "[project]",
+                                project.slug,
+                              )
+                            : "/auth/signin",
+                          isActive: router.pathname.includes("/suites"),
+                        },
+                      ]
+                    : []),
                 ]}
               />
             ) : (

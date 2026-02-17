@@ -34,12 +34,14 @@ import { EvaluatorEditorDrawer } from "./evaluators/EvaluatorEditorDrawer";
 import { EvaluatorListDrawer } from "./evaluators/EvaluatorListDrawer";
 import { EvaluatorTypeSelectorDrawer } from "./evaluators/EvaluatorTypeSelectorDrawer";
 import { WorkflowSelectorForEvaluatorDrawer } from "./evaluators/WorkflowSelectorForEvaluatorDrawer";
+import { SdkRadarDrawer } from "./drawers/SdkRadarDrawer";
 import { CreateProjectDrawer } from "./projects/CreateProjectDrawer";
 import { PromptEditorDrawer } from "./prompts/PromptEditorDrawer";
 import { PromptListDrawer } from "./prompts/PromptListDrawer";
 import { SeriesFiltersDrawer } from "./SeriesFilterDrawer";
 import { ScenarioFormDrawer } from "./scenarios/ScenarioFormDrawer";
 import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
+import { SuiteFormDrawer } from "./suites/SuiteFormDrawer";
 import { TraceDetailsDrawer } from "./TraceDetailsDrawer";
 // Evaluations V3 drawers
 import { TargetTypeSelectorDrawer } from "./targets/TargetTypeSelectorDrawer";
@@ -81,11 +83,15 @@ export const drawers = {
   workflowSelectorForEvaluator: WorkflowSelectorForEvaluatorDrawer,
   // Scenarios
   scenarioEditor: ScenarioFormDrawer,
+  // Suites
+  suiteEditor: SuiteFormDrawer,
   // Project management
   createProject: CreateProjectDrawer,
   // Online Evaluations (Monitors)
   onlineEvaluation: OnlineEvaluationDrawer,
   guardrails: GuardrailsDrawer,
+  // SDK Radar
+  sdkRadar: SdkRadarDrawer,
 } satisfies Record<string, React.FC<any>>;
 
 /**

@@ -63,6 +63,7 @@ export class EventSourcingService<
     featureFlagService,
     commandRegistrations,
     globalRegistry,
+    redisConnection,
   }: EventSourcingServiceOptions<EventType, ProjectionTypes>) {
     this.pipelineName = pipelineName;
     this.aggregateType = aggregateType;
@@ -101,6 +102,7 @@ export class EventSourcingService<
       pipelineName,
       this.queueManager,
       featureFlagService,
+      redisConnection,
     );
 
     // Register fold projections

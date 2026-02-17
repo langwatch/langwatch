@@ -10,14 +10,14 @@ Feature: Scenario Editor
   # Create Scenario
   # ============================================================================
 
-  @e2e
+  @integration
   Scenario: Navigate to create form
     Given I am on the scenarios list page
     When I click "New Scenario"
     Then I navigate to the scenario editor
     And I see an empty scenario form
 
-  @e2e
+  @integration
   Scenario: View scenario form fields
     When I am on the create scenario page
     Then I see the following fields:
@@ -62,7 +62,7 @@ Feature: Scenario Editor
   # Criteria Management
   # ============================================================================
 
-  @e2e
+  @integration
   Scenario: Add criterion to list
     Given I am on the scenario editor
     When I type criterion "Agent must apologize"
@@ -70,13 +70,13 @@ Feature: Scenario Editor
     Then the criterion appears in the criteria list
     And I can add more criteria
 
-  @e2e
+  @integration
   Scenario: Remove criterion from list
     Given criteria ["Criterion A", "Criterion B"] exist in the form
     When I click remove on "Criterion A"
     Then only "Criterion B" remains in the list
 
-  @component
+  @integration
   Scenario: Criteria list validates empty input
     Given I am on the scenario editor
     When I try to add an empty criterion
@@ -87,14 +87,14 @@ Feature: Scenario Editor
   # Target Configuration
   # ============================================================================
 
-  @e2e
+  @integration
   Scenario: Configure prompt as target
     Given I am on the scenario editor
     And prompts exist in the project
     When I open the target selector
     Then I can select an existing prompt config
 
-  @e2e
+  @integration
   Scenario: Configure HTTP agent as target
     Given I am on the scenario editor
     When I open the target selector

@@ -35,6 +35,11 @@
           "type": "json",
           "path": "package.json",
           "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "../langwatch/src/server/sdk-radar/sdk-versions.json",
+          "jsonpath": "$.typescript-sdk"
         }
       ]
     },
@@ -52,7 +57,14 @@
         { "type": "docs", "section": "Documentation", "hidden": false },
         { "type": "refactor", "section": "Code Refactoring", "hidden": false }
       ],
-      "extra-files": ["src/langwatch/__version__.py"]
+      "extra-files": [
+        "src/langwatch/__version__.py",
+        {
+          "type": "json",
+          "path": "../langwatch/src/server/sdk-radar/sdk-versions.json",
+          "jsonpath": "$.python-sdk"
+        }
+      ]
     },
     "mcp-server": {
       "release-type": "node",

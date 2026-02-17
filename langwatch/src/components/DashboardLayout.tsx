@@ -33,6 +33,7 @@ import { api } from "../utils/api";
 import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { trackEvent } from "../utils/tracking";
 import { CurrentDrawer } from "./CurrentDrawer";
+import { SdkRadarBanner } from "./SdkRadarBanner";
 import { FullLogo } from "./icons/FullLogo";
 import { LogoIcon } from "./icons/LogoIcon";
 import { LoadingScreen } from "./LoadingScreen";
@@ -608,6 +609,8 @@ export const DashboardLayout = ({
                   </Alert.Content>
                 </Alert.Root>
               )}
+
+            <SdkRadarBanner />
 
             {publicEnv.data?.DEMO_PROJECT_SLUG &&
               publicEnv.data.DEMO_PROJECT_SLUG === router.query.project && (

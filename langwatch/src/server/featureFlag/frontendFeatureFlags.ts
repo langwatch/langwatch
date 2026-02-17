@@ -50,7 +50,11 @@
  * @see docs/adr/005-feature-flags.md for architecture decisions
  * @see useFeatureFlag for frontend usage
  */
-export const FRONTEND_FEATURE_FLAGS = ["release_ui_simulations_menu_enabled"] as const;
+export const FRONTEND_FEATURE_FLAGS = [
+  "release_ui_simulations_menu_enabled",
+  "release_ui_suites_enabled",
+  "release_ui_sdk_radar_banner_card_enabled",
+] as const;
 
 /**
  * Type representing a valid frontend feature flag key.

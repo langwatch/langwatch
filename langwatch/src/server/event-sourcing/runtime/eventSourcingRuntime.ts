@@ -1,3 +1,5 @@
+import type IORedis from "ioredis";
+import type { Cluster } from "ioredis";
 import { createLogger } from "~/utils/logger/server";
 import type { EventStore } from "../library";
 import type { EventSourcingConfig, EventSourcingConfigOptions } from "./config";
@@ -51,6 +53,15 @@ export class EventSourcingRuntime {
    */
   get isClickHouseEnabled(): boolean {
     return this.config.clickHouseEnabled && !!this.config.clickHouseClient;
+  }
+
+  /**
+   * The Redis connection from config, if available.
+   * Exposed so pipelines can pass it through to components that need Redis
+   * (e.g. replay marker checks) without relying on the global singleton.
+   */
+  get redisConnection(): IORedis | Cluster | undefined {
+    return this.config.redisConnection;
   }
 
   /**

@@ -621,4 +621,72 @@ export class ScenarioEventService {
       },
     );
   }
+
+  /**
+   * Retrieves run data for all suites (cross-suite view) with cursor-based pagination.
+   * @param {Object} params - The parameters for retrieving run data
+   * @param {string} params.projectId - The ID of the project
+   * @param {number} [params.limit] - Maximum number of batch runs to return
+   * @param {string} [params.cursor] - Cursor for pagination
+   * @returns {Promise<{runs: ScenarioRunData[], scenarioSetIds: Record<string, string>, nextCursor?: string, hasMore: boolean}>} Paginated scenario run data with scenario set IDs
+   */
+  async getRunDataForAllSuites({
+    projectId,
+    limit = 20,
+    cursor,
+  }: {
+    projectId: string;
+    limit?: number;
+    cursor?: string;
+  }) {
+    return tracer.withActiveSpan(
+      "ScenarioEventService.getRunDataForAllSuites",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": projectId,
+          "pagination.limit": limit,
+          "pagination.has_cursor": cursor !== undefined,
+        },
+      },
+      async (span) => {
+        logger.debug({ projectId, limit, hasCursor: !!cursor }, "Fetching run data for all suites");
+
+        // Validate limit to prevent abuse
+        const validatedLimit = Math.min(Math.max(1, limit), 100);
+
+        // Use the new cross-suite repository method
+        const result = await this.eventRepository.getBatchRunIdsForAllSuites({
+          projectId,
+          limit: validatedLimit,
+          cursor,
+        });
+
+        if (result.batchRunIds.length === 0) {
+          span.setAttribute("result.count", 0);
+          return {
+            runs: [],
+            scenarioSetIds: {},
+            nextCursor: undefined,
+            hasMore: false,
+          };
+        }
+
+        const runs = await this.getRunDataForBatchIds({
+          projectId,
+          batchRunIds: result.batchRunIds,
+        });
+
+        span.setAttribute("result.count", runs.length);
+        span.setAttribute("result.has_more", result.hasMore);
+
+        return {
+          runs,
+          scenarioSetIds: result.scenarioSetIds,
+          nextCursor: result.nextCursor,
+          hasMore: result.hasMore,
+        };
+      },
+    );
+  }
 }

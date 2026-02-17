@@ -6,7 +6,7 @@ Lessons learned from running `/browser-test` against the LangWatch app.
 
 1. **Check the port is reachable** — try `browser_navigate` first. If it fails with `ERR_CONNECTION_REFUSED` or `ERR_CONNECTION_RESET`, the app isn't ready. Docker containers can take 1-2 minutes for migrations + compilation.
 
-2. **Dev mode is slow** — First visit to any page triggers Turbopack compilation. Expect 15-30 second waits per new page. The orange bar at the top of the screen is the compilation indicator. Don't panic — just wait.
+2. **Dev mode is slow** — First visit to any page triggers Turbopack compilation. Expect **60-120 second waits** per new page. The orange bar at the top of the screen is the compilation indicator. Don't panic — just wait. Use `browser_wait_for` with `time: 120` for first page loads.
 
 3. **Port mismatch kills auth** — `NEXTAUTH_URL` in `.env` must match the port the app is actually running on. If using `make quickstart` / `dev.sh`, the port auto-detects starting from 5560. The `compose.dev.yml` overrides `NEXTAUTH_URL` with `${APP_PORT:-5560}` so Docker should be fine. If running `pnpm dev` directly and the port increments (e.g. to 5561), auth callbacks will break.
 
@@ -26,9 +26,17 @@ Lessons learned from running `/browser-test` against the LangWatch app.
 ## Interaction Tips
 
 - **Use `browser_snapshot`** for all interactions — it returns the accessibility tree with element refs. Only use `browser_take_screenshot` for evidence of failures.
-- **Wait generously** — use `browser_wait_for` with 10-30 seconds for page transitions. Dev mode compilation is the bottleneck.
+- **Wait generously** — use `browser_wait_for` with 60-120 seconds for first page loads, 10-30 seconds for subsequent transitions. Dev mode compilation is the bottleneck.
 - **Check console logs** in snapshot events — tRPC query/mutation logs show what API calls are happening (`>> query` = request, `<< query` = response). This tells you if data is loading or if something failed.
 - **Escape closes dialogs** — prefer `browser_press_key Escape` over clicking Close buttons to avoid intercepted-click issues.
+
+## Screenshots
+
+Always save screenshots to `.browser-test-screenshots/` (gitignored). Never save to repo root.
+
+```text
+browser_take_screenshot → filename: ".browser-test-screenshots/my-screenshot.png"
+```
 
 ## After Finishing
 

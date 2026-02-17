@@ -1,4 +1,6 @@
 import { SpanKind } from "@opentelemetry/api";
+import type IORedis from "ioredis";
+import type { Cluster } from "ioredis";
 import { getLangWatchTracer } from "langwatch";
 import type { FeatureFlagServiceInterface } from "~/server/featureFlag/types";
 import { createLogger } from "~/utils/logger/server";
@@ -48,6 +50,7 @@ export class ProjectionRouter<
     private readonly pipelineName: string,
     private readonly queueManager: QueueManager<EventType>,
     private readonly featureFlagService?: FeatureFlagServiceInterface,
+    private readonly redisConnection?: IORedis | Cluster,
   ) {}
 
   registerFoldProjection(projection: FoldProjectionDefinition<any, EventType>): void {

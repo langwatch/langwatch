@@ -504,6 +504,191 @@ describe("ScenarioEventService Integration Tests", () => {
     });
   });
 
+  describe("getRunDataForAllSuites", () => {
+    it("returns runs from multiple suites with scenarioSetIds map", async () => {
+      const client = await esClient({ test: true });
+
+      // Two different suites with the __internal__<suiteId>__suite pattern
+      const suite1SetId = `__internal__suite_aaa_${Date.now()}__suite`;
+      const suite2SetId = `__internal__suite_bbb_${Date.now()}__suite`;
+      const ids1 = generateTestIds("allsuites-1");
+      const ids2 = generateTestIds("allsuites-2");
+
+      const timestamp1 = Date.now() - 10000;
+      const timestamp2 = Date.now() - 5000;
+
+      const events = [
+        // Suite 1 run
+        {
+          type: ScenarioEventType.RUN_STARTED,
+          timestamp: timestamp1,
+          project_id: project.id,
+          scenario_id: ids1.scenarioId,
+          scenario_run_id: ids1.scenarioRunId,
+          batch_run_id: ids1.batchRunId,
+          scenario_set_id: suite1SetId,
+          metadata: { name: "Suite 1 Scenario" },
+        },
+        {
+          type: ScenarioEventType.RUN_FINISHED,
+          timestamp: timestamp1 + 500,
+          project_id: project.id,
+          scenario_id: ids1.scenarioId,
+          scenario_run_id: ids1.scenarioRunId,
+          batch_run_id: ids1.batchRunId,
+          scenario_set_id: suite1SetId,
+          status: ScenarioRunStatus.SUCCESS,
+          results: { verdict: Verdict.SUCCESS },
+        },
+        // Suite 2 run
+        {
+          type: ScenarioEventType.RUN_STARTED,
+          timestamp: timestamp2,
+          project_id: project.id,
+          scenario_id: ids2.scenarioId,
+          scenario_run_id: ids2.scenarioRunId,
+          batch_run_id: ids2.batchRunId,
+          scenario_set_id: suite2SetId,
+          metadata: { name: "Suite 2 Scenario" },
+        },
+        {
+          type: ScenarioEventType.RUN_FINISHED,
+          timestamp: timestamp2 + 500,
+          project_id: project.id,
+          scenario_id: ids2.scenarioId,
+          scenario_run_id: ids2.scenarioRunId,
+          batch_run_id: ids2.batchRunId,
+          scenario_set_id: suite2SetId,
+          status: ScenarioRunStatus.ERROR,
+          results: { verdict: Verdict.FAILURE },
+        },
+      ];
+
+      await client.bulk({
+        index: SCENARIO_EVENTS_INDEX.alias,
+        body: events.flatMap((event) => [{ index: {} }, event]),
+        refresh: true,
+      });
+
+      const result = await service.getRunDataForAllSuites({
+        projectId: project.id,
+        limit: 10,
+      });
+
+      // Both batch runs should be returned
+      expect(result.runs.length).toBeGreaterThanOrEqual(2);
+
+      // scenarioSetIds map should contain both batch run → set id mappings
+      expect(result.scenarioSetIds[ids1.batchRunId]).toBe(suite1SetId);
+      expect(result.scenarioSetIds[ids2.batchRunId]).toBe(suite2SetId);
+
+      // Verify runs from both suites are present
+      const run1 = result.runs.find((r) => r.batchRunId === ids1.batchRunId);
+      const run2 = result.runs.find((r) => r.batchRunId === ids2.batchRunId);
+      expect(run1).toBeDefined();
+      expect(run2).toBeDefined();
+      expect(run1!.status).toBe(ScenarioRunStatus.SUCCESS);
+      expect(run2!.status).toBe(ScenarioRunStatus.ERROR);
+    });
+
+    it("excludes runs from non-suite scenario sets", async () => {
+      const client = await esClient({ test: true });
+
+      // Suite run (should be included)
+      const suiteSetId = `__internal__suite_ccc_${Date.now()}__suite`;
+      const suiteIds = generateTestIds("allsuites-include");
+
+      // Non-suite run (should be excluded)
+      const nonSuiteSetId = `__internal__proj_1__on-platform-scenarios`;
+      const nonSuiteIds = generateTestIds("allsuites-exclude");
+
+      const now = Date.now();
+
+      const events = [
+        // Suite run
+        {
+          type: ScenarioEventType.RUN_STARTED,
+          timestamp: now - 5000,
+          project_id: project.id,
+          scenario_id: suiteIds.scenarioId,
+          scenario_run_id: suiteIds.scenarioRunId,
+          batch_run_id: suiteIds.batchRunId,
+          scenario_set_id: suiteSetId,
+          metadata: { name: "Suite Run" },
+        },
+        {
+          type: ScenarioEventType.RUN_FINISHED,
+          timestamp: now - 4500,
+          project_id: project.id,
+          scenario_id: suiteIds.scenarioId,
+          scenario_run_id: suiteIds.scenarioRunId,
+          batch_run_id: suiteIds.batchRunId,
+          scenario_set_id: suiteSetId,
+          status: ScenarioRunStatus.SUCCESS,
+          results: { verdict: Verdict.SUCCESS },
+        },
+        // Non-suite run (on-platform)
+        {
+          type: ScenarioEventType.RUN_STARTED,
+          timestamp: now - 3000,
+          project_id: project.id,
+          scenario_id: nonSuiteIds.scenarioId,
+          scenario_run_id: nonSuiteIds.scenarioRunId,
+          batch_run_id: nonSuiteIds.batchRunId,
+          scenario_set_id: nonSuiteSetId,
+          metadata: { name: "Non-Suite Run" },
+        },
+        {
+          type: ScenarioEventType.RUN_FINISHED,
+          timestamp: now - 2500,
+          project_id: project.id,
+          scenario_id: nonSuiteIds.scenarioId,
+          scenario_run_id: nonSuiteIds.scenarioRunId,
+          batch_run_id: nonSuiteIds.batchRunId,
+          scenario_set_id: nonSuiteSetId,
+          status: ScenarioRunStatus.SUCCESS,
+          results: { verdict: Verdict.SUCCESS },
+        },
+      ];
+
+      await client.bulk({
+        index: SCENARIO_EVENTS_INDEX.alias,
+        body: events.flatMap((event) => [{ index: {} }, event]),
+        refresh: true,
+      });
+
+      const result = await service.getRunDataForAllSuites({
+        projectId: project.id,
+        limit: 100,
+      });
+
+      // Suite run should be present
+      const suiteRun = result.runs.find((r) => r.batchRunId === suiteIds.batchRunId);
+      expect(suiteRun).toBeDefined();
+
+      // Non-suite run should NOT be present
+      const nonSuiteRun = result.runs.find((r) => r.batchRunId === nonSuiteIds.batchRunId);
+      expect(nonSuiteRun).toBeUndefined();
+
+      // scenarioSetIds should only have the suite batch run
+      expect(result.scenarioSetIds[suiteIds.batchRunId]).toBe(suiteSetId);
+      expect(result.scenarioSetIds[nonSuiteIds.batchRunId]).toBeUndefined();
+    });
+
+    it("returns empty results for a project with no suite runs", async () => {
+      // Use a unique project ID that has no data at all
+      const emptyProjectId = `proj_empty_${Date.now()}`;
+      const result = await service.getRunDataForAllSuites({
+        projectId: emptyProjectId,
+        limit: 10,
+      });
+
+      expect(result.runs).toHaveLength(0);
+      expect(result.scenarioSetIds).toEqual({});
+      expect(result.hasMore).toBe(false);
+    });
+  });
+
   describe("getScenarioRunData (single run)", () => {
     it("should return correct data for a run without MESSAGE_SNAPSHOT", async () => {
       const client = await esClient({ test: true });
