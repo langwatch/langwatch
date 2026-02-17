@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 // Load this package's .env with override so it wins over the cleared defaults
 dotenv.config({ override: true });
 
+import fs from "node:fs";
 import { Command } from "commander";
 import IORedis from "ioredis";
 import { render } from "ink";
@@ -17,7 +18,12 @@ import {
 import { cleanupAll } from "./markers";
 import { ReplayUI } from "./components/ReplayUI";
 import { ParallelReplayUI } from "./components/ParallelReplayUI";
-import { ReplayWizard, type ReplayConfig } from "./components/ReplayWizard";
+import {
+  ReplayWizard,
+  parseTenantIds,
+  type ReplayConfig,
+} from "./components/ReplayWizard";
+import { TenantContinuePrompt } from "./components/TenantContinuePrompt";
 
 function resolveClickHouseUrl(opts: { clickhouseUrl?: string }): string {
   const url = opts.clickhouseUrl ?? process.env.CLICKHOUSE_URL;
@@ -90,10 +96,17 @@ async function resolveProjections(
   return resolved;
 }
 
+function readTenantFile(filePath: string): string[] {
+  const content = fs.readFileSync(filePath, "utf-8");
+  return content
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !line.startsWith("#"));
+}
+
 function runWizard(props: {
-  tenantId: string;
-  projectInfo: { name: string; slug: string } | null;
   availableProjections: DiscoveredFoldProjection[];
+  initialTenantIds?: string[];
   initialProjections?: DiscoveredFoldProjection[];
   initialSince?: string;
   initialConcurrency?: number;
@@ -102,9 +115,8 @@ function runWizard(props: {
   return new Promise((resolve) => {
     const { unmount } = render(
       <ReplayWizard
-        tenantId={props.tenantId}
-        projectInfo={props.projectInfo}
         availableProjections={props.availableProjections}
+        initialTenantIds={props.initialTenantIds}
         initialProjections={props.initialProjections}
         initialSince={props.initialSince}
         initialConcurrency={props.initialConcurrency}
@@ -133,6 +145,7 @@ function runProjectionPicker(props: {
         tenantId={props.tenantId}
         projectInfo={props.projectInfo}
         availableProjections={props.availableProjections}
+        initialTenantIds={[props.tenantId]}
         initialSince="unused"
         initialConcurrency={1}
         initialDryRun={false}
@@ -143,6 +156,28 @@ function runProjectionPicker(props: {
         onCancel={() => {
           unmount();
           resolve(null);
+        }}
+      />,
+    );
+  });
+}
+
+function runTenantContinuePrompt(
+  nextTenantId: string,
+  nextProjectInfo: { name: string; slug: string } | null,
+): Promise<"continue" | "abort"> {
+  return new Promise((resolve) => {
+    const { unmount } = render(
+      <TenantContinuePrompt
+        nextTenantId={nextTenantId}
+        nextProjectInfo={nextProjectInfo}
+        onContinue={() => {
+          unmount();
+          resolve("continue");
+        }}
+        onAbort={() => {
+          unmount();
+          resolve("abort");
         }}
       />,
     );
@@ -161,9 +196,13 @@ async function main() {
       "--projection <name>",
       "Projection name(s), comma-separated (interactive if omitted)",
     )
-    .requiredOption(
-      "--tenant-id <id>",
-      "Tenant ID to replay (e.g. project_abc123)",
+    .option(
+      "--tenant-id <ids>",
+      "Tenant ID(s), comma-separated (interactive if omitted)",
+    )
+    .option(
+      "--tenant-file <path>",
+      "File with tenant IDs (one per line, unattended mode)",
     )
     .option(
       "--since <date>",
@@ -192,7 +231,8 @@ async function main() {
     .action(
       async (opts: {
         projection?: string;
-        tenantId: string;
+        tenantId?: string;
+        tenantFile?: string;
         since?: string;
         clickhouseUrl?: string;
         redisUrl?: string;
@@ -202,11 +242,27 @@ async function main() {
         concurrency: string;
         dryRun: boolean;
       }) => {
+        if (opts.tenantId && opts.tenantFile) {
+          console.error(
+            "--tenant-id and --tenant-file are mutually exclusive.",
+          );
+          process.exit(1);
+        }
+
         resolveDatabaseUrl(opts);
-        const projectInfo = await fetchProject(opts.tenantId);
 
-        const needsWizard = !opts.projection || !opts.since;
+        const cliTenantIds = opts.tenantFile
+          ? readTenantFile(opts.tenantFile)
+          : opts.tenantId
+            ? parseTenantIds(opts.tenantId)
+            : undefined;
 
+        const batchMode = !!opts.tenantFile;
+
+        const needsWizard =
+          !cliTenantIds || !opts.projection || !opts.since;
+
+        let tenantIds: string[];
         let projections: DiscoveredFoldProjection[];
         let since: string;
         let concurrency: number;
@@ -224,9 +280,8 @@ async function main() {
           const initialConcurrency = parseInt(opts.concurrency, 10);
 
           const config = await runWizard({
-            tenantId: opts.tenantId,
-            projectInfo: projectInfo,
             availableProjections: allProjections,
+            initialTenantIds: cliTenantIds,
             initialProjections,
             initialSince: opts.since,
             initialConcurrency: isNaN(initialConcurrency)
@@ -240,13 +295,13 @@ async function main() {
             return;
           }
 
+          tenantIds = config.tenantIds;
           projections = config.projections;
           since = config.since;
           concurrency = config.concurrency;
           dryRun = config.dryRun;
         } else {
-          // Both opts.projection and opts.since are guaranteed defined here
-          // (needsWizard = !opts.projection || !opts.since was false)
+          tenantIds = cliTenantIds;
           projections = await resolveProjections(opts.projection!);
           since = opts.since!;
 
@@ -257,6 +312,11 @@ async function main() {
           }
           concurrency = parsedConcurrency;
           dryRun = opts.dryRun;
+        }
+
+        if (tenantIds.length === 0) {
+          console.error("No tenant IDs provided.");
+          process.exit(1);
         }
 
         const chUrl = resolveClickHouseUrl(opts);
@@ -277,38 +337,91 @@ async function main() {
           process.exit(1);
         }
 
-        if (projections.length === 1) {
-          const { waitUntilExit } = render(
-            <ReplayUI
-              projection={projections[0]!}
-              tenantId={opts.tenantId}
-              projectInfo={projectInfo}
-              since={since}
-              batchSize={batchSize}
-              aggregateBatchSize={aggregateBatchSize}
-              concurrency={concurrency}
-              dryRun={dryRun}
-              client={client}
-              redis={redis}
-            />,
-          );
-          await waitUntilExit();
-        } else {
-          const { waitUntilExit } = render(
-            <ParallelReplayUI
-              projections={projections}
-              tenantId={opts.tenantId}
-              projectInfo={projectInfo}
-              since={since}
-              batchSize={batchSize}
-              aggregateBatchSize={aggregateBatchSize}
-              concurrency={concurrency}
-              dryRun={dryRun}
-              client={client}
-              redis={redis}
-            />,
-          );
-          await waitUntilExit();
+        // Fetch project info for each tenant independently
+        const tenantInfos = await Promise.all(
+          tenantIds.map(async (tid) => ({
+            tenantId: tid,
+            projectInfo: await fetchProject(tid),
+          })),
+        );
+
+        // Run each tenant sequentially — no shared mutable state between iterations
+        for (let i = 0; i < tenantInfos.length; i++) {
+          const { tenantId, projectInfo } = tenantInfos[i]!;
+
+          if (tenantInfos.length > 1) {
+            console.log(
+              `\n[${ i + 1}/${tenantInfos.length}] Tenant: ${projectInfo ? `${projectInfo.name} (${tenantId})` : tenantId}`,
+            );
+          }
+
+          const lastResult: { batchErrors: number; firstError?: string } = {
+            batchErrors: 0,
+          };
+          const handleFinish = (r: {
+            batchErrors: number;
+            firstError?: string;
+          }) => {
+            lastResult.batchErrors = r.batchErrors;
+            lastResult.firstError = r.firstError;
+          };
+
+          if (projections.length === 1) {
+            const { waitUntilExit } = render(
+              <ReplayUI
+                projection={projections[0]!}
+                tenantId={tenantId}
+                projectInfo={projectInfo}
+                since={since}
+                batchSize={batchSize}
+                aggregateBatchSize={aggregateBatchSize}
+                concurrency={concurrency}
+                dryRun={dryRun}
+                client={client}
+                redis={redis}
+                onFinish={handleFinish}
+              />,
+            );
+            await waitUntilExit();
+          } else {
+            const { waitUntilExit } = render(
+              <ParallelReplayUI
+                projections={projections}
+                tenantId={tenantId}
+                projectInfo={projectInfo}
+                since={since}
+                batchSize={batchSize}
+                aggregateBatchSize={aggregateBatchSize}
+                concurrency={concurrency}
+                dryRun={dryRun}
+                client={client}
+                redis={redis}
+                onFinish={handleFinish}
+              />,
+            );
+            await waitUntilExit();
+          }
+
+          // In batch mode, stop on first error
+          if (batchMode && lastResult.batchErrors > 0) {
+            console.error(
+              `Stopping — errors in tenant ${tenantId}: ${lastResult.firstError ?? "unknown error"}`,
+            );
+            break;
+          }
+
+          // Prompt between tenants (not after the last one, not in batch mode)
+          if (!batchMode && i < tenantInfos.length - 1) {
+            const nextTenant = tenantInfos[i + 1]!;
+            const choice = await runTenantContinuePrompt(
+              nextTenant.tenantId,
+              nextTenant.projectInfo,
+            );
+            if (choice === "abort") {
+              console.log("Aborted. Remaining tenants skipped.");
+              break;
+            }
+          }
         }
 
         await client.close();
@@ -322,9 +435,13 @@ async function main() {
       "--projection <name>",
       "Projection name(s), comma-separated (interactive if omitted)",
     )
-    .requiredOption(
-      "--tenant-id <id>",
-      "Tenant ID (required for project lookup in interactive mode)",
+    .option(
+      "--tenant-id <ids>",
+      "Tenant ID(s), comma-separated (interactive if omitted)",
+    )
+    .option(
+      "--tenant-file <path>",
+      "File with tenant IDs (one per line, unattended mode)",
     )
     .option(
       "--redis-url <url>",
@@ -337,12 +454,26 @@ async function main() {
     .action(
       async (opts: {
         projection?: string;
-        tenantId: string;
+        tenantId?: string;
+        tenantFile?: string;
         redisUrl?: string;
         databaseUrl?: string;
       }) => {
+        if (opts.tenantId && opts.tenantFile) {
+          console.error(
+            "--tenant-id and --tenant-file are mutually exclusive.",
+          );
+          process.exit(1);
+        }
+
         const rUrl = resolveRedisUrl(opts);
         const redis = new IORedis(rUrl, { maxRetriesPerRequest: null });
+
+        const tenantIds = opts.tenantFile
+          ? readTenantFile(opts.tenantFile)
+          : opts.tenantId
+            ? parseTenantIds(opts.tenantId)
+            : [];
 
         let projectionNames: string[];
 
@@ -351,11 +482,16 @@ async function main() {
         } else {
           resolveDatabaseUrl(opts);
           const allProjections = await discoverAllFoldProjections();
-          const projectInfo = await fetchProject(opts.tenantId);
+
+          // Use first tenant for the projection picker display
+          const pickerId = tenantIds[0] ?? "unknown";
+          const pickerInfo = tenantIds[0]
+            ? await fetchProject(tenantIds[0])
+            : null;
 
           const selected = await runProjectionPicker({
-            tenantId: opts.tenantId,
-            projectInfo,
+            tenantId: pickerId,
+            projectInfo: pickerInfo,
             availableProjections: allProjections,
           });
 

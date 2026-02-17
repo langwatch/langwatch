@@ -6,6 +6,7 @@ import type { DiscoveredFoldProjection } from "../discovery";
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export interface ReplayConfig {
+  tenantIds: string[];
   projections: DiscoveredFoldProjection[];
   since: string;
   concurrency: number;
@@ -13,9 +14,10 @@ export interface ReplayConfig {
 }
 
 interface ReplayWizardProps {
-  tenantId: string;
-  projectInfo: { name: string; slug: string } | null;
+  tenantId?: string;
+  projectInfo?: { name: string; slug: string } | null;
   availableProjections: DiscoveredFoldProjection[];
+  initialTenantIds?: string[];
   initialProjections?: DiscoveredFoldProjection[];
   initialSince?: string;
   initialConcurrency?: number;
@@ -24,15 +26,64 @@ interface ReplayWizardProps {
   onCancel: () => void;
 }
 
-type WizardStep = "projections" | "since" | "concurrency" | "dryRun";
+type WizardStep = "tenantIds" | "projections" | "since" | "concurrency" | "dryRun";
 
 function getSteps(props: ReplayWizardProps): WizardStep[] {
   const steps: WizardStep[] = [];
+  if (!props.initialTenantIds) steps.push("tenantIds");
   if (!props.initialProjections) steps.push("projections");
   if (props.initialSince === undefined) steps.push("since");
   if (props.initialConcurrency === undefined) steps.push("concurrency");
   if (props.initialDryRun === undefined) steps.push("dryRun");
   return steps;
+}
+
+export function parseTenantIds(raw: string): string[] {
+  return raw.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
+}
+
+// ─── TenantIdInput ─────────────────────────────────────────────────────────
+
+function TenantIdInput({
+  onComplete,
+  onCancel,
+}: {
+  onComplete: (ids: string[]) => void;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState("");
+
+  useInput((_input, key) => {
+    if (key.escape) {
+      onCancel();
+    }
+  });
+
+  const parsed = parseTenantIds(value);
+
+  const handleSubmit = () => {
+    if (parsed.length > 0) {
+      onComplete(parsed);
+    }
+  };
+
+  return (
+    <Box flexDirection="column">
+      <Box>
+        <Text bold>Tenant ID(s) </Text>
+        <Text dimColor>(comma or newline separated): </Text>
+        <TextInput value={value} onChange={setValue} onSubmit={handleSubmit} />
+      </Box>
+      {parsed.length > 0 && (
+        <Box flexDirection="column" marginTop={1}>
+          <Text dimColor>{parsed.length} tenant(s) parsed:</Text>
+          {parsed.map((id) => (
+            <Text key={id} dimColor>  {id}</Text>
+          ))}
+        </Box>
+      )}
+    </Box>
+  );
 }
 
 // ─── ProjectionPicker ───────────────────────────────────────────────────────
@@ -215,6 +266,7 @@ export function ReplayWizard(props: ReplayWizardProps) {
     tenantId,
     projectInfo,
     availableProjections,
+    initialTenantIds,
     initialProjections,
     initialSince,
     initialConcurrency,
@@ -226,6 +278,9 @@ export function ReplayWizard(props: ReplayWizardProps) {
   const steps = getSteps(props);
   const [stepIndex, setStepIndex] = useState(0);
 
+  const [tenantIds, setTenantIds] = useState<string[]>(
+    initialTenantIds ?? (tenantId ? [tenantId] : []),
+  );
   const [projections, setProjections] = useState<DiscoveredFoldProjection[]>(
     initialProjections ?? [],
   );
@@ -238,6 +293,7 @@ export function ReplayWizard(props: ReplayWizardProps) {
   const advance = () => {
     if (stepIndex + 1 >= steps.length) {
       onComplete({
+        tenantIds,
         projections,
         since,
         concurrency,
@@ -248,23 +304,37 @@ export function ReplayWizard(props: ReplayWizardProps) {
     }
   };
 
-  const projectDisplay = projectInfo
-    ? `${projectInfo.name} (${tenantId})`
-    : `${tenantId} (not found in DB)`;
+  const projectDisplay = tenantId
+    ? projectInfo
+      ? `${projectInfo.name} (${tenantId})`
+      : `${tenantId} (not found in DB)`
+    : null;
 
   return (
     <Box flexDirection="column">
       <Text bold>Projection Replay</Text>
       <Text>{"━".repeat(50)}</Text>
 
-      <Box marginLeft={2} marginTop={1} flexDirection="column">
-        <Text>
-          <Text dimColor>project </Text>
-          <Text>{projectDisplay}</Text>
-        </Text>
-      </Box>
+      {projectDisplay && (
+        <Box marginLeft={2} marginTop={1} flexDirection="column">
+          <Text>
+            <Text dimColor>project </Text>
+            <Text>{projectDisplay}</Text>
+          </Text>
+        </Box>
+      )}
 
       <Box marginLeft={2} marginTop={1}>
+        {currentStep === "tenantIds" && (
+          <TenantIdInput
+            onComplete={(ids) => {
+              setTenantIds(ids);
+              advance();
+            }}
+            onCancel={onCancel}
+          />
+        )}
+
         {currentStep === "projections" && (
           <ProjectionPicker
             projections={availableProjections}

@@ -46,7 +46,7 @@ interface ProjectionState {
   aggregateCount: number;
   totalEvents: number;
   progress: ReplayProgress | null;
-  result: { aggregatesReplayed: number; totalEvents: number; durationSec: number } | null;
+  result: { aggregatesReplayed: number; totalEvents: number; durationSec: number; batchErrors: number; firstError?: string } | null;
   errorMsg: string;
   previousRun: { completedCount: number; markerCount: number } | null;
   logFile: string;
@@ -63,6 +63,7 @@ interface ParallelReplayUIProps {
   dryRun: boolean;
   client: ClickHouseClient;
   redis: IORedis;
+  onFinish?: (result: { batchErrors: number; firstError?: string }) => void;
 }
 
 type GlobalPhase = "discovering" | "confirm" | "replaying" | "done" | "error" | "cancelled";
@@ -80,9 +81,11 @@ export function ParallelReplayUI({
   dryRun,
   client,
   redis,
+  onFinish,
 }: ParallelReplayUIProps) {
   const { exit } = useApp();
   const [globalPhase, setGlobalPhase] = useState<GlobalPhase>("discovering");
+  const [globalErrorMsg, setGlobalErrorMsg] = useState("");
   const [states, setStates] = useState<ProjectionState[]>(() =>
     projections.map((projection) => ({
       projection,
@@ -111,6 +114,15 @@ export function ParallelReplayUI({
   // Exit Ink when terminal phase
   useEffect(() => {
     if (globalPhase === "done" || globalPhase === "error" || globalPhase === "cancelled") {
+      const totalErrors = states.reduce(
+        (sum, s) => sum + (s.result?.batchErrors ?? (s.phase === "error" ? 1 : 0)),
+        0,
+      );
+      const firstErr = states.find((s) => s.result?.firstError || s.errorMsg);
+      onFinish?.({
+        batchErrors: totalErrors,
+        firstError: firstErr?.result?.firstError ?? firstErr?.errorMsg,
+      });
       const timer = setTimeout(() => exit(), 100);
       return () => clearTimeout(timer);
     }
@@ -150,6 +162,7 @@ export function ParallelReplayUI({
           setGlobalPhase("confirm");
         }
       } catch (err) {
+        setGlobalErrorMsg(err instanceof Error ? err.message : String(err));
         setGlobalPhase("error");
       }
     })();
@@ -332,8 +345,8 @@ export function ParallelReplayUI({
       {globalPhase === "done" && !dryRun && (
         <Box flexDirection="column" marginTop={1} marginLeft={2}>
           {states.map((s) => (
-            <Box key={s.projection.projectionName}>
-              {s.phase === "done" && s.result && (
+            <Box key={s.projection.projectionName} flexDirection="column">
+              {s.phase === "done" && s.result && s.result.batchErrors === 0 && (
                 <Text color="green">
                   {"✓ "}
                   <Text bold>{s.projection.projectionName}</Text>
@@ -341,6 +354,24 @@ export function ParallelReplayUI({
                   {s.result.aggregatesReplayed.toLocaleString()} aggregates,{" "}
                   {s.result.totalEvents.toLocaleString()} events in {s.result.durationSec}s
                 </Text>
+              )}
+              {s.phase === "done" && s.result && s.result.batchErrors > 0 && (
+                <>
+                  <Text color="red">
+                    {"✗ "}
+                    <Text bold>{s.projection.projectionName}</Text>
+                    {" — failed after "}
+                    {s.result.aggregatesReplayed.toLocaleString()} aggregates,{" "}
+                    {s.result.totalEvents.toLocaleString()} events in {s.result.durationSec}s
+                    {" ("}{s.result.batchErrors} batch error{s.result.batchErrors > 1 ? "s" : ""}{")"}
+                  </Text>
+                  <Text color="red" dimColor>
+                    {"  "}{s.result.firstError}
+                  </Text>
+                  <Text color="yellow" dimColor>
+                    {"  "}Markers preserved — re-run with Resume to continue from where it stopped
+                  </Text>
+                </>
               )}
               {s.phase === "error" && (
                 <Text color="red">
@@ -351,6 +382,13 @@ export function ParallelReplayUI({
               )}
             </Box>
           ))}
+        </Box>
+      )}
+
+      {/* Error */}
+      {globalPhase === "error" && (
+        <Box marginTop={1} marginLeft={2}>
+          <Text color="red">Error: {globalErrorMsg}</Text>
         </Box>
       )}
 
@@ -413,6 +451,9 @@ function ProjectionProgress({ state }: { state: ProjectionState }) {
           {" · "}{progress.totalEventsReplayed.toLocaleString()} events
           {" · "}{pct}%
         </Text>
+        {progress.batchErrors > 0 && (
+          <Text color="red">{" · "}{progress.batchErrors} error{progress.batchErrors > 1 ? "s" : ""}</Text>
+        )}
       </Text>
     );
   }

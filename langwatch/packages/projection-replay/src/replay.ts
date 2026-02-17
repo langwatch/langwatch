@@ -50,8 +50,10 @@ export interface ReplayProgress {
   elapsedSec: number;
   /** Aggregates skipped (completed in previous run). */
   skippedCount: number;
-
-  errorMessage?: string;
+  /** Batches that failed with errors. */
+  batchErrors: number;
+  /** First error message (if any). */
+  firstError?: string;
 }
 
 type ProgressCallback = (progress: ReplayProgress) => void;
@@ -126,11 +128,13 @@ export async function runReplay({
   log: ReplayLog;
   onProgress: ProgressCallback;
   completedSet: Set<string>;
-}): Promise<{ aggregatesReplayed: number; totalEvents: number }> {
+}): Promise<{ aggregatesReplayed: number; totalEvents: number; batchErrors: number; firstError?: string }> {
   const startTime = Date.now();
   let aggregatesCompleted = 0;
   let totalEventsReplayed = 0;
   let skippedCount = 0;
+  let batchErrors = 0;
+  let firstError: string | undefined;
 
   // Remove stale markers (crashed mid-replay)
   const staleMarkers = await getCutoffMarkers({
@@ -179,6 +183,8 @@ export async function runReplay({
         totalEventsReplayed,
         elapsedSec: (Date.now() - startTime) / 1000,
         skippedCount,
+        batchErrors,
+        firstError,
       };
 
       const emit = () => {
@@ -199,9 +205,11 @@ export async function runReplay({
           log,
           onBatchProgress: (bp) => {
             progress.batchPhase = bp.batchPhase;
-            progress.eventsReplayed = bp.eventsReplayed;
-            progress.totalBatchEvents = bp.totalBatchEvents;
-            progress.totalEventsReplayed = totalEventsReplayed + bp.eventsReplayed;
+            if (bp.batchPhase === "replay") {
+              progress.eventsReplayed = bp.eventsReplayed;
+              progress.totalBatchEvents = bp.totalBatchEvents;
+              progress.totalEventsReplayed = totalEventsReplayed + bp.eventsReplayed;
+            }
             emit();
           },
         });
@@ -209,14 +217,27 @@ export async function runReplay({
         totalEventsReplayed += result.eventsReplayed;
         aggregatesCompleted += batch.length;
       } catch (error) {
+        batchErrors++;
         const errorMsg = error instanceof Error ? error.message : String(error);
+        if (!firstError) firstError = errorMsg;
         log.write({
           step: "error",
           tenant: tenantId,
           aggregate: `batch ${batchNum}`,
           error: errorMsg,
         });
-        aggregatesCompleted += batch.length;
+
+        // Stop immediately — don't cleanup markers so the run can be resumed
+        progress.batchErrors = batchErrors;
+        progress.firstError = firstError;
+        emit();
+
+        return {
+          aggregatesReplayed: aggregatesCompleted - skippedCount,
+          totalEvents: totalEventsReplayed,
+          batchErrors,
+          firstError,
+        };
       }
     }
   }
@@ -226,6 +247,8 @@ export async function runReplay({
   return {
     aggregatesReplayed: aggregatesCompleted - skippedCount,
     totalEvents: totalEventsReplayed,
+    batchErrors,
+    firstError,
   };
 }
 

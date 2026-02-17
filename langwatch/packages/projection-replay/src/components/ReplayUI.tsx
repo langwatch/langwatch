@@ -82,6 +82,7 @@ interface ReplayUIProps {
   dryRun: boolean;
   client: ClickHouseClient;
   redis: IORedis;
+  onFinish?: (result: { batchErrors: number; firstError?: string }) => void;
 }
 
 type Phase =
@@ -106,6 +107,7 @@ export function ReplayUI({
   dryRun,
   client,
   redis,
+  onFinish,
 }: ReplayUIProps) {
   const { exit } = useApp();
   const [phase, setPhase] = useState<Phase>("discovering");
@@ -120,6 +122,8 @@ export function ReplayUI({
     aggregatesReplayed: number;
     totalEvents: number;
     durationSec: number;
+    batchErrors: number;
+    firstError?: string;
   } | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [previousRun, setPreviousRun] = useState<{
@@ -136,6 +140,9 @@ export function ReplayUI({
   // Exit Ink when we reach a terminal phase
   useEffect(() => {
     if (phase === "done" || phase === "error") {
+      const errors = result?.batchErrors ?? (phase === "error" ? 1 : 0);
+      const firstErr = result?.firstError ?? (phase === "error" ? errorMsg : undefined);
+      onFinish?.({ batchErrors: errors, firstError: firstErr });
       const timer = setTimeout(() => exit(), 100);
       return () => clearTimeout(timer);
     }
@@ -395,6 +402,11 @@ export function ReplayUI({
               {progress.skippedCount > 0 &&
                 ` · ${progress.skippedCount} skipped`}
             </Text>
+            {progress.batchErrors > 0 && (
+              <Text color="red">
+                {progress.batchErrors} batch error{progress.batchErrors > 1 ? "s" : ""}: {progress.firstError}
+              </Text>
+            )}
           </Box>
         </Box>
       )}
@@ -409,8 +421,8 @@ export function ReplayUI({
         </Box>
       )}
 
-      {/* Done - replay */}
-      {phase === "done" && !dryRun && result && (
+      {/* Done - replay (success) */}
+      {phase === "done" && !dryRun && result && result.batchErrors === 0 && (
         <Box flexDirection="column" marginTop={1} marginLeft={2}>
           <Text color="green">
             Done. {result.aggregatesReplayed.toLocaleString()} aggregates,{" "}
@@ -419,6 +431,27 @@ export function ReplayUI({
           <Text dimColor>
             Markers removed — live processing continues from cutoff.
           </Text>
+        </Box>
+      )}
+
+      {/* Done - replay (with errors) */}
+      {phase === "done" && !dryRun && result && result.batchErrors > 0 && (
+        <Box flexDirection="column" marginTop={1} marginLeft={2}>
+          <Text color="red">
+            Failed after {result.aggregatesReplayed.toLocaleString()} aggregates,{" "}
+            {result.totalEvents.toLocaleString()} events in {result.durationSec}s.
+          </Text>
+          <Text color="red" dimColor>
+            {result.firstError}
+          </Text>
+          <Text color="yellow" dimColor>
+            Markers preserved — re-run with Resume to continue from where it stopped.
+          </Text>
+          {logFile && (
+            <Text dimColor>
+              See log for details: {logFile}
+            </Text>
+          )}
         </Box>
       )}
 
