@@ -29,7 +29,7 @@ export const SDK_REGISTRY: Record<string, Record<string, SdkVersionInfo>> = {
       },
     },
     typescript: {
-      displayName: "Node.js",
+      displayName: "TypeScript",
       latestVersion: "0.16.1",
       releasesUrl:
         "https://github.com/langwatch/langwatch/releases?q=typescript-sdk",
@@ -43,7 +43,7 @@ export const SDK_REGISTRY: Record<string, Record<string, SdkVersionInfo>> = {
   },
   "langwatch-client-sdk": {
     typescript: {
-      displayName: "TypeScript Client",
+      displayName: "TypeScript",
       latestVersion: "0.16.1",
       releasesUrl:
         "https://github.com/langwatch/langwatch/releases?q=typescript-sdk",

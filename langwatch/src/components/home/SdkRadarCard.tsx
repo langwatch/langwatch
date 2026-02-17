@@ -2,6 +2,7 @@ import { Button, Heading, HStack, Spacer, Text } from "@chakra-ui/react";
 import { LuArrowRight, LuBellOff } from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useSdkRadarUpdateSnooze } from "~/hooks/useSdkRadarUpdateSnooze";
 import { api } from "~/utils/api";
 import { HomeCard } from "./HomeCard";
@@ -11,13 +12,22 @@ export function SdkRadarCard() {
   const { project } = useOrganizationTeamProject();
   const { isSnoozed, snooze } = useSdkRadarUpdateSnooze(project?.id);
   const { openDrawer } = useDrawer();
+  const { enabled: sdkRadarEnabled } = useFeatureFlag(
+    "release_ui_sdk_radar_banner_card_enabled",
+  );
 
   const stats = api.sdkRadar.getVersionStats.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project?.id },
+    { enabled: !!project?.id && sdkRadarEnabled },
   );
 
-  if (!project || !stats.data || !stats.data.hasOutdated || isSnoozed) {
+  if (
+    !sdkRadarEnabled ||
+    !project ||
+    !stats.data ||
+    !stats.data.hasOutdated ||
+    isSnoozed
+  ) {
     return null;
   }
 
