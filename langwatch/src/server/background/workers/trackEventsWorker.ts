@@ -1,5 +1,5 @@
 import { type Job, Worker } from "bullmq";
-import { BullMQOtel } from "bullmq-otel";
+import { createWorkerTelemetry } from "../bullmqTelemetry";
 import type { TrackEventJob } from "~/server/background/types";
 import { withJobContext } from "../../context/asyncContext";
 import type {
@@ -125,7 +125,7 @@ export const startTrackEventsWorker = () => {
     {
       connection,
       concurrency: 3,
-      telemetry: new BullMQOtel(TRACK_EVENTS_QUEUE.NAME),
+      telemetry: createWorkerTelemetry(TRACK_EVENTS_QUEUE.NAME),
     },
   );
 

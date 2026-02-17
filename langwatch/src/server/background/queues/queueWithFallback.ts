@@ -6,7 +6,7 @@ import {
   type QueueOptions,
   type RedisClient,
 } from "bullmq";
-import { BullMQOtel } from "bullmq-otel";
+import { createQueueTelemetry } from "../bullmqTelemetry";
 import { EventEmitter } from "events";
 import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "../../../utils/logger/server";
@@ -44,7 +44,7 @@ export class QueueWithFallback<
     // Add BullMQ OTel instrumentation for automatic trace context propagation
     const optsWithTelemetry: QueueOptions = {
       ...opts,
-      telemetry: new BullMQOtel(name),
+      telemetry: createQueueTelemetry(name),
     } as QueueOptions;
     super(name, optsWithTelemetry, connection ? undefined : (NoOpConnection as any));
     this.worker = worker;

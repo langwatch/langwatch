@@ -1,5 +1,5 @@
 import { type Job, Worker } from "bullmq";
-import { BullMQOtel } from "bullmq-otel";
+import { createWorkerTelemetry } from "../bullmqTelemetry";
 import type { TopicClusteringJob } from "~/server/background/types";
 import { withJobContext } from "../../context/asyncContext";
 import { createLogger } from "../../../utils/logger/server";
@@ -44,7 +44,7 @@ export const startTopicClusteringWorker = () => {
     {
       connection,
       concurrency: 3,
-      telemetry: new BullMQOtel(TOPIC_CLUSTERING_QUEUE.NAME),
+      telemetry: createWorkerTelemetry(TOPIC_CLUSTERING_QUEUE.NAME),
     },
   );
 

@@ -1,6 +1,6 @@
 import type { Project } from "@prisma/client";
 import { Worker } from "bullmq";
-import { BullMQOtel } from "bullmq-otel";
+import { createWorkerTelemetry } from "../bullmqTelemetry";
 import type {
   CollectorCheckAndAdjustJob,
   CollectorJob,
@@ -922,7 +922,7 @@ export const startCollectorWorker = () => {
     {
       connection,
       concurrency: 20,
-      telemetry: new BullMQOtel(COLLECTOR_QUEUE.NAME),
+      telemetry: createWorkerTelemetry(COLLECTOR_QUEUE.NAME),
     },
   );
 

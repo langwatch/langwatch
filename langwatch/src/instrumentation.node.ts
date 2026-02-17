@@ -51,16 +51,40 @@ if (spanProcessors.length > 0) {
     }),
     instrumentations: [
       getNodeAutoInstrumentations({
-        "@opentelemetry/instrumentation-aws-sdk": {
-          enabled: false,
-        },
-        // Disable this until we kill Elastic Search
-        "@opentelemetry/instrumentation-undici": {
-          enabled: false,
-        },
-        "@opentelemetry/instrumentation-http": {
-          enabled: false,
-        },
+        // --- Disable everything noisy by default ---
+        "@opentelemetry/instrumentation-aws-lambda": { enabled: false },
+        "@opentelemetry/instrumentation-undici": { enabled: false },
+        "@opentelemetry/instrumentation-http": { enabled: false },
+        // Database: these generate a span per query, massive volume
+        // pg, ioredis kept enabled for DB/Redis observability
+        "@opentelemetry/instrumentation-mongodb": { enabled: false },
+        "@opentelemetry/instrumentation-mongoose": { enabled: false },
+        "@opentelemetry/instrumentation-mysql": { enabled: false },
+        "@opentelemetry/instrumentation-mysql2": { enabled: false },
+        "@opentelemetry/instrumentation-redis": { enabled: false },
+        "@opentelemetry/instrumentation-tedious": { enabled: false },
+        "@opentelemetry/instrumentation-oracledb": { enabled: false },
+        "@opentelemetry/instrumentation-memcached": { enabled: false },
+        "@opentelemetry/instrumentation-cassandra-driver": { enabled: false },
+        "@opentelemetry/instrumentation-knex": { enabled: false },
+        // Network-level: extremely verbose
+        "@opentelemetry/instrumentation-dns": { enabled: false },
+        "@opentelemetry/instrumentation-net": { enabled: false },
+        "@opentelemetry/instrumentation-socket.io": { enabled: false },
+        "@opentelemetry/instrumentation-generic-pool": { enabled: false },
+        // pino kept enabled for log correlation
+        "@opentelemetry/instrumentation-bunyan": { enabled: false },
+        "@opentelemetry/instrumentation-winston": { enabled: false },
+        // GraphQL: a span per resolver adds up fast
+        "@opentelemetry/instrumentation-graphql": { enabled: false },
+        "@opentelemetry/instrumentation-dataloader": { enabled: false },
+        // Message queues
+        "@opentelemetry/instrumentation-amqplib": { enabled: false },
+        "@opentelemetry/instrumentation-kafkajs": { enabled: false },
+        // Misc
+        "@opentelemetry/instrumentation-lru-memoizer": { enabled: false },
+        "@opentelemetry/instrumentation-cucumber": { enabled: false },
+        "@opentelemetry/instrumentation-router": { enabled: false },
       }),
     ],
   });

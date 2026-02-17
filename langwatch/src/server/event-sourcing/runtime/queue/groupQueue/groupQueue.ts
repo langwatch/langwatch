@@ -7,7 +7,7 @@ import {
   Worker,
   type WorkerOptions,
 } from "bullmq";
-import { BullMQOtel } from "bullmq-otel";
+import { createQueueTelemetry, createWorkerTelemetry } from "~/server/background/bullmqTelemetry";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import type { SemConvAttributes } from "langwatch/observability";
@@ -182,7 +182,7 @@ export class GroupQueueProcessorBullMq<
     // BullMQ Queue for job persistence
     const queueOptions: QueueOptions = {
       connection: this.redisConnection,
-      telemetry: new BullMQOtel(this.queueName),
+      telemetry: createQueueTelemetry(this.queueName),
       defaultJobOptions: {
         attempts: JOB_RETRY_CONFIG.maxAttempts,
         backoff: {
@@ -207,7 +207,7 @@ export class GroupQueueProcessorBullMq<
     const workerOptions: WorkerOptions = {
       connection: this.redisConnection,
       concurrency: this.globalConcurrency,
-      telemetry: new BullMQOtel(this.queueName),
+      telemetry: createWorkerTelemetry(this.queueName),
     };
     this.worker = new Worker<Payload>(
       this.queueName,

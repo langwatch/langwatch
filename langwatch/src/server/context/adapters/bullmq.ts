@@ -65,7 +65,7 @@ export function getJobContextMetadata(): JobContextMetadata {
  *   withJobContext(async (job) => {
  *     logger.info("Processing job"); // Will have traceId, projectId, etc.
  *   }),
- *   { connection, telemetry: new BullMQOtel(QUEUE_NAME) }
+ *   { connection, telemetry: createWorkerTelemetry(QUEUE_NAME) }
  * );
  * ```
  */
