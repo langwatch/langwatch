@@ -77,15 +77,16 @@ export async function pollForScenarioRun(
       if (runs.length > 0 && runs[0]?.scenarioRunId) {
         const run = runs[0];
 
-        // Check for error/cancelled states first
+        // Check for error/cancelled/stalled states first
         if (
           run.status === ScenarioRunStatus.ERROR ||
           run.status === ScenarioRunStatus.FAILED ||
-          run.status === ScenarioRunStatus.CANCELLED
+          run.status === ScenarioRunStatus.CANCELLED ||
+          run.status === ScenarioRunStatus.STALLED
         ) {
           logger.info(
             { status: run.status, scenarioRunId: run.scenarioRunId },
-            "Run terminated with error or cancelled",
+            "Run terminated with error, cancelled, or stalled",
           );
           return {
             success: false,

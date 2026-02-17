@@ -21,4 +21,5 @@ export enum ScenarioRunStatus {
   IN_PROGRESS = "IN_PROGRESS",
   PENDING = "PENDING",
   FAILED = "FAILED",
+  STALLED = "STALLED",
 }

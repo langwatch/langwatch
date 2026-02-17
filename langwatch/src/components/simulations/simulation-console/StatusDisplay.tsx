@@ -1,4 +1,4 @@
-import { HStack, Text } from "@chakra-ui/react";
+import { HStack, Text, type Tokens } from "@chakra-ui/react";
 import {
   ScenarioRunStatus,
   Verdict,
@@ -6,9 +6,19 @@ import {
 import { CONSOLE_COLORS, STATUS_DISPLAY_TEXT_MAP } from "./constants";
 
 interface StatusDisplayProps {
-  status?: string;
+  status?: ScenarioRunStatus;
   verdict?: Verdict;
 }
+
+const STATUS_COLOR_MAP: Record<ScenarioRunStatus, Tokens["colors"]> = {
+  [ScenarioRunStatus.SUCCESS]: "green.300",
+  [ScenarioRunStatus.FAILED]: "red.400",
+  [ScenarioRunStatus.ERROR]: "red.400",
+  [ScenarioRunStatus.CANCELLED]: "red.400",
+  [ScenarioRunStatus.IN_PROGRESS]: "yellow.400",
+  [ScenarioRunStatus.PENDING]: "yellow.400",
+  [ScenarioRunStatus.STALLED]: "yellow.400",
+};
 
 /**
  * Status display component
@@ -19,11 +29,7 @@ export function StatusDisplay({ status, verdict }: StatusDisplayProps) {
     if (verdict === Verdict.SUCCESS) return CONSOLE_COLORS.successColor;
     if (verdict === Verdict.FAILURE) return CONSOLE_COLORS.failureColor;
     if (verdict === Verdict.INCONCLUSIVE) return CONSOLE_COLORS.warningColor;
-    if (status === ScenarioRunStatus.IN_PROGRESS)
-      return CONSOLE_COLORS.pendingColor;
-    if (status === ScenarioRunStatus.SUCCESS)
-      return CONSOLE_COLORS.successColor;
-
+    if (status !== undefined) return STATUS_COLOR_MAP[status];
     return CONSOLE_COLORS.failureColor;
   };
 
@@ -35,9 +41,10 @@ export function StatusDisplay({ status, verdict }: StatusDisplayProps) {
           ? "FAILED"
           : "INCONCLUSIVE";
     }
-    return STATUS_DISPLAY_TEXT_MAP[
-      status as keyof typeof STATUS_DISPLAY_TEXT_MAP
-    ];
+    if (status !== undefined) {
+      return STATUS_DISPLAY_TEXT_MAP[status];
+    }
+    return undefined;
   };
 
   return (

@@ -1,5 +1,6 @@
 import { Badge, Box, Card, HStack, Text, VStack } from "@chakra-ui/react";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { SCENARIO_RUN_STATUS_CONFIG } from "~/server/scenarios/status-config";
 import { SimulationStatusOverlay } from "./SimulationStatusOverlay";
 
 export interface SimulationCardMessage {
@@ -13,6 +14,26 @@ export interface SimulationCardProps {
   children: React.ReactNode;
 }
 
+interface CardStatusConfig {
+  isComplete: boolean;
+  colorPalette: string;
+}
+
+/**
+ * Returns visual configuration for a scenario run status in the card header.
+ * Delegates to the centralized SCENARIO_RUN_STATUS_CONFIG for isComplete/colorPalette,
+ * with a context-specific override for IN_PROGRESS.
+ */
+function getCardStatusConfig(status: ScenarioRunStatus): CardStatusConfig {
+  const config = SCENARIO_RUN_STATUS_CONFIG[status];
+  return {
+    isComplete: config.isComplete,
+    // Card header uses blue for in-progress to contrast with the orange active-border
+    colorPalette:
+      status === ScenarioRunStatus.IN_PROGRESS ? "blue" : config.colorPalette,
+  };
+}
+
 function SimulationCardHeader({
   title,
   status,
@@ -20,20 +41,9 @@ function SimulationCardHeader({
   title: string;
   status?: ScenarioRunStatus;
 }) {
-  const isComplete =
-    status === ScenarioRunStatus.SUCCESS ||
-    status === ScenarioRunStatus.FAILED ||
-    status === ScenarioRunStatus.ERROR ||
-    status === ScenarioRunStatus.CANCELLED;
-
-  const colorPalette = {
-    [ScenarioRunStatus.SUCCESS]: "green",
-    [ScenarioRunStatus.IN_PROGRESS]: "blue",
-    [ScenarioRunStatus.ERROR]: "red",
-    [ScenarioRunStatus.CANCELLED]: "gray",
-    [ScenarioRunStatus.PENDING]: "gray",
-    [ScenarioRunStatus.FAILED]: "red",
-  }[status ?? ScenarioRunStatus.IN_PROGRESS];
+  const { isComplete, colorPalette } = getCardStatusConfig(
+    status ?? ScenarioRunStatus.IN_PROGRESS,
+  );
 
   return (
     <Box py={3} px={4} w="100%" position="relative" zIndex={25}>

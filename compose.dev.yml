@@ -118,13 +118,8 @@ services:
       sh -c "
         corepack enable &&
         pnpm config set store-dir /root/.local/share/pnpm/store &&
-        if [ ! -f node_modules/.modules.yaml ]; then
-          echo 'Installing dependencies for Linux...' &&
-          pnpm install &&
-          pnpm prisma generate
-        else
-          echo 'Dependencies already installed'
-        fi
+        pnpm install &&
+        pnpm prisma generate
       "
     environment:
       COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"

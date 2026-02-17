@@ -41,6 +41,7 @@ const TERMINAL_STATUSES = new Set([
   ScenarioRunStatus.ERROR,
   ScenarioRunStatus.FAILED,
   ScenarioRunStatus.CANCELLED,
+  ScenarioRunStatus.STALLED,
 ]);
 
 /**
