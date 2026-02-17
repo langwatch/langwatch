@@ -215,7 +215,7 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("`1__performance_total_cost__sum`");
     });
 
-    it("uses standard query for pipeline metrics when timeScale is not 'full'", () => {
+    it("builds CTE-based query for pipeline metrics with numeric timeScale", () => {
       const input = {
         ...baseInput,
         timeScale: 60,
@@ -229,9 +229,65 @@ describe("aggregation-builder", () => {
       };
       const result = buildTimeseriesQuery(input);
 
-      // Does NOT use CTEs for non-full timeScale (filters out pipeline metrics)
-      expect(result.sql).not.toContain("UNION ALL");
-      expect(result.sql).toContain("GROUP BY period, date");
+      // Uses CTEs with date bucketing for pipeline metrics
+      expect(result.sql).toContain("WITH");
+      expect(result.sql).toContain("UNION ALL");
+      expect(result.sql).toContain("'current' AS period");
+      expect(result.sql).toContain("'previous' AS period");
+      // Inner query has date truncation
+      expect(result.sql).toContain("AS date");
+      expect(result.sql).toContain("GROUP BY date");
+    });
+
+    it("includes date bucketing in pipeline CTEs for numeric timeScale", () => {
+      const input = {
+        ...baseInput,
+        timeScale: 60,
+        series: [
+          {
+            metric: "metadata.thread_id" as FlattenAnalyticsMetricsEnum,
+            aggregation: "cardinality" as const,
+            pipeline: { field: "user_id" as const, aggregation: "avg" as const },
+          },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // Pipeline CTE inner query groups by date + pipeline_key
+      expect(result.sql).toContain("GROUP BY date, pipeline_key");
+      // Pipeline CTE outer level groups by date
+      expect(result.sql).toContain("GROUP BY date");
+      // Final SELECT references date from CTE
+      expect(result.sql).toContain("AS date");
+      expect(result.sql).toContain("ORDER BY period, date");
+    });
+
+    it("handles mixed simple and pipeline metrics with numeric timeScale", () => {
+      const input = {
+        ...baseInput,
+        timeScale: 60,
+        series: [
+          { metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum, aggregation: "cardinality" as const },
+          {
+            metric: "metadata.thread_id" as FlattenAnalyticsMetricsEnum,
+            aggregation: "cardinality" as const,
+            pipeline: { field: "user_id" as const, aggregation: "avg" as const },
+          },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // Has CTEs for both simple and pipeline metrics with date bucketing
+      expect(result.sql).toContain("WITH");
+      expect(result.sql).toContain("simple_metrics_current AS");
+      expect(result.sql).toContain("simple_metrics_previous AS");
+      expect(result.sql).toContain("cte_1__metadata_thread_id__cardinality_current AS");
+      // Both CTEs have date bucketing
+      expect(result.sql).toContain("GROUP BY date");
+      // Final SELECT uses FULL JOIN to combine on date
+      expect(result.sql).toContain("FULL JOIN");
+      expect(result.sql).toContain("UNION ALL");
+      expect(result.sql).toContain("ORDER BY period, date");
     });
   });
 

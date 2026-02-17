@@ -128,9 +128,9 @@ function translateSimpleAggregation(
     default:
       if (isPercentileAggregation(aggregation)) {
         const percentile = percentileToPercent[aggregation];
-        // Use quantileExact for accurate percentiles (matching ES behavior)
-        // quantileTDigest is faster but has ±5% error at distribution extremes
-        return `quantileExact(${percentile})(${columnExpr}) AS ${alias}`;
+        // Use quantileTDigest for fast approximate percentiles (~1% error)
+        // quantileExact is more accurate but much slower on large datasets
+        return `quantileTDigest(${percentile})(${columnExpr}) AS ${alias}`;
       }
       return `count(${columnExpr}) AS ${alias}`;
   }
@@ -165,8 +165,8 @@ function translateArrayAggregation(
     default:
       if (isPercentileAggregation(aggregation)) {
         const percentile = percentileToPercent[aggregation];
-        // Use quantilesExactArray for percentiles on arrays
-        return `quantileExactArray(${percentile})(${arrayExpr}) AS ${alias}`;
+        // Use quantileTDigestArray for fast approximate percentiles on arrays
+        return `quantileTDigestArray(${percentile})(${arrayExpr}) AS ${alias}`;
       }
       // Default to counting array elements
       return `sum(length(${arrayExpr})) AS ${alias}`;
@@ -210,7 +210,7 @@ export function translateMetric(
 
   // Handle specific metric categories
   if (metric.startsWith("metadata.")) {
-    return translateMetadataMetric(metric, aggregation, alias, requiredJoins);
+    return translateMetadataMetric(metric, aggregation, alias, requiredJoins, key);
   }
 
   if (metric.startsWith("performance.")) {
@@ -278,6 +278,7 @@ function translateMetadataMetric(
   aggregation: AggregationTypes,
   alias: string,
   requiredJoins: CHTable[],
+  metricKey?: string,
 ): MetricTranslation {
   const ts = tableAliases.trace_summaries;
   const ss = tableAliases.stored_spans;
@@ -339,8 +340,20 @@ function translateMetadataMetric(
 
     case "metadata.span_type":
       // Requires JOIN with stored_spans
-      // Use the requested aggregation on TraceId to match ES behavior
       requiredJoins.push("stored_spans");
+      if (metricKey) {
+        // When a key is provided (e.g., "llm"), use conditional aggregation
+        // to count only traces with spans of that type, avoiding full span scan
+        const paramName = genMetricParamName("spanType");
+        const condition = `${ss}.SpanAttributes['langwatch.span.type'] = {${paramName}:String}`;
+        return {
+          selectExpression: `${getConditionalAggregation(aggregation)}(${ts}.TraceId, ${condition}) AS ${alias}`,
+          alias,
+          requiredJoins,
+          params: { [paramName]: metricKey },
+        };
+      }
+      // No key: use the requested aggregation on TraceId to match ES behavior
       return {
         selectExpression: translateSimpleAggregation(
           `${ts}.TraceId`,
@@ -464,7 +477,7 @@ function translatePerformanceMetric(
       if (isPercentileAggregation(aggregation)) {
         const percentile = percentileToPercent[aggregation];
         return {
-          selectExpression: `quantileExactIf(${percentile})(${spanTps}, ${hasTokens}) AS ${alias}`,
+          selectExpression: `quantileTDigestIf(${percentile})(${spanTps}, ${hasTokens}) AS ${alias}`,
           alias,
           requiredJoins,
           params: {},
@@ -545,7 +558,7 @@ function translateEvaluationMetric(
       if (isPercentileAggregation(aggregation)) {
         const percentile = percentileToPercent[aggregation];
         return {
-          selectExpression: `quantileExactIf(${percentile})(${es}.Score, ${evaluatorCondition} AND ${es}.Status = 'processed') AS ${alias}`,
+          selectExpression: `quantileTDigestIf(${percentile})(${es}.Score, ${evaluatorCondition} AND ${es}.Status = 'processed') AS ${alias}`,
           alias,
           requiredJoins,
           params,
@@ -563,7 +576,7 @@ function translateEvaluationMetric(
       if (isPercentileAggregation(aggregation)) {
         const percentile = percentileToPercent[aggregation];
         return {
-          selectExpression: `quantileExactIf(${percentile})(toFloat64(${es}.Passed), ${evaluatorCondition} AND ${es}.Status = 'processed') AS ${alias}`,
+          selectExpression: `quantileTDigestIf(${percentile})(toFloat64(${es}.Passed), ${evaluatorCondition} AND ${es}.Status = 'processed') AS ${alias}`,
           alias,
           requiredJoins,
           params,

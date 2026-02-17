@@ -18,10 +18,6 @@ import {
   translateAllFilters,
   type FilterTranslation,
 } from "./filter-translator";
-import { createLogger } from "../../../utils/logger/server";
-
-const logger = createLogger("langwatch:analytics:aggregation-builder");
-
 /** Maximum number of filter options returned by filter queries */
 const MAX_FILTER_OPTIONS = 10000;
 
@@ -204,15 +200,15 @@ const groupByExpressions: Partial<
     // Events.Name and Events.Attributes are parallel arrays, so we zip them to filter
     column: `arrayJoin(
       arrayMap(
-        (n, a) -> multiIf(
+        a -> multiIf(
           toInt32OrNull(a['event.metrics.vote']) = 1, 'thumbs_up',
           toInt32OrNull(a['event.metrics.vote']) = -1, 'thumbs_down',
           ''
         ),
         arrayFilter(
-          (n, a) -> n = 'thumbs_up_down' AND mapContains(a, 'event.metrics.vote'),
-          ${tableAliases.stored_spans}."Events.Name",
-          ${tableAliases.stored_spans}."Events.Attributes"
+          (a, n) -> n = 'thumbs_up_down' AND mapContains(a, 'event.metrics.vote'),
+          ${tableAliases.stored_spans}."Events.Attributes",
+          ${tableAliases.stored_spans}."Events.Name"
         )
       )
     )`,
@@ -434,6 +430,25 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   // (TraceId, group_key) pairs and preserves metrics per trace for accurate aggregation.
   // Without this, joining stored_spans causes each trace to be counted once per span.
   if ((usesArrayJoin || groupByRequiresSpans) && groupByColumn) {
+    // Skip the expensive arrayJoin path when all metrics are pipeline (subquery) metrics.
+    // The arrayJoin CTE only handles simple metrics; pipeline metrics are ignored,
+    // so the query would scan stored_spans for grouping but produce no useful output.
+    const hasSimpleMetrics = metricTranslations.some((m) => !m.requiresSubquery);
+    if (!hasSimpleMetrics) {
+      return {
+        sql: `SELECT 1 WHERE 0`,
+        params: {
+          tenantId: input.projectId,
+          currentStart: input.startDate,
+          currentEnd: input.endDate,
+          previousStart: input.previousPeriodStartDate,
+          previousEnd: input.startDate,
+          ...allTranslationParams,
+          ...(input.groupByKey ? { groupByKey: input.groupByKey } : {}),
+        },
+      };
+    }
+
     return buildArrayJoinTimeseriesQuery(
       input,
       groupByColumn,
@@ -451,30 +466,33 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   const simpleMetrics = metricTranslations.filter((m) => !m.requiresSubquery);
   const subqueryMetrics = metricTranslations.filter((m) => m.requiresSubquery);
 
-  // Warn if pipeline metrics will be dropped (only supported with timeScale "full")
-  if (subqueryMetrics.length > 0 && input.timeScale !== "full") {
-    // Pipeline metrics require CTEs and are only fully supported in "full" timeScale mode.
-    // When timeScale is numeric, they're omitted from the query. This is a known limitation.
-    logger.warn(
-      {
-        droppedMetrics: subqueryMetrics.map((m) => m.alias),
-        timeScale: input.timeScale,
-      },
-      "Pipeline metrics require timeScale='full' and will be omitted",
-    );
-  }
+  // Check if simple metrics need different JOINs (e.g., some need stored_spans).
+  // When true, route through CTE path to give each JOIN group its own CTE,
+  // preventing row multiplication from contaminating unrelated aggregates.
+  const hasHeterogeneousJoins =
+    !groupByColumn &&
+    simpleMetrics.length > 1 &&
+    new Set(
+      simpleMetrics.map((m) => JSON.stringify([...m.requiredJoins].sort())),
+    ).size > 1;
 
-  // For timeScale "full" (summary queries), always use CTE-based query to ensure
-  // both current and previous periods return data (even if one is empty)
-  if (input.timeScale === "full") {
+  // Use CTE-based query when there are pipeline metrics (any timeScale),
+  // when timeScale is "full", or when metrics need different JOINs
+  if (
+    subqueryMetrics.length > 0 ||
+    input.timeScale === "full" ||
+    hasHeterogeneousJoins
+  ) {
+    const filterJoins: CHTable[] = Array.from(filterTranslation.requiredJoins);
     return buildSubqueryTimeseriesQuery(
       input,
       simpleMetrics,
       subqueryMetrics,
-      joinClauses,
+      filterJoins,
       baseWhere,
       filterWhere,
       allTranslationParams,
+      timeZone,
     );
   }
 
@@ -686,24 +704,50 @@ function buildArrayJoinTimeseriesQuery(
 /**
  * Build a timeseries query using CTEs for subquery (pipeline) metrics.
  * This handles metrics that require two-level aggregation (e.g., avg threads per user).
+ * Supports both "full" timeScale (scalar results) and numeric timeScale (date-bucketed).
+ *
+ * Simple metrics are grouped by their JOIN requirements so that metrics needing
+ * stored_spans don't contaminate trace-level metrics with row multiplication.
  */
 function buildSubqueryTimeseriesQuery(
   input: TimeseriesQueryInput,
   simpleMetrics: MetricTranslation[],
   subqueryMetrics: MetricTranslation[],
-  joinClauses: string,
+  filterJoins: CHTable[],
   baseWhere: string,
   filterWhere: string,
   filterParams: Record<string, unknown>,
+  timeZone?: string,
 ): BuiltQuery {
   const ts = tableAliases.trace_summaries;
+  const isTimeseries = typeof input.timeScale === "number";
+  const dateTruncExpr = isTimeseries
+    ? getDateTruncFunction(input.timeScale as number, timeZone ?? "UTC")
+    : null;
+
+  // Date column expressions for timeseries mode:
+  // - dateTruncSelect: innermost level (computes date from ts.OccurredAt)
+  // - datePassthrough: higher levels (references the `date` alias from inner query)
+  // - dateGroupBy: prefix for GROUP BY at inner/middle levels
+  // - outerDateGroupBy: standalone GROUP BY date for outermost CTE level
+  const dateTruncSelect = dateTruncExpr ? `${dateTruncExpr} AS date, ` : "";
+  const datePassthrough = dateTruncExpr ? "date, " : "";
+  const dateGroupBy = dateTruncExpr ? "date, " : "";
+  const outerDateGroupBy = dateTruncExpr ? "\n        GROUP BY date" : "";
+
   const ctes: string[] = [];
 
-  // Build CTEs for each subquery metric, one for current and one for previous period
+  // Build CTEs for each subquery metric, using per-metric JOINs
   // Use 'cte_' prefix to ensure CTE names don't start with a digit (which is invalid SQL)
   for (const metric of subqueryMetrics) {
     const subquery = metric.subquery!;
     const cteName = `cte_${metric.alias}`;
+    const metricJoins = [
+      ...new Set([...filterJoins, ...metric.requiredJoins]),
+    ];
+    const metricJoinClauses = metricJoins
+      .map((table) => buildJoinClause(table))
+      .join("\n");
 
     // Check if this is a nested subquery (3-level aggregation)
     if (subquery.nestedSubquery) {
@@ -713,162 +757,215 @@ function buildSubqueryTimeseriesQuery(
       // CTE for current period with nested subquery
       ctes.push(`
       ${cteName}_current AS (
-        SELECT '${metric.alias}' AS metric_name, ${subquery.outerAggregation.replace(` AS ${metric.alias}`, "")} AS metric_value
+        SELECT ${datePassthrough}'${metric.alias}' AS metric_name, ${subquery.outerAggregation.replace(` AS ${metric.alias}`, "")} AS metric_value
         FROM (
-          SELECT ${subquery.innerSelect}
+          SELECT ${datePassthrough}${subquery.innerSelect}
           FROM (
-            SELECT ${nested.select}
+            SELECT ${dateTruncSelect}${nested.select}
             FROM trace_summaries ${ts} FINAL
-            ${joinClauses}
+            ${metricJoinClauses}
             WHERE ${ts}.TenantId = {tenantId:String}
               AND ${ts}.OccurredAt >= {currentStart:DateTime64(3)}
               AND ${ts}.OccurredAt < {currentEnd:DateTime64(3)}
               ${filterWhere}
-            GROUP BY ${nested.groupBy}
+            GROUP BY ${dateGroupBy}${nested.groupBy}
             ${havingClause}
           ) thread_data
-          GROUP BY ${subquery.innerGroupBy}
+          GROUP BY ${dateGroupBy}${subquery.innerGroupBy}
           HAVING ${subquery.innerGroupBy} IS NOT NULL AND toString(${subquery.innerGroupBy}) != ''
-        ) sub
+        ) sub${outerDateGroupBy}
       )`);
 
       // CTE for previous period with nested subquery
       ctes.push(`
       ${cteName}_previous AS (
-        SELECT '${metric.alias}' AS metric_name, ${subquery.outerAggregation.replace(` AS ${metric.alias}`, "")} AS metric_value
+        SELECT ${datePassthrough}'${metric.alias}' AS metric_name, ${subquery.outerAggregation.replace(` AS ${metric.alias}`, "")} AS metric_value
         FROM (
-          SELECT ${subquery.innerSelect}
+          SELECT ${datePassthrough}${subquery.innerSelect}
           FROM (
-            SELECT ${nested.select}
+            SELECT ${dateTruncSelect}${nested.select}
             FROM trace_summaries ${ts} FINAL
-            ${joinClauses}
+            ${metricJoinClauses}
             WHERE ${ts}.TenantId = {tenantId:String}
               AND ${ts}.OccurredAt >= {previousStart:DateTime64(3)}
               AND ${ts}.OccurredAt < {previousEnd:DateTime64(3)}
               ${filterWhere}
-            GROUP BY ${nested.groupBy}
+            GROUP BY ${dateGroupBy}${nested.groupBy}
             ${havingClause}
           ) thread_data
-          GROUP BY ${subquery.innerGroupBy}
+          GROUP BY ${dateGroupBy}${subquery.innerGroupBy}
           HAVING ${subquery.innerGroupBy} IS NOT NULL AND toString(${subquery.innerGroupBy}) != ''
-        ) sub
+        ) sub${outerDateGroupBy}
       )`);
     } else {
       // Standard 2-level aggregation
       // CTE for current period
       ctes.push(`
       ${cteName}_current AS (
-        SELECT '${metric.alias}' AS metric_name, ${subquery.outerAggregation.replace(` AS ${metric.alias}`, "")} AS metric_value
+        SELECT ${datePassthrough}'${metric.alias}' AS metric_name, ${subquery.outerAggregation.replace(` AS ${metric.alias}`, "")} AS metric_value
         FROM (
-          SELECT ${subquery.innerSelect}
+          SELECT ${dateTruncSelect}${subquery.innerSelect}
           FROM trace_summaries ${ts} FINAL
-          ${joinClauses}
+          ${metricJoinClauses}
           WHERE ${ts}.TenantId = {tenantId:String}
             AND ${ts}.OccurredAt >= {currentStart:DateTime64(3)}
             AND ${ts}.OccurredAt < {currentEnd:DateTime64(3)}
             ${filterWhere}
-          GROUP BY ${subquery.innerGroupBy}
+          GROUP BY ${dateGroupBy}${subquery.innerGroupBy}
           HAVING ${subquery.innerGroupBy} IS NOT NULL AND toString(${subquery.innerGroupBy}) != ''
-        ) sub
+        ) sub${outerDateGroupBy}
       )`);
 
       // CTE for previous period
       ctes.push(`
       ${cteName}_previous AS (
-        SELECT '${metric.alias}' AS metric_name, ${subquery.outerAggregation.replace(` AS ${metric.alias}`, "")} AS metric_value
+        SELECT ${datePassthrough}'${metric.alias}' AS metric_name, ${subquery.outerAggregation.replace(` AS ${metric.alias}`, "")} AS metric_value
         FROM (
-          SELECT ${subquery.innerSelect}
+          SELECT ${dateTruncSelect}${subquery.innerSelect}
           FROM trace_summaries ${ts} FINAL
-          ${joinClauses}
+          ${metricJoinClauses}
           WHERE ${ts}.TenantId = {tenantId:String}
             AND ${ts}.OccurredAt >= {previousStart:DateTime64(3)}
             AND ${ts}.OccurredAt < {previousEnd:DateTime64(3)}
             ${filterWhere}
-          GROUP BY ${subquery.innerGroupBy}
+          GROUP BY ${dateGroupBy}${subquery.innerGroupBy}
           HAVING ${subquery.innerGroupBy} IS NOT NULL AND toString(${subquery.innerGroupBy}) != ''
-        ) sub
+        ) sub${outerDateGroupBy}
       )`);
     }
   }
 
-  // Build simple metrics query for current period
-  // Quote aliases that start with digits for ClickHouse compatibility
-  const simpleSelectExprs: string[] = [];
-  for (const metric of simpleMetrics) {
-    // Replace unquoted alias with quoted alias in the selectExpression
-    const quotedAlias = quoteIdentifier(metric.alias);
-    const quotedExpression = metric.selectExpression.replace(
-      ` AS ${metric.alias}`,
-      ` AS ${quotedAlias}`,
-    );
-    simpleSelectExprs.push(quotedExpression);
-  }
+  // Group simple metrics by their JOIN requirements to prevent
+  // stored_spans JOIN from contaminating trace-level metrics
+  const simpleGroups: Array<{
+    metrics: MetricTranslation[];
+    selectExprs: string[];
+    joinClauses: string;
+    cteName: string;
+  }> = [];
 
-  // CTE for simple metrics current period
   if (simpleMetrics.length > 0) {
-    ctes.push(`
-      simple_metrics_current AS (
+    // Group by sorted JOIN signature
+    const groups = new Map<string, MetricTranslation[]>();
+    for (const m of simpleMetrics) {
+      const key = JSON.stringify([...m.requiredJoins].sort());
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(m);
+    }
+
+    let groupIdx = 0;
+    for (const [, metrics] of groups) {
+      const groupJoins = [
+        ...new Set([
+          ...filterJoins,
+          ...metrics.flatMap((m) => m.requiredJoins),
+        ]),
+      ];
+      const selectExprs: string[] = [];
+      for (const metric of metrics) {
+        const quotedAlias = quoteIdentifier(metric.alias);
+        const quotedExpression = metric.selectExpression.replace(
+          ` AS ${metric.alias}`,
+          ` AS ${quotedAlias}`,
+        );
+        selectExprs.push(quotedExpression);
+      }
+      simpleGroups.push({
+        metrics,
+        selectExprs,
+        joinClauses: groupJoins
+          .map((table) => buildJoinClause(table))
+          .join("\n"),
+        cteName:
+          groups.size === 1
+            ? "simple_metrics"
+            : `simple_metrics_${groupIdx}`,
+      });
+      groupIdx++;
+    }
+
+    const dateSelectPrefix = dateTruncExpr
+      ? `${dateTruncExpr} AS date,\n          `
+      : "";
+    const dateGroupByClause = dateTruncExpr ? "\n        GROUP BY date" : "";
+
+    for (const group of simpleGroups) {
+      ctes.push(`
+      ${group.cteName}_current AS (
         SELECT
-          ${simpleSelectExprs.join(",\n          ")}
+          ${dateSelectPrefix}${group.selectExprs.join(",\n          ")}
         FROM trace_summaries ${ts} FINAL
-        ${joinClauses}
+        ${group.joinClauses}
         WHERE ${ts}.TenantId = {tenantId:String}
           AND ${ts}.OccurredAt >= {currentStart:DateTime64(3)}
           AND ${ts}.OccurredAt < {currentEnd:DateTime64(3)}
-          ${filterWhere}
+          ${filterWhere}${dateGroupByClause}
       )`);
 
-    ctes.push(`
-      simple_metrics_previous AS (
+      ctes.push(`
+      ${group.cteName}_previous AS (
         SELECT
-          ${simpleSelectExprs.join(",\n          ")}
+          ${dateSelectPrefix}${group.selectExprs.join(",\n          ")}
         FROM trace_summaries ${ts} FINAL
-        ${joinClauses}
+        ${group.joinClauses}
         WHERE ${ts}.TenantId = {tenantId:String}
           AND ${ts}.OccurredAt >= {previousStart:DateTime64(3)}
           AND ${ts}.OccurredAt < {previousEnd:DateTime64(3)}
-          ${filterWhere}
+          ${filterWhere}${dateGroupByClause}
       )`);
-  }
-
-  // Build final SELECT that combines simple and subquery metrics
-  const currentSelectExprs: string[] = ["'current' AS period"];
-  const previousSelectExprs: string[] = ["'previous' AS period"];
-
-  // Add simple metrics columns (quote aliases that start with digits)
-  // Wrap entire subquery in COALESCE to handle empty result sets (0 rows returns NULL)
-  for (const metric of simpleMetrics) {
-    if (simpleMetrics.length > 0) {
-      const quotedAlias = quoteIdentifier(metric.alias);
-      currentSelectExprs.push(
-        `coalesce((SELECT ${quotedAlias} FROM simple_metrics_current), 0) AS ${quotedAlias}`,
-      );
-      previousSelectExprs.push(
-        `coalesce((SELECT ${quotedAlias} FROM simple_metrics_previous), 0) AS ${quotedAlias}`,
-      );
     }
   }
 
-  // Add subquery metrics columns (use cte_ prefix to match CTE names, quote aliases)
-  // Wrap entire subquery in COALESCE to handle empty result sets (0 rows returns NULL)
-  for (const metric of subqueryMetrics) {
-    const cteName = `cte_${metric.alias}`;
-    const quotedAlias = quoteIdentifier(metric.alias);
-    currentSelectExprs.push(
-      `coalesce((SELECT metric_value FROM ${cteName}_current), 0) AS ${quotedAlias}`,
-    );
-    previousSelectExprs.push(
-      `coalesce((SELECT metric_value FROM ${cteName}_previous), 0) AS ${quotedAlias}`,
-    );
-  }
+  let sql: string;
 
-  const sql = `
+  if (isTimeseries) {
+    // Timeseries: join CTEs on date for each period, then UNION ALL
+    sql = buildSubqueryTimeseriesFinalSQL(
+      ctes,
+      simpleGroups,
+      subqueryMetrics,
+    );
+  } else {
+    // "Full" timeScale: scalar subselects (existing behavior)
+    // Build final SELECT that combines simple and subquery metrics
+    const currentSelectExprs: string[] = ["'current' AS period"];
+    const previousSelectExprs: string[] = ["'previous' AS period"];
+
+    // Add simple metrics columns (quote aliases that start with digits)
+    // Wrap entire subquery in COALESCE to handle empty result sets (0 rows returns NULL)
+    for (const group of simpleGroups) {
+      for (const metric of group.metrics) {
+        const quotedAlias = quoteIdentifier(metric.alias);
+        currentSelectExprs.push(
+          `coalesce((SELECT ${quotedAlias} FROM ${group.cteName}_current), 0) AS ${quotedAlias}`,
+        );
+        previousSelectExprs.push(
+          `coalesce((SELECT ${quotedAlias} FROM ${group.cteName}_previous), 0) AS ${quotedAlias}`,
+        );
+      }
+    }
+
+    // Add subquery metrics columns (use cte_ prefix to match CTE names, quote aliases)
+    // Wrap entire subquery in COALESCE to handle empty result sets (0 rows returns NULL)
+    for (const metric of subqueryMetrics) {
+      const cteName = `cte_${metric.alias}`;
+      const quotedAlias = quoteIdentifier(metric.alias);
+      currentSelectExprs.push(
+        `coalesce((SELECT metric_value FROM ${cteName}_current), 0) AS ${quotedAlias}`,
+      );
+      previousSelectExprs.push(
+        `coalesce((SELECT metric_value FROM ${cteName}_previous), 0) AS ${quotedAlias}`,
+      );
+    }
+
+    sql = `
     WITH
       ${ctes.join(",\n      ")}
     SELECT ${currentSelectExprs.join(", ")}
     UNION ALL
     SELECT ${previousSelectExprs.join(", ")}
   `;
+  }
 
   return {
     sql,
@@ -882,6 +979,69 @@ function buildSubqueryTimeseriesQuery(
       ...(input.groupByKey ? { groupByKey: input.groupByKey } : {}),
     },
   };
+}
+
+/**
+ * Build the final SQL for timeseries mode, joining all CTEs on date.
+ * Each period (current/previous) gets its own SELECT block, combined with UNION ALL.
+ */
+function buildSubqueryTimeseriesFinalSQL(
+  ctes: string[],
+  simpleGroups: Array<{ metrics: MetricTranslation[]; cteName: string }>,
+  subqueryMetrics: MetricTranslation[],
+): string {
+  const buildPeriodSelect = (period: "current" | "previous"): string => {
+    const sources: Array<{ alias: string; ref: string }> = [];
+    const columns: string[] = [];
+
+    for (let gi = 0; gi < simpleGroups.length; gi++) {
+      const group = simpleGroups[gi]!;
+      const alias = simpleGroups.length === 1 ? "sm" : `sm${gi}`;
+      sources.push({ alias, ref: `${group.cteName}_${period}` });
+      for (const m of group.metrics) {
+        const q = quoteIdentifier(m.alias);
+        columns.push(`COALESCE(${alias}.${q}, 0) AS ${q}`);
+      }
+    }
+
+    for (let i = 0; i < subqueryMetrics.length; i++) {
+      const m = subqueryMetrics[i]!;
+      const alias = `sq${i}`;
+      sources.push({ alias, ref: `cte_${m.alias}_${period}` });
+      columns.push(
+        `COALESCE(${alias}.metric_value, 0) AS ${quoteIdentifier(m.alias)}`,
+      );
+    }
+
+    if (sources.length === 0) return "";
+
+    const base = sources[0]!;
+    const dateExpr =
+      sources.length === 1
+        ? `${base.alias}.date`
+        : `COALESCE(${sources.map((s) => `${s.alias}.date`).join(", ")})`;
+
+    let fromClause = `${base.ref} ${base.alias}`;
+    for (const s of sources.slice(1)) {
+      fromClause += `\n    FULL JOIN ${s.ref} ${s.alias} ON ${base.alias}.date = ${s.alias}.date`;
+    }
+
+    return `SELECT '${period}' AS period, ${dateExpr} AS date,
+      ${columns.join(",\n      ")}
+    FROM ${fromClause}`;
+  };
+
+  const currentSelect = buildPeriodSelect("current");
+  const previousSelect = buildPeriodSelect("previous");
+
+  return `
+    WITH
+      ${ctes.join(",\n      ")}
+    ${currentSelect}
+    UNION ALL
+    ${previousSelect}
+    ORDER BY period, date
+  `;
 }
 
 /** Maps source field names to their corresponding CTE column names */
