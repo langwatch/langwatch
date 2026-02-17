@@ -145,8 +145,9 @@ export function AddCustomModelDialog({
       open={open}
       onOpenChange={(e) => !e.open && handleClose()}
       size="lg"
+      closeOnInteractOutside={false}
     >
-      <DialogContent>
+      <DialogContent positionerProps={{ zIndex: 1502 }}>
         <DialogHeader>
           <DialogTitle>Add Model</DialogTitle>
         </DialogHeader>
