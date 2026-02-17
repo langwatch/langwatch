@@ -1,13 +1,14 @@
-/**
- * Sets safe default environment variables for deja-view.
- * This must be imported before any modules that use @t3-oss/env.
- */
+// Skip @t3-oss/env validation entirely — this is a standalone CLI tool,
+// not the Next.js app. Pipeline imports trigger env.mjs at module load;
+// this flag tells it to skip all validation.
+process.env.SKIP_ENV_VALIDATION = "1";
 
-// Suppress all logs by default to keep the TUI clean
+// Suppress runtime logs to keep the TUI clean
 process.env.PINO_LOG_LEVEL = process.env.LOG_LEVEL = "error";
-process.env.DATABASE_URL = "postgresql://fake:fake@localhost:5432/fake";
-process.env.BASE_HOST = "http://localhost:3000";
-process.env.NEXTAUTH_SECRET = "deja-view-fake-secret";
-process.env.NEXTAUTH_URL = "http://localhost:3000";
-process.env.API_TOKEN_JWT_SECRET = "deja-view-fake-jwt-secret";
-process.env.ELASTICSEARCH_NODE_URL = "http://localhost:9200";
+
+// Clear storage urls so they can't leak in from the shell.
+process.env.DATABASE_URL = "";
+process.env.CLICKHOUSE_URL = "";
+process.env.ELASTICSEARCH_NODE_URL = "";
+process.env.ELASTICSEARCH_API_KEY = "";
+process.env.REDIS_URL = "";

@@ -145,6 +145,9 @@ const TokenRenderer: React.FC<{ token: JsonToken; dimmed?: boolean }> = ({
 /**
  * Syntax-highlighted JSON viewer for Ink terminal UI.
  *
+ * Renders exactly `maxLines` lines of content (including scroll indicators),
+ * since Ink does not clip overflow in the terminal.
+ *
  * @example
  * <JsonViewer data={{ key: "value" }} maxLines={20} scrollOffset={0} />
  */
@@ -157,18 +160,16 @@ export const JsonViewer: React.FC<JsonViewerProps> = ({
   const jsonStr = JSON.stringify(data, null, 2);
   const tokenizedLines = tokenizeJson(jsonStr);
 
-  // Apply scroll offset - only limit lines if maxLines is explicitly set AND content exceeds it
+  // Apply scroll offset
   const startLine = Math.min(
     scrollOffset,
     Math.max(0, tokenizedLines.length - 1),
   );
 
-  // If maxLines is set, we need to account for scroll indicators in the total
+  // If maxLines is set, compute how many JSON lines fit after reserving space for indicators
   let effectiveMaxLines: number | undefined = undefined;
   if (maxLines !== undefined) {
-    // Check if we'll have scroll indicators
     const hasMoreAbove = startLine > 0;
-    // Estimate if we'll have below indicator (we know total lines and start)
     const remainingLines = tokenizedLines.length - startLine;
     const hasMoreBelow = remainingLines > maxLines;
 

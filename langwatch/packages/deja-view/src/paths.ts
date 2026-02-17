@@ -13,5 +13,14 @@ export const pipelineRoot = path.join(
   "pipelines",
 );
 
+export const globalProjectionsRoot = path.join(
+  monorepoRoot,
+  "src",
+  "server",
+  "event-sourcing",
+  "projections",
+  "global",
+);
+
 export const projectRoot = monorepoRoot;
 export const packageDirectory = packageRoot;

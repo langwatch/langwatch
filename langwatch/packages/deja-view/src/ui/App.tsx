@@ -1,6 +1,6 @@
-import { Box, Text, useApp, useInput } from "ink";
+import { Box, Text, measureElement, useApp, useInput } from "ink";
 import SelectInput from "ink-select-input";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { DiscoveredEventHandler } from "../discovery/eventHandlers.types";
 import type { AggregateLinkInfo } from "../discovery/links";
 import type { DiscoveredProjection } from "../discovery/projections.types";
@@ -10,7 +10,7 @@ import { buildProjectionTimelines } from "../runner/projectionTimeline";
 import { EventDetail } from "./EventDetail";
 import { EventHandlerRow } from "./EventHandlerRow";
 import { EventTimeline } from "./EventTimeline";
-import { FullscreenLayout, useTerminalDimensions } from "./FullscreenLayout";
+import { FullscreenLayout } from "./FullscreenLayout";
 import { ProjectionRow } from "./ProjectionRow";
 import type { ResolvedChildAggregate } from "./Root";
 
@@ -65,11 +65,6 @@ function getUniqueAggregates(
  * @example
  * render(<App events={events} projections={projections} />);
  */
-// Fixed heights for layout calculation
-const HEADER_HEIGHT = 3; // Border + content + border
-const TIMELINE_HEIGHT = 5; // Border + 3 lines (events + type + legend) + border
-const FOOTER_HEIGHT = 1; // Help text
-
 const App: React.FC<AppProps> = ({
   events,
   projections,
@@ -82,7 +77,8 @@ const App: React.FC<AppProps> = ({
   onNavigateToAggregate,
 }) => {
   const { exit } = useApp();
-  const { height: terminalHeight } = useTerminalDimensions();
+  const projectionsListRef = useRef(null);
+  const [measuredHeight, setMeasuredHeight] = useState(0);
   const [selectedAggregateId, setSelectedAggregateId] = useState<string | null>(
     null,
   );
@@ -214,14 +210,15 @@ const App: React.FC<AppProps> = ({
     return related;
   }, [linkInfo, filteredEvents, resolvedChildren]);
 
-  // Calculate available height for expanded projections
-  // Fixed UI: header (3) + timeline (5) + footer (1) + optional panels
-  const fixedUIHeight =
-    HEADER_HEIGHT +
-    TIMELINE_HEIGHT +
-    FOOTER_HEIGHT +
-    (showRelatedMenu ? 4 : 0) +
-    (showEventDetail ? 10 : 0);
+  // Measure the actual height of the projections list container.
+  // This bypasses terminal height detection issues — Ink's flex layout
+  // correctly sizes the container, and measureElement reads the result.
+  useEffect(() => {
+    if (projectionsListRef.current) {
+      const { height } = measureElement(projectionsListRef.current);
+      if (height > 0) setMeasuredHeight(height);
+    }
+  });
 
   // Count expanded items that have actual data (need full box)
   const expandedWithData = allTimelines.filter((item) => {
@@ -230,12 +227,12 @@ const App: React.FC<AppProps> = ({
       item.timeline.steps[item.timeline.steps.length - 1];
     if (item.type === "projection") {
       const projectionStep = step as {
-        projectionStateByAggregate?: Array<{ version?: number }>;
+        projectionStateByAggregate?: Array<{ data?: unknown }>;
       };
       const snapshot = projectionStep?.projectionStateByAggregate?.[0];
       return (
         expandedProjections.has(item.timeline.projection.id) &&
-        (snapshot?.version ?? 0) > 0
+        snapshot?.data !== undefined
       );
     } else {
       const handlerStep = step as { processed?: boolean };
@@ -246,12 +243,11 @@ const App: React.FC<AppProps> = ({
     }
   }).length;
 
-  // Simple calculation: total available minus fixed UI, divided among expanded items
-  // Each item header = 1 line, each expanded v0 = 2 lines (header + message)
+  // Compute maxLinesPerExpanded from the measured container height
+  // Each collapsed/v0 item takes 1 line for its title (+ 1 for expanded-without-data message)
   const collapsedAndV0Lines =
     allTimelines.length + expandedProjections.size - expandedWithData;
-  const availableForExpandedBoxes =
-    terminalHeight - fixedUIHeight - collapsedAndV0Lines;
+  const availableForExpandedBoxes = measuredHeight - collapsedAndV0Lines;
   const expandedSlots = Math.max(1, expandedWithData);
   const maxLinesPerExpanded = Math.max(
     10,
@@ -472,6 +468,7 @@ const App: React.FC<AppProps> = ({
       >
         {/* Projections list */}
         <Box
+          ref={projectionsListRef}
           flexDirection="column"
           flexGrow={1}
           flexShrink={1}
