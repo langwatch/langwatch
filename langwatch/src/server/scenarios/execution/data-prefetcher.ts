@@ -461,9 +461,14 @@ export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
             projectId,
           });
 
-          if (!params.api_key || !params.model) {
+          const hasCredentials = !!(
+            params.api_key ||
+            params.vertex_credentials ||
+            params.aws_access_key_id
+          );
+          if (!hasCredentials || !params.model) {
             const missing = [];
-            if (!params.api_key) missing.push("API key");
+            if (!hasCredentials) missing.push("API key");
             if (!params.model) missing.push("model");
             return {
               success: false,
