@@ -45,16 +45,16 @@ export const EventHandlerRow: React.FC<EventHandlerRowProps> = ({
     maxLines !== undefined ? maxLines - titleLines : undefined;
 
   // Calculate how many lines JsonViewer can display (it will add indicators if needed)
+  // Subtract 2 for the border lines (top + bottom) since height includes the border
   const jsonMaxLines =
     contentBoxMaxLines !== undefined
-      ? Math.max(5, contentBoxMaxLines - metadataLines)
+      ? Math.max(5, contentBoxMaxLines - metadataLines - 2)
       : undefined;
 
   return (
     <Box
       flexDirection="column"
       flexShrink={0}
-      flexGrow={isExpanded && hasDisplayData ? 1 : 0}
     >
       <Box flexShrink={0}>
         {/* Focus indicator */}
@@ -96,11 +96,7 @@ export const EventHandlerRow: React.FC<EventHandlerRowProps> = ({
             borderColor={isFocused ? "cyan" : "gray"}
             paddingX={1}
             flexDirection="column"
-            flexGrow={1}
-            flexShrink={1}
-            minHeight={0}
-            height={contentBoxMaxLines}
-            overflow="hidden"
+            flexShrink={0}
           >
             <Text dimColor>
               Event: {currentStep.eventType} | Processed:{" "}

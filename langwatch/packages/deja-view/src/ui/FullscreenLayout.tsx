@@ -1,6 +1,5 @@
 import { Box, useStdout } from "ink";
-import React from "react";
-import { createContext, useContext } from "react";
+import React, { createContext, useContext } from "react";
 
 interface TerminalDimensions {
   width: number;

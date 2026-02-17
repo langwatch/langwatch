@@ -1,5 +1,10 @@
 #!/usr/bin/env node
 import "./env-defaults";
+import dotenv from "dotenv";
+
+// Load this package's .env with override so it wins over the cleared defaults
+dotenv.config({ override: true });
+
 import { Command } from "commander";
 import { render } from "ink";
 import React from "react";
@@ -8,8 +13,6 @@ import { discoverProjections } from "./discovery/projections";
 import { buildPipelineAggregateTypeMap } from "./discovery/projections.types";
 import type { Environment } from "./io/secrets";
 import { Root } from "./ui/Root";
-
-import "dotenv/config";
 
 export interface CliOptions {
   file?: string;

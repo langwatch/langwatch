@@ -65,16 +65,16 @@ export const ProjectionRow: React.FC<ProjectionRowProps> = ({
     maxLines !== undefined ? maxLines - titleLines : undefined;
 
   // Calculate how many lines JsonViewer can display (it will add indicators if needed)
+  // Subtract 2 for the border lines (top + bottom) since height includes the border
   const jsonMaxLines =
     contentBoxMaxLines !== undefined
-      ? Math.max(5, contentBoxMaxLines - metadataLines)
+      ? Math.max(5, contentBoxMaxLines - metadataLines - 2)
       : undefined;
 
   return (
     <Box
       flexDirection="column"
       flexShrink={0}
-      flexGrow={isExpanded && hasData ? 1 : 0}
     >
       <Box flexShrink={0}>
         {/* Focus indicator - always visible even when dimmed */}
@@ -90,7 +90,7 @@ export const ProjectionRow: React.FC<ProjectionRowProps> = ({
           {expandIndicator} {projection.pipelineName}/
           {projection.projectionName}
         </Text>
-        <Text color="gray">{hasData && `v${snapshot.version}`}</Text>
+        <Text color="gray">{hasData && ` v${snapshot.version}`}</Text>
         {hasData && stale && (
           <Text color="gray" dimColor>
             {" "}
@@ -129,11 +129,7 @@ export const ProjectionRow: React.FC<ProjectionRowProps> = ({
           }
           paddingX={1}
           flexDirection="column"
-          flexGrow={1}
-          flexShrink={1}
-          minHeight={0}
-          height={contentBoxMaxLines}
-          overflow="hidden"
+          flexShrink={0}
         >
           {!isCompatible && (
             <Text color="yellow">

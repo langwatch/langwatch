@@ -79,8 +79,8 @@ function isStaticPipelineDefinition(
     definition.metadata !== null &&
     typeof (definition.metadata as any).name === "string" &&
     typeof (definition.metadata as any).aggregateType === "string" &&
-    definition.projections instanceof Map &&
-    definition.eventHandlers instanceof Map &&
+    definition.foldProjections instanceof Map &&
+    definition.mapProjections instanceof Map &&
     Array.isArray(definition.commands) &&
     Array.isArray(definition.parentLinks)
   );
