@@ -73,9 +73,22 @@ export interface ProjectFetcher {
   } | null>;
 }
 
+/** Reason codes for model params preparation failures */
+export type ModelParamsFailureReason =
+  | "invalid_model_format"
+  | "provider_not_found"
+  | "provider_not_enabled"
+  | "missing_params"
+  | "preparation_error";
+
+/** Structured result from model params preparation */
+export type ModelParamsResult =
+  | { success: true; params: LiteLLMParams }
+  | { success: false; reason: ModelParamsFailureReason; message: string };
+
 /** Minimal interface for model params preparation */
 export interface ModelParamsProvider {
-  prepare(projectId: string, model: string): Promise<LiteLLMParams | null>;
+  prepare(projectId: string, model: string): Promise<ModelParamsResult>;
 }
 
 /** All dependencies required by prefetchScenarioData */
@@ -100,6 +113,7 @@ export type PrefetchResult =
   | {
       success: false;
       error: string;
+      reason?: ModelParamsFailureReason;
     };
 
 // ============================================================================
@@ -158,14 +172,18 @@ export async function prefetchScenarioData(
     adapterData.type === "prompt" && adapterData.model
       ? adapterData.model
       : project.defaultModel;
-  const modelParams = await deps.modelParamsProvider.prepare(
+  const modelParamsResult = await deps.modelParamsProvider.prepare(
     context.projectId,
     modelForParams,
   );
-  if (!modelParams) {
-    logger.warn({ projectId: context.projectId, model: modelForParams }, "Failed to prepare model params");
-    return { success: false, error: "Failed to prepare model params" };
+  if (!modelParamsResult.success) {
+    logger.warn(
+      { projectId: context.projectId, model: modelForParams, reason: modelParamsResult.reason },
+      `Failed to prepare model params: ${modelParamsResult.message}`,
+    );
+    return { success: false, error: modelParamsResult.message, reason: modelParamsResult.reason };
   }
+  const modelParams = modelParamsResult.params;
 
   logger.debug(
     { projectId: context.projectId, scenarioId: context.scenarioId, targetType: target.type },
@@ -399,26 +417,75 @@ export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
         }),
     },
     modelParamsProvider: {
-      prepare: async (projectId, model) => {
+      prepare: async (projectId, model): Promise<ModelParamsResult> => {
         try {
-          const providers = await getProjectModelProviders(projectId);
-          const providerKey = model.split("/")[0];
-          if (!providerKey) return null;
+          if (!model.includes("/")) {
+            return {
+              success: false,
+              reason: "invalid_model_format",
+              message: `Invalid model format '${model}' - expected 'provider/model' format (e.g., 'openai/gpt-4')`,
+            };
+          }
 
+          const providerKey = model.split("/")[0];
+          if (!providerKey) {
+            return {
+              success: false,
+              reason: "invalid_model_format",
+              message: `Invalid model format '${model}' - expected 'provider/model' format (e.g., 'openai/gpt-4')`,
+            };
+          }
+
+          const providers = await getProjectModelProviders(projectId);
           const provider = providers[providerKey];
-          if (!provider?.enabled) return null;
+
+          if (!provider) {
+            return {
+              success: false,
+              reason: "provider_not_found",
+              message: `Provider '${providerKey}' not found for this project. Available providers: ${Object.keys(providers).join(", ") || "none"}`,
+            };
+          }
+
+          if (!provider.enabled) {
+            return {
+              success: false,
+              reason: "provider_not_enabled",
+              message: `Provider '${providerKey}' is not enabled for this project. Enable it in Settings > Model Providers.`,
+            };
+          }
 
           const params = await prepareLitellmParams({
             model,
             modelProvider: provider,
             projectId,
           });
-          if (!params.api_key || !params.model) return null;
 
-          return params as LiteLLMParams;
+          const hasCredentials = !!(
+            params.api_key ||
+            params.vertex_credentials ||
+            params.aws_access_key_id
+          );
+          if (!hasCredentials || !params.model) {
+            const missing = [];
+            if (!hasCredentials) missing.push("API key");
+            if (!params.model) missing.push("model");
+            return {
+              success: false,
+              reason: "missing_params",
+              message: `Provider '${providerKey}' is missing required configuration: ${missing.join(" and ")}. Check Settings > Model Providers.`,
+            };
+          }
+
+          return { success: true, params: params as LiteLLMParams };
         } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
           logger.error({ error }, "failed to prepare LiteLLM params");
-          return null;
+          return {
+            success: false,
+            reason: "preparation_error",
+            message: `Unexpected error preparing model params: ${errorMessage}`,
+          };
         }
       },
     },
