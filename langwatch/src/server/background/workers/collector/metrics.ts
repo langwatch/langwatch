@@ -130,11 +130,11 @@ export const computeTraceMetrics = (spans: Span[]): Trace["metrics"] => {
 
 // Fallback tokenizer used when no model cost match is found.
 // gpt-4o is the most common tokenizer and a reasonable approximation for unknown models.
-const FALLBACK_TOKENIZER: MaybeStoredLLMModelCost = {
+const FALLBACK_TOKENIZER = {
   projectId: "",
   model: "gpt-4o",
   regex: "^gpt-4o$",
-};
+} as const;
 
 // TODO: test
 export const addLLMTokensCount = async (projectId: string, spans: Span[]) => {
