@@ -50,16 +50,45 @@ if (spanProcessors.length > 0) {
       ],
     }),
     instrumentations: [
-      getNodeAutoInstrumentations({
-        "@opentelemetry/instrumentation-aws-sdk": {
-          enabled: false,
-        },
-        // Disable this until we kill Elastic Search
-        "@opentelemetry/instrumentation-undici": {
-          enabled: false,
-        },
-        "@opentelemetry/instrumentation-http": {
-          enabled: false,
+      ...getNodeAutoInstrumentations({
+        // disable everything noisy by default
+        "@opentelemetry/instrumentation-aws-lambda": { enabled: false },
+        "@opentelemetry/instrumentation-undici": { enabled: false },
+        "@opentelemetry/instrumentation-http": { enabled: false },
+        "@opentelemetry/instrumentation-mongodb": { enabled: false },
+        "@opentelemetry/instrumentation-mongoose": { enabled: false },
+        "@opentelemetry/instrumentation-mysql": { enabled: false },
+        "@opentelemetry/instrumentation-mysql2": { enabled: false },
+        "@opentelemetry/instrumentation-redis": { enabled: false },
+        "@opentelemetry/instrumentation-tedious": { enabled: false },
+        "@opentelemetry/instrumentation-oracledb": { enabled: false },
+        "@opentelemetry/instrumentation-memcached": { enabled: false },
+        "@opentelemetry/instrumentation-cassandra-driver": { enabled: false },
+        "@opentelemetry/instrumentation-knex": { enabled: false },
+        "@opentelemetry/instrumentation-dns": { enabled: false },
+        "@opentelemetry/instrumentation-net": { enabled: false },
+        "@opentelemetry/instrumentation-socket.io": { enabled: false },
+        "@opentelemetry/instrumentation-generic-pool": { enabled: false },
+        "@opentelemetry/instrumentation-bunyan": { enabled: false },
+        "@opentelemetry/instrumentation-winston": { enabled: false },
+        "@opentelemetry/instrumentation-graphql": { enabled: false },
+        "@opentelemetry/instrumentation-dataloader": { enabled: false },
+        "@opentelemetry/instrumentation-amqplib": { enabled: false },
+        "@opentelemetry/instrumentation-kafkajs": { enabled: false },
+        "@opentelemetry/instrumentation-lru-memoizer": { enabled: false },
+        "@opentelemetry/instrumentation-cucumber": { enabled: false },
+        "@opentelemetry/instrumentation-router": { enabled: false },
+
+        // Truncate ioredis db.statement to command + first key
+        // (avoud logging content + large attribtes)
+        "@opentelemetry/instrumentation-ioredis": {
+          dbStatementSerializer: (
+            cmdName: string,
+            cmdArgs: Array<string | Buffer | number | unknown[]>,
+          ) => {
+            const key = typeof cmdArgs[0] === "string" ? cmdArgs[0] : "";
+            return key ? `${cmdName} ${key}` : cmdName;
+          },
         },
       }),
     ],

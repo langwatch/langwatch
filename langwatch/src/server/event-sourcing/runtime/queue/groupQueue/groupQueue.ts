@@ -439,6 +439,7 @@ export class GroupQueueProcessorBullMq<
 
     const opts: JobsOptions = {
       jobId: bullmqJobId,
+      telemetry: { omitContext: true },
     };
 
     await this.queue.add(
