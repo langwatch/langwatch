@@ -1,7 +1,7 @@
 import Stripe from "stripe";
 import { afterAll, describe, expect, it } from "vitest";
-import { STRIPE_PRICE_NAMES } from "../stripePrices.types";
-import { getItemsToUpdate, prices } from "../stripeHelpers";
+import { STRIPE_PRICE_NAMES } from "../stripe/stripePrices.types";
+import { getItemsToUpdate, prices } from "../services/subscriptionItemCalculator";
 import { PlanTypes } from "../planTypes";
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;

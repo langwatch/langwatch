@@ -6,8 +6,6 @@ import type {
 import type { NextRequest } from "next/server";
 import type { Awaitable, DefaultSession, Session } from "next-auth";
 import type { MaybeStoredModelProvider } from "../server/modelProviders/registry";
-import { SubscriptionHandler } from "../server/subscriptionHandler";
-
 export interface RegistrationCbUser {
   name?: string | null;
   email?: string | null;
@@ -27,7 +25,6 @@ export interface RegistrationCbOrganization {
 }
 
 export interface Dependencies {
-  subscriptionHandler: typeof SubscriptionHandler;
   sessionHandler?: (params: {
     req: NextApiRequest | GetServerSidePropsContext["req"] | NextRequest;
     session: any;
@@ -56,8 +53,6 @@ export interface Dependencies {
   }) => Promise<Record<string, string>>;
 }
 
-const dependencies: Dependencies = {
-  subscriptionHandler: SubscriptionHandler,
-};
+const dependencies: Dependencies = {};
 
 export default dependencies;

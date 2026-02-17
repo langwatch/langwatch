@@ -1,7 +1,7 @@
 import Stripe from "stripe";
-import { PLAN_LIMITS } from "./planLimits";
-import { PlanTypes, type PlanTypes as PlanType } from "./planTypes";
-import { isStripePriceName, prices } from "./stripePriceCatalog";
+import { PLAN_LIMITS } from "../planLimits";
+import { PlanTypes, type PlanTypes as PlanType } from "../planTypes";
+import { isStripePriceName, prices } from "../stripe/stripePriceCatalog";
 
 export { prices };
 

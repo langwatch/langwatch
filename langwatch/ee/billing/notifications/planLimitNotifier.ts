@@ -1,12 +1,12 @@
 import type { PrismaClient } from "@prisma/client";
-import { env } from "../../src/env.mjs";
-import { prisma } from "../../src/server/db";
-import { captureException } from "../../src/utils/posthogErrorCapture";
+import { env } from "../../../src/env.mjs";
+import { prisma } from "../../../src/server/db";
+import { captureException } from "../../../src/utils/posthogErrorCapture";
 import { notifyPlanLimit } from "./notificationHandlers";
 import type {
   PlanLimitNotificationContext,
   PlanLimitNotifierInput,
-} from "./types";
+} from "../types";
 
 const MIN_DAYS_BETWEEN_ALERTS = 30;
 

@@ -4,7 +4,7 @@ import {
   notifyPlanLimit,
   notifySubscriptionEvent,
   setBillingNotificationHandlers,
-} from "../notificationHandlers";
+} from "../notifications/notificationHandlers";
 import type { SubscriptionNotificationPayload } from "../types";
 
 describe("notificationHandlers", () => {

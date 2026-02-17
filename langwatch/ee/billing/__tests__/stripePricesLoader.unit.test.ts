@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import stripeCatalogData from "../stripeCatalog.json";
+import stripeCatalogData from "../stripe/stripeCatalog.json";
 import {
   getStripeEnvironmentFromNodeEnv,
   parseStripePricesFile,
   resolveStripePriceMap,
-} from "../stripePriceCatalog";
-import { STRIPE_PRICE_NAMES } from "../stripePrices.types";
+} from "../stripe/stripePriceCatalog";
+import { STRIPE_PRICE_NAMES } from "../stripe/stripePrices.types";
 
 describe("stripeCatalog", () => {
   describe("parseStripePricesFile()", () => {

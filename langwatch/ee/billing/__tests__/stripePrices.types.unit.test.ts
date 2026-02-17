@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { STRIPE_PRICE_NAMES } from "../stripePrices.types";
+import { STRIPE_PRICE_NAMES } from "../stripe/stripePrices.types";
 
 describe("stripePrices.types", () => {
   it("defines all required billing price keys", () => {

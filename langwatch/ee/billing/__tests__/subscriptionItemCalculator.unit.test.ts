@@ -5,7 +5,7 @@ import {
   createItemsToAdd,
   getItemsToUpdate,
   prices,
-} from "../stripeHelpers";
+} from "../services/subscriptionItemCalculator";
 import { PlanTypes } from "../planTypes";
 
 const createSubscriptionItem = (
@@ -17,7 +17,7 @@ const createSubscriptionItem = (
     price: { id: priceId },
   }) as Stripe.SubscriptionItem;
 
-describe("stripeHelpers", () => {
+describe("subscriptionItemCalculator", () => {
   describe("getItemsToUpdate()", () => {
     it("updates launch items and deletes stale items from other plans", () => {
       const items = getItemsToUpdate({

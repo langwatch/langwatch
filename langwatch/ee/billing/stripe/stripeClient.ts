@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import { env } from "../../src/env.mjs";
+import { env } from "../../../src/env.mjs";
 
 export const createStripeClient = () => {
   const secretKey = env.STRIPE_SECRET_KEY;

@@ -1,9 +1,9 @@
-import { captureException } from "../../src/utils/posthogErrorCapture";
+import { captureException } from "../../../src/utils/posthogErrorCapture";
 import type {
   BillingNotificationHandlers,
   PlanLimitNotificationContext,
   SubscriptionNotificationPayload,
-} from "./types";
+} from "../types";
 
 let billingNotificationHandlers: BillingNotificationHandlers = {};
 

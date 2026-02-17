@@ -10,7 +10,7 @@ vi.mock("../../../src/server/db", () => ({
   prisma: {},
 }));
 
-vi.mock("../notificationHandlers", () => ({
+vi.mock("../notifications/notificationHandlers", () => ({
   notifyPlanLimit: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -19,8 +19,8 @@ vi.mock("../../../src/utils/posthogErrorCapture", () => ({
 }));
 
 import { env } from "../../../src/env.mjs";
-import { createPlanLimitNotifier } from "../planLimitNotifier";
-import { notifyPlanLimit } from "../notificationHandlers";
+import { createPlanLimitNotifier } from "../notifications/planLimitNotifier";
+import { notifyPlanLimit } from "../notifications/notificationHandlers";
 import { captureException } from "../../../src/utils/posthogErrorCapture";
 
 const mockEnv = env as { IS_SAAS: boolean | undefined };

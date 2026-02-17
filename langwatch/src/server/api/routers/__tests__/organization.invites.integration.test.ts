@@ -48,13 +48,15 @@ vi.mock("../../../../env.mjs", async (importOriginal) => {
 });
 
 // Mock subscription handler to control plan limits
-vi.mock("../../../../injection/dependencies.server", () => ({
-  dependencies: {
-    subscriptionHandler: {
+vi.mock("../../../subscriptionHandler", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../../../subscriptionHandler")>();
+  return {
+    ...original,
+    SubscriptionHandler: {
       getActivePlan: mockGetActivePlan,
     },
-  },
-}));
+  };
+});
 
 /** Default plan info for tests (all fields required by PlanInfo). */
 function makeTestPlan(overrides: Record<string, unknown> = {}) {
