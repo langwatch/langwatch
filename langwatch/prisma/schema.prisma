@@ -1061,6 +1061,21 @@ model SimulationSuite {
     @@unique([projectId, slug])
 }
 
+model ProjectDailySdkUsage {
+    id                 String   @id
+    projectId          String
+    date               String   // UTC date "YYYY-MM-DD"
+    sdkName            String   @default("")
+    sdkVersion         String   @default("")
+    sdkLanguage        String   @default("")
+    count              Int      @default(0)
+    lastEventTimestamp BigInt?  // Unix ms from event.timestamp
+    updatedAt          DateTime @default(now()) @updatedAt
+
+    @@unique([projectId, date, sdkName, sdkVersion, sdkLanguage])
+    @@index([projectId, date])
+}
+
 model Subscription {
     id                    String             @id @default(nanoid())
     organizationId        String
