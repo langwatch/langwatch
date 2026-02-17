@@ -128,16 +128,11 @@ export function ToggleAnalytics() {
       <PageLayout.HeaderButton
         variant="ghost"
         onClick={() => {
-          void router.push(
-            {
-              pathname: `/${project?.slug}`,
-              query: {
-                ...router.query,
-              },
-            },
-            undefined,
-            { shallow: true },
-          );
+          const { project: _project, view: _view, ...query } = router.query;
+          void router.push({
+            pathname: `/${project?.slug}/analytics`,
+            query,
+          });
         }}
       >
         <LuTrendingUp />
