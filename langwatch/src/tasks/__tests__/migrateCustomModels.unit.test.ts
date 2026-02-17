@@ -91,9 +91,6 @@ describe("migrateCustomModelsRow()", () => {
             "frequency_penalty",
             "presence_penalty",
           ],
-          responseFormats: ["text"],
-          supportsImageInput: false,
-          supportsFileInput: false,
         },
       ]);
       expect(result!.customEmbeddingsModels).toEqual([
@@ -103,9 +100,6 @@ describe("migrateCustomModelsRow()", () => {
           mode: "embedding",
           maxTokens: null,
           supportedParameters: [],
-          responseFormats: [],
-          supportsImageInput: false,
-          supportsFileInput: false,
         },
       ]);
     });
@@ -120,9 +114,7 @@ describe("migrateCustomModelsRow()", () => {
           mode: "chat",
           maxTokens: 4096,
           supportedParameters: ["temperature"],
-          responseFormats: ["text", "json"],
-          supportsImageInput: true,
-          supportsFileInput: false,
+          multimodalInputs: ["image"],
         },
       ];
 
@@ -189,9 +181,6 @@ describe("migrateCustomModelsRow()", () => {
             "frequency_penalty",
             "presence_penalty",
           ],
-          responseFormats: ["text"],
-          supportsImageInput: false,
-          supportsFileInput: false,
         },
       ]);
       expect(result!.customEmbeddingsModels).toBeNull();
@@ -217,9 +206,6 @@ describe("migrateCustomModelsRow()", () => {
           mode: "embedding",
           maxTokens: null,
           supportedParameters: [],
-          responseFormats: [],
-          supportsImageInput: false,
-          supportsFileInput: false,
         },
       ]);
     });
@@ -269,9 +255,6 @@ describe("migrateCustomModelsRow()", () => {
           mode: "embedding",
           maxTokens: null,
           supportedParameters: [],
-          responseFormats: [],
-          supportsImageInput: false,
-          supportsFileInput: false,
         },
       ]);
     });

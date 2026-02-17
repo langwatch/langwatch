@@ -27,15 +27,39 @@ describe("customModelEntrySchema", () => {
         mode: "chat" as const,
         maxTokens: 4096,
         supportedParameters: ["temperature", "top_p"],
-        responseFormats: ["text", "json"],
-        supportsImageInput: true,
-        supportsFileInput: false,
+        multimodalInputs: ["image", "audio"],
       };
 
       const result = customModelEntrySchema.safeParse(input);
 
       expect(result.success).toBe(true);
       expect(result.data).toEqual(input);
+    });
+
+    it("rejects unknown parameter names", () => {
+      const input = {
+        modelId: "my-model",
+        displayName: "My Model",
+        mode: "chat" as const,
+        supportedParameters: ["temperature", "unknown_param"],
+      };
+
+      const result = customModelEntrySchema.safeParse(input);
+
+      expect(result.success).toBe(false);
+    });
+
+    it("rejects unknown multimodal input types", () => {
+      const input = {
+        modelId: "my-model",
+        displayName: "My Model",
+        mode: "chat" as const,
+        multimodalInputs: ["image", "video"],
+      };
+
+      const result = customModelEntrySchema.safeParse(input);
+
+      expect(result.success).toBe(false);
     });
 
     it("accepts maxTokens as null", () => {

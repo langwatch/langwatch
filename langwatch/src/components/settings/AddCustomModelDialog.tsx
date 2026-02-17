@@ -7,8 +7,8 @@ import {
   Wrap,
 } from "@chakra-ui/react";
 import { useCallback, useState } from "react";
-import type { CustomModelEntry } from "../../server/modelProviders/customModel.schema";
-import { customModelEntrySchema } from "../../server/modelProviders/customModel.schema";
+import type { CustomModelEntry, SupportedParameter, MultimodalInput } from "../../server/modelProviders/customModel.schema";
+import { customModelEntrySchema, supportedParameterValues, multimodalInputValues } from "../../server/modelProviders/customModel.schema";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -21,22 +21,25 @@ import {
 import { Checkbox } from "../ui/checkbox";
 import { SmallLabel } from "../SmallLabel";
 
-const SUPPORTED_PARAMETERS = [
-  { value: "temperature", label: "Temperature" },
-  { value: "frequency_penalty", label: "Frequency Penalty" },
-  { value: "presence_penalty", label: "Presence Penalty" },
-  { value: "top_p", label: "Top P" },
-  { value: "top_k", label: "Top K" },
-  { value: "system_prompt", label: "System Prompt" },
-  { value: "reasoning_effort", label: "Reasoning Effort" },
-] as const;
+const PARAMETER_LABELS: Record<SupportedParameter, string> = {
+  temperature: "Temperature",
+  max_tokens: "Max Tokens",
+  top_p: "Top P",
+  frequency_penalty: "Frequency Penalty",
+  presence_penalty: "Presence Penalty",
+  top_k: "Top K",
+  min_p: "Min P",
+  repetition_penalty: "Repetition Penalty",
+  seed: "Seed",
+  reasoning: "Reasoning",
+  verbosity: "Verbosity",
+};
 
-const RESPONSE_FORMATS = [
-  { value: "plain_text", label: "Plain Text" },
-  { value: "json", label: "JSON" },
-  { value: "json_object", label: "JSON Object" },
-  { value: "tools", label: "Tools" },
-] as const;
+const MULTIMODAL_LABELS: Record<MultimodalInput, string> = {
+  image: "Images",
+  file: "Files",
+  audio: "Audio",
+};
 
 type AddCustomModelDialogProps = {
   open: boolean;
@@ -47,7 +50,7 @@ type AddCustomModelDialogProps = {
 /**
  * Dialog for adding a custom chat model with full metadata configuration.
  * Includes fields for Model ID, Display Name, Max Tokens, supported parameters,
- * response formats, and input types.
+ * and multimodal input types.
  */
 export function AddCustomModelDialog({
   open,
@@ -57,10 +60,8 @@ export function AddCustomModelDialog({
   const [modelId, setModelId] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [maxTokens, setMaxTokens] = useState("");
-  const [supportedParameters, setSupportedParameters] = useState<string[]>([]);
-  const [responseFormats, setResponseFormats] = useState<string[]>([]);
-  const [supportsImageInput, setSupportsImageInput] = useState(false);
-  const [supportsFileInput, setSupportsFileInput] = useState(false);
+  const [supportedParameters, setSupportedParameters] = useState<SupportedParameter[]>([]);
+  const [multimodalInputs, setMultimodalInputs] = useState<MultimodalInput[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const resetForm = useCallback(() => {
@@ -68,9 +69,7 @@ export function AddCustomModelDialog({
     setDisplayName("");
     setMaxTokens("");
     setSupportedParameters([]);
-    setResponseFormats([]);
-    setSupportsImageInput(false);
-    setSupportsFileInput(false);
+    setMultimodalInputs([]);
     setErrors({});
   }, []);
 
@@ -79,7 +78,7 @@ export function AddCustomModelDialog({
     onClose();
   }, [onClose, resetForm]);
 
-  const toggleParameter = useCallback((param: string) => {
+  const toggleParameter = useCallback((param: SupportedParameter) => {
     setSupportedParameters((prev) =>
       prev.includes(param)
         ? prev.filter((p) => p !== param)
@@ -87,11 +86,11 @@ export function AddCustomModelDialog({
     );
   }, []);
 
-  const toggleResponseFormat = useCallback((format: string) => {
-    setResponseFormats((prev) =>
-      prev.includes(format)
-        ? prev.filter((f) => f !== format)
-        : [...prev, format],
+  const toggleMultimodal = useCallback((input: MultimodalInput) => {
+    setMultimodalInputs((prev) =>
+      prev.includes(input)
+        ? prev.filter((i) => i !== input)
+        : [...prev, input],
     );
   }, []);
 
@@ -110,10 +109,8 @@ export function AddCustomModelDialog({
           : null,
       supportedParameters:
         supportedParameters.length > 0 ? supportedParameters : undefined,
-      responseFormats:
-        responseFormats.length > 0 ? responseFormats : undefined,
-      supportsImageInput: supportsImageInput || undefined,
-      supportsFileInput: supportsFileInput || undefined,
+      multimodalInputs:
+        multimodalInputs.length > 0 ? multimodalInputs : undefined,
     };
 
     const result = customModelEntrySchema.safeParse(entry);
@@ -137,9 +134,7 @@ export function AddCustomModelDialog({
     displayName,
     maxTokens,
     supportedParameters,
-    responseFormats,
-    supportsImageInput,
-    supportsFileInput,
+    multimodalInputs,
     onSubmit,
     onClose,
     resetForm,
@@ -201,56 +196,32 @@ export function AddCustomModelDialog({
             <VStack gap={1} align="stretch">
               <SmallLabel>Supported Parameters</SmallLabel>
               <Wrap gap={3}>
-                {SUPPORTED_PARAMETERS.map((param) => (
+                {supportedParameterValues.map((param) => (
                   <Checkbox
-                    key={param.value}
-                    checked={supportedParameters.includes(param.value)}
-                    onCheckedChange={() => toggleParameter(param.value)}
+                    key={param}
+                    checked={supportedParameters.includes(param)}
+                    onCheckedChange={() => toggleParameter(param)}
                     size="sm"
                   >
-                    <Text fontSize="sm">{param.label}</Text>
+                    <Text fontSize="sm">{PARAMETER_LABELS[param]}</Text>
                   </Checkbox>
                 ))}
               </Wrap>
             </VStack>
 
             <VStack gap={1} align="stretch">
-              <SmallLabel>Response Formats</SmallLabel>
+              <SmallLabel>Multimodal Support</SmallLabel>
               <Wrap gap={3}>
-                {RESPONSE_FORMATS.map((format) => (
+                {multimodalInputValues.map((input) => (
                   <Checkbox
-                    key={format.value}
-                    checked={responseFormats.includes(format.value)}
-                    onCheckedChange={() => toggleResponseFormat(format.value)}
+                    key={input}
+                    checked={multimodalInputs.includes(input)}
+                    onCheckedChange={() => toggleMultimodal(input)}
                     size="sm"
                   >
-                    <Text fontSize="sm">{format.label}</Text>
+                    <Text fontSize="sm">{MULTIMODAL_LABELS[input]}</Text>
                   </Checkbox>
                 ))}
-              </Wrap>
-            </VStack>
-
-            <VStack gap={1} align="stretch">
-              <SmallLabel>Input Types</SmallLabel>
-              <Wrap gap={3}>
-                <Checkbox
-                  checked={supportsImageInput}
-                  onCheckedChange={() =>
-                    setSupportsImageInput((prev) => !prev)
-                  }
-                  size="sm"
-                >
-                  <Text fontSize="sm">Images</Text>
-                </Checkbox>
-                <Checkbox
-                  checked={supportsFileInput}
-                  onCheckedChange={() =>
-                    setSupportsFileInput((prev) => !prev)
-                  }
-                  size="sm"
-                >
-                  <Text fontSize="sm">Files</Text>
-                </Checkbox>
               </Wrap>
             </VStack>
           </VStack>

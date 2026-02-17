@@ -1,6 +1,33 @@
 import { z } from "zod";
 
 /**
+ * Known parameter names from the parameter registry.
+ * These are the parameters that can be configured in LLMConfigPopover.
+ */
+export const supportedParameterValues = [
+  "temperature",
+  "max_tokens",
+  "top_p",
+  "frequency_penalty",
+  "presence_penalty",
+  "top_k",
+  "min_p",
+  "repetition_penalty",
+  "seed",
+  "reasoning",
+  "verbosity",
+] as const;
+
+export type SupportedParameter = (typeof supportedParameterValues)[number];
+
+/**
+ * Multimodal input types a custom model can support.
+ */
+export const multimodalInputValues = ["image", "file", "audio"] as const;
+
+export type MultimodalInput = (typeof multimodalInputValues)[number];
+
+/**
  * Zod schema for a custom model entry.
  * Represents a user-defined model (fine-tune, self-hosted, etc.)
  * with full metadata for UI display and parameter configuration.
@@ -10,10 +37,8 @@ export const customModelEntrySchema = z.object({
   displayName: z.string().min(1),
   mode: z.enum(["chat", "embedding"]),
   maxTokens: z.number().positive().nullable().optional(),
-  supportedParameters: z.array(z.string()).optional(),
-  responseFormats: z.array(z.string()).optional(),
-  supportsImageInput: z.boolean().optional(),
-  supportsFileInput: z.boolean().optional(),
+  supportedParameters: z.array(z.enum(supportedParameterValues)).optional(),
+  multimodalInputs: z.array(z.enum(multimodalInputValues)).optional(),
 });
 
 /**

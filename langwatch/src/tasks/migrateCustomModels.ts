@@ -53,12 +53,10 @@ const CHAT_DEFAULTS = {
     "frequency_penalty",
     "presence_penalty",
   ],
-  responseFormats: ["text"],
 } as const;
 
 const EMBEDDING_DEFAULTS = {
-  supportedParameters: [] as string[],
-  responseFormats: [] as string[],
+  supportedParameters: [],
 } as const;
 
 // ============================================================================
@@ -82,10 +80,7 @@ function convertStringToEntry({
     displayName: modelId,
     mode,
     maxTokens: null,
-    supportedParameters: [...defaults.supportedParameters],
-    responseFormats: [...defaults.responseFormats],
-    supportsImageInput: false,
-    supportsFileInput: false,
+    supportedParameters: [...defaults.supportedParameters] as CustomModelEntry["supportedParameters"],
   };
 }
 

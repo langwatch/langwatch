@@ -357,9 +357,7 @@ describe("customModelUpdateInputSchema", () => {
           mode: "chat",
           maxTokens: 8192,
           supportedParameters: ["temperature", "top_p"],
-          responseFormats: ["text", "json"],
-          supportsImageInput: true,
-          supportsFileInput: false,
+          multimodalInputs: ["image", "audio"],
         },
       ];
 
@@ -421,9 +419,7 @@ describe("mergeCustomModelMetadata", () => {
               mode: "chat",
               maxTokens: 4096,
               supportedParameters: ["temperature", "top_p"],
-              responseFormats: ["text", "json"],
-              supportsImageInput: true,
-              supportsFileInput: false,
+              multimodalInputs: ["image"],
             },
           ],
           customEmbeddingsModels: [

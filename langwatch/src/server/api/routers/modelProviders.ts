@@ -356,8 +356,8 @@ export const mergeCustomModelMetadata = (
         contextLength: 0,
         maxCompletionTokens: entry.maxTokens ?? null,
         defaultParameters: null,
-        supportsImageInput: entry.supportsImageInput ?? false,
-        supportsAudioInput: false,
+        supportsImageInput: entry.multimodalInputs?.includes("image") ?? false,
+        supportsAudioInput: entry.multimodalInputs?.includes("audio") ?? false,
         pricing: { inputCostPerToken: 0, outputCostPerToken: 0 },
         parameterConstraints: getParameterConstraints(fullId),
       };
