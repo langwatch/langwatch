@@ -5,9 +5,9 @@ Feature: Stripe price catalog sync for SaaS billing
 
   @integration
   Scenario: Sync task fetches Stripe prices for the detected key mode
-    Given STRIPE_SECRET_KEY is configured with a valid Stripe key
+    Given the billing system is configured with valid Stripe credentials
     When I run the stripe prices sync task
-    Then the task fetches prices from Stripe using pagination
+    Then the task fetches all prices from Stripe
     And the generated catalog includes the detected mode prices
 
   @integration
@@ -18,17 +18,21 @@ Feature: Stripe price catalog sync for SaaS billing
 
   @integration
   Scenario: Sync task preserves the opposite mode mapping
-    Given stripeCatalog.json contains mapping values for both test and live
+    Given the price catalog includes both test and live price mappings
     When I run the sync task with a test key
     Then the test mapping is updated from Stripe data
     And the live mapping remains unchanged
 
   @unit
-  Scenario: Billing runtime resolves price ids from catalog by NODE_ENV
+  Scenario: Billing runtime resolves live price ids in production
     Given stripeCatalog.json has mapping values for test and live
-    When NODE_ENV is production
+    When the system runs in production mode
     Then billing resolves live price ids for required keys
-    When NODE_ENV is not production
+
+  @unit
+  Scenario: Billing runtime resolves test price ids outside production
+    Given stripeCatalog.json has mapping values for test and live
+    When the system runs outside production mode
     Then billing resolves test price ids for required keys
 
   @unit

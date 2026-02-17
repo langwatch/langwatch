@@ -36,12 +36,17 @@ const definePaidPlan = (overrides: PlanOverrides): PlanInfo => ({
   ...overrides,
 });
 
-const withAnnualVariant = (
-  basePlan: PlanInfo,
-  type: PlanType,
-  name: string,
-  prices: PlanInfo["prices"],
-): PlanInfo => ({
+const withAnnualVariant = ({
+  basePlan,
+  type,
+  name,
+  prices,
+}: {
+  basePlan: PlanInfo;
+  type: PlanType;
+  name: string;
+  prices: PlanInfo["prices"];
+}): PlanInfo => ({
   ...basePlan,
   type,
   name,
@@ -115,25 +120,25 @@ export const PLAN_LIMITS: Record<PlanType, PlanInfo> = {
     },
   }),
   [PlanTypes.LAUNCH]: LAUNCH_PLAN,
-  [PlanTypes.LAUNCH_ANNUAL]: withAnnualVariant(
-    LAUNCH_PLAN,
-    PlanTypes.LAUNCH_ANNUAL,
-    "Launch Annual",
-    {
+  [PlanTypes.LAUNCH_ANNUAL]: withAnnualVariant({
+    basePlan: LAUNCH_PLAN,
+    type: PlanTypes.LAUNCH_ANNUAL,
+    name: "Launch Annual",
+    prices: {
       USD: 649,
       EUR: 649,
     },
-  ),
+  }),
   [PlanTypes.ACCELERATE]: ACCELERATE_PLAN,
-  [PlanTypes.ACCELERATE_ANNUAL]: withAnnualVariant(
-    ACCELERATE_PLAN,
-    PlanTypes.ACCELERATE_ANNUAL,
-    "Accelerate Annual",
-    {
+  [PlanTypes.ACCELERATE_ANNUAL]: withAnnualVariant({
+    basePlan: ACCELERATE_PLAN,
+    type: PlanTypes.ACCELERATE_ANNUAL,
+    name: "Accelerate Annual",
+    prices: {
       USD: 2199,
       EUR: 2199,
     },
-  ),
+  }),
   [PlanTypes.GROWTH]: definePaidPlan({
     type: PlanTypes.GROWTH,
     name: "Growth",

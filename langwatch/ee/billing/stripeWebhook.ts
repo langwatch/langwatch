@@ -14,6 +14,234 @@ import { SubscriptionStatus } from "./planTypes";
 
 const logger = createLogger("langwatch:billing:stripeWebhook");
 
+const maskCustomerId = (id: string) => `${id.slice(0, 7)}...${id.slice(-4)}`;
+
+/** Stripe webhooks can arrive before subscription state is fully consistent. */
+const STRIPE_EVENTUAL_CONSISTENCY_DELAY_MS = 2000;
+// TECH-DEBT: This fixed delay should become a retry loop with backoff.
+const waitForStripeConsistency = () =>
+  new Promise((resolve) => setTimeout(resolve, STRIPE_EVENTUAL_CONSISTENCY_DELAY_MS));
+
+const syncInvoicePaymentSuccess = async ({
+  subscriptionId,
+  throwOnMissing = false,
+}: {
+  subscriptionId: string;
+  throwOnMissing?: boolean;
+}) => {
+  await waitForStripeConsistency();
+
+  const previousSubscription = await prisma.subscription.findUnique({
+    where: { stripeSubscriptionId: subscriptionId },
+    select: { id: true, status: true },
+  });
+
+  if (!previousSubscription) {
+    if (throwOnMissing) {
+      throw new Error(`Subscription record not found for ${subscriptionId} after checkout`);
+    }
+    logger.warn({ subscriptionId }, "[stripeWebhook] No subscription record found, skipping sync");
+    return;
+  }
+
+  const updatedSubscription = await prisma.subscription.update({
+    where: { id: previousSubscription.id },
+    data: {
+      status: SubscriptionStatus.ACTIVE,
+      ...(previousSubscription.status !== SubscriptionStatus.ACTIVE && {
+        startDate: new Date(),
+      }),
+      lastPaymentFailedDate: null,
+    },
+    include: { organization: true },
+  });
+
+  if (previousSubscription.status !== SubscriptionStatus.ACTIVE) {
+    await notifySubscriptionEvent({
+      type: "confirmed",
+      organizationId: updatedSubscription.organizationId,
+      organizationName: updatedSubscription.organization.name,
+      plan: updatedSubscription.plan,
+      subscriptionId: updatedSubscription.id,
+      startDate: updatedSubscription.startDate,
+      maxMembers: updatedSubscription.maxMembers,
+      maxMessagesPerMonth: updatedSubscription.maxMessagesPerMonth,
+    });
+  }
+};
+
+const handleCheckoutCompleted = async ({
+  subscriptionId,
+  event,
+}: {
+  subscriptionId: string;
+  event: Stripe.Event;
+}) => {
+  const subscriptionClientReferenceId =
+    (event.data.object as Stripe.Checkout.Session).client_reference_id?.replace(
+      "subscription_setup_",
+      "",
+    );
+
+  if (!subscriptionClientReferenceId) {
+    return { earlyReturn: true } as const;
+  }
+
+  await prisma.subscription.update({
+    where: {
+      id: subscriptionClientReferenceId,
+    },
+    data: { stripeSubscriptionId: subscriptionId },
+  });
+
+  await syncInvoicePaymentSuccess({ subscriptionId, throwOnMissing: true });
+  return { earlyReturn: false } as const;
+};
+
+const handleInvoicePaymentFailed = async ({
+  subscriptionId,
+}: {
+  subscriptionId: string;
+}) => {
+  await waitForStripeConsistency();
+
+  const currentSubscription = await prisma.subscription.findUnique({
+    where: { stripeSubscriptionId: subscriptionId },
+  });
+
+  if (!currentSubscription) {
+    logger.warn({ subscriptionId }, "[stripeWebhook] No subscription record for payment failure, skipping");
+    return;
+  }
+
+  await prisma.subscription.update({
+    where: { id: currentSubscription.id },
+    data: {
+      status:
+        currentSubscription.status === SubscriptionStatus.ACTIVE
+          ? SubscriptionStatus.ACTIVE
+          : SubscriptionStatus.FAILED,
+      lastPaymentFailedDate: new Date(),
+    },
+  });
+};
+
+const handleSubscriptionDeleted = async ({
+  subscription,
+}: {
+  subscription: Stripe.Subscription;
+}) => {
+  const existingSubscription = await prisma.subscription.findUnique({
+    where: { stripeSubscriptionId: subscription.id },
+  });
+  if (!existingSubscription) {
+    logger.warn({ stripeSubscriptionId: subscription.id }, "[stripeWebhook] No subscription for deletion event, skipping");
+    return;
+  }
+
+  await prisma.subscription.update({
+    where: { id: existingSubscription.id },
+    data: {
+      status: SubscriptionStatus.CANCELLED,
+      endDate: new Date(),
+      maxMembers: null,
+      maxMessagesPerMonth: null,
+      maxProjects: null,
+      evaluationsCredit: null,
+    },
+  });
+};
+
+const handleSubscriptionUpdated = async ({
+  subscription,
+}: {
+  subscription: Stripe.Subscription;
+}) => {
+  await waitForStripeConsistency();
+
+  const existingSubForUpdate = await prisma.subscription.findUnique({
+    where: { stripeSubscriptionId: subscription.id },
+  });
+  if (!existingSubForUpdate) {
+    logger.warn({ stripeSubscriptionId: subscription.id }, "[stripeWebhook] No subscription for update event, skipping");
+    return;
+  }
+
+  let tracesQuantity: number | null = null;
+  let usersQuantity: number | null = null;
+
+  if (
+    subscription.status !== "active" ||
+    subscription.canceled_at ||
+    subscription.ended_at
+  ) {
+    await prisma.subscription.update({
+      where: { id: existingSubForUpdate.id },
+      data: {
+        status: SubscriptionStatus.CANCELLED,
+        endDate: new Date(),
+        maxMembers: null,
+        maxMessagesPerMonth: null,
+        maxProjects: null,
+        evaluationsCredit: null,
+      },
+    });
+  } else if (subscription.status === "active") {
+    // Safe to reuse existingSubForUpdate: cancelled and active branches are
+    // mutually exclusive, so status cannot change between fetch and here.
+    const shouldNotify =
+      existingSubForUpdate.status !== SubscriptionStatus.ACTIVE;
+
+    for (const item of subscription.items.data) {
+      const calculateQuantity = calculateQuantityForPrice({
+        priceId: item.price.id,
+        quantity: item.quantity ?? 0,
+        plan: existingSubForUpdate.plan,
+      });
+
+      if (
+        item.price.id === prices.LAUNCH_USERS ||
+        item.price.id === prices.ACCELERATE_USERS ||
+        item.price.id === prices.LAUNCH_ANNUAL_USERS ||
+        item.price.id === prices.ACCELERATE_ANNUAL_USERS
+      ) {
+        usersQuantity = calculateQuantity;
+      } else if (
+        item.price.id === prices.ACCELERATE_TRACES_100K ||
+        item.price.id === prices.LAUNCH_TRACES_10K ||
+        item.price.id === prices.LAUNCH_ANNUAL_TRACES_10K ||
+        item.price.id === prices.ACCELERATE_ANNUAL_TRACES_100K
+      ) {
+        tracesQuantity = calculateQuantity;
+      }
+    }
+
+    const updatedSubscription = await prisma.subscription.update({
+      where: { id: existingSubForUpdate.id },
+      data: {
+        status: SubscriptionStatus.ACTIVE,
+        lastPaymentFailedDate: null,
+        maxMembers: usersQuantity,
+        maxMessagesPerMonth: tracesQuantity,
+      },
+      include: { organization: true },
+    });
+
+    if (shouldNotify) {
+      await notifySubscriptionEvent({
+        type: "confirmed",
+        organizationId: updatedSubscription.organizationId,
+        organizationName: updatedSubscription.organization.name,
+        plan: updatedSubscription.plan,
+        subscriptionId: updatedSubscription.id,
+        startDate: updatedSubscription.startDate,
+        maxMembers: updatedSubscription.maxMembers,
+        maxMessagesPerMonth: updatedSubscription.maxMessagesPerMonth,
+      });
+    }
+  }
+};
+
 export const createStripeWebhookHandler = () => {
   const stripe = createStripeClient();
 
@@ -76,82 +304,27 @@ export const createStripeWebhookHandler = () => {
         });
 
         if (!organization) {
-          logger.error({ eventType: event.type, customerId }, "[stripeWebhook] No organization found for customer");
+          logger.error({ eventType: event.type, customerId: maskCustomerId(customerId) }, "[stripeWebhook] No organization found for customer");
           return res.json({ received: true });
         }
 
       switch (event.type) {
         case "checkout.session.completed": {
-          const subscriptionClientReferenceId =
-            (event.data.object as Stripe.Checkout.Session).client_reference_id?.replace(
-              "subscription_setup_",
-              "",
-            );
-
-          if (!subscriptionClientReferenceId) {
-            logger.error({ customerId }, "[stripeWebhook] No client_reference_id in checkout session");
+          const result = await handleCheckoutCompleted({ subscriptionId, event });
+          if (result.earlyReturn) {
+            logger.error({ customerId: maskCustomerId(customerId) }, "[stripeWebhook] No client_reference_id in checkout session");
             return res.json({ received: true });
           }
-
-          await prisma.subscription.update({
-            where: {
-              id: subscriptionClientReferenceId,
-            },
-            data: { stripeSubscriptionId: subscriptionId },
-          });
+          break;
         }
-        // fallthrough is intentional because checkout success is followed by invoice status sync.
+
         case "invoice.payment_succeeded": {
-          await new Promise((resolve) => setTimeout(resolve, 2000));
-
-          const previousSubscription = await prisma.subscription.findFirst({
-            where: { stripeSubscriptionId: subscriptionId },
-            select: { status: true },
-          });
-
-          const updatedSubscription = await prisma.subscription.update({
-            where: { stripeSubscriptionId: subscriptionId },
-            data: {
-              status: SubscriptionStatus.ACTIVE,
-              startDate: new Date(),
-              lastPaymentFailedDate: null,
-            },
-            include: { organization: true },
-          });
-
-          if (previousSubscription?.status !== SubscriptionStatus.ACTIVE) {
-            await notifySubscriptionEvent({
-              type: "confirmed",
-              organizationId: updatedSubscription.organizationId,
-              organizationName: updatedSubscription.organization.name,
-              plan: updatedSubscription.plan,
-              subscriptionId: updatedSubscription.id,
-              startDate: updatedSubscription.startDate,
-              maxMembers: updatedSubscription.maxMembers,
-              maxMessagesPerMonth: updatedSubscription.maxMessagesPerMonth,
-            });
-          }
-
+          await syncInvoicePaymentSuccess({ subscriptionId });
           break;
         }
 
         case "invoice.payment_failed": {
-          await new Promise((resolve) => setTimeout(resolve, 2000));
-
-          const currentSubscription = await prisma.subscription.findFirst({
-            where: { stripeSubscriptionId: subscriptionId },
-          });
-
-          await prisma.subscription.update({
-            where: { stripeSubscriptionId: subscriptionId },
-            data: {
-              status:
-                currentSubscription?.status === SubscriptionStatus.ACTIVE
-                  ? SubscriptionStatus.ACTIVE
-                  : SubscriptionStatus.FAILED,
-              lastPaymentFailedDate: new Date(),
-            },
-          });
+          await handleInvoicePaymentFailed({ subscriptionId });
           break;
         }
       }
@@ -166,94 +339,12 @@ export const createStripeWebhookHandler = () => {
 
         switch (event.type) {
           case "customer.subscription.deleted": {
-            await prisma.subscription.update({
-              where: { stripeSubscriptionId: subscription.id },
-              data: {
-                status: SubscriptionStatus.CANCELLED,
-                endDate: new Date(),
-                maxMembers: null,
-                maxMessagesPerMonth: null,
-              },
-            });
+            await handleSubscriptionDeleted({ subscription });
             break;
           }
 
           case "customer.subscription.updated": {
-            await new Promise((resolve) => setTimeout(resolve, 2000));
-
-            let tracesQuantity: number | null = null;
-            let usersQuantity: number | null = null;
-
-            if (
-              subscription.status !== "active" ||
-              subscription.canceled_at ||
-              subscription.ended_at
-            ) {
-              await prisma.subscription.update({
-                where: { stripeSubscriptionId: subscription.id },
-                data: {
-                  status: SubscriptionStatus.CANCELLED,
-                  endDate: new Date(),
-                  maxMembers: null,
-                  maxMessagesPerMonth: null,
-                },
-              });
-            } else if (subscription.status === "active") {
-              const currentSubscription = await prisma.subscription.findFirst({
-                where: { stripeSubscriptionId: subscription.id },
-              });
-
-              const shouldNotify =
-                currentSubscription?.status !== SubscriptionStatus.ACTIVE;
-
-              for (const item of subscription.items.data) {
-                const calculateQuantity = calculateQuantityForPrice(
-                  item.price.id,
-                  item.quantity ?? 0,
-                  currentSubscription?.plan,
-                );
-
-                if (
-                  item.price.id === prices.LAUNCH_USERS ||
-                  item.price.id === prices.ACCELERATE_USERS ||
-                  item.price.id === prices.LAUNCH_ANNUAL_USERS ||
-                  item.price.id === prices.ACCELERATE_ANNUAL_USERS
-                ) {
-                  usersQuantity = calculateQuantity;
-                } else if (
-                  item.price.id === prices.ACCELERATE_TRACES_100K ||
-                  item.price.id === prices.LAUNCH_TRACES_10K ||
-                  item.price.id === prices.LAUNCH_ANNUAL_TRACES_10K ||
-                  item.price.id === prices.ACCELERATE_ANNUAL_TRACES_100K
-                ) {
-                  tracesQuantity = calculateQuantity;
-                }
-              }
-
-              const updatedSubscription = await prisma.subscription.update({
-                where: { stripeSubscriptionId: subscription.id },
-                data: {
-                  status: SubscriptionStatus.ACTIVE,
-                  lastPaymentFailedDate: null,
-                  maxMembers: usersQuantity,
-                  maxMessagesPerMonth: tracesQuantity,
-                },
-                include: { organization: true },
-              });
-
-              if (shouldNotify) {
-                await notifySubscriptionEvent({
-                  type: "confirmed",
-                  organizationId: updatedSubscription.organizationId,
-                  organizationName: updatedSubscription.organization.name,
-                  plan: updatedSubscription.plan,
-                  subscriptionId: updatedSubscription.id,
-                  startDate: updatedSubscription.startDate,
-                  maxMembers: updatedSubscription.maxMembers,
-                  maxMessagesPerMonth: updatedSubscription.maxMessagesPerMonth,
-                });
-              }
-            }
+            await handleSubscriptionUpdated({ subscription });
             break;
           }
         }

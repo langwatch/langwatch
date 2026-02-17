@@ -1,10 +1,5 @@
-import type { PrismaClient } from "@prisma/client";
 import type { PlanInfo } from "../licensing/planInfo";
 import type { PlanTypes } from "./planTypes";
-
-export type BillingDeps = {
-  prisma: PrismaClient;
-};
 
 export type BillingPlanProvider = {
   getActivePlan(
@@ -42,7 +37,7 @@ export type PlanLimitNotificationHandlers = {
   ) => Promise<void> | void;
 };
 
-type SubscriptionPlan = PlanTypes | string;
+type SubscriptionPlan = PlanTypes | (string & {});
 
 type SubscriptionNotificationBase = {
   organizationId: string;

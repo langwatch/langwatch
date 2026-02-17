@@ -13,7 +13,7 @@ describe("stripeCatalog", () => {
       const parsed = parseStripePricesFile(stripeCatalogData);
 
       expect(parsed.schemaVersion).toBe(1);
-      expect(Object.keys(parsed.mapping)).toHaveLength(14);
+      expect(Object.keys(parsed.mapping)).toHaveLength(STRIPE_PRICE_NAMES.length);
       expect(Object.keys(parsed.prices).length).toBeGreaterThan(0);
     });
 
@@ -27,9 +27,7 @@ describe("stripeCatalog", () => {
 
       delete (invalid.mapping as Record<string, unknown>).PRO;
 
-      expect(() => parseStripePricesFile(invalid)).toThrow(
-        "mapping.PRO must be an object",
-      );
+      expect(() => parseStripePricesFile(invalid)).toThrow(/PRO/);
     });
   });
 

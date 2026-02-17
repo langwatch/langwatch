@@ -1,11 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearBillingNotificationHandlers,
-  clearPlanLimitNotificationHandlers,
   notifyPlanLimit,
   notifySubscriptionEvent,
   setBillingNotificationHandlers,
-  setPlanLimitNotificationHandlers,
 } from "../notificationHandlers";
 import type { SubscriptionNotificationPayload } from "../types";
 
@@ -21,88 +19,100 @@ describe("notificationHandlers", () => {
     clearBillingNotificationHandlers();
   });
 
-  it("dispatches subscription notifications through registered handler", async () => {
-    const sendSubscriptionNotification = vi.fn();
+  describe("when dispatching subscription notifications", () => {
+    it("dispatches through registered handler", async () => {
+      const sendSubscriptionNotification = vi.fn();
 
-    setBillingNotificationHandlers({
-      sendSubscriptionNotification,
+      setBillingNotificationHandlers({
+        sendSubscriptionNotification,
+      });
+
+      await notifySubscriptionEvent(subscriptionPayload);
+
+      expect(sendSubscriptionNotification).toHaveBeenCalledWith(
+        subscriptionPayload,
+      );
     });
-
-    await notifySubscriptionEvent(subscriptionPayload);
-
-    expect(sendSubscriptionNotification).toHaveBeenCalledWith(
-      subscriptionPayload,
-    );
   });
 
-  it("dispatches plan-limit notifications through registered handlers", async () => {
-    const sendSlackNotification = vi.fn();
-    const sendHubspotNotification = vi.fn();
+  describe("when dispatching plan-limit notifications", () => {
+    it("dispatches through registered handlers with full context", async () => {
+      const sendSlackNotification = vi.fn();
+      const sendHubspotNotification = vi.fn();
 
-    setPlanLimitNotificationHandlers({
-      sendSlackNotification,
-      sendHubspotNotification,
+      setBillingNotificationHandlers({
+        sendSlackNotification,
+        sendHubspotNotification,
+      });
+
+      const planLimitContext = {
+        organizationId: "org_123",
+        organizationName: "Acme",
+        adminName: "Admin",
+        adminEmail: "admin@acme.com",
+        planName: "LAUNCH",
+      };
+
+      await notifyPlanLimit(planLimitContext);
+
+      expect(sendSlackNotification).toHaveBeenCalledWith(planLimitContext);
+      expect(sendHubspotNotification).toHaveBeenCalledWith(planLimitContext);
     });
 
-    await notifyPlanLimit({
-      organizationId: "org_123",
-      organizationName: "Acme",
-      adminName: "Admin",
-      adminEmail: "admin@acme.com",
-      planName: "LAUNCH",
-    });
+    it("dispatches with minimal context", async () => {
+      const sendSlackNotification = vi.fn();
 
-    expect(sendSlackNotification).toHaveBeenCalledTimes(1);
-    expect(sendHubspotNotification).toHaveBeenCalledTimes(1);
+      setBillingNotificationHandlers({
+        sendSlackNotification,
+      });
+
+      const minimalContext = {
+        organizationId: "org_123",
+        organizationName: "Acme",
+        planName: "LAUNCH",
+      };
+
+      await notifyPlanLimit(minimalContext);
+
+      expect(sendSlackNotification).toHaveBeenCalledWith(minimalContext);
+    });
   });
 
-  it("keeps compatibility for legacy plan-limit registration", async () => {
-    const sendSlackNotification = vi.fn();
+  describe("when handler throws an error", () => {
+    it("swallows notification handler errors", async () => {
+      setBillingNotificationHandlers({
+        sendSubscriptionNotification: () => {
+          throw new Error("boom");
+        },
+      });
 
-    setPlanLimitNotificationHandlers({
-      sendSlackNotification,
+      await expect(
+        notifySubscriptionEvent(subscriptionPayload),
+      ).resolves.toBeUndefined();
     });
-
-    await notifyPlanLimit({
-      organizationId: "org_123",
-      organizationName: "Acme",
-      planName: "LAUNCH",
-    });
-
-    expect(sendSlackNotification).toHaveBeenCalledTimes(1);
   });
 
-  it("swallows notification handler errors", async () => {
-    setBillingNotificationHandlers({
-      sendSubscriptionNotification: () => {
-        throw new Error("boom");
-      },
+  describe("when clearing handlers", () => {
+    it("clears all handlers", async () => {
+      const sendSubscriptionNotification = vi.fn();
+      const sendSlackNotification = vi.fn();
+
+      setBillingNotificationHandlers({
+        sendSubscriptionNotification,
+        sendSlackNotification,
+      });
+
+      clearBillingNotificationHandlers();
+
+      await notifySubscriptionEvent(subscriptionPayload);
+      await notifyPlanLimit({
+        organizationId: "org_123",
+        organizationName: "Acme",
+        planName: "LAUNCH",
+      });
+
+      expect(sendSubscriptionNotification).not.toHaveBeenCalled();
+      expect(sendSlackNotification).not.toHaveBeenCalled();
     });
-
-    await expect(
-      notifySubscriptionEvent(subscriptionPayload),
-    ).resolves.toBeUndefined();
-  });
-
-  it("clears all handlers when legacy clear function is called", async () => {
-    const sendSubscriptionNotification = vi.fn();
-    const sendSlackNotification = vi.fn();
-
-    setBillingNotificationHandlers({
-      sendSubscriptionNotification,
-      sendSlackNotification,
-    });
-
-    clearPlanLimitNotificationHandlers();
-
-    await notifySubscriptionEvent(subscriptionPayload);
-    await notifyPlanLimit({
-      organizationId: "org_123",
-      organizationName: "Acme",
-      planName: "LAUNCH",
-    });
-
-    expect(sendSubscriptionNotification).not.toHaveBeenCalled();
-    expect(sendSlackNotification).not.toHaveBeenCalled();
   });
 });

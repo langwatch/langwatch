@@ -2,7 +2,6 @@ import { captureException } from "../../src/utils/posthogErrorCapture";
 import type {
   BillingNotificationHandlers,
   PlanLimitNotificationContext,
-  PlanLimitNotificationHandlers,
   SubscriptionNotificationPayload,
 } from "./types";
 
@@ -16,16 +15,6 @@ export const setBillingNotificationHandlers = (
 
 export const clearBillingNotificationHandlers = () => {
   billingNotificationHandlers = {};
-};
-
-export const setPlanLimitNotificationHandlers = (
-  handlers: PlanLimitNotificationHandlers,
-) => {
-  setBillingNotificationHandlers(handlers);
-};
-
-export const clearPlanLimitNotificationHandlers = () => {
-  clearBillingNotificationHandlers();
 };
 
 const runHandlerSafely = async <T>(

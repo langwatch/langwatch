@@ -19,8 +19,13 @@ const isAdmin = (user?: { email?: string | null }) => {
     return false;
   }
 
-  const adminEmails = process.env.ADMIN_EMAILS;
-  return !!adminEmails && adminEmails.split(",").includes(user.email);
+  const adminEmails = env.ADMIN_EMAILS;
+  if (!adminEmails) {
+    return false;
+  }
+
+  const adminSet = new Set(adminEmails.split(",").map((s) => s.trim()));
+  return adminSet.has(user.email);
 };
 
 export type SaaSPlanProvider = {
@@ -52,17 +57,17 @@ export const createSaaSPlanProvider = (
       });
 
       const customLimits: Partial<PlanInfo> = {};
-      if (activeSubscription?.maxMembers) {
+      if (activeSubscription?.maxMembers != null) {
         customLimits.maxMembers = activeSubscription.maxMembers;
       }
-      if (activeSubscription?.maxProjects) {
+      if (activeSubscription?.maxProjects != null) {
         customLimits.maxProjects = activeSubscription.maxProjects;
       }
-      if (activeSubscription?.maxMessagesPerMonth) {
+      if (activeSubscription?.maxMessagesPerMonth != null) {
         customLimits.maxMessagesPerMonth =
           activeSubscription.maxMessagesPerMonth;
       }
-      if (activeSubscription?.evaluationsCredit) {
+      if (activeSubscription?.evaluationsCredit != null) {
         customLimits.evaluationsCredit = activeSubscription.evaluationsCredit;
       }
 
@@ -73,12 +78,14 @@ export const createSaaSPlanProvider = (
         };
       }
 
-      const subscriptionPlan = activeSubscription.plan as
-        | keyof typeof PLAN_LIMITS
-        | undefined;
+      const subscriptionPlan = activeSubscription.plan as string | undefined;
+      const resolvedPlan =
+        subscriptionPlan && subscriptionPlan in PLAN_LIMITS
+          ? (subscriptionPlan as keyof typeof PLAN_LIMITS)
+          : PlanTypes.FREE;
 
       return {
-        ...PLAN_LIMITS[subscriptionPlan ?? PlanTypes.FREE],
+        ...PLAN_LIMITS[resolvedPlan],
         ...customLimits,
         overrideAddingLimitations,
       };

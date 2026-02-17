@@ -7,6 +7,7 @@ import {
   createTRPCRouter,
   protectedProcedure,
 } from "../../src/server/api/trpc";
+import { createLogger } from "../../src/utils/logger";
 import { notifySubscriptionEvent } from "./notificationHandlers";
 import {
   createItemsToAdd,
@@ -16,9 +17,14 @@ import {
 import { createStripeClient } from "./stripeClient";
 import {
   type PlanTypes as PlanType,
+  PlanTypes,
   SUBSCRIBABLE_PLANS,
   SubscriptionStatus,
 } from "./planTypes";
+
+const logger = createLogger("langwatch:billing:subscriptionRouter");
+
+const maskCustomerId = (id: string) => `${id.slice(0, 7)}...${id.slice(-4)}`;
 
 const subscriptionPlanEnum = z.enum(SUBSCRIBABLE_PLANS);
 
@@ -30,7 +36,7 @@ export const createSubscriptionRouter = () => {
       .input(
         z.object({
           organizationId: z.string(),
-          plan: z.string(),
+          plan: subscriptionPlanEnum,
           upgradeMembers: z.boolean(),
           upgradeTraces: z.boolean(),
           totalMembers: z.number(),
@@ -55,12 +61,12 @@ export const createSubscriptionRouter = () => {
           const planType: PlanType = lastSubscription.plan as PlanType;
           const currentItems = subscription.items.data;
 
-          const itemsToUpdate = getItemsToUpdate(
+          const itemsToUpdate = getItemsToUpdate({
             currentItems,
-            planType,
-            input.totalTraces,
-            input.totalMembers,
-          );
+            plan: planType,
+            tracesToAdd: input.totalTraces,
+            membersToAdd: input.totalMembers,
+          });
 
           await stripe.subscriptions.update(lastSubscription.stripeSubscriptionId, {
             items: itemsToUpdate,
@@ -88,11 +94,11 @@ export const createSubscriptionRouter = () => {
       )
       .use(checkOrganizationPermission("organization:manage"))
       .mutation(async ({ input, ctx }) => {
-        const customerId = await getOrCreateCustomerId(
+        const customerId = await getOrCreateCustomerId({
           stripe,
-          ctx.session.user,
-          input.organizationId,
-        );
+          user: ctx.session.user,
+          organizationId: input.organizationId,
+        });
 
         const lastSubscription = await getLastNonCancelledSubscription(
           input.organizationId,
@@ -103,7 +109,7 @@ export const createSubscriptionRouter = () => {
           lastSubscription.stripeSubscriptionId &&
           lastSubscription.status !== SubscriptionStatus.PENDING
         ) {
-          if (input.plan === "FREE") {
+          if (input.plan === PlanTypes.FREE) {
             const response = await stripe.subscriptions.cancel(
               lastSubscription.stripeSubscriptionId,
             );
@@ -122,12 +128,12 @@ export const createSubscriptionRouter = () => {
             lastSubscription.stripeSubscriptionId,
           );
 
-          const itemsToUpdate = getItemsToUpdate(
-            currentStripeSubscription.items.data,
-            input.plan,
-            input.tracesToAdd ?? 0,
-            input.membersToAdd ?? 0,
-          );
+          const itemsToUpdate = getItemsToUpdate({
+            currentItems: currentStripeSubscription.items.data,
+            plan: input.plan,
+            tracesToAdd: input.tracesToAdd ?? 0,
+            membersToAdd: input.membersToAdd ?? 0,
+          });
 
           const response = await stripe.subscriptions.update(
             lastSubscription.stripeSubscriptionId,
@@ -146,7 +152,7 @@ export const createSubscriptionRouter = () => {
           return { url: `${input.baseUrl}/settings/subscription?success` };
         }
 
-        if (input.plan === "FREE") {
+        if (input.plan === PlanTypes.FREE) {
           return { url: `${input.baseUrl}/settings/subscription` };
         }
 
@@ -195,11 +201,11 @@ export const createSubscriptionRouter = () => {
       .input(z.object({ organizationId: z.string(), baseUrl: z.string() }))
       .use(checkOrganizationPermission("organization:manage"))
       .mutation(async ({ input, ctx }) => {
-        const customerId = await getOrCreateCustomerId(
+        const customerId = await getOrCreateCustomerId({
           stripe,
-          ctx.session.user,
-          input.organizationId,
-        );
+          user: ctx.session.user,
+          organizationId: input.organizationId,
+        });
 
         const session = await stripe.billingPortal.sessions.create({
           customer: customerId,
@@ -272,40 +278,64 @@ const getLastNonCancelledSubscription = async (organizationId: string) => {
       },
     },
     orderBy: { createdAt: "desc" },
-    take: 1,
   });
 };
 
-const getOrCreateCustomerId = async (
-  stripe: Stripe,
-  user: { email?: string | null },
-  organizationId: string,
-) => {
+const getOrCreateCustomerId = async ({
+  stripe,
+  user,
+  organizationId,
+}: {
+  stripe: Stripe;
+  user: { email?: string | null };
+  organizationId: string;
+}) => {
   const organization = await prisma.organization.findUnique({
     where: { id: organizationId },
   });
 
   if (!organization) {
-    throw new Error("Organization not found");
+    throw new TRPCError({ code: "NOT_FOUND", message: "Organization not found" });
   }
 
-  if (!organization.stripeCustomerId) {
-    if (!user.email) {
-      throw new Error("User email not found, can't create stripe customer");
+  if (organization.stripeCustomerId) {
+    return organization.stripeCustomerId;
+  }
+
+  if (!user.email) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: "User email is required to create Stripe customer" });
+  }
+
+  const customer = await stripe.customers.create({
+    email: user.email,
+    name: organization.name,
+  });
+
+  const updated = await prisma.organization.updateMany({
+    where: { id: organizationId, stripeCustomerId: null },
+    data: { stripeCustomerId: customer.id },
+  });
+
+  if (updated.count === 0) {
+    // Another request won the race — clean up orphan and use existing
+    logger.warn({ organizationId, orphanedCustomerId: maskCustomerId(customer.id) },
+      "[billing] Stripe customer race detected, cleaning up orphan");
+    try {
+      await stripe.customers.del(customer.id);
+    } catch (error) {
+      logger.warn({ organizationId, orphanedCustomerId: maskCustomerId(customer.id), error: (error as Error).message },
+        "[billing] Failed to clean up orphaned Stripe customer");
     }
 
-    const customer = await stripe.customers.create({
-      email: user.email,
-      name: organization.name,
-    });
-
-    await prisma.organization.update({
+    const refreshed = await prisma.organization.findUniqueOrThrow({
       where: { id: organizationId },
-      data: { stripeCustomerId: customer.id },
     });
-
-    return customer.id;
+    if (!refreshed.stripeCustomerId) {
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR",
+        message: "Stripe customer ID missing after concurrent creation" });
+    }
+    return refreshed.stripeCustomerId;
   }
 
-  return organization.stripeCustomerId;
+  return customer.id;
 };

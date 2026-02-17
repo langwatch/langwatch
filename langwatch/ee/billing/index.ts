@@ -2,10 +2,8 @@ import { prisma } from "../../src/server/db";
 import { createPlanLimitNotifier } from "./planLimitNotifier";
 import {
   clearBillingNotificationHandlers,
-  clearPlanLimitNotificationHandlers,
   notifySubscriptionEvent,
   setBillingNotificationHandlers,
-  setPlanLimitNotificationHandlers,
 } from "./notificationHandlers";
 import { createSaaSPlanProvider } from "./planProvider";
 import { createSubscriptionRouter } from "./subscriptionRouter";
@@ -24,10 +22,8 @@ export type {
 } from "./types";
 export {
   clearBillingNotificationHandlers,
-  clearPlanLimitNotificationHandlers,
   notifySubscriptionEvent,
   setBillingNotificationHandlers,
-  setPlanLimitNotificationHandlers,
 };
 
 export { createSubscriptionRouter, createStripeWebhookHandler };

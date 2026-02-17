@@ -103,6 +103,11 @@ const eeRouters = env.IS_SAAS
  *
  * All routers added in /api/routers should be manually added here.
  */
+// EE routers are merged at runtime via `as any` because the conditional
+// shape (`{ subscription: ... } | {}`) cannot be expressed statically
+// without a broader AppRouter redesign. The baseAppRouter type is used
+// as the canonical type export so callers always see the core surface.
+// TODO: Follow-up issue for full type-safe EE conditional composition.
 export const appRouter = createTRPCRouter({
   ...coreRouters,
   ...(eeRouters as any),

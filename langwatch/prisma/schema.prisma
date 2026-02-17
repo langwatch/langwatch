@@ -168,9 +168,12 @@ model Organization {
     ssoProvider            String?
 
     promoCode     String?
+    stripeCustomerId String?      @unique
+    currency      Currency         @default(EUR)
     features      OrganizationFeature[]
     CustomRoles   CustomRole[]
     notifications Notification[]
+    subscriptions Subscription[]
 
     // License enforcement fields (COSS-0226)
     license                String?   @db.Text
@@ -179,6 +182,29 @@ model Organization {
 
     @@index([ssoDomain])
     @@index([ssoProvider])
+}
+
+enum PlanTypes {
+    FREE
+    PRO
+    GROWTH
+    ENTERPRISE
+    LAUNCH
+    ACCELERATE
+    LAUNCH_ANNUAL
+    ACCELERATE_ANNUAL
+}
+
+enum SubscriptionStatus {
+    PENDING
+    FAILED
+    ACTIVE
+    CANCELLED
+}
+
+enum Currency {
+    USD
+    EUR
 }
 
 enum PIIRedactionLevel {
@@ -1003,19 +1029,57 @@ model SimulationSuite {
     @@unique([projectId, slug])
 }
 
-model ProjectDailySdkUsage {
-    id                 String   @id
-    projectId          String
-    date               String   // UTC date "YYYY-MM-DD"
-    sdkName            String   @default("")
-    sdkVersion         String   @default("")
-    sdkLanguage        String   @default("")
-    count              Int      @default(0)
-    lastEventTimestamp BigInt?  // Unix ms from event.timestamp
-    updatedAt          DateTime @default(now()) @updatedAt
+model Subscription {
+    id                    String             @id @default(nanoid())
+    organizationId        String
+    plan                  PlanTypes
+    stripeSubscriptionId  String?            @unique
+    status                SubscriptionStatus
+    startDate             DateTime?
+    endDate               DateTime?
+    lastPaymentFailedDate DateTime?
+    createdAt             DateTime           @default(now())
+    updatedAt             DateTime           @default(now()) @updatedAt
+    maxMembers            Int?
+    maxProjects           Int?
+    maxMessagesPerMonth   Int?
+    evaluationsCredit     Int?
+    maxWorkflows          Int?
+    maxRetentionDays      Int?
 
-    @@unique([projectId, date, sdkName, sdkVersion, sdkLanguage])
-    @@index([projectId, date])
+    organization Organization @relation(fields: [organizationId], references: [id])
+    invoices     Invoice[]
+
+    @@index([organizationId])
+}
+
+model Invoice {
+    id             String   @id @default(nanoid())
+    subscriptionId String
+    totalAmount    Float
+    currency       String
+    dueDate        DateTime
+    paid           Boolean  @default(false)
+    createdAt      DateTime @default(now())
+    updatedAt      DateTime @default(now()) @updatedAt
+
+    subscription Subscription  @relation(fields: [subscriptionId], references: [id])
+    lineItems    InvoiceItem[]
+
+    @@index([subscriptionId])
+}
+
+model InvoiceItem {
+    id          String   @id @default(nanoid())
+    invoiceId   String
+    description String
+    amount      Float
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @default(now()) @updatedAt
+
+    invoice Invoice @relation(fields: [invoiceId], references: [id])
+
+    @@index([invoiceId])
 }
 
 model ProjectDailyBillableEvents {

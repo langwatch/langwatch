@@ -14,23 +14,23 @@ const createSubscriptionItem = (
 ): Stripe.SubscriptionItem =>
   ({
     id,
-    plan: { id: priceId },
+    price: { id: priceId },
   }) as Stripe.SubscriptionItem;
 
 describe("stripeHelpers", () => {
   describe("getItemsToUpdate()", () => {
     it("updates launch items and deletes stale items from other plans", () => {
-      const items = getItemsToUpdate(
-        [
+      const items = getItemsToUpdate({
+        currentItems: [
           createSubscriptionItem("launch-base", prices.LAUNCH),
           createSubscriptionItem("launch-users", prices.LAUNCH_USERS),
           createSubscriptionItem("launch-traces", prices.LAUNCH_TRACES_10K),
           createSubscriptionItem("stale-acc-users", prices.ACCELERATE_USERS),
         ],
-        PlanTypes.LAUNCH,
-        45_000,
-        8,
-      );
+        plan: PlanTypes.LAUNCH,
+        tracesToAdd: 45_000,
+        membersToAdd: 8,
+      });
 
       expect(items).toEqual([
         { id: "launch-traces", quantity: 2 },
@@ -41,16 +41,16 @@ describe("stripeHelpers", () => {
     });
 
     it("switches from launch to accelerate and removes launch-specific items", () => {
-      const items = getItemsToUpdate(
-        [
+      const items = getItemsToUpdate({
+        currentItems: [
           createSubscriptionItem("launch-base", prices.LAUNCH),
           createSubscriptionItem("launch-users", prices.LAUNCH_USERS),
           createSubscriptionItem("launch-traces", prices.LAUNCH_TRACES_10K),
         ],
-        PlanTypes.ACCELERATE,
-        250_000,
-        9,
-      );
+        plan: PlanTypes.ACCELERATE,
+        tracesToAdd: 250_000,
+        membersToAdd: 9,
+      });
 
       expect(items).toEqual([
         { price: prices.ACCELERATE_TRACES_100K, quantity: 2 },
@@ -63,32 +63,32 @@ describe("stripeHelpers", () => {
     });
 
     it("keeps PRO behavior without add-on item updates", () => {
-      const items = getItemsToUpdate(
-        [createSubscriptionItem("pro-base", prices.PRO)],
-        PlanTypes.PRO,
-        10_000,
-        5,
-      );
+      const items = getItemsToUpdate({
+        currentItems: [createSubscriptionItem("pro-base", prices.PRO)],
+        plan: PlanTypes.PRO,
+        tracesToAdd: 10_000,
+        membersToAdd: 5,
+      });
 
       expect(items).toEqual([{ price: prices.PRO, quantity: 1 }]);
     });
 
-    it("keeps FREE downgrade behavior for callers that pass FREE", () => {
-      const items = getItemsToUpdate([], PlanTypes.FREE, 1_000, 2);
+    it("returns empty for FREE downgrade", () => {
+      const items = getItemsToUpdate({ currentItems: [], plan: PlanTypes.FREE, tracesToAdd: 1_000, membersToAdd: 2 });
 
-      expect(items).toEqual([{ price: undefined, quantity: 1 }]);
+      expect(items).toEqual([]);
     });
 
     it("marks zero quantity add-ons as deleted", () => {
-      const items = getItemsToUpdate(
-        [
+      const items = getItemsToUpdate({
+        currentItems: [
           createSubscriptionItem("launch-base", prices.LAUNCH),
           createSubscriptionItem("launch-traces", prices.LAUNCH_TRACES_10K),
         ],
-        PlanTypes.LAUNCH,
-        20_000,
-        3,
-      );
+        plan: PlanTypes.LAUNCH,
+        tracesToAdd: 20_000,
+        membersToAdd: 3,
+      });
 
       expect(items).toEqual([
         { id: "launch-traces", quantity: 0, deleted: true },
@@ -138,39 +138,39 @@ describe("stripeHelpers", () => {
   describe("calculateQuantityForPrice()", () => {
     it("calculates quantity for user add-ons", () => {
       expect(
-        calculateQuantityForPrice(prices.LAUNCH_USERS, 4, PlanTypes.LAUNCH),
+        calculateQuantityForPrice({ priceId: prices.LAUNCH_USERS, quantity: 4, plan: PlanTypes.LAUNCH }),
       ).toBe(7);
       expect(
-        calculateQuantityForPrice(
-          prices.ACCELERATE_ANNUAL_USERS,
-          4,
-          PlanTypes.ACCELERATE_ANNUAL,
-        ),
+        calculateQuantityForPrice({
+          priceId: prices.ACCELERATE_ANNUAL_USERS,
+          quantity: 4,
+          plan: PlanTypes.ACCELERATE_ANNUAL,
+        }),
       ).toBe(9);
     });
 
     it("calculates quantity for 10K traces add-ons", () => {
       expect(
-        calculateQuantityForPrice(
-          prices.LAUNCH_TRACES_10K,
-          3,
-          PlanTypes.LAUNCH,
-        ),
+        calculateQuantityForPrice({
+          priceId: prices.LAUNCH_TRACES_10K,
+          quantity: 3,
+          plan: PlanTypes.LAUNCH,
+        }),
       ).toBe(50_000);
     });
 
     it("calculates quantity for 100K traces add-ons", () => {
       expect(
-        calculateQuantityForPrice(
-          prices.ACCELERATE_TRACES_100K,
-          2,
-          PlanTypes.ACCELERATE,
-        ),
+        calculateQuantityForPrice({
+          priceId: prices.ACCELERATE_TRACES_100K,
+          quantity: 2,
+          plan: PlanTypes.ACCELERATE,
+        }),
       ).toBe(220_000);
     });
 
     it("returns 0 for unknown price ids", () => {
-      expect(calculateQuantityForPrice("unknown", 10, PlanTypes.PRO)).toBe(0);
+      expect(calculateQuantityForPrice({ priceId: "unknown", quantity: 10, plan: PlanTypes.PRO })).toBe(0);
     });
   });
 });
