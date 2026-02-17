@@ -5,6 +5,7 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
+import type { CustomModelEntry } from "../../server/modelProviders/customModel.schema";
 import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
 import { MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
 
@@ -410,47 +411,261 @@ describe("useModelProviderForm", () => {
   });
 
   describe("Custom Models", () => {
-    it("can add custom models from comma-separated text", () => {
-      const provider = createOpenAIProvider();
+    const chatModelEntry: CustomModelEntry = {
+      modelId: "ft:gpt-4o:my-org",
+      displayName: "My Fine-Tuned GPT-4o",
+      mode: "chat",
+      maxTokens: 4096,
+      supportedParameters: ["temperature", "top_p"],
+    };
 
-      const { result } = renderHook(() =>
-        useModelProviderForm({
-          provider,
-          projectId: "test-project-id",
-          project: null,
-        }),
-      );
+    const embeddingsModelEntry: CustomModelEntry = {
+      modelId: "custom-embed-v1",
+      displayName: "Custom Embeddings v1",
+      mode: "embedding",
+    };
 
-      act(() => {
-        result.current[1].addCustomModelsFromText("model-1, model-2, model-3");
+    describe("when initializing", () => {
+      it("starts with empty custom models when provider has none stored", () => {
+        const provider = createOpenAIProvider();
+
+        const { result } = renderHook(() =>
+          useModelProviderForm({
+            provider,
+            projectId: "test-project-id",
+            project: null,
+          }),
+        );
+
+        expect(result.current[0].customModels).toEqual([]);
+        expect(result.current[0].customEmbeddingsModels).toEqual([]);
       });
 
-      const modelValues = result.current[0].customModels.map((m) => m.value);
-      expect(modelValues).toContain("model-1");
-      expect(modelValues).toContain("model-2");
-      expect(modelValues).toContain("model-3");
+      it("initializes from provider.customModels when present", () => {
+        const storedModels: CustomModelEntry[] = [chatModelEntry];
+        const storedEmbeddings: CustomModelEntry[] = [embeddingsModelEntry];
+        const provider = createOpenAIProvider({
+          customModels: storedModels,
+          customEmbeddingsModels: storedEmbeddings,
+        });
+
+        const { result } = renderHook(() =>
+          useModelProviderForm({
+            provider,
+            projectId: "test-project-id",
+            project: null,
+          }),
+        );
+
+        expect(result.current[0].customModels).toEqual(storedModels);
+        expect(result.current[0].customEmbeddingsModels).toEqual(
+          storedEmbeddings,
+        );
+      });
     });
 
-    it("does not add duplicate models", () => {
-      const provider = createOpenAIProvider();
+    describe("when adding a custom model", () => {
+      it("adds a CustomModelEntry to state", () => {
+        const provider = createOpenAIProvider();
 
-      const { result } = renderHook(() =>
-        useModelProviderForm({
-          provider,
-          projectId: "test-project-id",
-          project: null,
-        }),
-      );
+        const { result } = renderHook(() =>
+          useModelProviderForm({
+            provider,
+            projectId: "test-project-id",
+            project: null,
+          }),
+        );
 
-      act(() => {
-        result.current[1].addCustomModelsFromText("model-1");
-        result.current[1].addCustomModelsFromText("model-1, model-2");
+        act(() => {
+          result.current[1].addCustomModel(chatModelEntry);
+        });
+
+        expect(result.current[0].customModels).toHaveLength(1);
+        expect(result.current[0].customModels[0]).toEqual(chatModelEntry);
       });
 
-      const model1Count = result.current[0].customModels.filter(
-        (m) => m.value === "model-1",
-      ).length;
-      expect(model1Count).toBe(1);
+      it("does not add duplicate models with the same modelId", () => {
+        const provider = createOpenAIProvider();
+
+        const { result } = renderHook(() =>
+          useModelProviderForm({
+            provider,
+            projectId: "test-project-id",
+            project: null,
+          }),
+        );
+
+        act(() => {
+          result.current[1].addCustomModel(chatModelEntry);
+          result.current[1].addCustomModel({
+            ...chatModelEntry,
+            displayName: "Duplicate",
+          });
+        });
+
+        expect(result.current[0].customModels).toHaveLength(1);
+        expect(result.current[0].customModels[0]!.displayName).toBe(
+          "My Fine-Tuned GPT-4o",
+        );
+      });
+    });
+
+    describe("when removing a custom model", () => {
+      it("removes the model by modelId", () => {
+        const provider = createOpenAIProvider({
+          customModels: [chatModelEntry],
+        });
+
+        const { result } = renderHook(() =>
+          useModelProviderForm({
+            provider,
+            projectId: "test-project-id",
+            project: null,
+          }),
+        );
+
+        expect(result.current[0].customModels).toHaveLength(1);
+
+        act(() => {
+          result.current[1].removeCustomModel(chatModelEntry.modelId);
+        });
+
+        expect(result.current[0].customModels).toHaveLength(0);
+      });
+    });
+
+    describe("when adding a custom embeddings model", () => {
+      it("adds a CustomModelEntry to embeddings state", () => {
+        const provider = createOpenAIProvider();
+
+        const { result } = renderHook(() =>
+          useModelProviderForm({
+            provider,
+            projectId: "test-project-id",
+            project: null,
+          }),
+        );
+
+        act(() => {
+          result.current[1].addCustomEmbeddingsModel(embeddingsModelEntry);
+        });
+
+        expect(result.current[0].customEmbeddingsModels).toHaveLength(1);
+        expect(result.current[0].customEmbeddingsModels[0]).toEqual(
+          embeddingsModelEntry,
+        );
+      });
+
+      it("does not add duplicate embeddings models with the same modelId", () => {
+        const provider = createOpenAIProvider();
+
+        const { result } = renderHook(() =>
+          useModelProviderForm({
+            provider,
+            projectId: "test-project-id",
+            project: null,
+          }),
+        );
+
+        act(() => {
+          result.current[1].addCustomEmbeddingsModel(embeddingsModelEntry);
+          result.current[1].addCustomEmbeddingsModel(embeddingsModelEntry);
+        });
+
+        expect(result.current[0].customEmbeddingsModels).toHaveLength(1);
+      });
+    });
+
+    describe("when removing a custom embeddings model", () => {
+      it("removes the embeddings model by modelId", () => {
+        const provider = createOpenAIProvider({
+          customEmbeddingsModels: [embeddingsModelEntry],
+        });
+
+        const { result } = renderHook(() =>
+          useModelProviderForm({
+            provider,
+            projectId: "test-project-id",
+            project: null,
+          }),
+        );
+
+        expect(result.current[0].customEmbeddingsModels).toHaveLength(1);
+
+        act(() => {
+          result.current[1].removeCustomEmbeddingsModel(
+            embeddingsModelEntry.modelId,
+          );
+        });
+
+        expect(result.current[0].customEmbeddingsModels).toHaveLength(0);
+      });
+    });
+
+    describe("when submitting", () => {
+      it("sends CustomModelEntry[] directly in mutation", async () => {
+        const provider = createOpenAIProvider({
+          id: "provider-123",
+          customModels: [chatModelEntry],
+          customEmbeddingsModels: [embeddingsModelEntry],
+          customKeys: { OPENAI_API_KEY: "sk-key" },
+        });
+
+        const { result } = renderHook(() =>
+          useModelProviderForm({
+            provider,
+            projectId: "test-project-id",
+            project: null,
+          }),
+        );
+
+        await act(async () => {
+          await result.current[1].submit();
+        });
+
+        expect(mockMutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({
+            customModels: [chatModelEntry],
+            customEmbeddingsModels: [embeddingsModelEntry],
+          }),
+        );
+      });
+    });
+
+    describe("when syncing from provider prop change", () => {
+      it("updates custom models when provider changes", () => {
+        const initialProvider = createOpenAIProvider({
+          id: "provider-1",
+          customModels: [chatModelEntry],
+        });
+
+        const updatedModel: CustomModelEntry = {
+          modelId: "new-model",
+          displayName: "New Model",
+          mode: "chat",
+        };
+
+        const updatedProvider = createOpenAIProvider({
+          id: "provider-2",
+          customModels: [updatedModel],
+        });
+
+        const { result, rerender } = renderHook(
+          ({ provider }) =>
+            useModelProviderForm({
+              provider,
+              projectId: "test-project-id",
+              project: null,
+            }),
+          { initialProps: { provider: initialProvider } },
+        );
+
+        expect(result.current[0].customModels).toEqual([chatModelEntry]);
+
+        rerender({ provider: updatedProvider });
+
+        expect(result.current[0].customModels).toEqual([updatedModel]);
+      });
     });
   });
 

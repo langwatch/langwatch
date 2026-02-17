@@ -11,16 +11,17 @@ import {
 } from "@chakra-ui/react";
 import type React from "react";
 import { useCallback, useEffect, useId, useMemo, useRef } from "react";
+import type { CustomModelEntry } from "../../../../../server/modelProviders/customModel.schema";
 import type { ModelProviderKey } from "../../../regions/model-providers/types";
 
 type ModelOption = { label: string; value: string };
 
 interface ModelProviderModelSettingsProps {
   modelProviderKey: ModelProviderKey;
-  customModels: ModelOption[];
+  customModels: CustomModelEntry[];
   chatModelOptions?: ModelOption[];
   defaultModel: string | null;
-  onCustomModelsChange: (models: ModelOption[]) => void;
+  onCustomModelsChange: (models: CustomModelEntry[]) => void;
   onDefaultModelChange: (model: string | null) => void;
 }
 
@@ -38,7 +39,7 @@ export const ModelProviderModelSettings: React.FC<
   const controlRef = useRef<HTMLDivElement | null>(null);
 
   const customModelValues = useMemo(
-    () => (customModels ?? []).map((model) => model.value),
+    () => (customModels ?? []).map((model) => model.modelId),
     [customModels],
   );
 
@@ -73,7 +74,11 @@ export const ModelProviderModelSettings: React.FC<
   const handleTagsValueChange = useCallback(
     (details: { value: string[] }) => {
       onCustomModelsChange(
-        details.value.map((value) => ({ label: value, value })),
+        details.value.map((value) => ({
+          modelId: value,
+          displayName: value,
+          mode: "chat" as const,
+        })),
       );
     },
     [onCustomModelsChange],

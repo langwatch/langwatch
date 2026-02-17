@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type ZodError, z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { toaster } from "../components/ui/toaster";
+import type { CustomModelEntry } from "../server/modelProviders/customModel.schema";
 import {
-  getProviderModelOptions,
   type MaybeStoredModelProvider,
   modelProviders as modelProvidersRegistry,
 } from "../server/modelProviders/registry";
@@ -18,8 +18,6 @@ import {
   hasUserModifiedNonApiKeyFields,
   isProviderDefaultModel,
 } from "../utils/modelProviderHelpers";
-
-type SelectOption = { value: string; label: string };
 
 export type ExtraHeader = { key: string; value: string; concealed?: boolean };
 
@@ -45,8 +43,8 @@ export type UseModelProviderFormState = {
   displayKeys: Record<string, any>;
   initialKeys: Record<string, unknown>;
   extraHeaders: ExtraHeader[];
-  customModels: SelectOption[];
-  customEmbeddingsModels: SelectOption[];
+  customModels: CustomModelEntry[];
+  customEmbeddingsModels: CustomModelEntry[];
   useAsDefaultProvider: boolean;
   projectDefaultModel: string | null;
   projectTopicClusteringModel: string | null;
@@ -66,10 +64,11 @@ export type UseModelProviderFormActions = {
   toggleExtraHeaderConcealed: (index: number) => void;
   setExtraHeaderKey: (index: number, key: string) => void;
   setExtraHeaderValue: (index: number, value: string) => void;
-  setCustomModels: (options: SelectOption[]) => void;
-  setCustomEmbeddingsModels: (options: SelectOption[]) => void;
-  addCustomModelsFromText: (text: string) => void;
-  addCustomEmbeddingsFromText: (text: string) => void;
+  addCustomModel: (entry: CustomModelEntry) => void;
+  removeCustomModel: (modelId: string) => void;
+  setCustomModels: (models: CustomModelEntry[]) => void;
+  addCustomEmbeddingsModel: (entry: CustomModelEntry) => void;
+  removeCustomEmbeddingsModel: (modelId: string) => void;
   setUseAsDefaultProvider: (use: boolean) => void;
   setProjectDefaultModel: (model: string | null) => void;
   setProjectTopicClusteringModel: (model: string | null) => void;
@@ -153,33 +152,12 @@ export function useModelProviderForm(
     })),
   );
 
-  const getStoredModelOptions = (
-    models: string[] | undefined,
-    providerName: string,
-    mode: "chat" | "embedding",
-  ): SelectOption[] => {
-    if (!models || models.length === 0) {
-      return getProviderModelOptions(providerName, mode);
-    }
-    return models.map((model) => ({ value: model, label: model }));
-  };
-
-  const [customModels, setCustomModels] = useState<SelectOption[]>(
-    getStoredModelOptions(
-      provider.models ?? undefined,
-      provider.provider,
-      "chat",
-    ),
+  const [customModels, setCustomModels] = useState<CustomModelEntry[]>(
+    provider.customModels ?? [],
   );
   const [customEmbeddingsModels, setCustomEmbeddingsModels] = useState<
-    SelectOption[]
-  >(
-    getStoredModelOptions(
-      provider.embeddingsModels ?? undefined,
-      provider.provider,
-      "embedding",
-    ),
-  );
+    CustomModelEntry[]
+  >(provider.customEmbeddingsModels ?? []);
 
   // Auto-enable toggle if this provider is used for the Default Model (matching badge logic)
   const [useAsDefaultProvider, setUseAsDefaultProvider] = useState<boolean>(
@@ -244,21 +222,8 @@ export function useModelProviderForm(
 
     setExtraHeaders(nextExtraHeaders);
 
-    setCustomModels(
-      getStoredModelOptions(
-        provider.models ?? undefined,
-        provider.provider,
-        "chat",
-      ),
-    );
-
-    setCustomEmbeddingsModels(
-      getStoredModelOptions(
-        provider.embeddingsModels ?? undefined,
-        provider.provider,
-        "embedding",
-      ),
-    );
+    setCustomModels(provider.customModels ?? []);
+    setCustomEmbeddingsModels(provider.customEmbeddingsModels ?? []);
 
     // Auto-enable the toggle if this provider is used for the Default Model (matching badge logic)
     const isUsedForDefaultModel = isProviderDefaultModel(
@@ -277,6 +242,8 @@ export function useModelProviderForm(
     provider.id,
     provider.enabled,
     provider.customKeys,
+    provider.customModels,
+    provider.customEmbeddingsModels,
     provider.extraHeaders,
     originalSchemaShape,
     initialProjectDefaultModel,
@@ -294,8 +261,8 @@ export function useModelProviderForm(
           provider: provider.provider,
           enabled: newEnabled,
           customKeys: provider.customKeys as any,
-          customModels: provider.models ?? [],
-          customEmbeddingsModels: provider.embeddingsModels ?? [],
+          customModels: provider.customModels ?? [],
+          customEmbeddingsModels: provider.customEmbeddingsModels ?? [],
         });
         onSuccess?.();
       } catch (err) {
@@ -315,8 +282,8 @@ export function useModelProviderForm(
       provider.id,
       provider.provider,
       provider.customKeys,
-      provider.models,
-      provider.embeddingsModels,
+      provider.customModels,
+      provider.customEmbeddingsModels,
       projectId,
       updateMutation,
     ],
@@ -384,30 +351,32 @@ export function useModelProviderForm(
     );
   }, []);
 
-  const addCustomModelsFromText = useCallback((text: string) => {
-    const newModels = text
-      .split(",")
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0)
-      .map((s) => ({ value: s, label: s }));
+  const addCustomModel = useCallback((entry: CustomModelEntry) => {
     setCustomModels((prev) => {
-      const existingValues = new Set(prev.map((m) => m.value));
-      const uniqueNew = newModels.filter((m) => !existingValues.has(m.value));
-      return [...prev, ...uniqueNew];
+      if (prev.some((m) => m.modelId === entry.modelId)) return prev;
+      return [...prev, entry];
     });
   }, []);
 
-  const addCustomEmbeddingsFromText = useCallback((text: string) => {
-    const newModels = text
-      .split(",")
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0)
-      .map((s) => ({ value: s, label: s }));
+  const removeCustomModel = useCallback((modelId: string) => {
+    setCustomModels((prev) => prev.filter((m) => m.modelId !== modelId));
+  }, []);
+
+  const replaceCustomModels = useCallback((models: CustomModelEntry[]) => {
+    setCustomModels(models);
+  }, []);
+
+  const addCustomEmbeddingsModel = useCallback((entry: CustomModelEntry) => {
     setCustomEmbeddingsModels((prev) => {
-      const existingValues = new Set(prev.map((m) => m.value));
-      const uniqueNew = newModels.filter((m) => !existingValues.has(m.value));
-      return [...prev, ...uniqueNew];
+      if (prev.some((m) => m.modelId === entry.modelId)) return prev;
+      return [...prev, entry];
     });
+  }, []);
+
+  const removeCustomEmbeddingsModel = useCallback((modelId: string) => {
+    setCustomEmbeddingsModels((prev) =>
+      prev.filter((m) => m.modelId !== modelId),
+    );
   }, []);
 
   const submit = useCallback(async () => {
@@ -489,10 +458,8 @@ export function useModelProviderForm(
         provider: provider.provider,
         enabled: true, // Always enable when saving through the form
         customKeys: customKeysToSend,
-        customModels: (customModels ?? []).map((m) => m.value),
-        customEmbeddingsModels: (customEmbeddingsModels ?? []).map(
-          (m) => m.value,
-        ),
+        customModels: customModels,
+        customEmbeddingsModels: customEmbeddingsModels,
         extraHeaders: extraHeadersToSend,
       });
 
@@ -575,10 +542,11 @@ export function useModelProviderForm(
       toggleExtraHeaderConcealed,
       setExtraHeaderKey,
       setExtraHeaderValue,
-      setCustomModels,
-      setCustomEmbeddingsModels,
-      addCustomModelsFromText,
-      addCustomEmbeddingsFromText,
+      addCustomModel,
+      removeCustomModel,
+      setCustomModels: replaceCustomModels,
+      addCustomEmbeddingsModel,
+      removeCustomEmbeddingsModel,
       setUseAsDefaultProvider,
       setProjectDefaultModel,
       setProjectTopicClusteringModel,

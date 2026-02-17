@@ -12,10 +12,7 @@ import React, { useEffect, useState } from "react";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { modelProviderIcons } from "../server/modelProviders/iconsMap";
 import type { MaybeStoredModelProvider } from "../server/modelProviders/registry";
-import {
-  allLitellmModels,
-  hasVariantSuffix,
-} from "../server/modelProviders/registry";
+import { allLitellmModels } from "../server/modelProviders/registry";
 import { api } from "../utils/api";
 import { titleCase } from "../utils/stringCasing";
 import {
@@ -312,53 +309,44 @@ export const ModelSelector = React.memo(function ModelSelector({
   );
 });
 
-const getCustomModels = (
+/**
+ * Builds the list of available models by combining registry models with custom models.
+ *
+ * Registry models from `options` are always included for enabled providers.
+ * Custom models (from provider's `customModels` or `customEmbeddingsModels`)
+ * are added on top. Disabled providers are excluded entirely.
+ *
+ * @param modelProviders - Map of provider keys to their configuration
+ * @param options - Registry model IDs (e.g., "openai/gpt-4o")
+ * @param mode - Whether to include chat or embedding custom models
+ * @returns Combined list of model IDs for enabled providers
+ */
+export const getCustomModels = (
   modelProviders: Record<string, MaybeStoredModelProvider>,
   options: string[],
   mode: "chat" | "embedding" = "chat",
-) => {
-  const models: string[] = [];
+): string[] => {
+  const models = new Set<string>();
 
-  const customProviders: string[] = [];
-
-  for (const provider of Object.keys(modelProviders)) {
-    const providerConfig = modelProviders[provider];
-    if (!providerConfig) continue;
-
-    if (providerConfig.enabled && providerConfig.models && mode === "chat") {
-      providerConfig.models
-        .filter((model: string) => !hasVariantSuffix(model))
-        .forEach((model: string) => {
-          models.push(`${provider}/${model}`);
-          customProviders.push(provider);
-        });
-    }
-
-    if (
-      providerConfig.enabled &&
-      providerConfig.embeddingsModels &&
-      mode === "embedding"
-    ) {
-      providerConfig.embeddingsModels
-        .filter((model: string) => !hasVariantSuffix(model))
-        .forEach((model: string) => {
-          models.push(`${provider}/${model}`);
-          customProviders.push(provider);
-        });
+  // Always include registry models from enabled providers
+  for (const option of options) {
+    const provider = option.split("/")[0]!;
+    if (modelProviders[provider]?.enabled) {
+      models.add(option);
     }
   }
 
-  if (customProviders.length > 0) {
-    options.forEach((option) => {
-      const optionProvider = option.split("/")[0]!;
-
-      if (!customProviders.includes(optionProvider)) {
-        models.push(option);
+  // Add custom models from enabled providers
+  for (const [providerKey, config] of Object.entries(modelProviders)) {
+    if (!config.enabled) continue;
+    const customList =
+      mode === "chat" ? config.customModels : config.customEmbeddingsModels;
+    if (customList) {
+      for (const model of customList) {
+        models.add(`${providerKey}/${model.modelId}`);
       }
-    });
-
-    return models;
+    }
   }
 
-  return options;
+  return Array.from(models);
 };

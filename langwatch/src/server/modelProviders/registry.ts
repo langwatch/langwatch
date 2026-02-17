@@ -1,5 +1,6 @@
 import type { ModelProvider } from "@prisma/client";
 import { z } from "zod";
+import type { CustomModelEntry } from "./customModel.schema";
 // @ts-ignore - JSON import
 import * as llmModelsRaw from "./llmModels.json";
 import type { LLMModelEntry, LLMModelRegistry } from "./llmModels.types";
@@ -45,8 +46,14 @@ export type MaybeStoredModelProvider = Omit<
   | "customEmbeddingsModels"
 > & {
   id?: string;
+  /** Registry model IDs (populated from the model registry, not user-managed) */
   models?: string[] | null;
+  /** Registry embedding model IDs (populated from the model registry) */
   embeddingsModels?: string[] | null;
+  /** User-defined custom chat models with metadata */
+  customModels?: CustomModelEntry[] | null;
+  /** User-defined custom embedding models with metadata */
+  customEmbeddingsModels?: CustomModelEntry[] | null;
   disabledByDefault?: boolean;
   extraHeaders?: { key: string; value: string }[] | null;
 };

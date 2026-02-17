@@ -84,7 +84,7 @@ export const DefaultProviderSection = ({
 
     // Add custom models from state, formatted with provider prefix
     const customModels = state.customModels.map(
-      (model) => `${provider.provider}/${model.value}`,
+      (model) => `${provider.provider}/${model.modelId}`,
     );
 
     // Combine and deduplicate
@@ -116,7 +116,7 @@ export const DefaultProviderSection = ({
 
     // Also include custom embeddings being edited in the current form state
     state.customEmbeddingsModels.forEach((model) => {
-      customEmbeddings.push(`${provider.provider}/${model.value}`);
+      customEmbeddings.push(`${provider.provider}/${model.modelId}`);
     });
 
     // Combine and deduplicate

@@ -1,4 +1,8 @@
 import type { ModelProvider, Prisma, PrismaClient } from "@prisma/client";
+import type { CustomModelEntry } from "./customModel.schema";
+
+/** Union type for customModels: accepts both legacy string[] and new CustomModelEntry[] */
+type CustomModelsData = CustomModelEntry[] | string[];
 
 /**
  * Repository for ModelProvider data access.
@@ -45,8 +49,8 @@ export class ModelProviderRepository {
       provider: string;
       enabled: boolean;
       customKeys?: Record<string, unknown> | null;
-      customModels?: string[];
-      customEmbeddingsModels?: string[];
+      customModels?: CustomModelsData;
+      customEmbeddingsModels?: CustomModelsData;
       extraHeaders?: { key: string; value: string }[];
     },
     tx?: Prisma.TransactionClient,
@@ -60,8 +64,10 @@ export class ModelProviderRepository {
         customKeys: (data.customKeys ?? undefined) as
           | Prisma.InputJsonValue
           | undefined,
-        customModels: data.customModels,
-        customEmbeddingsModels: data.customEmbeddingsModels,
+        customModels: data.customModels as Prisma.InputJsonValue | undefined,
+        customEmbeddingsModels: data.customEmbeddingsModels as
+          | Prisma.InputJsonValue
+          | undefined,
         extraHeaders: data.extraHeaders ?? [],
       },
     });
@@ -73,8 +79,8 @@ export class ModelProviderRepository {
     data: {
       enabled?: boolean;
       customKeys?: Record<string, unknown>;
-      customModels?: string[];
-      customEmbeddingsModels?: string[];
+      customModels?: CustomModelsData;
+      customEmbeddingsModels?: CustomModelsData;
       extraHeaders?: { key: string; value: string }[];
     },
     tx?: Prisma.TransactionClient,
@@ -85,6 +91,10 @@ export class ModelProviderRepository {
       data: {
         ...data,
         customKeys: data.customKeys as Prisma.InputJsonValue | undefined,
+        customModels: data.customModels as Prisma.InputJsonValue | undefined,
+        customEmbeddingsModels: data.customEmbeddingsModels as
+          | Prisma.InputJsonValue
+          | undefined,
       },
     });
   }

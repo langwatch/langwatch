@@ -1,161 +1,32 @@
 import {
+  Badge,
   Box,
-  Combobox,
-  Field,
-  TagsInput,
-  useCombobox,
-  useFilter,
-  useListCollection,
-  useTagsInput,
+  Button,
+  HStack,
+  Table,
+  Text,
   VStack,
 } from "@chakra-ui/react";
-import { useCallback, useEffect, useId, useMemo, useRef } from "react";
+import { Plus, Trash2 } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import type { CustomModelEntry } from "../../server/modelProviders/customModel.schema";
 import type {
   UseModelProviderFormActions,
   UseModelProviderFormState,
 } from "../../hooks/useModelProviderForm";
-import {
-  getProviderModelOptions,
-  type MaybeStoredModelProvider,
-} from "../../server/modelProviders/registry";
+import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
 import { SmallLabel } from "../SmallLabel";
-
-type ModelTagsInputProps = {
-  label: string;
-  placeholder: string;
-  values: string[];
-  options: { value: string; label: string }[];
-  onValuesChange: (values: string[]) => void;
-};
+import { Menu } from "../ui/menu";
+import { AddCustomModelDialog } from "./AddCustomModelDialog";
+import { AddCustomEmbeddingsModelDialog } from "./AddCustomEmbeddingsModelDialog";
+import { RegistryModelsModal } from "./RegistryModelsModal";
 
 /**
- * A reusable TagsInput component with Combobox for model selection.
- */
-const ModelTagsInput = ({
-  label,
-  placeholder,
-  values,
-  options,
-  onValuesChange,
-}: ModelTagsInputProps) => {
-  const inputId = useId();
-  const controlRef = useRef<HTMLDivElement | null>(null);
-
-  const optionValues = useMemo(() => options.map((o) => o.value), [options]);
-
-  // eslint-disable-next-line @typescript-eslint/unbound-method
-  const { contains } = useFilter({ sensitivity: "base" });
-  const { collection, filter } = useListCollection({
-    initialItems: optionValues,
-    filter: contains,
-  });
-
-  const handleTagsValueChange = useCallback(
-    (details: { value: string[] }) => {
-      onValuesChange(details.value);
-    },
-    [onValuesChange],
-  );
-
-  const tags = useTagsInput({
-    ids: { input: inputId },
-    value: values,
-    onValueChange: handleTagsValueChange,
-  });
-
-  useEffect(() => {
-    const differs =
-      tags.value.length !== values.length ||
-      tags.value.some((value, index) => value !== values[index]);
-    if (differs) {
-      tags.setValue(values);
-    }
-  }, [values, tags]);
-
-  const handleComboboxInputChange = useCallback(
-    (event: { inputValue: string }) => {
-      filter(event.inputValue);
-    },
-    [filter],
-  );
-
-  const handleComboboxValueChange = useCallback(
-    (event: { value?: string[] }) => {
-      const nextValue = event.value?.[0];
-      if (!nextValue) return;
-      if (!values.includes(nextValue)) {
-        tags.addValue(nextValue);
-      }
-    },
-    [values, tags],
-  );
-
-  const combobox = useCombobox({
-    ids: { input: inputId },
-    collection,
-    allowCustomValue: true,
-    value: [],
-    selectionBehavior: "clear",
-    positioning: {
-      getAnchorRect: () => controlRef.current?.getBoundingClientRect() ?? null,
-    },
-    onInputValueChange: handleComboboxInputChange,
-    onValueChange: handleComboboxValueChange,
-  });
-
-  return (
-    <Box width="full">
-      <SmallLabel>{label}</SmallLabel>
-      <Field.Root>
-        <Combobox.RootProvider value={combobox}>
-          <TagsInput.RootProvider value={tags} size="sm">
-            <TagsInput.Control
-              ref={controlRef}
-              maxHeight="120px"
-              overflowY="auto"
-            >
-              {tags.value.map((tag, index) => (
-                <TagsInput.Item key={index} index={index} value={tag}>
-                  <TagsInput.ItemPreview borderRadius="md">
-                    <TagsInput.ItemText>{tag}</TagsInput.ItemText>
-                    <TagsInput.ItemDeleteTrigger />
-                  </TagsInput.ItemPreview>
-                  <TagsInput.ItemInput />
-                </TagsInput.Item>
-              ))}
-              <Combobox.Input unstyled asChild>
-                <TagsInput.Input placeholder={placeholder} />
-              </Combobox.Input>
-            </TagsInput.Control>
-            <TagsInput.HiddenInput />
-            <Combobox.Positioner>
-              <Combobox.Content
-                borderRadius="md"
-                maxHeight="200px"
-                overflowY="auto"
-              >
-                {collection.items.length > 0 ? (
-                  collection.items.map((item) => (
-                    <Combobox.Item key={item} item={item}>
-                      <Combobox.ItemText>{item}</Combobox.ItemText>
-                    </Combobox.Item>
-                  ))
-                ) : (
-                  <Combobox.Empty>Type to add a model</Combobox.Empty>
-                )}
-              </Combobox.Content>
-            </Combobox.Positioner>
-          </TagsInput.RootProvider>
-        </Combobox.RootProvider>
-      </Field.Root>
-    </Box>
-  );
-};
-
-/**
- * Renders model and embeddings model selection fields for all providers.
- * Uses TagsInput with Combobox to allow selecting from known models or adding custom model names.
- * @param state - Form state containing custom model names
+ * Renders the Custom Models section in the model provider configuration drawer.
+ * Displays a table of user-defined custom models (chat and embeddings combined),
+ * with controls to add new models via dialogs and view registry models.
+ *
+ * @param state - Form state containing custom model entries
  * @param actions - Form actions for managing custom models
  * @param provider - The model provider configuration
  */
@@ -168,57 +39,151 @@ export const CustomModelInputSection = ({
   actions: UseModelProviderFormActions;
   provider: MaybeStoredModelProvider;
 }) => {
-  const modelOptions = useMemo(
-    () => getProviderModelOptions(provider.provider, "chat"),
-    [provider.provider],
+  const [addModelDialogOpen, setAddModelDialogOpen] = useState(false);
+  const [addEmbeddingsDialogOpen, setAddEmbeddingsDialogOpen] = useState(false);
+  const [registryModalOpen, setRegistryModalOpen] = useState(false);
+
+  const allCustomModels: CustomModelEntry[] = useMemo(
+    () => [...state.customModels, ...state.customEmbeddingsModels],
+    [state.customModels, state.customEmbeddingsModels],
   );
 
-  const embeddingsOptions = useMemo(
-    () => getProviderModelOptions(provider.provider, "embedding"),
-    [provider.provider],
-  );
-
-  const modelValues = useMemo(
-    () => state.customModels.map((m) => m.value),
-    [state.customModels],
-  );
-
-  const embeddingsValues = useMemo(
-    () => state.customEmbeddingsModels.map((m) => m.value),
-    [state.customEmbeddingsModels],
-  );
-
-  const handleModelsChange = useCallback(
-    (values: string[]) => {
-      actions.setCustomModels(values.map((v) => ({ label: v, value: v })));
+  const handleDeleteModel = useCallback(
+    (entry: CustomModelEntry) => {
+      if (entry.mode === "embedding") {
+        actions.removeCustomEmbeddingsModel(entry.modelId);
+      } else {
+        actions.removeCustomModel(entry.modelId);
+      }
     },
     [actions],
   );
 
-  const handleEmbeddingsChange = useCallback(
-    (values: string[]) => {
-      actions.setCustomEmbeddingsModels(
-        values.map((v) => ({ label: v, value: v })),
-      );
+  const handleAddModel = useCallback(
+    (entry: CustomModelEntry) => {
+      actions.addCustomModel(entry);
+    },
+    [actions],
+  );
+
+  const handleAddEmbeddingsModel = useCallback(
+    (entry: CustomModelEntry) => {
+      actions.addCustomEmbeddingsModel(entry);
     },
     [actions],
   );
 
   return (
-    <VStack width="full" gap={4} paddingTop={4}>
-      <ModelTagsInput
-        label="Models"
-        placeholder="Add custom model"
-        values={modelValues}
-        options={modelOptions}
-        onValuesChange={handleModelsChange}
+    <VStack width="full" gap={3} paddingTop={4} align="stretch">
+      <HStack justify="space-between" align="center">
+        <SmallLabel>Custom Models</SmallLabel>
+        <Menu.Root>
+          <Menu.Trigger asChild>
+            <Button size="xs" variant="outline">
+              <Plus size={14} />
+              Add
+            </Button>
+          </Menu.Trigger>
+          <Menu.Content>
+            <Menu.Item
+              value="add-model"
+              onClick={() => setAddModelDialogOpen(true)}
+            >
+              Add model
+            </Menu.Item>
+            <Menu.Item
+              value="add-embeddings"
+              onClick={() => setAddEmbeddingsDialogOpen(true)}
+            >
+              Add embeddings model
+            </Menu.Item>
+          </Menu.Content>
+        </Menu.Root>
+      </HStack>
+
+      {allCustomModels.length === 0 ? (
+        <Box
+          borderWidth="1px"
+          borderRadius="md"
+          padding={4}
+          textAlign="center"
+        >
+          <Text fontSize="sm" color="fg.muted">
+            No custom models added
+          </Text>
+        </Box>
+      ) : (
+        <Table.Root size="sm" variant="outline">
+          <Table.Header>
+            <Table.Row>
+              <Table.ColumnHeader>Model ID</Table.ColumnHeader>
+              <Table.ColumnHeader>Display Name</Table.ColumnHeader>
+              <Table.ColumnHeader>Type</Table.ColumnHeader>
+              <Table.ColumnHeader width="40px" />
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
+            {allCustomModels.map((entry) => (
+              <Table.Row key={`${entry.mode}-${entry.modelId}`}>
+                <Table.Cell>
+                  <Text fontSize="sm">{entry.modelId}</Text>
+                </Table.Cell>
+                <Table.Cell>
+                  <Text fontSize="sm">{entry.displayName}</Text>
+                </Table.Cell>
+                <Table.Cell>
+                  <Badge
+                    size="sm"
+                    colorPalette={entry.mode === "chat" ? "blue" : "purple"}
+                  >
+                    {entry.mode === "chat" ? "Chat" : "Embedding"}
+                  </Badge>
+                </Table.Cell>
+                <Table.Cell>
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    colorPalette="red"
+                    onClick={() => handleDeleteModel(entry)}
+                    aria-label={`Delete ${entry.modelId}`}
+                  >
+                    <Trash2 size={14} />
+                  </Button>
+                </Table.Cell>
+              </Table.Row>
+            ))}
+          </Table.Body>
+        </Table.Root>
+      )}
+
+      <HStack justify="end">
+        <Button
+          variant="plain"
+          size="xs"
+          color="fg.muted"
+          textDecoration="underline"
+          onClick={() => setRegistryModalOpen(true)}
+        >
+          See all models
+        </Button>
+      </HStack>
+
+      <AddCustomModelDialog
+        open={addModelDialogOpen}
+        onClose={() => setAddModelDialogOpen(false)}
+        onSubmit={handleAddModel}
       />
-      <ModelTagsInput
-        label="Embeddings Models"
-        placeholder="Add custom embeddings model"
-        values={embeddingsValues}
-        options={embeddingsOptions}
-        onValuesChange={handleEmbeddingsChange}
+
+      <AddCustomEmbeddingsModelDialog
+        open={addEmbeddingsDialogOpen}
+        onClose={() => setAddEmbeddingsDialogOpen(false)}
+        onSubmit={handleAddEmbeddingsModel}
+      />
+
+      <RegistryModelsModal
+        open={registryModalOpen}
+        onClose={() => setRegistryModalOpen(false)}
+        provider={provider.provider}
       />
     </VStack>
   );
