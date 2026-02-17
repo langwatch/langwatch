@@ -1,5 +1,6 @@
 import type { Event } from "../../library/domain/types";
 import { ProjectionRegistry } from "../../library/projections/projectionRegistry";
+import { projectDailyBillableEventsProjection } from "./projectDailyBillableEvents.foldProjection";
 import { projectDailySdkUsageProjection } from "./projectDailySdkUsage.foldProjection";
 
 /**
@@ -12,9 +13,14 @@ export function getGlobalProjectionRegistry(): ProjectionRegistry<Event> {
   if (!globalRegistry) {
     globalRegistry = new ProjectionRegistry<Event>();
 
-    const isSaas = process.env.IS_SAAS === "1" || process.env.IS_SAAS?.toLowerCase() === "true";
+    const isSaas =
+      process.env.IS_SAAS === "1" ||
+      process.env.IS_SAAS?.toLowerCase() === "true";
     if (isSaas) {
       globalRegistry.registerFoldProjection(projectDailySdkUsageProjection);
+      globalRegistry.registerFoldProjection(
+        projectDailyBillableEventsProjection,
+      );
     }
   }
   return globalRegistry;
