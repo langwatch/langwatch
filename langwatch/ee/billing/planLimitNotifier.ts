@@ -8,7 +8,7 @@ import type {
   PlanLimitNotifierInput,
 } from "./types";
 
-const DAYS_SINCE_LAST_ALERT = 30;
+const MIN_DAYS_BETWEEN_ALERTS = 30;
 
 const updatePlanLimitMessages = async (
   db: PrismaClient,
@@ -51,15 +51,9 @@ export const createPlanLimitNotifier = (db: PrismaClient = prisma) => {
         timeSinceLastAlert / (1000 * 60 * 60 * 24),
       );
 
-      if (daysSinceLastAlert < DAYS_SINCE_LAST_ALERT) {
+      if (daysSinceLastAlert < MIN_DAYS_BETWEEN_ALERTS) {
         return;
       }
-    }
-
-    try {
-      await updatePlanLimitMessages(db, organizationId);
-    } catch (error) {
-      captureException(error);
     }
 
     const admin = organization.members[0]?.user;
@@ -73,5 +67,16 @@ export const createPlanLimitNotifier = (db: PrismaClient = prisma) => {
     };
 
     await notifyPlanLimit(context);
+
+    try {
+      await updatePlanLimitMessages(db, organizationId);
+    } catch (error) {
+      captureException(
+        new Error(
+          `Critical: plan limit notification sent but DB timestamp update failed for org ${organizationId} on plan ${planName}`,
+          { cause: error },
+        ),
+      );
+    }
   };
 };
