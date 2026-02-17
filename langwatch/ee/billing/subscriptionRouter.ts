@@ -9,7 +9,6 @@ import { createLogger } from "../../src/utils/logger";
 import { notifySubscriptionEvent } from "./notificationHandlers";
 import {
   type PlanTypes as PlanType,
-  PlanTypes,
   SUBSCRIBABLE_PLANS,
 } from "./planTypes";
 import type { CustomerService } from "./services/customerService";
