@@ -505,7 +505,6 @@ export const promptsRouter = createTRPCRouter({
         verbosity: sourcePrompt.verbosity ?? undefined,
         promptingTechnique: sourcePrompt.promptingTechnique ?? undefined,
         demonstrations: sourcePrompt.demonstrations ?? undefined,
-        responseFormat: sourcePrompt.responseFormat ?? undefined,
       });
 
       // Set the copiedFromPromptId to track the source
@@ -660,9 +659,6 @@ export const promptsRouter = createTRPCRouter({
             promptingTechnique: sourcePrompt.promptingTechnique,
           }),
           demonstrations: sourcePrompt.demonstrations,
-          ...(sourcePrompt.responseFormat != null && {
-            responseFormat: sourcePrompt.responseFormat,
-          }),
           authorId,
         },
       });
