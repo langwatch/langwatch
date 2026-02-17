@@ -10,6 +10,47 @@ import { Hono } from "hono";
 import type IORedis from "ioredis";
 import { stripHashTag } from "./redisQueues";
 
+/**
+ * Lua script to atomically unblock a group.
+ * Mirrors complete.lua: clears blocked + active state, recalculates
+ * ready score so the dispatcher can pick the group up immediately.
+ *
+ * KEYS[1] = {queueName}:gq:blocked                 (set)
+ * KEYS[2] = {queueName}:gq:group:{groupId}:active  (string)
+ * KEYS[3] = {queueName}:gq:group:{groupId}:jobs    (sorted set)
+ * KEYS[4] = {queueName}:gq:ready                   (sorted set)
+ * KEYS[5] = {queueName}:gq:signal                  (list)
+ * ARGV[1] = groupId
+ *
+ * Returns: 1 = was blocked and unblocked, 0 = was not blocked
+ */
+const UNBLOCK_LUA = `
+local blockedKey = KEYS[1]
+local activeKey  = KEYS[2]
+local jobsKey    = KEYS[3]
+local readyKey   = KEYS[4]
+local signalKey  = KEYS[5]
+local groupId    = ARGV[1]
+
+local wasBlocked = redis.call("SREM", blockedKey, groupId)
+
+if wasBlocked > 0 then
+  redis.call("DEL", activeKey)
+
+  local pendingCount = redis.call("ZCARD", jobsKey)
+  if pendingCount > 0 then
+    local score = math.sqrt(pendingCount)
+    redis.call("ZADD", readyKey, score, groupId)
+  else
+    redis.call("ZREM", readyKey, groupId)
+  end
+
+  redis.call("LPUSH", signalKey, "1")
+end
+
+return wasBlocked
+`;
+
 interface JobInfo {
   stagedJobId: string;
   dispatchAfter: number;
@@ -149,6 +190,43 @@ export function createGroupQueueRoutes(
     return c.json({ queues });
   });
 
+  app.post("/api/group-queues/unblock", async (c) => {
+    const body = await c.req.json<{ queueName: string; groupId: string }>();
+    const { queueName, groupId } = body;
+
+    if (!queueName || !groupId) {
+      return c.json({ error: "queueName and groupId are required" }, 400);
+    }
+
+    if (!groupQueueNames.includes(queueName)) {
+      return c.json({ error: "Unknown queue name" }, 404);
+    }
+
+    const prefix = `${queueName}:gq:`;
+
+    // Atomic unblock: mirrors complete.lua logic
+    // 1. Remove from blocked set
+    // 2. Delete active key (stale lock from the failed job)
+    // 3. Re-add to ready set if there are pending jobs (group may have
+    //    been removed from ready during the original dispatch)
+    // 4. Signal the dispatcher
+    const unblockResult = await redis.eval(
+      UNBLOCK_LUA,
+      5,
+      `${prefix}blocked`,
+      `${prefix}group:${groupId}:active`,
+      `${prefix}group:${groupId}:jobs`,
+      `${prefix}ready`,
+      `${prefix}signal`,
+      groupId,
+    );
+
+    return c.json({
+      ok: true,
+      wasBlocked: unblockResult === 1,
+    });
+  });
+
   app.get("/groups", async (c) => {
     return c.html(groupsPageHtml());
   });
@@ -252,6 +330,15 @@ function groupsPageHtml(): string {
     .pill-none    { background: #2a2a4a; color: #666; }
     .pill-blocked { background: #5f1e1e; color: #ef9a9a; }
 
+    .btn-unblock {
+      display: inline-block; margin-left: 8px; padding: 2px 10px;
+      border-radius: 10px; font-size: 11px; font-weight: 600;
+      background: #1e3a5f; color: #64b5f6; border: 1px solid #2a5a8f;
+      cursor: pointer;
+    }
+    .btn-unblock:hover { background: #2a5a8f; }
+    .btn-unblock:disabled { opacity: 0.5; cursor: default; }
+
     .time-ago { color: #888; font-size: 12px; white-space: nowrap; }
     .active-id {
       font-family: monospace; font-size: 11px; color: #81c784;
@@ -300,7 +387,7 @@ function groupsPageHtml(): string {
 
   // ---- DOM refs keyed by id ----
   var queueEls  = {};  // queueName -> { section, chevron, badges:{jobs,pending,blocked,active}, body, tbody, showMore }
-  var groupEls  = {};  // "queueName::groupId" -> { tr, pending, oldest, newest, activeCell, statusPill, payloadCell }
+  var groupEls  = {};  // "queueName::groupId" -> { tr, pending, oldest, newest, activeCell, statusCell, statusPill, payloadCell }
   var container = document.getElementById("content");
 
   // ---- helpers ----
@@ -376,6 +463,25 @@ function groupsPageHtml(): string {
       var box = pt.parentNode.querySelector(".payload-box");
       if (box) box.style.display = expandedPayloads[key] ? "block" : "none";
       setText(pt, expandedPayloads[key] ? "hide" : "show");
+      return;
+    }
+
+    // unblock button
+    var ub = target.closest("[data-unblock]");
+    if (ub) {
+      var parts = ub.getAttribute("data-unblock").split("::");
+      var qName = parts[0];
+      var gId = parts.slice(1).join("::");
+      ub.disabled = true;
+      ub.textContent = "...";
+      fetch("/api/group-queues/unblock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ queueName: qName, groupId: gId }),
+      }).then(function(res) { return res.json(); })
+        .then(function() { refresh(); })
+        .catch(function(err) { alert("Unblock failed: " + err.message); })
+        .finally(function() { ub.disabled = false; ub.textContent = "Unblock"; });
       return;
     }
   });
@@ -672,6 +778,13 @@ function groupsPageHtml(): string {
     statusPill.className = "pill " + (g.isBlocked ? "pill-blocked" : "pill-ok");
     statusPill.textContent = g.isBlocked ? "Blocked" : "OK";
     tdStatus.appendChild(statusPill);
+    if (g.isBlocked) {
+      var unblockBtn = document.createElement("button");
+      unblockBtn.className = "btn-unblock";
+      unblockBtn.setAttribute("data-unblock", queueName + "::" + g.groupId);
+      unblockBtn.textContent = "Unblock";
+      tdStatus.appendChild(unblockBtn);
+    }
 
     // Payload
     var tdPayload = document.createElement("td");
@@ -689,6 +802,7 @@ function groupsPageHtml(): string {
       oldest: oldSpan,
       newest: newSpan,
       activeCell: tdActive,
+      statusCell: tdStatus,
       statusPill: statusPill,
       payloadCell: tdPayload,
     };
@@ -739,6 +853,18 @@ function groupsPageHtml(): string {
     // status
     el.statusPill.className = "pill " + (g.isBlocked ? "pill-blocked" : "pill-ok");
     setText(el.statusPill, g.isBlocked ? "Blocked" : "OK");
+
+    // unblock button
+    var existingBtn = el.statusCell.querySelector(".btn-unblock");
+    if (g.isBlocked && !existingBtn) {
+      var unblockBtn = document.createElement("button");
+      unblockBtn.className = "btn-unblock";
+      unblockBtn.setAttribute("data-unblock", queueName + "::" + g.groupId);
+      unblockBtn.textContent = "Unblock";
+      el.statusCell.appendChild(unblockBtn);
+    } else if (!g.isBlocked && existingBtn) {
+      existingBtn.remove();
+    }
 
     // payload — only rebuild if not currently expanded (avoid nuking open previews)
     var payloadKey = queueName + "::" + g.groupId;
