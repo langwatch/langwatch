@@ -71,7 +71,7 @@ function createOtelTraceWithAttributes(
 
 describe("Metadata and Labels Flow - OTEL Path", () => {
   describe("Thread ID hoisting", () => {
-    it("should hoist gen_ai.conversation.id to thread_id (OTEL semconv)", async () => {
+    it("hoists gen_ai.conversation.id to thread_id (OTEL semconv)", async () => {
       const request = createOtelTraceWithAttributes([
         { key: "gen_ai.conversation.id", value: { stringValue: "conv-123" } },
       ]);
@@ -84,7 +84,7 @@ describe("Metadata and Labels Flow - OTEL Path", () => {
       expect(trace.reservedTraceMetadata.thread_id).toBe("conv-123");
     });
 
-    it("should hoist session.id to thread_id (OpenInference)", async () => {
+    it("hoists session.id to thread_id (OpenInference)", async () => {
       const request = createOtelTraceWithAttributes([
         { key: "session.id", value: { stringValue: "session-456" } },
       ]);
@@ -97,7 +97,7 @@ describe("Metadata and Labels Flow - OTEL Path", () => {
       expect(trace.reservedTraceMetadata.thread_id).toBe("session-456");
     });
 
-    it("should hoist langwatch.thread.id to thread_id (legacy)", async () => {
+    it("hoists langwatch.thread.id to thread_id (legacy)", async () => {
       const request = createOtelTraceWithAttributes([
         { key: "langwatch.thread.id", value: { stringValue: "lw-thread-789" } },
       ]);
@@ -110,7 +110,7 @@ describe("Metadata and Labels Flow - OTEL Path", () => {
       expect(trace.reservedTraceMetadata.thread_id).toBe("lw-thread-789");
     });
 
-    it("should prefer gen_ai.conversation.id over session.id when both present", async () => {
+    it("prefers gen_ai.conversation.id over session.id when both present", async () => {
       const request = createOtelTraceWithAttributes([
         { key: "session.id", value: { stringValue: "session-from-session" } },
         {
@@ -130,7 +130,7 @@ describe("Metadata and Labels Flow - OTEL Path", () => {
   });
 
   describe("User ID hoisting", () => {
-    it("should hoist user.id to user_id (OpenInference)", async () => {
+    it("hoists user.id to user_id (OpenInference)", async () => {
       const request = createOtelTraceWithAttributes([
         { key: "user.id", value: { stringValue: "user-123" } },
       ]);
@@ -143,7 +143,7 @@ describe("Metadata and Labels Flow - OTEL Path", () => {
       expect(trace.reservedTraceMetadata.user_id).toBe("user-123");
     });
 
-    it("should hoist langwatch.user.id to user_id (legacy)", async () => {
+    it("hoists langwatch.user.id to user_id (legacy)", async () => {
       const request = createOtelTraceWithAttributes([
         { key: "langwatch.user.id", value: { stringValue: "lw-user-456" } },
       ]);
@@ -158,7 +158,7 @@ describe("Metadata and Labels Flow - OTEL Path", () => {
   });
 
   describe("Customer ID hoisting", () => {
-    it("should hoist langwatch.customer.id to customer_id", async () => {
+    it("hoists langwatch.customer.id to customer_id", async () => {
       const request = createOtelTraceWithAttributes([
         { key: "langwatch.customer.id", value: { stringValue: "cust-789" } },
       ]);
@@ -173,7 +173,7 @@ describe("Metadata and Labels Flow - OTEL Path", () => {
   });
 
   describe("Labels hoisting", () => {
-    it("should hoist tag.tags array to labels", async () => {
+    it("hoists tag.tags array to labels", async () => {
       const request = createOtelTraceWithAttributes([
         {
           key: "tag.tags",
@@ -201,7 +201,7 @@ describe("Metadata and Labels Flow - OTEL Path", () => {
       ]);
     });
 
-    it("should hoist langwatch.labels JSON array string to labels", async () => {
+    it("hoists langwatch.labels JSON array string to labels", async () => {
       const request = createOtelTraceWithAttributes([
         {
           key: "langwatch.labels",
@@ -223,7 +223,7 @@ describe("Metadata and Labels Flow - OTEL Path", () => {
   });
 
   describe("Metadata attribute processing", () => {
-    it("should extract metadata JSON object to custom metadata", async () => {
+    it("extracts metadata JSON object to custom metadata", async () => {
       const request = createOtelTraceWithAttributes([
         {
           key: "metadata",
@@ -242,7 +242,7 @@ describe("Metadata and Labels Flow - OTEL Path", () => {
       expect(trace.customMetadata.count).toBe(42);
     });
 
-    it("should hoist reserved fields from metadata to reservedTraceMetadata", async () => {
+    it("hoists reserved fields from metadata to reservedTraceMetadata", async () => {
       const request = createOtelTraceWithAttributes([
         {
           key: "metadata",
@@ -270,7 +270,7 @@ describe("Metadata and Labels Flow - OTEL Path", () => {
       expect(trace.customMetadata.custom_field).toBe("stays-in-custom");
     });
 
-    it("should handle camelCase to snake_case conversion in metadata", async () => {
+    it("converts camelCase metadata keys to snake_case", async () => {
       const request = createOtelTraceWithAttributes([
         {
           key: "metadata",
@@ -297,7 +297,7 @@ describe("Metadata and Labels Flow - OTEL Path", () => {
   });
 
   describe("Combined metadata from multiple sources", () => {
-    it("should combine metadata from span attributes and metadata object", async () => {
+    it("combines metadata from span attributes and metadata object", async () => {
       const request = createOtelTraceWithAttributes([
         { key: "user.id", value: { stringValue: "span-user" } },
         {
@@ -333,7 +333,7 @@ describe("Metadata and Labels Flow - OTEL Path", () => {
       expect(trace.customMetadata.custom_key).toBe("custom_value");
     });
 
-    it("should handle the complete OTEL semconv + legacy attributes scenario", async () => {
+    it("handles complete OTEL semconv + legacy attributes together", async () => {
       // This represents a real-world scenario where an SDK might send various attributes
       const request = createOtelTraceWithAttributes([
         // OTEL GenAI semconv
@@ -378,7 +378,7 @@ describe("Metadata and Labels Flow - OTEL Path", () => {
   });
 
   describe("Edge cases", () => {
-    it("should handle empty metadata object", async () => {
+    it("handles empty metadata object", async () => {
       const request = createOtelTraceWithAttributes([
         {
           key: "metadata",
@@ -396,7 +396,7 @@ describe("Metadata and Labels Flow - OTEL Path", () => {
       expect(trace.customMetadata["service.name"]).toBe("test-service");
     });
 
-    it("should handle null/undefined values gracefully", async () => {
+    it("ignores null and undefined metadata values", async () => {
       const request = createOtelTraceWithAttributes([
         {
           key: "metadata",
@@ -421,7 +421,7 @@ describe("Metadata and Labels Flow - OTEL Path", () => {
       expect(trace.customMetadata.valid_field).toBe("valid");
     });
 
-    it("should handle numeric string values for IDs", async () => {
+    it("preserves numeric string values for IDs", async () => {
       const request = createOtelTraceWithAttributes([
         { key: "user.id", value: { stringValue: "12345" } },
         { key: "gen_ai.conversation.id", value: { stringValue: "67890" } },
@@ -441,7 +441,7 @@ describe("Metadata and Labels Flow - OTEL Path", () => {
 });
 
 describe("Metadata and Labels Flow - SDK Telemetry attributes", () => {
-  it("should extract SDK telemetry attributes from resource", async () => {
+  it("extracts SDK telemetry attributes from resource", async () => {
     const request: DeepPartial<IExportTraceServiceRequest> = {
       resourceSpans: [
         {
@@ -499,7 +499,7 @@ describe("Metadata and Labels Flow - SDK Telemetry attributes", () => {
 });
 
 describe("Metadata Mapping - openTelemetryToLangWatchMetadataMapping", () => {
-  it("should map thread.id to thread_id via metadata", async () => {
+  it("maps thread.id to thread_id via metadata", async () => {
     const request = createOtelTraceWithAttributes([
       {
         key: "metadata",
@@ -514,7 +514,7 @@ describe("Metadata Mapping - openTelemetryToLangWatchMetadataMapping", () => {
     expect(trace.reservedTraceMetadata.thread_id).toBe("mapped-thread");
   });
 
-  it("should map gen_ai.conversation.id to thread_id via metadata", async () => {
+  it("maps gen_ai.conversation.id to thread_id via metadata", async () => {
     const request = createOtelTraceWithAttributes([
       {
         key: "metadata",
@@ -531,7 +531,7 @@ describe("Metadata Mapping - openTelemetryToLangWatchMetadataMapping", () => {
     expect(trace.reservedTraceMetadata.thread_id).toBe("genai-conv");
   });
 
-  it("should map user.id to user_id via metadata", async () => {
+  it("maps user.id to user_id via metadata", async () => {
     const request = createOtelTraceWithAttributes([
       {
         key: "metadata",
@@ -546,7 +546,7 @@ describe("Metadata Mapping - openTelemetryToLangWatchMetadataMapping", () => {
     expect(trace.reservedTraceMetadata.user_id).toBe("mapped-user");
   });
 
-  it("should map customer.id to customer_id via metadata", async () => {
+  it("maps customer.id to customer_id via metadata", async () => {
     const request = createOtelTraceWithAttributes([
       {
         key: "metadata",
@@ -563,7 +563,7 @@ describe("Metadata Mapping - openTelemetryToLangWatchMetadataMapping", () => {
     expect(trace.reservedTraceMetadata.customer_id).toBe("mapped-customer");
   });
 
-  it("should map tag.tags to labels via metadata", async () => {
+  it("maps tag.tags to labels via metadata", async () => {
     const request = createOtelTraceWithAttributes([
       {
         key: "metadata",
@@ -580,7 +580,7 @@ describe("Metadata Mapping - openTelemetryToLangWatchMetadataMapping", () => {
     expect(trace.reservedTraceMetadata.labels).toEqual(["tag1", "tag2"]);
   });
 
-  it("should map langwatch.* attributes via metadata", async () => {
+  it("maps langwatch.* attributes via metadata", async () => {
     const request = createOtelTraceWithAttributes([
       {
         key: "metadata",
@@ -603,7 +603,7 @@ describe("Metadata Mapping - openTelemetryToLangWatchMetadataMapping", () => {
     expect(trace.reservedTraceMetadata.customer_id).toBe("lw-meta-customer");
   });
 
-  it("should map langwatch SDK attributes via metadata", async () => {
+  it("maps langwatch SDK attributes via metadata", async () => {
     const request = createOtelTraceWithAttributes([
       {
         key: "metadata",
@@ -628,7 +628,7 @@ describe("Metadata Mapping - openTelemetryToLangWatchMetadataMapping", () => {
 });
 
 describe("Vercel AI SDK telemetry metadata", () => {
-  it("should extract metadata from ai.telemetry.metadata", async () => {
+  it("extracts metadata from ai.telemetry.metadata", async () => {
     const request = createOtelTraceWithAttributes([
       {
         key: "ai.telemetry.metadata",
@@ -653,7 +653,7 @@ describe("Vercel AI SDK telemetry metadata", () => {
 });
 
 describe("Integration - Real-world SDK scenarios", () => {
-  it("should handle OpenInference (Phoenix) instrumentation attributes", async () => {
+  it("handles OpenInference (Phoenix) instrumentation attributes", async () => {
     const request: DeepPartial<IExportTraceServiceRequest> = {
       resourceSpans: [
         {
@@ -731,7 +731,7 @@ describe("Integration - Real-world SDK scenarios", () => {
     expect(trace.customMetadata.experiment).toBe("test-run-1");
   });
 
-  it("should handle Traceloop (OpenLLMetry) instrumentation attributes", async () => {
+  it("handles Traceloop (OpenLLMetry) instrumentation attributes", async () => {
     const request: DeepPartial<IExportTraceServiceRequest> = {
       resourceSpans: [
         {
@@ -790,7 +790,7 @@ describe("Integration - Real-world SDK scenarios", () => {
     expect(trace.reservedTraceMetadata.user_id).toBe("traceloop-user-012");
   });
 
-  it("should handle LangWatch Python SDK attributes", async () => {
+  it("handles LangWatch Python SDK attributes", async () => {
     const request: DeepPartial<IExportTraceServiceRequest> = {
       resourceSpans: [
         {

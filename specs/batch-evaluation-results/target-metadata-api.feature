@@ -11,18 +11,21 @@ Feature: Python SDK Target Metadata API
   # Basic Target Usage
   # ============================================================================
 
+  @unit
   Scenario: Log metric without target (backwards compatible)
     When I call evaluation.log("accuracy", index=0, score=0.95)
     Then the metric is logged successfully
     And no target is associated with this metric
     And the API payload has no targets array
 
+  @unit
   Scenario: Log metric with target name only
     When I call evaluation.log("accuracy", index=0, score=0.95, target="gpt4-baseline")
     Then the metric is logged successfully
     And a target named "gpt4-baseline" is registered
     And the target has type "custom"
 
+  @unit
   Scenario: Log metric with target and metadata
     When I call:
       """
@@ -44,22 +47,26 @@ Feature: Python SDK Target Metadata API
   # Target Registration and Validation
   # ============================================================================
 
+  @unit
   Scenario: First log with target registers it
     When I call evaluation.log("accuracy", index=0, target="my-target", metadata={"model": "gpt-4"})
     Then target "my-target" is registered with metadata {"model": "gpt-4"}
 
+  @unit
   Scenario: Subsequent logs with same target reuse registration
     Given I previously logged with target="my-target" and metadata={"model": "gpt-4"}
     When I call evaluation.log("accuracy", index=1, target="my-target", score=0.9)
     Then the metric is logged successfully
     And the target metadata remains {"model": "gpt-4"}
 
+  @unit
   Scenario: Subsequent logs can omit metadata
     Given I previously logged with target="my-target" and metadata={"model": "gpt-4"}
     When I call evaluation.log("accuracy", index=1, target="my-target", score=0.9)
     Then no error is raised
     And the target retains its original metadata
 
+  @unit
   Scenario: Error when providing conflicting metadata
     Given I previously logged with target="my-target" and metadata={"model": "gpt-4"}
     When I call evaluation.log("accuracy", index=1, target="my-target", metadata={"model": "claude-3"})
@@ -70,6 +77,7 @@ Feature: Python SDK Target Metadata API
       New: {'model': 'claude-3'}
       """
 
+  @unit
   Scenario: Error includes suggestion to use different target name
     Given I previously logged with target="my-target" and metadata={"model": "gpt-4"}
     When I call evaluation.log with conflicting metadata for "my-target"
@@ -82,6 +90,7 @@ Feature: Python SDK Target Metadata API
   # Multiple Targets in Same Run
   # ============================================================================
 
+  @unit
   Scenario: Log metrics for multiple targets
     When I log metrics for different targets:
       """
@@ -91,6 +100,7 @@ Feature: Python SDK Target Metadata API
     Then both targets are registered
     And the API payload includes both targets in the targets array
 
+  @unit
   Scenario: Same metric name for different targets
     When I log:
       """
@@ -104,18 +114,22 @@ Feature: Python SDK Target Metadata API
   # Metadata Types
   # ============================================================================
 
+  @unit
   Scenario: String metadata values
     When I call evaluation.log with metadata={"model": "gpt-4", "version": "v1.2"}
     Then metadata is stored correctly
 
+  @unit
   Scenario: Numeric metadata values
     When I call evaluation.log with metadata={"temperature": 0.7, "max_tokens": 1000}
     Then metadata is stored correctly
 
+  @unit
   Scenario: Boolean metadata values
     When I call evaluation.log with metadata={"use_cache": True, "streaming": False}
     Then metadata is stored correctly
 
+  @unit
   Scenario: Mixed metadata value types
     When I call evaluation.log with metadata:
       """
@@ -132,12 +146,14 @@ Feature: Python SDK Target Metadata API
   # API Payload
   # ============================================================================
 
+  @integration
   Scenario: Targets included in batch payload
     Given I have logged metrics with 2 different targets
     When the batch is sent to the API
     Then the payload includes a "targets" array with 2 entries
     And each target entry has: id, name, type, metadata
 
+  @integration
   Scenario: Target structure in payload
     Given I logged with target="my-model" and metadata={"model": "gpt-4", "temp": 0.5}
     When the batch is sent to the API
@@ -148,6 +164,7 @@ Feature: Python SDK Target Metadata API
       | type     | custom                          |
       | metadata | {"model": "gpt-4", "temp": 0.5} |
 
+  @integration
   Scenario: Evaluations reference target_id
     Given I logged with target="my-model"
     When the batch is sent to the API
@@ -157,6 +174,7 @@ Feature: Python SDK Target Metadata API
   # Backwards Compatibility
   # ============================================================================
 
+  @integration
   Scenario: Mixed target and no-target logs in same run
     When I log:
       """
@@ -167,6 +185,7 @@ Feature: Python SDK Target Metadata API
     And metric1 has no target_id
     And metric2 has target_id="gpt4"
 
+  @integration
   Scenario: Old SDK version without target support
     Given the SDK version does not support targets
     When evaluation.log is called without target parameter
@@ -177,21 +196,25 @@ Feature: Python SDK Target Metadata API
   # Edge Cases
   # ============================================================================
 
+  @unit
   Scenario: Empty metadata object
     When I call evaluation.log with target="my-target" and metadata={}
     Then the target is registered with empty metadata
     And no error is raised
 
+  @unit
   Scenario: None metadata
     When I call evaluation.log with target="my-target" and metadata=None
     Then the target is registered with no metadata
     And no error is raised
 
+  @unit
   Scenario: Target name with special characters
     When I call evaluation.log with target="gpt-4/turbo_v2.0"
     Then the target is registered successfully
     And the name is preserved exactly
 
+  @unit
   Scenario: Very long target name
     When I call evaluation.log with a target name of 500 characters
     Then an appropriate error or truncation occurs
@@ -200,11 +223,13 @@ Feature: Python SDK Target Metadata API
   # Custom Type Override
   # ============================================================================
 
+  @unit
   Scenario: Override target type via metadata
     When I call evaluation.log with target="my-llm" and metadata={"type": "prompt"}
     Then the target type is set to "prompt" (not "custom")
     And the "type" key is removed from metadata
 
+  @unit
   Scenario: Invalid type in metadata is rejected
     When I call evaluation.log with target="my-target" and metadata={"type": "invalid_type"}
     Then an error is raised with message containing:
@@ -212,6 +237,7 @@ Feature: Python SDK Target Metadata API
       Invalid target type 'invalid_type'. Must be one of: prompt, agent, custom
       """
 
+  @unit
   Scenario: Valid type values in metadata
     When I call evaluation.log with metadata containing type
     Then only these type values are accepted:
