@@ -1,7 +1,7 @@
 import semver from "semver";
 import { z } from "zod";
 import { prisma } from "~/server/db";
-import { getLatestSdkVersions } from "~/server/sdk-radar/lastestSdkVersions";
+import { getLatestSdkVersions } from "~/server/sdk-radar/latestSdkVersions";
 import { SDK_REGISTRY } from "~/server/sdk-radar/sdkVersions.config";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";

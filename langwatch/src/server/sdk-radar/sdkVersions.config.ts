@@ -1,3 +1,5 @@
+import sdkVersions from "./sdk-versions.json";
+
 export interface SdkVersionInfo {
   displayName: string;
   latestVersion: string;
@@ -13,12 +15,14 @@ export interface SdkVersionInfo {
  *
  * `latestVersion` is the hardcoded fallback — dynamic versions are fetched
  * from GitHub releases and cached in Redis (see latestSdkVersions.ts).
+ *
+ * Versions come from sdk-versions.json, updated automatically by release-please.
  */
 export const SDK_REGISTRY: Record<string, Record<string, SdkVersionInfo>> = {
   "langwatch-observability-sdk": {
     python: {
       displayName: "Python",
-      latestVersion: "0.13.0",
+      latestVersion: sdkVersions["python-sdk"],
       releasesUrl:
         "https://github.com/langwatch/langwatch/releases?q=python-sdk",
       docsUrl: "https://docs.langwatch.ai/integration/python/guide",
@@ -30,7 +34,7 @@ export const SDK_REGISTRY: Record<string, Record<string, SdkVersionInfo>> = {
     },
     typescript: {
       displayName: "TypeScript",
-      latestVersion: "0.16.1",
+      latestVersion: sdkVersions["typescript-sdk"],
       releasesUrl:
         "https://github.com/langwatch/langwatch/releases?q=typescript-sdk",
       docsUrl: "https://docs.langwatch.ai/integration/typescript/guide",
@@ -44,7 +48,7 @@ export const SDK_REGISTRY: Record<string, Record<string, SdkVersionInfo>> = {
   "langwatch-client-sdk": {
     typescript: {
       displayName: "TypeScript",
-      latestVersion: "0.16.1",
+      latestVersion: sdkVersions["typescript-sdk"],
       releasesUrl:
         "https://github.com/langwatch/langwatch/releases?q=typescript-sdk",
       docsUrl: "https://docs.langwatch.ai/integration/typescript/guide",

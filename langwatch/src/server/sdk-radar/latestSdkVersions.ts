@@ -5,8 +5,8 @@ import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:sdk-radar");
 
-const REDIS_KEY = "sdk-radar:latest-versions";
-const TTL_SECONDS = 86400; // 24 hours
+const REDIS_KEY = "sdk-radar:latest-sdk-versions";
+const TTL_SECONDS = 3_600; // 1 hour
 
 const GITHUB_RELEASES_URL =
   "https://api.github.com/repos/langwatch/langwatch/releases?per_page=100";
