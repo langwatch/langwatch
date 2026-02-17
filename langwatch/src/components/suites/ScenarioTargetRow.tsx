@@ -6,8 +6,8 @@
 
 import { HStack, Text } from "@chakra-ui/react";
 import { CheckCircle, XCircle, Loader } from "lucide-react";
-import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
-import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/types";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 
 type ScenarioTargetRowProps = {
   scenarioRun: ScenarioRunData;

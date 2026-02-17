@@ -3,7 +3,7 @@
  * Defines the structure of API responses for scenario runs, batches, and events.
  */
 import { z } from "zod";
-import { ScenarioRunStatus } from "../enums";
+import { ScenarioRunStatus } from "../scenario-event.enums";
 import {
   batchRunIdSchema,
   scenarioEventSchema,

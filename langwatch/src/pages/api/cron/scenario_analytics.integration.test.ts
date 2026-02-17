@@ -11,7 +11,7 @@ import {
   it,
   vi,
 } from "vitest";
-import { ScenarioEventType } from "~/app/api/scenario-events/[[...route]]/enums";
+import { ScenarioEventType } from "~/server/scenarios/scenario-event.enums";
 import { prisma } from "~/server/db";
 import { esClient, SCENARIO_EVENTS_INDEX } from "~/server/elasticsearch";
 import { ANALYTICS_KEYS } from "~/types";

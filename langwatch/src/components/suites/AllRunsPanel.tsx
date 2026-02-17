@@ -7,7 +7,7 @@
 
 import { Box, Button, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/types";
+import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { buildRoutePath } from "~/utils/routes";

@@ -1,5 +1,5 @@
 import type { AggregationsCalendarInterval } from "@elastic/elasticsearch/lib/api/types";
-import { ScenarioEventType } from "~/app/api/scenario-events/[[...route]]/enums";
+import { ScenarioEventType } from "~/server/scenarios/scenario-event.enums";
 import { SCENARIO_EVENTS_INDEX } from "~/server/elasticsearch";
 
 export interface ScenarioAnalyticsQueryOptions {

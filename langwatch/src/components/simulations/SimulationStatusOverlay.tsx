@@ -1,6 +1,6 @@
 import { Box, Text, VStack } from "@chakra-ui/react";
 import { AlertCircle, Check, X } from "react-feather";
-import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { useColorModeValue } from "../ui/color-mode";
 
 export function SimulationStatusOverlay({

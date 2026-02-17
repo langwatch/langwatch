@@ -1,6 +1,6 @@
 import { Icon, type IconProps } from "@chakra-ui/react";
 import { Check, Clock, XCircle } from "lucide-react";
-import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 
 interface ScenarioRunStatusIconProps extends Omit<IconProps, "as" | "color"> {
   status?: ScenarioRunStatus;

@@ -4,12 +4,12 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ScenarioEventService } from "~/app/api/scenario-events/[[...route]]/scenario-event.service";
+import type { ScenarioEventService } from "~/server/scenarios/scenario-event.service";
 import {
   ScenarioEventType,
   ScenarioRunStatus,
-} from "~/app/api/scenario-events/[[...route]]/enums";
-import { Verdict } from "~/app/api/scenario-events/[[...route]]/enums";
+  Verdict,
+} from "~/server/scenarios/scenario-event.enums";
 import { ScenarioFailureHandler } from "../scenario-failure-handler";
 
 describe("ScenarioFailureHandler", () => {

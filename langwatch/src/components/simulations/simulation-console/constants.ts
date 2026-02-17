@@ -3,7 +3,7 @@ import type { Tokens } from "@chakra-ui/react";
 import {
   ScenarioRunStatus,
   Verdict,
-} from "~/app/api/scenario-events/[[...route]]/enums";
+} from "~/server/scenarios/scenario-event.enums";
 
 /**
  * Static console styling colors

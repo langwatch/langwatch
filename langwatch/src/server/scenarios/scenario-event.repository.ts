@@ -5,7 +5,7 @@ import { z } from "zod";
 import { esClient, SCENARIO_EVENTS_INDEX } from "~/server/elasticsearch";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
-import { ScenarioEventType, Verdict } from "./enums";
+import { ScenarioEventType, Verdict } from "./scenario-event.enums";
 import { scenarioEventSchema } from "./schemas";
 import { batchRunIdSchema, scenarioRunIdSchema } from "./schemas/event-schemas";
 import type {
@@ -14,7 +14,7 @@ import type {
   ScenarioRunFinishedEvent,
   ScenarioRunStartedEvent,
   ScenarioSetData,
-} from "./types";
+} from "./scenario-event.types";
 import {
   ES_FIELDS,
   transformFromElasticsearch,

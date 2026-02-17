@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/types";
+import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
