@@ -104,7 +104,7 @@ export const sdkRadarRouter = createTRPCRouter({
         let totalCount = 0;
 
         for (const [version, data] of versions) {
-          const isOutdated = semver.valid(version)
+          const isOutdated = semver.valid(version) && semver.valid(latestVersion)
             ? semver.lt(version, latestVersion)
             : true;
 
