@@ -81,6 +81,7 @@ export class EventSourcingPipeline<
         featureFlagService: definition.featureFlagService,
         commandRegistrations: definition.commandRegistrations,
         globalRegistry: definition.globalRegistry,
+        redisConnection: definition.redisConnection,
       }),
       writable: false,
       enumerable: true,

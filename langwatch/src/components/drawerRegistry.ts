@@ -34,6 +34,7 @@ import { EvaluatorEditorDrawer } from "./evaluators/EvaluatorEditorDrawer";
 import { EvaluatorListDrawer } from "./evaluators/EvaluatorListDrawer";
 import { EvaluatorTypeSelectorDrawer } from "./evaluators/EvaluatorTypeSelectorDrawer";
 import { WorkflowSelectorForEvaluatorDrawer } from "./evaluators/WorkflowSelectorForEvaluatorDrawer";
+import { SdkRadarDrawer } from "./drawers/SdkRadarDrawer";
 import { CreateProjectDrawer } from "./projects/CreateProjectDrawer";
 import { PromptEditorDrawer } from "./prompts/PromptEditorDrawer";
 import { PromptListDrawer } from "./prompts/PromptListDrawer";
@@ -89,6 +90,8 @@ export const drawers = {
   // Online Evaluations (Monitors)
   onlineEvaluation: OnlineEvaluationDrawer,
   guardrails: GuardrailsDrawer,
+  // SDK Radar
+  sdkRadar: SdkRadarDrawer,
 } satisfies Record<string, React.FC<any>>;
 
 /**

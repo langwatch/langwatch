@@ -173,6 +173,7 @@ export class EventSourcing {
           featureFlagService: definition.featureFlagService,
           commandRegistrations,
           globalRegistry,
+          redisConnection: this.runtime.redisConnection,
         });
 
         // Get command dispatchers

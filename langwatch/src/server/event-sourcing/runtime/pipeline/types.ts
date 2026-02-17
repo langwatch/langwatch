@@ -1,3 +1,5 @@
+import type IORedis from "ioredis";
+import type { Cluster } from "ioredis";
 import type { FeatureFlagServiceInterface } from "../../../featureFlag/types";
 import type { CommandHandlerClass } from "../../library/commands/commandHandlerClass";
 import type { AggregateType } from "../../library/domain/aggregateType";
@@ -54,6 +56,7 @@ export interface EventSourcingPipelineDefinition<
     options?: CommandHandlerOptions<unknown>;
   }>;
   globalRegistry?: ProjectionRegistry<Event>;
+  redisConnection?: IORedis | Cluster;
 }
 
 export interface RegisteredPipeline<
