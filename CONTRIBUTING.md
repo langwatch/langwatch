@@ -26,6 +26,15 @@ We understand, here are the basics:
 
 Please note, all contributions should start with an issue first.
 
+## System Requirements
+
+- **RAM**: At least **8 GB** of RAM is required to run the development environment
+- **Docker**: Docker Desktop (or equivalent) must be installed and running
+- **Performance tips**:
+  - Close unnecessary applications to free up memory when running the full dev environment
+  - If builds or hot-reload feel slow, ensure Docker has enough memory allocated (Docker Desktop → Settings → Resources)
+  - Use `pnpm dev` for the lightest development setup
+
 ## How Can I Contribute?
 
 ### Reporting Bugs and Suggesting Enhancements
