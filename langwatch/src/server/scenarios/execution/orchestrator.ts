@@ -6,6 +6,7 @@
  */
 
 import { createLogger } from "~/utils/logger/server";
+import type { ModelParamsFailureReason } from "./data-prefetcher";
 import type {
   ExecutionInput,
   OrchestratorDependencies,
@@ -16,6 +17,19 @@ import type {
   ScenarioConfig,
   ScenarioExecutionResult,
 } from "./types";
+
+const MODEL_PARAMS_USER_MESSAGES: Record<ModelParamsFailureReason, string> = {
+  invalid_model_format:
+    "The model is not configured correctly. Please check the model setting for this scenario.",
+  provider_not_found:
+    "The configured model provider was not found. Check your project's model provider settings.",
+  provider_not_enabled:
+    "The configured model provider is not enabled. Enable it in Settings > Model Providers.",
+  missing_params:
+    "The model provider is missing required credentials. Check Settings > Model Providers.",
+  preparation_error:
+    "Something went wrong while preparing the model configuration. Please try again.",
+};
 
 const logger = createLogger("langwatch:scenarios:orchestrator");
 
@@ -49,7 +63,11 @@ export class ScenarioExecutionOrchestrator {
         project.defaultModel,
       );
       if (!modelParamsResult.success) {
-        return this.failure(modelParamsResult.message);
+        logger.warn(
+          { reason: modelParamsResult.reason, detail: modelParamsResult.message },
+          "Model params preparation failed",
+        );
+        return this.failure(MODEL_PARAMS_USER_MESSAGES[modelParamsResult.reason]);
       }
 
       const adapterResult = await this.createAdapter(

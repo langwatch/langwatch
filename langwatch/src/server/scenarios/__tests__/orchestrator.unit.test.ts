@@ -172,7 +172,7 @@ describe("ScenarioExecutionOrchestrator", () => {
           const result = await orchestrator.execute(defaultInput);
 
           expect(result.success).toBe(false);
-          expect(result.error).toContain("Provider 'openai' not found");
+          expect(result.error).toContain("model provider was not found");
         });
       });
     });
