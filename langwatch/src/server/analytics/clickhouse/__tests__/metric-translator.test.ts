@@ -103,7 +103,7 @@ describe("metric-translator", () => {
 
       it("translates performance.first_token with p95", () => {
         const result = translateMetric("performance.first_token", "p95", 0);
-        expect(result.selectExpression).toContain("quantileExact(0.95)");
+        expect(result.selectExpression).toContain("quantileTDigest(0.95)");
         expect(result.selectExpression).toContain("TimeToFirstTokenMs");
       });
 
@@ -242,9 +242,9 @@ describe("metric-translator", () => {
         expect(result.selectExpression).toContain("uniq(");
       });
 
-      it("uses quantileExact for percentile aggregations", () => {
+      it("uses quantileTDigest for percentile aggregations", () => {
         const result = translateMetric("performance.completion_time", "p99", 0);
-        expect(result.selectExpression).toContain("quantileExact(0.99)");
+        expect(result.selectExpression).toContain("quantileTDigest(0.99)");
       });
 
       it("uses correct aggregation for min/max", () => {
