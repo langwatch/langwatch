@@ -1,5 +1,5 @@
 import { Button, HStack, Input, VStack } from "@chakra-ui/react";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { CustomModelEntry } from "../../server/modelProviders/customModel.schema";
 import { customModelEntrySchema } from "../../server/modelProviders/customModel.schema";
 import {
@@ -17,10 +17,12 @@ type AddCustomEmbeddingsModelDialogProps = {
   open: boolean;
   onClose: () => void;
   onSubmit: (entry: CustomModelEntry) => void;
+  /** When provided, the dialog opens in edit mode pre-filled with these values. */
+  initialValues?: CustomModelEntry;
 };
 
 /**
- * Dialog for adding a custom embeddings model.
+ * Dialog for adding or editing a custom embeddings model.
  * Only collects Model ID and Display Name since embeddings models
  * do not need parameter configuration.
  */
@@ -28,15 +30,26 @@ export function AddCustomEmbeddingsModelDialog({
   open,
   onClose,
   onSubmit,
+  initialValues,
 }: AddCustomEmbeddingsModelDialogProps) {
+  const isEditing = !!initialValues;
   const [modelId, setModelId] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const initialized = useRef(false);
+
+  // Pre-fill form when initialValues change (edit mode)
+  if (open && initialValues && !initialized.current) {
+    initialized.current = true;
+    setModelId(initialValues.modelId);
+    setDisplayName(initialValues.displayName);
+  }
 
   const resetForm = useCallback(() => {
     setModelId("");
     setDisplayName("");
     setErrors({});
+    initialized.current = false;
   }, []);
 
   const handleClose = useCallback(() => {
@@ -73,7 +86,7 @@ export function AddCustomEmbeddingsModelDialog({
     <DialogRoot open={open} onOpenChange={(e) => !e.open && handleClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add Embeddings Model</DialogTitle>
+          <DialogTitle>{isEditing ? "Edit Embeddings Model" : "Add Embeddings Model"}</DialogTitle>
         </DialogHeader>
         <DialogCloseTrigger />
         <DialogBody>
@@ -114,7 +127,7 @@ export function AddCustomEmbeddingsModelDialog({
               size="sm"
               onClick={handleSubmit}
             >
-              Create model
+              {isEditing ? "Save" : "Create model"}
             </Button>
           </HStack>
         </DialogFooter>

@@ -7,7 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import type { CustomModelEntry } from "../../server/modelProviders/customModel.schema";
 import type {
@@ -42,6 +42,7 @@ export const CustomModelInputSection = ({
   const [addModelDialogOpen, setAddModelDialogOpen] = useState(false);
   const [addEmbeddingsDialogOpen, setAddEmbeddingsDialogOpen] = useState(false);
   const [registryModalOpen, setRegistryModalOpen] = useState(false);
+  const [editingModel, setEditingModel] = useState<CustomModelEntry | undefined>();
 
   const allCustomModels: CustomModelEntry[] = useMemo(
     () => [...state.customModels, ...state.customEmbeddingsModels],
@@ -59,19 +60,46 @@ export const CustomModelInputSection = ({
     [actions],
   );
 
+  const handleEditModel = useCallback((entry: CustomModelEntry) => {
+    setEditingModel(entry);
+    if (entry.mode === "embedding") {
+      setAddEmbeddingsDialogOpen(true);
+    } else {
+      setAddModelDialogOpen(true);
+    }
+  }, []);
+
   const handleAddModel = useCallback(
     (entry: CustomModelEntry) => {
+      if (editingModel) {
+        actions.removeCustomModel(editingModel.modelId);
+        setEditingModel(undefined);
+      }
       actions.addCustomModel(entry);
     },
-    [actions],
+    [actions, editingModel],
   );
 
   const handleAddEmbeddingsModel = useCallback(
     (entry: CustomModelEntry) => {
+      if (editingModel) {
+        actions.removeCustomEmbeddingsModel(editingModel.modelId);
+        setEditingModel(undefined);
+      }
       actions.addCustomEmbeddingsModel(entry);
     },
-    [actions],
+    [actions, editingModel],
   );
+
+  const handleCloseModelDialog = useCallback(() => {
+    setAddModelDialogOpen(false);
+    setEditingModel(undefined);
+  }, []);
+
+  const handleCloseEmbeddingsDialog = useCallback(() => {
+    setAddEmbeddingsDialogOpen(false);
+    setEditingModel(undefined);
+  }, []);
 
   return (
     <VStack width="full" gap={3} paddingTop={4} align="stretch">
@@ -119,7 +147,7 @@ export const CustomModelInputSection = ({
               <Table.ColumnHeader>Model ID</Table.ColumnHeader>
               <Table.ColumnHeader>Display Name</Table.ColumnHeader>
               <Table.ColumnHeader>Type</Table.ColumnHeader>
-              <Table.ColumnHeader width="40px" />
+              <Table.ColumnHeader width="80px" />
             </Table.Row>
           </Table.Header>
           <Table.Body>
@@ -140,15 +168,25 @@ export const CustomModelInputSection = ({
                   </Badge>
                 </Table.Cell>
                 <Table.Cell>
-                  <Button
-                    size="xs"
-                    variant="ghost"
-                    colorPalette="red"
-                    onClick={() => handleDeleteModel(entry)}
-                    aria-label={`Delete ${entry.modelId}`}
-                  >
-                    <Trash2 size={14} />
-                  </Button>
+                  <HStack gap={0}>
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      onClick={() => handleEditModel(entry)}
+                      aria-label={`Edit ${entry.modelId}`}
+                    >
+                      <Pencil size={14} />
+                    </Button>
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      colorPalette="red"
+                      onClick={() => handleDeleteModel(entry)}
+                      aria-label={`Delete ${entry.modelId}`}
+                    >
+                      <Trash2 size={14} />
+                    </Button>
+                  </HStack>
                 </Table.Cell>
               </Table.Row>
             ))}
@@ -170,14 +208,16 @@ export const CustomModelInputSection = ({
 
       <AddCustomModelDialog
         open={addModelDialogOpen}
-        onClose={() => setAddModelDialogOpen(false)}
+        onClose={handleCloseModelDialog}
         onSubmit={handleAddModel}
+        initialValues={editingModel?.mode === "chat" ? editingModel : undefined}
       />
 
       <AddCustomEmbeddingsModelDialog
         open={addEmbeddingsDialogOpen}
-        onClose={() => setAddEmbeddingsDialogOpen(false)}
+        onClose={handleCloseEmbeddingsDialog}
         onSubmit={handleAddEmbeddingsModel}
+        initialValues={editingModel?.mode === "embedding" ? editingModel : undefined}
       />
 
       <RegistryModelsModal

@@ -46,10 +46,12 @@ type AddCustomModelDialogProps = {
   open: boolean;
   onClose: () => void;
   onSubmit: (entry: CustomModelEntry) => void;
+  /** When provided, the dialog opens in edit mode pre-filled with these values. */
+  initialValues?: CustomModelEntry;
 };
 
 /**
- * Dialog for adding a custom chat model with metadata configuration.
+ * Dialog for adding or editing a custom chat model with metadata configuration.
  * Includes fields for Model ID, Display Name, supported parameters,
  * and multimodal input types.
  */
@@ -57,7 +59,9 @@ export function AddCustomModelDialog({
   open,
   onClose,
   onSubmit,
+  initialValues,
 }: AddCustomModelDialogProps) {
+  const isEditing = !!initialValues;
   const [modelId, setModelId] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [maxTokens, setMaxTokens] = useState(String(DEFAULT_MAX_TOKENS));
@@ -65,6 +69,18 @@ export function AddCustomModelDialog({
   const [multimodalInputs, setMultimodalInputs] = useState<MultimodalInput[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const displayNameTouched = useRef(false);
+  const initialized = useRef(false);
+
+  // Pre-fill form when initialValues change (edit mode)
+  if (open && initialValues && !initialized.current) {
+    initialized.current = true;
+    setModelId(initialValues.modelId);
+    setDisplayName(initialValues.displayName);
+    setMaxTokens(String(initialValues.maxTokens ?? DEFAULT_MAX_TOKENS));
+    setSupportedParameters([...(initialValues.supportedParameters ?? DEFAULT_PARAMETERS)]);
+    setMultimodalInputs([...(initialValues.multimodalInputs ?? [])]);
+    displayNameTouched.current = true;
+  }
 
   const handleModelIdChange = useCallback((value: string) => {
     setModelId(value);
@@ -86,6 +102,7 @@ export function AddCustomModelDialog({
     setMultimodalInputs([]);
     setErrors({});
     displayNameTouched.current = false;
+    initialized.current = false;
   }, []);
 
   const handleClose = useCallback(() => {
@@ -158,7 +175,7 @@ export function AddCustomModelDialog({
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add Model</DialogTitle>
+          <DialogTitle>{isEditing ? "Edit Model" : "Add Model"}</DialogTitle>
         </DialogHeader>
         <DialogCloseTrigger />
         <DialogBody>
@@ -246,7 +263,7 @@ export function AddCustomModelDialog({
               size="sm"
               onClick={handleSubmit}
             >
-              Create model
+              {isEditing ? "Save" : "Create model"}
             </Button>
           </HStack>
         </DialogFooter>

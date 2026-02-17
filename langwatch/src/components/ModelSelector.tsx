@@ -30,6 +30,7 @@ export type ModelOption = {
   icon: React.ReactNode;
   isDisabled: boolean;
   mode?: "chat" | "embedding" | undefined;
+  isCustom?: boolean;
 };
 
 export const modelSelectorOptions: ModelOption[] = Object.entries(
@@ -48,11 +49,14 @@ export const allModelOptions = modelSelectorOptions.map(
   (option) => option.value,
 );
 
-export type GroupedModelOptions = {
+export type ModelOptionGroup = {
   provider: string;
   icon: React.ReactNode;
   models: ModelOption[];
-}[];
+  isCustom?: boolean;
+};
+
+export type GroupedModelOptions = ModelOptionGroup[];
 
 export const useModelSelectionOptions = (
   options: string[],
@@ -65,19 +69,27 @@ export const useModelSelectionOptions = (
     { enabled: !!project?.id, refetchOnMount: false },
   );
 
-  const customModels = getCustomModels(
+  const allModels = getCustomModels(
     modelProviders.data ?? {},
     options,
     mode,
   );
 
-  // Filter to only include models from enabled providers
-  const enabledModels = customModels.filter((modelValue) => {
-    const provider = modelValue.split("/")[0]!;
-    return modelProviders.data?.[provider]?.enabled;
-  });
+  // Build a set of custom model IDs for quick lookup
+  const customModelIdSet = new Set<string>();
+  for (const [providerKey, config] of Object.entries(
+    modelProviders.data ?? {},
+  )) {
+    const customList =
+      mode === "chat" ? config.customModels : config.customEmbeddingsModels;
+    if (customList) {
+      for (const model of customList) {
+        customModelIdSet.add(`${providerKey}/${model.modelId}`);
+      }
+    }
+  }
 
-  const selectOptions: ModelOption[] = enabledModels.map((modelValue) => {
+  const selectOptions: ModelOption[] = allModels.map((modelValue) => {
     const provider = modelValue.split("/")[0]!;
     const modelName = modelValue.split("/").slice(1).join("/");
 
@@ -87,12 +99,25 @@ export const useModelSelectionOptions = (
       icon: modelProviderIcons[provider as keyof typeof modelProviderIcons],
       isDisabled: false,
       mode: mode,
+      isCustom: customModelIdSet.has(modelValue),
     };
   });
 
-  // Group models by provider
-  const groupedByProvider: GroupedModelOptions = Object.entries(
-    selectOptions.reduce(
+  // Group models by provider, with custom models in a separate group at the top
+  const customOptions = selectOptions.filter((o) => o.isCustom);
+  const registryOptions = selectOptions.filter((o) => !o.isCustom);
+
+  const customGroup: GroupedModelOptions = customOptions.length > 0
+    ? [{
+        provider: "Custom Models",
+        icon: undefined as unknown as React.ReactNode,
+        models: customOptions,
+        isCustom: true,
+      }]
+    : [];
+
+  const registryGroups: GroupedModelOptions = Object.entries(
+    registryOptions.reduce(
       (acc, option) => {
         const provider = option.value.split("/")[0]!;
         if (!acc[provider]) {
@@ -108,6 +133,11 @@ export const useModelSelectionOptions = (
     icon: modelProviderIcons[provider as keyof typeof modelProviderIcons],
     models,
   }));
+
+  const groupedByProvider: GroupedModelOptions = [
+    ...customGroup,
+    ...registryGroups,
+  ];
 
   const modelOption = selectOptions.find((opt) => opt.value === model);
 
@@ -251,34 +281,40 @@ export const ModelSelector = React.memo(function ModelSelector({
             </InputGroup>
           </Box>
         </Field.Root>
-        {filteredGroups.map((group) => (
-          <Select.ItemGroup
-            key={group.provider}
-            label={
-              <HStack gap={2} paddingX={2}>
-                <Text fontWeight="medium">{titleCase(group.provider)}</Text>
-              </HStack>
-            }
-          >
-            {group.models.map((item) => (
-              <Select.Item key={item.value} item={item}>
-                <HStack gap={2}>
-                  {item.icon && (
-                    <Box width={MODEL_ICON_SIZE} minWidth={MODEL_ICON_SIZE}>
-                      {item.icon}
+        {filteredGroups.map((group, groupIndex) => (
+          <React.Fragment key={group.provider}>
+            <Select.ItemGroup
+              label={
+                group.isCustom ? undefined : (
+                  <HStack gap={2} paddingX={2}>
+                    <Text fontWeight="medium">{titleCase(group.provider)}</Text>
+                  </HStack>
+                )
+              }
+            >
+              {group.models.map((item) => (
+                <Select.Item key={item.value} item={item}>
+                  <HStack gap={2}>
+                    {item.icon && (
+                      <Box width={MODEL_ICON_SIZE} minWidth={MODEL_ICON_SIZE}>
+                        {item.icon}
+                      </Box>
+                    )}
+                    <Box
+                      fontSize={size === "sm" ? 12 : 14}
+                      fontFamily="mono"
+                      paddingY={size === "sm" ? 0 : "2px"}
+                    >
+                      {item.label}
                     </Box>
-                  )}
-                  <Box
-                    fontSize={size === "sm" ? 12 : 14}
-                    fontFamily="mono"
-                    paddingY={size === "sm" ? 0 : "2px"}
-                  >
-                    {item.label}
-                  </Box>
-                </HStack>
-              </Select.Item>
-            ))}
-          </Select.ItemGroup>
+                  </HStack>
+                </Select.Item>
+              ))}
+            </Select.ItemGroup>
+            {group.isCustom && groupIndex < filteredGroups.length - 1 && (
+              <Box borderBottom="1px solid" borderColor="border" />
+            )}
+          </React.Fragment>
         ))}
         {showConfigureAction && (
           <Box
@@ -312,41 +348,50 @@ export const ModelSelector = React.memo(function ModelSelector({
 /**
  * Builds the list of available models by combining registry models with custom models.
  *
- * Registry models from `options` are always included for enabled providers.
- * Custom models (from provider's `customModels` or `customEmbeddingsModels`)
- * are added on top. Disabled providers are excluded entirely.
+ * Registry models from `options` are always included for enabled providers,
+ * filtered by mode (chat or embedding). Custom models are returned first
+ * so they appear at the top of the selector.
  *
  * @param modelProviders - Map of provider keys to their configuration
  * @param options - Registry model IDs (e.g., "openai/gpt-4o")
  * @param mode - Whether to include chat or embedding custom models
- * @returns Combined list of model IDs for enabled providers
+ * @returns Combined list of model IDs for enabled providers (custom first, then registry)
  */
 export const getCustomModels = (
   modelProviders: Record<string, MaybeStoredModelProvider>,
   options: string[],
   mode: "chat" | "embedding" = "chat",
 ): string[] => {
-  const models = new Set<string>();
+  const customModelIds: string[] = [];
+  const registryModelIds: string[] = [];
 
-  // Always include registry models from enabled providers
-  for (const option of options) {
-    const provider = option.split("/")[0]!;
-    if (modelProviders[provider]?.enabled) {
-      models.add(option);
-    }
-  }
-
-  // Add custom models from enabled providers
+  // Add custom models first so they appear at the top
   for (const [providerKey, config] of Object.entries(modelProviders)) {
     if (!config.enabled) continue;
     const customList =
       mode === "chat" ? config.customModels : config.customEmbeddingsModels;
     if (customList) {
       for (const model of customList) {
-        models.add(`${providerKey}/${model.modelId}`);
+        customModelIds.push(`${providerKey}/${model.modelId}`);
       }
     }
   }
 
-  return Array.from(models);
+  const customSet = new Set(customModelIds);
+
+  // Include registry models from enabled providers, filtered by mode
+  for (const option of options) {
+    const provider = option.split("/")[0]!;
+    if (!modelProviders[provider]?.enabled) continue;
+
+    const registryMode = allLitellmModels[option]?.mode;
+    if (registryMode && registryMode !== mode) continue;
+
+    // Skip if already added as a custom model (same ID)
+    if (customSet.has(option)) continue;
+
+    registryModelIds.push(option);
+  }
+
+  return [...customModelIds, ...registryModelIds];
 };

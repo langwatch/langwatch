@@ -255,6 +255,8 @@ describe("CustomModelInputSection", () => {
       const displayNameInput = screen.getByLabelText("Display Name");
 
       await user.type(modelIdInput, "gpt-5-custom");
+      // Display name is auto-filled from model ID; clear and type the desired value
+      await user.clear(displayNameInput);
       await user.type(displayNameInput, "GPT-5 Custom");
 
       // Submit
