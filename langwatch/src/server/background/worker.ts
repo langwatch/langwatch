@@ -1,3 +1,4 @@
+import "../../instrumentation.node";
 import type { Job, Worker } from "bullmq";
 import type {
   CollectorJob,
@@ -19,7 +20,6 @@ import {
 import { startTopicClusteringWorker } from "./workers/topicClusteringWorker";
 import { startTrackEventsWorker } from "./workers/trackEventsWorker";
 
-import "../../instrumentation.node";
 import fs from "fs";
 import http from "http";
 import path from "path";
@@ -278,7 +278,10 @@ async function collectQueueMetrics(): Promise<void> {
         }
       } catch (error) {
         logger.debug(
-          { queueName: name, error: error instanceof Error ? error.message : String(error) },
+          {
+            queueName: name,
+            error: error instanceof Error ? error.message : String(error),
+          },
           "Failed to collect queue metrics",
         );
       }
