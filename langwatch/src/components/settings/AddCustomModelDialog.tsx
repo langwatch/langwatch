@@ -48,6 +48,8 @@ type AddCustomModelDialogProps = {
   onSubmit: (entry: CustomModelEntry) => void;
   /** When provided, the dialog opens in edit mode pre-filled with these values. */
   initialValues?: CustomModelEntry;
+  /** Override DialogContent background (e.g. "bg.surface" for solid on onboarding). */
+  dialogBackground?: string;
 };
 
 /**
@@ -60,6 +62,7 @@ export function AddCustomModelDialog({
   onClose,
   onSubmit,
   initialValues,
+  dialogBackground,
 }: AddCustomModelDialogProps) {
   const isEditing = !!initialValues;
   const [modelId, setModelId] = useState("");
@@ -173,7 +176,7 @@ export function AddCustomModelDialog({
       onOpenChange={(e) => !e.open && handleClose()}
       size="md"
     >
-      <DialogContent>
+      <DialogContent {...(dialogBackground ? { background: dialogBackground } : {})}>
         <DialogHeader>
           <DialogTitle>{isEditing ? "Edit Model" : "Add Model"}</DialogTitle>
         </DialogHeader>

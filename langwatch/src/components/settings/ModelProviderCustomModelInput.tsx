@@ -34,10 +34,16 @@ export const CustomModelInputSection = ({
   state,
   actions,
   provider,
+  dialogBackground,
+  showRegistryLink = true,
 }: {
   state: UseModelProviderFormState;
   actions: UseModelProviderFormActions;
   provider: MaybeStoredModelProvider;
+  /** Override DialogContent background (e.g. "bg.surface" for solid on onboarding). */
+  dialogBackground?: string;
+  /** Whether to show the "See all models" link and registry modal. Defaults to true. */
+  showRegistryLink?: boolean;
 }) => {
   const [addModelDialogOpen, setAddModelDialogOpen] = useState(false);
   const [addEmbeddingsDialogOpen, setAddEmbeddingsDialogOpen] = useState(false);
@@ -194,23 +200,26 @@ export const CustomModelInputSection = ({
         </Table.Root>
       )}
 
-      <HStack justify="end">
-        <Button
-          variant="plain"
-          size="xs"
-          color="fg.muted"
-          textDecoration="underline"
-          onClick={() => setRegistryModalOpen(true)}
-        >
-          See all models
-        </Button>
-      </HStack>
+      {showRegistryLink && (
+        <HStack justify="end">
+          <Button
+            variant="plain"
+            size="xs"
+            color="fg.muted"
+            textDecoration="underline"
+            onClick={() => setRegistryModalOpen(true)}
+          >
+            See all models
+          </Button>
+        </HStack>
+      )}
 
       <AddCustomModelDialog
         open={addModelDialogOpen}
         onClose={handleCloseModelDialog}
         onSubmit={handleAddModel}
         initialValues={editingModel?.mode === "chat" ? editingModel : undefined}
+        dialogBackground={dialogBackground}
       />
 
       <AddCustomEmbeddingsModelDialog
@@ -218,13 +227,17 @@ export const CustomModelInputSection = ({
         onClose={handleCloseEmbeddingsDialog}
         onSubmit={handleAddEmbeddingsModel}
         initialValues={editingModel?.mode === "embedding" ? editingModel : undefined}
+        dialogBackground={dialogBackground}
       />
 
-      <RegistryModelsModal
-        open={registryModalOpen}
-        onClose={() => setRegistryModalOpen(false)}
-        provider={provider.provider}
-      />
+      {showRegistryLink && (
+        <RegistryModelsModal
+          open={registryModalOpen}
+          onClose={() => setRegistryModalOpen(false)}
+          provider={provider.provider}
+          dialogBackground={dialogBackground}
+        />
+      )}
     </VStack>
   );
 };

@@ -22,6 +22,8 @@ type RegistryModelsModalProps = {
   open: boolean;
   onClose: () => void;
   provider: string;
+  /** Override DialogContent background (e.g. "bg.surface" for solid on onboarding). */
+  dialogBackground?: string;
 };
 
 /**
@@ -33,6 +35,7 @@ export function RegistryModelsModal({
   open,
   onClose,
   provider,
+  dialogBackground,
 }: RegistryModelsModalProps) {
   const [search, setSearch] = useState("");
 
@@ -77,7 +80,7 @@ export function RegistryModelsModal({
       onOpenChange={(e) => !e.open && handleClose()}
       size="lg"
     >
-      <DialogContent>
+      <DialogContent {...(dialogBackground ? { background: dialogBackground } : {})}>
         <DialogHeader>
           <DialogTitle>Registry Models</DialogTitle>
         </DialogHeader>

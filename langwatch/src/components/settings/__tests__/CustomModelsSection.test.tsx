@@ -260,7 +260,7 @@ describe("CustomModelInputSection", () => {
       await user.type(displayNameInput, "GPT-5 Custom");
 
       // Submit
-      await user.click(screen.getByRole("button", { name: /create model/i }));
+      await user.click(screen.getByRole("button", { name: /add model/i }));
 
       await waitFor(() => {
         expect(addCustomModel).toHaveBeenCalledWith(
@@ -312,7 +312,7 @@ describe("CustomModelInputSection", () => {
       await user.type(displayNameInput, "Custom Embedding");
 
       // Submit
-      await user.click(screen.getByRole("button", { name: /create model/i }));
+      await user.click(screen.getByRole("button", { name: /add model/i }));
 
       await waitFor(() => {
         expect(addCustomEmbeddingsModel).toHaveBeenCalledWith(

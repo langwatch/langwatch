@@ -19,6 +19,8 @@ type AddCustomEmbeddingsModelDialogProps = {
   onSubmit: (entry: CustomModelEntry) => void;
   /** When provided, the dialog opens in edit mode pre-filled with these values. */
   initialValues?: CustomModelEntry;
+  /** Override DialogContent background (e.g. "bg.surface" for solid on onboarding). */
+  dialogBackground?: string;
 };
 
 /**
@@ -31,6 +33,7 @@ export function AddCustomEmbeddingsModelDialog({
   onClose,
   onSubmit,
   initialValues,
+  dialogBackground,
 }: AddCustomEmbeddingsModelDialogProps) {
   const isEditing = !!initialValues;
   const [modelId, setModelId] = useState("");
@@ -84,7 +87,7 @@ export function AddCustomEmbeddingsModelDialog({
 
   return (
     <DialogRoot open={open} onOpenChange={(e) => !e.open && handleClose()}>
-      <DialogContent>
+      <DialogContent {...(dialogBackground ? { background: dialogBackground } : {})}>
         <DialogHeader>
           <DialogTitle>{isEditing ? "Edit Embeddings Model" : "Add Embeddings Model"}</DialogTitle>
         </DialogHeader>
@@ -127,7 +130,7 @@ export function AddCustomEmbeddingsModelDialog({
               size="sm"
               onClick={handleSubmit}
             >
-              {isEditing ? "Save" : "Create model"}
+              {isEditing ? "Save" : "Add model"}
             </Button>
           </HStack>
         </DialogFooter>

@@ -970,7 +970,8 @@ export const system = createSystem(defaultConfig, {
             fontWeight: "500",
           },
           content: {
-            background: "bg.surface",
+            background: "bg.surface/75",
+            backdropFilter: "blur(8px)",
             "& button:not([data-variant=ghost]):not([data-part])": {
               boxShadow: "md",
             },
