@@ -133,8 +133,16 @@ const mockUpgradeWithInvites = vi.fn(() => ({
 }));
 
 const mockGetPendingInvites = vi.fn(() => ({
-  data: [] as Array<{ role: string; status: string }>,
+  data: [] as Array<{ id?: string; email?: string; role: string; status: string }>,
   isLoading: false,
+}));
+
+const mockCreateInvitesMutate = vi.fn();
+const mockCreateInvites = vi.fn(() => ({
+  mutate: mockCreateInvitesMutate,
+  mutateAsync: vi.fn().mockResolvedValue({ success: true }),
+  isLoading: false,
+  isPending: false,
 }));
 
 vi.mock("~/components/ui/toaster", () => ({
@@ -160,6 +168,9 @@ vi.mock("~/utils/api", () => ({
       },
       getOrganizationPendingInvites: {
         useQuery: () => ({ ...mockGetPendingInvites(), refetch: vi.fn() }),
+      },
+      createInvites: {
+        useMutation: () => mockCreateInvites(),
       },
     },
     subscription: {
@@ -212,6 +223,10 @@ describe("<SubscriptionPage/>", () => {
       data: mockOrganizationMembers,
       isLoading: false,
       refetch: vi.fn(),
+    });
+    mockGetPendingInvites.mockReturnValue({
+      data: [],
+      isLoading: false,
     });
   });
 
@@ -384,15 +399,15 @@ describe("<SubscriptionPage/>", () => {
       });
     });
 
-    it("shows Current Members and New seats sections", async () => {
+    it("shows collapsible members button and Seats available sections", async () => {
       const user = userEvent.setup();
       renderSubscriptionPage();
 
       await user.click(screen.getByTestId("user-count-link"));
 
       await waitFor(() => {
-        expect(screen.getByText("Current Members")).toBeInTheDocument();
-        expect(screen.getByText("New seats")).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /Show members/i })).toBeInTheDocument();
+        expect(screen.getByText("Seats available")).toBeInTheDocument();
       });
     });
 
@@ -466,7 +481,7 @@ describe("<SubscriptionPage/>", () => {
       expect(emailInput.value).toBe("newuser@example.com");
     });
 
-    it("defaults member type to Full Member", async () => {
+    it("shows Full Member badge for new seat", async () => {
       const user = userEvent.setup();
       renderSubscriptionPage();
 
@@ -474,28 +489,9 @@ describe("<SubscriptionPage/>", () => {
       await user.click(screen.getByRole("button", { name: /Add Seat/i }));
 
       await waitFor(() => {
-        const selectRoot = screen.getByTestId("seat-member-type-0");
-        // The Chakra Select renders a value text span showing the selected label
-        const valueText = within(selectRoot).getByText("Full Member", { selector: "span" });
-        expect(valueText).toBeInTheDocument();
+        const badge = screen.getByTestId("seat-member-type-0");
+        expect(badge).toHaveTextContent("Full Member");
       });
-    });
-
-    it("renders both Full Member and Lite Member options", async () => {
-      const user = userEvent.setup();
-      renderSubscriptionPage();
-
-      await user.click(screen.getByTestId("user-count-link"));
-      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
-
-      // The Chakra Select renders a hidden native <select> with both options
-      const selectRoot = screen.getByTestId("seat-member-type-0");
-      const nativeSelect = selectRoot.querySelector("select") as HTMLSelectElement;
-      expect(nativeSelect).toBeInTheDocument();
-
-      const options = Array.from(nativeSelect.options).map((o) => o.textContent);
-      expect(options).toContain("Full Member");
-      expect(options).toContain("Lite Member");
     });
 
     it("adds multiple seats when clicked multiple times", async () => {
@@ -838,7 +834,7 @@ describe("<SubscriptionPage/>", () => {
           type: "GROWTH",
           name: "Growth",
           free: false,
-          maxMembers: 20,
+          maxMembers: 2,
           maxMembersLite: 1000,
           maxMessagesPerMonth: 200000,
         }),
@@ -874,7 +870,7 @@ describe("<SubscriptionPage/>", () => {
       const user = userEvent.setup();
       renderSubscriptionPage();
 
-      // Add 1 seat: maxMembers (20) + 1 planned = 21 total
+      // Add 1 seat: maxMembers (2) + 1 planned = 3 total
       await user.click(screen.getByTestId("user-count-link"));
       await user.click(screen.getByRole("button", { name: /Add Seat/i }));
       await user.click(screen.getByRole("button", { name: /Done/i }));
@@ -889,8 +885,8 @@ describe("<SubscriptionPage/>", () => {
         expect(mockOpenSeats).toHaveBeenCalledWith(
           expect.objectContaining({
             organizationId: "test-org-id",
-            currentSeats: 20,
-            newSeats: 21,
+            currentSeats: 2,
+            newSeats: 3,
             onConfirm: expect.any(Function),
           })
         );
@@ -909,7 +905,7 @@ describe("<SubscriptionPage/>", () => {
 
       renderSubscriptionPage();
 
-      // Add 1 seat: maxMembers (20) + 1 planned = 21 total
+      // Add 1 seat: maxMembers (2) + 1 planned = 3 total
       await user.click(screen.getByTestId("user-count-link"));
       await user.click(screen.getByRole("button", { name: /Add Seat/i }));
       await user.click(screen.getByRole("button", { name: /Done/i }));
@@ -930,10 +926,35 @@ describe("<SubscriptionPage/>", () => {
           plan: "GROWTH_SEAT_EVENT",
           upgradeMembers: true,
           upgradeTraces: false,
-          totalMembers: 21,
+          totalMembers: 3,
           totalTraces: 0,
         })
       );
+    });
+
+    it("hides update-seats-block and resets user count when clicking Discard", async () => {
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+
+      // Add 1 seat: shows update-seats block
+      await user.click(screen.getByTestId("user-count-link"));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+      await user.click(screen.getByRole("button", { name: /Done/i }));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("update-seats-block")).toBeInTheDocument();
+      });
+
+      // Click Discard
+      await user.click(screen.getByTestId("discard-seat-changes-button"));
+
+      // Update seats block should disappear
+      await waitFor(() => {
+        expect(screen.queryByTestId("update-seats-block")).not.toBeInTheDocument();
+      });
+
+      // User count should return to original (2/2)
+      expect(screen.getByTestId("user-count-link")).toHaveTextContent("2/2");
     });
   });
 
@@ -989,7 +1010,7 @@ describe("<SubscriptionPage/>", () => {
           type: "GROWTH",
           name: "Growth",
           free: false,
-          maxMembers: 20,
+          maxMembers: 2,
           maxMembersLite: 1000,
           maxMessagesPerMonth: 200000,
         }),
@@ -1313,7 +1334,7 @@ describe("<SubscriptionPage/>", () => {
           type: "GROWTH",
           name: "Growth",
           free: false,
-          maxMembers: 20,
+          maxMembers: 2,
           maxMembersLite: 1000,
           maxMessagesPerMonth: 200000,
         }),
@@ -1333,9 +1354,9 @@ describe("<SubscriptionPage/>", () => {
       await user.type(emailInput, "teammate@example.com");
       await user.click(screen.getByRole("button", { name: /Done/i }));
 
-      // Verify seats were added (3/20)
+      // Verify seats were added (3/2)
       await waitFor(() => {
-        expect(screen.getByTestId("user-count-link")).toHaveTextContent("3/20");
+        expect(screen.getByTestId("user-count-link")).toHaveTextContent("3/2");
       });
 
       await user.click(screen.getByRole("button", { name: /Update subscription/i }));
@@ -1346,8 +1367,141 @@ describe("<SubscriptionPage/>", () => {
 
       // After successful update, planned users are cleared — count returns to existing members
       await waitFor(() => {
-        expect(screen.getByTestId("user-count-link")).toHaveTextContent("2/20");
+        expect(screen.getByTestId("user-count-link")).toHaveTextContent("2/2");
       });
+    });
+  });
+
+  // ============================================================================
+  // Upgrade with Invites
+  // ============================================================================
+
+  // ============================================================================
+  // Drawer Auto-Fill for Available Seats
+  // ============================================================================
+
+  describe("when opening drawer on Growth plan with available seats", () => {
+    beforeEach(() => {
+      mockGetActivePlan.mockReturnValue({
+        data: createMockPlan({
+          type: "GROWTH",
+          name: "Growth",
+          free: false,
+          maxMembers: 6,
+        }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+    });
+
+    it("shows empty seat rows for each unused FullMember slot", async () => {
+      // 2 active FullMembers, 6 maxMembers → 4 auto-filled rows
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+      await user.click(screen.getByTestId("user-count-link"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("pending-seat-0")).toBeInTheDocument();
+        expect(screen.getByTestId("pending-seat-3")).toBeInTheDocument();
+        expect(screen.queryByTestId("pending-seat-4")).not.toBeInTheDocument();
+      });
+    });
+
+    describe("when organization also has pending core invites", () => {
+      beforeEach(() => {
+        mockGetPendingInvites.mockReturnValue({
+          data: [
+            { id: "inv-1", email: "inv1@example.com", role: "MEMBER", status: "PENDING" },
+            { id: "inv-2", email: "inv2@example.com", role: "ADMIN", status: "PENDING" },
+          ],
+          isLoading: false,
+        });
+      });
+
+      it("reduces available rows by pending invite count", async () => {
+        // 2 active + 2 pending = 4 occupied, 6 max → 2 auto-filled
+        const user = userEvent.setup();
+        renderSubscriptionPage();
+        await user.click(screen.getByTestId("user-count-link"));
+
+        await waitFor(() => {
+          expect(screen.getByTestId("pending-seat-0")).toBeInTheDocument();
+          expect(screen.getByTestId("pending-seat-1")).toBeInTheDocument();
+          expect(screen.queryByTestId("pending-seat-2")).not.toBeInTheDocument();
+        });
+      });
+    });
+
+    describe("when closing drawer without entering emails", () => {
+      it("does not show update-seats block", async () => {
+        const user = userEvent.setup();
+        renderSubscriptionPage();
+        await user.click(screen.getByTestId("user-count-link"));
+        await user.click(screen.getByRole("button", { name: /Done/i }));
+
+        await waitFor(() => {
+          expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
+        });
+        expect(screen.queryByTestId("update-seats-block")).not.toBeInTheDocument();
+      });
+    });
+
+    describe("when entering email in an available seat row", () => {
+      it("sends invite via createInvites without changing subscription", async () => {
+        const user = userEvent.setup();
+        renderSubscriptionPage();
+        await user.click(screen.getByTestId("user-count-link"));
+
+        const emailInput = screen.getByTestId("seat-email-0") as HTMLInputElement;
+        await user.type(emailInput, "newuser@example.com");
+        await user.click(screen.getByRole("button", { name: /Done/i }));
+
+        await waitFor(() => {
+          // Invite sent via createInvites (not subscription change)
+          expect(mockCreateInvitesMutate).toHaveBeenCalledWith(
+            expect.objectContaining({
+              organizationId: "test-org-id",
+              invites: expect.arrayContaining([
+                expect.objectContaining({ email: "newuser@example.com" }),
+              ]),
+            }),
+            expect.anything(),
+          );
+        });
+
+        // No update-seats block should appear (invite only, no billing change)
+        expect(screen.queryByTestId("update-seats-block")).not.toBeInTheDocument();
+      });
+    });
+
+    describe("when manually adding a seat via Add Seat button", () => {
+      it("saves the manual row even without an email", async () => {
+        const user = userEvent.setup();
+        renderSubscriptionPage();
+        await user.click(screen.getByTestId("user-count-link"));
+
+        // Scroll past auto-filled rows, click Add Seat
+        await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+        await user.click(screen.getByRole("button", { name: /Done/i }));
+
+        await waitFor(() => {
+          expect(screen.getByTestId("update-seats-block")).toBeInTheDocument();
+        });
+      });
+    });
+  });
+
+  describe("when opening drawer on Free plan at capacity", () => {
+    it("shows no available seat rows", async () => {
+      // Default: Free plan, maxMembers: 2, 2 active members → 0 auto-fill
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+      await user.click(screen.getByTestId("user-count-link"));
+
+      await waitFor(() => {
+        expect(screen.getByText("Manage Seats")).toBeInTheDocument();
+      });
+      expect(screen.queryByTestId("pending-seat-0")).not.toBeInTheDocument();
     });
   });
 
@@ -1367,7 +1521,7 @@ describe("<SubscriptionPage/>", () => {
       });
       renderSubscriptionPage();
 
-      // Add a seat with email
+      // Add a seat with email via "Add Seat" button (manual row, not auto-fill)
       await user.click(screen.getByTestId("user-count-link"));
       await user.click(screen.getByRole("button", { name: /Add Seat/i }));
       const emailInput = screen.getByTestId("seat-email-0") as HTMLInputElement;
@@ -1389,6 +1543,118 @@ describe("<SubscriptionPage/>", () => {
             ]),
           })
         );
+      });
+    });
+  });
+
+  // ============================================================================
+  // Invite vs Seat Change Separation (Growth Plan)
+  // ============================================================================
+
+  describe("when on Growth plan separating invites from seat changes", () => {
+    beforeEach(() => {
+      mockGetActivePlan.mockReturnValue({
+        data: createMockPlan({
+          type: "GROWTH",
+          name: "Growth",
+          free: false,
+          maxMembers: 6,
+        }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+    });
+
+    it("deleting an auto-filled empty row shows subscription downgrade option", async () => {
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+      await user.click(screen.getByTestId("user-count-link"));
+
+      // 2 active members, 6 max → 4 auto-fill rows (indices 0-3)
+      await waitFor(() => {
+        expect(screen.getByTestId("pending-seat-3")).toBeInTheDocument();
+      });
+
+      // Delete one auto-fill row
+      await user.click(screen.getByTestId("remove-seat-0"));
+      await user.click(screen.getByRole("button", { name: /Done/i }));
+
+      // Should show update-seats block for downgrade (6 → 5)
+      await waitFor(() => {
+        expect(screen.getByTestId("update-seats-block")).toBeInTheDocument();
+      });
+
+      // No invite should be sent (no emails filled)
+      expect(mockCreateInvitesMutate).not.toHaveBeenCalled();
+    });
+
+    it("does not call createInvites when no changes are made", async () => {
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+      await user.click(screen.getByTestId("user-count-link"));
+      await user.click(screen.getByRole("button", { name: /Done/i }));
+
+      expect(mockCreateInvitesMutate).not.toHaveBeenCalled();
+      expect(screen.queryByTestId("update-seats-block")).not.toBeInTheDocument();
+    });
+
+    it("sends invite and shows downgrade when filling email and deleting a row", async () => {
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+      await user.click(screen.getByTestId("user-count-link"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("pending-seat-3")).toBeInTheDocument();
+      });
+
+      // Fill email in first auto-fill row
+      const emailInput = screen.getByTestId("seat-email-0") as HTMLInputElement;
+      await user.type(emailInput, "invite@example.com");
+
+      // Delete a different auto-fill row
+      await user.click(screen.getByTestId("remove-seat-1"));
+      await user.click(screen.getByRole("button", { name: /Done/i }));
+
+      // Invite should be sent
+      await waitFor(() => {
+        expect(mockCreateInvitesMutate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            organizationId: "test-org-id",
+            invites: expect.arrayContaining([
+              expect.objectContaining({ email: "invite@example.com" }),
+            ]),
+          }),
+          expect.anything(),
+        );
+      });
+
+      // Should also show update-seats block for the deleted row
+      expect(screen.getByTestId("update-seats-block")).toBeInTheDocument();
+    });
+  });
+
+  // ============================================================================
+  // Free Plan: Auto-fill email does not send invite
+  // ============================================================================
+
+  describe("when on Free plan filling seat via Add Seat", () => {
+    it("does not call createInvites and saves as planned user for upgrade", async () => {
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+
+      await user.click(screen.getByTestId("user-count-link"));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+
+      const emailInput = screen.getByTestId("seat-email-0") as HTMLInputElement;
+      await user.type(emailInput, "freeuser@example.com");
+      await user.click(screen.getByRole("button", { name: /Done/i }));
+
+      // No invite — free plan users go through upgrade flow
+      expect(mockCreateInvitesMutate).not.toHaveBeenCalled();
+
+      // Should show upgrade required
+      await waitFor(() => {
+        expect(screen.getByText(/Upgrade required/i)).toBeInTheDocument();
       });
     });
   });

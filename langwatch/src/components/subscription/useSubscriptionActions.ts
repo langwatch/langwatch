@@ -24,6 +24,7 @@ export function useSubscriptionActions({
   totalFullMembers,
   currentMaxMembers,
   plannedUsers,
+  deletedSeatCount,
   onSeatsUpdated,
   organizationWithMembers,
 }: {
@@ -33,6 +34,7 @@ export function useSubscriptionActions({
   totalFullMembers: number;
   currentMaxMembers?: number;
   plannedUsers: PlannedUser[];
+  deletedSeatCount: number;
   onSeatsUpdated: () => void;
   organizationWithMembers: TRPCRefetchFn;
 }) {
@@ -98,13 +100,9 @@ export function useSubscriptionActions({
   const handleUpdateSeats = () => {
     if (!organizationId) return;
 
-    const invitesWithEmail = plannedUsers
-      .filter((u) => u.email.trim() !== "")
-      .map((u) => ({ email: u.email, role: memberTypeToRole(u.memberType) }));
-
-    // Use plan.maxMembers as base (what's already paid for), add new planned Full Member seats
+    // Use plan.maxMembers as base (what's already paid for), add/remove seats
     const plannedCoreCount = plannedUsers.filter((u) => u.memberType === "FullMember").length;
-    const updateTotalMembers = (currentMaxMembers ?? totalFullMembers) + plannedCoreCount;
+    const updateTotalMembers = (currentMaxMembers ?? totalFullMembers) + plannedCoreCount - deletedSeatCount;
 
     openSeats({
       organizationId,
@@ -118,7 +116,6 @@ export function useSubscriptionActions({
           upgradeTraces: false,
           totalMembers: updateTotalMembers,
           totalTraces: 0,
-          ...(invitesWithEmail.length > 0 ? { invites: invitesWithEmail } : {}),
         });
         onSeatsUpdated();
         toaster.create({

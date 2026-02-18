@@ -55,7 +55,7 @@ Feature: Proration Preview Before Seat Update
     Given I have triggered a seat update from 5 to 7 seats
     When the proration preview modal opens
     Then I see "Confirm Seat Update" title
-    And I see current seats as 5 and new seats as 7
+    And I see current seats as 5 and seats available as 7
     And I see line items showing credits and charges
     And I see the prorated amount due now
     And I see the new recurring price per billing period
@@ -155,7 +155,7 @@ Feature: Proration Preview Before Seat Update
     Given a subscription with maxMembers 5
     And 3 current core members in the organization
     When calculating the new total for 2 additional seats
-    Then the new total is 7 (maxMembers 5 + 2 new seats)
+    Then the new total is 7 (maxMembers 5 + 2 seats available)
 
   @unit
   Scenario: Proration is needed when new core invites exceed maxMembers

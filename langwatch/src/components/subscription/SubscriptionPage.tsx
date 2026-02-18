@@ -11,6 +11,7 @@ import {
   Box,
   Button,
   Card,
+  Collapsible,
   createListCollection,
   Flex,
   Heading,
@@ -22,8 +23,8 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ArrowRight, Check, Info, Plus, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { ArrowRight, Check, ChevronDown, Info, Plus, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import SettingsLayout from "~/components/SettingsLayout";
 import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
@@ -41,6 +42,8 @@ import {
 import { useBillingPricing } from "./useBillingPricing";
 import { useSubscriptionActions } from "./useSubscriptionActions";
 import { classifyMemberType, type MemberType } from "~/server/license-enforcement/member-classification";
+import { toaster } from "~/components/ui/toaster";
+import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 
 /**
  * User representation in the subscription context
@@ -61,13 +64,6 @@ interface SubscriptionUser {
 interface EditableUser extends SubscriptionUser {
   isNew?: boolean;
 }
-
-const memberTypeOptions = [
-  { label: "Full Member", value: "FullMember" as const },
-  { label: "Lite Member", value: "LiteMember" as const },
-];
-
-const memberTypeCollection = createListCollection({ items: memberTypeOptions });
 
 const currencyOptions = [
   { label: "€ EUR", value: "EUR" as const },
@@ -100,6 +96,7 @@ function CurrentPlanBlock({
   onUserCountClick,
   onManageSubscription,
   isManageLoading,
+  deprecatedNotice,
 }: {
   planName: string;
   description?: string;
@@ -110,6 +107,7 @@ function CurrentPlanBlock({
   onUserCountClick?: () => void;
   onManageSubscription?: () => void;
   isManageLoading?: boolean;
+  deprecatedNotice?: boolean;
 }) {
   return (
     <Card.Root
@@ -187,6 +185,32 @@ function CurrentPlanBlock({
               ))}
             </SimpleGrid>
           )}
+          {deprecatedNotice && (
+            <Box
+              data-testid="tiered-deprecated-notice"
+              backgroundColor="orange.50"
+              borderWidth={1}
+              borderColor="orange.200"
+              borderRadius="md"
+              padding={4}
+            >
+              <HStack gap={2} alignItems="start">
+                <Info size={16} color="var(--chakra-colors-orange-500)" />
+                <Text fontSize="sm" color="orange.900">
+                  Your current pricing model has been discontinued.{" "}
+                  <Link
+                    href="/settings/plans"
+                    fontWeight="semibold"
+                    color="orange.700"
+                    _hover={{ color: "orange.900" }}
+                  >
+                    Update your plan
+                  </Link>{" "}
+                  to move to seat and usage billing.
+                </Text>
+              </HStack>
+            </Box>
+          )}
           {onManageSubscription && (
             <Button
               data-testid="manage-subscription-button"
@@ -212,11 +236,13 @@ function UpdateSeatsBlock({
   totalFullMembers,
   totalPrice,
   onUpdate,
+  onDiscard,
   isLoading,
 }: {
   totalFullMembers: number;
   totalPrice: string;
   onUpdate: () => void;
+  onDiscard: () => void;
   isLoading?: boolean;
 }) {
   return (
@@ -236,15 +262,26 @@ function UpdateSeatsBlock({
               {totalFullMembers !== 1 ? "s" : ""}
             </Text>
           </VStack>
-          <Button
-            colorPalette="blue"
-            size="md"
-            onClick={onUpdate}
-            loading={isLoading}
-            disabled={isLoading}
-          >
-            Update subscription
-          </Button>
+          <HStack gap={2}>
+            <Button
+              data-testid="discard-seat-changes-button"
+              variant="ghost"
+              size="md"
+              onClick={onDiscard}
+              disabled={isLoading}
+            >
+              Discard
+            </Button>
+            <Button
+              colorPalette="blue"
+              size="md"
+              onClick={onUpdate}
+              loading={isLoading}
+              disabled={isLoading}
+            >
+              Update subscription
+            </Button>
+          </HStack>
         </Flex>
       </Card.Body>
     </Card.Root>
@@ -375,6 +412,15 @@ interface PendingInviteWithMemberType {
 }
 
 /**
+ * Result of saving the drawer — categorizes rows by action type
+ */
+interface DrawerSaveResult {
+  inviteEmails: string[];       // emails from auto-fill rows (for invite API)
+  newSeats: PlannedUser[];      // manually-added rows (for subscription change)
+  deletedSeatCount: number;     // auto rows user deleted (for seat reduction)
+}
+
+/**
  * User management drawer component
  * Manages ephemeral state for planning upgrades - does NOT save to DB
  */
@@ -389,6 +435,7 @@ function UserManagementDrawer({
   currency,
   isLoading,
   onSave,
+  maxSeats,
 }: {
   open: boolean;
   onClose: () => void;
@@ -399,18 +446,44 @@ function UserManagementDrawer({
   billingPeriod: "monthly" | "annually";
   currency: Currency;
   isLoading: boolean;
-  onSave: (plannedUsers: PlannedUser[]) => void;
+  onSave: (result: DrawerSaveResult) => void;
+  maxSeats?: number;
 }) {
   const [editableUsers, setEditableUsers] = useState<EditableUser[]>([]);
   const [localPlannedUsers, setLocalPlannedUsers] = useState<PlannedUser[]>([]);
+  const [initialAutoFillCount, setInitialAutoFillCount] = useState(0);
+  const prevOpenRef = useRef(false);
 
-  // Initialize state when drawer opens
+  // Initialize state only when drawer transitions from closed to open
   useEffect(() => {
-    if (open) {
-      setEditableUsers(users.map((u) => ({ ...u, isNew: false })));
-      setLocalPlannedUsers(plannedUsers);
-    }
-  }, [open, users, plannedUsers]);
+    const justOpened = open && !prevOpenRef.current;
+    prevOpenRef.current = open;
+    if (!justOpened) return;
+
+    setEditableUsers(users.map((u) => ({ ...u, isNew: false })));
+
+    const occupiedFullMemberSeats =
+      users.filter((u) => u.memberType === "FullMember").length +
+      pendingInvitesWithMemberType.filter((inv) => inv.memberType === "FullMember").length +
+      plannedUsers.filter((u) => u.memberType === "FullMember").length;
+
+    const autoFillCount = maxSeats != null
+      ? Math.max(0, maxSeats - occupiedFullMemberSeats)
+      : 0;
+
+    setInitialAutoFillCount(autoFillCount);
+
+    const autoFilledRows: PlannedUser[] = Array.from(
+      { length: autoFillCount },
+      (_, i) => ({
+        id: `auto-${Date.now()}-${i}`,
+        email: "",
+        memberType: "FullMember" as MemberType,
+      })
+    );
+
+    setLocalPlannedUsers([...plannedUsers, ...autoFilledRows]);
+  }, [open, users, plannedUsers, pendingInvitesWithMemberType, maxSeats]);
 
   // Reset state when closing without saving
   const handleClose = useCallback(() => {
@@ -438,17 +511,17 @@ function UserManagementDrawer({
     );
   };
 
-  const handleUpdatePlannedUserMemberType = (
-    id: string,
-    memberType: MemberType,
-  ) => {
-    setLocalPlannedUsers((prev) =>
-      prev.map((u) => (u.id === id ? { ...u, memberType } : u)),
-    );
-  };
-
   const handleSave = () => {
-    onSave(localPlannedUsers);
+    const autoRows = localPlannedUsers.filter((u) => u.id.startsWith("auto-"));
+    const manualRows = localPlannedUsers.filter((u) => u.id.startsWith("planned-"));
+    const autoRowsWithEmail = autoRows.filter((u) => u.email.trim() !== "");
+    const deletedAutoCount = initialAutoFillCount - autoRows.length;
+
+    onSave({
+      inviteEmails: autoRowsWithEmail.map((u) => u.email),
+      newSeats: manualRows,
+      deletedSeatCount: Math.max(0, deletedAutoCount),
+    });
     onClose();
   };
 
@@ -490,68 +563,85 @@ function UserManagementDrawer({
             </Flex>
           ) : (
             <VStack align="start" gap={6} width="full">
-              {/* Current Members section - includes active users and pending invites */}
-              <VStack align="start" gap={3} width="full">
-                <Text fontWeight="semibold" fontSize="sm" color="gray.500">
-                  Current Members
-                </Text>
-                {/* Active users */}
-                {editableUsers.map((user) => (
-                  <HStack
-                    key={user.id}
-                    width="full"
-                    justify="space-between"
-                  >
-                    <VStack align="start" gap={0}>
-                      <Text fontSize="sm" fontWeight="medium" color="gray.600">
-                        {user.email}
-                      </Text>
-                      <Text fontSize="xs" color="gray.500">
-                        Active
-                      </Text>
-                    </VStack>
-                    <Badge
-                      colorPalette={
-                        user.memberType === "FullMember" ? "blue" : "gray"
-                      }
-                      variant="outline"
+              {/* Current Members section - collapsible */}
+              <Collapsible.Root width="full">
+                <HStack justify="flex-start" width="full">
+                  <Collapsible.Trigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      color="gray.500"
+                      fontSize="xs"
                     >
-                      {user.memberType === "FullMember" ? "Full Member" : "Lite Member"}
-                    </Badge>
-                  </HStack>
-                ))}
-                {/* Pending invites (no separate header) */}
-                {pendingInvitesWithMemberType.map((invite) => (
-                  <HStack
-                    key={invite.id}
-                    width="full"
-                    justify="space-between"
-                    opacity={0.8}
-                    data-testid={`pending-invite-${invite.email}`}
-                  >
-                    <VStack align="start" gap={0}>
-                      <Text fontSize="sm" fontWeight="medium" color="gray.600">
-                        {invite.email}
-                      </Text>
-                      <Text fontSize="xs" color="gray.500">
-                        Invited - Waiting for acceptance
-                      </Text>
-                    </VStack>
-                    <Badge
-                      colorPalette={invite.memberType === "FullMember" ? "blue" : "gray"}
-                      variant="outline"
-                    >
-                      {invite.memberType === "FullMember" ? "Full Member" : "Lite Member"}
-                    </Badge>
-                  </HStack>
-                ))}
-              </VStack>
+                      Show members ({editableUsers.length + pendingInvitesWithMemberType.length})
+                      <ChevronDown size={12} />
+                    </Button>
+                  </Collapsible.Trigger>
+                </HStack>
+                <Collapsible.Content>
+                  <Box as="table" width="full" style={{ borderCollapse: "collapse" }}>
+                    <Box as="tbody">
+                      {editableUsers.map((user) => (
+                        <Box as="tr" key={user.id}>
+                          <Box as="td" paddingY={2} verticalAlign="top">
+                            <Text fontSize="sm" fontWeight="medium" color="gray.600">
+                              {user.email}
+                            </Text>
+                            <Text fontSize="xs" color="gray.500">
+                              Active
+                            </Text>
+                          </Box>
+                          <Box as="td" paddingY={2} textAlign="right" verticalAlign="middle">
+                            <Badge
+                              colorPalette={user.memberType === "FullMember" ? "blue" : "yellow"}
+                              variant="outline"
+                            >
+                              {user.memberType === "FullMember" ? "Full Member" : "Lite Member"}
+                            </Badge>
+                          </Box>
+                        </Box>
+                      ))}
+                      {pendingInvitesWithMemberType.map((invite) => (
+                        <Box
+                          as="tr"
+                          key={invite.id}
+                          opacity={0.8}
+                          data-testid={`pending-invite-${invite.email}`}
+                        >
+                          <Box as="td" paddingY={2} verticalAlign="top">
+                            <Text fontSize="sm" fontWeight="medium" color="gray.600">
+                              {invite.email}
+                            </Text>
+                            <Text fontSize="xs" color="gray.500">
+                              Invited - Waiting for acceptance
+                            </Text>
+                          </Box>
+                          <Box as="td" paddingY={2} textAlign="right" verticalAlign="middle">
+                            <Badge
+                              colorPalette={invite.memberType === "FullMember" ? "blue" : "yellow"}
+                              variant="outline"
+                            >
+                              {invite.memberType === "FullMember" ? "Full Member" : "Lite Member"}
+                            </Badge>
+                          </Box>
+                        </Box>
+                      ))}
+                    </Box>
+                  </Box>
+                </Collapsible.Content>
+              </Collapsible.Root>
 
               {/* New Planned Seats section (editable) */}
               <VStack align="start" gap={3} width="full">
-                <Text fontWeight="semibold" fontSize="sm" color="gray.500">
-                  New seats
-                </Text>
+                <HStack justify="space-between" width="full">
+                  <Text fontWeight="semibold" fontSize="sm" color="gray.500">
+                    Seats available
+                  </Text>
+                  <Button variant="outline" size="sm" onClick={handleAddSeat}>
+                    <Plus size={16} />
+                    Add Seat
+                  </Button>
+                </HStack>
                 {localPlannedUsers.map((user, index) => (
                   <HStack
                     key={user.id}
@@ -573,33 +663,13 @@ function UserManagementDrawer({
                         handleUpdatePlannedUserEmail(user.id, e.target.value)
                       }
                     />
-                    <Select.Root
+                    <Badge
                       data-testid={`seat-member-type-${index}`}
-                      collection={memberTypeCollection}
-                      size="sm"
-                      width="160px"
-                      value={[user.memberType]}
-                      onValueChange={(details) => {
-                        const selectedValue = details.value[0];
-                        if (selectedValue) {
-                          handleUpdatePlannedUserMemberType(
-                            user.id,
-                            selectedValue as MemberType,
-                          );
-                        }
-                      }}
+                      colorPalette="blue"
+                      variant="outline"
                     >
-                      <Select.Trigger>
-                        <Select.ValueText placeholder="Select type" />
-                      </Select.Trigger>
-                      <Select.Content paddingY={2} zIndex="popover">
-                        {memberTypeOptions.map((option) => (
-                          <Select.Item key={option.value} item={option}>
-                            {option.label}
-                          </Select.Item>
-                        ))}
-                      </Select.Content>
-                    </Select.Root>
+                      Full Member
+                    </Badge>
                     <Button
                       data-testid={`remove-seat-${index}`}
                       size="xs"
@@ -611,10 +681,6 @@ function UserManagementDrawer({
                     </Button>
                   </HStack>
                 ))}
-                <Button variant="outline" size="sm" onClick={handleAddSeat}>
-                  <Plus size={16} />
-                  Add Seat
-                </Button>
               </VStack>
             </VStack>
           )}
@@ -632,32 +698,7 @@ function UserManagementDrawer({
               borderRadius="md"
               width="full"
             >
-              <HStack justify="space-between">
-                <Text color="gray.600">Active Members:</Text>
-                <Text fontWeight="medium" data-testid="active-members-footer-count">
-                  {activeFullMembers}
-                </Text>
-              </HStack>
 
-              {pendingFullMembers > 0 && (
-                <HStack justify="space-between">
-                  <Text color="gray.600">Pending Invites:</Text>
-                  <Text fontWeight="medium" data-testid="pending-invites-footer-count">
-                    {pendingFullMembers}
-                  </Text>
-                </HStack>
-              )}
-
-              {plannedFullMembers > 0 && (
-                <HStack justify="space-between">
-                  <Text color="gray.600">New Planned Seats:</Text>
-                  <Text fontWeight="medium" data-testid="planned-seats-footer-count">
-                    {plannedFullMembers}
-                  </Text>
-                </HStack>
-              )}
-
-              <Separator />
 
               <HStack justify="space-between">
                 <Text fontWeight="bold">Total Seats:</Text>
@@ -665,6 +706,7 @@ function UserManagementDrawer({
                   {totalFullMembersInDrawer}
                 </Text>
               </HStack>
+              <Separator />
 
               <HStack justify="space-between">
                 <Text fontWeight="bold">{priceLabel}</Text>
@@ -693,9 +735,10 @@ function UserManagementDrawer({
  * Main subscription page component
  */
 export function SubscriptionPage() {
-  const { organization } = useOrganizationTeamProject();
+  const { organization, team } = useOrganizationTeamProject();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [plannedUsers, setPlannedUsers] = useState<PlannedUser[]>([]);
+  const [deletedSeatCount, setDeletedSeatCount] = useState(0);
   const [currency, setCurrency] = useState<Currency>("EUR");
   const [currencyInitialized, setCurrencyInitialized] = useState(false);
   const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annually">(
@@ -747,6 +790,9 @@ export function SubscriptionPage() {
     { organizationId: organization?.id ?? "" },
     { enabled: !!organization },
   );
+
+  // Mutation for sending invites to already-paid seats
+  const createInvitesMutation = api.organization.createInvites.useMutation();
 
   // Map organization members to subscription users format
   const users: SubscriptionUser[] = useMemo(() => {
@@ -804,12 +850,47 @@ export function SubscriptionPage() {
   // For update-seats flow: base on plan.maxMembers (what's already paid for), not recount of users
   // Only count NEW planned users from drawer (NOT pending invites, they're already in maxMembers)
   const newPlannedCoreSeatCount = plannedUsers.filter((u) => u.memberType === "FullMember").length;
-  const updateTotalCoreMembers = (seatUsageM ?? totalFullMembers) + newPlannedCoreSeatCount;
+  const updateTotalCoreMembers = (seatUsageM ?? totalFullMembers) + newPlannedCoreSeatCount - deletedSeatCount;
   const updateTotalCents = updateTotalCoreMembers * seatPricePerPeriodCents;
   const updateTotalPriceFormatted = `${formatPrice(updateTotalCents, currency)}${periodSuffix}`;
 
-  const handleSavePlannedUsers = (newPlannedUsers: PlannedUser[]) => {
-    setPlannedUsers(newPlannedUsers);
+  const handleDrawerSave = (result: DrawerSaveResult) => {
+    // 1. Store new seats for upgrade flow (manually-added only)
+    setPlannedUsers(result.newSeats);
+
+    // 2. Store deleted seat count for downgrade flow
+    setDeletedSeatCount(result.deletedSeatCount);
+
+    // 3. Paid plan: send invites immediately for already-paid seats
+    if (!isDeveloperPlan && result.inviteEmails.length > 0 && organization?.id) {
+      createInvitesMutation.mutate({
+        organizationId: organization.id,
+        invites: result.inviteEmails.map((email) => ({
+          email: email.toLowerCase(),
+          role: OrganizationUserRole.MEMBER,
+          ...(team?.id ? { teams: [{ teamId: team.id, role: TeamUserRole.MEMBER }] } : {}),
+        })),
+      }, {
+        onSuccess: () => {
+          toaster.create({ title: "Invites sent successfully", type: "success" });
+          void pendingInvites.refetch();
+          void organizationWithMembers.refetch();
+        },
+        onError: (error) => {
+          toaster.create({ title: "Failed to send invites", description: error.message, type: "error" });
+        },
+      });
+    }
+
+    // 4. Free plan: auto-fill rows with email go to plannedUsers (for upgrade flow)
+    if (isDeveloperPlan && result.inviteEmails.length > 0) {
+      const inviteAsPlanned: PlannedUser[] = result.inviteEmails.map((email, i) => ({
+        id: `invite-${Date.now()}-${i}`,
+        email,
+        memberType: "FullMember" as MemberType,
+      }));
+      setPlannedUsers((prev) => [...prev, ...inviteAsPlanned]);
+    }
   };
 
   const {
@@ -826,8 +907,10 @@ export function SubscriptionPage() {
     totalFullMembers,
     currentMaxMembers: seatUsageM ?? undefined,
     plannedUsers,
+    deletedSeatCount,
     onSeatsUpdated: () => {
       setPlannedUsers([]);
+      setDeletedSeatCount(0);
       void activePlan.refetch();
       void pendingInvites.refetch();
     },
@@ -951,26 +1034,6 @@ export function SubscriptionPage() {
           </Box>
         )}
 
-        {/* Deprecated pricing notice for TIERED paid orgs */}
-        {isTieredLegacyPaidPlan && (
-          <Box
-            data-testid="tiered-deprecated-notice"
-            backgroundColor="orange.50"
-            borderWidth={1}
-            borderColor="orange.200"
-            borderRadius="md"
-            padding={4}
-          >
-            <HStack gap={2} alignItems="start">
-              <Info size={16} color="var(--chakra-colors-orange-500)" />
-              <Text fontSize="sm" color="orange.900">
-                Your current pricing model has been discontinued. Upgrade to
-                per-seat billing for more flexibility and up to 20 core members.
-              </Text>
-            </HStack>
-          </Box>
-        )}
-
         {/* Current Plan Block */}
         <CurrentPlanBlock
           planName={currentPlanName}
@@ -984,6 +1047,7 @@ export function SubscriptionPage() {
             !isDeveloperPlan ? handleManageSubscription : undefined
           }
           isManageLoading={isManageLoading}
+          deprecatedNotice={isTieredLegacyPaidPlan}
         />
 
         {/* Upgrade Block - show for free plan and TIERED legacy paid orgs */}
@@ -1009,12 +1073,16 @@ export function SubscriptionPage() {
           />
         )}
 
-        {/* Update seats Block - show for Growth seat+usage plan when seats have been added */}
-        {!isDeveloperPlan && plannedUsers.length > 0 && !isTieredPricingModel && (
+        {/* Update seats Block - show for Growth seat+usage plan when seats have been added or removed */}
+        {!isDeveloperPlan && (plannedUsers.length > 0 || deletedSeatCount > 0) && !isTieredPricingModel && (
           <UpdateSeatsBlock
             totalFullMembers={updateTotalCoreMembers}
             totalPrice={updateTotalPriceFormatted}
             onUpdate={handleUpdateSeats}
+            onDiscard={() => {
+              setPlannedUsers([]);
+              setDeletedSeatCount(0);
+            }}
             isLoading={isUpdateSeatsLoading}
           />
         )}
@@ -1033,7 +1101,8 @@ export function SubscriptionPage() {
         billingPeriod={billingPeriod}
         currency={currency}
         isLoading={organizationWithMembers.isLoading}
-        onSave={handleSavePlannedUsers}
+        onSave={handleDrawerSave}
+        maxSeats={plan?.maxMembers}
       />
     </SettingsLayout>
   );
