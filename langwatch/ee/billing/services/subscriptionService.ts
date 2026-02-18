@@ -12,6 +12,7 @@ import type {
   getItemsToUpdate,
   prices,
 } from "./subscriptionItemCalculator";
+import { isStripePriceName } from "../stripe/stripePriceCatalog";
 
 type ItemCalculator = {
   getItemsToUpdate: typeof getItemsToUpdate;
@@ -192,6 +193,11 @@ export const createSubscriptionService = ({
         },
       });
 
+
+      if (!isStripePriceName(plan as StripePriceName)) {
+        throw new Error(`Plan ${plan} does not have an associated Stripe price`);
+      }
+      
       itemsToAdd.push({
         price: itemCalculator.prices[plan as StripePriceName],
         quantity: 1,

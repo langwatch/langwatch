@@ -16,6 +16,7 @@ const createMockDb = () => ({
   subscription: {
     findUnique: vi.fn(),
     update: vi.fn(),
+    updateMany: vi.fn(),
   },
 });
 
@@ -78,6 +79,7 @@ describe("webhookService", () => {
 
     describe("when client reference ID exists", () => {
       it("links Stripe subscription and activates", async () => {
+        db.subscription.updateMany.mockResolvedValue({ count: 1 });
         db.subscription.findUnique.mockResolvedValue({
           id: "sub_db_1",
           status: SubscriptionStatus.PENDING,
@@ -102,12 +104,10 @@ describe("webhookService", () => {
         const result = await promise;
 
         expect(result.earlyReturn).toBe(false);
-        expect(db.subscription.update).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: { id: "sub_db_1" },
-            data: { stripeSubscriptionId: "sub_stripe_1" },
-          }),
-        );
+        expect(db.subscription.updateMany).toHaveBeenCalledWith({
+          where: { id: "sub_db_1" },
+          data: { stripeSubscriptionId: "sub_stripe_1" },
+        });
       });
     });
   });

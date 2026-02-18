@@ -113,10 +113,20 @@ export const createWebhookService = ({
         return { earlyReturn: true };
       }
 
-      await db.subscription.update({
+      const updateResult = await db.subscription.updateMany({
         where: { id: subscriptionClientReferenceId },
         data: { stripeSubscriptionId: subscriptionId },
       });
+
+      if (updateResult.count === 0) {
+        logger.error(
+          { subscriptionClientReferenceId },
+          "[stripeWebhook] No subscription found for checkout",
+        );
+        throw new Error(
+          `No subscription found with id ${subscriptionClientReferenceId}`,
+        );
+      }
 
       await syncInvoicePaymentSuccess({
         subscriptionId,

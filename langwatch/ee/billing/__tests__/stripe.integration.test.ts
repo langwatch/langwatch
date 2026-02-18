@@ -67,7 +67,7 @@ describeIfStripeKey("Stripe billing integration", () => {
     return paymentMethod;
   };
 
-  describe("customer CRUD", () => {
+  describe("managing customers", () => {
     it("creates a customer with email and name", async () => {
       const customer = await createTrackedCustomer("crud");
 
