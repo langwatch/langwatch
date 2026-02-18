@@ -171,7 +171,7 @@ export function AddCustomModelDialog({
     <DialogRoot
       open={open}
       onOpenChange={(e) => !e.open && handleClose()}
-      size="lg"
+      size="md"
     >
       <DialogContent>
         <DialogHeader>
@@ -263,7 +263,7 @@ export function AddCustomModelDialog({
               size="sm"
               onClick={handleSubmit}
             >
-              {isEditing ? "Save" : "Create model"}
+              {isEditing ? "Save" : "Add model"}
             </Button>
           </HStack>
         </DialogFooter>

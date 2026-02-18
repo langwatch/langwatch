@@ -1,8 +1,5 @@
 import type { ModelProvider, Prisma, PrismaClient } from "@prisma/client";
-import type { CustomModelEntry } from "./customModel.schema";
-
-/** Union type for customModels: accepts both legacy string[] and new CustomModelEntry[] */
-type CustomModelsData = CustomModelEntry[] | string[];
+import type { CustomModelsInput } from "./customModel.schema";
 
 /**
  * Repository for ModelProvider data access.
@@ -49,8 +46,8 @@ export class ModelProviderRepository {
       provider: string;
       enabled: boolean;
       customKeys?: Record<string, unknown> | null;
-      customModels?: CustomModelsData;
-      customEmbeddingsModels?: CustomModelsData;
+      customModels?: CustomModelsInput;
+      customEmbeddingsModels?: CustomModelsInput;
       extraHeaders?: { key: string; value: string }[];
     },
     tx?: Prisma.TransactionClient,
@@ -79,8 +76,8 @@ export class ModelProviderRepository {
     data: {
       enabled?: boolean;
       customKeys?: Record<string, unknown>;
-      customModels?: CustomModelsData;
-      customEmbeddingsModels?: CustomModelsData;
+      customModels?: CustomModelsInput;
+      customEmbeddingsModels?: CustomModelsInput;
       extraHeaders?: { key: string; value: string }[];
     },
     tx?: Prisma.TransactionClient,

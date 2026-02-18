@@ -57,6 +57,12 @@ export const customModelUpdateInputSchema = z.union([
 ]);
 
 /**
+ * Inferred type for the union input accepted by service/repository layers.
+ * Single source of truth — use this instead of manually writing `CustomModelEntry[] | string[]`.
+ */
+export type CustomModelsInput = z.infer<typeof customModelUpdateInputSchema>;
+
+/**
  * Type guard that detects old string[] format vs new CustomModelEntry[] format
  * when reading custom models from the database.
  *

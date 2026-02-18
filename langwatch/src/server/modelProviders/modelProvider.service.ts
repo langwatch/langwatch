@@ -1,7 +1,7 @@
 import type { Prisma, PrismaClient, Project } from "@prisma/client";
 import { z } from "zod";
 import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
-import type { CustomModelEntry } from "./customModel.schema";
+import type { CustomModelsInput } from "./customModel.schema";
 import { toLegacyCompatibleCustomModels } from "./customModel.schema";
 import { ModelProviderRepository } from "./modelProvider.repository";
 import {
@@ -9,9 +9,6 @@ import {
   type MaybeStoredModelProvider,
   modelProviders,
 } from "./registry";
-
-/** Union type for customModels input: accepts both legacy string[] and new CustomModelEntry[] */
-type CustomModelsInput = CustomModelEntry[] | string[];
 
 /**
  * Input types for service operations
