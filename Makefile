@@ -1,5 +1,5 @@
 .PHONY: start sync-all-openapi user-delete-dry-run user-delete es-delete-dry-run es-delete
-.PHONY: dev dev-nlp dev-scenarios dev-full down logs clean ps quickstart
+.PHONY: dev dev-nlp dev-scenarios dev-full down logs clean ps quickstart worktree
 
 # =============================================================================
 # DOCKER DEV ENVIRONMENT (compose.dev.yml)
@@ -76,6 +76,15 @@ tsc-watch:
 # Interactive profile chooser
 quickstart:
 	@./scripts/dev.sh
+
+# Create a git worktree from issue number or feature name
+# Usage: make worktree 1663  or  make worktree add-dark-mode
+ifeq (worktree,$(firstword $(MAKECMDGOALS)))
+  WORKTREE_ARG := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
+  $(eval $(WORKTREE_ARG):;@:)
+endif
+worktree:
+	@./scripts/worktree.sh $(WORKTREE_ARG)
 
 sync-all-openapi:
 	pnpm run task generateOpenAPISpec
