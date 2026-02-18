@@ -377,6 +377,77 @@ describe("useSuiteForm()", () => {
     });
   });
 
+  describe("given stale target detection", () => {
+    describe("when selected targets all exist in available targets", () => {
+      it("returns empty staleTargetIds", () => {
+        const { result } = renderHook(() => useSuiteForm(baseParams));
+
+        act(() => {
+          result.current.toggleTarget({ type: "http", referenceId: "agent_1" });
+        });
+
+        expect(result.current.staleTargetIds).toEqual([]);
+      });
+    });
+
+    describe("when a selected target is not in available targets", () => {
+      it("returns the stale referenceId", () => {
+        const { result } = renderHook(() =>
+          useSuiteForm({
+            ...baseParams,
+            suite: {
+              id: "suite_1",
+              projectId: "proj_1",
+              name: "Test",
+              slug: "test",
+              description: null,
+              scenarioIds: ["scen_1"],
+              targets: [
+                { type: "prompt", referenceId: "prompt_deleted" },
+                { type: "http", referenceId: "agent_1" },
+              ],
+              repeatCount: 1,
+              labels: [],
+              archivedAt: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          }),
+        );
+
+        expect(result.current.staleTargetIds).toEqual(["prompt_deleted"]);
+      });
+    });
+
+    describe("when agents and prompts have not loaded yet", () => {
+      it("returns empty staleTargetIds", () => {
+        const { result } = renderHook(() =>
+          useSuiteForm({
+            ...baseParams,
+            agents: undefined,
+            prompts: undefined,
+            suite: {
+              id: "suite_1",
+              projectId: "proj_1",
+              name: "Test",
+              slug: "test",
+              description: null,
+              scenarioIds: ["scen_1"],
+              targets: [{ type: "prompt", referenceId: "prompt_1" }],
+              repeatCount: 1,
+              labels: [],
+              archivedAt: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          }),
+        );
+
+        expect(result.current.staleTargetIds).toEqual([]);
+      });
+    });
+  });
+
   describe("given allLabels derivation", () => {
     describe("when scenarios have labels", () => {
       it("returns unique sorted labels", () => {

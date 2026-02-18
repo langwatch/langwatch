@@ -73,6 +73,7 @@ export class LlmConfigRepository {
   }): Promise<LlmConfigWithLatestVersion[]> {
     const configs = await this.prisma.llmPromptConfig.findMany({
       where: {
+        deletedAt: null,
         OR: [{ projectId }, { organizationId, scope: "ORGANIZATION" }],
       },
       orderBy: { updatedAt: "desc" },
@@ -384,9 +385,11 @@ export class LlmConfigRepository {
       );
     }
 
-    // This will error if the projectId !== config.projectId
-    await this.prisma.llmPromptConfig.delete({
+    // Soft-delete: set deletedAt instead of hard-deleting, so existing
+    // suite references can still identify the prompt as deleted.
+    await this.prisma.llmPromptConfig.update({
       where: { id: config.id, projectId },
+      data: { deletedAt: new Date() },
     });
 
     return { success: true };
