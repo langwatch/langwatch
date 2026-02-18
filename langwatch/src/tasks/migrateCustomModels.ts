@@ -165,50 +165,58 @@ export function migrateCustomModelsRow({
 export default async function main() {
   console.log("Starting custom models migration...");
 
-  const rows = await prisma.modelProvider.findMany({
-    select: {
-      id: true,
-      provider: true,
-      customModels: true,
-      customEmbeddingsModels: true,
-    },
+  const projects = await prisma.project.findMany({
+    select: { id: true },
   });
 
-  console.log(`Found ${rows.length} model provider rows to process.`);
+  console.log(`Found ${projects.length} projects to process.`);
 
   let updatedCount = 0;
   let skippedCount = 0;
 
-  for (const row of rows) {
-    const result = migrateCustomModelsRow({
-      row,
-      registryLookup: getProviderModelOptions,
+  for (const project of projects) {
+    const rows = await prisma.modelProvider.findMany({
+      where: { projectId: project.id },
+      select: {
+        id: true,
+        projectId: true,
+        provider: true,
+        customModels: true,
+        customEmbeddingsModels: true,
+      },
     });
 
-    if (result === null) {
-      skippedCount++;
-      continue;
-    }
-
-    const updateData: Record<string, unknown> = {};
-    if (result.customModels !== null) {
-      updateData.customModels = result.customModels;
-    }
-    if (result.customEmbeddingsModels !== null) {
-      updateData.customEmbeddingsModels = result.customEmbeddingsModels;
-    }
-
-    if (Object.keys(updateData).length > 0) {
-      await prisma.modelProvider.update({
-        where: { id: row.id },
-        data: updateData,
+    for (const row of rows) {
+      const result = migrateCustomModelsRow({
+        row,
+        registryLookup: getProviderModelOptions,
       });
-      updatedCount++;
-      console.log(
-        `  Updated provider ${row.id} (${row.provider}): ` +
-          `customModels=${result.customModels?.length ?? "unchanged"}, ` +
-          `customEmbeddingsModels=${result.customEmbeddingsModels?.length ?? "unchanged"}`,
-      );
+
+      if (result === null) {
+        skippedCount++;
+        continue;
+      }
+
+      const updateData: Record<string, unknown> = {};
+      if (result.customModels !== null) {
+        updateData.customModels = result.customModels;
+      }
+      if (result.customEmbeddingsModels !== null) {
+        updateData.customEmbeddingsModels = result.customEmbeddingsModels;
+      }
+
+      if (Object.keys(updateData).length > 0) {
+        await prisma.modelProvider.update({
+          where: { id: row.id, projectId: row.projectId },
+          data: updateData,
+        });
+        updatedCount++;
+        console.log(
+          `  Updated provider ${row.id} (${row.provider}): ` +
+            `customModels=${result.customModels?.length ?? "unchanged"}, ` +
+            `customEmbeddingsModels=${result.customEmbeddingsModels?.length ?? "unchanged"}`,
+        );
+      }
     }
   }
 
