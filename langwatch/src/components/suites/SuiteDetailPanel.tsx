@@ -14,15 +14,16 @@ import {
 } from "@chakra-ui/react";
 import type { SimulationSuite } from "@prisma/client";
 import {
-  Activity,
+  BarChart3,
   CheckCircle,
+  Clock,
   FileText,
   FolderOpen,
-  Hash,
+  Layers,
   Pencil,
   Play,
   Plus,
-  RefreshCw,
+  Repeat2,
   Target,
 } from "lucide-react";
 import { useState } from "react";
@@ -99,46 +100,68 @@ export function SuiteDetailPanel({
 
       {/* Stats Bar */}
       <Box paddingX={6} paddingBottom={4}>
-        <HStack gap={4} flexWrap="wrap">
-          <StatChip
+        <HStack gap={2} flexWrap="wrap" alignItems="center">
+          <StatPill
             icon={<FileText size={14} />}
             value={suite.scenarioIds.length}
             label="scenarios"
+            colorScheme="gray"
           />
-          <StatChip
+          <StatPill
             icon={<Target size={14} />}
             value={targets.length}
             label="targets"
+            colorScheme="purple"
           />
-          <StatChip
-            icon={<RefreshCw size={14} />}
+          <StatPill
+            icon={<Repeat2 size={14} />}
             value={`${suite.repeatCount}x`}
             label="trials"
-          />
-          <StatChip
-            icon={<Hash size={14} />}
-            value={jobCount}
-            label="executions"
+            colorScheme="gray"
           />
           {liveStats && (
             <>
-              <StatChip
-                icon={<Play size={14} />}
+              <Separator
+                orientation="vertical"
+                height="24px"
+                borderColor="border"
+              />
+              <StatPill
+                icon={<Layers size={14} />}
+                value={jobCount}
+                label="executions"
+                colorScheme="gray"
+              />
+              <StatPill
+                icon={<BarChart3 size={14} />}
                 value={liveStats.runCount}
                 label="runs"
+                colorScheme="gray"
               />
-              <StatChip
-                icon={<CheckCircle size={14} />}
-                value={`${Math.round(liveStats.passRate)}%`}
-                label="pass rate"
-              />
+              <PassRatePill passRate={liveStats.passRate} />
               {liveStats.lastActivityTimestamp && (
-                <StatChip
-                  icon={<Activity size={14} />}
+                <StatPill
+                  icon={<Clock size={14} />}
                   value={formatTimeAgo(liveStats.lastActivityTimestamp) ?? ""}
-                  label="last run"
+                  label=""
+                  colorScheme="gray"
                 />
               )}
+            </>
+          )}
+          {!liveStats && (
+            <>
+              <Separator
+                orientation="vertical"
+                height="24px"
+                borderColor="border"
+              />
+              <StatPill
+                icon={<Layers size={14} />}
+                value={jobCount}
+                label="executions"
+                colorScheme="gray"
+              />
             </>
           )}
         </HStack>
@@ -152,34 +175,65 @@ export function SuiteDetailPanel({
   );
 }
 
-function StatChip({
+const pillColors: Record<string, { bg: string; color: string }> = {
+  gray: { bg: "gray.50", color: "fg.muted" },
+  purple: { bg: "purple.50", color: "purple.600" },
+  blue: { bg: "blue.50", color: "blue.600" },
+  orange: { bg: "orange.50", color: "orange.600" },
+};
+
+function StatPill({
   icon,
   value,
   label,
+  colorScheme = "gray",
 }: {
   icon: React.ReactNode;
   value: string | number;
   label: string;
+  colorScheme?: string;
 }) {
+  const colors = pillColors[colorScheme] ?? pillColors.gray;
   return (
     <HStack
       gap={1.5}
       paddingX={3}
-      paddingY={2}
-      borderRadius="md"
-      border="1px solid"
-      borderColor="border"
-      bg="bg.subtle"
+      paddingY={1.5}
+      borderRadius="full"
+      bg={colors!.bg}
     >
-      {icon}
-      <VStack gap={0} align="start">
-        <Text fontSize="sm" fontWeight="semibold">
-          {value}
-        </Text>
-        <Text fontSize="xs" color="fg.muted">
+      <Box color={colors!.color}>{icon}</Box>
+      <Text fontSize="sm" fontWeight="semibold">
+        {value}
+      </Text>
+      {label && (
+        <Text fontSize="sm" color="fg.muted">
           {label}
         </Text>
-      </VStack>
+      )}
+    </HStack>
+  );
+}
+
+function PassRatePill({ passRate }: { passRate: number }) {
+  const rounded = Math.round(passRate);
+  return (
+    <HStack
+      gap={1.5}
+      paddingX={3}
+      paddingY={1.5}
+      borderRadius="full"
+      border="1px solid"
+      borderColor="border"
+      bg="bg"
+    >
+      <CheckCircle size={14} />
+      <Text fontSize="sm" fontWeight="semibold">
+        {rounded}%
+      </Text>
+      <Text fontSize="sm" color="fg.muted">
+        pass
+      </Text>
     </HStack>
   );
 }
