@@ -426,3 +426,24 @@ Feature: Suite Workflow — Create, Run, See Results
     Given suites "Critical Path", "Billing Edge", and "Quick Run" exist
     When I type "billing" in the sidebar search box
     Then only "Billing Edge" is shown in the sidebar list
+
+  # ============================================================================
+  # Layout Consistency (Issue #1671)
+  # ============================================================================
+
+  @integration
+  Scenario: Suite page uses standard PageLayout header
+    When I am on the suites page
+    Then a PageLayout.Header is rendered with a PageLayout.Heading titled "Suites"
+    And the SuiteSidebar does not render its own duplicate "Suites" label
+
+  @integration
+  Scenario: Suite page sidebar fills available height below header
+    When I am on the suites page with many suites
+    Then the SuiteSidebar scrolls independently within its bounded height
+    And the main panel scrolls independently
+
+  @integration
+  Scenario: DashboardLayout wraps the page exactly once
+    When I am on the suites page
+    Then DashboardLayout is not rendered twice
