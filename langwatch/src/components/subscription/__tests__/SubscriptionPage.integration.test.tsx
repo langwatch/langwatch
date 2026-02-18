@@ -704,9 +704,9 @@ describe("<SubscriptionPage/>", () => {
       await user.click(switchInput);
 
       await waitFor(() => {
-        // 3 x €27 (Math.round(29 * 0.92)) = €81/mo
+        // 3 seats × €320/yr = €96,000 cents → "€960/yr"
         const total = screen.getByTestId("upgrade-total");
-        expect(total).toHaveTextContent("€81/mo");
+        expect(total).toHaveTextContent("€960/yr");
       });
     });
 
@@ -732,7 +732,7 @@ describe("<SubscriptionPage/>", () => {
         expect(mockMutateAsync).toHaveBeenCalledWith(
           expect.objectContaining({
             organizationId: "test-org-id",
-            plan: "GROWTH_SEAT_USAGE",
+            plan: "GROWTH_SEAT_EVENT",
             membersToAdd: 3,
           })
         );
@@ -927,7 +927,7 @@ describe("<SubscriptionPage/>", () => {
       expect(mockMutateAsync).toHaveBeenCalledWith(
         expect.objectContaining({
           organizationId: "test-org-id",
-          plan: "GROWTH_SEAT_USAGE",
+          plan: "GROWTH_SEAT_EVENT",
           upgradeMembers: true,
           upgradeTraces: false,
           totalMembers: 21,
@@ -1019,12 +1019,12 @@ describe("<SubscriptionPage/>", () => {
   // ============================================================================
 
   describe("when organization has specific pricing model", () => {
-    describe("when organization uses SEAT_USAGE pricing model", () => {
+    describe("when organization uses SEAT_EVENT pricing model", () => {
       beforeEach(() => {
         mockOrganization = {
           id: "test-org-id",
           name: "Test Org",
-          pricingModel: "SEAT_USAGE",
+          pricingModel: "SEAT_EVENT",
         };
       });
 
@@ -1034,7 +1034,7 @@ describe("<SubscriptionPage/>", () => {
         await waitFor(() => {
           expect(screen.getByRole("heading", { name: "Billing" })).toBeInTheDocument();
           expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
-          expect(screen.getByTestId("invoices-block")).toBeInTheDocument();
+          expect(screen.getByTestId("contact-sales-block")).toBeInTheDocument();
         });
       });
     });

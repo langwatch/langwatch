@@ -12,10 +12,10 @@ describe("resolveCurrentComparisonPlan()", () => {
       ).toBe("free");
     });
 
-    it("returns growth for GROWTH_SEAT_USAGE plan", () => {
+    it("returns growth for GROWTH_SEAT_EVENT plan", () => {
       expect(
         resolveCurrentComparisonPlan({
-          type: "GROWTH_SEAT_USAGE",
+          type: "GROWTH_SEAT_EVENT",
           free: false,
         }),
       ).toBe("growth");

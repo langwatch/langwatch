@@ -7,6 +7,8 @@ import {
 } from "./notifications/notificationHandlers";
 import { createSaaSPlanProvider } from "./planProvider";
 import { createCustomerService } from "./services/customerService";
+import { createSeatEventSubscriptionFns } from "./services/seatEventSubscription";
+import { createSeatSyncService } from "./services/seatSyncService";
 import { createSubscriptionService } from "./services/subscriptionService";
 import { createUsageReportingService } from "./services/usageReportingService";
 import * as subscriptionItemCalculator from "./services/subscriptionItemCalculator";
@@ -47,12 +49,27 @@ export { createCurrencyRouter };
 export const createSubscriptionRouter = () => {
   const s = getStripe();
   const customerService = createCustomerService({ stripe: s, db: prisma });
+  const seatEventFns = createSeatEventSubscriptionFns({ stripe: s, db: prisma });
   const subscriptionService = createSubscriptionService({
     stripe: s,
     db: prisma,
     itemCalculator: subscriptionItemCalculator,
+    seatEventFns,
   });
   return createSubscriptionRouterFactory({ customerService, subscriptionService });
+};
+
+export { createCurrencyRouter };
+
+let seatSyncServiceInstance: ReturnType<typeof createSeatSyncService> | null = null;
+
+export const getSeatSyncService = () => {
+  if (!seatSyncServiceInstance) {
+    const s = getStripe();
+    const seatEventFns = createSeatEventSubscriptionFns({ stripe: s, db: prisma });
+    seatSyncServiceInstance = createSeatSyncService({ seatEventFns, db: prisma });
+  }
+  return seatSyncServiceInstance;
 };
 
 export const createStripeWebhookHandler = () => {

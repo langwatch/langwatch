@@ -226,6 +226,7 @@ describe("subscriptionService", () => {
       const result = await service.createBillingPortalSession({
         customerId: "cus_123",
         baseUrl: "https://app.test",
+        organizationId: "org_123",
       });
 
       expect(result.url).toBe("https://billing.stripe.com/session");

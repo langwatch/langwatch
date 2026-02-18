@@ -28,7 +28,7 @@ export const createSubscriptionRouterFactory = ({
   subscriptionService: SubscriptionService;
 }) => {
   return createTRPCRouter({
-    addTeamMemberOrTraces: protectedProcedure
+    addTeamMemberOrEvents: protectedProcedure
       .input(
         z.object({
           organizationId: z.string(),
@@ -59,6 +59,8 @@ export const createSubscriptionRouterFactory = ({
           plan: subscriptionPlanEnum,
           membersToAdd: z.number().optional(),
           tracesToAdd: z.number().optional(),
+          currency: z.enum(["EUR", "USD"]).optional(),
+          billingInterval: z.enum(["monthly", "annual"]).optional(),
         }),
       )
       .use(checkOrganizationPermission("organization:manage"))
@@ -88,6 +90,8 @@ export const createSubscriptionRouterFactory = ({
           membersToAdd: input.membersToAdd,
           tracesToAdd: input.tracesToAdd,
           customerId,
+          currency: input.currency,
+          billingInterval: input.billingInterval,
         });
       }),
 
@@ -116,6 +120,7 @@ export const createSubscriptionRouterFactory = ({
         return await subscriptionService.createBillingPortalSession({
           customerId,
           baseUrl: input.baseUrl,
+          organizationId: input.organizationId,
         });
       }),
 

@@ -4,13 +4,14 @@ import {
   Box,
   Button,
   Card,
+  Flex,
   Heading,
   HStack,
   SimpleGrid,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Check, CircleDollarSign, DollarSign, Euro, Info } from "lucide-react";
+import { ArrowLeft, Check, CircleDollarSign, DollarSign, Euro, Info } from "lucide-react";
 import { Link } from "~/components/ui/link";
 import {
   type ComparisonPlanId,
@@ -18,9 +19,12 @@ import {
 } from "./planCurrentResolver";
 import {
   type Currency,
-  SEAT_PRICE,
-  ANNUAL_DISCOUNT,
+  getGrowthSeatPriceCents,
+  formatPrice,
   currencySymbol,
+  FREE_PLAN_FEATURES,
+  GROWTH_PLAN_FEATURES,
+  ENTERPRISE_PLAN_FEATURES,
 } from "../subscription/billing-plans";
 
 type PlanColumn = {
@@ -41,13 +45,7 @@ const PLAN_COLUMNS: PlanColumn[] = [
     actionLabel: "Get Started",
     actionHref: "/settings/subscription",
     actionColor: "blue",
-    features: [
-      "All platform features",
-      "50,000 events included",
-      "14 days data retention",
-      "2 users",
-      "3 scenarios, 3 simulations, 3 custom evaluations",
-    ],
+    features: FREE_PLAN_FEATURES,
   },
   {
     id: "growth",
@@ -56,15 +54,7 @@ const PLAN_COLUMNS: PlanColumn[] = [
     actionLabel: "Get Started",
     actionHref: "/settings/subscription",
     actionColor: "orange",
-    features: [
-      "Everything in Free",
-      "200,000 events included",
-      "$1 per additional 100,000 events",
-      "30 days retention (+ custom at $3/GB)",
-      "Up to 20 core users (volume discount available)",
-      "Unlimited lite users",
-      "Unlimited evals, simulations and prompts",
-    ],
+    features: GROWTH_PLAN_FEATURES,
   },
   {
     id: "enterprise",
@@ -73,15 +63,7 @@ const PLAN_COLUMNS: PlanColumn[] = [
     actionLabel: "Talk to Sales",
     actionHref: "mailto:sales@langwatch.ai",
     actionColor: "blue",
-    features: [
-      "Alternative hosting options",
-      "Custom data retention",
-      "Custom SSO / RBAC",
-      "Audit logs",
-      "Uptime & Support SLA",
-      "Compliance and legal reviews",
-      "Custom terms and DPA",
-    ],
+    features: ENTERPRISE_PLAN_FEATURES,
   },
 ];
 
@@ -100,12 +82,12 @@ function getPlanPrice(
 ): string {
   if (planId === "free") return `${currencySymbol[currency]}0 per user/month`;
   if (planId === "growth") {
-    const base = SEAT_PRICE[currency];
-    const price =
+    const p = getGrowthSeatPriceCents();
+    const cents =
       billingPeriod === "annually"
-        ? Math.round(base * (1 - ANNUAL_DISCOUNT))
-        : base;
-    return `${currencySymbol[currency]}${price} per seat/month`;
+        ? Math.round(p[currency].annual / 12)
+        : p[currency].monthly;
+    return `${formatPrice(cents, currency)} per seat/month`;
   }
   return "Custom pricing";
 }
@@ -181,7 +163,7 @@ function PlanCard({
         boxShadow: "lg",
       }}
     >
-      <Card.Body paddingY={5} paddingX={6}>
+      <Card.Body paddingY={6} paddingX={6}>
         <VStack align="stretch" gap={5} height="full">
           <VStack align="start" gap={1}>
             <HStack gap={2}>
@@ -217,7 +199,7 @@ function PlanCard({
             ))}
           </VStack>
 
-          <VStack width="full" marginTop="auto">
+          <VStack width="full" marginTop="auto" paddingTop={4}>
             <PlanCardActions plan={plan} currentPlan={currentPlan} />
           </VStack>
         </VStack>
@@ -246,14 +228,24 @@ export function PlansComparisonPage({
       maxWidth="900px"
       marginX="auto"
     >
-      <VStack align="center" gap={1}>
-        <Heading size="xl" as="h2">
-          Plans
-        </Heading>
-        <Text color="fg.muted">
-          Compare plans and choose the right tier for your organization.
-        </Text>
-      </VStack>
+      <Flex justifyContent="space-between" alignItems="flex-start">
+        <Box flex={1}>
+          <Link href="/settings/subscription">
+            <Button variant="ghost" size="sm" color="gray.600">
+              <ArrowLeft size={14} /> Subscription
+            </Button>
+          </Link>
+        </Box>
+        <VStack align="center" gap={1} flex={2}>
+          <Heading size="xl" as="h2">
+            Plans
+          </Heading>
+          <Text color="fg.muted">
+            Compare plans and choose the right tier for your organization.
+          </Text>
+        </VStack>
+        <Box flex={1} />
+      </Flex>
 
       <HStack
         width="full"

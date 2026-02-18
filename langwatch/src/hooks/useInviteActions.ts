@@ -10,7 +10,7 @@ import { api } from "../utils/api";
  * Encapsulates invite mutation handlers: create invite (admin), create invite request (non-admin),
  * approve, reject, and delete. Keeps MembersList focused on rendering.
  *
- * All pricing models go through enforcement first. When `pricingModel` is "SEAT_USAGE"
+ * All pricing models go through enforcement first. When `pricingModel` is "SEAT_EVENT"
  * and the user has an active subscription, exceeding the limit opens the proration
  * preview modal. Otherwise, the standard upgrade modal is shown.
  */
@@ -30,7 +30,7 @@ export function useInviteActions({
   onInviteCreated: (invites: { inviteCode: string; email: string }[]) => void;
   onClose: () => void;
   refetchInvites: () => void;
-  /** Pricing model of the organization (e.g. "SEAT_USAGE", "TIERED"). */
+  /** Pricing model of the organization (e.g. "SEAT_EVENT", "TIERED"). */
   pricingModel?: string;
   /** Whether the active plan is a free plan (no paid subscription). */
   activePlanFree: boolean;
@@ -213,11 +213,11 @@ export function useInviteActions({
 
     // Over limit — decide which modal to show
     if (
-      pricingModel === "SEAT_USAGE" &&
+      pricingModel === "SEAT_EVENT" &&
       !activePlanFree &&
       expandSeatsMutation
     ) {
-      // SEAT_USAGE with active subscription — proration modal
+      // SEAT_EVENT with active subscription — proration modal
       const newSeats = limitInfo.current + newFullMemberInviteCount;
       openSeats({
         organizationId,
@@ -226,7 +226,7 @@ export function useInviteActions({
         onConfirm: async () => {
           await expandSeatsMutation.mutateAsync({
             organizationId,
-            plan: "GROWTH_SEAT_USAGE",
+            plan: "GROWTH_SEAT_EVENT",
             upgradeMembers: true,
             upgradeTraces: false,
             totalMembers: newSeats,

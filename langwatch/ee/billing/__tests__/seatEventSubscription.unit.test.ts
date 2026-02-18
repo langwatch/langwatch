@@ -1,0 +1,191 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("../utils/growthSeatEvent", () => ({
+  createCheckoutLineItems: vi.fn().mockReturnValue([
+    { price: "price_seat", quantity: 3 },
+    { price: "price_events" },
+  ]),
+  isGrowthSeatPrice: vi.fn(),
+  resolveGrowthSeatPriceId: vi.fn().mockReturnValue("price_seat"),
+}));
+
+import { isGrowthSeatPrice } from "../utils/growthSeatEvent";
+import { createSeatEventSubscriptionFns } from "../services/seatEventSubscription";
+
+const mockIsGrowthSeatPrice = isGrowthSeatPrice as ReturnType<typeof vi.fn>;
+
+const createMockStripe = () => ({
+  checkout: {
+    sessions: {
+      create: vi.fn().mockResolvedValue({ url: "https://checkout.stripe.com/session_123" }),
+    },
+  },
+  subscriptions: {
+    retrieve: vi.fn(),
+    update: vi.fn(),
+  },
+  billingPortal: {
+    sessions: {
+      create: vi.fn().mockResolvedValue({ url: "https://billing.stripe.com/portal_123" }),
+    },
+  },
+});
+
+const createMockDb = () => ({
+  subscription: {
+    create: vi.fn().mockResolvedValue({ id: "sub_local_1" }),
+    findFirst: vi.fn(),
+    update: vi.fn(),
+  },
+  organization: {
+    findUnique: vi.fn(),
+  },
+});
+
+describe("seatEventSubscriptionFns", () => {
+  let stripe: ReturnType<typeof createMockStripe>;
+  let db: ReturnType<typeof createMockDb>;
+  let fns: ReturnType<typeof createSeatEventSubscriptionFns>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    stripe = createMockStripe();
+    db = createMockDb();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    fns = createSeatEventSubscriptionFns({ stripe: stripe as any, db: db as any });
+  });
+
+  describe("createSeatEventCheckout", () => {
+    it("creates a PENDING subscription and Stripe checkout session", async () => {
+      const result = await fns.createSeatEventCheckout({
+        organizationId: "org_1",
+        customerId: "cus_1",
+        baseUrl: "https://app.langwatch.ai",
+        currency: "EUR",
+        billingInterval: "monthly",
+        membersToAdd: 3,
+      });
+
+      expect(db.subscription.create).toHaveBeenCalledWith({
+        data: {
+          organizationId: "org_1",
+          status: "PENDING",
+          plan: "GROWTH_SEAT_EVENT",
+        },
+      });
+
+      expect(stripe.checkout.sessions.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mode: "subscription",
+          customer: "cus_1",
+          line_items: [
+            { price: "price_seat", quantity: 3 },
+            { price: "price_events" },
+          ],
+          success_url: "https://app.langwatch.ai/settings/subscription?success",
+          cancel_url: "https://app.langwatch.ai/settings/subscription",
+          client_reference_id: "subscription_setup_sub_local_1",
+        }),
+      );
+
+      expect(result).toEqual({ url: "https://checkout.stripe.com/session_123" });
+    });
+  });
+
+  describe("updateSeatEventItems", () => {
+    describe("when subscription exists with seat item", () => {
+      it("updates Stripe subscription quantity and local maxMembers", async () => {
+        db.subscription.findFirst.mockResolvedValue({
+          id: "sub_local_1",
+          stripeSubscriptionId: "sub_stripe_1",
+          status: "ACTIVE",
+        });
+
+        stripe.subscriptions.retrieve.mockResolvedValue({
+          items: {
+            data: [
+              { id: "si_seat", price: { id: "price_seat_eur_monthly" } },
+              { id: "si_events", price: { id: "price_events_eur_monthly" } },
+            ],
+          },
+        });
+
+        mockIsGrowthSeatPrice.mockImplementation(
+          (id: string) => id === "price_seat_eur_monthly",
+        );
+
+        const result = await fns.updateSeatEventItems({
+          organizationId: "org_1",
+          totalMembers: 7,
+        });
+
+        expect(stripe.subscriptions.update).toHaveBeenCalledWith("sub_stripe_1", {
+          items: [{ id: "si_seat", quantity: 7 }],
+        });
+
+        expect(db.subscription.update).toHaveBeenCalledWith({
+          where: { id: "sub_local_1" },
+          data: { maxMembers: 7 },
+        });
+
+        expect(result).toEqual({ success: true });
+      });
+    });
+
+    describe("when no subscription exists", () => {
+      it("returns success false", async () => {
+        db.subscription.findFirst.mockResolvedValue(null);
+
+        const result = await fns.updateSeatEventItems({
+          organizationId: "org_1",
+          totalMembers: 5,
+        });
+
+        expect(result).toEqual({ success: false });
+      });
+    });
+
+    describe("when no seat item found on Stripe subscription", () => {
+      it("returns success false", async () => {
+        db.subscription.findFirst.mockResolvedValue({
+          id: "sub_local_1",
+          stripeSubscriptionId: "sub_stripe_1",
+          status: "ACTIVE",
+        });
+
+        stripe.subscriptions.retrieve.mockResolvedValue({
+          items: {
+            data: [
+              { id: "si_other", price: { id: "price_other" } },
+            ],
+          },
+        });
+
+        mockIsGrowthSeatPrice.mockReturnValue(false);
+
+        const result = await fns.updateSeatEventItems({
+          organizationId: "org_1",
+          totalMembers: 5,
+        });
+
+        expect(result).toEqual({ success: false });
+      });
+    });
+  });
+
+  describe("seatEventBillingPortalUrl", () => {
+    it("creates billing portal session with subscription return URL", async () => {
+      const result = await fns.seatEventBillingPortalUrl({
+        customerId: "cus_1",
+        baseUrl: "https://app.langwatch.ai",
+      });
+
+      expect(stripe.billingPortal.sessions.create).toHaveBeenCalledWith({
+        customer: "cus_1",
+        return_url: "https://app.langwatch.ai/settings/subscription",
+      });
+
+      expect(result).toEqual({ url: "https://billing.stripe.com/portal_123" });
+    });
+  });
+});
