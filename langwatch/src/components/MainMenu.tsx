@@ -165,7 +165,8 @@ export const MainMenu = React.memo(function MainMenu({
                       : "/auth/signin",
                     isActive:
                       router.pathname.includes("/simulations") &&
-                      !router.pathname.includes("/simulations/scenarios"),
+                      !router.pathname.includes("/simulations/scenarios") &&
+                      !router.pathname.includes("/simulations/suites"),
                   },
                   ...(showSuites
                     ? [
@@ -178,7 +179,7 @@ export const MainMenu = React.memo(function MainMenu({
                                 project.slug,
                               )
                             : "/auth/signin",
-                          isActive: router.pathname.includes("/suites"),
+                          isActive: router.pathname.includes("/simulations/suites"),
                         },
                       ]
                     : []),
