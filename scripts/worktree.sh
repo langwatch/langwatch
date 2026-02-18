@@ -66,6 +66,16 @@ main() {
     exit 1
   fi
 
+  # Guard against running from inside a worktree (would nest worktrees)
+  local git_common_dir
+  git_common_dir=$(git rev-parse --git-common-dir 2>/dev/null)
+  local git_dir
+  git_dir=$(git rev-parse --git-dir 2>/dev/null)
+  if [ "$git_common_dir" != "$git_dir" ]; then
+    echo "Error: You're inside a worktree. Run this script from the main repo checkout instead." >&2
+    exit 1
+  fi
+
   local input="$1"
   local branch=""
   local issue_url=""
@@ -111,14 +121,15 @@ main() {
     git worktree add -b "$branch" "$dir" origin/main
   fi
 
-  # Copy .env files (graceful if none exist)
-  local env_files
-  env_files=$(ls .env* 2>/dev/null || true)
-  if [ -n "$env_files" ]; then
-    for f in .env*; do
-      [ -f "$f" ] && cp "$f" "${dir}/"
+  # Copy .env files from repo root and subdirectories that need them
+  for src_dir in "." "langwatch" "langwatch_nlp"; do
+    local dest="${dir}"
+    [ "$src_dir" != "." ] && dest="${dir}/${src_dir}"
+    for f in "${src_dir}"/.env*; do
+      [ -f "$f" ] || continue
+      cp "$f" "${dest}/"
     done
-  fi
+  done
 
   # Install dependencies
   echo ""
