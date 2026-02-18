@@ -1242,22 +1242,12 @@ describe("<SubscriptionPage/>", () => {
   // ============================================================================
 
   describe("when URL contains success and upgraded_from params", () => {
-    const originalLocation = window.location;
-
     beforeEach(() => {
-      Object.defineProperty(window, "location", {
-        value: { ...originalLocation, search: "?success&upgraded_from=tiered" },
-        writable: true,
-        configurable: true,
-      });
+      window.history.pushState({}, "", "?success&upgraded_from=tiered");
     });
 
     afterEach(() => {
-      Object.defineProperty(window, "location", {
-        value: originalLocation,
-        writable: true,
-        configurable: true,
-      });
+      window.history.pushState({}, "", "/");
     });
 
     it("displays the upgrade credit notice", async () => {
