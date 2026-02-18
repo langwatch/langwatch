@@ -2,6 +2,11 @@ import { z } from "zod";
 import { dependencies } from "../../../injection/dependencies.server";
 import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
 import { prisma } from "../../db";
+import type { CustomModelEntry } from "../../modelProviders/customModel.schema";
+import {
+  customModelUpdateInputSchema,
+  toLegacyCompatibleCustomModels,
+} from "../../modelProviders/customModel.schema";
 import type {
   LLMModelEntry,
   ReasoningConfig,
@@ -81,8 +86,8 @@ export const modelProviderRouter = createTRPCRouter({
         provider: z.string(),
         enabled: z.boolean(),
         customKeys: z.object({}).passthrough().optional().nullable(),
-        customModels: z.array(z.string()).optional().nullable(),
-        customEmbeddingsModels: z.array(z.string()).optional().nullable(),
+        customModels: customModelUpdateInputSchema.optional().nullable(),
+        customEmbeddingsModels: customModelUpdateInputSchema.optional().nullable(),
         extraHeaders: z
           .array(z.object({ key: z.string(), value: z.string() }))
           .optional()
@@ -229,10 +234,10 @@ export const getProjectModelProviders = async (
       const defaultProvider = defaultModelProviders[modelProvider.provider];
       if (modelProvider.enabled !== defaultProvider?.enabled) return true;
 
-      // Keep if has custom models or embeddings (not default)
-      const customModels = modelProvider.customModels as string[] | null;
+      // Keep if has custom models or embeddings (works for both string[] and object[])
+      const customModels = modelProvider.customModels as unknown[] | null;
       const customEmbeddings = modelProvider.customEmbeddingsModels as
-        | string[]
+        | unknown[]
         | null;
       const hasCustomModels = customModels && customModels.length > 0;
       const hasCustomEmbeddings =
@@ -242,18 +247,35 @@ export const getProjectModelProviders = async (
     })
     .reduce(
       (acc, modelProvider) => {
+        // Always use registry models for models/embeddingsModels
+        const defaultProvider =
+          defaultModelProviders[modelProvider.provider];
+
+        // Convert DB custom models (may be legacy string[] or new object[])
+        const customModels = toLegacyCompatibleCustomModels(
+          modelProvider.customModels,
+          "chat",
+        );
+        const customEmbeddingsModels = toLegacyCompatibleCustomModels(
+          modelProvider.customEmbeddingsModels,
+          "embedding",
+        );
+
         const modelProvider_: MaybeStoredModelProvider = {
           id: modelProvider.id,
           provider: modelProvider.provider,
           enabled: modelProvider.enabled,
           customKeys: modelProvider.customKeys,
-          models: modelProvider.customModels as string[] | null,
-          embeddingsModels: modelProvider.customEmbeddingsModels as
-            | string[]
-            | null,
+          models: defaultProvider?.models ?? null,
+          embeddingsModels: defaultProvider?.embeddingsModels ?? null,
+          customModels:
+            customModels.length > 0 ? customModels : null,
+          customEmbeddingsModels:
+            customEmbeddingsModels.length > 0
+              ? customEmbeddingsModels
+              : null,
           deploymentMapping: modelProvider.deploymentMapping,
-          disabledByDefault:
-            defaultModelProviders[modelProvider.provider]?.disabledByDefault,
+          disabledByDefault: defaultProvider?.disabledByDefault,
           extraHeaders: modelProvider.extraHeaders as
             | { key: string; value: string }[]
             | null,
@@ -307,6 +329,44 @@ export const getModelMetadataForFrontend = (): Record<
   );
 };
 
+/**
+ * Merges custom model entries from providers into the model metadata record.
+ * This allows consumers like LLMConfigPopover to look up custom model parameters
+ * by their full model ID (e.g., "openai/my-model").
+ */
+export const mergeCustomModelMetadata = (
+  existingMetadata: Record<string, ModelMetadataForFrontend>,
+  providers: Record<string, MaybeStoredModelProvider>,
+): Record<string, ModelMetadataForFrontend> => {
+  const merged = { ...existingMetadata };
+
+  for (const [providerKey, providerConfig] of Object.entries(providers)) {
+    const allCustomModels = [
+      ...(providerConfig.customModels ?? []),
+      ...(providerConfig.customEmbeddingsModels ?? []),
+    ];
+
+    for (const entry of allCustomModels) {
+      const fullId = `${providerKey}/${entry.modelId}`;
+      merged[fullId] = {
+        id: fullId,
+        name: entry.displayName,
+        provider: providerKey,
+        supportedParameters: entry.supportedParameters ?? [],
+        contextLength: 0,
+        maxCompletionTokens: entry.maxTokens ?? null,
+        defaultParameters: null,
+        supportsImageInput: entry.multimodalInputs?.includes("image") ?? false,
+        supportsAudioInput: entry.multimodalInputs?.includes("audio") ?? false,
+        pricing: { inputCostPerToken: 0, outputCostPerToken: 0 },
+        parameterConstraints: getParameterConstraints(fullId),
+      };
+    }
+  }
+
+  return merged;
+};
+
 // Frontend-only function that masks API keys for security and includes model metadata
 export const getProjectModelProvidersForFrontend = async (
   projectId: string,
@@ -338,8 +398,12 @@ export const getProjectModelProvidersForFrontend = async (
     }
   }
 
-  // Include model metadata for all models
-  const modelMetadata = getModelMetadataForFrontend();
+  // Include model metadata for all models, merged with custom model entries
+  const registryMetadata = getModelMetadataForFrontend();
+  const modelMetadata = mergeCustomModelMetadata(
+    registryMetadata,
+    maskedProviders,
+  );
 
   return {
     providers: maskedProviders,

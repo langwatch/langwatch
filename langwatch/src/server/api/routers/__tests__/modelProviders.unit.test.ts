@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../../../utils/constants";
+import type { CustomModelEntry } from "../../../modelProviders/customModel.schema";
+import { customModelUpdateInputSchema } from "../../../modelProviders/customModel.schema";
 import type { MaybeStoredModelProvider } from "../../../modelProviders/registry";
 import {
   getModelMetadataForFrontend,
+  mergeCustomModelMetadata,
   type ModelMetadataForFrontend,
   prepareLitellmParams,
 } from "../modelProviders";
@@ -324,6 +327,196 @@ describe("prepareLitellmParams", () => {
       });
 
       expect(result.api_base).toBe("https://custom-llm.example.com/v1");
+    });
+  });
+});
+
+describe("customModelUpdateInputSchema", () => {
+  describe("when given new CustomModelEntry[] format", () => {
+    it("accepts an array of CustomModelEntry objects", () => {
+      const input: CustomModelEntry[] = [
+        { modelId: "gpt-5-custom", displayName: "GPT-5 Custom", mode: "chat" },
+        {
+          modelId: "my-embedding",
+          displayName: "My Embedding",
+          mode: "embedding",
+        },
+      ];
+
+      const result = customModelUpdateInputSchema.safeParse(input);
+
+      expect(result.success).toBe(true);
+      expect(result.data).toEqual(input);
+    });
+
+    it("accepts CustomModelEntry objects with optional fields", () => {
+      const input: CustomModelEntry[] = [
+        {
+          modelId: "gpt-5-custom",
+          displayName: "GPT-5 Custom",
+          mode: "chat",
+          maxTokens: 8192,
+          supportedParameters: ["temperature", "top_p"],
+          multimodalInputs: ["image", "audio"],
+        },
+      ];
+
+      const result = customModelUpdateInputSchema.safeParse(input);
+
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe("when given legacy string[] format", () => {
+    it("accepts an array of strings for backward compatibility", () => {
+      const input = ["gpt-5-custom", "my-model"];
+
+      const result = customModelUpdateInputSchema.safeParse(input);
+
+      expect(result.success).toBe(true);
+      expect(result.data).toEqual(input);
+    });
+
+    it("accepts an empty array", () => {
+      const result = customModelUpdateInputSchema.safeParse([]);
+
+      expect(result.success).toBe(true);
+      expect(result.data).toEqual([]);
+    });
+  });
+
+  describe("when given invalid input", () => {
+    it("rejects mixed arrays of strings and objects", () => {
+      const input = [
+        "some-string",
+        { modelId: "x", displayName: "X", mode: "chat" },
+      ];
+
+      const result = customModelUpdateInputSchema.safeParse(input);
+
+      expect(result.success).toBe(false);
+    });
+  });
+});
+
+describe("mergeCustomModelMetadata", () => {
+  describe("when providers have custom models", () => {
+    it("adds custom model entries to metadata record", () => {
+      const existingMetadata: Record<string, ModelMetadataForFrontend> = {};
+      const providers: Record<string, MaybeStoredModelProvider> = {
+        openai: {
+          provider: "openai",
+          enabled: true,
+          customKeys: null,
+          models: null,
+          embeddingsModels: null,
+          deploymentMapping: null,
+          extraHeaders: null,
+          customModels: [
+            {
+              modelId: "gpt-5-custom",
+              displayName: "GPT-5 Custom",
+              mode: "chat",
+              maxTokens: 4096,
+              supportedParameters: ["temperature", "top_p"],
+              multimodalInputs: ["image"],
+            },
+          ],
+          customEmbeddingsModels: [
+            {
+              modelId: "custom-embed",
+              displayName: "Custom Embed",
+              mode: "embedding",
+            },
+          ],
+        },
+      };
+
+      const result = mergeCustomModelMetadata(existingMetadata, providers);
+
+      expect(result["openai/gpt-5-custom"]).toBeDefined();
+      expect(result["openai/gpt-5-custom"]?.name).toBe("GPT-5 Custom");
+      expect(result["openai/gpt-5-custom"]?.provider).toBe("openai");
+      expect(result["openai/gpt-5-custom"]?.maxCompletionTokens).toBe(4096);
+      expect(result["openai/gpt-5-custom"]?.supportedParameters).toEqual([
+        "temperature",
+        "top_p",
+      ]);
+      expect(result["openai/gpt-5-custom"]?.supportsImageInput).toBe(true);
+
+      expect(result["openai/custom-embed"]).toBeDefined();
+      expect(result["openai/custom-embed"]?.name).toBe("Custom Embed");
+    });
+  });
+
+  describe("when providers have no custom models", () => {
+    it("returns metadata unchanged", () => {
+      const existingMetadata: Record<string, ModelMetadataForFrontend> = {
+        "openai/gpt-4o": {
+          id: "openai/gpt-4o",
+          name: "gpt-4o",
+          provider: "openai",
+          supportedParameters: ["temperature"],
+          contextLength: 128000,
+          maxCompletionTokens: 4096,
+          defaultParameters: null,
+          supportsImageInput: true,
+          supportsAudioInput: false,
+          pricing: {
+            inputCostPerToken: 0.001,
+            outputCostPerToken: 0.002,
+          },
+        },
+      };
+      const providers: Record<string, MaybeStoredModelProvider> = {
+        openai: {
+          provider: "openai",
+          enabled: true,
+          customKeys: null,
+          models: null,
+          embeddingsModels: null,
+          deploymentMapping: null,
+          extraHeaders: null,
+        },
+      };
+
+      const result = mergeCustomModelMetadata(existingMetadata, providers);
+
+      expect(result).toEqual(existingMetadata);
+    });
+  });
+
+  describe("when custom model has no optional fields", () => {
+    it("uses sensible defaults for missing metadata", () => {
+      const existingMetadata: Record<string, ModelMetadataForFrontend> = {};
+      const providers: Record<string, MaybeStoredModelProvider> = {
+        openai: {
+          provider: "openai",
+          enabled: true,
+          customKeys: null,
+          models: null,
+          embeddingsModels: null,
+          deploymentMapping: null,
+          extraHeaders: null,
+          customModels: [
+            {
+              modelId: "bare-model",
+              displayName: "Bare Model",
+              mode: "chat",
+            },
+          ],
+        },
+      };
+
+      const result = mergeCustomModelMetadata(existingMetadata, providers);
+
+      const model = result["openai/bare-model"];
+      expect(model).toBeDefined();
+      expect(model?.maxCompletionTokens).toBeNull();
+      expect(model?.supportedParameters).toEqual([]);
+      expect(model?.supportsImageInput).toBe(false);
+      expect(model?.supportsAudioInput).toBe(false);
+      expect(model?.contextLength).toBe(0);
     });
   });
 });

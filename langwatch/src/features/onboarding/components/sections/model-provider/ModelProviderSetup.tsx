@@ -1,4 +1,4 @@
-import { Button, Field, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Button, Field, HStack, NativeSelect, Spinner, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
@@ -29,10 +29,22 @@ import {
 import type { ModelProviderKey } from "../../../regions/model-providers/types";
 import { DocsLinks } from "../observability/DocsLinks";
 import { ModelProviderCredentialFields } from "./ModelProviderCredentialFields";
+import { CustomModelInputSection } from "../../../../../components/settings/ModelProviderCustomModelInput";
 import { ModelProviderExtraHeaders } from "./ModelProviderExtraHeaders";
-import { ModelProviderModelSettings } from "./ModelProviderModelSettings";
 
 const logger = createLogger("ModelProviderSetup");
+
+/**
+ * Providers whose registry already includes well-known models.
+ * These don't need the custom model add/edit UI during onboarding.
+ */
+const PROVIDERS_WITH_WELL_KNOWN_MODELS = new Set([
+  "openai",
+  "anthropic",
+  "gemini",
+  "deepseek",
+  "xai",
+]);
 
 interface ModelProviderSetupProps {
   modelProviderKey: ModelProviderKey;
@@ -350,7 +362,7 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
           Configure {meta.label}
         </Text>
         <Text fontSize="xs" color="fg.muted">
-          Enter your API credentials and allowed models for {meta.label}
+          Enter your API credentials for {meta.label}
         </Text>
       </VStack>
 
@@ -397,14 +409,70 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
             />
           )}
 
-          <ModelProviderModelSettings
-            modelProviderKey={modelProviderKey}
-            customModels={state.customModels}
-            chatModelOptions={chatModelOptions}
-            defaultModel={state.projectDefaultModel}
-            onCustomModelsChange={actions.setCustomModels}
-            onDefaultModelChange={actions.setProjectDefaultModel}
-          />
+          {PROVIDERS_WITH_WELL_KNOWN_MODELS.has(backendModelProviderKey) ? (
+            <Field.Root>
+              <Field.Label>Default Chat Model</Field.Label>
+              <NativeSelect.Root size="sm" bg="bg.muted/40">
+                <NativeSelect.Field
+                  value={state.projectDefaultModel ?? ""}
+                  onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
+                    actions.setProjectDefaultModel(
+                      event.target.value || null,
+                    )
+                  }
+                >
+                  <option value="">Select default model...</option>
+                  {chatModelOptions.map((model) => (
+                    <option key={model.value} value={model.value}>
+                      {model.label}
+                    </option>
+                  ))}
+                </NativeSelect.Field>
+                <NativeSelect.Indicator />
+              </NativeSelect.Root>
+              <Field.HelperText>
+                This model will be used for evaluations, prompt optimization,
+                and dataset generation.
+              </Field.HelperText>
+            </Field.Root>
+          ) : (
+            <VStack align="stretch" gap={4}>
+              <CustomModelInputSection
+                state={state}
+                actions={actions}
+                provider={provider}
+                dialogBackground="bg.surface"
+                showRegistryLink={false}
+              />
+              <Field.Root>
+                <Field.Label>Default Chat Model</Field.Label>
+                <NativeSelect.Root size="sm" bg="bg.muted/40">
+                  <NativeSelect.Field
+                    value={state.projectDefaultModel ?? ""}
+                    onChange={(
+                      event: React.ChangeEvent<HTMLSelectElement>,
+                    ) =>
+                      actions.setProjectDefaultModel(
+                        event.target.value || null,
+                      )
+                    }
+                  >
+                    <option value="">Select default model...</option>
+                    {state.customModels.map((model) => (
+                      <option key={model.modelId} value={model.modelId}>
+                        {model.displayName}
+                      </option>
+                    ))}
+                  </NativeSelect.Field>
+                  <NativeSelect.Indicator />
+                </NativeSelect.Root>
+                <Field.HelperText>
+                  This model will be used for evaluations, prompt
+                  optimization, and dataset generation.
+                </Field.HelperText>
+              </Field.Root>
+            </VStack>
+          )}
 
           <DocsLinks
             docs={{

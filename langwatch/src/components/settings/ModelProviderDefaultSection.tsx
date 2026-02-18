@@ -84,11 +84,11 @@ export const DefaultProviderSection = ({
 
     // Add custom models from state, formatted with provider prefix
     const customModels = state.customModels.map(
-      (model) => `${provider.provider}/${model.value}`,
+      (model) => `${provider.provider}/${model.modelId}`,
     );
 
-    // Combine and deduplicate
-    return [...new Set([...registryModels, ...customModels])];
+    // Combine and deduplicate — custom models first
+    return [...new Set([...customModels, ...registryModels])];
   }, [provider.provider, state.customModels]);
 
   // Get all embedding models from registry and custom embeddings from all enabled providers
@@ -116,11 +116,11 @@ export const DefaultProviderSection = ({
 
     // Also include custom embeddings being edited in the current form state
     state.customEmbeddingsModels.forEach((model) => {
-      customEmbeddings.push(`${provider.provider}/${model.value}`);
+      customEmbeddings.push(`${provider.provider}/${model.modelId}`);
     });
 
-    // Combine and deduplicate
-    return [...new Set([...registryModels, ...customEmbeddings])];
+    // Combine and deduplicate — custom models first
+    return [...new Set([...customEmbeddings, ...registryModels])];
   }, [providers, provider.provider, state.customEmbeddingsModels]);
 
   return (
