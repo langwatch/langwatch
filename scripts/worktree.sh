@@ -144,9 +144,11 @@ main() {
   if [ -n "$issue_url" ]; then
     echo "  Issue:  ${issue_url}"
   fi
+
+  # Open a new shell in the worktree directory
   echo ""
-  echo "To start working:"
-  echo "  cd ${abs_dir}"
+  echo "Opening shell in worktree..."
+  cd "$abs_dir" && exec "$SHELL"
 }
 
 # Only run main when executed directly (not sourced)
