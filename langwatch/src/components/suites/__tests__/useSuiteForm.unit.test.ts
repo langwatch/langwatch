@@ -419,6 +419,34 @@ describe("useSuiteForm()", () => {
       });
     });
 
+    describe("when only agents have loaded but prompts have not", () => {
+      it("returns empty staleTargetIds to avoid false positives", () => {
+        const { result } = renderHook(() =>
+          useSuiteForm({
+            ...baseParams,
+            agents: [{ id: "agent_1", name: "Prod Agent" }],
+            prompts: undefined,
+            suite: {
+              id: "suite_1",
+              projectId: "proj_1",
+              name: "Test",
+              slug: "test",
+              description: null,
+              scenarioIds: ["scen_1"],
+              targets: [{ type: "prompt", referenceId: "prompt_1" }],
+              repeatCount: 1,
+              labels: [],
+              archivedAt: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          }),
+        );
+
+        expect(result.current.staleTargetIds).toEqual([]);
+      });
+    });
+
     describe("when agents and prompts have not loaded yet", () => {
       it("returns empty staleTargetIds", () => {
         const { result } = renderHook(() =>

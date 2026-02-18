@@ -98,7 +98,7 @@ export function useSuiteForm({
 
   // -- Derived: stale target references (selected but no longer available) --
   const staleTargetIds = useMemo(() => {
-    if (!agents && !prompts) return [];
+    if (!agents || !prompts) return [];
     return selectedTargets
       .filter(
         (t) =>
