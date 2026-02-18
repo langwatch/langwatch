@@ -144,3 +144,100 @@ Feature: Dual Pricing Model — Seat+Usage Billing
     When I call addTeamMemberOrEvents with plan "ACCELERATE"
     Then the Stripe subscription is updated using tiered logic
     And no growth seat usage logic is applied
+
+  # ============================================================================
+  # TIERED → SEAT_EVENT: Lazy Upgrade
+  # ============================================================================
+
+  @integration
+  Scenario: TIERED paid org sees upgrade block on subscription page
+    Given the organization has pricingModel "TIERED"
+    And the organization has an active ACCELERATE subscription
+    When the subscription page loads
+    Then a deprecated pricing notice is shown
+    And an upgrade block is shown with SEAT_EVENT pricing
+    And the upgrade block shows the current active member count
+
+  @integration
+  Scenario: TIERED paid org upgrade creates SEAT_EVENT checkout
+    Given the organization has pricingModel "TIERED"
+    And the organization has an active LAUNCH subscription with 6 active members
+    When I click "Upgrade now" on the subscription page
+    Then subscription.create is called with plan "GROWTH_SEAT_EVENT"
+    And membersToAdd equals the current active member count
+
+  @integration
+  Scenario: After SEAT_EVENT payment old TIERED subscription is cancelled with proration
+    Given the organization has pricingModel "TIERED"
+    And the organization has an active ACCELERATE subscription
+    And a GROWTH_SEAT_EVENT checkout was completed successfully
+    When the invoice.payment_succeeded webhook fires for the SEAT_EVENT subscription
+    Then the organization pricingModel is set to "SEAT_EVENT"
+    And the old ACCELERATE subscription is cancelled via Stripe with proration
+    And the old subscription status is CANCELLED in the database
+
+  @integration
+  Scenario: TIERED paid org can plan seats before upgrading
+    Given the organization has pricingModel "TIERED"
+    And the organization has an active LAUNCH subscription with 4 active members
+    When I open the seat drawer and add 2 planned Full Member seats
+    And I click "Upgrade now"
+    Then subscription.create is called with membersToAdd 6
+
+  @integration
+  Scenario: Success page shows credit message after upgrade from TIERED
+    Given the organization just upgraded from TIERED to SEAT_EVENT
+    And the URL contains "?success" query parameter
+    When the subscription page loads
+    Then a success message shows the subscription was activated
+    And a credit notice informs the user that unused time was credited
+
+  @integration
+  Scenario: Abandoned SEAT_EVENT checkout leaves TIERED subscription intact
+    Given the organization has pricingModel "TIERED"
+    And the organization has an active LAUNCH subscription
+    When I start a GROWTH_SEAT_EVENT checkout but abandon it
+    Then the LAUNCH subscription remains ACTIVE
+    And the organization pricingModel is still "TIERED"
+
+  @unit
+  Scenario: Stale PENDING subscriptions are cleaned up before new checkout
+    Given the organization has a PENDING GROWTH_SEAT_EVENT subscription from an abandoned checkout
+    When I start a new GROWTH_SEAT_EVENT checkout
+    Then the stale PENDING subscription is cancelled
+    And a new PENDING subscription is created with the correct seat count
+
+  @unit
+  Scenario: maxMembers is set on PENDING subscription creation
+    When I create a GROWTH_SEAT_EVENT checkout for 5 members
+    Then the PENDING subscription has maxMembers set to 5
+
+  @integration
+  Scenario: maxMembers is preserved through activation lifecycle
+    Given a PENDING GROWTH_SEAT_EVENT subscription with maxMembers 5
+    When the invoice.payment_succeeded webhook fires
+    Then the subscription is ACTIVE with maxMembers 5
+    And when the subscription.updated webhook fires with quantity 5
+    Then maxMembers remains 5
+
+  @unit
+  Scenario: Proration preview shows prorated amount separate from recurring total
+    Given the organization has an active GROWTH_SEAT_EVENT subscription with 1 seat
+    When I preview proration for 4 total seats
+    Then the prorated amount reflects only the mid-cycle charge for added seats
+    And the recurring total reflects the full next-period cost for all seats
+
+  @integration
+  Scenario: ENTERPRISE org does not see deprecated notice or upgrade block
+    Given the organization has pricingModel "TIERED"
+    And the organization has an active ENTERPRISE subscription
+    When the subscription page loads
+    Then a deprecated pricing notice is not shown
+    And an upgrade block is not shown
+
+  @unit
+  Scenario: Duplicate subscription.deleted webhook for already-cancelled sub is idempotent
+    Given the organization had a TIERED subscription cancelled during upgrade
+    When a subscription.deleted webhook arrives for the already-cancelled subscription
+    Then no database update is performed
+    And the subscription limits are not nulled out

@@ -51,6 +51,15 @@ export type SubscriptionService = {
     organizationId: string,
   ): Promise<Awaited<ReturnType<PrismaClient["subscription"]["findFirst"]>>>;
 
+  previewProration(params: {
+    organizationId: string;
+    newTotalSeats: number;
+  }): Promise<{
+    formattedAmountDue: string;
+    formattedRecurringTotal: string;
+    billingInterval: string;
+  }>;
+
   notifyProspective(params: {
     organizationId: string;
     plan: PlanType;
@@ -147,6 +156,11 @@ export const createSubscriptionService = ({
       billingInterval,
     }) {
       if (plan === PlanTypes.GROWTH_SEAT_EVENT && seatEventFns) {
+        const org = await db.organization.findUnique({
+          where: { id: organizationId },
+          select: { pricingModel: true },
+        });
+
         return seatEventFns.createSeatEventCheckout({
           organizationId,
           customerId,
@@ -154,6 +168,7 @@ export const createSubscriptionService = ({
           currency: currency ?? "EUR",
           billingInterval: billingInterval ?? "monthly",
           membersToAdd,
+          isUpgradeFromTiered: org?.pricingModel === "TIERED",
         });
       }
 
@@ -279,6 +294,13 @@ export const createSubscriptionService = ({
     },
 
     getLastNonCancelledSubscription,
+
+    async previewProration({ organizationId, newTotalSeats }) {
+      if (!seatEventFns) {
+        throw new Error("Seat event billing is not available");
+      }
+      return seatEventFns.previewProration({ organizationId, newTotalSeats });
+    },
 
     async notifyProspective({
       organizationId,

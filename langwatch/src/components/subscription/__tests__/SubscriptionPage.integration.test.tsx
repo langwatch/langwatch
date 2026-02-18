@@ -828,7 +828,7 @@ describe("<SubscriptionPage/>", () => {
   });
 
   // ============================================================================
-  // Update Seats Block (Growth Plan)
+  // Update seats Block (Growth Plan)
   // ============================================================================
 
   describe("when on Growth plan with planned users", () => {
@@ -1119,6 +1119,157 @@ describe("<SubscriptionPage/>", () => {
   });
 
   // ============================================================================
+  // TIERED Legacy Paid Org
+  // ============================================================================
+
+  describe("when TIERED paid org views subscription page", () => {
+    beforeEach(() => {
+      mockOrganization = {
+        id: "test-org-id",
+        name: "Test Org",
+        pricingModel: "TIERED",
+      };
+      mockGetActivePlan.mockReturnValue({
+        data: createMockPlan({
+          type: "ACCELERATE",
+          name: "Accelerate",
+          free: false,
+          maxMembers: 5,
+          maxMembersLite: 9999,
+          maxMessagesPerMonth: 20000,
+        }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+    });
+
+    it("displays deprecated pricing notice", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("tiered-deprecated-notice")).toBeInTheDocument();
+      });
+    });
+
+    it("displays upgrade plan block with Upgrade now button", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        const upgradeBlock = screen.getByTestId("upgrade-plan-block");
+        expect(within(upgradeBlock).getByRole("button", { name: /Upgrade now/i })).toBeInTheDocument();
+      });
+    });
+
+    describe("when clicking Upgrade now", () => {
+      it("calls createSubscription with GROWTH_SEAT_EVENT plan", async () => {
+        const user = userEvent.setup();
+        const mockMutateAsync = vi.fn().mockResolvedValue({ url: null });
+        mockCreateSubscription.mockReturnValue({
+          mutate: vi.fn(),
+          mutateAsync: mockMutateAsync,
+          isLoading: false,
+          isPending: false,
+        });
+
+        renderSubscriptionPage();
+
+        await waitFor(() => {
+          expect(screen.getByTestId("upgrade-plan-block")).toBeInTheDocument();
+        });
+
+        await user.click(screen.getByRole("button", { name: /Upgrade now/i }));
+
+        await waitFor(() => {
+          expect(mockMutateAsync).toHaveBeenCalledWith(
+            expect.objectContaining({
+              organizationId: "test-org-id",
+              plan: "GROWTH_SEAT_EVENT",
+            }),
+          );
+        });
+      });
+    });
+  });
+
+  // ============================================================================
+  // ENTERPRISE TIERED Org (Exclusion)
+  // ============================================================================
+
+  describe("when ENTERPRISE TIERED org views subscription page", () => {
+    beforeEach(() => {
+      mockOrganization = {
+        id: "test-org-id",
+        name: "Test Org",
+        pricingModel: "TIERED",
+      };
+      mockGetActivePlan.mockReturnValue({
+        data: createMockPlan({
+          type: "ENTERPRISE",
+          name: "Enterprise",
+          free: false,
+          maxMembers: 100,
+          maxMembersLite: 9999,
+          maxMessagesPerMonth: 1000000,
+        }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+    });
+
+    it("does not display deprecated pricing notice", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
+      });
+
+      expect(screen.queryByTestId("tiered-deprecated-notice")).not.toBeInTheDocument();
+    });
+
+    it("does not display upgrade plan block", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
+      });
+
+      expect(screen.queryByTestId("upgrade-plan-block")).not.toBeInTheDocument();
+    });
+  });
+
+  // ============================================================================
+  // Upgrade Credit Notice
+  // ============================================================================
+
+  describe("when URL contains success and upgraded_from params", () => {
+    const originalLocation = window.location;
+
+    beforeEach(() => {
+      Object.defineProperty(window, "location", {
+        value: { ...originalLocation, search: "?success&upgraded_from=tiered" },
+        writable: true,
+        configurable: true,
+      });
+    });
+
+    afterEach(() => {
+      Object.defineProperty(window, "location", {
+        value: originalLocation,
+        writable: true,
+        configurable: true,
+      });
+    });
+
+    it("displays the upgrade credit notice", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("credit-notice")).toBeInTheDocument();
+      });
+    });
+  });
+
+  // ============================================================================
   // N/M Seat Display with Pending Invites
   // ============================================================================
 
@@ -1162,7 +1313,7 @@ describe("<SubscriptionPage/>", () => {
   });
 
   // ============================================================================
-  // Update Seats with Invites (Growth Plan)
+  // Update seats with Invites (Growth Plan)
   // ============================================================================
 
   describe("when on Growth plan and updating seats with invite emails", () => {

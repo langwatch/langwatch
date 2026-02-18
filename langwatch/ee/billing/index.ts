@@ -76,6 +76,7 @@ export const createStripeWebhookHandler = () => {
   const s = getStripe();
   const webhookService = createWebhookService({
     db: prisma,
+    stripe: s,
     itemCalculator: subscriptionItemCalculator,
   });
   return createStripeWebhookHandlerFactory({ stripe: s, webhookService });

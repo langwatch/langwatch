@@ -124,6 +124,21 @@ export const createSubscriptionRouterFactory = ({
         });
       }),
 
+    previewProration: protectedProcedure
+      .input(
+        z.object({
+          organizationId: z.string(),
+          newTotalSeats: z.number().min(1),
+        }),
+      )
+      .use(checkOrganizationPermission("organization:manage"))
+      .query(async ({ input }) => {
+        return await subscriptionService.previewProration({
+          organizationId: input.organizationId,
+          newTotalSeats: input.newTotalSeats,
+        });
+      }),
+
     getLastSubscription: protectedProcedure
       .input(z.object({ organizationId: z.string() }))
       .use(checkOrganizationPermission("organization:view"))
