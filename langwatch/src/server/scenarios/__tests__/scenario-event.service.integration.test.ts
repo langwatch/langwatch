@@ -591,16 +591,64 @@ describe("ScenarioEventService Integration Tests", () => {
       expect(run2!.status).toBe(ScenarioRunStatus.ERROR);
     });
 
-    it("excludes runs from non-suite scenario sets", async () => {
+    it("includes pre-suite runs with scenarioSetId 'default'", async () => {
       const client = await esClient({ test: true });
 
-      // Suite run (should be included)
+      const defaultSetId = "default";
+      const ids = generateTestIds("allsuites-default");
+      const now = Date.now();
+
+      const events = [
+        {
+          type: ScenarioEventType.RUN_STARTED,
+          timestamp: now - 5000,
+          project_id: project.id,
+          scenario_id: ids.scenarioId,
+          scenario_run_id: ids.scenarioRunId,
+          batch_run_id: ids.batchRunId,
+          scenario_set_id: defaultSetId,
+          metadata: { name: "Pre-Suite Run" },
+        },
+        {
+          type: ScenarioEventType.RUN_FINISHED,
+          timestamp: now - 4500,
+          project_id: project.id,
+          scenario_id: ids.scenarioId,
+          scenario_run_id: ids.scenarioRunId,
+          batch_run_id: ids.batchRunId,
+          scenario_set_id: defaultSetId,
+          status: ScenarioRunStatus.SUCCESS,
+          results: { verdict: Verdict.SUCCESS },
+        },
+      ];
+
+      await client.bulk({
+        index: SCENARIO_EVENTS_INDEX.alias,
+        body: events.flatMap((event) => [{ index: {} }, event]),
+        refresh: true,
+      });
+
+      const result = await service.getRunDataForAllSuites({
+        projectId: project.id,
+        limit: 100,
+      });
+
+      const preSuiteRun = result.runs.find((r) => r.batchRunId === ids.batchRunId);
+      expect(preSuiteRun).toBeDefined();
+      expect(preSuiteRun!.status).toBe(ScenarioRunStatus.SUCCESS);
+      expect(result.scenarioSetIds[ids.batchRunId]).toBe(defaultSetId);
+    });
+
+    it("includes both suite and non-suite runs together", async () => {
+      const client = await esClient({ test: true });
+
+      // Suite run
       const suiteSetId = `__internal__suite_ccc_${Date.now()}__suite`;
       const suiteIds = generateTestIds("allsuites-include");
 
-      // Non-suite run (should be excluded)
-      const nonSuiteSetId = `__internal__proj_1__on-platform-scenarios`;
-      const nonSuiteIds = generateTestIds("allsuites-exclude");
+      // Pre-suite run with "default" scenarioSetId
+      const defaultSetId = "default";
+      const defaultIds = generateTestIds("allsuites-default-mix");
 
       const now = Date.now();
 
@@ -627,25 +675,25 @@ describe("ScenarioEventService Integration Tests", () => {
           status: ScenarioRunStatus.SUCCESS,
           results: { verdict: Verdict.SUCCESS },
         },
-        // Non-suite run (on-platform)
+        // Pre-suite run
         {
           type: ScenarioEventType.RUN_STARTED,
           timestamp: now - 3000,
           project_id: project.id,
-          scenario_id: nonSuiteIds.scenarioId,
-          scenario_run_id: nonSuiteIds.scenarioRunId,
-          batch_run_id: nonSuiteIds.batchRunId,
-          scenario_set_id: nonSuiteSetId,
-          metadata: { name: "Non-Suite Run" },
+          scenario_id: defaultIds.scenarioId,
+          scenario_run_id: defaultIds.scenarioRunId,
+          batch_run_id: defaultIds.batchRunId,
+          scenario_set_id: defaultSetId,
+          metadata: { name: "Pre-Suite Run" },
         },
         {
           type: ScenarioEventType.RUN_FINISHED,
           timestamp: now - 2500,
           project_id: project.id,
-          scenario_id: nonSuiteIds.scenarioId,
-          scenario_run_id: nonSuiteIds.scenarioRunId,
-          batch_run_id: nonSuiteIds.batchRunId,
-          scenario_set_id: nonSuiteSetId,
+          scenario_id: defaultIds.scenarioId,
+          scenario_run_id: defaultIds.scenarioRunId,
+          batch_run_id: defaultIds.batchRunId,
+          scenario_set_id: defaultSetId,
           status: ScenarioRunStatus.SUCCESS,
           results: { verdict: Verdict.SUCCESS },
         },
@@ -662,20 +710,18 @@ describe("ScenarioEventService Integration Tests", () => {
         limit: 100,
       });
 
-      // Suite run should be present
+      // Both runs should be present
       const suiteRun = result.runs.find((r) => r.batchRunId === suiteIds.batchRunId);
+      const defaultRun = result.runs.find((r) => r.batchRunId === defaultIds.batchRunId);
       expect(suiteRun).toBeDefined();
+      expect(defaultRun).toBeDefined();
 
-      // Non-suite run should NOT be present
-      const nonSuiteRun = result.runs.find((r) => r.batchRunId === nonSuiteIds.batchRunId);
-      expect(nonSuiteRun).toBeUndefined();
-
-      // scenarioSetIds should only have the suite batch run
+      // scenarioSetIds should have both
       expect(result.scenarioSetIds[suiteIds.batchRunId]).toBe(suiteSetId);
-      expect(result.scenarioSetIds[nonSuiteIds.batchRunId]).toBeUndefined();
+      expect(result.scenarioSetIds[defaultIds.batchRunId]).toBe(defaultSetId);
     });
 
-    it("returns empty results for a project with no suite runs", async () => {
+    it("returns empty results for a project with no runs", async () => {
       // Use a unique project ID that has no data at all
       const emptyProjectId = `proj_empty_${Date.now()}`;
       const result = await service.getRunDataForAllSuites({

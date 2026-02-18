@@ -508,8 +508,8 @@ export class ScenarioEventRepository {
   }
 
   /**
-   * Retrieves batch run IDs across all suites with cursor-based pagination.
-   * Uses a wildcard query on scenario_set_id to match all suite sets.
+   * Retrieves batch run IDs across all scenario runs with cursor-based pagination.
+   * Returns ALL runs for the project (both pre-suite "default" runs and suite-patterned runs).
    * Returns scenarioSetIds map (batchRunId → scenarioSetId) for suite name resolution.
    */
   async getBatchRunIdsForAllSuites({
@@ -530,7 +530,6 @@ export class ScenarioEventRepository {
       projectId,
       limit,
       cursor,
-      setFilter: { wildcard: { [ES_FIELDS.scenarioSetId]: "__internal__*__suite" } },
       trackScenarioSetIds: true,
     });
 
@@ -551,7 +550,7 @@ export class ScenarioEventRepository {
     projectId: string;
     limit: number;
     cursor?: string;
-    setFilter: Record<string, any>;
+    setFilter?: Record<string, any>;
     trackScenarioSetIds?: boolean;
   }): Promise<{
     batchRunIds: string[];
@@ -579,7 +578,7 @@ export class ScenarioEventRepository {
           bool: {
             filter: [
               { term: { [ES_FIELDS.projectId]: validatedProjectId } },
-              setFilter,
+              ...(setFilter ? [setFilter] : []),
               { exists: { field: ES_FIELDS.batchRunId } },
             ],
           },
@@ -610,8 +609,6 @@ export class ScenarioEventRepository {
         : "";
 
       if (batchRunId && timestamp !== undefined) {
-        if (trackScenarioSetIds && !scenarioSetId) continue;
-
         const existing = batchRunMap.get(batchRunId);
         if (!existing || timestamp > existing.timestamp) {
           const sortValues = hit.sort;
