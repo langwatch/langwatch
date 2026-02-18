@@ -10,6 +10,25 @@ import type { PrismaClient } from "@prisma/client";
 import type { SuiteRunDependencies } from "./suite.service";
 
 /**
+ * Look up the organizationId for a project by traversing project -> team -> organization.
+ *
+ * Returns null if the project does not exist or has no associated organization.
+ */
+export async function getOrganizationIdForProject({
+  prisma,
+  projectId,
+}: {
+  prisma: PrismaClient;
+  projectId: string;
+}): Promise<string | null> {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    include: { team: { include: { organization: true } } },
+  });
+  return project?.team?.organizationId ?? null;
+}
+
+/**
  * Create a SuiteRunDependencies object from a PrismaClient.
  *
  * Encapsulates the Prisma queries for validating scenario and target
@@ -27,10 +46,17 @@ export function createSuiteRunDependencies({
       });
       return scenario !== null;
     },
-    validateTargetExists: async ({ referenceId, type, projectId }) => {
+    validateTargetExists: async ({ referenceId, type, projectId, organizationId }) => {
       if (type === "prompt") {
         const prompt = await prisma.llmPromptConfig.findFirst({
-          where: { id: referenceId, projectId, deletedAt: null },
+          where: {
+            id: referenceId,
+            deletedAt: null,
+            OR: [
+              { projectId },
+              { organizationId, scope: "ORGANIZATION" },
+            ],
+          },
         });
         return prompt !== null;
       }

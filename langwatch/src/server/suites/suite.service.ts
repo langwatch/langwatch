@@ -60,6 +60,7 @@ export interface SuiteRunDependencies {
     referenceId: string;
     type: string;
     projectId: string;
+    organizationId: string;
   }) => Promise<boolean>;
 }
 
@@ -260,6 +261,7 @@ export class SuiteService {
   async run(params: {
     suite: SimulationSuite;
     projectId: string;
+    organizationId: string;
     deps: SuiteRunDependencies;
   }): Promise<SuiteRunResult> {
     return tracer.withActiveSpan(
@@ -274,11 +276,11 @@ export class SuiteService {
         },
       },
       async (span) => {
-        const { suite, projectId, deps } = params;
+        const { suite, projectId, organizationId, deps } = params;
         const targets = parseSuiteTargets(suite.targets);
         span.setAttribute("suite.target_count", targets.length);
 
-        await this.validateReferences({ suite, projectId, targets, deps });
+        await this.validateReferences({ suite, projectId, organizationId, targets, deps });
 
         const batchRunId = generateBatchRunId();
         const setId = getSuiteSetId(suite.id);
@@ -371,10 +373,11 @@ export class SuiteService {
   private async validateReferences(params: {
     suite: SimulationSuite;
     projectId: string;
+    organizationId: string;
     targets: SuiteTarget[];
     deps: SuiteRunDependencies;
   }): Promise<void> {
-    const { suite, projectId, targets, deps } = params;
+    const { suite, projectId, organizationId, targets, deps } = params;
 
     const invalidScenarios: string[] = [];
     for (const scenarioId of suite.scenarioIds) {
@@ -398,6 +401,7 @@ export class SuiteService {
         referenceId: target.referenceId,
         type: target.type,
         projectId,
+        organizationId,
       });
       if (!exists) {
         invalidTargets.push(target.referenceId);

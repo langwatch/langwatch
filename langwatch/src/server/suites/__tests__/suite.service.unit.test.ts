@@ -134,6 +134,7 @@ describe("SuiteService", () => {
           const result = await service.run({
             suite,
             projectId: "proj_1",
+            organizationId: "org_1",
             deps,
           });
 
@@ -158,6 +159,7 @@ describe("SuiteService", () => {
           const result = await service.run({
             suite,
             projectId: "proj_1",
+            organizationId: "org_1",
             deps,
           });
 
@@ -176,6 +178,7 @@ describe("SuiteService", () => {
           const result = await service.run({
             suite,
             projectId: "proj_1",
+            organizationId: "org_1",
             deps,
           });
 
@@ -198,6 +201,7 @@ describe("SuiteService", () => {
           const result = await service.run({
             suite,
             projectId: "proj_1",
+            organizationId: "org_1",
             deps,
           });
 
@@ -235,7 +239,7 @@ describe("SuiteService", () => {
           const deps = makeDeps();
 
           await expect(
-            service.run({ suite, projectId: "proj_1", deps }),
+            service.run({ suite, projectId: "proj_1", organizationId: "org_1", deps }),
           ).rejects.toThrow("Failed to schedule suite run: 1 of 3 jobs failed to enqueue");
 
           // Verify rollback: remove called for each of the 2 successfully enqueued jobs
@@ -258,10 +262,10 @@ describe("SuiteService", () => {
           });
 
           await expect(
-            service.run({ suite, projectId: "proj_1", deps }),
+            service.run({ suite, projectId: "proj_1", organizationId: "org_1", deps }),
           ).rejects.toThrow(InvalidScenarioReferencesError);
           await expect(
-            service.run({ suite, projectId: "proj_1", deps }),
+            service.run({ suite, projectId: "proj_1", organizationId: "org_1", deps }),
           ).rejects.toThrow("Invalid scenario references: deleted-scenario");
           expect(mockScheduleScenarioRun).not.toHaveBeenCalled();
         });
@@ -283,10 +287,10 @@ describe("SuiteService", () => {
           });
 
           await expect(
-            service.run({ suite, projectId: "proj_1", deps }),
+            service.run({ suite, projectId: "proj_1", organizationId: "org_1", deps }),
           ).rejects.toThrow(InvalidTargetReferencesError);
           await expect(
-            service.run({ suite, projectId: "proj_1", deps }),
+            service.run({ suite, projectId: "proj_1", organizationId: "org_1", deps }),
           ).rejects.toThrow("Invalid target references: removed-target");
           expect(mockScheduleScenarioRun).not.toHaveBeenCalled();
         });

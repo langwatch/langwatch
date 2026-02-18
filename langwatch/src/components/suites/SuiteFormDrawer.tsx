@@ -21,6 +21,7 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
+import { AlertTriangle } from "lucide-react";
 import type { SimulationSuite } from "@prisma/client";
 import { ChevronDown, ChevronRight, Play } from "lucide-react";
 import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
@@ -309,6 +310,23 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                 <Text fontSize="xs" color="red.500">
                   {form.errors.targets}
                 </Text>
+              )}
+              {form.staleTargetIds.length > 0 && (
+                <HStack
+                  gap={2}
+                  padding={2}
+                  borderRadius="md"
+                  backgroundColor="orange.50"
+                  _dark={{ backgroundColor: "orange.900" }}
+                  data-testid="stale-targets-warning"
+                >
+                  <AlertTriangle size={14} color="var(--chakra-colors-orange-500)" />
+                  <Text fontSize="xs" color="orange.700" _dark={{ color: "orange.200" }}>
+                    {form.staleTargetIds.length === 1
+                      ? "1 target is no longer available and may have been deleted."
+                      : `${form.staleTargetIds.length} targets are no longer available and may have been deleted.`}
+                  </Text>
+                </HStack>
               )}
             </VStack>
 

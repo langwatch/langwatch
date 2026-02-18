@@ -96,6 +96,19 @@ export function useSuiteForm({
     return result;
   }, [agents, prompts]);
 
+  // -- Derived: stale target references (selected but no longer available) --
+  const staleTargetIds = useMemo(() => {
+    if (!agents || !prompts) return [];
+    return selectedTargets
+      .filter(
+        (t) =>
+          !availableTargets.some(
+            (a) => a.type === t.type && a.referenceId === t.referenceId,
+          ),
+      )
+      .map((t) => t.referenceId);
+  }, [selectedTargets, availableTargets, agents, prompts]);
+
   // -- Derived: unique scenario labels --
   const allLabels = useMemo(() => {
     if (!scenarios) return [];
@@ -151,7 +164,8 @@ export function useSuiteForm({
       setTargetSearch("");
       setActiveLabelFilter(null);
     }
-  }, [suite, suiteId, isOpen]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on suite.id to avoid infinite loop from unstable suite reference
+  }, [suite?.id, suiteId, isOpen]);
 
   // -- Actions --
 
@@ -275,6 +289,7 @@ export function useSuiteForm({
     filteredTargets,
     toggleTarget,
     isTargetSelected,
+    staleTargetIds,
 
     // Validation
     errors,

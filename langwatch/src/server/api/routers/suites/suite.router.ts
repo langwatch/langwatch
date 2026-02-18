@@ -9,7 +9,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { SuiteService } from "~/server/suites/suite.service";
 import { SuiteDomainError } from "~/server/suites/errors";
-import { createSuiteRunDependencies } from "~/server/suites/suite-run-dependencies";
+import { createSuiteRunDependencies, getOrganizationIdForProject } from "~/server/suites/suite-run-dependencies";
 import { checkProjectPermission } from "../../rbac";
 import { createSuiteSchema, projectSchema, updateSuiteSchema } from "./schemas";
 
@@ -120,10 +120,22 @@ export const suiteRouter = createTRPCRouter({
       }
 
       try {
+        const organizationId = await getOrganizationIdForProject({
+          prisma: ctx.prisma,
+          projectId: input.projectId,
+        });
+        if (!organizationId) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Organization not found for project",
+          });
+        }
+
         const deps = createSuiteRunDependencies({ prisma: ctx.prisma });
         const result = await service.run({
           suite,
           projectId: input.projectId,
+          organizationId,
           deps,
         });
 
