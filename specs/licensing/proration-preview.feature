@@ -1,11 +1,11 @@
 Feature: Proration Preview Before Seat Update
-  As a Growth plan (SEAT_USAGE) administrator
+  As a Growth plan (SEAT_EVENT) administrator
   I want to see the prorated charges before confirming a seat update
   So that I understand exactly what I'll be charged before committing
 
   Background:
     Given I am logged in as an organization administrator on LangWatch Cloud
-    And the organization uses the SEAT_USAGE pricing model
+    And the organization uses the SEAT_EVENT pricing model
     And the organization has an active Growth subscription
 
   # ============================================================================
@@ -39,7 +39,7 @@ Feature: Proration Preview Before Seat Update
   # ============================================================================
 
   @integration
-  Scenario: Existing limit upgrade modal still works for non-SEAT_USAGE limits
+  Scenario: Existing limit upgrade modal still works for non-SEAT_EVENT limits
     Given the organization has reached its team member limit
     When the upgrade modal opens for a limit enforcement
     Then I see "Upgrade Required" title

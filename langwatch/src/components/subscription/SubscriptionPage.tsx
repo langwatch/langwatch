@@ -22,19 +22,20 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ArrowRight, Check, Info, Plus, Trash2 } from "lucide-react";
+import { ArrowRight, Check, Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import SettingsLayout from "~/components/SettingsLayout";
 import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
 import { Select } from "~/components/ui/select";
-import { Tooltip } from "~/components/ui/tooltip";
 import { LabeledSwitch } from "~/components/ui/LabeledSwitch";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import {
   type Currency,
-  ANNUAL_DISCOUNT,
+  getGrowthSeatPriceCents,
+  getAnnualDiscountPercent,
+  formatPrice,
   DEVELOPER_FEATURES,
   GROWTH_FEATURES,
 } from "./billing-plans";
@@ -259,9 +260,8 @@ function UpgradePlanBlock({
   pricePerSeat,
   totalPrice,
   coreMembers,
-  existingFullMembers,
-  pendingFullMemberCount,
   features,
+  monthlyEquivalent,
   onUpgrade,
   isLoading,
 }: {
@@ -269,9 +269,8 @@ function UpgradePlanBlock({
   pricePerSeat: React.ReactNode;
   totalPrice: string;
   coreMembers: number;
-  existingFullMembers: number;
-  pendingFullMemberCount: number;
   features: string[];
+  monthlyEquivalent?: string | null;
   onUpgrade?: () => void;
   isLoading?: boolean;
 }) {
@@ -299,6 +298,11 @@ function UpgradePlanBlock({
                 {totalPrice} per {coreMembers} Full Member
                 {coreMembers !== 1 ? "s" : ""}
               </Text>
+              {monthlyEquivalent && (
+                <Text fontSize="xs" color="gray.500">
+                  ({monthlyEquivalent})
+                </Text>
+              )}
             </VStack>
             <Button
               colorPalette="blue"
@@ -310,55 +314,6 @@ function UpgradePlanBlock({
               Upgrade now
             </Button>
           </Flex>
-
-          {/* Seat Breakdown */}
-          <Box
-            data-testid="seat-breakdown"
-            borderWidth={1}
-            borderColor="gray.200"
-            borderRadius="md"
-            padding={4}
-            bg="gray.50"
-          >
-            <Text fontSize="sm" fontWeight="semibold" mb={3}>
-              Seat Breakdown
-            </Text>
-
-            <VStack align="stretch" gap={2} fontSize="sm">
-              <HStack justify="space-between">
-                <Text color="gray.600">Active Full Members:</Text>
-                <Text fontWeight="medium" data-testid="active-full-members-count">
-                  {existingFullMembers}
-                </Text>
-              </HStack>
-
-              {pendingFullMemberCount > 0 && (
-                <HStack justify="space-between">
-                  <HStack gap={1}>
-                    <Text color="gray.600">Pending Invites:</Text>
-                    <Tooltip
-                      content="These invites will consume seats once accepted"
-                      positioning={{ placement: "top" }}
-                    >
-                      <Info size={14} color="var(--chakra-colors-gray-400)" />
-                    </Tooltip>
-                  </HStack>
-                  <Text fontWeight="medium" data-testid="pending-invites-count">
-                    {pendingFullMemberCount}
-                  </Text>
-                </HStack>
-              )}
-
-              <Separator my={1} />
-
-              <HStack justify="space-between">
-                <Text fontWeight="semibold">Total Seats:</Text>
-                <Text fontWeight="bold" data-testid="total-seats-count">
-                  {coreMembers}
-                </Text>
-              </HStack>
-            </VStack>
-          </Box>
 
           <SimpleGrid columns={3} gap={2}>
             {features.map((feature, index) => (
@@ -377,24 +332,28 @@ function UpgradePlanBlock({
 }
 
 /**
- * Recent Invoices Block - displays invoice history
+ * Contact Sales Block - CTA for enterprise or higher-tier needs
  */
-function RecentInvoicesBlock() {
+function ContactSalesBlock() {
   return (
-    <VStack align="stretch" gap={4} width="full">
-      <Text fontWeight="semibold" fontSize="lg">
-        Recent invoices
-      </Text>
-      <Card.Root
-        data-testid="invoices-block"
-        borderWidth={1}
-        borderColor="gray.200"
-      >
-        <Card.Body paddingY={5} paddingX={6}>
-          <Text color="gray.500">No invoices yet</Text>
-        </Card.Body>
-      </Card.Root>
-    </VStack>
+    <Card.Root
+      data-testid="contact-sales-block"
+      borderWidth={1}
+      borderColor="gray.200"
+    >
+      <Card.Body paddingY={5} paddingX={6}>
+        <Flex justifyContent="space-between" alignItems="center">
+          <Text fontWeight="semibold" fontSize="lg">
+            Need more?
+          </Text>
+          <Button asChild variant="outline" size="sm">
+            <Link href="mailto:sales@langwatch.ai">
+              Contact Sales
+            </Link>
+          </Button>
+        </Flex>
+      </Card.Body>
+    </Card.Root>
   );
 }
 
@@ -426,8 +385,9 @@ function UserManagementDrawer({
   users,
   plannedUsers,
   pendingInvitesWithMemberType,
-  seatPrice,
-  currencySymbol: sym,
+  seatPricePerPeriodCents,
+  billingPeriod,
+  currency,
   isLoading,
   onSave,
 }: {
@@ -436,8 +396,9 @@ function UserManagementDrawer({
   users: SubscriptionUser[];
   plannedUsers: PlannedUser[];
   pendingInvitesWithMemberType: PendingInviteWithMemberType[];
-  seatPrice: number;
-  currencySymbol: string;
+  seatPricePerPeriodCents: number;
+  billingPeriod: "monthly" | "annually";
+  currency: Currency;
   isLoading: boolean;
   onSave: (plannedUsers: PlannedUser[]) => void;
 }) {
@@ -502,7 +463,9 @@ function UserManagementDrawer({
     (u) => u.memberType === "FullMember",
   ).length;
   const totalFullMembersInDrawer = activeFullMembers + pendingFullMembers + plannedFullMembers;
-  const totalPriceInDrawer = totalFullMembersInDrawer * seatPrice;
+  const totalPriceCentsInDrawer = totalFullMembersInDrawer * seatPricePerPeriodCents;
+  const periodSuffix = billingPeriod === "annually" ? "/yr" : "/mo";
+  const priceLabel = billingPeriod === "annually" ? "Annual Price:" : "Monthly Price:";
 
   return (
     <Drawer.Root
@@ -705,9 +668,9 @@ function UserManagementDrawer({
               </HStack>
 
               <HStack justify="space-between">
-                <Text fontWeight="bold">Monthly Price:</Text>
+                <Text fontWeight="bold">{priceLabel}</Text>
                 <Text fontWeight="bold" color="blue.600" data-testid="monthly-price-footer">
-                  {sym}{totalPriceInDrawer}
+                  {formatPrice(totalPriceCentsInDrawer, currency)}{periodSuffix}
                 </Text>
               </HStack>
             </VStack>
@@ -815,11 +778,6 @@ export function SubscriptionPage() {
       }));
   }, [pendingInvites.data]);
 
-  // Count pending Full Member invites for display
-  const pendingFullMemberCount = pendingInvitesWithMemberType.filter(
-    (inv) => inv.memberType === "FullMember"
-  ).length;
-
   // Combine plannedUsers (from drawer) with pendingInvites (from DB) for billing calculation
   const allPlannedUsers = [...plannedUsers, ...pendingInvitesWithMemberType];
 
@@ -831,19 +789,21 @@ export function SubscriptionPage() {
   const totalUserCount = users.length + allPlannedUsers.length;
 
   const {
-    sym,
-    seatPrice,
+    seatPricePerPeriodCents,
+    periodSuffix,
     totalFullMembers,
     plannedFullMembers,
     pricePerSeat,
     totalPriceFormatted,
+    monthlyEquivalent,
   } = useBillingPricing({ currency, billingPeriod, users, plannedUsers: allPlannedUsers });
 
   // For update-seats flow: base on plan.maxMembers (what's already paid for), not recount of users
   // Only count NEW planned users from drawer (NOT pending invites, they're already in maxMembers)
   const newPlannedCoreSeatCount = plannedUsers.filter((u) => u.memberType === "FullMember").length;
   const updateTotalCoreMembers = (seatUsageM ?? totalFullMembers) + newPlannedCoreSeatCount;
-  const updateTotalPriceFormatted = `${sym}${updateTotalCoreMembers * seatPrice}/mo`;
+  const updateTotalCents = updateTotalCoreMembers * seatPricePerPeriodCents;
+  const updateTotalPriceFormatted = `${formatPrice(updateTotalCents, currency)}${periodSuffix}`;
 
   const handleSavePlannedUsers = (newPlannedUsers: PlannedUser[]) => {
     setPlannedUsers(newPlannedUsers);
@@ -886,11 +846,16 @@ export function SubscriptionPage() {
     : isDeveloperPlan
       ? "Free plan"
       : "Growth plan";
+  const priceCents = getGrowthSeatPriceCents();
+  const monthlyEquivCents =
+    billingPeriod === "annually"
+      ? Math.round(priceCents[currency].annual / 12)
+      : priceCents[currency].monthly;
   const currentPlanDescription = isTieredPricingModel
     ? undefined
     : isDeveloperPlan
       ? undefined
-      : `${sym}${seatPrice} per user/mo`;
+      : `${formatPrice(monthlyEquivCents, currency)} per user/mo`;
   const currentPlanFeatures = isTieredLegacyPaidPlan
     ? undefined
     : isDeveloperPlan
@@ -1003,7 +968,7 @@ export function SubscriptionPage() {
                 Growth Plan{" "}
                 {billingPeriod === "annually" && (
                   <Badge colorPalette="green" variant="subtle" fontSize="xs">
-                    Save {Math.round(ANNUAL_DISCOUNT * 100)}%
+                    Save {getAnnualDiscountPercent(currency)}%
                   </Badge>
                 )}
               </>
@@ -1011,9 +976,8 @@ export function SubscriptionPage() {
             pricePerSeat={pricePerSeat}
             totalPrice={totalPriceFormatted}
             coreMembers={totalFullMembers}
-            existingFullMembers={existingCoreMembers}
-            pendingFullMemberCount={pendingFullMemberCount}
             features={GROWTH_FEATURES}
+            monthlyEquivalent={monthlyEquivalent}
             onUpgrade={handleUpgrade}
             isLoading={isUpgradeLoading}
           />
@@ -1029,8 +993,8 @@ export function SubscriptionPage() {
           />
         )}
 
-        {/* Recent Invoices */}
-        <RecentInvoicesBlock />
+        {/* Contact Sales */}
+        <ContactSalesBlock />
       </VStack>
 
       <UserManagementDrawer
@@ -1039,8 +1003,9 @@ export function SubscriptionPage() {
         users={users}
         plannedUsers={plannedUsers}
         pendingInvitesWithMemberType={pendingInvitesWithMemberType}
-        seatPrice={seatPrice}
-        currencySymbol={sym}
+        seatPricePerPeriodCents={seatPricePerPeriodCents}
+        billingPeriod={billingPeriod}
+        currency={currency}
         isLoading={organizationWithMembers.isLoading}
         onSave={handleSavePlannedUsers}
       />

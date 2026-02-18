@@ -84,7 +84,7 @@ export function useSubscriptionActions({
     const result = await createSubscription.mutateAsync({
       organizationId,
       baseUrl: window.location.origin,
-      plan: "GROWTH_SEAT_USAGE",
+      plan: "GROWTH_SEAT_EVENT",
       membersToAdd: totalFullMembers,
       currency,
       billingInterval: billingPeriod === "annually" ? "annual" : "monthly",
@@ -113,7 +113,7 @@ export function useSubscriptionActions({
       onConfirm: async () => {
         await addTeamMemberOrEvents.mutateAsync({
           organizationId,
-          plan: "GROWTH_SEAT_USAGE",
+          plan: "GROWTH_SEAT_EVENT",
           upgradeMembers: true,
           upgradeTraces: false,
           totalMembers: updateTotalMembers,

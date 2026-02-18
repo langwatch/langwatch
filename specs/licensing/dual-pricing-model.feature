@@ -4,8 +4,8 @@ Feature: Dual Pricing Model — Seat+Usage Billing
   So that I can pay per core member seat and access Growth features
 
   # PricingModel vs PlanTypes:
-  #   PricingModel describes HOW billing works: "TIERED" (legacy) vs "SEAT_USAGE" (new seat+usage model).
-  #   PlanTypes describes WHAT plan the org is on: "GROWTH_SEAT_USAGE", "LAUNCH", "ACCELERATE", etc.
+  #   PricingModel describes HOW billing works: "TIERED" (legacy) vs "SEAT_EVENT" (new seat+usage model).
+  #   PlanTypes describes WHAT plan the org is on: "GROWTH_SEAT_EVENT", "LAUNCH", "ACCELERATE", etc.
 
   Background:
     Given I am logged in as an organization administrator on LangWatch Cloud
@@ -21,16 +21,16 @@ Feature: Dual Pricing Model — Seat+Usage Billing
     Then the organization's pricingModel is "TIERED"
 
   @unit
-  Scenario: Organization can be set to SEAT_USAGE pricing model
+  Scenario: Organization can be set to SEAT_EVENT pricing model
     Given an organization exists
-    When the organization's pricingModel is updated to "SEAT_USAGE"
-    Then the organization's pricingModel is "SEAT_USAGE"
+    When the organization's pricingModel is updated to "SEAT_EVENT"
+    Then the organization's pricingModel is "SEAT_EVENT"
 
   @integration
-  Scenario: Onboarding creates organizations with SEAT_USAGE pricing model
+  Scenario: Onboarding creates organizations with SEAT_EVENT pricing model
     Given I am onboarding a new organization
     When the organization is created via onboarding
-    Then the organization's pricingModel is "SEAT_USAGE"
+    Then the organization's pricingModel is "SEAT_EVENT"
 
   # ============================================================================
   # Stripe Utility: Growth Seat Usage helpers
@@ -64,15 +64,15 @@ Feature: Dual Pricing Model — Seat+Usage Billing
   # ============================================================================
 
   @integration
-  Scenario: Creating GROWTH_SEAT_USAGE subscription creates Stripe checkout
-    Given the organization has pricingModel "SEAT_USAGE"
+  Scenario: Creating GROWTH_SEAT_EVENT subscription creates Stripe checkout
+    Given the organization has pricingModel "SEAT_EVENT"
     And the organization has no active subscription
-    When I call subscription.create with plan "GROWTH_SEAT_USAGE" and 3 members
-    Then a PENDING subscription is created with plan "GROWTH_SEAT_USAGE"
+    When I call subscription.create with plan "GROWTH_SEAT_EVENT" and 3 members
+    Then a PENDING subscription is created with plan "GROWTH_SEAT_EVENT"
     And a Stripe checkout session is created with seat-based line items
     And the checkout success URL points to "/settings/subscription"
     And the checkout cancel URL points to "/settings/subscription"
-    And the organization's pricingModel is set to "SEAT_USAGE"
+    And the organization's pricingModel is set to "SEAT_EVENT"
 
   @integration
   Scenario: Creating LAUNCH subscription still uses legacy TIERED logic
@@ -84,8 +84,8 @@ Feature: Dual Pricing Model — Seat+Usage Billing
     And the checkout success URL points to "/settings/subscription"
 
   @integration
-  Scenario: Managing billing portal returns correct URL for SEAT_USAGE
-    Given the organization has pricingModel "SEAT_USAGE"
+  Scenario: Managing billing portal returns correct URL for SEAT_EVENT
+    Given the organization has pricingModel "SEAT_EVENT"
     When I call subscription.manage
     Then the billing portal return URL points to "/settings/subscription"
 
@@ -124,7 +124,7 @@ Feature: Dual Pricing Model — Seat+Usage Billing
     Given the organization has no active paid subscription
     And I have added 2 core member seats
     When I click "Upgrade now"
-    Then the subscription.create mutation is called with plan "GROWTH_SEAT_USAGE"
+    Then the subscription.create mutation is called with plan "GROWTH_SEAT_EVENT"
     And the mutation is called with the total core member count
 
   @integration

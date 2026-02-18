@@ -37,11 +37,14 @@ export type SubscriptionService = {
     membersToAdd?: number;
     tracesToAdd?: number;
     customerId: string;
+    currency?: "EUR" | "USD";
+    billingInterval?: "monthly" | "annual";
   }): Promise<{ url: string | null }>;
 
   createBillingPortalSession(params: {
     customerId: string;
     baseUrl: string;
+    organizationId: string;
   }): Promise<{ url: string }>;
 
   getLastNonCancelledSubscription(
@@ -62,10 +65,12 @@ export const createSubscriptionService = ({
   stripe,
   db,
   itemCalculator,
+  seatEventFns,
 }: {
   stripe: Stripe;
   db: PrismaClient;
   itemCalculator: ItemCalculator;
+  seatEventFns?: SeatEventSubscriptionFns;
 }): SubscriptionService => {
   const getLastNonCancelledSubscription = async (organizationId: string) => {
     return await db.subscription.findFirst({
@@ -86,6 +91,19 @@ export const createSubscriptionService = ({
       totalMembers,
       totalTraces,
     }) {
+      if (seatEventFns) {
+        const org = await db.organization.findUnique({
+          where: { id: organizationId },
+          select: { pricingModel: true },
+        });
+        if (org?.pricingModel === "SEAT_EVENT") {
+          return seatEventFns.updateSeatEventItems({
+            organizationId,
+            totalMembers,
+          });
+        }
+      }
+
       const lastSubscription =
         await getLastNonCancelledSubscription(organizationId);
 
@@ -125,7 +143,20 @@ export const createSubscriptionService = ({
       membersToAdd = 0,
       tracesToAdd = 0,
       customerId,
+      currency,
+      billingInterval,
     }) {
+      if (plan === PlanTypes.GROWTH_SEAT_EVENT && seatEventFns) {
+        return seatEventFns.createSeatEventCheckout({
+          organizationId,
+          customerId,
+          baseUrl,
+          currency: currency ?? "EUR",
+          billingInterval: billingInterval ?? "monthly",
+          membersToAdd,
+        });
+      }
+
       const lastSubscription =
         await getLastNonCancelledSubscription(organizationId);
 
@@ -225,7 +256,20 @@ export const createSubscriptionService = ({
       return { url: session.url };
     },
 
-    async createBillingPortalSession({ customerId, baseUrl }) {
+    async createBillingPortalSession({ customerId, baseUrl, organizationId }) {
+      if (seatEventFns && organizationId) {
+        const org = await db.organization.findUnique({
+          where: { id: organizationId },
+          select: { pricingModel: true },
+        });
+        if (org?.pricingModel === "SEAT_EVENT") {
+          return seatEventFns.seatEventBillingPortalUrl({
+            customerId,
+            baseUrl,
+          });
+        }
+      }
+
       const session = await stripe.billingPortal.sessions.create({
         customer: customerId,
         return_url: `${baseUrl}/settings/subscription`,

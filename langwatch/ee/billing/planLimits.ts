@@ -151,6 +151,19 @@ export const PLAN_LIMITS: Record<PlanType, PlanInfo> = {
       EUR: 399,
     },
   }),
+  [PlanTypes.GROWTH_SEAT_EVENT]: definePaidPlan({
+    type: PlanTypes.GROWTH_SEAT_EVENT,
+    name: "Growth",
+    maxMembers: 20,
+    maxProjects: 99,
+    maxMessagesPerMonth: 200_000,
+    evaluationsCredit: 9999,
+    userPrice: { EUR: 29, USD: 32 },
+    prices: {
+      USD: 0,
+      EUR: 0,
+    },
+  }),
   [PlanTypes.ENTERPRISE]: definePaidPlan({
     type: PlanTypes.ENTERPRISE,
     name: "Enterprise",

@@ -5,7 +5,7 @@ type ActivePlanLike = {
   free?: boolean | null;
 };
 
-const GROWTH_PLAN_TYPES = new Set(["GROWTH", "GROWTH_SEAT_USAGE"]);
+const GROWTH_PLAN_TYPES = new Set(["GROWTH", "GROWTH_SEAT_EVENT"]);
 
 export function resolveCurrentComparisonPlan(
   activePlan?: ActivePlanLike,

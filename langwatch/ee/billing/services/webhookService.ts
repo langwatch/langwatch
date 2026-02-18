@@ -4,6 +4,7 @@ import { createLogger } from "../../../src/utils/logger";
 import { notifySubscriptionEvent } from "../notifications/notificationHandlers";
 import { SubscriptionStatus } from "../planTypes";
 import type { calculateQuantityForPrice, prices } from "./subscriptionItemCalculator";
+import { isGrowthEventsPrice, isGrowthSeatPrice } from "../utils/growthSeatEvent";
 
 const logger = createLogger("langwatch:billing:webhookService");
 
@@ -89,6 +90,13 @@ export const createWebhookService = ({
     });
 
     if (previousSubscription.status !== SubscriptionStatus.ACTIVE) {
+      if (updatedSubscription.plan === "GROWTH_SEAT_EVENT") {
+        await db.organization.update({
+          where: { id: updatedSubscription.organizationId },
+          data: { pricingModel: "SEAT_EVENT" },
+        });
+      }
+
       await notifySubscriptionEvent({
         type: "confirmed",
         organizationId: updatedSubscription.organizationId,
@@ -229,20 +237,23 @@ export const createWebhookService = ({
         let usersQuantity: number | null = null;
 
         for (const item of subscription.items.data) {
-          const calculateQuantity =
-            itemCalculator.calculateQuantityForPrice({
-              priceId: item.price.id,
-              quantity: item.quantity ?? 0,
-              plan: existingSubForUpdate.plan,
-            });
-
-          if (
+          if (isGrowthSeatPrice(item.price.id)) {
+            usersQuantity = item.quantity ?? 0;
+          } else if (isGrowthEventsPrice(item.price.id)) {
+            // Events price exists on the subscription; traces limit comes from plan limits
+          } else if (
             item.price.id === itemCalculator.prices.LAUNCH_USERS ||
             item.price.id === itemCalculator.prices.ACCELERATE_USERS ||
             item.price.id === itemCalculator.prices.LAUNCH_ANNUAL_USERS ||
             item.price.id ===
               itemCalculator.prices.ACCELERATE_ANNUAL_USERS
           ) {
+            const calculateQuantity =
+              itemCalculator.calculateQuantityForPrice({
+                priceId: item.price.id,
+                quantity: item.quantity ?? 0,
+                plan: existingSubForUpdate.plan,
+              });
             usersQuantity = calculateQuantity;
           } else if (
             item.price.id ===
@@ -253,6 +264,12 @@ export const createWebhookService = ({
             item.price.id ===
               itemCalculator.prices.ACCELERATE_ANNUAL_TRACES_100K
           ) {
+            const calculateQuantity =
+              itemCalculator.calculateQuantityForPrice({
+                priceId: item.price.id,
+                quantity: item.quantity ?? 0,
+                plan: existingSubForUpdate.plan,
+              });
             tracesQuantity = calculateQuantity;
           }
         }

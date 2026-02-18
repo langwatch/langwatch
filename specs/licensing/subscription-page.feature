@@ -12,8 +12,8 @@ Feature: Subscription Page Plan Management
   # ============================================================================
 
   @integration
-  Scenario: SEAT_USAGE organization sees billing page on subscription route
-    Given the organization uses the SEAT_USAGE pricing model
+  Scenario: SEAT_EVENT organization sees billing page on subscription route
+    Given the organization uses the SEAT_EVENT pricing model
     When I navigate to the subscription page
     Then I see the billing page content
     And I see the current plan block

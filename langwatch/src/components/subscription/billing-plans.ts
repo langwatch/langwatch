@@ -1,16 +1,21 @@
 /**
  * Shared billing plan constants
  *
- * Single source of truth for pricing, currency, and feature data
- * used by both SubscriptionPage and PlansComparisonPage.
+ * Pricing is derived from the Stripe catalog (single source of truth).
+ * Feature lists and currency helpers used by SubscriptionPage and PlansComparisonPage.
  */
 
-export type Currency = "EUR" | "USD";
+export type { Currency } from "../../../ee/billing/pricing";
+export {
+  getGrowthSeatPriceCents,
+  getAnnualDiscountPercent,
+  formatPrice,
+} from "../../../ee/billing/pricing";
 
-export const SEAT_PRICE: Record<Currency, number> = { EUR: 29, USD: 32 };
-export const ANNUAL_DISCOUNT = 0.08;
-
-export const currencySymbol: Record<Currency, string> = { EUR: "€", USD: "$" };
+export const currencySymbol: Record<"EUR" | "USD", string> = {
+  EUR: "\u20AC",
+  USD: "$",
+};
 
 /**
  * Developer plan features for current plan block
@@ -31,4 +36,41 @@ export const GROWTH_FEATURES = [
   "30 days retention",
   "Unlimited evals",
   "Private Slack support",
+];
+
+/**
+ * Plan comparison page feature lists (detailed)
+ */
+export const FREE_PLAN_FEATURES = [
+  "All platform features",
+  "50,000 events included",
+  "14 days data retention",
+  "2 users",
+  "3 scenarios, 3 simulations, 3 custom evaluations",
+  "Community support",
+];
+
+export const GROWTH_PLAN_FEATURES = [
+  "Everything in Free",
+  "200,000 events included",
+  "$1 per additional 100,000 events",
+  "30 days retention (+ custom at $3/GB)",
+  "Up to 20 core users (volume discount available)",
+  "Unlimited lite users",
+  "Unlimited evals, simulations and prompts",
+  "Slack support",
+];
+
+export const ENTERPRISE_PLAN_FEATURES = [
+  "Alternative hosting options",
+  "Custom data retention",
+  "Custom SSO / RBAC",
+  "Audit logs",
+  "Uptime & Support SLA",
+  "Compliance and legal reviews",
+  "Custom terms and DPA",
+  "Dedicated Solution Engineer",
+  "Slack / Teams support",
+  "AWS/Azure/GCP Marketplace",
+  "ISO27001 / SOC2 reports",
 ];
