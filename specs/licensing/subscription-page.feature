@@ -101,8 +101,8 @@ Feature: Subscription Page Plan Management
     Given the organization has no active paid subscription
     When I click on the user count in the plan block
     Then a drawer opens showing "Manage Seats"
-    And I see a "Current Members" section with organization users
-    And I see a "Pending Seats" section
+    And I see a collapsible "Show N Members" button for current members
+    And I see a "Seats available" section
 
   @integration
   Scenario: Drawer does not display alert banners
@@ -114,25 +114,24 @@ Feature: Subscription Page Plan Management
   Scenario: User list shows member type for each user
     Given the organization has users:
       | name       | type        |
-      | Admin User | Core User   |
-      | Jane Doe   | Lite User   |
+      | Admin User | Full Member |
+      | Jane Doe   | Lite Member |
     When I open the seat management drawer
     Then each user shows their member type badge
-    And "Admin User" shows "Core User"
-    And "Jane Doe" shows "Lite User"
+    And "Admin User" shows "Full Member"
+    And "Jane Doe" shows "Lite Member"
 
   @integration
-  Scenario: Add Seat button uses plus icon
+  Scenario: Add Seat button is positioned next to Seats available header
     When I open the seat management drawer
-    Then I see a button labeled "Add Seat"
-    And the button displays a plus icon
+    Then I see a button labeled "Add Seat" with a plus icon
+    And the button is aligned to the right of the "Seats available" header
 
   @integration
   Scenario: Clicking Add Seat adds a pending seat immediately
     When I open the seat management drawer
     And I click "Add Seat"
-    Then a new pending seat row appears with an email input and member type selector
-    And the member type defaults to "Full Member"
+    Then a new pending seat row appears with an email input and a "Full Member" badge
     And the pending seat count increases by 1
 
   @integration
@@ -141,13 +140,6 @@ Feature: Subscription Page Plan Management
     And I click "Add Seat"
     And I enter "newuser@example.com" in the seat email field
     Then the pending seat row shows the entered email
-
-  @integration
-  Scenario: Can change pending seat member type to Lite Member
-    When I open the seat management drawer
-    And I click "Add Seat"
-    And I change the seat member type to "Lite Member"
-    Then the pending seat shows "Lite Member" selected
 
   @integration
   Scenario: Clicking Add Seat multiple times in a row adds multiple seats
@@ -184,6 +176,64 @@ Feature: Subscription Page Plan Management
     And I close the drawer by clicking Done
     And I reopen the seat management drawer
     Then 2 pending seat rows are shown
+
+  # ============================================================================
+  # Drawer Auto-Fill for Available Seats
+  # ============================================================================
+
+  @integration
+  Scenario: Drawer shows available seat rows for unused seats on Growth plan
+    Given the organization has an active Growth subscription with 6 seats
+    And the organization has 1 active core member
+    When I open the seat management drawer
+    Then I see 5 empty seat rows in the "Seats available" section
+    And the drawer footer shows "Total Seats: 6"
+
+  @integration
+  Scenario: Drawer shows remaining available seats when some are pending
+    Given the organization has an active Growth subscription with 6 seats
+    And the organization has 1 active core member
+    And the organization has 2 pending core invites
+    When I open the seat management drawer
+    Then I see 3 empty seat rows in the "Seats available" section
+    And the drawer footer shows "Total Seats: 6"
+
+  @integration
+  Scenario: Closing drawer without changes does not trigger subscription update
+    Given the organization has an active Growth subscription with 6 seats
+    And the organization has 2 active core members
+    When I open the seat management drawer
+    And I close the drawer by clicking Done without entering any emails
+    Then the subscription page does not show the "Update seats" block
+
+  @integration
+  Scenario: Filling email in auto-filled row sends invite without changing subscription
+    Given the organization has an active Growth subscription with 6 seats
+    And the organization has 2 active core members
+    When I open the seat management drawer
+    And I enter "newuser@example.com" in the first available seat row
+    And I close the drawer by clicking Done
+    Then an invite is sent to "newuser@example.com"
+    And no subscription update is triggered
+
+  @integration
+  Scenario: Deleting auto-filled empty row shows subscription downgrade option
+    Given the organization has an active Growth subscription with 6 seats
+    And the organization has 2 active core members
+    When I open the seat management drawer
+    And I delete an empty available seat row
+    And I close the drawer by clicking Done
+    Then I see an "Update seats" block showing reduced seat count
+
+  @integration
+  Scenario: Free plan user filling seat does not send invite
+    Given the organization has no active paid subscription
+    When I open the seat management drawer
+    And I click "Add Seat"
+    And I enter "newuser@example.com" in the seat email field
+    And I close the drawer by clicking Done
+    Then no invite is sent
+    And the "Upgrade required" badge appears on the current plan block
 
   # ============================================================================
   # Billing Toggles and Dynamic Pricing
@@ -268,6 +318,16 @@ Feature: Subscription Page Plan Management
     And I close the drawer by clicking Done
     Then I see an "Update seats" block with seat count and price
     And I can click "Update subscription" to finalize the changes
+
+  @integration
+  Scenario: Clicking Discard on Update seats block restores original state
+    Given the organization has an active Growth subscription
+    When I open the seat management drawer
+    And I click "Add Seat"
+    And I close the drawer by clicking Done
+    And I click "Discard" on the Update seats block
+    Then the "Update seats" block disappears
+    And the user count returns to its original value
 
   @integration
   Scenario: Growth plan user sees Manage Subscription button
