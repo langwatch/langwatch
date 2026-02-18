@@ -2,7 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import type Stripe from "stripe";
 import { createLogger } from "../../../src/utils/logger";
 import { notifySubscriptionEvent } from "../notifications/notificationHandlers";
-import { SubscriptionStatus } from "../planTypes";
+import { PlanTypes, SubscriptionStatus } from "../planTypes";
 import type { calculateQuantityForPrice, prices } from "./subscriptionItemCalculator";
 import { isGrowthEventsPrice, isGrowthSeatPrice } from "../utils/growthSeatEvent";
 
@@ -45,9 +45,11 @@ export type WebhookService = {
 
 export const createWebhookService = ({
   db,
+  stripe,
   itemCalculator,
 }: {
   db: PrismaClient;
+  stripe: Stripe;
   itemCalculator: ItemCalculator;
 }): WebhookService => {
   const syncInvoicePaymentSuccess = async ({
@@ -91,10 +93,56 @@ export const createWebhookService = ({
 
     if (previousSubscription.status !== SubscriptionStatus.ACTIVE) {
       if (updatedSubscription.plan === "GROWTH_SEAT_EVENT") {
-        await db.organization.update({
-          where: { id: updatedSubscription.organizationId },
-          data: { pricingModel: "SEAT_EVENT" },
+        const TIERED_PLAN_TYPES: PlanTypes[] = [
+          PlanTypes.LAUNCH,
+          PlanTypes.ACCELERATE,
+          PlanTypes.LAUNCH_ANNUAL,
+          PlanTypes.ACCELERATE_ANNUAL,
+          PlanTypes.PRO,
+          PlanTypes.GROWTH,
+        ];
+
+        const oldSubscriptions = await db.$transaction(async (tx) => {
+          await tx.organization.update({
+            where: { id: updatedSubscription.organizationId },
+            data: { pricingModel: "SEAT_EVENT" },
+          });
+
+          const oldSubs = await tx.subscription.findMany({
+            where: {
+              organizationId: updatedSubscription.organizationId,
+              id: { not: updatedSubscription.id },
+              status: { not: SubscriptionStatus.CANCELLED },
+              stripeSubscriptionId: { not: null },
+              plan: { in: TIERED_PLAN_TYPES },
+            },
+          });
+
+          // Mark CANCELLED in DB first, before Stripe call
+          for (const oldSub of oldSubs) {
+            await tx.subscription.update({
+              where: { id: oldSub.id },
+              data: { status: SubscriptionStatus.CANCELLED, endDate: new Date() },
+            });
+          }
+          return oldSubs;
         });
+
+        // Cancel in Stripe after DB is consistent (outside transaction)
+        for (const oldSub of oldSubscriptions) {
+          if (oldSub.stripeSubscriptionId) {
+            try {
+              await stripe.subscriptions.cancel(oldSub.stripeSubscriptionId, {
+                prorate: true,
+              });
+            } catch (err) {
+              logger.error(
+                { stripeSubscriptionId: oldSub.stripeSubscriptionId, err },
+                "[stripeWebhook] CRITICAL: Failed to cancel old Stripe subscription during upgrade. Manual intervention required.",
+              );
+            }
+          }
+        }
       }
 
       await notifySubscriptionEvent({
@@ -182,6 +230,15 @@ export const createWebhookService = ({
         logger.warn(
           { stripeSubscriptionId },
           "[stripeWebhook] No subscription for deletion event, skipping",
+        );
+        return;
+      }
+
+      // Idempotency: if already CANCELLED (e.g., by upgrade flow), skip redundant update
+      if (existingSubscription.status === SubscriptionStatus.CANCELLED) {
+        logger.info(
+          { stripeSubscriptionId },
+          "[stripeWebhook] Subscription already cancelled, skipping redundant update",
         );
         return;
       }

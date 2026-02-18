@@ -15,8 +15,28 @@ const mockNotifySubscriptionEvent = notifySubscriptionEvent as ReturnType<
 const createMockDb = () => ({
   subscription: {
     findUnique: vi.fn(),
+    findMany: vi.fn().mockResolvedValue([]),
     update: vi.fn(),
     updateMany: vi.fn(),
+  },
+  organization: {
+    update: vi.fn(),
+  },
+  $transaction: vi.fn(async (fn: (tx: any) => Promise<any>) => {
+    const tx = {
+      organization: { update: vi.fn() },
+      subscription: {
+        findMany: vi.fn().mockResolvedValue([]),
+        update: vi.fn(),
+      },
+    };
+    return fn(tx);
+  }),
+});
+
+const createMockStripe = () => ({
+  subscriptions: {
+    cancel: vi.fn().mockResolvedValue({}),
   },
 });
 
@@ -50,6 +70,7 @@ const createMockItemCalculator = () => ({
 
 describe("webhookService", () => {
   let db: ReturnType<typeof createMockDb>;
+  let stripe: ReturnType<typeof createMockStripe>;
   let itemCalculator: ReturnType<typeof createMockItemCalculator>;
   let service: ReturnType<typeof createWebhookService>;
 
@@ -57,9 +78,11 @@ describe("webhookService", () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     db = createMockDb();
+    stripe = createMockStripe();
     itemCalculator = createMockItemCalculator();
     service = createWebhookService({
       db: db as any,
+      stripe: stripe as any,
       itemCalculator,
     });
   });
@@ -213,6 +236,119 @@ describe("webhookService", () => {
             maxProjects: null,
             evaluationsCredit: null,
           },
+        });
+      });
+    });
+
+    describe("when subscription is already CANCELLED", () => {
+      it("skips the update (idempotency)", async () => {
+        db.subscription.findUnique.mockResolvedValue({
+          id: "sub_db_1",
+          status: SubscriptionStatus.CANCELLED,
+        });
+
+        await service.handleSubscriptionDeleted({
+          stripeSubscriptionId: "sub_stripe_1",
+        });
+
+        expect(db.subscription.update).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("handleInvoicePaymentSucceeded()", () => {
+    describe("when GROWTH_SEAT_EVENT sub activates from PENDING", () => {
+      beforeEach(() => {
+        db.subscription.findUnique.mockResolvedValue({
+          id: "sub_db_new",
+          status: SubscriptionStatus.PENDING,
+        });
+        db.subscription.update.mockResolvedValue({
+          id: "sub_db_new",
+          organizationId: "org_1",
+          organization: { name: "Acme" },
+          plan: "GROWTH_SEAT_EVENT",
+          startDate: new Date(),
+          maxMembers: 5,
+          maxMessagesPerMonth: null,
+          status: SubscriptionStatus.ACTIVE,
+        });
+      });
+
+      describe("when old TIERED subscriptions exist", () => {
+        beforeEach(() => {
+          db.$transaction.mockImplementation(async (fn: any) => {
+            const tx = {
+              organization: { update: vi.fn() },
+              subscription: {
+                findMany: vi.fn().mockResolvedValue([{
+                  id: "old_sub_1",
+                  stripeSubscriptionId: "sub_stripe_old",
+                  plan: "ACCELERATE",
+                  status: "ACTIVE",
+                }]),
+                update: vi.fn(),
+              },
+            };
+            return fn(tx);
+          });
+        });
+
+        it("cancels old TIERED subscription in Stripe with proration", async () => {
+          const promise = service.handleInvoicePaymentSucceeded({
+            subscriptionId: "sub_stripe_new",
+            throwOnMissing: false,
+          });
+          await vi.advanceTimersByTimeAsync(2000);
+          await promise;
+
+          expect(stripe.subscriptions.cancel).toHaveBeenCalledWith(
+            "sub_stripe_old",
+            { prorate: true },
+          );
+        });
+      });
+
+      describe("when no old TIERED subscriptions exist", () => {
+        it("does not cancel any Stripe subscriptions", async () => {
+          const promise = service.handleInvoicePaymentSucceeded({
+            subscriptionId: "sub_stripe_new",
+            throwOnMissing: false,
+          });
+          await vi.advanceTimersByTimeAsync(2000);
+          await promise;
+
+          expect(stripe.subscriptions.cancel).not.toHaveBeenCalled();
+        });
+      });
+
+      describe("when Stripe cancel fails", () => {
+        beforeEach(() => {
+          db.$transaction.mockImplementation(async (fn: any) => {
+            const tx = {
+              organization: { update: vi.fn() },
+              subscription: {
+                findMany: vi.fn().mockResolvedValue([{
+                  id: "old_sub_1",
+                  stripeSubscriptionId: "sub_stripe_old",
+                  plan: "LAUNCH",
+                  status: "ACTIVE",
+                }]),
+                update: vi.fn(),
+              },
+            };
+            return fn(tx);
+          });
+          stripe.subscriptions.cancel.mockRejectedValue(new Error("Stripe down"));
+        });
+
+        it("resolves without throwing", async () => {
+          const promise = service.handleInvoicePaymentSucceeded({
+            subscriptionId: "sub_stripe_new",
+            throwOnMissing: false,
+          });
+          await vi.advanceTimersByTimeAsync(2000);
+          await expect(promise).resolves.toBeUndefined();
         });
       });
     });

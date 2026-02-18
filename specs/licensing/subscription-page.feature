@@ -266,7 +266,7 @@ Feature: Subscription Page Plan Management
     When I open the seat management drawer
     And I click "Add Seat"
     And I close the drawer by clicking Done
-    Then I see an "Update Seats" block with seat count and price
+    Then I see an "Update seats" block with seat count and price
     And I can click "Update subscription" to finalize the changes
 
   @integration

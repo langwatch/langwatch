@@ -22,7 +22,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ArrowRight, Check, Plus, Trash2 } from "lucide-react";
+import { ArrowRight, Check, Info, Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import SettingsLayout from "~/components/SettingsLayout";
 import { Drawer } from "~/components/ui/drawer";
@@ -33,7 +33,6 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import {
   type Currency,
-  getGrowthSeatPriceCents,
   getAnnualDiscountPercent,
   formatPrice,
   DEVELOPER_FEATURES,
@@ -207,7 +206,7 @@ function CurrentPlanBlock({
 }
 
 /**
- * Update Seats Block - allows Growth plan users to finalize seat changes
+ * Update seats Block - allows Growth plan users to finalize seat changes
  */
 function UpdateSeatsBlock({
   totalFullMembers,
@@ -230,7 +229,7 @@ function UpdateSeatsBlock({
         <Flex justifyContent="space-between" alignItems="center">
           <VStack align="start" gap={1}>
             <Text fontWeight="semibold" fontSize="lg">
-              Update Seats
+              Update seats
             </Text>
             <Text fontSize="sm" color="gray.700">
               {totalPrice} for {totalFullMembers} Full Member
@@ -703,6 +702,7 @@ export function SubscriptionPage() {
     "monthly",
   );
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showUpgradeCredit, setShowUpgradeCredit] = useState(false);
 
   // Detect currency from IP geolocation
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -721,8 +721,10 @@ export function SubscriptionPage() {
   }, [detectedCurrency?.data, currencyInitialized]);
 
   useEffect(() => {
-    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).has("success")) {
-      setShowSuccess(true);
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.has("success")) setShowSuccess(true);
+      if (params.has("upgraded_from")) setShowUpgradeCredit(true);
     }
   }, []);
 
@@ -764,7 +766,8 @@ export function SubscriptionPage() {
   const plan = activePlan.data;
   const isDeveloperPlan = plan?.free ?? true;
   const isTieredPricingModel = organization?.pricingModel === "TIERED";
-  const isTieredLegacyPaidPlan = isTieredPricingModel && !isDeveloperPlan;
+  const isEnterprisePlan = plan?.type === "ENTERPRISE";
+  const isTieredLegacyPaidPlan = isTieredPricingModel && !isDeveloperPlan && !isEnterprisePlan;
 
   // Classify and map pending invites to include in billing calculation
   const pendingInvitesWithMemberType = useMemo(() => {
@@ -846,16 +849,11 @@ export function SubscriptionPage() {
     : isDeveloperPlan
       ? "Free plan"
       : "Growth plan";
-  const priceCents = getGrowthSeatPriceCents();
-  const monthlyEquivCents =
-    billingPeriod === "annually"
-      ? Math.round(priceCents[currency].annual / 12)
-      : priceCents[currency].monthly;
   const currentPlanDescription = isTieredPricingModel
     ? undefined
     : isDeveloperPlan
       ? undefined
-      : `${formatPrice(monthlyEquivCents, currency)} per user/mo`;
+      : `${formatPrice(seatPricePerPeriodCents * (plan?.maxMembers ?? 1), currency)}${periodSuffix}`;
   const currentPlanFeatures = isTieredLegacyPaidPlan
     ? undefined
     : isDeveloperPlan
@@ -936,10 +934,38 @@ export function SubscriptionPage() {
             borderRadius="md"
             padding={4}
           >
-            <HStack gap={2}>
-              <Check size={16} color="green" />
-              <Text fontWeight="semibold" color="green.800">
-                Subscription activated successfully!
+            <VStack align="start" gap={1}>
+              <HStack gap={2}>
+                <Check size={16} color="green" />
+                <Text fontWeight="semibold" color="green.800">
+                  Subscription activated successfully!
+                </Text>
+              </HStack>
+              {showUpgradeCredit && (
+                <Text fontSize="sm" color="green.700" data-testid="credit-notice">
+                  Your previous plan has been prorated. Any unused credit has been
+                  applied to your account and will offset future invoices.
+                </Text>
+              )}
+            </VStack>
+          </Box>
+        )}
+
+        {/* Deprecated pricing notice for TIERED paid orgs */}
+        {isTieredLegacyPaidPlan && (
+          <Box
+            data-testid="tiered-deprecated-notice"
+            backgroundColor="orange.50"
+            borderWidth={1}
+            borderColor="orange.200"
+            borderRadius="md"
+            padding={4}
+          >
+            <HStack gap={2} alignItems="start">
+              <Info size={16} color="var(--chakra-colors-orange-500)" />
+              <Text fontSize="sm" color="orange.900">
+                Your current pricing model has been discontinued. Upgrade to
+                per-seat billing for more flexibility and up to 20 core members.
               </Text>
             </HStack>
           </Box>
@@ -960,8 +986,8 @@ export function SubscriptionPage() {
           isManageLoading={isManageLoading}
         />
 
-        {/* Upgrade Block - show for free plan on both pricing models */}
-        {isDeveloperPlan && (
+        {/* Upgrade Block - show for free plan and TIERED legacy paid orgs */}
+        {(isDeveloperPlan || isTieredLegacyPaidPlan) && (
           <UpgradePlanBlock
             planName={
               <>
@@ -983,7 +1009,7 @@ export function SubscriptionPage() {
           />
         )}
 
-        {/* Update Seats Block - show for Growth seat+usage plan when seats have been added */}
+        {/* Update seats Block - show for Growth seat+usage plan when seats have been added */}
         {!isDeveloperPlan && plannedUsers.length > 0 && !isTieredPricingModel && (
           <UpdateSeatsBlock
             totalFullMembers={updateTotalCoreMembers}
