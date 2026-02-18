@@ -19,7 +19,7 @@ import {
   DialogTitle,
 } from "../ui/dialog";
 import { Checkbox } from "../ui/checkbox";
-import { SmallLabel } from "../SmallLabel";
+import { HorizontalFormControl } from "../HorizontalFormControl";
 
 /**
  * Parameters shown in the dialog — only the ones we actually
@@ -179,35 +179,38 @@ export function AddCustomModelDialog({
         </DialogHeader>
         <DialogCloseTrigger />
         <DialogBody>
-          <VStack gap={4} align="stretch">
-            <VStack gap={1} align="stretch">
-              <SmallLabel>Model ID</SmallLabel>
+          <VStack gap={0} align="stretch">
+            <HorizontalFormControl
+              label="Model ID"
+              helper="Exactly as your provider specifies it, e.g. a fine-tune ID or deployment name"
+              error={errors.modelId ? <Text color="red.500" fontSize="xs">{errors.modelId}</Text> : undefined}
+            >
               <Input
                 placeholder="e.g. gpt-5-custom"
                 value={modelId}
                 onChange={(e) => handleModelIdChange(e.target.value)}
                 aria-label="Model ID"
               />
-              {errors.modelId && (
-                <SmallLabel color="red.500">{errors.modelId}</SmallLabel>
-              )}
-            </VStack>
+            </HorizontalFormControl>
 
-            <VStack gap={1} align="stretch">
-              <SmallLabel>Display Name</SmallLabel>
+            <HorizontalFormControl
+              label="Display Name"
+              helper="How this model appears in selectors across LangWatch"
+              error={errors.displayName ? <Text color="red.500" fontSize="xs">{errors.displayName}</Text> : undefined}
+            >
               <Input
                 placeholder="e.g. GPT-5 Custom"
                 value={displayName}
                 onChange={(e) => handleDisplayNameChange(e.target.value)}
                 aria-label="Display Name"
               />
-              {errors.displayName && (
-                <SmallLabel color="red.500">{errors.displayName}</SmallLabel>
-              )}
-            </VStack>
+            </HorizontalFormControl>
 
-            <VStack gap={1} align="stretch">
-              <SmallLabel>Max Tokens</SmallLabel>
+            <HorizontalFormControl
+              label="Max Tokens"
+              helper="Maximum number of output tokens the model supports"
+              error={errors.maxTokens ? <Text color="red.500" fontSize="xs">{errors.maxTokens}</Text> : undefined}
+            >
               <Input
                 type="number"
                 placeholder="e.g. 8192"
@@ -215,13 +218,12 @@ export function AddCustomModelDialog({
                 onChange={(e) => setMaxTokens(e.target.value)}
                 aria-label="Max Tokens"
               />
-              {errors.maxTokens && (
-                <SmallLabel color="red.500">{errors.maxTokens}</SmallLabel>
-              )}
-            </VStack>
+            </HorizontalFormControl>
 
-            <VStack gap={1} align="stretch">
-              <SmallLabel>Supported Parameters</SmallLabel>
+            <HorizontalFormControl
+              label="Supported Parameters"
+              helper="Which sampling parameters this model accepts"
+            >
               <Wrap gap={3}>
                 {DIALOG_PARAMETERS.map((param) => (
                   <Checkbox
@@ -234,10 +236,12 @@ export function AddCustomModelDialog({
                   </Checkbox>
                 ))}
               </Wrap>
-            </VStack>
+            </HorizontalFormControl>
 
-            <VStack gap={1} align="stretch">
-              <SmallLabel>Multimodal Support</SmallLabel>
+            <HorizontalFormControl
+              label="Multimodal Support"
+              helper="Input types this model can process besides text"
+            >
               <Wrap gap={3}>
                 {multimodalInputValues.map((input) => (
                   <Checkbox
@@ -250,7 +254,7 @@ export function AddCustomModelDialog({
                   </Checkbox>
                 ))}
               </Wrap>
-            </VStack>
+            </HorizontalFormControl>
           </VStack>
         </DialogBody>
         <DialogFooter>
