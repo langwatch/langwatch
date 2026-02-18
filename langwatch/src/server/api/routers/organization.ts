@@ -289,6 +289,7 @@ export const organizationRouter = createTRPCRouter({
               slug: orgSlug,
               phoneNumber: input.phoneNumber,
               signupData: input.signUpData,
+              pricingModel: "SEAT_USAGE",
             },
           });
 
@@ -929,8 +930,7 @@ export const organizationRouter = createTRPCRouter({
     .input(z.object({ inviteId: z.string(), organizationId: z.string() }))
     .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input, ctx }) => {
-      const prisma = ctx.prisma;
-      await prisma.organizationInvite.delete({
+      await ctx.prisma.organizationInvite.delete({
         where: { id: input.inviteId, organizationId: input.organizationId },
       });
     }),

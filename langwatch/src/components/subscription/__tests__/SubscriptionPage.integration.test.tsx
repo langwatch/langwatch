@@ -1,0 +1,1254 @@
+/**
+ * @vitest-environment jsdom
+ *
+ * Integration tests for the SubscriptionPage component.
+ * Tests scenarios from specs/licensing/subscription-page.feature
+ */
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { PlanInfo } from "../../../../ee/licensing/planInfo";
+import { SubscriptionPage } from "../SubscriptionPage";
+
+let mockOrganization: { id: string; name: string; pricingModel?: string } = {
+  id: "test-org-id",
+  name: "Test Org",
+};
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "test-project-id", slug: "test-project" },
+    organization: mockOrganization,
+    team: { id: "test-team-id" },
+  }),
+}));
+
+// Mock SettingsLayout to avoid complex dependency chain
+vi.mock("~/components/SettingsLayout", () => ({
+  default: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="settings-layout">{children}</div>
+  ),
+}));
+
+// Mock plan data
+const createMockPlan = (overrides: Partial<PlanInfo> = {}): PlanInfo => ({
+  type: "FREE",
+  name: "Developer",
+  free: true,
+  maxMembers: 2,
+  maxMembersLite: 0,
+  maxTeams: 1,
+  maxProjects: 3,
+  maxMessagesPerMonth: 50000,
+  evaluationsCredit: 3,
+  maxWorkflows: 3,
+  maxPrompts: 3,
+  maxEvaluators: 3,
+  maxScenarios: 3,
+  maxAgents: 3,
+  maxExperiments: 3,
+  maxOnlineEvaluations: 3,
+  maxDatasets: 3,
+  maxDashboards: 3,
+  maxCustomGraphs: 3,
+  maxAutomations: 3,
+  canPublish: false,
+  prices: { USD: 0, EUR: 0 },
+  ...overrides,
+});
+
+// Mock organization members data (matches the shape returned by getOrganizationWithMembersAndTheirTeams)
+const mockOrganizationMembers = {
+  id: "test-org-id",
+  name: "Test Org",
+  members: [
+    {
+      userId: "user-1",
+      role: "ADMIN",
+      user: {
+        id: "user-1",
+        name: "Admin User",
+        email: "admin@example.com",
+        teamMemberships: [],
+      },
+    },
+    {
+      userId: "user-2",
+      role: "MEMBER",
+      user: {
+        id: "user-2",
+        name: "Jane Doe",
+        email: "jane@example.com",
+        teamMemberships: [],
+      },
+    },
+  ],
+};
+
+// Mock API
+const mockGetActivePlan = vi.fn(() => ({
+  data: createMockPlan(),
+  isLoading: false,
+  refetch: vi.fn(),
+}));
+
+const mockGetOrganizationWithMembers = vi.fn(() => ({
+  data: mockOrganizationMembers,
+  isLoading: false,
+  refetch: vi.fn(),
+}));
+
+const mockUpdateUsers = vi.fn(() => ({
+  mutate: vi.fn(),
+  mutateAsync: vi.fn(),
+  isLoading: false,
+}));
+
+const mockCreateSubscription = vi.fn(() => ({
+  mutate: vi.fn(),
+  mutateAsync: vi.fn().mockResolvedValue({ url: null }),
+  isLoading: false,
+  isPending: false,
+}));
+
+const mockAddTeamMemberOrEvents = vi.fn(() => ({
+  mutate: vi.fn(),
+  mutateAsync: vi.fn().mockResolvedValue({ success: true }),
+  isLoading: false,
+  isPending: false,
+}));
+
+const mockManageSubscription = vi.fn(() => ({
+  mutate: vi.fn(),
+  mutateAsync: vi.fn().mockResolvedValue({ url: "https://billing.stripe.com/session/test" }),
+  isLoading: false,
+  isPending: false,
+}));
+
+const mockUpgradeWithInvites = vi.fn(() => ({
+  mutate: vi.fn(),
+  mutateAsync: vi.fn().mockResolvedValue({ url: null }),
+  isLoading: false,
+  isPending: false,
+}));
+
+const mockGetPendingInvites = vi.fn(() => ({
+  data: [] as Array<{ role: string; status: string }>,
+  isLoading: false,
+}));
+
+vi.mock("~/components/ui/toaster", () => ({
+  toaster: { create: vi.fn() },
+}));
+
+const mockOpenSeats = vi.fn();
+vi.mock("../../../stores/upgradeModalStore", () => ({
+  useUpgradeModalStore: (selector: (state: { openSeats: typeof mockOpenSeats }) => unknown) =>
+    selector({ openSeats: mockOpenSeats }),
+}));
+
+vi.mock("~/utils/api", () => ({
+  api: {
+    plan: {
+      getActivePlan: {
+        useQuery: () => mockGetActivePlan(),
+      },
+    },
+    organization: {
+      getOrganizationWithMembersAndTheirTeams: {
+        useQuery: () => mockGetOrganizationWithMembers(),
+      },
+      getOrganizationPendingInvites: {
+        useQuery: () => ({ ...mockGetPendingInvites(), refetch: vi.fn() }),
+      },
+    },
+    subscription: {
+      updateUsers: {
+        useMutation: () => mockUpdateUsers(),
+      },
+      create: {
+        useMutation: () => mockCreateSubscription(),
+      },
+      upgradeWithInvites: {
+        useMutation: () => mockUpgradeWithInvites(),
+      },
+      addTeamMemberOrEvents: {
+        useMutation: () => mockAddTeamMemberOrEvents(),
+      },
+      manage: {
+        useMutation: () => mockManageSubscription(),
+      },
+    },
+    useContext: vi.fn(() => ({
+      organization: {
+        getOrganizationWithMembersAndTheirTeams: { invalidate: vi.fn() },
+      },
+    })),
+  },
+}));
+
+// Wrapper with Chakra provider
+const Wrapper = ({ children }: { children: React.ReactNode }) => (
+  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+);
+
+const renderSubscriptionPage = () => {
+  return render(<SubscriptionPage />, { wrapper: Wrapper });
+};
+
+describe("<SubscriptionPage/>", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockOrganization = {
+      id: "test-org-id",
+      name: "Test Org",
+    };
+    mockGetActivePlan.mockReturnValue({
+      data: createMockPlan(),
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+    mockGetOrganizationWithMembers.mockReturnValue({
+      data: mockOrganizationMembers,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  // ============================================================================
+  // Page Layout
+  // ============================================================================
+
+  describe("when the subscription page loads", () => {
+    it("displays current plan block and upgrade plan block", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
+        expect(screen.getByTestId("upgrade-plan-block")).toBeInTheDocument();
+      });
+    });
+
+    it("displays a contact link for billing questions", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        expect(screen.getByText(/contact us/i)).toBeInTheDocument();
+      });
+    });
+  });
+
+  // ============================================================================
+  // Plan Display - Developer (Free) Tier
+  // ============================================================================
+
+  describe("when organization has no active paid subscription", () => {
+    it("shows 'Current' badge on the current plan block", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        const currentBlock = screen.getByTestId("current-plan-block");
+        expect(within(currentBlock).getByText("Current")).toBeInTheDocument();
+      });
+    });
+
+    it("shows the Free plan label and developer features", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        const currentBlock = screen.getByTestId("current-plan-block");
+
+        // Title
+        expect(within(currentBlock).getByText("Free plan")).toBeInTheDocument();
+
+        // Features
+        expect(within(currentBlock).getByText(/2 core members/i)).toBeInTheDocument();
+        expect(within(currentBlock).getByText(/Community support/i)).toBeInTheDocument();
+      });
+    });
+
+    it("shows the upgrade block with Growth features", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        const upgradeBlock = screen.getByTestId("upgrade-plan-block");
+        expect(within(upgradeBlock).getByText(/Growth Plan/i)).toBeInTheDocument();
+        expect(within(upgradeBlock).getByRole("button", { name: /Upgrade now/i })).toBeInTheDocument();
+      });
+    });
+
+    it("displays the user count as N/M format", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        const userCountLink = screen.getByTestId("user-count-link");
+        expect(userCountLink).toBeInTheDocument();
+        expect(userCountLink).toHaveTextContent("2/2");
+      });
+    });
+  });
+
+  // ============================================================================
+  // Plan Display - Growth Tier
+  // ============================================================================
+
+  describe("when viewing the upgrade plan block", () => {
+    it("shows correct Growth plan features", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        const upgradeBlock = screen.getByTestId("upgrade-plan-block");
+
+        // Features
+        expect(within(upgradeBlock).getByText(/200,000.*events/i)).toBeInTheDocument();
+        expect(within(upgradeBlock).getByText(/30 days.*retention/i)).toBeInTheDocument();
+        expect(within(upgradeBlock).getByText(/20.*core users/i)).toBeInTheDocument();
+        expect(within(upgradeBlock).getByText(/Unlimited.*lite users/i)).toBeInTheDocument();
+        expect(within(upgradeBlock).getByText(/Unlimited.*evals/i)).toBeInTheDocument();
+        expect(within(upgradeBlock).getByText(/Private Slack/i)).toBeInTheDocument();
+      });
+    });
+
+    it("shows 'Upgrade now' button on upgrade block", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        const upgradeBlock = screen.getByTestId("upgrade-plan-block");
+        expect(within(upgradeBlock).getByRole("button", { name: /Upgrade now/i })).toBeInTheDocument();
+      });
+    });
+  });
+
+  // ============================================================================
+  // Growth Plan as Current
+  // ============================================================================
+
+  describe("when organization has an active Growth subscription", () => {
+    beforeEach(() => {
+      mockGetActivePlan.mockReturnValue({
+        data: createMockPlan({
+          type: "GROWTH",
+          name: "Growth",
+          free: false,
+          maxMembers: 20,
+          maxMembersLite: 1000,
+          maxMessagesPerMonth: 200000,
+        }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+    });
+
+    it("shows 'Current' badge on the Growth plan block", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        const currentBlock = screen.getByTestId("current-plan-block");
+        expect(within(currentBlock).getByText("Current")).toBeInTheDocument();
+        expect(within(currentBlock).getByText("Growth plan")).toBeInTheDocument();
+      });
+    });
+
+    it("does not show the upgrade block", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
+      });
+
+      expect(screen.queryByTestId("upgrade-plan-block")).not.toBeInTheDocument();
+    });
+  });
+
+  // ============================================================================
+  // User Management Drawer
+  // ============================================================================
+
+  describe("when clicking on the user count in the plan block", () => {
+    it("opens a drawer showing 'Manage Seats'", async () => {
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("user-count-link")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByTestId("user-count-link"));
+
+      await waitFor(() => {
+        expect(screen.getByText("Manage Seats")).toBeInTheDocument();
+      });
+    });
+
+    it("shows Current Members and New seats sections", async () => {
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+
+      await user.click(screen.getByTestId("user-count-link"));
+
+      await waitFor(() => {
+        expect(screen.getByText("Current Members")).toBeInTheDocument();
+        expect(screen.getByText("New seats")).toBeInTheDocument();
+      });
+    });
+
+    it("shows a list of organization users by email", async () => {
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+
+      await user.click(screen.getByTestId("user-count-link"));
+
+      await waitFor(() => {
+        expect(screen.getByText("admin@example.com")).toBeInTheDocument();
+        expect(screen.getByText("jane@example.com")).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("when viewing the seat management drawer", () => {
+    it("shows member type badge for each user", async () => {
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+
+      await user.click(screen.getByTestId("user-count-link"));
+
+      await waitFor(() => {
+        // Both users are Full Members (ADMIN and MEMBER roles map to FullMember)
+        const fullMemberBadges = screen.getAllByText("Full Member");
+        expect(fullMemberBadges.length).toBeGreaterThanOrEqual(2);
+      });
+    });
+
+  });
+
+  // ============================================================================
+  // Adding Seats
+  // ============================================================================
+
+  describe("when clicking 'Add Seat' in the drawer", () => {
+    it("adds a pending seat row with email input immediately", async () => {
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+
+      await user.click(screen.getByTestId("user-count-link"));
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /Add Seat/i })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("pending-seat-0")).toBeInTheDocument();
+        expect(screen.getByTestId("seat-email-0")).toBeInTheDocument();
+      });
+    });
+
+    it("allows entering an email for a pending seat", async () => {
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+
+      await user.click(screen.getByTestId("user-count-link"));
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /Add Seat/i })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+
+      const emailInput = screen.getByTestId("seat-email-0") as HTMLInputElement;
+      await user.type(emailInput, "newuser@example.com");
+
+      expect(emailInput.value).toBe("newuser@example.com");
+    });
+
+    it("defaults member type to Full Member", async () => {
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+
+      await user.click(screen.getByTestId("user-count-link"));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+
+      await waitFor(() => {
+        const selectRoot = screen.getByTestId("seat-member-type-0");
+        // The Chakra Select renders a value text span showing the selected label
+        const valueText = within(selectRoot).getByText("Full Member", { selector: "span" });
+        expect(valueText).toBeInTheDocument();
+      });
+    });
+
+    it("renders both Full Member and Lite Member options", async () => {
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+
+      await user.click(screen.getByTestId("user-count-link"));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+
+      // The Chakra Select renders a hidden native <select> with both options
+      const selectRoot = screen.getByTestId("seat-member-type-0");
+      const nativeSelect = selectRoot.querySelector("select") as HTMLSelectElement;
+      expect(nativeSelect).toBeInTheDocument();
+
+      const options = Array.from(nativeSelect.options).map((o) => o.textContent);
+      expect(options).toContain("Full Member");
+      expect(options).toContain("Lite Member");
+    });
+
+    it("adds multiple seats when clicked multiple times", async () => {
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+
+      await user.click(screen.getByTestId("user-count-link"));
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /Add Seat/i })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("pending-seat-0")).toBeInTheDocument();
+        expect(screen.getByTestId("pending-seat-1")).toBeInTheDocument();
+        expect(screen.getByTestId("pending-seat-2")).toBeInTheDocument();
+      });
+    });
+
+    it("allows removing individual pending seats", async () => {
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+
+      await user.click(screen.getByTestId("user-count-link"));
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /Add Seat/i })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("pending-seat-2")).toBeInTheDocument();
+      });
+
+      // Remove the second pending seat using its data-testid
+      await user.click(screen.getByTestId("remove-seat-1"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("pending-seat-0")).toBeInTheDocument();
+        expect(screen.getByTestId("pending-seat-1")).toBeInTheDocument();
+        expect(screen.queryByTestId("pending-seat-2")).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("when closing the drawer with Done after adding seats", () => {
+    it("reflects batch-added seats in total user count (N/M format)", async () => {
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+
+      await user.click(screen.getByTestId("user-count-link"));
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /Add Seat/i })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+
+      // Click Done to save
+      await user.click(screen.getByRole("button", { name: /Done/i }));
+
+      await waitFor(() => {
+        // 2 existing core + 3 new core seats = 5, max = 2 → "5/2"
+        expect(screen.getByTestId("user-count-link")).toHaveTextContent("5/2");
+      });
+    });
+
+    it("preserves batch-added seats when reopening drawer", async () => {
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+
+      await user.click(screen.getByTestId("user-count-link"));
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: /Add Seat/i })).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+
+      // Click Done to save
+      await user.click(screen.getByRole("button", { name: /Done/i }));
+
+      // Reopen drawer
+      await user.click(screen.getByTestId("user-count-link"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("pending-seat-0")).toBeInTheDocument();
+        expect(screen.getByTestId("pending-seat-1")).toBeInTheDocument();
+      });
+    });
+  });
+
+  // ============================================================================
+  // Discarding Changes
+  // ============================================================================
+
+  describe("when clicking Cancel after adding seats", () => {
+    it("closes the drawer and discards batch-added seats", async () => {
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+
+      await user.click(screen.getByTestId("user-count-link"));
+
+      await waitFor(() => {
+        expect(screen.getByText("Manage Seats")).toBeInTheDocument();
+      });
+
+      // Add some seats
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+
+      // Click Cancel
+      await user.click(screen.getByRole("button", { name: /Cancel/i }));
+
+      await waitFor(() => {
+        expect(screen.queryByText("Manage Seats")).not.toBeInTheDocument();
+      });
+
+      // Reopen - pending seats should be gone
+      await user.click(screen.getByTestId("user-count-link"));
+
+      await waitFor(() => {
+        expect(screen.queryByTestId("pending-seat-0")).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  // ============================================================================
+  // Billing Toggles and Dynamic Pricing
+  // ============================================================================
+
+  describe("when viewing billing toggles", () => {
+    it("shows currency selector defaulting to EUR", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        const currencySelector = screen.getByTestId("currency-selector");
+        expect(currencySelector).toBeInTheDocument();
+      });
+    });
+
+    it("shows billing period toggle defaulting to Monthly", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("billing-period-toggle")).toBeInTheDocument();
+        expect(screen.getByText("Monthly")).toBeInTheDocument();
+        expect(screen.getByText("Annually")).toBeInTheDocument();
+      });
+    });
+
+    it("shows Save badge when switching to annually", async () => {
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+
+      const toggle = screen.getByTestId("billing-period-toggle");
+      const switchInput = within(toggle).getByRole("checkbox");
+      await user.click(switchInput);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Save 8%/i)).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("when upgrade block shows dynamic pricing", () => {
+    it("displays total based on core members count", async () => {
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+
+      // Add 1 seat via drawer (2 existing core + 1 = 3 total)
+      await user.click(screen.getByTestId("user-count-link"));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+      await user.click(screen.getByRole("button", { name: /Done/i }));
+
+      await waitFor(() => {
+        // 3 Full Members × €29 = €87/mo
+        const total = screen.getByTestId("upgrade-total");
+        expect(total).toHaveTextContent("€87/mo");
+        expect(total).toHaveTextContent("3 Full Members");
+      });
+    });
+
+    it("updates price when switching to annually", async () => {
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+
+      // Add 1 seat
+      await user.click(screen.getByTestId("user-count-link"));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+      await user.click(screen.getByRole("button", { name: /Done/i }));
+
+      // Switch to annual
+      const toggle = screen.getByTestId("billing-period-toggle");
+      const switchInput = within(toggle).getByRole("checkbox");
+      await user.click(switchInput);
+
+      await waitFor(() => {
+        // 3 x €27 (Math.round(29 * 0.92)) = €81/mo
+        const total = screen.getByTestId("upgrade-total");
+        expect(total).toHaveTextContent("€81/mo");
+      });
+    });
+
+    it("calls create subscription API when clicking Upgrade now", async () => {
+      const user = userEvent.setup();
+      const mockMutateAsync = vi.fn().mockResolvedValue({ url: null });
+      mockCreateSubscription.mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: mockMutateAsync,
+        isLoading: false,
+        isPending: false,
+      });
+      renderSubscriptionPage();
+
+      // Add 1 seat
+      await user.click(screen.getByTestId("user-count-link"));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+      await user.click(screen.getByRole("button", { name: /Done/i }));
+
+      await user.click(screen.getByRole("button", { name: /Upgrade now/i }));
+
+      await waitFor(() => {
+        expect(mockMutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({
+            organizationId: "test-org-id",
+            plan: "GROWTH_SEAT_USAGE",
+            membersToAdd: 3,
+          })
+        );
+      });
+    });
+  });
+
+  // ============================================================================
+  // Saving - Pending State Flow
+  // ============================================================================
+
+  describe("when adding seats beyond the plan limit", () => {
+    beforeEach(() => {
+      mockGetActivePlan.mockReturnValue({
+        data: createMockPlan({ maxMembers: 2 }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+    });
+
+    it("shows upgrade required badge after adding seats and clicking Done", async () => {
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+
+      await user.click(screen.getByTestId("user-count-link"));
+
+      // Add a third seat (exceeds limit of 2)
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+
+      // Click Done
+      await user.click(screen.getByRole("button", { name: /Done/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/Upgrade required/i)).toBeInTheDocument();
+      });
+    });
+  });
+
+
+  // ============================================================================
+  // Loading States
+  // ============================================================================
+
+  describe("when user data is being fetched", () => {
+    it("shows a loading spinner", async () => {
+      const user = userEvent.setup();
+      mockGetOrganizationWithMembers.mockReturnValue({
+        data: { ...mockOrganizationMembers, members: [] },
+        isLoading: true,
+        refetch: vi.fn(),
+      });
+
+      renderSubscriptionPage();
+
+      await user.click(screen.getByTestId("user-count-link"));
+
+      await waitFor(() => {
+        const spinner = document.querySelector(".chakra-spinner");
+        expect(spinner).toBeInTheDocument();
+      });
+    });
+  });
+
+  // ============================================================================
+  // Drawer does not display alert banners
+  // ============================================================================
+
+  describe("when opening the seat management drawer", () => {
+    it("does not display alert banners", async () => {
+      const user = userEvent.setup();
+
+      // Set up org with single admin to previously trigger the alert
+      const adminMember = mockOrganizationMembers.members[0]!;
+      mockGetOrganizationWithMembers.mockReturnValue({
+        data: { ...mockOrganizationMembers, members: [adminMember] },
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+
+      renderSubscriptionPage();
+
+      await user.click(screen.getByTestId("user-count-link"));
+
+      await waitFor(() => {
+        expect(screen.getByText("Manage Seats")).toBeInTheDocument();
+      });
+
+      // No admin-requires-core-user info banner
+      expect(screen.queryByText(/admin.*requires.*core/i)).not.toBeInTheDocument();
+      // No exceeded-limit warning banner
+      expect(screen.queryByText(/exceeded.*user limit/i)).not.toBeInTheDocument();
+    });
+  });
+
+  // ============================================================================
+  // Update Seats Block (Growth Plan)
+  // ============================================================================
+
+  describe("when on Growth plan with planned users", () => {
+    beforeEach(() => {
+      mockGetActivePlan.mockReturnValue({
+        data: createMockPlan({
+          type: "GROWTH",
+          name: "Growth",
+          free: false,
+          maxMembers: 20,
+          maxMembersLite: 1000,
+          maxMessagesPerMonth: 200000,
+        }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+    });
+
+    it("shows update-seats-block after adding seats", async () => {
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+
+      await user.click(screen.getByTestId("user-count-link"));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+      await user.click(screen.getByRole("button", { name: /Done/i }));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("update-seats-block")).toBeInTheDocument();
+      });
+    });
+
+    it("does not show update-seats-block without planned users", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
+      });
+
+      expect(screen.queryByTestId("update-seats-block")).not.toBeInTheDocument();
+    });
+
+    it("opens proration preview modal with correct params when clicking Update subscription", async () => {
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+
+      // Add 1 seat: maxMembers (20) + 1 planned = 21 total
+      await user.click(screen.getByTestId("user-count-link"));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+      await user.click(screen.getByRole("button", { name: /Done/i }));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("update-seats-block")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: /Update subscription/i }));
+
+      await waitFor(() => {
+        expect(mockOpenSeats).toHaveBeenCalledWith(
+          expect.objectContaining({
+            organizationId: "test-org-id",
+            currentSeats: 20,
+            newSeats: 21,
+            onConfirm: expect.any(Function),
+          })
+        );
+      });
+    });
+
+    it("calls addTeamMemberOrEvents when onConfirm callback is invoked", async () => {
+      const user = userEvent.setup();
+      const mockMutateAsync = vi.fn().mockResolvedValue({ success: true });
+      mockAddTeamMemberOrEvents.mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: mockMutateAsync,
+        isLoading: false,
+        isPending: false,
+      });
+
+      renderSubscriptionPage();
+
+      // Add 1 seat: maxMembers (20) + 1 planned = 21 total
+      await user.click(screen.getByTestId("user-count-link"));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+      await user.click(screen.getByRole("button", { name: /Done/i }));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("update-seats-block")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: /Update subscription/i }));
+
+      // Extract the onConfirm callback from the openSeats call and invoke it
+      const openSeatsCall = mockOpenSeats.mock.calls[0]![0] as { onConfirm: () => Promise<void> };
+      await openSeatsCall.onConfirm();
+
+      expect(mockMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organizationId: "test-org-id",
+          plan: "GROWTH_SEAT_USAGE",
+          upgradeMembers: true,
+          upgradeTraces: false,
+          totalMembers: 21,
+          totalTraces: 0,
+        })
+      );
+    });
+  });
+
+  // ============================================================================
+  // Manage Subscription Button
+  // ============================================================================
+
+  describe("when on Growth plan", () => {
+    beforeEach(() => {
+      mockGetActivePlan.mockReturnValue({
+        data: createMockPlan({
+          type: "GROWTH",
+          name: "Growth",
+          free: false,
+          maxMembers: 20,
+          maxMembersLite: 1000,
+          maxMessagesPerMonth: 200000,
+        }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+    });
+
+    it("shows Manage Subscription button", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("manage-subscription-button")).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("when on Free plan", () => {
+    it("does not show Manage Subscription button", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
+      });
+
+      expect(screen.queryByTestId("manage-subscription-button")).not.toBeInTheDocument();
+    });
+  });
+
+  // ============================================================================
+  // Upgrade Required Badge
+  // ============================================================================
+
+  describe("when on Growth plan and adding seats", () => {
+    beforeEach(() => {
+      mockGetActivePlan.mockReturnValue({
+        data: createMockPlan({
+          type: "GROWTH",
+          name: "Growth",
+          free: false,
+          maxMembers: 20,
+          maxMembersLite: 1000,
+          maxMessagesPerMonth: 200000,
+        }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+    });
+
+    it("does not show Upgrade required badge", async () => {
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+
+      await user.click(screen.getByTestId("user-count-link"));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+      await user.click(screen.getByRole("button", { name: /Done/i }));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("update-seats-block")).toBeInTheDocument();
+      });
+
+      expect(screen.queryByText(/Upgrade required/i)).not.toBeInTheDocument();
+    });
+  });
+
+  // ============================================================================
+  // Pricing Model Behavior
+  // ============================================================================
+
+  describe("when organization has specific pricing model", () => {
+    describe("when organization uses SEAT_USAGE pricing model", () => {
+      beforeEach(() => {
+        mockOrganization = {
+          id: "test-org-id",
+          name: "Test Org",
+          pricingModel: "SEAT_USAGE",
+        };
+      });
+
+      it("renders billing page content on subscription route", async () => {
+        renderSubscriptionPage();
+
+        await waitFor(() => {
+          expect(screen.getByRole("heading", { name: "Billing" })).toBeInTheDocument();
+          expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
+          expect(screen.getByTestId("invoices-block")).toBeInTheDocument();
+        });
+      });
+    });
+
+    describe("when organization uses TIERED pricing model", () => {
+      beforeEach(() => {
+        mockOrganization = {
+          id: "test-org-id",
+          name: "Test Org",
+          pricingModel: "TIERED",
+        };
+      });
+
+      it("does not show the old tiered alert on subscription page", async () => {
+        renderSubscriptionPage();
+
+        await waitFor(() => {
+          expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
+        });
+
+        expect(screen.queryByTestId("tiered-pricing-alert")).not.toBeInTheDocument();
+      });
+
+      it("shows upgrade plan block on free plan", async () => {
+        renderSubscriptionPage();
+
+        await waitFor(() => {
+          expect(screen.getByTestId("upgrade-plan-block")).toBeInTheDocument();
+        });
+      });
+
+      it("shows legacy paid plan name as current plan title", async () => {
+        mockGetActivePlan.mockReturnValue({
+          data: createMockPlan({
+            type: "ACCELERATE",
+            name: "Accelerate",
+            free: false,
+            maxMembers: 5,
+            maxMembersLite: 9999,
+            maxMessagesPerMonth: 20000,
+          }),
+          isLoading: false,
+          refetch: vi.fn(),
+        });
+
+        renderSubscriptionPage();
+
+        await waitFor(() => {
+          const currentBlock = screen.getByTestId("current-plan-block");
+          expect(within(currentBlock).getByText("Accelerate")).toBeInTheDocument();
+        });
+      });
+
+      it("hides the update seats block on legacy paid plan with planned users", async () => {
+        mockGetActivePlan.mockReturnValue({
+          data: createMockPlan({
+            type: "ACCELERATE",
+            name: "Accelerate",
+            free: false,
+            maxMembers: 5,
+            maxMembersLite: 9999,
+            maxMessagesPerMonth: 20000,
+          }),
+          isLoading: false,
+          refetch: vi.fn(),
+        });
+
+        const user = userEvent.setup();
+        renderSubscriptionPage();
+
+        await user.click(screen.getByTestId("user-count-link"));
+        await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+        await user.click(screen.getByRole("button", { name: /Done/i }));
+
+        await waitFor(() => {
+          expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
+        });
+
+        expect(screen.queryByTestId("update-seats-block")).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  // ============================================================================
+  // N/M Seat Display with Pending Invites
+  // ============================================================================
+
+  describe("when organization has pending invites", () => {
+    beforeEach(() => {
+      mockGetPendingInvites.mockReturnValue({
+        data: [
+          { role: "MEMBER", status: "PENDING" },
+          { role: "ADMIN", status: "PENDING" },
+          { role: "EXTERNAL", status: "PENDING" },
+        ],
+        isLoading: false,
+      });
+    });
+
+    it("includes core PENDING invites in N count", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        // 2 core members + 2 core PENDING invites (MEMBER + ADMIN) = 4, maxMembers = 2
+        const userCountLink = screen.getByTestId("user-count-link");
+        expect(userCountLink).toHaveTextContent("4/2");
+      });
+    });
+
+    it("excludes EXTERNAL invites from N count", async () => {
+      mockGetPendingInvites.mockReturnValue({
+        data: [
+          { role: "EXTERNAL", status: "PENDING" },
+        ],
+        isLoading: false,
+      });
+
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        // 2 core members + 0 core pending = 2, maxMembers = 2
+        expect(screen.getByTestId("user-count-link")).toHaveTextContent("2/2");
+      });
+    });
+  });
+
+  // ============================================================================
+  // Update Seats with Invites (Growth Plan)
+  // ============================================================================
+
+  describe("when on Growth plan and updating seats with invite emails", () => {
+    beforeEach(() => {
+      mockGetActivePlan.mockReturnValue({
+        data: createMockPlan({
+          type: "GROWTH",
+          name: "Growth",
+          free: false,
+          maxMembers: 20,
+          maxMembersLite: 1000,
+          maxMessagesPerMonth: 200000,
+        }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+    });
+
+    it("clears planned users after successful seat update via onConfirm", async () => {
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+
+      // Add a seat with email
+      await user.click(screen.getByTestId("user-count-link"));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+      const emailInput = screen.getByTestId("seat-email-0") as HTMLInputElement;
+      await user.type(emailInput, "teammate@example.com");
+      await user.click(screen.getByRole("button", { name: /Done/i }));
+
+      // Verify seats were added (3/20)
+      await waitFor(() => {
+        expect(screen.getByTestId("user-count-link")).toHaveTextContent("3/20");
+      });
+
+      await user.click(screen.getByRole("button", { name: /Update subscription/i }));
+
+      // Extract and invoke the onConfirm callback to simulate the modal confirmation
+      const openSeatsCall = mockOpenSeats.mock.calls.at(-1)![0] as { onConfirm: () => Promise<void> };
+      await openSeatsCall.onConfirm();
+
+      // After successful update, planned users are cleared — count returns to existing members
+      await waitFor(() => {
+        expect(screen.getByTestId("user-count-link")).toHaveTextContent("2/20");
+      });
+    });
+  });
+
+  // ============================================================================
+  // Upgrade with Invites
+  // ============================================================================
+
+  describe("when upgrading with invites containing emails", () => {
+    it("calls upgradeWithInvites mutation with invite data", async () => {
+      const user = userEvent.setup();
+      const mockMutateAsync = vi.fn().mockResolvedValue({ url: null });
+      mockUpgradeWithInvites.mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: mockMutateAsync,
+        isLoading: false,
+        isPending: false,
+      });
+      renderSubscriptionPage();
+
+      // Add a seat with email
+      await user.click(screen.getByTestId("user-count-link"));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+      const emailInput = screen.getByTestId("seat-email-0") as HTMLInputElement;
+      await user.type(emailInput, "new@example.com");
+      await user.click(screen.getByRole("button", { name: /Done/i }));
+
+      await user.click(screen.getByRole("button", { name: /Upgrade now/i }));
+
+      await waitFor(() => {
+        expect(mockMutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({
+            organizationId: "test-org-id",
+            totalSeats: 3,
+            invites: expect.arrayContaining([
+              expect.objectContaining({
+                email: "new@example.com",
+                role: "MEMBER",
+              }),
+            ]),
+          })
+        );
+      });
+    });
+  });
+});

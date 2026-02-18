@@ -148,6 +148,8 @@ function MembersList({
     onInviteCreated: setSelectedInvites,
     onClose: onAddMembersClose,
     refetchInvites: () => void pendingInvites.refetch(),
+    pricingModel: (organization as { pricingModel?: string }).pricingModel,
+    activePlanFree: activePlan.free,
   });
 
   const deleteMember = (userId: string) => {
@@ -177,6 +179,7 @@ function MembersList({
                 },
               });
             });
+          void queryClient.licenseEnforcement.checkLimit.invalidate();
         },
         onError: () => {
           toaster.create({
