@@ -1,11 +1,12 @@
-export { experimentRunProcessingPipelineDefinition } from "./pipeline";
+export { createExperimentRunProcessingPipeline } from "./pipeline";
+export type { ExperimentRunProcessingPipelineDeps } from "./pipeline";
 
 export { CompleteExperimentRunCommand } from "./commands/completeExperimentRun.command";
 export { RecordEvaluatorResultCommand } from "./commands/recordEvaluatorResult.command";
 export { RecordTargetResultCommand } from "./commands/recordTargetResult.command";
 export { StartExperimentRunCommand } from "./commands/startExperimentRun.command";
 
-export { experimentRunResultStorageMapProjection } from "./handlers";
+export { createExperimentRunResultStorageMapProjection } from "./projections/experimentRunResultStorage.mapProjection";
 
 export * from "./projections";
 export * from "./repositories";
