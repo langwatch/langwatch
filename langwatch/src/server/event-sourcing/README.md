@@ -1,436 +1,289 @@
-# Event Sourcing Library
-
-A generic, reusable event sourcing library for building event-driven systems with projections.
+# Event Sourcing - Implementation Guide
 
 For conceptual overview and architecture, see [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ## Creating a Pipeline
 
-Create a pipeline using the fluent builder pattern:
+Pipelines are defined using the `definePipeline()` builder, then registered with the `EventSourcing` runtime at startup.
+
+### Step 1: Define the Pipeline (static, no runtime deps)
 
 ```typescript
-import { eventSourcing } from "../../runtime";
-import {
-  createTenantId,
-  type ProjectionHandler,
-  type EventStream,
-  type TenantId,
-} from "./library";
+import { definePipeline } from "~/server/event-sourcing";
 
-// Define event and projection types
-interface MyEvent {
-  id: string;
-  aggregateId: string;
-  tenantId: TenantId;
-  timestamp: number;
-  type: "my.event.type";
-  data: {
-    /* ... */
-  };
-}
-
-interface MyProjection {
-  id: string;
-  aggregateId: string;
-  tenantId: TenantId;
-  version: number;
-  data: {
-    /* ... */
-  };
-}
-
-// Implement projection handler
-class MyProjectionHandler implements ProjectionHandler<MyEvent, MyProjection> {
-  handle(stream: EventStream<TenantId, MyEvent>): MyProjection {
-    const events = stream.getEvents();
-    // Build projection from events
-    return {
-      /* ... */
-    };
-  }
-}
-
-// Create pipeline
-const pipeline = eventSourcing
-  .registerPipeline<MyEvent, MyProjection>()
-  .withName("m_pipeline")
+const pipeline = definePipeline<MyEvent>()
+  .withName("my_pipeline")
   .withAggregateType("my_aggregate")
-  .withProjection("summary", MyProjectionHandler)
+  .withFoldProjection("summary", summaryFoldProjection)
+  .withMapProjection("records", recordsMapProjection)
+  .withReactor("summary", "notify", notifyReactor)
+  .withCommand("doSomething", DoSomethingCommand)
   .build();
-
-// Use pipeline
-await pipeline.service.storeEvents(events, {
-  tenantId: createTenantId("tenant-id"),
-});
-const projection = await pipeline.service.getProjectionByName(
-  "summary",
-  "aggregate-id",
-  {
-    tenantId: createTenantId("tenant-id"),
-  },
-);
 ```
 
-**Basic usage:**
-
-- **Commands**: Register with `.withCommand(name, HandlerClass)` → access via `pipeline.commands.commandName.send()`
-- **Event Handlers**: Register with `.withEventHandler(name, HandlerClass)` → process events asynchronously via queues with sequential ordering
-- **Projections**: Register with `.withProjection(name, HandlerClass)` → process events asynchronously via queues, access via `pipeline.service.getProjectionByName()`
-- **Events**: Store via `pipeline.service.storeEvents()` → triggers handlers and updates projections automatically
-- **Checkpoints**: Automatically tracked per-aggregate for both handlers and projections (one checkpoint per aggregate tracks last processed event), enabling idempotency and sequential ordering
-
-## Navigating the Codebase
-
-### Library (`library/`)
-
-The library contains no feature/product specifcs, so this is not the section you are looking for if you need that, look down.
-
-- **`domain/`** - Core domain types (Event, Projection, TenantId, AggregateType)
-- **`commands/`** - Command handling (Command, CommandHandler, CommandSchema)
-- **`streams/`** - EventStream for ordered event processing
-- **`services/`** - EventSourcingService (main orchestration) and modular services:
-  - **`services/validation/`** - ProjectionValidator, SequenceNumberCalculator, IdempotencyChecker, OrderingValidator, FailureDetector
-  - **`services/checkpoints/`** - `saveCheckpointSafely` function (checkpoint operations with error handling)
-  - **`services/queues/`** - QueueManager (manages queues for handlers, projections, commands)
-  - **`services/handlers/`** - EventHandlerDispatcher (dispatches events to handlers)
-  - **`services/projections/`** - ProjectionUpdater (handles projection updates)
-  - **`services/errorHandling.ts`** - Standardized error categorization and handling
-- **`stores/`** - Store interfaces (EventStore, ProjectionStore, CheckpointStore)
-- **`domain/handlers/`** - Handler interfaces (EventHandler, ProjectionHandler)
-- **`publishing/`** - Event publishing interface
-- **`queues/`** - Queue processor interfaces
-- **`utils/`** - Utilities including `checkpointKey.ts` for checkpoint key construction
-
-**Entry point:** `index.ts` exports all public APIs
-
-### Runtime (`runtime/`)
-
-Runtime infrastructure and pipeline builder:
-
-- **`eventSourcing.ts`** - Singleton instance and shared event store
-- **`pipeline/`** - Pipeline builder (fluent API for registering pipelines)
-- **`queue/`** - Queue implementations (Memory, BullMQ)
-
-**Entry point:** `index.ts` exports `eventSourcing` singleton
-
-### Stores (`stores/`)
-
-Concrete store implementations:
-
-- **`eventStoreClickHouse.ts`** / **`eventStoreMemory.ts`** - Event store implementations
-- **`processorCheckpointStoreClickHouse.ts`** / **`processorCheckpointStoreMemory.ts`** - Processor checkpoint stores (for handlers and projections)
-
-## Cautions, Security & Best Practices
-
-### Security: Tenant Isolation
-
-⚠️ **CRITICAL**: Always validate tenant context in store implementations.
+### Step 2: Register at Runtime
 
 ```typescript
-import { EventUtils } from "./library";
+const registered = eventSourcing.register(pipeline);
 
-class MyEventStore implements EventStore<MyEvent> {
-  async getEvents(
-    aggregateId: string,
-    context: EventStoreReadContext<MyEvent>,
-    aggregateType: AggregateType,
-  ): Promise<readonly MyEvent[]> {
-    // CRITICAL: Validate tenant before any query
-    EventUtils.validateTenantId(context, "getEvents");
+// Send commands
+await registered.commands.doSomething.add({ tenantId: "acme", /* payload */ });
+```
 
-    return await this.db.query(
-      "SELECT * FROM events WHERE aggregate_id = ? AND tenant_id = ? AND aggregate_type = ?",
-      [aggregateId, context.tenantId, aggregateType],
-    );
-  }
+Registration connects the static definition to ClickHouse, Redis, and BullMQ. This happens in the composition root (`pipelineRegistry.ts`).
+
+## Builder API
+
+| Method | Description |
+|--------|-------------|
+| `.withName(name)` | Pipeline name (must be unique) |
+| `.withAggregateType(type)` | Aggregate type for event grouping |
+| `.withFoldProjection(name, definition, options?)` | Register a fold projection (stateful, ordered) |
+| `.withMapProjection(name, definition, options?)` | Register a map projection (stateless, parallel) |
+| `.withReactor(foldName, reactorName, definition)` | Register a reactor on a fold projection |
+| `.withCommand(name, HandlerClass, options?)` | Register a command handler |
+| `.withFeatureFlagService(service)` | Optional kill-switch support |
+| `.build()` | Build the static pipeline definition |
+
+## Defining Projections
+
+### Fold Projection
+
+A fold projection reduces events into accumulated state:
+
+```typescript
+import type { FoldProjectionDefinition } from "~/server/event-sourcing";
+
+const summaryFoldProjection: FoldProjectionDefinition<SummaryState, MyEvent> = {
+  name: "summary",
+  init: () => ({ count: 0, lastUpdated: 0 }),
+  apply: (state, event) => ({
+    ...state,
+    count: state.count + 1,
+    lastUpdated: event.timestamp,
+  }),
+  store: myFoldStore,  // { get, store } interface
+};
+```
+
+The `store` must implement `FoldProjectionStore<StateType>`:
+
+```typescript
+interface FoldProjectionStore<T> {
+  get(aggregateId: string, context: ProjectionStoreContext): Promise<T | null>;
+  store(state: T, context: ProjectionStoreContext): Promise<void>;
 }
 ```
 
-**Always:**
+### Map Projection
 
-- Use `createTenantId()` to create tenant IDs
-- Call `EventUtils.validateTenantId()` in store implementations
-- Filter queries by `tenantId` in all database operations
-- Never trust tenant context from external sources
-
-See: [Security & Concurrency Guide](../../../.cursor/docs/06-event-sourcing-library.md)
-
-### Testing
-
-Use in-memory stores for tests:
+A map projection transforms individual events into records:
 
 ```typescript
-import { EventStoreMemory, ProjectionStoreMemory } from "../stores";
+import type { MapProjectionDefinition } from "~/server/event-sourcing";
 
-const eventStore = new EventStoreMemory(new EventRepositoryMemory());
-const projectionStore = new ProjectionStoreMemory();
-
-const pipeline = eventSourcing
-  .registerPipeline<MyEvent, MyProjection>()
-  .withName("test_pipeline")
-  .withAggregateType("test")
-  .withEventProjection("test", projectionStore, handler)
-  .build();
+const recordsMapProjection: MapProjectionDefinition<RecordType, MyEvent> = {
+  name: "records",
+  eventTypes: ["my.event.created"],
+  map: (event) => ({
+    id: event.id,
+    data: event.data,
+    timestamp: event.timestamp,
+  }),
+  store: myAppendStore,  // { append } interface
+};
 ```
 
-**Run tests:**
+The `store` must implement `AppendStore<RecordType>`:
 
-```bash
-pnpm test src/server/event-sourcing/library
+```typescript
+interface AppendStore<T> {
+  append(record: T, context: ProjectionStoreContext): Promise<void>;
+}
 ```
 
-### Common Pitfalls
+### Reactor
 
-1. **Missing tenant validation**: Always validate `tenantId` in store implementations
-2. **Concurrent updates**: Use distributed locking in production
-3. **Event ordering**: Events are automatically ordered by timestamp (see Event Ordering section)
-4. **Sequential processing**: Events must be processed in sequence number order - if a previous event fails, subsequent events stop processing
-5. **Projection updates**: Projections are automatically updated after `storeEvents()` via queues - manual updates only needed for recovery
-6. **Checkpoint stores**: Processor checkpoint stores are automatically created for handlers and projections when using the runtime
-7. **Checkpoint keys**: Checkpoint keys use format `tenantId:pipelineName:processorName:aggregateType:aggregateId` (one checkpoint per aggregate, not per event)
+A reactor fires after a fold projection succeeds:
 
-## Reference
+```typescript
+import type { ReactorDefinition } from "~/server/event-sourcing/reactors/reactor.types";
 
-### Common Patterns
+const notifyReactor: ReactorDefinition<MyEvent, SummaryState> = {
+  name: "notify",
+  handle: async (event, { foldState, tenantId, aggregateId }) => {
+    await broadcastService.send(tenantId, { type: "updated", aggregateId });
+  },
+  options: {
+    delay: 500,
+    makeJobId: ({ event }) => `notify:${event.aggregateId}`,
+  },
+};
+```
 
-#### Command → Event → Handler
+## Defining Commands
+
+Commands validate intent and produce events:
 
 ```typescript
 import { z } from "zod";
-import { defineCommandSchema, EventUtils } from "./library";
+import { defineCommandSchema, type Command, type CommandHandler } from "~/server/event-sourcing";
 
-const spanPayloadSchema = z.object({
+const payloadSchema = z.object({
   traceId: z.string(),
   spanId: z.string(),
 });
 
 class RecordSpanCommand
-  implements
-    CommandHandler<Command<z.infer<typeof spanPayloadSchema>>, SpanEvent>
+  implements CommandHandler<Command<z.infer<typeof payloadSchema>>, MyEvent>
 {
   static readonly dispatcherName = "recordSpan" as const;
   static readonly schema = defineCommandSchema(
     "lw.obs.span_ingestion.record",
-    spanPayloadSchema,
+    payloadSchema,
   );
 
-  static getAggregateId(payload: z.infer<typeof spanPayloadSchema>): string {
+  static getAggregateId(payload: z.infer<typeof payloadSchema>): string {
     return payload.traceId;
   }
 
-  async handle(
-    command: Command<z.infer<typeof spanPayloadSchema>>,
-  ): Promise<SpanEvent[]> {
-    const event = EventUtils.createEvent(
-      "span_ingestion",
-      command.aggregateId,
-      command.tenantId,
-      "lw.obs.span_ingestion.recorded",
-      { traceId: command.data.traceId, spanId: command.data.spanId },
-      void 0,
-      void 0,
-      { includeTraceContext: true },
-    );
-    return [event];
+  async handle(command: Command<z.infer<typeof payloadSchema>>): Promise<MyEvent[]> {
+    return [EventUtils.createEvent(/* ... */)];
   }
 }
-
-const pipeline = eventSourcing
-  .registerPipeline<SpanEvent>()
-  .withName("span-ingestion")
-  .withAggregateType("span")
-  .withCommand("recordSpan", RecordSpanCommand)
-  .build();
-
-await pipeline.commands.recordSpan.send({
-  tenantId: "acme",
-  traceId: "trace-123",
-  spanId: "span-456",
-});
 ```
 
-#### Event Handlers for Side Effects
+## Composition Root
 
-Event handlers and projections process events with identical validation and checkpointing logic. Both enforce sequential ordering per aggregate - events are processed in sequence number order, and if any event fails, subsequent events for that aggregate skip processing gracefully (storeEvents succeeds, but processing is skipped). Sequential ordering violations cause storeEvents to reject (hard constraint).
-
-Event handlers process individual events asynchronously via queues.
+The `PipelineRegistry` (in `pipelineRegistry.ts`) is the composition root. It creates store adapters, builds reactors and commands, then registers all pipelines:
 
 ```typescript
-import type { EventHandler } from "./library";
+export class PipelineRegistry {
+  registerAll() {
+    const evalPipeline = this.registerEvaluationPipeline();
+    const tracePipeline = this.registerTracePipeline(evalPipeline);
+    const experimentRunPipeline = this.registerExperimentRunPipeline();
+    const simulationPipeline = this.registerSimulationPipeline();
 
-class SpanClickHouseWriterHandler implements EventHandler<SpanEvent> {
-  constructor(private spanRepository: SpanRepository) {}
-
-  static getEventTypes() {
-    return ["lw.obs.span_ingestion.recorded"] as const;
-  }
-
-  async handle(event: SpanEvent): Promise<void> {
-    // This handler is idempotent - the system tracks checkpoints per aggregate
-    // If this event was already processed, it will be skipped automatically
-    await this.spanRepository.insertSpan(event.data.spanData);
+    return {
+      traces: mapCommands(tracePipeline.commands),
+      evaluations: mapCommands(evalPipeline.commands),
+      experimentRuns: mapCommands(experimentRunPipeline.commands),
+      simulations: mapCommands(simulationPipeline.commands),
+    };
   }
 }
-
-const pipeline = eventSourcing
-  .registerPipeline<SpanEvent>()
-  .withName("span_ingestion")
-  .withAggregateType("span_ingestion")
-  .withEventHandler("spanStorage", SpanClickHouseWriterHandler, {
-    // Optional: override eventTypes, configure concurrency, delay, job ID factory, etc.
-  })
-  .build();
 ```
 
-**Key features:**
+## Testing
 
-- **Sequential ordering**: Events are processed in sequence number order per aggregate
-- **Per-aggregate checkpoints**: One checkpoint per aggregate tracks the last processed event (checkpoint key: `tenantId:pipelineName:processorName:aggregateType:aggregateId`)
-- **Idempotency**: Already processed events are automatically skipped via ProjectionValidator
-- **Failure handling**: If an event fails, subsequent events for that aggregate stop processing
-- **Queue-based**: Events are processed asynchronously via queues (BullMQ or Memory)
-- **Validation**: ProjectionValidator orchestrates sequence number calculation, idempotency checking, ordering validation, and failure detection
+### Unit Tests
 
-#### Multiple Projections
-
-Projections are processed asynchronously via queues, similar to event handlers. Each event triggers a projection rebuild, but the rebuild uses all events for the aggregate to ensure consistency.
+Use in-memory stores and `EventSourcing.createForTesting()`:
 
 ```typescript
-const pipeline = eventSourcing
-  .registerPipeline<SpanEvent>()
-  .withName("trace_aggregation")
-  .withAggregateType("trace_aggregation")
-  .withProjection("summary", SummaryProjectionHandler)
-  .withProjection("analytics", AnalyticsProjectionHandler)
-  .build();
+import { EventSourcing } from "~/server/event-sourcing";
+import { EventStoreMemory } from "~/server/event-sourcing/stores/eventStoreMemory";
+import { EventRepositoryMemory } from "~/server/event-sourcing/stores/repositories/eventRepositoryMemory";
 
-// Projections are automatically updated after events are stored
-await pipeline.service.storeEvents(events, {
-  tenantId: createTenantId("acme"),
-});
+const eventStore = new EventStoreMemory(new EventRepositoryMemory());
+const es = EventSourcing.createForTesting({ eventStore });
 
-// Access projections
-const summary = await pipeline.service.getProjectionByName(
-  "summary",
-  "trace-123",
-  {
-    tenantId: createTenantId("acme"),
-  },
-);
+const registered = es.register(myPipeline);
 ```
 
-**Key features:**
+### Integration Tests
 
-- **Queue-based processing**: Each projection has its own queue processor
-- **Per-event triggering**: Each event triggers a projection rebuild
-- **Full rebuild**: Projections rebuild from all events for the aggregate (not incremental)
-- **Sequential ordering**: Events are processed in sequence number order
-- **Per-aggregate checkpoints**: One checkpoint per aggregate tracks the last processed event for the projection
-
-### API Reference
-
-#### Pipeline Registration
+Use `EventSourcing.createWithStores()` for integration tests with explicit stores:
 
 ```typescript
-const pipeline = eventSourcing
-  .registerPipeline<EventType, ProjectionType>()
-  .withName("pipeline_name")
-  .withAggregateType("aggregate_type")
-  .withProjection("projectionName", ProjectionHandlerClass)
-  .withEventHandler("handlerName", EventHandlerClass, {
-    eventTypes: ["event.type"],
-  })
-  .withCommand("commandName", CommandHandlerClass)
-  .withEventPublisher(publisher)
-  .build();
-```
-
-#### Projection Operations
-
-```typescript
-// Get projection
-const projection = await pipeline.service.getProjectionByName(
-  "projection-name",
-  "aggregate-id",
-  { tenantId: createTenantId("tenant-id") },
-);
-
-// Check if projection exists
-const exists = await pipeline.service.hasProjectionByName(
-  "projection-name",
-  "aggregate-id",
-  { tenantId: createTenantId("tenant-id") },
-);
-
-// Update projection manually (typically only for recovery)
-const projection = await pipeline.service.updateProjectionByName(
-  "projection-name",
-  "aggregate-id",
-  { tenantId: createTenantId("tenant-id") },
-);
-```
-
-#### Storing Events
-
-```typescript
-// Store events (triggers event handlers and updates projections automatically)
-await pipeline.service.storeEvents(events, {
-  tenantId: createTenantId("tenant-id"),
+const es = EventSourcing.createWithStores({
+  eventStore: new EventStoreMemory(new EventRepositoryMemory()),
+  queueProcessorFactory: new DefaultQueueProcessorFactory(null),
 });
 ```
 
-#### Sending Commands
+### Running Tests
 
-```typescript
-// Send command (automatically queued and processed)
-await pipeline.commands.commandName.send({
-  tenantId: "tenant-id",
-  // ... command payload
-});
+```bash
+# All event-sourcing unit tests
+pnpm test:unit src/server/event-sourcing
+
+# Specific pipeline tests
+pnpm test:unit src/server/event-sourcing/pipelines/trace-processing
+
+# Integration tests (requires Docker services)
+pnpm test:integration src/server/event-sourcing
 ```
 
-### Event Ordering
+## Navigating the Codebase
 
-Events are automatically ordered when building projections. Additionally, the system enforces sequential processing per aggregate using sequence numbers.
+All paths below are relative to `src/server/event-sourcing/`.
 
-**Event Stream Ordering:**
+### Core Infrastructure
 
-```typescript
-// Timestamp ordering (default)
-const stream = new EventStream(aggregateId, tenantId, events);
+| Directory | Description |
+|-----------|-------------|
+| `domain/` | Core types: `Event`, `Projection`, `TenantId`, `AggregateType` |
+| `commands/` | Command handling: `Command`, `CommandHandlerClass`, `CommandSchema` |
+| `pipeline/` | Static builder: `definePipeline()`, `StaticPipelineDefinition`, pipeline types |
+| `services/` | `EventSourcingService` (main orchestration), `CommandDispatcher`, `QueueManager` |
+| `projections/` | Projection executors: `FoldProjectionExecutor`, `MapProjectionExecutor`, `ProjectionRouter`, `ProjectionRegistry` |
+| `reactors/` | Reactor type definitions |
+| `queues/` | Queue implementations: `GroupQueue`, `SimpleQueue` (BullMQ), `MemoryQueue` |
+| `stores/` | Event store implementations: `EventStoreClickHouse`, `EventStoreMemory`, projection store interfaces |
+| `utils/` | `EventUtils` (event creation, validation), `KillSwitch` |
+| `schemas/` | Shared type identifiers |
 
-// As-is ordering (use when DB pre-sorts)
-const stream = new EventStream(aggregateId, tenantId, events, {
-  ordering: "as-is",
-});
+### Pipeline Implementations
 
-// Custom ordering
-const stream = new EventStream(aggregateId, tenantId, events, {
-  ordering: (a, b) => a.data.sequenceNumber - b.data.sequenceNumber,
-});
+Each pipeline follows the same internal structure:
+
+```
+pipelines/<name>/
+  commands/         # Command handlers
+  projections/      # Fold and map projection definitions + stores
+  reactors/         # Reactor definitions
+  repositories/     # Projection store implementations (ClickHouse + Memory)
+  schemas/          # Event types, command schemas, constants
+  utils/            # Pipeline-specific utilities
+  pipeline.ts       # Pipeline factory function (createXxxPipeline)
+  index.ts          # Public exports
 ```
 
-**Sequential Processing:**
+**Active pipelines:**
 
-The system computes sequence numbers (1-indexed) for each event within its aggregate and enforces strict sequential processing:
+| Pipeline | Aggregate | Purpose |
+|----------|-----------|---------|
+| `trace-processing` | `trace` | Ingests OTLP spans, builds trace summaries |
+| `evaluation-processing` | `evaluation` | Runs evaluations, tracks evaluation state |
+| `experiment-run-processing` | `experiment_run` | Tracks experiment runs with evaluator results |
+| `simulation-processing` | `simulation_run` | Tracks simulation run lifecycle |
 
-- Events are assigned sequence numbers based on their position in chronological order
-- Handlers and projections process events in sequence number order
-- If event N hasn't been processed, event N+1 will not be processed (throws error)
-- If any event fails, subsequent events for that aggregate stop processing
-- This ensures consistency and prevents out-of-order processing
+### Global Projections
 
-Sequence numbers are computed using `countEventsBefore()` - the number of events that occurred before this event (by timestamp and ID), plus 1. The `ProjectionValidator` orchestrates validation by coordinating `SequenceNumberCalculator`, `IdempotencyChecker`, `OrderingValidator`, and `FailureDetector`.
+SaaS-only cross-pipeline fold projections live in `projections/global/`:
 
-### Additional Resources
+| Projection | Purpose |
+|------------|---------|
+| `projectDailyBillableEvents` | Tracks billable event counts per project per day |
+| `projectDailySdkUsage` | Tracks SDK usage per project per day |
 
-- **Architecture Overview**: See [OVERVIEW.md](./OVERVIEW.md) for core concepts and architecture
-- **Runtime Architecture**: See [Runtime Architecture](../../../.cursor/docs/05-event-sourcing-runtime.md) for how the runtime works
-- **Security & Concurrency**: See [Library Guide](../../../.cursor/docs/06-event-sourcing-library.md) for security pitfalls and implementation patterns
-- **Type Definitions**:
-  - `domain/types.ts` - Core types (Event, Projection)
-  - `stores/eventStore.types.ts` - Event store interface
-  - `stores/projectionStore.types.ts` - Projection store interface
-  - `stores/checkpointStore.types.ts` - Checkpoint store interface
-  - `services/eventSourcingService.ts` - Main service
-  - `utils/event.utils.ts` - Utilities
+### Entry Points
+
+| File | Description |
+|------|-------------|
+| `index.ts` | Public exports for the module |
+| `eventSourcing.ts` | `EventSourcing` central class (owns event store, queue factory, pipelines) |
+| `pipelineRegistry.ts` | Composition root -- creates and registers all pipelines |
+| `runtimePipeline.ts` | `EventSourcingPipeline` -- connects static definitions to runtime |
+| `disabledPipeline.ts` | No-op pipeline returned when event sourcing is disabled |
+| `mapCommands.ts` | Utility to convert command processors to typed dispatch functions |
+
+## Common Pitfalls
+
+1. **Missing tenant validation**: Always call `EventUtils.validateTenantId()` in store implementations.
+2. **Reactor without fold**: Reactors must be registered on an existing fold projection (`withReactor(foldName, ...)`). The builder will throw if the fold does not exist.
+3. **Fold store failures**: If `store.store()` fails, BullMQ retries the entire event. Make sure your store is idempotent or uses upsert semantics.
+4. **Map projection ordering**: Map projections have no ordering guarantees. Do not rely on event order in append stores.
+5. **Process role mismatch**: Commands dispatched in a `web` process are enqueued but not processed until a `worker` process picks them up. Ensure workers are running.

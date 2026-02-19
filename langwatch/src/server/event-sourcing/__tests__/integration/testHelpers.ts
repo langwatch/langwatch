@@ -1,25 +1,24 @@
-import type { AggregateType } from "../../library";
-import { createTenantId, definePipeline } from "../../library";
-import { EventSourcing } from "../../runtime/eventSourcing";
-import { EventSourcingRuntime } from "../../runtime/eventSourcingRuntime";
+import type { AggregateType } from "../../";
+import { createTenantId, definePipeline } from "../../";
+import { EventSourcing } from "../../eventSourcing";
 import type {
-  PipelineWithCommandHandlers,
-  RegisteredPipeline,
-} from "../../runtime/pipeline/types";
-import { BullmqQueueProcessorFactory } from "../../runtime/queue/factory";
-import { EventStoreClickHouse } from "../../runtime/stores/eventStoreClickHouse";
-import { EventRepositoryClickHouse } from "../../runtime/stores/repositories/eventRepositoryClickHouse";
+	PipelineWithCommandHandlers,
+	RegisteredPipeline,
+} from "../../pipeline/types";
+import { BullmqQueueProcessorFactory } from "../../queues/factory";
+import { EventStoreClickHouse } from "../../stores/eventStoreClickHouse";
+import { EventRepositoryClickHouse } from "../../stores/repositories/eventRepositoryClickHouse";
 import {
-  cleanupTestData,
-  getTestClickHouseClient,
-  getTestRedisConnection,
+	cleanupTestData,
+	getTestClickHouseClient,
+	getTestRedisConnection,
 } from "./testContainers";
-import {
-  TestCommandHandler,
-  testFoldProjection,
-  testMapProjection,
-} from "./testPipelines";
 import type { TestProjection } from "./testPipelines";
+import {
+	TestCommandHandler,
+	testFoldProjection,
+	testMapProjection,
+} from "./testPipelines";
 
 /**
  * Gracefully closes a pipeline and waits for cleanup to complete.
@@ -86,25 +85,12 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
     redisConnection,
   );
 
-  // Create EventSourcingRuntime with test stores
-  const runtime = EventSourcingRuntime.createWithStores(
-    {
-      enabled: true,
-      clickHouseEnabled: true,
-      forceClickHouseInTests: true,
-      isTestEnvironment: true,
-      isBuildTime: false,
-      clickHouseClient,
-      redisConnection,
-    },
-    {
-      eventStore,
-      queueProcessorFactory,
-    },
-  );
-
-  // Create EventSourcing instance with the runtime
-  const eventSourcing = new EventSourcing(runtime);
+  const eventSourcing = EventSourcing.createWithStores({
+    eventStore,
+    queueProcessorFactory,
+    clickhouse: clickHouseClient,
+    redis: redisConnection,
+  });
 
   // Build pipeline using static definition
   // Using test aggregate type (now included in production schemas)

@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { prisma } from "~/server/db";
-import type { FoldProjectionStore } from "../../library/projections/foldProjection.types";
-import type { ProjectionStoreContext } from "../../library/projections/projectionStoreContext";
+import type { FoldProjectionStore } from "../foldProjection.types";
+import type { ProjectionStoreContext } from "../projectionStoreContext";
 
 export interface ProjectDailyBillableEventsState {
   projectId: string;

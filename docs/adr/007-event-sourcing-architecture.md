@@ -8,7 +8,7 @@
 
 ## Context
 
-LangWatch uses event sourcing for traces, evaluations, and experiment runs. ADR-002 established the core principle — immutable events, derived projections, branded TenantId. This ADR documents the full architecture after the fold/map projection refactoring, which replaced the earlier handler/checkpoint system with a simpler model.
+LangWatch uses event sourcing for traces, evaluations, experiment runs, and simulations. ADR-002 established the core principle — immutable events, derived projections, branded TenantId. This ADR documents the full architecture after the fold/map projection refactoring, which replaced the earlier handler/checkpoint system with a simpler model.
 
 The previous architecture used event handlers (class-based, async), a checkpoint store (ClickHouse + Redis cache), and a projection updater that rebuilt from scratch on each event. This was complex, fragile, and hard to reason about. The refactoring simplified it to two projection primitives — fold and map — with no checkpoints needed.
 
@@ -20,8 +20,9 @@ Each domain has a **pipeline** that defines:
 - **Events** — immutable facts stored in ClickHouse `event_log` (e.g., `SpanReceivedEvent`)
 - **Fold projections** — stateful aggregations per aggregate (e.g., `TraceSummary`)
 - **Map projections** — stateless per-event transformations (e.g., `SpanStorage`)
+- **Reactors** — post-fold side-effect handlers (e.g., `EvaluationTrigger`)
 
-Three production pipelines exist: `trace_processing`, `evaluation_processing`, `experiment_run_processing`.
+Four production pipelines exist: `trace_processing`, `evaluation_processing`, `experiment_run_processing`, and `simulation_processing`.
 
 Pipelines are defined statically using `definePipeline()` and registered with `EventSourcing.register()`. No runtime builder or dynamic configuration.
 
@@ -33,7 +34,7 @@ Fold projections accumulate state one event at a time:
 2. `state = apply(state, event)`
 3. Store result
 
-**Fold state = stored data.** No intermediate types. `apply()` writes PascalCase fields that map directly to ClickHouse columns. The store is a dumb read/write layer.
+**Fold state = stored data.** No intermediate types. `apply()` writes camelCase or PascalCase fields that map directly to ClickHouse or Prisma columns. The store is a dumb read/write layer.
 
 Fold projections run on a **GroupQueue** (BullMQ + Redis) that guarantees per-aggregate FIFO ordering via BullMQ's `group` parameter. This means events for the same aggregate are always processed one at a time, in order.
 
@@ -50,6 +51,15 @@ Map projections run on a **SimpleQueue** (BullMQ). No ordering guarantees needed
 
 `map()` is a pure function: event in, record out (or null to skip). The `AppendStore` handles persistence.
 
+## Decision — Reactors (Post-Fold Side Effects)
+
+Reactors are side-effect handlers that fire after a fold projection successfully updates and persists its state.
+
+1. `FoldProjection.store()` succeeds
+2. `Reactor.handle(event, { foldState, ... })` is dispatched
+
+Reactors allow reacting to the *newly computed state* of an aggregate. They are dispatched asynchronously via a **SimpleQueue**. If a fold fails, its reactors never fire, guaranteeing that reactors always operate on a consistent, persisted state.
+
 ## Decision — No Checkpoints
 
 The fold state serves as both data store and checkpoint. Rationale:
@@ -63,9 +73,18 @@ This eliminated the checkpoint store (ClickHouse table + Redis cache), the check
 
 ## Decision — Global Projection Registry
 
-Cross-pipeline projections (e.g., daily event counts) use a `ProjectionRegistry` that receives events from all pipelines after local dispatch. The registry creates its own `ProjectionRouter` and `QueueManager` with the virtual pipeline name `global_projections`.
+Cross-pipeline projections (e.g., daily event counts, SDK usage) use a `ProjectionRegistry` that receives events from all pipelines after local dispatch. The registry creates its own `ProjectionRouter` and `QueueManager` with the virtual pipeline name `global_projections`.
 
 Events flow: `EventSourcingService.storeEvents()` → local `ProjectionRouter.dispatch()` → `ProjectionRegistry.dispatch()`.
+
+## Decision — Process Roles
+
+The runtime supports two roles to optimize resource usage and prevent event loop contention:
+
+- **web**: Only dispatches commands and events to queues. Does not start BullMQ workers.
+- **worker**: Starts all BullMQ workers for projections, reactors, and command handlers.
+
+This ensures that the web servers remains responsive to HTTP requests while background processing is offloaded to dedicated workers.
 
 ## Consequences / Rules
 
@@ -76,30 +95,21 @@ Events flow: `EventSourcingService.storeEvents()` → local `ProjectionRouter.di
 5. **Stores must handle ClickHouse eventually-consistent reads** — use `FINAL` or deduplication where needed
 6. **One fold store per projection** — the store is a dumb get/store layer, not shared
 7. **Map projections are fire-and-forget** — no retry coordination needed beyond BullMQ
+8. **Reactors only fire on success** — they are the safe place for side effects that depend on state
 
 ## Key Files
 
 ```
 src/server/event-sourcing/
-├── library/                           # Domain types, projections, services (framework)
-│   ├── projections/
-│   │   ├── foldProjection.types.ts    # FoldProjectionDefinition, FoldProjectionStore
-│   │   ├── mapProjection.types.ts     # MapProjectionDefinition, AppendStore
-│   │   ├── projectionRouter.ts        # Dispatches events to fold/map queues
-│   │   └── projectionRegistry.ts      # Cross-pipeline projection registry
-│   ├── services/
-│   │   └── eventSourcingService.ts    # Main orchestrator: store → dispatch → project
-│   └── pipeline/
-│       └── staticBuilder.ts           # definePipeline() builder
-├── runtime/                           # ClickHouse stores, BullMQ queues, runtime wiring
-│   ├── eventSourcing.ts               # EventSourcing class: register pipelines
-│   └── queue/
-│       └── groupQueue/                # Per-aggregate FIFO via BullMQ groups
-├── pipelines/                         # Three production pipelines
-│   ├── trace-processing/
-│   ├── evaluation-processing/
-│   └── experiment-run-processing/
-└── projections/global/                # Cross-pipeline projections
+├── commands/                          # Command types and handler interfaces
+├── domain/                            # Branded types (TenantId, AggregateType) and core Event/Projection schemas
+├── pipeline/                          # definePipeline() builder and types
+├── pipelines/                         # Production pipelines (trace, evaluation, experiment, simulation)
+├── projections/                       # Fold/Map projection types, Router, and Global registry
+├── queues/                            # GroupQueue (FIFO) and SimpleQueue implementations
+├── reactors/                          # Reactor types and base definitions
+├── services/                          # EventSourcingService (orchestrator) and error handling
+└── stores/                            # EventStore and ProjectionStore implementations (ClickHouse, Memory)
 ```
 
 ## Diagram
@@ -114,7 +124,10 @@ Command → CommandHandler → Event[] → EventStore.store()
                                     ↓                ↓
                            FoldProjection      MapProjection
                           load → apply → store   map → append
-                                         ↓
+                                    ↓
+                                 Reactor (SimpleQueue)
+                                 handle(event, { state })
+                                    ↓
                                   ProjectionRegistry.dispatch()  (global projections)
 ```
 

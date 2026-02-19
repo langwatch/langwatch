@@ -1,10 +1,10 @@
-import type { Event } from "../../library/domain/types";
-import type { FoldProjectionDefinition } from "../../library/projections/foldProjection.types";
 import { SPAN_RECEIVED_EVENT_TYPE } from "../../pipelines/trace-processing/schemas/constants";
 import type { SpanReceivedEventData } from "../../pipelines/trace-processing/schemas/events";
+import type { Event } from "../../domain/types";
+import type { FoldProjectionDefinition } from "../foldProjection.types";
 import {
-  projectDailySdkUsageStore,
-  type ProjectDailySdkUsageState,
+	projectDailySdkUsageStore,
+	type ProjectDailySdkUsageState,
 } from "./projectDailySdkUsage.store";
 
 export const PROJECT_DAILY_SDK_USAGE_PROJECTION_VERSION =
