@@ -979,6 +979,13 @@ export function SubscriptionPage() {
       ? DEVELOPER_FEATURES
       : GROWTH_FEATURES;
 
+
+  const isUpgradeSeatsRequired = !isDeveloperPlan && (plannedUsers.length > 0 || deletedSeatCount > 0);
+  const isUpgradePlanRequired = (
+    isDeveloperPlan && 
+    (plannedUsers.length > 0 || deletedSeatCount > 0 )) 
+  || isTieredLegacyPaidPlan;
+
   return (
     <SettingsLayout>
       <VStack
@@ -1077,7 +1084,7 @@ export function SubscriptionPage() {
           features={currentPlanFeatures}
           userCount={seatUsageN}
           maxSeats={seatUsageM}
-          upgradeRequired={isDeveloperPlan && plannedUsers.length > 0}
+          upgradeRequired={isUpgradePlanRequired}
           onUserCountClick={() => setIsDrawerOpen(true)}
           onManageSubscription={
             !isDeveloperPlan ? handleManageSubscription : undefined
@@ -1087,7 +1094,7 @@ export function SubscriptionPage() {
         />
 
         {/* Upgrade Block - show for free plan and TIERED legacy paid orgs */}
-        {(isDeveloperPlan || isTieredLegacyPaidPlan) && (
+        {(isUpgradePlanRequired) && (
           <UpgradePlanBlock
             planName={
               <>
@@ -1110,7 +1117,7 @@ export function SubscriptionPage() {
         )}
 
         {/* Update seats Block - show for Growth seat+usage plan when seats have been added or removed */}
-        {!isDeveloperPlan && (plannedUsers.length > 0 || deletedSeatCount > 0) && !isTieredPricingModel && (
+        {isUpgradeSeatsRequired && (
           <UpdateSeatsBlock
             totalFullMembers={billingSeats}
             totalPrice={billingPriceFormatted}
