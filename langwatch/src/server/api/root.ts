@@ -35,6 +35,7 @@ import { publicEnvRouter } from "./routers/publicEnv";
 import { roleRouter } from "./routers/role";
 import { scenarioRouter } from "./routers/scenarios";
 import { sdkRadarRouter } from "./routers/sdkRadar";
+import { secretsRouter } from "./routers/secrets";
 import { suiteRouter } from "./routers/suites";
 import { shareRouter } from "./routers/share";
 import { spansRouter } from "./routers/spans";
@@ -92,6 +93,7 @@ export const appRouter = createTRPCRouter({
   role: roleRouter,
   prompts: promptsRouter,
   sdkRadar: sdkRadarRouter,
+  secrets: secretsRouter,
   license: licenseRouter,
   licenseEnforcement: licenseEnforcementRouter,
   ...(dependencies.extraTRPCRoutes?.() ?? {}),

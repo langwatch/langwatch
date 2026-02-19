@@ -8,7 +8,7 @@ from langwatch_nlp.studio.parser import (
     normalized_node,
     parse_component,
 )
-from langwatch_nlp.studio.utils import disable_dsp_caching, optional_langwatch_trace
+from langwatch_nlp.studio.utils import build_secrets_preamble, disable_dsp_caching, optional_langwatch_trace
 from langwatch_nlp.studio.types.events import (
     Debug,
     DebugPayload,
@@ -48,6 +48,7 @@ async def execute_component(event: ExecuteComponentPayload):
             code, class_name, kwargs = parse_component(
                 normalized_node(node), event.workflow, standalone=True
             )
+            code = build_secrets_preamble(event.workflow.secrets) + code
             with dspy.context(**({"adapter": TemplateAdapter()} if event.workflow.template_adapter == "default" else {})):
                 with materialized_component_class(
                     component_code=code, class_name=class_name

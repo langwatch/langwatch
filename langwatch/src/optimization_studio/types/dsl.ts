@@ -356,6 +356,7 @@ export type ServerWorkflow = Omit<Workflow, "workflow_id"> & {
   api_key: string;
   workflow_id: string;
   project_id: string;
+  secrets?: Record<string, string>;
 };
 
 // ============================================================================
