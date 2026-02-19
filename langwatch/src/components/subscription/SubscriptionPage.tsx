@@ -44,6 +44,10 @@ import { useSubscriptionActions } from "./useSubscriptionActions";
 import { classifyMemberType, type MemberType } from "~/server/license-enforcement/member-classification";
 import { toaster } from "~/components/ui/toaster";
 import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
+import { z } from "zod";
+
+const emailSchema = z.string().email();
+const isValidEmail = (value: string) => emailSchema.safeParse(value).success;
 
 /**
  * User representation in the subscription context
@@ -451,6 +455,7 @@ function UserManagementDrawer({
 }) {
   const [editableUsers, setEditableUsers] = useState<EditableUser[]>([]);
   const [localPlannedUsers, setLocalPlannedUsers] = useState<PlannedUser[]>([]);
+  const [emailErrors, setEmailErrors] = useState<Record<string, string>>({});
   const [initialAutoFillCount, setInitialAutoFillCount] = useState(0);
   const prevOpenRef = useRef(false);
 
@@ -489,6 +494,7 @@ function UserManagementDrawer({
   const handleClose = useCallback(() => {
     setEditableUsers([]);
     setLocalPlannedUsers([]);
+    setEmailErrors({});
     onClose();
   }, [onClose]);
 
@@ -509,9 +515,26 @@ function UserManagementDrawer({
     setLocalPlannedUsers((prev) =>
       prev.map((u) => (u.id === id ? { ...u, email } : u)),
     );
+    setEmailErrors((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
   };
 
   const handleSave = () => {
+    const errors: Record<string, string> = {};
+    for (const user of localPlannedUsers) {
+      const trimmed = user.email.trim();
+      if (trimmed !== "" && !isValidEmail(trimmed)) {
+        errors[user.id] = "Please enter a valid email address";
+      }
+    }
+    if (Object.keys(errors).length > 0) {
+      setEmailErrors(errors);
+      return;
+    }
+
     const autoRows = localPlannedUsers.filter((u) => u.id.startsWith("auto-"));
     const manualRows = localPlannedUsers.filter((u) => u.id.startsWith("planned-"));
     const autoRowsWithEmail = autoRows.filter((u) => u.email.trim() !== "");
@@ -643,43 +666,49 @@ function UserManagementDrawer({
                   </Button>
                 </HStack>
                 {localPlannedUsers.map((user, index) => (
-                  <HStack
-                    key={user.id}
-                    data-testid={`pending-seat-${index}`}
-                    width="full"
-                    gap={2}
-                    padding={3}
-                    borderWidth={1}
-                    borderRadius="md"
-                    borderColor="gray.200"
-                  >
-                    <Input
-                      data-testid={`seat-email-${index}`}
-                      placeholder="Enter email address"
-                      size="sm"
-                      flex={1}
-                      value={user.email}
-                      onChange={(e) =>
-                        handleUpdatePlannedUserEmail(user.id, e.target.value)
-                      }
-                    />
-                    <Badge
-                      data-testid={`seat-member-type-${index}`}
-                      colorPalette="blue"
-                      variant="outline"
+                  <VStack key={user.id} width="full" gap={1} align="stretch">
+                    <HStack
+                      data-testid={`pending-seat-${index}`}
+                      width="full"
+                      gap={2}
+                      padding={3}
+                      borderWidth={1}
+                      borderRadius="md"
+                      borderColor={emailErrors[user.id] ? "red.300" : "gray.200"}
                     >
-                      Full Member
-                    </Badge>
-                    <Button
-                      data-testid={`remove-seat-${index}`}
-                      size="xs"
-                      variant="ghost"
-                      colorPalette="red"
-                      onClick={() => handleRemovePlannedUser(user.id)}
-                    >
-                      <Trash2 size={14} />
-                    </Button>
-                  </HStack>
+                      <Input
+                        data-testid={`seat-email-${index}`}
+                        placeholder="Enter email address"
+                        size="sm"
+                        flex={1}
+                        value={user.email}
+                        onChange={(e) =>
+                          handleUpdatePlannedUserEmail(user.id, e.target.value)
+                        }
+                      />
+                      <Badge
+                        data-testid={`seat-member-type-${index}`}
+                        colorPalette="blue"
+                        variant="outline"
+                      >
+                        Full Member
+                      </Badge>
+                      <Button
+                        data-testid={`remove-seat-${index}`}
+                        size="xs"
+                        variant="ghost"
+                        colorPalette="red"
+                        onClick={() => handleRemovePlannedUser(user.id)}
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    </HStack>
+                    {emailErrors[user.id] && (
+                      <Text fontSize="xs" color="red.500" paddingLeft={3}>
+                        {emailErrors[user.id]}
+                      </Text>
+                    )}
+                  </VStack>
                 ))}
               </VStack>
             </VStack>
