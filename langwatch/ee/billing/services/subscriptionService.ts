@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { OrganizationUserRole, PrismaClient } from "@prisma/client";
 import type Stripe from "stripe";
 import { notifySubscriptionEvent } from "../notifications/notificationHandlers";
 import {
@@ -13,6 +13,11 @@ import type {
   prices,
 } from "./subscriptionItemCalculator";
 import { isStripePriceName } from "../stripe/stripePriceCatalog";
+import {
+  InvalidPlanError,
+  OrganizationNotFoundError,
+  SeatBillingUnavailableError,
+} from "../errors";
 
 type ItemCalculator = {
   getItemsToUpdate: typeof getItemsToUpdate;
@@ -68,6 +73,16 @@ export type SubscriptionService = {
     note?: string;
     actorEmail: string;
   }): Promise<{ success: boolean }>;
+
+  createSubscriptionWithInvites(params: {
+    organizationId: string;
+    baseUrl: string;
+    membersToAdd: number;
+    customerId: string;
+    currency?: "EUR" | "USD";
+    billingInterval?: "monthly" | "annual";
+    invites: Array<{ email: string; role: OrganizationUserRole }>;
+  }): Promise<{ url: string | null }>;
 };
 
 export const createSubscriptionService = ({
@@ -241,7 +256,7 @@ export const createSubscriptionService = ({
 
 
       if (!isStripePriceName(plan as StripePriceName)) {
-        throw new Error(`Plan ${plan} does not have an associated Stripe price`);
+        throw new InvalidPlanError(plan);
       }
       
       itemsToAdd.push({
@@ -297,9 +312,52 @@ export const createSubscriptionService = ({
 
     async previewProration({ organizationId, newTotalSeats }) {
       if (!seatEventFns) {
-        throw new Error("Seat event billing is not available");
+        throw new SeatBillingUnavailableError();
       }
       return seatEventFns.previewProration({ organizationId, newTotalSeats });
+    },
+
+    async createSubscriptionWithInvites({
+      organizationId,
+      baseUrl,
+      membersToAdd,
+      customerId,
+      currency,
+      billingInterval,
+      invites,
+    }) {
+      if (!seatEventFns) {
+        throw new SeatBillingUnavailableError();
+      }
+
+      // Resolve the first team in the org for deterministic team assignment
+      const firstTeam = await db.team.findFirst({
+        where: { organizationId },
+        orderBy: { createdAt: "asc" },
+        select: { id: true },
+      });
+
+      const teamIds = firstTeam?.id ?? "";
+
+      const org = await db.organization.findUnique({
+        where: { id: organizationId },
+        select: { pricingModel: true },
+      });
+
+      return seatEventFns.createSeatEventCheckout({
+        organizationId,
+        customerId,
+        baseUrl,
+        currency: currency ?? "EUR",
+        billingInterval: billingInterval ?? "monthly",
+        membersToAdd,
+        isUpgradeFromTiered: org?.pricingModel === "TIERED",
+        invites: invites.map((inv) => ({
+          email: inv.email,
+          role: inv.role,
+          teamIds,
+        })),
+      });
     },
 
     async notifyProspective({
@@ -315,7 +373,7 @@ export const createSubscriptionService = ({
       });
 
       if (!organization) {
-        throw new Error("Organization not found");
+        throw new OrganizationNotFoundError();
       }
 
       await notifySubscriptionEvent({

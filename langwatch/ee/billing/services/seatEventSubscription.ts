@@ -1,4 +1,5 @@
-import type { PrismaClient } from "@prisma/client";
+import type { OrganizationUserRole, PrismaClient } from "@prisma/client";
+import { nanoid } from "nanoid";
 import type Stripe from "stripe";
 import { SubscriptionStatus } from "../planTypes";
 import {
@@ -6,9 +7,19 @@ import {
   isGrowthSeatPrice,
   resolveGrowthSeatPriceId,
 } from "../utils/growthSeatEvent";
+import {
+  NoActiveSubscriptionError,
+  SubscriptionItemNotFoundError,
+} from "../errors";
 
 type Currency = "EUR" | "USD";
 type BillingInterval = "monthly" | "annual";
+
+type InviteInput = {
+  email: string;
+  role: OrganizationUserRole;
+  teamIds: string;
+};
 
 export type SeatEventSubscriptionFns = ReturnType<
   typeof createSeatEventSubscriptionFns
@@ -29,6 +40,7 @@ export const createSeatEventSubscriptionFns = ({
     billingInterval,
     membersToAdd,
     isUpgradeFromTiered = false,
+    invites,
   }: {
     organizationId: string;
     customerId: string;
@@ -37,8 +49,21 @@ export const createSeatEventSubscriptionFns = ({
     billingInterval: BillingInterval;
     membersToAdd: number;
     isUpgradeFromTiered?: boolean;
+    invites?: InviteInput[];
   }) {
-    // Clean up stale PENDING subs from abandoned checkouts
+    // Find stale PENDING subs so we can clean up their PAYMENT_PENDING invites too
+    const staleSubs = await db.subscription.findMany({
+      where: {
+        organizationId,
+        plan: "GROWTH_SEAT_EVENT",
+        status: SubscriptionStatus.PENDING,
+      },
+      select: { id: true },
+    });
+
+    const staleSubIds = staleSubs.map((s) => s.id);
+
+    // Cancel stale PENDING subs from abandoned checkouts
     await db.subscription.updateMany({
       where: {
         organizationId,
@@ -51,13 +76,58 @@ export const createSeatEventSubscriptionFns = ({
       },
     });
 
-    const subscription = await db.subscription.create({
-      data: {
-        organizationId,
-        status: SubscriptionStatus.PENDING,
-        plan: "GROWTH_SEAT_EVENT",
-        maxMembers: membersToAdd,
-      },
+    // Clean up orphaned PAYMENT_PENDING invites from stale subs
+    if (staleSubIds.length > 0) {
+      await db.organizationInvite.deleteMany({
+        where: {
+          organizationId,
+          status: "PAYMENT_PENDING",
+          subscriptionId: { in: staleSubIds },
+        },
+      });
+    }
+
+    // Create subscription + invites in a transaction
+    const subscription = await db.$transaction(async (tx) => {
+      const sub = await tx.subscription.create({
+        data: {
+          organizationId,
+          status: SubscriptionStatus.PENDING,
+          plan: "GROWTH_SEAT_EVENT",
+          maxMembers: membersToAdd,
+        },
+      });
+
+      if (invites && invites.length > 0) {
+        for (const invite of invites) {
+          // Skip duplicates (existing PENDING or PAYMENT_PENDING invites)
+          const existing = await tx.organizationInvite.findFirst({
+            where: {
+              email: invite.email,
+              organizationId,
+              status: { in: ["PENDING", "PAYMENT_PENDING"] },
+              OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
+            },
+          });
+
+          if (existing) continue;
+
+          await tx.organizationInvite.create({
+            data: {
+              email: invite.email,
+              inviteCode: nanoid(),
+              expiration: null,
+              organizationId,
+              teamIds: invite.teamIds,
+              role: invite.role,
+              status: "PAYMENT_PENDING",
+              subscriptionId: sub.id,
+            },
+          });
+        }
+      }
+
+      return sub;
     });
 
     const lineItems = createCheckoutLineItems({
@@ -113,10 +183,12 @@ export const createSeatEventSubscriptionFns = ({
     organizationId: string;
     totalMembers: number;
   }) {
+    // Find the most recent subscription with a Stripe ID (ACTIVE or CANCELLED-but-still-active-in-Stripe)
     const lastSubscription = await db.subscription.findFirst({
       where: {
         organizationId,
-        status: { not: SubscriptionStatus.CANCELLED },
+        status: { in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.CANCELLED] },
+        stripeSubscriptionId: { not: null },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -129,6 +201,11 @@ export const createSeatEventSubscriptionFns = ({
       lastSubscription.stripeSubscriptionId,
     );
 
+    // Stripe sub must still be active (even if scheduled for cancellation)
+    if (stripeSubscription.status !== "active") {
+      return { success: false };
+    }
+
     const seatItem = stripeSubscription.items.data.find((item) =>
       isGrowthSeatPrice(item.price.id),
     );
@@ -137,13 +214,26 @@ export const createSeatEventSubscriptionFns = ({
       return { success: false };
     }
 
+    // If the sub was scheduled for cancellation, reactivate it — the user
+    // is choosing to keep their subscription by updating seats.
+    if (stripeSubscription.canceled_at) {
+      await stripe.subscriptions.update(lastSubscription.stripeSubscriptionId, {
+        cancel_at_period_end: false,
+      });
+    }
+
     await stripe.subscriptions.update(lastSubscription.stripeSubscriptionId, {
       items: [{ id: seatItem.id, quantity: totalMembers }],
     });
 
+    // Restore DB record to ACTIVE with updated seat count
     await db.subscription.update({
       where: { id: lastSubscription.id },
-      data: { maxMembers: totalMembers },
+      data: {
+        status: SubscriptionStatus.ACTIVE,
+        maxMembers: totalMembers,
+        endDate: null,
+      },
     });
 
     return { success: true };
@@ -156,28 +246,35 @@ export const createSeatEventSubscriptionFns = ({
     organizationId: string;
     newTotalSeats: number;
   }) {
+    // Find the most recent subscription with a Stripe ID (ACTIVE or CANCELLED-but-still-active-in-Stripe)
     const lastSubscription = await db.subscription.findFirst({
       where: {
         organizationId,
-        status: { not: SubscriptionStatus.CANCELLED },
+        status: { in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.CANCELLED] },
+        stripeSubscriptionId: { not: null },
       },
       orderBy: { createdAt: "desc" },
     });
 
     if (!lastSubscription?.stripeSubscriptionId) {
-      throw new Error("No active subscription found");
+      throw new NoActiveSubscriptionError();
     }
 
     const stripeSubscription = await stripe.subscriptions.retrieve(
       lastSubscription.stripeSubscriptionId,
     );
 
+    // Guard: Stripe sub must still be active (even if scheduled for cancellation)
+    if (stripeSubscription.status !== "active") {
+      throw new NoActiveSubscriptionError();
+    }
+
     const seatItem = stripeSubscription.items.data.find((item) =>
       isGrowthSeatPrice(item.price.id),
     );
 
     if (!seatItem) {
-      throw new Error("No seat item found on subscription");
+      throw new SubscriptionItemNotFoundError("seat");
     }
 
     // Fetch upcoming invoice WITH the proposed seat change
