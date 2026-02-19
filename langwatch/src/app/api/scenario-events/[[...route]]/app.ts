@@ -2,7 +2,13 @@ import type { Project } from "@prisma/client";
 import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
-import z from "zod";
+import { getApp } from "~/server/app-layer/app";
+import { getClickHouseClient } from "~/server/clickhouse/client";
+import { ScenarioEventType } from "~/server/scenarios/scenario-event.enums";
+import { ScenarioEventService } from "~/server/scenarios/scenario-event.service";
+import type { ScenarioEvent } from "~/server/scenarios/scenario-event.types";
+import { responseSchemas, scenarioEventSchema } from "~/server/scenarios/schemas";
+import { ClickHouseSimulationService } from "~/server/simulations/clickhouse-simulation.service";
 import { createLogger } from "~/utils/logger/server";
 import {
   authMiddleware,
@@ -12,8 +18,6 @@ import {
   tracerMiddleware,
 } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
-import { ScenarioEventService } from "~/server/scenarios/scenario-event.service";
-import { responseSchemas, scenarioEventSchema } from "~/server/scenarios/schemas";
 
 const logger = createLogger("langwatch:api:scenario-events");
 
@@ -71,11 +75,17 @@ app.post(
       "Received scenario event",
     );
 
-    const scenarioRunnerService = new ScenarioEventService();
-    await scenarioRunnerService.saveScenarioEvent({
-      projectId: project.id,
-      ...event,
-    });
+
+    // Dual-write to ClickHouse via event-sourcing (fire-and-forget)
+    if (project.featureEventSourcingSimulationIngestion) {
+      await dispatchSimulationEvent(project.id, event);
+    }
+
+    // const scenarioRunnerService = new ScenarioEventService();
+    // await scenarioRunnerService.saveScenarioEvent({
+    //   projectId: project.id,
+    //   ...event,
+    // });
 
     const path = `/${project.slug}/simulations/${
       event.scenarioSetId ?? "default"
@@ -120,8 +130,78 @@ export const route = app.delete(
       projectId: project.id,
     });
 
+    // Also soft-delete in CH (fire-and-forget)
+    if (project.featureEventSourcingSimulationIngestion) {
+      void softDeleteSimulationRunsInClickHouse(project.id);
+    }
+
     return c.json({ success: true }, 200);
   },
 );
 
 export type ScenarioEventsAppType = typeof route;
+
+async function dispatchSimulationEvent(
+  projectId: string,
+  event: ScenarioEvent,
+): Promise<void> {
+  try {
+    const basePayload = {
+      tenantId: projectId,
+      scenarioRunId: event.scenarioRunId,
+      occurredAt: event.timestamp ?? Date.now(),
+    };
+
+    if (event.type === ScenarioEventType.RUN_STARTED) {
+      await getApp().simulations.startRun({
+        ...basePayload,
+        scenarioId: event.scenarioId,
+        batchRunId: event.batchRunId,
+        scenarioSetId: event.scenarioSetId ?? "default",
+        name: event.metadata?.name,
+        description: event.metadata?.description,
+      });
+    } else if (event.type === ScenarioEventType.MESSAGE_SNAPSHOT) {
+      const messages = event.messages ?? [];
+      await getApp().simulations.messageSnapshot({
+        ...basePayload,
+        messages: messages as Array<{ trace_id?: string; [key: string]: unknown }>,
+        traceIds: messages
+          .map((m: { trace_id?: string }) => m.trace_id)
+          .filter((id): id is string => typeof id === "string"),
+      });
+    } else if (event.type === ScenarioEventType.RUN_FINISHED) {
+      await getApp().simulations.finishRun({
+        ...basePayload,
+        results: event.results
+          ? {
+              verdict: event.results.verdict,
+              reasoning: event.results.reasoning,
+              metCriteria: event.results.metCriteria,
+              unmetCriteria: event.results.unmetCriteria,
+              error: event.results.error,
+            }
+          : undefined,
+        status: event.status,
+      });
+    }
+  } catch (err) {
+    logger.warn({ err, projectId }, "Failed to dispatch simulation event to CH");
+  }
+}
+
+async function softDeleteSimulationRunsInClickHouse(
+  projectId: string,
+): Promise<void> {
+  try {
+    const chService = ClickHouseSimulationService.create(getClickHouseClient());
+    if (chService) {
+      await chService.softDeleteAllForProject({ projectId });
+    }
+  } catch (err) {
+    logger.warn(
+      { err, projectId },
+      "Failed to soft-delete simulation runs in ClickHouse",
+    );
+  }
+}
