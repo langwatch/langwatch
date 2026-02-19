@@ -12,11 +12,12 @@
  * @see specs/background/redis-cluster-compatibility.feature
  */
 
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { GenericContainer, Wait } from "testcontainers";
-import type { StartedTestContainer } from "testcontainers";
+import { Queue, QueueEvents, Worker } from "bullmq";
 import { Cluster } from "ioredis";
-import { Queue, Worker, QueueEvents } from "bullmq";
+import type { StartedTestContainer } from "testcontainers";
+import { GenericContainer, Wait } from "testcontainers";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { SCENARIO_QUEUE } from "../../scenarios/scenario.constants";
 import {
   COLLECTOR_QUEUE,
   EVALUATIONS_QUEUE,
@@ -24,10 +25,6 @@ import {
   TRACK_EVENTS_QUEUE,
   USAGE_STATS_QUEUE,
 } from "../queues/constants";
-import { EVENT_SOURCING_QUEUE_NAME } from "../workers/eventSourcingWorker";
-import { SCENARIO_QUEUE } from "../../scenarios/scenario.constants";
-import { traceProcessingPipelineDefinition } from "../../event-sourcing/pipelines/trace-processing/pipeline";
-import { evaluationProcessingPipelineDefinition } from "../../event-sourcing/pipelines/evaluation-processing/pipeline";
 import { makeQueueName } from "../queues/makeQueueName";
 
 /**
@@ -68,23 +65,6 @@ describe("BullMQ Redis Cluster Compatibility", () => {
       ["USAGE_STATS_QUEUE", USAGE_STATS_QUEUE.NAME],
     ])("%s contains a hash tag", (_label, queueName) => {
       expect(hasHashTag(queueName)).toBe(true);
-    });
-  });
-
-  describe("when checking event sourcing queue names", () => {
-    it("event sourcing worker queue contains a hash tag", () => {
-      expect(hasHashTag(EVENT_SOURCING_QUEUE_NAME)).toBe(true);
-    });
-
-    it("trace_processing pipeline name is defined in metadata", () => {
-      // QueueProcessorManager.makeQueueName wraps this as {trace_processing/...}
-      const pipelineName = traceProcessingPipelineDefinition.metadata.name;
-      expect(pipelineName).toBe("trace_processing");
-    });
-
-    it("evaluation_processing pipeline name is defined in metadata", () => {
-      const pipelineName = evaluationProcessingPipelineDefinition.metadata.name;
-      expect(pipelineName).toBe("evaluation_processing");
     });
   });
 

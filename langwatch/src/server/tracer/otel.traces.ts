@@ -1313,55 +1313,17 @@ const addOpenTelemetrySpanAsSpan = (
   );
 };
 
-type RecursiveRecord = {
-  // biome-ignore lint/complexity/noBannedTypes: this is a trick to get rich key types + arbitrary strings
-  [key: string]: (RecursiveRecord & (string | {})) | undefined;
-};
-
-const isNumeric = (n: any) => !isNaN(parseFloat(n)) && isFinite(n);
-
 export function otelAttributesToNestedAttributes(
   attributes: DeepPartial<IKeyValue[]> | undefined,
-): RecursiveRecord {
-  const resolveOtelAnyValue = (anyValuePair?: DeepPartial<IAnyValue>): any => {
-    if (!anyValuePair) return void 0;
+): Record<string, any> {
+  const result: Record<string, any> = {};
 
-    if (anyValuePair.stringValue != null) {
-      if (isNumeric(anyValuePair.stringValue)) return anyValuePair.stringValue;
-
-      try {
-        return JSON.parse(anyValuePair.stringValue);
-      } catch {
-        return anyValuePair.stringValue;
-      }
-    }
-
-    if (anyValuePair.boolValue != null) return anyValuePair.boolValue;
-    if (anyValuePair.intValue != null)
-      return Long.isLong(anyValuePair.intValue)
-        ? anyValuePair.intValue.toInt()
-        : anyValuePair.intValue;
-    if (anyValuePair.doubleValue != null)
-      return Long.isLong(anyValuePair.doubleValue)
-        ? anyValuePair.doubleValue.toNumber()
-        : anyValuePair.doubleValue;
-    if (anyValuePair.bytesValue != null) return anyValuePair.bytesValue;
-
-    if (anyValuePair.kvlistValue)
-      return otelAttributesToNestedAttributes(anyValuePair.kvlistValue.values);
-
-    if (anyValuePair.arrayValue?.values)
-      return anyValuePair.arrayValue.values.map(resolveOtelAnyValue);
-
-    return void 0;
-  };
-
-  return (attributes ?? []).reduce<RecursiveRecord>((acc, kv) => {
-    if (!kv?.key) return acc;
+  for (const kv of attributes ?? []) {
+    if (!kv?.key) continue;
 
     const path = kv.key.split(".");
     const last = path.pop()!;
-    let cursor: any = acc;
+    let cursor: any = result;
 
     // walk the paths, and create every segment *except* the last
     path.forEach((seg, i) => {
@@ -1381,9 +1343,44 @@ export function otelAttributesToNestedAttributes(
     const key = leafIsIndex ? Number(last) : last;
 
     cursor[key] = resolveOtelAnyValue(kv.value);
+  }
 
-    return acc;
-  }, {});
+  return result;
+}
+
+const isNumeric = (n: any) => !isNaN(parseFloat(n)) && isFinite(n);
+
+function resolveOtelAnyValue(anyValuePair?: DeepPartial<IAnyValue>): any {
+  if (!anyValuePair) return void 0;
+
+  if (anyValuePair.stringValue != null) {
+    if (isNumeric(anyValuePair.stringValue)) return anyValuePair.stringValue;
+
+    try {
+      return JSON.parse(anyValuePair.stringValue);
+    } catch {
+      return anyValuePair.stringValue;
+    }
+  }
+
+  if (anyValuePair.boolValue != null) return anyValuePair.boolValue;
+  if (anyValuePair.intValue != null)
+    return Long.isLong(anyValuePair.intValue)
+      ? anyValuePair.intValue.toInt()
+      : anyValuePair.intValue;
+  if (anyValuePair.doubleValue != null)
+    return Long.isLong(anyValuePair.doubleValue)
+      ? anyValuePair.doubleValue.toNumber()
+      : anyValuePair.doubleValue;
+  if (anyValuePair.bytesValue != null) return anyValuePair.bytesValue;
+
+  if (anyValuePair.kvlistValue)
+    return otelAttributesToNestedAttributes(anyValuePair.kvlistValue.values);
+
+  if (anyValuePair.arrayValue?.values)
+    return anyValuePair.arrayValue.values.map(resolveOtelAnyValue);
+
+  return void 0;
 }
 
 const maybeConvertLongBits = (value: any): number => {

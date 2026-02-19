@@ -1,5 +1,26 @@
+import superjson from "superjson";
 import pino, { type LoggerOptions, type Logger as PinoLogger, type DestinationStream } from "pino";
 import { getLogContext } from "../../server/context/logging";
+
+/**
+ * Custom Error serializer using superjson.
+ * Avoids expensive manual stack trace formatting while preserving all metadata.
+ */
+const superjsonErrorSerializer = (err: any) => {
+  if (!(err instanceof Error)) {
+    return pino.stdSerializers.err(err);
+  }
+
+  // Use superjson to serialize the error object efficiently
+  const serialized = superjson.serialize(err);
+  
+  return {
+    ...pino.stdSerializers.err(err),
+    // Include the superjson metadata for better downstream reconstruction if needed
+    // but keep standard fields for compatibility with typical log viewers
+    _superjson: serialized.meta,
+  };
+};
 
 export interface CreateLoggerOptions {
   /**
@@ -70,7 +91,7 @@ export const createLogger = (
     name,
     level: baseLevel,
     timestamp: pino.stdTimeFunctions.isoTime,
-    serializers: { error: pino.stdSerializers.err },
+    serializers: { error: superjsonErrorSerializer },
     formatters: {
       bindings: (bindings) => bindings,
       level: (label) => ({ level: label.toUpperCase() }),
