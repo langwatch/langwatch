@@ -232,6 +232,7 @@ function ReportsContent() {
             <ReportGrid
               graphs={graphs}
               projectSlug={project?.slug ?? ""}
+              dashboardId={activeDashboardId ?? undefined}
               onGraphDelete={handleGraphDelete}
               onGraphSizeChange={handleGraphSizeChange}
               onGraphsReorder={handleGraphsReorder}

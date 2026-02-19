@@ -20,6 +20,7 @@ interface GraphCardHeaderProps {
   name: string;
   graph: unknown;
   projectSlug: string;
+  dashboardId?: string;
   colSpan: number;
   rowSpan: number;
   filters: unknown;
@@ -41,6 +42,7 @@ export function GraphCardHeader({
   name,
   graph,
   projectSlug,
+  dashboardId,
   colSpan,
   rowSpan,
   filters,
@@ -174,6 +176,7 @@ export function GraphCardHeader({
       <GraphCardMenu
         graphId={graphId}
         projectSlug={projectSlug}
+        dashboardId={dashboardId}
         colSpan={colSpan}
         rowSpan={rowSpan}
         onSizeChange={onSizeChange}
