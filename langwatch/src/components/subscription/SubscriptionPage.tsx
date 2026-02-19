@@ -36,7 +36,7 @@ import {
   type Currency,
   getAnnualDiscountPercent,
   formatPrice,
-  DEVELOPER_FEATURES,
+  FREE_PLAN_FEATURES as DEVELOPER_FEATURES,
   GROWTH_FEATURES,
 } from "./billing-plans";
 import { useBillingPricing } from "./useBillingPricing";
