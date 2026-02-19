@@ -25,6 +25,7 @@ import superjson from "superjson";
 import { ZodError } from "zod";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
+import { DomainError } from "~/server/app-layer/domain-error";
 import { getLogLevelFromStatusCode } from "../middleware/requestLogging";
 import { createLogger } from "../../utils/logger/server";
 import { captureException } from "../../utils/posthogErrorCapture";
@@ -114,6 +115,9 @@ const t = initTRPC.context<typeof createTRPCContext>().create({
         }
       : null;
 
+    const domainError =
+      error.cause instanceof DomainError ? error.cause.serialize() : null;
+
     return {
       ...shape,
       data: {
@@ -121,6 +125,7 @@ const t = initTRPC.context<typeof createTRPCContext>().create({
         zodError:
           error.cause instanceof ZodError ? error.cause.flatten() : null,
         cause: limitInfo,
+        domainError,
       },
     };
   },
@@ -254,6 +259,39 @@ export const tracerMiddleware = t.middleware(
   },
 );
 
+function domainErrorToTRPCCode(
+  error: DomainError,
+): TRPCError["code"] {
+  const map: Partial<Record<number, TRPCError["code"]>> = {
+    400: "BAD_REQUEST",
+    401: "UNAUTHORIZED",
+    403: "FORBIDDEN",
+    404: "NOT_FOUND",
+    409: "CONFLICT",
+    422: "UNPROCESSABLE_CONTENT",
+    429: "TOO_MANY_REQUESTS",
+  };
+  return map[error.httpStatus] ?? "INTERNAL_SERVER_ERROR";
+}
+
+/**
+ * Converts DomainErrors thrown in procedures to properly-coded TRPCErrors.
+ * Without this, DomainErrors fall through as INTERNAL_SERVER_ERROR.
+ * Placed inner to loggerMiddleware so the logger sees the correct code.
+ */
+const domainErrorMiddleware = t.middleware(async ({ next }) => {
+  const result = await next();
+  if (!result.ok && result.error.cause instanceof DomainError) {
+    const domainError = result.error.cause;
+    throw new TRPCError({
+      code: domainErrorToTRPCCode(domainError),
+      message: domainError.message,
+      cause: domainError,
+    });
+  }
+  return result;
+});
+
 /** Processes a tRPC call result and logs accordingly. Extracted for testability. */
 export function handleTrpcCallLogging({
   result,
@@ -293,6 +331,11 @@ export function handleTrpcCallLogging({
         ? getHTTPStatusCodeFromError(result.error)
         : 500;
     logData.statusCode = resolvedStatus;
+
+    // Include domain error kind in log data for structured filtering
+    if (result.error instanceof TRPCError && result.error.cause instanceof DomainError) {
+      logData.domainErrorKind = result.error.cause.kind;
+    }
 
     // Only capture 5xx errors (actual bugs)
     if (resolvedStatus >= 500) {
@@ -396,6 +439,7 @@ const permissionProcedureBuilder = <TParams extends ProcedureParams>(
       return procedure
         .use(tracerMiddleware as any)
         .use(loggerMiddleware as any)
+        .use(domainErrorMiddleware as any)
         .use(middleware as any)
         .use(enforcePermissionCheck as any)
         .use(auditLogMutations as any) as any;
