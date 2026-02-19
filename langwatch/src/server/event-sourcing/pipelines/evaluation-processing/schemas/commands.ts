@@ -1,6 +1,31 @@
 import { z } from "zod";
 
 /**
+ * Command data for executing a single evaluation.
+ * Sent by the evaluationTrigger reactor — one per monitor.
+ * Does preconditions, sampling, execution, ES write, and emits events.
+ */
+export const executeEvaluationCommandDataSchema = z.object({
+  tenantId: z.string(),
+  traceId: z.string(),
+  evaluationId: z.string(),
+  evaluatorId: z.string(),
+  evaluatorType: z.string(),
+  evaluatorName: z.string().optional(),
+  isGuardrail: z.boolean().optional(),
+  occurredAt: z.number(),
+  // Trace metadata passed from evaluationTrigger reactor
+  threadId: z.string().optional(),
+  userId: z.string().optional(),
+  customerId: z.string().optional(),
+  labels: z.array(z.string()).optional(),
+});
+
+export type ExecuteEvaluationCommandData = z.infer<
+  typeof executeEvaluationCommandDataSchema
+>;
+
+/**
  * Base evaluation data shared across commands.
  */
 const baseEvaluationSchema = z.object({
@@ -15,18 +40,8 @@ const baseEvaluationSchema = z.object({
 });
 
 /**
- * Command data for scheduling an evaluation.
- * Emitted when an evaluation job is added to the queue.
- */
-export const scheduleEvaluationCommandDataSchema = baseEvaluationSchema;
-
-export type ScheduleEvaluationCommandData = z.infer<
-  typeof scheduleEvaluationCommandDataSchema
->;
-
-/**
  * Command data for starting an evaluation.
- * Emitted when evaluation execution begins.
+ * Emitted when evaluation execution begins (API handler path).
  */
 export const startEvaluationCommandDataSchema = baseEvaluationSchema;
 
@@ -36,7 +51,7 @@ export type StartEvaluationCommandData = z.infer<
 
 /**
  * Command data for completing an evaluation.
- * Emitted when evaluation execution finishes.
+ * Emitted when evaluation execution finishes (API handler path).
  */
 export const completeEvaluationCommandDataSchema = z.object({
   tenantId: z.string(),
@@ -47,6 +62,7 @@ export const completeEvaluationCommandDataSchema = z.object({
   label: z.string().nullable().optional(),
   details: z.string().nullable().optional(),
   error: z.string().nullable().optional(),
+  costId: z.string().nullable().optional(),
   occurredAt: z.number(),
 });
 

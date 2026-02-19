@@ -1,18 +1,18 @@
 import { describe, expect, it } from "vitest";
 import type { Evaluation } from "~/server/tracer/types";
-import type { ClickHouseEvaluationStateRow } from "../evaluation-state.mappers";
+import type { ClickHouseEvaluationRunRow } from "../evaluation-run.mappers";
 import {
   mapClickHouseEvaluationToTraceEvaluation,
   mapEsEvaluationToTraceEvaluation,
   mapTraceEvaluationsToLegacyEvaluations,
-} from "../evaluation-state.mappers";
-import type { TraceEvaluation } from "../evaluation-state.types";
+} from "../evaluation-run.mappers";
+import type { TraceEvaluation } from "../evaluation-run.types";
 
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
 
-const baseCHRow: ClickHouseEvaluationStateRow = {
+const baseCHRow: ClickHouseEvaluationRunRow = {
   Id: "row-1",
   TenantId: "project-1",
   EvaluationId: "eval-001",

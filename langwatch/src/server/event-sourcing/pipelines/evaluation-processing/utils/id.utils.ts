@@ -3,7 +3,7 @@ import { getEnvironment, Instance, Ksuid } from "@langwatch/ksuid";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 /**
- * Generates a deterministic evaluation state ID from evaluation data.
+ * Generates a deterministic evaluation run ID from evaluation data.
  * This ensures that replaying events produces the same IDs for idempotency,
  * while maintaining K-sortability by creation time.
  *
@@ -15,16 +15,16 @@ import { KSUID_RESOURCES } from "~/utils/constants";
  * @param tenantId - The tenant ID
  * @param evaluationId - The evaluation ID
  * @param timestampMs - The timestamp in milliseconds
- * @returns A deterministic KSUID string for the evaluation state
+ * @returns A deterministic KSUID string for the evaluation run
  *
  * @example
  * ```typescript
- * const stateId = IdUtils.generateDeterministicEvaluationStateId(
+ * const stateId = IdUtils.generateDeterministicEvaluationRunId(
  *   tenantId, evaluationId, Date.now()
  * );
  * ```
  */
-function generateDeterministicEvaluationStateId(
+function generateDeterministicEvaluationRunId(
   tenantId: string,
   evaluationId: string,
   timestampMs: number,
@@ -50,7 +50,7 @@ function generateDeterministicEvaluationStateId(
   // Create KSUID with deterministic components
   const ksuid = new Ksuid(
     getEnvironment(),
-    KSUID_RESOURCES.EVALUATION_STATE,
+    KSUID_RESOURCES.EVALUATION,
     timestampSeconds,
     instance,
     sequenceId,
@@ -60,5 +60,5 @@ function generateDeterministicEvaluationStateId(
 }
 
 export const IdUtils = {
-  generateDeterministicEvaluationStateId,
+  generateDeterministicEvaluationRunId,
 } as const;

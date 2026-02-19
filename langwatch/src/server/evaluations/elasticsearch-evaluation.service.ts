@@ -2,8 +2,8 @@ import type { PrismaClient } from "@prisma/client";
 import { prisma as defaultPrisma } from "~/server/db";
 import type { Protections } from "~/server/elasticsearch/protections";
 import { ElasticsearchTraceService } from "~/server/traces/elasticsearch-trace.service";
-import { mapEsEvaluationToTraceEvaluation } from "./evaluation-state.mappers";
-import type { TraceEvaluation } from "./evaluation-state.types";
+import { mapEsEvaluationToTraceEvaluation } from "./evaluation-run.mappers";
+import type { TraceEvaluation } from "./evaluation-run.types";
 
 /**
  * Service for fetching per-trace evaluation states from Elasticsearch.
