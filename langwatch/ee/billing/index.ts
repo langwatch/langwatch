@@ -8,6 +8,7 @@ import {
 import { createSaaSPlanProvider } from "./planProvider";
 import { createCustomerService } from "./services/customerService";
 import { createSeatEventSubscriptionFns } from "./services/seatEventSubscription";
+import { InviteService } from "../../src/server/invites/invite.service";
 import { createSeatSyncService } from "./services/seatSyncService";
 import { createSubscriptionService } from "./services/subscriptionService";
 import { createUsageReportingService } from "./services/usageReportingService";
@@ -74,10 +75,12 @@ export const getSeatSyncService = () => {
 
 export const createStripeWebhookHandler = () => {
   const s = getStripe();
+  const inviteApprover = InviteService.create(prisma);
   const webhookService = createWebhookService({
     db: prisma,
     stripe: s,
     itemCalculator: subscriptionItemCalculator,
+    inviteApprover,
   });
   return createStripeWebhookHandlerFactory({ stripe: s, webhookService });
 };
