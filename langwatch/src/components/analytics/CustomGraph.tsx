@@ -757,6 +757,9 @@ const CustomGraph_ = React.memo(
               height={
                 input.graphType === "horizontal_bar" ? undefined : xAxisWidth
               }
+              interval={
+                input.graphType === "horizontal_bar" ? 0 : undefined
+              }
               tickLine={false}
               axisLine={false}
               tick={{ fill: gray400 }}
@@ -783,6 +786,7 @@ const CustomGraph_ = React.memo(
             />
             <Bar
               dataKey="value"
+              minPointSize={4}
               onClick={(item: any) => {
                 if (handleDataPointClick && item && item.payload && item.payload.key) {
                   const key = item.payload.key;
