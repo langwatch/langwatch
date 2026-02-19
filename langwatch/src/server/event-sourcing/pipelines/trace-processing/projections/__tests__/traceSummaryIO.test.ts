@@ -1,15 +1,19 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import type { NormalizedSpan } from "../../schemas/spans";
 import { NormalizedSpanKind, NormalizedStatusCode } from "../../schemas/spans";
-import { TraceIOExtractionService } from "../../services/traceIOExtractionService";
+import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import {
   applySpanToSummary,
-  traceSummaryFoldProjection,
+  createTraceSummaryFoldProjection,
   type TraceSummaryData,
 } from "../traceSummary.foldProjection";
 
+const traceSummaryProjection = createTraceSummaryFoldProjection({
+  store: { store: async () => {}, get: async () => null },
+});
+
 function createInitState(): TraceSummaryData {
-  return traceSummaryFoldProjection.init();
+  return traceSummaryProjection.init();
 }
 
 function createTestSpan(overrides: Partial<NormalizedSpan> = {}): NormalizedSpan {
@@ -73,8 +77,8 @@ describe("applySpanToSummary I/O logic", () => {
       );
 
       let state = applySpanToSummary(createInitState(), childSpan);
-      expect(state.ComputedOutput).toBe("child output");
-      expect(state.OutputFromRootSpan).toBe(false);
+      expect(state.computedOutput).toBe("child output");
+      expect(state.outputFromRootSpan).toBe(false);
 
       // Now apply root span with output — should override
       const rootSpan = createTestSpan({
@@ -92,8 +96,8 @@ describe("applySpanToSummary I/O logic", () => {
       );
 
       state = applySpanToSummary(state, rootSpan);
-      expect(state.ComputedOutput).toBe("root output");
-      expect(state.OutputFromRootSpan).toBe(true);
+      expect(state.computedOutput).toBe("root output");
+      expect(state.outputFromRootSpan).toBe(true);
     });
   });
 
@@ -115,8 +119,8 @@ describe("applySpanToSummary I/O logic", () => {
       );
 
       let state = applySpanToSummary(createInitState(), rootSpan);
-      expect(state.ComputedOutput).toBe("root output");
-      expect(state.OutputFromRootSpan).toBe(true);
+      expect(state.computedOutput).toBe("root output");
+      expect(state.outputFromRootSpan).toBe(true);
 
       // Now apply child span — should NOT override root
       const childSpan = createTestSpan({
@@ -134,8 +138,8 @@ describe("applySpanToSummary I/O logic", () => {
       );
 
       state = applySpanToSummary(state, childSpan);
-      expect(state.ComputedOutput).toBe("root output");
-      expect(state.OutputFromRootSpan).toBe(true);
+      expect(state.computedOutput).toBe("root output");
+      expect(state.outputFromRootSpan).toBe(true);
     });
   });
 
@@ -153,8 +157,8 @@ describe("applySpanToSummary I/O logic", () => {
       });
 
       const state = applySpanToSummary(createInitState(), evalSpan);
-      expect(state.ComputedOutput).toBeNull();
-      expect(state.ComputedInput).toBeNull();
+      expect(state.computedOutput).toBeNull();
+      expect(state.computedInput).toBeNull();
       expect(extractSpy).not.toHaveBeenCalled();
     });
 
@@ -171,8 +175,8 @@ describe("applySpanToSummary I/O logic", () => {
       });
 
       const state = applySpanToSummary(createInitState(), guardrailSpan);
-      expect(state.ComputedOutput).toBeNull();
-      expect(state.ComputedInput).toBeNull();
+      expect(state.computedOutput).toBeNull();
+      expect(state.computedInput).toBeNull();
       expect(extractSpy).not.toHaveBeenCalled();
     });
   });
@@ -195,8 +199,8 @@ describe("applySpanToSummary I/O logic", () => {
       );
 
       let state = applySpanToSummary(createInitState(), span1);
-      expect(state.ComputedOutput).toBe("first output");
-      expect(state.OutputSpanEndTimeMs).toBe(1500);
+      expect(state.computedOutput).toBe("first output");
+      expect(state.outputSpanEndTimeMs).toBe(1500);
 
       // Second non-root span ending later at 2000
       const span2 = createTestSpan({
@@ -214,8 +218,8 @@ describe("applySpanToSummary I/O logic", () => {
       );
 
       state = applySpanToSummary(state, span2);
-      expect(state.ComputedOutput).toBe("second output");
-      expect(state.OutputSpanEndTimeMs).toBe(2000);
+      expect(state.computedOutput).toBe("second output");
+      expect(state.outputSpanEndTimeMs).toBe(2000);
 
       // Third non-root span ending earlier at 1200 — should NOT override
       const span3 = createTestSpan({
@@ -233,8 +237,8 @@ describe("applySpanToSummary I/O logic", () => {
       );
 
       state = applySpanToSummary(state, span3);
-      expect(state.ComputedOutput).toBe("second output");
-      expect(state.OutputSpanEndTimeMs).toBe(2000);
+      expect(state.computedOutput).toBe("second output");
+      expect(state.outputSpanEndTimeMs).toBe(2000);
     });
   });
 });

@@ -1,18 +1,18 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { createLogger } from "../../../../../utils/logger/server";
-import type { Command, CommandHandler } from "../../../library";
+import type { Command, CommandHandler } from "../../../";
 import {
-  createTenantId,
-  defineCommandSchema,
-  EventUtils,
-} from "../../../library";
+	createTenantId,
+	defineCommandSchema,
+	EventUtils,
+} from "../../../";
+import { createLogger } from "../../../../../utils/logger/server";
 import type { AssignTopicCommandData } from "../schemas/commands";
 import { assignTopicCommandDataSchema } from "../schemas/commands";
 import {
-  ASSIGN_TOPIC_COMMAND_TYPE,
-  TOPIC_ASSIGNED_EVENT_TYPE,
-  TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
+	ASSIGN_TOPIC_COMMAND_TYPE,
+	TOPIC_ASSIGNED_EVENT_TYPE,
+	TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
 } from "../schemas/constants";
 import type { TopicAssignedEvent } from "../schemas/events";
 

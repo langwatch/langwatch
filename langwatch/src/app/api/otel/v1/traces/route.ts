@@ -1,3 +1,4 @@
+import superjson from "superjson";
 import * as crypto from "node:crypto";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
@@ -16,7 +17,7 @@ import { prisma } from "../../../../../server/db";
 import { SubscriptionHandler } from "../../../../../server/subscriptionHandler";
 import { openTelemetryTraceRequestToTracesForCollection } from "../../../../../server/tracer/otel.traces";
 import { TraceRequestCollectionService } from "../../../../../server/traces/trace-request-collection.service";
-import { TraceUsageService } from "../../../../../server/traces/trace-usage.service";
+import { getApp } from "../../../../../server/app-layer/app";
 import { createLogger } from "../../../../../utils/logger/server";
 
 const tracer = getLangWatchTracer("langwatch.otel.traces");
@@ -84,8 +85,7 @@ async function handleTracesRequest(req: NextRequest) {
       }
 
       try {
-        const traceUsageService = TraceUsageService.create();
-        const limitResult = await traceUsageService.checkLimit({
+        const limitResult = await getApp().usage.checkLimit({
           teamId: project.teamId,
         });
 
@@ -208,9 +208,18 @@ async function handleTracesRequest(req: NextRequest) {
         async () => {
           const promises: Promise<void>[] = [];
           for (const traceForCollection of tracesForCollection) {
+            // Fingerprint for deduplication: traceId + span count + first/last span timestamps
+            // Much faster than stringifying thousands of spans
+            const fingerprint = {
+              traceId: traceForCollection.traceId,
+              spanCount: traceForCollection.spans.length,
+              firstSpanStart: traceForCollection.spans[0]?.timestamps?.started_at,
+              lastSpanEnd: traceForCollection.spans[traceForCollection.spans.length - 1]?.timestamps?.finished_at,
+            };
+            
             const paramsMD5 = crypto
               .createHash("md5")
-              .update(JSON.stringify({ ...traceForCollection }))
+              .update(JSON.stringify(fingerprint))
               .digest("hex");
             const existingTrace = await fetchExistingMD5s(
               traceForCollection.traceId,
@@ -224,10 +233,7 @@ async function handleTracesRequest(req: NextRequest) {
               {
                 traceId: traceForCollection.traceId,
                 traceRequestSizeMb: parseFloat(
-                  (
-                    Buffer.from(JSON.stringify(traceRequest)).length /
-                    (1024 * 1024)
-                  ).toFixed(3),
+                  (body.byteLength / (1024 * 1024)).toFixed(3),
                 ),
                 traceRequestSpansCount:
                   traceRequest.resourceSpans?.reduce(
@@ -240,15 +246,19 @@ async function handleTracesRequest(req: NextRequest) {
             );
 
             promises.push(
-              scheduleTraceCollectionWithFallback({
-                ...traceForCollection,
-                projectId: project.id,
-                existingTrace,
-                paramsMD5,
-                expectedOutput: void 0,
-                evaluations: void 0,
-                collectedAt: Date.now(),
-              }),
+              scheduleTraceCollectionWithFallback(
+                {
+                  ...traceForCollection,
+                  projectId: project.id,
+                  existingTrace,
+                  paramsMD5,
+                  expectedOutput: void 0,
+                  evaluations: void 0,
+                  collectedAt: Date.now(),
+                },
+                false,
+                body.byteLength,
+              ),
             );
           }
 
