@@ -137,7 +137,7 @@ export const projectRoutes = {
     parent: "simulations",
   },
   suites: {
-    path: "/[project]/suites",
+    path: "/[project]/simulations/suites",
     title: "Suites",
     parent: "simulations",
   },
