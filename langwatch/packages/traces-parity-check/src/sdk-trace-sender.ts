@@ -5,10 +5,9 @@
  * to both ES and CH projects simultaneously.
  */
 
-import { setupObservability, type ObservabilityHandle } from "langwatch/observability/node";
-import { getLangWatchTracer } from "langwatch/observability";
-import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { getLangWatchTracer } from "langwatch/observability";
 import { sleep } from "./utils.js";
 
 type Tracer = ReturnType<typeof getLangWatchTracer>;

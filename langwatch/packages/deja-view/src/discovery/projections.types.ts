@@ -1,5 +1,5 @@
-import type { FoldProjectionDefinition } from "../../../../src/server/event-sourcing/library/projections/foldProjection.types";
-import type { Event } from "../../../../src/server/event-sourcing/library/domain/types";
+import type { FoldProjectionDefinition } from "../../../../src/server/event-sourcing/projections/foldProjection.types";
+import type { Event } from "../../../../src/server/event-sourcing/domain/types";
 
 /**
  * Metadata for a fold projection discovered from a pipeline.
