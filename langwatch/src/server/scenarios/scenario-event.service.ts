@@ -2,11 +2,19 @@ import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "~/utils/logger/server";
 import { ScenarioEventRepository } from "./scenario-event.repository";
-import type { ScenarioEvent, ScenarioRunData } from "./scenario-event.types";
+import type {
+  BatchHistoryResult,
+  BatchRunDataResult,
+  ScenarioEvent,
+  ScenarioRunData,
+} from "./scenario-event.types";
 import { resolveRunStatus } from "./stall-detection";
 
 const tracer = getLangWatchTracer("langwatch.scenario-events.service");
 const logger = createLogger("langwatch:scenario-events:service");
+
+const ALL_RUNS_PAGE_LIMIT = 100;
+const ALL_RUNS_MAX_PAGES = 200; // safety: caps total fetch at 20 000 batch IDs
 
 /**
  * Computes the most recent event timestamp across all event types for a scenario run.
@@ -32,11 +40,7 @@ function computeLastEventTimestamp({
  * Handles operations like saving events, retrieving run data, and managing project-wide event operations.
  */
 export class ScenarioEventService {
-  private eventRepository: ScenarioEventRepository;
-
-  constructor() {
-    this.eventRepository = new ScenarioEventRepository();
-  }
+  constructor(private eventRepository = new ScenarioEventRepository()) {}
 
   /**
    * Saves a scenario event to the repository.
@@ -50,13 +54,7 @@ export class ScenarioEventService {
   async saveScenarioEvent({
     projectId,
     ...event
-  }: {
-    projectId: string;
-    type: string;
-    scenarioId: string;
-    scenarioRunId: string;
-    [key: string]: any;
-  }) {
+  }: ScenarioEvent & { projectId: string }) {
     return tracer.withActiveSpan(
       "ScenarioEventService.saveScenarioEvent",
       {
@@ -75,7 +73,7 @@ export class ScenarioEventService {
         );
         await this.eventRepository.saveEvent({
           projectId,
-          ...(event as ScenarioEvent),
+          ...event,
         });
       },
     );
@@ -368,23 +366,21 @@ export class ScenarioEventService {
 
         const batchRunIds = new Set<string>();
         let cursor: string | undefined = undefined;
-        const pageLimit = 100; // repository/server cap
-        const maxPages = 200; // safety guard (20k ids)
         let truncated = false;
 
-        for (let i = 0; i < maxPages; i++) {
+        for (let i = 0; i < ALL_RUNS_MAX_PAGES; i++) {
           const { batchRunIds: ids, nextCursor } =
             await this.eventRepository.getBatchRunIdsForScenarioSet({
               projectId,
               scenarioSetId,
-              limit: pageLimit,
+              limit: ALL_RUNS_PAGE_LIMIT,
               cursor,
             });
           if (ids.length === 0) break;
           ids.forEach((id) => batchRunIds.add(id));
 
           if (!nextCursor || nextCursor === cursor) break;
-          if (i === maxPages - 1 && nextCursor) {
+          if (i === ALL_RUNS_MAX_PAGES - 1 && nextCursor) {
             truncated = true;
             break;
           }
@@ -392,7 +388,7 @@ export class ScenarioEventService {
         }
         if (truncated) {
           throw new Error(
-            `Too many runs to fetch exhaustively (cap ${maxPages * pageLimit}). ` +
+            `Too many runs to fetch exhaustively (cap ${ALL_RUNS_MAX_PAGES * ALL_RUNS_PAGE_LIMIT}). ` +
               "Refine filters or use the paginated API.",
           );
         }
@@ -416,22 +412,128 @@ export class ScenarioEventService {
   }
 
   /**
+   * Returns pre-aggregated batch history for the sidebar (ES path).
+   * Builds BatchHistoryItem[] by doing per-batch queries; no full messages in output.
+   */
+  async getBatchHistoryForScenarioSet({
+    projectId,
+    scenarioSetId,
+    limit = 8,
+    cursor,
+  }: {
+    projectId: string;
+    scenarioSetId: string;
+    limit?: number;
+    cursor?: string;
+  }): Promise<BatchHistoryResult> {
+    return tracer.withActiveSpan(
+      "ScenarioEventService.getBatchHistoryForScenarioSet",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": projectId,
+          "scenario.set.id": scenarioSetId,
+        },
+      },
+      async (span) => {
+        const validatedLimit = Math.min(Math.max(1, limit), 100);
+
+        const { batchRunIds, nextCursor, hasMore } =
+          await this.eventRepository.getBatchRunIdsForScenarioSet({
+            projectId,
+            scenarioSetId,
+            limit: validatedLimit,
+            cursor,
+          });
+
+        if (batchRunIds.length === 0) {
+          return { batches: [], nextCursor: undefined, hasMore: false, lastUpdatedAt: 0, totalCount: 0 };
+        }
+
+        // Fetch total count in parallel with run data
+        const [runs, totalCount] = await Promise.all([
+          this.getRunDataForBatchIds({ projectId, batchRunIds }),
+          this.eventRepository.getBatchRunCountForScenarioSet({ projectId, scenarioSetId }),
+        ]);
+
+        // Group by batchRunId and build BatchHistoryItem
+        const batchMap = new Map<string, ScenarioRunData[]>();
+        for (const run of runs) {
+          const list = batchMap.get(run.batchRunId) ?? [];
+          list.push(run);
+          batchMap.set(run.batchRunId, list);
+        }
+
+        let globalLastUpdatedAt = 0;
+
+        const completedStatuses = new Set(["SUCCESS", "FAILED", "FAILURE", "ERROR", "CANCELLED"]);
+
+        const batches = batchRunIds.map((batchRunId) => {
+          const items = batchMap.get(batchRunId) ?? [];
+          const lastUpdatedAt = items.reduce((max, r) => Math.max(max, r.timestamp), 0);
+          if (lastUpdatedAt > globalLastUpdatedAt) globalLastUpdatedAt = lastUpdatedAt;
+
+          const completedItems = items.filter((r) => completedStatuses.has(r.status));
+          const completedTimestamps = completedItems.map((r) => r.timestamp).filter((t) => t > 0);
+          const firstCompletedAt = completedTimestamps.length > 0 ? Math.min(...completedTimestamps) : null;
+          const nonPendingItems = items.filter((r) => !["STALLED", "IN_PROGRESS", "PENDING"].includes(r.status));
+          const nonPendingTimestamps = nonPendingItems.map((r) => r.timestamp).filter((t) => t > 0);
+          const allCompletedAt = nonPendingTimestamps.length > 0 ? Math.max(...nonPendingTimestamps) : null;
+
+          return {
+            batchRunId,
+            totalCount: items.length,
+            passCount: items.filter((r) => r.status === "SUCCESS").length,
+            failCount: items.filter((r) => completedStatuses.has(r.status) && r.status !== "SUCCESS").length,
+            runningCount: items.filter((r) =>
+              ["IN_PROGRESS", "PENDING"].includes(r.status),
+            ).length,
+            stalledCount: items.filter((r) => r.status === "STALLED").length,
+            lastRunAt: lastUpdatedAt,
+            lastUpdatedAt,
+            firstCompletedAt,
+            allCompletedAt,
+            items: items.map((r) => ({
+              scenarioRunId: r.scenarioRunId,
+              name: r.name ?? null,
+              description: r.description ?? null,
+              status: r.status,
+              durationInMs: r.durationInMs,
+              messagePreview: r.messages.slice(0, 4).map((m) => ({
+                role: (m as Record<string, unknown>).role as string ?? "",
+                content: (m as Record<string, unknown>).content as string ?? "",
+              })),
+            })),
+          };
+        });
+
+        span.setAttribute("result.count", batches.length);
+        return { batches, nextCursor, hasMore, lastUpdatedAt: globalLastUpdatedAt, totalCount };
+      },
+    );
+  }
+
+  /**
    * Retrieves run data for a specific batch run.
+   * Accepts an optional sinceTimestamp for conditional fetching.
    * @param {Object} params - The parameters for retrieving batch run data
    * @param {string} params.projectId - The ID of the project
    * @param {string} params.scenarioSetId - The ID of the scenario set
    * @param {string} params.batchRunId - The ID of the specific batch run
-   * @returns {Promise<ScenarioRunData[]>} Array of scenario run data for the batch run
+   * @param {number} [params.sinceTimestamp] - Skip fetch if nothing changed since this timestamp
+   * @returns Discriminated union: { changed: false } or { changed: true, runs }
    */
   async getRunDataForBatchRun({
     projectId,
     scenarioSetId,
     batchRunId,
+    sinceTimestamp,
   }: {
     projectId: string;
     scenarioSetId: string;
     batchRunId: string;
-  }) {
+    sinceTimestamp?: number;
+  }): Promise<BatchRunDataResult> {
     return tracer.withActiveSpan(
       "ScenarioEventService.getRunDataForBatchRun",
       {
@@ -445,6 +547,18 @@ export class ScenarioEventService {
       async (span) => {
         logger.debug({ projectId, scenarioSetId, batchRunId }, "Fetching run data for batch run");
 
+        // Conditional check for ES: compute max event timestamp for this batch
+        if (sinceTimestamp !== undefined) {
+          const maxTs = await this.eventRepository.getMaxTimestampForBatchRun({
+            projectId,
+            batchRunId,
+          });
+          if (maxTs <= sinceTimestamp) {
+            span.setAttribute("result.changed", false);
+            return { changed: false as const, lastUpdatedAt: maxTs };
+          }
+        }
+
         // Get scenario run IDs for this specific batch run
         const scenarioRunIds =
           await this.eventRepository.getScenarioRunIdsForBatchRun({
@@ -455,7 +569,7 @@ export class ScenarioEventService {
 
         if (scenarioRunIds.length === 0) {
           span.setAttribute("result.count", 0);
-          return [];
+          return { changed: true as const, lastUpdatedAt: 0, runs: [] };
         }
 
         // Use batch method to get the actual run data
@@ -464,9 +578,9 @@ export class ScenarioEventService {
           scenarioRunIds,
         });
 
+        const lastUpdatedAt = runs.reduce((max, r) => Math.max(max, r.timestamp), 0);
         span.setAttribute("result.count", runs.length);
-
-        return runs;
+        return { changed: true as const, lastUpdatedAt, runs };
       },
     );
   }
