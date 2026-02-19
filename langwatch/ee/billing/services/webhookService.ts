@@ -5,6 +5,7 @@ import { notifySubscriptionEvent } from "../notifications/notificationHandlers";
 import { PlanTypes, SubscriptionStatus } from "../planTypes";
 import type { calculateQuantityForPrice, prices } from "./subscriptionItemCalculator";
 import { isGrowthEventsPrice, isGrowthSeatPrice } from "../utils/growthSeatEvent";
+import { SubscriptionRecordNotFoundError } from "../errors";
 
 const logger = createLogger("langwatch:billing:webhookService");
 
@@ -47,10 +48,17 @@ export const createWebhookService = ({
   db,
   stripe,
   itemCalculator,
+  inviteApprover,
 }: {
   db: PrismaClient;
   stripe: Stripe;
   itemCalculator: ItemCalculator;
+  inviteApprover?: {
+    approvePaymentPendingInvites(params: {
+      subscriptionId: string;
+      organizationId: string;
+    }): Promise<unknown>;
+  };
 }): WebhookService => {
   const syncInvoicePaymentSuccess = async ({
     subscriptionId,
@@ -68,9 +76,7 @@ export const createWebhookService = ({
 
     if (!previousSubscription) {
       if (throwOnMissing) {
-        throw new Error(
-          `Subscription record not found for ${subscriptionId} after checkout`,
-        );
+        throw new SubscriptionRecordNotFoundError(subscriptionId);
       }
       logger.warn(
         { subscriptionId },
@@ -179,8 +185,8 @@ export const createWebhookService = ({
           { subscriptionClientReferenceId },
           "[stripeWebhook] No subscription found for checkout",
         );
-        throw new Error(
-          `No subscription found with id ${subscriptionClientReferenceId}`,
+        throw new SubscriptionRecordNotFoundError(
+          subscriptionClientReferenceId,
         );
       }
 
@@ -188,6 +194,29 @@ export const createWebhookService = ({
         subscriptionId,
         throwOnMissing: true,
       });
+
+      // Approve PAYMENT_PENDING invites linked to this subscription
+      if (inviteApprover) {
+        try {
+          const subscriptionRecord = await db.subscription.findUnique({
+            where: { stripeSubscriptionId: subscriptionId },
+            select: { id: true, organizationId: true },
+          });
+
+          if (subscriptionRecord) {
+            await inviteApprover.approvePaymentPendingInvites({
+              subscriptionId: subscriptionRecord.id,
+              organizationId: subscriptionRecord.organizationId,
+            });
+          }
+        } catch (err) {
+          logger.error(
+            { subscriptionId, err },
+            "[stripeWebhook] Failed to approve PAYMENT_PENDING invites after checkout, manual resolution may be needed",
+          );
+        }
+      }
+
       return { earlyReturn: false };
     },
 
@@ -272,9 +301,13 @@ export const createWebhookService = ({
 
       if (
         subscription.status !== "active" ||
-        subscription.canceled_at ||
         subscription.ended_at
       ) {
+        // Truly cancelled or ended — mark as CANCELLED in DB.
+        // Note: canceled_at alone means "scheduled for cancellation at period end"
+        // — the sub is still active until then, so we don't cancel in DB yet.
+        // When the period ends, Stripe fires `customer.subscription.deleted`
+        // which is handled by handleSubscriptionDeleted.
         await db.subscription.update({
           where: { id: existingSubForUpdate.id },
           data: {

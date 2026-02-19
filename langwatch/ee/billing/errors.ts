@@ -74,3 +74,13 @@ export class SubscriptionItemNotFoundError extends BillingError {
     this.name = "SubscriptionItemNotFoundError";
   }
 }
+
+export class SubscriptionRecordNotFoundError extends BillingError {
+  constructor(identifier: string) {
+    super(
+      `No subscription record found for ${identifier}`,
+      "INTERNAL_SERVER_ERROR",
+    );
+    this.name = "SubscriptionRecordNotFoundError";
+  }
+}
