@@ -52,7 +52,7 @@ vi.mock("next/router", () => ({
   }),
 }));
 
-vi.mock("../../../hooks/useOrganizationTeamProject", () => ({
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     organization: { id: "org-1" },
     organizations: [{ id: "org-1", name: "Test Org" }],
@@ -64,15 +64,15 @@ vi.mock("../../../hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
-vi.mock("../../../components/SettingsLayout", () => ({
+vi.mock("~/components/SettingsLayout", () => ({
   default: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
 }));
 
-vi.mock("../../../components/DashboardLayout", () => ({
+vi.mock("~/components/DashboardLayout", () => ({
   ProjectSelector: () => <div data-testid="project-selector" />,
 }));
 
-vi.mock("../../../utils/api", () => ({
+vi.mock("~/utils/api", () => ({
   api: {
     useContext: () => ({
       secrets: {
@@ -112,7 +112,9 @@ vi.mock("../../../utils/api", () => ({
 }));
 
 // Lazy import to ensure mocks are set up first
-const { default: SecretsPage } = await import("../secrets");
+const { default: SecretsPage } = await import(
+  "~/pages/settings/secrets"
+);
 
 function renderPage() {
   return render(
