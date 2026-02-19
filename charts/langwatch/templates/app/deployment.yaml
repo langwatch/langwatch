@@ -90,7 +90,7 @@ spec:
             runAsNonRoot: true
         {{- if .Values.opensearch.chartManaged }}
         - name: wait-for-opensearch
-          image: curlimages/curl:latest
+          image: "{{ .Values.cronjobs.image.repository }}:{{ .Values.cronjobs.image.tag }}"
           command: ['sh', '-c']
           args:
             - |
