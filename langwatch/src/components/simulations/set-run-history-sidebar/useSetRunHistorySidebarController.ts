@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import type { BatchHistoryItem } from "~/server/scenarios/scenario-event.types";
 import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -38,12 +38,13 @@ export const useSetRunHistorySidebarController = () => {
     setCursorHistory([]);
   }, [scenarioSetId]);
 
-  // Fetch scenario run data with cursor-based pagination
+  // Fetch pre-aggregated batch history (no full messages in payload)
+  // totalCount is returned atomically with the batch list to avoid race conditions
   const {
-    data: runData,
+    data: batchHistoryData,
     error,
     isLoading,
-  } = api.scenarios.getScenarioSetRunData.useQuery(
+  } = api.scenarios.getScenarioSetBatchHistory.useQuery(
     {
       projectId: project?.id ?? "",
       scenarioSetId: scenarioSetId ?? "",
@@ -51,29 +52,16 @@ export const useSetRunHistorySidebarController = () => {
       cursor,
     },
     {
-      // Only fetch when we have both required IDs to avoid unnecessary API calls
       enabled: !!project?.id && !!scenarioSetId,
       refetchInterval: 1000,
     },
   );
 
-  // Fetch total count for pagination info
-  const { data: countData } =
-    api.scenarios.getScenarioSetBatchRunCount.useQuery(
-      {
-        projectId: project?.id ?? "",
-        scenarioSetId: scenarioSetId ?? "",
-      },
-      {
-        enabled: !!project?.id && !!scenarioSetId,
-      },
-    );
-
-  const totalCount = countData?.count ?? 0;
+  const totalCount = batchHistoryData?.totalCount ?? 0;
   const currentPage = cursorHistory.length + 1;
   const totalPages = Math.ceil(totalCount / limit);
 
-  // Clamp cursor to valid range when total count changes
+  // Clamp cursor when total count changes
   useEffect(() => {
     if (totalCount === 0 && cursor) {
       setCursor(undefined);
@@ -82,27 +70,26 @@ export const useSetRunHistorySidebarController = () => {
   }, [totalCount, cursor]);
 
   useEffect(() => {
-    if (scenarioSetId && !batchRunId && runData?.runs?.length) {
-      const lastRun = runData.runs[runData.runs.length - 1];
-      if (lastRun) {
-        goToSimulationBatchRuns(scenarioSetId, lastRun.batchRunId, {
+    if (scenarioSetId && !batchRunId && batchHistoryData?.batches?.length) {
+      const lastBatch = batchHistoryData.batches[batchHistoryData.batches.length - 1];
+      if (lastBatch) {
+        goToSimulationBatchRuns(scenarioSetId, lastBatch.batchRunId, {
           replace: true,
         });
       }
     }
-  }, [scenarioSetId, batchRunId, runData?.runs, goToSimulationBatchRuns]);
+  }, [scenarioSetId, batchRunId, batchHistoryData?.batches, goToSimulationBatchRuns]);
 
-  // Memoize the expensive data transformation to prevent unnecessary re-renders
-  // This transforms raw API data into the UI-friendly Run format
+  // Server already groups and sorts — map BatchHistoryItem[] directly to Run[]
   const runs = useMemo(() => {
-    if (!runData?.runs?.length) return [];
-    return transformRunDataToBatchRuns(
-      runData.runs,
+    if (!batchHistoryData?.batches?.length) return [];
+    return batchHistoryItemsToRuns(
+      batchHistoryData.batches,
       currentPage,
       limit,
       totalCount,
     );
-  }, [runData?.runs, currentPage, limit, totalCount]);
+  }, [batchHistoryData?.batches, currentPage, limit, totalCount]);
 
   // Extract click handler for better testability and performance
   // Memoized to prevent child component re-renders when dependencies haven't changed
@@ -119,9 +106,9 @@ export const useSetRunHistorySidebarController = () => {
 
   // Cursor-based pagination handlers
   const handleNextPage = () => {
-    if (runData?.nextCursor) {
+    if (batchHistoryData?.nextCursor) {
       setCursorHistory((prev) => [...prev, cursor]);
-      setCursor(runData.nextCursor);
+      setCursor(batchHistoryData.nextCursor);
     }
   };
 
@@ -161,7 +148,7 @@ export const useSetRunHistorySidebarController = () => {
       limit,
       totalCount,
       totalPages,
-      hasNextPage: Boolean(runData?.nextCursor),
+      hasNextPage: Boolean(batchHistoryData?.nextCursor),
       hasPrevPage: cursorHistory.length > 0,
       onPageChange: handlePageChange,
       onNextPage: handleNextPage,
@@ -171,79 +158,31 @@ export const useSetRunHistorySidebarController = () => {
 };
 
 /**
- * Transforms raw scenario run data from the API into grouped batch runs for UI display.
- *
- * This function:
- * 1. Groups individual scenario runs by their batchRunId
- * 2. Sorts runs chronologically by timestamp
- * 3. Adds display-friendly labels and formatting
- * 4. Returns runs in reverse chronological order (newest first)
- *
- * @param runData - Array of raw scenario run data from the API
- * @returns Array of Run objects ready for UI consumption
+ * Maps server-aggregated BatchHistoryItem[] to Run[] for the sidebar.
+ * No client-side grouping needed — server already grouped and sorted.
  */
-const transformRunDataToBatchRuns = (
-  runData: ScenarioRunData[],
+const batchHistoryItemsToRuns = (
+  batches: BatchHistoryItem[],
   currentPage: number,
   limit: number,
   totalCount: number,
 ): Run[] => {
-  // Group runs by batchRunId using a functional reduce approach
-  // Each batch run contains metadata and an array of individual scenario runs
-  const batchRunsMap = runData.reduce(
-    (acc, run) => {
-      const batchRunId = run.batchRunId;
-
-      // Initialize new batch run if we haven't seen this batchRunId before
-      if (!acc[batchRunId]) {
-        acc[batchRunId] = {
-          scenarioRunId: run.scenarioRunId,
-          batchRunId: run.batchRunId,
-          timestamp: run.timestamp, // Store raw timestamp for accurate sorting
-          duration: formatDuration(run.durationInMs),
-          items: [],
-        };
-      }
-
-      // Add this scenario run to the batch's items array
-      acc[batchRunId]!.items.push(createRunItem(run));
-      return acc;
-    },
-    {} as Record<string, Omit<Run, "label" | "date">>,
-  );
-
-  // Sort by timestamp (numerical) for accurate chronological ordering
-  // Then add display labels and format dates for UI consumption
-  return Object.values(batchRunsMap)
-    .sort((a, b) => b.timestamp - a.timestamp) // Sort newest first (descending)
-    .map((run, idx) => ({
-      ...run,
-      label: `Run #${totalCount - ((currentPage - 1) * limit + idx)}`, // Newest gets highest number
-    }));
+  return batches.map((batch, idx) => ({
+    batchRunId: batch.batchRunId,
+    scenarioRunId: batch.items[0]?.scenarioRunId ?? batch.batchRunId,
+    label: `Run #${totalCount - ((currentPage - 1) * limit + idx)}`,
+    timestamp: batch.lastRunAt,
+    firstCompletedAt: batch.firstCompletedAt,
+    allCompletedAt: batch.allCompletedAt,
+    isRunning: batch.runningCount > 0,
+    items: batch.items.map(
+      (i): RunItem => ({
+        title: i.name ?? "",
+        description: i.description ?? "",
+        status: i.status,
+        batchRunId: batch.batchRunId,
+        scenarioRunId: i.scenarioRunId,
+      }),
+    ),
+  }));
 };
-
-/**
- * Formats duration from milliseconds to a human-readable seconds string.
- * Rounds to nearest second for cleaner display.
- *
- * @param durationInMs - Duration in milliseconds
- * @returns Formatted duration string (e.g., "45s")
- */
-const formatDuration = (durationInMs: number): string => {
-  return `${Math.round(durationInMs / 1000)}s`;
-};
-
-/**
- * Creates a RunItem object from raw scenario run data.
- * Handles potential null/undefined values with safe defaults.
- *
- * @param run - Raw scenario run data from API
- * @returns RunItem object for UI consumption
- */
-const createRunItem = (run: ScenarioRunData): RunItem => ({
-  title: run.name ?? "", // Fallback to empty string if name is null/undefined
-  description: run.description ?? "", // Fallback to empty string if description is null/undefined
-  status: run.status,
-  batchRunId: run.batchRunId,
-  scenarioRunId: run.scenarioRunId,
-});

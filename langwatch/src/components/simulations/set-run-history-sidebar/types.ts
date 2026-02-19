@@ -14,6 +14,8 @@ export type Run = {
   scenarioRunId: string;
   label: string;
   timestamp: number;
-  duration: string;
+  firstCompletedAt?: number | null;
+  allCompletedAt?: number | null;
   items: RunItem[];
+  isRunning?: boolean;
 };
