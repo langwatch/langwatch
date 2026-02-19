@@ -1,20 +1,28 @@
 import { describe, expect, it } from "vitest";
-import { createTenantId } from "../../../../library/domain/tenantId";
+import { createTenantId } from "../../../../domain/tenantId";
+import type { FoldProjectionStore } from "../../../../projections/foldProjection.types";
 import {
-  EXPERIMENT_RUN_EVENT_TYPES,
-  EXPERIMENT_RUN_EVENT_VERSIONS,
+	EXPERIMENT_RUN_EVENT_TYPES,
+	EXPERIMENT_RUN_EVENT_VERSIONS,
 } from "../../schemas/constants";
 import type {
-  ExperimentRunCompletedEvent,
-  ExperimentRunProcessingEvent,
-  ExperimentRunStartedEvent,
-  EvaluatorResultEvent,
-  TargetResultEvent,
+	EvaluatorResultEvent,
+	ExperimentRunCompletedEvent,
+	ExperimentRunProcessingEvent,
+	ExperimentRunStartedEvent,
+	TargetResultEvent,
 } from "../../schemas/events";
 import {
-  experimentRunStateFoldProjection,
-  type ExperimentRunStateData,
+	createExperimentRunStateFoldProjection,
+	type ExperimentRunStateData,
 } from "../experimentRunState.foldProjection";
+
+// Create a dummy store — only init/apply are tested, not persistence
+const noopStore: FoldProjectionStore<ExperimentRunStateData> = {
+  store: async () => {},
+  get: async () => null,
+};
+const experimentRunStateFoldProjection = createExperimentRunStateFoldProjection({ store: noopStore });
 
 const TEST_TENANT_ID = createTenantId("tenant-1");
 

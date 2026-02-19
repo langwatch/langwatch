@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { createTenantId } from "../../../../library/domain/tenantId";
+import { createTenantId } from "../../../../domain/tenantId";
 import {
-  EXPERIMENT_RUN_EVENT_TYPES,
-  EXPERIMENT_RUN_EVENT_VERSIONS,
+	EXPERIMENT_RUN_EVENT_TYPES,
+	EXPERIMENT_RUN_EVENT_VERSIONS,
 } from "../constants";
 import type { ExperimentRunProcessingEvent } from "../events";
 import {
-  isExperimentRunCompletedEvent,
-  isExperimentRunStartedEvent,
-  isEvaluatorResultEvent,
-  isTargetResultEvent,
+	isEvaluatorResultEvent,
+	isExperimentRunCompletedEvent,
+	isExperimentRunStartedEvent,
+	isTargetResultEvent,
 } from "../typeGuards";
 
 const TEST_TENANT_ID = createTenantId("tenant-1");
