@@ -1,15 +1,19 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import type { NormalizedSpan } from "../../schemas/spans";
 import { NormalizedSpanKind, NormalizedStatusCode } from "../../schemas/spans";
-import { TraceIOExtractionService } from "../../services/traceIOExtractionService";
+import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import {
   applySpanToSummary,
-  traceSummaryFoldProjection,
+  createTraceSummaryFoldProjection,
   type TraceSummaryData,
 } from "../traceSummary.foldProjection";
 
+const traceSummaryProjection = createTraceSummaryFoldProjection({
+  store: { store: async () => {}, get: async () => null },
+});
+
 function createInitState(): TraceSummaryData {
-  return traceSummaryFoldProjection.init();
+  return traceSummaryProjection.init();
 }
 
 function createTestSpan(overrides: Partial<NormalizedSpan> = {}): NormalizedSpan {
@@ -71,7 +75,7 @@ describe("applySpanToSummary cost computation", () => {
       const result = applySpanToSummary(createInitState(), span);
 
       // 100 * 0.000005 + 50 * 0.000015 = 0.0005 + 0.00075 = 0.00125
-      expect(result.TotalCost).toBeCloseTo(0.00125, 6);
+      expect(result.totalCost).toBeCloseTo(0.00125, 6);
     });
   });
 
@@ -89,8 +93,8 @@ describe("applySpanToSummary cost computation", () => {
 
       // gpt-4o is in the static registry, so cost should be computed
       // The exact value depends on the JSON file, but it should be > 0
-      expect(result.TotalCost).not.toBeNull();
-      expect(result.TotalCost).toBeGreaterThan(0);
+      expect(result.totalCost).not.toBeNull();
+      expect(result.totalCost).toBeGreaterThan(0);
     });
   });
 
@@ -106,7 +110,7 @@ describe("applySpanToSummary cost computation", () => {
 
       const result = applySpanToSummary(createInitState(), span);
 
-      expect(result.TotalCost).toBeNull();
+      expect(result.totalCost).toBeNull();
     });
   });
 
@@ -120,7 +124,7 @@ describe("applySpanToSummary cost computation", () => {
 
       const result = applySpanToSummary(createInitState(), span);
 
-      expect(result.TotalCost).toBeNull();
+      expect(result.totalCost).toBeNull();
     });
   });
 
@@ -136,7 +140,7 @@ describe("applySpanToSummary cost computation", () => {
 
       const result = applySpanToSummary(createInitState(), span);
 
-      expect(result.TotalCost).toBeCloseTo(0.005, 6);
+      expect(result.totalCost).toBeCloseTo(0.005, 6);
     });
   });
 
@@ -151,7 +155,7 @@ describe("applySpanToSummary cost computation", () => {
 
       const result = applySpanToSummary(createInitState(), span);
 
-      expect(result.TotalCost).toBeNull();
+      expect(result.totalCost).toBeNull();
     });
   });
 
@@ -169,7 +173,7 @@ describe("applySpanToSummary cost computation", () => {
       const result = applySpanToSummary(createInitState(), span);
 
       // 100 * 0.00001 + 50 * 0 = 0.001
-      expect(result.TotalCost).toBeCloseTo(0.001, 6);
+      expect(result.totalCost).toBeCloseTo(0.001, 6);
     });
   });
 });

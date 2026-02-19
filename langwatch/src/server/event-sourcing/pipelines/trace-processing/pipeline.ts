@@ -1,26 +1,42 @@
-import { definePipeline } from "../../library";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import { definePipeline } from "../../";
+import type { FoldProjectionStore } from "../../projections/foldProjection.types";
+import type { AppendStore } from "../../projections/mapProjection.types";
+import type { ReactorDefinition } from "../../reactors/reactor.types";
 import { AssignTopicCommand } from "./commands/assignTopicCommand";
 import { RecordSpanCommand } from "./commands/recordSpanCommand";
-import { spanStorageMapProjection } from "./handlers/spanStorage.mapProjection";
-import { traceSummaryFoldProjection } from "./projections/traceSummary.foldProjection";
+import { createSpanStorageMapProjection } from "./projections/spanStorage.mapProjection";
+import { createTraceSummaryFoldProjection } from "./projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "./schemas/events";
+import type { NormalizedSpan } from "./schemas/spans";
+
+export interface TraceProcessingPipelineDeps {
+  spanAppendStore: AppendStore<NormalizedSpan>;
+  traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
+  evaluationTriggerReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+  traceUpdateBroadcastReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+}
 
 /**
- * Trace processing pipeline definition (static, no runtime dependencies).
+ * Creates the trace processing pipeline definition.
  *
  * This pipeline uses trace-level aggregates (aggregateId = traceId).
  * It aggregates span events into trace summary metrics (fold projection) and writes
  * individual spans to the stored_spans table (map projection).
- *
- * This is a static definition that can be safely imported without triggering
- * ClickHouse/Redis connections.
  */
-export const traceProcessingPipelineDefinition =
-  definePipeline<TraceProcessingEvent>()
+export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps) {
+  return definePipeline<TraceProcessingEvent>()
     .withName("trace_processing")
     .withAggregateType("trace")
-    .withFoldProjection("traceSummary", traceSummaryFoldProjection)
-    .withMapProjection("spanStorage", spanStorageMapProjection)
+    .withFoldProjection("traceSummary", createTraceSummaryFoldProjection({
+      store: deps.traceSummaryStore,
+    }))
+    .withMapProjection("spanStorage", createSpanStorageMapProjection({
+      store: deps.spanAppendStore,
+    }))
+    .withReactor("traceSummary", "evaluationTrigger", deps.evaluationTriggerReactor)
+    .withReactor("traceSummary", "traceUpdateBroadcast", deps.traceUpdateBroadcastReactor)
     .withCommand("recordSpan", RecordSpanCommand)
     .withCommand("assignTopic", AssignTopicCommand)
     .build();
+}

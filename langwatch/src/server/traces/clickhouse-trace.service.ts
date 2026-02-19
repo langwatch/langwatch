@@ -2,16 +2,19 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import type { TraceWithGuardrail } from "~/components/messages/MessageCard";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { getClickHouseClient } from "~/server/clickhouse/client";
 import { prisma as defaultPrisma } from "~/server/db";
 import type { Protections } from "~/server/elasticsearch/protections";
+import { mapTraceEvaluationsToLegacyEvaluations } from "~/server/evaluations/evaluation-run.mappers";
+import { EvaluationService } from "~/server/evaluations/evaluation.service";
 import type {
   NormalizedSpan,
   NormalizedSpanKind,
   NormalizedStatusCode,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { generateClickHouseFilterConditions } from "~/server/filters/clickhouse";
-import type { Evaluation, Span, Trace } from "~/server/tracer/types";
+import type { Span, Trace } from "~/server/tracer/types";
 import { createLogger } from "~/utils/logger/server";
 import {
   applyTraceProtections,
@@ -61,9 +64,11 @@ export class ClickHouseTraceService {
   private readonly tracer = getLangWatchTracer(
     "langwatch.traces.clickhouse-service",
   );
+  private readonly evaluationService: EvaluationService;
 
   constructor(private readonly prisma: PrismaClient) {
     this.clickHouseClient = getClickHouseClient();
+    this.evaluationService = EvaluationService.create(prisma);
   }
 
   /**
@@ -498,12 +503,6 @@ export class ClickHouseTraceService {
           // Group traces (for now, single-trace groups unless groupBy is specified)
           const rawGroups = this.groupTraces(traces, input.groupBy);
 
-          // Extract evaluations (empty for now, ClickHouse doesn't have evaluations)
-          const traceChecks: Record<string, Evaluation[]> = {};
-          for (const trace of traces) {
-            traceChecks[trace.trace_id] = [];
-          }
-
           // Transform traces to include guardrail information
           const groups = rawGroups.map((group) =>
             transformTracesWithGuardrails(group),
@@ -522,6 +521,20 @@ export class ClickHouseTraceService {
             },
             "Returning traces result",
           );
+
+          // Enrich with evaluations
+          const traceIds = groups.flat().map((t) => t.trace_id);
+          let traceChecks: TracesForProjectResult["traceChecks"] = {};
+          if (traceIds.length > 0) {
+            const evaluations =
+              await this.evaluationService.getEvaluationsMultiple({
+                projectId: input.projectId,
+                traceIds,
+                protections,
+              });
+            traceChecks =
+              mapTraceEvaluationsToLegacyEvaluations(evaluations);
+          }
 
           return {
             groups,
@@ -1237,7 +1250,7 @@ export class ClickHouseTraceService {
             traces.push(applyTraceProtections(trace, protections));
           } else {
             // Create trace without spans if not found
-            const summary = this.rowToTraceSummaryRecord(row);
+            const summary = this.rowToTraceSummaryData(row);
             const trace = mapTraceSummaryToTrace(summary, [], projectId);
             // Apply redaction protections
             traces.push(applyTraceProtections(trace, protections));
@@ -1253,37 +1266,37 @@ export class ClickHouseTraceService {
   }
 
   /**
-   * Convert a summary row to TraceSummaryRecord.
+   * Convert a summary row to TraceSummaryData.
    * @internal
    */
-  private rowToTraceSummaryRecord(row: TraceSummaryRow): TraceSummaryRecord {
+  private rowToTraceSummaryData(row: TraceSummaryRow): TraceSummaryData {
     return {
-      TraceId: row.ts_TraceId,
-      SpanCount: row.ts_SpanCount,
-      TotalDurationMs: row.ts_TotalDurationMs,
-      ComputedIOSchemaVersion: row.ts_ComputedIOSchemaVersion,
-      ComputedInput: row.ts_ComputedInput,
-      ComputedOutput: row.ts_ComputedOutput,
-      TimeToFirstTokenMs: row.ts_TimeToFirstTokenMs,
-      TimeToLastTokenMs: row.ts_TimeToLastTokenMs,
-      TokensPerSecond: row.ts_TokensPerSecond,
-      ContainsErrorStatus: row.ts_ContainsErrorStatus,
-      ContainsOKStatus: row.ts_ContainsOKStatus,
-      ErrorMessage: row.ts_ErrorMessage,
-      Models: row.ts_Models,
-      TotalCost: row.ts_TotalCost,
-      TokensEstimated: row.ts_TokensEstimated,
-      TotalPromptTokenCount: row.ts_TotalPromptTokenCount,
-      TotalCompletionTokenCount: row.ts_TotalCompletionTokenCount,
-      OutputFromRootSpan: row.ts_OutputFromRootSpan ?? false,
-      OutputSpanEndTimeMs: row.ts_OutputSpanEndTimeMs ?? 0,
-      TopicId: row.ts_TopicId,
-      SubTopicId: row.ts_SubTopicId,
-      HasAnnotation: row.ts_HasAnnotation,
-      Attributes: row.ts_Attributes,
-      OccurredAt: row.ts_OccurredAt,
-      CreatedAt: row.ts_CreatedAt,
-      LastUpdatedAt: row.ts_LastUpdatedAt,
+      traceId: row.ts_TraceId,
+      spanCount: row.ts_SpanCount,
+      totalDurationMs: row.ts_TotalDurationMs,
+      computedIOSchemaVersion: row.ts_ComputedIOSchemaVersion,
+      computedInput: row.ts_ComputedInput,
+      computedOutput: row.ts_ComputedOutput,
+      timeToFirstTokenMs: row.ts_TimeToFirstTokenMs,
+      timeToLastTokenMs: row.ts_TimeToLastTokenMs,
+      tokensPerSecond: row.ts_TokensPerSecond,
+      containsErrorStatus: row.ts_ContainsErrorStatus,
+      containsOKStatus: row.ts_ContainsOKStatus,
+      errorMessage: row.ts_ErrorMessage,
+      models: row.ts_Models,
+      totalCost: row.ts_TotalCost,
+      tokensEstimated: row.ts_TokensEstimated,
+      totalPromptTokenCount: row.ts_TotalPromptTokenCount,
+      totalCompletionTokenCount: row.ts_TotalCompletionTokenCount,
+      outputFromRootSpan: row.ts_OutputFromRootSpan ?? false,
+      outputSpanEndTimeMs: row.ts_OutputSpanEndTimeMs ?? 0,
+      topicId: row.ts_TopicId,
+      subTopicId: row.ts_SubTopicId,
+      hasAnnotation: row.ts_HasAnnotation,
+      attributes: row.ts_Attributes,
+      occurredAt: row.ts_OccurredAt,
+      createdAt: row.ts_CreatedAt,
+      lastUpdatedAt: row.ts_LastUpdatedAt,
     };
   }
 
@@ -1333,7 +1346,7 @@ export class ClickHouseTraceService {
     projectId: string,
     traceIds: string[],
   ): Promise<
-    Map<string, { summary: TraceSummaryRecord; spans: NormalizedSpan[] }>
+    Map<string, { summary: TraceSummaryData; spans: NormalizedSpan[] }>
   > {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.fetchTracesWithSpansJoined",
@@ -1426,7 +1439,7 @@ export class ClickHouseTraceService {
         // Group results by TraceId
         const tracesMap = new Map<
           string,
-          { summary: TraceSummaryRecord; spans: NormalizedSpan[] }
+          { summary: TraceSummaryData; spans: NormalizedSpan[] }
         >();
 
         for (const row of rows) {
@@ -1453,39 +1466,39 @@ export class ClickHouseTraceService {
   }
 
   /**
-   * Extract TraceSummaryRecord from a joined row.
+   * Extract TraceSummaryData from a joined row.
    * @internal
    */
   private extractTraceSummaryFromRow(
     row: JoinedTraceSpanRow,
-  ): TraceSummaryRecord {
+  ): TraceSummaryData {
     return {
-      TraceId: row.ts_TraceId,
-      SpanCount: row.ts_SpanCount,
-      TotalDurationMs: row.ts_TotalDurationMs,
-      ComputedIOSchemaVersion: row.ts_ComputedIOSchemaVersion,
-      ComputedInput: row.ts_ComputedInput,
-      ComputedOutput: row.ts_ComputedOutput,
-      TimeToFirstTokenMs: row.ts_TimeToFirstTokenMs,
-      TimeToLastTokenMs: row.ts_TimeToLastTokenMs,
-      TokensPerSecond: row.ts_TokensPerSecond,
-      ContainsErrorStatus: row.ts_ContainsErrorStatus,
-      ContainsOKStatus: row.ts_ContainsOKStatus,
-      ErrorMessage: row.ts_ErrorMessage,
-      Models: row.ts_Models,
-      TotalCost: row.ts_TotalCost,
-      TokensEstimated: row.ts_TokensEstimated,
-      TotalPromptTokenCount: row.ts_TotalPromptTokenCount,
-      TotalCompletionTokenCount: row.ts_TotalCompletionTokenCount,
-      OutputFromRootSpan: row.ts_OutputFromRootSpan ?? false,
-      OutputSpanEndTimeMs: row.ts_OutputSpanEndTimeMs ?? 0,
-      TopicId: row.ts_TopicId,
-      SubTopicId: row.ts_SubTopicId,
-      HasAnnotation: row.ts_HasAnnotation,
-      Attributes: row.ts_Attributes,
-      OccurredAt: row.ts_OccurredAt,
-      CreatedAt: row.ts_CreatedAt,
-      LastUpdatedAt: row.ts_LastUpdatedAt,
+      traceId: row.ts_TraceId,
+      spanCount: row.ts_SpanCount,
+      totalDurationMs: row.ts_TotalDurationMs,
+      computedIOSchemaVersion: row.ts_ComputedIOSchemaVersion,
+      computedInput: row.ts_ComputedInput,
+      computedOutput: row.ts_ComputedOutput,
+      timeToFirstTokenMs: row.ts_TimeToFirstTokenMs,
+      timeToLastTokenMs: row.ts_TimeToLastTokenMs,
+      tokensPerSecond: row.ts_TokensPerSecond,
+      containsErrorStatus: row.ts_ContainsErrorStatus,
+      containsOKStatus: row.ts_ContainsOKStatus,
+      errorMessage: row.ts_ErrorMessage,
+      models: row.ts_Models,
+      totalCost: row.ts_TotalCost,
+      tokensEstimated: row.ts_TokensEstimated,
+      totalPromptTokenCount: row.ts_TotalPromptTokenCount,
+      totalCompletionTokenCount: row.ts_TotalCompletionTokenCount,
+      outputFromRootSpan: row.ts_OutputFromRootSpan ?? false,
+      outputSpanEndTimeMs: row.ts_OutputSpanEndTimeMs ?? 0,
+      topicId: row.ts_TopicId,
+      subTopicId: row.ts_SubTopicId,
+      hasAnnotation: row.ts_HasAnnotation,
+      attributes: row.ts_Attributes,
+      occurredAt: row.ts_OccurredAt,
+      createdAt: row.ts_CreatedAt,
+      lastUpdatedAt: row.ts_LastUpdatedAt,
     };
   }
 
@@ -1577,39 +1590,6 @@ export class ClickHouseTraceService {
       droppedLinksCount: 0,
     };
   }
-}
-
-/**
- * Type representing a trace summary record from ClickHouse.
- * This matches TraceSummaryData from the projection.
- */
-interface TraceSummaryRecord {
-  TraceId: string;
-  SpanCount: number;
-  TotalDurationMs: number;
-  ComputedIOSchemaVersion: string;
-  ComputedInput: string | null;
-  ComputedOutput: string | null;
-  TimeToFirstTokenMs: number | null;
-  TimeToLastTokenMs: number | null;
-  TokensPerSecond: number | null;
-  ContainsErrorStatus: boolean;
-  ContainsOKStatus: boolean;
-  ErrorMessage: string | null;
-  Models: string[];
-  TotalCost: number | null;
-  TokensEstimated: boolean;
-  TotalPromptTokenCount: number | null;
-  TotalCompletionTokenCount: number | null;
-  OutputFromRootSpan: boolean;
-  OutputSpanEndTimeMs: number;
-  TopicId: string | null;
-  SubTopicId: string | null;
-  HasAnnotation: boolean | null;
-  Attributes: Record<string, string>;
-  OccurredAt: number;
-  CreatedAt: number;
-  LastUpdatedAt: number;
 }
 
 /**

@@ -29,7 +29,7 @@ const RESERVED_ATTRIBUTE_MAPPINGS: Record<string, keyof TraceMetadata> = {
 };
 
 /**
- * Maps TraceSummaryData.Attributes to the legacy TraceMetadata format.
+ * Maps TraceSummaryData.attributes to the legacy TraceMetadata format.
  *
  * The Attributes map in ClickHouse stores various metadata using semantic
  * convention keys. These need to be mapped to the flat TraceMetadata structure.
@@ -350,31 +350,31 @@ export function mapTraceSummaryToTrace(
   projectId: string,
 ): Trace {
   const metadata = mapAttributesToMetadata(
-    summary.Attributes,
-    summary.TopicId,
-    summary.SubTopicId,
+    summary.attributes,
+    summary.topicId,
+    summary.subTopicId,
   );
 
   const trace: Trace = {
-    trace_id: summary.TraceId,
+    trace_id: summary.traceId,
     project_id: projectId,
     metadata,
     timestamps: {
-      started_at: summary.CreatedAt,
-      inserted_at: summary.CreatedAt,
-      updated_at: summary.LastUpdatedAt,
+      started_at: summary.createdAt,
+      inserted_at: summary.createdAt,
+      updated_at: summary.lastUpdatedAt,
     },
-    input: parseComputedInput(summary.ComputedInput),
-    output: parseComputedOutput(summary.ComputedOutput),
+    input: parseComputedInput(summary.computedInput),
+    output: parseComputedOutput(summary.computedOutput),
     metrics: {
-      first_token_ms: summary.TimeToFirstTokenMs,
-      total_time_ms: summary.TotalDurationMs,
-      prompt_tokens: summary.TotalPromptTokenCount,
-      completion_tokens: summary.TotalCompletionTokenCount,
-      total_cost: summary.TotalCost,
-      tokens_estimated: summary.TokensEstimated,
+      first_token_ms: summary.timeToFirstTokenMs,
+      total_time_ms: summary.totalDurationMs,
+      prompt_tokens: summary.totalPromptTokenCount,
+      completion_tokens: summary.totalCompletionTokenCount,
+      total_cost: summary.totalCost,
+      tokens_estimated: summary.tokensEstimated,
     },
-    error: createError(summary.ContainsErrorStatus, summary.ErrorMessage),
+    error: createError(summary.containsErrorStatus, summary.errorMessage),
     spans,
   };
 

@@ -2,6 +2,7 @@ import { SpanKind as ApiSpanKind } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "../../utils/logger/server";
+import { getApp } from "../app-layer/app";
 import type { PIIRedactionLevel } from "../event-sourcing/pipelines/trace-processing/schemas/commands";
 import {
   instrumentationScopeSchema,
@@ -10,7 +11,6 @@ import {
   spanSchema,
 } from "../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import { TraceRequestUtils } from "../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
-import { getTraceProcessingPipeline } from "../event-sourcing/runtime/eventSourcing";
 
 /**
  * Normalizes all ID fields in a span to hex strings before queuing.
@@ -140,12 +140,13 @@ export class TraceRequestCollectionService {
                 // Uint8Array serialization issues through JSON (BullMQ/Redis)
                 const normalizedSpan = normalizeSpanIds(spanParseResult.data);
 
-                await getTraceProcessingPipeline().commands.recordSpan.send({
+                await getApp().traces.recordSpan({
                   tenantId,
                   span: normalizedSpan,
                   resource: resourceParseResult.data ?? null,
                   instrumentationScope: scopeParseResult.data ?? null,
                   piiRedactionLevel,
+                  occurredAt: Date.now(),
                 });
 
                 collectedSpanCount++;
