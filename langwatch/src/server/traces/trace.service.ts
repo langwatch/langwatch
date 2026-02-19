@@ -2,7 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { prisma as defaultPrisma } from "~/server/db";
 import type { Protections } from "~/server/elasticsearch/protections";
-import { mapTraceEvaluationsToLegacyEvaluations } from "~/server/evaluations/evaluation-state.mappers";
+import { mapTraceEvaluationsToLegacyEvaluations } from "~/server/evaluations/evaluation-run.mappers";
 import { EvaluationService } from "~/server/evaluations/evaluation.service";
 import type { Evaluation, Trace } from "~/server/tracer/types";
 import { createLogger } from "~/utils/logger/server";
@@ -243,6 +243,7 @@ export class TraceService {
               "ClickHouse is enabled but returned null for getAllTracesForProject — check ClickHouse client configuration",
             );
           }
+
           return result;
         }
 

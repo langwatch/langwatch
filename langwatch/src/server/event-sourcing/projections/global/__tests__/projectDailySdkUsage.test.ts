@@ -1,16 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  extractSdkInfoFromEvent,
-  projectDailySdkUsageProjection,
-} from "../projectDailySdkUsage.foldProjection";
-import type { Event } from "../../../library/domain/types";
-import {
-  createTestEvent,
-  createTestTenantId,
-  TEST_CONSTANTS,
-} from "../../../library/services/__tests__/testHelpers";
-import { SPAN_RECEIVED_EVENT_TYPE } from "../../../pipelines/trace-processing/schemas/constants";
 import { EVALUATION_STARTED_EVENT_TYPE } from "../../../pipelines/evaluation-processing/schemas/constants";
+import { SPAN_RECEIVED_EVENT_TYPE } from "../../../pipelines/trace-processing/schemas/constants";
+import type { Event } from "../../../domain/types";
+import {
+	createTestEvent,
+	createTestTenantId,
+	TEST_CONSTANTS,
+} from "../../../services/__tests__/testHelpers";
+import {
+	extractSdkInfoFromEvent,
+	projectDailySdkUsageProjection,
+} from "../projectDailySdkUsage.foldProjection";
 
 describe("projectDailySdkUsageProjection", () => {
   const tenantId = createTestTenantId();

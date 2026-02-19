@@ -4,7 +4,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ScenarioEventService } from "~/server/scenarios/scenario-event.service";
+import type { SimulationService } from "~/server/simulations/simulation.service";
 import {
   ScenarioEventType,
   ScenarioRunStatus,
@@ -14,7 +14,7 @@ import { ScenarioFailureHandler } from "../scenario-failure-handler";
 
 describe("ScenarioFailureHandler", () => {
   let handler: ScenarioFailureHandler;
-  let mockEventService: {
+  let mockService: {
     getRunDataForBatchRun: ReturnType<typeof vi.fn>;
     saveScenarioEvent: ReturnType<typeof vi.fn>;
   };
@@ -27,19 +27,19 @@ describe("ScenarioFailureHandler", () => {
   };
 
   beforeEach(() => {
-    mockEventService = {
+    mockService = {
       getRunDataForBatchRun: vi.fn(),
       saveScenarioEvent: vi.fn(),
     };
     handler = new ScenarioFailureHandler(
-      mockEventService as unknown as ScenarioEventService,
+      mockService as unknown as SimulationService,
     );
   });
 
   describe("ensureFailureEventsEmitted", () => {
     describe("given no events exist for the batch run", () => {
       beforeEach(() => {
-        mockEventService.getRunDataForBatchRun.mockResolvedValue([]);
+        mockService.getRunDataForBatchRun.mockResolvedValue({ changed: true, runs: [] });
       });
 
       describe("when called with an error", () => {
@@ -49,7 +49,7 @@ describe("ScenarioFailureHandler", () => {
             error: "Child process exited with code 1",
           });
 
-          expect(mockEventService.saveScenarioEvent).toHaveBeenCalledTimes(2);
+          expect(mockService.saveScenarioEvent).toHaveBeenCalledTimes(2);
         });
 
         it("emits RUN_STARTED with synthetic scenarioRunId", async () => {
@@ -58,7 +58,7 @@ describe("ScenarioFailureHandler", () => {
             error: "Child process exited with code 1",
           });
 
-          const runStartedCall = mockEventService.saveScenarioEvent.mock.calls[0]?.[0] as Record<string, unknown>;
+          const runStartedCall = mockService.saveScenarioEvent.mock.calls[0]?.[0] as Record<string, unknown>;
           expect(runStartedCall.type).toBe(ScenarioEventType.RUN_STARTED);
           expect(runStartedCall.scenarioRunId).toMatch(/^scenariorun_/);
           expect(runStartedCall.projectId).toBe("proj_123");
@@ -70,7 +70,7 @@ describe("ScenarioFailureHandler", () => {
             error: "Child process exited with code 1",
           });
 
-          const runFinishedCall = mockEventService.saveScenarioEvent.mock.calls[1]?.[0] as Record<string, unknown>;
+          const runFinishedCall = mockService.saveScenarioEvent.mock.calls[1]?.[0] as Record<string, unknown>;
           expect(runFinishedCall.type).toBe(ScenarioEventType.RUN_FINISHED);
           expect(runFinishedCall.status).toBe(ScenarioRunStatus.ERROR);
           expect((runFinishedCall.results as Record<string, unknown>).error).toBe("Child process exited with code 1");
@@ -82,8 +82,8 @@ describe("ScenarioFailureHandler", () => {
             error: "Child process exited with code 1",
           });
 
-          const runStartedCall = mockEventService.saveScenarioEvent.mock.calls[0]?.[0] as Record<string, unknown>;
-          const runFinishedCall = mockEventService.saveScenarioEvent.mock.calls[1]?.[0] as Record<string, unknown>;
+          const runStartedCall = mockService.saveScenarioEvent.mock.calls[0]?.[0] as Record<string, unknown>;
+          const runFinishedCall = mockService.saveScenarioEvent.mock.calls[1]?.[0] as Record<string, unknown>;
           expect(runFinishedCall.scenarioRunId).toBe(runStartedCall.scenarioRunId);
         });
 
@@ -93,7 +93,7 @@ describe("ScenarioFailureHandler", () => {
             error: "Test error",
           });
 
-          const runStartedCall = mockEventService.saveScenarioEvent.mock.calls[0]?.[0] as Record<string, unknown>;
+          const runStartedCall = mockService.saveScenarioEvent.mock.calls[0]?.[0] as Record<string, unknown>;
           expect(runStartedCall.scenarioRunId).toMatch(/^scenariorun_[A-Za-z0-9_-]+$/);
         });
 
@@ -106,13 +106,13 @@ describe("ScenarioFailureHandler", () => {
             error: "Model API failed",
           });
 
-          const runStartedCall = mockEventService.saveScenarioEvent.mock.calls[0]?.[0] as Record<string, unknown>;
+          const runStartedCall = mockService.saveScenarioEvent.mock.calls[0]?.[0] as Record<string, unknown>;
           expect(runStartedCall.projectId).toBe("proj_123");
           expect(runStartedCall.scenarioId).toBe("scen_456");
           expect(runStartedCall.scenarioSetId).toBe("set_789");
           expect(runStartedCall.batchRunId).toBe("batch_abc");
 
-          const runFinishedCall = mockEventService.saveScenarioEvent.mock.calls[1]?.[0] as Record<string, unknown>;
+          const runFinishedCall = mockService.saveScenarioEvent.mock.calls[1]?.[0] as Record<string, unknown>;
           expect(runFinishedCall.projectId).toBe("proj_123");
           expect(runFinishedCall.scenarioId).toBe("scen_456");
           expect(runFinishedCall.scenarioSetId).toBe("set_789");
@@ -125,17 +125,20 @@ describe("ScenarioFailureHandler", () => {
       const existingScenarioRunId = "scenariorun_existing123";
 
       beforeEach(() => {
-        mockEventService.getRunDataForBatchRun.mockResolvedValue([
-          {
-            scenarioRunId: existingScenarioRunId,
-            scenarioId: "scen_456",
-            batchRunId: "batch_abc",
-            status: ScenarioRunStatus.IN_PROGRESS,
-            results: null,
-            messages: [],
-            timestamp: Date.now(),
-          },
-        ]);
+        mockService.getRunDataForBatchRun.mockResolvedValue({
+          changed: true,
+          runs: [
+            {
+              scenarioRunId: existingScenarioRunId,
+              scenarioId: "scen_456",
+              batchRunId: "batch_abc",
+              status: ScenarioRunStatus.IN_PROGRESS,
+              results: null,
+              messages: [],
+              timestamp: Date.now(),
+            },
+          ],
+        });
       });
 
       describe("when called with an error", () => {
@@ -145,9 +148,9 @@ describe("ScenarioFailureHandler", () => {
             error: "Scenario execution timed out",
           });
 
-          expect(mockEventService.saveScenarioEvent).toHaveBeenCalledTimes(1);
+          expect(mockService.saveScenarioEvent).toHaveBeenCalledTimes(1);
 
-          const runFinishedCall = mockEventService.saveScenarioEvent.mock.calls[0]?.[0] as Record<string, unknown>;
+          const runFinishedCall = mockService.saveScenarioEvent.mock.calls[0]?.[0] as Record<string, unknown>;
           expect(runFinishedCall.type).toBe(ScenarioEventType.RUN_FINISHED);
           expect(runFinishedCall.status).toBe(ScenarioRunStatus.ERROR);
         });
@@ -158,7 +161,7 @@ describe("ScenarioFailureHandler", () => {
             error: "Scenario execution timed out",
           });
 
-          const runFinishedCall = mockEventService.saveScenarioEvent.mock.calls[0]?.[0] as Record<string, unknown>;
+          const runFinishedCall = mockService.saveScenarioEvent.mock.calls[0]?.[0] as Record<string, unknown>;
           expect(runFinishedCall.scenarioRunId).toBe(existingScenarioRunId);
         });
 
@@ -168,7 +171,7 @@ describe("ScenarioFailureHandler", () => {
             error: "Scenario execution timed out",
           });
 
-          const calls = mockEventService.saveScenarioEvent.mock.calls;
+          const calls = mockService.saveScenarioEvent.mock.calls;
           const runStartedCalls = calls.filter(
             (call: any) => call[0].type === ScenarioEventType.RUN_STARTED,
           );
@@ -180,17 +183,20 @@ describe("ScenarioFailureHandler", () => {
     describe("given run already has terminal status", () => {
       describe("when status is ERROR", () => {
         beforeEach(() => {
-          mockEventService.getRunDataForBatchRun.mockResolvedValue([
-            {
-              scenarioRunId: "scenariorun_existing123",
-              scenarioId: "scen_456",
-              batchRunId: "batch_abc",
-              status: ScenarioRunStatus.ERROR,
-              results: { verdict: Verdict.FAILURE, error: "Previous error" },
-              messages: [],
-              timestamp: Date.now(),
-            },
-          ]);
+          mockService.getRunDataForBatchRun.mockResolvedValue({
+            changed: true,
+            runs: [
+              {
+                scenarioRunId: "scenariorun_existing123",
+                scenarioId: "scen_456",
+                batchRunId: "batch_abc",
+                status: ScenarioRunStatus.ERROR,
+                results: { verdict: Verdict.FAILURE, error: "Previous error" },
+                messages: [],
+                timestamp: Date.now(),
+              },
+            ],
+          });
         });
 
         it("emits no events (idempotent)", async () => {
@@ -199,23 +205,26 @@ describe("ScenarioFailureHandler", () => {
             error: "This error should be ignored",
           });
 
-          expect(mockEventService.saveScenarioEvent).not.toHaveBeenCalled();
+          expect(mockService.saveScenarioEvent).not.toHaveBeenCalled();
         });
       });
 
       describe("when status is SUCCESS", () => {
         beforeEach(() => {
-          mockEventService.getRunDataForBatchRun.mockResolvedValue([
-            {
-              scenarioRunId: "scenariorun_existing123",
-              scenarioId: "scen_456",
-              batchRunId: "batch_abc",
-              status: ScenarioRunStatus.SUCCESS,
-              results: { verdict: Verdict.SUCCESS },
-              messages: [],
-              timestamp: Date.now(),
-            },
-          ]);
+          mockService.getRunDataForBatchRun.mockResolvedValue({
+            changed: true,
+            runs: [
+              {
+                scenarioRunId: "scenariorun_existing123",
+                scenarioId: "scen_456",
+                batchRunId: "batch_abc",
+                status: ScenarioRunStatus.SUCCESS,
+                results: { verdict: Verdict.SUCCESS },
+                messages: [],
+                timestamp: Date.now(),
+              },
+            ],
+          });
         });
 
         it("emits no events (trusts existing terminal state)", async () => {
@@ -224,23 +233,26 @@ describe("ScenarioFailureHandler", () => {
             error: "Spurious error",
           });
 
-          expect(mockEventService.saveScenarioEvent).not.toHaveBeenCalled();
+          expect(mockService.saveScenarioEvent).not.toHaveBeenCalled();
         });
       });
 
       describe("when status is FAILED", () => {
         beforeEach(() => {
-          mockEventService.getRunDataForBatchRun.mockResolvedValue([
-            {
-              scenarioRunId: "scenariorun_existing123",
-              scenarioId: "scen_456",
-              batchRunId: "batch_abc",
-              status: ScenarioRunStatus.FAILED,
-              results: { verdict: Verdict.FAILURE },
-              messages: [],
-              timestamp: Date.now(),
-            },
-          ]);
+          mockService.getRunDataForBatchRun.mockResolvedValue({
+            changed: true,
+            runs: [
+              {
+                scenarioRunId: "scenariorun_existing123",
+                scenarioId: "scen_456",
+                batchRunId: "batch_abc",
+                status: ScenarioRunStatus.FAILED,
+                results: { verdict: Verdict.FAILURE },
+                messages: [],
+                timestamp: Date.now(),
+              },
+            ],
+          });
         });
 
         it("emits no events (already in terminal state)", async () => {
@@ -249,7 +261,7 @@ describe("ScenarioFailureHandler", () => {
             error: "Another error",
           });
 
-          expect(mockEventService.saveScenarioEvent).not.toHaveBeenCalled();
+          expect(mockService.saveScenarioEvent).not.toHaveBeenCalled();
         });
       });
     });

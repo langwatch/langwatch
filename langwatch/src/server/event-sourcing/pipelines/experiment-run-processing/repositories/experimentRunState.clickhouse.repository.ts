@@ -1,22 +1,22 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { WithDateWrites } from "~/server/clickhouse/types";
 import {
-  ErrorCategory,
-  SecurityError,
-  StoreError,
-  ValidationError,
-} from "~/server/event-sourcing/library/services/errorHandling";
+	ErrorCategory,
+	SecurityError,
+	StoreError,
+	ValidationError,
+} from "~/server/event-sourcing/services/errorHandling";
+import type {
+	Projection,
+	ProjectionStoreReadContext,
+	ProjectionStoreWriteContext,
+} from "../../../";
+import { createTenantId, EventUtils } from "../../../";
 import { createLogger } from "../../../../../utils/logger";
 import type {
-  Projection,
-  ProjectionStoreReadContext,
-  ProjectionStoreWriteContext,
-} from "../../../library";
-import { createTenantId, EventUtils } from "../../../library";
-import type {
-  ExperimentRunState,
-  ExperimentRunStateData,
+	ExperimentRunState,
+	ExperimentRunStateData,
 } from "../projections/experimentRunState.foldProjection";
-import type { WithDateWrites } from "~/server/clickhouse/types";
 import type { ExperimentRunStateRepository } from "./experimentRunState.repository";
 
 const TABLE_NAME = "experiment_runs" as const;

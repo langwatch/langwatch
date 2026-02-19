@@ -4,18 +4,19 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import type { z } from "zod";
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
-import { mapZodIssuesToLogContext } from "~/utils/zod";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { captureException } from "~/utils/posthogErrorCapture";
+import { mapZodIssuesToLogContext } from "~/utils/zod";
 import type { Workflow } from "../../../../../optimization_studio/types/dsl";
 import { getWorkflowEntryOutputs } from "../../../../../optimization_studio/utils/workflowFields";
+import { getApp } from "../../../../../server/app-layer/app";
 import { updateEvaluationStatusInES } from "../../../../../server/background/queues/evaluationsQueue";
 import { evaluationNameAutoslug } from "../../../../../server/background/workers/collector/evaluations";
 import {
   type DataForEvaluation,
   runEvaluation,
 } from "../../../../../server/background/workers/evaluationsWorker";
-import { prisma } from "../../../../../server/db"; // Adjust the import based on your setup
+import { prisma } from "../../../../../server/db";
 import type {
   EvaluatorTypes,
   SingleEvaluationResult,
@@ -27,7 +28,6 @@ import {
   type EvaluationRESTResult,
   evaluationInputSchema,
 } from "../../../../../server/evaluations/types";
-import { getEvaluationProcessingPipeline } from "../../../../../server/event-sourcing/runtime/eventSourcing";
 import { createLogger } from "../../../../../utils/logger/server";
 import {
   getEvaluatorDataForParams,
@@ -331,6 +331,7 @@ export async function handleEvaluatorCall(
   }
 
   let result: SingleEvaluationResult;
+  let costId: string | undefined;
 
   // Generate evaluationId for event sourcing tracking
   // evaluationId must be unique per execution (not per evaluator definition)
@@ -358,7 +359,7 @@ export async function handleEvaluatorCall(
   // should proceed even if event tracking fails. Errors are captured for monitoring.
   if (project.featureEventSourcingEvaluationIngestion) {
     try {
-      await getEvaluationProcessingPipeline().commands.startEvaluation.send({
+      await getApp().evaluations.startEvaluation({
         tenantId: project.id,
         evaluationId,
         evaluatorId,
@@ -394,6 +395,26 @@ export async function handleEvaluatorCall(
     ) {
       result = await runEval();
     }
+
+    // Create cost row before emitting completed event so costId is available
+    if ("cost" in result && result.cost) {
+      const cost = await prisma.cost.create({
+        data: {
+          id: generate(KSUID_RESOURCES.COST).toString(),
+          projectId: project.id,
+          costType: isGuardrail ? CostType.GUARDRAIL : CostType.TRACE_CHECK,
+          costName: evaluatorName ?? monitor?.name ?? checkType,
+          referenceType: CostReferenceType.CHECK,
+          referenceId: evaluatorName ?? monitor?.id ?? checkType,
+          amount: result.cost.amount,
+          currency: result.cost.currency,
+          extraInfo: {
+            trace_id: params.trace_id,
+          },
+        },
+      });
+      costId = cost.id;
+    }
   } catch (error) {
     captureException(error, {
       extra: {
@@ -413,82 +434,65 @@ export async function handleEvaluatorCall(
       details: error instanceof Error ? error.message : "Internal error",
       traceback: [],
     };
-  }
-
-  // Emit evaluation completed event
-  // Note: Event sourcing errors are logged but not re-thrown because the evaluation
-  // result should be returned even if event tracking fails. Errors are captured for monitoring.
-  if (project.featureEventSourcingEvaluationIngestion) {
-    try {
-      await getEvaluationProcessingPipeline().commands.completeEvaluation.send({
-        tenantId: project.id,
-        evaluationId,
-        status: result.status,
-        score: "score" in result ? result.score : undefined,
-        passed: "passed" in result ? result.passed : undefined,
-        label: "label" in result ? result.label : undefined,
-        details: "details" in result ? result.details : undefined,
-        occurredAt: Date.now(),
-        error:
-          result.status === "error"
-            ? "details" in result
-              ? result.details
-              : undefined
-            : undefined,
-      });
-    } catch (eventError) {
-      captureException(eventError, {
-        extra: { projectId: project.id, evaluationId, event: "completed" },
-      });
-      logger.error(
-        {
-          err: eventError,
-          projectId: project.id,
+  } finally {
+    // Emit evaluation completed event — always fires even if cost creation threw
+    // Note: Event sourcing errors are logged but not re-thrown because the evaluation
+    // result should be returned even if event tracking fails. Errors are captured for monitoring.
+    if (project.featureEventSourcingEvaluationIngestion) {
+      await getApp()
+        .evaluations.completeEvaluation({
+          tenantId: project.id,
           evaluationId,
-        },
-        "Failed to emit evaluation completed event",
-      );
+          status: result!.status,
+          score: "score" in result! ? result!.score : undefined,
+          passed: "passed" in result! ? result!.passed : undefined,
+          label: "label" in result! ? result!.label : undefined,
+          details: "details" in result! ? result!.details : undefined,
+          costId: costId ?? null,
+          occurredAt: Date.now(),
+          error:
+            result!.status === "error"
+              ? "details" in result!
+                ? result!.details
+                : undefined
+              : undefined,
+        })
+        .catch((eventError: unknown) => {
+          captureException(eventError, {
+            extra: { projectId: project.id, evaluationId, event: "completed" },
+          });
+          logger.error(
+            {
+              err: eventError,
+              projectId: project.id,
+              evaluationId,
+            },
+            "Failed to emit evaluation completed event",
+          );
+        });
     }
   }
 
-  if ("cost" in result && result.cost) {
-    await prisma.cost.create({
-      data: {
-        id: generate(KSUID_RESOURCES.COST).toString(),
-        projectId: project.id,
-        costType: isGuardrail ? CostType.GUARDRAIL : CostType.TRACE_CHECK,
-        costName: evaluatorName ?? monitor?.name ?? checkType,
-        referenceType: CostReferenceType.CHECK,
-        referenceId: evaluatorName ?? monitor?.id ?? checkType,
-        amount: result.cost.amount,
-        currency: result.cost.currency,
-        extraInfo: {
-          trace_id: params.trace_id,
-        },
-      },
-    });
-  }
-
   const resultWithoutTraceback: EvaluationRESTResult =
-    result.status === "error"
+    result!.status === "error"
       ? {
           status: "error",
           error_type: "EVALUATOR_ERROR",
-          details: result.details,
+          details: result!.details,
           ...(isGuardrail ? { passed: true } : {}), // We don't want to fail the check if the evaluator throws, becuase this is likely a bug in the evaluator
         }
-      : result.status === "skipped"
+      : result!.status === "skipped"
         ? {
             status: "skipped",
-            details: result.details,
+            details: result!.details,
             ...(isGuardrail ? { passed: true } : {}),
           }
         : {
-            ...result,
-            ...(isGuardrail ? { passed: result.passed ?? true } : {}),
+            ...result!,
+            ...(isGuardrail ? { passed: result!.passed ?? true } : {}),
           };
 
-  if (params.trace_id) {
+  if (params.trace_id && !project.featureEventSourcingEvaluationIngestion) {
     await updateEvaluationStatusInES({
       check: {
         evaluation_id: evaluationId,
@@ -500,24 +504,24 @@ export async function handleEvaluatorCall(
         trace_id: params.trace_id,
         project_id: project.id,
       },
-      status: result.status,
+      status: result!.status,
       is_guardrail: isGuardrail ?? undefined,
-      ...(result.status === "error"
+      ...(result!.status === "error"
         ? {
             error: {
-              details: result.details,
-              stack: result.traceback,
+              details: result!.details,
+              stack: result!.traceback,
             },
           }
         : {}),
-      ...(result.status === "processed"
+      ...(result!.status === "processed"
         ? {
-            score: result.score,
-            passed: result.passed,
-            label: result.label,
+            score: result!.score,
+            passed: result!.passed,
+            label: result!.label,
           }
         : {}),
-      details: "details" in result ? (result.details ?? "") : "",
+      details: "details" in result! ? (result!.details ?? "") : "",
     });
   }
 

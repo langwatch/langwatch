@@ -1,9 +1,10 @@
-import { Box, Button, Grid, HStack } from "@chakra-ui/react";
+import { Box, Grid, HStack, IconButton, Text } from "@chakra-ui/react";
 import type React from "react";
 import { createContext, useContext, useLayoutEffect, useState } from "react";
 import { ZoomIn, ZoomOut } from "react-feather";
 import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
 import { useZoom } from "~/hooks/useZoom";
+import { Tooltip } from "../ui/tooltip";
 import { SimulationChatViewer } from "./SimulationChatViewer";
 
 const ZoomContext = createContext<ReturnType<typeof useZoom> | null>(null);
@@ -38,26 +39,48 @@ function Controls({ showScale = true }: ControlsProps) {
   const { scale, zoomIn, zoomOut } = useZoomContext();
 
   return (
-    <HStack gap={2}>
-      <Button bgColor="bg.panel" size="sm" variant="outline" onClick={zoomOut}>
-        Zoom Out <ZoomOut size={16} />
-      </Button>
-      <Button bgColor="bg.panel" size="sm" variant="outline" onClick={zoomIn}>
-        Zoom In <ZoomIn size={16} />
-      </Button>
+    <HStack
+      gap={1}
+      bg="bg.panel"
+      border="1px solid"
+      borderColor="border"
+      borderRadius="lg"
+      px={1}
+      py={0.5}
+      w="fit-content"
+      boxShadow="sm"
+    >
+      <Tooltip content="Zoom out">
+        <IconButton
+          size="xs"
+          variant="ghost"
+          aria-label="Zoom out"
+          onClick={zoomOut}
+        >
+          <ZoomOut size={14} />
+        </IconButton>
+      </Tooltip>
       {showScale && (
-        <Box
-          px={2}
-          py={1}
-          bg="bg.muted"
-          borderRadius="full"
+        <Text
           fontSize="xs"
           fontFamily="mono"
-          fontWeight="bold"
+          color="fg.muted"
+          minW="36px"
+          textAlign="center"
         >
           {Math.round(scale * 100)}%
-        </Box>
+        </Text>
       )}
+      <Tooltip content="Zoom in">
+        <IconButton
+          size="xs"
+          variant="ghost"
+          aria-label="Zoom in"
+          onClick={zoomIn}
+        >
+          <ZoomIn size={14} />
+        </IconButton>
+      </Tooltip>
     </HStack>
   );
 }
@@ -153,7 +176,7 @@ function GridComponent({ scenarioRunIds }: GridProps) {
           height: `${100 / scale}%`,
         }}
       >
-        {scenarioRunIds?.map((scenarioRunId) => (
+        {scenarioRunIds?.map((scenarioRunId, idx) => (
           <Box
             key={scenarioRunId}
             width="full"
@@ -161,7 +184,13 @@ function GridComponent({ scenarioRunIds }: GridProps) {
             cursor="pointer"
             onClick={() => handleExpandToggle(scenarioRunId)}
             overflow="auto"
-            style={{
+            css={{
+              opacity: 0,
+              animation: `fade-in-up 0.4s ease-out ${idx * 0.06}s forwards`,
+              "@keyframes fade-in-up": {
+                from: { opacity: 0, transform: "translateY(8px)" },
+                to: { opacity: 1, transform: "translateY(0)" },
+              },
               minWidth: 0,
               minHeight: 0,
             }}

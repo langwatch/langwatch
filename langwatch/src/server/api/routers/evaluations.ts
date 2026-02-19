@@ -1,6 +1,9 @@
+import { generate } from "@langwatch/ksuid";
 import { z } from "zod";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { createLogger } from "~/utils/logger/server";
 import { runEvaluationForTrace } from "../../background/workers/evaluationsWorker";
 import {
@@ -13,7 +16,7 @@ import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { getUserProtectionsForProject } from "../utils";
 
-const logger = createLogger("langwatch:evaluations:warmup");
+const logger = createLogger("langwatch:evaluations");
 
 export const evaluationsRouter = createTRPCRouter({
   availableEvaluators: protectedProcedure
@@ -69,6 +72,44 @@ export const evaluationsRouter = createTRPCRouter({
         mappings: input.mappings ?? {},
         protections,
       });
+
+      // Dispatch to evaluation processing pipeline when flag is ON
+      const project = await prisma.project.findUnique({
+        where: { id: input.projectId },
+        select: { featureEventSourcingEvaluationIngestion: true },
+      });
+      if (project?.featureEventSourcingEvaluationIngestion && result) {
+        const evaluationId = generate(KSUID_RESOURCES.EVALUATION).toString();
+        void (async () => {
+          try {
+            const app = getApp();
+            await app.evaluations.startEvaluation({
+              tenantId: input.projectId,
+              evaluationId,
+              evaluatorId: input.evaluatorType,
+              evaluatorType: input.evaluatorType,
+              traceId: input.traceId,
+              occurredAt: Date.now(),
+            });
+            await app.evaluations.completeEvaluation({
+              tenantId: input.projectId,
+              evaluationId,
+              status: result.status,
+              score: result.status === "processed" ? (result.score ?? undefined) : undefined,
+              passed: result.status === "processed" ? (result.passed ?? undefined) : undefined,
+              label: result.status === "processed" ? (result.label ?? undefined) : undefined,
+              details: result.status === "error" ? result.details : result.status === "processed" ? (result.details ?? undefined) : undefined,
+              error: result.status === "error" ? result.details : undefined,
+              occurredAt: Date.now(),
+            });
+          } catch (error) {
+            logger.warn(
+              { error, evaluationId, evaluatorType: input.evaluatorType },
+              "Failed to dispatch single re-eval to evaluation processing pipeline",
+            );
+          }
+        })();
+      }
 
       return result;
     }),

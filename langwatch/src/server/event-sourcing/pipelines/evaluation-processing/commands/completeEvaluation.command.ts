@@ -1,25 +1,25 @@
 import type {
-  Command,
-  CommandHandler,
-  CommandHandlerResult,
-} from "../../../library";
-import { defineCommandSchema } from "../../../library";
+	Command,
+	CommandHandler,
+	CommandHandlerResult,
+} from "../../../";
+import { defineCommandSchema } from "../../../";
 import type { CompleteEvaluationCommandData } from "../schemas/commands";
 import { completeEvaluationCommandDataSchema } from "../schemas/commands";
 import {
-  COMPLETE_EVALUATION_COMMAND_TYPE,
-  EVALUATION_COMPLETED_EVENT_TYPE,
-  EVALUATION_COMPLETED_EVENT_VERSION_LATEST,
+	COMPLETE_EVALUATION_COMMAND_TYPE,
+	EVALUATION_COMPLETED_EVENT_TYPE,
+	EVALUATION_COMPLETED_EVENT_VERSION_LATEST,
 } from "../schemas/constants";
 import type {
-  EvaluationCompletedEvent,
-  EvaluationCompletedEventData,
-  EvaluationProcessingEvent,
+	EvaluationCompletedEvent,
+	EvaluationCompletedEventData,
+	EvaluationProcessingEvent,
 } from "../schemas/events";
 import {
-  createEvaluationCommandHandler,
-  type EvaluationCommandConfig,
-  makeJobIdWithSuffix,
+	createEvaluationCommandHandler,
+	type EvaluationCommandConfig,
+	makeJobIdWithSuffix,
 } from "./base.command";
 
 const config: EvaluationCommandConfig<
@@ -39,6 +39,7 @@ const config: EvaluationCommandConfig<
     label: commandData.label,
     details: commandData.details,
     error: commandData.error,
+    costId: commandData.costId ?? null,
   }),
   getLogContext: (commandData) => ({
     status: commandData.status,

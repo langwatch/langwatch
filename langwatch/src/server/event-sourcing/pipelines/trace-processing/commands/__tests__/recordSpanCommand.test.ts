@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createTenantId, type Command } from "../../../../library";
+import { createTenantId, type Command } from "../../../../";
 import type { PIIRedactionLevel, RecordSpanCommandData } from "../../schemas/commands";
 import {
-  RECORD_SPAN_COMMAND_TYPE,
-  SPAN_RECEIVED_EVENT_TYPE,
+	RECORD_SPAN_COMMAND_TYPE,
+	SPAN_RECEIVED_EVENT_TYPE,
 } from "../../schemas/constants";
 import {
-  RecordSpanCommand,
-  type RecordSpanCommandDependencies,
+	RecordSpanCommand,
+	type RecordSpanCommandDependencies,
 } from "../recordSpanCommand";
 
 function createMockCommand(
@@ -23,6 +23,7 @@ function createMockCommand(
     tenantId: createTenantId(tenantId),
     data: {
       tenantId,
+      occurredAt: 1000000,
       span: {
         traceId,
         spanId,

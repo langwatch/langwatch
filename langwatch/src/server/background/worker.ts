@@ -1,4 +1,6 @@
 import "../../instrumentation.node";
+// This MUST BE first.
+
 import type { Job, Worker } from "bullmq";
 import type {
   CollectorJob,
@@ -31,16 +33,13 @@ import {
 } from "../metrics";
 import { getWorkerMetricsPort } from "./config";
 import { WorkersRestart } from "./errors";
-import type { EventSourcingJob } from "./types";
 
-import { startEventSourcingWorker } from "./workers/eventSourcingWorker";
-import { startUsageStatsWorker } from "./workers/usageStatsWorker";
+import { getApp } from "../app-layer/app";
 import { getClickHouseClient } from "../clickhouse/client";
 import {
   startStorageStatsCollection,
   stopStorageStatsCollection,
 } from "../clickhouse/metrics";
-import { initializeEventSourcing } from "../event-sourcing";
 import { connection as redis } from "../redis";
 import { startScenarioProcessor } from "../scenarios/scenario.processor";
 import type {
@@ -48,6 +47,7 @@ import type {
   ScenarioJobResult,
 } from "../scenarios/scenario.queue";
 import { monitoredQueues } from "./queues";
+import { startUsageStatsWorker } from "./workers/usageStatsWorker";
 
 const logger = createLogger("langwatch:workers");
 
@@ -84,6 +84,14 @@ export async function gracefulShutdown() {
   );
 
   const failed = results.filter((r) => r.status === "rejected").length;
+
+  // Close App (ES pipelines + CH + Redis + Prisma)
+  try {
+    await getApp().close();
+  } catch (error) {
+    logger.error({ error }, "Failed to close App");
+  }
+
   if (failed > 0) {
     logger.warn(
       { failed, total: closeables.size },
@@ -105,7 +113,6 @@ type Workers = {
   topicClusteringWorker: Worker<TopicClusteringJob, void, string> | undefined;
   trackEventsWorker: Worker<TrackEventJob, void, string> | undefined;
   usageStatsWorker: Worker<UsageStatsJob, void, string> | undefined;
-  eventSourcingWorker: Worker<EventSourcingJob, void, string> | undefined;
   scenarioWorker: Worker<ScenarioJob, ScenarioJobResult, string> | undefined;
 };
 
@@ -121,14 +128,8 @@ export const start = (
   closeables.clear();
   isShuttingDown = false;
 
-  // Initialize event sourcing with ClickHouse and Redis clients
-  const clickHouseClient = getClickHouseClient();
-  initializeEventSourcing({
-    clickHouseClient,
-    redisConnection: redis,
-  });
-
   // Start ClickHouse storage metrics collection if ClickHouse is enabled
+  const clickHouseClient = getClickHouseClient();
   if (clickHouseClient) {
     startStorageStatsCollection(clickHouseClient);
   }
@@ -141,7 +142,6 @@ export const start = (
     const topicClusteringWorker = startTopicClusteringWorker();
     const trackEventsWorker = startTrackEventsWorker();
     const usageStatsWorker = startUsageStatsWorker();
-    const eventSourcingWorker = startEventSourcingWorker();
     const scenarioWorker = startScenarioProcessor();
     const metricsServer = startMetricsServer();
 
@@ -151,7 +151,6 @@ export const start = (
     registerCloseable("topicClustering", topicClusteringWorker);
     registerCloseable("trackEvents", trackEventsWorker);
     registerCloseable("usageStats", usageStatsWorker);
-    registerCloseable("eventSourcing", eventSourcingWorker);
     registerCloseable("scenario", scenarioWorker);
     registerCloseable("metricsServer", {
       close: () =>
@@ -180,7 +179,6 @@ export const start = (
     topicClusteringWorker?.on("closing", closingListener);
     trackEventsWorker?.on("closing", closingListener);
     usageStatsWorker?.on("closing", closingListener);
-    eventSourcingWorker?.on("closing", closingListener);
     scenarioWorker?.on("closing", closingListener);
 
     if (maxRuntimeMs) {
@@ -193,7 +191,6 @@ export const start = (
           topicClusteringWorker?.off("closing", closingListener);
           trackEventsWorker?.off("closing", closingListener);
           usageStatsWorker?.off("closing", closingListener);
-          eventSourcingWorker?.off("closing", closingListener);
           scenarioWorker?.off("closing", closingListener);
           await Promise.all([
             collectorWorker?.close(),
@@ -201,7 +198,6 @@ export const start = (
             topicClusteringWorker?.close(),
             trackEventsWorker?.close(),
             usageStatsWorker?.close(),
-            eventSourcingWorker?.close(),
             scenarioWorker?.close(),
             new Promise<void>((resolve) =>
               metricsServer.close(() => resolve()),
@@ -222,7 +218,6 @@ export const start = (
         topicClusteringWorker,
         trackEventsWorker,
         usageStatsWorker,
-        eventSourcingWorker,
         scenarioWorker,
       });
     }

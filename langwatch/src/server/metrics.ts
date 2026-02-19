@@ -1,5 +1,10 @@
 import { performance } from "node:perf_hooks";
-import { Counter, Gauge, Histogram, register } from "prom-client";
+import { Counter, Gauge, Histogram, register, collectDefaultMetrics } from "prom-client";
+
+// Enable default metrics collection (heap, stack, GC, etc.)
+if (!register.getSingleMetric("process_cpu_user_seconds_total")) {
+  collectDefaultMetrics({ register });
+}
 
 type Endpoint =
   | "collector"

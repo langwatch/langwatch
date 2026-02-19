@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { type AggregateType, EventUtils } from "../../library";
+import { type AggregateType, EventUtils } from "../../";
 import {
-  cleanupTestDataForTenant,
-  closePipelineGracefully,
-  createTestPipeline,
-  createTestTenantId,
-  generateTestAggregateId,
-  getTenantIdString,
-  waitForEventHandler,
-  waitForProjection,
+	cleanupTestDataForTenant,
+	closePipelineGracefully,
+	createTestPipeline,
+	createTestTenantId,
+	generateTestAggregateId,
+	getTenantIdString,
+	waitForEventHandler,
+	waitForProjection,
 } from "./testHelpers";
 import type { TestEvent, TestProjection } from "./testPipelines";
 

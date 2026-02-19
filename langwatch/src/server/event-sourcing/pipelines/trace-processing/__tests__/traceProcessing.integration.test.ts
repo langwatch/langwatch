@@ -1,4 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
+import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
+import type { AggregateType } from "../../../";
+import { definePipeline } from "../../../";
 import {
   getTestClickHouseClient,
   getTestRedisConnection,
@@ -8,25 +12,20 @@ import {
   createTestTenantId,
   getTenantIdString,
 } from "../../../__tests__/integration/testHelpers";
-import type { AggregateType } from "../../../library";
-import { definePipeline } from "../../../library";
-import { EventSourcing } from "../../../runtime/eventSourcing";
-import { EventSourcingRuntime } from "../../../runtime/eventSourcingRuntime";
-import type { PipelineWithCommandHandlers } from "../../../runtime/pipeline/types";
-import { BullmqQueueProcessorFactory } from "../../../runtime/queue/factory";
-import { EventStoreClickHouse } from "../../../runtime/stores/eventStoreClickHouse";
-import { EventRepositoryClickHouse } from "../../../runtime/stores/repositories/eventRepositoryClickHouse";
-import { RecordSpanCommand } from "../commands/recordSpanCommand";
+import { EventSourcing } from "../../../eventSourcing";
+import type { PipelineWithCommandHandlers } from "../../../pipeline/types";
+import { BullmqQueueProcessorFactory } from "../../../queues/factory";
+import { EventStoreClickHouse } from "../../../stores/eventStoreClickHouse";
+import { EventRepositoryClickHouse } from "../../../stores/repositories/eventRepositoryClickHouse";
 import { AssignTopicCommand } from "../commands/assignTopicCommand";
-import { traceSummaryFoldProjection } from "../projections/traceSummary.foldProjection";
+import { RecordSpanCommand } from "../commands/recordSpanCommand";
+import { createSpanStorageMapProjection } from "../projections/spanStorage.mapProjection";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
-import { spanStorageMapProjection } from "../handlers/spanStorage.mapProjection";
+import { createTraceSummaryFoldProjection } from "../projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "../schemas/events";
 import type { OtlpSpan } from "../schemas/otlp";
-
-// ============================================================================
-// Test Helpers
-// ============================================================================
+import { SpanAppendStore } from "../projections/spanStorage.store";
+import { TraceSummaryStore } from "../projections/traceSummary.store";
 
 function generateTestTraceId(): string {
   return `trace-${Date.now()}-${Math.random().toString(36).substring(7)}`;
@@ -116,26 +115,21 @@ function createTraceTestPipeline(): PipelineWithCommandHandlers<
 
   const queueProcessorFactory = new BullmqQueueProcessorFactory(redisConnection);
 
-  const runtime = EventSourcingRuntime.createWithStores(
-    {
-      enabled: true,
-      clickHouseEnabled: true,
-      forceClickHouseInTests: true,
-      isTestEnvironment: true,
-      isBuildTime: false,
-      clickHouseClient,
-      redisConnection,
-    },
-    { eventStore, queueProcessorFactory },
-  );
+  const eventSourcing = EventSourcing.createWithStores({
+    eventStore,
+    queueProcessorFactory,
+    clickhouse: clickHouseClient,
+    redis: redisConnection,
+  });
 
-  const eventSourcing = new EventSourcing(runtime);
+  const spanAppendStore = new SpanAppendStore(SpanStorageService.create(clickHouseClient).repository);
+  const traceSummaryStore = new TraceSummaryStore(TraceSummaryService.create(clickHouseClient).repository);
 
   const pipelineDefinition = definePipeline<TraceProcessingEvent>()
     .withName(pipelineName)
     .withAggregateType("trace" as AggregateType)
-    .withFoldProjection("traceSummary", traceSummaryFoldProjection as any)
-    .withMapProjection("spanStorage", spanStorageMapProjection as any)
+    .withFoldProjection("traceSummary", createTraceSummaryFoldProjection({ store: traceSummaryStore }) as any)
+    .withMapProjection("spanStorage", createSpanStorageMapProjection({ store: spanAppendStore }) as any)
     .withCommand("recordSpan", RecordSpanCommand as any)
     .withCommand("assignTopic", AssignTopicCommand as any)
     .build();
@@ -171,7 +165,7 @@ async function waitForTraceSummary(
         { tenantId },
       );
       const data = projection?.data as TraceSummaryData | undefined;
-      if (data && data.SpanCount >= expectedSpanCount) {
+      if (data && data.spanCount >= expectedSpanCount) {
         return;
       }
     } catch {
@@ -191,7 +185,7 @@ async function waitForTraceSummary(
       { tenantId },
     );
     const data = projection?.data as TraceSummaryData | undefined;
-    if (data && data.SpanCount >= expectedSpanCount) {
+    if (data && data.spanCount >= expectedSpanCount) {
       return;
     }
   } catch { /* ignore */ }
@@ -222,7 +216,7 @@ async function waitForTopicAssignment(
         { tenantId },
       );
       const data = projection?.data as TraceSummaryData | undefined;
-      if (data && data.TopicId === expectedTopicId) {
+      if (data && data.topicId === expectedTopicId) {
         return;
       }
     } catch {
@@ -242,7 +236,7 @@ async function waitForTopicAssignment(
       { tenantId },
     );
     const data = projection?.data as TraceSummaryData | undefined;
-    if (data && data.TopicId === expectedTopicId) {
+    if (data && data.topicId === expectedTopicId) {
       return;
     }
   } catch { /* ignore */ }
@@ -315,10 +309,6 @@ async function waitForClickHouseConsistency(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, CLICKHOUSE_CONSISTENCY_DELAY_MS));
 }
 
-// ============================================================================
-// Integration Tests
-// ============================================================================
-
 const hasTestcontainers = !!(
   process.env.TEST_CLICKHOUSE_URL || process.env.CI_CLICKHOUSE_URL
 );
@@ -373,11 +363,11 @@ describe.skipIf(!hasTestcontainers)(
         );
         const data = projection?.data as TraceSummaryData;
 
-        expect(data.TraceId).toBe(traceId);
-        expect(data.SpanCount).toBe(1);
-        expect(data.TotalDurationMs).toBeGreaterThan(0);
-        expect(data.ContainsOKStatus).toBe(true);
-        expect(data.ContainsErrorStatus).toBe(false);
+        expect(data.traceId).toBe(traceId);
+        expect(data.spanCount).toBe(1);
+        expect(data.totalDurationMs).toBeGreaterThan(0);
+        expect(data.containsOKStatus).toBe(true);
+        expect(data.containsErrorStatus).toBe(false);
       });
 
       it("writes the span to stored_spans via map projection", async () => {
@@ -443,8 +433,8 @@ describe.skipIf(!hasTestcontainers)(
         );
         const data = projection?.data as TraceSummaryData;
 
-        expect(data.SpanCount).toBe(2);
-        expect(data.TotalDurationMs).toBeGreaterThanOrEqual(500);
+        expect(data.spanCount).toBe(2);
+        expect(data.totalDurationMs).toBeGreaterThanOrEqual(500);
       });
     });
 
@@ -475,8 +465,8 @@ describe.skipIf(!hasTestcontainers)(
         );
         const data = projection?.data as TraceSummaryData;
 
-        expect(data.ContainsErrorStatus).toBe(true);
-        expect(data.ErrorMessage).toBe("Connection refused");
+        expect(data.containsErrorStatus).toBe(true);
+        expect(data.errorMessage).toBe("Connection refused");
       });
     });
 
@@ -510,9 +500,9 @@ describe.skipIf(!hasTestcontainers)(
         );
         const data = projection?.data as TraceSummaryData;
 
-        expect(data.TotalPromptTokenCount).toBe(150);
-        expect(data.TotalCompletionTokenCount).toBe(80);
-        expect(data.Models).toContain("gpt-4o");
+        expect(data.totalPromptTokenCount).toBe(150);
+        expect(data.totalCompletionTokenCount).toBe(80);
+        expect(data.models).toContain("gpt-4o");
       });
     });
 
@@ -556,9 +546,9 @@ describe.skipIf(!hasTestcontainers)(
         );
         const data = projection?.data as TraceSummaryData;
 
-        expect(data.TopicId).toBe(topicId);
-        expect(data.SubTopicId).toBe(subtopicId);
-        expect(data.SpanCount).toBe(1);
+        expect(data.topicId).toBe(topicId);
+        expect(data.subTopicId).toBe(subtopicId);
+        expect(data.spanCount).toBe(1);
       });
     });
 
@@ -593,9 +583,9 @@ describe.skipIf(!hasTestcontainers)(
         );
         const data = projection?.data as TraceSummaryData;
 
-        expect(data.Attributes["sdk.name"]).toBe("opentelemetry");
-        expect(data.Attributes["sdk.language"]).toBe("python");
-        expect(data.Attributes["service.name"]).toBe("my-agent");
+        expect(data.attributes["sdk.name"]).toBe("opentelemetry");
+        expect(data.attributes["sdk.language"]).toBe("python");
+        expect(data.attributes["service.name"]).toBe("my-agent");
       });
     });
   },

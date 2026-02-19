@@ -1,23 +1,26 @@
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import {
   estimateCost,
   matchingLLMModelCost,
 } from "~/server/background/workers/collector/cost";
+import type {
+  FoldProjectionDefinition,
+  FoldProjectionStore,
+} from "~/server/event-sourcing/projections";
 import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
-import type { Projection } from "../../../library";
-import type { FoldProjectionDefinition } from "../../../library/projections/foldProjection.types";
-import { ATTR_KEYS } from "../canonicalisation/extractors/_constants";
-import { TRACE_PROCESSING_EVENT_TYPES, TRACE_SUMMARY_PROJECTION_VERSION_LATEST } from "../schemas/constants";
+import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
+import {
+  TRACE_PROCESSING_EVENT_TYPES,
+  TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
+} from "../schemas/constants";
 import type { TraceProcessingEvent } from "../schemas/events";
 import { isSpanReceivedEvent, isTopicAssignedEvent } from "../schemas/events";
 import type { NormalizedSpan } from "../schemas/spans";
 import { NormalizedStatusCode as StatusCode } from "../schemas/spans";
-import { SpanNormalizationPipelineService } from "../services";
-import { traceIOExtractionService } from "../services/traceIOExtractionService";
-import { traceSummaryFoldStore } from "../repositories/traceSummaryFoldStore";
+import { SpanNormalizationPipelineService } from "~/server/app-layer/traces/span-normalization.service";
+import { traceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 
-// ============================================================================
-// Constants
-// ============================================================================
+export type { TraceSummaryData };
 
 const COMPUTED_IO_SCHEMA_VERSION = "2025-12-18" as const;
 
@@ -47,57 +50,6 @@ const STANDARD_RESOURCE_PREFIXES = [
   "faas.",
   "webengine.",
 ] as const;
-
-// ============================================================================
-// Types
-// ============================================================================
-
-/**
- * Summary data for trace metrics.
- * Matches the trace_summaries ClickHouse table schema exactly.
- *
- * This is both the fold state and the stored data — one type, not two.
- * `apply()` does all computation per-span. Store is a dumb read/write layer.
- */
-export interface TraceSummaryData {
-  TraceId: string;
-  SpanCount: number;
-  TotalDurationMs: number;
-  ComputedIOSchemaVersion: string;
-  ComputedInput: string | null;
-  ComputedOutput: string | null;
-  TimeToFirstTokenMs: number | null;
-  TimeToLastTokenMs: number | null;
-  TokensPerSecond: number | null;
-  ContainsErrorStatus: boolean;
-  ContainsOKStatus: boolean;
-  ErrorMessage: string | null;
-  Models: string[];
-  TotalCost: number | null;
-  TokensEstimated: boolean;
-  TotalPromptTokenCount: number | null;
-  TotalCompletionTokenCount: number | null;
-  OutputFromRootSpan: boolean;
-  OutputSpanEndTimeMs: number;
-  TopicId: string | null;
-  SubTopicId: string | null;
-  HasAnnotation: boolean | null;
-  Attributes: Record<string, string>;
-  OccurredAt: number;
-  CreatedAt: number;
-  LastUpdatedAt: number;
-}
-
-/**
- * Summary projection for trace metrics.
- */
-export interface TraceSummary extends Projection<TraceSummaryData> {
-  data: TraceSummaryData;
-}
-
-// ============================================================================
-// Per-span helper functions
-// ============================================================================
 
 const isValidTimestamp = (ts: number | undefined | null): ts is number =>
   typeof ts === "number" && ts > 0 && Number.isFinite(ts);
@@ -148,7 +100,10 @@ function extractTokenMetricsFromSpan(span: NormalizedSpan): SpanTokenMetrics {
   const genAiCompletionTokens = attrs[ATTR_KEYS.GEN_AI_USAGE_COMPLETION_TOKENS];
   if (typeof outputTokens === "number" && outputTokens > 0) {
     completionTokens = outputTokens;
-  } else if (typeof genAiCompletionTokens === "number" && genAiCompletionTokens > 0) {
+  } else if (
+    typeof genAiCompletionTokens === "number" &&
+    genAiCompletionTokens > 0
+  ) {
     completionTokens = genAiCompletionTokens;
   }
 
@@ -158,7 +113,8 @@ function extractTokenMetricsFromSpan(span: NormalizedSpan): SpanTokenMetrics {
   if (model && (promptTokens > 0 || completionTokens > 0)) {
     // Check span for custom cost rates (set by enrichment service)
     const rawInputRate = attrs[ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN];
-    const rawOutputRate = attrs[ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN];
+    const rawOutputRate =
+      attrs[ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN];
     const hasCustomRates =
       typeof rawInputRate === "number" || typeof rawOutputRate === "number";
 
@@ -227,8 +183,7 @@ function extractStatusFromSpan(span: NormalizedSpan): SpanStatusInfo {
 
   if (!hasError) {
     const hasErrorAttr =
-      attrs[ATTR_KEYS.ERROR_HAS_ERROR] ??
-      attrs[ATTR_KEYS.SPAN_ERROR_HAS_ERROR];
+      attrs[ATTR_KEYS.ERROR_HAS_ERROR] ?? attrs[ATTR_KEYS.SPAN_ERROR_HAS_ERROR];
     if (hasErrorAttr === true || hasErrorAttr === "true") {
       hasError = true;
     }
@@ -280,7 +235,9 @@ function extractTokenTimingFromSpan(span: NormalizedSpan): SpanTokenTiming {
   return { timeToFirstToken, timeToLastToken };
 }
 
-function extractAttributesFromSpan(span: NormalizedSpan): Record<string, string> {
+function extractAttributesFromSpan(
+  span: NormalizedSpan,
+): Record<string, string> {
   const attributes: Record<string, string> = {};
   const spanAttrs = span.spanAttributes;
   const resourceAttrs = span.resourceAttributes;
@@ -324,13 +281,16 @@ function extractAttributesFromSpan(span: NormalizedSpan): Record<string, string>
     spanAttrs[ATTR_KEYS.LANGWATCH_CUSTOMER_ID_LEGACY] ??
     spanAttrs[ATTR_KEYS.LANGWATCH_CUSTOMER_ID_LEGACY_ROOT];
 
-  if (typeof threadId === "string") attributes["gen_ai.conversation.id"] = threadId;
+  if (typeof threadId === "string")
+    attributes["gen_ai.conversation.id"] = threadId;
   if (typeof userId === "string") attributes["langwatch.user_id"] = userId;
-  if (typeof customerId === "string") attributes["langwatch.customer_id"] = customerId;
+  if (typeof customerId === "string")
+    attributes["langwatch.customer_id"] = customerId;
 
   // LangGraph metadata
   const langgraphThreadId = spanAttrs[ATTR_KEYS.LANGWATCH_LANGGRAPH_THREAD_ID];
-  if (typeof langgraphThreadId === "string") attributes["langgraph.thread_id"] = langgraphThreadId;
+  if (typeof langgraphThreadId === "string")
+    attributes["langgraph.thread_id"] = langgraphThreadId;
 
   // Labels
   const labels = spanAttrs[ATTR_KEYS.LANGWATCH_LABELS];
@@ -348,7 +308,10 @@ function extractAttributesFromSpan(span: NormalizedSpan): Record<string, string>
       const parsed = JSON.parse(metadataJson) as unknown;
       if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
         const parsedObj = parsed as Record<string, unknown>;
-        if (Array.isArray(parsedObj.labels) && !attributes["langwatch.labels"]) {
+        if (
+          Array.isArray(parsedObj.labels) &&
+          !attributes["langwatch.labels"]
+        ) {
           attributes["langwatch.labels"] = JSON.stringify(parsedObj.labels);
         }
         for (const [key, value] of Object.entries(parsedObj)) {
@@ -367,19 +330,23 @@ function extractAttributesFromSpan(span: NormalizedSpan): Record<string, string>
   return attributes;
 }
 
-// ============================================================================
-// Incremental apply
-// ============================================================================
-
 /** @internal Exported for unit testing */
-export function applySpanToSummary(state: TraceSummaryData, span: NormalizedSpan): TraceSummaryData {
-  const hasValidTimestamps = isValidTimestamp(span.startTimeUnixMs) && isValidTimestamp(span.endTimeUnixMs);
+export function applySpanToSummary(
+  state: TraceSummaryData,
+  span: NormalizedSpan,
+): TraceSummaryData {
+  const hasValidTimestamps =
+    isValidTimestamp(span.startTimeUnixMs) &&
+    isValidTimestamp(span.endTimeUnixMs);
 
   // Timing
-  let occurredAt = state.OccurredAt;
-  let totalDurationMs = state.TotalDurationMs;
+  let occurredAt = state.occurredAt;
+  let totalDurationMs = state.totalDurationMs;
   if (hasValidTimestamps) {
-    const newStart = occurredAt > 0 ? Math.min(occurredAt, span.startTimeUnixMs) : span.startTimeUnixMs;
+    const newStart =
+      occurredAt > 0
+        ? Math.min(occurredAt, span.startTimeUnixMs)
+        : span.startTimeUnixMs;
     const currentEnd = occurredAt > 0 ? occurredAt + totalDurationMs : 0;
     const newEnd = Math.max(currentEnd, span.endTimeUnixMs);
     occurredAt = newStart;
@@ -388,7 +355,7 @@ export function applySpanToSummary(state: TraceSummaryData, span: NormalizedSpan
 
   // Models
   const newModels = extractModelsFromSpan(span);
-  let models = state.Models;
+  let models = state.models;
   if (newModels.length > 0) {
     const modelSet = new Set(models);
     for (const m of newModels) modelSet.add(m);
@@ -397,36 +364,43 @@ export function applySpanToSummary(state: TraceSummaryData, span: NormalizedSpan
 
   // Token metrics
   const tokenMetrics = extractTokenMetricsFromSpan(span);
-  const totalPromptTokenCount = (state.TotalPromptTokenCount ?? 0) + tokenMetrics.promptTokens;
-  const totalCompletionTokenCount = (state.TotalCompletionTokenCount ?? 0) + tokenMetrics.completionTokens;
-  const totalCost = (state.TotalCost ?? 0) + tokenMetrics.cost;
-  const tokensEstimated = state.TokensEstimated || tokenMetrics.estimated;
+  const totalPromptTokenCount =
+    (state.totalPromptTokenCount ?? 0) + tokenMetrics.promptTokens;
+  const totalCompletionTokenCount =
+    (state.totalCompletionTokenCount ?? 0) + tokenMetrics.completionTokens;
+  const totalCost = (state.totalCost ?? 0) + tokenMetrics.cost;
+  const tokensEstimated = state.tokensEstimated || tokenMetrics.estimated;
 
   // Status
   const statusInfo = extractStatusFromSpan(span);
-  const containsErrorStatus = state.ContainsErrorStatus || statusInfo.hasError;
-  const containsOKStatus = state.ContainsOKStatus || statusInfo.hasOK;
-  const errorMessage = state.ErrorMessage ?? statusInfo.errorMessage;
+  const containsErrorStatus = state.containsErrorStatus || statusInfo.hasError;
+  const containsOKStatus = state.containsOKStatus || statusInfo.hasOK;
+  const errorMessage = state.errorMessage ?? statusInfo.errorMessage;
 
   // Token timing
   const tokenTiming = extractTokenTimingFromSpan(span);
-  let timeToFirstTokenMs = state.TimeToFirstTokenMs;
+  let timeToFirstTokenMs = state.timeToFirstTokenMs;
   if (tokenTiming.timeToFirstToken !== null) {
-    timeToFirstTokenMs = timeToFirstTokenMs === null
-      ? tokenTiming.timeToFirstToken
-      : Math.min(timeToFirstTokenMs, tokenTiming.timeToFirstToken);
+    timeToFirstTokenMs =
+      timeToFirstTokenMs === null
+        ? tokenTiming.timeToFirstToken
+        : Math.min(timeToFirstTokenMs, tokenTiming.timeToFirstToken);
   }
-  let timeToLastTokenMs = state.TimeToLastTokenMs;
+  let timeToLastTokenMs = state.timeToLastTokenMs;
   if (tokenTiming.timeToLastToken !== null) {
-    timeToLastTokenMs = timeToLastTokenMs === null
-      ? tokenTiming.timeToLastToken
-      : Math.max(timeToLastTokenMs, tokenTiming.timeToLastToken);
+    timeToLastTokenMs =
+      timeToLastTokenMs === null
+        ? tokenTiming.timeToLastToken
+        : Math.max(timeToLastTokenMs, tokenTiming.timeToLastToken);
   }
 
   // Tokens per second
-  const finalCompletionCount = totalCompletionTokenCount > 0 ? totalCompletionTokenCount : null;
+  const finalCompletionCount =
+    totalCompletionTokenCount > 0 ? totalCompletionTokenCount : null;
   const tokensPerSecond =
-    finalCompletionCount !== null && finalCompletionCount > 0 && totalDurationMs > 0
+    finalCompletionCount !== null &&
+    finalCompletionCount > 0 &&
+    totalDurationMs > 0
       ? Math.round((finalCompletionCount / totalDurationMs) * 1000)
       : null;
 
@@ -435,13 +409,16 @@ export function applySpanToSummary(state: TraceSummaryData, span: NormalizedSpan
   const spanType = span.spanAttributes[ATTR_KEYS.SPAN_TYPE];
   const isExcludedType = spanType === "evaluation" || spanType === "guardrail";
 
-  let computedInput = state.ComputedInput;
-  let computedOutput = state.ComputedOutput;
-  let outputFromRoot = state.OutputFromRootSpan;
-  let outputSpanEndTimeMs = state.OutputSpanEndTimeMs;
+  let computedInput = state.computedInput;
+  let computedOutput = state.computedOutput;
+  let outputFromRoot = state.outputFromRootSpan;
+  let outputSpanEndTimeMs = state.outputSpanEndTimeMs;
 
   if (!isExcludedType) {
-    const inputResult = traceIOExtractionService.extractRichIOFromSpan(span, "input");
+    const inputResult = traceIOExtractionService.extractRichIOFromSpan(
+      span,
+      "input",
+    );
     if (inputResult) {
       const isRootSpan = !span.parentSpanId;
       // Root span input always overrides; otherwise set once from first span with input
@@ -451,7 +428,10 @@ export function applySpanToSummary(state: TraceSummaryData, span: NormalizedSpan
       }
     }
 
-    const outputResult = traceIOExtractionService.extractRichIOFromSpan(span, "output");
+    const outputResult = traceIOExtractionService.extractRichIOFromSpan(
+      span,
+      "output",
+    );
     if (outputResult) {
       const isRootSpan = !span.parentSpanId;
       // Root always wins; among non-root, last-finishing wins (matches batch logic)
@@ -470,119 +450,120 @@ export function applySpanToSummary(state: TraceSummaryData, span: NormalizedSpan
 
   // Attributes (first-wins per key)
   const spanAttributes = extractAttributesFromSpan(span);
-  const mergedAttributes = { ...spanAttributes, ...state.Attributes };
+  const mergedAttributes = { ...spanAttributes, ...state.attributes };
 
   return {
     ...state,
-    TraceId: state.TraceId || span.traceId,
-    SpanCount: state.SpanCount + 1,
-    OccurredAt: occurredAt,
-    TotalDurationMs: totalDurationMs,
-    ComputedIOSchemaVersion: COMPUTED_IO_SCHEMA_VERSION,
-    ComputedInput: computedInput,
-    ComputedOutput: computedOutput,
-    OutputFromRootSpan: outputFromRoot,
-    OutputSpanEndTimeMs: outputSpanEndTimeMs,
-    Models: models,
-    TotalPromptTokenCount: totalPromptTokenCount > 0 ? totalPromptTokenCount : null,
-    TotalCompletionTokenCount: totalCompletionTokenCount > 0 ? totalCompletionTokenCount : null,
-    TotalCost: totalCost > 0 ? Number(totalCost.toFixed(6)) : null,
-    TokensEstimated: tokensEstimated,
-    ContainsErrorStatus: containsErrorStatus,
-    ContainsOKStatus: containsOKStatus,
-    ErrorMessage: errorMessage,
-    TimeToFirstTokenMs: timeToFirstTokenMs,
-    TimeToLastTokenMs: timeToLastTokenMs,
-    TokensPerSecond: tokensPerSecond,
-    Attributes: mergedAttributes,
+    traceId: state.traceId || span.traceId,
+    spanCount: state.spanCount + 1,
+    occurredAt: occurredAt,
+    totalDurationMs: totalDurationMs,
+    computedIOSchemaVersion: COMPUTED_IO_SCHEMA_VERSION,
+    computedInput: computedInput,
+    computedOutput: computedOutput,
+    outputFromRootSpan: outputFromRoot,
+    outputSpanEndTimeMs: outputSpanEndTimeMs,
+    models: models,
+    totalPromptTokenCount:
+      totalPromptTokenCount > 0 ? totalPromptTokenCount : null,
+    totalCompletionTokenCount:
+      totalCompletionTokenCount > 0 ? totalCompletionTokenCount : null,
+    totalCost: totalCost > 0 ? Number(totalCost.toFixed(6)) : null,
+    tokensEstimated: tokensEstimated,
+    containsErrorStatus: containsErrorStatus,
+    containsOKStatus: containsOKStatus,
+    errorMessage: errorMessage,
+    timeToFirstTokenMs: timeToFirstTokenMs,
+    timeToLastTokenMs: timeToLastTokenMs,
+    tokensPerSecond: tokensPerSecond,
+    attributes: mergedAttributes,
   };
 }
-
-// ============================================================================
-// Fold Projection Definition
-// ============================================================================
 
 const spanNormalizationPipelineService = new SpanNormalizationPipelineService();
 
 /**
- * FoldProjection definition for trace summaries.
+ * Creates a FoldProjection definition for trace summaries.
  *
  * Fold state = stored data. Each SpanReceivedEvent is normalized and then
  * incrementally applied to the summary. No batch aggregation — `apply()`
  * does all computation per-span.
  */
-export const traceSummaryFoldProjection: FoldProjectionDefinition<
-  TraceSummaryData,
-  TraceProcessingEvent
-> = {
-  name: "traceSummary",
-  version: TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
-  eventTypes: TRACE_PROCESSING_EVENT_TYPES,
+export function createTraceSummaryFoldProjection({
+  store,
+}: {
+  store: FoldProjectionStore<TraceSummaryData>;
+}): FoldProjectionDefinition<TraceSummaryData, TraceProcessingEvent> {
+  return {
+    name: "traceSummary",
+    version: TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
+    eventTypes: TRACE_PROCESSING_EVENT_TYPES,
 
-  init(): TraceSummaryData {
-    return {
-      TraceId: "",
-      SpanCount: 0,
-      TotalDurationMs: 0,
-      ComputedIOSchemaVersion: COMPUTED_IO_SCHEMA_VERSION,
-      ComputedInput: null,
-      ComputedOutput: null,
-      TimeToFirstTokenMs: null,
-      TimeToLastTokenMs: null,
-      TokensPerSecond: null,
-      ContainsErrorStatus: false,
-      ContainsOKStatus: false,
-      ErrorMessage: null,
-      Models: [],
-      TotalCost: null,
-      TokensEstimated: false,
-      TotalPromptTokenCount: null,
-      TotalCompletionTokenCount: null,
-      OutputFromRootSpan: false,
-      OutputSpanEndTimeMs: 0,
-      TopicId: null,
-      SubTopicId: null,
-      HasAnnotation: null,
-      Attributes: {},
-      OccurredAt: 0,
-      CreatedAt: 0,
-      LastUpdatedAt: 0,
-    };
-  },
-
-  apply(
-    state: TraceSummaryData,
-    event: TraceProcessingEvent,
-  ): TraceSummaryData {
-    if (isSpanReceivedEvent(event)) {
-      const normalizedSpan =
-        spanNormalizationPipelineService.normalizeSpanReceived(
-          event.tenantId,
-          event.data.span,
-          event.data.resource,
-          event.data.instrumentationScope,
-        );
-
-      const updatedState = applySpanToSummary(state, normalizedSpan);
-
+    init(): TraceSummaryData {
       return {
-        ...updatedState,
-        CreatedAt: state.CreatedAt || event.timestamp,
-        LastUpdatedAt: event.timestamp,
+        traceId: "",
+        spanCount: 0,
+        totalDurationMs: 0,
+        computedIOSchemaVersion: COMPUTED_IO_SCHEMA_VERSION,
+        computedInput: null,
+        computedOutput: null,
+        timeToFirstTokenMs: null,
+        timeToLastTokenMs: null,
+        tokensPerSecond: null,
+        containsErrorStatus: false,
+        containsOKStatus: false,
+        errorMessage: null,
+        models: [],
+        totalCost: null,
+        tokensEstimated: false,
+        totalPromptTokenCount: null,
+        totalCompletionTokenCount: null,
+        outputFromRootSpan: false,
+        outputSpanEndTimeMs: 0,
+        topicId: null,
+        subTopicId: null,
+        hasAnnotation: null,
+        attributes: {},
+        occurredAt: 0,
+        createdAt: 0,
+        lastUpdatedAt: 0,
       };
-    }
+    },
 
-    if (isTopicAssignedEvent(event)) {
-      return {
-        ...state,
-        TopicId: event.data.topicId ?? state.TopicId,
-        SubTopicId: event.data.subtopicId ?? state.SubTopicId,
-        LastUpdatedAt: event.timestamp,
-      };
-    }
+    apply(
+      state: TraceSummaryData,
+      event: TraceProcessingEvent,
+    ): TraceSummaryData {
+      if (isSpanReceivedEvent(event)) {
+        const normalizedSpan =
+          spanNormalizationPipelineService.normalizeSpanReceived(
+            event.tenantId,
+            event.data.span,
+            event.data.resource,
+            event.data.instrumentationScope,
+          );
 
-    return state;
-  },
+        const updatedState = applySpanToSummary(state, normalizedSpan);
 
-  store: traceSummaryFoldStore,
-};
+        return {
+          ...updatedState,
+          createdAt: state.createdAt || event.timestamp,
+          lastUpdatedAt: event.timestamp,
+        };
+      }
+
+      if (isTopicAssignedEvent(event)) {
+        return {
+          ...state,
+          topicId: event.data.topicId ?? state.topicId,
+          subTopicId: event.data.subtopicId ?? state.subTopicId,
+          lastUpdatedAt: event.timestamp,
+        };
+      }
+
+      return state;
+    },
+
+    store,
+  };
+}

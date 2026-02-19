@@ -2,7 +2,8 @@ import type { PrismaClient } from "@prisma/client";
 import { env } from "../../env.mjs";
 import { createLogger } from "../../utils/logger/server";
 import { sendUsageLimitEmail } from "../mailer/usageLimitEmail";
-import { TraceUsageService } from "../traces/trace-usage.service";
+import { getApp } from "../app-layer/app";
+import type { UsageService } from "../app-layer/usage/usage.service";
 import { getCurrentMonthStart } from "../utils/dateUtils";
 import { NotificationRepository } from "./repositories/notification.repository";
 import { NOTIFICATION_TYPES } from "./types";
@@ -25,15 +26,14 @@ export interface UsageLimitData {
  */
 export class UsageLimitService {
   private readonly notificationRepository: NotificationRepository;
-  private readonly traceUsageService: TraceUsageService;
+  private readonly usageService: UsageService;
 
   constructor(
     private readonly prisma: PrismaClient,
-    traceUsageService?: TraceUsageService,
+    usageService?: UsageService,
   ) {
     this.notificationRepository = new NotificationRepository(prisma);
-    this.traceUsageService =
-      traceUsageService ?? TraceUsageService.create(prisma);
+    this.usageService = usageService ?? getApp().usage;
   }
 
   /**
@@ -152,9 +152,9 @@ export class UsageLimitService {
       },
     });
 
-    // Get message counts per project via TraceUsageService
+    // Get message counts per project via UsageService
     const projectIds = projects.map((p) => p.id);
-    const counts = await this.traceUsageService.getCountByProjects({
+    const counts = await this.usageService.getCountByProjects({
       organizationId,
       projectIds,
     });

@@ -107,15 +107,15 @@ export default async function handler(
 
   let traces: unknown[];
   if (format === "digest") {
-    traces = rawTraces.map((trace) => ({
+    traces = await Promise.all(rawTraces.map(async (trace) => ({
       trace_id: trace.trace_id,
-      formatted_trace: formatSpansDigest(trace.spans ?? []),
+      formatted_trace: await formatSpansDigest(trace.spans ?? []),
       input: trace.input,
       output: trace.output,
       timestamps: trace.timestamps,
       metadata: trace.metadata,
       error: trace.error,
-    }));
+    })));
   } else if (params.llmMode) {
     // Legacy llmMode behavior (kept for backward compat, but format=digest is preferred)
     traces = (rawTraces as Trace[]).map((trace) => ({

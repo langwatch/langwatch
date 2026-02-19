@@ -6,30 +6,22 @@ import {
   defineCommandSchema,
   type EventType,
   EventUtils,
-} from "../../library";
-import type { Command, CommandHandler } from "../../library/commands/command";
-import type { TenantId } from "../../library/domain/tenantId";
-import type { Projection } from "../../library/domain/types";
-import type { FoldProjectionDefinition, FoldProjectionStore } from "../../library/projections/foldProjection.types";
-import type { AppendStore, MapProjectionDefinition } from "../../library/projections/mapProjection.types";
-import type { ProjectionStoreContext } from "../../library/projections/projectionStoreContext";
+} from "../../";
+import type { Command, CommandHandler } from "../../commands/command";
+import type { TenantId } from "../../domain/tenantId";
+import type { Projection } from "../../domain/types";
+import type { FoldProjectionDefinition, FoldProjectionStore } from "../../projections/foldProjection.types";
+import type { AppendStore, MapProjectionDefinition } from "../../projections/mapProjection.types";
+import type { ProjectionStoreContext } from "../../projections/projectionStoreContext";
 import { getTestClickHouseClient } from "./testContainers";
 
 const logger = createLogger(
   "langwatch:event-sourcing:tests:integration:test-pipelines",
 );
 
-// ============================================================================
-// Type Identifiers
-// ============================================================================
-
 // Test event type - now included in production schemas for validation
 export const TEST_EVENT_TYPE = "test.integration.event" as const;
 export const TEST_COMMAND_TYPE = "test.integration.command" as const;
-
-// ============================================================================
-// Schemas
-// ============================================================================
 
 export const testCommandPayloadSchema = z.object({
   tenantId: z.string(),
@@ -69,10 +61,6 @@ export interface TestProjection extends Projection<TestProjectionData> {
   data: TestProjectionData;
 }
 
-// ============================================================================
-// Command Handler
-// ============================================================================
-
 export class TestCommandHandler implements CommandHandler<
   Command<TestCommandPayload>,
   any
@@ -104,10 +92,6 @@ export class TestCommandHandler implements CommandHandler<
     return payload.aggregateId;
   }
 }
-
-// ============================================================================
-// Map Projection (replaces TestEventHandler)
-// ============================================================================
 
 /**
  * Record produced by the test map projection for storage in ClickHouse.
@@ -184,10 +168,6 @@ export const testMapProjection: MapProjectionDefinition<TestEventHandlerRecord, 
   },
   store: new TestEventHandlerAppendStore(),
 };
-
-// ============================================================================
-// Fold Projection (replaces TestProjectionHandler)
-// ============================================================================
 
 /**
  * In-memory fold projection store for tests.

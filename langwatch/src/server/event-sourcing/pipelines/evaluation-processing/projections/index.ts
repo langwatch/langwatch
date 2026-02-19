@@ -1,5 +1,6 @@
 export type {
-  EvaluationState,
-  EvaluationStateData,
-} from "./evaluationState.foldProjection";
-export { evaluationStateFoldProjection } from "./evaluationState.foldProjection";
+  EvaluationRun,
+  EvaluationRunData,
+} from "./evaluationRun.foldProjection";
+export { createEvaluationRunFoldProjection } from "./evaluationRun.foldProjection";
+export { EvaluationRunStore } from "./evaluationRun.store";
