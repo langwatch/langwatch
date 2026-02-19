@@ -18,7 +18,11 @@ interface PollForRunParams {
   batchRunId: string;
 }
 
-type FetchBatchRunData = (params: PollForRunParams) => Promise<ScenarioRun[]>;
+type BatchRunDataResult =
+  | { changed: false }
+  | { changed: true; runs: ScenarioRun[] };
+
+type FetchBatchRunData = (params: PollForRunParams) => Promise<BatchRunDataResult>;
 
 describe("pollForScenarioRun", () => {
   const baseParams = {
@@ -40,13 +44,10 @@ describe("pollForScenarioRun", () => {
 
   it("returns success when RUN_STARTED exists with IN_PROGRESS status", async () => {
     // Given: a scenario run exists with IN_PROGRESS status and no messages
-    fetchBatchRunData.mockResolvedValue([
-      {
-        scenarioRunId: "run_123",
-        status: "IN_PROGRESS",
-        messages: [],
-      },
-    ]);
+    fetchBatchRunData.mockResolvedValue({
+      changed: true,
+      runs: [{ scenarioRunId: "run_123", status: "IN_PROGRESS", messages: [] }],
+    });
 
     // When: pollForScenarioRun fetches the batch run data
     const resultPromise = pollForScenarioRun(fetchBatchRunData, baseParams);
@@ -67,13 +68,10 @@ describe("pollForScenarioRun", () => {
 
   it("returns error when run has ERROR status", async () => {
     // Given: a scenario run exists with ERROR status
-    fetchBatchRunData.mockResolvedValue([
-      {
-        scenarioRunId: "run_123",
-        status: "ERROR",
-        messages: [],
-      },
-    ]);
+    fetchBatchRunData.mockResolvedValue({
+      changed: true,
+      runs: [{ scenarioRunId: "run_123", status: "ERROR", messages: [] }],
+    });
 
     // When: pollForScenarioRun fetches the batch run data
     const resultPromise = pollForScenarioRun(fetchBatchRunData, baseParams);
@@ -91,13 +89,10 @@ describe("pollForScenarioRun", () => {
 
   it("returns error when run has FAILED status", async () => {
     // Given: a scenario run exists with FAILED status
-    fetchBatchRunData.mockResolvedValue([
-      {
-        scenarioRunId: "run_123",
-        status: "FAILED",
-        messages: [],
-      },
-    ]);
+    fetchBatchRunData.mockResolvedValue({
+      changed: true,
+      runs: [{ scenarioRunId: "run_123", status: "FAILED", messages: [] }],
+    });
 
     // When: pollForScenarioRun fetches the batch run data
     const resultPromise = pollForScenarioRun(fetchBatchRunData, baseParams);
@@ -115,7 +110,7 @@ describe("pollForScenarioRun", () => {
 
   it("continues polling when no runs exist yet and times out", async () => {
     // Given: no scenario runs exist for the batchRunId
-    fetchBatchRunData.mockResolvedValue([]);
+    fetchBatchRunData.mockResolvedValue({ changed: true, runs: [] });
 
     // When: pollForScenarioRun is called
     const resultPromise = pollForScenarioRun(fetchBatchRunData, baseParams);
@@ -137,13 +132,10 @@ describe("pollForScenarioRun", () => {
 
   it("returns success when run exists with SUCCESS status", async () => {
     // Given: a completed run with SUCCESS status
-    fetchBatchRunData.mockResolvedValue([
-      {
-        scenarioRunId: "run_123",
-        status: "SUCCESS",
-        messages: [],
-      },
-    ]);
+    fetchBatchRunData.mockResolvedValue({
+      changed: true,
+      runs: [{ scenarioRunId: "run_123", status: "SUCCESS", messages: [] }],
+    });
 
     // When: pollForScenarioRun fetches the batch run data
     const resultPromise = pollForScenarioRun(fetchBatchRunData, baseParams);
@@ -159,13 +151,16 @@ describe("pollForScenarioRun", () => {
 
   it("returns success when run has messages even without terminal status", async () => {
     // Given: a run with messages but still IN_PROGRESS
-    fetchBatchRunData.mockResolvedValue([
-      {
-        scenarioRunId: "run_123",
-        status: "IN_PROGRESS",
-        messages: [{ role: "user", content: "Hello" }],
-      },
-    ]);
+    fetchBatchRunData.mockResolvedValue({
+      changed: true,
+      runs: [
+        {
+          scenarioRunId: "run_123",
+          status: "IN_PROGRESS",
+          messages: [{ role: "user", content: "Hello" }],
+        },
+      ],
+    });
 
     // When: pollForScenarioRun fetches the batch run data
     const resultPromise = pollForScenarioRun(fetchBatchRunData, baseParams);
