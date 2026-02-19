@@ -21,7 +21,11 @@ interface ScenarioRun {
   messages?: unknown[];
 }
 
-type FetchBatchRunData = (params: PollForRunParams) => Promise<ScenarioRun[]>;
+type BatchRunDataResult =
+  | { changed: false }
+  | { changed: true; runs: ScenarioRun[] };
+
+type FetchBatchRunData = (params: PollForRunParams) => Promise<BatchRunDataResult>;
 
 export type PollResult =
   | { success: true; scenarioRunId: string }
@@ -54,7 +58,8 @@ export async function pollForScenarioRun(
   for (let attempt = 0; attempt < MAX_POLLING_ATTEMPTS; attempt++) {
     try {
       logger.info({ attempt }, "Fetching batch run data");
-      const runs = await fetchBatchRunData(params);
+      const batchResult = await fetchBatchRunData(params);
+      const runs = batchResult.changed ? batchResult.runs : [];
       logger.info({ attempt, runsCount: runs.length }, "Fetch completed");
 
       if (attempt % 10 === 0) {
