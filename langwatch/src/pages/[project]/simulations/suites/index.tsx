@@ -10,6 +10,7 @@ import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { SimulationSuite } from "@prisma/client";
 import { useCallback, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { AllRunsPanel } from "~/components/suites/AllRunsPanel";
 import { SuiteContextMenu } from "~/components/suites/SuiteContextMenu";
 import {
@@ -193,7 +194,10 @@ function SuitesPageContent() {
 
   return (
     <DashboardLayout>
-      <HStack w="full" h="full" alignItems="stretch" gap={0}>
+      <PageLayout.Header>
+        <PageLayout.Heading>Suites</PageLayout.Heading>
+      </PageLayout.Header>
+      <HStack w="full" flex={1} alignItems="stretch" gap={0} overflow="hidden">
         {/* Sidebar */}
         {isLoading ? (
           <VStack width="280px" minWidth="280px" justify="center" align="center">

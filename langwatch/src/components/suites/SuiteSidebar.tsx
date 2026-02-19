@@ -52,17 +52,6 @@ export function SuiteSidebar({
       gap={0}
     >
       <Box paddingX={3} paddingTop={3} paddingBottom={2}>
-        <Text
-          fontSize="xs"
-          fontWeight="semibold"
-          textTransform="uppercase"
-          color="fg.muted"
-        >
-          Suites
-        </Text>
-      </Box>
-
-      <Box paddingX={3} paddingBottom={2}>
         <Input
           size="sm"
           placeholder="Search..."
