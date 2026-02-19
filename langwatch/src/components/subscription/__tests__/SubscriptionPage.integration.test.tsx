@@ -1658,4 +1658,107 @@ describe("<SubscriptionPage/>", () => {
       });
     });
   });
+
+  // ============================================================================
+  // Billing Seat Count Consistency
+  // ============================================================================
+
+  describe("when verifying billing seat count consistency", () => {
+    describe("when on Free plan with fewer active users than maxSeats", () => {
+      beforeEach(() => {
+        // 1 active member, maxMembers=2
+        mockGetOrganizationWithMembers.mockReturnValue({
+          data: {
+            ...mockOrganizationMembers,
+            members: [mockOrganizationMembers.members[0]!],
+          },
+          isLoading: false,
+          refetch: vi.fn(),
+        });
+        mockGetActivePlan.mockReturnValue({
+          data: createMockPlan({ maxMembers: 2 }),
+          isLoading: false,
+          refetch: vi.fn(),
+        });
+      });
+
+      it("shows upgrade block based on active members only", async () => {
+        renderSubscriptionPage();
+
+        await waitFor(() => {
+          const total = screen.getByTestId("upgrade-total");
+          expect(total).toHaveTextContent("1 Full Member");
+          expect(total).toHaveTextContent("€29/mo");
+        });
+      });
+
+      it("shows 2 Full Members after adding a manual seat in drawer", async () => {
+        const user = userEvent.setup();
+        renderSubscriptionPage();
+
+        await user.click(screen.getByTestId("user-count-link"));
+        await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+        await user.click(screen.getByRole("button", { name: /Done/i }));
+
+        await waitFor(() => {
+          const total = screen.getByTestId("upgrade-total");
+          expect(total).toHaveTextContent("2 Full Members");
+          expect(total).toHaveTextContent("€58/mo");
+        });
+      });
+    });
+
+    describe("when on Free plan at capacity (2/2 members)", () => {
+      it("shows upgrade block matching active member count", async () => {
+        renderSubscriptionPage();
+
+        await waitFor(() => {
+          const total = screen.getByTestId("upgrade-total");
+          expect(total).toHaveTextContent("2 Full Members");
+          expect(total).toHaveTextContent("€58/mo");
+        });
+      });
+    });
+
+    describe("when on paid plan with pending invites (no double-counting)", () => {
+      beforeEach(() => {
+        mockGetActivePlan.mockReturnValue({
+          data: createMockPlan({
+            type: "GROWTH",
+            name: "Growth",
+            free: false,
+            maxMembers: 6,
+          }),
+          isLoading: false,
+          refetch: vi.fn(),
+        });
+        // 2 pending core invites (already counted in maxMembers)
+        mockGetPendingInvites.mockReturnValue({
+          data: [
+            { id: "inv-1", email: "inv1@example.com", role: "MEMBER", status: "PENDING" },
+            { id: "inv-2", email: "inv2@example.com", role: "ADMIN", status: "PENDING" },
+          ],
+          isLoading: false,
+        });
+      });
+
+      it("shows correct seat count without double-counting pending invites", async () => {
+        const user = userEvent.setup();
+        renderSubscriptionPage();
+
+        // Add 1 manual seat
+        await user.click(screen.getByTestId("user-count-link"));
+        await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+        await user.click(screen.getByRole("button", { name: /Done/i }));
+
+        await waitFor(() => {
+          expect(screen.getByTestId("update-seats-block")).toBeInTheDocument();
+        });
+
+        // maxMembers(6) + 1 new manual seat = 7, NOT 6 + 3 (which double-counts pending invites)
+        const updateBlock = screen.getByTestId("update-seats-block");
+        expect(within(updateBlock).getByText(/7 Full Members/i)).toBeInTheDocument();
+      });
+    });
+  });
 });

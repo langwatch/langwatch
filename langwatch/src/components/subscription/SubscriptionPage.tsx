@@ -564,7 +564,7 @@ function UserManagementDrawer({
           ) : (
             <VStack align="start" gap={6} width="full">
               {/* Current Members section - collapsible */}
-              <Collapsible.Root width="full">
+              <Collapsible.Root width="full" >
                 <HStack justify="flex-start" width="full">
                   <Collapsible.Trigger asChild>
                     <Button
@@ -835,24 +835,32 @@ export function SubscriptionPage() {
   const seatUsageN = existingCoreMembers + plannedCoreSeatCount;
   const seatUsageM = plan?.maxMembers;
 
-  const totalUserCount = users.length + allPlannedUsers.length;
-
   const {
     seatPricePerPeriodCents,
     periodSuffix,
     totalFullMembers,
-    plannedFullMembers,
     pricePerSeat,
-    totalPriceFormatted,
     monthlyEquivalent,
   } = useBillingPricing({ currency, billingPeriod, users, plannedUsers: allPlannedUsers });
 
-  // For update-seats flow: base on plan.maxMembers (what's already paid for), not recount of users
-  // Only count NEW planned users from drawer (NOT pending invites, they're already in maxMembers)
-  const newPlannedCoreSeatCount = plannedUsers.filter((u) => u.memberType === "FullMember").length;
-  const updateTotalCoreMembers = (seatUsageM ?? totalFullMembers) + newPlannedCoreSeatCount - deletedSeatCount;
-  const updateTotalCents = updateTotalCoreMembers * seatPricePerPeriodCents;
-  const updateTotalPriceFormatted = `${formatPrice(updateTotalCents, currency)}${periodSuffix}`;
+  // Free plan allows 1 extra seat beyond active members; paid plan uses plan capacity
+  const effectiveMaxSeats = isDeveloperPlan ? 1 : seatUsageM;
+
+  // Manual planned seats only (NOT pending invites — they're already in maxMembers)
+  const newPlannedFullMembers = plannedUsers.filter(
+    (u) => u.memberType === "FullMember"
+  ).length;
+
+  // Single source of truth for billing seat count
+  const billingSeats = isDeveloperPlan
+    ? Math.max(
+        totalFullMembers,
+        (effectiveMaxSeats ?? 0) + newPlannedFullMembers - deletedSeatCount
+      )
+    : (effectiveMaxSeats ?? totalFullMembers) + newPlannedFullMembers - deletedSeatCount;
+
+  const billingPriceCents = billingSeats * seatPricePerPeriodCents;
+  const billingPriceFormatted = `${formatPrice(billingPriceCents, currency)}${periodSuffix}`;
 
   const handleDrawerSave = (result: DrawerSaveResult) => {
     // 1. Store new seats for upgrade flow (manually-added only)
@@ -904,10 +912,9 @@ export function SubscriptionPage() {
     organizationId: organization?.id,
     currency,
     billingPeriod,
-    totalFullMembers,
+    totalFullMembers: billingSeats,
     currentMaxMembers: seatUsageM ?? undefined,
     plannedUsers,
-    deletedSeatCount,
     onSeatsUpdated: () => {
       setPlannedUsers([]);
       setDeletedSeatCount(0);
@@ -1064,8 +1071,8 @@ export function SubscriptionPage() {
               </>
             }
             pricePerSeat={pricePerSeat}
-            totalPrice={totalPriceFormatted}
-            coreMembers={totalFullMembers}
+            totalPrice={billingPriceFormatted}
+            coreMembers={billingSeats}
             features={GROWTH_FEATURES}
             monthlyEquivalent={monthlyEquivalent}
             onUpgrade={handleUpgrade}
@@ -1076,8 +1083,8 @@ export function SubscriptionPage() {
         {/* Update seats Block - show for Growth seat+usage plan when seats have been added or removed */}
         {!isDeveloperPlan && (plannedUsers.length > 0 || deletedSeatCount > 0) && !isTieredPricingModel && (
           <UpdateSeatsBlock
-            totalFullMembers={updateTotalCoreMembers}
-            totalPrice={updateTotalPriceFormatted}
+            totalFullMembers={billingSeats}
+            totalPrice={billingPriceFormatted}
             onUpdate={handleUpdateSeats}
             onDiscard={() => {
               setPlannedUsers([]);
@@ -1102,7 +1109,7 @@ export function SubscriptionPage() {
         currency={currency}
         isLoading={organizationWithMembers.isLoading}
         onSave={handleDrawerSave}
-        maxSeats={plan?.maxMembers}
+        maxSeats={effectiveMaxSeats}
       />
     </SettingsLayout>
   );

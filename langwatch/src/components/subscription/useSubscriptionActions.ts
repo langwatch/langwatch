@@ -24,7 +24,6 @@ export function useSubscriptionActions({
   totalFullMembers,
   currentMaxMembers,
   plannedUsers,
-  deletedSeatCount,
   onSeatsUpdated,
   organizationWithMembers,
 }: {
@@ -34,7 +33,6 @@ export function useSubscriptionActions({
   totalFullMembers: number;
   currentMaxMembers?: number;
   plannedUsers: PlannedUser[];
-  deletedSeatCount: number;
   onSeatsUpdated: () => void;
   organizationWithMembers: TRPCRefetchFn;
 }) {
@@ -100,9 +98,7 @@ export function useSubscriptionActions({
   const handleUpdateSeats = () => {
     if (!organizationId) return;
 
-    // Use plan.maxMembers as base (what's already paid for), add/remove seats
-    const plannedCoreCount = plannedUsers.filter((u) => u.memberType === "FullMember").length;
-    const updateTotalMembers = (currentMaxMembers ?? totalFullMembers) + plannedCoreCount - deletedSeatCount;
+    const updateTotalMembers = totalFullMembers;
 
     openSeats({
       organizationId,
