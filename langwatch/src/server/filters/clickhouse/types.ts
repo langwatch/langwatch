@@ -33,7 +33,7 @@ export type FilterOption = {
 export type ClickHouseFilterTable =
   | "trace_summaries"
   | "stored_spans"
-  | "evaluation_states";
+  | "evaluation_runs";
 
 export type ClickHouseFilterDefinition = {
   /**

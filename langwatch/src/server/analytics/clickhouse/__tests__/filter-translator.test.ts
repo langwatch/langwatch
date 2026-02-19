@@ -142,7 +142,7 @@ describe("filter-translator", () => {
           "eval-2",
         ]);
         expect(result.whereClause).toContain("EXISTS");
-        expect(result.whereClause).toContain("evaluation_states");
+        expect(result.whereClause).toContain("evaluation_runs");
         expect(result.whereClause).toContain("es.EvaluatorId IN ({evaluatorIds_0:Array(String)})");
         expect(result.params).toEqual({ evaluatorIds_0: ["eval-1", "eval-2"] });
       });
@@ -314,12 +314,12 @@ describe("filter-translator", () => {
     it("collects all required joins", () => {
       const filters: FilterTranslation[] = [
         { whereClause: "a = 1", requiredJoins: ["stored_spans"], params: {} },
-        { whereClause: "b = 2", requiredJoins: ["evaluation_states"], params: {} },
+        { whereClause: "b = 2", requiredJoins: ["evaluation_runs"], params: {} },
         { whereClause: "c = 3", requiredJoins: ["stored_spans"], params: {} },
       ];
       const result = combineFilters(filters);
       expect(result.requiredJoins).toContain("stored_spans");
-      expect(result.requiredJoins).toContain("evaluation_states");
+      expect(result.requiredJoins).toContain("evaluation_runs");
       expect(result.requiredJoins).toHaveLength(2); // Deduplicated
     });
 

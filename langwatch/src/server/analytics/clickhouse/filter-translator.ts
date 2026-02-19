@@ -3,7 +3,7 @@
  *
  * WHY REGISTRY PATTERN: ClickHouse requires different WHERE clause patterns
  * depending on where data is stored (trace_summaries vs stored_spans vs
- * evaluation_states). Some filters use simple attribute lookups, others need
+ * evaluation_runs). Some filters use simple attribute lookups, others need
  * EXISTS subqueries with JOINs. The registry pattern:
  * 1. Makes it easy to add new filter types without modifying existing code (OCP)
  * 2. Centralizes the mapping of filter fields to their translation logic
@@ -334,12 +334,12 @@ function translateSpanModelFilter(values: string[]): FilterTranslation {
  */
 function translateEvaluatorIdFilter(values: string[]): FilterTranslation {
   const ts = tableAliases.trace_summaries;
-  const es = tableAliases.evaluation_states;
+  const es = tableAliases.evaluation_runs;
   const paramName = genParamName("evaluatorIds");
 
   return {
     whereClause: `EXISTS (
-      SELECT 1 FROM evaluation_states ${es}
+      SELECT 1 FROM evaluation_runs ${es}
       WHERE ${es}.TenantId = ${ts}.TenantId
         AND ${es}.TraceId = ${ts}.TraceId
         AND ${es}.EvaluatorId IN ({${paramName}:Array(String)})
@@ -358,7 +358,7 @@ function translateEvaluationPassedFilter(
   evaluatorId?: string,
 ): FilterTranslation {
   const ts = tableAliases.trace_summaries;
-  const es = tableAliases.evaluation_states;
+  const es = tableAliases.evaluation_runs;
   const paramName = genParamName("evalPassed");
 
   // Convert string values to UInt8 (boolean in CH)
@@ -377,7 +377,7 @@ function translateEvaluationPassedFilter(
 
   return {
     whereClause: `EXISTS (
-      SELECT 1 FROM evaluation_states ${es}
+      SELECT 1 FROM evaluation_runs ${es}
       WHERE ${es}.TenantId = ${ts}.TenantId
         AND ${es}.TraceId = ${ts}.TraceId
         ${evaluatorCondition}
@@ -397,7 +397,7 @@ function translateEvaluationScoreFilter(
   evaluatorId?: string,
 ): FilterTranslation {
   const ts = tableAliases.trace_summaries;
-  const es = tableAliases.evaluation_states;
+  const es = tableAliases.evaluation_runs;
   const minParam = genParamName("scoreMin");
   const maxParam = genParamName("scoreMax");
 
@@ -419,7 +419,7 @@ function translateEvaluationScoreFilter(
 
   return {
     whereClause: `EXISTS (
-      SELECT 1 FROM evaluation_states ${es}
+      SELECT 1 FROM evaluation_runs ${es}
       WHERE ${es}.TenantId = ${ts}.TenantId
         AND ${es}.TraceId = ${ts}.TraceId
         ${evaluatorCondition}
@@ -440,7 +440,7 @@ function translateEvaluationLabelFilter(
   evaluatorId?: string,
 ): FilterTranslation {
   const ts = tableAliases.trace_summaries;
-  const es = tableAliases.evaluation_states;
+  const es = tableAliases.evaluation_runs;
   const paramName = genParamName("evalLabels");
 
   const params: Record<string, unknown> = { [paramName]: values };
@@ -454,7 +454,7 @@ function translateEvaluationLabelFilter(
 
   return {
     whereClause: `EXISTS (
-      SELECT 1 FROM evaluation_states ${es}
+      SELECT 1 FROM evaluation_runs ${es}
       WHERE ${es}.TenantId = ${ts}.TenantId
         AND ${es}.TraceId = ${ts}.TraceId
         ${evaluatorCondition}
@@ -474,7 +474,7 @@ function translateEvaluationStateFilter(
   evaluatorId?: string,
 ): FilterTranslation {
   const ts = tableAliases.trace_summaries;
-  const es = tableAliases.evaluation_states;
+  const es = tableAliases.evaluation_runs;
   const paramName = genParamName("evalStates");
 
   const params: Record<string, unknown> = { [paramName]: values };
@@ -488,7 +488,7 @@ function translateEvaluationStateFilter(
 
   return {
     whereClause: `EXISTS (
-      SELECT 1 FROM evaluation_states ${es}
+      SELECT 1 FROM evaluation_runs ${es}
       WHERE ${es}.TenantId = ${ts}.TenantId
         AND ${es}.TraceId = ${ts}.TraceId
         ${evaluatorCondition}

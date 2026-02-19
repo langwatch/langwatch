@@ -528,8 +528,8 @@ function translateEvaluationMetric(
   requiredJoins: CHTable[],
   evaluatorId?: string,
 ): MetricTranslation {
-  requiredJoins.push("evaluation_states");
-  const es = tableAliases.evaluation_states;
+  requiredJoins.push("evaluation_runs");
+  const es = tableAliases.evaluation_runs;
 
   // Build evaluator filter condition with parameterized query to prevent SQL injection
   const params: Record<string, unknown> = {};
