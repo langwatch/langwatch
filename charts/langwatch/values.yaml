@@ -796,7 +796,10 @@ langevals:
   # Container security context (capabilities, readOnlyRootFilesystem, etc.)
   # See: https://kubespec.dev/v1/Pod#spec.containers.securityContext
   ## @param langevals.containerSecurityContext [object] Container security context overrides.
-  containerSecurityContext: {}
+  # readOnlyRootFilesystem must be false: langevals runs `uv sync` at startup
+  # which writes package files into /usr/src/app/.venv inside the container.
+  containerSecurityContext:
+    readOnlyRootFilesystem: false
   # PodDisruptionBudget pass-through (spec fields)
   # See: https://kubespec.dev/kubernetes/policy/v1/PodDisruptionBudget
   ## @param langevals.podDisruptionBudget [object] PodDisruptionBudget spec overrides.
@@ -1376,13 +1379,16 @@ opensearch:
       discovery.type: single-node
       plugins.security.disabled: true
 
+  # Set to true for single-node deployments. Prevents the opensearch sub-chart
+  # from injecting the cluster.initial_master_nodes env var, which conflicts
+  # with discovery.type: single-node and can prevent the node from starting.
+  singleNode: true
+
   # Additional environment variables
   # See: https://kubespec.dev/v1/Pod#spec.containers.env
   ## @extra opensearch.extraEnvs Additional environment variables.
   ## @skip opensearch.extraEnvs Skip documenting example environment variable item.
-  extraEnvs:
-    - name: cluster.initial_master_nodes
-      value: "" # force empty so the setting is gone
+  extraEnvs: []
 
   # Persistent storage configuration
   # See: https://kubespec.dev/v1/PersistentVolumeClaim

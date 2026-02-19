@@ -87,6 +87,10 @@ spec:
 
           # Environment variables for the LangEvals service
           env:
+            # uv defaults to /.cache/uv but containers run as non-root (user 1000),
+            # which lacks permission to create directories under /. /tmp is always writable.
+            - name: UV_CACHE_DIR
+              value: /tmp/.cache/uv
             {{- with .Values.langevals.extraEnvs}}
             {{- toYaml . | nindent 12 }}
             {{- end }}
