@@ -239,12 +239,14 @@ function CurrentPlanBlock({
 function UpdateSeatsBlock({
   totalFullMembers,
   totalPrice,
+  monthlyEquivalent,
   onUpdate,
   onDiscard,
   isLoading,
 }: {
   totalFullMembers: number;
   totalPrice: string;
+  monthlyEquivalent?: string | null;
   onUpdate: () => void;
   onDiscard: () => void;
   isLoading?: boolean;
@@ -265,6 +267,11 @@ function UpdateSeatsBlock({
               {totalPrice} for {totalFullMembers} Full Member
               {totalFullMembers !== 1 ? "s" : ""}
             </Text>
+            {monthlyEquivalent && (
+              <Text fontSize="xs" color="gray.500">
+                ({monthlyEquivalent})
+              </Text>
+            )}
           </VStack>
           <HStack gap={2}>
             <Button
@@ -986,6 +993,8 @@ export function SubscriptionPage() {
     (plannedUsers.length > 0 || deletedSeatCount > 0 )) 
   || isTieredLegacyPaidPlan;
 
+  const updateRequired = isUpgradeSeatsRequired || isUpgradePlanRequired;
+
   return (
     <SettingsLayout>
       <VStack
@@ -1084,7 +1093,7 @@ export function SubscriptionPage() {
           features={currentPlanFeatures}
           userCount={seatUsageN}
           maxSeats={seatUsageM}
-          upgradeRequired={isUpgradePlanRequired}
+          upgradeRequired={updateRequired}
           onUserCountClick={() => setIsDrawerOpen(true)}
           onManageSubscription={
             !isDeveloperPlan ? handleManageSubscription : undefined
@@ -1121,6 +1130,7 @@ export function SubscriptionPage() {
           <UpdateSeatsBlock
             totalFullMembers={billingSeats}
             totalPrice={billingPriceFormatted}
+            monthlyEquivalent={monthlyEquivalent}
             onUpdate={handleUpdateSeats}
             onDiscard={() => {
               setPlannedUsers([]);
