@@ -434,16 +434,16 @@ Feature: Suite Workflow — Create, Run, See Results
   @integration
   Scenario: Suite page uses standard PageLayout header
     When I am on the suites page
-    Then a PageLayout.Header is rendered with a PageLayout.Heading titled "Suites"
-    And the SuiteSidebar does not render its own duplicate "Suites" label
+    Then I see a "Suites" heading at the top of the page
+    And the sidebar does not show a duplicate "Suites" label
 
   @integration
   Scenario: Suite page sidebar fills available height below header
     When I am on the suites page with many suites
-    Then the SuiteSidebar scrolls independently within its bounded height
+    Then the sidebar scrolls independently within its bounded height
     And the main panel scrolls independently
 
   @integration
   Scenario: DashboardLayout wraps the page exactly once
     When I am on the suites page
-    Then DashboardLayout is not rendered twice
+    Then the standard page layout and navigation appear exactly once
