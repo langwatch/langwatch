@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { SubscriptionHandler } from "~/server/subscriptionHandler";
 import { formatNumber, formatPercent } from "../../utils/formatNumber";
-import { TraceUsageService } from "../traces/trace-usage.service";
+import { getApp } from "../app-layer/app";
 import {
   type ILicenseEnforcementRepository,
   LicenseEnforcementRepository,
@@ -122,11 +122,10 @@ export class UsageStatsService {
    * Routers should call this instead of manually wiring dependencies.
    */
   static create(prisma: PrismaClient): UsageStatsService {
-    const traceUsageService = TraceUsageService.create(prisma);
     const repository = new LicenseEnforcementRepository(prisma);
     return new UsageStatsService(
       repository,
-      traceUsageService,
+      getApp().usage,
       SubscriptionHandler,
     );
   }

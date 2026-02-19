@@ -1,3 +1,4 @@
+import superjson from "superjson";
 import crypto from "node:crypto";
 import type { NextApiRequest, NextApiResponse } from "next";
 import type { ZodError } from "zod";
@@ -26,8 +27,8 @@ import {
   spanSchema,
   spanValidatorSchema,
 } from "../../server/tracer/types.generated";
+import { getApp } from "../../server/app-layer/app";
 import { SubscriptionHandler } from "../../server/subscriptionHandler";
-import { TraceUsageService } from "../../server/traces/trace-usage.service";
 import { createLogger } from "../../utils/logger/server";
 
 const logger = createLogger("langwatch.collector");
@@ -91,8 +92,7 @@ async function handleCollectorRequest(
   logger.info({ projectId: project.id }, "collector request being processed");
 
   try {
-    const traceUsageService = TraceUsageService.create();
-    const limitResult = await traceUsageService.checkLimit({
+    const limitResult = await getApp().usage.checkLimit({
       teamId: project.teamId,
     });
 
@@ -447,7 +447,7 @@ async function handleCollectorRequest(
 
   const paramsMD5 = crypto
     .createHash("md5")
-    .update(JSON.stringify({ ...params, spans }))
+    .update(superjson.stringify({ ...params, spans }))
     .digest("hex");
   const existingTrace = await fetchExistingMD5s(traceId, project.id);
   if (existingTrace?.indexing_md5s?.includes(paramsMD5)) {
@@ -478,6 +478,7 @@ async function handleCollectorRequest(
   }
 
   const forceSync = req.query.force_sync === "true";
+  const contentLength = req.headers["content-length"];
   await scheduleTraceCollectionWithFallback(
     {
       projectId: project.id,
@@ -492,6 +493,7 @@ async function handleCollectorRequest(
       collectedAt: Date.now(),
     },
     forceSync,
+    contentLength ? parseInt(contentLength as string, 10) : undefined,
   );
 
   return res.status(200).json({ message: "Trace received successfully." });

@@ -28,6 +28,16 @@ describe("TraceUsageService", () => {
     getActivePlan: vi.fn(),
   };
 
+  const mockPrisma = {
+    project: {
+      findMany: vi.fn(),
+    },
+  };
+
+  const mockClickHouseClient = {
+    query: vi.fn(),
+  };
+
   let service: TraceUsageService;
 
   beforeEach(() => {
@@ -37,6 +47,8 @@ describe("TraceUsageService", () => {
       mockOrganizationRepository,
       mockEsClientFactory,
       mockSubscriptionHandler as any,
+      mockPrisma as any,
+      mockClickHouseClient as any,
     );
   });
 
@@ -60,6 +72,9 @@ describe("TraceUsageService", () => {
         ).mockResolvedValue("org-123");
         vi.mocked(mockOrganizationRepository.getProjectIds).mockResolvedValue([
           "proj-1",
+        ]);
+        mockPrisma.project.findMany.mockResolvedValue([
+          { id: "proj-1", featureClickHouseDataSourceTraces: false },
         ]);
         mockEsClient.count.mockResolvedValue({ count: 1000 });
         mockSubscriptionHandler.getActivePlan.mockResolvedValue({
@@ -98,6 +113,9 @@ describe("TraceUsageService", () => {
         vi.mocked(mockOrganizationRepository.getProjectIds).mockResolvedValue([
           "proj-1",
         ]);
+        mockPrisma.project.findMany.mockResolvedValue([
+          { id: "proj-1", featureClickHouseDataSourceTraces: false },
+        ]);
         mockEsClient.count.mockResolvedValue({ count: 500 });
         mockSubscriptionHandler.getActivePlan.mockResolvedValue({
           maxMessagesPerMonth: 1000,
@@ -116,6 +134,9 @@ describe("TraceUsageService", () => {
         ).mockResolvedValue("org-123");
         vi.mocked(mockOrganizationRepository.getProjectIds).mockResolvedValue([
           "proj-1",
+        ]);
+        mockPrisma.project.findMany.mockResolvedValue([
+          { id: "proj-1", featureClickHouseDataSourceTraces: false },
         ]);
         mockEsClient.count.mockResolvedValue({ count: 5000 }); // Over any limit
         mockSubscriptionHandler.getActivePlan.mockResolvedValue(FREE_PLAN);
@@ -168,11 +189,15 @@ describe("TraceUsageService", () => {
       });
     });
 
-    describe("when organization has projects", () => {
-      it("sums counts from all projects", async () => {
+    describe("when organization has projects (all ES)", () => {
+      it("sums counts from all projects via ES", async () => {
         vi.mocked(mockOrganizationRepository.getProjectIds).mockResolvedValue([
           "proj-1",
           "proj-2",
+        ]);
+        mockPrisma.project.findMany.mockResolvedValue([
+          { id: "proj-1", featureClickHouseDataSourceTraces: false },
+          { id: "proj-2", featureClickHouseDataSourceTraces: false },
         ]);
         mockEsClient.count.mockResolvedValue({ count: 42 });
 
@@ -184,6 +209,142 @@ describe("TraceUsageService", () => {
         expect(mockEsClientFactory).toHaveBeenCalledWith({
           organizationId: "org-123",
         });
+      });
+    });
+  });
+
+  describe("getCountByProjects", () => {
+    describe("when project list is empty", () => {
+      it("returns empty array", async () => {
+        const result = await service.getCountByProjects({
+          organizationId: "org-123",
+          projectIds: [],
+        });
+
+        expect(result).toEqual([]);
+        expect(mockEsClientFactory).not.toHaveBeenCalled();
+        expect(mockClickHouseClient.query).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when all projects have CH flag off", () => {
+      it("queries ES for all projects", async () => {
+        mockPrisma.project.findMany.mockResolvedValue([
+          { id: "proj-1", featureClickHouseDataSourceTraces: false },
+          { id: "proj-2", featureClickHouseDataSourceTraces: false },
+        ]);
+        mockEsClient.count
+          .mockResolvedValueOnce({ count: 10 })
+          .mockResolvedValueOnce({ count: 20 });
+
+        const result = await service.getCountByProjects({
+          organizationId: "org-123",
+          projectIds: ["proj-1", "proj-2"],
+        });
+
+        expect(result).toEqual([
+          { projectId: "proj-1", count: 10 },
+          { projectId: "proj-2", count: 20 },
+        ]);
+        expect(mockClickHouseClient.query).not.toHaveBeenCalled();
+        expect(mockEsClient.count).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    describe("when all projects have CH flag on", () => {
+      it("queries CH with a single batch query, no ES calls", async () => {
+        mockPrisma.project.findMany.mockResolvedValue([
+          { id: "proj-1", featureClickHouseDataSourceTraces: true },
+          { id: "proj-2", featureClickHouseDataSourceTraces: true },
+        ]);
+        mockClickHouseClient.query.mockResolvedValue({
+          json: () =>
+            Promise.resolve([
+              { TenantId: "proj-1", Total: "15" },
+              { TenantId: "proj-2", Total: "25" },
+            ]),
+        });
+
+        const result = await service.getCountByProjects({
+          organizationId: "org-123",
+          projectIds: ["proj-1", "proj-2"],
+        });
+
+        expect(result).toEqual([
+          { projectId: "proj-1", count: 15 },
+          { projectId: "proj-2", count: 25 },
+        ]);
+        expect(mockClickHouseClient.query).toHaveBeenCalledTimes(1);
+        expect(mockEsClientFactory).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when projects have mixed flags", () => {
+      it("splits between CH and ES, merges results", async () => {
+        mockPrisma.project.findMany.mockResolvedValue([
+          { id: "proj-1", featureClickHouseDataSourceTraces: true },
+          { id: "proj-2", featureClickHouseDataSourceTraces: false },
+        ]);
+        mockClickHouseClient.query.mockResolvedValue({
+          json: () => Promise.resolve([{ TenantId: "proj-1", Total: "15" }]),
+        });
+        mockEsClient.count.mockResolvedValue({ count: 20 });
+
+        const result = await service.getCountByProjects({
+          organizationId: "org-123",
+          projectIds: ["proj-1", "proj-2"],
+        });
+
+        expect(result).toEqual([
+          { projectId: "proj-1", count: 15 },
+          { projectId: "proj-2", count: 20 },
+        ]);
+        expect(mockClickHouseClient.query).toHaveBeenCalledTimes(1);
+        expect(mockEsClient.count).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when CH client is null", () => {
+      it("routes all projects to ES", async () => {
+        const esOnlyService = new TraceUsageService(
+          mockOrganizationRepository,
+          mockEsClientFactory,
+          mockSubscriptionHandler as any,
+          mockPrisma as any,
+          null,
+        );
+        mockEsClient.count
+          .mockResolvedValueOnce({ count: 10 })
+          .mockResolvedValueOnce({ count: 20 });
+
+        const result = await esOnlyService.getCountByProjects({
+          organizationId: "org-123",
+          projectIds: ["proj-1", "proj-2"],
+        });
+
+        expect(result).toEqual([
+          { projectId: "proj-1", count: 10 },
+          { projectId: "proj-2", count: 20 },
+        ]);
+        expect(mockPrisma.project.findMany).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when CH returns no rows for a project", () => {
+      it("returns count 0 for missing projects", async () => {
+        mockPrisma.project.findMany.mockResolvedValue([
+          { id: "proj-1", featureClickHouseDataSourceTraces: true },
+        ]);
+        mockClickHouseClient.query.mockResolvedValue({
+          json: () => Promise.resolve([]),
+        });
+
+        const result = await service.getCountByProjects({
+          organizationId: "org-123",
+          projectIds: ["proj-1"],
+        });
+
+        expect(result).toEqual([{ projectId: "proj-1", count: 0 }]);
       });
     });
   });
