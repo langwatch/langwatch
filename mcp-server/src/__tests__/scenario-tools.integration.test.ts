@@ -99,7 +99,7 @@ function createMockServer(): Server {
           res.writeHead(400);
           res.end(JSON.stringify({ message: "Validation error: name is required" }));
         } else {
-          res.writeHead(200);
+          res.writeHead(201);
           res.end(JSON.stringify(CANNED_SCENARIO_CREATED));
         }
       }
