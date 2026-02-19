@@ -21,24 +21,40 @@ These are intentional patterns, not issues:
 
 ## Output Format
 
+Only output sections that have actionable findings. Skip empty sections entirely.
+
+If no issues are found, output only:
+
 ```
-## Summary
-[One paragraph assessment]
+No issues found.
+```
+
+When issues exist, use this format (include only sections with findings):
+
+```
+## Must Fix
+
+- [file:line] Description of blocking issue
+
+## Should Fix
+
+- [file:line] Description of important issue
 
 ## Pyramid Violations
-[Tests at wrong level - include file:line, current tag, recommended tag, reason from decision tree]
+
+- [file:line] Current: @tag → Recommended: @tag — Reason from decision tree
 
 ## Naming Issues
-[Tests using "should" or unclear names - include file:line and fix]
 
-## What's Working Well
-[Patterns to maintain]
-
-## Recommendations
-1) Must fix — Blocking
-2) Should fix — Important
-3) Consider — Nice-to-have
+- [file:line] Current name → Suggested fix
 ```
+
+Do NOT include:
+- Summary or assessment paragraphs
+- "What's Working Well" or praise sections
+- "Consider" / nice-to-have items
+- Explanations of why correct things are correct
+- Empty sections
 
 ## Valid Tags
 
