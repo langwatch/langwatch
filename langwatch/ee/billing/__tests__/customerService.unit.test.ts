@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createCustomerService } from "../services/customerService";
+import {
+  CustomerCreationRaceError,
+  OrganizationNotFoundError,
+  UserEmailRequiredError,
+} from "../errors";
 
 const createMockStripe = () => ({
   customers: {
@@ -32,7 +37,7 @@ describe("customerService", () => {
 
   describe("getOrCreateCustomerId()", () => {
     describe("when organization not found", () => {
-      it("throws an error", async () => {
+      it("throws OrganizationNotFoundError", async () => {
         db.organization.findUnique.mockResolvedValue(null);
 
         await expect(
@@ -40,7 +45,7 @@ describe("customerService", () => {
             user: { email: "test@example.com" },
             organizationId: "org_missing",
           }),
-        ).rejects.toThrow("Organization not found");
+        ).rejects.toThrow(OrganizationNotFoundError);
       });
     });
 
@@ -63,7 +68,7 @@ describe("customerService", () => {
     });
 
     describe("when user has no email", () => {
-      it("throws an error", async () => {
+      it("throws UserEmailRequiredError", async () => {
         db.organization.findUnique.mockResolvedValue({
           id: "org_123",
           name: "Acme",
@@ -75,7 +80,7 @@ describe("customerService", () => {
             user: { email: null },
             organizationId: "org_123",
           }),
-        ).rejects.toThrow("User email is required");
+        ).rejects.toThrow(UserEmailRequiredError);
       });
     });
 
@@ -152,7 +157,7 @@ describe("customerService", () => {
         expect(result).toBe("cus_winner");
       });
 
-      it("throws when refreshed org has no customer ID", async () => {
+      it("throws CustomerCreationRaceError when refreshed org has no customer ID", async () => {
         db.organization.findUnique.mockResolvedValue({
           id: "org_123",
           name: "Acme",
@@ -171,7 +176,7 @@ describe("customerService", () => {
             user: { email: "test@example.com" },
             organizationId: "org_123",
           }),
-        ).rejects.toThrow("Stripe customer ID missing after concurrent creation");
+        ).rejects.toThrow(CustomerCreationRaceError);
       });
     });
   });

@@ -1,6 +1,11 @@
 import type { PrismaClient } from "@prisma/client";
 import type Stripe from "stripe";
 import { createLogger } from "../../../src/utils/logger";
+import {
+  CustomerCreationRaceError,
+  OrganizationNotFoundError,
+  UserEmailRequiredError,
+} from "../errors";
 
 const logger = createLogger("langwatch:billing:customerService");
 
@@ -27,7 +32,7 @@ export const createCustomerService = ({
       });
 
       if (!organization) {
-        throw new Error("Organization not found");
+        throw new OrganizationNotFoundError();
       }
 
       if (organization.stripeCustomerId) {
@@ -35,7 +40,7 @@ export const createCustomerService = ({
       }
 
       if (!user.email) {
-        throw new Error("User email is required to create Stripe customer");
+        throw new UserEmailRequiredError();
       }
 
       const customer = await stripe.customers.create({
@@ -74,9 +79,7 @@ export const createCustomerService = ({
           where: { id: organizationId },
         });
         if (!refreshed.stripeCustomerId) {
-          throw new Error(
-            "Stripe customer ID missing after concurrent creation",
-          );
+          throw new CustomerCreationRaceError();
         }
         return refreshed.stripeCustomerId;
       }

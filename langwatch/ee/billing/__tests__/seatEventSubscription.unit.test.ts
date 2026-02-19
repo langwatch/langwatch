@@ -11,6 +11,10 @@ vi.mock("../utils/growthSeatEvent", () => ({
 
 import { isGrowthSeatPrice } from "../utils/growthSeatEvent";
 import { createSeatEventSubscriptionFns } from "../services/seatEventSubscription";
+import {
+  NoActiveSubscriptionError,
+  SubscriptionItemNotFoundError,
+} from "../errors";
 
 const mockIsGrowthSeatPrice = isGrowthSeatPrice as ReturnType<typeof vi.fn>;
 
@@ -34,17 +38,41 @@ const createMockStripe = () => ({
   },
 });
 
-const createMockDb = () => ({
-  subscription: {
+const createMockDb = () => {
+  const subscriptionMock = {
     create: vi.fn().mockResolvedValue({ id: "sub_local_1" }),
     findFirst: vi.fn(),
+    findMany: vi.fn().mockResolvedValue([]),
     update: vi.fn(),
     updateMany: vi.fn().mockResolvedValue({ count: 0 }),
-  },
-  organization: {
-    findUnique: vi.fn(),
-  },
-});
+  };
+
+  const organizationInviteMock = {
+    findFirst: vi.fn().mockResolvedValue(null),
+    create: vi.fn().mockResolvedValue({}),
+    deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+  };
+
+  return {
+    subscription: subscriptionMock,
+    organization: {
+      findUnique: vi.fn(),
+    },
+    organizationInvite: organizationInviteMock,
+    $transaction: vi.fn(async (fn: (tx: any) => Promise<any>) => {
+      const tx = {
+        subscription: {
+          create: subscriptionMock.create,
+        },
+        organizationInvite: {
+          findFirst: organizationInviteMock.findFirst,
+          create: organizationInviteMock.create,
+        },
+      };
+      return fn(tx);
+    }),
+  };
+};
 
 describe("seatEventSubscriptionFns", () => {
   let stripe: ReturnType<typeof createMockStripe>;
@@ -180,6 +208,7 @@ describe("seatEventSubscriptionFns", () => {
         });
 
         stripe.subscriptions.retrieve.mockResolvedValue({
+          status: "active",
           items: {
             data: [
               { id: "si_seat", price: { id: "price_seat_eur_monthly" } },
@@ -203,7 +232,7 @@ describe("seatEventSubscriptionFns", () => {
 
         expect(db.subscription.update).toHaveBeenCalledWith({
           where: { id: "sub_local_1" },
-          data: { maxMembers: 7 },
+          data: { status: "ACTIVE", maxMembers: 7, endDate: null },
         });
 
         expect(result).toEqual({ success: true });
@@ -232,6 +261,7 @@ describe("seatEventSubscriptionFns", () => {
         });
 
         stripe.subscriptions.retrieve.mockResolvedValue({
+          status: "active",
           items: {
             data: [
               { id: "si_other", price: { id: "price_other" } },
@@ -260,6 +290,7 @@ describe("seatEventSubscriptionFns", () => {
           status: "ACTIVE",
         });
         stripe.subscriptions.retrieve.mockResolvedValue({
+          status: "active",
           items: {
             data: [{ id: "si_seat", price: { id: "price_seat_eur_monthly", unit_amount: 2900, recurring: { interval: "month" } } }],
           },
@@ -302,6 +333,7 @@ describe("seatEventSubscriptionFns", () => {
           status: "ACTIVE",
         });
         stripe.subscriptions.retrieve.mockResolvedValue({
+          status: "active",
           items: {
             data: [{ id: "si_seat", price: { id: "price_seat_eur_monthly", unit_amount: 2900, recurring: { interval: "month" } } }],
           },
@@ -329,6 +361,7 @@ describe("seatEventSubscriptionFns", () => {
           status: "ACTIVE",
         });
         stripe.subscriptions.retrieve.mockResolvedValue({
+          status: "active",
           items: {
             data: [{ id: "si_seat", price: { id: "price_seat_eur_monthly", unit_amount: 2900, recurring: { interval: "month" } } }],
           },
@@ -351,28 +384,29 @@ describe("seatEventSubscriptionFns", () => {
     });
 
     describe("when no subscription exists", () => {
-      it("throws 'No active subscription found'", async () => {
+      it("throws NoActiveSubscriptionError", async () => {
         db.subscription.findFirst.mockResolvedValue(null);
 
         await expect(fns.previewProration({ organizationId: "org_1", newTotalSeats: 4 }))
-          .rejects.toThrow("No active subscription found");
+          .rejects.toThrow(NoActiveSubscriptionError);
       });
     });
 
     describe("when no seat item found on subscription", () => {
-      it("throws 'No seat item found on subscription'", async () => {
+      it("throws SubscriptionItemNotFoundError", async () => {
         db.subscription.findFirst.mockResolvedValue({
           id: "sub_local_1",
           stripeSubscriptionId: "sub_stripe_1",
           status: "ACTIVE",
         });
         stripe.subscriptions.retrieve.mockResolvedValue({
+          status: "active",
           items: { data: [{ id: "si_other", price: { id: "price_other" } }] },
         });
         mockIsGrowthSeatPrice.mockReturnValue(false);
 
         await expect(fns.previewProration({ organizationId: "org_1", newTotalSeats: 4 }))
-          .rejects.toThrow("No seat item found on subscription");
+          .rejects.toThrow(SubscriptionItemNotFoundError);
       });
     });
   });

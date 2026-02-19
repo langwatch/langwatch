@@ -11,6 +11,7 @@ import {
   type PlanTypes as PlanType,
   SUBSCRIBABLE_PLANS,
 } from "./planTypes";
+import { billingErrorHandler } from "./middleware";
 import type { CustomerService } from "./services/customerService";
 import type { SubscriptionService } from "./services/subscriptionService";
 
@@ -44,6 +45,7 @@ export const createSubscriptionRouterFactory = ({
         }),
       )
       .use(checkOrganizationPermission("organization:manage"))
+      .use(billingErrorHandler)
       .mutation(async ({ input }) => {
         return await subscriptionService.updateSubscriptionItems({
           organizationId: input.organizationId,
@@ -68,24 +70,12 @@ export const createSubscriptionRouterFactory = ({
         }),
       )
       .use(checkOrganizationPermission("organization:manage"))
+      .use(billingErrorHandler)
       .mutation(async ({ input, ctx }) => {
-        let customerId: string;
-        try {
-          customerId = await customerService.getOrCreateCustomerId({
-            user: ctx.session.user,
-            organizationId: input.organizationId,
-          });
-        } catch (error) {
-          throw new TRPCError({
-            code:
-              (error as Error).message === "Organization not found"
-                ? "NOT_FOUND"
-                : (error as Error).message.includes("email")
-                  ? "UNAUTHORIZED"
-                  : "INTERNAL_SERVER_ERROR",
-            message: (error as Error).message,
-          });
-        }
+        const customerId = await customerService.getOrCreateCustomerId({
+          user: ctx.session.user,
+          organizationId: input.organizationId,
+        });
 
         return await subscriptionService.createOrUpdateSubscription({
           organizationId: input.organizationId,
@@ -102,24 +92,12 @@ export const createSubscriptionRouterFactory = ({
     manage: protectedProcedure
       .input(z.object({ organizationId: z.string(), baseUrl: z.string() }))
       .use(checkOrganizationPermission("organization:manage"))
+      .use(billingErrorHandler)
       .mutation(async ({ input, ctx }) => {
-        let customerId: string;
-        try {
-          customerId = await customerService.getOrCreateCustomerId({
-            user: ctx.session.user,
-            organizationId: input.organizationId,
-          });
-        } catch (error) {
-          throw new TRPCError({
-            code:
-              (error as Error).message === "Organization not found"
-                ? "NOT_FOUND"
-                : (error as Error).message.includes("email")
-                  ? "UNAUTHORIZED"
-                  : "INTERNAL_SERVER_ERROR",
-            message: (error as Error).message,
-          });
-        }
+        const customerId = await customerService.getOrCreateCustomerId({
+          user: ctx.session.user,
+          organizationId: input.organizationId,
+        });
 
         return await subscriptionService.createBillingPortalSession({
           customerId,
@@ -136,6 +114,7 @@ export const createSubscriptionRouterFactory = ({
         }),
       )
       .use(checkOrganizationPermission("organization:manage"))
+      .use(billingErrorHandler)
       .query(async ({ input }) => {
         return await subscriptionService.previewProration({
           organizationId: input.organizationId,
@@ -146,10 +125,46 @@ export const createSubscriptionRouterFactory = ({
     getLastSubscription: protectedProcedure
       .input(z.object({ organizationId: z.string() }))
       .use(checkOrganizationPermission("organization:view"))
+      .use(billingErrorHandler)
       .query(async ({ input }) => {
         return await subscriptionService.getLastNonCancelledSubscription(
           input.organizationId,
         );
+      }),
+
+    upgradeWithInvites: protectedProcedure
+      .input(
+        z.object({
+          organizationId: z.string(),
+          baseUrl: z.string(),
+          currency: z.enum(["EUR", "USD"]).optional(),
+          billingInterval: z.enum(["monthly", "annual"]).optional(),
+          totalSeats: z.number().min(1),
+          invites: z.array(
+            z.object({
+              email: z.string().email(),
+              role: z.enum(["ADMIN", "MEMBER", "EXTERNAL"]),
+            }),
+          ),
+        }),
+      )
+      .use(checkOrganizationPermission("organization:manage"))
+      .use(billingErrorHandler)
+      .mutation(async ({ input, ctx }) => {
+        const customerId = await customerService.getOrCreateCustomerId({
+          user: ctx.session.user,
+          organizationId: input.organizationId,
+        });
+
+        return await subscriptionService.createSubscriptionWithInvites({
+          organizationId: input.organizationId,
+          baseUrl: input.baseUrl,
+          membersToAdd: input.totalSeats,
+          customerId,
+          currency: input.currency,
+          billingInterval: input.billingInterval,
+          invites: input.invites,
+        });
       }),
 
     prospective: protectedProcedure
@@ -163,6 +178,7 @@ export const createSubscriptionRouterFactory = ({
         }),
       )
       .use(checkOrganizationPermission("organization:manage"))
+      .use(billingErrorHandler)
       .mutation(async ({ input, ctx }) => {
         const actorEmail = ctx.session.user.email;
         if (!actorEmail) {
@@ -172,21 +188,14 @@ export const createSubscriptionRouterFactory = ({
           });
         }
 
-        try {
-          return await subscriptionService.notifyProspective({
-            organizationId: input.organizationId,
-            plan: input.plan as PlanType,
-            customerName: input.customerName,
-            customerEmail: input.customerEmail,
-            note: input.note,
-            actorEmail,
-          });
-        } catch (error) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: (error as Error).message,
-          });
-        }
+        return await subscriptionService.notifyProspective({
+          organizationId: input.organizationId,
+          plan: input.plan as PlanType,
+          customerName: input.customerName,
+          customerEmail: input.customerEmail,
+          note: input.note,
+          actorEmail,
+        });
       }),
   });
 };
