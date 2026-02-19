@@ -214,6 +214,7 @@ app.post("/:slug/run", async (c) => {
           loadedAgents: loadedAgents as Map<string, TypedAgent>,
           loadedEvaluators,
           saveToEs: true,
+          featureEventSourcingEvaluationIngestion: project.featureEventSourcingEvaluationIngestion,
         });
 
         for await (const event of orchestrator) {
@@ -258,6 +259,7 @@ app.post("/:slug/run", async (c) => {
         loadedEvaluators,
         saveToEs: true,
         runId, // Pass the run ID we generated
+        featureEventSourcingEvaluationIngestion: project.featureEventSourcingEvaluationIngestion,
       });
 
       for await (const event of orchestrator) {

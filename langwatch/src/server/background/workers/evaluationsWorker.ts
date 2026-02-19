@@ -202,8 +202,7 @@ const buildThreadData = async (
         (SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(source)
       ) {
         if (source === "formatted_traces") {
-          result[targetField] = threadTraces
-            .map((t) => formatSpansDigest(t.spans ?? []))
+          result[targetField] = (await Promise.all(threadTraces.map((t) => formatSpansDigest(t.spans ?? []))))
             .join("\n\n---\n\n");
         }
       } else {
@@ -241,7 +240,7 @@ const buildThreadData = async (
           )
         ) {
           if (mappingConfig.source === "formatted_trace") {
-            result[targetField] = formatSpansDigest(trace.spans ?? []);
+            result[targetField] = await formatSpansDigest(trace.spans ?? []);
           }
         } else {
           const traceMappingConfig = {
@@ -380,7 +379,7 @@ const buildDataForEvaluation = async (
           )
         ) {
           if (config.source === "formatted_trace") {
-            mappedData[field] = formatSpansDigest(trace.spans ?? []);
+            mappedData[field] = await formatSpansDigest(trace.spans ?? []);
           }
         }
       }

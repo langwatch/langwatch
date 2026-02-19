@@ -1,10 +1,10 @@
 import type { Evaluation } from "~/server/tracer/types";
-import type { TraceEvaluation } from "./evaluation-state.types";
+import type { TraceEvaluation } from "./evaluation-run.types";
 
 /**
- * ClickHouse evaluation_states row shape (PascalCase, matching the table schema).
+ * ClickHouse evaluation_runs row shape (PascalCase, matching the table schema).
  */
-export interface ClickHouseEvaluationStateRow {
+export interface ClickHouseEvaluationRunRow {
   Id: string;
   TenantId: string;
   EvaluationId: string;
@@ -28,13 +28,13 @@ export interface ClickHouseEvaluationStateRow {
 }
 
 /**
- * Maps a ClickHouse evaluation_states row to the canonical TraceEvaluation type.
+ * Maps a ClickHouse evaluation_runs row to the canonical TraceEvaluation type.
  *
- * @param record - A row from the evaluation_states table
+ * @param record - A row from the evaluation_runs table
  * @returns TraceEvaluation in camelCase
  */
 export function mapClickHouseEvaluationToTraceEvaluation(
-  record: ClickHouseEvaluationStateRow,
+  record: ClickHouseEvaluationRunRow,
 ): TraceEvaluation {
   return {
     evaluationId: record.EvaluationId,
@@ -51,13 +51,13 @@ export function mapClickHouseEvaluationToTraceEvaluation(
     error: record.Error,
     timestamps: {
       scheduledAt: record.ScheduledAt
-        ? new Date(record.ScheduledAt).getTime()
+        ? new Date(record.ScheduledAt + "Z").getTime()
         : null,
       startedAt: record.StartedAt
-        ? new Date(record.StartedAt).getTime()
+        ? new Date(record.StartedAt + "Z").getTime()
         : null,
       completedAt: record.CompletedAt
-        ? new Date(record.CompletedAt).getTime()
+        ? new Date(record.CompletedAt + "Z").getTime()
         : null,
     },
   };

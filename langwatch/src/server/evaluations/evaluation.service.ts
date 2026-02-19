@@ -4,10 +4,10 @@ import { prisma as defaultPrisma } from "~/server/db";
 import type { Protections } from "~/server/elasticsearch/protections";
 import { ClickHouseEvaluationService } from "./clickhouse-evaluation.service";
 import { ElasticsearchEvaluationService } from "./elasticsearch-evaluation.service";
-import type { TraceEvaluation } from "./evaluation-state.types";
+import type { TraceEvaluation } from "./evaluation-run.types";
 
 /**
- * Unified service for fetching per-trace evaluation states from either
+ * Unified service for fetching per-trace evaluation runs from either
  * ClickHouse or Elasticsearch.
  *
  * This service acts as a facade that:
@@ -15,7 +15,10 @@ import type { TraceEvaluation } from "./evaluation-state.types";
  *    (via featureClickHouseDataSourceEvaluations flag)
  * 2. Routes requests to the appropriate backend based on the feature flag
  *
- * When ClickHouse is enabled, it is the exclusive data source — no fallback to Elasticsearch.
+ * When ClickHouse is the exclusive source (flag on), only CH is queried.
+ * When ES is the primary source (flag off), ES results are merged with any
+ * CH evaluations (from the event-sourcing path) so new evaluations appear
+ * immediately without dual-writing to ES.
  *
  * @example
  * ```ts
@@ -103,11 +106,19 @@ export class EvaluationService {
           return result;
         }
 
-        return this.elasticsearchService.getEvaluationsForTrace({
-          projectId,
-          traceId,
-          protections,
-        });
+        // ES path: merge ES evaluations with any CH evaluations from event-sourcing
+        const [esResult, chResult] = await Promise.all([
+          this.elasticsearchService.getEvaluationsForTrace({
+            projectId,
+            traceId,
+            protections,
+          }),
+          this.clickHouseService
+            .getEvaluationsForTrace({ projectId, traceId })
+            .catch(() => null),
+        ]);
+
+        return mergeEvaluations(esResult, chResult ?? []);
       },
     );
   }
@@ -160,12 +171,50 @@ export class EvaluationService {
           return result;
         }
 
-        return this.elasticsearchService.getEvaluationsMultiple({
-          projectId,
-          traceIds,
-          protections,
-        });
+        // ES path: merge ES evaluations with any CH evaluations from event-sourcing
+        const [esResult, chResult] = await Promise.all([
+          this.elasticsearchService.getEvaluationsMultiple({
+            projectId,
+            traceIds,
+            protections,
+          }),
+          this.clickHouseService
+            .getEvaluationsMultiple({ projectId, traceIds })
+            .catch(() => null),
+        ]);
+
+        if (!chResult) return esResult;
+
+        const merged: Record<string, TraceEvaluation[]> = {};
+        const allTraceIds = new Set([
+          ...Object.keys(esResult),
+          ...Object.keys(chResult),
+        ]);
+        for (const traceId of allTraceIds) {
+          merged[traceId] = mergeEvaluations(
+            esResult[traceId] ?? [],
+            chResult[traceId] ?? [],
+          );
+        }
+        return merged;
       },
     );
   }
+}
+
+/**
+ * Merge evaluations from ES and CH. CH wins on duplicate evaluationId.
+ * This allows the event-sourcing path to write only to CH while
+ * the read side transparently merges both sources.
+ */
+function mergeEvaluations(
+  esEvaluations: TraceEvaluation[],
+  chEvaluations: TraceEvaluation[],
+): TraceEvaluation[] {
+  if (chEvaluations.length === 0) return esEvaluations;
+  if (esEvaluations.length === 0) return chEvaluations;
+
+  const chIds = new Set(chEvaluations.map((e) => e.evaluationId));
+  const fromEs = esEvaluations.filter((e) => !chIds.has(e.evaluationId));
+  return [...fromEs, ...chEvaluations];
 }

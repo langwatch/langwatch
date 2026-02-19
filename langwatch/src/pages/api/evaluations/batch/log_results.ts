@@ -1,7 +1,11 @@
+import { generate } from "@langwatch/ksuid";
 import { ExperimentType, type Project } from "@prisma/client";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { type ZodError, z } from "zod";
 import { fromZodError } from "zod-validation-error";
+import { getApp } from "~/server/app-layer/app";
+import { DomainError } from "~/server/app-layer/domain-error";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { prisma } from "../../../../server/db";
 import {
@@ -9,7 +13,6 @@ import {
   batchEvaluationId,
   esClient,
 } from "../../../../server/elasticsearch";
-import { ExperimentRunDispatcher } from "../../../../server/evaluations-v3/dispatch";
 import { mapEsTargetsToTargets } from "../../../../server/evaluations-v3/services/mappers";
 import type {
   ESBatchEvaluation,
@@ -148,6 +151,14 @@ export default async function handler(
 
       const validationError = fromZodError(error);
       return res.status(400).json({ error: validationError.message });
+    } else if (DomainError.is(error)) {
+      logger.warn(
+        { kind: error.kind, meta: error.meta, projectId: project.id },
+        "domain error processing batch evaluation",
+      );
+      return res
+        .status(error.httpStatus)
+        .json({ error: error.kind, message: error.message });
     } else {
       logger.error(
         { error, body: params, projectId: project.id },
@@ -362,18 +373,22 @@ const processBatchEvaluation = async (
     },
   };
 
-  const client = await esClient({ projectId: project.id });
-  await client.update({
-    index: BATCH_EVALUATION_INDEX.alias,
-    id,
-    body: {
-      script,
-      upsert: validatedBatchEvaluation,
-    },
-    retry_on_conflict: 5,
-  });
+  // When featureEventSourcingEvaluationIngestion is ON, the experimentRunEsSync
+  // reactor handles ES writes — skip direct writes to avoid double-writing.
+  if (!project.featureEventSourcingEvaluationIngestion) {
+    const client = await esClient({ projectId: project.id });
+    await client.update({
+      index: BATCH_EVALUATION_INDEX.alias,
+      id,
+      body: {
+        script,
+        upsert: validatedBatchEvaluation,
+      },
+      retry_on_conflict: 5,
+    });
+  }
 
-  // Dual-write to ClickHouse via event sourcing when enabled
+  // Dual-write to ClickHouse via event sourcing (unconditional)
   await dispatchToClickHouse(project, experiment.id, batchEvaluation);
 };
 
@@ -387,15 +402,11 @@ const dispatchToClickHouse = async (
   batchEvaluation: ESBatchEvaluation,
 ) => {
   try {
-    const dispatcher = ExperimentRunDispatcher.create();
-    const enabled = await dispatcher.isClickHouseEnabled(project.id);
-    if (!enabled) return;
-
     const { run_id: runId } = batchEvaluation;
 
     const targets = mapEsTargetsToTargets(batchEvaluation.targets ?? []);
 
-    await dispatcher.startRun({
+    await getApp().experimentRuns.startExperimentRun({
       tenantId: project.id,
       runId,
       experimentId,
@@ -407,7 +418,7 @@ const dispatchToClickHouse = async (
     // Dispatch target and evaluator results in parallel
     await Promise.all([
       ...batchEvaluation.dataset.map((entry) =>
-        dispatcher.recordTargetResult({
+        getApp().experimentRuns.recordTargetResult({
           tenantId: project.id,
           runId,
           experimentId,
@@ -423,7 +434,7 @@ const dispatchToClickHouse = async (
         }),
       ),
       ...batchEvaluation.evaluations.map((evaluation) =>
-        dispatcher.recordEvaluatorResult({
+        getApp().experimentRuns.recordEvaluatorResult({
           tenantId: project.id,
           runId,
           experimentId,
@@ -447,13 +458,48 @@ const dispatchToClickHouse = async (
       batchEvaluation.timestamps.finished_at ||
       batchEvaluation.timestamps.stopped_at
     ) {
-      await dispatcher.completeRun({
+      await getApp().experimentRuns.completeExperimentRun({
         tenantId: project.id,
         runId,
         finishedAt: batchEvaluation.timestamps.finished_at ?? undefined,
         stoppedAt: batchEvaluation.timestamps.stopped_at ?? undefined,
         occurredAt: Date.now(),
       });
+    }
+
+    // Dispatch to evaluation processing pipeline for per-trace eval CH writes
+    if (project.featureEventSourcingEvaluationIngestion) {
+      const app = getApp();
+      for (const evaluation of batchEvaluation.evaluations) {
+        const evaluationId = generate(KSUID_RESOURCES.EVALUATION).toString();
+        void (async () => {
+          try {
+            await app.evaluations.startEvaluation({
+              tenantId: project.id,
+              evaluationId,
+              evaluatorId: evaluation.evaluator,
+              evaluatorType: evaluation.evaluator,
+              evaluatorName: evaluation.name ?? undefined,
+              occurredAt: Date.now(),
+            });
+            await app.evaluations.completeEvaluation({
+              tenantId: project.id,
+              evaluationId,
+              status: evaluation.status,
+              score: evaluation.score ?? undefined,
+              passed: evaluation.passed ?? undefined,
+              label: evaluation.label ?? undefined,
+              details: evaluation.details ?? undefined,
+              occurredAt: Date.now(),
+            });
+          } catch (err) {
+            logger.warn(
+              { err, evaluationId, evaluator: evaluation.evaluator },
+              "Failed to dispatch evaluation to evaluation processing pipeline",
+            );
+          }
+        })();
+      }
     }
   } catch (error) {
     logger.warn(
