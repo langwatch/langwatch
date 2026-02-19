@@ -46,6 +46,34 @@ export interface UseSliderControlReturn {
 }
 
 // ============================================================================
+// Utilities
+// ============================================================================
+
+/** Decimal places in a step value (e.g. 0.01 → 2, 256 → 0) */
+export function stepPrecision(step: number): number {
+  return String(step).split(".")[1]?.length ?? 0;
+}
+
+/**
+ * Snap rawMax to the nearest step-aligned value above min.
+ * zag-js requires max > min and (max - min) divisible by step.
+ */
+export function alignMaxToStep(
+  rawMax: number,
+  min: number,
+  step: number,
+): number {
+  const range = rawMax - min;
+  const stepsInRange = range > 0 ? Math.floor(range / step) : 0;
+  const snappedMax = min + stepsInRange * step;
+  const p = stepPrecision(step);
+  return Math.max(
+    Number(snappedMax.toFixed(p)),
+    Number((min + step).toFixed(p)),
+  );
+}
+
+// ============================================================================
 // Hook Implementation
 // ============================================================================
 
@@ -56,18 +84,22 @@ export function useSliderControl({
   maxOverride,
   minOverride,
 }: UseSliderControlParams): UseSliderControlReturn {
+  const precision = stepPrecision(config.step);
+
   // Calculate effective min - use override if provided (e.g., provider constraints)
   const effectiveMin = minOverride ?? config.min;
 
   // Calculate effective max - use model override for dynamic params or provider constraints
   // For dynamic max params (like max_tokens), always use the override
   // For other params, use override if it's more restrictive than config.max
-  const effectiveMax =
+  const rawMax =
     config.dynamicMax && maxOverride
       ? maxOverride
       : maxOverride !== undefined
         ? Math.min(maxOverride, config.max)
         : config.max;
+
+  const effectiveMax = alignMaxToStep(rawMax, effectiveMin, config.step);
 
   // For dynamic max params (like max_tokens), default to the model's max
   // For other params, use the config default
@@ -101,8 +133,6 @@ export function useSliderControl({
       const clamped = Math.min(Math.max(parsed, effectiveMin), effectiveMax);
       // Round to step precision
       const rounded = Math.round(clamped / config.step) * config.step;
-      // Fix floating point precision
-      const precision = String(config.step).split(".")[1]?.length ?? 0;
       const fixed = Number(rounded.toFixed(precision));
       onChange(fixed);
       setInputValue(String(fixed));
