@@ -219,7 +219,7 @@ describe("Scenarios API", () => {
           labels: ["auth", "happy-path"],
         });
 
-        expect(res.status).toBe(200);
+        expect(res.status).toBe(201);
         const body = await res.json();
         expect(body).toMatchObject({
           name: "Login Flow Happy Path",
@@ -329,7 +329,7 @@ describe("Scenarios API", () => {
 
         expect(listRes.status).toBe(200);
         const body = await listRes.json();
-        const ids = body.map((s: Scenario) => s.id);
+        const ids = body.map((s: { id: string }) => s.id);
         expect(ids).not.toContain(scenario.id);
       });
     });

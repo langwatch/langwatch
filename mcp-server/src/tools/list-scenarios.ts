@@ -1,4 +1,4 @@
-import { listScenarios as apiListScenarios } from "../langwatch-api.js";
+import { listScenarios as apiListScenarios } from "../langwatch-api-scenarios.js";
 
 /**
  * Handles the list_scenarios MCP tool invocation.

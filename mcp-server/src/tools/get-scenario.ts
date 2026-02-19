@@ -1,4 +1,4 @@
-import { getScenario as apiGetScenario } from "../langwatch-api.js";
+import { getScenario as apiGetScenario } from "../langwatch-api-scenarios.js";
 
 /**
  * Handles the get_scenario MCP tool invocation.

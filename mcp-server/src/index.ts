@@ -106,7 +106,12 @@ server.tool(
       return { content: [{ type: "text", text: formatScenarioSchema() }] };
     }
     const { formatSchema } = await import("./tools/discover-schema.js");
-    return { content: [{ type: "text", text: formatSchema(category) }] };
+    let text = formatSchema(category);
+    if (category === "all") {
+      const { formatScenarioSchema } = await import("./tools/discover-scenario-schema.js");
+      text += "\n\n" + formatScenarioSchema();
+    }
+    return { content: [{ type: "text", text }] };
   }
 );
 

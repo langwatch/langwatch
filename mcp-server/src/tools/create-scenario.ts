@@ -1,4 +1,4 @@
-import { createScenario as apiCreateScenario } from "../langwatch-api.js";
+import { createScenario as apiCreateScenario } from "../langwatch-api-scenarios.js";
 
 /**
  * Handles the create_scenario MCP tool invocation.

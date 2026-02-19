@@ -1,5 +1,7 @@
 import type { Scenario } from "@prisma/client";
+import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
+import { z } from "zod";
 import { prisma } from "~/server/db";
 import { ScenarioNotFoundError } from "~/server/scenarios/errors";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
@@ -13,6 +15,20 @@ type Variables = AuthMiddlewareVariables;
 export const app = new Hono<{ Variables: Variables }>().basePath("/");
 
 const getService = () => ScenarioService.create(prisma);
+
+const createScenarioSchema = z.object({
+  name: z.string().min(1, "name is required"),
+  situation: z.string().optional().default(""),
+  criteria: z.array(z.string()).optional().default([]),
+  labels: z.array(z.string()).optional().default([]),
+});
+
+const updateScenarioSchema = z.object({
+  name: z.string().min(1).optional(),
+  situation: z.string().optional(),
+  criteria: z.array(z.string()).optional(),
+  labels: z.array(z.string()).optional(),
+});
 
 function toScenarioResponse(scenario: Scenario) {
   return {
@@ -49,13 +65,9 @@ app.get("/:id", async (c) => {
   return c.json(toScenarioResponse(scenario));
 });
 
-app.post("/", async (c) => {
+app.post("/", zValidator("json", createScenarioSchema), async (c) => {
   const project = c.get("project");
-  const body = await c.req.json();
-
-  if (!body.name || body.name.trim() === "") {
-    return c.json({ error: "Validation error: name is required" }, 400);
-  }
+  const body = c.req.valid("json");
 
   logger.info({ projectId: project.id }, "Creating scenario");
 
@@ -63,18 +75,18 @@ app.post("/", async (c) => {
   const scenario = await service.create({
     projectId: project.id,
     name: body.name,
-    situation: body.situation ?? "",
-    criteria: body.criteria ?? [],
-    labels: body.labels ?? [],
+    situation: body.situation,
+    criteria: body.criteria,
+    labels: body.labels,
   });
 
-  return c.json(toScenarioResponse(scenario));
+  return c.json(toScenarioResponse(scenario), 201);
 });
 
-app.put("/:id", async (c) => {
+app.put("/:id", zValidator("json", updateScenarioSchema), async (c) => {
   const project = c.get("project");
   const { id } = c.req.param();
-  const body = await c.req.json();
+  const body = c.req.valid("json");
 
   logger.info(
     { projectId: project.id, scenarioId: id },

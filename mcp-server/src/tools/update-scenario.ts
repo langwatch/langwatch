@@ -1,4 +1,4 @@
-import { updateScenario as apiUpdateScenario } from "../langwatch-api.js";
+import { updateScenario as apiUpdateScenario } from "../langwatch-api-scenarios.js";
 
 /**
  * Handles the update_scenario MCP tool invocation.
@@ -14,7 +14,7 @@ export async function handleUpdateScenario(params: {
   labels?: string[];
 }): Promise<string> {
   const { scenarioId, ...data } = params;
-  const result = await apiUpdateScenario(scenarioId, data);
+  const result = await apiUpdateScenario({ id: scenarioId, ...data });
 
   const lines: string[] = [];
   lines.push("Scenario updated successfully!\n");

@@ -103,7 +103,7 @@ function createMockServer(): Server {
           res.end(JSON.stringify(CANNED_SCENARIO_CREATED));
         }
       }
-      // PATCH /api/scenarios/:id - update scenario
+      // PUT /api/scenarios/:id - update scenario
       else if (
         url.match(/^\/api\/scenarios\/scen_abc123$/) &&
         req.method === "PUT"
@@ -111,7 +111,7 @@ function createMockServer(): Server {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_SCENARIO_UPDATED));
       }
-      // PATCH /api/scenarios/:id - not found
+      // PUT /api/scenarios/:id - not found
       else if (
         url.match(/^\/api\/scenarios\/scen_nonexistent$/) &&
         req.method === "PUT"
@@ -226,7 +226,7 @@ describe("MCP scenario tools integration", () => {
       });
     });
 
-    describe("when required fields are missing", () => {
+    describe("when name is empty", () => {
       it("propagates the validation error", async () => {
         const { handleCreateScenario } = await import(
           "../tools/create-scenario.js"
