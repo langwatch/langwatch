@@ -1,13 +1,18 @@
-import { PARAM_NAME_MAPPING } from "~/components/llmPromptConfigs/parameterConfig";
 import type { LLMConfig } from "../../../types/dsl";
 
 /**
- * Reverse mapping: camelCase → snake_case
- * Built from PARAM_NAME_MAPPING which maps snake_case → camelCase
+ * camelCase → snake_case mapping for LLM config parameters.
+ * Mirrors PARAM_NAME_MAPPING in parameterConfig.ts (reversed).
  */
-const CAMEL_TO_SNAKE: Record<string, string> = Object.fromEntries(
-  Object.entries(PARAM_NAME_MAPPING).map(([snake, camel]) => [camel, snake]),
-);
+const CAMEL_TO_SNAKE: Record<string, string> = {
+  topP: "top_p",
+  frequencyPenalty: "frequency_penalty",
+  presencePenalty: "presence_penalty",
+  maxTokens: "max_tokens",
+  topK: "top_k",
+  minP: "min_p",
+  repetitionPenalty: "repetition_penalty",
+};
 
 /**
  * Normalizes LLM config to snake_case format required by optimization studio DSL.

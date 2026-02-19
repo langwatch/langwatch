@@ -7,7 +7,7 @@ import {
   Role,
   type TextMessage,
 } from "@copilotkit/runtime-client-gql";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import type { ScenarioMessageSnapshotEvent } from "~/server/scenarios/scenario-event.types";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { createLogger } from "~/utils/logger";
@@ -61,6 +61,25 @@ function CustomCopilotKitChatInner({
     },
   });
 
+  // Build a stable traceId lookup from converted messages.
+  // CopilotKit's setMessages reconstructs message objects internally,
+  // stripping custom properties like traceId. We keep our own map
+  // keyed by message ID so the trace buttons persist across re-renders.
+  const traceIdMap = useMemo(() => {
+    try {
+      const converted = convertScenarioMessagesToCopilotKit(messages);
+      const map = new Map<string, string>();
+      for (const msg of converted) {
+        if (msg.traceId && msg.id) {
+          map.set(msg.id, msg.traceId);
+        }
+      }
+      return map;
+    } catch {
+      return new Map<string, string>();
+    }
+  }, [messages]);
+
   useEffect(() => {
     try {
       const convertedMessages = convertScenarioMessagesToCopilotKit(messages);
@@ -75,14 +94,24 @@ function CustomCopilotKitChatInner({
     }
   }, [messages, setMessages]);
 
+  const fadeInCss = {
+    animation: "fadeIn 0.3s ease-in",
+    "@keyframes fadeIn": {
+      from: { opacity: 0, transform: "translateY(4px)" },
+      to: { opacity: 1, transform: "translateY(0)" },
+    },
+  } as const;
+
   return (
     <CopilotChat
       RenderTextMessage={({ message, AssistantMessage, UserMessage }) => {
-        const message_ = message as TextMessage & { traceId?: string };
+        const message_ = message as TextMessage;
+        const traceId = traceIdMap.get(message_.id);
 
         return (
           <VStack
             align={message_.role === Role.Assistant ? "flex-start" : "flex-end"}
+            css={fadeInCss}
           >
             {message_.role === Role.Assistant && (
               <Markdown className="markdown">{message_.content}</Markdown>
@@ -91,35 +120,35 @@ function CustomCopilotKitChatInner({
               <UserMessage message={message_.content} rawData={message} />
             )}
             {!smallerView &&
-              message_.traceId &&
+              traceId &&
               message_.role === Role.Assistant && (
-                <TraceMessage traceId={message_.traceId} />
+                <TraceMessage traceId={traceId} />
               )}
           </VStack>
         );
       }}
       RenderActionExecutionMessage={({ message }) => {
-        const message_ = message as ActionExecutionMessage & {
-          traceId?: string;
-        };
+        const message_ = message as ActionExecutionMessage;
+        const traceId = traceIdMap.get(message_.id);
 
         return (
-          <VStack align="flex-start" gap={6}>
+          <VStack align="flex-start" gap={6} css={fadeInCss}>
             <ToolCallMessage message={message_} />
-            {!smallerView && message_.traceId && (
-              <TraceMessage traceId={message_.traceId} />
+            {!smallerView && traceId && (
+              <TraceMessage traceId={traceId} />
             )}
           </VStack>
         );
       }}
       RenderResultMessage={({ message }) => {
-        const message_ = message as ResultMessage & { traceId?: string };
+        const message_ = message as ResultMessage;
+        const traceId = traceIdMap.get(message_.id);
 
         return (
-          <VStack align="flex-start" gap={6}>
+          <VStack align="flex-start" gap={6} css={fadeInCss}>
             <ToolResultMessage message={message_} />
-            {!smallerView && message_.traceId && (
-              <TraceMessage traceId={message_.traceId} />
+            {!smallerView && traceId && (
+              <TraceMessage traceId={traceId} />
             )}
           </VStack>
         );

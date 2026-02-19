@@ -20,6 +20,7 @@ import "@copilotkit/react-ui/styles.css";
 import "../../../simulations.css";
 import { useSimulationRouter } from "~/hooks/simulations";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
 import { api } from "~/utils/api";
 
 // Main component
@@ -35,16 +36,24 @@ export default function IndividualScenarioRunPage() {
     projectSlug: project?.slug,
   });
   // Fetch scenario run data using the correct API
-  const { data: scenarioState } = api.scenarios.getRunState.useQuery(
+  const { data: scenarioState, refetch } = api.scenarios.getRunState.useQuery(
     {
       scenarioRunId: scenarioRunId ?? "",
       projectId: project?.id ?? "",
     },
     {
       enabled: !!project?.id && !!scenarioRunId,
-      refetchInterval: 1000,
+      refetchInterval: 10_000,
     },
   );
+
+  useSimulationUpdateListener({
+    projectId: project?.id ?? "",
+    refetch,
+    enabled: !!project?.id && !!scenarioRunId,
+    debounceMs: 300,
+    filter: scenarioRunId ? { scenarioRunId } : undefined,
+  });
 
   const results = scenarioState?.results;
   const scenarioId = scenarioState?.scenarioId;
