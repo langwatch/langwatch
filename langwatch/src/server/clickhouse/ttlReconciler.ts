@@ -42,9 +42,9 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
     hardcodedDefault: 30,
   },
   {
-    table: "evaluation_states",
+    table: "evaluation_runs",
     ttlColumn: "UpdatedAt",
-    envVar: "TIERED_EVALUATION_STATES_TABLE_HOT_DAYS",
+    envVar: "TIERED_EVALUATION_RUNS_TABLE_HOT_DAYS",
     hardcodedDefault: 30,
   },
   {

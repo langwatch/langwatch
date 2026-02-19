@@ -1,7 +1,7 @@
 import type { FilterField } from "../types";
 import {
   ATTRIBUTE_KEYS,
-  buildEvaluationStatesConditions,
+  buildEvaluationRunsConditions,
   buildQueryFilter,
   buildScopeConditions,
   buildStoredSpansConditions,
@@ -334,11 +334,11 @@ export const clickHouseFilters: Record<
     extractResults: extractStandardResults,
   },
 
-  // Evaluation filters - using evaluation_states table
-  // Note: evaluation_states filters require a join with trace_summaries for scope conditions
+  // Evaluation filters - using evaluation_runs table
+  // Note: evaluation_runs filters require a join with trace_summaries for scope conditions
   // For now, we'll add scope via a subquery when scopeFilters are present
   "evaluations.evaluator_id": {
-    tableName: "evaluation_states",
+    tableName: "evaluation_runs",
     buildQuery: (params) => {
       const { sql: scopeSql } = buildScopeConditions(params);
       const scopeJoin = scopeSql
@@ -349,8 +349,8 @@ export const clickHouseFilters: Record<
           EvaluatorId as field,
           if(EvaluatorName != '', concat('[', EvaluatorType, '] ', EvaluatorName), concat('[', EvaluatorType, '] ', EvaluatorId)) as label,
           count() as count
-        FROM evaluation_states FINAL
-        WHERE ${buildEvaluationStatesConditions(params)}
+        FROM evaluation_runs FINAL
+        WHERE ${buildEvaluationRunsConditions(params)}
           ${params.query ? `AND lower(ifNull(EvaluatorName, '')) LIKE lower(concat({query:String}, '%'))` : ""}
           ${scopeJoin}
         GROUP BY EvaluatorId, EvaluatorType, EvaluatorName
@@ -362,7 +362,7 @@ export const clickHouseFilters: Record<
   },
 
   "evaluations.evaluator_id.guardrails_only": {
-    tableName: "evaluation_states",
+    tableName: "evaluation_runs",
     buildQuery: (params) => {
       const { sql: scopeSql } = buildScopeConditions(params);
       const scopeJoin = scopeSql
@@ -373,8 +373,8 @@ export const clickHouseFilters: Record<
           EvaluatorId as field,
           if(EvaluatorName != '', concat('[', EvaluatorType, '] ', EvaluatorName), concat('[', EvaluatorType, '] ', EvaluatorId)) as label,
           count() as count
-        FROM evaluation_states FINAL
-        WHERE ${buildEvaluationStatesConditions(params)}
+        FROM evaluation_runs FINAL
+        WHERE ${buildEvaluationRunsConditions(params)}
           AND IsGuardrail = 1
           ${params.query ? `AND lower(ifNull(EvaluatorName, '')) LIKE lower(concat({query:String}, '%'))` : ""}
           ${scopeJoin}
@@ -387,7 +387,7 @@ export const clickHouseFilters: Record<
   },
 
   "evaluations.passed": {
-    tableName: "evaluation_states",
+    tableName: "evaluation_runs",
     buildQuery: (params) => {
       if (!params.key) {
         return `SELECT '' as field, '' as label, 0 as count WHERE false`;
@@ -401,8 +401,8 @@ export const clickHouseFilters: Record<
           if(Passed = 1, 'true', 'false') as field,
           if(Passed = 1, 'Passed', 'Failed') as label,
           count() as count
-        FROM evaluation_states FINAL
-        WHERE ${buildEvaluationStatesConditions(params)}
+        FROM evaluation_runs FINAL
+        WHERE ${buildEvaluationRunsConditions(params)}
           AND EvaluatorId = {key:String}
           AND Passed IS NOT NULL
           ${scopeJoin}
@@ -414,7 +414,7 @@ export const clickHouseFilters: Record<
   },
 
   "evaluations.score": {
-    tableName: "evaluation_states",
+    tableName: "evaluation_runs",
     buildQuery: (params) => {
       if (!params.key) {
         return `SELECT '' as field, '' as label, 0 as count WHERE false`;
@@ -427,8 +427,8 @@ export const clickHouseFilters: Record<
         SELECT
           min(Score) as min_score,
           max(Score) as max_score
-        FROM evaluation_states FINAL
-        WHERE ${buildEvaluationStatesConditions(params)}
+        FROM evaluation_runs FINAL
+        WHERE ${buildEvaluationRunsConditions(params)}
           AND EvaluatorId = {key:String}
           AND Score IS NOT NULL
           ${scopeJoin}
@@ -449,7 +449,7 @@ export const clickHouseFilters: Record<
   },
 
   "evaluations.state": {
-    tableName: "evaluation_states",
+    tableName: "evaluation_runs",
     buildQuery: (params) => {
       if (!params.key) {
         return `SELECT '' as field, '' as label, 0 as count WHERE false`;
@@ -463,8 +463,8 @@ export const clickHouseFilters: Record<
           Status as field,
           Status as label,
           count() as count
-        FROM evaluation_states FINAL
-        WHERE ${buildEvaluationStatesConditions(params)}
+        FROM evaluation_runs FINAL
+        WHERE ${buildEvaluationRunsConditions(params)}
           AND EvaluatorId = {key:String}
           AND Status NOT IN ('succeeded', 'failed')
           ${scopeJoin}
@@ -477,7 +477,7 @@ export const clickHouseFilters: Record<
   },
 
   "evaluations.label": {
-    tableName: "evaluation_states",
+    tableName: "evaluation_runs",
     buildQuery: (params) => {
       if (!params.key) {
         return `SELECT '' as field, '' as label, 0 as count WHERE false`;
@@ -491,8 +491,8 @@ export const clickHouseFilters: Record<
           Label as field,
           Label as label,
           count() as count
-        FROM evaluation_states FINAL
-        WHERE ${buildEvaluationStatesConditions(params)}
+        FROM evaluation_runs FINAL
+        WHERE ${buildEvaluationRunsConditions(params)}
           AND EvaluatorId = {key:String}
           AND Label IS NOT NULL
           AND Label != ''

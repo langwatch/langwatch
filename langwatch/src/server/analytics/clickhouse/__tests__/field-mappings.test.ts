@@ -56,10 +56,10 @@ describe("field-mappings", () => {
       );
     });
 
-    it("has mappings for evaluation fields with evaluation_states table", () => {
+    it("has mappings for evaluation fields with evaluation_runs table", () => {
       expect(fieldMappings["evaluations.evaluator_id"]).toBeDefined();
       expect(fieldMappings["evaluations.evaluator_id"]?.table).toBe(
-        "evaluation_states"
+        "evaluation_runs"
       );
       expect(fieldMappings["evaluations.evaluator_id"]?.column).toBe(
         "EvaluatorId"
@@ -101,11 +101,11 @@ describe("field-mappings", () => {
       expect(getTableForField("spans.model")).toBe("stored_spans");
     });
 
-    it("returns evaluation_states for evaluation fields", () => {
+    it("returns evaluation_runs for evaluation fields", () => {
       expect(getTableForField("evaluations.evaluator_id")).toBe(
-        "evaluation_states"
+        "evaluation_runs"
       );
-      expect(getTableForField("evaluations.score")).toBe("evaluation_states");
+      expect(getTableForField("evaluations.score")).toBe("evaluation_runs");
     });
 
     it("returns trace_summaries as default for unknown fields", () => {
@@ -141,8 +141,8 @@ describe("field-mappings", () => {
       expect(requiresJoin("spans.model")).toBe("stored_spans");
     });
 
-    it("returns evaluation_states for evaluation fields", () => {
-      expect(requiresJoin("evaluations.evaluator_id")).toBe("evaluation_states");
+    it("returns evaluation_runs for evaluation fields", () => {
+      expect(requiresJoin("evaluations.evaluator_id")).toBe("evaluation_runs");
     });
   });
 
@@ -154,8 +154,8 @@ describe("field-mappings", () => {
       expect(fields).toContain("events.event_type");
     });
 
-    it("returns fields for evaluation_states table", () => {
-      const fields = getFieldsRequiringTable("evaluation_states");
+    it("returns fields for evaluation_runs table", () => {
+      const fields = getFieldsRequiringTable("evaluation_runs");
       expect(fields).toContain("evaluations.evaluator_id");
       expect(fields).toContain("evaluations.score");
       expect(fields).toContain("evaluations.passed");
@@ -166,7 +166,7 @@ describe("field-mappings", () => {
     it("has correct aliases for all tables", () => {
       expect(tableAliases.trace_summaries).toBe("ts");
       expect(tableAliases.stored_spans).toBe("ss");
-      expect(tableAliases.evaluation_states).toBe("es");
+      expect(tableAliases.evaluation_runs).toBe("es");
     });
   });
 
@@ -174,7 +174,7 @@ describe("field-mappings", () => {
     it("returns correct alias for each table", () => {
       expect(getTableAlias("trace_summaries")).toBe("ts");
       expect(getTableAlias("stored_spans")).toBe("ss");
-      expect(getTableAlias("evaluation_states")).toBe("es");
+      expect(getTableAlias("evaluation_runs")).toBe("es");
     });
   });
 
@@ -190,9 +190,9 @@ describe("field-mappings", () => {
       expect(join).toContain("ts.TraceId = ss.TraceId");
     });
 
-    it("builds correct JOIN for evaluation_states", () => {
-      const join = buildJoinClause("evaluation_states");
-      expect(join).toContain("JOIN evaluation_states es FINAL");
+    it("builds correct JOIN for evaluation_runs", () => {
+      const join = buildJoinClause("evaluation_runs");
+      expect(join).toContain("JOIN evaluation_runs es FINAL");
       expect(join).toContain("ts.TenantId = es.TenantId");
       expect(join).toContain("ts.TraceId = es.TraceId");
     });

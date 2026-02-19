@@ -12,7 +12,7 @@
 export type CHTable =
   | "trace_summaries"
   | "stored_spans"
-  | "evaluation_states";
+  | "evaluation_runs";
 
 /**
  * Field mapping configuration
@@ -218,49 +218,49 @@ export const fieldMappings: Record<string, FieldMapping> = {
     isArray: true,
   },
 
-  // ===== Evaluation Fields (requires JOIN with evaluation_states) =====
+  // ===== Evaluation Fields (requires JOIN with evaluation_runs) =====
   "evaluations.evaluator_id": {
-    table: "evaluation_states",
+    table: "evaluation_runs",
     column: "EvaluatorId",
     description: "Evaluator identifier",
   },
   "evaluations.evaluation_id": {
-    table: "evaluation_states",
+    table: "evaluation_runs",
     column: "EvaluationId",
     description: "Evaluation instance identifier",
   },
   "evaluations.name": {
-    table: "evaluation_states",
+    table: "evaluation_runs",
     column: "EvaluatorName",
     description: "Evaluator name",
   },
   "evaluations.type": {
-    table: "evaluation_states",
+    table: "evaluation_runs",
     column: "EvaluatorType",
     description: "Evaluator type",
   },
   "evaluations.score": {
-    table: "evaluation_states",
+    table: "evaluation_runs",
     column: "Score",
     description: "Evaluation score",
   },
   "evaluations.passed": {
-    table: "evaluation_states",
+    table: "evaluation_runs",
     column: "Passed",
     description: "Whether evaluation passed (0/1)",
   },
   "evaluations.label": {
-    table: "evaluation_states",
+    table: "evaluation_runs",
     column: "Label",
     description: "Evaluation label",
   },
   "evaluations.status": {
-    table: "evaluation_states",
+    table: "evaluation_runs",
     column: "Status",
     description: "Evaluation processing status",
   },
   "evaluations.is_guardrail": {
-    table: "evaluation_states",
+    table: "evaluation_runs",
     column: "IsGuardrail",
     description: "Whether this is a guardrail evaluation",
   },
@@ -383,7 +383,7 @@ export function getFieldsRequiringTable(table: CHTable): string[] {
 export const tableAliases: Record<CHTable, string> = {
   trace_summaries: "ts",
   stored_spans: "ss",
-  evaluation_states: "es",
+  evaluation_runs: "es",
 };
 
 /**
@@ -403,8 +403,8 @@ export function buildJoinClause(table: CHTable): string {
   switch (table) {
     case "stored_spans":
       return `JOIN stored_spans ${alias} FINAL ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
-    case "evaluation_states":
-      return `JOIN evaluation_states ${alias} FINAL ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
+    case "evaluation_runs":
+      return `JOIN evaluation_runs ${alias} FINAL ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
     default:
       return "";
   }
