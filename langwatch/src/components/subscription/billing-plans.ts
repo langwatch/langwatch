@@ -31,7 +31,8 @@ export const DEVELOPER_FEATURES = [
  */
 export const GROWTH_FEATURES = [
   "Up to 20 core users",
-  "200,000 events/month (Included)",
+  "200,000 events included",
+  "$1 per additional 100,000 events",
   "Unlimited lite users",
   "30 days retention",
   "Unlimited evals",
