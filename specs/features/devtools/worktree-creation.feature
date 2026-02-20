@@ -80,10 +80,13 @@ Feature: Streamlined worktree creation
     Then all .env* files are copied to the new worktree
 
   @integration
-  Scenario: Succeeds when no .env files exist
+  Scenario: Warns when .env files are missing from main checkout
     Given no .env files exist in the current working tree
+    And .env.example files exist in langwatch/ and langwatch_nlp/
     When I run the worktree script with argument "add-dark-mode"
     Then the worktree is created successfully
+    And a warning is printed for each missing .env file
+    And the warning suggests copying from .env.example
 
   @integration
   Scenario: Exits when worktree directory already exists

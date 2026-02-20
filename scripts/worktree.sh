@@ -121,15 +121,37 @@ main() {
     git worktree add -b "$branch" "$dir" origin/main
   fi
 
-  # Copy .env files from repo root and subdirectories that need them
+  # Copy .env files from repo root and subdirectories that need them.
+  # Warns when a required .env is missing so the developer knows to create one.
+  local env_warnings=0
   for src_dir in "." "langwatch" "langwatch_nlp"; do
     local dest="${dir}"
     [ "$src_dir" != "." ] && dest="${dir}/${src_dir}"
+
+    local has_env=false
     for f in "${src_dir}"/.env*; do
       [ -f "$f" ] || continue
       cp "$f" "${dest}/"
+      has_env=true
     done
+
+    # Check that a .env file (not just .env.example) was copied
+    if [ "$has_env" = false ] || [ ! -f "${src_dir}/.env" ]; then
+      local display_dir="$src_dir"
+      [ "$src_dir" = "." ] && display_dir="(repo root)"
+      echo "WARNING: ${display_dir}/.env not found in main checkout" >&2
+      if [ -f "${src_dir}/.env.example" ]; then
+        echo "  → cp ${src_dir}/.env.example ${src_dir}/.env  (then re-run or copy manually)" >&2
+      fi
+      env_warnings=$((env_warnings + 1))
+    fi
   done
+
+  if [ "$env_warnings" -gt 0 ]; then
+    echo "" >&2
+    echo "Some .env files are missing. The worktree may not work correctly without them." >&2
+    echo "Create them in the main checkout, then copy to: ${abs_dir}" >&2
+  fi
 
   # Install dependencies
   echo ""
