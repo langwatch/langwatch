@@ -5,6 +5,7 @@
 .pytest_cache
 .venv
 *.generated.*
+!langevals/ts-integration/evaluators.generated.ts
 .DS_Store
 .github
 .env
