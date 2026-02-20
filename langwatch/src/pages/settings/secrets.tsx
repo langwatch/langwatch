@@ -223,12 +223,11 @@ export default function SecretsPage() {
                     placeholder="e.g., OPENAI_API_KEY"
                     value={newSecretName}
                     onChange={(e) =>
-                      setNewSecretName(e.target.value.toUpperCase())
+                      setNewSecretName(
+                        e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, "")
+                      )
                     }
                   />
-                  <Text fontSize="sm" color="fg.muted">
-                    Use UPPER_SNAKE_CASE (e.g., OPENAI_API_KEY)
-                  </Text>
                 </VStack>
                 <VStack gap={1} align="start" width="full">
                   <Text fontWeight="medium">Value</Text>
