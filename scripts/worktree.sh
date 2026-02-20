@@ -134,7 +134,7 @@ main() {
   # Install dependencies
   echo ""
   echo "Installing dependencies..."
-  (cd "$dir" && pnpm install)
+  (cd "$dir" && cd langwatch && pnpm install && pnpm start:prepare:files && pnpm start:prepare:db)
 
   # Print summary
   echo ""
