@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.5.0](https://github.com/langwatch/langwatch/compare/mcp-server@v0.4.0...mcp-server@v0.5.0) (2026-02-20)
+
+
+### Features
+
+* add scenario management tools to MCP server ([#1705](https://github.com/langwatch/langwatch/issues/1705)) ([0376fde](https://github.com/langwatch/langwatch/commit/0376fde0abff7b110b4ec5996a399c4b2ceafde0))
+
+
+### Miscellaneous
+
+* **deps-dev:** bump @eslint/js from 9.35.0 to 9.39.2 in /mcp-server ([#1465](https://github.com/langwatch/langwatch/issues/1465)) ([fbee07d](https://github.com/langwatch/langwatch/commit/fbee07d8b964d0a059eaa32c7685c8bf667898e7))
+* **deps:** bump hono ([f7e8f05](https://github.com/langwatch/langwatch/commit/f7e8f056843958cac4504ae02f37a351457f77ee))
+* **deps:** bump hono from 4.11.9 to 4.12.0 in /mcp-server in the npm_and_yarn group across 1 directory ([#1736](https://github.com/langwatch/langwatch/issues/1736)) ([f7e8f05](https://github.com/langwatch/langwatch/commit/f7e8f056843958cac4504ae02f37a351457f77ee))
+* **deps:** bump node-pty from 1.0.0 to 1.1.0 in /mcp-server ([#1447](https://github.com/langwatch/langwatch/issues/1447)) ([12ad02c](https://github.com/langwatch/langwatch/commit/12ad02c19dcc0ba90ad32f77659816b768188a53))
+* **deps:** bump qs ([f0e9747](https://github.com/langwatch/langwatch/commit/f0e97475becd58dfa523a944fbb3fa0657dfc1dc))
+* **deps:** bump qs from 6.14.1 to 6.14.2 in /mcp-server in the npm_and_yarn group across 1 directory ([#1568](https://github.com/langwatch/langwatch/issues/1568)) ([f0e9747](https://github.com/langwatch/langwatch/commit/f0e97475becd58dfa523a944fbb3fa0657dfc1dc))
+* **deps:** bump the npm_and_yarn group across 1 directory with 8 updates ([#1519](https://github.com/langwatch/langwatch/issues/1519)) ([487e563](https://github.com/langwatch/langwatch/commit/487e5637a941fa9335ec8e951efdf38bb0a02a8c))
+* **deps:** bump the uv group across 1 directory with 7 updates ([#1516](https://github.com/langwatch/langwatch/issues/1516)) ([7f2f178](https://github.com/langwatch/langwatch/commit/7f2f178588d89a63f3b38510844b87de7b528b3b))
+
 ## [0.4.0](https://github.com/langwatch/langwatch/compare/mcp-server@v0.3.3...mcp-server@v0.4.0) (2026-02-08)
 
 
