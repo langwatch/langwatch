@@ -18,6 +18,7 @@
 * **deps:** bump qs from 6.14.1 to 6.14.2 in /mcp-server in the npm_and_yarn group across 1 directory ([#1568](https://github.com/langwatch/langwatch/issues/1568)) ([f0e9747](https://github.com/langwatch/langwatch/commit/f0e97475becd58dfa523a944fbb3fa0657dfc1dc))
 * **deps:** bump the npm_and_yarn group across 1 directory with 8 updates ([#1519](https://github.com/langwatch/langwatch/issues/1519)) ([487e563](https://github.com/langwatch/langwatch/commit/487e5637a941fa9335ec8e951efdf38bb0a02a8c))
 * **deps:** bump the uv group across 1 directory with 7 updates ([#1516](https://github.com/langwatch/langwatch/issues/1516)) ([7f2f178](https://github.com/langwatch/langwatch/commit/7f2f178588d89a63f3b38510844b87de7b528b3b))
+* **main:** release mcp-server 0.5.0 ([#1529](https://github.com/langwatch/langwatch/issues/1529)) ([c258a15](https://github.com/langwatch/langwatch/commit/c258a15842c523e722e424c653a96f60fa6ec1dd))
 
 ## [0.4.0](https://github.com/langwatch/langwatch/compare/mcp-server@v0.3.3...mcp-server@v0.4.0) (2026-02-08)
 
