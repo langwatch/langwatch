@@ -10,7 +10,7 @@ importers:
     dependencies:
       '@modelcontextprotocol/sdk':
         specifier: ^1.7.0
-        version: 1.26.0(zod@3.25.76)
+        version: 1.26.0(zod@4.3.6)
       '@opentelemetry/context-async-hooks':
         specifier: ^2.1.0
         version: 2.1.0(@opentelemetry/api@1.9.0)
@@ -33,15 +33,15 @@ importers:
         specifier: ^17.7.2
         version: 17.7.2
       zod:
-        specifier: ^3.25.76
-        version: 3.25.76
+        specifier: ^4.3.6
+        version: 4.3.6
       zod-validation-error:
         specifier: ^3.5.3
-        version: 3.5.3(zod@3.25.76)
+        version: 3.5.3(zod@4.3.6)
     devDependencies:
       '@ai-sdk/anthropic':
         specifier: ^2.0.15
-        version: 2.0.15(zod@3.25.76)
+        version: 2.0.15(zod@4.3.6)
       '@anthropic-ai/claude-code':
         specifier: ^2.1.7
         version: 2.1.7
@@ -50,7 +50,7 @@ importers:
         version: 9.39.2
       '@langwatch/scenario':
         specifier: ^0.3.0
-        version: 0.3.0(ai@5.0.52(zod@3.25.76))(vitest@3.2.4(@types/debug@4.1.12)(@types/node@16.18.126)(tsx@4.20.5))
+        version: 0.3.0(ai@5.0.52(zod@4.3.6))(vitest@3.2.4(@types/debug@4.1.12)(@types/node@16.18.126)(tsx@4.20.5))
       '@types/debug':
         specifier: ^4.1.12
         version: 4.1.12
@@ -68,7 +68,7 @@ importers:
         version: 7.0.0-dev.20250911.1
       ai:
         specifier: ^5.0.40
-        version: 5.0.52(zod@3.25.76)
+        version: 5.0.52(zod@4.3.6)
       dotenv:
         specifier: ^17.2.2
         version: 17.2.2
@@ -2419,6 +2419,9 @@ packages:
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
+  zod@4.3.6:
+    resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
+
 snapshots:
 
   '@ag-ui/core@0.0.28':
@@ -2426,17 +2429,17 @@ snapshots:
       rxjs: 7.8.1
       zod: 3.25.76
 
-  '@ai-sdk/anthropic@2.0.15(zod@3.25.76)':
+  '@ai-sdk/anthropic@2.0.15(zod@4.3.6)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
-      '@ai-sdk/provider-utils': 3.0.8(zod@3.25.76)
-      zod: 3.25.76
+      '@ai-sdk/provider-utils': 3.0.8(zod@4.3.6)
+      zod: 4.3.6
 
-  '@ai-sdk/gateway@1.0.29(zod@3.25.76)':
+  '@ai-sdk/gateway@1.0.29(zod@4.3.6)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
-      '@ai-sdk/provider-utils': 3.0.9(zod@3.25.76)
-      zod: 3.25.76
+      '@ai-sdk/provider-utils': 3.0.9(zod@4.3.6)
+      zod: 4.3.6
 
   '@ai-sdk/openai@2.0.27(zod@3.25.76)':
     dependencies:
@@ -2451,12 +2454,19 @@ snapshots:
       eventsource-parser: 3.0.6
       zod: 3.25.76
 
-  '@ai-sdk/provider-utils@3.0.9(zod@3.25.76)':
+  '@ai-sdk/provider-utils@3.0.8(zod@4.3.6)':
+    dependencies:
+      '@ai-sdk/provider': 2.0.0
+      '@standard-schema/spec': 1.0.0
+      eventsource-parser: 3.0.6
+      zod: 4.3.6
+
+  '@ai-sdk/provider-utils@3.0.9(zod@4.3.6)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
       '@standard-schema/spec': 1.1.0
       eventsource-parser: 3.0.6
-      zod: 3.25.76
+      zod: 4.3.6
 
   '@ai-sdk/provider@2.0.0':
     dependencies:
@@ -2763,11 +2773,11 @@ snapshots:
 
   '@js-sdsl/ordered-map@4.4.2': {}
 
-  '@langwatch/scenario@0.3.0(ai@5.0.52(zod@3.25.76))(vitest@3.2.4(@types/debug@4.1.12)(@types/node@16.18.126)(tsx@4.20.5))':
+  '@langwatch/scenario@0.3.0(ai@5.0.52(zod@4.3.6))(vitest@3.2.4(@types/debug@4.1.12)(@types/node@16.18.126)(tsx@4.20.5))':
     dependencies:
       '@ag-ui/core': 0.0.28
       '@ai-sdk/openai': 2.0.27(zod@3.25.76)
-      ai: 5.0.52(zod@3.25.76)
+      ai: 5.0.52(zod@4.3.6)
       chalk: 5.6.2
       open: 10.2.0
       rxjs: 7.8.2
@@ -2775,7 +2785,7 @@ snapshots:
       xksuid: 0.0.4
       zod: 3.25.76
 
-  '@modelcontextprotocol/sdk@1.26.0(zod@3.25.76)':
+  '@modelcontextprotocol/sdk@1.26.0(zod@4.3.6)':
     dependencies:
       '@hono/node-server': 1.19.9(hono@4.12.0)
       ajv: 8.17.1
@@ -2792,8 +2802,8 @@ snapshots:
       json-schema-typed: 8.0.2
       pkce-challenge: 5.0.1
       raw-body: 3.0.2
-      zod: 3.25.76
-      zod-to-json-schema: 3.25.1(zod@3.25.76)
+      zod: 4.3.6
+      zod-to-json-schema: 3.25.1(zod@4.3.6)
     transitivePeerDependencies:
       - supports-color
 
@@ -3333,13 +3343,13 @@ snapshots:
 
   acorn@8.15.0: {}
 
-  ai@5.0.52(zod@3.25.76):
+  ai@5.0.52(zod@4.3.6):
     dependencies:
-      '@ai-sdk/gateway': 1.0.29(zod@3.25.76)
+      '@ai-sdk/gateway': 1.0.29(zod@4.3.6)
       '@ai-sdk/provider': 2.0.0
-      '@ai-sdk/provider-utils': 3.0.9(zod@3.25.76)
+      '@ai-sdk/provider-utils': 3.0.9(zod@4.3.6)
       '@opentelemetry/api': 1.9.0
-      zod: 3.25.76
+      zod: 4.3.6
 
   ajv-formats@3.0.1(ajv@8.17.1):
     optionalDependencies:
@@ -4669,12 +4679,14 @@ snapshots:
 
   yocto-queue@0.1.0: {}
 
-  zod-to-json-schema@3.25.1(zod@3.25.76):
+  zod-to-json-schema@3.25.1(zod@4.3.6):
     dependencies:
-      zod: 3.25.76
+      zod: 4.3.6
 
-  zod-validation-error@3.5.3(zod@3.25.76):
+  zod-validation-error@3.5.3(zod@4.3.6):
     dependencies:
-      zod: 3.25.76
+      zod: 4.3.6
 
   zod@3.25.76: {}
+
+  zod@4.3.6: {}
