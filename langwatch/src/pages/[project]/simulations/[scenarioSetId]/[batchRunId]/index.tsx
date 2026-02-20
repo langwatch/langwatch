@@ -36,6 +36,18 @@ export default function SimulationSetPage() {
     },
   );
 
+  // Fetch batch history to redirect when batchRunId is missing
+  const { data: batchHistory } = api.scenarios.getScenarioSetBatchHistory.useQuery(
+    {
+      projectId: project?.id ?? "",
+      scenarioSetId: scenarioSetId ?? "",
+      limit: 1,
+    },
+    {
+      enabled: !!project?.id && !!scenarioSetId && !batchRunId,
+    },
+  );
+
   // Reset state when navigating to a different batch run
   useEffect(() => {
     if (batchRunId !== lastBatchRunIdRef.current) {
@@ -77,13 +89,14 @@ export default function SimulationSetPage() {
     onNewBatchRun: handleNewBatchRun,
   });
 
+  // Redirect to latest batch run when batchRunId is missing
   useEffect(() => {
-    if (!scenarioSetId) return;
-    if (!batchRunId && batchRunData?.changed && batchRunData.runs.length > 0) {
-      const lastRun = batchRunData.runs[batchRunData.runs.length - 1];
-      if (lastRun) goToSimulationBatchRuns(scenarioSetId, lastRun.batchRunId, { replace: true });
+    if (!scenarioSetId || batchRunId) return;
+    const latestRun = batchHistory?.batches?.[0];
+    if (latestRun) {
+      goToSimulationBatchRuns(scenarioSetId, latestRun.batchRunId, { replace: true });
     }
-  }, [batchRunData, scenarioSetId, batchRunId, goToSimulationBatchRuns]);
+  }, [batchHistory, scenarioSetId, batchRunId, goToSimulationBatchRuns]);
 
   return (
     <SimulationLayout>

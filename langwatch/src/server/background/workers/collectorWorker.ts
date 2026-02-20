@@ -1095,6 +1095,7 @@ export const fetchExistingMD5s = async (
 function estimatePayloadSize(obj: any): number {
   if (obj === null || obj === undefined) return 0;
   let bytes = 0;
+  const seen = new WeakSet<object>();
 
   const stack = [obj];
   while (stack.length > 0) {
@@ -1107,6 +1108,8 @@ function estimatePayloadSize(obj: any): number {
     } else if (typeof value === "boolean") {
       bytes += 4;
     } else if (typeof value === "object" && value !== null) {
+      if (seen.has(value)) continue;
+      seen.add(value);
       if (Array.isArray(value)) {
         for (let i = 0; i < value.length; i++) {
           stack.push(value[i]);

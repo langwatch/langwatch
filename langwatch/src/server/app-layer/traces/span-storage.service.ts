@@ -22,7 +22,7 @@ export class SpanStorageService {
     await this.repository.insertSpan(span);
   }
 
-  async getSpansByTraceId(tenantId: string, traceId: string): Promise<Span[]> {
-    return this.repository.getSpansByTraceId(tenantId, traceId);
+  async getSpansByTraceId({ tenantId, traceId }: { tenantId: string; traceId: string }): Promise<Span[]> {
+    return this.repository.getSpansByTraceId({ tenantId, traceId });
   }
 }

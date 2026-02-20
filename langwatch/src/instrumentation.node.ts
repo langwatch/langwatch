@@ -90,7 +90,7 @@ if (spanProcessors.length > 0 || logRecordProcessors.length > 0) {
 				"@opentelemetry/instrumentation-router": { enabled: false },
 
 				// Truncate ioredis db.statement to command + first key
-				// (avoud logging content + large attribtes)
+				// (avoid logging content + large attributes)
 				"@opentelemetry/instrumentation-ioredis": {
 					dbStatementSerializer: (
 						cmdName: string,

@@ -82,7 +82,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     }
   }
 
-  async getSpansByTraceId(tenantId: string, traceId: string): Promise<Span[]> {
+  async getSpansByTraceId({ tenantId, traceId }: { tenantId: string; traceId: string }): Promise<Span[]> {
     const result = await this.clickHouseClient.query({
       query: `
         SELECT

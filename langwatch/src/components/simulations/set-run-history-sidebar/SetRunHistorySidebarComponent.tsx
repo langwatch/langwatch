@@ -130,6 +130,7 @@ export const SetRunHistorySidebarComponent = (
             onClick={pagination.onPrevPage}
             disabled={!pagination.hasPrevPage}
             px={2}
+            aria-label="Previous page"
           >
             <Icon as={ChevronLeft} boxSize={4} />
           </Button>
@@ -145,6 +146,7 @@ export const SetRunHistorySidebarComponent = (
             onClick={pagination.onNextPage}
             disabled={!pagination.hasNextPage}
             px={2}
+            aria-label="Next page"
           >
             <Icon as={ChevronRight} boxSize={4} />
           </Button>

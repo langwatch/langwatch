@@ -23,7 +23,7 @@ function SimulationsPageContent() {
   } = api.scenarios.getScenarioSetsData.useQuery(
     { projectId: project?.id ?? "" },
     {
-      refetchInterval: 10_000,
+      refetchInterval: 60_000,
       enabled: !!project,
     },
   );

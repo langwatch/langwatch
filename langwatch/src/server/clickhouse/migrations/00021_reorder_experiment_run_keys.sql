@@ -16,6 +16,11 @@
 -- to maintain fast experiment-scoped lookups.
 -- ============================================================================
 
+-- NOTE: DROP + recreate is acceptable here because experiment_runs and
+-- experiment_run_items are projections derived from the event-sourcing log.
+-- Data can be fully re-derived by replaying events, so no production data is
+-- permanently lost by this migration.
+
 -- +goose StatementBegin
 DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.experiment_runs SYNC;
 -- +goose StatementEnd

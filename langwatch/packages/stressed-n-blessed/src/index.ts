@@ -5,6 +5,7 @@ import { performance } from 'node:perf_hooks';
 import { SpanKind, context, trace } from '@opentelemetry/api';
 import { program } from 'commander';
 import { getLangWatchTracer } from 'langwatch/observability';
+import { setupObservability } from 'langwatch/observability/node';
 
 import { getRandomSpanGenerator } from './generators.js';
 import {

@@ -538,6 +538,10 @@ export async function* runOrchestrator(
       ? getDefaultBatchEvaluationRepository()
       : null;
 
+  // Track CH dispatch failures for observability
+  let chDispatchFailures = 0;
+  let chDispatchTotal = 0;
+
   // Accumulate results for batch saving
   const pendingDataset: DatasetEntry[] = [];
   const pendingEvaluations: EvaluationEntry[] = [];
@@ -605,6 +609,7 @@ export async function* runOrchestrator(
     });
 
     // Dispatch event to ClickHouse for dual-write
+    chDispatchTotal++;
     void commands.startExperimentRun({
       tenantId: projectId,
       runId,
@@ -613,7 +618,10 @@ export async function* runOrchestrator(
       total: totalCells,
       targets: targetMetadata,
       occurredAt: Date.now(),
-    }).catch((err) => logger.warn({ err, runId }, "Failed to dispatch startExperimentRun to CH"));
+    }).catch((err) => {
+      chDispatchFailures++;
+      logger.warn({ err, runId }, "Failed to dispatch startExperimentRun to CH");
+    });
   }
 
   // Helper to save pending results
@@ -717,6 +725,7 @@ export async function* runOrchestrator(
       });
 
       // Dispatch event to ClickHouse for dual-write
+      chDispatchTotal++;
       void commands.recordTargetResult({
         tenantId: projectId,
         runId,
@@ -733,7 +742,10 @@ export async function* runOrchestrator(
         error: event.error ?? null,
         traceId: event.traceId ?? null,
         occurredAt: Date.now(),
-      }).catch((err) => logger.warn({ err, runId }, "Failed to dispatch recordTargetResult to CH"));
+      }).catch((err) => {
+        chDispatchFailures++;
+        logger.warn({ err, runId }, "Failed to dispatch recordTargetResult to CH");
+      });
     } else if (event.type === "error") {
       // Store error events as dataset entries with the error message
       // This captures errors that occur during cell execution (e.g., network errors)
@@ -752,6 +764,7 @@ export async function* runOrchestrator(
         });
 
         // Dispatch error as target result to ClickHouse
+        chDispatchTotal++;
         void commands.recordTargetResult({
           tenantId: projectId,
           runId,
@@ -765,7 +778,10 @@ export async function* runOrchestrator(
           error: event.message,
           traceId: null,
           occurredAt: Date.now(),
-        }).catch((err) => logger.warn({ err, runId }, "Failed to dispatch recordTargetResult to CH"));
+        }).catch((err) => {
+          chDispatchFailures++;
+          logger.warn({ err, runId }, "Failed to dispatch recordTargetResult to CH");
+        });
       }
     } else if (event.type === "evaluator_result") {
       const result = event.result as SingleEvaluationResult;
@@ -798,6 +814,7 @@ export async function* runOrchestrator(
       });
 
       // Dispatch event to ClickHouse for dual-write
+      chDispatchTotal++;
       void commands.recordEvaluatorResult({
         tenantId: projectId,
         runId,
@@ -821,7 +838,10 @@ export async function* runOrchestrator(
           result.status === "processed" && result.cost
             ? result.cost.amount
             : null,
-      }).catch((err) => logger.warn({ err, runId }, "Failed to dispatch recordEvaluatorResult to CH"));
+      }).catch((err) => {
+        chDispatchFailures++;
+        logger.warn({ err, runId }, "Failed to dispatch recordEvaluatorResult to CH");
+      });
     } else if (event.type === "progress") {
       pendingProgress = event.completed;
     }
@@ -1051,13 +1071,17 @@ export async function* runOrchestrator(
         });
 
         // Dispatch completion event to ClickHouse for dual-write
+        chDispatchTotal++;
         void commands.completeExperimentRun({
           tenantId: projectId,
           runId,
           finishedAt: aborted ? null : finishedAt,
           stoppedAt: aborted ? finishedAt : null,
           occurredAt: Date.now(),
-        }).catch((err) => logger.warn({ err, runId }, "Failed to dispatch completeExperimentRun to CH"));
+        }).catch((err) => {
+          chDispatchFailures++;
+          logger.warn({ err, runId }, "Failed to dispatch completeExperimentRun to CH");
+        });
       } catch (error) {
         logger.error(
           { error, runId },
@@ -1065,6 +1089,14 @@ export async function* runOrchestrator(
         );
       }
     }
+  }
+
+  // Log CH dispatch failure summary if any failed
+  if (chDispatchFailures > 0) {
+    logger.warn(
+      { runId, chDispatchFailures, chDispatchTotal },
+      `${chDispatchFailures} of ${chDispatchTotal} CH dispatches failed for run ${runId}`,
+    );
   }
 
   // Only emit done if not aborted
@@ -1084,6 +1116,7 @@ export async function* runOrchestrator(
       completedCells,
       failedCells,
       duration,
+      ...(chDispatchFailures > 0 && { chDispatchFailures }),
       timestamps: {
         startedAt: startTime,
         finishedAt,

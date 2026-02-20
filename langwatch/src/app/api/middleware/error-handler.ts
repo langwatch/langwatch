@@ -39,11 +39,14 @@ function determineErrorResponse(
     name?: string;
   },
 ): { statusCode: ContentfulStatusCode; response: object } {
-  // DomainErrors are handled first — they carry their own status and serialized shape
+  // DomainErrors are handled first — normalize to client-safe shape
   if (DomainError.is(error)) {
     return {
       statusCode: error.httpStatus as ContentfulStatusCode,
-      response: error.serialize(),
+      response: errorSchema.parse({
+        error: error.kind,
+        message: error.message,
+      }),
     };
   }
 

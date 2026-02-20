@@ -78,68 +78,94 @@ export function createEvaluationEsSyncReactor(
 
       const traceId = foldState.traceId;
 
-      try {
-        const client = await deps.esClient({ projectId: tenantId });
-        await client.update({
-          index: deps.traceIndex.alias,
-          id: deps.traceIndexId({ traceId, projectId: tenantId }),
-          retry_on_conflict: 10,
-          body: {
-            script: {
-              source: `
-              if (ctx._source.evaluations == null) {
-                ctx._source.evaluations = [];
-              }
-              def newEvaluation = params.newEvaluation;
-              def found = false;
-              for (int i = 0; i < ctx._source.evaluations.size(); i++) {
-                if (ctx._source.evaluations[i].evaluation_id == newEvaluation.evaluation_id) {
-                  ctx._source.evaluations[i] = newEvaluation;
-                  found = true;
-                  break;
-                }
-              }
-              if (!found) {
-                if (newEvaluation.timestamps == null) {
-                  newEvaluation.timestamps = new HashMap();
-                }
-                newEvaluation.timestamps.inserted_at = System.currentTimeMillis();
-                ctx._source.evaluations.add(newEvaluation);
-              }
-            `,
-              lang: "painless",
-              params: { newEvaluation: evaluation },
-            },
-            upsert: {
-              trace_id: traceId,
-              project_id: tenantId,
-              timestamps: {
-                inserted_at: Date.now(),
-                started_at: Date.now(),
-                updated_at: Date.now(),
-              },
-              evaluations: [evaluation],
-            },
-          },
-          refresh: true,
-        });
+      const MAX_RETRIES = 3;
+      const BASE_DELAY_MS = 1000;
+      let lastError: unknown;
 
-        logger.debug(
-          { tenantId, traceId, evaluationId: foldState.evaluationId },
-          "Synced evaluation to ES",
-        );
-      } catch (error) {
-        logger.error(
-          {
-            tenantId,
-            traceId,
-            evaluationId: foldState.evaluationId,
-            error: error instanceof Error ? error.message : String(error),
-          },
-          "Failed to sync evaluation to ES",
-        );
-        throw error;
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          const client = await deps.esClient({ projectId: tenantId });
+          await client.update({
+            index: deps.traceIndex.alias,
+            id: deps.traceIndexId({ traceId, projectId: tenantId }),
+            retry_on_conflict: 10,
+            body: {
+              script: {
+                source: `
+                if (ctx._source.evaluations == null) {
+                  ctx._source.evaluations = [];
+                }
+                def newEvaluation = params.newEvaluation;
+                def found = false;
+                for (int i = 0; i < ctx._source.evaluations.size(); i++) {
+                  if (ctx._source.evaluations[i].evaluation_id == newEvaluation.evaluation_id) {
+                    ctx._source.evaluations[i] = newEvaluation;
+                    found = true;
+                    break;
+                  }
+                }
+                if (!found) {
+                  if (newEvaluation.timestamps == null) {
+                    newEvaluation.timestamps = new HashMap();
+                  }
+                  newEvaluation.timestamps.inserted_at = System.currentTimeMillis();
+                  ctx._source.evaluations.add(newEvaluation);
+                }
+              `,
+                lang: "painless",
+                params: { newEvaluation: evaluation },
+              },
+              upsert: {
+                trace_id: traceId,
+                project_id: tenantId,
+                timestamps: {
+                  inserted_at: Date.now(),
+                  started_at: Date.now(),
+                  updated_at: Date.now(),
+                },
+                evaluations: [evaluation],
+              },
+            },
+            refresh: true,
+          });
+
+          logger.debug(
+            { tenantId, traceId, evaluationId: foldState.evaluationId },
+            "Synced evaluation to ES",
+          );
+          return; // Success — exit retry loop
+        } catch (error) {
+          lastError = error;
+          if (attempt < MAX_RETRIES) {
+            const delayMs = BASE_DELAY_MS * Math.pow(2, attempt - 1);
+            logger.warn(
+              {
+                tenantId,
+                traceId,
+                evaluationId: foldState.evaluationId,
+                attempt,
+                maxRetries: MAX_RETRIES,
+                delayMs,
+                error: error instanceof Error ? error.message : String(error),
+              },
+              "ES sync failed, retrying",
+            );
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
+          }
+        }
       }
+
+      // All retries exhausted
+      logger.error(
+        {
+          tenantId,
+          traceId,
+          evaluationId: foldState.evaluationId,
+          error: lastError instanceof Error ? lastError.message : String(lastError),
+        },
+        `Failed to sync evaluation to ES after ${MAX_RETRIES} attempts`,
+      );
+      throw lastError;
     },
   };
 }

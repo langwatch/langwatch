@@ -42,7 +42,7 @@ export class App {
 
   async close(): Promise<void> {
     await Promise.allSettled([
-      async () => {
+      (async () => {
         if (this._eventSourcing) {
           try {
             await this._eventSourcing.close();
@@ -50,7 +50,7 @@ export class App {
             logger.error({ error }, "Failed to close EventSourcing");
           }
         }
-      },
+      })(),
       ...this._gracefulCloseables.map(async (c) => {
         try {
           await c.close();

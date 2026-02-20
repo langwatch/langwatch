@@ -111,16 +111,16 @@ export class UsageService {
       return 0;
     }
 
-    const useBillableEvents = true; // TODO(afr): don't forget about this one!!
-      // await this.organizationService.isFeatureEnabled(
-      //   organizationId,
-      //   BILLABLE_EVENTS_FEATURE,
-      // );
+    const useBillableEvents =
+      await this.organizationService.isFeatureEnabled(
+        organizationId,
+        BILLABLE_EVENTS_FEATURE,
+      );
 
     let total: number;
     if (useBillableEvents) {
       const monthStart = getCurrentMonthStartDateString();
-      total = await this.repo.sumBillableEvents(projectIds, monthStart);
+      total = await this.repo.sumBillableEvents({ projectIds, fromDate: monthStart });
     } else {
       const counts = await this.esTraceUsageService.getCountByProjects({
         organizationId,
@@ -152,7 +152,7 @@ export class UsageService {
 
     if (useBillableEvents) {
       const monthStart = getCurrentMonthStartDateString();
-      return this.repo.groupBillableEventsByProject(projectIds, monthStart);
+      return this.repo.groupBillableEventsByProject({ projectIds, fromDate: monthStart });
     }
 
     return this.esTraceUsageService.getCountByProjects({

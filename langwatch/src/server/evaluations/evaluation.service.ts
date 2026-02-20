@@ -2,6 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { prisma as defaultPrisma } from "~/server/db";
 import type { Protections } from "~/server/elasticsearch/protections";
+import { createLogger } from "~/utils/logger/server";
 import { ClickHouseEvaluationService } from "./clickhouse-evaluation.service";
 import { ElasticsearchEvaluationService } from "./elasticsearch-evaluation.service";
 import type { TraceEvaluation } from "./evaluation-run.types";
@@ -36,6 +37,7 @@ export class EvaluationService {
   private readonly tracer = getLangWatchTracer(
     "langwatch.evaluations.service",
   );
+  private readonly logger = createLogger("langwatch:evaluations:service");
 
   constructor(private readonly prisma: PrismaClient) {
     this.clickHouseService = ClickHouseEvaluationService.create(prisma);
@@ -97,6 +99,7 @@ export class EvaluationService {
             await this.clickHouseService.getEvaluationsForTrace({
               projectId,
               traceId,
+              protections,
             });
           if (result === null) {
             throw new Error(
@@ -114,8 +117,14 @@ export class EvaluationService {
             protections,
           }),
           this.clickHouseService
-            .getEvaluationsForTrace({ projectId, traceId })
-            .catch(() => null),
+            .getEvaluationsForTrace({ projectId, traceId, protections })
+            .catch((err) => {
+              this.logger.warn(
+                { err, projectId, traceId },
+                "CH query failed during ES-primary merge for getEvaluationsForTrace",
+              );
+              return null;
+            }),
         ]);
 
         return mergeEvaluations(esResult, chResult ?? []);
@@ -162,6 +171,7 @@ export class EvaluationService {
             await this.clickHouseService.getEvaluationsMultiple({
               projectId,
               traceIds,
+              protections,
             });
           if (result === null) {
             throw new Error(
@@ -179,8 +189,14 @@ export class EvaluationService {
             protections,
           }),
           this.clickHouseService
-            .getEvaluationsMultiple({ projectId, traceIds })
-            .catch(() => null),
+            .getEvaluationsMultiple({ projectId, traceIds, protections })
+            .catch((err) => {
+              this.logger.warn(
+                { err, projectId, traceIdCount: traceIds.length },
+                "CH query failed during ES-primary merge for getEvaluationsMultiple",
+              );
+              return null;
+            }),
         ]);
 
         if (!chResult) return esResult;

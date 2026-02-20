@@ -394,18 +394,23 @@ const processBatchEvaluation = async (
 
 /**
  * Fire event-sourcing commands for ClickHouse dual-write.
- * Fire-and-forget — errors are logged but don't affect the main execution.
+ *
+ * Critical commands (startExperimentRun, completeExperimentRun) are awaited.
+ * Individual result dispatches are best-effort — failures are logged but
+ * don't prevent the run from being recorded.
+ * Per-evaluation processing pipeline dispatches remain fire-and-forget.
  */
 const dispatchToClickHouse = async (
   project: Project,
   experimentId: string,
   batchEvaluation: ESBatchEvaluation,
 ) => {
-  try {
-    const { run_id: runId } = batchEvaluation;
+  const { run_id: runId } = batchEvaluation;
 
+  try {
     const targets = mapEsTargetsToTargets(batchEvaluation.targets ?? []);
 
+    // Critical: await the start command so the run exists in CH
     await getApp().experimentRuns.startExperimentRun({
       tenantId: project.id,
       runId,
@@ -414,50 +419,69 @@ const dispatchToClickHouse = async (
       targets,
       occurredAt: Date.now(),
     });
+  } catch (error) {
+    logger.warn(
+      { error, runId, projectId: project.id },
+      "Failed to dispatch startExperimentRun to CH — aborting CH dual-write for this batch",
+    );
+    return; // Without start, individual results would be orphaned
+  }
 
-    // Dispatch target and evaluator results in parallel
-    await Promise.all([
-      ...batchEvaluation.dataset.map((entry) =>
-        getApp().experimentRuns.recordTargetResult({
-          tenantId: project.id,
-          runId,
-          experimentId,
-          index: entry.index,
-          targetId: entry.target_id ?? "default",
-          entry: entry.entry,
-          predicted: entry.predicted ?? undefined,
-          cost: entry.cost ?? undefined,
-          duration: entry.duration ?? undefined,
-          error: entry.error ?? undefined,
-          traceId: entry.trace_id ?? undefined,
-          occurredAt: Date.now(),
-        }),
-      ),
-      ...batchEvaluation.evaluations.map((evaluation) =>
-        getApp().experimentRuns.recordEvaluatorResult({
-          tenantId: project.id,
-          runId,
-          experimentId,
-          index: evaluation.index,
-          targetId: evaluation.target_id ?? "default",
-          evaluatorId: evaluation.evaluator,
-          evaluatorName: evaluation.name ?? undefined,
-          status: evaluation.status,
-          score: evaluation.score ?? undefined,
-          label: evaluation.label ?? undefined,
-          passed: evaluation.passed ?? undefined,
-          details: evaluation.details ?? undefined,
-          cost: evaluation.cost ?? undefined,
-          occurredAt: Date.now(),
-        }),
-      ),
-    ]);
+  // Dispatch target and evaluator results — best-effort, log failures
+  const resultPromises = [
+    ...batchEvaluation.dataset.map((entry) =>
+      getApp().experimentRuns.recordTargetResult({
+        tenantId: project.id,
+        runId,
+        experimentId,
+        index: entry.index,
+        targetId: entry.target_id ?? "default",
+        entry: entry.entry,
+        predicted: entry.predicted ?? undefined,
+        cost: entry.cost ?? undefined,
+        duration: entry.duration ?? undefined,
+        error: entry.error ?? undefined,
+        traceId: entry.trace_id ?? undefined,
+        occurredAt: Date.now(),
+      }).catch((err) => {
+        logger.warn(
+          { err, runId, index: entry.index, targetId: entry.target_id },
+          "Failed to dispatch recordTargetResult to CH",
+        );
+      }),
+    ),
+    ...batchEvaluation.evaluations.map((evaluation) =>
+      getApp().experimentRuns.recordEvaluatorResult({
+        tenantId: project.id,
+        runId,
+        experimentId,
+        index: evaluation.index,
+        targetId: evaluation.target_id ?? "default",
+        evaluatorId: evaluation.evaluator,
+        evaluatorName: evaluation.name ?? undefined,
+        status: evaluation.status,
+        score: evaluation.score ?? undefined,
+        label: evaluation.label ?? undefined,
+        passed: evaluation.passed ?? undefined,
+        details: evaluation.details ?? undefined,
+        cost: evaluation.cost ?? undefined,
+        occurredAt: Date.now(),
+      }).catch((err) => {
+        logger.warn(
+          { err, runId, index: evaluation.index, evaluator: evaluation.evaluator },
+          "Failed to dispatch recordEvaluatorResult to CH",
+        );
+      }),
+    ),
+  ];
+  await Promise.all(resultPromises);
 
-    // Dispatch completion if finished or stopped
-    if (
-      batchEvaluation.timestamps.finished_at ||
-      batchEvaluation.timestamps.stopped_at
-    ) {
+  // Critical: await the completion command
+  if (
+    batchEvaluation.timestamps.finished_at ||
+    batchEvaluation.timestamps.stopped_at
+  ) {
+    try {
       await getApp().experimentRuns.completeExperimentRun({
         tenantId: project.id,
         runId,
@@ -465,46 +489,46 @@ const dispatchToClickHouse = async (
         stoppedAt: batchEvaluation.timestamps.stopped_at ?? undefined,
         occurredAt: Date.now(),
       });
+    } catch (error) {
+      logger.warn(
+        { error, runId, projectId: project.id },
+        "Failed to dispatch completeExperimentRun to CH",
+      );
     }
+  }
 
-    // Dispatch to evaluation processing pipeline for per-trace eval CH writes
-    if (project.featureEventSourcingEvaluationIngestion) {
-      const app = getApp();
-      for (const evaluation of batchEvaluation.evaluations) {
-        const evaluationId = generate(KSUID_RESOURCES.EVALUATION).toString();
-        void (async () => {
-          try {
-            await app.evaluations.startEvaluation({
-              tenantId: project.id,
-              evaluationId,
-              evaluatorId: evaluation.evaluator,
-              evaluatorType: evaluation.evaluator,
-              evaluatorName: evaluation.name ?? undefined,
-              occurredAt: Date.now(),
-            });
-            await app.evaluations.completeEvaluation({
-              tenantId: project.id,
-              evaluationId,
-              status: evaluation.status,
-              score: evaluation.score ?? undefined,
-              passed: evaluation.passed ?? undefined,
-              label: evaluation.label ?? undefined,
-              details: evaluation.details ?? undefined,
-              occurredAt: Date.now(),
-            });
-          } catch (err) {
-            logger.warn(
-              { err, evaluationId, evaluator: evaluation.evaluator },
-              "Failed to dispatch evaluation to evaluation processing pipeline",
-            );
-          }
-        })();
-      }
+  // Per-evaluation processing pipeline dispatches — fire-and-forget (supplementary)
+  if (project.featureEventSourcingEvaluationIngestion) {
+    const app = getApp();
+    for (const evaluation of batchEvaluation.evaluations) {
+      const evaluationId = generate(KSUID_RESOURCES.EVALUATION).toString();
+      void (async () => {
+        try {
+          await app.evaluations.startEvaluation({
+            tenantId: project.id,
+            evaluationId,
+            evaluatorId: evaluation.evaluator,
+            evaluatorType: evaluation.evaluator,
+            evaluatorName: evaluation.name ?? undefined,
+            occurredAt: Date.now(),
+          });
+          await app.evaluations.completeEvaluation({
+            tenantId: project.id,
+            evaluationId,
+            status: evaluation.status,
+            score: evaluation.score ?? undefined,
+            passed: evaluation.passed ?? undefined,
+            label: evaluation.label ?? undefined,
+            details: evaluation.details ?? undefined,
+            occurredAt: Date.now(),
+          });
+        } catch (err) {
+          logger.warn(
+            { err, evaluationId, evaluator: evaluation.evaluator },
+            "Failed to dispatch evaluation to evaluation processing pipeline",
+          );
+        }
+      })();
     }
-  } catch (error) {
-    logger.warn(
-      { error, runId: batchEvaluation.run_id, projectId: project.id },
-      "Failed to dispatch batch evaluation to ClickHouse (non-fatal)",
-    );
   }
 };

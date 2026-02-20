@@ -50,14 +50,15 @@ export function mapClickHouseEvaluationToTraceEvaluation(
     details: record.Details,
     error: record.Error,
     timestamps: {
+      // CH DateTime64(3) returns UTC strings without timezone suffix; append "Z" only when missing
       scheduledAt: record.ScheduledAt
-        ? new Date(record.ScheduledAt + "Z").getTime()
+        ? new Date(appendUtcSuffix(record.ScheduledAt)).getTime()
         : null,
       startedAt: record.StartedAt
-        ? new Date(record.StartedAt + "Z").getTime()
+        ? new Date(appendUtcSuffix(record.StartedAt)).getTime()
         : null,
       completedAt: record.CompletedAt
-        ? new Date(record.CompletedAt + "Z").getTime()
+        ? new Date(appendUtcSuffix(record.CompletedAt)).getTime()
         : null,
     },
   };
@@ -132,4 +133,9 @@ export function mapTraceEvaluationsToLegacyEvaluations(
   }
 
   return output;
+}
+
+/** Appends "Z" to a timestamp string only when it lacks a timezone indicator. */
+function appendUtcSuffix(ts: string): string {
+  return /[Zz]$|[+-]\d{2}:?\d{2}$/.test(ts) ? ts : ts + "Z";
 }

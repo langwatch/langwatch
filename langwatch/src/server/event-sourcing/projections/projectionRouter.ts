@@ -557,9 +557,12 @@ export class ProjectionRouter<
               reactorName: reactor.name,
               foldName,
               eventId: event.id,
+              eventType: event.type,
+              aggregateId: String(event.aggregateId),
+              tenantId: event.tenantId,
               error: error instanceof Error ? error.message : String(error),
             },
-            "Reactor failed during inline execution",
+            "Reactor failed during inline execution — fold state persisted in CH but reactor side-effect (e.g. ES sync) was lost",
           );
         }
       }
