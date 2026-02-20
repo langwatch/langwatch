@@ -35,8 +35,12 @@ export function makeScenarioRunData(
 }
 
 export function makeBatchRun(overrides: Partial<BatchRun> = {}): BatchRun {
+  const batchRunId = overrides.batchRunId ?? "batch_1";
   return {
-    batchRunId: "batch_1",
+    groupKey: batchRunId,
+    groupLabel: batchRunId,
+    groupType: "none",
+    batchRunId,
     timestamp: Date.now() - 2 * 60 * 60 * 1000,
     scenarioRuns: [
       makeScenarioRunData(),

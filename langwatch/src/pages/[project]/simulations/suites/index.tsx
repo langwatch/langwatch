@@ -39,7 +39,7 @@ function SuitesPageContent() {
   const utils = api.useContext();
 
   // State
-  const [selectedSuiteId, setSelectedSuiteId] = useState<string | "all-runs" | null>(null);
+  const [selectedSuiteId, setSelectedSuiteId] = useState<string | "all-runs" | null>("all-runs");
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
