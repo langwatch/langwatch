@@ -176,9 +176,10 @@ describe("formatScenarioSchema()", () => {
     expect(result).toContain("**code**: Test a code function");
   });
 
-  it("includes examples of good criteria", () => {
+  it("includes authoring guidance for situations and criteria", () => {
     const result = formatScenarioSchema();
-    expect(result).toContain("## Example Criteria");
-    expect(result).toContain("Responds with a welcome message");
+    expect(result).toContain("## Writing a Good Situation");
+    expect(result).toContain("## Writing Good Criteria");
+    expect(result).toContain("Specific and testable");
   });
 });

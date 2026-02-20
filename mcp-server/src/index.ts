@@ -380,7 +380,7 @@ server.tool(
 
 server.tool(
   "create_scenario",
-  "Create a new scenario in the LangWatch project.",
+  "Create a new scenario in the LangWatch project. Call discover_schema({ category: 'scenarios' }) first to learn how to write effective situations and criteria.",
   {
     name: z.string().describe("Scenario name"),
     situation: z
