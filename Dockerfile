@@ -29,6 +29,7 @@ COPY langwatch/package.json langwatch/pnpm-lock.yaml langwatch/pnpm-workspace.ya
 COPY langwatch/vendor ./langwatch/vendor
 # https://stackoverflow.com/questions/70154568/pnpm-equivalent-command-for-npm-ci
 RUN cd langwatch && CI=true pnpm install --frozen-lockfile
+COPY langevals/ts-integration/evaluators.generated.ts ./langevals/ts-integration/evaluators.generated.ts
 COPY langwatch ./langwatch
 RUN cd langwatch && pnpm run build
 EXPOSE 5560
