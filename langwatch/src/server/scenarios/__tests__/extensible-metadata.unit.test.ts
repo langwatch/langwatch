@@ -234,7 +234,7 @@ describe("extensible scenario metadata", () => {
 
   describe("Elasticsearch mapping", () => {
     describe("metadata.langwatch", () => {
-      it("is mapped as a nested object with dynamic keyword support", () => {
+      it("is mapped as an object with dynamic keyword support", () => {
         const properties = eventMapping.properties as Record<string, unknown>;
         const metadataMapping = properties.metadata as {
           dynamic?: string | boolean;

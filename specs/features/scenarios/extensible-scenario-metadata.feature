@@ -72,7 +72,7 @@ Feature: Extensible metadata on scenario run events
   @unit
   Scenario: Elasticsearch mapping includes langwatch namespace fields
     Given the scenario events Elasticsearch mapping
-    Then metadata.langwatch is mapped as a nested object with dynamic keyword support
+    Then metadata.langwatch is mapped as an object with dynamic keyword support
 
   @unit
   Scenario: User metadata fields are not explicitly mapped in Elasticsearch
