@@ -77,3 +77,15 @@ Feature: Extensible metadata on scenario run events
   Scenario: User metadata fields are not explicitly mapped in Elasticsearch
     Given the scenario events Elasticsearch mapping
     Then user-level metadata fields outside langwatch are not explicitly mapped
+
+  @unit
+  Scenario: Langwatch namespace rejects incomplete platform metadata
+    Given a SCENARIO_RUN_STARTED event with langwatch metadata missing targetType
+    When the event is parsed by the schema
+    Then the schema rejects the event with a validation error
+
+  @unit
+  Scenario: Langwatch namespace is optional on metadata
+    Given a SCENARIO_RUN_STARTED event without langwatch metadata
+    When the event is parsed by the schema
+    Then the event validates successfully with langwatch undefined

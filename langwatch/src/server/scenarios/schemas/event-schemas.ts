@@ -49,9 +49,21 @@ const baseScenarioEventSchema = baseEventSchema.extend({
 });
 
 /**
+ * LangWatch platform metadata schema.
+ * Reserved namespace for platform-internal context (e.g. suite target references).
+ * Direct SDK users should not populate this — the suite runner does.
+ */
+export const langwatchMetadataSchema = z.object({
+  targetReferenceId: z.string(),
+  targetType: z.string(),
+});
+
+/**
  * Scenario Run Started Event Schema
  * Captures the initiation of a scenario run with metadata about the scenario being executed.
  * Contains the scenario name and optional description for identification purposes.
+ * User-defined metadata fields pass through via .passthrough().
+ * The langwatch namespace is strictly validated.
  */
 export const scenarioRunStartedSchema = baseScenarioEventSchema.extend({
   type: z.literal(ScenarioEventType.RUN_STARTED),
@@ -59,6 +71,7 @@ export const scenarioRunStartedSchema = baseScenarioEventSchema.extend({
     .object({
       name: z.string().optional(),
       description: z.string().optional(),
+      langwatch: langwatchMetadataSchema.optional(),
     })
     .passthrough(),
 });

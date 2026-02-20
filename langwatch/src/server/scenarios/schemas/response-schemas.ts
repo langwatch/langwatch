@@ -6,6 +6,7 @@ import { z } from "zod";
 import { ScenarioRunStatus } from "../scenario-event.enums";
 import {
   batchRunIdSchema,
+  langwatchMetadataSchema,
   scenarioEventSchema,
   scenarioIdSchema,
   scenarioMessageSnapshotSchema,
@@ -42,6 +43,7 @@ export const runDataSchema = z.object({
     .object({
       name: z.string().optional(),
       description: z.string().optional(),
+      langwatch: langwatchMetadataSchema.optional(),
     })
     .passthrough()
     .optional()

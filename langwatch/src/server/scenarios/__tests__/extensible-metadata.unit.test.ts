@@ -63,7 +63,7 @@ describe("extensible scenario metadata", () => {
     });
 
     describe("when metadata includes langwatch namespace", () => {
-      it("preserves the langwatch object", () => {
+      it("preserves the langwatch object with typed fields", () => {
         const event = {
           type: ScenarioEventType.RUN_STARTED,
           timestamp: Date.now(),
@@ -80,11 +80,49 @@ describe("extensible scenario metadata", () => {
         };
 
         const parsed = scenarioRunStartedSchema.parse(event);
-        const metadata = parsed.metadata as Record<string, unknown>;
-        expect(metadata.langwatch).toEqual({
+        expect(parsed.metadata.langwatch).toEqual({
           targetReferenceId: "prompt_abc123",
           targetType: "prompt",
         });
+      });
+    });
+
+    describe("when langwatch namespace is missing required fields", () => {
+      it("rejects the event", () => {
+        const event = {
+          type: ScenarioEventType.RUN_STARTED,
+          timestamp: Date.now(),
+          batchRunId: "batch_1",
+          scenarioId: "scenario_1",
+          scenarioRunId: "run_1",
+          metadata: {
+            name: "Login flow",
+            langwatch: {
+              targetReferenceId: "prompt_abc123",
+              // missing targetType
+            },
+          },
+        };
+
+        expect(() => scenarioRunStartedSchema.parse(event)).toThrow();
+      });
+    });
+
+    describe("when langwatch namespace is omitted", () => {
+      it("validates successfully", () => {
+        const event = {
+          type: ScenarioEventType.RUN_STARTED,
+          timestamp: Date.now(),
+          batchRunId: "batch_1",
+          scenarioId: "scenario_1",
+          scenarioRunId: "run_1",
+          metadata: {
+            name: "Login flow",
+          },
+        };
+
+        const parsed = scenarioRunStartedSchema.parse(event);
+        expect(parsed.metadata.langwatch).toBeUndefined();
       });
     });
   });
