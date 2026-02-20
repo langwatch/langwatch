@@ -295,6 +295,18 @@ describe("Scenarios API", () => {
           labels: ["updated"],
         });
       });
+
+      describe("when name is empty", () => {
+        it("returns a validation error", async () => {
+          const res = await helpers.api.put(`/api/scenarios/${scenario.id}`, {
+            name: "",
+          });
+
+          expect(res.status).toBe(400);
+          const body = await res.json();
+          expect(body).toHaveProperty("error");
+        });
+      });
     });
 
     describe("when the scenario does not exist", () => {
