@@ -25,6 +25,7 @@ export const organizationFactory = Factory.define<
   s3Bucket: null,
   useCustomS3: false,
   sentPlanLimitAlert: null,
+  pricingModel: "TIERED",
   promoCode: null,
   ssoDomain: null,
   ssoProvider: null,
