@@ -208,6 +208,8 @@ async function handleTracesRequest(req: NextRequest) {
         async () => {
           const promises: Promise<void>[] = [];
           for (const traceForCollection of tracesForCollection) {
+            if (traceForCollection.spans.length === 0) continue;
+
             // Fingerprint for deduplication: traceId + span count + first/last span timestamps
             // Much faster than stringifying thousands of spans
             const fingerprint = {

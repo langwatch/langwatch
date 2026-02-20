@@ -187,10 +187,10 @@ describe("UsageService", () => {
         });
 
         expect(result).toBe(250);
-        expect(mockRepo.sumBillableEvents).toHaveBeenCalledWith(
-          ["proj-1", "proj-2"],
-          expect.stringMatching(/^\d{4}-\d{2}-01$/),
-        );
+        expect(mockRepo.sumBillableEvents).toHaveBeenCalledWith({
+          projectIds: ["proj-1", "proj-2"],
+          fromDate: expect.stringMatching(/^\d{4}-\d{2}-01$/),
+        });
         expect(
           mockEsTraceUsageService.getCountByProjects,
         ).not.toHaveBeenCalled();
@@ -299,10 +299,10 @@ describe("UsageService", () => {
         ]);
         expect(
           mockRepo.groupBillableEventsByProject,
-        ).toHaveBeenCalledWith(
-          ["proj-1", "proj-2"],
-          expect.stringMatching(/^\d{4}-\d{2}-01$/),
-        );
+        ).toHaveBeenCalledWith({
+          projectIds: ["proj-1", "proj-2"],
+          fromDate: expect.stringMatching(/^\d{4}-\d{2}-01$/),
+        });
         expect(
           mockEsTraceUsageService.getCountByProjects,
         ).not.toHaveBeenCalled();

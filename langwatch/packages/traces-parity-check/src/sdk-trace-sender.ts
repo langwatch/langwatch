@@ -8,6 +8,7 @@
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { getLangWatchTracer } from "langwatch/observability";
+import { setupObservability } from "langwatch/observability/node";
 import { sleep } from "./utils.js";
 
 type Tracer = ReturnType<typeof getLangWatchTracer>;

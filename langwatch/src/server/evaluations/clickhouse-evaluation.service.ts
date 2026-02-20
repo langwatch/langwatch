@@ -3,6 +3,7 @@ import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { getClickHouseClient } from "~/server/clickhouse/client";
 import { prisma as defaultPrisma } from "~/server/db";
+import type { Protections } from "~/server/elasticsearch/protections";
 import { createLogger } from "~/utils/logger/server";
 import type { ClickHouseEvaluationRunRow } from "./evaluation-run.mappers";
 import { mapClickHouseEvaluationToTraceEvaluation } from "./evaluation-run.mappers";
@@ -76,9 +77,11 @@ export class ClickHouseEvaluationService {
   async getEvaluationsForTrace({
     projectId,
     traceId,
+    protections: _protections,
   }: {
     projectId: string;
     traceId: string;
+    protections?: Protections;
   }): Promise<TraceEvaluation[] | null> {
     return await this.tracer.withActiveSpan(
       "ClickHouseEvaluationService.getEvaluationsForTrace",
@@ -140,9 +143,11 @@ export class ClickHouseEvaluationService {
   async getEvaluationsMultiple({
     projectId,
     traceIds,
+    protections: _protections,
   }: {
     projectId: string;
     traceIds: string[];
+    protections?: Protections;
   }): Promise<Record<string, TraceEvaluation[]> | null> {
     return await this.tracer.withActiveSpan(
       "ClickHouseEvaluationService.getEvaluationsMultiple",

@@ -108,13 +108,13 @@ describe("mapClickHouseEvaluationToTraceEvaluation", () => {
     const result = mapClickHouseEvaluationToTraceEvaluation(baseCHRow);
 
     expect(result.timestamps.scheduledAt).toBe(
-      new Date("2024-01-15 10:30:00.000").getTime(),
+      new Date("2024-01-15T10:30:00.000Z").getTime(),
     );
     expect(result.timestamps.startedAt).toBe(
-      new Date("2024-01-15 10:30:01.000").getTime(),
+      new Date("2024-01-15T10:30:01.000Z").getTime(),
     );
     expect(result.timestamps.completedAt).toBe(
-      new Date("2024-01-15 10:30:02.000").getTime(),
+      new Date("2024-01-15T10:30:02.000Z").getTime(),
     );
   });
 

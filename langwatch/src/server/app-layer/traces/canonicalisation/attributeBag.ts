@@ -2,6 +2,9 @@ import type {
   NormalizedAttributes,
   NormalizedAttrValue,
 } from "../../../event-sourcing/pipelines/trace-processing/schemas/spans";
+import { createLogger } from "~/utils/logger/server";
+
+const logger = createLogger("langwatch:attribute-bag");
 
 export class AttributeBag {
   private readonly map: Map<string, NormalizedAttrValue>;
@@ -51,8 +54,9 @@ export class AttributeBag {
 
     // Safety guard for large strings to avoid blocking the event loop
     if (trimmed.length > maxSafeSize) {
-      console.warn(
-        `Attribute ${key} is too large for synchronous JSON parsing (${trimmed.length} chars). Skipping.`,
+      logger.warn(
+        { key, size: trimmed.length },
+        "Attribute too large for synchronous JSON parsing, skipping",
       );
       return val;
     }

@@ -39,7 +39,7 @@ const logger = createLogger(
 
 export interface ExecuteEvaluationCommandDeps {
   prisma: PrismaClient;
-  spanStorage: { getSpansByTraceId(tenantId: string, traceId: string): Promise<Span[]> };
+  spanStorage: { getSpansByTraceId(params: { tenantId: string; traceId: string }): Promise<Span[]> };
   evaluationExecution: EvaluationExecutionService;
 }
 
@@ -133,7 +133,7 @@ export function createExecuteEvaluationCommandClass(deps: ExecuteEvaluationComma
       }
 
       // 3. Read spans from CH, check preconditions
-      const spans = await deps.spanStorage.getSpansByTraceId(tenantId, data.traceId);
+      const spans = await deps.spanStorage.getSpansByTraceId({ tenantId, traceId: data.traceId });
 
       const preconditionTrace: PreconditionTrace = {
         input: { value: "" },

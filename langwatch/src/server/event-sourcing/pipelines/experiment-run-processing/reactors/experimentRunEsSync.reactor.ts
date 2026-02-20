@@ -55,100 +55,126 @@ export function createExperimentRunEsSyncReactor(
         return;
       }
 
-      try {
-        switch (event.type) {
-          case EXPERIMENT_RUN_EVENT_TYPES.STARTED: {
-            let targets: Parameters<typeof repository.create>[0]["targets"] = [];
-            try {
-              targets = JSON.parse(foldState.Targets);
-            } catch {
-              // Targets may not be valid JSON
+      const MAX_RETRIES = 3;
+      const BASE_DELAY_MS = 1000;
+      let lastError: unknown;
+
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          switch (event.type) {
+            case EXPERIMENT_RUN_EVENT_TYPES.STARTED: {
+              let targets: Parameters<typeof repository.create>[0]["targets"] = [];
+              try {
+                targets = JSON.parse(foldState.Targets);
+              } catch {
+                // Targets may not be valid JSON
+              }
+
+              await repository.create({
+                projectId: tenantId,
+                experimentId,
+                runId,
+                workflowVersionId: foldState.WorkflowVersionId,
+                total: foldState.Total,
+                targets,
+              });
+              break;
             }
 
-            await repository.create({
-              projectId: tenantId,
-              experimentId,
-              runId,
-              workflowVersionId: foldState.WorkflowVersionId,
-              total: foldState.Total,
-              targets,
-            });
-            break;
+            case EXPERIMENT_RUN_EVENT_TYPES.TARGET_RESULT: {
+              await repository.upsertResults({
+                projectId: tenantId,
+                experimentId,
+                runId,
+                dataset: [
+                  {
+                    index: event.data.index,
+                    target_id: event.data.targetId,
+                    entry: event.data.entry as Record<string, unknown>,
+                    predicted: event.data.predicted ?? undefined,
+                    cost: event.data.cost ?? null,
+                    duration: event.data.duration ?? null,
+                    error: event.data.error ?? null,
+                    trace_id: event.data.traceId ?? null,
+                  },
+                ],
+                progress: foldState.Progress,
+              });
+              break;
+            }
+
+            case EXPERIMENT_RUN_EVENT_TYPES.EVALUATOR_RESULT: {
+              await repository.upsertResults({
+                projectId: tenantId,
+                experimentId,
+                runId,
+                evaluations: [
+                  {
+                    evaluator: event.data.evaluatorId,
+                    name: event.data.evaluatorName ?? null,
+                    target_id: event.data.targetId,
+                    index: event.data.index,
+                    status: event.data.status,
+                    score: event.data.score ?? null,
+                    label: event.data.label ?? null,
+                    passed: event.data.passed ?? null,
+                    details: event.data.details ?? null,
+                    cost: event.data.cost ?? null,
+                  },
+                ],
+              });
+              break;
+            }
+
+            case EXPERIMENT_RUN_EVENT_TYPES.COMPLETED: {
+              await repository.markComplete({
+                projectId: tenantId,
+                experimentId,
+                runId,
+                finishedAt: event.data.finishedAt ?? undefined,
+                stoppedAt: event.data.stoppedAt ?? undefined,
+              });
+              break;
+            }
           }
 
-          case EXPERIMENT_RUN_EVENT_TYPES.TARGET_RESULT: {
-            await repository.upsertResults({
-              projectId: tenantId,
-              experimentId,
-              runId,
-              dataset: [
-                {
-                  index: event.data.index,
-                  target_id: event.data.targetId,
-                  entry: event.data.entry as Record<string, unknown>,
-                  predicted: event.data.predicted ?? undefined,
-                  cost: event.data.cost ?? null,
-                  duration: event.data.duration ?? null,
-                  error: event.data.error ?? null,
-                  trace_id: event.data.traceId ?? null,
-                },
-              ],
-              progress: foldState.Progress,
-            });
-            break;
-          }
-
-          case EXPERIMENT_RUN_EVENT_TYPES.EVALUATOR_RESULT: {
-            await repository.upsertResults({
-              projectId: tenantId,
-              experimentId,
-              runId,
-              evaluations: [
-                {
-                  evaluator: event.data.evaluatorId,
-                  name: event.data.evaluatorName ?? null,
-                  target_id: event.data.targetId,
-                  index: event.data.index,
-                  status: event.data.status,
-                  score: event.data.score ?? null,
-                  label: event.data.label ?? null,
-                  passed: event.data.passed ?? null,
-                  details: event.data.details ?? null,
-                  cost: event.data.cost ?? null,
-                },
-              ],
-            });
-            break;
-          }
-
-          case EXPERIMENT_RUN_EVENT_TYPES.COMPLETED: {
-            await repository.markComplete({
-              projectId: tenantId,
-              experimentId,
-              runId,
-              finishedAt: event.data.finishedAt ?? undefined,
-              stoppedAt: event.data.stoppedAt ?? undefined,
-            });
-            break;
+          logger.debug(
+            { tenantId, runId, eventType: event.type },
+            "Synced experiment run event to ES",
+          );
+          return; // Success — exit retry loop
+        } catch (error) {
+          lastError = error;
+          if (attempt < MAX_RETRIES) {
+            const delayMs = BASE_DELAY_MS * Math.pow(2, attempt - 1);
+            logger.warn(
+              {
+                tenantId,
+                runId,
+                eventType: event.type,
+                attempt,
+                maxRetries: MAX_RETRIES,
+                delayMs,
+                error: error instanceof Error ? error.message : String(error),
+              },
+              "ES sync failed, retrying",
+            );
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
           }
         }
-
-        logger.debug(
-          { tenantId, runId, eventType: event.type },
-          "Synced experiment run event to ES",
-        );
-      } catch (error) {
-        logger.error(
-          {
-            tenantId,
-            runId,
-            eventType: event.type,
-            error: error instanceof Error ? error.message : String(error),
-          },
-          "Failed to sync experiment run to ES",
-        );
-        throw error;
       }
+
+      // All retries exhausted
+      logger.error(
+        {
+          tenantId,
+          runId,
+          eventType: event.type,
+          error: lastError instanceof Error ? lastError.message : String(lastError),
+        },
+        `Failed to sync experiment run to ES after ${MAX_RETRIES} attempts`,
+      );
+      throw lastError;
     },
   };
 }

@@ -7,10 +7,13 @@ import type { LangEvalsClient, LangEvalsEvaluateParams } from "./langevals.clien
 
 const logger = createLogger("langwatch:langevals-http-client");
 
+const DEFAULT_TIMEOUT_MS = 120_000; // 2 minutes
+
 export class LangEvalsHttpClient implements LangEvalsClient {
   constructor(
     private readonly endpoint: string,
     private readonly maxRetries: number = 1,
+    private readonly timeoutMs: number = DEFAULT_TIMEOUT_MS,
   ) {}
 
   async evaluate(params: LangEvalsEvaluateParams): Promise<SingleEvaluationResult> {
@@ -27,10 +30,14 @@ export class LangEvalsHttpClient implements LangEvalsClient {
     const startTime = performance.now();
     let response: Response;
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+
     try {
       response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           data: [
             {
@@ -47,6 +54,13 @@ export class LangEvalsHttpClient implements LangEvalsClient {
         }),
       });
     } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        logger.error({ url, timeoutMs: this.timeoutMs }, "Evaluator request timed out");
+        throw new EvaluatorExecutionError(
+          `Evaluator timed out after ${this.timeoutMs}ms`,
+          { meta: { evaluatorType, url, timeoutMs: this.timeoutMs } },
+        );
+      }
       if (error instanceof Error && error.message.includes("fetch failed")) {
         logger.error({ error, url }, "Evaluator cannot be reached");
         throw new EvaluatorExecutionError("Evaluator cannot be reached", {
@@ -54,6 +68,8 @@ export class LangEvalsHttpClient implements LangEvalsClient {
         });
       }
       throw error;
+    } finally {
+      clearTimeout(timeout);
     }
 
     const duration = performance.now() - startTime;

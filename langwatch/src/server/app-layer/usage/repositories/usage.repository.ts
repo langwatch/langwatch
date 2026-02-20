@@ -4,28 +4,26 @@ export interface BillableEventsAggregate {
 }
 
 export interface UsageRepository {
-  sumBillableEvents(
-    projectIds: string[],
-    fromDate: string,
-  ): Promise<number>;
+  sumBillableEvents(params: {
+    projectIds: string[];
+    fromDate: string;
+  }): Promise<number>;
 
-  groupBillableEventsByProject(
-    projectIds: string[],
-    fromDate: string,
-  ): Promise<BillableEventsAggregate[]>;
+  groupBillableEventsByProject(params: {
+    projectIds: string[];
+    fromDate: string;
+  }): Promise<BillableEventsAggregate[]>;
 }
 
 export class NullUsageRepository implements UsageRepository {
   async sumBillableEvents(
-    _projectIds: string[],
-    _fromDate: string,
+    _params: { projectIds: string[]; fromDate: string },
   ): Promise<number> {
     return 0;
   }
 
   async groupBillableEventsByProject(
-    _projectIds: string[],
-    _fromDate: string,
+    _params: { projectIds: string[]; fromDate: string },
   ): Promise<BillableEventsAggregate[]> {
     return [];
   }

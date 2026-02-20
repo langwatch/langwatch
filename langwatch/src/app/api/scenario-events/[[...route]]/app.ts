@@ -76,16 +76,17 @@ app.post(
     );
 
 
-    // Dual-write to ClickHouse via event-sourcing (fire-and-forget)
+    // Legacy ES write (always runs so data is available when feature flag is off)
+    const scenarioRunnerService = new ScenarioEventService();
+    await scenarioRunnerService.saveScenarioEvent({
+      projectId: project.id,
+      ...event,
+    });
+
+    // Dual-write to ClickHouse via event-sourcing
     if (project.featureEventSourcingSimulationIngestion) {
       await dispatchSimulationEvent(project.id, event);
     }
-
-    // const scenarioRunnerService = new ScenarioEventService();
-    // await scenarioRunnerService.saveScenarioEvent({
-    //   projectId: project.id,
-    //   ...event,
-    // });
 
     const path = `/${project.slug}/simulations/${
       event.scenarioSetId ?? "default"

@@ -7,10 +7,13 @@ import type {
 export class PrismaUsageRepository implements UsageRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async sumBillableEvents(
-    projectIds: string[],
-    fromDate: string,
-  ): Promise<number> {
+  async sumBillableEvents({
+    projectIds,
+    fromDate,
+  }: {
+    projectIds: string[];
+    fromDate: string;
+  }): Promise<number> {
     const result = await this.prisma.projectDailyBillableEvents.aggregate({
       where: {
         projectId: { in: projectIds },
@@ -21,10 +24,13 @@ export class PrismaUsageRepository implements UsageRepository {
     return result._sum.count ?? 0;
   }
 
-  async groupBillableEventsByProject(
-    projectIds: string[],
-    fromDate: string,
-  ): Promise<BillableEventsAggregate[]> {
+  async groupBillableEventsByProject({
+    projectIds,
+    fromDate,
+  }: {
+    projectIds: string[];
+    fromDate: string;
+  }): Promise<BillableEventsAggregate[]> {
     const groups = await this.prisma.projectDailyBillableEvents.groupBy({
       by: ["projectId"],
       where: {
