@@ -172,6 +172,7 @@ model Organization {
     promoCode     String?
     stripeCustomerId String?      @unique
     currency      Currency         @default(EUR)
+    pricingModel  PricingModel     @default(TIERED)
     features      OrganizationFeature[]
     CustomRoles   CustomRole[]
     notifications Notification[]
@@ -195,6 +196,11 @@ enum PlanTypes {
     ACCELERATE
     LAUNCH_ANNUAL
     ACCELERATE_ANNUAL
+}
+
+enum PricingModel {
+    TIERED
+    SEAT_EVENT
 }
 
 enum SubscriptionStatus {
