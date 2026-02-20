@@ -128,15 +128,18 @@ function makeOrg({
   stripeCustomerId = "cus_123",
   hasSubscription = true,
   projectIds = ["proj-1"],
+  pricingModel = "SEAT_EVENT",
 }: {
   id?: string;
   stripeCustomerId?: string | null;
   hasSubscription?: boolean;
   projectIds?: string[];
+  pricingModel?: string;
 } = {}) {
   return {
     id,
     stripeCustomerId,
+    pricingModel,
     subscriptions: hasSubscription ? [{ id: "sub-1" }] : [],
     teams: [{ projects: projectIds.map((pid) => ({ id: pid })) }],
   };
@@ -189,6 +192,21 @@ describe("runUsageReportingJob", () => {
     it("skips reporting", async () => {
       mockPrisma.organization.findUnique.mockResolvedValue(
         makeOrg({ hasSubscription: false }),
+      );
+      const { runUsageReportingJob } = await import(
+        "../usageReportingWorker"
+      );
+
+      await runUsageReportingJob(makeJob("org-1"));
+
+      expect(mockReportUsageDelta).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given org not on SEAT_EVENT pricing", () => {
+    it("skips reporting", async () => {
+      mockPrisma.organization.findUnique.mockResolvedValue(
+        makeOrg({ pricingModel: "TIERED" }),
       );
       const { runUsageReportingJob } = await import(
         "../usageReportingWorker"

@@ -89,6 +89,7 @@ export async function runUsageReportingJob(
       select: {
         id: true,
         stripeCustomerId: true,
+        pricingModel: true,
         subscriptions: {
           where: { status: "ACTIVE" },
           take: 1,
@@ -115,6 +116,14 @@ export async function runUsageReportingJob(
       logger.debug(
         { organizationId },
         "no active subscription, skipping usage reporting",
+      );
+      return;
+    }
+
+    if (org.pricingModel !== "SEAT_EVENT") {
+      logger.debug(
+        { organizationId, pricingModel: org.pricingModel },
+        "organization not on SEAT_EVENT pricing, skipping usage reporting",
       );
       return;
     }

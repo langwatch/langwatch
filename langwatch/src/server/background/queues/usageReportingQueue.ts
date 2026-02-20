@@ -1,3 +1,6 @@
+// Uses plain Queue instead of QueueWithFallback because falling back to
+// synchronous execution would block the event-sourcing hot path with Stripe
+// API calls. When Redis is unavailable, the queue is null and dispatch skips.
 import { Queue, type ConnectionOptions, type QueueOptions } from "bullmq";
 import { BullMQOtel } from "bullmq-otel";
 import type { UsageReportingJob } from "~/server/background/types";
