@@ -458,8 +458,8 @@ importers:
         specifier: ^19.0.0
         version: 19.1.0(react@19.1.0)
       react-error-boundary:
-        specifier: ^5.0.0
-        version: 5.0.0(react@19.1.0)
+        specifier: ^6.1.0
+        version: 6.1.0(react@19.1.0)
       react-feather:
         specifier: ^2.0.10
         version: 2.0.10(react@19.1.0)
@@ -11272,10 +11272,10 @@ packages:
     peerDependencies:
       react: '>=16.13.1'
 
-  react-error-boundary@5.0.0:
-    resolution: {integrity: sha512-tnjAxG+IkpLephNcePNA7v6F/QpWLH8He65+DmedchDwg162JZqx4NmbXj0mlAYVVEd81OW7aFhmbsScYfiAFQ==}
+  react-error-boundary@6.1.0:
+    resolution: {integrity: sha512-02k9WQ/mUhdbXir0tC1NiMesGzRPaCsJEWU/4bcFrbY1YMZOtHShtZP6zw0SJrBWA/31H0KT9/FgdL8+sPKgHA==}
     peerDependencies:
-      react: '>=16.13.1'
+      react: ^18.0.0 || ^19.0.0
 
   react-feather@2.0.10:
     resolution: {integrity: sha512-BLhukwJ+Z92Nmdcs+EMw6dy1Z/VLiJTzEQACDUEnWMClhYnFykJCGWQx+NmwP/qQHGX/5CzQ+TGi8ofg2+HzVQ==}
@@ -27104,9 +27104,8 @@ snapshots:
       '@babel/runtime': 7.28.6
       react: 19.1.0
 
-  react-error-boundary@5.0.0(react@19.1.0):
+  react-error-boundary@6.1.0(react@19.1.0):
     dependencies:
-      '@babel/runtime': 7.27.6
       react: 19.1.0
 
   react-feather@2.0.10(react@19.1.0):
