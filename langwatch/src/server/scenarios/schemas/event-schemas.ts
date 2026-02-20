@@ -50,12 +50,13 @@ const baseScenarioEventSchema = baseEventSchema.extend({
 
 /**
  * LangWatch platform metadata schema.
- * Reserved namespace for platform-internal context (e.g. suite target references).
- * Direct SDK users should not populate this — the suite runner does.
+ * Reserved namespace for platform-internal context injected by the suite runner.
+ * Direct SDK users should not populate this.
  */
 export const langwatchMetadataSchema = z.object({
   targetReferenceId: z.string(),
-  targetType: z.string(),
+  targetType: z.enum(["prompt", "http", "code"]),
+  simulationSuiteId: z.string().optional(),
 });
 
 /**

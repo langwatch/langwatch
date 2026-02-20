@@ -223,6 +223,7 @@ describe("extensible metadata integration", () => {
               langwatch: {
                 targetReferenceId: "prompt_abc123",
                 targetType: "prompt",
+                simulationSuiteId: "suite_789",
               },
             },
           },
@@ -256,6 +257,7 @@ describe("extensible metadata integration", () => {
         expect(metadata.langwatch).toEqual({
           targetReferenceId: "prompt_abc123",
           targetType: "prompt",
+          simulationSuiteId: "suite_789",
         });
       });
     });

@@ -74,7 +74,8 @@ describe("extensible scenario metadata", () => {
             name: "Login flow",
             langwatch: {
               targetReferenceId: "prompt_abc123",
-              targetType: "prompt",
+              targetType: "prompt" as const,
+              simulationSuiteId: "suite_456",
             },
           },
         };
@@ -83,6 +84,7 @@ describe("extensible scenario metadata", () => {
         expect(parsed.metadata.langwatch).toEqual({
           targetReferenceId: "prompt_abc123",
           targetType: "prompt",
+          simulationSuiteId: "suite_456",
         });
       });
     });
@@ -100,6 +102,27 @@ describe("extensible scenario metadata", () => {
             langwatch: {
               targetReferenceId: "prompt_abc123",
               // missing targetType
+            },
+          },
+        };
+
+        expect(() => scenarioRunStartedSchema.parse(event)).toThrow();
+      });
+    });
+
+    describe("when langwatch has invalid targetType", () => {
+      it("rejects the event", () => {
+        const event = {
+          type: ScenarioEventType.RUN_STARTED,
+          timestamp: Date.now(),
+          batchRunId: "batch_1",
+          scenarioId: "scenario_1",
+          scenarioRunId: "run_1",
+          metadata: {
+            name: "Login flow",
+            langwatch: {
+              targetReferenceId: "prompt_abc123",
+              targetType: "invalid",
             },
           },
         };

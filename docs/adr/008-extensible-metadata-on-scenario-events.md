@@ -55,16 +55,27 @@ await scenario.run({
     "name": "Login Test",
     "langwatch": {
       "targetReferenceId": "prompt_abc123",
-      "targetType": "prompt"
+      "targetType": "prompt",
+      "simulationSuiteId": "suite_789"
     },
     "environment": "staging"
   }
 }
 ```
 
-**Server-side schema**: Metadata Zod schema changes from strict to `.passthrough()`.
+**`langwatch` namespace fields** (strict Zod schema at the API layer):
 
-**ES mappings**: The `metadata` root uses `dynamic: false` so user-defined fields are stored in `_source` but not indexed (prevents mapping explosion from high-cardinality custom keys). The `metadata.langwatch` sub-object uses `dynamic: true` so any platform-internal field added there is automatically indexed as a keyword -- no mapping change required when new platform fields are introduced.
+| Field | Type | Required | Purpose |
+|---|---|---|---|
+| `targetReferenceId` | `string` | yes | ID of the agent/prompt target this run was executed against |
+| `targetType` | `"prompt" \| "http" \| "code"` | yes | Target kind, matches `scenarioJobSchema.target.type` |
+| `simulationSuiteId` | `string` | no | `SimulationSuite.id` — which suite dispatched this run |
+
+The entire `langwatch` object is optional on metadata (SDK users never send it).
+
+**Server-side schema**: The outer `metadata` uses `.passthrough()` so user-defined fields survive Zod parsing. The `langwatch` sub-object uses a strict schema (`langwatchMetadataSchema`) that validates field types and rejects unknown fields.
+
+**ES mappings**: The `metadata` root uses `dynamic: false` so user-defined fields are stored in `_source` but not indexed (prevents mapping explosion from high-cardinality custom keys). The `metadata.langwatch` sub-object uses `dynamic: true` so platform fields are automatically indexed as keywords -- this means ES stays forward-compatible while the Zod layer enforces the contract at ingestion time.
 
 **Projection**: `getScenarioRunDataBatch` reads `metadata` from `RUN_STARTED` events and exposes it on `ScenarioRunData`.
 
@@ -79,7 +90,7 @@ await scenario.run({
 
 **Negative:**
 - User metadata is untyped beyond "JSON-serializable"
-- The `langwatch` namespace convention is enforced by documentation, not code
+- ES `dynamic: true` on `metadata.langwatch` means any field sent there gets indexed; the Zod schema guards against this at the API layer, but bulk-inserted documents bypass it
 
 **Neutral:**
 - The server remains a dumb pipe

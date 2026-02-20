@@ -36,12 +36,13 @@ Feature: Extensible metadata on scenario run events
   Scenario: Metadata under the langwatch namespace is preserved in projection
     Given a SCENARIO_RUN_STARTED event with metadata:
       | name        | Login flow |
-      | langwatch   | {"targetReferenceId": "prompt_abc123", "targetType": "prompt"} |
+      | langwatch   | {"targetReferenceId": "prompt_abc123", "targetType": "prompt", "simulationSuiteId": "suite_789"} |
     When the event is ingested through the repository
     And I retrieve the scenario run data
     Then the run data metadata.langwatch contains:
       | targetReferenceId | prompt_abc123 |
       | targetType        | prompt        |
+      | simulationSuiteId | suite_789     |
 
   @unit
   Scenario: Event parsing preserves additional metadata fields
