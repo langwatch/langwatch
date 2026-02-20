@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.4.0](https://github.com/langwatch/langwatch/compare/langwatch@v2.3.0...langwatch@v2.4.0) (2026-02-20)
+
+
+### Features
+
+* add extensible metadata support to scenario run events ([#1734](https://github.com/langwatch/langwatch/issues/1734)) ([e4cd154](https://github.com/langwatch/langwatch/commit/e4cd154682205e1af4a8801ffa073c0444e50ca4))
+* add project secrets manager ([#1709](https://github.com/langwatch/langwatch/issues/1709)) ([54db16e](https://github.com/langwatch/langwatch/commit/54db16ef4e368c5f351a1671d07cbe26566e6b9a))
+* add scenario management tools to MCP server ([#1705](https://github.com/langwatch/langwatch/issues/1705)) ([0376fde](https://github.com/langwatch/langwatch/commit/0376fde0abff7b110b4ec5996a399c4b2ceafde0))
+
+
+### Bug Fixes
+
+* include langevals generated types in Docker build ([#1741](https://github.com/langwatch/langwatch/issues/1741)) ([534a25d](https://github.com/langwatch/langwatch/commit/534a25dae1e4ad24604d800ccb9f52f0bc7394c6))
+* replace sdk-versions.json with build-time generation ([#1746](https://github.com/langwatch/langwatch/issues/1746)) ([20293d3](https://github.com/langwatch/langwatch/commit/20293d3407fea49524dd853efbfba94d1fe3d0a8))
+* worktree script warns when .env files are missing ([#1747](https://github.com/langwatch/langwatch/issues/1747)) ([b30feef](https://github.com/langwatch/langwatch/commit/b30feef56a1013fb3ee1f6b6a3199a11bbb26353))
+
 ## [2.3.0](https://github.com/langwatch/langwatch/compare/langwatch@v2.2.0...langwatch@v2.3.0) (2026-02-17)
 
 
