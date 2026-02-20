@@ -35,7 +35,7 @@ import {
 } from "../license-enforcement/license-enforcement.repository";
 import { LICENSE_LIMIT_ERRORS } from "../license-enforcement/license-limit-guard";
 import { sendInviteEmail } from "../mailer/inviteEmail";
-import { dependencies } from "../../injection/dependencies.server";
+import { SubscriptionHandler } from "~/server/subscriptionHandler";
 import { TeamUserRole } from "@prisma/client";
 import type { Session } from "next-auth";
 import type { PlanInfo } from "../subscriptionHandler";
@@ -152,8 +152,8 @@ export class InviteService {
   static create(prisma: PrismaClient | Prisma.TransactionClient): InviteService {
     const licenseRepo = new LicenseEnforcementRepository(prisma);
     const subscriptionHandler = {
-      getActivePlan: dependencies.subscriptionHandler.getActivePlan.bind(
-        dependencies.subscriptionHandler
+      getActivePlan: SubscriptionHandler.getActivePlan.bind(
+        SubscriptionHandler
       ),
     };
     return new InviteService(prisma, licenseRepo, subscriptionHandler);

@@ -3,7 +3,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { captureException, getCurrentScope } from "~/utils/posthogErrorCapture";
-import { dependencies } from "../../injection/dependencies.server";
+import { notifyPlanLimitReached } from "../../../ee/billing";
 import { withPagesRouterLogger } from "../../middleware/pages-router-logger";
 import { withPagesRouterTracer } from "../../middleware/pages-router-tracer";
 import { maybeAddIdsToContextList } from "../../server/background/workers/collector/rag";
@@ -26,6 +26,7 @@ import {
   spanSchema,
   spanValidatorSchema,
 } from "../../server/tracer/types.generated";
+import { SubscriptionHandler } from "../../server/subscriptionHandler";
 import { TraceUsageService } from "../../server/traces/trace-usage.service";
 import { createLogger } from "../../utils/logger/server";
 
@@ -96,22 +97,19 @@ async function handleCollectorRequest(
     });
 
     if (limitResult.exceeded) {
-      if (dependencies.planLimits) {
-        try {
-          const activePlan =
-            await dependencies.subscriptionHandler.getActivePlan(
-              project.team.organizationId,
-            );
-          await dependencies.planLimits(
-            project.team.organizationId,
-            activePlan.name ?? "free",
-          );
-        } catch (error) {
-          logger.error(
-            { error, projectId: project.id },
-            "Error sending plan limit notification",
-          );
-        }
+      try {
+        const activePlan = await SubscriptionHandler.getActivePlan(
+          project.team.organizationId,
+        );
+        await notifyPlanLimitReached({
+          organizationId: project.team.organizationId,
+          planName: activePlan.name ?? "free",
+        });
+      } catch (error) {
+        logger.error(
+          { error, projectId: project.id },
+          "Error sending plan limit notification",
+        );
       }
       logger.info(
         {

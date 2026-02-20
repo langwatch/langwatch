@@ -21,17 +21,19 @@ vi.mock("../../../traces/trace-usage.service", () => ({
 }));
 
 // Mock subscription handler to control plan limits
-vi.mock("../../../../injection/dependencies.server", () => ({
-  dependencies: {
-    subscriptionHandler: {
+vi.mock("../../../subscriptionHandler", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../../../subscriptionHandler")>();
+  return {
+    ...original,
+    SubscriptionHandler: {
       getActivePlan: vi.fn().mockResolvedValue({
         type: "PRO",
         name: "Pro",
         maxMessagesPerMonth: 1000,
       }),
     },
-  },
-}));
+  };
+});
 
 describe("Limits Router Integration", () => {
   const testOrgSlug = "limits-router-test-org";

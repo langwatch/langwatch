@@ -4,8 +4,8 @@ import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
 import { getLangWatchTracer } from "langwatch";
 import { type NextRequest, NextResponse } from "next/server";
+import { notifyPlanLimitReached } from "../../../../../../ee/billing";
 import { captureException } from "~/utils/posthogErrorCapture";
-import { dependencies } from "../../../../../injection/dependencies.server";
 import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
 import { withAppRouterTracer } from "../../../../../middleware/app-router-tracer";
 import {
@@ -13,6 +13,7 @@ import {
   scheduleTraceCollectionWithFallback,
 } from "../../../../../server/background/workers/collectorWorker";
 import { prisma } from "../../../../../server/db";
+import { SubscriptionHandler } from "../../../../../server/subscriptionHandler";
 import { openTelemetryTraceRequestToTracesForCollection } from "../../../../../server/tracer/otel.traces";
 import { TraceRequestCollectionService } from "../../../../../server/traces/trace-request-collection.service";
 import { TraceUsageService } from "../../../../../server/traces/trace-usage.service";
@@ -89,22 +90,19 @@ async function handleTracesRequest(req: NextRequest) {
         });
 
         if (limitResult.exceeded) {
-          if (dependencies.planLimits) {
-            try {
-              const activePlan =
-                await dependencies.subscriptionHandler.getActivePlan(
-                  project.team.organizationId,
-                );
-              await dependencies.planLimits(
-                project.team.organizationId,
-                activePlan.name ?? "free",
-              );
-            } catch (error) {
-              logger.error(
-                { error, projectId: project.id },
-                "Error sending plan limit notification",
-              );
-            }
+          try {
+            const activePlan = await SubscriptionHandler.getActivePlan(
+              project.team.organizationId,
+            );
+            await notifyPlanLimitReached({
+              organizationId: project.team.organizationId,
+              planName: activePlan.name ?? "free",
+            });
+          } catch (error) {
+            logger.error(
+              { error, projectId: project.id },
+              "Error sending plan limit notification",
+            );
           }
           logger.info(
             {
