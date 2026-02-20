@@ -14,6 +14,7 @@ import {
 import { Edit, Key, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { toaster } from "~/components/ui/toaster";
 import { api } from "~/utils/api";
 import { ProjectSelector } from "../../components/DashboardLayout";
 import SettingsLayout from "../../components/SettingsLayout";
@@ -55,37 +56,58 @@ export default function SecretsPage() {
 
   const handleCreate = async () => {
     if (!project?.id || !newSecretName || !newSecretValue) return;
-    await createMutation.mutateAsync({
-      projectId: project.id,
-      name: newSecretName,
-      value: newSecretValue,
-    });
-    setIsAddDialogOpen(false);
-    setNewSecretName("");
-    setNewSecretValue("");
-    await utils.secrets.list.invalidate();
+    try {
+      await createMutation.mutateAsync({
+        projectId: project.id,
+        name: newSecretName,
+        value: newSecretValue,
+      });
+      setIsAddDialogOpen(false);
+      setNewSecretName("");
+      setNewSecretValue("");
+      await utils.secrets.list.invalidate();
+    } catch (error) {
+      toaster.create({
+        title: error instanceof Error ? error.message : "Failed to create secret",
+        type: "error",
+      });
+    }
   };
 
   const handleDelete = async () => {
     if (!project?.id || !secretToDelete) return;
-    await deleteMutation.mutateAsync({
-      projectId: project.id,
-      secretId: secretToDelete.id,
-    });
-    setSecretToDelete(null);
-    await utils.secrets.list.invalidate();
+    try {
+      await deleteMutation.mutateAsync({
+        projectId: project.id,
+        secretId: secretToDelete.id,
+      });
+      setSecretToDelete(null);
+      await utils.secrets.list.invalidate();
+    } catch (error) {
+      toaster.create({
+        title: error instanceof Error ? error.message : "Failed to delete secret",
+        type: "error",
+      });
+    }
   };
 
   const handleUpdate = async () => {
     if (!project?.id || !secretToUpdate || !updateValue) return;
-    await updateMutation.mutateAsync({
-      projectId: project.id,
-      secretId: secretToUpdate.id,
-      value: updateValue,
-    });
-    setSecretToUpdate(null);
-    setUpdateValue("");
-    await utils.secrets.list.invalidate();
+    try {
+      await updateMutation.mutateAsync({
+        projectId: project.id,
+        secretId: secretToUpdate.id,
+        value: updateValue,
+      });
+      setSecretToUpdate(null);
+      setUpdateValue("");
+      await utils.secrets.list.invalidate();
+    } catch (error) {
+      toaster.create({
+        title: error instanceof Error ? error.message : "Failed to update secret",
+        type: "error",
+      });
+    }
   };
 
   return (
@@ -268,7 +290,9 @@ export default function SecretsPage() {
         >
           <Dialog.Content>
             <Dialog.Header>
-              <Dialog.Title>Delete {secretToDelete?.name}?</Dialog.Title>
+              <Dialog.Title>
+                Delete {secretToDelete?.name ?? ""}?
+              </Dialog.Title>
             </Dialog.Header>
             <Dialog.Body>
               <Text>
@@ -304,7 +328,7 @@ export default function SecretsPage() {
           <Dialog.Content>
             <Dialog.Header>
               <Dialog.Title>
-                Update Value for {secretToUpdate?.name}
+                Update Value for {secretToUpdate?.name ?? ""}
               </Dialog.Title>
             </Dialog.Header>
             <Dialog.Body>
