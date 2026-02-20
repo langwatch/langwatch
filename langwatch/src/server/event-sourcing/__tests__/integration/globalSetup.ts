@@ -9,6 +9,7 @@ import {
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
+import { execSync } from "node:child_process";
 import { migrateUp } from "~/server/clickhouse/goose";
 
 const TEST_DATABASE = "test_langwatch";
@@ -79,6 +80,13 @@ let redisContainer: StartedRedisContainer | null = null;
  * Connection URLs are written to a temp file for test workers to read.
  */
 export async function setup(): Promise<void> {
+  // Generate sdk-versions.json (normally done by start:prepare:files)
+  const sdkVersionsPath = path.join(__dirname, "../../../../server/sdk-radar/sdk-versions.json");
+  if (!fs.existsSync(sdkVersionsPath)) {
+    console.log("[globalSetup] Generating sdk-versions.json...");
+    execSync("pnpm run generate:sdk-versions", { stdio: "inherit" });
+  }
+
   // Skip if using CI service containers
   if (process.env.CI_CLICKHOUSE_URL && process.env.CI_REDIS_URL && process.env.CI) {
     console.log("[globalSetup] Using CI service containers");
