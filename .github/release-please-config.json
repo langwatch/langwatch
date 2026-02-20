@@ -174,7 +174,16 @@
           "path": "pyproject.toml",
           "jsonpath": "$.project.version"
         },
-        "charts/langwatch/Chart.yaml",
+        {
+          "type": "yaml",
+          "path": "charts/langwatch/Chart.yaml",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "yaml",
+          "path": "charts/langwatch/Chart.yaml",
+          "jsonpath": "$.appVersion"
+        },
         "charts/langwatch/values.yaml"
       ]
     }
