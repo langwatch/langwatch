@@ -55,6 +55,14 @@ vi.mock("next/router", () => ({
   }),
 }));
 
+vi.mock("next/router", () => ({
+  useRouter: () => ({
+    query: {},
+    push: mockRouterPush,
+    isReady: true,
+  }),
+}));
+
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );

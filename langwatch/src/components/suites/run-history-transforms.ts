@@ -41,6 +41,8 @@ export type RunGroupSummary = {
   passRate: number;
   passedCount: number;
   failedCount: number;
+  stalledCount: number;
+  cancelledCount: number;
   totalCount: number;
   inProgressCount: number;
 };
@@ -55,13 +57,33 @@ export type RunHistoryTotals = {
   failedCount: number;
 };
 
-const FINISHED_STATUSES = new Set<string>([
-  ScenarioRunStatus.SUCCESS,
-  ScenarioRunStatus.ERROR,
-  ScenarioRunStatus.FAILED,
-]);
+/** Returns the most severe status for a group summary, used for the overall icon. */
+export function worstStatus(summary: RunGroupSummary): ScenarioRunStatus {
+  if (summary.inProgressCount > 0) return ScenarioRunStatus.IN_PROGRESS;
+  if (summary.stalledCount > 0) return ScenarioRunStatus.STALLED;
+  if (summary.failedCount > 0) return ScenarioRunStatus.FAILED;
+  if (summary.cancelledCount > 0) return ScenarioRunStatus.CANCELLED;
+  return ScenarioRunStatus.SUCCESS;
+}
 
-const SUCCESS_STATUSES = new Set<string>([ScenarioRunStatus.SUCCESS]);
+type RunStatusCategory = "success" | "failure" | "stalled" | "cancelled" | "in_progress";
+
+function categorizeRunStatus(status: ScenarioRunStatus): RunStatusCategory {
+  switch (status) {
+    case ScenarioRunStatus.SUCCESS:
+      return "success";
+    case ScenarioRunStatus.ERROR:
+    case ScenarioRunStatus.FAILED:
+      return "failure";
+    case ScenarioRunStatus.STALLED:
+      return "stalled";
+    case ScenarioRunStatus.CANCELLED:
+      return "cancelled";
+    case ScenarioRunStatus.IN_PROGRESS:
+    case ScenarioRunStatus.PENDING:
+      return "in_progress";
+  }
+}
 
 const UNKNOWN_GROUP_KEY = "__unknown__";
 
@@ -226,8 +248,8 @@ export function computeBatchRunSummary({
 /**
  * Computes pass/fail summary for any RunGroup (batch, scenario, or target).
  *
- * Only finished runs (SUCCESS, ERROR, FAILED) contribute to the pass rate.
- * In-progress runs are tracked separately.
+ * Pass rate = passed / all finished (SUCCESS, ERROR, FAILED, STALLED, CANCELLED).
+ * In-progress and pending runs are tracked separately.
  */
 export function computeGroupSummary({
   group,
@@ -236,25 +258,39 @@ export function computeGroupSummary({
 }): RunGroupSummary {
   let passedCount = 0;
   let failedCount = 0;
+  let stalledCount = 0;
+  let cancelledCount = 0;
   let inProgressCount = 0;
 
   for (const run of group.scenarioRuns) {
-    if (SUCCESS_STATUSES.has(run.status)) {
-      passedCount++;
-    } else if (FINISHED_STATUSES.has(run.status)) {
-      failedCount++;
-    } else {
-      inProgressCount++;
+    switch (categorizeRunStatus(run.status)) {
+      case "success":
+        passedCount++;
+        break;
+      case "failure":
+        failedCount++;
+        break;
+      case "stalled":
+        stalledCount++;
+        break;
+      case "cancelled":
+        cancelledCount++;
+        break;
+      case "in_progress":
+        inProgressCount++;
+        break;
     }
   }
 
-  const finishedCount = passedCount + failedCount;
+  const finishedCount = passedCount + failedCount + stalledCount + cancelledCount;
   const passRate = finishedCount > 0 ? (passedCount / finishedCount) * 100 : 0;
 
   return {
     passRate,
     passedCount,
     failedCount,
+    stalledCount,
+    cancelledCount,
     totalCount: group.scenarioRuns.length,
     inProgressCount,
   };
@@ -289,24 +325,25 @@ export function getScenarioDisplayNames({
 }
 
 /**
- * Computes aggregate totals across all batch runs.
+ * Computes aggregate totals from raw scenario runs.
+ * Works regardless of grouping mode since it operates on flat runs.
  */
 export function computeRunHistoryTotals({
-  batchRuns,
+  runs,
 }: {
-  batchRuns: BatchRun[];
+  runs: ScenarioRunData[];
 }): RunHistoryTotals {
   let passedCount = 0;
   let failedCount = 0;
 
-  for (const batchRun of batchRuns) {
-    const summary = computeBatchRunSummary({ batchRun });
-    passedCount += summary.passedCount;
-    failedCount += summary.failedCount;
+  for (const run of runs) {
+    const category = categorizeRunStatus(run.status);
+    if (category === "success") passedCount++;
+    else if (category === "failure" || category === "stalled" || category === "cancelled") failedCount++;
   }
 
   return {
-    runCount: batchRuns.length,
+    runCount: runs.length,
     passedCount,
     failedCount,
   };
