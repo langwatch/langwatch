@@ -234,7 +234,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.3.8",
     "@next/bundle-analyzer": "^16.1.6",
-    "@types/mustache": "^4.2.5",
+    "@types/mustache": "^4.2.6",
     "concurrently": "^8.2.2",
     "esbuild": "^0.27.3",
     "turbo": "^2.4.4",
