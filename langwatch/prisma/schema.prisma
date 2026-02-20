@@ -1181,3 +1181,14 @@ model ProjectDailyBillableEvents {
     @@unique([projectId, date])
     @@index([projectId, date])
 }
+
+model BillingMeterCheckpoint {
+    id                   String   @id @default(cuid())
+    organizationId       String
+    billingMonth         String   // "2026-02"
+    lastReportedTotal    Int      @default(0)
+    pendingReportedTotal Int?     // non-null = in-flight Stripe call
+    updatedAt            DateTime @updatedAt
+
+    @@unique([organizationId, billingMonth])
+}
