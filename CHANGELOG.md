@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.4.1](https://github.com/langwatch/langwatch/compare/langwatch@v2.4.0...langwatch@v2.4.1) (2026-02-20)
+
+
+### Bug Fixes
+
+* copy SDK package files for generate-sdk-versions.sh in Docker build ([455c0ca](https://github.com/langwatch/langwatch/commit/455c0caa0e982c29f3cf30cec6b2c3b5ae58eda7))
+* copy SDK package files into Docker image for build ([#1753](https://github.com/langwatch/langwatch/issues/1753)) ([455c0ca](https://github.com/langwatch/langwatch/commit/455c0caa0e982c29f3cf30cec6b2c3b5ae58eda7))
+
 ## [2.4.0](https://github.com/langwatch/langwatch/compare/langwatch@v2.3.0...langwatch@v2.4.0) (2026-02-20)
 
 
