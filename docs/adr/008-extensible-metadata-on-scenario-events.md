@@ -75,7 +75,7 @@ The entire `langwatch` object is optional on metadata (SDK users never send it).
 
 **Server-side schema**: The outer `metadata` uses `.passthrough()` so user-defined fields survive Zod parsing. The `langwatch` sub-object uses a typed schema (`langwatchMetadataSchema`) that validates field types and strips unknown fields.
 
-**ES mappings**: The `metadata` root uses `dynamic: false` so user-defined fields are stored in `_source` but not indexed (prevents mapping explosion from high-cardinality custom keys). The `metadata.langwatch` sub-object uses `dynamic: true` so platform fields are automatically indexed as keywords -- this means ES stays forward-compatible while the Zod layer enforces the contract at ingestion time.
+**ES mappings**: The `metadata` root uses `dynamic: false` so user-defined fields are stored in `_source` but not indexed (prevents mapping explosion from high-cardinality custom keys). The `metadata.langwatch` sub-object uses `dynamic: true` so platform fields are automatically mapped and indexed according to their detected type -- this means ES stays forward-compatible while the Zod layer enforces the contract at ingestion time.
 
 **Projection**: `getScenarioRunDataBatch` reads `metadata` from `RUN_STARTED` events and exposes it on `ScenarioRunData`.
 
