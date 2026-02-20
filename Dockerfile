@@ -30,6 +30,9 @@ COPY langwatch/vendor ./langwatch/vendor
 # https://stackoverflow.com/questions/70154568/pnpm-equivalent-command-for-npm-ci
 RUN cd langwatch && CI=true pnpm install --frozen-lockfile
 COPY langevals/ts-integration/evaluators.generated.ts ./langevals/ts-integration/evaluators.generated.ts
+# SDK package files needed by generate-sdk-versions.sh during build
+COPY typescript-sdk/package.json ./typescript-sdk/package.json
+COPY python-sdk/pyproject.toml ./python-sdk/pyproject.toml
 COPY langwatch ./langwatch
 RUN cd langwatch && pnpm run build
 EXPOSE 5560
