@@ -318,7 +318,7 @@ export async function runUsageReportingJob(
           USAGE_REPORTING_QUEUE.JOB,
           { organizationId },
           {
-            jobId: `usage_report:${organizationId}`,
+            jobId: `usage_report_${organizationId}`,
             delay: RETRIGGER_DELAY_MS,
           },
         );
