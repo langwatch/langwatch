@@ -77,7 +77,7 @@ export const billingMeterDispatchStore: AppendStore<BillingMeterDispatchRecord> 
         USAGE_REPORTING_QUEUE.JOB,
         { organizationId },
         {
-          jobId: `usage_report:${organizationId}`,
+          jobId: `usage_report_${organizationId}`,
           delay: FIVE_MINUTES_MS,
         },
       );

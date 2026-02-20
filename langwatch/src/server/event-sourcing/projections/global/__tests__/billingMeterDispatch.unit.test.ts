@@ -101,7 +101,7 @@ describe("billingMeterDispatchStore", () => {
         "usage_reporting",
         { organizationId: "org-1" },
         expect.objectContaining({
-          jobId: "usage_report:org-1",
+          jobId: "usage_report_org-1",
           delay: expect.any(Number),
         }),
       );
@@ -140,7 +140,7 @@ describe("billingMeterDispatchStore", () => {
       expect(mockQueueAdd).toHaveBeenCalledWith(
         "usage_reporting",
         { organizationId: "org-1" },
-        expect.objectContaining({ jobId: "usage_report:org-1" }),
+        expect.objectContaining({ jobId: "usage_report_org-1" }),
       );
     });
   });
@@ -222,7 +222,7 @@ describe("billingMeterDispatchStore", () => {
       const jobIds = mockQueueAdd.mock.calls.map(
         (call: unknown[]) => (call[2] as { jobId: string }).jobId,
       );
-      expect(jobIds.every((id: string) => id === "usage_report:org-1")).toBe(
+      expect(jobIds.every((id: string) => id === "usage_report_org-1")).toBe(
         true,
       );
     });

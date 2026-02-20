@@ -387,7 +387,7 @@ describe("runUsageReportingJob", () => {
         expect.any(String),
         { organizationId: "org-1" },
         expect.objectContaining({
-          jobId: "usage_report:org-1",
+          jobId: "usage_report_org-1",
           delay: 5 * 60 * 1000,
         }),
       );
