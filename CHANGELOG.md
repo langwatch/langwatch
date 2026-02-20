@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.2](https://github.com/langwatch/langwatch/compare/langwatch@v2.4.1...langwatch@v2.4.2) (2026-02-20)
+
+
+### Bug Fixes
+
+* clean up release_ui_simulations_menu_enabled feature flag ([6ae6175](https://github.com/langwatch/langwatch/commit/6ae6175aabd99f9c962fc36bbe3dbdbecf852be3))
+
 ## [2.4.1](https://github.com/langwatch/langwatch/compare/langwatch@v2.4.0...langwatch@v2.4.1) (2026-02-20)
 
 
