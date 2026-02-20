@@ -1,6 +1,8 @@
 import { LicenseHandler, PUBLIC_KEY } from "../../ee/licensing";
 import type { PlanInfo } from "../../ee/licensing/planInfo";
 import { createLicenseHandler } from "../../ee/licensing/server";
+import { getSaaSPlanProvider } from "../../ee/billing";
+import { env } from "~/env.mjs";
 import { prisma } from "./db";
 
 // Re-export PlanInfo from canonical location for backward compatibility
@@ -23,13 +25,20 @@ export function getLicenseHandler(): LicenseHandler {
 export abstract class SubscriptionHandler {
   static async getActivePlan(
     organizationId: string,
-    _user?: {
+    user?: {
       id: string;
       email?: string | null;
       name?: string | null;
+      impersonator?: {
+        email?: string | null;
+      };
     },
     handler: LicenseHandler = getLicenseHandler(),
   ): Promise<PlanInfo> {
+    if (env.IS_SAAS) {
+      return await getSaaSPlanProvider().getActivePlan(organizationId, user);
+    }
+
     return handler.getActivePlan(organizationId);
   }
 }

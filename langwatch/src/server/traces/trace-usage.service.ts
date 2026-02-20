@@ -2,7 +2,7 @@ import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 import { FREE_PLAN } from "../../../ee/licensing/constants";
 import type { PrismaClient } from "@prisma/client";
 import { env } from "~/env.mjs";
-import { dependencies } from "~/injection/dependencies.server";
+import { SubscriptionHandler } from "~/server/subscriptionHandler";
 import { prisma } from "~/server/db";
 import {
   esClient as defaultEsClient,
@@ -32,7 +32,7 @@ export class TraceUsageService {
   constructor(
     private readonly organizationRepository: OrganizationRepository,
     private readonly esClientFactory: EsClientFactory,
-    private readonly subscriptionHandler: typeof dependencies.subscriptionHandler,
+    private readonly subscriptionHandler: typeof SubscriptionHandler,
   ) {}
 
   /**
@@ -42,7 +42,7 @@ export class TraceUsageService {
     return new TraceUsageService(
       new OrganizationRepository(db),
       defaultEsClient,
-      dependencies.subscriptionHandler,
+      SubscriptionHandler,
     );
   }
 

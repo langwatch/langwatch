@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
-import { dependencies } from "../../injection/dependencies.server";
+import { SubscriptionHandler } from "~/server/subscriptionHandler";
 import { formatNumber, formatPercent } from "../../utils/formatNumber";
 import { TraceUsageService } from "../traces/trace-usage.service";
 import {
@@ -83,7 +83,7 @@ export interface UsageStats {
   currentMonthMessagesCount: number;
   currentMonthCost: number;
   activePlan: Awaited<
-    ReturnType<typeof dependencies.subscriptionHandler.getActivePlan>
+    ReturnType<typeof SubscriptionHandler.getActivePlan>
   >;
   maxMonthlyUsageLimit: number;
   membersCount: number;
@@ -114,7 +114,7 @@ export class UsageStatsService {
   constructor(
     private readonly repository: ILicenseEnforcementRepository,
     private readonly traceUsageService: ITraceUsageService,
-    private readonly subscriptionHandler: typeof dependencies.subscriptionHandler,
+    private readonly subscriptionHandler: typeof SubscriptionHandler,
   ) {}
 
   /**
@@ -127,7 +127,7 @@ export class UsageStatsService {
     return new UsageStatsService(
       repository,
       traceUsageService,
-      dependencies.subscriptionHandler,
+      SubscriptionHandler,
     );
   }
 

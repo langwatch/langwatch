@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
-import { dependencies } from "~/injection/dependencies.server";
+import { SubscriptionHandler } from "~/server/subscriptionHandler";
 import { LicenseEnforcementRepository } from "./license-enforcement.repository";
 import { LicenseEnforcementService } from "./license-enforcement.service";
 
@@ -42,6 +42,6 @@ export function createLicenseEnforcementService(
 ): LicenseEnforcementService {
   return new LicenseEnforcementService(
     new LicenseEnforcementRepository(prisma),
-    dependencies.subscriptionHandler,
+    SubscriptionHandler,
   );
 }

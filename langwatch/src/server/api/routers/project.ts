@@ -17,7 +17,7 @@ import {
 import { encrypt } from "~/utils/encryption";
 import { slugify } from "~/utils/slugify";
 import { env } from "../../../env.mjs";
-import { dependencies } from "../../../injection/dependencies.server";
+import { SubscriptionHandler } from "~/server/subscriptionHandler";
 import {
   checkOrganizationPermission,
   checkProjectPermission,
@@ -129,7 +129,7 @@ export const projectRouter = createTRPCRouter({
       const projectCount = await getOrganizationProjectsCount(
         input.organizationId,
       );
-      const activePlan = await dependencies.subscriptionHandler.getActivePlan(
+      const activePlan = await SubscriptionHandler.getActivePlan(
         input.organizationId,
         ctx.session.user,
       );
