@@ -31,7 +31,7 @@ import { scheduleUsageStatsForOrganization } from "~/server/background/queues/us
 import { decrypt, encrypt } from "~/utils/encryption";
 import { isTeamRoleAllowedForOrganizationRole, type TeamRoleValue } from "~/utils/memberRoleConstraints";
 import { slugify } from "~/utils/slugify";
-import { dependencies } from "../../../injection/dependencies.server";
+import { SubscriptionHandler } from "~/server/subscriptionHandler";
 import { elasticsearchMigrate } from "../../../tasks/elasticMigrate";
 import {
   INVITE_EXPIRATION_MS,
@@ -1580,7 +1580,7 @@ export const organizationRouter = createTRPCRouter({
 
             // Check license limits for member type changes
             const subscriptionLimits =
-              await dependencies.subscriptionHandler.getActivePlan(
+              await SubscriptionHandler.getActivePlan(
                 team.organizationId,
                 ctx.session.user
               );
@@ -1780,7 +1780,7 @@ export const organizationRouter = createTRPCRouter({
 
         // Check limits for member type changes
         const subscriptionLimits =
-          await dependencies.subscriptionHandler.getActivePlan(
+          await SubscriptionHandler.getActivePlan(
             input.organizationId,
             ctx.session.user
           );

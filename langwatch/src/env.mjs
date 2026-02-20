@@ -103,6 +103,11 @@ export const env = createEnv({
     CLICKHOUSE_CLUSTER: z.string().optional(),
 
     LANGWATCH_LICENSE_PUBLIC_KEY: z.string().optional(),
+
+    // Stripe
+    STRIPE_SECRET_KEY: z.string().optional(),
+    STRIPE_WEBHOOK_SECRET: z.string().optional(),
+    ADMIN_EMAILS: z.string().optional(),
   },
 
   /**
@@ -204,6 +209,9 @@ export const env = createEnv({
       process.env.ENABLE_CLICKHOUSE?.toLowerCase() === "true",
     CLICKHOUSE_CLUSTER: process.env.CLICKHOUSE_CLUSTER,
     LANGWATCH_LICENSE_PUBLIC_KEY: process.env.LANGWATCH_LICENSE_PUBLIC_KEY,
+    STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+    STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+    ADMIN_EMAILS: process.env.ADMIN_EMAILS,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.

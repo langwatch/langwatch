@@ -1,8 +1,8 @@
 import type { Prisma } from "@prisma/client";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { env } from "~/env.mjs";
-import { dependencies } from "~/injection/dependencies.server";
 import { prisma } from "~/server/db";
+import { SubscriptionHandler } from "~/server/subscriptionHandler";
 import { esClient, TRACE_INDEX } from "~/server/elasticsearch";
 import { UsageLimitService } from "~/server/notifications/usage-limit.service";
 import { OrganizationRepository } from "~/server/repositories/organization.repository";
@@ -197,7 +197,7 @@ export default async function handler(
               organizationId: org.id,
             });
           const activePlan =
-            await dependencies.subscriptionHandler.getActivePlan(org.id);
+            await SubscriptionHandler.getActivePlan(org.id);
 
           // Guard against null/undefined activePlan or invalid maxMessagesPerMonth
           if (

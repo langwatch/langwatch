@@ -2,7 +2,7 @@ import { TeamUserRole } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { dependencies } from "../../../injection/dependencies.server";
+import { SubscriptionHandler } from "~/server/subscriptionHandler";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { slugify } from "~/utils/slugify";
 import { checkOrganizationPermission, checkTeamPermission } from "../rbac";
@@ -352,7 +352,7 @@ export const teamRouter = createTRPCRouter({
 
       // Check teams license limit
       const subscriptionLimits =
-        await dependencies.subscriptionHandler.getActivePlan(
+        await SubscriptionHandler.getActivePlan(
           input.organizationId,
           ctx.session.user,
         );
