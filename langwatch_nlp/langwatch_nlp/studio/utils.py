@@ -11,7 +11,7 @@ import threading
 import random
 import enum
 
-from typing import Any, Dict, Iterator, List, cast
+from typing import Any, Dict, Iterator, List, Optional, cast
 from joblib.memory import MemorizedFunc, AsyncMemorizedFunc
 import langwatch
 import litellm
@@ -98,6 +98,37 @@ def validate_identifier(identifier: str) -> str:
     ):
         raise ValueError(f"Reserved identifier cannot be used: {identifier}")
     return identifier
+
+
+def build_secrets_preamble(
+    secrets: Optional[Dict[str, str]],
+) -> str:
+    """Build a Python code preamble that injects a ``secrets`` namespace.
+
+    Instead of doing regex-based text replacement on the user's code, this
+    generates a small preamble that defines ``secrets`` as a namespace object
+    with each secret as an attribute.  This way ``secrets.MY_API_KEY`` is
+    valid Python attribute access with proper syntax highlighting.
+
+    Args:
+        secrets: A mapping of secret names to their plain-text values. May be
+            ``None`` if no secrets were provided.
+
+    Returns:
+        A Python code snippet to prepend to the user's code. Returns an empty
+        string when there are no secrets.
+    """
+    if not secrets:
+        return ""
+
+    # Use repr() for proper Python string literal escaping.
+    assignments = ", ".join(
+        f"{name}={repr(value)}" for name, value in secrets.items()
+    )
+    return (
+        "from types import SimpleNamespace as _SecretsNS\n"
+        f"secrets = _SecretsNS({assignments})\n\n"
+    )
 
 
 def transpose_inline_dataset_to_object_list(

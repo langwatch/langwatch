@@ -73,6 +73,8 @@ model User {
     llmPromptConfigVersions LlmPromptConfigVersion[]
     scenarios               Scenario[]
     inviteRequests          OrganizationInvite[]
+    secretsCreated          ProjectSecret[]          @relation("secretCreatedBy")
+    secretsUpdated          ProjectSecret[]          @relation("secretUpdatedBy")
 }
 
 model VerificationToken {
@@ -249,6 +251,7 @@ model Project {
     experiments              Experiment[]
     annotations              Annotation[]
     modelProviders           ModelProvider[]
+    projectSecrets           ProjectSecret[]
     defaultModel             String?
     topicClusteringModel     String?
     embeddingsModel          String?
@@ -594,6 +597,23 @@ model ModelProvider {
     createdAt              DateTime @default(now())
     updatedAt              DateTime @default(now()) @updatedAt
 
+    @@index([projectId])
+}
+
+model ProjectSecret {
+    id             String   @id @default(nanoid())
+    projectId      String
+    project        Project  @relation(fields: [projectId], references: [id])
+    name           String
+    encryptedValue String
+    createdById    String
+    createdBy      User     @relation("secretCreatedBy", fields: [createdById], references: [id])
+    updatedById    String
+    updatedBy      User     @relation("secretUpdatedBy", fields: [updatedById], references: [id])
+    createdAt      DateTime @default(now())
+    updatedAt      DateTime @default(now()) @updatedAt
+
+    @@unique([projectId, name])
     @@index([projectId])
 }
 

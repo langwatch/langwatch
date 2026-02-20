@@ -16,7 +16,7 @@ export const camelCaseToTitleCase = (input: string): string => {
 
 // Special cases (acronyms etc.)
 const accronyms =
-  /(\b(llm|rag|id|ip|iban|vat|pii|url|nrp|us|uk|es|it|pl|sg|au|in|fi|itin|ssn|nhs|nif|nie|nric|uen|abn|acn|tfn|ai|hhem)\b)/gi;
+  /(\b(llm|rag|gpt|id|ip|iban|vat|pii|url|nrp|us|uk|es|it|pl|sg|au|in|fi|itin|ssn|nhs|nif|nie|nric|uen|abn|acn|tfn|ai|hhem)\b)/gi;
 
 export const titleCase = (input: string): string => {
   return input

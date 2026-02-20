@@ -1,4 +1,4 @@
-import { Button } from "@chakra-ui/react";
+import { Button, HStack } from "@chakra-ui/react";
 import { Prism } from "prism-react-renderer";
 import { Dialog } from "../../../components/ui/dialog";
 
@@ -13,7 +13,15 @@ const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
 });
 
 import { registerCompletion } from "monacopilot";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+/** Minimal type for the Monaco editor instance (from @monaco-editor/react onMount) */
+type MonacoEditorInstance = {
+  focus: () => void;
+  trigger: (source: string, handlerId: string, payload: unknown) => void;
+  onKeyDown: (handler: (e: { code: string; preventDefault: () => void; stopPropagation: () => void }) => void) => void;
+};
+import { SecretsIndicator } from "../../../components/secrets/SecretsIndicator";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import monokaiTheme from "./Monokai.json";
 
@@ -28,7 +36,9 @@ export function CodeEditorModal({
   open: boolean;
   onClose: () => void;
 }) {
+  const { project } = useOrganizationTeamProject();
   const [localCode, setLocalCode] = useState(code);
+  const editorRef = useRef<MonacoEditorInstance | null>(null);
 
   useEffect(() => {
     setLocalCode(code);
@@ -62,6 +72,20 @@ export function CodeEditorModal({
     }
   }, [handleSave, open, localCode]);
 
+  const insertAtCursor = useCallback((text: string) => {
+    const ed = editorRef.current;
+    if (!ed) return;
+    ed.focus();
+    ed.trigger("keyboard", "type", { text });
+  }, []);
+
+  const handleInsertSecret = useCallback(
+    (secretName: string) => {
+      insertAtCursor(`secrets.${secretName}`);
+    },
+    [insertAtCursor],
+  );
+
   return (
     <Dialog.Root open={open} onOpenChange={({ open }) => !open && onClose_()}>
       <Dialog.Content
@@ -75,8 +99,24 @@ export function CodeEditorModal({
         }}
       >
         <Dialog.Header>
-          <Dialog.Title>Edit Code</Dialog.Title>
-          <Dialog.CloseTrigger color="white" _hover={{ color: "black" }} />
+          <HStack justify="space-between" width="full">
+            <Dialog.Title>Edit Code</Dialog.Title>
+            <HStack gap={1}>
+              {project?.id && (
+                <SecretsIndicator
+                  projectId={project.id}
+                  onInsertSecret={handleInsertSecret}
+                />
+              )}
+              <Dialog.CloseTrigger
+                position="relative"
+                top="unset"
+                right="unset"
+                color="white"
+                _hover={{ color: "black" }}
+              />
+            </HStack>
+          </HStack>
         </Dialog.Header>
         <Dialog.Body padding="0">
           {open && (
@@ -86,6 +126,9 @@ export function CodeEditorModal({
               onClose={onClose_}
               language="python"
               technologies={["python", "dspy"]}
+              onEditorMount={(ed) => {
+                editorRef.current = ed;
+              }}
             />
           )}
         </Dialog.Body>
@@ -117,12 +160,14 @@ export function CodeEditor({
   onClose,
   language,
   technologies,
+  onEditorMount,
 }: {
   code: string;
   setCode: (code: string) => void;
   onClose: () => void;
   language: string;
   technologies: string[];
+  onEditorMount?: (editor: MonacoEditorInstance) => void;
 }) {
   const { project } = useOrganizationTeamProject();
 
@@ -142,6 +187,7 @@ export function CodeEditor({
       }}
       onMount={(editor, monaco) => {
         editor.focus();
+        onEditorMount?.(editor);
         editor.onKeyDown((e) => {
           if (e.code === "Escape") {
             onKeyDown.fn();

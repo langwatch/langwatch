@@ -34,6 +34,7 @@ import { roleRouter } from "./routers/role";
 import { subscriptionRouter } from "./routers/subscription";
 import { scenarioRouter } from "./routers/scenarios";
 import { sdkRadarRouter } from "./routers/sdkRadar";
+import { secretsRouter } from "./routers/secrets";
 import { suiteRouter } from "./routers/suites";
 import { shareRouter } from "./routers/share";
 import { spansRouter } from "./routers/spans";
@@ -87,6 +88,7 @@ const coreRouters = {
   role: roleRouter,
   prompts: promptsRouter,
   sdkRadar: sdkRadarRouter,
+  secrets: secretsRouter,
   license: licenseRouter,
   licenseEnforcement: licenseEnforcementRouter,
 };
