@@ -1,7 +1,9 @@
 import stripeCatalogData from "./stripeCatalog.json";
 import {
+  STRIPE_METER_NAMES,
   STRIPE_PRICE_NAMES,
   type StripeEnvironment,
+  type StripeMeterMap,
   type StripePriceMap,
   type StripePriceName,
   type StripePricesFile,
@@ -39,6 +41,26 @@ export const resolveStripePriceMap = (
 export const stripePricesFile = parseStripePricesFile(stripeCatalogData);
 
 export const prices = resolveStripePriceMap(
+  stripePricesFile,
+  getStripeEnvironmentFromNodeEnv(),
+);
+
+export const resolveStripeMeterMap = (
+  data: StripePricesFile,
+  environment: StripeEnvironment,
+): StripeMeterMap => {
+  const resolved = {} as StripeMeterMap;
+  for (const key of STRIPE_METER_NAMES) {
+    const meterId = data.meters?.[key]?.[environment];
+    if (!meterId) {
+      throw new Error(`Missing mapped meter for ${key} in ${environment} mode`);
+    }
+    resolved[key] = meterId;
+  }
+  return resolved;
+};
+
+export const meters = resolveStripeMeterMap(
   stripePricesFile,
   getStripeEnvironmentFromNodeEnv(),
 );
