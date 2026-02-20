@@ -2,8 +2,8 @@ apiVersion: v2
 name: langwatch-helm
 description: Helm chart for LangWatch application
 type: application
-appVersion: 2.4.1
-version: 2.4.1
+appVersion: 2.4.2
+version: 2.4.2
 annotations:
   category: Observability
   keywords: ai,observability,monitoring,secrets
