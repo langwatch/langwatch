@@ -33,7 +33,7 @@ export async function getScenario(id: string): Promise<ScenarioSummary> {
 /** Creates a new scenario. */
 export async function createScenario(data: {
   name: string;
-  situation?: string;
+  situation: string;
   criteria?: string[];
   labels?: string[];
 }): Promise<ScenarioSummary> {

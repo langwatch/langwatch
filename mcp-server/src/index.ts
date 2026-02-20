@@ -385,7 +385,6 @@ server.tool(
     name: z.string().describe("Scenario name"),
     situation: z
       .string()
-      .optional()
       .describe("The context or setup describing what the user/agent is doing"),
     criteria: z
       .array(z.string())

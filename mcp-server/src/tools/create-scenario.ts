@@ -8,7 +8,7 @@ import { createScenario as apiCreateScenario } from "../langwatch-api-scenarios.
  */
 export async function handleCreateScenario(params: {
   name: string;
-  situation?: string;
+  situation: string;
   criteria?: string[];
   labels?: string[];
 }): Promise<string> {
@@ -18,7 +18,7 @@ export async function handleCreateScenario(params: {
   lines.push("Scenario created successfully!\n");
   lines.push(`**ID**: ${result.id}`);
   lines.push(`**Name**: ${result.name}`);
-  if (result.situation) lines.push(`**Situation**: ${result.situation}`);
+  lines.push(`**Situation**: ${result.situation}`);
   if (Array.isArray(result.criteria) && result.criteria.length > 0) {
     lines.push(`**Criteria**: ${result.criteria.length} criteria`);
   }

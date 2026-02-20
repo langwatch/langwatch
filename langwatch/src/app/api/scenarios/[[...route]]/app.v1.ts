@@ -18,7 +18,7 @@ const getService = () => ScenarioService.create(prisma);
 
 const createScenarioSchema = z.object({
   name: z.string().min(1, "name is required"),
-  situation: z.string().optional().default(""),
+  situation: z.string(),
   criteria: z.array(z.string()).optional().default([]),
   labels: z.array(z.string()).optional().default([]),
 });

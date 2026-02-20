@@ -245,6 +245,20 @@ describe("Scenarios API", () => {
         expect(body).toHaveProperty("error");
       });
     });
+
+    describe("when situation is missing", () => {
+      it("returns a validation error", async () => {
+        const res = await helpers.api.post("/api/scenarios", {
+          name: "A valid name",
+          criteria: ["A criterion"],
+          labels: [],
+        });
+
+        expect(res.status).toBe(400);
+        const body = await res.json();
+        expect(body).toHaveProperty("error");
+      });
+    });
   });
 
   describe("PUT /api/scenarios/:id", () => {
