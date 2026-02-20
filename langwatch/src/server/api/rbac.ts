@@ -42,6 +42,7 @@ export const Resources = {
   TRIGGERS: "triggers",
   WORKFLOWS: "workflows",
   PROMPTS: "prompts",
+  SECRETS: "secrets",
   PLAYGROUND: "playground",
 } as const;
 
@@ -101,6 +102,9 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Scenarios
     "scenarios:view",
     "scenarios:manage",
+    // Secrets
+    "secrets:view",
+    "secrets:manage",
     // Team
     "team:view",
     "team:manage",
@@ -141,6 +145,9 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Scenarios
     "scenarios:view",
     "scenarios:manage",
+    // Secrets
+    "secrets:view",
+    "secrets:manage",
     // Team
     "team:view",
   ],
@@ -163,6 +170,8 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "prompts:view",
     // Scenarios
     "scenarios:view",
+    // Secrets
+    "secrets:view",
     // Team
     "team:view",
   ],
@@ -186,6 +195,8 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "prompts:view",
     // Scenarios
     "scenarios:view",
+    // Secrets
+    "secrets:view",
     // Team
     "team:view",
   ],

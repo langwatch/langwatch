@@ -5,6 +5,7 @@ import {
 } from "../../server/api/routers/modelProviders";
 import { prisma } from "../../server/db";
 import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
+import { decrypt } from "../../utils/encryption";
 import { normalizeToSnakeCase } from "../components/properties/llm-configs/normalizeToSnakeCase";
 import type { LLMConfig, ServerWorkflow, Workflow } from "../types/dsl";
 import type { StudioClientEvent } from "../types/events";
@@ -17,7 +18,7 @@ export const addEnvs = async (
     return event;
   }
 
-  const [modelProviders, { apiKey }] = await Promise.all([
+  const [modelProviders, { apiKey }, projectSecrets] = await Promise.all([
     getProjectModelProviders(projectId),
     prisma.project.findUniqueOrThrow({
       where: {
@@ -27,7 +28,16 @@ export const addEnvs = async (
         apiKey: true,
       },
     }),
+    prisma.projectSecret.findMany({
+      where: { projectId },
+      select: { name: true, encryptedValue: true },
+    }),
   ]);
+
+  const secrets: Record<string, string> = {};
+  for (const secret of projectSecrets) {
+    secrets[secret.name] = decrypt(secret.encryptedValue);
+  }
 
   const workflow_id = event.payload.workflow.workflow_id;
   if (!workflow_id) {
@@ -56,6 +66,7 @@ export const addEnvs = async (
     workflow_id,
     api_key: apiKey,
     project_id: projectId,
+    secrets,
     nodes: await Promise.all(
       (event.payload.workflow.nodes as Workflow["nodes"]).map(async (node) => {
         const parameters = await Promise.all(

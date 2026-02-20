@@ -38,6 +38,7 @@ export default function SettingsLayout({
           <MenuLink href={`/${project?.slug}/setup`}>API Key & Setup</MenuLink>
           <MenuLink href="/settings/model-providers">Model Providers</MenuLink>
           <MenuLink href="/settings/model-costs">Model Costs</MenuLink>
+          <MenuLink href="/settings/secrets">Secrets</MenuLink>
           <MenuLink href={`/${project?.slug}/automations`}>Automations</MenuLink>
           <MenuLink href="/settings/projects">Projects</MenuLink>
           <MenuLink href="/settings/teams">Teams</MenuLink>

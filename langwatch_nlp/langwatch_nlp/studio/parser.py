@@ -27,6 +27,7 @@ import dspy
 from langwatch_nlp.studio.utils import (
     SerializableWithStringFallback,
     get_corrected_llm_params,
+    build_secrets_preamble,
     normalize_name_to_class_name,
     normalize_to_variable_name,
     snake_case_to_pascal_case,
@@ -157,6 +158,7 @@ def parsed_and_materialized_workflow_class(
     class_name, code, inputs = parse_workflow(
         workflow, format, debug_level, until_node_id, handle_errors, do_not_trace
     )
+    code = build_secrets_preamble(workflow.secrets) + code
     with materialized_component_class(
         component_code=code, class_name=class_name
     ) as Module:
