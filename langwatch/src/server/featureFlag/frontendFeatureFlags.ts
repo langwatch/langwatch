@@ -26,7 +26,6 @@
  * ### Descriptor: specific target + state (e.g., `menu_enabled`, `endpoint_access`)
  *
  * ## Examples
- * - `release_ui_simulations_menu_enabled` - UI feature rollout
  * - `permission_api_prompts_v2_access` - API access control
  * - `ops_es_trace_processing_killswitch` - operational kill switch
  * - `experiment_ui_dashboard_new_layout` - A/B experiment
@@ -51,7 +50,6 @@
  * @see useFeatureFlag for frontend usage
  */
 export const FRONTEND_FEATURE_FLAGS = [
-  "release_ui_simulations_menu_enabled",
   "release_ui_suites_enabled",
   "release_ui_sdk_radar_banner_card_enabled",
 ] as const;

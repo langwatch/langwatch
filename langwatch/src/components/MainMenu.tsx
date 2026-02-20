@@ -35,11 +35,6 @@ export const MainMenu = React.memo(function MainMenu({
     { enabled: !!project?.id },
   );
 
-  const { enabled: showScenariosOnThePlatform } = useFeatureFlag(
-    "release_ui_simulations_menu_enabled",
-    { projectId: project?.id, organizationId: organization?.id },
-  );
-
   const { enabled: showSuites } = useFeatureFlag(
     "release_ui_suites_enabled",
     { projectId: project?.id, organizationId: organization?.id },
@@ -134,67 +129,57 @@ export const MainMenu = React.memo(function MainMenu({
               {showExpanded ? "Evaluate" : <div>&nbsp;</div>}
             </Text>
 
-            {showScenariosOnThePlatform ? (
-              <CollapsibleMenuGroup
-                icon={featureIcons.simulations.icon}
-                label={projectRoutes.simulations.title}
-                project={project}
-                showLabel={showExpanded}
-                children={[
-                  {
-                    icon: featureIcons.scenarios.icon,
-                    label: projectRoutes.scenarios.title,
-                    href: project
-                      ? projectRoutes.scenarios.path.replace(
-                          "[project]",
-                          project.slug,
-                        )
-                      : "/auth/signin",
-                    isActive: router.pathname.includes(
-                      "/simulations/scenarios",
-                    ),
-                  },
-                  {
-                    icon: featureIcons.simulation_runs.icon,
-                    label: projectRoutes.simulation_runs.title,
-                    href: project
-                      ? projectRoutes.simulation_runs.path.replace(
-                          "[project]",
-                          project.slug,
-                        )
-                      : "/auth/signin",
-                    isActive:
-                      router.pathname.includes("/simulations") &&
-                      !router.pathname.includes("/simulations/scenarios") &&
-                      !router.pathname.includes("/simulations/suites"),
-                  },
-                  ...(showSuites
-                    ? [
-                        {
-                          icon: featureIcons.suites.icon,
-                          label: projectRoutes.suites.title,
-                          href: project
-                            ? projectRoutes.suites.path.replace(
-                                "[project]",
-                                project.slug,
-                              )
-                            : "/auth/signin",
-                          isActive: router.pathname.includes("/simulations/suites"),
-                        },
-                      ]
-                    : []),
-                ]}
-              />
-            ) : (
-              <PageMenuLink
-                path={projectRoutes.simulations.path}
-                icon={featureIcons.simulations.icon}
-                label={projectRoutes.simulations.title}
-                project={project}
-                isActive={router.pathname.includes("/simulations")}
-                showLabel={showExpanded}
-              />
-            )}
+            <CollapsibleMenuGroup
+              icon={featureIcons.simulations.icon}
+              label={projectRoutes.simulations.title}
+              project={project}
+              showLabel={showExpanded}
+              children={[
+                {
+                  icon: featureIcons.scenarios.icon,
+                  label: projectRoutes.scenarios.title,
+                  href: project
+                    ? projectRoutes.scenarios.path.replace(
+                        "[project]",
+                        project.slug,
+                      )
+                    : "/auth/signin",
+                  isActive: router.pathname.includes(
+                    "/simulations/scenarios",
+                  ),
+                },
+                {
+                  icon: featureIcons.simulation_runs.icon,
+                  label: projectRoutes.simulation_runs.title,
+                  href: project
+                    ? projectRoutes.simulation_runs.path.replace(
+                        "[project]",
+                        project.slug,
+                      )
+                    : "/auth/signin",
+                  isActive:
+                    router.pathname.includes("/simulations") &&
+                    !router.pathname.includes("/simulations/scenarios") &&
+                    !router.pathname.includes("/simulations/suites"),
+                },
+                ...(showSuites
+                  ? [
+                      {
+                        icon: featureIcons.suites.icon,
+                        label: projectRoutes.suites.title,
+                        href: project
+                          ? projectRoutes.suites.path.replace(
+                              "[project]",
+                              project.slug,
+                            )
+                          : "/auth/signin",
+                        isActive: router.pathname.includes("/simulations/suites"),
+                      },
+                    ]
+                  : []),
+              ]}
+            />
+
             <PageMenuLink
               path={projectRoutes.evaluations.path}
               icon={featureIcons.evaluations.icon}
