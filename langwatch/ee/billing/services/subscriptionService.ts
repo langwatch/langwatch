@@ -18,6 +18,7 @@ import {
   OrganizationNotFoundError,
   SeatBillingUnavailableError,
 } from "../errors";
+import type { SeatEventSubscriptionFns } from "./seatEventSubscription";
 
 type ItemCalculator = {
   getItemsToUpdate: typeof getItemsToUpdate;

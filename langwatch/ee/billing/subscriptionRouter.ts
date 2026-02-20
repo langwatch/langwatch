@@ -5,8 +5,6 @@ import {
   createTRPCRouter,
   protectedProcedure,
 } from "../../src/server/api/trpc";
-import { createLogger } from "../../src/utils/logger";
-import { notifySubscriptionEvent } from "./notificationHandlers";
 import {
   type PlanTypes as PlanType,
   SUBSCRIBABLE_PLANS,
@@ -14,14 +12,6 @@ import {
 import { billingErrorHandler } from "./middleware";
 import type { CustomerService } from "./services/customerService";
 import type { SubscriptionService } from "./services/subscriptionService";
-
-const logger = createLogger("langwatch:billing:subscriptionRouter");
-
-const maskCustomerId = (id: string) => `${id.slice(0, 7)}...${id.slice(-4)}`;
-
-const logger = createLogger("langwatch:billing:subscriptionRouter");
-
-const maskCustomerId = (id: string) => `${id.slice(0, 7)}...${id.slice(-4)}`;
 
 const subscriptionPlanEnum = z.enum(SUBSCRIBABLE_PLANS);
 
