@@ -44,7 +44,7 @@ importers:
         version: 2.0.15(zod@3.25.76)
       '@anthropic-ai/claude-code':
         specifier: ^2.1.7
-        version: 2.1.7
+        version: 2.1.42
       '@eslint/js':
         specifier: ^9.4.0
         version: 9.39.2
@@ -130,8 +130,8 @@ packages:
     resolution: {integrity: sha512-6o7Y2SeO9vFKB8lArHXehNuusnpddKPk7xqL7T2/b+OvXMRIXUO1rR4wcv1hAFUAT9avGZshty3Wlua/XA7TvA==}
     engines: {node: '>=18'}
 
-  '@anthropic-ai/claude-code@2.1.7':
-    resolution: {integrity: sha512-nETDGeuXk/pwUpja/dlVY8dch4doTtue381BjaNqWiMPSqpY4PPg8dDbTqAYpbkIi1sgli7met+okAeDsXVTpg==}
+  '@anthropic-ai/claude-code@2.1.42':
+    resolution: {integrity: sha512-6zSAsdkmY3KSiO3EtPLHvXy9NbLYFC9Zk8s5dEBUwFR/vBpCvTlCv81JAIVgX53nuuqFv/ktBYEdAVDVbJJsqA==}
     engines: {node: '>=18.0.0'}
     hasBin: true
 
@@ -2462,7 +2462,7 @@ snapshots:
     dependencies:
       json-schema: 0.4.0
 
-  '@anthropic-ai/claude-code@2.1.7':
+  '@anthropic-ai/claude-code@2.1.42':
     optionalDependencies:
       '@img/sharp-darwin-arm64': 0.33.5
       '@img/sharp-darwin-x64': 0.33.5
