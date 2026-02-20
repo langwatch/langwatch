@@ -51,6 +51,7 @@ yarn-error.log*
 
 llmModelCosts.json
 *.generated.ts
+src/server/sdk-radar/sdk-versions.json
 
 quickwit
 quickwit-*
