@@ -86,7 +86,7 @@
     "@hono/zod-validator": "^0.4.3",
     "@hookform/resolvers": "^3.3.2",
     "@langwatch/ksuid": "^2.0.2",
-    "@langwatch/scenario": "file:vendor/langwatch-scenario-0.4.0.tgz",
+    "@langwatch/scenario": "file:vendor/langwatch-scenario-0.4.2.tgz",
     "@microlink/react-json-view": "^1.27.1",
     "@microsoft/fetch-event-source": "^2.0.1",
     "@monaco-editor/react": "^4.7.0-rc.0",
