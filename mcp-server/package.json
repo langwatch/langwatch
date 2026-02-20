@@ -57,7 +57,7 @@
     "vitest": "^3.2.4",
     "yargs": "^17.7.2",
     "zod": "^3.25.76",
-    "zod-validation-error": "^3.5.3"
+    "zod-validation-error": "^5.0.0"
   },
   "bin": {
     "langwatch-mcp-server": "./dist/index.js"
