@@ -46,6 +46,7 @@ agentic-e2e-tests/tests/seed.spec.ts
 agentic-e2e-tests/node_modules/
 seed.spec.ts
 .playwright-mcp/
+.mcp.local.json
 
 !.worktrees/.gitkeep
 .worktrees/**

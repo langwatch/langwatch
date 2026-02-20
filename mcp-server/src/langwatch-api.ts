@@ -116,8 +116,8 @@ export interface PromptMutationResponse {
  *
  * @throws Error with status code and response body when the response is not OK
  */
-async function makeRequest(
-  method: "GET" | "POST",
+export async function makeRequest(
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
   path: string,
   body?: unknown
 ): Promise<unknown> {
@@ -126,7 +126,7 @@ async function makeRequest(
     "X-Auth-Token": requireApiKey(),
   };
 
-  if (method === "POST") {
+  if (body !== undefined) {
     headers["Content-Type"] = "application/json";
   }
 
@@ -263,3 +263,4 @@ export async function createPromptVersion(
     data
   ) as Promise<PromptMutationResponse>;
 }
+

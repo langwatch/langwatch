@@ -94,15 +94,24 @@ server.tool(
 
 server.tool(
   "discover_schema",
-  "Discover available filter fields, metrics, aggregation types, and group-by options for LangWatch queries. Call this before using search_traces or get_analytics to understand available options.",
+  "Discover available filter fields, metrics, aggregation types, group-by options, and scenario schema for LangWatch queries. Call this before using search_traces, get_analytics, or scenario tools to understand available options.",
   {
     category: z
-      .enum(["filters", "metrics", "aggregations", "groups", "all"])
+      .enum(["filters", "metrics", "aggregations", "groups", "scenarios", "all"])
       .describe("Which schema category to discover"),
   },
   async ({ category }) => {
+    if (category === "scenarios") {
+      const { formatScenarioSchema } = await import("./tools/discover-scenario-schema.js");
+      return { content: [{ type: "text", text: formatScenarioSchema() }] };
+    }
     const { formatSchema } = await import("./tools/discover-schema.js");
-    return { content: [{ type: "text", text: formatSchema(category) }] };
+    let text = formatSchema(category);
+    if (category === "all") {
+      const { formatScenarioSchema } = await import("./tools/discover-scenario-schema.js");
+      text += "\n\n" + formatScenarioSchema();
+    }
+    return { content: [{ type: "text", text }] };
   }
 );
 
@@ -320,6 +329,126 @@ server.tool(
     const { handleUpdatePrompt } = await import("./tools/update-prompt.js");
     return {
       content: [{ type: "text", text: await handleUpdatePrompt(params) }],
+    };
+  }
+);
+
+// --- Scenario Tools (require API key) ---
+
+server.tool(
+  "list_scenarios",
+  "List all scenarios in the LangWatch project. Returns AI-readable digest by default.",
+  {
+    format: z
+      .enum(["digest", "json"])
+      .optional()
+      .describe(
+        "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)"
+      ),
+  },
+  async (params) => {
+    const { requireApiKey } = await import("./config.js");
+    requireApiKey();
+    const { handleListScenarios } = await import("./tools/list-scenarios.js");
+    return {
+      content: [{ type: "text", text: await handleListScenarios(params) }],
+    };
+  }
+);
+
+server.tool(
+  "get_scenario",
+  "Get full details of a scenario by ID, including situation, criteria, and labels.",
+  {
+    scenarioId: z.string().describe("The scenario ID to retrieve"),
+    format: z
+      .enum(["digest", "json"])
+      .optional()
+      .describe(
+        "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)"
+      ),
+  },
+  async (params) => {
+    const { requireApiKey } = await import("./config.js");
+    requireApiKey();
+    const { handleGetScenario } = await import("./tools/get-scenario.js");
+    return {
+      content: [{ type: "text", text: await handleGetScenario(params) }],
+    };
+  }
+);
+
+server.tool(
+  "create_scenario",
+  "Create a new scenario in the LangWatch project. Call discover_schema({ category: 'scenarios' }) first to learn how to write effective situations and criteria.",
+  {
+    name: z.string().describe("Scenario name"),
+    situation: z
+      .string()
+      .describe("The context or setup describing what the user/agent is doing"),
+    criteria: z
+      .array(z.string())
+      .optional()
+      .describe("Pass/fail conditions the agent's response must satisfy"),
+    labels: z
+      .array(z.string())
+      .optional()
+      .describe("Tags for organizing and filtering scenarios"),
+  },
+  async (params) => {
+    const { requireApiKey } = await import("./config.js");
+    requireApiKey();
+    const { handleCreateScenario } = await import(
+      "./tools/create-scenario.js"
+    );
+    return {
+      content: [{ type: "text", text: await handleCreateScenario(params) }],
+    };
+  }
+);
+
+server.tool(
+  "update_scenario",
+  "Update an existing scenario.",
+  {
+    scenarioId: z.string().describe("The scenario ID to update"),
+    name: z.string().optional().describe("Updated scenario name"),
+    situation: z.string().optional().describe("Updated situation"),
+    criteria: z
+      .array(z.string())
+      .optional()
+      .describe("Updated criteria"),
+    labels: z
+      .array(z.string())
+      .optional()
+      .describe("Updated labels"),
+  },
+  async (params) => {
+    const { requireApiKey } = await import("./config.js");
+    requireApiKey();
+    const { handleUpdateScenario } = await import(
+      "./tools/update-scenario.js"
+    );
+    return {
+      content: [{ type: "text", text: await handleUpdateScenario(params) }],
+    };
+  }
+);
+
+server.tool(
+  "archive_scenario",
+  "Archive (soft-delete) a scenario.",
+  {
+    scenarioId: z.string().describe("The scenario ID to archive"),
+  },
+  async (params) => {
+    const { requireApiKey } = await import("./config.js");
+    requireApiKey();
+    const { handleArchiveScenario } = await import(
+      "./tools/archive-scenario.js"
+    );
+    return {
+      content: [{ type: "text", text: await handleArchiveScenario(params) }],
     };
   }
 );
