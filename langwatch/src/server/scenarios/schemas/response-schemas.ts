@@ -38,6 +38,14 @@ export const runDataSchema = z.object({
   scenarioRunId: scenarioRunIdSchema,
   name: z.string().optional().nullable(),
   description: z.string().optional().nullable(),
+  metadata: z
+    .object({
+      name: z.string().optional(),
+      description: z.string().optional(),
+    })
+    .passthrough()
+    .optional()
+    .nullable(),
   status: z.nativeEnum(ScenarioRunStatus),
   results: scenarioResultsSchema.optional().nullable(),
   messages: scenarioMessageSnapshotSchema.shape.messages,

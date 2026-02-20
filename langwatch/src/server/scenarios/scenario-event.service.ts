@@ -156,6 +156,7 @@ export class ScenarioEventService {
           timestamp: latestMessageEvent?.timestamp ?? runStartedEvent.timestamp,
           name: runStartedEvent?.metadata?.name ?? null,
           description: runStartedEvent?.metadata?.description ?? null,
+          metadata: runStartedEvent?.metadata ?? null,
           durationInMs: latestRunFinishedEvent
             ? latestRunFinishedEvent.timestamp - runStartedEvent.timestamp
             : lastEventTimestamp - runStartedEvent.timestamp,
@@ -612,6 +613,7 @@ export class ScenarioEventService {
             timestamp: messageEvent?.timestamp ?? runStartedEvent.timestamp,
             name: runStartedEvent?.metadata?.name ?? null,
             description: runStartedEvent?.metadata?.description ?? null,
+            metadata: runStartedEvent?.metadata ?? null,
             durationInMs: runFinishedEvent
               ? Math.max(0, runFinishedEvent.timestamp - runStartedEvent.timestamp)
               : Math.max(0, lastEventTimestamp - runStartedEvent.timestamp),
