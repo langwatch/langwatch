@@ -12,7 +12,7 @@
     "@hono/node-server": "^1.19.9",
     "bullmq": "^5.67.2",
     "dotenv": "^17.2.3",
-    "hono": "^4.11.7",
+    "hono": "^4.11.10",
     "ioredis": "^5.9.2"
   },
   "devDependencies": {
