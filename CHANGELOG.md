@@ -1,5 +1,122 @@
 # Changelog
 
+## [2.3.0](https://github.com/langwatch/langwatch/compare/langwatch@v2.2.0...langwatch@v2.3.0) (2026-02-17)
+
+
+### Features
+
+* add AI-readable trace mapping to dataset mapping dropdowns ([#1437](https://github.com/langwatch/langwatch/issues/1437)) ([82d9c3d](https://github.com/langwatch/langwatch/commit/82d9c3d4605970eb994aa3ee0765140101fa5a2b))
+* add experiment eval runs (eval v3) to event sourcing ([#1276](https://github.com/langwatch/langwatch/issues/1276)) ([791415a](https://github.com/langwatch/langwatch/commit/791415aeb90a14109c5841fb4583d6eddc558b92))
+* add library to help catch trace parity dift betwen ElasicSearch and ClickHouse ([#1426](https://github.com/langwatch/langwatch/issues/1426)) ([bce70bf](https://github.com/langwatch/langwatch/commit/bce70bfe453a9202414e17afa8018786fe3d225f))
+* add POST /api/evaluators to create evaluators via REST API ([#1574](https://github.com/langwatch/langwatch/issues/1574)) ([3084655](https://github.com/langwatch/langwatch/commit/308465566db22345663ba78135338ad587e8d84d))
+* add public REST API for evaluators ([#1540](https://github.com/langwatch/langwatch/issues/1540)) ([46f4064](https://github.com/langwatch/langwatch/commit/46f4064c32dee33be58eee54f98c810a0da57cee))
+* add public REST API for evaluators (/api/evaluators) ([46f4064](https://github.com/langwatch/langwatch/commit/46f4064c32dee33be58eee54f98c810a0da57cee))
+* add separate worker pod deployment to Helm chart ([#1436](https://github.com/langwatch/langwatch/issues/1436)) ([49657a1](https://github.com/langwatch/langwatch/commit/49657a1807667ef4585eab7cde78e626aff923ae))
+* added sdk version usage tracking + sdk radar to notify users of outdated sdks ([#1653](https://github.com/langwatch/langwatch/issues/1653)) ([e423b54](https://github.com/langwatch/langwatch/commit/e423b54de5f3a172856406a5be5b133ae9eb10b3))
+* bullboard view for event sourcing groups ([#1632](https://github.com/langwatch/langwatch/issues/1632)) ([0a191ba](https://github.com/langwatch/langwatch/commit/0a191ba43eb85cf3c5071736778878312ba5de28))
+* **cli:** add separate prompt pull and prompt push commands ([#1543](https://github.com/langwatch/langwatch/issues/1543)) ([76c4881](https://github.com/langwatch/langwatch/commit/76c48817d284b300b33a37bbc52c4047bff8e36e))
+* dedicated endpoint for span names and metadata keys ([#1434](https://github.com/langwatch/langwatch/issues/1434)) ([1ea0297](https://github.com/langwatch/langwatch/commit/1ea02975dabbe7ad648edcd30f0c695bc0a023b2))
+* full Liquid template support with autocomplete ([#1583](https://github.com/langwatch/langwatch/issues/1583)) ([00863a7](https://github.com/langwatch/langwatch/commit/00863a7643c8f6af48582bf82512fd37391902a7))
+* **license:** add contact sales link to license activation page ([#1552](https://github.com/langwatch/langwatch/issues/1552)) ([2168404](https://github.com/langwatch/langwatch/commit/2168404d6734f2f4e63b69f2c9e9f8c3be6eda10))
+* **license:** add purchase license link to license activation page ([#1572](https://github.com/langwatch/langwatch/issues/1572)) ([fc0acdb](https://github.com/langwatch/langwatch/commit/fc0acdb231ce4301b32d84ba1f4efbb4a96da28d))
+* **members:** add pending invitation logic ([#1412](https://github.com/langwatch/langwatch/issues/1412)) ([d54416f](https://github.com/langwatch/langwatch/commit/d54416f62ebda1306545fc45a2b6774c9224d6e8))
+* move langevals into monorepo ([#1591](https://github.com/langwatch/langwatch/issues/1591)) ([0d8a7ed](https://github.com/langwatch/langwatch/commit/0d8a7ed1278f7218e9a1749b247566853b1a3268))
+* move table TTL orchestration to application layer ([#1414](https://github.com/langwatch/langwatch/issues/1414)) ([61fd8a4](https://github.com/langwatch/langwatch/commit/61fd8a4e60bf049a0b1e20a5d7228070950a0959))
+* **scenarios:** enable code agents as scenario targets ([#1545](https://github.com/langwatch/langwatch/issues/1545)) ([7d8573e](https://github.com/langwatch/langwatch/commit/7d8573e4393fe3382382de28adb141435dc8cf02))
+* studio evaluator sidebar, inline editing, agent/HTTP nodes, llm-as-a-judge image support and image rendering on experiments workbench ([#1589](https://github.com/langwatch/langwatch/issues/1589)) ([3da4f98](https://github.com/langwatch/langwatch/commit/3da4f982d532cac9fbb576f2b56a2ded5f726a55))
+* suite workflow — create, run, see results ([#1421](https://github.com/langwatch/langwatch/issues/1421)) ([7291b60](https://github.com/langwatch/langwatch/commit/7291b60e361b917d9a65c6939f67135e8c85d206))
+
+
+### Bug Fixes
+
+* add tslib as package extension to fix otel bullmq ([#1631](https://github.com/langwatch/langwatch/issues/1631)) ([ae584aa](https://github.com/langwatch/langwatch/commit/ae584aa8c2b9c1f51a5ef2a20abe8e3173f1aa26))
+* base64 image rendering and evaluator body size limit ([#1638](https://github.com/langwatch/langwatch/issues/1638)) ([d6e1b80](https://github.com/langwatch/langwatch/commit/d6e1b802476d1aa4b4aa301544daead4f0bad263))
+* bundle analysis conditional import ([#1596](https://github.com/langwatch/langwatch/issues/1596)) ([62dcb84](https://github.com/langwatch/langwatch/commit/62dcb845836c916389fb87c28367accb22058ae0))
+* CI stability — NLP duration assertion and app-ci OOM ([c475af5](https://github.com/langwatch/langwatch/commit/c475af5453d6adf0e3a605f664d0f064e77e2587))
+* ci stability — NLP duration assertion and app-ci OOM ([#1599](https://github.com/langwatch/langwatch/issues/1599)) ([c475af5](https://github.com/langwatch/langwatch/commit/c475af5453d6adf0e3a605f664d0f064e77e2587))
+* CLI sync now properly sends structured outputs to backend ([#1645](https://github.com/langwatch/langwatch/issues/1645)) ([9b57d7a](https://github.com/langwatch/langwatch/commit/9b57d7a9ffbc2d525261d3b509f12a1c01ccdda0))
+* code agent editor broken inputs form ([#1646](https://github.com/langwatch/langwatch/issues/1646)) ([c8bdc25](https://github.com/langwatch/langwatch/commit/c8bdc2599a6713c701fdc6acb38d72dca2aab096))
+* **event-sourcing:** add redis caching for checkpoint methods ([#1539](https://github.com/langwatch/langwatch/issues/1539)) ([f0c5cba](https://github.com/langwatch/langwatch/commit/f0c5cbaabc1261aabe9be309106e0fc147e27906))
+* guard against undefined llmConfig in nodeDataToLocalPromptConfig ([a4a8b5d](https://github.com/langwatch/langwatch/commit/a4a8b5daec1498ce1eef71afd982450d66495995))
+* handle NaN/Infinity in JSON serialization for batch evaluation payloads ([#1557](https://github.com/langwatch/langwatch/issues/1557)) ([072c347](https://github.com/langwatch/langwatch/commit/072c347ca3ba7c148ae19d0d9e3fc80f6d6c84fc))
+* handle NaN/Infinity in JSON serialization for batch evaluation payloads ([#1558](https://github.com/langwatch/langwatch/issues/1558)) ([072c347](https://github.com/langwatch/langwatch/commit/072c347ca3ba7c148ae19d0d9e3fc80f6d6c84fc))
+* include target and index in BullMQ scenario job ID to prevent deduplication ([da1aa47](https://github.com/langwatch/langwatch/commit/da1aa4753f65b7d2aa6c008a853641de51c918ee)), closes [#1396](https://github.com/langwatch/langwatch/issues/1396)
+* increase body size limit to 30mb for datasetRecord.update ([d378066](https://github.com/langwatch/langwatch/commit/d378066ffbeb6dc8329b9bc245ee25c5d79808d7))
+* missing model overriding the whole prompt by accident ([422f660](https://github.com/langwatch/langwatch/commit/422f660ff22b353b1249295ec2909edab60f0a9d))
+* mock @copilotkit/react-ui to prevent @react-aria/interactions crash in vmThreads ([2426aa7](https://github.com/langwatch/langwatch/commit/2426aa74e41809a47a7cae4c051cc0f8b331d753))
+* prevent cascading dataset sync requests on cell edit ([c230d03](https://github.com/langwatch/langwatch/commit/c230d0304b2aaa0f5a917791c92de2f54688a273))
+* prompt editor losing content due to watch firing before init ([4ae7c73](https://github.com/langwatch/langwatch/commit/4ae7c730f5e45bd51a003c87b9fa9e70e9bcb155))
+* **settings:** enforce Lite Member role sync and explicit member save flow ([#1413](https://github.com/langwatch/langwatch/issues/1413)) ([1fdbaa3](https://github.com/langwatch/langwatch/commit/1fdbaa36e40fd769dc628e69a6b71bbbc10f13bf))
+* studio prompt editor bugs — structured outputs toggle, variable types, and test fixes ([0df27cb](https://github.com/langwatch/langwatch/commit/0df27cba5ec7d3be713a17d8daf434f28eb71322))
+* studio prompt editor bugs ([#1590](https://github.com/langwatch/langwatch/issues/1590)) ([0df27cb](https://github.com/langwatch/langwatch/commit/0df27cba5ec7d3be713a17d8daf434f28eb71322))
+* tRPC loggerMiddleware silently swallows all errors ([#1579](https://github.com/langwatch/langwatch/issues/1579)) ([426cb8e](https://github.com/langwatch/langwatch/commit/426cb8ed1bbd235e6f1b637a4bea1f7a034e077b))
+* typescript sdk labels not configured correctly ([#1550](https://github.com/langwatch/langwatch/issues/1550)) ([13b07a4](https://github.com/langwatch/langwatch/commit/13b07a4b4d3abb281bdbfb49aadc367808a16391))
+* update Azure API version to 2024-06-01 for tool_choice support ([#1547](https://github.com/langwatch/langwatch/issues/1547)) ([3f4ea00](https://github.com/langwatch/langwatch/commit/3f4ea0085b6334f5168581e6402cae92c6b2d83e)), closes [#1546](https://github.com/langwatch/langwatch/issues/1546)
+* update BullMQ job ID deduplication for multi-target and repeated runs ([#1404](https://github.com/langwatch/langwatch/issues/1404)) ([da1aa47](https://github.com/langwatch/langwatch/commit/da1aa4753f65b7d2aa6c008a853641de51c918ee))
+* use z.date() for evaluator schema dates to match Prisma output ([3b5041a](https://github.com/langwatch/langwatch/commit/3b5041a93c3b18f2c3c3cdb6713abdd567bad3e2))
+* vitest vmThreads OOM — add vmMemoryLimit to recycle leaky workers ([52de8b6](https://github.com/langwatch/langwatch/commit/52de8b6260fb617b508521734a5e12db9af127b4))
+
+
+### Miscellaneous
+
+* **deps-dev:** bump chainlit from 2.8.3 to 2.9.6 in /python-sdk ([#1508](https://github.com/langwatch/langwatch/issues/1508)) ([5cdb91a](https://github.com/langwatch/langwatch/commit/5cdb91a628442b747eb776978156c5531ab80f61))
+* **deps-dev:** bump fishery from 2.2.3 to 2.4.0 in /langwatch ([#1470](https://github.com/langwatch/langwatch/issues/1470)) ([1a89366](https://github.com/langwatch/langwatch/commit/1a893668b02d39a698da9285ab54fff424fd8b21))
+* **deps-dev:** bump json-repair from 0.49.0 to 0.57.1 in /python-sdk ([#1507](https://github.com/langwatch/langwatch/issues/1507)) ([eb681e5](https://github.com/langwatch/langwatch/commit/eb681e5d5d341aee61fc9eed7236d9d40168c6ff))
+* **deps-dev:** bump openinference-instrumentation-dspy from 0.1.28 to 0.1.33 in /python-sdk ([#1505](https://github.com/langwatch/langwatch/issues/1505)) ([1280b4c](https://github.com/langwatch/langwatch/commit/1280b4cab9e67ce2976837a6244588d8cfdfd814))
+* **deps-dev:** bump openinference-instrumentation-dspy in /python-sdk ([1280b4c](https://github.com/langwatch/langwatch/commit/1280b4cab9e67ce2976837a6244588d8cfdfd814))
+* **deps-dev:** bump python-dotenv from 1.0.1 to 1.2.1 in /python-sdk ([#1509](https://github.com/langwatch/langwatch/issues/1509)) ([01d4a17](https://github.com/langwatch/langwatch/commit/01d4a171ae4b6253d82e157d477ecac58d3de25f))
+* **deps-dev:** update uvicorn requirement from &lt;0.40.0,&gt;=0.38.0 to &gt;=0.38.0,&lt;0.41.0 in /python-sdk ([#1445](https://github.com/langwatch/langwatch/issues/1445)) ([a26937d](https://github.com/langwatch/langwatch/commit/a26937df10f8dd39f93c79532d42a681fffb73d9))
+* **deps-dev:** update uvicorn requirement in /python-sdk ([a26937d](https://github.com/langwatch/langwatch/commit/a26937df10f8dd39f93c79532d42a681fffb73d9))
+* **deps:** bump @aws-sdk/client-cloudwatch-logs from 3.828.0 to 3.987.0 in /langwatch ([#1486](https://github.com/langwatch/langwatch/issues/1486)) ([caccdd5](https://github.com/langwatch/langwatch/commit/caccdd5103fd5ea41b2cd987d2cc0cd604e68f96))
+* **deps:** bump @aws-sdk/client-cloudwatch-logs in /langwatch ([caccdd5](https://github.com/langwatch/langwatch/commit/caccdd5103fd5ea41b2cd987d2cc0cd604e68f96))
+* **deps:** bump @aws-sdk/client-lambda from 3.817.0 to 3.987.0 in /langwatch ([#1476](https://github.com/langwatch/langwatch/issues/1476)) ([b7e24cb](https://github.com/langwatch/langwatch/commit/b7e24cb413cb2bdb6a2bc0375af09bcc362ec849))
+* **deps:** bump @aws-sdk/client-lambda in /langwatch ([b7e24cb](https://github.com/langwatch/langwatch/commit/b7e24cb413cb2bdb6a2bc0375af09bcc362ec849))
+* **deps:** bump @microlink/react-json-view from 1.23.1 to 1.27.1 in /langwatch ([#1480](https://github.com/langwatch/langwatch/issues/1480)) ([9f97192](https://github.com/langwatch/langwatch/commit/9f97192500f7de451f408da0b886b0c624f6ba5d))
+* **deps:** bump @microlink/react-json-view in /langwatch ([9f97192](https://github.com/langwatch/langwatch/commit/9f97192500f7de451f408da0b886b0c624f6ba5d))
+* **deps:** bump @next/bundle-analyzer from 15.3.3 to 16.1.6 in /langwatch ([#1485](https://github.com/langwatch/langwatch/issues/1485)) ([604a0fb](https://github.com/langwatch/langwatch/commit/604a0fb16493668e8aa05dcfed5ecfb634910c41))
+* **deps:** bump @next/bundle-analyzer in /langwatch ([604a0fb](https://github.com/langwatch/langwatch/commit/604a0fb16493668e8aa05dcfed5ecfb634910c41))
+* **deps:** bump @opentelemetry/context-async-hooks from 2.2.0 to 2.5.0 in /langwatch ([#1490](https://github.com/langwatch/langwatch/issues/1490)) ([f9fcf02](https://github.com/langwatch/langwatch/commit/f9fcf029e4919bdb9aa2676b1e19ea52a40b3e47))
+* **deps:** bump @opentelemetry/context-async-hooks in /langwatch ([f9fcf02](https://github.com/langwatch/langwatch/commit/f9fcf029e4919bdb9aa2676b1e19ea52a40b3e47))
+* **deps:** bump bcrypt and @types/bcrypt in /langwatch ([#1482](https://github.com/langwatch/langwatch/issues/1482)) ([930eca8](https://github.com/langwatch/langwatch/commit/930eca810a1a38fcb7fc71b7c820ae6c7a25c900))
+* **deps:** bump esbuild from 0.23.1 to 0.27.3 in /langwatch ([#1484](https://github.com/langwatch/langwatch/issues/1484)) ([99ac643](https://github.com/langwatch/langwatch/commit/99ac643718a46d4a5c03a7b32d81b77e92ea9c91))
+* **deps:** bump libphonenumber-js from 1.12.24 to 1.12.36 in /langwatch ([#1477](https://github.com/langwatch/langwatch/issues/1477)) ([68d1064](https://github.com/langwatch/langwatch/commit/68d10645453075ded9b166e2592afa12a06cf853))
+* **deps:** bump libphonenumber-js in /langwatch ([68d1064](https://github.com/langwatch/langwatch/commit/68d10645453075ded9b166e2592afa12a06cf853))
+* **deps:** bump mangum from 0.17.0 to 0.21.0 in /langwatch_nlp ([#1498](https://github.com/langwatch/langwatch/issues/1498)) ([2cf411a](https://github.com/langwatch/langwatch/commit/2cf411a9a66a2474c567396f2b3eb5407cfaac18))
+* **deps:** bump mermaid from 11.12.0 to 11.12.2 in /langwatch ([#1491](https://github.com/langwatch/langwatch/issues/1491)) ([eaca044](https://github.com/langwatch/langwatch/commit/eaca044cf670d67713ce7e3339f9a0bf9cfc2a0b))
+* **deps:** bump numpy from 1.26.4 to 2.4.2 in /langwatch_nlp ([#1500](https://github.com/langwatch/langwatch/issues/1500)) ([ba09059](https://github.com/langwatch/langwatch/commit/ba0905906aab267ca4d1ccb16ea37b5de750a334))
+* **deps:** bump openai from 2.8.1 to 2.20.0 in /langwatch_nlp ([#1499](https://github.com/langwatch/langwatch/issues/1499)) ([1419d5c](https://github.com/langwatch/langwatch/commit/1419d5cd5c3c79c819ec380d2b4b820e82b89558))
+* **deps:** bump pillow from 11.3.0 to 12.1.1 in /langwatch_nlp ([#1501](https://github.com/langwatch/langwatch/issues/1501)) ([69f7ec3](https://github.com/langwatch/langwatch/commit/69f7ec31dc32fa68dda8286c6563f72897f13541))
+* **deps:** bump qs ([2d064b9](https://github.com/langwatch/langwatch/commit/2d064b93f48fc3002df5c199fff932f1e18aa441))
+* **deps:** bump qs from 6.14.1 to 6.14.2 in /langwatch in the npm_and_yarn group across 1 directory ([#1569](https://github.com/langwatch/langwatch/issues/1569)) ([2d064b9](https://github.com/langwatch/langwatch/commit/2d064b93f48fc3002df5c199fff932f1e18aa441))
+* **deps:** bump ruff from 0.12.9 to 0.15.0 in /python-sdk ([#1506](https://github.com/langwatch/langwatch/issues/1506)) ([89b6fb3](https://github.com/langwatch/langwatch/commit/89b6fb32a1571b87e3c7f963fa6e565b3063b8f1))
+* **deps:** bump sass from 1.79.0 to 1.97.3 in /langwatch ([#1488](https://github.com/langwatch/langwatch/issues/1488)) ([f0527ac](https://github.com/langwatch/langwatch/commit/f0527ac4086f177548bc965a86b8a23cf90f0617))
+* **deps:** bump shiki from 3.13.0 to 3.22.0 in /langwatch ([#1481](https://github.com/langwatch/langwatch/issues/1481)) ([296ad11](https://github.com/langwatch/langwatch/commit/296ad11143f318d1d5a44f044072f652ec794648))
+* **deps:** bump the npm_and_yarn group across 1 directory with 3 updates ([#1532](https://github.com/langwatch/langwatch/issues/1532)) ([552d2bd](https://github.com/langwatch/langwatch/commit/552d2bd27c319a3fcf0b6339e7400a528098a0bb))
+* **deps:** bump the npm_and_yarn group across 1 directory with 5 updates ([#1524](https://github.com/langwatch/langwatch/issues/1524)) ([95e8852](https://github.com/langwatch/langwatch/commit/95e88529f5afae5ad197849683eb5a78f41691eb))
+* **deps:** bump ws and @types/ws in /langwatch ([#1492](https://github.com/langwatch/langwatch/issues/1492)) ([951f89a](https://github.com/langwatch/langwatch/commit/951f89ae49859e2210dad9c3e7f362e9bdbb40ab))
+* **deps:** cleanup dependencies/dev dependencies ([#1594](https://github.com/langwatch/langwatch/issues/1594)) ([10a30e2](https://github.com/langwatch/langwatch/commit/10a30e254b5be4a7512df71396b26cab322e03d3))
+* **deps:** update langwatch requirement from &lt;0.2,&gt;=0.1.37 to &gt;=0.1.37,&lt;0.11 in /langwatch_nlp ([#1444](https://github.com/langwatch/langwatch/issues/1444)) ([3715853](https://github.com/langwatch/langwatch/commit/3715853859285d936d0db89b9ec40a2c753fef76))
+* **deps:** update langwatch requirement in /langwatch_nlp ([3715853](https://github.com/langwatch/langwatch/commit/3715853859285d936d0db89b9ec40a2c753fef76))
+* fix test pyramid violations and naming conventions ([beb0203](https://github.com/langwatch/langwatch/commit/beb0203b4b9cb5d5c1bce40cb3f6a89d9db06fc9)), closes [#1649](https://github.com/langwatch/langwatch/issues/1649)
+* fix test pyramid violations and naming in scenario tests ([#1650](https://github.com/langwatch/langwatch/issues/1650)) ([beb0203](https://github.com/langwatch/langwatch/commit/beb0203b4b9cb5d5c1bce40cb3f6a89d9db06fc9))
+* **main:** release python-sdk 0.11.0 ([#1366](https://github.com/langwatch/langwatch/issues/1366)) ([8a93d1f](https://github.com/langwatch/langwatch/commit/8a93d1f6e23249bd1a695d3bd9c623316a3d785b))
+* **main:** release python-sdk 0.12.0 ([#1544](https://github.com/langwatch/langwatch/issues/1544)) ([c866bcd](https://github.com/langwatch/langwatch/commit/c866bcdfbb1dcee5d113507c263c534f1b962732))
+* **main:** release python-sdk 0.13.0 ([#1584](https://github.com/langwatch/langwatch/issues/1584)) ([aa72a8c](https://github.com/langwatch/langwatch/commit/aa72a8c6e8d97066914a1fe8ae0bc0ce14dc0111))
+* **nlp:** improve log context propagation, improve log levels, fix log cascade, and improve error handling ([#1439](https://github.com/langwatch/langwatch/issues/1439)) ([94fb2ac](https://github.com/langwatch/langwatch/commit/94fb2ace70e18547728e75491a59d1f82272d3eb))
+
+
+### Documentation
+
+* add /challenge step to orchestration flow ([#1573](https://github.com/langwatch/langwatch/issues/1573)) ([701539b](https://github.com/langwatch/langwatch/commit/701539be9ade98674339fe6e7eeed84fa12a454b))
+* consolidate langwatch/docs/ into root docs/ ([#1535](https://github.com/langwatch/langwatch/issues/1535)) ([58ef711](https://github.com/langwatch/langwatch/commit/58ef71139a1744d38d2213502be5049eb736588e)), closes [#1533](https://github.com/langwatch/langwatch/issues/1533)
+
+
+### Code Refactoring
+
+* **event-sourcing:** huge refactors with launch learnings ([#1593](https://github.com/langwatch/langwatch/issues/1593)) ([c2b808b](https://github.com/langwatch/langwatch/commit/c2b808bbfe1c982e3a36f1e17a9ccc9a3a85ec93))
+* **event-sourcing:** replace suboptimal delaying/locking system with proper atomic queue grouping mechanism ([#1567](https://github.com/langwatch/langwatch/issues/1567)) ([693adf7](https://github.com/langwatch/langwatch/commit/693adf75ec43fd5658810bec62732534cf648aa3))
+* **event-souring:** improve timestamp handling and consistency across the system ([#1633](https://github.com/langwatch/langwatch/issues/1633)) ([3d7043d](https://github.com/langwatch/langwatch/commit/3d7043d8f55fcdf57034d2c650d5c5978e3ae99c))
+
 ## [2.2.0](https://github.com/langwatch/langwatch/compare/langwatch@v2.1.0...langwatch@v2.2.0) (2026-02-10)
 
 

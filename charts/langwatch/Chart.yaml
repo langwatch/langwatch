@@ -2,13 +2,12 @@ apiVersion: v2
 name: langwatch-helm
 description: Helm chart for LangWatch application
 type: application
-appVersion: "2.2.0" # x-release-please-version
-version: 1.2.0 # x-release-please-version
+appVersion: 2.3.0
+version: 2.3.0
 annotations:
-  category: "Observability"
-  keywords: "ai,observability,monitoring,secrets"
-  maintainers: "LangWatch Team"
-
+  category: Observability
+  keywords: ai,observability,monitoring,secrets
+  maintainers: LangWatch Team
 dependencies:
   - name: postgresql
     version: 16.4.9
@@ -20,7 +19,7 @@ dependencies:
     condition: redis.chartManaged
   - name: opensearch
     version: 2.35.0
-    repository: "https://opensearch-project.github.io/helm-charts/"
+    repository: https://opensearch-project.github.io/helm-charts/
     condition: opensearch.chartManaged
   - name: prometheus
     version: 2.1.23
