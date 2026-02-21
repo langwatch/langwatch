@@ -1,7 +1,7 @@
 import { listScenarios as apiListScenarios } from "../langwatch-api-scenarios.js";
 
 /**
- * Handles the list_scenarios MCP tool invocation.
+ * Handles the platform_list_scenarios MCP tool invocation.
  *
  * Lists all scenarios in the LangWatch project, formatted as an
  * AI-readable digest or raw JSON.
@@ -16,7 +16,7 @@ export async function handleListScenarios(params: {
   }
 
   if (!Array.isArray(scenarios) || scenarios.length === 0) {
-    return "No scenarios found in this project.\n\n> Tip: Use `create_scenario` to create your first scenario.";
+    return "No scenarios found in this project.\n\n> Tip: Use `platform_create_scenario` to create your first scenario.";
   }
 
   const lines: string[] = [];
@@ -40,7 +40,7 @@ export async function handleListScenarios(params: {
   }
 
   lines.push(
-    "> Use `get_scenario` with the ID to see full scenario details.",
+    "> Use `platform_get_scenario` with the ID to see full scenario details.",
   );
 
   return lines.join("\n");

@@ -1,7 +1,7 @@
 import { archiveScenario as apiArchiveScenario } from "../langwatch-api-scenarios.js";
 
 /**
- * Handles the archive_scenario MCP tool invocation.
+ * Handles the platform_archive_scenario MCP tool invocation.
  *
  * Archives (soft-deletes) a scenario and returns confirmation.
  */
