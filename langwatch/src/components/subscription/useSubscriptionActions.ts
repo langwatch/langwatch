@@ -33,19 +33,11 @@ export function useSubscriptionActions({
 }) {
   const openSeats = useUpgradeModalStore((s) => s.openSeats);
 
-  // Subscription router is injected via SaaS dependency injection (not in OSS types)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const subscriptionApi = (api as any).subscription;
-  if (!subscriptionApi?.create) {
-    throw new Error(
-      "Subscription API not available - SaaS dependency injection may be missing",
-    );
-  }
-  const createSubscription = subscriptionApi.create.useMutation();
-  const upgradeWithInvites = subscriptionApi.upgradeWithInvites?.useMutation();
+  const createSubscription = api.subscription.create.useMutation();
+  const upgradeWithInvites = api.subscription.upgradeWithInvites.useMutation();
   const addTeamMemberOrEvents =
-    subscriptionApi.addTeamMemberOrEvents.useMutation();
-  const manageSubscription = subscriptionApi.manage.useMutation();
+    api.subscription.addTeamMemberOrEvents.useMutation();
+  const manageSubscription = api.subscription.manage.useMutation();
 
   const handleUpgrade = async () => {
     if (!organizationId) return;
@@ -58,8 +50,7 @@ export function useSubscriptionActions({
         role: memberTypeToRole(u.memberType),
       }));
 
-    // If upgradeWithInvites is available and we have invites, use it
-    if (upgradeWithInvites && invitesWithEmail.length > 0) {
+    if (invitesWithEmail.length > 0) {
       const result = await upgradeWithInvites.mutateAsync({
         organizationId,
         baseUrl: window.location.origin,
@@ -75,7 +66,7 @@ export function useSubscriptionActions({
       return;
     }
 
-    // Fallback to existing create mutation (no invites or mutation unavailable)
+    // Fallback to create mutation (no invites)
     const result = await createSubscription.mutateAsync({
       organizationId,
       baseUrl: window.location.origin,
@@ -135,7 +126,7 @@ export function useSubscriptionActions({
     handleUpgrade,
     handleUpdateSeats,
     handleManageSubscription,
-    isUpgradeLoading: createSubscription.isPending || (upgradeWithInvites?.isPending ?? false),
+    isUpgradeLoading: createSubscription.isPending || upgradeWithInvites.isPending,
     isUpdateSeatsLoading: addTeamMemberOrEvents.isPending,
     isManageLoading: manageSubscription.isPending,
   };

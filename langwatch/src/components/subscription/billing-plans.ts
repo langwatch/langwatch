@@ -5,6 +5,7 @@
  * Feature lists and currency helpers used by SubscriptionPage and PlansComparisonPage.
  */
 
+import { Currency } from "@prisma/client";
 import { formatNumber } from "~/utils/formatNumber";
 
 export type { Currency } from "../../../ee/billing/pricing";
@@ -14,9 +15,9 @@ export {
   formatPrice,
 } from "../../../ee/billing/pricing";
 
-export const currencySymbol: Record<"EUR" | "USD", string> = {
-  EUR: "\u20AC",
-  USD: "$",
+export const currencySymbol: Record<Currency, string> = {
+  [Currency.EUR]: "\u20AC",
+  [Currency.USD]: "$",
 };
 
 /**

@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import { Currency, type PrismaClient } from "@prisma/client";
 import type Stripe from "stripe";
 import { createLogger } from "../../../src/utils/logger";
 import { notifySubscriptionEvent } from "../notifications/notificationHandlers";
@@ -61,8 +61,8 @@ export const createWebhookService = ({
     }): Promise<unknown>;
   };
 }): WebhookService => {
-  const normalizeSelectedCurrency = (value?: string | null): "EUR" | "USD" | null => {
-    if (value === "EUR" || value === "USD") {
+  const normalizeSelectedCurrency = (value?: string | null): Currency | null => {
+    if (value === Currency.EUR || value === Currency.USD) {
       return value;
     }
     return null;

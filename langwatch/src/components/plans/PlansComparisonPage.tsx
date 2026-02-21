@@ -8,10 +8,13 @@ import {
   Heading,
   HStack,
   SimpleGrid,
+  Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { Currency as PrismaCurrency } from "@prisma/client";
 import { ArrowLeft, Check, CircleDollarSign, DollarSign, Euro, Info } from "lucide-react";
+import { api } from "~/utils/api";
 import { Link } from "~/components/ui/link";
 import {
   type ComparisonPlanId,
@@ -60,8 +63,8 @@ const PLAN_COLUMNS: PlanColumn[] = [
     id: "enterprise",
     name: "Enterprise",
     subtitle: "Regulated and high-volume deployments",
-    actionLabel: "Talk to Sales",
-    actionHref: "mailto:sales@langwatch.ai",
+    actionLabel: "Contact Sales",
+    actionHref: "https://meetings-eu1.hubspot.com/manouk-draisma?uuid=3c29cf0c-03e5-4a53-81fd-94abb0b66cfd",
     actionColor: "blue",
     features: ENTERPRISE_PLAN_FEATURES,
   },
@@ -116,7 +119,7 @@ function PlanCardActions({
 
     return (
       <Button asChild width="full" colorPalette="orange" variant="solid">
-        <Link color="emphasized" href="/settings/subscription">
+        <Link color="white" href="/settings/subscription">
           Upgrade Now
         </Link>
       </Button>
@@ -126,8 +129,8 @@ function PlanCardActions({
   if (plan.id === "enterprise" && currentPlan !== "enterprise") {
     return (
       <Button asChild width="full" colorPalette="muted" variant="outline">
-        <Link href="mailto:sales@langwatch.ai" isExternal>
-          Talk to Sales
+        <Link href="https://meetings-eu1.hubspot.com/manouk-draisma?uuid=3c29cf0c-03e5-4a53-81fd-94abb0b66cfd" isExternal>
+          Contact Sales
         </Link>
       </Button>
     );
@@ -215,10 +218,16 @@ export function PlansComparisonPage({
   const currentPlan = resolveCurrentComparisonPlan(activePlan);
   const showTieredNotice = pricingModel === "TIERED";
 
-  const [currency, setCurrency] = useState<Currency>("USD");
+  const detectedCurrency = api.currency.detectCurrency.useQuery({});
+  const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(null);
+  const currency = selectedCurrency ?? detectedCurrency.data?.currency ?? PrismaCurrency.EUR;
   const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annually">(
     "monthly",
   );
+
+  if (detectedCurrency.isLoading) {
+    return <Spinner />;
+  }
 
   return (
     <VStack
@@ -296,9 +305,9 @@ export function PlansComparisonPage({
               bgColor: "orange.400",
               color: "bg.muted",
             }}
-            onClick={() => setCurrency(currency === "EUR" ? "USD" : "EUR")}
+            onClick={() => setSelectedCurrency(currency === PrismaCurrency.EUR ? PrismaCurrency.USD : PrismaCurrency.EUR)}
           >
-            {currency === "EUR" ? <Euro size={14} /> : <DollarSign size={14} />}
+            {currency === PrismaCurrency.EUR ? <Euro size={14} /> : <DollarSign size={14} />}
             {currency}
           </Button>
         </Box>
