@@ -1,8 +1,8 @@
 /**
  * Integration tests for the usage reporting worker.
  *
- * Mocks boundaries: Prisma, Stripe UsageReportingService, BullMQ queue,
- * env.IS_SAAS, metrics, and error capture.
+ * Mocks boundaries: Prisma, ClickHouse, Stripe UsageReportingService,
+ * BullMQ queue, env.IS_SAAS, metrics, and error capture.
  *
  * @see specs/licensing/billing-meter-dispatch.feature
  */
@@ -21,12 +21,16 @@ const {
   mockQueueAdd,
   mockCaptureException,
   mockIsSaas,
+  mockClickHouseQuery,
+  mockGetClickHouseClient,
   createMockLogger,
 } = vi.hoisted(() => {
   const mockReportUsageDelta = vi.fn();
   const mockQueueAdd = vi.fn();
   const mockCaptureException = vi.fn();
   const mockIsSaas = { value: true };
+  const mockClickHouseQuery = vi.fn();
+  const mockGetClickHouseClient = vi.fn();
 
   const createMockLogger = () => ({
     info: vi.fn(),
@@ -43,7 +47,6 @@ const {
       upsert: vi.fn(),
       update: vi.fn(),
     },
-    projectDailyBillableEvents: { aggregate: vi.fn() },
   };
 
   return {
@@ -52,6 +55,8 @@ const {
     mockQueueAdd,
     mockCaptureException,
     mockIsSaas,
+    mockClickHouseQuery,
+    mockGetClickHouseClient,
     createMockLogger,
   };
 });
@@ -73,6 +78,10 @@ vi.mock("~/env.mjs", () => ({
 }));
 
 vi.mock("~/server/db", () => ({ prisma: mockPrisma }));
+
+vi.mock("~/server/clickhouse/client", () => ({
+  getClickHouseClient: mockGetClickHouseClient,
+}));
 
 vi.mock("~/utils/logger/server", () => ({
   createLogger: vi.fn(() => createMockLogger()),
@@ -127,13 +136,11 @@ function makeOrg({
   id = "org-1",
   stripeCustomerId = "cus_123",
   hasSubscription = true,
-  projectIds = ["proj-1"],
   pricingModel = "SEAT_EVENT",
 }: {
   id?: string;
   stripeCustomerId?: string | null;
   hasSubscription?: boolean;
-  projectIds?: string[];
   pricingModel?: string;
 } = {}) {
   return {
@@ -141,8 +148,16 @@ function makeOrg({
     stripeCustomerId,
     pricingModel,
     subscriptions: hasSubscription ? [{ id: "sub-1" }] : [],
-    teams: [{ projects: projectIds.map((pid) => ({ id: pid })) }],
   };
+}
+
+function mockClickHouseTotal(total: number) {
+  mockGetClickHouseClient.mockReturnValue({
+    query: mockClickHouseQuery,
+  });
+  mockClickHouseQuery.mockResolvedValue({
+    json: vi.fn().mockResolvedValue([{ total: String(total) }]),
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -218,11 +233,11 @@ describe("runUsageReportingJob", () => {
     });
   });
 
-  describe("given org has no projects", () => {
-    it("skips reporting", async () => {
-      mockPrisma.organization.findUnique.mockResolvedValue(
-        makeOrg({ projectIds: [] }),
-      );
+  describe("given ClickHouse not available", () => {
+    it("skips usage reporting", async () => {
+      mockPrisma.organization.findUnique.mockResolvedValue(makeOrg());
+      mockGetClickHouseClient.mockReturnValue(null);
+      mockPrisma.billingMeterCheckpoint.findUnique.mockResolvedValue(null);
       const { runUsageReportingJob } = await import(
         "../usageReportingWorker"
       );
@@ -240,9 +255,7 @@ describe("runUsageReportingJob", () => {
         lastReportedTotal: 100,
         pendingReportedTotal: null,
       });
-      mockPrisma.projectDailyBillableEvents.aggregate.mockResolvedValue({
-        _sum: { count: 100 },
-      });
+      mockClickHouseTotal(100);
       const { runUsageReportingJob } = await import(
         "../usageReportingWorker"
       );
@@ -264,9 +277,7 @@ describe("runUsageReportingJob", () => {
         lastReportedTotal: 100,
         pendingReportedTotal: null,
       });
-      mockPrisma.projectDailyBillableEvents.aggregate.mockResolvedValue({
-        _sum: { count: 150 },
-      });
+      mockClickHouseTotal(150);
       mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
       mockPrisma.billingMeterCheckpoint.upsert.mockResolvedValue({});
       const { runUsageReportingJob } = await import(
@@ -305,9 +316,7 @@ describe("runUsageReportingJob", () => {
     it("creates checkpoint at reported total", async () => {
       mockPrisma.organization.findUnique.mockResolvedValue(makeOrg());
       mockPrisma.billingMeterCheckpoint.findUnique.mockResolvedValue(null);
-      mockPrisma.projectDailyBillableEvents.aggregate.mockResolvedValue({
-        _sum: { count: 50 },
-      });
+      mockClickHouseTotal(50);
       mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
       mockPrisma.billingMeterCheckpoint.upsert.mockResolvedValue({});
       const { runUsageReportingJob } = await import(
@@ -338,16 +347,15 @@ describe("runUsageReportingJob", () => {
     });
   });
 
-  describe("given multiple projects", () => {
-    it("aggregates across all projects", async () => {
-      mockPrisma.organization.findUnique.mockResolvedValue(
-        makeOrg({ projectIds: ["proj-a", "proj-b", "proj-c"] }),
-      );
+  // ========================================================================
+  // ClickHouse query
+  // ========================================================================
+
+  describe("given ClickHouse returns deduped count", () => {
+    it("queries by organizationId and date range", async () => {
+      mockPrisma.organization.findUnique.mockResolvedValue(makeOrg());
       mockPrisma.billingMeterCheckpoint.findUnique.mockResolvedValue(null);
-      // Aggregate returns the sum of all projects
-      mockPrisma.projectDailyBillableEvents.aggregate.mockResolvedValue({
-        _sum: { count: 100 },
-      });
+      mockClickHouseTotal(75);
       mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
       mockPrisma.billingMeterCheckpoint.upsert.mockResolvedValue({});
       const { runUsageReportingJob } = await import(
@@ -356,23 +364,13 @@ describe("runUsageReportingJob", () => {
 
       await runUsageReportingJob(makeJob("org-1"));
 
-      // Aggregate query includes all project IDs
-      expect(
-        mockPrisma.projectDailyBillableEvents.aggregate,
-      ).toHaveBeenCalledWith(
+      expect(mockClickHouseQuery).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({
-            projectId: { in: ["proj-a", "proj-b", "proj-c"] },
+          query: expect.stringContaining("countDistinct(DeduplicationKey)"),
+          query_params: expect.objectContaining({
+            organizationId: "org-1",
           }),
-        }),
-      );
-
-      // Reports total 100
-      expect(mockReportUsageDelta).toHaveBeenCalledWith(
-        expect.objectContaining({
-          events: expect.arrayContaining([
-            expect.objectContaining({ value: 100 }),
-          ]),
+          format: "JSONEachRow",
         }),
       );
     });
@@ -389,9 +387,7 @@ describe("runUsageReportingJob", () => {
         lastReportedTotal: 0,
         pendingReportedTotal: null,
       });
-      mockPrisma.projectDailyBillableEvents.aggregate.mockResolvedValue({
-        _sum: { count: 10 },
-      });
+      mockClickHouseTotal(10);
       mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
       mockPrisma.billingMeterCheckpoint.upsert.mockResolvedValue({});
       mockQueueAdd.mockResolvedValue({});
@@ -431,10 +427,8 @@ describe("runUsageReportingJob", () => {
 
       await runUsageReportingJob(makeJob("org-1"));
 
-      // Does NOT re-aggregate from DB; uses pending value directly
-      expect(
-        mockPrisma.projectDailyBillableEvents.aggregate,
-      ).not.toHaveBeenCalled();
+      // Does NOT query ClickHouse; uses pending value directly
+      expect(mockClickHouseQuery).not.toHaveBeenCalled();
 
       // Reports delta of 100 (200 - 100)
       expect(mockReportUsageDelta).toHaveBeenCalledWith(
@@ -485,9 +479,7 @@ describe("runUsageReportingJob", () => {
         lastReportedTotal: 100,
         pendingReportedTotal: null,
       });
-      mockPrisma.projectDailyBillableEvents.aggregate.mockResolvedValue({
-        _sum: { count: 150 },
-      });
+      mockClickHouseTotal(150);
       mockReportUsageDelta.mockResolvedValue([
         { reported: false, error: "meter_event_invalid" },
       ]);
@@ -539,9 +531,7 @@ describe("runUsageReportingJob", () => {
         lastReportedTotal: 0,
         pendingReportedTotal: null,
       });
-      mockPrisma.projectDailyBillableEvents.aggregate.mockResolvedValue({
-        _sum: { count: 10 },
-      });
+      mockClickHouseTotal(10);
       mockPrisma.billingMeterCheckpoint.upsert.mockResolvedValue({});
       const transientError = new Error("Stripe rate limit");
       mockReportUsageDelta.mockRejectedValue(transientError);
@@ -553,5 +543,138 @@ describe("runUsageReportingJob", () => {
         runUsageReportingJob(makeJob("org-1")),
       ).rejects.toThrow("Stripe rate limit");
     });
+  });
+
+  // ========================================================================
+  // Month-boundary grace period
+  // ========================================================================
+
+  describe("given first day of month", () => {
+    it("reports both previous and current month", async () => {
+      mockPrisma.organization.findUnique.mockResolvedValue(makeOrg());
+      // Return null checkpoint for all months
+      mockPrisma.billingMeterCheckpoint.findUnique.mockResolvedValue(null);
+      mockClickHouseTotal(25);
+      mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
+      mockPrisma.billingMeterCheckpoint.upsert.mockResolvedValue({});
+
+      const { runUsageReportingJob, getBillingMonth, getPreviousBillingMonth } =
+        await import("../usageReportingWorker");
+
+      // Mock Date to be first day of month
+      const firstDayOfMonth = new Date(Date.UTC(2026, 2, 1, 12, 0, 0)); // March 1, 2026
+      vi.useFakeTimers();
+      vi.setSystemTime(firstDayOfMonth);
+
+      try {
+        await runUsageReportingJob(makeJob("org-1"));
+
+        // Should have queried ClickHouse twice (once per month)
+        expect(mockClickHouseQuery).toHaveBeenCalledTimes(2);
+
+        // Should have reported for both months
+        expect(mockReportUsageDelta).toHaveBeenCalledTimes(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  describe("given third day of month (within grace period)", () => {
+    it("reports both previous and current month", async () => {
+      mockPrisma.organization.findUnique.mockResolvedValue(makeOrg());
+      mockPrisma.billingMeterCheckpoint.findUnique.mockResolvedValue(null);
+      mockClickHouseTotal(25);
+      mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
+      mockPrisma.billingMeterCheckpoint.upsert.mockResolvedValue({});
+
+      const { runUsageReportingJob } = await import(
+        "../usageReportingWorker"
+      );
+
+      // Mock Date to be third day of month (within 3-day grace period)
+      const thirdDayOfMonth = new Date(Date.UTC(2026, 2, 3, 12, 0, 0)); // March 3, 2026
+      vi.useFakeTimers();
+      vi.setSystemTime(thirdDayOfMonth);
+
+      try {
+        await runUsageReportingJob(makeJob("org-1"));
+
+        // Should have queried ClickHouse twice (once per month)
+        expect(mockClickHouseQuery).toHaveBeenCalledTimes(2);
+
+        // Should have reported for both months
+        expect(mockReportUsageDelta).toHaveBeenCalledTimes(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  describe("given fourth day of month (past grace period)", () => {
+    it("reports only current month", async () => {
+      mockPrisma.organization.findUnique.mockResolvedValue(makeOrg());
+      mockPrisma.billingMeterCheckpoint.findUnique.mockResolvedValue(null);
+      mockClickHouseTotal(25);
+      mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
+      mockPrisma.billingMeterCheckpoint.upsert.mockResolvedValue({});
+
+      const { runUsageReportingJob } = await import(
+        "../usageReportingWorker"
+      );
+
+      // Mock Date to be fourth day of month (past 3-day grace period)
+      const fourthDayOfMonth = new Date(Date.UTC(2026, 2, 4, 12, 0, 0)); // March 4, 2026
+      vi.useFakeTimers();
+      vi.setSystemTime(fourthDayOfMonth);
+
+      try {
+        await runUsageReportingJob(makeJob("org-1"));
+
+        // Should have queried ClickHouse once (current month only)
+        expect(mockClickHouseQuery).toHaveBeenCalledTimes(1);
+
+        // Should have reported once
+        expect(mockReportUsageDelta).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Helper function tests
+// ---------------------------------------------------------------------------
+
+describe("billingMonthDateRange", () => {
+  it("converts billing month to date range", async () => {
+    const { billingMonthDateRange } = await import(
+      "../usageReportingWorker"
+    );
+
+    expect(billingMonthDateRange("2026-02")).toEqual([
+      "2026-02-01 00:00:00.000",
+      "2026-03-01 00:00:00.000",
+    ]);
+    expect(billingMonthDateRange("2026-12")).toEqual([
+      "2026-12-01 00:00:00.000",
+      "2027-01-01 00:00:00.000",
+    ]);
+  });
+});
+
+describe("getPreviousBillingMonth", () => {
+  it("returns previous month", async () => {
+    const { getPreviousBillingMonth } = await import(
+      "../usageReportingWorker"
+    );
+
+    expect(getPreviousBillingMonth(new Date(Date.UTC(2026, 2, 1)))).toBe(
+      "2026-02",
+    );
+    expect(getPreviousBillingMonth(new Date(Date.UTC(2026, 0, 15)))).toBe(
+      "2025-12",
+    );
   });
 });

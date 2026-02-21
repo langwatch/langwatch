@@ -3,13 +3,13 @@ import type { MapProjectionDefinition } from "../../library/projections/mapProje
 import { EVALUATION_STARTED_EVENT_TYPE } from "../../pipelines/evaluation-processing/schemas/constants";
 import { EXPERIMENT_RUN_EVENT_TYPES } from "../../pipelines/experiment-run-processing/schemas/constants";
 import { SPAN_RECEIVED_EVENT_TYPE } from "../../pipelines/trace-processing/schemas/constants";
-import { billingMeterDispatchStore } from "./billingMeterDispatch.store";
+import { orgBillingMeterDispatchStore } from "./orgBillingMeterDispatch.store";
 
 /**
  * Record produced by the billing meter dispatch projection.
  * Contains only the tenantId (projectId) needed to resolve the organization.
  */
-export interface BillingMeterDispatchRecord {
+export interface OrgBillingMeterDispatchRecord {
   tenantId: string;
 }
 
@@ -20,20 +20,20 @@ export interface BillingMeterDispatchRecord {
  * evaluation.started, experiment_run.started). The pure map function extracts
  * the tenantId; the store handles org resolution and queue dispatch.
  */
-export const billingMeterDispatchProjection: MapProjectionDefinition<
-  BillingMeterDispatchRecord,
+export const orgBillingMeterDispatchProjection: MapProjectionDefinition<
+  OrgBillingMeterDispatchRecord,
   Event
 > = {
-  name: "billingMeterDispatch",
+  name: "orgBillingMeterDispatch",
   eventTypes: [
     SPAN_RECEIVED_EVENT_TYPE,
     EVALUATION_STARTED_EVENT_TYPE,
     EXPERIMENT_RUN_EVENT_TYPES.STARTED,
   ],
 
-  map(event: Event): BillingMeterDispatchRecord {
+  map(event: Event): OrgBillingMeterDispatchRecord {
     return { tenantId: String(event.tenantId) };
   },
 
-  store: billingMeterDispatchStore,
+  store: orgBillingMeterDispatchStore,
 };

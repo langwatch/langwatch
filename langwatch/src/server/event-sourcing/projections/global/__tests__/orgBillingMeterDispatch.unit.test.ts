@@ -66,7 +66,7 @@ function makeRecord(tenantId: string) {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("billingMeterDispatchStore", () => {
+describe("orgBillingMeterDispatchStore", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     vi.resetModules();
@@ -79,12 +79,12 @@ describe("billingMeterDispatchStore", () => {
       });
       mockQueueAdd.mockResolvedValue({});
 
-      const { billingMeterDispatchStore, clearOrgCache } = await import(
-        "../billingMeterDispatch.store"
+      const { orgBillingMeterDispatchStore, clearOrgCache } = await import(
+        "../orgBillingMeterDispatch.store"
       );
       clearOrgCache();
 
-      await billingMeterDispatchStore.append(
+      await orgBillingMeterDispatchStore.append(
         makeRecord("proj-1"),
         dummyContext,
       );
@@ -115,13 +115,13 @@ describe("billingMeterDispatchStore", () => {
       });
       mockQueueAdd.mockResolvedValue({});
 
-      const { billingMeterDispatchStore, clearOrgCache } = await import(
-        "../billingMeterDispatch.store"
+      const { orgBillingMeterDispatchStore, clearOrgCache } = await import(
+        "../orgBillingMeterDispatch.store"
       );
       clearOrgCache();
 
       // First call: populates cache
-      await billingMeterDispatchStore.append(
+      await orgBillingMeterDispatchStore.append(
         makeRecord("proj-1"),
         dummyContext,
       );
@@ -131,7 +131,7 @@ describe("billingMeterDispatchStore", () => {
       mockQueueAdd.mockClear();
 
       // Second call: should use cache
-      await billingMeterDispatchStore.append(
+      await orgBillingMeterDispatchStore.append(
         makeRecord("proj-1"),
         dummyContext,
       );
@@ -151,12 +151,12 @@ describe("billingMeterDispatchStore", () => {
         team: null,
       });
 
-      const { billingMeterDispatchStore, clearOrgCache } = await import(
-        "../billingMeterDispatch.store"
+      const { orgBillingMeterDispatchStore, clearOrgCache } = await import(
+        "../orgBillingMeterDispatch.store"
       );
       clearOrgCache();
 
-      await billingMeterDispatchStore.append(
+      await orgBillingMeterDispatchStore.append(
         makeRecord("orphan-proj"),
         dummyContext,
       );
@@ -181,12 +181,12 @@ describe("billingMeterDispatchStore", () => {
       });
 
       // Re-import to pick up the null queue (resetModules in beforeEach ensures fresh load)
-      const { billingMeterDispatchStore, clearOrgCache } = await import(
-        "../billingMeterDispatch.store"
+      const { orgBillingMeterDispatchStore, clearOrgCache } = await import(
+        "../orgBillingMeterDispatch.store"
       );
       clearOrgCache();
 
-      await billingMeterDispatchStore.append(
+      await orgBillingMeterDispatchStore.append(
         makeRecord("proj-1"),
         dummyContext,
       );
@@ -203,17 +203,17 @@ describe("billingMeterDispatchStore", () => {
       });
       mockQueueAdd.mockResolvedValue({});
 
-      const { billingMeterDispatchStore, clearOrgCache } = await import(
-        "../billingMeterDispatch.store"
+      const { orgBillingMeterDispatchStore, clearOrgCache } = await import(
+        "../orgBillingMeterDispatch.store"
       );
       clearOrgCache();
 
       // Dispatch two events for projects belonging to the same org
-      await billingMeterDispatchStore.append(
+      await orgBillingMeterDispatchStore.append(
         makeRecord("proj-1"),
         dummyContext,
       );
-      await billingMeterDispatchStore.append(
+      await orgBillingMeterDispatchStore.append(
         makeRecord("proj-2"),
         dummyContext,
       );
