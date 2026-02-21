@@ -6,8 +6,9 @@ import { type MemberType } from "~/server/license-enforcement/member-classificat
 import { type Currency } from "./billing-plans";
 import { Currency as PrismaCurrency } from "@prisma/client";
 
-export const emailSchema = z.string().email();
-export const isValidEmail = (value: string) => emailSchema.safeParse(value).success;
+export const isValidEmail = (value: string) => z.string().email().safeParse(value).success;
+export const countFullMembers = (list: { memberType: MemberType }[]) =>
+  list.filter((u) => u.memberType === "FullMember").length;
 export const isSupportedCurrency = (value: unknown): value is Currency =>
   value === PrismaCurrency.EUR || value === PrismaCurrency.USD;
 

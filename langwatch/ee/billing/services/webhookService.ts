@@ -25,7 +25,6 @@ export type WebhookService = {
     subscriptionId: string;
     clientReferenceId: string | null;
     selectedCurrency?: string | null;
-    selectedBillingInterval?: string | null;
   }): Promise<{ earlyReturn: boolean }>;
 
   handleInvoicePaymentSucceeded(params: {
@@ -173,6 +172,15 @@ export const createWebhookService = ({
     }
   };
 
+  const cancellationData = () => ({
+    status: SubscriptionStatus.CANCELLED,
+    endDate: new Date(),
+    maxMembers: null,
+    maxMessagesPerMonth: null,
+    maxProjects: null,
+    evaluationsCredit: null,
+  });
+
   return {
     async handleCheckoutCompleted({
       subscriptionId,
@@ -303,14 +311,7 @@ export const createWebhookService = ({
 
       await db.subscription.update({
         where: { id: existingSubscription.id },
-        data: {
-          status: SubscriptionStatus.CANCELLED,
-          endDate: new Date(),
-          maxMembers: null,
-          maxMessagesPerMonth: null,
-          maxProjects: null,
-          evaluationsCredit: null,
-        },
+        data: cancellationData(),
       });
     },
 
@@ -339,14 +340,7 @@ export const createWebhookService = ({
         // which is handled by handleSubscriptionDeleted.
         await db.subscription.update({
           where: { id: existingSubForUpdate.id },
-          data: {
-            status: SubscriptionStatus.CANCELLED,
-            endDate: new Date(),
-            maxMembers: null,
-            maxMessagesPerMonth: null,
-            maxProjects: null,
-            evaluationsCredit: null,
-          },
+          data: cancellationData(),
         });
       } else if (subscription.status === "active") {
         const shouldNotify =

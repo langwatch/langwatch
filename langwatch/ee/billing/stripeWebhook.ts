@@ -99,13 +99,10 @@ export const createStripeWebhookHandlerFactory = ({
             const checkoutSession = event.data.object as Stripe.Checkout.Session;
             const clientReferenceId = checkoutSession.client_reference_id;
             const selectedCurrency = checkoutSession.metadata?.selectedCurrency;
-            const selectedBillingInterval =
-              checkoutSession.metadata?.selectedBillingInterval;
             const result = await webhookService.handleCheckoutCompleted({
               subscriptionId,
               clientReferenceId: clientReferenceId ?? null,
               selectedCurrency: selectedCurrency ?? null,
-              selectedBillingInterval: selectedBillingInterval ?? null,
             });
             if (result.earlyReturn) {
               logger.error(

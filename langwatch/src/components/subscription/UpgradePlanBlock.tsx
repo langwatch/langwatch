@@ -15,7 +15,6 @@ import React from "react";
 
 export function UpgradePlanBlock({
   planName,
-  pricePerSeat,
   totalPrice,
   coreMembers,
   features,
@@ -24,7 +23,6 @@ export function UpgradePlanBlock({
   isLoading,
 }: {
   planName: React.ReactNode;
-  pricePerSeat: React.ReactNode;
   totalPrice: string;
   coreMembers: number;
   features: string[];

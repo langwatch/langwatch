@@ -27,14 +27,8 @@ import {
   type PendingInviteWithMemberType,
   type DrawerSaveResult,
   isValidEmail,
+  countFullMembers,
 } from "./subscription-types";
-
-/**
- * Local state for a user being edited
- */
-interface EditableUser extends SubscriptionUser {
-  isNew?: boolean;
-}
 
 export function UserManagementDrawer({
   open,
@@ -61,7 +55,7 @@ export function UserManagementDrawer({
   onSave: (result: DrawerSaveResult) => void;
   maxSeats?: number;
 }) {
-  const [editableUsers, setEditableUsers] = useState<EditableUser[]>([]);
+  const [editableUsers, setEditableUsers] = useState<SubscriptionUser[]>([]);
   const [localPlannedUsers, setLocalPlannedUsers] = useState<PlannedUser[]>([]);
   const [emailErrors, setEmailErrors] = useState<Record<string, string>>({});
   const [initialAutoFillCount, setInitialAutoFillCount] = useState(0);
@@ -73,12 +67,12 @@ export function UserManagementDrawer({
     prevOpenRef.current = open;
     if (!justOpened) return;
 
-    setEditableUsers(users.map((u) => ({ ...u, isNew: false })));
+    setEditableUsers([...users]);
 
     const occupiedFullMemberSeats =
-      users.filter((u) => u.memberType === "FullMember").length +
-      pendingInvitesWithMemberType.filter((inv) => inv.memberType === "FullMember").length +
-      plannedUsers.filter((u) => u.memberType === "FullMember").length;
+      countFullMembers(users) +
+      countFullMembers(pendingInvitesWithMemberType) +
+      countFullMembers(plannedUsers);
 
     const autoFillCount = maxSeats != null
       ? Math.max(0, maxSeats - occupiedFullMemberSeats)
@@ -156,16 +150,10 @@ export function UserManagementDrawer({
     onClose();
   };
 
-  const activeFullMembers = editableUsers.filter(
-    (u) => u.memberType === "FullMember",
-  ).length;
-  const pendingFullMembers = pendingInvitesWithMemberType.filter(
-    (inv) => inv.memberType === "FullMember",
-  ).length;
-  const plannedFullMembers = localPlannedUsers.filter(
-    (u) => u.memberType === "FullMember",
-  ).length;
-  const totalFullMembersInDrawer = activeFullMembers + pendingFullMembers + plannedFullMembers;
+  const totalFullMembersInDrawer =
+    countFullMembers(editableUsers) +
+    countFullMembers(pendingInvitesWithMemberType) +
+    countFullMembers(localPlannedUsers);
   const totalPriceCentsInDrawer = totalFullMembersInDrawer * seatPricePerPeriodCents;
   const periodSuffix = billingPeriod === "annually" ? "/yr" : "/mo";
   const priceLabel = billingPeriod === "annually" ? "Annual Price:" : "Monthly Price:";
