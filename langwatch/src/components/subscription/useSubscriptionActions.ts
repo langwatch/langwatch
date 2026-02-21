@@ -2,16 +2,11 @@ import { toaster } from "~/components/ui/toaster";
 import { useUpgradeModalStore } from "../../stores/upgradeModalStore";
 import { api } from "~/utils/api";
 import type { Currency } from "./billing-plans";
+import { type PlannedUser } from "./subscription-types";
 import { type MemberType } from "~/server/license-enforcement/member-classification";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type TRPCRefetchFn = { refetch: () => any };
-
-interface PlannedUser {
-  id: string;
-  email: string;
-  memberType: MemberType;
-}
 
 function memberTypeToRole(memberType: MemberType): "MEMBER" | "EXTERNAL" {
   return memberType === "FullMember" ? "MEMBER" : "EXTERNAL";
