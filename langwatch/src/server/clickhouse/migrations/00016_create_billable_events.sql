@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.billable_events
     EventId String CODEC(ZSTD(1)),
     EventType LowCardinality(String),
     DeduplicationKey String CODEC(ZSTD(1)),
-    DedupKeyHash UInt64 MATERIALIZED cityHash64(DeduplicationKey),
+    DeduplicationKeyHash UInt64 MATERIALIZED cityHash64(DeduplicationKey),
     EventTimestamp DateTime64(3) CODEC(Delta(8), ZSTD(1)),
     CreatedAt DateTime64(3) DEFAULT now64(3) CODEC(Delta(8), ZSTD(1)),
 

@@ -103,7 +103,7 @@ async function queryBillableEventsTotal({
 
   const result = await client.query({
     query: `
-      SELECT countDistinct(DeduplicationKey) as total
+      SELECT countDistinct(DeduplicationKeyHash) as total
       FROM billable_events
       WHERE OrganizationId = {organizationId:String}
         AND EventTimestamp >= {startDate:DateTime64(3)}
