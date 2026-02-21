@@ -39,16 +39,15 @@ import { useSubscriptionActions } from "./useSubscriptionActions";
 import { classifyMemberType, type MemberType } from "~/server/license-enforcement/member-classification";
 import { toaster } from "~/components/ui/toaster";
 import {
+  Currency as PrismaCurrency,
   OrganizationUserRole,
   TeamUserRole,
 } from "@prisma/client";
 import {
-  isSupportedCurrency,
   formatPlanTypeLabel,
   countFullMembers,
   type PlannedUser,
   type SubscriptionUser,
-  type PendingInviteWithMemberType,
   type DrawerSaveResult,
 } from "./subscription-types";
 import { CurrentPlanBlock } from "./CurrentPlanBlock";
@@ -58,8 +57,8 @@ import { ContactSalesBlock } from "./ContactSalesBlock";
 import { UserManagementDrawer } from "./UserManagementDrawer";
 
 const currencyOptions = [
-  { label: "\u20AC EUR", value: "EUR" as const },
-  { label: "$ USD", value: "USD" as const },
+  { label: "\u20AC EUR", value: PrismaCurrency.EUR },
+  { label: "$ USD", value: PrismaCurrency.USD },
 ];
 const currencyCollection = createListCollection({ items: currencyOptions });
 
@@ -68,43 +67,25 @@ const currencyCollection = createListCollection({ items: currencyOptions });
  */
 export function SubscriptionPage() {
   const { organization, team } = useOrganizationTeamProject();
-  const organizationCurrency = isSupportedCurrency(organization?.currency)
-    ? organization.currency
-    : null;
-  const hasOrganizationCurrency = organizationCurrency !== null;
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [plannedUsers, setPlannedUsers] = useState<PlannedUser[]>([]);
   const [deletedSeatCount, setDeletedSeatCount] = useState(0);
-  const [currency, setCurrency] = useState<Currency>("EUR");
+  const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(null);
   const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annually">(
     "monthly",
   );
   const [showSuccess, setShowSuccess] = useState(false);
   const [showUpgradeCredit, setShowUpgradeCredit] = useState(false);
 
-  // Detect currency from IP geolocation
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const currencyApi = (api as any).currency as
-    | { detectCurrency: { useQuery: (input: Record<string, never>, opts: { enabled: boolean }) => { data?: { currency: Currency } } } }
-    | undefined;
-  const detectedCurrency = currencyApi?.detectCurrency?.useQuery({}, {
-    enabled: !!organization && !hasOrganizationCurrency,
+  const detectedCurrency = api.currency.detectCurrency.useQuery({}, {
+    enabled: !!organization,
   });
 
-  useEffect(() => {
-    if (hasOrganizationCurrency) {
-      setCurrency(organizationCurrency);
-      return;
-    }
+  const currency = selectedCurrency ?? detectedCurrency.data?.currency ?? PrismaCurrency.EUR;
 
-    if (detectedCurrency?.data?.currency) {
-      setCurrency(detectedCurrency.data.currency);
-    }
-  }, [
-    detectedCurrency?.data?.currency,
-    hasOrganizationCurrency,
-    organizationCurrency,
-  ]);
+  useEffect(() => {
+    setSelectedCurrency(null);
+  }, [organization?.id]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -264,7 +245,7 @@ export function SubscriptionPage() {
     organizationWithMembers,
   });
 
-  if (!organization || !plan) {
+  if (!organization || !plan || detectedCurrency.isLoading) {
     return (
       <SettingsLayout>
         <Flex justifyContent="center" padding={8}>
@@ -352,7 +333,7 @@ export function SubscriptionPage() {
                   onValueChange={(details) => {
                     const selected = details.value[0];
                     if (selected) {
-                      setCurrency(selected as Currency);
+                      setSelectedCurrency(selected as Currency);
                     }
                   }}
                 >

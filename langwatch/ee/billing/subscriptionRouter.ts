@@ -1,3 +1,4 @@
+import { Currency } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { checkOrganizationPermission } from "../../src/server/api/rbac";
@@ -55,7 +56,7 @@ export const createSubscriptionRouterFactory = ({
           plan: subscriptionPlanEnum,
           membersToAdd: z.number().optional(),
           tracesToAdd: z.number().optional(),
-          currency: z.enum(["EUR", "USD"]).optional(),
+          currency: z.nativeEnum(Currency).optional(),
           billingInterval: z.enum(["monthly", "annual"]).optional(),
         }),
       )
@@ -127,7 +128,7 @@ export const createSubscriptionRouterFactory = ({
         z.object({
           organizationId: z.string(),
           baseUrl: z.string(),
-          currency: z.enum(["EUR", "USD"]).optional(),
+          currency: z.nativeEnum(Currency).optional(),
           billingInterval: z.enum(["monthly", "annual"]).optional(),
           totalSeats: z.number().min(1),
           invites: z.array(

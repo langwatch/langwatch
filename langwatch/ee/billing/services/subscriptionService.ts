@@ -1,4 +1,4 @@
-import type { OrganizationUserRole, PrismaClient } from "@prisma/client";
+import { Currency, type OrganizationUserRole, type PrismaClient } from "@prisma/client";
 import type Stripe from "stripe";
 import { notifySubscriptionEvent } from "../notifications/notificationHandlers";
 import {
@@ -43,7 +43,7 @@ export type SubscriptionService = {
     membersToAdd?: number;
     tracesToAdd?: number;
     customerId: string;
-    currency?: "EUR" | "USD";
+    currency?: Currency;
     billingInterval?: "monthly" | "annual";
   }): Promise<{ url: string | null }>;
 
@@ -80,7 +80,7 @@ export type SubscriptionService = {
     baseUrl: string;
     membersToAdd: number;
     customerId: string;
-    currency?: "EUR" | "USD";
+    currency?: Currency;
     billingInterval?: "monthly" | "annual";
     invites: Array<{ email: string; role: OrganizationUserRole }>;
   }): Promise<{ url: string | null }>;
@@ -181,7 +181,7 @@ export const createSubscriptionService = ({
           organizationId,
           customerId,
           baseUrl,
-          currency: currency ?? "EUR",
+          currency: currency ?? Currency.EUR,
           billingInterval: billingInterval ?? "monthly",
           membersToAdd,
           isUpgradeFromTiered: org?.pricingModel === "TIERED",
@@ -349,7 +349,7 @@ export const createSubscriptionService = ({
         organizationId,
         customerId,
         baseUrl,
-        currency: currency ?? "EUR",
+        currency: currency ?? Currency.EUR,
         billingInterval: billingInterval ?? "monthly",
         membersToAdd,
         isUpgradeFromTiered: org?.pricingModel === "TIERED",

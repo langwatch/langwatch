@@ -4,7 +4,7 @@ import {
   protectedProcedure,
 } from "../../src/server/api/trpc";
 import { skipPermissionCheck } from "../../src/server/api/rbac";
-import { getCurrencyFromCountry } from "./utils/currency";
+import { detectCurrencyFromRequest } from "./utils/currency";
 
 export const createCurrencyRouter = () => {
   return createTRPCRouter({
@@ -12,14 +12,7 @@ export const createCurrencyRouter = () => {
       .input(z.object({}).passthrough())
       .use(skipPermissionCheck)
       .query(async ({ ctx }) => {
-      // Try to get country from request headers (X-Vercel-IP-Country, CF-IPCountry, etc.)
-      const headers = ctx.req?.headers;
-      const country =
-        (headers?.["x-vercel-ip-country"] as string | undefined) ??
-        (headers?.["cf-ipcountry"] as string | undefined) ??
-        null;
-
-      return { currency: getCurrencyFromCountry(country) };
-    }),
+        return detectCurrencyFromRequest(ctx.req);
+      }),
   });
 };

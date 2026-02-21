@@ -689,12 +689,16 @@ describe("<SubscriptionPage/>", () => {
   // ============================================================================
 
   describe("when viewing billing toggles", () => {
-    it("shows currency selector defaulting to organization currency", async () => {
+    it("shows currency selector defaulting to API-detected currency", async () => {
       mockOrganization = {
         id: "test-org-id",
         name: "Test Org",
         currency: "USD",
       };
+      mockDetectCurrency.mockReturnValue({
+        data: { currency: "USD" },
+        isLoading: false,
+      });
 
       renderSubscriptionPage();
 

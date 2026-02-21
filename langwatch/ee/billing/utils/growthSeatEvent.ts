@@ -1,3 +1,4 @@
+import type { Currency } from "@prisma/client";
 import { prices } from "../stripe/stripePriceCatalog";
 import type { StripePriceName } from "../stripe/stripePrices.types";
 
@@ -25,7 +26,6 @@ export const isGrowthSeatPrice = (priceId: string): boolean =>
 export const isGrowthEventsPrice = (priceId: string): boolean =>
   GROWTH_EVENTS_PRICE_IDS.has(priceId);
 
-type Currency = "EUR" | "USD";
 type BillingInterval = "monthly" | "annual";
 
 /** Resolves the Stripe price ID for a Growth seat given currency and interval. */

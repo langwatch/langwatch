@@ -1,4 +1,4 @@
-import type { OrganizationUserRole, PrismaClient } from "@prisma/client";
+import { Currency, type OrganizationUserRole, type PrismaClient } from "@prisma/client";
 import { nanoid } from "nanoid";
 import type Stripe from "stripe";
 import { SubscriptionStatus } from "../planTypes";
@@ -12,7 +12,6 @@ import {
   SubscriptionItemNotFoundError,
 } from "../errors";
 
-type Currency = "EUR" | "USD";
 type BillingInterval = "monthly" | "annual";
 
 type InviteInput = {
@@ -299,7 +298,7 @@ export const createSeatEventSubscriptionFns = ({
       subscription: lastSubscription.stripeSubscriptionId,
     });
 
-    const currency = (upcomingWithChange.currency?.toUpperCase() ?? "USD") as "EUR" | "USD";
+    const currency = (upcomingWithChange.currency?.toUpperCase() ?? Currency.USD) as Currency;
     const billingInterval = seatItem.price.recurring?.interval ?? "month";
 
     // Subtract existing prorations from changed prorations to get ONLY
@@ -321,7 +320,7 @@ export const createSeatEventSubscriptionFns = ({
 
     const format = (cents: number) => {
       const amount = cents / 100;
-      return new Intl.NumberFormat(currency === "EUR" ? "en-IE" : "en-US", {
+      return new Intl.NumberFormat(currency === Currency.EUR ? "en-IE" : "en-US", {
         style: "currency",
         currency,
         minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,

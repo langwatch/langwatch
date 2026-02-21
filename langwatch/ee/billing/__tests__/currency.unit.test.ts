@@ -31,12 +31,12 @@ describe("getCurrencyFromCountry", () => {
   });
 
   describe("when given null or undefined", () => {
-    it("returns USD for null", () => {
-      expect(getCurrencyFromCountry(null)).toBe("USD");
+    it("returns EUR for null", () => {
+      expect(getCurrencyFromCountry(null)).toBe("EUR");
     });
 
-    it("returns USD for undefined", () => {
-      expect(getCurrencyFromCountry(undefined)).toBe("USD");
+    it("returns EUR for undefined", () => {
+      expect(getCurrencyFromCountry(undefined)).toBe("EUR");
     });
   });
 

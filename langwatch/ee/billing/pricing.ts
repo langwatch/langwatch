@@ -1,7 +1,8 @@
+import { Currency } from "@prisma/client";
 import { prices, stripePricesFile } from "./stripe/stripePriceCatalog";
 import type { StripePriceName } from "./stripe/stripePrices.types";
 
-export type Currency = "EUR" | "USD";
+export type { Currency } from "@prisma/client";
 
 function getUnitAmountCents(name: StripePriceName): number {
   const priceId = prices[name];
@@ -16,11 +17,11 @@ export function getGrowthSeatPriceCents(): Record<
   { monthly: number; annual: number }
 > {
   return {
-    EUR: {
+    [Currency.EUR]: {
       monthly: getUnitAmountCents("GROWTH_SEAT_EUR_MONTHLY"),
       annual: getUnitAmountCents("GROWTH_SEAT_EUR_ANNUAL"),
     },
-    USD: {
+    [Currency.USD]: {
       monthly: getUnitAmountCents("GROWTH_SEAT_USD_MONTHLY"),
       annual: getUnitAmountCents("GROWTH_SEAT_USD_ANNUAL"),
     },
@@ -41,7 +42,7 @@ export function getAnnualDiscountPercent(currency: Currency): number {
  */
 export function formatPrice(cents: number, currency: Currency): string {
   const amount = cents / 100;
-  return new Intl.NumberFormat(currency === "EUR" ? "en-IE" : "en-US", {
+  return new Intl.NumberFormat(currency === Currency.EUR ? "en-IE" : "en-US", {
     style: "currency",
     currency,
     minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
