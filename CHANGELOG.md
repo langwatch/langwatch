@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.3](https://github.com/langwatch/langwatch/compare/langwatch@v2.4.2...langwatch@v2.4.3) (2026-02-21)
+
+
+### Bug Fixes
+
+* remove padding for scenario library page ([#1758](https://github.com/langwatch/langwatch/issues/1758)) ([5226da4](https://github.com/langwatch/langwatch/commit/5226da4b02e71d7c76999104ae2c72bc5da6a230))
+
 ## [2.4.2](https://github.com/langwatch/langwatch/compare/langwatch@v2.4.1...langwatch@v2.4.2) (2026-02-20)
 
 
