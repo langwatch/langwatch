@@ -337,7 +337,17 @@ server.tool(
 
 server.tool(
   "list_scenarios",
-  "List all scenarios in the LangWatch project. Returns AI-readable digest by default.",
+  `List all scenarios in the LangWatch project. Returns AI-readable digest by default.
+
+  *Important Note*: There are two ways of creating scenarios
+
+  - Via Code: When you are in a codebase, helping users test their agents, most likely what they want is
+    to create scenarios is to use the Scenario Python and TypeScript libraries, so you can run the tests and
+    iterate locally. Use the \`fetch_scenario_docs\` tool to learn more.
+
+  - Via LangWatch UI: When the user is using you more as an assistant to create, update and run scenarios on
+    LangWatch platform, this is when you should use the MCP tools like this and the ones below instead.
+  `,
   {
     format: z
       .enum(["digest", "json"])
