@@ -20,15 +20,6 @@ export const currencySymbol: Record<"EUR" | "USD", string> = {
 };
 
 /**
- * Developer plan features for current plan block
- */
-export const DEVELOPER_FEATURES = [
-  "Up to 2 core members",
-  "Limited platform features",
-  "Community support",
-];
-
-/**
  * Growth plan features for upgrade block
  */
 export const GROWTH_FEATURES = [

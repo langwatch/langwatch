@@ -159,7 +159,6 @@ describe("webhookService", () => {
           subscriptionId: "sub_stripe_1",
           clientReferenceId: "subscription_setup_sub_db_1",
           selectedCurrency: "USD",
-          selectedBillingInterval: "annual",
         });
 
         await vi.advanceTimersByTimeAsync(2000);

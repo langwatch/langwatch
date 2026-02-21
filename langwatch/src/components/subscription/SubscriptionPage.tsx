@@ -45,6 +45,7 @@ import {
 import {
   isSupportedCurrency,
   formatPlanTypeLabel,
+  countFullMembers,
   type PlannedUser,
   type SubscriptionUser,
   type PendingInviteWithMemberType,
@@ -172,8 +173,8 @@ export function SubscriptionPage() {
   // Combine plannedUsers (from drawer) with pendingInvites (from DB) for billing calculation
   const allPlannedUsers = [...plannedUsers, ...pendingInvitesWithMemberType];
 
-  const existingCoreMembers = users.filter((u) => u.memberType === "FullMember").length;
-  const plannedCoreSeatCount = allPlannedUsers.filter((u) => u.memberType === "FullMember").length;
+  const existingCoreMembers = countFullMembers(users);
+  const plannedCoreSeatCount = countFullMembers(allPlannedUsers);
   const seatUsageN = existingCoreMembers + plannedCoreSeatCount;
   const seatUsageM = plan?.maxMembers;
 
@@ -181,7 +182,6 @@ export function SubscriptionPage() {
     seatPricePerPeriodCents,
     periodSuffix,
     totalFullMembers,
-    pricePerSeat,
     monthlyEquivalent,
   } = useBillingPricing({ currency, billingPeriod, users, plannedUsers: allPlannedUsers });
 
@@ -189,9 +189,7 @@ export function SubscriptionPage() {
   const effectiveMaxSeats = isDeveloperPlan ? 1 : seatUsageM;
 
   // Manual planned seats only (NOT pending invites — they're already in maxMembers)
-  const newPlannedFullMembers = plannedUsers.filter(
-    (u) => u.memberType === "FullMember"
-  ).length;
+  const newPlannedFullMembers = countFullMembers(plannedUsers);
 
   // Single source of truth for billing seat count
   const billingSeats = isDeveloperPlan
@@ -434,7 +432,6 @@ export function SubscriptionPage() {
                 )}
               </>
             }
-            pricePerSeat={pricePerSeat}
             totalPrice={billingPriceFormatted}
             coreMembers={billingSeats}
             features={GROWTH_FEATURES}
