@@ -1,5 +1,7 @@
 import type { Event } from "../../library/domain/types";
 import { ProjectionRegistry } from "../../library/projections/projectionRegistry";
+import { orgBillableEventsMeterProjection } from "./orgBillableEventsMeter.mapProjection";
+import { orgBillingMeterDispatchProjection } from "./orgBillingMeterDispatch.mapProjection";
 import { projectDailyBillableEventsProjection } from "./projectDailyBillableEvents.foldProjection";
 import { projectDailySdkUsageProjection } from "./projectDailySdkUsage.foldProjection";
 
@@ -21,6 +23,8 @@ export function getGlobalProjectionRegistry(): ProjectionRegistry<Event> {
       globalRegistry.registerFoldProjection(
         projectDailyBillableEventsProjection,
       );
+      globalRegistry.registerMapProjection(orgBillingMeterDispatchProjection);
+      globalRegistry.registerMapProjection(orgBillableEventsMeterProjection);
     }
   }
   return globalRegistry;

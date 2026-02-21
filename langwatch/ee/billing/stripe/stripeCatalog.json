@@ -1,6 +1,12 @@
 {
   "schemaVersion": 1,
   "updatedAt": "2026-02-18T18:34:12.013Z",
+  "meters": {
+    "BILLABLE_EVENTS": {
+      "test": "mtr_test_61UBL0fe0hM4Csg7x41IMsTw08cudQaG",
+      "live": "mtr_61UBLon1Ka5iWAcoH41IMsTw08cudD7o"
+    }
+  },
   "mapping": {
     "PRO": {
       "test": "price_1P6bSyIMsTw08cudmzoqwBVN",

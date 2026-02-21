@@ -8,7 +8,12 @@ export default defineConfig({
   test: {
     setupFiles: ["./test-setup.ts"],
     include: ["**/*.stress.{test,spec}.?(c|m)[jt]s?(x)"],
-    exclude: [...configDefaults.exclude, ".next/**/*", ".next-saas/**/*"],
+    exclude: [
+      ...configDefaults.exclude,
+      ".next/**/*",
+      ".next-saas/**/*",
+      "saas-src/**/*",
+    ],
     testTimeout: 300_000,
     hookTimeout: 30_000,
   },

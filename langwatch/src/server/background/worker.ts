@@ -5,6 +5,7 @@ import type {
   EvaluationJob,
   TopicClusteringJob,
   TrackEventJob,
+  UsageReportingJob,
   UsageStatsJob,
 } from "~/server/background/types";
 import type {
@@ -34,6 +35,7 @@ import { WorkersRestart } from "./errors";
 import type { EventSourcingJob } from "./types";
 
 import { startEventSourcingWorker } from "./workers/eventSourcingWorker";
+import { startUsageReportingWorker } from "./workers/usageReportingWorker";
 import { startUsageStatsWorker } from "./workers/usageStatsWorker";
 import { getClickHouseClient } from "../clickhouse/client";
 import {
@@ -105,6 +107,7 @@ type Workers = {
   topicClusteringWorker: Worker<TopicClusteringJob, void, string> | undefined;
   trackEventsWorker: Worker<TrackEventJob, void, string> | undefined;
   usageStatsWorker: Worker<UsageStatsJob, void, string> | undefined;
+  usageReportingWorker: Worker<UsageReportingJob, void, string> | undefined;
   eventSourcingWorker: Worker<EventSourcingJob, void, string> | undefined;
   scenarioWorker: Worker<ScenarioJob, ScenarioJobResult, string> | undefined;
 };
@@ -141,6 +144,7 @@ export const start = (
     const topicClusteringWorker = startTopicClusteringWorker();
     const trackEventsWorker = startTrackEventsWorker();
     const usageStatsWorker = startUsageStatsWorker();
+    const usageReportingWorker = startUsageReportingWorker();
     const eventSourcingWorker = startEventSourcingWorker();
     const scenarioWorker = startScenarioProcessor();
     const metricsServer = startMetricsServer();
@@ -151,6 +155,7 @@ export const start = (
     registerCloseable("topicClustering", topicClusteringWorker);
     registerCloseable("trackEvents", trackEventsWorker);
     registerCloseable("usageStats", usageStatsWorker);
+    registerCloseable("usageReporting", usageReportingWorker);
     registerCloseable("eventSourcing", eventSourcingWorker);
     registerCloseable("scenario", scenarioWorker);
     registerCloseable("metricsServer", {
@@ -180,6 +185,7 @@ export const start = (
     topicClusteringWorker?.on("closing", closingListener);
     trackEventsWorker?.on("closing", closingListener);
     usageStatsWorker?.on("closing", closingListener);
+    usageReportingWorker?.on("closing", closingListener);
     eventSourcingWorker?.on("closing", closingListener);
     scenarioWorker?.on("closing", closingListener);
 
@@ -193,6 +199,7 @@ export const start = (
           topicClusteringWorker?.off("closing", closingListener);
           trackEventsWorker?.off("closing", closingListener);
           usageStatsWorker?.off("closing", closingListener);
+          usageReportingWorker?.off("closing", closingListener);
           eventSourcingWorker?.off("closing", closingListener);
           scenarioWorker?.off("closing", closingListener);
           await Promise.all([
@@ -201,6 +208,7 @@ export const start = (
             topicClusteringWorker?.close(),
             trackEventsWorker?.close(),
             usageStatsWorker?.close(),
+            usageReportingWorker?.close(),
             eventSourcingWorker?.close(),
             scenarioWorker?.close(),
             new Promise<void>((resolve) =>
@@ -222,6 +230,7 @@ export const start = (
         topicClusteringWorker,
         trackEventsWorker,
         usageStatsWorker,
+        usageReportingWorker,
         eventSourcingWorker,
         scenarioWorker,
       });
