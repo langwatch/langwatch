@@ -48,10 +48,10 @@ const initTikToken = async (
   }
 
   const fallback = "gpt-4o";
-  const tokenizer =
-    modelName in models
-      ? (models as any)[modelName]
-      : (models as any)[fallback];
+  const usingFallback = !(modelName in models);
+  const tokenizer = usingFallback
+    ? (models as any)[fallback]
+    : (models as any)[modelName];
 
   const startedWaiting = Date.now();
   while (loadingModel.has(tokenizer)) {
@@ -131,7 +131,7 @@ async function countTokens(
   if (!text) return 0;
 
   const model = llmModelCost.model.includes("/")
-    ? llmModelCost.model.split("/")[1]!
+    ? llmModelCost.model.substring(llmModelCost.model.indexOf("/") + 1)
     : llmModelCost.model;
 
   const tiktoken = await initTikToken(model);
@@ -182,15 +182,64 @@ export function estimateCost({
     : undefined;
 }
 
+/**
+ * Normalize model name for better matching:
+ * - Convert to lowercase
+ * - Normalize common vendor prefix variations
+ * - Remove variant suffixes (FP8, GPTQ, etc.)
+ */
+const normalizeModelName = (model: string): string => {
+  let normalized = model.toLowerCase();
+
+  // Normalize vendor prefixes
+  const vendorMappings: Record<string, string> = {
+    "deepseek-ai/": "deepseek/",
+    "minimaxai/": "minimax/",
+    "zai-org/": "z-ai/",
+    "zhipu-ai/": "z-ai/",
+  };
+
+  for (const [from, to] of Object.entries(vendorMappings)) {
+    if (normalized.startsWith(from)) {
+      normalized = normalized.replace(from, to);
+      break;
+    }
+  }
+
+  // Remove common variant suffixes
+  const suffixesToRemove = [
+    "-fp8",
+    "-gptq",
+    "-awq",
+    "-gguf",
+    "-int4",
+    "-int8",
+  ];
+
+  for (const suffix of suffixesToRemove) {
+    if (normalized.endsWith(suffix)) {
+      normalized = normalized.slice(0, -suffix.length);
+      break;
+    }
+  }
+
+  return normalized;
+};
+
 export const matchingLLMModelCost = (
   model: string,
   llmModelCosts: MaybeStoredLLMModelCost[],
 ): MaybeStoredLLMModelCost | undefined => {
-  const llmModelCost = llmModelCosts.find((llmModelCost) =>
-    new RegExp(llmModelCost.regex).test(model),
-  );
-  if (!llmModelCost && model.includes("/")) {
-    const model_ = model.split("/")[1]!;
+  // Normalize model name for better matching
+  const normalizedModel = normalizeModelName(model);
+
+  const llmModelCost = llmModelCosts.find((llmModelCost) => {
+    const regex = new RegExp(llmModelCost.regex);
+    return regex.test(normalizedModel);
+  });
+
+  if (!llmModelCost && normalizedModel.includes("/")) {
+    const model_ = normalizedModel.substring(normalizedModel.indexOf("/") + 1);
     return matchingLLMModelCost(model_, llmModelCosts);
   }
   return llmModelCost;
