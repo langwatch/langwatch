@@ -136,17 +136,23 @@ export const createSeatEventSubscriptionFns = ({
       interval: billingInterval,
     });
 
+    const selectedOptionsMetadata = {
+      selectedCurrency: currency,
+      selectedBillingInterval: billingInterval,
+    };
+
     // Annual: charge full year immediately, no anchor needed.
     // Monthly: anchor billing cycle to 1st of next month with prorations.
     const subscriptionData: Stripe.Checkout.SessionCreateParams["subscription_data"] =
       billingInterval === "annual"
-        ? {}
+        ? { metadata: selectedOptionsMetadata }
         : (() => {
             const now = new Date();
             const billingCycleAnchor = new Date(
               Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
             );
             return {
+              metadata: selectedOptionsMetadata,
               billing_cycle_anchor: Math.floor(
                 billingCycleAnchor.getTime() / 1000,
               ),
@@ -166,6 +172,7 @@ export const createSeatEventSubscriptionFns = ({
       billing_address_collection: "required",
       tax_id_collection: { enabled: true },
       line_items: lineItems,
+      metadata: selectedOptionsMetadata,
       subscription_data: subscriptionData,
       success_url: `${baseUrl}/settings/subscription?success${isUpgradeFromTiered ? "&upgraded_from=tiered" : ""}`,
       cancel_url: `${baseUrl}/settings/subscription`,

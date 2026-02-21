@@ -115,6 +115,16 @@ describe("seatEventSubscriptionFns", () => {
             { price: "price_seat", quantity: 3 },
             { price: "price_events" },
           ],
+          metadata: {
+            selectedCurrency: "EUR",
+            selectedBillingInterval: "monthly",
+          },
+          subscription_data: expect.objectContaining({
+            metadata: {
+              selectedCurrency: "EUR",
+              selectedBillingInterval: "monthly",
+            },
+          }),
           success_url: "https://app.langwatch.ai/settings/subscription?success",
           cancel_url: "https://app.langwatch.ai/settings/subscription",
           client_reference_id: "subscription_setup_sub_local_1",

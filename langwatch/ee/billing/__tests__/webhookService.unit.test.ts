@@ -132,6 +132,73 @@ describe("webhookService", () => {
           data: { stripeSubscriptionId: "sub_stripe_1" },
         });
       });
+
+      it("persists selected currency after successful checkout", async () => {
+        db.subscription.updateMany.mockResolvedValue({ count: 1 });
+        db.subscription.findUnique
+          .mockResolvedValueOnce({
+            id: "sub_db_1",
+            status: SubscriptionStatus.PENDING,
+          })
+          .mockResolvedValueOnce({
+            id: "sub_db_1",
+            organizationId: "org_123",
+          });
+        db.subscription.update.mockResolvedValue({
+          id: "sub_db_1",
+          organizationId: "org_123",
+          organization: { name: "Acme" },
+          plan: "GROWTH_SEAT_EVENT",
+          startDate: new Date(),
+          maxMembers: null,
+          maxMessagesPerMonth: null,
+          status: SubscriptionStatus.ACTIVE,
+        });
+
+        const promise = service.handleCheckoutCompleted({
+          subscriptionId: "sub_stripe_1",
+          clientReferenceId: "subscription_setup_sub_db_1",
+          selectedCurrency: "USD",
+          selectedBillingInterval: "annual",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(db.organization.update).toHaveBeenCalledWith({
+          where: { id: "org_123" },
+          data: { currency: "USD" },
+        });
+      });
+
+      it("ignores invalid currency metadata", async () => {
+        db.subscription.updateMany.mockResolvedValue({ count: 1 });
+        db.subscription.findUnique.mockResolvedValue({
+          id: "sub_db_1",
+          status: SubscriptionStatus.PENDING,
+        });
+        db.subscription.update.mockResolvedValue({
+          id: "sub_db_1",
+          organizationId: "org_123",
+          organization: { name: "Acme" },
+          plan: "GROWTH_SEAT_EVENT",
+          startDate: new Date(),
+          maxMembers: null,
+          maxMessagesPerMonth: null,
+          status: SubscriptionStatus.ACTIVE,
+        });
+
+        const promise = service.handleCheckoutCompleted({
+          subscriptionId: "sub_stripe_1",
+          clientReferenceId: "subscription_setup_sub_db_1",
+          selectedCurrency: "GBP",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(db.organization.update).not.toHaveBeenCalled();
+      });
     });
   });
 
