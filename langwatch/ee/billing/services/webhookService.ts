@@ -24,6 +24,8 @@ export type WebhookService = {
   handleCheckoutCompleted(params: {
     subscriptionId: string;
     clientReferenceId: string | null;
+    selectedCurrency?: string | null;
+    selectedBillingInterval?: string | null;
   }): Promise<{ earlyReturn: boolean }>;
 
   handleInvoicePaymentSucceeded(params: {
@@ -60,6 +62,13 @@ export const createWebhookService = ({
     }): Promise<unknown>;
   };
 }): WebhookService => {
+  const normalizeSelectedCurrency = (value?: string | null): "EUR" | "USD" | null => {
+    if (value === "EUR" || value === "USD") {
+      return value;
+    }
+    return null;
+  };
+
   const syncInvoicePaymentSuccess = async ({
     subscriptionId,
     throwOnMissing = false,
@@ -165,7 +174,11 @@ export const createWebhookService = ({
   };
 
   return {
-    async handleCheckoutCompleted({ subscriptionId, clientReferenceId }) {
+    async handleCheckoutCompleted({
+      subscriptionId,
+      clientReferenceId,
+      selectedCurrency,
+    }) {
       const subscriptionClientReferenceId = clientReferenceId?.replace(
         "subscription_setup_",
         "",
@@ -195,20 +208,36 @@ export const createWebhookService = ({
         throwOnMissing: true,
       });
 
-      // Approve PAYMENT_PENDING invites linked to this subscription
-      if (inviteApprover) {
-        try {
-          const subscriptionRecord = await db.subscription.findUnique({
-            where: { stripeSubscriptionId: subscriptionId },
-            select: { id: true, organizationId: true },
-          });
+      const subscriptionRecord =
+        normalizeSelectedCurrency(selectedCurrency) || inviteApprover
+          ? await db.subscription.findUnique({
+              where: { stripeSubscriptionId: subscriptionId },
+              select: { id: true, organizationId: true },
+            })
+          : null;
 
-          if (subscriptionRecord) {
-            await inviteApprover.approvePaymentPendingInvites({
-              subscriptionId: subscriptionRecord.id,
-              organizationId: subscriptionRecord.organizationId,
-            });
-          }
+      const normalizedCurrency = normalizeSelectedCurrency(selectedCurrency);
+      if (normalizedCurrency && subscriptionRecord) {
+        try {
+          await db.organization.update({
+            where: { id: subscriptionRecord.organizationId },
+            data: { currency: normalizedCurrency },
+          });
+        } catch (err) {
+          logger.warn(
+            { subscriptionId, selectedCurrency: normalizedCurrency, err },
+            "[stripeWebhook] Failed to persist selected currency on checkout completion",
+          );
+        }
+      }
+
+      // Approve PAYMENT_PENDING invites linked to this subscription
+      if (inviteApprover && subscriptionRecord) {
+        try {
+          await inviteApprover.approvePaymentPendingInvites({
+            subscriptionId: subscriptionRecord.id,
+            organizationId: subscriptionRecord.organizationId,
+          });
         } catch (err) {
           logger.error(
             { subscriptionId, err },
