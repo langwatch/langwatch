@@ -4,6 +4,7 @@ import { env } from "~/env.mjs";
 import type { UsageReportingJob } from "~/server/background/types";
 import { withJobContext } from "../../context/asyncContext";
 import { prisma } from "../../db";
+import { getClickHouseClient } from "../../clickhouse/client";
 import { createLogger } from "../../../utils/logger/server";
 import {
   captureException,
@@ -26,12 +27,39 @@ const BILLABLE_EVENTS_EVENT_NAME = "langwatch_billable_events";
 const RETRIGGER_DELAY_MS = 5 * 60 * 1000;
 
 /**
- * Formats the current date as a billing month string (YYYY-MM).
+ * Formats a date as a billing month string (YYYY-MM).
  */
-function getBillingMonth(now: Date = new Date()): string {
+export function getBillingMonth(now: Date = new Date()): string {
   const year = now.getUTCFullYear();
   const month = String(now.getUTCMonth() + 1).padStart(2, "0");
   return `${year}-${month}`;
+}
+
+/**
+ * Returns the billing month string for the previous month.
+ */
+export function getPreviousBillingMonth(now: Date = new Date()): string {
+  const prev = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+  return getBillingMonth(prev);
+}
+
+/** Number of days at the start of a new month to also check the previous month. */
+const GRACE_PERIOD_DAYS = 3;
+
+/**
+ * Converts a billing month string (YYYY-MM) to a [startDate, endDate) range.
+ * Returns ISO datetime strings suitable for ClickHouse DateTime64 comparisons.
+ */
+export function billingMonthDateRange(billingMonth: string): [string, string] {
+  const [yearStr, monthStr] = billingMonth.split("-") as [string, string];
+  const year = parseInt(yearStr, 10);
+  const month = parseInt(monthStr, 10);
+  const startDate = `${year}-${String(month).padStart(2, "0")}-01 00:00:00.000`;
+  const nextMonth = new Date(Date.UTC(year, month, 1));
+  const endYear = nextMonth.getUTCFullYear();
+  const endMonth = String(nextMonth.getUTCMonth() + 1).padStart(2, "0");
+  const endDate = `${endYear}-${endMonth}-01 00:00:00.000`;
+  return [startDate, endDate];
 }
 
 /**
@@ -53,7 +81,46 @@ function buildIdentifier({
 }
 
 /**
- * Processes a single usage reporting job for an organization.
+ * Queries ClickHouse for the count of distinct billable events for an org in a billing month.
+ */
+async function queryBillableEventsTotal({
+  organizationId,
+  billingMonth,
+}: {
+  organizationId: string;
+  billingMonth: string;
+}): Promise<number | null> {
+  const client = getClickHouseClient();
+  if (!client) {
+    logger.warn(
+      { organizationId },
+      "ClickHouse not available, skipping usage reporting",
+    );
+    return null;
+  }
+
+  const [startDate, endDate] = billingMonthDateRange(billingMonth);
+
+  const result = await client.query({
+    query: `
+      SELECT countDistinct(DeduplicationKey) as total
+      FROM billable_events
+      WHERE OrganizationId = {organizationId:String}
+        AND EventTimestamp >= {startDate:DateTime64(3)}
+        AND EventTimestamp < {endDate:DateTime64(3)}
+    `,
+    query_params: { organizationId, startDate, endDate },
+    format: "JSONEachRow",
+  });
+
+  const jsonResult = await result.json();
+  const rows = Array.isArray(jsonResult) ? jsonResult : [];
+  const firstRow = rows[0] as { total: string } | undefined;
+  return parseInt(firstRow?.total ?? "0", 10);
+}
+
+/**
+ * Reports usage for a single billing month.
  *
  * Two-phase checkpoint protocol:
  * 1. Write `pendingReportedTotal` before calling Stripe (intent).
@@ -62,6 +129,172 @@ function buildIdentifier({
  * If the process crashes between phases, the next run detects the
  * pending value and replays with the same deterministic identifier,
  * which Stripe deduplicates via its 24-hour idempotency window.
+ */
+async function reportForBillingMonth({
+  organizationId,
+  billingMonth,
+  stripeCustomerId,
+}: {
+  organizationId: string;
+  billingMonth: string;
+  stripeCustomerId: string;
+}): Promise<void> {
+  const checkpoint = await prisma.billingMeterCheckpoint.findUnique({
+    where: {
+      organizationId_billingMonth: { organizationId, billingMonth },
+    },
+  });
+
+  const lastReportedTotal = checkpoint?.lastReportedTotal ?? 0;
+
+  let targetTotal: number;
+
+  if (checkpoint?.pendingReportedTotal != null) {
+    // Crash recovery: a previous run wrote the intent but never confirmed.
+    targetTotal = checkpoint.pendingReportedTotal;
+    logger.info(
+      { organizationId, billingMonth, targetTotal, lastReportedTotal },
+      "recovering pending checkpoint from previous crash",
+    );
+  } else {
+    // Normal path: query ClickHouse for deduplicated count.
+    const currentTotal = await queryBillableEventsTotal({
+      organizationId,
+      billingMonth,
+    });
+
+    if (currentTotal === null) {
+      // ClickHouse not available
+      return;
+    }
+
+    if (currentTotal <= lastReportedTotal) {
+      logger.debug(
+        { organizationId, billingMonth, currentTotal, lastReportedTotal },
+        "no new billable events, skipping",
+      );
+      return;
+    }
+
+    targetTotal = currentTotal;
+
+    // Phase 1: Write intent (pendingReportedTotal) before calling Stripe.
+    await prisma.billingMeterCheckpoint.upsert({
+      where: {
+        organizationId_billingMonth: { organizationId, billingMonth },
+      },
+      create: {
+        organizationId,
+        billingMonth,
+        lastReportedTotal,
+        pendingReportedTotal: targetTotal,
+      },
+      update: {
+        pendingReportedTotal: targetTotal,
+      },
+    });
+  }
+
+  // Compute delta and report to Stripe
+  const delta = targetTotal - lastReportedTotal;
+  if (delta <= 0) {
+    logger.debug(
+      { organizationId, billingMonth, targetTotal, lastReportedTotal },
+      "non-positive delta, skipping Stripe report",
+    );
+    return;
+  }
+
+  const identifier = buildIdentifier({
+    organizationId,
+    billingMonth,
+    lastReportedTotal,
+    targetTotal,
+  });
+
+  // Dynamic import to avoid circular dependency with ee/billing
+  const { getUsageReportingService } = await import(
+    "../../../../ee/billing/index"
+  );
+
+  const results = await getUsageReportingService().reportUsageDelta({
+    stripeCustomerId,
+    organizationId,
+    events: [
+      {
+        eventName: BILLABLE_EVENTS_EVENT_NAME,
+        identifier,
+        timestamp: Math.floor(Date.now() / 1000),
+        value: delta,
+      },
+    ],
+  });
+
+  const result = results[0];
+
+  if (!result || !result.reported) {
+    // Permanent Stripe rejection: do NOT update checkpoint.
+    logger.error(
+      {
+        organizationId,
+        billingMonth,
+        identifier,
+        delta,
+        error: result?.error,
+      },
+      "Stripe permanently rejected meter event, checkpoint NOT updated",
+    );
+    await withScope(async (scope) => {
+      scope.setTag?.("worker", "usageReporting");
+      scope.setExtra?.("organizationId", organizationId);
+      scope.setExtra?.("identifier", identifier);
+      scope.setExtra?.("delta", delta);
+      scope.setExtra?.("stripeError", result?.error);
+      captureException(
+        new Error(
+          `Stripe rejected meter event: ${result?.error ?? "unknown"}`,
+        ),
+      );
+    });
+
+    // Clear pending so subsequent runs don't replay the rejected delta forever.
+    await prisma.billingMeterCheckpoint.update({
+      where: {
+        organizationId_billingMonth: { organizationId, billingMonth },
+      },
+      data: {
+        pendingReportedTotal: null,
+      },
+    });
+
+    return;
+  }
+
+  // Phase 2: Confirm checkpoint - promote to lastReportedTotal, clear pending.
+  await prisma.billingMeterCheckpoint.upsert({
+    where: {
+      organizationId_billingMonth: { organizationId, billingMonth },
+    },
+    create: {
+      organizationId,
+      billingMonth,
+      lastReportedTotal: targetTotal,
+      pendingReportedTotal: null,
+    },
+    update: {
+      lastReportedTotal: targetTotal,
+      pendingReportedTotal: null,
+    },
+  });
+
+  logger.info(
+    { organizationId, billingMonth, identifier, delta, targetTotal },
+    "usage reported and checkpoint updated successfully",
+  );
+}
+
+/**
+ * Processes a single usage reporting job for an organization.
  */
 export async function runUsageReportingJob(
   job: Job<UsageReportingJob, void, string>,
@@ -95,7 +328,6 @@ export async function runUsageReportingJob(
           take: 1,
           select: { id: true },
         },
-        teams: { select: { projects: { select: { id: true } } } },
       },
     });
 
@@ -128,194 +360,32 @@ export async function runUsageReportingJob(
       return;
     }
 
-    const projectIds = org.teams.flatMap((t) =>
-      t.projects.map((p) => p.id),
-    );
-    if (projectIds.length === 0) {
-      logger.debug(
-        { organizationId },
-        "no projects found, skipping usage reporting",
-      );
-      return;
-    }
-
     // ----------------------------------------------------------------
-    // 2. Determine billing month and read checkpoint
+    // 2. Report for current (and possibly previous) billing month
     // ----------------------------------------------------------------
-    const billingMonth = getBillingMonth();
+    const now = new Date();
+    const billingMonth = getBillingMonth(now);
 
-    const checkpoint = await prisma.billingMeterCheckpoint.findUnique({
-      where: {
-        organizationId_billingMonth: { organizationId, billingMonth },
-      },
-    });
-
-    const lastReportedTotal = checkpoint?.lastReportedTotal ?? 0;
-
-    // ----------------------------------------------------------------
-    // 3. Two-phase logic: determine target total
-    // ----------------------------------------------------------------
-    let targetTotal: number;
-
-    if (checkpoint?.pendingReportedTotal != null) {
-      // Crash recovery: a previous run wrote the intent but never confirmed.
-      targetTotal = checkpoint.pendingReportedTotal;
-      logger.info(
-        { organizationId, billingMonth, targetTotal, lastReportedTotal },
-        "recovering pending checkpoint from previous crash",
-      );
-    } else {
-      // Normal path: aggregate current month across all org projects.
-      const aggregate = await prisma.projectDailyBillableEvents.aggregate({
-        _sum: { count: true },
-        where: {
-          projectId: { in: projectIds },
-          date: { startsWith: billingMonth },
-        },
-      });
-
-      const currentTotal = aggregate._sum.count ?? 0;
-
-      if (currentTotal <= lastReportedTotal) {
-        logger.debug(
-          { organizationId, billingMonth, currentTotal, lastReportedTotal },
-          "no new billable events, skipping",
-        );
-        getJobProcessingCounter("usage_reporting", "completed").inc();
-        const duration = Date.now() - start;
-        getJobProcessingDurationHistogram("usage_reporting").observe(duration);
-        return;
-      }
-
-      targetTotal = currentTotal;
-
-      // Phase 1: Write intent (pendingReportedTotal) before calling Stripe.
-      await prisma.billingMeterCheckpoint.upsert({
-        where: {
-          organizationId_billingMonth: { organizationId, billingMonth },
-        },
-        create: {
-          organizationId,
-          billingMonth,
-          lastReportedTotal,
-          pendingReportedTotal: targetTotal,
-        },
-        update: {
-          pendingReportedTotal: targetTotal,
-        },
+    // Grace period: check previous month during first days of a new month
+    // to catch late-arriving events that belong to the previous billing cycle
+    if (now.getUTCDate() <= GRACE_PERIOD_DAYS) {
+      const prevMonth = getPreviousBillingMonth(now);
+      await reportForBillingMonth({
+        organizationId,
+        billingMonth: prevMonth,
+        stripeCustomerId: org.stripeCustomerId,
       });
     }
 
-    // ----------------------------------------------------------------
-    // 4. Compute delta and report to Stripe
-    // ----------------------------------------------------------------
-    const delta = targetTotal - lastReportedTotal;
-    if (delta <= 0) {
-      logger.debug(
-        { organizationId, billingMonth, targetTotal, lastReportedTotal },
-        "non-positive delta, skipping Stripe report",
-      );
-      getJobProcessingCounter("usage_reporting", "completed").inc();
-      const duration = Date.now() - start;
-      getJobProcessingDurationHistogram("usage_reporting").observe(duration);
-      return;
-    }
-
-    const identifier = buildIdentifier({
+    // Always check current month
+    await reportForBillingMonth({
       organizationId,
       billingMonth,
-      lastReportedTotal,
-      targetTotal,
-    });
-
-    // Dynamic import to avoid circular dependency with ee/billing
-    const { getUsageReportingService } = await import(
-      "../../../../ee/billing/index"
-    );
-
-    const results = await getUsageReportingService().reportUsageDelta({
       stripeCustomerId: org.stripeCustomerId,
-      organizationId,
-      events: [
-        {
-          eventName: BILLABLE_EVENTS_EVENT_NAME,
-          identifier,
-          timestamp: Math.floor(Date.now() / 1000),
-          value: delta,
-        },
-      ],
     });
 
-    const result = results[0];
-
     // ----------------------------------------------------------------
-    // 5. Handle result
-    // ----------------------------------------------------------------
-    if (!result || !result.reported) {
-      // Permanent Stripe rejection: do NOT update checkpoint.
-      logger.error(
-        {
-          organizationId,
-          billingMonth,
-          identifier,
-          delta,
-          error: result?.error,
-        },
-        "Stripe permanently rejected meter event, checkpoint NOT updated",
-      );
-      await withScope(async (scope) => {
-        scope.setTag?.("worker", "usageReporting");
-        scope.setExtra?.("organizationId", organizationId);
-        scope.setExtra?.("identifier", identifier);
-        scope.setExtra?.("delta", delta);
-        scope.setExtra?.("stripeError", result?.error);
-        captureException(
-          new Error(
-            `Stripe rejected meter event: ${result?.error ?? "unknown"}`,
-          ),
-        );
-      });
-
-      // Clear pending so subsequent runs don't replay the rejected delta forever.
-      await prisma.billingMeterCheckpoint.update({
-        where: {
-          organizationId_billingMonth: { organizationId, billingMonth },
-        },
-        data: {
-          pendingReportedTotal: null,
-        },
-      });
-
-      getJobProcessingCounter("usage_reporting", "completed").inc();
-      const duration = Date.now() - start;
-      getJobProcessingDurationHistogram("usage_reporting").observe(duration);
-      return;
-    }
-
-    // Phase 2: Confirm checkpoint - promote to lastReportedTotal, clear pending.
-    await prisma.billingMeterCheckpoint.upsert({
-      where: {
-        organizationId_billingMonth: { organizationId, billingMonth },
-      },
-      create: {
-        organizationId,
-        billingMonth,
-        lastReportedTotal: targetTotal,
-        pendingReportedTotal: null,
-      },
-      update: {
-        lastReportedTotal: targetTotal,
-        pendingReportedTotal: null,
-      },
-    });
-
-    logger.info(
-      { organizationId, billingMonth, identifier, delta, targetTotal },
-      "usage reported and checkpoint updated successfully",
-    );
-
-    // ----------------------------------------------------------------
-    // 6. Self-re-trigger to catch any events that arrived during processing
+    // 3. Self-re-trigger to catch any events that arrived during processing
     // ----------------------------------------------------------------
     try {
       // Dynamic import to avoid circular dependency with the queue module
