@@ -169,7 +169,7 @@ function ScenarioLibraryPage() {
         </HStack>
       </PageLayout.Header>
 
-      <PageLayout.Container>
+      <PageLayout.Container padding={0}>
         {isLoading && (
           <VStack gap={4} align="center" py={8}>
             <Spinner borderWidth="3px" animationDuration="0.8s" />
