@@ -5,7 +5,7 @@ import {
 import type { PromptMutationResponse } from "../langwatch-api.js";
 
 /**
- * Handles the update_prompt MCP tool invocation.
+ * Handles the platform_update_prompt MCP tool invocation.
  *
  * Updates an existing prompt or creates a new version, depending on the
  * `createVersion` flag. Returns a confirmation with the updated details.

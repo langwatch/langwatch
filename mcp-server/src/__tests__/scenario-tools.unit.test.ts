@@ -96,8 +96,8 @@ describe("handleListScenarios()", () => {
       expect(result).toContain("No scenarios found");
     });
 
-    it("includes a tip to use create_scenario", () => {
-      expect(result).toContain("create_scenario");
+    it("includes a tip to use platform_create_scenario", () => {
+      expect(result).toContain("platform_create_scenario");
     });
   });
 
