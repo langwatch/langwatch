@@ -5,6 +5,8 @@
  * Feature lists and currency helpers used by SubscriptionPage and PlansComparisonPage.
  */
 
+import { formatNumber } from "~/utils/formatNumber";
+
 export type { Currency } from "../../../ee/billing/pricing";
 export {
   getGrowthSeatPriceCents,
@@ -47,7 +49,9 @@ export const FREE_PLAN_FEATURES = [
   "50,000 events included",
   "14 days data retention",
   "2 users",
-  "3 scenarios, 3 simulations, 3 custom evaluations",
+  "3 scenarios",
+  "3 simulations",
+  "3 custom evaluations",
   "Community support",
 ];
 
@@ -75,3 +79,52 @@ export const ENTERPRISE_PLAN_FEATURES = [
   "AWS/Azure/GCP Marketplace",
   "ISO27001 / SOC2 reports",
 ];
+
+export function buildTieredCapabilities({
+  maxMembers,
+  maxMessagesPerMonth,
+  maxProjects,
+  maxMembersLite,
+  evaluationsCredit,
+}: {
+  maxMembers: number;
+  maxMessagesPerMonth: number;
+  maxProjects: number;
+  maxMembersLite: number;
+  evaluationsCredit: number;
+}) {
+  const coreUsersText =
+    maxMembers > 0
+      ? `Up to ${formatNumber(maxMembers)} core users`
+      : "Custom core user limits";
+  const eventsText =
+    maxMessagesPerMonth > 0
+      ? `${formatNumber(maxMessagesPerMonth)} events included`
+      : "Custom event limits";
+  const projectsText =
+    maxProjects >= 9999
+      ? "Unlimited projects"
+      : maxProjects > 0
+        ? `Up to ${formatNumber(maxProjects)} projects`
+        : "Custom project limits";
+  const liteUsersText =
+    maxMembersLite >= 9999
+      ? "Unlimited lite users"
+      : maxMembersLite > 0
+        ? `Up to ${formatNumber(maxMembersLite)} lite users`
+        : "Custom lite user limits";
+  const evalsText =
+    evaluationsCredit >= 9999
+      ? "Unlimited evaluations"
+      : evaluationsCredit > 0
+        ? `${formatNumber(evaluationsCredit)} evaluation credits`
+        : "Custom evaluation limits";
+
+  return [
+    coreUsersText,
+    eventsText,
+    projectsText,
+    liteUsersText,
+    evalsText,
+  ];
+}

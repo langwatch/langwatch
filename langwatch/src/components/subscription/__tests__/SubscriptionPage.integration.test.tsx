@@ -10,10 +10,17 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PlanInfo } from "../../../../ee/licensing/planInfo";
 import { SubscriptionPage } from "../SubscriptionPage";
+import { ENTERPRISE_PLAN_FEATURES } from "../billing-plans";
 
-let mockOrganization: { id: string; name: string; pricingModel?: string } = {
+let mockOrganization: {
+  id: string;
+  name: string;
+  pricingModel?: string;
+  currency?: "EUR" | "USD" | null;
+} = {
   id: "test-org-id",
   name: "Test Org",
+  currency: "EUR",
 };
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
@@ -137,6 +144,11 @@ const mockGetPendingInvites = vi.fn(() => ({
   isLoading: false,
 }));
 
+const mockDetectCurrency = vi.fn(() => ({
+  data: { currency: "EUR" as "EUR" | "USD" },
+  isLoading: false,
+}));
+
 const mockCreateInvitesMutate = vi.fn();
 const mockCreateInvites = vi.fn(() => ({
   mutate: mockCreateInvitesMutate,
@@ -171,6 +183,12 @@ vi.mock("~/utils/api", () => ({
       },
       createInvites: {
         useMutation: () => mockCreateInvites(),
+      },
+    },
+    currency: {
+      detectCurrency: {
+        useQuery: (_input: Record<string, never>, opts: { enabled: boolean }) =>
+          opts.enabled ? mockDetectCurrency() : { data: undefined },
       },
     },
     subscription: {
@@ -213,6 +231,7 @@ describe("<SubscriptionPage/>", () => {
     mockOrganization = {
       id: "test-org-id",
       name: "Test Org",
+      currency: "EUR",
     };
     mockGetActivePlan.mockReturnValue({
       data: createMockPlan(),
@@ -228,6 +247,10 @@ describe("<SubscriptionPage/>", () => {
       data: [],
       isLoading: false,
     });
+    mockDetectCurrency.mockReturnValue({
+      data: { currency: "EUR" },
+      isLoading: false,
+    });
   });
 
   afterEach(() => {
@@ -239,12 +262,12 @@ describe("<SubscriptionPage/>", () => {
   // ============================================================================
 
   describe("when the subscription page loads", () => {
-    it("displays current plan block and upgrade plan block", async () => {
+    it("displays current plan block and hides upgrade plan block by default", async () => {
       renderSubscriptionPage();
 
       await waitFor(() => {
         expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
-        expect(screen.getByTestId("upgrade-plan-block")).toBeInTheDocument();
+        expect(screen.queryByTestId("upgrade-plan-block")).not.toBeInTheDocument();
       });
     });
 
@@ -253,6 +276,30 @@ describe("<SubscriptionPage/>", () => {
 
       await waitFor(() => {
         expect(screen.getByText(/contact us/i)).toBeInTheDocument();
+      });
+    });
+
+    it("shows enterprise features in the contact sales block", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        const enterpriseFeatures = screen.getByTestId("enterprise-features-list");
+        expect(
+          within(enterpriseFeatures).getByText(ENTERPRISE_PLAN_FEATURES[0]!),
+        ).toBeInTheDocument();
+        expect(
+          within(enterpriseFeatures).getByText(
+            ENTERPRISE_PLAN_FEATURES[ENTERPRISE_PLAN_FEATURES.length - 1]!,
+          ),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("renders feature grid for current plan block", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("current-plan-features-grid")).toBeInTheDocument();
       });
     });
   });
@@ -281,19 +328,19 @@ describe("<SubscriptionPage/>", () => {
         expect(within(currentBlock).getByText("Free plan")).toBeInTheDocument();
 
         // Features
-        expect(within(currentBlock).getByText(/2 core members/i)).toBeInTheDocument();
+        expect(within(currentBlock).getByText(/2 users/i)).toBeInTheDocument();
         expect(within(currentBlock).getByText(/Community support/i)).toBeInTheDocument();
       });
     });
 
-    it("shows the upgrade block with Growth features", async () => {
+    it("hides the upgrade block before seat changes", async () => {
       renderSubscriptionPage();
 
       await waitFor(() => {
-        const upgradeBlock = screen.getByTestId("upgrade-plan-block");
-        expect(within(upgradeBlock).getByText(/Growth Plan/i)).toBeInTheDocument();
-        expect(within(upgradeBlock).getByRole("button", { name: /Upgrade now/i })).toBeInTheDocument();
+        expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
       });
+
+      expect(screen.queryByTestId("upgrade-plan-block")).not.toBeInTheDocument();
     });
 
     it("displays the user count as N/M format", async () => {
@@ -313,7 +360,11 @@ describe("<SubscriptionPage/>", () => {
 
   describe("when viewing the upgrade plan block", () => {
     it("shows correct Growth plan features", async () => {
+      const user = userEvent.setup();
       renderSubscriptionPage();
+      await user.click(screen.getByTestId("user-count-link"));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+      await user.click(screen.getByRole("button", { name: /Done/i }));
 
       await waitFor(() => {
         const upgradeBlock = screen.getByTestId("upgrade-plan-block");
@@ -329,7 +380,11 @@ describe("<SubscriptionPage/>", () => {
     });
 
     it("shows 'Upgrade now' button on upgrade block", async () => {
+      const user = userEvent.setup();
       renderSubscriptionPage();
+      await user.click(screen.getByTestId("user-count-link"));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+      await user.click(screen.getByRole("button", { name: /Done/i }));
 
       await waitFor(() => {
         const upgradeBlock = screen.getByTestId("upgrade-plan-block");
@@ -634,12 +689,21 @@ describe("<SubscriptionPage/>", () => {
   // ============================================================================
 
   describe("when viewing billing toggles", () => {
-    it("shows currency selector defaulting to EUR", async () => {
+    it("shows currency selector defaulting to organization currency", async () => {
+      mockOrganization = {
+        id: "test-org-id",
+        name: "Test Org",
+        currency: "USD",
+      };
+
       renderSubscriptionPage();
 
       await waitFor(() => {
         const currencySelector = screen.getByTestId("currency-selector");
         expect(currencySelector).toBeInTheDocument();
+        expect(
+          within(currencySelector).getByDisplayValue("$ USD"),
+        ).toBeInTheDocument();
       });
     });
 
@@ -653,9 +717,34 @@ describe("<SubscriptionPage/>", () => {
       });
     });
 
+    it("falls back to detected currency when organization currency is missing", async () => {
+      mockOrganization = {
+        id: "test-org-id",
+        name: "Test Org",
+        currency: null,
+      };
+      mockDetectCurrency.mockReturnValue({
+        data: { currency: "USD" },
+        isLoading: false,
+      });
+
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        const currencySelector = screen.getByTestId("currency-selector");
+        expect(
+          within(currencySelector).getByDisplayValue("$ USD"),
+        ).toBeInTheDocument();
+      });
+    });
+
     it("shows Save badge when switching to annually", async () => {
       const user = userEvent.setup();
       renderSubscriptionPage();
+
+      await user.click(screen.getByTestId("user-count-link"));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+      await user.click(screen.getByRole("button", { name: /Done/i }));
 
       const toggle = screen.getByTestId("billing-period-toggle");
       const switchInput = within(toggle).getByRole("checkbox");
@@ -664,6 +753,30 @@ describe("<SubscriptionPage/>", () => {
       await waitFor(() => {
         expect(screen.getByText(/Save 8%/i)).toBeInTheDocument();
       });
+    });
+
+    it("hides billing controls for paid plans", async () => {
+      mockGetActivePlan.mockReturnValue({
+        data: createMockPlan({
+          type: "GROWTH",
+          name: "Growth",
+          free: false,
+          maxMembers: 5,
+          maxMembersLite: 1000,
+          maxMessagesPerMonth: 200000,
+        }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
+      });
+
+      expect(screen.queryByTestId("billing-period-toggle")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("currency-selector")).not.toBeInTheDocument();
     });
   });
 
@@ -1019,7 +1132,7 @@ describe("<SubscriptionPage/>", () => {
       });
     });
 
-    it("does not show Upgrade required badge", async () => {
+    it("shows Upgrade required badge", async () => {
       const user = userEvent.setup();
       renderSubscriptionPage();
 
@@ -1031,7 +1144,7 @@ describe("<SubscriptionPage/>", () => {
         expect(screen.getByTestId("update-seats-block")).toBeInTheDocument();
       });
 
-      expect(screen.queryByText(/Upgrade required/i)).not.toBeInTheDocument();
+      expect(screen.getByText(/Upgrade required/i)).toBeInTheDocument();
     });
   });
 
@@ -1079,12 +1192,14 @@ describe("<SubscriptionPage/>", () => {
         expect(screen.queryByTestId("tiered-pricing-alert")).not.toBeInTheDocument();
       });
 
-      it("shows upgrade plan block on free plan", async () => {
+      it("hides upgrade plan block on free plan without seat changes", async () => {
         renderSubscriptionPage();
 
         await waitFor(() => {
-          expect(screen.getByTestId("upgrade-plan-block")).toBeInTheDocument();
+          expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
         });
+
+        expect(screen.queryByTestId("upgrade-plan-block")).not.toBeInTheDocument();
       });
 
       it("shows legacy paid plan name as current plan title", async () => {
@@ -1169,6 +1284,16 @@ describe("<SubscriptionPage/>", () => {
 
       await waitFor(() => {
         expect(screen.getByTestId("tiered-deprecated-notice")).toBeInTheDocument();
+      });
+    });
+
+    it("shows legacy tiered capabilities in the current plan block", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        const currentBlock = screen.getByTestId("current-plan-block");
+        expect(within(currentBlock).getByText("Up to 5 core users")).toBeInTheDocument();
+        expect(within(currentBlock).getByText("20,000 events included")).toBeInTheDocument();
       });
     });
 
@@ -1682,14 +1807,14 @@ describe("<SubscriptionPage/>", () => {
         });
       });
 
-      it("shows upgrade block based on active members only", async () => {
+      it("does not show upgrade block before planning seats", async () => {
         renderSubscriptionPage();
 
         await waitFor(() => {
-          const total = screen.getByTestId("upgrade-total");
-          expect(total).toHaveTextContent("1 Full Member");
-          expect(total).toHaveTextContent("€29/mo");
+          expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
         });
+
+        expect(screen.queryByTestId("upgrade-plan-block")).not.toBeInTheDocument();
       });
 
       it("shows 2 Full Members after adding a manual seat in drawer", async () => {
@@ -1709,14 +1834,14 @@ describe("<SubscriptionPage/>", () => {
     });
 
     describe("when on Free plan at capacity (2/2 members)", () => {
-      it("shows upgrade block matching active member count", async () => {
+      it("does not show upgrade block without planned seat changes", async () => {
         renderSubscriptionPage();
 
         await waitFor(() => {
-          const total = screen.getByTestId("upgrade-total");
-          expect(total).toHaveTextContent("2 Full Members");
-          expect(total).toHaveTextContent("€58/mo");
+          expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
         });
+
+        expect(screen.queryByTestId("upgrade-plan-block")).not.toBeInTheDocument();
       });
     });
 
