@@ -35,7 +35,11 @@ export async function handleSetModelProvider(params: {
   }
 
   if (params.defaultModel) {
-    lines.push(`**Default Model**: ${params.defaultModel}`);
+    // Show the normalized model name (with provider prefix)
+    const normalizedModel = params.defaultModel.includes("/")
+      ? params.defaultModel
+      : `${params.provider}/${params.defaultModel}`;
+    lines.push(`**Default Model**: ${normalizedModel}`);
   }
 
   return lines.join("\n");

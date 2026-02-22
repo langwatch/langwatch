@@ -133,7 +133,7 @@ describe("handleSetModelProvider()", () => {
     });
   });
 
-  describe("when setting default model", () => {
+  describe("when setting default model without provider prefix", () => {
     let result: string;
 
     beforeEach(async () => {
@@ -155,8 +155,36 @@ describe("handleSetModelProvider()", () => {
       });
     });
 
-    it("includes default model in response", () => {
-      expect(result).toContain("**Default Model**: gpt-4o");
+    it("prepends provider prefix in response", () => {
+      expect(result).toContain("**Default Model**: openai/gpt-4o");
+    });
+  });
+
+  describe("when setting default model with provider prefix already", () => {
+    let result: string;
+
+    beforeEach(async () => {
+      mockSetModelProvider.mockResolvedValue({
+        openai: {
+          provider: "openai",
+          enabled: true,
+          customKeys: null,
+          models: ["gpt-4o"],
+          embeddingsModels: null,
+          deploymentMapping: null,
+          extraHeaders: [],
+        },
+      });
+      result = await handleSetModelProvider({
+        provider: "openai",
+        enabled: true,
+        defaultModel: "openai/gpt-4o",
+      });
+    });
+
+    it("keeps the prefix as-is", () => {
+      expect(result).toContain("**Default Model**: openai/gpt-4o");
+      expect(result).not.toContain("openai/openai/");
     });
   });
 });

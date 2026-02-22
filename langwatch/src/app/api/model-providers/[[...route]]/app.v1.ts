@@ -108,6 +108,13 @@ app.put(
     );
 
     try {
+      // Ensure defaultModel has the provider prefix (e.g. "openai/gpt-4o")
+      // required by litellm for routing
+      let defaultModel = data.defaultModel;
+      if (defaultModel && !defaultModel.includes("/")) {
+        defaultModel = `${provider}/${defaultModel}`;
+      }
+
       await service.updateModelProvider({
         projectId: project.id,
         provider,
@@ -116,7 +123,7 @@ app.put(
         customModels: data.customModels,
         customEmbeddingsModels: data.customEmbeddingsModels,
         extraHeaders: data.extraHeaders,
-        defaultModel: data.defaultModel,
+        defaultModel,
       });
     } catch (error) {
       if (error instanceof Error) {
