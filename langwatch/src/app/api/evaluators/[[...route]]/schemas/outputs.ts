@@ -48,3 +48,10 @@ export const createEvaluatorInputSchema = z.object({
       }),
     ),
 });
+
+export const updateEvaluatorInputSchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+  config: z
+    .record(z.unknown())
+    .optional(),
+});
