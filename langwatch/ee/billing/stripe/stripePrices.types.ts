@@ -61,7 +61,7 @@ export type StripePricesFile = {
   schemaVersion: number;
   updatedAt: string;
   mapping: StripePriceMapping;
-  meters?: StripeMeterMapping;
+  meters: StripeMeterMapping;
   prices: Record<string, StripePriceDetail>;
 };
 
@@ -109,6 +109,6 @@ export const stripePricesFileSchema = z.object({
   schemaVersion: z.number(),
   updatedAt: z.string(),
   mapping: stripePriceMappingSchema,
-  meters: stripeMeterMappingSchema.optional(),
+  meters: stripeMeterMappingSchema,
   prices: z.record(z.string(), stripePriceDetailSchema),
 });

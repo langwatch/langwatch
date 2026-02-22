@@ -245,9 +245,7 @@ export const createUsageReportingService = ({
         }
       );
 
-      const summary = response.data[0];
-
-      if (!summary) {
+      if (response.data.length === 0) {
         logger.warn(
           {
             stripeCustomerId: validated.stripeCustomerId,
@@ -265,7 +263,10 @@ export const createUsageReportingService = ({
         };
       }
 
-      const aggregatedValue = summary.aggregated_value;
+      const aggregatedValue = response.data.reduce(
+        (sum, s) => sum + s.aggregated_value,
+        0,
+      );
 
       logger.info(
         {

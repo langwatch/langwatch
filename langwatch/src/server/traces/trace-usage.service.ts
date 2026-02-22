@@ -13,6 +13,11 @@ import {
 import { OrganizationRepository } from "~/server/repositories/organization.repository";
 import { getCurrentMonthStartMs } from "~/server/utils/dateUtils";
 import { TtlCache } from "~/server/utils/ttlCache";
+import {
+  queryBillableEventsTotalApprox,
+  queryBillableEventsByProjectApprox,
+  getBillingMonth,
+} from "../../../ee/billing/services/billableEventsQuery";
 
 type EsClientFactory = typeof defaultEsClient;
 
@@ -93,7 +98,7 @@ export class TraceUsageService {
   }
 
   /**
-   * Gets current month trace count for an organization (cached for 5 minutes)
+   * Gets current month trace count for an organization (cached for 5 minutes).
    */
   async getCurrentMonthCount({
     organizationId,
@@ -105,6 +110,15 @@ export class TraceUsageService {
       return cached;
     }
 
+    // SaaS: deduplicated billable events from ClickHouse, null when not configured
+    // ClickHouse is configured in Cloud environment
+    const totalEvents = await this.getBillableEventsMonthCount({ organizationId });
+    if (totalEvents !== null) {
+      monthCountCache.set(organizationId, totalEvents);
+      return totalEvents;
+    }
+
+    // Self-hosted fallback: raw trace count from ES
     const projectIds =
       await this.organizationRepository.getProjectIds(organizationId);
     if (projectIds.length === 0) {
@@ -122,7 +136,7 @@ export class TraceUsageService {
   }
 
   /**
-   * Gets current month trace count per project, routing to CH or ES based on feature flag.
+   * Gets current month trace count per project.
    */
   async getCountByProjects({
     organizationId,
@@ -135,9 +149,18 @@ export class TraceUsageService {
       return [];
     }
 
+    // SaaS: deduplicated billable events per project from ClickHouse
+    const eventCounts = await this.getBillableEventsCountByProjects({
+      organizationId,
+      projectIds,
+    });
+    if (eventCounts !== null) {
+      return eventCounts;
+    }
+
+    // Self-hosted fallback: route by per-project CH feature flag
     const monthStart = getCurrentMonthStartMs();
 
-    // Split projects by CH feature flag
     const { chProjectIds, esProjectIds } =
       await this.splitProjectsByFlag(projectIds);
 
@@ -259,5 +282,48 @@ export class TraceUsageService {
     }
 
     return results;
+  }
+
+  /**
+   * Returns approximate billable event count for the current UTC month
+   * using HyperLogLog (~1% error), or null if ClickHouse is not configured.
+   */
+  private async getBillableEventsMonthCount({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<number | null> {
+    if (!getClickHouseClient()) return null;
+
+    const billingMonth = getBillingMonth();
+    return (
+      (await queryBillableEventsTotalApprox({ organizationId, billingMonth })) ??
+      0
+    );
+  }
+
+  /**
+   * Returns approximate per-project billable event counts for the current UTC
+   * billing month using HyperLogLog (~1% error), or null if ClickHouse is not configured.
+   */
+  private async getBillableEventsCountByProjects({
+    organizationId,
+    projectIds,
+  }: {
+    organizationId: string;
+    projectIds: string[];
+  }): Promise<Array<{ projectId: string; count: number }> | null> {
+    if (!getClickHouseClient()) return null;
+
+    const billingMonth = getBillingMonth();
+    const counts = await queryBillableEventsByProjectApprox({
+      organizationId,
+      billingMonth,
+    });
+    const countsMap = new Map(counts.map((c) => [c.projectId, c.count]));
+    return projectIds.map((pid) => ({
+      projectId: pid,
+      count: countsMap.get(pid) ?? 0,
+    }));
   }
 }

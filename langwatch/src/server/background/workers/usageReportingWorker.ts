@@ -4,7 +4,6 @@ import { env } from "~/env.mjs";
 import type { UsageReportingJob } from "~/server/background/types";
 import { withJobContext } from "../../context/asyncContext";
 import { prisma } from "../../db";
-import { getClickHouseClient } from "../../clickhouse/client";
 import { createLogger } from "../../../utils/logger/server";
 import {
   captureException,
@@ -17,6 +16,15 @@ import {
 } from "../../metrics";
 import { connection } from "../../redis";
 import { USAGE_REPORTING_QUEUE } from "../queues/constants";
+import {
+  getBillingMonth,
+  getPreviousBillingMonth,
+  billingMonthDateRange,
+  queryBillableEventsTotal,
+} from "../../../../ee/billing/services/billableEventsQuery";
+
+// Re-export for existing test imports
+export { getBillingMonth, getPreviousBillingMonth, billingMonthDateRange };
 
 const logger = createLogger("langwatch:workers:usageReportingWorker");
 
@@ -26,41 +34,8 @@ const BILLABLE_EVENTS_EVENT_NAME = "langwatch_billable_events";
 /** Delay before self-re-trigger in milliseconds (5 minutes). */
 const RETRIGGER_DELAY_MS = 5 * 60 * 1000;
 
-/**
- * Formats a date as a billing month string (YYYY-MM).
- */
-export function getBillingMonth(now: Date = new Date()): string {
-  const year = now.getUTCFullYear();
-  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
-  return `${year}-${month}`;
-}
-
-/**
- * Returns the billing month string for the previous month.
- */
-export function getPreviousBillingMonth(now: Date = new Date()): string {
-  const prev = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
-  return getBillingMonth(prev);
-}
-
 /** Number of days at the start of a new month to also check the previous month. */
 const GRACE_PERIOD_DAYS = 3;
-
-/**
- * Converts a billing month string (YYYY-MM) to a [startDate, endDate) range.
- * Returns ISO datetime strings suitable for ClickHouse DateTime64 comparisons.
- */
-export function billingMonthDateRange(billingMonth: string): [string, string] {
-  const [yearStr, monthStr] = billingMonth.split("-") as [string, string];
-  const year = parseInt(yearStr, 10);
-  const month = parseInt(monthStr, 10);
-  const startDate = `${year}-${String(month).padStart(2, "0")}-01 00:00:00.000`;
-  const nextMonth = new Date(Date.UTC(year, month, 1));
-  const endYear = nextMonth.getUTCFullYear();
-  const endMonth = String(nextMonth.getUTCMonth() + 1).padStart(2, "0");
-  const endDate = `${endYear}-${endMonth}-01 00:00:00.000`;
-  return [startDate, endDate];
-}
 
 /**
  * Builds a deterministic idempotency key for Stripe meter events.
@@ -78,45 +53,6 @@ function buildIdentifier({
   targetTotal: number;
 }): string {
   return `${organizationId}:${billingMonth}:from:${lastReportedTotal}:to:${targetTotal}`;
-}
-
-/**
- * Queries ClickHouse for the count of distinct billable events for an org in a billing month.
- */
-async function queryBillableEventsTotal({
-  organizationId,
-  billingMonth,
-}: {
-  organizationId: string;
-  billingMonth: string;
-}): Promise<number | null> {
-  const client = getClickHouseClient();
-  if (!client) {
-    logger.warn(
-      { organizationId },
-      "ClickHouse not available, skipping usage reporting",
-    );
-    return null;
-  }
-
-  const [startDate, endDate] = billingMonthDateRange(billingMonth);
-
-  const result = await client.query({
-    query: `
-      SELECT countDistinct(DeduplicationKeyHash) as total
-      FROM billable_events
-      WHERE OrganizationId = {organizationId:String}
-        AND EventTimestamp >= {startDate:DateTime64(3)}
-        AND EventTimestamp < {endDate:DateTime64(3)}
-    `,
-    query_params: { organizationId, startDate, endDate },
-    format: "JSONEachRow",
-  });
-
-  const jsonResult = await result.json();
-  const rows = Array.isArray(jsonResult) ? jsonResult : [];
-  const firstRow = rows[0] as { total: string } | undefined;
-  return parseInt(firstRow?.total ?? "0", 10);
 }
 
 /**
@@ -333,6 +269,7 @@ export async function runUsageReportingJob(
 
     if (!org) {
       logger.warn({ organizationId }, "organization not found, skipping");
+      getJobProcessingCounter("usage_reporting", "completed").inc();
       return;
     }
 
@@ -341,6 +278,7 @@ export async function runUsageReportingJob(
         { organizationId },
         "no Stripe customer ID, skipping usage reporting",
       );
+      getJobProcessingCounter("usage_reporting", "completed").inc();
       return;
     }
 
@@ -349,6 +287,7 @@ export async function runUsageReportingJob(
         { organizationId },
         "no active subscription, skipping usage reporting",
       );
+      getJobProcessingCounter("usage_reporting", "completed").inc();
       return;
     }
 
@@ -357,6 +296,7 @@ export async function runUsageReportingJob(
         { organizationId, pricingModel: org.pricingModel },
         "organization not on SEAT_EVENT pricing, skipping usage reporting",
       );
+      getJobProcessingCounter("usage_reporting", "completed").inc();
       return;
     }
 
@@ -463,11 +403,6 @@ export const startUsageReportingWorker = () => {
   usageReportingWorker.on("failed", async (job, err) => {
     logger.error({ jobId: job?.id, error: err.message }, "job failed");
     getJobProcessingCounter("usage_reporting", "failed").inc();
-    await withScope((scope) => {
-      scope.setTag?.("worker", "usageReporting");
-      scope.setExtra?.("job", job?.data);
-      captureException(err);
-    });
   });
 
   logger.info("usage reporting worker registered");

@@ -138,7 +138,7 @@ describe("OTEL traces API stress test", () => {
     }
   });
 
-  test("benchmarks 100 concurrent OTEL trace insertions", async () => {
+  test("benchmarks ${NUMBER_OF_RUNS} trace insertions", async () => {
     const makeApiCall = async (): Promise<number> => {
       const traceIdHex = nanoid(16)
         .split("")
