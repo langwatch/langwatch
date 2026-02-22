@@ -16,6 +16,12 @@ export async function handleSetModelProvider(params: {
 
   const updated = providers[params.provider];
 
+  if (!updated) {
+    throw new Error(
+      `Model provider "${params.provider}" was not found in the response. The provider name may be invalid.`
+    );
+  }
+
   const lines: string[] = [];
   lines.push("Model provider updated successfully!\n");
   lines.push(`**Provider**: ${params.provider}`);
