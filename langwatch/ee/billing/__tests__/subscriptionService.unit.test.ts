@@ -7,6 +7,7 @@ vi.mock("../notifications/notificationHandlers", () => ({
 import { notifySubscriptionEvent } from "../notifications/notificationHandlers";
 import { PlanTypes, SubscriptionStatus } from "../planTypes";
 import { createSubscriptionService } from "../services/subscriptionService";
+import { OrganizationNotFoundError } from "../errors";
 
 const mockNotifySubscriptionEvent = notifySubscriptionEvent as ReturnType<
   typeof vi.fn
@@ -226,6 +227,7 @@ describe("subscriptionService", () => {
       const result = await service.createBillingPortalSession({
         customerId: "cus_123",
         baseUrl: "https://app.test",
+        organizationId: "org_123",
       });
 
       expect(result.url).toBe("https://billing.stripe.com/session");
@@ -286,7 +288,7 @@ describe("subscriptionService", () => {
     });
 
     describe("when organization not found", () => {
-      it("throws an error", async () => {
+      it("throws OrganizationNotFoundError", async () => {
         db.organization.findUnique.mockResolvedValue(null);
 
         await expect(
@@ -295,7 +297,7 @@ describe("subscriptionService", () => {
             plan: PlanTypes.LAUNCH,
             actorEmail: "actor@acme.com",
           }),
-        ).rejects.toThrow("Organization not found");
+        ).rejects.toThrow(OrganizationNotFoundError);
       });
     });
   });
