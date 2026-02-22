@@ -150,6 +150,7 @@ function MembersList({
     refetchInvites: () => void pendingInvites.refetch(),
     pricingModel: (organization as { pricingModel?: string }).pricingModel,
     activePlanFree: activePlan.free,
+    activePlanType: activePlan.type,
   });
 
   const deleteMember = (userId: string) => {

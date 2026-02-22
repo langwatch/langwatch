@@ -12,6 +12,7 @@ import {
 } from "@chakra-ui/react";
 import { Check } from "lucide-react";
 import React from "react";
+import { PricingSummary } from "./PricingSummary";
 
 export function UpgradePlanBlock({
   planName,
@@ -44,21 +45,12 @@ export function UpgradePlanBlock({
                 Upgrade to {planName}
               </Text>
 
-              <Text
-                data-testid="upgrade-total"
-                fontSize="sm"
-                paddingY={4}
-                fontWeight="medium"
-                color="gray.700"
-              >
-                {totalPrice} per {coreMembers} Full Member
-                {coreMembers !== 1 ? "s" : ""}
-              </Text>
-              {monthlyEquivalent && (
-                <Text fontSize="xs" color="gray.500">
-                  ({monthlyEquivalent})
-                </Text>
-              )}
+              <PricingSummary
+                totalPrice={totalPrice}
+                seatCount={coreMembers}
+                perSeatPrice={monthlyEquivalent}
+                totalTestId="upgrade-total"
+              />
             </VStack>
             <Button
               colorPalette="blue"

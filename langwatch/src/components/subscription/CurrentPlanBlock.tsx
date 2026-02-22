@@ -14,10 +14,11 @@ import {
 } from "@chakra-ui/react";
 import { Check } from "lucide-react";
 import { Link } from "~/components/ui/link";
+import { PricingSummary } from "./PricingSummary";
 
 export function CurrentPlanBlock({
   planName,
-  description,
+  pricing,
   features,
   userCount,
   maxSeats,
@@ -28,7 +29,11 @@ export function CurrentPlanBlock({
   deprecatedNotice,
 }: {
   planName: string;
-  description?: string;
+  pricing?: {
+    totalPrice: string;
+    seatCount: number;
+    perSeatPrice?: string | null;
+  };
   features?: string[];
   userCount: number;
   maxSeats?: number;
@@ -75,10 +80,12 @@ export function CurrentPlanBlock({
                   </Badge>
                 )}
               </HStack>
-              {description && (
-                <Text color="gray.500" fontSize="sm">
-                  {description}
-                </Text>
+              {pricing && (
+                <PricingSummary
+                  totalPrice={pricing.totalPrice}
+                  seatCount={pricing.seatCount}
+                  perSeatPrice={pricing.perSeatPrice}
+                />
               )}
             </VStack>
             <VStack align="end" gap={0}>

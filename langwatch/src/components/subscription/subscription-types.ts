@@ -10,7 +10,7 @@ export const isValidEmail = (value: string) => z.string().email().safeParse(valu
 export const countFullMembers = (list: { memberType: MemberType }[]) =>
   list.filter((u) => u.memberType === "FullMember").length;
 export const isSupportedCurrency = (value: unknown): value is Currency =>
-  value === PrismaCurrency.EUR || value === PrismaCurrency.USD;
+  Object.values(PrismaCurrency).includes(value as PrismaCurrency);
 
 /**
  * User representation in the subscription context
@@ -55,6 +55,10 @@ export interface DrawerSaveResult {
 export function formatPlanTypeLabel(planType?: string | null) {
   if (!planType) {
     return "Current plan";
+  }
+
+  if (planType.startsWith("GROWTH_SEAT_")) {
+    return "Growth";
   }
 
   return planType

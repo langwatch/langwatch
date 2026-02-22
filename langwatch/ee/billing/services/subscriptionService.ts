@@ -18,6 +18,7 @@ import {
   OrganizationNotFoundError,
   SeatBillingUnavailableError,
 } from "../errors";
+import { isGrowthSeatEventPlan } from "../utils/growthSeatEvent";
 import type { SeatEventSubscriptionFns } from "./seatEventSubscription";
 
 type ItemCalculator = {
@@ -171,7 +172,7 @@ export const createSubscriptionService = ({
       currency,
       billingInterval,
     }) {
-      if (plan === PlanTypes.GROWTH_SEAT_EVENT && seatEventFns) {
+      if (isGrowthSeatEventPlan(plan) && seatEventFns) {
         const org = await db.organization.findUnique({
           where: { id: organizationId },
           select: { pricingModel: true },

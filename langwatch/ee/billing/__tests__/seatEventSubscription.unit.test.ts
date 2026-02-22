@@ -102,7 +102,7 @@ describe("seatEventSubscriptionFns", () => {
         data: {
           organizationId: "org_1",
           status: "PENDING",
-          plan: "GROWTH_SEAT_EVENT",
+          plan: "GROWTH_SEAT_EUR_MONTHLY",
           maxMembers: 3,
         },
       });
@@ -146,7 +146,7 @@ describe("seatEventSubscriptionFns", () => {
         });
 
         expect(db.subscription.updateMany).toHaveBeenCalledWith({
-          where: { organizationId: "org_1", plan: "GROWTH_SEAT_EVENT", status: "PENDING" },
+          where: { organizationId: "org_1", plan: { in: ["GROWTH_SEAT_EUR_MONTHLY", "GROWTH_SEAT_EUR_ANNUAL", "GROWTH_SEAT_USD_MONTHLY", "GROWTH_SEAT_USD_ANNUAL"] }, status: "PENDING" },
           data: { status: "CANCELLED", endDate: expect.any(Date) },
         });
       });

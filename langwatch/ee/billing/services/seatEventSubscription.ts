@@ -4,7 +4,9 @@ import type Stripe from "stripe";
 import { SubscriptionStatus } from "../planTypes";
 import {
   createCheckoutLineItems,
+  GROWTH_SEAT_PLAN_TYPES,
   isGrowthSeatPrice,
+  resolveGrowthSeatPlanType,
   resolveGrowthSeatPriceId,
 } from "../utils/growthSeatEvent";
 import {
@@ -54,7 +56,7 @@ export const createSeatEventSubscriptionFns = ({
     const staleSubs = await db.subscription.findMany({
       where: {
         organizationId,
-        plan: "GROWTH_SEAT_EVENT",
+        plan: { in: [...GROWTH_SEAT_PLAN_TYPES] },
         status: SubscriptionStatus.PENDING,
       },
       select: { id: true },
@@ -66,7 +68,7 @@ export const createSeatEventSubscriptionFns = ({
     await db.subscription.updateMany({
       where: {
         organizationId,
-        plan: "GROWTH_SEAT_EVENT",
+        plan: { in: [...GROWTH_SEAT_PLAN_TYPES] },
         status: SubscriptionStatus.PENDING,
       },
       data: {
@@ -92,7 +94,7 @@ export const createSeatEventSubscriptionFns = ({
         data: {
           organizationId,
           status: SubscriptionStatus.PENDING,
-          plan: "GROWTH_SEAT_EVENT",
+          plan: resolveGrowthSeatPlanType(currency, billingInterval),
           maxMembers: membersToAdd,
         },
       });
