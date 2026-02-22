@@ -4,8 +4,21 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { PlansComparisonPage } from "../PlansComparisonPage";
+
+vi.mock("~/utils/api", () => ({
+  api: {
+    currency: {
+      detectCurrency: {
+        useQuery: () => ({
+          data: { currency: "EUR" as const },
+          isLoading: false,
+        }),
+      },
+    },
+  },
+}));
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -87,7 +100,7 @@ describe("<PlansComparisonPage/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("$32 per seat/month")).toBeInTheDocument();
+      expect(screen.getByText("€29 per seat/month")).toBeInTheDocument();
       const growthColumn = screen.getByTestId("plan-column-growth");
       expect(
         within(growthColumn).getByRole("link", { name: "Add Members" }),
@@ -181,7 +194,7 @@ describe("<PlansComparisonPage/>", () => {
         within(enterpriseColumn).getByText("Custom pricing"),
       ).toBeInTheDocument();
       expect(
-        within(enterpriseColumn).getByRole("link", { name: "Talk to Sales" }),
+        within(enterpriseColumn).getByRole("link", { name: "Contact Sales" }),
       ).toBeInTheDocument();
       expect(screen.getByText("Custom SSO / RBAC")).toBeInTheDocument();
       expect(screen.getByText("Uptime & Support SLA")).toBeInTheDocument();

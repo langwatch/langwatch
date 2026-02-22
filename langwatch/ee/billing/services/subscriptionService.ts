@@ -18,7 +18,7 @@ import {
   OrganizationNotFoundError,
   SeatBillingUnavailableError,
 } from "../errors";
-import { isGrowthSeatEventPlan } from "../utils/growthSeatEvent";
+import { isGrowthSeatEventPlan, type BillingInterval } from "../utils/growthSeatEvent";
 import type { SeatEventSubscriptionFns } from "./seatEventSubscription";
 
 type ItemCalculator = {
@@ -45,7 +45,7 @@ export type SubscriptionService = {
     tracesToAdd?: number;
     customerId: string;
     currency?: Currency;
-    billingInterval?: "monthly" | "annual";
+    billingInterval?: BillingInterval;
   }): Promise<{ url: string | null }>;
 
   createBillingPortalSession(params: {
@@ -82,7 +82,7 @@ export type SubscriptionService = {
     membersToAdd: number;
     customerId: string;
     currency?: Currency;
-    billingInterval?: "monthly" | "annual";
+    billingInterval?: BillingInterval;
     invites: Array<{ email: string; role: OrganizationUserRole }>;
   }): Promise<{ url: string | null }>;
 };

@@ -22,6 +22,7 @@ import {
 } from "./planCurrentResolver";
 import {
   type Currency,
+  type BillingInterval,
   getGrowthSeatPriceCents,
   formatPrice,
   currencySymbol,
@@ -81,13 +82,13 @@ type PlansComparisonPageProps = {
 function getPlanPrice(
   planId: ComparisonPlanId,
   currency: Currency,
-  billingPeriod: "monthly" | "annually",
+  billingPeriod: BillingInterval,
 ): string {
   if (planId === "free") return `${currencySymbol[currency]}0 per user/month`;
   if (planId === "growth") {
     const p = getGrowthSeatPriceCents();
     const cents =
-      billingPeriod === "annually"
+      billingPeriod === "annual"
         ? Math.round(p[currency].annual / 12)
         : p[currency].monthly;
     return `${formatPrice(cents, currency)} per seat/month`;
@@ -150,7 +151,7 @@ function PlanCard({
   isCurrent: boolean;
   currentPlan: ComparisonPlanId | null;
   currency: Currency;
-  billingPeriod: "monthly" | "annually";
+  billingPeriod: BillingInterval;
 }) {
   return (
     <Card.Root
@@ -221,7 +222,7 @@ export function PlansComparisonPage({
   const detectedCurrency = api.currency.detectCurrency.useQuery({});
   const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(null);
   const currency = selectedCurrency ?? detectedCurrency.data?.currency ?? PrismaCurrency.EUR;
-  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annually">(
+  const [billingPeriod, setBillingPeriod] = useState<BillingInterval>(
     "monthly",
   );
 
@@ -272,7 +273,7 @@ export function PlansComparisonPage({
         >
           {[
             { label: "Monthly", value: "monthly" as const },
-            { label: "Annually", value: "annually" as const },
+            { label: "Annually", value: "annual" as const },
           ].map((opt) => (
             <Box
               key={opt.value}

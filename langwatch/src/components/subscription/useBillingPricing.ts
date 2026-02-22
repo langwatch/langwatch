@@ -1,5 +1,6 @@
 import {
   type Currency,
+  type BillingInterval,
   getGrowthSeatPriceCents,
   formatPrice,
 } from "./billing-plans";
@@ -17,16 +18,16 @@ export function useBillingPricing({
   plannedUsers,
 }: {
   currency: Currency;
-  billingPeriod: "monthly" | "annually";
+  billingPeriod: BillingInterval;
   users: HasMemberType[];
   plannedUsers: HasMemberType[];
 }) {
   const priceCents = getGrowthSeatPriceCents();
   const seatCents =
-    billingPeriod === "annually"
+    billingPeriod === "annual"
       ? priceCents[currency].annual
       : priceCents[currency].monthly;
-  const periodSuffix = billingPeriod === "annually" ? "/yr" : "/mo";
+  const periodSuffix = billingPeriod === "annual" ? "/yr" : "/mo";
 
   const totalFullMembers = countFullMembers(users) + countFullMembers(plannedUsers);
 
@@ -35,7 +36,7 @@ export function useBillingPricing({
     periodSuffix,
     totalFullMembers,
     monthlyEquivalent:
-      billingPeriod === "annually"
+      billingPeriod === "annual"
         ? `${formatPrice(Math.round(seatCents / 12), currency)}/mo per seat`
         : `${formatPrice(seatCents, currency)}/mo per seat`,
   };

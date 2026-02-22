@@ -39,42 +39,6 @@ export const GROWTH_SEAT_PLAN_TYPES = [
 ] as const;
 
 /** Type guard: returns true for any of the four GROWTH_SEAT_* plan types. */
-export const isGrowthSeatEventPlan = (
-  plan: string,
-): plan is (typeof GROWTH_SEAT_PLAN_TYPES)[number] =>
-  GROWTH_SEAT_PLAN_TYPES.includes(plan as (typeof GROWTH_SEAT_PLAN_TYPES)[number]);
-
-/** Builds the plan type string from currency + billing interval. */
-export const resolveGrowthSeatPlanType = ({
-  currency,
-  interval,
-}: {
-  currency: Currency;
-  interval: BillingInterval;
-}): PlanType =>
-  `GROWTH_SEAT_${currency}_${interval.toUpperCase()}` as PlanType;
-
-/** Extracts currency and billing interval from a GROWTH_SEAT plan type. */
-export const parseGrowthSeatPlanType = (
-  plan: string,
-): { currency: Currency; billingInterval: BillingInterval } | null => {
-  const match = plan.match(/^GROWTH_SEAT_(EUR|USD)_(MONTHLY|ANNUAL)$/);
-  if (!match) return null;
-  return {
-    currency: match[1] as Currency,
-    billingInterval: match[2]!.toLowerCase() as BillingInterval,
-  };
-};
-
-/** All GROWTH_SEAT plan type strings. */
-export const GROWTH_SEAT_PLAN_TYPES = [
-  PlanTypes.GROWTH_SEAT_EUR_MONTHLY,
-  PlanTypes.GROWTH_SEAT_EUR_ANNUAL,
-  PlanTypes.GROWTH_SEAT_USD_MONTHLY,
-  PlanTypes.GROWTH_SEAT_USD_ANNUAL,
-] as const;
-
-/** Type guard: returns true for any of the four GROWTH_SEAT_* plan types. */
 export const isGrowthSeatEventPlan = (plan: string): boolean =>
   plan.startsWith("GROWTH_SEAT_");
 

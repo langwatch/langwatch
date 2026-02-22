@@ -20,7 +20,7 @@ import { ChevronDown, Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Drawer } from "~/components/ui/drawer";
 import { type MemberType } from "~/server/license-enforcement/member-classification";
-import { type Currency, formatPrice } from "./billing-plans";
+import { type Currency, type BillingInterval, formatPrice } from "./billing-plans";
 import {
   type PlannedUser,
   type SubscriptionUser,
@@ -49,7 +49,7 @@ export function UserManagementDrawer({
   plannedUsers: PlannedUser[];
   pendingInvitesWithMemberType: PendingInviteWithMemberType[];
   seatPricePerPeriodCents: number;
-  billingPeriod: "monthly" | "annually";
+  billingPeriod: BillingInterval;
   currency: Currency;
   isLoading: boolean;
   onSave: (result: DrawerSaveResult) => void;
@@ -155,8 +155,8 @@ export function UserManagementDrawer({
     countFullMembers(pendingInvitesWithMemberType) +
     countFullMembers(localPlannedUsers);
   const totalPriceCentsInDrawer = totalFullMembersInDrawer * seatPricePerPeriodCents;
-  const periodSuffix = billingPeriod === "annually" ? "/yr" : "/mo";
-  const priceLabel = billingPeriod === "annually" ? "Annual Price:" : "Monthly Price:";
+  const periodSuffix = billingPeriod === "annual" ? "/yr" : "/mo";
+  const priceLabel = billingPeriod === "annual" ? "Annual Price:" : "Monthly Price:";
 
   return (
     <Drawer.Root
