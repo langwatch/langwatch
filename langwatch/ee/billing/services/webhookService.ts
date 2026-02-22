@@ -4,7 +4,7 @@ import { createLogger } from "../../../src/utils/logger";
 import { notifySubscriptionEvent } from "../notifications/notificationHandlers";
 import { PlanTypes, SubscriptionStatus } from "../planTypes";
 import type { calculateQuantityForPrice, prices } from "./subscriptionItemCalculator";
-import { isGrowthEventsPrice, isGrowthSeatPrice } from "../utils/growthSeatEvent";
+import { isGrowthEventsPrice, isGrowthSeatEventPlan, isGrowthSeatPrice } from "../utils/growthSeatEvent";
 import { SubscriptionRecordNotFoundError } from "../errors";
 
 const logger = createLogger("langwatch:billing:webhookService");
@@ -106,7 +106,7 @@ export const createWebhookService = ({
     });
 
     if (previousSubscription.status !== SubscriptionStatus.ACTIVE) {
-      if (updatedSubscription.plan === "GROWTH_SEAT_EVENT") {
+      if (isGrowthSeatEventPlan(updatedSubscription.plan)) {
         const TIERED_PLAN_TYPES: PlanTypes[] = [
           PlanTypes.LAUNCH,
           PlanTypes.ACCELERATE,

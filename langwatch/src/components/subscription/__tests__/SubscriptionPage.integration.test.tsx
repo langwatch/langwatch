@@ -798,7 +798,7 @@ describe("<SubscriptionPage/>", () => {
         // 3 Full Members × €29 = €87/mo
         const total = screen.getByTestId("upgrade-total");
         expect(total).toHaveTextContent("€87/mo");
-        expect(total).toHaveTextContent("3 Full Members");
+        expect(total).toHaveTextContent("3 seats");
       });
     });
 
@@ -845,7 +845,7 @@ describe("<SubscriptionPage/>", () => {
         expect(mockMutateAsync).toHaveBeenCalledWith(
           expect.objectContaining({
             organizationId: "test-org-id",
-            plan: "GROWTH_SEAT_EVENT",
+            plan: "GROWTH_SEAT_EUR_MONTHLY",
             membersToAdd: 3,
           })
         );
@@ -1040,7 +1040,7 @@ describe("<SubscriptionPage/>", () => {
       expect(mockMutateAsync).toHaveBeenCalledWith(
         expect.objectContaining({
           organizationId: "test-org-id",
-          plan: "GROWTH_SEAT_EVENT",
+          plan: "GROWTH",
           upgradeMembers: true,
           upgradeTraces: false,
           totalMembers: 3,
@@ -1311,7 +1311,7 @@ describe("<SubscriptionPage/>", () => {
     });
 
     describe("when clicking Upgrade now", () => {
-      it("calls createSubscription with GROWTH_SEAT_EVENT plan", async () => {
+      it("calls createSubscription with resolved GROWTH_SEAT plan", async () => {
         const user = userEvent.setup();
         const mockMutateAsync = vi.fn().mockResolvedValue({ url: null });
         mockCreateSubscription.mockReturnValue({
@@ -1333,7 +1333,7 @@ describe("<SubscriptionPage/>", () => {
           expect(mockMutateAsync).toHaveBeenCalledWith(
             expect.objectContaining({
               organizationId: "test-org-id",
-              plan: "GROWTH_SEAT_EVENT",
+              plan: "GROWTH_SEAT_EUR_MONTHLY",
             }),
           );
         });
@@ -1831,7 +1831,7 @@ describe("<SubscriptionPage/>", () => {
 
         await waitFor(() => {
           const total = screen.getByTestId("upgrade-total");
-          expect(total).toHaveTextContent("2 Full Members");
+          expect(total).toHaveTextContent("2 seats");
           expect(total).toHaveTextContent("€58/mo");
         });
       });
@@ -1886,7 +1886,129 @@ describe("<SubscriptionPage/>", () => {
 
         // maxMembers(6) + 1 new manual seat = 7, NOT 6 + 3 (which double-counts pending invites)
         const updateBlock = screen.getByTestId("update-seats-block");
-        expect(within(updateBlock).getByText(/7 Full Members/i)).toBeInTheDocument();
+        expect(within(updateBlock).getByText(/7 seats/i)).toBeInTheDocument();
+      });
+    });
+  });
+
+  // ============================================================================
+  // GROWTH_SEAT Plan Type — Billing Interval & Currency from Plan
+  // ============================================================================
+
+  describe("when organization has a GROWTH_SEAT_EUR_ANNUAL plan", () => {
+    beforeEach(() => {
+      mockGetActivePlan.mockReturnValue({
+        data: createMockPlan({
+          type: "GROWTH_SEAT_EUR_ANNUAL",
+          name: "Growth",
+          free: false,
+          maxMembers: 5,
+          maxMembersLite: 9999,
+          maxMessagesPerMonth: 200000,
+          evaluationsCredit: 9999,
+        }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+    });
+
+    it("displays annual price with /yr suffix in plan description", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        const currentBlock = screen.getByTestId("current-plan-block");
+        expect(within(currentBlock).getByText("Growth plan")).toBeInTheDocument();
+        // 5 seats × €320/yr = €1,600/yr
+        expect(within(currentBlock).getByText(/€1,600\/yr/)).toBeInTheDocument();
+      });
+    });
+
+    it("hides billing period toggle and currency selector", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
+      });
+
+      expect(screen.queryByTestId("billing-period-toggle")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("currency-selector")).not.toBeInTheDocument();
+    });
+
+    it("sends correct plan type in seat update mutation", async () => {
+      const user = userEvent.setup();
+      const mockMutateAsync = vi.fn().mockResolvedValue({ success: true });
+      mockAddTeamMemberOrEvents.mockReturnValue({
+        mutate: vi.fn(),
+        mutateAsync: mockMutateAsync,
+        isLoading: false,
+        isPending: false,
+      });
+
+      renderSubscriptionPage();
+
+      await user.click(screen.getByTestId("user-count-link"));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+      await user.click(screen.getByRole("button", { name: /Done/i }));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("update-seats-block")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole("button", { name: /Update subscription/i }));
+
+      const openSeatsCall = mockOpenSeats.mock.calls.at(-1)![0] as { onConfirm: () => Promise<void> };
+      await openSeatsCall.onConfirm();
+
+      expect(mockMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organizationId: "test-org-id",
+          plan: "GROWTH_SEAT_EUR_ANNUAL",
+          totalMembers: 6,
+        })
+      );
+    });
+  });
+
+  describe("when organization has a GROWTH_SEAT_USD_MONTHLY plan", () => {
+    beforeEach(() => {
+      mockGetActivePlan.mockReturnValue({
+        data: createMockPlan({
+          type: "GROWTH_SEAT_USD_MONTHLY",
+          name: "Growth",
+          free: false,
+          maxMembers: 3,
+          maxMembersLite: 9999,
+          maxMessagesPerMonth: 200000,
+          evaluationsCredit: 9999,
+        }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+    });
+
+    it("displays USD monthly price with /mo suffix in plan description", async () => {
+      renderSubscriptionPage();
+
+      await waitFor(() => {
+        const currentBlock = screen.getByTestId("current-plan-block");
+        expect(within(currentBlock).getByText("Growth plan")).toBeInTheDocument();
+        // 3 seats × $32/mo = $96/mo
+        expect(within(currentBlock).getByText(/\$96\/mo/)).toBeInTheDocument();
+      });
+    });
+
+    it("uses USD currency for update-seats pricing", async () => {
+      const user = userEvent.setup();
+      renderSubscriptionPage();
+
+      await user.click(screen.getByTestId("user-count-link"));
+      await user.click(screen.getByRole("button", { name: /Add Seat/i }));
+      await user.click(screen.getByRole("button", { name: /Done/i }));
+
+      await waitFor(() => {
+        const updateBlock = screen.getByTestId("update-seats-block");
+        // maxMembers(3) + 1 planned = 4 seats × $32/mo = $128/mo
+        expect(within(updateBlock).getByText(/\$128\/mo/)).toBeInTheDocument();
       });
     });
   });

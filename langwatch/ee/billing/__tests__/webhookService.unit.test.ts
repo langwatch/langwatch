@@ -148,7 +148,7 @@ describe("webhookService", () => {
           id: "sub_db_1",
           organizationId: "org_123",
           organization: { name: "Acme" },
-          plan: "GROWTH_SEAT_EVENT",
+          plan: "GROWTH_SEAT_USD_MONTHLY",
           startDate: new Date(),
           maxMembers: null,
           maxMessagesPerMonth: null,
@@ -180,7 +180,7 @@ describe("webhookService", () => {
           id: "sub_db_1",
           organizationId: "org_123",
           organization: { name: "Acme" },
-          plan: "GROWTH_SEAT_EVENT",
+          plan: "GROWTH_SEAT_EUR_MONTHLY",
           startDate: new Date(),
           maxMembers: null,
           maxMessagesPerMonth: null,
@@ -323,7 +323,7 @@ describe("webhookService", () => {
   });
 
   describe("handleInvoicePaymentSucceeded()", () => {
-    describe("when GROWTH_SEAT_EVENT sub activates from PENDING", () => {
+    describe("when GROWTH_SEAT plan sub activates from PENDING", () => {
       beforeEach(() => {
         db.subscription.findUnique.mockResolvedValue({
           id: "sub_db_new",
@@ -333,7 +333,7 @@ describe("webhookService", () => {
           id: "sub_db_new",
           organizationId: "org_1",
           organization: { name: "Acme" },
-          plan: "GROWTH_SEAT_EVENT",
+          plan: "GROWTH_SEAT_EUR_MONTHLY",
           startDate: new Date(),
           maxMembers: 5,
           maxMessagesPerMonth: null,

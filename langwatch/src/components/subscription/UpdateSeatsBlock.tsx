@@ -9,6 +9,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { PricingSummary } from "./PricingSummary";
 
 export function UpdateSeatsBlock({
   totalFullMembers,
@@ -37,15 +38,11 @@ export function UpdateSeatsBlock({
             <Text fontWeight="semibold" fontSize="lg">
               Update seats
             </Text>
-            <Text fontSize="sm" color="gray.700">
-              {totalPrice} for {totalFullMembers} Full Member
-              {totalFullMembers !== 1 ? "s" : ""}
-            </Text>
-            {monthlyEquivalent && (
-              <Text fontSize="xs" color="gray.500">
-                ({monthlyEquivalent})
-              </Text>
-            )}
+            <PricingSummary
+              totalPrice={totalPrice}
+              seatCount={totalFullMembers}
+              perSeatPrice={monthlyEquivalent}
+            />
           </VStack>
           <HStack gap={2}>
             <Button

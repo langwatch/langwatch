@@ -62,7 +62,7 @@ describe("<PlansComparisonPage/>", () => {
     it("marks the Growth column as current", () => {
       render(
         <PlansComparisonPage
-          activePlan={{ type: "GROWTH_SEAT_EVENT", free: false }}
+          activePlan={{ type: "GROWTH_SEAT_EUR_MONTHLY", free: false }}
         />,
         { wrapper: Wrapper },
       );
@@ -82,7 +82,7 @@ describe("<PlansComparisonPage/>", () => {
     it("shows seat and usage pricing details", () => {
       render(
         <PlansComparisonPage
-          activePlan={{ type: "GROWTH_SEAT_EVENT", free: false }}
+          activePlan={{ type: "GROWTH_SEAT_EUR_MONTHLY", free: false }}
         />,
         { wrapper: Wrapper },
       );
@@ -157,7 +157,7 @@ describe("<PlansComparisonPage/>", () => {
     it("does not show discontinued pricing notice for SEAT_EVENT organizations", () => {
       render(
         <PlansComparisonPage
-          activePlan={{ type: "GROWTH_SEAT_EVENT", free: false }}
+          activePlan={{ type: "GROWTH_SEAT_EUR_MONTHLY", free: false }}
           pricingModel="SEAT_EVENT"
         />,
         { wrapper: Wrapper },

@@ -23,6 +23,7 @@ export function useInviteActions({
   refetchInvites,
   pricingModel,
   activePlanFree,
+  activePlanType,
 }: {
   organizationId: string;
   isAdmin: boolean;
@@ -34,6 +35,8 @@ export function useInviteActions({
   pricingModel?: string;
   /** Whether the active plan is a free plan (no paid subscription). */
   activePlanFree: boolean;
+  /** The active plan type string (e.g. "GROWTH_SEAT_EUR_MONTHLY"). */
+  activePlanType: string;
 }) {
   const membersEnforcement = useLicenseEnforcement("members");
   const membersLiteEnforcement = useLicenseEnforcement("membersLite");
@@ -226,7 +229,7 @@ export function useInviteActions({
         onConfirm: async () => {
           await expandSeatsMutation.mutateAsync({
             organizationId,
-            plan: "GROWTH_SEAT_EVENT",
+            plan: activePlanType,
             upgradeMembers: true,
             upgradeTraces: false,
             totalMembers: newSeats,

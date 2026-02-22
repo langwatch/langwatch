@@ -66,6 +66,37 @@ export const parseGrowthSeatPlanType = (
   };
 };
 
+/** All GROWTH_SEAT plan type strings. */
+export const GROWTH_SEAT_PLAN_TYPES = [
+  PlanTypes.GROWTH_SEAT_EUR_MONTHLY,
+  PlanTypes.GROWTH_SEAT_EUR_ANNUAL,
+  PlanTypes.GROWTH_SEAT_USD_MONTHLY,
+  PlanTypes.GROWTH_SEAT_USD_ANNUAL,
+] as const;
+
+/** Type guard: returns true for any of the four GROWTH_SEAT_* plan types. */
+export const isGrowthSeatEventPlan = (plan: string): boolean =>
+  plan.startsWith("GROWTH_SEAT_");
+
+/** Builds the plan type string from currency + billing interval. */
+export const resolveGrowthSeatPlanType = (
+  currency: Currency,
+  interval: BillingInterval,
+): PlanType =>
+  `GROWTH_SEAT_${currency}_${interval.toUpperCase()}` as PlanType;
+
+/** Extracts currency and billing interval from a GROWTH_SEAT plan type. */
+export const parseGrowthSeatPlanType = (
+  plan: string,
+): { currency: Currency; billingInterval: BillingInterval } | null => {
+  const match = plan.match(/^GROWTH_SEAT_(EUR|USD)_(MONTHLY|ANNUAL)$/);
+  if (!match) return null;
+  return {
+    currency: match[1] as Currency,
+    billingInterval: match[2]!.toLowerCase() as BillingInterval,
+  };
+};
+
 /** Resolves the Stripe price ID for a Growth seat given currency and interval. */
 export const resolveGrowthSeatPriceId = ({
   currency,

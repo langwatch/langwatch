@@ -1,9 +1,26 @@
+import { PlanTypes } from "@prisma/client";
 import { toaster } from "~/components/ui/toaster";
 import { useUpgradeModalStore } from "../../stores/upgradeModalStore";
 import { api } from "~/utils/api";
 import type { Currency } from "./billing-plans";
 import { type PlannedUser } from "./subscription-types";
 import { type MemberType } from "~/server/license-enforcement/member-classification";
+
+type GrowthSeatPlanType = Extract<PlanTypes, `GROWTH_SEAT_${string}`>;
+
+const GROWTH_SEAT_PLAN_MAP: Record<`${Currency}_${"monthly" | "annually"}`, GrowthSeatPlanType> = {
+  EUR_monthly: PlanTypes.GROWTH_SEAT_EUR_MONTHLY,
+  EUR_annually: PlanTypes.GROWTH_SEAT_EUR_ANNUAL,
+  USD_monthly: PlanTypes.GROWTH_SEAT_USD_MONTHLY,
+  USD_annually: PlanTypes.GROWTH_SEAT_USD_ANNUAL,
+};
+
+function resolveGrowthSeatPlanType(
+  currency: Currency,
+  billingPeriod: "monthly" | "annually",
+): GrowthSeatPlanType {
+  return GROWTH_SEAT_PLAN_MAP[`${currency}_${billingPeriod}`];
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type TRPCRefetchFn = { refetch: () => any };
@@ -21,6 +38,7 @@ export function useSubscriptionActions({
   plannedUsers,
   onSeatsUpdated,
   organizationWithMembers,
+  activePlanType,
 }: {
   organizationId: string | undefined;
   currency: Currency;
@@ -30,6 +48,7 @@ export function useSubscriptionActions({
   plannedUsers: PlannedUser[];
   onSeatsUpdated: () => void;
   organizationWithMembers: TRPCRefetchFn;
+  activePlanType?: string;
 }) {
   const openSeats = useUpgradeModalStore((s) => s.openSeats);
 
@@ -70,7 +89,7 @@ export function useSubscriptionActions({
     const result = await createSubscription.mutateAsync({
       organizationId,
       baseUrl: window.location.origin,
-      plan: "GROWTH_SEAT_EVENT",
+      plan: resolveGrowthSeatPlanType(currency, billingPeriod),
       membersToAdd: totalFullMembers,
       currency,
       billingInterval: billingPeriod === "annually" ? "annual" : "monthly",
@@ -93,7 +112,7 @@ export function useSubscriptionActions({
       onConfirm: async () => {
         await addTeamMemberOrEvents.mutateAsync({
           organizationId,
-          plan: "GROWTH_SEAT_EVENT",
+          plan: (activePlanType as GrowthSeatPlanType) ?? resolveGrowthSeatPlanType(currency, billingPeriod),
           upgradeMembers: true,
           upgradeTraces: false,
           totalMembers: updateTotalMembers,

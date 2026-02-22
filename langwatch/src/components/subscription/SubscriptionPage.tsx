@@ -30,6 +30,7 @@ import {
   type Currency,
   getAnnualDiscountPercent,
   formatPrice,
+  parseGrowthSeatPlanType,
   FREE_PLAN_FEATURES as DEVELOPER_FEATURES,
   GROWTH_FEATURES,
   buildTieredCapabilities,
@@ -42,6 +43,7 @@ import {
   Currency as PrismaCurrency,
   OrganizationUserRole,
   TeamUserRole,
+  PricingModel,
 } from "@prisma/client";
 import {
   formatPlanTypeLabel,
@@ -135,9 +137,17 @@ export function SubscriptionPage() {
 
   const plan = activePlan.data;
   const isDeveloperPlan = plan?.free ?? true;
-  const isTieredPricingModel = organization?.pricingModel === "TIERED";
+  const isTieredPricingModel = organization?.pricingModel === PricingModel.TIERED;
   const isEnterprisePlan = plan?.type === "ENTERPRISE";
   const isTieredLegacyPaidPlan = isTieredPricingModel && !isDeveloperPlan && !isEnterprisePlan;
+
+  const parsedPlan = plan ? parseGrowthSeatPlanType(plan.type) : null;
+  const effectiveBillingPeriod: "monthly" | "annually" = parsedPlan
+    ? (parsedPlan.billingInterval === "annual" ? "annually" : "monthly")
+    : billingPeriod;
+  const effectiveCurrency: Currency = parsedPlan
+    ? parsedPlan.currency
+    : currency;
 
   // Classify and map pending invites to include in billing calculation
   const pendingInvitesWithMemberType = useMemo(() => {
@@ -164,7 +174,7 @@ export function SubscriptionPage() {
     periodSuffix,
     totalFullMembers,
     monthlyEquivalent,
-  } = useBillingPricing({ currency, billingPeriod, users, plannedUsers: allPlannedUsers });
+  } = useBillingPricing({ currency: effectiveCurrency, billingPeriod: effectiveBillingPeriod, users, plannedUsers: allPlannedUsers });
 
   // Free plan allows 1 extra seat beyond active members; paid plan uses plan capacity
   const effectiveMaxSeats = isDeveloperPlan ? 1 : seatUsageM;
@@ -181,7 +191,7 @@ export function SubscriptionPage() {
     : (effectiveMaxSeats ?? totalFullMembers) + newPlannedFullMembers - deletedSeatCount;
 
   const billingPriceCents = billingSeats * seatPricePerPeriodCents;
-  const billingPriceFormatted = `${formatPrice(billingPriceCents, currency)}${periodSuffix}`;
+  const billingPriceFormatted = `${formatPrice(billingPriceCents, effectiveCurrency)}${periodSuffix}`;
 
   const handleDrawerSave = (result: DrawerSaveResult) => {
     // 1. Store new seats for upgrade flow (manually-added only)
@@ -231,8 +241,8 @@ export function SubscriptionPage() {
     isManageLoading,
   } = useSubscriptionActions({
     organizationId: organization?.id,
-    currency,
-    billingPeriod,
+    currency: effectiveCurrency,
+    billingPeriod: effectiveBillingPeriod,
     totalFullMembers: billingSeats,
     currentMaxMembers: seatUsageM ?? undefined,
     plannedUsers,
@@ -243,6 +253,7 @@ export function SubscriptionPage() {
       void pendingInvites.refetch();
     },
     organizationWithMembers,
+    activePlanType: plan?.type,
   });
 
   if (!organization || !plan || detectedCurrency.isLoading) {
@@ -260,11 +271,14 @@ export function SubscriptionPage() {
     : isDeveloperPlan
       ? "Free plan"
       : "Growth plan";
-  const currentPlanDescription = isTieredPricingModel
-    ? undefined
-    : isDeveloperPlan
+  const currentPlanPricing =
+    isTieredPricingModel || isDeveloperPlan
       ? undefined
-      : `${formatPrice(seatPricePerPeriodCents * (plan?.maxMembers ?? 1), currency)}${periodSuffix}`;
+      : {
+          totalPrice: `${formatPrice(seatPricePerPeriodCents * (plan?.maxMembers ?? 1), effectiveCurrency)}${periodSuffix}`,
+          seatCount: plan?.maxMembers ?? 1,
+          perSeatPrice: monthlyEquivalent,
+        };
   const currentPlanFeatures = isTieredLegacyPaidPlan
     ? buildTieredCapabilities({
       maxMembers: plan?.maxMembers ?? 0,
@@ -387,7 +401,7 @@ export function SubscriptionPage() {
         {/* Current Plan Block */}
         <CurrentPlanBlock
           planName={currentPlanName}
-          description={currentPlanDescription}
+          pricing={currentPlanPricing}
           features={currentPlanFeatures}
           userCount={seatUsageN}
           maxSeats={seatUsageM}
@@ -406,9 +420,9 @@ export function SubscriptionPage() {
             planName={
               <>
                 Growth Plan{" "}
-                {billingPeriod === "annually" && (
+                {effectiveBillingPeriod === "annually" && (
                   <Badge colorPalette="green" variant="subtle" fontSize="xs">
-                    Save {getAnnualDiscountPercent(currency)}%
+                    Save {getAnnualDiscountPercent(effectiveCurrency)}%
                   </Badge>
                 )}
               </>
@@ -448,8 +462,8 @@ export function SubscriptionPage() {
         plannedUsers={plannedUsers}
         pendingInvitesWithMemberType={pendingInvitesWithMemberType}
         seatPricePerPeriodCents={seatPricePerPeriodCents}
-        billingPeriod={billingPeriod}
-        currency={currency}
+        billingPeriod={effectiveBillingPeriod}
+        currency={effectiveCurrency}
         isLoading={organizationWithMembers.isLoading}
         onSave={handleDrawerSave}
         maxSeats={effectiveMaxSeats}

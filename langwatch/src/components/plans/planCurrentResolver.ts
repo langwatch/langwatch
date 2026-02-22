@@ -1,11 +1,11 @@
+import { isGrowthSeatEventPlan } from "../../../ee/billing/utils/growthSeatEvent";
+
 export type ComparisonPlanId = "free" | "growth" | "enterprise";
 
 type ActivePlanLike = {
   type?: string | null;
   free?: boolean | null;
 };
-
-const GROWTH_PLAN_TYPES = new Set(["GROWTH", "GROWTH_SEAT_EVENT"]);
 
 export function resolveCurrentComparisonPlan(
   activePlan?: ActivePlanLike,
@@ -20,7 +20,7 @@ export function resolveCurrentComparisonPlan(
     return "free";
   }
 
-  if (normalizedType && GROWTH_PLAN_TYPES.has(normalizedType)) {
+  if (normalizedType === "GROWTH" || (normalizedType && isGrowthSeatEventPlan(normalizedType))) {
     return "growth";
   }
 

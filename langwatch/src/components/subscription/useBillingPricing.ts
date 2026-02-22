@@ -36,7 +36,7 @@ export function useBillingPricing({
     totalFullMembers,
     monthlyEquivalent:
       billingPeriod === "annually"
-        ? `~${formatPrice(Math.round(seatCents / 12), currency)}/seat/mo`
-        : `${formatPrice(seatCents, currency)}/seat/mo`,
+        ? `${formatPrice(Math.round(seatCents / 12), currency)}/mo per seat`
+        : `${formatPrice(seatCents, currency)}/mo per seat`,
   };
 }
