@@ -94,22 +94,32 @@ server.tool(
 
 server.tool(
   "discover_schema",
-  "Discover available filter fields, metrics, aggregation types, group-by options, and scenario schema for LangWatch queries. Call this before using search_traces, get_analytics, or scenario tools to understand available options.",
+  "Discover available filter fields, metrics, aggregation types, group-by options, scenario schema, and evaluator types for LangWatch queries. Call this before using search_traces, get_analytics, scenario tools, or evaluator tools to understand available options.",
   {
     category: z
-      .enum(["filters", "metrics", "aggregations", "groups", "scenarios", "all"])
+      .enum(["filters", "metrics", "aggregations", "groups", "scenarios", "evaluators", "all"])
       .describe("Which schema category to discover"),
+    evaluatorType: z
+      .string()
+      .optional()
+      .describe("When category is 'evaluators', provide a specific evaluator type (e.g. 'langevals/llm_judge') to get its full schema details"),
   },
-  async ({ category }) => {
+  async ({ category, evaluatorType }) => {
     if (category === "scenarios") {
       const { formatScenarioSchema } = await import("./tools/discover-scenario-schema.js");
       return { content: [{ type: "text", text: formatScenarioSchema() }] };
+    }
+    if (category === "evaluators") {
+      const { formatEvaluatorSchema } = await import("./tools/discover-evaluator-schema.js");
+      return { content: [{ type: "text", text: formatEvaluatorSchema(evaluatorType) }] };
     }
     const { formatSchema } = await import("./tools/discover-schema.js");
     let text = formatSchema(category);
     if (category === "all") {
       const { formatScenarioSchema } = await import("./tools/discover-scenario-schema.js");
       text += "\n\n" + formatScenarioSchema();
+      const { formatEvaluatorSchema } = await import("./tools/discover-evaluator-schema.js");
+      text += "\n\n" + formatEvaluatorSchema();
     }
     return { content: [{ type: "text", text }] };
   }
@@ -469,6 +479,143 @@ server.tool(
     );
     return {
       content: [{ type: "text", text: await handleArchiveScenario(params) }],
+    };
+  }
+);
+
+// --- Platform Evaluator Tools (require API key) ---
+// These tools manage evaluators on the LangWatch platform via API.
+
+server.tool(
+  "platform_create_evaluator",
+  `Create an evaluator on the LangWatch platform. Useful for setting up LLM-as-judge and other evaluators to use in evaluation notebooks. Call discover_schema({ category: 'evaluators' }) first to see available evaluator types and their settings.`,
+  {
+    name: z.string().describe("Evaluator name"),
+    config: z
+      .record(z.unknown())
+      .describe(
+        'Evaluator config object. Must include "evaluatorType" (e.g. "langevals/llm_boolean") and optional "settings" overrides.'
+      ),
+  },
+  async (params) => {
+    const { requireApiKey } = await import("./config.js");
+    requireApiKey();
+    const { handleCreateEvaluator } = await import(
+      "./tools/create-evaluator.js"
+    );
+    return {
+      content: [{ type: "text", text: await handleCreateEvaluator(params) }],
+    };
+  }
+);
+
+server.tool(
+  "platform_list_evaluators",
+  "List all evaluators configured on the LangWatch platform.",
+  {},
+  async () => {
+    const { requireApiKey } = await import("./config.js");
+    requireApiKey();
+    const { handleListEvaluators } = await import(
+      "./tools/list-evaluators.js"
+    );
+    return {
+      content: [{ type: "text", text: await handleListEvaluators() }],
+    };
+  }
+);
+
+server.tool(
+  "platform_get_evaluator",
+  "Get full details of an evaluator on the LangWatch platform by ID or slug, including config, input fields, and output fields.",
+  {
+    idOrSlug: z.string().describe("The evaluator ID or slug to retrieve"),
+  },
+  async (params) => {
+    const { requireApiKey } = await import("./config.js");
+    requireApiKey();
+    const { handleGetEvaluator } = await import("./tools/get-evaluator.js");
+    return {
+      content: [{ type: "text", text: await handleGetEvaluator(params) }],
+    };
+  }
+);
+
+server.tool(
+  "platform_update_evaluator",
+  "Update an existing evaluator on the LangWatch platform. The evaluatorType in config cannot be changed after creation.",
+  {
+    evaluatorId: z.string().describe("The evaluator ID to update"),
+    name: z.string().optional().describe("Updated evaluator name"),
+    config: z
+      .record(z.unknown())
+      .optional()
+      .describe(
+        "Updated config settings. Note: evaluatorType cannot be changed after creation."
+      ),
+  },
+  async (params) => {
+    const { requireApiKey } = await import("./config.js");
+    requireApiKey();
+    const { handleUpdateEvaluator } = await import(
+      "./tools/update-evaluator.js"
+    );
+    return {
+      content: [{ type: "text", text: await handleUpdateEvaluator(params) }],
+    };
+  }
+);
+
+// --- Platform Model Provider Tools (require API key) ---
+// These tools manage model provider API keys on the LangWatch platform.
+
+server.tool(
+  "platform_set_model_provider",
+  `Set or update a model provider on the LangWatch platform. Use this to configure API keys (e.g. OPENAI_API_KEY) needed to run evaluators. The API key is stored securely and never returned in responses. Omit customKeys to update other settings without changing existing keys.`,
+  {
+    provider: z
+      .string()
+      .describe(
+        'Provider name, e.g., "openai", "anthropic", "azure", "custom"'
+      ),
+    enabled: z.boolean().describe("Whether the provider is enabled"),
+    customKeys: z
+      .record(z.unknown())
+      .optional()
+      .describe(
+        'API key configuration, e.g. { "OPENAI_API_KEY": "sk-..." }. Omit to keep existing keys.'
+      ),
+    defaultModel: z
+      .string()
+      .optional()
+      .describe("Set as project default model"),
+  },
+  async (params) => {
+    const { requireApiKey } = await import("./config.js");
+    requireApiKey();
+    const { handleSetModelProvider } = await import(
+      "./tools/set-model-provider.js"
+    );
+    return {
+      content: [
+        { type: "text", text: await handleSetModelProvider(params) },
+      ],
+    };
+  }
+);
+
+server.tool(
+  "platform_list_model_providers",
+  "List all model providers configured on the LangWatch platform. API keys are masked in the response.",
+  {},
+  async () => {
+    const { requireApiKey } = await import("./config.js");
+    requireApiKey();
+    const { handleListModelProviders } = await import(
+      "./tools/list-model-providers.js"
+    );
+    return {
+      content: [{ type: "text", text: await handleListModelProviders() }],
     };
   }
 );
