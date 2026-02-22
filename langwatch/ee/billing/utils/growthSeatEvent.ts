@@ -27,7 +27,7 @@ export const isGrowthSeatPrice = (priceId: string): boolean =>
 export const isGrowthEventsPrice = (priceId: string): boolean =>
   GROWTH_EVENTS_PRICE_IDS.has(priceId);
 
-type BillingInterval = "monthly" | "annual";
+export type BillingInterval = "monthly" | "annual";
 
 /** All GROWTH_SEAT plan type strings. */
 export const GROWTH_SEAT_PLAN_TYPES = [

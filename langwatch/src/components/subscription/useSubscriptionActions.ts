@@ -2,22 +2,22 @@ import { PlanTypes } from "@prisma/client";
 import { toaster } from "~/components/ui/toaster";
 import { useUpgradeModalStore } from "../../stores/upgradeModalStore";
 import { api } from "~/utils/api";
-import type { Currency } from "./billing-plans";
+import type { Currency, BillingInterval } from "./billing-plans";
 import { type PlannedUser } from "./subscription-types";
 import { type MemberType } from "~/server/license-enforcement/member-classification";
 
 type GrowthSeatPlanType = Extract<PlanTypes, `GROWTH_SEAT_${string}`>;
 
-const GROWTH_SEAT_PLAN_MAP: Record<`${Currency}_${"monthly" | "annually"}`, GrowthSeatPlanType> = {
+const GROWTH_SEAT_PLAN_MAP: Record<`${Currency}_${BillingInterval}`, GrowthSeatPlanType> = {
   EUR_monthly: PlanTypes.GROWTH_SEAT_EUR_MONTHLY,
-  EUR_annually: PlanTypes.GROWTH_SEAT_EUR_ANNUAL,
+  EUR_annual: PlanTypes.GROWTH_SEAT_EUR_ANNUAL,
   USD_monthly: PlanTypes.GROWTH_SEAT_USD_MONTHLY,
-  USD_annually: PlanTypes.GROWTH_SEAT_USD_ANNUAL,
+  USD_annual: PlanTypes.GROWTH_SEAT_USD_ANNUAL,
 };
 
 function resolveGrowthSeatPlanType(
   currency: Currency,
-  billingPeriod: "monthly" | "annually",
+  billingPeriod: BillingInterval,
 ): GrowthSeatPlanType {
   return GROWTH_SEAT_PLAN_MAP[`${currency}_${billingPeriod}`];
 }
@@ -42,7 +42,7 @@ export function useSubscriptionActions({
 }: {
   organizationId: string | undefined;
   currency: Currency;
-  billingPeriod: "monthly" | "annually";
+  billingPeriod: BillingInterval;
   totalFullMembers: number;
   currentMaxMembers?: number;
   plannedUsers: PlannedUser[];
@@ -74,7 +74,7 @@ export function useSubscriptionActions({
         organizationId,
         baseUrl: window.location.origin,
         currency,
-        billingInterval: billingPeriod === "annually" ? "annual" : "monthly",
+        billingInterval: billingPeriod,
         totalSeats: totalFullMembers,
         invites: invitesWithEmail,
       });
@@ -92,7 +92,7 @@ export function useSubscriptionActions({
       plan: resolveGrowthSeatPlanType(currency, billingPeriod),
       membersToAdd: totalFullMembers,
       currency,
-      billingInterval: billingPeriod === "annually" ? "annual" : "monthly",
+      billingInterval: billingPeriod,
     });
 
     if (result.url) {

@@ -28,6 +28,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import {
   type Currency,
+  type BillingInterval,
   getAnnualDiscountPercent,
   formatPrice,
   parseGrowthSeatPlanType,
@@ -73,7 +74,7 @@ export function SubscriptionPage() {
   const [plannedUsers, setPlannedUsers] = useState<PlannedUser[]>([]);
   const [deletedSeatCount, setDeletedSeatCount] = useState(0);
   const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(null);
-  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annually">(
+  const [billingPeriod, setBillingPeriod] = useState<BillingInterval>(
     "monthly",
   );
   const [showSuccess, setShowSuccess] = useState(false);
@@ -142,8 +143,8 @@ export function SubscriptionPage() {
   const isTieredLegacyPaidPlan = isTieredPricingModel && !isDeveloperPlan && !isEnterprisePlan;
 
   const parsedPlan = plan ? parseGrowthSeatPlanType(plan.type) : null;
-  const effectiveBillingPeriod: "monthly" | "annually" = parsedPlan
-    ? (parsedPlan.billingInterval === "annual" ? "annually" : "monthly")
+  const effectiveBillingPeriod: BillingInterval = parsedPlan
+    ? parsedPlan.billingInterval
     : billingPeriod;
   const effectiveCurrency: Currency = parsedPlan
     ? parsedPlan.currency
@@ -334,7 +335,7 @@ export function SubscriptionPage() {
                 <LabeledSwitch
                   data-testid="billing-period-toggle"
                   left={{ label: "Monthly", value: "monthly" }}
-                  right={{ label: "Annually", value: "annually" }}
+                  right={{ label: "Annually", value: "annual" }}
                   value={billingPeriod}
                   onChange={setBillingPeriod}
                 />
@@ -420,7 +421,7 @@ export function SubscriptionPage() {
             planName={
               <>
                 Growth Plan{" "}
-                {effectiveBillingPeriod === "annually" && (
+                {effectiveBillingPeriod === "annual" && (
                   <Badge colorPalette="green" variant="subtle" fontSize="xs">
                     Save {getAnnualDiscountPercent(effectiveCurrency)}%
                   </Badge>

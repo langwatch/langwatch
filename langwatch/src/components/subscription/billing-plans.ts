@@ -15,6 +15,7 @@ export {
   formatPrice,
 } from "../../../ee/billing/pricing";
 export { parseGrowthSeatPlanType } from "../../../ee/billing/utils/growthSeatEvent";
+export type { BillingInterval } from "../../../ee/billing/utils/growthSeatEvent";
 
 export const currencySymbol: Record<Currency, string> = {
   [Currency.EUR]: "\u20AC",

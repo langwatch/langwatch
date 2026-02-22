@@ -13,8 +13,7 @@ import {
   NoActiveSubscriptionError,
   SubscriptionItemNotFoundError,
 } from "../errors";
-
-type BillingInterval = "monthly" | "annual";
+import type { BillingInterval } from "../utils/growthSeatEvent";
 
 type InviteInput = {
   email: string;
