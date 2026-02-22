@@ -238,7 +238,7 @@ describe("orgBillableEventsMeterStore", () => {
         "../orgBillableEventsMeter.store"
       );
       // Clear org cache to ensure fresh lookup
-      const { clearOrgCache } = await import("../resolveOrganizationId");
+      const { clearOrgCache } = await import("~/server/organizations/resolveOrganizationId");
       clearOrgCache();
 
       await orgBillableEventsMeterStore.append(
@@ -313,7 +313,7 @@ describe("orgBillableEventsMeterStore", () => {
       const { orgBillableEventsMeterStore } = await import(
         "../orgBillableEventsMeter.store"
       );
-      const { clearOrgCache } = await import("../resolveOrganizationId");
+      const { clearOrgCache } = await import("~/server/organizations/resolveOrganizationId");
       clearOrgCache();
 
       await expect(
@@ -345,7 +345,7 @@ describe("orgBillableEventsMeterStore", () => {
       const { orgBillableEventsMeterStore } = await import(
         "../orgBillableEventsMeter.store"
       );
-      const { clearOrgCache } = await import("../resolveOrganizationId");
+      const { clearOrgCache } = await import("~/server/organizations/resolveOrganizationId");
       clearOrgCache();
 
       await orgBillableEventsMeterStore.append(

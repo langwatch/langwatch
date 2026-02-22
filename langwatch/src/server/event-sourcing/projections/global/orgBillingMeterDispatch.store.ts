@@ -6,7 +6,7 @@ import type { OrgBillingMeterDispatchRecord } from "./orgBillingMeterDispatch.ma
 import {
   resolveOrganizationId,
   clearOrgCache,
-} from "./resolveOrganizationId";
+} from "~/server/organizations/resolveOrganizationId";
 
 const logger = createLogger("langwatch:billing:meterDispatch");
 
@@ -44,14 +44,21 @@ export const orgBillingMeterDispatchStore: AppendStore<OrgBillingMeterDispatchRe
         return;
       }
 
-      await usageReportingQueue.add(
-        USAGE_REPORTING_QUEUE.JOB,
-        { organizationId },
-        {
-          jobId: `usage_report_${organizationId}`,
-          delay: FIVE_MINUTES_MS,
-        },
-      );
+      try {
+        await usageReportingQueue.add(
+          USAGE_REPORTING_QUEUE.JOB,
+          { organizationId },
+          {
+            jobId: `usage_report_${organizationId}`,
+            delay: FIVE_MINUTES_MS,
+          },
+        );
+      } catch (error) {
+        logger.warn(
+          { organizationId, error },
+          "failed to enqueue usage reporting job, events are safe in ClickHouse",
+        );
+      }
     },
   };
 

@@ -8,8 +8,6 @@ import { createLogger } from "../../../utils/logger/server";
 import { connection } from "../../redis";
 import { USAGE_REPORTING_QUEUE } from "./constants";
 
-export { USAGE_REPORTING_QUEUE } from "./constants";
-
 const logger = createLogger("langwatch:usageReportingQueue");
 
 function createUsageReportingQueue(): Queue<

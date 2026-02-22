@@ -1,5 +1,5 @@
 /**
- * Integration tests for the usage reporting worker.
+ * Unit tests for the usage reporting worker.
  *
  * Mocks boundaries: Prisma, ClickHouse, Stripe UsageReportingService,
  * BullMQ queue, env.IS_SAAS, metrics, and error capture.
@@ -366,7 +366,7 @@ describe("runUsageReportingJob", () => {
 
       expect(mockClickHouseQuery).toHaveBeenCalledWith(
         expect.objectContaining({
-          query: expect.stringContaining("countDistinct(DeduplicationKey)"),
+          query: expect.stringContaining("countDistinct(DeduplicationKeyHash)"),
           query_params: expect.objectContaining({
             organizationId: "org-1",
           }),

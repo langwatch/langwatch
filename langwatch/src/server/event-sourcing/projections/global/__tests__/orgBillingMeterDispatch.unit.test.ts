@@ -1,5 +1,5 @@
 /**
- * Integration tests for the billing meter dispatch store.
+ * Unit tests for the billing meter dispatch store.
  *
  * Mocks boundaries: Prisma (project lookup), BullMQ queue, and logger.
  *
