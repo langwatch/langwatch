@@ -37,12 +37,6 @@ export default defineConfig({
     fileParallelism: false,
     // NOTE: BUILD_TIME is NOT set for integration tests because we need real Redis/ClickHouse connections.
     // The setup.ts file handles setting the correct URLs from globalSetup.
-    env: {
-      // Skip t3-oss/env-nextjs validation for jsdom-based component integration tests.
-      // Without this, importing any server module from a jsdom test throws
-      // "Attempted to access a server-side environment variable on the client".
-      SKIP_ENV_VALIDATION: "1",
-    },
   },
   esbuild: {
     jsx: "automatic",
