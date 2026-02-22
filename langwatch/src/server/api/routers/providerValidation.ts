@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { providerDefaultBaseUrls } from "../../../features/onboarding/regions/model-providers/registry";
 import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
+import { ModelProviderRepository } from "../../modelProviders/modelProvider.repository";
 import { modelProviders } from "../../modelProviders/registry";
 
 /** Validation result returned by all validation functions */
@@ -208,11 +209,9 @@ export async function validateKeyWithCustomUrl(
   const apiKeyField = providerDef.apiKey;
   const endpointField = providerDef.endpointKey;
 
-  // Try to get stored API key from DB
-  const storedProvider = await prisma.modelProvider.findFirst({
-    where: { projectId, provider },
-    select: { customKeys: true },
-  });
+  // Try to get stored API key from DB (decrypted by repository)
+  const repository = new ModelProviderRepository(prisma);
+  const storedProvider = await repository.findByProvider(provider, projectId);
 
   const storedKeys = storedProvider?.customKeys as Record<
     string,

@@ -1,12 +1,7 @@
 import { z } from "zod";
 import { dependencies } from "../../../injection/dependencies.server";
-import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
 import { prisma } from "../../db";
-import type { CustomModelEntry } from "../../modelProviders/customModel.schema";
-import {
-  customModelUpdateInputSchema,
-  toLegacyCompatibleCustomModels,
-} from "../../modelProviders/customModel.schema";
+import { customModelUpdateInputSchema } from "../../modelProviders/customModel.schema";
 import type {
   LLMModelEntry,
   ReasoningConfig,
@@ -16,7 +11,6 @@ import { ModelProviderService } from "../../modelProviders/modelProvider.service
 import {
   getAllModels,
   getParameterConstraints,
-  getProviderModelOptions,
   type MaybeStoredModelProvider,
   modelProviders,
   type ParameterConstraints,
@@ -124,16 +118,8 @@ export const modelProviderRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("project:delete"))
     .mutation(async ({ input, ctx }) => {
-      const { id, projectId, provider } = input;
-      if (id) {
-        return await ctx.prisma.modelProvider.delete({
-          where: { id, projectId },
-        });
-      } else {
-        return await ctx.prisma.modelProvider.deleteMany({
-          where: { provider, projectId },
-        });
-      }
+      const service = ModelProviderService.create(ctx.prisma);
+      return await service.deleteModelProvider(input);
     }),
 
   /**
@@ -182,121 +168,8 @@ export const getProjectModelProviders = async (
   projectId: string,
   includeKeys = true,
 ) => {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-  });
-
-  if (!project) {
-    throw new Error("Project not found");
-  }
-
-  const defaultModelProviders: Record<string, MaybeStoredModelProvider> =
-    Object.fromEntries(
-      Object.entries(modelProviders)
-        .filter(([_providerKey, modelProvider]) => {
-          return modelProvider.enabledSince;
-        })
-        .map(([providerKey, modelProvider]) => {
-          const enabled =
-            modelProvider.enabledSince < project.createdAt &&
-            !!process.env[modelProvider.apiKey] &&
-            (providerKey !== "vertex_ai" || !!process.env.VERTEXAI_PROJECT);
-
-          const modelProvider_: MaybeStoredModelProvider = {
-            provider: providerKey,
-            enabled,
-            disabledByDefault: !enabled,
-            customKeys: null,
-            models: getProviderModelOptions(providerKey, "chat").map(
-              (m) => m.value,
-            ),
-            embeddingsModels: getProviderModelOptions(
-              providerKey,
-              "embedding",
-            ).map((m) => m.value),
-            deploymentMapping: null,
-            extraHeaders: [],
-          };
-          return [providerKey, modelProvider_];
-        }),
-    );
-
-  const savedModelProviders = (
-    await prisma.modelProvider.findMany({
-      where: { projectId },
-    })
-  )
-    .filter((modelProvider) => {
-      // Keep if has custom keys
-      if (modelProvider.customKeys) return true;
-
-      // Keep if enabled status differs from default
-      const defaultProvider = defaultModelProviders[modelProvider.provider];
-      if (modelProvider.enabled !== defaultProvider?.enabled) return true;
-
-      // Keep if has custom models or embeddings (works for both string[] and object[])
-      const customModels = modelProvider.customModels as unknown[] | null;
-      const customEmbeddings = modelProvider.customEmbeddingsModels as
-        | unknown[]
-        | null;
-      const hasCustomModels = customModels && customModels.length > 0;
-      const hasCustomEmbeddings =
-        customEmbeddings && customEmbeddings.length > 0;
-
-      return hasCustomModels || hasCustomEmbeddings;
-    })
-    .reduce(
-      (acc, modelProvider) => {
-        // Always use registry models for models/embeddingsModels
-        const defaultProvider =
-          defaultModelProviders[modelProvider.provider];
-
-        // Convert DB custom models (may be legacy string[] or new object[])
-        const customModels = toLegacyCompatibleCustomModels(
-          modelProvider.customModels,
-          "chat",
-        );
-        const customEmbeddingsModels = toLegacyCompatibleCustomModels(
-          modelProvider.customEmbeddingsModels,
-          "embedding",
-        );
-
-        const modelProvider_: MaybeStoredModelProvider = {
-          id: modelProvider.id,
-          provider: modelProvider.provider,
-          enabled: modelProvider.enabled,
-          customKeys: modelProvider.customKeys,
-          models: defaultProvider?.models ?? null,
-          embeddingsModels: defaultProvider?.embeddingsModels ?? null,
-          customModels:
-            customModels.length > 0 ? customModels : null,
-          customEmbeddingsModels:
-            customEmbeddingsModels.length > 0
-              ? customEmbeddingsModels
-              : null,
-          deploymentMapping: modelProvider.deploymentMapping,
-          disabledByDefault: defaultProvider?.disabledByDefault,
-          extraHeaders: modelProvider.extraHeaders as
-            | { key: string; value: string }[]
-            | null,
-        };
-
-        if (!includeKeys) {
-          modelProvider_.customKeys = null;
-        }
-
-        return {
-          ...acc,
-          [modelProvider.provider]: modelProvider_,
-        };
-      },
-      {} as Record<string, MaybeStoredModelProvider>,
-    );
-
-  return {
-    ...defaultModelProviders,
-    ...savedModelProviders,
-  };
+  const service = ModelProviderService.create(prisma);
+  return await service.getProjectModelProviders(projectId, includeKeys);
 };
 
 /**
@@ -372,31 +245,11 @@ export const getProjectModelProvidersForFrontend = async (
   projectId: string,
   includeKeys = true,
 ) => {
-  const modelProvidersData = await getProjectModelProviders(
+  const service = ModelProviderService.create(prisma);
+  const maskedProviders = await service.getProjectModelProvidersForFrontend(
     projectId,
     includeKeys,
   );
-
-  // Mask only API keys, keep URLs visible
-  const maskedProviders = { ...modelProvidersData };
-  if (includeKeys) {
-    for (const [provider, config] of Object.entries(maskedProviders)) {
-      if (config.customKeys) {
-        maskedProviders[provider] = {
-          ...config,
-          customKeys: Object.fromEntries(
-            Object.entries(config.customKeys).map(([key, value]) => [
-              key,
-              // Only mask values that look like API keys (contain "_KEY" pattern)
-              KEY_CHECK.some((k) => key.includes(k))
-                ? MASKED_KEY_PLACEHOLDER
-                : value,
-            ]),
-          ),
-        };
-      }
-    }
-  }
 
   // Include model metadata for all models, merged with custom model entries
   const registryMetadata = getModelMetadataForFrontend();

@@ -1,7 +1,6 @@
-import type { Prisma, PrismaClient, Project } from "@prisma/client";
-import { generate } from "@langwatch/ksuid";
+import type { PrismaClient, Project } from "@prisma/client";
 import { z } from "zod";
-import { KEY_CHECK, KSUID_RESOURCES, MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
+import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
 import type { CustomModelsInput } from "./customModel.schema";
 import { toLegacyCompatibleCustomModels } from "./customModel.schema";
 import { ModelProviderRepository } from "./modelProvider.repository";
@@ -424,19 +423,20 @@ export class ModelProviderService {
       );
     }
 
-    return await tx.modelProvider.update({
-      where: { id: existingProvider.id, projectId: data.projectId },
-      data: {
+    return await this.repository.update(
+      existingProvider.id,
+      data.projectId,
+      {
         enabled: data.enabled,
-        customModels: data.customModels as Prisma.InputJsonValue,
-        customEmbeddingsModels:
-          data.customEmbeddingsModels as Prisma.InputJsonValue,
+        customModels: data.customModels,
+        customEmbeddingsModels: data.customEmbeddingsModels,
         extraHeaders: data.extraHeaders,
         ...(customKeysToSave !== undefined && {
-          customKeys: customKeysToSave as Prisma.InputJsonValue,
+          customKeys: customKeysToSave,
         }),
       },
-    });
+      tx,
+    );
   }
 
   private async createNew(
@@ -452,20 +452,19 @@ export class ModelProviderService {
     customKeysProvided: boolean,
     tx: Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0],
   ) {
-    return await tx.modelProvider.create({
-      data: {
-        id: generate(KSUID_RESOURCES.MODEL_PROVIDER).toString(),
+    return await this.repository.create(
+      {
         projectId: data.projectId,
         provider: data.provider,
         enabled: data.enabled,
-        customModels: (data.customModels ?? []) as Prisma.InputJsonValue,
-        customEmbeddingsModels:
-          (data.customEmbeddingsModels ?? []) as Prisma.InputJsonValue,
+        customModels: data.customModels,
+        customEmbeddingsModels: data.customEmbeddingsModels,
         extraHeaders: data.extraHeaders,
         ...(customKeysProvided &&
           validatedKeys && { customKeys: validatedKeys }),
-      } as Parameters<typeof tx.modelProvider.create>[0]["data"],
-    });
+      },
+      tx,
+    );
   }
 
   /**
