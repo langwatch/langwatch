@@ -7,7 +7,6 @@ import {
   GROWTH_SEAT_PLAN_TYPES,
   isGrowthSeatPrice,
   resolveGrowthSeatPlanType,
-  resolveGrowthSeatPriceId,
 } from "../utils/growthSeatEvent";
 import {
   NoActiveSubscriptionError,
@@ -141,25 +140,22 @@ export const createSeatEventSubscriptionFns = ({
       selectedBillingInterval: billingInterval,
     };
 
-    // Annual: charge full year immediately, no anchor needed.
-    // Monthly: anchor billing cycle to 1st of next month with prorations.
+    // Anchor billing cycle to the 1st of next month for all plans.
+    // Customer pays prorated amount for the partial period (checkout → anchor),
+    // then full price (monthly or annual) starting on the 1st.
+    const now = new Date();
+    const billingCycleAnchor = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
+    );
     const subscriptionData: Stripe.Checkout.SessionCreateParams["subscription_data"] =
-      billingInterval === "annual"
-        ? { metadata: selectedOptionsMetadata }
-        : (() => {
-            const now = new Date();
-            const billingCycleAnchor = new Date(
-              Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
-            );
-            return {
-              metadata: selectedOptionsMetadata,
-              billing_cycle_anchor: Math.floor(
-                billingCycleAnchor.getTime() / 1000,
-              ),
-              proration_behavior:
-                "create_prorations" as Stripe.Checkout.SessionCreateParams.SubscriptionData.ProrationBehavior,
-            };
-          })();
+      {
+        metadata: selectedOptionsMetadata,
+        billing_cycle_anchor: Math.floor(
+          billingCycleAnchor.getTime() / 1000,
+        ),
+        proration_behavior:
+          "create_prorations" as Stripe.Checkout.SessionCreateParams.SubscriptionData.ProrationBehavior,
+      };
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",

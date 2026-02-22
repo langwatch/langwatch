@@ -32,6 +32,7 @@ import {
   getAnnualDiscountPercent,
   formatPrice,
   parseGrowthSeatPlanType,
+  isAnnualTieredPlan,
   FREE_PLAN_FEATURES as DEVELOPER_FEATURES,
   GROWTH_FEATURES,
   buildTieredCapabilities,
@@ -142,6 +143,12 @@ export function SubscriptionPage() {
   const isEnterprisePlan = plan?.type === "ENTERPRISE";
   const isTieredLegacyPaidPlan = isTieredPricingModel && !isDeveloperPlan && !isEnterprisePlan;
 
+  useEffect(() => {
+    if (isTieredLegacyPaidPlan && plan && isAnnualTieredPlan(plan.type)) {
+      setBillingPeriod("annual");
+    }
+  }, [isTieredLegacyPaidPlan, plan?.type]);
+
   const parsedPlan = plan ? parseGrowthSeatPlanType(plan.type) : null;
   const effectiveBillingPeriod: BillingInterval = parsedPlan
     ? parsedPlan.billingInterval
@@ -191,8 +198,16 @@ export function SubscriptionPage() {
       )
     : (effectiveMaxSeats ?? totalFullMembers) + newPlannedFullMembers - deletedSeatCount;
 
+  // For tiered legacy plans upgrading to seat-based, use actual member count
+  // (not the old plan's maxMembers capacity which is irrelevant for the new model)
+  const upgradeBillingSeats = isTieredLegacyPaidPlan
+    ? Math.max(1, totalFullMembers)
+    : billingSeats;
+
   const billingPriceCents = billingSeats * seatPricePerPeriodCents;
   const billingPriceFormatted = `${formatPrice(billingPriceCents, effectiveCurrency)}${periodSuffix}`;
+  const upgradeBillingPriceCents = upgradeBillingSeats * seatPricePerPeriodCents;
+  const upgradeBillingPriceFormatted = `${formatPrice(upgradeBillingPriceCents, effectiveCurrency)}${periodSuffix}`;
 
   const handleDrawerSave = (result: DrawerSaveResult) => {
     // 1. Store new seats for upgrade flow (manually-added only)
@@ -244,7 +259,7 @@ export function SubscriptionPage() {
     organizationId: organization?.id,
     currency: effectiveCurrency,
     billingPeriod: effectiveBillingPeriod,
-    totalFullMembers: billingSeats,
+    totalFullMembers: upgradeBillingSeats,
     currentMaxMembers: seatUsageM ?? undefined,
     plannedUsers,
     onSeatsUpdated: () => {
@@ -330,7 +345,7 @@ export function SubscriptionPage() {
             </Text>
           </VStack>
           <HStack gap={4} alignItems="center">
-            {isDeveloperPlan && (
+            {(isDeveloperPlan || isTieredLegacyPaidPlan) && (
               <>
                 <LabeledSwitch
                   data-testid="billing-period-toggle"
@@ -428,8 +443,8 @@ export function SubscriptionPage() {
                 )}
               </>
             }
-            totalPrice={billingPriceFormatted}
-            coreMembers={billingSeats}
+            totalPrice={upgradeBillingPriceFormatted}
+            coreMembers={upgradeBillingSeats}
             features={GROWTH_FEATURES}
             monthlyEquivalent={monthlyEquivalent}
             onUpgrade={handleUpgrade}

@@ -17,7 +17,7 @@ export function PricingSummary({
         {totalPrice} for {seatCount} seat{seatCount !== 1 ? "s" : ""}
       </Text>
       {perSeatPrice && seatCount >1 && (
-        <Text fontSize="sm" color="gray.500">
+        <Text fontSize="xs" color="gray.500">
           {perSeatPrice}
         </Text>
       )}

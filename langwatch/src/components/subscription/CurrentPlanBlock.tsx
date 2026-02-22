@@ -90,7 +90,7 @@ export function CurrentPlanBlock({
             </VStack>
             <VStack align="end" gap={0}>
               <Text color="gray.500" fontSize="sm">
-                Users
+                Members / Seats
               </Text>
               <Box
                 as="button"

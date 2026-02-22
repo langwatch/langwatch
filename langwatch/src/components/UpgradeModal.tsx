@@ -198,26 +198,9 @@ function SeatsContent({
 
             {data && (
               <>
-                {variant.newSeats > variant.currentSeats && (
-                  <HStack justify="space-between" paddingX={2}>
-                    <HStack gap={2}>
-                      <Text fontWeight="normal" fontSize="md">
-                        Due now
-                      </Text>
-                      <Badge colorPalette="blue" variant="subtle" size="sm">
-                        prorated
-                      </Badge>
-                    </HStack>
-                    <Text fontWeight="semibold" fontSize="lg">
-                      {data.formattedAmountDue}
-                    </Text>
-                  </HStack>
-                )}
                 <HStack justify="space-between" paddingX={2}>
                   <Text fontWeight="normal" fontSize="md" color="gray.500">
-                    {data.billingInterval === "year"
-                      ? "Next year"
-                      : "Next month"}
+                    Updated billing amount
                   </Text>
                   <Text fontWeight="normal" fontSize="md" color="gray.500">
                     {data.formattedRecurringTotal}
