@@ -24,6 +24,7 @@ export const KSUID_RESOURCES = {
   EVENT: "event",
   EXPERIMENT: "experiment",
   EXPERIMENT_RUN_RESULT: "exprunresult",
+  MODEL_PROVIDER: "provider",
   MONITOR: "monitor",
   ORGANIZATION: "organization",
   PROJECT: "project",

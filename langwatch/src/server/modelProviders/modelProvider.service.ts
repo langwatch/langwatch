@@ -1,6 +1,7 @@
 import type { Prisma, PrismaClient, Project } from "@prisma/client";
+import { generate } from "@langwatch/ksuid";
 import { z } from "zod";
-import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
+import { KEY_CHECK, KSUID_RESOURCES, MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
 import type { CustomModelsInput } from "./customModel.schema";
 import { toLegacyCompatibleCustomModels } from "./customModel.schema";
 import { ModelProviderRepository } from "./modelProvider.repository";
@@ -453,6 +454,7 @@ export class ModelProviderService {
   ) {
     return await tx.modelProvider.create({
       data: {
+        id: generate(KSUID_RESOURCES.MODEL_PROVIDER).toString(),
         projectId: data.projectId,
         provider: data.provider,
         enabled: data.enabled,

@@ -1,4 +1,6 @@
 import type { ModelProvider, Prisma, PrismaClient } from "@prisma/client";
+import { generate } from "@langwatch/ksuid";
+import { KSUID_RESOURCES } from "../../utils/constants";
 import type { CustomModelsInput } from "./customModel.schema";
 
 /**
@@ -55,6 +57,7 @@ export class ModelProviderRepository {
     const client = tx ?? this.prisma;
     return client.modelProvider.create({
       data: {
+        id: generate(KSUID_RESOURCES.MODEL_PROVIDER).toString(),
         projectId: data.projectId,
         provider: data.provider,
         enabled: data.enabled,
