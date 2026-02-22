@@ -488,14 +488,14 @@ describe("handleListPrompts()", () => {
     });
   });
 
-  it("includes usage tip about get_prompt", async () => {
+  it("includes usage tip about platform_get_prompt", async () => {
     mockListPrompts.mockResolvedValue([
       { handle: "test", name: "Test", latestVersionNumber: 1 },
     ]);
 
     const result = await handleListPrompts();
 
-    expect(result).toContain("get_prompt");
+    expect(result).toContain("platform_get_prompt");
   });
 });
 

@@ -222,7 +222,7 @@ describe("MCP tools integration", () => {
     });
   });
 
-  describe("list_prompts", () => {
+  describe("platform_list_prompts", () => {
     it("returns formatted prompt list from mock server", async () => {
       const { handleListPrompts } = await import("../tools/list-prompts.js");
       const result = await handleListPrompts();
@@ -232,7 +232,7 @@ describe("MCP tools integration", () => {
     });
   });
 
-  describe("get_prompt", () => {
+  describe("platform_get_prompt", () => {
     it("returns formatted prompt details from mock server", async () => {
       const { handleGetPrompt } = await import("../tools/get-prompt.js");
       const result = await handleGetPrompt({ idOrHandle: "greeting-bot" });
@@ -243,7 +243,7 @@ describe("MCP tools integration", () => {
     });
   });
 
-  describe("create_prompt", () => {
+  describe("platform_create_prompt", () => {
     it("returns success message from mock server", async () => {
       const { handleCreatePrompt } = await import(
         "../tools/create-prompt.js"
@@ -259,7 +259,7 @@ describe("MCP tools integration", () => {
     });
   });
 
-  describe("update_prompt", () => {
+  describe("platform_update_prompt", () => {
     it("returns success message for in-place update from mock server", async () => {
       const { handleUpdatePrompt } = await import(
         "../tools/update-prompt.js"

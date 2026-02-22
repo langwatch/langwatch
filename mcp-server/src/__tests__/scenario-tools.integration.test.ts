@@ -165,7 +165,7 @@ describe("MCP scenario tools integration", () => {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   });
 
-  describe("list_scenarios", () => {
+  describe("platform_list_scenarios", () => {
     describe("when the API returns scenarios", () => {
       it("returns a non-empty result", async () => {
         const { handleListScenarios } = await import(
@@ -187,7 +187,7 @@ describe("MCP scenario tools integration", () => {
     });
   });
 
-  describe("get_scenario", () => {
+  describe("platform_get_scenario", () => {
     describe("when the scenario exists", () => {
       it("returns a non-empty result", async () => {
         const { handleGetScenario } = await import(
@@ -210,7 +210,7 @@ describe("MCP scenario tools integration", () => {
     });
   });
 
-  describe("create_scenario", () => {
+  describe("platform_create_scenario", () => {
     describe("when valid data is provided", () => {
       it("returns confirmation with new scenario ID", async () => {
         const { handleCreateScenario } = await import(
@@ -241,7 +241,7 @@ describe("MCP scenario tools integration", () => {
     });
   });
 
-  describe("update_scenario", () => {
+  describe("platform_update_scenario", () => {
     describe("when the scenario exists", () => {
       it("returns a non-empty result", async () => {
         const { handleUpdateScenario } = await import(
@@ -270,7 +270,7 @@ describe("MCP scenario tools integration", () => {
     });
   });
 
-  describe("archive_scenario", () => {
+  describe("platform_archive_scenario", () => {
     describe("when the scenario exists", () => {
       it("returns confirmation that scenario was archived", async () => {
         const { handleArchiveScenario } = await import(

@@ -1,7 +1,7 @@
 import { updateScenario as apiUpdateScenario } from "../langwatch-api-scenarios.js";
 
 /**
- * Handles the update_scenario MCP tool invocation.
+ * Handles the platform_update_scenario MCP tool invocation.
  *
  * Updates an existing scenario and returns a confirmation
  * with the updated details.

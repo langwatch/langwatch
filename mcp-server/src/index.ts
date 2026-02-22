@@ -225,43 +225,20 @@ server.tool(
   }
 );
 
-server.tool(
-  "list_prompts",
-  "List all prompts configured in the LangWatch project.",
-  {},
-  async () => {
-    const { requireApiKey } = await import("./config.js");
-    requireApiKey();
-    const { handleListPrompts } = await import("./tools/list-prompts.js");
-    return {
-      content: [{ type: "text", text: await handleListPrompts() }],
-    };
-  }
-);
+// --- Platform Prompt Tools (require API key) ---
+// These tools manage prompts on the LangWatch platform via API.
+// For code-based prompt management, see `fetch_langwatch_docs` for the CLI/SDK approach.
 
 server.tool(
-  "get_prompt",
-  "Get a specific prompt by ID or handle, including messages, model config, and version history.",
-  {
-    idOrHandle: z.string().describe("Prompt ID or handle"),
-    version: z
-      .number()
-      .optional()
-      .describe("Specific version number (default: latest)"),
-  },
-  async (params) => {
-    const { requireApiKey } = await import("./config.js");
-    requireApiKey();
-    const { handleGetPrompt } = await import("./tools/get-prompt.js");
-    return {
-      content: [{ type: "text", text: await handleGetPrompt(params) }],
-    };
-  }
-);
+  "platform_create_prompt",
+  `Create a new prompt on the LangWatch platform.
 
-server.tool(
-  "create_prompt",
-  "Create a new prompt in the LangWatch project.",
+NOTE: Prompts can be managed two ways. Determine which approach the user needs:
+
+1. Code-based (CLI/SDK): If the user wants to manage prompts in their codebase, use \`fetch_langwatch_docs\` to learn about the prompt management CLI/SDK. This lets them version-control prompts and pull them into code.
+
+2. Platform-based (LangWatch UI): If the user wants to manage prompts directly on the LangWatch platform, use the \`platform_\` MCP tools (\`platform_create_prompt\`, \`platform_update_prompt\`, etc.).
+`,
   {
     name: z.string().describe("Prompt name"),
     handle: z
@@ -297,8 +274,42 @@ server.tool(
 );
 
 server.tool(
-  "update_prompt",
-  "Update an existing prompt or create a new version.",
+  "platform_list_prompts",
+  "List all prompts configured on the LangWatch platform.",
+  {},
+  async () => {
+    const { requireApiKey } = await import("./config.js");
+    requireApiKey();
+    const { handleListPrompts } = await import("./tools/list-prompts.js");
+    return {
+      content: [{ type: "text", text: await handleListPrompts() }],
+    };
+  }
+);
+
+server.tool(
+  "platform_get_prompt",
+  "Get a specific prompt from the LangWatch platform by ID or handle, including messages, model config, and version history.",
+  {
+    idOrHandle: z.string().describe("Prompt ID or handle"),
+    version: z
+      .number()
+      .optional()
+      .describe("Specific version number (default: latest)"),
+  },
+  async (params) => {
+    const { requireApiKey } = await import("./config.js");
+    requireApiKey();
+    const { handleGetPrompt } = await import("./tools/get-prompt.js");
+    return {
+      content: [{ type: "text", text: await handleGetPrompt(params) }],
+    };
+  }
+);
+
+server.tool(
+  "platform_update_prompt",
+  "Update an existing prompt on the LangWatch platform or create a new version.",
   {
     idOrHandle: z.string().describe("Prompt ID or handle to update"),
     messages: z
@@ -333,54 +344,20 @@ server.tool(
   }
 );
 
-// --- Scenario Tools (require API key) ---
+// --- Platform Scenario Tools (require API key) ---
+// These tools manage scenarios on the LangWatch platform via API.
+// For code-based scenario testing, see `fetch_scenario_docs` for the SDK approach.
 
 server.tool(
-  "list_scenarios",
-  "List all scenarios in the LangWatch project. Returns AI-readable digest by default.",
-  {
-    format: z
-      .enum(["digest", "json"])
-      .optional()
-      .describe(
-        "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)"
-      ),
-  },
-  async (params) => {
-    const { requireApiKey } = await import("./config.js");
-    requireApiKey();
-    const { handleListScenarios } = await import("./tools/list-scenarios.js");
-    return {
-      content: [{ type: "text", text: await handleListScenarios(params) }],
-    };
-  }
-);
+  "platform_create_scenario",
+  `Create a new scenario on the LangWatch platform. Call discover_schema({ category: 'scenarios' }) first to learn how to write effective situations and criteria.
 
-server.tool(
-  "get_scenario",
-  "Get full details of a scenario by ID, including situation, criteria, and labels.",
-  {
-    scenarioId: z.string().describe("The scenario ID to retrieve"),
-    format: z
-      .enum(["digest", "json"])
-      .optional()
-      .describe(
-        "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)"
-      ),
-  },
-  async (params) => {
-    const { requireApiKey } = await import("./config.js");
-    requireApiKey();
-    const { handleGetScenario } = await import("./tools/get-scenario.js");
-    return {
-      content: [{ type: "text", text: await handleGetScenario(params) }],
-    };
-  }
-);
+NOTE: Scenarios can be created two ways. Determine which approach the user needs:
 
-server.tool(
-  "create_scenario",
-  "Create a new scenario in the LangWatch project. Call discover_schema({ category: 'scenarios' }) first to learn how to write effective situations and criteria.",
+1. Code-based (local testing): If the user has a codebase with an AI agent they want to test, use \`fetch_scenario_docs\` to learn about the Scenario Python/TypeScript SDK. This lets them run tests locally and iterate in code.
+
+2. Platform-based (LangWatch UI): If the user wants to manage scenarios directly on the LangWatch platform, use the \`platform_\` MCP tools (\`platform_create_scenario\`, \`platform_update_scenario\`, etc.).
+`,
   {
     name: z.string().describe("Scenario name"),
     situation: z
@@ -408,8 +385,51 @@ server.tool(
 );
 
 server.tool(
-  "update_scenario",
-  "Update an existing scenario.",
+  "platform_list_scenarios",
+  "List all scenarios on the LangWatch platform. Returns AI-readable digest by default.",
+  {
+    format: z
+      .enum(["digest", "json"])
+      .optional()
+      .describe(
+        "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)"
+      ),
+  },
+  async (params) => {
+    const { requireApiKey } = await import("./config.js");
+    requireApiKey();
+    const { handleListScenarios } = await import("./tools/list-scenarios.js");
+    return {
+      content: [{ type: "text", text: await handleListScenarios(params) }],
+    };
+  }
+);
+
+server.tool(
+  "platform_get_scenario",
+  "Get full details of a scenario on the LangWatch platform by ID, including situation, criteria, and labels.",
+  {
+    scenarioId: z.string().describe("The scenario ID to retrieve"),
+    format: z
+      .enum(["digest", "json"])
+      .optional()
+      .describe(
+        "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)"
+      ),
+  },
+  async (params) => {
+    const { requireApiKey } = await import("./config.js");
+    requireApiKey();
+    const { handleGetScenario } = await import("./tools/get-scenario.js");
+    return {
+      content: [{ type: "text", text: await handleGetScenario(params) }],
+    };
+  }
+);
+
+server.tool(
+  "platform_update_scenario",
+  "Update an existing scenario on the LangWatch platform.",
   {
     scenarioId: z.string().describe("The scenario ID to update"),
     name: z.string().optional().describe("Updated scenario name"),
@@ -436,8 +456,8 @@ server.tool(
 );
 
 server.tool(
-  "archive_scenario",
-  "Archive (soft-delete) a scenario.",
+  "platform_archive_scenario",
+  "Archive (soft-delete) a scenario on the LangWatch platform.",
   {
     scenarioId: z.string().describe("The scenario ID to archive"),
   },

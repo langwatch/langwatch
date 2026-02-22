@@ -1,7 +1,7 @@
 import { createScenario as apiCreateScenario } from "../langwatch-api-scenarios.js";
 
 /**
- * Handles the create_scenario MCP tool invocation.
+ * Handles the platform_create_scenario MCP tool invocation.
  *
  * Creates a new scenario in the LangWatch project and returns a
  * confirmation with the created scenario's details.

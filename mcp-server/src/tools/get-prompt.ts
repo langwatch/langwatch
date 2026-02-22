@@ -1,7 +1,7 @@
 import { getPrompt as apiGetPrompt } from "../langwatch-api.js";
 
 /**
- * Handles the get_prompt MCP tool invocation.
+ * Handles the platform_get_prompt MCP tool invocation.
  *
  * Retrieves a specific prompt by ID or handle and formats it as
  * AI-readable markdown, including messages, model config, and version history.
