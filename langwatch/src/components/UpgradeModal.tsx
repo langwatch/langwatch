@@ -200,7 +200,7 @@ function SeatsContent({
               <>
                 <HStack justify="space-between" paddingX={2}>
                   <Text fontWeight="normal" fontSize="md" color="gray.500">
-                    Updated billing amount
+                    New billing amount
                   </Text>
                   <Text fontWeight="normal" fontSize="md" color="gray.500">
                     {data.formattedRecurringTotal}

@@ -27,6 +27,7 @@ export function CurrentPlanBlock({
   onManageSubscription,
   isManageLoading,
   deprecatedNotice,
+  contactSalesUrl,
 }: {
   planName: string;
   pricing?: {
@@ -42,6 +43,7 @@ export function CurrentPlanBlock({
   onManageSubscription?: () => void;
   isManageLoading?: boolean;
   deprecatedNotice?: boolean;
+  contactSalesUrl?: string;
 }) {
   return (
     <Card.Root
@@ -151,6 +153,23 @@ export function CurrentPlanBlock({
               disabled={isManageLoading}
             >
               Manage Subscription
+            </Button>
+          )}
+          {contactSalesUrl && (
+            <Button
+              asChild
+              variant="outline"
+              size="sm"
+              colorPalette="orange"
+              data-testid="contact-sales-button"
+            >
+              <Link
+                href={contactSalesUrl}
+                isExternal
+                fontWeight="semibold"
+              >
+                Contact us to Upgrade
+              </Link>
             </Button>
           )}
         </VStack>

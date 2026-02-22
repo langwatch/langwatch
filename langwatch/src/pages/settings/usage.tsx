@@ -1,13 +1,15 @@
 import {
   Badge,
   Button,
+  Card,
+  Flex,
   Heading,
   HStack,
   Skeleton,
-  Spacer,
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { ArrowRight } from "lucide-react";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { usePlanManagementUrl } from "~/hooks/usePlanManagementUrl";
 import {
@@ -26,58 +28,80 @@ import {
 } from "../../components/license/ResourceLimitsDisplay";
 import { FREE_PLAN } from "../../../ee/licensing/constants";
 
+function ResourceLimitsCard({
+  planLabel,
+  planColorPalette,
+  subtitle,
+  limits,
+  showLimits,
+  actionHref,
+  actionLabel,
+}: {
+  planLabel: string;
+  planColorPalette: string;
+  subtitle: string;
+  limits: React.ComponentProps<typeof ResourceLimitsDisplay>["limits"];
+  showLimits?: boolean;
+  actionHref: string;
+  actionLabel: string;
+}) {
+  return (
+    <Card.Root borderWidth={1} borderColor="gray.200">
+      <Card.Body paddingY={5} paddingX={6}>
+        <VStack align="stretch" gap={5}>
+          <Flex justifyContent="space-between" alignItems="flex-start">
+            <VStack align="start" gap={1}>
+              <HStack gap={3}>
+                <Text fontWeight="semibold" fontSize="lg">
+                  Resource Usage
+                </Text>
+                <Badge
+                  colorPalette={planColorPalette}
+                  variant="outline"
+                  borderRadius="md"
+                  paddingX={2}
+                  paddingY={0.5}
+                  fontSize="xs"
+                >
+                  {planLabel}
+                </Badge>
+              </HStack>
+              <Text color="gray.500" fontSize="sm">
+                {subtitle}
+              </Text>
+            </VStack>
+            <Button asChild variant="ghost" size="sm" color="gray.600">
+              <Link href={actionHref}>
+                {actionLabel} <ArrowRight size={14} />
+              </Link>
+            </Button>
+          </Flex>
+          <ResourceLimitsDisplay limits={limits} showLimits={showLimits} />
+        </VStack>
+      </Card.Body>
+    </Card.Root>
+  );
+}
+
 function Usage() {
   const { organization } = useOrganizationTeamProject();
   const { period, setPeriod } = usePeriodSelector(30);
-
-  const activePlan = api.plan.getActivePlan.useQuery(
-    {
-      organizationId: organization?.id ?? "",
-    },
-    {
-      enabled: !!organization,
-      refetchOnWindowFocus: false,
-      refetchOnMount: false,
-    },
-  );
-
-  const _aggregatedCosts = api.costs.getAggregatedCostsForOrganization.useQuery(
-    {
-      organizationId: organization?.id ?? "",
-      startDate: period.startDate.getTime(),
-      endDate: period.endDate.getTime(),
-    },
-    {
-      enabled: !!organization,
-      refetchOnWindowFocus: false,
-      refetchOnMount: false,
-    },
-  );
-
-  const usage = api.limits.getUsage.useQuery(
-    { organizationId: organization?.id ?? "" },
-    {
-      enabled: !!organization,
-      refetchOnWindowFocus: false,
-      refetchOnMount: false,
-    },
-  );
 
   const publicEnv = usePublicEnv();
   const isSaaS = publicEnv.data?.IS_SAAS;
   const { url: planManagementUrl, buttonLabel: planButtonLabel } =
     usePlanManagementUrl();
 
+  const organizationId = organization?.id ?? "";
+  const queryOpts = { enabled: !!organization, refetchOnWindowFocus: false, refetchOnMount: false } as const;
+
+  const activePlan = api.plan.getActivePlan.useQuery({ organizationId }, queryOpts);
+  const usage = api.limits.getUsage.useQuery({ organizationId }, queryOpts);
   const licenseStatus = api.license.getStatus.useQuery(
-    { organizationId: organization?.id ?? "" },
-    {
-      enabled: !!organization && !isSaaS,
-      refetchOnWindowFocus: false,
-      refetchOnMount: false,
-    },
+    { organizationId },
+    { ...queryOpts, enabled: !!organization && !isSaaS },
   );
 
-  // Derived states for self-hosted license display
   const isSelfHosted = !isSaaS;
   const isLoadingLimits =
     isSelfHosted &&
@@ -103,126 +127,100 @@ function Usage() {
 
   return (
     <SettingsLayout>
-      <VStack gap={6} width="full" align="start">
-        <HStack width="full" marginTop={2}>
-          <Heading as="h2">Usage</Heading>
-          <Spacer />
-          <PeriodSelector period={period} setPeriod={setPeriod} />
-        </HStack>
-        <VStack width="full" gap={4} align="start">
-          {usage.data && isSaaS && (
-            <>
-              <HStack gap={3}>
-                <Heading size="md" as="h2">
-                  Resource Limits
-                </Heading>
-                {activePlan.data?.free && (
-                  <Badge
-                    colorPalette="gray"
-                    fontSize="sm"
-                    paddingX={2}
-                    paddingY={1}
-                  >
-                    Free
-                  </Badge>
-                )}
-              </HStack>
-              <Text color="fg.muted" fontSize="sm" marginBottom={2}>
-                Current usage versus {activePlan.data?.free ? "free tier" : "your plan"} limits
-              </Text>
-              <ResourceLimitsDisplay
-                limits={mapUsageToLimits(usage.data, usage.data.activePlan)}
-              />
-              <Button asChild marginTop={2}>
-                <Link href={planManagementUrl}>{planButtonLabel}</Link>
-              </Button>
-            </>
-          )}
-          {activePlan.data && !activePlan.data.free && (
-            <>
-              <Heading size="md" as="h2">
-                Active Plan
-              </Heading>
-              <Text paddingBottom={4}>
-                You are on the <b>{activePlan.data.name}</b> plan
-              </Text>
-            </>
-          )}
-          {isLoadingLimits && (
-            <>
-              <Heading size="md" as="h2">
-                Resource Limits
-              </Heading>
-              <Skeleton height="20px" width="200px" />
-              <Skeleton height="100px" width="full" maxWidth="400px" />
-            </>
-          )}
-          {hasLimitsError && (
-            <Text color="fg.muted">
-              Unable to load resource limits. Please refresh the page or contact
-              support if the issue persists.
+      <VStack gap={6} width="full" align="stretch" maxWidth="900px" marginX="auto">
+        <Flex justifyContent="space-between" alignItems="flex-start">
+          <VStack align="start" gap={1}>
+            <Heading size="xl">Usage</Heading>
+            <Text color="gray.500" fontSize="sm">
+              Monitor your resource consumption and plan limits
             </Text>
-          )}
-          {hasCorruptedLicense && (
-            <>
-              <Heading size="md" as="h2">
-                Resource Limits
-              </Heading>
-              <Text color="orange.500">
-                Your license appears to be corrupted. Please re-upload your
-                license on the{" "}
-                <Link href="/settings/license" textDecoration="underline">
-                  License page
-                </Link>
-                .
+          </VStack>
+          <PeriodSelector period={period} setPeriod={setPeriod} />
+        </Flex>
+
+        {/* SaaS: Resource limits from active plan */}
+        {usage.data && isSaaS && (
+          <ResourceLimitsCard
+            planLabel={activePlan.data?.free ? "Free" : (activePlan.data?.name ?? "Plan")}
+            planColorPalette={activePlan.data?.free ? "gray" : "blue"}
+            subtitle={`Current usage versus ${activePlan.data?.free ? "free tier" : "your plan"} limits`}
+            limits={mapUsageToLimits(usage.data, usage.data.activePlan)}
+            showLimits={activePlan.data?.free}
+            actionHref={planManagementUrl}
+            actionLabel={planButtonLabel}
+          />
+        )}
+
+        {/* Self-hosted: Loading state */}
+        {isLoadingLimits && (
+          <Card.Root borderWidth={1} borderColor="gray.200">
+            <Card.Body paddingY={5} paddingX={6}>
+              <VStack align="start" gap={4}>
+                <Text fontWeight="semibold" fontSize="lg">Resource Limits</Text>
+                <Skeleton height="20px" width="200px" />
+                <Skeleton height="80px" width="full" />
+              </VStack>
+            </Card.Body>
+          </Card.Root>
+        )}
+
+        {/* Self-hosted: Error state */}
+        {hasLimitsError && (
+          <Card.Root borderWidth={1} borderColor="red.200" backgroundColor="red.50">
+            <Card.Body paddingY={5} paddingX={6}>
+              <Text color="red.600" fontSize="sm">
+                Unable to load resource limits. Please refresh the page or
+                contact support if the issue persists.
               </Text>
-            </>
-          )}
-          {hasValidLicense &&
-            licenseStatus.data &&
-            "currentMembers" in licenseStatus.data && (
-              <>
-                <Heading size="md" as="h2">
-                  Resource Limits
-                </Heading>
-                <Text color="fg.muted" fontSize="sm" marginBottom={2}>
-                  Current usage versus your license limits
+            </Card.Body>
+          </Card.Root>
+        )}
+
+        {/* Self-hosted: Corrupted license */}
+        {hasCorruptedLicense && (
+          <Card.Root borderWidth={1} borderColor="orange.200" backgroundColor="orange.50">
+            <Card.Body paddingY={5} paddingX={6}>
+              <VStack align="start" gap={2}>
+                <Text fontWeight="semibold" fontSize="lg">Resource Limits</Text>
+                <Text color="orange.700" fontSize="sm">
+                  Your license appears to be corrupted. Please re-upload your
+                  license on the{" "}
+                  <Link href="/settings/license" textDecoration="underline" fontWeight="semibold">
+                    License page
+                  </Link>
+                  .
                 </Text>
-                <ResourceLimitsDisplay
-                  limits={mapLicenseStatusToLimits(licenseStatus.data)}
-                />
-                <Button asChild marginTop={2}>
-                  <Link href={planManagementUrl}>{planButtonLabel}</Link>
-                </Button>
-              </>
-            )}
-          {isFreeTier && (
-            <>
-              <HStack gap={3}>
-                <Heading size="md" as="h2">
-                  Resource Limits
-                </Heading>
-                <Badge
-                  colorPalette="gray"
-                  fontSize="sm"
-                  paddingX={2}
-                  paddingY={1}
-                >
-                  Free
-                </Badge>
-              </HStack>
-              <Text color="fg.muted" fontSize="sm" marginBottom={2}>
-                Current usage versus free tier limits
-              </Text>
-              <ResourceLimitsDisplay
-                limits={mapUsageToLimits(usage.data, FREE_PLAN)}
-              />
-              <Button asChild marginTop={2}>
-                <Link href="/settings/license">Manage license</Link>
-              </Button>
-            </>
+              </VStack>
+            </Card.Body>
+          </Card.Root>
+        )}
+
+        {/* Self-hosted: Valid license */}
+        {hasValidLicense &&
+          licenseStatus.data &&
+          "currentMembers" in licenseStatus.data && (
+            <ResourceLimitsCard
+              planLabel="Licensed"
+              planColorPalette="green"
+              subtitle="Current resource usage"
+              limits={mapLicenseStatusToLimits(licenseStatus.data)}
+              actionHref={planManagementUrl}
+              actionLabel={planButtonLabel}
+            />
           )}
-        </VStack>
+
+        {/* Self-hosted: Free tier */}
+        {isFreeTier && (
+          <ResourceLimitsCard
+            planLabel="Free"
+            planColorPalette="gray"
+            subtitle="Current usage versus free tier limits"
+            limits={mapUsageToLimits(usage.data, FREE_PLAN)}
+            showLimits
+            actionHref="/settings/license"
+            actionLabel="Manage license"
+          />
+        )}
       </VStack>
     </SettingsLayout>
   );

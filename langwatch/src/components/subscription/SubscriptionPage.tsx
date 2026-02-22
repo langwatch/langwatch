@@ -35,6 +35,7 @@ import {
   isAnnualTieredPlan,
   FREE_PLAN_FEATURES as DEVELOPER_FEATURES,
   GROWTH_FEATURES,
+  ENTERPRISE_PLAN_FEATURES,
   buildTieredCapabilities,
 } from "./billing-plans";
 import { useBillingPricing } from "./useBillingPricing";
@@ -303,19 +304,22 @@ export function SubscriptionPage() {
       maxMembersLite: plan?.maxMembersLite ?? 0,
       evaluationsCredit: plan?.evaluationsCredit ?? 0,
     })
-    : isDeveloperPlan
-      ? DEVELOPER_FEATURES
-      : GROWTH_FEATURES;
+    : isEnterprisePlan
+      ? ENTERPRISE_PLAN_FEATURES
+      : isDeveloperPlan
+        ? DEVELOPER_FEATURES
+        : GROWTH_FEATURES;
 
 
   const isUpgradeSeatsRequired =
     !isDeveloperPlan &&
     !isTieredLegacyPaidPlan &&
+    !isEnterprisePlan &&
     (plannedUsers.length > 0 || deletedSeatCount > 0);
-  const isUpgradePlanRequired = (
-    isDeveloperPlan &&
-    (plannedUsers.length > 0 || deletedSeatCount > 0 ))
-  || isTieredLegacyPaidPlan;
+  const isUpgradePlanRequired =
+    ((isDeveloperPlan && (plannedUsers.length > 0 || deletedSeatCount > 0))
+    || isTieredLegacyPaidPlan)
+    && !isEnterprisePlan;
 
   const updateRequired = isUpgradeSeatsRequired || isUpgradePlanRequired;
 
@@ -345,7 +349,7 @@ export function SubscriptionPage() {
             </Text>
           </VStack>
           <HStack gap={4} alignItems="center">
-            {(isDeveloperPlan || isTieredLegacyPaidPlan) && (
+            {(isDeveloperPlan || isTieredLegacyPaidPlan) && !isEnterprisePlan && (
               <>
                 <LabeledSwitch
                   data-testid="billing-period-toggle"
@@ -420,14 +424,18 @@ export function SubscriptionPage() {
           pricing={currentPlanPricing}
           features={currentPlanFeatures}
           userCount={seatUsageN}
-          maxSeats={seatUsageM}
+          maxSeats={isTieredPricingModel ? undefined : seatUsageM}
           upgradeRequired={updateRequired}
           onUserCountClick={() => setIsDrawerOpen(true)}
           onManageSubscription={
-            !isDeveloperPlan ? handleManageSubscription : undefined
+            !isDeveloperPlan && !isEnterprisePlan ? handleManageSubscription : undefined
           }
           isManageLoading={isManageLoading}
           deprecatedNotice={isTieredLegacyPaidPlan}
+          contactSalesUrl={isEnterprisePlan
+            ? "https://meetings-eu1.hubspot.com/manouk-draisma?uuid=3c29cf0c-03e5-4a53-81fd-94abb0b66cfd"
+            : undefined
+          }
         />
 
         {/* Upgrade Block - show for free plan and TIERED legacy paid orgs */}
@@ -467,8 +475,8 @@ export function SubscriptionPage() {
           />
         )}
 
-        {/* Contact Sales */}
-        <ContactSalesBlock />
+        {/* Contact Sales - hidden for Enterprise since CTA is in their plan block */}
+        {!isEnterprisePlan && <ContactSalesBlock />}
       </VStack>
 
       <UserManagementDrawer
@@ -482,7 +490,7 @@ export function SubscriptionPage() {
         currency={effectiveCurrency}
         isLoading={organizationWithMembers.isLoading}
         onSave={handleDrawerSave}
-        maxSeats={effectiveMaxSeats}
+        maxSeats={isTieredPricingModel ? undefined : effectiveMaxSeats}
       />
     </SettingsLayout>
   );

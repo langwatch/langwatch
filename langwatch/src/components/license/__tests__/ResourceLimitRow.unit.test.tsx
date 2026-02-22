@@ -11,13 +11,23 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 describe("ResourceLimitRow", () => {
-  it("renders label and formatted usage", () => {
+  it("renders label and formatted usage with max", () => {
     render(<ResourceLimitRow label="Members" current={5} max={10} />, {
       wrapper: Wrapper,
     });
 
-    expect(screen.getByText("Members:")).toBeInTheDocument();
-    expect(screen.getByText("5 / 10")).toBeInTheDocument();
+    expect(screen.getByText("Members")).toBeInTheDocument();
+    expect(screen.getByText("/ 10")).toBeInTheDocument();
+  });
+
+  it("renders count only when max is omitted", () => {
+    const { container } = render(<ResourceLimitRow label="Events" current={42} />, {
+      wrapper: Wrapper,
+    });
+
+    expect(screen.getByText("Events")).toBeInTheDocument();
+    expect(screen.getByText("42")).toBeInTheDocument();
+    expect(container.textContent).not.toContain("/");
   });
 
   it("displays 'Unlimited' for large max values (>= 1M)", () => {
@@ -25,8 +35,8 @@ describe("ResourceLimitRow", () => {
       wrapper: Wrapper,
     });
 
-    expect(screen.getByText("Projects:")).toBeInTheDocument();
-    expect(screen.getByText("3 / Unlimited")).toBeInTheDocument();
+    expect(screen.getByText("Projects")).toBeInTheDocument();
+    expect(screen.getByText("/ Unlimited")).toBeInTheDocument();
   });
 
   it("formats numbers with locale separators", () => {
@@ -34,7 +44,7 @@ describe("ResourceLimitRow", () => {
       wrapper: Wrapper,
     });
 
-    expect(screen.getByText("Messages:")).toBeInTheDocument();
-    expect(screen.getByText("1,000 / 5,000")).toBeInTheDocument();
+    expect(screen.getByText("Messages")).toBeInTheDocument();
+    expect(screen.getByText("/ 5,000")).toBeInTheDocument();
   });
 });
