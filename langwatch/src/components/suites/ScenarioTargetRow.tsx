@@ -7,6 +7,7 @@
 import { HStack, Text } from "@chakra-ui/react";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { SCENARIO_RUN_STATUS_CONFIG } from "~/server/scenarios/status-config";
+import { STATUS_ICON_CONFIG } from "./status-icons";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 
 type ScenarioTargetRowProps = {
@@ -22,12 +23,13 @@ function formatDuration(ms: number): string {
 
 function StatusIcon({ status }: { status: ScenarioRunStatus }) {
   const config = SCENARIO_RUN_STATUS_CONFIG[status];
-  const Icon = config.icon;
+  const iconConfig = STATUS_ICON_CONFIG[status];
+  const Icon = iconConfig.icon;
   return (
     <Icon
       size={14}
       color={`var(--chakra-colors-${config.colorPalette}-500)`}
-      style={config.animate ? { animation: "spin 2s linear infinite" } : undefined}
+      style={iconConfig.animate ? { animation: "spin 2s linear infinite" } : undefined}
     />
   );
 }

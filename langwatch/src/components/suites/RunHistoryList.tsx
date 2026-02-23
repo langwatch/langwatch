@@ -33,7 +33,6 @@ import {
   groupRunsByScenarioId,
   groupRunsByTarget,
 } from "./run-history-transforms";
-import type { RunGroup } from "./run-history-transforms";
 
 export type RunHistoryStats = {
   runCount: number;
@@ -58,7 +57,7 @@ export function RunHistoryList({ suite, onStatsReady }: RunHistoryListProps) {
   const groupBy = useRunHistoryStore((s) => s.groupBy);
   const filters = useRunHistoryStore((s) => s.filters);
   const setGroupBy = useRunHistoryStore((s) => s.setGroupBy);
-  const setFilter = useRunHistoryStore((s) => s.setFilter);
+  const setFilters = useRunHistoryStore((s) => s.setFilters);
   const syncToUrl = useRunHistoryStore((s) => s.syncToUrl);
   const hydrateFromUrl = useRunHistoryStore((s) => s.hydrateFromUrl);
 
@@ -223,12 +222,12 @@ export function RunHistoryList({ suite, onStatsReady }: RunHistoryListProps) {
 
   // Group filtered runs by scenario or target (when groupBy is not "none")
   const groups = useMemo(() => {
-    let grouped: RunGroup[] = [];
-    if (groupBy === "scenario") {
-      grouped = groupRunsByScenarioId({ runs: filteredRuns });
-    } else if (groupBy === "target") {
-      grouped = groupRunsByTarget({ runs: filteredRuns, targetNameMap });
-    }
+    if (groupBy === "none") return [];
+
+    const grouped =
+      groupBy === "scenario"
+        ? groupRunsByScenarioId({ runs: filteredRuns })
+        : groupRunsByTarget({ runs: filteredRuns, targetNameMap });
 
     if (filters.passFailStatus === "pass") {
       return grouped.filter((g) => {
@@ -266,8 +265,8 @@ export function RunHistoryList({ suite, onStatsReady }: RunHistoryListProps) {
   }, [batchRuns, groups, groupBy]);
 
   const totals = useMemo(
-    () => computeRunHistoryTotals({ batchRuns }),
-    [batchRuns],
+    () => computeRunHistoryTotals({ runs: filteredRuns }),
+    [filteredRuns],
   );
 
   const lastActivityTimestamp =
@@ -278,20 +277,16 @@ export function RunHistoryList({ suite, onStatsReady }: RunHistoryListProps) {
   // Notify parent when stats are ready
   useEffect(() => {
     if (onStatsReady) {
-      const totalRunCount = batchRuns.reduce(
-        (sum, batch) => sum + batch.scenarioRuns.length,
-        0,
-      );
       const finishedCount = totals.passedCount + totals.failedCount;
       const passRate = finishedCount > 0 ? (totals.passedCount / finishedCount) * 100 : 0;
 
       onStatsReady({
-        runCount: totalRunCount,
+        runCount: totals.runCount,
         passRate,
         lastActivityTimestamp,
       });
     }
-  }, [batchRuns, totals, lastActivityTimestamp, onStatsReady]);
+  }, [totals, lastActivityTimestamp, onStatsReady]);
 
   const handleToggle = useCallback((id: string) => {
     setExpandedIds((prev) => {
@@ -321,10 +316,9 @@ export function RunHistoryList({ suite, onStatsReady }: RunHistoryListProps) {
 
   const handleFiltersChange = useCallback(
     (newFilters: { scenarioId: string; passFailStatus: string }) => {
-      setFilter("scenarioId", newFilters.scenarioId);
-      setFilter("passFailStatus", newFilters.passFailStatus);
+      setFilters(newFilters);
     },
-    [setFilter],
+    [setFilters],
   );
 
   if (isLoading) {

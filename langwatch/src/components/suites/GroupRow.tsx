@@ -9,38 +9,32 @@
 
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { SCENARIO_RUN_STATUS_CONFIG } from "~/server/scenarios/status-config";
-import type { RunGroup, BatchRunSummary } from "./run-history-transforms";
+import { STATUS_ICON_CONFIG } from "./status-icons";
+import type { RunGroup, RunGroupSummary } from "./run-history-transforms";
+import { worstStatus } from "./run-history-transforms";
 import { ScenarioTargetRow } from "./ScenarioTargetRow";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 
 type GroupRowProps = {
   group: RunGroup;
-  summary: BatchRunSummary;
+  summary: RunGroupSummary;
   isExpanded: boolean;
   onToggle: () => void;
   onScenarioRunClick: (scenarioRun: ScenarioRunData) => void;
   targetName?: string | null;
 };
 
-function worstStatus(summary: BatchRunSummary): ScenarioRunStatus {
-  if (summary.inProgressCount > 0) return ScenarioRunStatus.IN_PROGRESS;
-  if (summary.stalledCount > 0) return ScenarioRunStatus.STALLED;
-  if (summary.failedCount > 0) return ScenarioRunStatus.FAILED;
-  if (summary.cancelledCount > 0) return ScenarioRunStatus.CANCELLED;
-  return ScenarioRunStatus.SUCCESS;
-}
-
-function GroupStatusIcon({ summary }: { summary: BatchRunSummary }) {
+function GroupStatusIcon({ summary }: { summary: RunGroupSummary }) {
   const status = worstStatus(summary);
   const config = SCENARIO_RUN_STATUS_CONFIG[status];
-  const Icon = config.icon;
+  const iconConfig = STATUS_ICON_CONFIG[status];
+  const Icon = iconConfig.icon;
   return (
     <Icon
       size={14}
       color={`var(--chakra-colors-${config.colorPalette}-500)`}
-      style={config.animate ? { animation: "spin 2s linear infinite" } : undefined}
+      style={iconConfig.animate ? { animation: "spin 2s linear infinite" } : undefined}
     />
   );
 }

@@ -43,6 +43,7 @@ export interface RunHistoryState {
   filters: Filters;
   setGroupBy: (value: RunGroupType) => void;
   setFilter: (key: FilterKey, value: string) => void;
+  setFilters: (filters: Filters) => void;
   syncToUrl: (router: RouterLike) => void;
   hydrateFromUrl: (query: QueryLike) => void;
 }
@@ -76,6 +77,10 @@ export function createRunHistoryStore() {
       set((state) => ({
         filters: { ...state.filters, [key]: value },
       }));
+    },
+
+    setFilters: (filters: Filters) => {
+      set({ filters });
     },
 
     syncToUrl: (router: RouterLike) => {
