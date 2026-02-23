@@ -262,7 +262,8 @@ function extractChunkTextualContent(object: unknown): string {
   if (typeof content === "object" && content !== null) {
     return JSON.stringify(content);
   }
-  return "";
+  // Parsed to a primitive (number, boolean, etc.) — use the original string
+  return String(object).trim();
 }
 
 /** @internal Exported for unit testing */
@@ -300,10 +301,10 @@ function enrichRagContextIds(span: NormalizedSpan): void {
   const enriched = contexts.filter(Boolean).map((ctx) => {
     const ctxObj = ctx as Record<string, unknown>;
     return {
+      ...ctxObj,
       document_id: generateDocumentId(
         ctxObj.content !== undefined ? ctxObj.content : ctx,
       ),
-      content: ctxObj.content !== undefined ? ctxObj.content : ctx,
     };
   });
 

@@ -52,15 +52,23 @@ export function createSatisfactionScoreReactor(
       if (event.occurredAt < Date.now() - 60 * 60 * 1000) return;
 
       try {
-        const response = await lambdaFetch<SatisfactionScoreResult>(
-          deps.nlpServiceUrl,
-          "/sentiment",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text: foldState.computedInput }),
-          },
-        );
+        const response = await Promise.race([
+          lambdaFetch<SatisfactionScoreResult>(
+            deps.nlpServiceUrl,
+            "/sentiment",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ text: foldState.computedInput }),
+            },
+          ),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error("NLP sentiment API timed out")),
+              10_000,
+            ),
+          ),
+        ]);
 
         if (!response.ok) {
           logger.warn(
@@ -75,6 +83,14 @@ export function createSatisfactionScoreReactor(
         }
 
         const result = await response.json();
+
+        if (typeof result.score_normalized !== "number") {
+          logger.warn(
+            { tenantId, traceId, result },
+            "NLP sentiment API returned invalid score_normalized",
+          );
+          return;
+        }
 
         await deps.assignSatisfactionScore({
           tenantId,
