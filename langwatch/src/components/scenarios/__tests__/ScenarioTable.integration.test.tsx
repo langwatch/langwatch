@@ -279,6 +279,24 @@ describe("<BatchActionBar/>", () => {
     });
   });
 
+  describe("when selection count changes", () => {
+    it("updates the displayed count", () => {
+      const onArchive = vi.fn();
+      const { rerender } = render(
+        <BatchActionBar selectedCount={2} onArchive={onArchive} />,
+        { wrapper: Wrapper },
+      );
+      expect(screen.getByText("2 selected")).toBeInTheDocument();
+
+      rerender(
+        <ChakraProvider value={defaultSystem}>
+          <BatchActionBar selectedCount={3} onArchive={onArchive} />
+        </ChakraProvider>,
+      );
+      expect(screen.getByText("3 selected")).toBeInTheDocument();
+    });
+  });
+
   describe("when selection transitions from 1 to 0", () => {
     it("hides the batch action bar", () => {
       const { rerender } = render(
