@@ -58,7 +58,7 @@ export function useSuiteForm({
   prompts,
 }: UseSuiteFormParams) {
   // -- Form state --
-  const [name, setName] = useState("");
+  const [name, setNameRaw] = useState("");
   const [description, setDescription] = useState("");
   const [labels, setLabels] = useState<string[]>([]);
   const [selectedScenarioIds, setSelectedScenarioIds] = useState<string[]>([]);
@@ -75,6 +75,16 @@ export function useSuiteForm({
 
   // -- Validation state --
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  /** Wraps setNameRaw to clear the name validation error on change. */
+  const setName = useCallback((value: string | ((prev: string) => string)) => {
+    setNameRaw(value);
+    setErrors((prev) => {
+      if (!prev.name) return prev;
+      const { name: _, ...rest } = prev;
+      return rest;
+    });
+  }, []);
 
   // -- Derived: available targets from agents + prompts --
   const availableTargets = useMemo(() => {
@@ -145,7 +155,7 @@ export function useSuiteForm({
   // -- Initialize form for edit mode / reset for create mode --
   useEffect(() => {
     if (suite && isOpen) {
-      setName(suite.name);
+      setNameRaw(suite.name);
       setDescription(suite.description ?? "");
       setLabels(suite.labels);
       setSelectedScenarioIds(suite.scenarioIds);
@@ -153,7 +163,7 @@ export function useSuiteForm({
       setRepeatCountStr(String(suite.repeatCount));
       setErrors({});
     } else if (isOpen) {
-      setName("");
+      setNameRaw("");
       setDescription("");
       setLabels([]);
       setSelectedScenarioIds([]);

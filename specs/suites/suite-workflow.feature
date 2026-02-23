@@ -80,6 +80,16 @@ Feature: Suite Workflow — Create, Run, See Results
     And I see a validation error for Targets
 
   @integration
+  Scenario: Typing in the name field clears its validation error
+    Given I have opened the new suite drawer
+    And I clicked "Save" without filling any fields
+    And I see a validation error for Name
+    When I type "My Suite" in the name field
+    Then the validation error for Name is no longer visible
+    And I still see a validation error for Scenarios
+    And I still see a validation error for Targets
+
+  @integration
   Scenario: Drawer validates at least one scenario selected
     When I click "+ New Suite" in the sidebar
     And I enter "My Suite" as the suite name
