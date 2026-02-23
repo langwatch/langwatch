@@ -245,7 +245,7 @@ async def execute_http_node(
     # Build headers
     headers = build_headers(config)
 
-    # Configure timeout (default 5 minutes for slow RAG agents)
+    # Configure timeout (default 5 minutes)
     timeout_seconds = (config.timeout_ms / 1000) if config.timeout_ms else 300.0
 
     try:
