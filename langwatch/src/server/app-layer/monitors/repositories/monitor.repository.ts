@@ -2,6 +2,8 @@ export interface MonitorSummary {
   id: string;
   checkType: string;
   name: string;
+  sample: number;
+  threadIdleTimeout: number | null;
 }
 
 export interface MonitorRepository {
@@ -9,7 +11,9 @@ export interface MonitorRepository {
 }
 
 export class NullMonitorRepository implements MonitorRepository {
-  async getEnabledOnMessageMonitors(_projectId: string): Promise<MonitorSummary[]> {
+  async getEnabledOnMessageMonitors(
+    _projectId: string,
+  ): Promise<MonitorSummary[]> {
     return [];
   }
 }

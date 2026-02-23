@@ -65,6 +65,13 @@ function getSpanAttributes(
 }
 
 function makeJobId(payload: ExecuteEvaluationCommandData): string {
+  if (
+    payload.threadIdleTimeout &&
+    payload.threadIdleTimeout > 0 &&
+    payload.threadId
+  ) {
+    return `exec:${payload.tenantId}:thread:${payload.threadId}:${payload.evaluatorId}`;
+  }
   return `exec:${payload.tenantId}:${payload.traceId}:${payload.evaluatorId}`;
 }
 

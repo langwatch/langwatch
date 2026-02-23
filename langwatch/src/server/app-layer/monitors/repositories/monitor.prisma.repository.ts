@@ -11,7 +11,13 @@ export class PrismaMonitorRepository implements MonitorRepository {
         enabled: true,
         executionMode: EvaluationExecutionMode.ON_MESSAGE,
       },
-      select: { id: true, checkType: true, name: true },
+      select: {
+        id: true,
+        checkType: true,
+        name: true,
+        sample: true,
+        threadIdleTimeout: true,
+      },
     });
   }
 }
