@@ -28,8 +28,10 @@ Work should be tied to a GitHub issue. If requirements are unclear:
 
 Before specifying new functionality, search for existing patterns and systems in the codebase. Extend what exists rather than building from scratch.
 
+**Same for feature files**: Check `specs/features/` for related files first. Amend existing features instead of creating duplicates.
+
 ## Output Location
-Write to `specs/features/<feature-name>.feature`
+Write to `specs/features/<feature-name>.feature` (or amend an existing file if one covers this area).
 
 ## What Makes a Good Feature File
 
