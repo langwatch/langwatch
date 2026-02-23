@@ -93,14 +93,6 @@ vi.mock("~/hooks/useModelProvidersSettings", () => ({
   }),
 }));
 
-// Mock toaster
-const mockToasterCreate = vi.fn();
-vi.mock("../../ui/toaster", () => ({
-  toaster: {
-    create: (args: unknown) => mockToasterCreate(args),
-  },
-}));
-
 // Mock fetch for AI generation API
 const mockGeneratedScenario = {
   name: "Generated Scenario",
@@ -128,7 +120,6 @@ describe("<ScenarioCreateModal/>", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockToasterCreate.mockClear();
     // Reset to having providers by default
     mockHasEnabledProviders = true;
 
@@ -300,8 +291,9 @@ describe("<ScenarioCreateModal/>", () => {
 
   describe("when user clicks Skip", () => {
     it("opens drawer with empty initial data without creating a DB record", async () => {
+      const onClose = vi.fn();
       render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
+        <ScenarioCreateModal open={true} onClose={onClose} />,
         { wrapper: Wrapper }
       );
 
@@ -343,7 +335,6 @@ describe("<ScenarioCreateModal/>", () => {
   describe("when no model providers are configured", () => {
     beforeEach(() => {
       vi.clearAllMocks();
-      mockToasterCreate.mockClear();
       // Set to no providers
       mockHasEnabledProviders = false;
     });
