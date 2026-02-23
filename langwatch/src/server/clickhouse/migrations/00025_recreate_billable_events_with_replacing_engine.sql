@@ -32,3 +32,6 @@ SETTINGS index_granularity = 8192, storage_policy = 'local_primary';
 -- +goose StatementBegin
 
 -- DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.billable_events SYNC;
+
+-- +goose StatementEnd
+-- +goose ENVSUB OFF
