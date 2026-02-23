@@ -24,11 +24,6 @@ const scenarioSchema = z.object({
     .describe(
       "3-6 specific, observable success criteria that can be judged from the conversation",
     ),
-  labels: z
-    .array(z.string())
-    .describe(
-      "1-3 short labels for categorization (e.g., 'billing', 'escalation', 'edge-case')",
-    ),
 });
 
 const requestSchema = z.object({
@@ -38,7 +33,6 @@ const requestSchema = z.object({
       name: z.string(),
       situation: z.string(),
       criteria: z.array(z.string()),
-      labels: z.array(z.string()),
     })
     .nullable(),
   projectId: z.string().min(1, "Project ID is required"),
@@ -69,8 +63,6 @@ Given a description of an agent and desired scenario, generate:
    - Are observable from the conversation
    - Test one specific behavior each
    - Use clear, judgeable language (e.g., "Agent must acknowledge the error" not "Agent is helpful")
-
-4. **labels**: 1-3 categorization labels (e.g., "billing", "escalation", "edge-case")
 
 When refining an existing scenario, incorporate the user's feedback while preserving the overall structure and any parts they haven't asked to change.`;
 

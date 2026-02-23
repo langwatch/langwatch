@@ -61,7 +61,6 @@ describe("useScenarioGeneration", () => {
     name: "Test Scenario",
     situation: "Test situation",
     criteria: ["criterion 1"],
-    labels: ["test"],
   };
 
   beforeEach(() => {
@@ -182,7 +181,6 @@ describe("useScenarioGeneration", () => {
       name: "Current",
       situation: "Current situation",
       criteria: ["existing"],
-      labels: ["label"],
     };
 
     await act(async () => {
