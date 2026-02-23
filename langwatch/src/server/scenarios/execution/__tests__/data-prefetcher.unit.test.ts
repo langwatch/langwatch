@@ -485,6 +485,7 @@ describe("prefetchScenarioData", () => {
               systemPrompt: "You are helpful",
             });
             expect(result.data.modelParams).toEqual(defaultModelParams);
+            expect(result.data.target).toEqual({ type: "prompt", referenceId: "prompt_123" });
             expect(result.telemetry).toEqual({
               endpoint: "http://localhost:3000",
               apiKey: "test-api-key",

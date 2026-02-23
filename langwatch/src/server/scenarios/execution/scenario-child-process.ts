@@ -80,7 +80,7 @@ async function readJobDataFromStdin(): Promise<ChildProcessJobData> {
 }
 
 async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
-	const { context, scenario, adapterData, modelParams, nlpServiceUrl } =
+	const { context, scenario, adapterData, modelParams, nlpServiceUrl, target } =
 		jobData;
 
 	const adapter = createAdapter({ adapterData, modelParams, nlpServiceUrl });
@@ -100,6 +100,12 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
 				ScenarioRunner.judgeAgent({ criteria: scenario.criteria, model }),
 			],
 			verbose,
+			metadata: {
+				langwatch: {
+					targetReferenceId: target.referenceId,
+					targetType: target.type,
+				},
+			},
 		},
 		{
 			batchRunId: context.batchRunId,
