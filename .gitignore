@@ -33,6 +33,7 @@ prompts/**
 # Claude Code personal settings
 **/.claude/settings.local.json
 **/.claude/agent-memory/
+.claude/skills/local-*/
 
 # Browser test screenshots
 .browser-test-screenshots/
