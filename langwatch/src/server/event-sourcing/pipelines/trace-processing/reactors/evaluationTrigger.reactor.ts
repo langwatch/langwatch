@@ -36,6 +36,9 @@ export function createEvaluationTriggerReactor(
       // Guard: skip old traces (resyncing)
       if (event.occurredAt < Date.now() - 60 * 60 * 1000) return;
 
+      // Guard: skip traces blocked by guardrail with no output
+      if (foldState.blockedByGuardrail && !foldState.computedOutput) return;
+
       // Guard: skip studio development traces TODO: test these are still hoisted
       const attrs = foldState.attributes ?? {};
       if (
@@ -57,6 +60,9 @@ export function createEvaluationTriggerReactor(
       const labels = parseLabels(attrs["langwatch.labels"]);
 
       for (const monitor of monitors) {
+        // Early sampling in reactor to avoid dispatching commands that get discarded
+        if (Math.random() > monitor.sample) continue;
+
         const evaluationId = generate(KSUID_RESOURCES.EVALUATION).toString();
         try {
           await deps.evaluation({
@@ -68,6 +74,7 @@ export function createEvaluationTriggerReactor(
             evaluatorName: monitor.name,
             isGuardrail: false,
             occurredAt: event.occurredAt,
+            threadIdleTimeout: monitor.threadIdleTimeout ?? undefined,
             threadId,
             userId,
             customerId,
