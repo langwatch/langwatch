@@ -3,6 +3,7 @@ import { vi } from "vitest";
 import type { NormalizedAttributes } from "../../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
 import { SpanDataBag } from "../../spanDataBag";
 import type { ExtractorContext } from "../_types";
+import { toAttrValue } from "../../utils";
 
 /**
  * Creates a real ExtractorContext for extractor unit tests.
@@ -19,12 +20,16 @@ export function createExtractorContext(
   const out: NormalizedAttributes = {};
 
   const setAttr = vi.fn((key: string, value: unknown) => {
-    out[key] = value as NormalizedAttributes[string];
+    const av = toAttrValue(value);
+    if (av === null) return;
+    out[key] = av;
   });
 
   const setAttrIfAbsent = vi.fn((key: string, value: unknown) => {
     if (!(key in out)) {
-      out[key] = value as NormalizedAttributes[string];
+      const av = toAttrValue(value);
+      if (av === null) return;
+      out[key] = av;
     }
   });
 

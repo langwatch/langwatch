@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 
+import { vi } from "vitest";
 import type { NormalizedAttributes } from "../../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
 import { SpanDataBag } from "../../spanDataBag";
+import { toAttrValue } from "../../utils";
 import { ATTR_KEYS } from "../_constants";
 import type { ExtractorContext } from "../_types";
 import { StrandsExtractor } from "../strands";
 import { createExtractorContext } from "./_testHelpers";
-import { vi } from "vitest";
 
 /**
  * Creates a context with events support for Strands tests.
@@ -20,7 +21,7 @@ function createStrandsContext(
   const normalizedEvents = events.map((e) => ({
     name: e.name,
     attributes: e.attributes as NormalizedAttributes,
-    timeUnixNano: "0",
+    timeUnixMs: 0,
   }));
 
   const bag = new SpanDataBag(
@@ -30,12 +31,16 @@ function createStrandsContext(
   const out: NormalizedAttributes = {};
 
   const setAttr = vi.fn((key: string, value: unknown) => {
-    out[key] = value as NormalizedAttributes[string];
+    const av = toAttrValue(value);
+    if (av === null) return;
+    out[key] = av;
   });
 
   const setAttrIfAbsent = vi.fn((key: string, value: unknown) => {
     if (!(key in out)) {
-      out[key] = value as NormalizedAttributes[string];
+      const av = toAttrValue(value);
+      if (av === null) return;
+      out[key] = av;
     }
   });
 
@@ -130,9 +135,9 @@ describe("StrandsExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toEqual([
-        { role: "user", content: "Hello from user" },
-      ]);
+      expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toEqual(
+        JSON.stringify([{ role: "user", content: "Hello from user" }]),
+      );
     });
 
     it("extracts gen_ai.system.message events as input messages", () => {
@@ -145,9 +150,9 @@ describe("StrandsExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toEqual([
-        { role: "system", content: "System prompt" },
-      ]);
+      expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toEqual(
+        JSON.stringify([{ role: "system", content: "System prompt" }]),
+      );
     });
 
     it("extracts multiple role events in order", () => {
@@ -164,7 +169,9 @@ describe("StrandsExtractor", () => {
 
       extractor.apply(ctx);
 
-      const messages = ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] as unknown[];
+      const messages = JSON.parse(
+        ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] as string,
+      ) as unknown[];
       expect(messages).toHaveLength(2);
       expect(messages[0]).toEqual({ role: "system", content: "Be helpful" });
       expect(messages[1]).toEqual({ role: "user", content: "Hi" });
@@ -182,9 +189,11 @@ describe("StrandsExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES]).toEqual([
-        { role: "assistant", content: "Response text", finish_reason: undefined },
-      ]);
+      expect(ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES]).toEqual(
+        JSON.stringify([
+          { role: "assistant", content: "Response text" },
+        ]),
+      );
     });
   });
 

@@ -27,10 +27,12 @@ describe("HaystackExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS]).toEqual([
-        { document_id: "doc-1", content: "Document 1 content" },
-        { content: "Document 2 content" },
-      ]);
+      expect(ctx.out[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS]).toEqual(
+        JSON.stringify([
+          { document_id: "doc-1", content: "Document 1 content" },
+          { content: "Document 2 content" },
+        ]),
+      );
     });
 
     it("infers span type as rag", () => {
@@ -56,10 +58,9 @@ describe("HaystackExtractor", () => {
 
       extractor.apply(ctx);
 
-      const contexts = ctx.out[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS] as Array<{
-        content: string;
-        document_id?: string;
-      }>;
+      const contexts = JSON.parse(
+        ctx.out[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS] as string,
+      ) as Array<{ content: string; document_id?: string }>;
       expect(contexts[0]!.document_id).toBe("my-doc-id");
     });
 
@@ -76,7 +77,9 @@ describe("HaystackExtractor", () => {
 
       extractor.apply(ctx);
 
-      const contexts = ctx.out[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS] as unknown[];
+      const contexts = JSON.parse(
+        ctx.out[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS] as string,
+      ) as unknown[];
       expect(contexts).toHaveLength(1);
       expect(contexts[0]).toEqual({ content: "Valid" });
     });

@@ -9,15 +9,17 @@ import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import type { Session } from "next-auth";
 import { z } from "zod";
+import { env } from "~/env.mjs";
 import {
   createTRPCRouter,
   protectedProcedure,
   publicProcedure,
 } from "~/server/api/trpc";
+import { SubscriptionHandler } from "~/server/subscriptionHandler";
 import { encrypt } from "~/utils/encryption";
 import { slugify } from "~/utils/slugify";
-import { env } from "../../../env.mjs";
-import { SubscriptionHandler } from "~/server/subscriptionHandler";
+import { auditLog } from "../../auditLog";
+import { generateApiKey } from "../../utils/apiKeyGenerator";
 import {
   checkOrganizationPermission,
   checkProjectPermission,
@@ -28,8 +30,6 @@ import {
 } from "../rbac";
 import { getOrganizationProjectsCount } from "./limits";
 import { revokeAllTraceShares } from "./share";
-import { auditLog } from "../../auditLog";
-import { generateApiKey } from "../../utils/apiKeyGenerator";
 
 export const projectRouter = createTRPCRouter({
   publicGetById: publicProcedure
@@ -211,7 +211,9 @@ export const projectRouter = createTRPCRouter({
             ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
           capturedOutputVisibility:
             ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
-          featureEventSourcingTraceIngestion: true,
+          featureEventSourcingTraceIngestion: Boolean(env.IS_SAAS),
+          featureEventSourcingEvaluationIngestion: Boolean(env.IS_SAAS),
+          featureEventSourcingSimulationIngestion: Boolean(env.IS_SAAS),
         },
       });
 

@@ -497,38 +497,36 @@ const dispatchToClickHouse = async (
     }
   }
 
-  // Per-evaluation processing pipeline dispatches — fire-and-forget (supplementary)
+  // Per-evaluation processing pipeline dispatches
   if (project.featureEventSourcingEvaluationIngestion) {
     const app = getApp();
     for (const evaluation of batchEvaluation.evaluations) {
       const evaluationId = generate(KSUID_RESOURCES.EVALUATION).toString();
-      void (async () => {
-        try {
-          await app.evaluations.startEvaluation({
-            tenantId: project.id,
-            evaluationId,
-            evaluatorId: evaluation.evaluator,
-            evaluatorType: evaluation.evaluator,
-            evaluatorName: evaluation.name ?? undefined,
-            occurredAt: Date.now(),
-          });
-          await app.evaluations.completeEvaluation({
-            tenantId: project.id,
-            evaluationId,
-            status: evaluation.status,
-            score: evaluation.score ?? undefined,
-            passed: evaluation.passed ?? undefined,
-            label: evaluation.label ?? undefined,
-            details: evaluation.details ?? undefined,
-            occurredAt: Date.now(),
-          });
-        } catch (err) {
-          logger.warn(
-            { err, evaluationId, evaluator: evaluation.evaluator },
-            "Failed to dispatch evaluation to evaluation processing pipeline",
-          );
-        }
-      })();
+      try {
+        await app.evaluations.startEvaluation({
+          tenantId: project.id,
+          evaluationId,
+          evaluatorId: evaluation.evaluator,
+          evaluatorType: evaluation.evaluator,
+          evaluatorName: evaluation.name ?? undefined,
+          occurredAt: Date.now(),
+        });
+        await app.evaluations.completeEvaluation({
+          tenantId: project.id,
+          evaluationId,
+          status: evaluation.status,
+          score: evaluation.score ?? undefined,
+          passed: evaluation.passed ?? undefined,
+          label: evaluation.label ?? undefined,
+          details: evaluation.details ?? undefined,
+          occurredAt: Date.now(),
+        });
+      } catch (err) {
+        logger.warn(
+          { err, evaluationId, evaluator: evaluation.evaluator },
+          "Failed to dispatch evaluation to evaluation processing pipeline",
+        );
+      }
     }
   }
 };

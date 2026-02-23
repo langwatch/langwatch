@@ -323,7 +323,7 @@ importers:
         specifier: 1.14.2
         version: 1.14.2
       ioredis:
-        specifier: ^5.9.2
+        specifier: ^5.8.2
         version: 5.9.2
       jsonpath-plus:
         specifier: ^10.3.0
@@ -11949,10 +11949,6 @@ packages:
     resolution: {integrity: sha512-iq6eVVI64nQQTRYq2KtEg2d2uU7LElhTJwsH4YzIHZshxlgZms/wIc4VoDQTlG/IvVIrBKG06CrZnp0qv7hkcQ==}
     engines: {node: '>=12'}
 
-  stripe@15.2.0:
-    resolution: {integrity: sha512-SRHzYkRHYld49BeL1xECsjoeNZYpRYzm2iUenWqeRdwJwkRHOVGNccn0UnaLr3jA4B7QpUYHX7Ef7U5yIljsZw==}
-    engines: {node: '>=12.*'}
-
   strip-bom@4.0.0:
     resolution: {integrity: sha512-3xurFv5tEgii33Zi8Jtp55wEIILR9eh34FAW00PZf+JnSsTmV/ioewSgQl97JHvgjoRGwPShsWm+IdrxB35d0w==}
     engines: {node: '>=8'}
@@ -11968,6 +11964,10 @@ packages:
   strip-json-comments@3.1.1:
     resolution: {integrity: sha512-6fPc+R4ihwqP6N/aIv2f1gMH8lOVtWQHoqC4yK6oSDVVocumAsfCqjkXnqiYMhmMwS/mEHLp7Vehlt3ql6lEig==}
     engines: {node: '>=8'}
+
+  stripe@15.2.0:
+    resolution: {integrity: sha512-SRHzYkRHYld49BeL1xECsjoeNZYpRYzm2iUenWqeRdwJwkRHOVGNccn0UnaLr3jA4B7QpUYHX7Ef7U5yIljsZw==}
+    engines: {node: '>=12.*'}
 
   strnum@1.1.2:
     resolution: {integrity: sha512-vrN+B7DBIoTTZjnPNewwhx6cBA/H+IS7rfW68n7XxC1y7uoiGQBxaKzqucGUgavX15dJgiGztLJ8vxuEzwqBdA==}
@@ -27988,11 +27988,6 @@ snapshots:
     dependencies:
       ansi-regex: 6.1.0
 
-  stripe@15.2.0:
-    dependencies:
-      '@types/node': 20.19.27
-      qs: 6.14.2
-
   strip-bom@4.0.0: {}
 
   strip-final-newline@2.0.0: {}
@@ -28002,6 +27997,11 @@ snapshots:
       min-indent: 1.0.1
 
   strip-json-comments@3.1.1: {}
+
+  stripe@15.2.0:
+    dependencies:
+      '@types/node': 20.19.27
+      qs: 6.14.2
 
   strnum@1.1.2: {}
 

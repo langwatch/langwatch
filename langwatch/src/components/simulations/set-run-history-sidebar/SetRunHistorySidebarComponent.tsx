@@ -7,12 +7,11 @@ import {
   HStack,
   Icon,
   Skeleton,
-  Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import React, { useState } from "react";
-import { ChevronLeft, ChevronRight, Clock } from "react-feather";
+import { ChevronLeft, ChevronRight, Clock, Inbox } from "react-feather";
 import {
   isOnPlatformSet,
   ON_PLATFORM_DISPLAY_NAME,
@@ -85,7 +84,7 @@ export const SetRunHistorySidebarComponent = (
           <EmptyState.Root size={"md"}>
             <EmptyState.Content>
               <EmptyState.Indicator>
-                <Spinner />
+                <Inbox />
               </EmptyState.Indicator>
               <VStack textAlign="center">
                 <EmptyState.Title>This set is all alone</EmptyState.Title>

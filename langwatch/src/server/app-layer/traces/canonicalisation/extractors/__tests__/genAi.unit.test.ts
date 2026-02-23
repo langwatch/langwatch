@@ -77,9 +77,9 @@ describe("GenAIExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toEqual([
-        { role: "user", content: "What is 2+2?" },
-      ]);
+      expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toEqual(
+        JSON.stringify([{ role: "user", content: "What is 2+2?" }]),
+      );
     });
 
     it("extracts system instruction from first system message", () => {
@@ -107,9 +107,9 @@ describe("GenAIExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES]).toEqual([
-        { role: "assistant", content: "The answer is 4." },
-      ]);
+      expect(ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES]).toEqual(
+        JSON.stringify([{ role: "assistant", content: "The answer is 4." }]),
+      );
     });
   });
 
@@ -122,7 +122,9 @@ describe("GenAIExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toEqual(messages);
+      expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toEqual(
+        JSON.stringify(messages),
+      );
     });
   });
 
@@ -135,7 +137,9 @@ describe("GenAIExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES]).toEqual(messages);
+      expect(ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES]).toEqual(
+        JSON.stringify(messages),
+      );
     });
   });
 

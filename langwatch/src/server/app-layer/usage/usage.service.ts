@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
+import { SubscriptionHandler } from "~/server/subscriptionHandler";
 import { FREE_PLAN } from "../../../../ee/licensing/constants";
 import { env } from "../../../env.mjs";
-import { dependencies } from "../../../injection/dependencies.server";
 import { TraceUsageService } from "../../traces/trace-usage.service";
 import { getCurrentMonthStartDateString } from "../../utils/dateUtils";
 import { TtlCache } from "../../utils/ttlCache";
@@ -38,7 +38,7 @@ export class UsageService {
     private readonly repo: UsageRepository,
     private readonly organizationService: OrganizationService,
     private readonly esTraceUsageService: TraceUsageService,
-    private readonly subscriptionHandler: typeof dependencies.subscriptionHandler,
+    private readonly subscriptionHandler: typeof SubscriptionHandler,
   ) {
     this.cache = new TtlCache<number>(CACHE_TTL_MS);
   }
@@ -46,11 +46,11 @@ export class UsageService {
   static create({
     prisma,
     organizationService,
-    subscriptionHandler = dependencies.subscriptionHandler,
+    subscriptionHandler = SubscriptionHandler,
   }: {
     prisma: PrismaClient | null;
     organizationService: OrganizationService;
-    subscriptionHandler?: typeof dependencies.subscriptionHandler;
+    subscriptionHandler?: typeof SubscriptionHandler;
   }): UsageService {
     const repo = prisma
       ? new PrismaUsageRepository(prisma)

@@ -1,8 +1,8 @@
+import type { ClickHouseClient } from "@clickhouse/client";
 import type {
   QueryDslBoolQuery,
   QueryDslQueryContainer,
 } from "@elastic/elasticsearch/lib/api/types";
-import type { ClickHouseClient } from "@clickhouse/client";
 import { CostReferenceType, CostType, type Project } from "@prisma/client";
 import { fetch as fetchHTTP2 } from "fetch-h2";
 import { nanoid } from "nanoid";
@@ -13,17 +13,17 @@ import {
 } from "../../utils/constants";
 import { createLogger } from "../../utils/logger/server";
 import { getExtractedInput } from "../../utils/traceExtraction";
-import { createCostChecker } from "../license-enforcement/license-enforcement.repository";
 import {
   getProjectModelProviders,
   prepareLitellmParams,
 } from "../api/routers/modelProviders";
+import { getApp } from "../app-layer/app";
 import { scheduleTopicClusteringNextPage } from "../background/queues/topicClusteringQueue";
 import { getClickHouseClient } from "../clickhouse/client";
 import { prisma } from "../db";
 import { esClient, TRACE_INDEX, traceIndexId } from "../elasticsearch";
 import { getProjectEmbeddingsModel } from "../embeddings";
-import { getApp } from "../app-layer/app";
+import { createCostChecker } from "../license-enforcement/license-enforcement.repository";
 import { getPayloadSizeHistogram } from "../metrics";
 import type { ElasticSearchTrace, Trace } from "../tracer/types";
 import type {
@@ -802,6 +802,7 @@ export const storeResults = async (
                 ? (subtopicNameMap.get(subtopic_id) ?? null)
                 : null,
               isIncremental,
+              occurredAt: Date.now(),
             }),
           ),
         );

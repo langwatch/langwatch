@@ -1,8 +1,8 @@
-import { describe, expect, it } from "vitest";
-import { vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { NormalizedAttributes } from "../../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
 import { SpanDataBag } from "../../spanDataBag";
+import { toAttrValue } from "../../utils";
 import { ATTR_KEYS } from "../_constants";
 import type { ExtractorContext } from "../_types";
 import { LogfireExtractor } from "../logfire";
@@ -15,7 +15,7 @@ function createLogfireContext(
   const normalizedEvents = events.map((e) => ({
     name: e.name,
     attributes: e.attributes as NormalizedAttributes,
-    timeUnixNano: "0",
+    timeUnixMs: 0,
   }));
 
   const bag = new SpanDataBag(
@@ -25,12 +25,16 @@ function createLogfireContext(
   const out: NormalizedAttributes = {};
 
   const setAttr = vi.fn((key: string, value: unknown) => {
-    out[key] = value as NormalizedAttributes[string];
+    const av = toAttrValue(value);
+    if (av === null) return;
+    out[key] = av;
   });
 
   const setAttrIfAbsent = vi.fn((key: string, value: unknown) => {
     if (!(key in out)) {
-      out[key] = value as NormalizedAttributes[string];
+      const av = toAttrValue(value);
+      if (av === null) return;
+      out[key] = av;
     }
   });
 
@@ -59,7 +63,9 @@ describe("LogfireExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toEqual(messages);
+      expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toEqual(
+        JSON.stringify(messages),
+      );
     });
 
     it("infers span type as llm when raw_input is still in bag", () => {
@@ -95,9 +101,11 @@ describe("LogfireExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES]).toEqual([
-        { role: "assistant", content: { role: "assistant", content: "Hi there" } },
-      ]);
+      expect(ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES]).toEqual(
+        JSON.stringify([
+          { role: "assistant", content: { role: "assistant", content: "Hi there" } },
+        ]),
+      );
     });
   });
 

@@ -83,110 +83,127 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   }
 
   async getSpansByTraceId({ tenantId, traceId }: { tenantId: string; traceId: string }): Promise<Span[]> {
-    const result = await this.clickHouseClient.query({
-      query: `
-        SELECT
-          SpanId,
-          TraceId,
-          TenantId,
-          ParentSpanId,
-          ParentTraceId,
-          ParentIsRemote,
-          Sampled,
-          toUnixTimestamp64Milli(StartTime) AS StartTime,
-          toUnixTimestamp64Milli(EndTime) AS EndTime,
-          DurationMs,
-          SpanName,
-          SpanKind,
-          ResourceAttributes,
-          SpanAttributes,
-          StatusCode,
-          StatusMessage,
-          ScopeName,
-          ScopeVersion,
-          arrayMap(x -> toUnixTimestamp64Milli(x), \`Events.Timestamp\`) AS Events_Timestamp,
-          \`Events.Name\` AS Events_Name,
-          \`Events.Attributes\` AS Events_Attributes,
-          \`Links.TraceId\` AS Links_TraceId,
-          \`Links.SpanId\` AS Links_SpanId,
-          \`Links.Attributes\` AS Links_Attributes
-        FROM ${TABLE_NAME}
-        WHERE TenantId = {tenantId:String}
-          AND TraceId = {traceId:String}
-        ORDER BY StartTime ASC
-      `,
-      query_params: { tenantId, traceId },
-      format: "JSONEachRow",
-    });
+    EventUtils.validateTenantId(
+      { tenantId },
+      "SpanStorageClickHouseRepository.getSpansByTraceId",
+    );
 
-    const rows = (await result.json()) as Array<{
-      SpanId: string;
-      TraceId: string;
-      TenantId: string;
-      ParentSpanId: string | null;
-      ParentTraceId: string | null;
-      ParentIsRemote: boolean | null;
-      Sampled: boolean;
-      StartTime: number;
-      EndTime: number;
-      DurationMs: number;
-      SpanName: string;
-      SpanKind: number;
-      ResourceAttributes: Record<string, unknown>;
-      SpanAttributes: Record<string, unknown>;
-      StatusCode: number | null;
-      StatusMessage: string | null;
-      ScopeName: string | null;
-      ScopeVersion: string | null;
-      Events_Timestamp: number[];
-      Events_Name: string[];
-      Events_Attributes: Record<string, unknown>[];
-      Links_TraceId: string[];
-      Links_SpanId: string[];
-      Links_Attributes: Record<string, unknown>[];
-    }>;
+    try {
+      const result = await this.clickHouseClient.query({
+        query: `
+          SELECT
+            SpanId,
+            TraceId,
+            TenantId,
+            ParentSpanId,
+            ParentTraceId,
+            ParentIsRemote,
+            Sampled,
+            toUnixTimestamp64Milli(StartTime) AS StartTime,
+            toUnixTimestamp64Milli(EndTime) AS EndTime,
+            DurationMs,
+            SpanName,
+            SpanKind,
+            ResourceAttributes,
+            SpanAttributes,
+            StatusCode,
+            StatusMessage,
+            ScopeName,
+            ScopeVersion,
+            arrayMap(x -> toUnixTimestamp64Milli(x), \`Events.Timestamp\`) AS Events_Timestamp,
+            \`Events.Name\` AS Events_Name,
+            \`Events.Attributes\` AS Events_Attributes,
+            \`Links.TraceId\` AS Links_TraceId,
+            \`Links.SpanId\` AS Links_SpanId,
+            \`Links.Attributes\` AS Links_Attributes
+          FROM ${TABLE_NAME} FINAL
+          WHERE TenantId = {tenantId:String}
+            AND TraceId = {traceId:String}
+          ORDER BY StartTime ASC
+        `,
+        query_params: { tenantId, traceId },
+        format: "JSONEachRow",
+      });
 
-    // Re-use the existing mapper by converting CH rows to the SpanInsertData
-    // shape expected by mapNormalizedSpansToSpans
-    const normalizedSpans = rows.map((row) => ({
-      id: "",
-      traceId: row.TraceId,
-      spanId: row.SpanId,
-      tenantId: row.TenantId,
-      parentSpanId: row.ParentSpanId,
-      parentTraceId: row.ParentTraceId,
-      parentIsRemote: row.ParentIsRemote,
-      sampled: row.Sampled,
-      startTimeUnixMs: row.StartTime,
-      endTimeUnixMs: row.EndTime,
-      durationMs: row.DurationMs,
-      name: row.SpanName,
-      kind: row.SpanKind,
-      resourceAttributes: row.ResourceAttributes,
-      spanAttributes: row.SpanAttributes,
-      statusCode: row.StatusCode,
-      statusMessage: row.StatusMessage,
-      instrumentationScope: {
-        name: row.ScopeName ?? "",
-        version: row.ScopeVersion,
-      },
-      events: (row.Events_Timestamp ?? []).map((ts, i) => ({
-        name: row.Events_Name?.[i] ?? "",
-        timeUnixMs: ts,
-        attributes: row.Events_Attributes?.[i] ?? {},
-      })),
-      links: (row.Links_TraceId ?? []).map((lt, i) => ({
-        traceId: lt,
-        spanId: row.Links_SpanId?.[i] ?? "",
-        attributes: row.Links_Attributes?.[i] ?? {},
-      })),
-      droppedAttributesCount: 0,
-      droppedEventsCount: 0,
-      droppedLinksCount: 0,
-    }));
+      const rows = (await result.json()) as Array<{
+        SpanId: string;
+        TraceId: string;
+        TenantId: string;
+        ParentSpanId: string | null;
+        ParentTraceId: string | null;
+        ParentIsRemote: boolean | null;
+        Sampled: boolean;
+        StartTime: number;
+        EndTime: number;
+        DurationMs: number;
+        SpanName: string;
+        SpanKind: number;
+        ResourceAttributes: Record<string, unknown>;
+        SpanAttributes: Record<string, unknown>;
+        StatusCode: number | null;
+        StatusMessage: string | null;
+        ScopeName: string | null;
+        ScopeVersion: string | null;
+        Events_Timestamp: number[];
+        Events_Name: string[];
+        Events_Attributes: Record<string, unknown>[];
+        Links_TraceId: string[];
+        Links_SpanId: string[];
+        Links_Attributes: Record<string, unknown>[];
+      }>;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return mapNormalizedSpansToSpans(normalizedSpans as any);
+      // Re-use the existing mapper by converting CH rows to the SpanInsertData
+      // shape expected by mapNormalizedSpansToSpans
+      const normalizedSpans = rows.map((row) => ({
+        id: "",
+        traceId: row.TraceId,
+        spanId: row.SpanId,
+        tenantId: row.TenantId,
+        parentSpanId: row.ParentSpanId,
+        parentTraceId: row.ParentTraceId,
+        parentIsRemote: row.ParentIsRemote,
+        sampled: row.Sampled,
+        startTimeUnixMs: row.StartTime,
+        endTimeUnixMs: row.EndTime,
+        durationMs: row.DurationMs,
+        name: row.SpanName,
+        kind: row.SpanKind,
+        resourceAttributes: row.ResourceAttributes,
+        spanAttributes: row.SpanAttributes,
+        statusCode: row.StatusCode,
+        statusMessage: row.StatusMessage,
+        instrumentationScope: {
+          name: row.ScopeName ?? "",
+          version: row.ScopeVersion,
+        },
+        events: (row.Events_Timestamp ?? []).map((ts, i) => ({
+          name: row.Events_Name?.[i] ?? "",
+          timeUnixMs: ts,
+          attributes: row.Events_Attributes?.[i] ?? {},
+        })),
+        links: (row.Links_TraceId ?? []).map((lt, i) => ({
+          traceId: lt,
+          spanId: row.Links_SpanId?.[i] ?? "",
+          attributes: row.Links_Attributes?.[i] ?? {},
+        })),
+        droppedAttributesCount: 0,
+        droppedEventsCount: 0,
+        droppedLinksCount: 0,
+      }));
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return mapNormalizedSpansToSpans(normalizedSpans as any);
+    } catch (error) {
+      logger.error(
+        {
+          tenantId,
+          traceId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Failed to get spans by trace ID from ClickHouse",
+      );
+      throw error;
+    }
   }
 
   private toClickHouseRecord(span: SpanInsertData): ClickHouseSpanWriteRecord {

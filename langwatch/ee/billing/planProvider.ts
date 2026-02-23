@@ -20,7 +20,7 @@ const isAdmin = (user?: { email?: string | null }) => {
   }
 
   const adminEmails = env.ADMIN_EMAILS;
-  if (!adminEmails) {
+  if (!adminEmails || typeof adminEmails !== "string") {
     return false;
   }
 

@@ -92,6 +92,7 @@ export class AttributeBag {
 
   delete(key: string): void {
     this.map.delete(key);
+    this.parsedCache.delete(key);
   }
 
   remaining(): NormalizedAttributes {

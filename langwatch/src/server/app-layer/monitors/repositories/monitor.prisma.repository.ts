@@ -1,5 +1,5 @@
 import { EvaluationExecutionMode, type PrismaClient } from "@prisma/client";
-import type { MonitorRepository, MonitorSummary } from "../monitor.repository";
+import type { MonitorRepository, MonitorSummary } from "./monitor.repository";
 
 export class PrismaMonitorRepository implements MonitorRepository {
   constructor(private readonly prisma: PrismaClient) {}

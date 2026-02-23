@@ -36,6 +36,6 @@ export function createRedisConnectionFromConfig(
       ? { rejectUnauthorized: false }
       : opts.url?.includes("rediss://")
         ? {}
-        : null,
+        : void 0,
   });
 }

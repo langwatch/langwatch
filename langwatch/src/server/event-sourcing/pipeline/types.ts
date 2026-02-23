@@ -14,9 +14,6 @@ import type { CommandHandlerOptions } from "../services/commands/commandDispatch
 import type { EventSourcingService } from "../services/eventSourcingService";
 import type { EventStore } from "../stores/eventStore.types";
 
-// Re-export KillSwitchOptions for consumers that import from pipeline/types
-export type { KillSwitchOptions } from "./staticBuilder.types";
-
 /**
  * Static metadata about a pipeline for tooling and introspection.
  */
