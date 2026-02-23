@@ -8,7 +8,12 @@
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { extractSuiteId, isSuiteSetId } from "~/server/suites/suite-set-id";
-import type { SuiteRunSummary } from "./SuiteSidebar";
+
+export type SuiteRunSummary = {
+  passedCount: number;
+  totalCount: number;
+  lastRunTimestamp: number | null;
+};
 
 /** Valid values for the grouping dimension. */
 export const RUN_GROUP_TYPES = ["none", "scenario", "target"] as const;

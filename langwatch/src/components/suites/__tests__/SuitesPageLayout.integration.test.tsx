@@ -36,7 +36,7 @@ vi.mock("~/utils/api", () => ({
     scenarios: {
       getAllSuiteRunData: {
         useQuery: () => ({
-          data: { runs: [], hasMore: false, nextCursor: undefined },
+          data: { runs: [], scenarioSetIds: {}, hasMore: false, nextCursor: undefined },
           isLoading: false,
           error: null,
         }),
