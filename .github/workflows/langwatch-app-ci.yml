@@ -49,6 +49,12 @@ jobs:
         working-directory: langwatch
         run: pnpm typecheck
 
+      - name: Notify Slack on failure
+        if: failure() && github.ref == 'refs/heads/main'
+        env:
+          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
+        run: bash .github/scripts/notify-slack-job-failure.sh typecheck
+
   test-unit:
     env:
       VITEST_MAX_WORKERS: "8" # Cannot use 100% here, it gets parsed as "100" so its actually slower
@@ -311,6 +317,12 @@ jobs:
           fail_level: error
           biome_flags: "./src"
 
+      - name: Notify Slack on failure
+        if: failure() && github.ref == 'refs/heads/main'
+        env:
+          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
+        run: bash .github/scripts/notify-slack-job-failure.sh lint
+
   build:
     runs-on: ubuntu-latest
     env:
@@ -380,3 +392,9 @@ jobs:
       - name: Build
         working-directory: langwatch
         run: pnpm build
+
+      - name: Notify Slack on failure
+        if: failure() && github.ref == 'refs/heads/main'
+        env:
+          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
+        run: bash .github/scripts/notify-slack-job-failure.sh build
