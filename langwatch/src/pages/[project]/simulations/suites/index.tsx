@@ -18,9 +18,8 @@ import {
   SuiteDetailPanel,
   SuiteEmptyState,
 } from "~/components/suites/SuiteDetailPanel";
-import { SuiteSidebar, type SuiteRunSummary } from "~/components/suites/SuiteSidebar";
-import { groupRunsByBatchId, computeBatchRunSummary } from "~/components/suites/run-history-transforms";
-import { extractSuiteId, isSuiteSetId } from "~/server/suites/suite-set-id";
+import { SuiteSidebar } from "~/components/suites/SuiteSidebar";
+import { computeSuiteRunSummaries } from "~/components/suites/run-history-transforms";
 import {
   DialogRoot,
   DialogContent,
@@ -67,39 +66,10 @@ function SuitesPageContent() {
 
   const runSummaries = useMemo(() => {
     if (!allRunData) return undefined;
-    const map = new Map<string, SuiteRunSummary>();
-
-    // Group runs by suite: scenarioSetIds maps batchRunId → scenarioSetId
-    const runsBySuite = new Map<string, typeof allRunData.runs>();
-    for (const run of allRunData.runs) {
-      const scenarioSetId = allRunData.scenarioSetIds[run.batchRunId];
-      if (!scenarioSetId || !isSuiteSetId(scenarioSetId)) continue;
-      const suiteId = extractSuiteId(scenarioSetId);
-      if (!suiteId) continue;
-
-      const existing = runsBySuite.get(suiteId);
-      if (existing) {
-        existing.push(run);
-      } else {
-        runsBySuite.set(suiteId, [run]);
-      }
-    }
-
-    // For each suite, get the most recent batch run and compute its summary
-    for (const [suiteId, runs] of runsBySuite) {
-      const batchRuns = groupRunsByBatchId({ runs });
-      const latestBatch = batchRuns[0]; // already sorted by timestamp desc
-      if (!latestBatch) continue;
-
-      const summary = computeBatchRunSummary({ batchRun: latestBatch });
-      map.set(suiteId, {
-        passedCount: summary.passedCount,
-        totalCount: summary.totalCount,
-        lastRunTimestamp: latestBatch.timestamp,
-      });
-    }
-
-    return map;
+    return computeSuiteRunSummaries({
+      runs: allRunData.runs,
+      scenarioSetIds: allRunData.scenarioSetIds,
+    });
   }, [allRunData]);
 
   const selectedSuite = typeof selectedSuiteId === "string" && selectedSuiteId !== "all-runs"

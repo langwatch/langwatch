@@ -5,6 +5,7 @@ import {
   groupRunsByTarget,
   computeBatchRunSummary,
   computeRunHistoryTotals,
+  computeSuiteRunSummaries,
   type BatchRun,
   type RunGroup,
 } from "../run-history-transforms";
@@ -498,6 +499,129 @@ describe("groupRunsByBatchId() RunGroup fields", () => {
 
       expect(result[0]!.groupType).toBe("none");
       expect(result[0]!.groupKey).toBe("batch_1");
+    });
+  });
+});
+
+describe("computeSuiteRunSummaries()", () => {
+  describe("when given no runs", () => {
+    it("returns an empty map", () => {
+      const result = computeSuiteRunSummaries({
+        runs: [],
+        scenarioSetIds: {},
+      });
+
+      expect(result.size).toBe(0);
+    });
+  });
+
+  describe("when a suite has all passing runs", () => {
+    it("returns correct summary with all passed", () => {
+      const now = Date.now();
+      const runs = [
+        makeScenarioRunData({
+          batchRunId: "batch_1",
+          scenarioRunId: "run_1",
+          status: ScenarioRunStatus.SUCCESS,
+          timestamp: now,
+        }),
+        makeScenarioRunData({
+          batchRunId: "batch_1",
+          scenarioRunId: "run_2",
+          scenarioId: "scen_2",
+          status: ScenarioRunStatus.SUCCESS,
+          timestamp: now,
+        }),
+        makeScenarioRunData({
+          batchRunId: "batch_1",
+          scenarioRunId: "run_3",
+          scenarioId: "scen_3",
+          status: ScenarioRunStatus.SUCCESS,
+          timestamp: now,
+        }),
+      ];
+
+      const scenarioSetIds = {
+        batch_1: "__internal__suite_abc__suite",
+      };
+
+      const result = computeSuiteRunSummaries({ runs, scenarioSetIds });
+
+      expect(result.size).toBe(1);
+      const summary = result.get("suite_abc");
+      expect(summary).toEqual({
+        passedCount: 3,
+        totalCount: 3,
+        lastRunTimestamp: now,
+      });
+    });
+  });
+
+  describe("when a suite has mixed pass/fail runs", () => {
+    it("returns correct summary with failures", () => {
+      const now = Date.now();
+      const runs = [
+        makeScenarioRunData({
+          batchRunId: "batch_1",
+          scenarioRunId: "run_1",
+          status: ScenarioRunStatus.SUCCESS,
+          timestamp: now,
+        }),
+        makeScenarioRunData({
+          batchRunId: "batch_1",
+          scenarioRunId: "run_2",
+          scenarioId: "scen_2",
+          status: ScenarioRunStatus.ERROR,
+          timestamp: now,
+        }),
+        makeScenarioRunData({
+          batchRunId: "batch_1",
+          scenarioRunId: "run_3",
+          scenarioId: "scen_3",
+          status: ScenarioRunStatus.FAILED,
+          timestamp: now,
+        }),
+      ];
+
+      const scenarioSetIds = {
+        batch_1: "__internal__suite_xyz__suite",
+      };
+
+      const result = computeSuiteRunSummaries({ runs, scenarioSetIds });
+
+      expect(result.size).toBe(1);
+      const summary = result.get("suite_xyz");
+      expect(summary).toEqual({
+        passedCount: 1,
+        totalCount: 3,
+        lastRunTimestamp: now,
+      });
+    });
+  });
+
+  describe("when runs do not belong to a suite", () => {
+    it("ignores non-suite scenarioSetIds", () => {
+      const runs = [
+        makeScenarioRunData({
+          batchRunId: "batch_1",
+          scenarioRunId: "run_1",
+          status: ScenarioRunStatus.SUCCESS,
+        }),
+        makeScenarioRunData({
+          batchRunId: "batch_2",
+          scenarioRunId: "run_2",
+          status: ScenarioRunStatus.SUCCESS,
+        }),
+      ];
+
+      const scenarioSetIds = {
+        batch_1: "some-regular-set-id",
+        batch_2: "__internal__not-a-suite-id",
+      };
+
+      const result = computeSuiteRunSummaries({ runs, scenarioSetIds });
+
+      expect(result.size).toBe(0);
     });
   });
 });

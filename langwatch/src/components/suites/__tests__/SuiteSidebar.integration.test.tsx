@@ -427,9 +427,10 @@ describe("<SuiteSidebar/>", () => {
         { wrapper: Wrapper },
       );
 
-      const allRunsContainer = screen.getByText("All Runs").closest("button, .group")!;
-      expect(allRunsContainer).not.toBeNull();
-      expect(allRunsContainer!.textContent).not.toMatch(/passed/);
+      const allRunsButton = screen.getByText("All Runs");
+      const container = allRunsButton.parentElement;
+      expect(container).not.toBeNull();
+      expect(container!.textContent).not.toMatch(/passed/);
     });
   });
 
@@ -447,7 +448,7 @@ describe("<SuiteSidebar/>", () => {
           { wrapper: Wrapper },
         );
 
-        const suiteItem = screen.getByText("Critical Path").closest(".group")!;
+        const suiteItem = screen.getByText("Critical Path").closest("[data-testid='suite-list-item']")!;
         await user.hover(suiteItem);
 
         expect(screen.getByTestId("suite-menu-button")).toBeInTheDocument();
@@ -455,14 +456,13 @@ describe("<SuiteSidebar/>", () => {
     });
 
     describe("when not hovering over a suite item", () => {
-      it("renders the three-dot menu button with zero opacity", () => {
+      it("renders the three-dot menu button in the DOM", () => {
         render(
           <SuiteSidebar {...defaultProps} suites={suites} />,
           { wrapper: Wrapper },
         );
 
-        const menuButton = screen.getByTestId("suite-menu-button");
-        expect(menuButton).toBeInTheDocument();
+        expect(screen.getByTestId("suite-menu-button")).toBeInTheDocument();
       });
     });
 
@@ -480,7 +480,7 @@ describe("<SuiteSidebar/>", () => {
           { wrapper: Wrapper },
         );
 
-        const suiteItem = screen.getByText("Critical Path").closest(".group")!;
+        const suiteItem = screen.getByText("Critical Path").closest("[data-testid='suite-list-item']")!;
         await user.hover(suiteItem);
 
         const menuButton = screen.getByTestId("suite-menu-button");

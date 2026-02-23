@@ -7,6 +7,8 @@
 
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import { extractSuiteId, isSuiteSetId } from "~/server/suites/suite-set-id";
+import type { SuiteRunSummary } from "./SuiteSidebar";
 
 /** Valid values for the grouping dimension. */
 export const RUN_GROUP_TYPES = ["none", "scenario", "target"] as const;
@@ -275,4 +277,52 @@ export function computeRunHistoryTotals({
     passedCount,
     failedCount,
   };
+}
+
+/**
+ * Computes run summaries for each suite from flat scenario run data.
+ *
+ * Groups runs by suite (via scenarioSetIds), finds the most recent batch
+ * for each suite, and returns pass/fail summary for that batch.
+ */
+export function computeSuiteRunSummaries({
+  runs,
+  scenarioSetIds,
+}: {
+  runs: ScenarioRunData[];
+  scenarioSetIds: Record<string, string>;
+}): Map<string, SuiteRunSummary> {
+  const map = new Map<string, SuiteRunSummary>();
+
+  // Group runs by suite: scenarioSetIds maps batchRunId -> scenarioSetId
+  const runsBySuite = new Map<string, ScenarioRunData[]>();
+  for (const run of runs) {
+    const scenarioSetId = scenarioSetIds[run.batchRunId];
+    if (!scenarioSetId || !isSuiteSetId(scenarioSetId)) continue;
+    const suiteId = extractSuiteId(scenarioSetId);
+    if (!suiteId) continue;
+
+    const existing = runsBySuite.get(suiteId);
+    if (existing) {
+      existing.push(run);
+    } else {
+      runsBySuite.set(suiteId, [run]);
+    }
+  }
+
+  // For each suite, get the most recent batch run and compute its summary
+  for (const [suiteId, suiteRuns] of runsBySuite) {
+    const batchRuns = groupRunsByBatchId({ runs: suiteRuns });
+    const latestBatch = batchRuns[0]; // already sorted by timestamp desc
+    if (!latestBatch) continue;
+
+    const summary = computeBatchRunSummary({ batchRun: latestBatch });
+    map.set(suiteId, {
+      passedCount: summary.passedCount,
+      totalCount: summary.totalCount,
+      lastRunTimestamp: latestBatch.timestamp,
+    });
+  }
+
+  return map;
 }
