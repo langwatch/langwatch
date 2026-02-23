@@ -1203,7 +1203,7 @@ export class ClickHouseTraceService {
           toUnixTimestamp64Milli(ts.LastUpdatedAt) AS ts_LastUpdatedAt
         FROM (
           SELECT *
-          FROM trace_summaries
+          FROM trace_summaries ts
           WHERE ${whereClause}
           ORDER BY TraceId, LastUpdatedAt DESC
           LIMIT 1 BY TraceId
