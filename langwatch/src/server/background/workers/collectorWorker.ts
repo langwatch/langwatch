@@ -1092,12 +1092,13 @@ export const fetchExistingMD5s = async (
  * Lightweight estimation of payload size in bytes.
  * Avoids JSON.stringify() which causes massive allocations and GC pressure.
  */
-function estimatePayloadSize(obj: any): number {
+function estimatePayloadSize(obj: unknown): number {
   if (obj === null || obj === undefined) return 0;
   let bytes = 0;
   const seen = new WeakSet<object>();
 
-  const stack = [obj];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const stack: any[] = [obj];
   while (stack.length > 0) {
     const value = stack.pop();
 
@@ -1115,10 +1116,11 @@ function estimatePayloadSize(obj: any): number {
           stack.push(value[i]);
         }
       } else {
-        for (const key in value) {
-          if (Object.prototype.hasOwnProperty.call(value, key)) {
+        const record = value as Record<string, unknown>;
+        for (const key in record) {
+          if (Object.prototype.hasOwnProperty.call(record, key)) {
             bytes += key.length * 2;
-            stack.push(value[key]);
+            stack.push(record[key]);
           }
         }
       }

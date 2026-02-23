@@ -4,7 +4,7 @@ import type { FeatureFlagServiceInterface } from "~/server/featureFlag/types";
 import { createLogger } from "~/utils/logger/server";
 import type { AggregateType } from "../domain/aggregateType";
 import type { Event, Projection } from "../domain/types";
-import type { KillSwitchOptions } from "../pipeline/types";
+import type { KillSwitchOptions } from "../pipeline/staticBuilder.types";
 import type { DeduplicationStrategy } from "../queues";
 import type { ReactorDefinition } from "../reactors/reactor.types";
 import {

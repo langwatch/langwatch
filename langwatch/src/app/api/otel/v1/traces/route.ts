@@ -1,4 +1,3 @@
-import superjson from "superjson";
 import * as crypto from "node:crypto";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";

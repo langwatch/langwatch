@@ -1,5 +1,5 @@
 import type { Event } from "../domain/types";
-import type { KillSwitchOptions } from "../pipeline/types";
+import type { KillSwitchOptions } from "../pipeline/staticBuilder.types";
 import type { ProjectionStoreContext } from "./projectionStoreContext";
 
 /**

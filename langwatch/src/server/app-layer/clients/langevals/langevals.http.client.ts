@@ -72,15 +72,14 @@ export class LangEvalsHttpClient implements LangEvalsClient {
       clearTimeout(timeout);
     }
 
-    const duration = performance.now() - startTime;
-    evaluationDurationHistogram.labels(evaluatorType).observe(duration);
-
     if (!response.ok) {
       if (response.status >= 500 && retriesLeft > 0) {
         await new Promise((resolve) => setTimeout(resolve, 100));
         return this.evaluateWithRetry(params, retriesLeft - 1);
       }
 
+      const duration = performance.now() - startTime;
+      evaluationDurationHistogram.labels(evaluatorType).observe(duration);
       getEvaluationStatusCounter(evaluatorType, "error").inc();
       let statusText = response.statusText;
       try {
@@ -93,6 +92,9 @@ export class LangEvalsHttpClient implements LangEvalsClient {
         { meta: { evaluatorType, httpStatus: response.status } },
       );
     }
+
+    const duration = performance.now() - startTime;
+    evaluationDurationHistogram.labels(evaluatorType).observe(duration);
 
     const result = ((await response.json()) as BatchEvaluationResult)[0];
     if (!result) {
