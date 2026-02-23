@@ -1,5 +1,3 @@
-import sdkVersions from "./sdk-versions.json";
-
 export interface SdkVersionInfo {
   displayName: string;
   latestVersion: string;
@@ -22,7 +20,7 @@ export const SDK_REGISTRY: Record<string, Record<string, SdkVersionInfo>> = {
   "langwatch-observability-sdk": {
     python: {
       displayName: "Python",
-      latestVersion: sdkVersions["python-sdk"],
+      latestVersion: "0.13.0",
       releasesUrl:
         "https://github.com/langwatch/langwatch/releases?q=python-sdk",
       docsUrl: "https://docs.langwatch.ai/integration/python/guide",
@@ -34,7 +32,7 @@ export const SDK_REGISTRY: Record<string, Record<string, SdkVersionInfo>> = {
     },
     typescript: {
       displayName: "TypeScript",
-      latestVersion: sdkVersions["typescript-sdk"],
+      latestVersion: "0.16.1",
       releasesUrl:
         "https://github.com/langwatch/langwatch/releases?q=typescript-sdk",
       docsUrl: "https://docs.langwatch.ai/integration/typescript/guide",
@@ -48,7 +46,7 @@ export const SDK_REGISTRY: Record<string, Record<string, SdkVersionInfo>> = {
   "langwatch-client-sdk": {
     typescript: {
       displayName: "TypeScript",
-      latestVersion: sdkVersions["typescript-sdk"],
+      latestVersion: "0.16.1",
       releasesUrl:
         "https://github.com/langwatch/langwatch/releases?q=typescript-sdk",
       docsUrl: "https://docs.langwatch.ai/integration/typescript/guide",

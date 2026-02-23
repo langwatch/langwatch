@@ -267,3 +267,23 @@ export const getEventSourcingLockContentionCounter = (
   pipelineName: string,
   processorName: string,
 ) => eventSourcingLockContentionTotal.labels(pipelineName, processorName);
+
+// Counter for events stored (tracks throughput at event level, not job level)
+register.removeSingleMetric("event_sourcing_events_stored_total");
+const eventSourcingEventsStoredTotal = new Counter({
+  name: "event_sourcing_events_stored_total",
+  help: "Total number of events stored by event sourcing pipelines",
+  labelNames: ["pipeline_name"] as const,
+});
+
+export const getEventSourcingEventsStoredCounter = (pipelineName: string) =>
+  eventSourcingEventsStoredTotal.labels(pipelineName);
+
+// Histogram for storeEvents duration (end-to-end: store + dispatch)
+register.removeSingleMetric("event_sourcing_store_duration_milliseconds");
+export const eventSourcingStoreDurationHistogram = new Histogram({
+  name: "event_sourcing_store_duration_milliseconds",
+  help: "Duration of storeEvents (store + projection dispatch) in milliseconds",
+  labelNames: ["pipeline_name"] as const,
+  buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000],
+});

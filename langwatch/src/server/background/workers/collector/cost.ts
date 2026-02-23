@@ -1,11 +1,4 @@
-import fs from "fs/promises";
-import NodeFetchCache, { FileSystemCache } from "node-fetch-cache";
-import path from "path";
-import type { Tiktoken } from "tiktoken/lite";
-// @ts-ignore
-import models from "tiktoken/model_to_encoding.json";
-// @ts-ignore
-import registry from "tiktoken/registry.json";
+import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
 import { createLogger } from "../../../../utils/logger/server";
 import { startSpan } from "../../../../utils/posthogErrorCapture";
 import {
@@ -16,113 +9,7 @@ import { isBuildOrNoRedis } from "../../../redis";
 
 const logger = createLogger("langwatch:workers:collector:cost");
 
-const cachedModel: Record<
-  string,
-  {
-    model: {
-      explicit_n_vocab: number | undefined;
-      pat_str: string;
-      special_tokens: Record<string, number>;
-      bpe_ranks: string;
-    };
-    encoder: Tiktoken;
-  }
-> = {};
-
-const loadingModel = new Set<string>();
-
-const initTikToken = async (
-  modelName: string,
-): Promise<{ encoder: Tiktoken } | undefined> => {
-  let Tiktoken: typeof import("tiktoken/lite").Tiktoken;
-  let load: typeof import("tiktoken/load").load;
-  try {
-    Tiktoken = (await import("tiktoken/lite")).Tiktoken;
-    load = (await import("tiktoken/load")).load;
-  } catch (error) {
-    logger.warn(
-      { error },
-      "tiktoken could not be loaded, skipping tokenization",
-    );
-    return undefined;
-  }
-
-  const fallback = "gpt-4o";
-  const tokenizer =
-    modelName in models
-      ? (models as any)[modelName]
-      : (models as any)[fallback];
-
-  const startedWaiting = Date.now();
-  while (loadingModel.has(tokenizer)) {
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    if (Date.now() - startedWaiting > 10000) {
-      logger.warn({ tokenizer }, "timeout waiting for tokenizer");
-      loadingModel.delete(tokenizer);
-      break;
-    }
-  }
-
-  if (!cachedModel[tokenizer]) {
-    logger.info(`loading tiktoken model ${tokenizer}`);
-    loadingModel.add(tokenizer);
-    const registryInfo = (registry as any)[tokenizer];
-    const fetch = NodeFetchCache.create({
-      cache: new FileSystemCache({
-        cacheDirectory: "node_modules/.cache/tiktoken",
-        ttl: 1000 * 60 * 60 * 24 * 365, // 1 year
-      }),
-    });
-
-    const model = await load(registryInfo, async (url) => {
-      const filename = path.basename(url);
-
-      // Prevent directory traversal
-      const isSafeFilename = /^[a-zA-Z0-9._-]+$/.test(filename);
-      if (!isSafeFilename) {
-        logger.warn(
-          { filename },
-          "Unsafe filename detected; using remote fetch instead",
-        );
-        return fetch(url).then((r) => r.text());
-      }
-
-      if (process.env.TIKTOKENS_PATH) {
-        const localPath = path.join(process.env.TIKTOKENS_PATH, filename);
-        logger.debug(
-          { localPath },
-          "Attempting to load tiktoken model from local file",
-        );
-
-        try {
-          return await fs.readFile(localPath, "utf8");
-        } catch (error) {
-          logger.warn(
-            {
-              localPath,
-              error: error instanceof Error ? error.message : String(error),
-            },
-            "Local read failed; falling back to remote fetch",
-          );
-        }
-      }
-
-      // Default: fetch from remote
-      return fetch(url).then((r) => r.text());
-    });
-
-    const encoder = new Tiktoken(
-      model.bpe_ranks,
-      model.special_tokens,
-      model.pat_str,
-    );
-
-    cachedModel[tokenizer] = { model, encoder };
-    loadingModel.delete(tokenizer);
-  }
-
-  return cachedModel[tokenizer];
-};
+const tiktokenClient = new TiktokenClient();
 
 async function countTokens(
   llmModelCost: MaybeStoredLLMModelCost,
@@ -134,10 +21,7 @@ async function countTokens(
     ? llmModelCost.model.split("/")[1]!
     : llmModelCost.model;
 
-  const tiktoken = await initTikToken(model);
-  if (!tiktoken) return undefined;
-
-  return tiktoken.encoder.encode(text).length;
+  return tiktokenClient.countTokens(model, text);
 }
 
 export async function tokenizeAndEstimateCost({
@@ -206,8 +90,7 @@ export const getMatchingLLMModelCost = async (
 
 // Pre-warm most used models
 export const prewarmTiktokenModels = async () => {
-  await initTikToken("gpt-4");
-  await initTikToken("gpt-4o");
+  await tiktokenClient.prewarm(["gpt-4", "gpt-4o"]);
 };
 
 if (isBuildOrNoRedis) {
