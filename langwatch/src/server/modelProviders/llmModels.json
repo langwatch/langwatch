@@ -1,25 +1,209 @@
 {
-  "updatedAt": "2026-02-09T03:06:58.939Z",
-  "modelCount": 332,
+  "updatedAt": "2026-02-23T03:06:29.131Z",
+  "modelCount": 329,
   "models": {
-    "openrouter/pony-alpha": {
-      "id": "openrouter/pony-alpha",
-      "name": "Pony Alpha",
-      "provider": "openrouter",
+    "gemini/gemini-3.1-pro-preview": {
+      "id": "gemini/gemini-3.1-pro-preview",
+      "name": "Google: Gemini 3.1 Pro Preview",
+      "provider": "gemini",
       "pricing": {
-        "inputCostPerToken": 0,
-        "outputCostPerToken": 0
+        "inputCostPerToken": 0.000002,
+        "outputCostPerToken": 0.000012,
+        "inputCacheReadPerToken": 2e-7,
+        "inputCacheWritePerToken": 3.75e-7,
+        "imageCostPerToken": 0.000002,
+        "audioCostPerToken": 0.000002,
+        "internalReasoningCostPerToken": 0.000012
       },
-      "contextLength": 200000,
-      "maxCompletionTokens": 131000,
+      "contextLength": 1048576,
+      "maxCompletionTokens": 65536,
       "supportedParameters": [
         "include_reasoning",
         "max_tokens",
         "reasoning",
         "response_format",
+        "seed",
+        "stop",
         "structured_outputs",
         "temperature",
+        "tool_choice",
         "tools",
+        "top_p"
+      ],
+      "defaultParameters": {
+        "temperature": null,
+        "topP": null,
+        "frequencyPenalty": null
+      },
+      "modality": "text+image+file+audio+video->text",
+      "mode": "chat",
+      "description": "Gemini 3.1 Pro Preview is Google’s frontier reasoning model, delivering enhanced software engineering performance, improved agentic reliability, and more efficient token usage across complex workflows. Building on the multimodal foundation of the Gemini 3 series, it combines high-precision reasoning across text, image, video, audio, and code with a 1M-token context window. Reasoning Details must be preserved when using multi-turn tool calling, see our docs here: The 3.1 update introduces measurable gains in SWE benchmarks and real-world coding environments, along with stronger autonomous task execution in structured domains such as finance and spreadsheet-based workflows. Designed for advanced development and agentic systems, Gemini 3.1 Pro Preview improves long-horizon stability and tool orchestration while increasing token efficiency. It introduces a new medium thinking level to better balance cost, speed, and performance. The model excels in agentic coding, structured planning, multimodal analysis, and workflow automation, making it well-suited for autonomous agents, financial modeling, spreadsheet automation, and high-context enterprise tasks.",
+      "supportsImageInput": true,
+      "supportsAudioInput": true,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false,
+      "reasoningConfig": {
+        "supported": true,
+        "parameterName": "thinkingLevel",
+        "allowedValues": [
+          "low",
+          "high"
+        ],
+        "defaultValue": "low",
+        "canDisable": false
+      }
+    },
+    "anthropic/claude-sonnet-4.6": {
+      "id": "anthropic/claude-sonnet-4.6",
+      "name": "Anthropic: Claude Sonnet 4.6",
+      "provider": "anthropic",
+      "pricing": {
+        "inputCostPerToken": 0.000003,
+        "outputCostPerToken": 0.000015,
+        "inputCacheReadPerToken": 3e-7,
+        "inputCacheWritePerToken": 0.00000375,
+        "webSearchCostPerQuery": 0.01
+      },
+      "contextLength": 1000000,
+      "maxCompletionTokens": 128000,
+      "supportedParameters": [
+        "include_reasoning",
+        "max_tokens",
+        "reasoning",
+        "response_format",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_k",
+        "top_p",
+        "verbosity"
+      ],
+      "defaultParameters": {
+        "temperature": null,
+        "topP": null,
+        "frequencyPenalty": null
+      },
+      "modality": "text+image->text",
+      "mode": "chat",
+      "description": "Sonnet 4.6 is Anthropic's most capable Sonnet-class model yet, with frontier performance across coding, agents, and professional work. It excels at iterative development, complex codebase navigation, end-to-end project management with memory, polished document creation, and confident computer use for web QA and workflow automation.",
+      "supportsImageInput": true,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "qwen/qwen3.5-plus-02-15": {
+      "id": "qwen/qwen3.5-plus-02-15",
+      "name": "Qwen: Qwen3.5 Plus 2026-02-15",
+      "provider": "qwen",
+      "pricing": {
+        "inputCostPerToken": 4e-7,
+        "outputCostPerToken": 0.0000024
+      },
+      "contextLength": 1000000,
+      "maxCompletionTokens": 65536,
+      "supportedParameters": [
+        "include_reasoning",
+        "max_tokens",
+        "presence_penalty",
+        "reasoning",
+        "response_format",
+        "seed",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_p"
+      ],
+      "defaultParameters": {
+        "temperature": null,
+        "topP": null,
+        "frequencyPenalty": null
+      },
+      "modality": "text+image+video->text",
+      "mode": "chat",
+      "description": "The Qwen3.5 native vision-language series Plus models are built on a hybrid architecture that integrates linear attention mechanisms with sparse mixture-of-experts models, achieving higher inference efficiency. In a variety of task evaluations, the 3.5 series consistently demonstrates performance on par with state-of-the-art leading models. Compared to the 3 series, these models show a leap forward in both pure-text and multimodal capabilities.",
+      "supportsImageInput": true,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "qwen/qwen3.5-397b-a17b": {
+      "id": "qwen/qwen3.5-397b-a17b",
+      "name": "Qwen: Qwen3.5 397B A17B",
+      "provider": "qwen",
+      "pricing": {
+        "inputCostPerToken": 1.5e-7,
+        "outputCostPerToken": 0.000001,
+        "inputCacheReadPerToken": 1.5e-7
+      },
+      "contextLength": 262144,
+      "maxCompletionTokens": 65536,
+      "supportedParameters": [
+        "frequency_penalty",
+        "include_reasoning",
+        "logit_bias",
+        "max_tokens",
+        "min_p",
+        "presence_penalty",
+        "reasoning",
+        "repetition_penalty",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_k",
+        "top_p"
+      ],
+      "defaultParameters": {
+        "temperature": 0.6,
+        "topP": 0.95,
+        "frequencyPenalty": null
+      },
+      "modality": "text+image+video->text",
+      "mode": "chat",
+      "description": "The Qwen3.5 series 397B-A17B native vision-language model is built on a hybrid architecture that integrates a linear attention mechanism with a sparse mixture-of-experts model, achieving higher inference efficiency. It delivers state-of-the-art performance comparable to leading-edge models across a wide range of tasks, including language understanding, logical reasoning, code generation, agent-based tasks, image understanding, video understanding, and graphical user interface (GUI) interactions. With its robust code-generation and agent capabilities, the model exhibits strong generalization across diverse agent.",
+      "supportsImageInput": true,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "minimax/minimax-m2.5": {
+      "id": "minimax/minimax-m2.5",
+      "name": "MiniMax: MiniMax M2.5",
+      "provider": "minimax",
+      "pricing": {
+        "inputCostPerToken": 3e-7,
+        "outputCostPerToken": 0.0000011,
+        "inputCacheReadPerToken": 1.5e-7
+      },
+      "contextLength": 196608,
+      "maxCompletionTokens": 65536,
+      "supportedParameters": [
+        "frequency_penalty",
+        "include_reasoning",
+        "logit_bias",
+        "logprobs",
+        "max_tokens",
+        "min_p",
+        "parallel_tool_calls",
+        "presence_penalty",
+        "reasoning",
+        "reasoning_effort",
+        "repetition_penalty",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_k",
+        "top_logprobs",
         "top_p"
       ],
       "defaultParameters": {
@@ -29,7 +213,87 @@
       },
       "modality": "text->text",
       "mode": "chat",
-      "description": "Pony is a cutting-edge foundation model with strong performance in coding, agentic workflows, reasoning, and roleplay, making it well suited for hands-on coding and real-world use. **Note:** All prompts and completions for this model are logged by the provider and may be used to improve the model.",
+      "description": "MiniMax-M2.5 is a SOTA large language model designed for real-world productivity. Trained in a diverse range of complex real-world digital working environments, M2.5 builds upon the coding expertise of M2.1 to extend into general office work, reaching fluency in generating and operating Word, Excel, and Powerpoint files, context switching between diverse software environments, and working across different agent and human teams. Scoring 80.2% on SWE-Bench Verified, 51.3% on Multi-SWE-Bench, and 76.3% on BrowseComp, M2.5 is also more token efficient than previous generations, having been trained to optimize its actions and output through planning.",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "z-ai/glm-5": {
+      "id": "z-ai/glm-5",
+      "name": "Z.ai: GLM 5",
+      "provider": "z-ai",
+      "pricing": {
+        "inputCostPerToken": 9.5e-7,
+        "outputCostPerToken": 0.00000255
+      },
+      "contextLength": 204800,
+      "maxCompletionTokens": 131072,
+      "supportedParameters": [
+        "frequency_penalty",
+        "include_reasoning",
+        "logit_bias",
+        "logprobs",
+        "max_tokens",
+        "min_p",
+        "presence_penalty",
+        "reasoning",
+        "repetition_penalty",
+        "response_format",
+        "seed",
+        "stop",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_k",
+        "top_logprobs",
+        "top_p"
+      ],
+      "defaultParameters": {
+        "temperature": 1,
+        "topP": 0.95,
+        "frequencyPenalty": null
+      },
+      "modality": "text->text",
+      "mode": "chat",
+      "description": "GLM-5 is Z.ai’s flagship open-source foundation model engineered for complex systems design and long-horizon agent workflows. Built for expert developers, it delivers production-grade performance on large-scale programming tasks, rivaling leading closed-source models. With advanced agentic planning, deep backend reasoning, and iterative self-correction, GLM-5 moves beyond code generation to full-system construction and autonomous execution.",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "qwen/qwen3-max-thinking": {
+      "id": "qwen/qwen3-max-thinking",
+      "name": "Qwen: Qwen3 Max Thinking",
+      "provider": "qwen",
+      "pricing": {
+        "inputCostPerToken": 0.0000012,
+        "outputCostPerToken": 0.000006
+      },
+      "contextLength": 262144,
+      "maxCompletionTokens": 32768,
+      "supportedParameters": [
+        "include_reasoning",
+        "max_tokens",
+        "presence_penalty",
+        "reasoning",
+        "response_format",
+        "seed",
+        "structured_outputs",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_p"
+      ],
+      "defaultParameters": {
+        "temperature": null,
+        "topP": null,
+        "frequencyPenalty": null
+      },
+      "modality": "text->text",
+      "mode": "chat",
+      "description": "Qwen3-Max-Thinking is the flagship reasoning model in the Qwen3 series, designed for high-stakes cognitive tasks that require deep, multi-step reasoning. By significantly scaling model capacity and reinforcement learning compute, it delivers major gains in factual accuracy, complex reasoning, instruction following, alignment with human preferences, and agentic behavior.",
       "supportsImageInput": false,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
@@ -91,9 +355,9 @@
       "name": "Qwen: Qwen3 Coder Next",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 7e-8,
-        "outputCostPerToken": 3e-7,
-        "inputCacheReadPerToken": 3.5e-8
+        "inputCostPerToken": 1.2e-7,
+        "outputCostPerToken": 7.5e-7,
+        "inputCacheReadPerToken": 6e-8
       },
       "contextLength": 262144,
       "maxCompletionTokens": 65536,
@@ -168,17 +432,51 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
+    "stepfun/step-3.5-flash": {
+      "id": "stepfun/step-3.5-flash",
+      "name": "StepFun: Step 3.5 Flash",
+      "provider": "stepfun",
+      "pricing": {
+        "inputCostPerToken": 1e-7,
+        "outputCostPerToken": 3e-7,
+        "inputCacheReadPerToken": 2e-8
+      },
+      "contextLength": 256000,
+      "maxCompletionTokens": 256000,
+      "supportedParameters": [
+        "frequency_penalty",
+        "include_reasoning",
+        "max_tokens",
+        "reasoning",
+        "stop",
+        "temperature",
+        "tools",
+        "top_p"
+      ],
+      "defaultParameters": {
+        "temperature": null,
+        "topP": null,
+        "frequencyPenalty": null
+      },
+      "modality": "text->text",
+      "mode": "chat",
+      "description": "Step 3.5 Flash is StepFun's most capable open-source foundation model. Built on a sparse Mixture of Experts (MoE) architecture, it selectively activates only 11B of its 196B parameters per token. It is a reasoning model that is incredibly speed efficient even at long contexts.",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
     "moonshotai/kimi-k2.5": {
       "id": "moonshotai/kimi-k2.5",
       "name": "MoonshotAI: Kimi K2.5",
       "provider": "moonshotai",
       "pricing": {
         "inputCostPerToken": 4.5e-7,
-        "outputCostPerToken": 0.00000225,
-        "inputCacheReadPerToken": 7.0000002e-8
+        "outputCostPerToken": 0.0000022,
+        "inputCacheReadPerToken": 2.25e-7
       },
       "contextLength": 262144,
-      "maxCompletionTokens": null,
+      "maxCompletionTokens": 65535,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -350,7 +648,7 @@
     },
     "z-ai/glm-4.7-flash": {
       "id": "z-ai/glm-4.7-flash",
-      "name": "Z.AI: GLM 4.7 Flash",
+      "name": "Z.ai: GLM 4.7 Flash",
       "provider": "z-ai",
       "pricing": {
         "inputCostPerToken": 6e-8,
@@ -403,20 +701,14 @@
       "contextLength": 400000,
       "maxCompletionTokens": 128000,
       "supportedParameters": [
-        "frequency_penalty",
         "include_reasoning",
-        "logit_bias",
-        "logprobs",
         "max_tokens",
-        "presence_penalty",
         "reasoning",
         "response_format",
         "seed",
-        "stop",
         "structured_outputs",
         "tool_choice",
-        "tools",
-        "top_logprobs"
+        "tools"
       ],
       "defaultParameters": {
         "temperature": null,
@@ -637,12 +929,12 @@
     },
     "z-ai/glm-4.7": {
       "id": "z-ai/glm-4.7",
-      "name": "Z.AI: GLM 4.7",
+      "name": "Z.ai: GLM 4.7",
       "provider": "z-ai",
       "pricing": {
-        "inputCostPerToken": 4e-7,
-        "outputCostPerToken": 0.0000015,
-        "inputCacheReadPerToken": 2e-7
+        "inputCostPerToken": 3.8e-7,
+        "outputCostPerToken": 0.0000017,
+        "inputCacheReadPerToken": 1.9e-7
       },
       "contextLength": 202752,
       "maxCompletionTokens": 65535,
@@ -650,13 +942,10 @@
         "frequency_penalty",
         "include_reasoning",
         "logit_bias",
-        "logprobs",
         "max_tokens",
         "min_p",
-        "parallel_tool_calls",
         "presence_penalty",
         "reasoning",
-        "reasoning_effort",
         "repetition_penalty",
         "response_format",
         "seed",
@@ -666,7 +955,6 @@
         "tool_choice",
         "tools",
         "top_k",
-        "top_logprobs",
         "top_p"
       ],
       "defaultParameters": {
@@ -676,7 +964,7 @@
       },
       "modality": "text->text",
       "mode": "chat",
-      "description": "GLM-4.7 is Z.AI’s latest flagship model, featuring upgrades in two key areas: enhanced programming capabilities and more stable multi-step reasoning/execution. It demonstrates significant improvements in executing complex agent tasks while delivering more natural conversational experiences and superior front-end aesthetics.",
+      "description": "GLM-4.7 is Z.ai’s latest flagship model, featuring upgrades in two key areas: enhanced programming capabilities and more stable multi-step reasoning/execution. It demonstrates significant improvements in executing complex agent tasks while delivering more natural conversational experiences and superior front-end aesthetics.",
       "supportsImageInput": false,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
@@ -809,7 +1097,7 @@
         "inputCacheReadPerToken": 4.5e-8
       },
       "contextLength": 262144,
-      "maxCompletionTokens": null,
+      "maxCompletionTokens": 65536,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -861,7 +1149,6 @@
         "response_format",
         "seed",
         "stop",
-        "structured_outputs",
         "temperature",
         "tool_choice",
         "tools",
@@ -1023,17 +1310,15 @@
       "name": "Mistral: Devstral 2 2512",
       "provider": "mistralai",
       "pricing": {
-        "inputCostPerToken": 5e-8,
-        "outputCostPerToken": 2.2e-7,
-        "inputCacheReadPerToken": 2.5e-8
+        "inputCostPerToken": 4e-7,
+        "outputCostPerToken": 0.000002
       },
       "contextLength": 262144,
-      "maxCompletionTokens": 65536,
+      "maxCompletionTokens": null,
       "supportedParameters": [
         "frequency_penalty",
         "max_tokens",
         "presence_penalty",
-        "repetition_penalty",
         "response_format",
         "seed",
         "stop",
@@ -1041,7 +1326,6 @@
         "temperature",
         "tool_choice",
         "tools",
-        "top_k",
         "top_p"
       ],
       "defaultParameters": {
@@ -1091,7 +1375,7 @@
     },
     "z-ai/glm-4.6v": {
       "id": "z-ai/glm-4.6v",
-      "name": "Z.AI: GLM 4.6V",
+      "name": "Z.ai: GLM 4.6V",
       "provider": "z-ai",
       "pricing": {
         "inputCostPerToken": 3e-7,
@@ -1102,7 +1386,6 @@
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
-        "logit_bias",
         "max_tokens",
         "min_p",
         "presence_penalty",
@@ -1466,21 +1749,15 @@
       "contextLength": 131072,
       "maxCompletionTokens": 131072,
       "supportedParameters": [
-        "frequency_penalty",
         "include_reasoning",
-        "logit_bias",
         "max_tokens",
-        "min_p",
-        "presence_penalty",
         "reasoning",
-        "repetition_penalty",
         "response_format",
         "stop",
         "structured_outputs",
         "temperature",
         "tool_choice",
         "tools",
-        "top_k",
         "top_p"
       ],
       "defaultParameters": {
@@ -1501,26 +1778,17 @@
       "name": "DeepSeek: DeepSeek V3.2 Speciale",
       "provider": "deepseek",
       "pricing": {
-        "inputCostPerToken": 2.7e-7,
-        "outputCostPerToken": 4.1e-7,
-        "inputCacheReadPerToken": 1.35e-7
+        "inputCostPerToken": 4e-7,
+        "outputCostPerToken": 0.0000012,
+        "inputCacheReadPerToken": 2e-7
       },
       "contextLength": 163840,
       "maxCompletionTokens": 65536,
       "supportedParameters": [
-        "frequency_penalty",
         "include_reasoning",
-        "logit_bias",
         "max_tokens",
-        "presence_penalty",
         "reasoning",
-        "repetition_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
         "temperature",
-        "top_k",
         "top_p"
       ],
       "defaultParameters": {
@@ -1541,12 +1809,12 @@
       "name": "DeepSeek: DeepSeek V3.2",
       "provider": "deepseek",
       "pricing": {
-        "inputCostPerToken": 2.5e-7,
+        "inputCostPerToken": 2.6e-7,
         "outputCostPerToken": 3.8e-7,
-        "inputCacheReadPerToken": 1.25e-7
+        "inputCacheReadPerToken": 1.3e-7
       },
       "contextLength": 163840,
-      "maxCompletionTokens": 65536,
+      "maxCompletionTokens": null,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -1617,47 +1885,6 @@
       "modality": "text->text",
       "mode": "chat",
       "description": "INTELLECT-3 is a 106B-parameter Mixture-of-Experts model (12B active) post-trained from GLM-4.5-Air-Base using supervised fine-tuning (SFT) followed by large-scale reinforcement learning (RL). It offers state-of-the-art performance for its size across math, code, science, and general reasoning, consistently outperforming many larger frontier models. Designed for strong multi-step problem solving, it maintains high accuracy on structured tasks while remaining efficient at inference thanks to its MoE architecture.",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "tngtech/tng-r1t-chimera": {
-      "id": "tngtech/tng-r1t-chimera",
-      "name": "TNG: R1T Chimera",
-      "provider": "tngtech",
-      "pricing": {
-        "inputCostPerToken": 2.5e-7,
-        "outputCostPerToken": 8.5e-7,
-        "inputCacheReadPerToken": 1.25e-7
-      },
-      "contextLength": 163840,
-      "maxCompletionTokens": 65536,
-      "supportedParameters": [
-        "frequency_penalty",
-        "include_reasoning",
-        "max_tokens",
-        "presence_penalty",
-        "reasoning",
-        "repetition_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_k",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "TNG-R1T-Chimera is an experimental LLM with a faible for creative storytelling and character interaction. It is a derivate of the original TNG/DeepSeek-R1T-Chimera released in April 2025 and is available exclusively via Chutes and OpenRouter. Characteristics and improvements include: We think that it has a creative and pleasant personality. It has a preliminary EQ-Bench3 value of about 1305. It is quite a bit more intelligent than the original, albeit a slightly slower. It is much more think-token consistent, i.e. reasoning and answer blocks are properly delineated. Tool calling is much improved. TNG Tech, the model authors, ask that users follow the careful guidelines that Microsoft has created for their \"MAI-DS-R1\" DeepSeek-based model. These guidelines are available on Hugging Face (https://huggingface.co/microsoft/MAI-DS-R1).",
       "supportsImageInput": false,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
@@ -2234,17 +2461,16 @@
       "name": "MoonshotAI: Kimi K2 Thinking",
       "provider": "moonshotai",
       "pricing": {
-        "inputCostPerToken": 4e-7,
-        "outputCostPerToken": 0.00000175,
-        "inputCacheReadPerToken": 2e-7
+        "inputCostPerToken": 4.7e-7,
+        "outputCostPerToken": 0.000002,
+        "inputCacheReadPerToken": 1.41e-7
       },
-      "contextLength": 262144,
-      "maxCompletionTokens": 65535,
+      "contextLength": 131072,
+      "maxCompletionTokens": null,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
         "logit_bias",
-        "logprobs",
         "max_tokens",
         "min_p",
         "presence_penalty",
@@ -2258,7 +2484,6 @@
         "tool_choice",
         "tools",
         "top_k",
-        "top_logprobs",
         "top_p"
       ],
       "defaultParameters": {
@@ -2312,7 +2537,8 @@
       "provider": "perplexity",
       "pricing": {
         "inputCostPerToken": 0.000003,
-        "outputCostPerToken": 0.000015
+        "outputCostPerToken": 0.000015,
+        "webSearchCostPerQuery": 0.018
       },
       "contextLength": 200000,
       "maxCompletionTokens": 8000,
@@ -2419,8 +2645,8 @@
       "name": "NVIDIA: Nemotron Nano 12B 2 VL",
       "provider": "nvidia",
       "pricing": {
-        "inputCostPerToken": 2e-7,
-        "outputCostPerToken": 6e-7
+        "inputCostPerToken": 7e-8,
+        "outputCostPerToken": 2e-7
       },
       "contextLength": 131072,
       "maxCompletionTokens": null,
@@ -2498,11 +2724,11 @@
       "name": "Qwen: Qwen3 VL 32B Instruct",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 5e-7,
-        "outputCostPerToken": 0.0000015
+        "inputCostPerToken": 1.04e-7,
+        "outputCostPerToken": 4.16e-7
       },
-      "contextLength": 262144,
-      "maxCompletionTokens": null,
+      "contextLength": 131072,
+      "maxCompletionTokens": 32768,
       "supportedParameters": [
         "frequency_penalty",
         "logit_bias",
@@ -2511,9 +2737,12 @@
         "presence_penalty",
         "repetition_penalty",
         "response_format",
+        "seed",
         "stop",
         "structured_outputs",
         "temperature",
+        "tool_choice",
+        "tools",
         "top_k",
         "top_p"
       ],
@@ -2704,7 +2933,9 @@
         "include_reasoning",
         "max_tokens",
         "reasoning",
+        "response_format",
         "stop",
+        "structured_outputs",
         "temperature",
         "tool_choice",
         "tools",
@@ -2729,10 +2960,10 @@
       "name": "Qwen: Qwen3 VL 8B Thinking",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 1.8e-7,
-        "outputCostPerToken": 0.0000021
+        "inputCostPerToken": 1.17e-7,
+        "outputCostPerToken": 0.000001365
       },
-      "contextLength": 256000,
+      "contextLength": 131072,
       "maxCompletionTokens": 32768,
       "supportedParameters": [
         "include_reasoning",
@@ -3074,8 +3305,8 @@
       "name": "Qwen: Qwen3 VL 30B A3B Thinking",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 2e-7,
-        "outputCostPerToken": 0.000001
+        "inputCostPerToken": 0,
+        "outputCostPerToken": 0
       },
       "contextLength": 131072,
       "maxCompletionTokens": 32768,
@@ -3113,16 +3344,13 @@
       "name": "Qwen: Qwen3 VL 30B A3B Instruct",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 1.5e-7,
-        "outputCostPerToken": 6e-7,
-        "inputCacheReadPerToken": 7.5e-8
+        "inputCostPerToken": 1.3e-7,
+        "outputCostPerToken": 5.2e-7
       },
-      "contextLength": 262144,
-      "maxCompletionTokens": null,
+      "contextLength": 131072,
+      "maxCompletionTokens": 32768,
       "supportedParameters": [
         "frequency_penalty",
-        "logit_bias",
-        "logprobs",
         "max_tokens",
         "min_p",
         "presence_penalty",
@@ -3135,7 +3363,6 @@
         "tool_choice",
         "tools",
         "top_k",
-        "top_logprobs",
         "top_p"
       ],
       "defaultParameters": {
@@ -3196,20 +3423,18 @@
     },
     "z-ai/glm-4.6": {
       "id": "z-ai/glm-4.6",
-      "name": "Z.AI: GLM 4.6",
+      "name": "Z.ai: GLM 4.6",
       "provider": "z-ai",
       "pricing": {
         "inputCostPerToken": 3.5e-7,
-        "outputCostPerToken": 0.0000015,
-        "inputCacheReadPerToken": 1.75e-7
+        "outputCostPerToken": 0.00000171
       },
       "contextLength": 202752,
-      "maxCompletionTokens": 65536,
+      "maxCompletionTokens": 131072,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
         "logit_bias",
-        "logprobs",
         "max_tokens",
         "min_p",
         "presence_penalty",
@@ -3222,9 +3447,7 @@
         "temperature",
         "tool_choice",
         "tools",
-        "top_a",
         "top_k",
-        "top_logprobs",
         "top_p"
       ],
       "defaultParameters": {
@@ -3242,7 +3465,7 @@
     },
     "z-ai/glm-4.6:exacto": {
       "id": "z-ai/glm-4.6:exacto",
-      "name": "Z.AI: GLM 4.6 (exacto)",
+      "name": "Z.ai: GLM 4.6 (exacto)",
       "provider": "z-ai",
       "pricing": {
         "inputCostPerToken": 4.4e-7,
@@ -3425,58 +3648,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "gemini/gemini-2.5-flash-preview-09-2025": {
-      "id": "gemini/gemini-2.5-flash-preview-09-2025",
-      "name": "Google: Gemini 2.5 Flash Preview 09-2025",
-      "provider": "gemini",
-      "pricing": {
-        "inputCostPerToken": 3e-7,
-        "outputCostPerToken": 0.0000025,
-        "inputCacheReadPerToken": 3e-8,
-        "inputCacheWritePerToken": 8.333333333333334e-8,
-        "imageCostPerToken": 3e-7,
-        "audioCostPerToken": 0.000001,
-        "internalReasoningCostPerToken": 0.0000025
-      },
-      "contextLength": 1048576,
-      "maxCompletionTokens": 65536,
-      "supportedParameters": [
-        "include_reasoning",
-        "max_tokens",
-        "reasoning",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text+image+file+audio+video->text",
-      "mode": "chat",
-      "description": "Gemini 2.5 Flash Preview September 2025 Checkpoint is Google's state-of-the-art workhorse model, specifically designed for advanced reasoning, coding, mathematics, and scientific tasks. It includes built-in \"thinking\" capabilities, enabling it to provide responses with greater accuracy and nuanced context handling. Additionally, Gemini 2.5 Flash is configurable through the \"max tokens for reasoning\" parameter, as described in the documentation ().",
-      "supportsImageInput": true,
-      "supportsAudioInput": true,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false,
-      "reasoningConfig": {
-        "supported": true,
-        "parameterName": "thinkingLevel",
-        "allowedValues": [
-          "none",
-          "low",
-          "high"
-        ],
-        "defaultValue": "low",
-        "canDisable": true
-      }
-    },
     "gemini/gemini-2.5-flash-lite-preview-09-2025": {
       "id": "gemini/gemini-2.5-flash-lite-preview-09-2025",
       "name": "Google: Gemini 2.5 Flash Lite Preview 09-2025",
@@ -3534,11 +3705,11 @@
       "name": "Qwen: Qwen3 VL 235B A22B Thinking",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 4.5e-7,
-        "outputCostPerToken": 0.0000035
+        "inputCostPerToken": 0,
+        "outputCostPerToken": 0
       },
-      "contextLength": 262144,
-      "maxCompletionTokens": 262144,
+      "contextLength": 131072,
+      "maxCompletionTokens": 32768,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -3583,7 +3754,6 @@
       "supportedParameters": [
         "frequency_penalty",
         "logit_bias",
-        "logprobs",
         "max_tokens",
         "min_p",
         "presence_penalty",
@@ -3596,7 +3766,6 @@
         "tool_choice",
         "tools",
         "top_k",
-        "top_logprobs",
         "top_p"
       ],
       "defaultParameters": {
@@ -3621,7 +3790,7 @@
         "outputCostPerToken": 0.000006,
         "inputCacheReadPerToken": 2.4e-7
       },
-      "contextLength": 256000,
+      "contextLength": 262144,
       "maxCompletionTokens": 32768,
       "supportedParameters": [
         "max_tokens",
@@ -3653,9 +3822,9 @@
       "pricing": {
         "inputCostPerToken": 0.000001,
         "outputCostPerToken": 0.000005,
-        "inputCacheReadPerToken": 1e-7
+        "inputCacheReadPerToken": 2e-7
       },
-      "contextLength": 128000,
+      "contextLength": 1000000,
       "maxCompletionTokens": 65536,
       "supportedParameters": [
         "max_tokens",
@@ -3891,9 +4060,9 @@
       "pricing": {
         "inputCostPerToken": 3e-7,
         "outputCostPerToken": 0.0000015,
-        "inputCacheReadPerToken": 8e-8
+        "inputCacheReadPerToken": 6e-8
       },
-      "contextLength": 128000,
+      "contextLength": 1000000,
       "maxCompletionTokens": 65536,
       "supportedParameters": [
         "max_tokens",
@@ -4130,12 +4299,12 @@
       "name": "MoonshotAI: Kimi K2 0905",
       "provider": "moonshotai",
       "pricing": {
-        "inputCostPerToken": 3.9e-7,
-        "outputCostPerToken": 0.0000019,
-        "inputCacheReadPerToken": 1.95e-7
+        "inputCostPerToken": 4e-7,
+        "outputCostPerToken": 0.000002,
+        "inputCacheReadPerToken": 1.5e-7
       },
-      "contextLength": 262144,
-      "maxCompletionTokens": 262144,
+      "contextLength": 131072,
+      "maxCompletionTokens": null,
       "supportedParameters": [
         "frequency_penalty",
         "logit_bias",
@@ -4272,12 +4441,11 @@
       "name": "Nous: Hermes 4 70B",
       "provider": "nousresearch",
       "pricing": {
-        "inputCostPerToken": 1.1e-7,
-        "outputCostPerToken": 3.8e-7,
-        "inputCacheReadPerToken": 5.5e-8
+        "inputCostPerToken": 1.3e-7,
+        "outputCostPerToken": 4e-7
       },
       "contextLength": 131072,
-      "maxCompletionTokens": 131072,
+      "maxCompletionTokens": null,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -4286,12 +4454,7 @@
         "reasoning",
         "repetition_penalty",
         "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
         "temperature",
-        "tool_choice",
-        "tools",
         "top_k",
         "top_p"
       ],
@@ -4521,7 +4684,7 @@
     },
     "z-ai/glm-4.5v": {
       "id": "z-ai/glm-4.5v",
-      "name": "Z.AI: GLM 4.5V",
+      "name": "Z.ai: GLM 4.5V",
       "provider": "z-ai",
       "pricing": {
         "inputCostPerToken": 6e-7,
@@ -4556,34 +4719,6 @@
       "mode": "chat",
       "description": "GLM-4.5V is a vision-language foundation model for multimodal agent applications. Built on a Mixture-of-Experts (MoE) architecture with 106B parameters and 12B activated parameters, it achieves state-of-the-art results in video understanding, image Q&A, OCR, and document parsing, with strong gains in front-end web coding, grounding, and spatial reasoning. It offers a hybrid inference mode: a \"thinking mode\" for deep reasoning and a \"non-thinking mode\" for fast responses. Reasoning behavior can be toggled via the `reasoning` `enabled` boolean.",
       "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "ai21/jamba-mini-1.7": {
-      "id": "ai21/jamba-mini-1.7",
-      "name": "AI21: Jamba Mini 1.7",
-      "provider": "ai21",
-      "pricing": {
-        "inputCostPerToken": 2e-7,
-        "outputCostPerToken": 4e-7
-      },
-      "contextLength": 256000,
-      "maxCompletionTokens": 4096,
-      "supportedParameters": [
-        "max_tokens",
-        "response_format",
-        "stop",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_p"
-      ],
-      "defaultParameters": {},
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "Jamba Mini 1.7 is a compact and efficient member of the Jamba open model family, incorporating key improvements in grounding and instruction-following while maintaining the benefits of the SSM-Transformer hybrid architecture and 256K context window. Despite its compact size, it delivers accurate, contextually grounded responses and improved steerability.",
-      "supportsImageInput": false,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
       "supportsAudioOutput": false
@@ -5036,9 +5171,8 @@
       "name": "Qwen: Qwen3 30B A3B Instruct 2507",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 8e-8,
-        "outputCostPerToken": 3.3e-7,
-        "inputCacheReadPerToken": 4e-8
+        "inputCostPerToken": 9e-8,
+        "outputCostPerToken": 3e-7
       },
       "contextLength": 262144,
       "maxCompletionTokens": 262144,
@@ -5049,7 +5183,6 @@
         "repetition_penalty",
         "response_format",
         "seed",
-        "stop",
         "structured_outputs",
         "temperature",
         "tool_choice",
@@ -5068,15 +5201,14 @@
     },
     "z-ai/glm-4.5": {
       "id": "z-ai/glm-4.5",
-      "name": "Z.AI: GLM 4.5",
+      "name": "Z.ai: GLM 4.5",
       "provider": "z-ai",
       "pricing": {
-        "inputCostPerToken": 3.5e-7,
-        "outputCostPerToken": 0.00000155,
-        "inputCacheReadPerToken": 1.75e-7
+        "inputCostPerToken": 5.5e-7,
+        "outputCostPerToken": 0.000002
       },
-      "contextLength": 131072,
-      "maxCompletionTokens": 65536,
+      "contextLength": 131000,
+      "maxCompletionTokens": 131000,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -5109,7 +5241,7 @@
     },
     "z-ai/glm-4.5-air": {
       "id": "z-ai/glm-4.5-air",
-      "name": "Z.AI: GLM 4.5 Air",
+      "name": "Z.ai: GLM 4.5 Air",
       "provider": "z-ai",
       "pricing": {
         "inputCostPerToken": 1.3e-7,
@@ -5153,12 +5285,11 @@
       "name": "Qwen: Qwen3 235B A22B Thinking 2507",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 1.1e-7,
-        "outputCostPerToken": 6e-7,
-        "inputCacheReadPerToken": 5.5e-8
+        "inputCostPerToken": 0,
+        "outputCostPerToken": 0
       },
-      "contextLength": 262144,
-      "maxCompletionTokens": 262144,
+      "contextLength": 131072,
+      "maxCompletionTokens": null,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -5193,7 +5324,7 @@
     },
     "z-ai/glm-4-32b": {
       "id": "z-ai/glm-4-32b",
-      "name": "Z.AI: GLM 4 32B ",
+      "name": "Z.ai: GLM 4 32B ",
       "provider": "z-ai",
       "pricing": {
         "inputCostPerToken": 1e-7,
@@ -5235,11 +5366,9 @@
       "supportedParameters": [
         "frequency_penalty",
         "logit_bias",
-        "logprobs",
         "max_tokens",
         "min_p",
         "presence_penalty",
-        "reasoning",
         "repetition_penalty",
         "response_format",
         "seed",
@@ -5249,7 +5378,6 @@
         "tool_choice",
         "tools",
         "top_k",
-        "top_logprobs",
         "top_p"
       ],
       "defaultParameters": {},
@@ -5875,7 +6003,11 @@
         "top_k",
         "top_p"
       ],
-      "defaultParameters": {},
+      "defaultParameters": {
+        "temperature": null,
+        "topP": null,
+        "frequencyPenalty": null
+      },
       "modality": "text->text",
       "mode": "chat",
       "description": "MiniMax-M1 is a large-scale, open-weight reasoning model designed for extended context and high-efficiency inference. It leverages a hybrid Mixture-of-Experts (MoE) architecture paired with a custom \"lightning attention\" mechanism, allowing it to process long sequences—up to 1 million tokens—while maintaining competitive FLOP efficiency. With 456 billion total parameters and 45.9B active per token, this variant is optimized for complex, multi-step reasoning tasks. Trained via a custom reinforcement learning pipeline (CISPO), M1 excels in long-context understanding, software engineering, agentic tool use, and mathematical reasoning. Benchmarks show strong performance across FullStackBench, SWE-bench, MATH, GPQA, and TAU-Bench, often outperforming other open models like DeepSeek R1 and Qwen3-235B.",
@@ -6337,43 +6469,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "nousresearch/deephermes-3-mistral-24b-preview": {
-      "id": "nousresearch/deephermes-3-mistral-24b-preview",
-      "name": "Nous: DeepHermes 3 Mistral 24B Preview",
-      "provider": "nousresearch",
-      "pricing": {
-        "inputCostPerToken": 2e-8,
-        "outputCostPerToken": 1e-7,
-        "inputCacheReadPerToken": 1e-8
-      },
-      "contextLength": 32768,
-      "maxCompletionTokens": 32768,
-      "supportedParameters": [
-        "frequency_penalty",
-        "include_reasoning",
-        "max_tokens",
-        "presence_penalty",
-        "reasoning",
-        "repetition_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_k",
-        "top_p"
-      ],
-      "defaultParameters": {},
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "DeepHermes 3 (Mistral 24B Preview) is an instruction-tuned language model by Nous Research based on Mistral-Small-24B, designed for chat, function calling, and advanced multi-turn reasoning. It introduces a dual-mode system that toggles between intuitive chat responses and structured “deep reasoning” mode using special system prompts. Fine-tuned via distillation from R1, it supports structured output (JSON mode) and function call syntax for agent-based applications. DeepHermes 3 supports a **reasoning toggle via system prompt**, allowing users to switch between fast, intuitive responses and deliberate, multi-step reasoning. When activated with the following specific system instruction, the model enters a *\"deep thinking\"* mode—generating extended chains of thought wrapped in `<think></think>` tags before delivering a final answer. System Prompt: You are a deep thinking AI, you may use extremely long chains of thought to deeply consider the problem and deliberate with yourself via systematic reasoning processes to help come to a correct solution prior to answering. You should enclose your thoughts and internal monologue inside <think> </think> tags, and then provide your solution or response to the problem.",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "mistralai/mistral-medium-3": {
       "id": "mistralai/mistral-medium-3",
       "name": "Mistral: Mistral Medium 3",
@@ -6659,9 +6754,8 @@
       "name": "Qwen: Qwen3 30B A3B",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 6e-8,
-        "outputCostPerToken": 2.2e-7,
-        "inputCacheReadPerToken": 3e-8
+        "inputCostPerToken": 8e-8,
+        "outputCostPerToken": 2.8e-7
       },
       "contextLength": 40960,
       "maxCompletionTokens": 40960,
@@ -6710,8 +6804,10 @@
       "supportedParameters": [
         "include_reasoning",
         "max_tokens",
+        "presence_penalty",
         "reasoning",
         "response_format",
+        "seed",
         "structured_outputs",
         "temperature",
         "tool_choice",
@@ -6736,9 +6832,8 @@
       "name": "Qwen: Qwen3 14B",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 5e-8,
-        "outputCostPerToken": 2.2e-7,
-        "inputCacheReadPerToken": 2.5e-8
+        "inputCostPerToken": 6e-8,
+        "outputCostPerToken": 2.4e-7
       },
       "contextLength": 40960,
       "maxCompletionTokens": 40960,
@@ -6783,7 +6878,6 @@
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
-        "logprobs",
         "max_tokens",
         "min_p",
         "presence_penalty",
@@ -6797,7 +6891,6 @@
         "tool_choice",
         "tools",
         "top_k",
-        "top_logprobs",
         "top_p"
       ],
       "defaultParameters": {},
@@ -6814,71 +6907,27 @@
       "name": "Qwen: Qwen3 235B A22B",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 2e-7,
-        "outputCostPerToken": 6e-7
+        "inputCostPerToken": 4.55e-7,
+        "outputCostPerToken": 0.00000182
       },
-      "contextLength": 40960,
-      "maxCompletionTokens": null,
+      "contextLength": 131072,
+      "maxCompletionTokens": 8192,
       "supportedParameters": [
-        "frequency_penalty",
         "include_reasoning",
-        "logit_bias",
-        "logprobs",
         "max_tokens",
-        "min_p",
         "presence_penalty",
         "reasoning",
-        "repetition_penalty",
         "response_format",
         "seed",
-        "stop",
-        "structured_outputs",
         "temperature",
         "tool_choice",
         "tools",
-        "top_k",
-        "top_logprobs",
         "top_p"
       ],
       "defaultParameters": {},
       "modality": "text->text",
       "mode": "chat",
       "description": "Qwen3-235B-A22B is a 235B parameter mixture-of-experts (MoE) model developed by Qwen, activating 22B parameters per forward pass. It supports seamless switching between a \"thinking\" mode for complex reasoning, math, and code tasks, and a \"non-thinking\" mode for general conversational efficiency. The model demonstrates strong reasoning ability, multilingual support (100+ languages and dialects), advanced instruction-following, and agent tool-calling capabilities. It natively handles a 32K token context window and extends up to 131K tokens using YaRN-based scaling.",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "tngtech/deepseek-r1t-chimera": {
-      "id": "tngtech/deepseek-r1t-chimera",
-      "name": "TNG: DeepSeek R1T Chimera",
-      "provider": "tngtech",
-      "pricing": {
-        "inputCostPerToken": 3e-7,
-        "outputCostPerToken": 0.0000012,
-        "inputCacheReadPerToken": 1.5e-7
-      },
-      "contextLength": 163840,
-      "maxCompletionTokens": 163840,
-      "supportedParameters": [
-        "frequency_penalty",
-        "include_reasoning",
-        "max_tokens",
-        "presence_penalty",
-        "reasoning",
-        "repetition_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "top_k",
-        "top_p"
-      ],
-      "defaultParameters": {},
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "DeepSeek-R1T-Chimera is created by merging DeepSeek-R1 and DeepSeek-V3 (0324), combining the reasoning capabilities of R1 with the token efficiency improvements of V3. It is based on a DeepSeek-MoE Transformer architecture and is optimized for general text generation tasks. The model merges pretrained weights from both source models to balance performance across reasoning, efficiency, and instruction-following tasks. It is released under the MIT license and intended for research and commercial use.",
       "supportsImageInput": false,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
@@ -7369,16 +7418,13 @@
       "name": "Qwen: Qwen2.5 VL 32B Instruct",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 5e-8,
-        "outputCostPerToken": 2.2e-7,
-        "inputCacheReadPerToken": 2.5e-8
+        "inputCostPerToken": 2e-7,
+        "outputCostPerToken": 6e-7
       },
-      "contextLength": 16384,
-      "maxCompletionTokens": 16384,
+      "contextLength": 128000,
+      "maxCompletionTokens": null,
       "supportedParameters": [
         "frequency_penalty",
-        "logit_bias",
-        "logprobs",
         "max_tokens",
         "min_p",
         "presence_penalty",
@@ -7386,10 +7432,8 @@
         "response_format",
         "seed",
         "stop",
-        "structured_outputs",
         "temperature",
         "top_k",
-        "top_logprobs",
         "top_p"
       ],
       "defaultParameters": {},
@@ -7484,24 +7528,18 @@
       "name": "Mistral: Mistral Small 3.1 24B",
       "provider": "mistralai",
       "pricing": {
-        "inputCostPerToken": 3e-8,
-        "outputCostPerToken": 1.1e-7,
-        "inputCacheReadPerToken": 1.5e-8
+        "inputCostPerToken": 3.5e-7,
+        "outputCostPerToken": 5.6e-7
       },
-      "contextLength": 131072,
-      "maxCompletionTokens": 131072,
+      "contextLength": 128000,
+      "maxCompletionTokens": null,
       "supportedParameters": [
         "frequency_penalty",
         "max_tokens",
         "presence_penalty",
         "repetition_penalty",
-        "response_format",
         "seed",
-        "stop",
-        "structured_outputs",
         "temperature",
-        "tool_choice",
-        "tools",
         "top_k",
         "top_p"
       ],
@@ -7541,10 +7579,10 @@
       "name": "Google: Gemma 3 4B",
       "provider": "gemini",
       "pricing": {
-        "inputCostPerToken": 1.703012e-8,
-        "outputCostPerToken": 6.81536e-8
+        "inputCostPerToken": 4e-8,
+        "outputCostPerToken": 8e-8
       },
-      "contextLength": 96000,
+      "contextLength": 131072,
       "maxCompletionTokens": null,
       "supportedParameters": [
         "frequency_penalty",
@@ -7573,12 +7611,11 @@
       "name": "Google: Gemma 3 12B",
       "provider": "gemini",
       "pricing": {
-        "inputCostPerToken": 3e-8,
-        "outputCostPerToken": 1e-7,
-        "inputCacheReadPerToken": 1.5e-8
+        "inputCostPerToken": 4e-8,
+        "outputCostPerToken": 1.3e-7
       },
       "contextLength": 131072,
-      "maxCompletionTokens": 131072,
+      "maxCompletionTokens": null,
       "supportedParameters": [
         "frequency_penalty",
         "logit_bias",
@@ -8114,10 +8151,10 @@
       "pricing": {
         "inputCostPerToken": 2.1e-7,
         "outputCostPerToken": 6.3e-7,
-        "imageCostPerToken": 0.0002688
+        "inputCacheReadPerToken": 4.2e-8
       },
-      "contextLength": 7500,
-      "maxCompletionTokens": 1500,
+      "contextLength": 131072,
+      "maxCompletionTokens": 8192,
       "supportedParameters": [
         "max_tokens",
         "presence_penalty",
@@ -8217,11 +8254,10 @@
       "provider": "qwen",
       "pricing": {
         "inputCostPerToken": 8e-7,
-        "outputCostPerToken": 0.0000032,
-        "imageCostPerToken": 0.001024
+        "outputCostPerToken": 0.0000032
       },
       "contextLength": 131072,
-      "maxCompletionTokens": 8192,
+      "maxCompletionTokens": 32768,
       "supportedParameters": [
         "max_tokens",
         "presence_penalty",
@@ -8252,9 +8288,9 @@
       "pricing": {
         "inputCostPerToken": 5e-8,
         "outputCostPerToken": 2e-7,
-        "inputCacheReadPerToken": 2e-8
+        "inputCacheReadPerToken": 1e-8
       },
-      "contextLength": 1000000,
+      "contextLength": 131072,
       "maxCompletionTokens": 8192,
       "supportedParameters": [
         "max_tokens",
@@ -8280,17 +8316,15 @@
       "name": "Qwen: Qwen2.5 VL 72B Instruct",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 1.5e-7,
-        "outputCostPerToken": 6e-7,
-        "inputCacheReadPerToken": 7.5e-8
+        "inputCostPerToken": 2.5e-7,
+        "outputCostPerToken": 7.5e-7
       },
-      "contextLength": 32768,
-      "maxCompletionTokens": 32768,
+      "contextLength": 32000,
+      "maxCompletionTokens": null,
       "supportedParameters": [
         "frequency_penalty",
         "logit_bias",
         "max_tokens",
-        "min_p",
         "presence_penalty",
         "repetition_penalty",
         "response_format",
@@ -8317,10 +8351,10 @@
       "pricing": {
         "inputCostPerToken": 4e-7,
         "outputCostPerToken": 0.0000012,
-        "inputCacheReadPerToken": 1.6e-7
+        "inputCacheReadPerToken": 8e-8
       },
-      "contextLength": 131072,
-      "maxCompletionTokens": 8192,
+      "contextLength": 1000000,
+      "maxCompletionTokens": 32768,
       "supportedParameters": [
         "max_tokens",
         "presence_penalty",
@@ -8347,7 +8381,7 @@
       "pricing": {
         "inputCostPerToken": 0.0000016,
         "outputCostPerToken": 0.0000064,
-        "inputCacheReadPerToken": 6.4e-7
+        "inputCacheReadPerToken": 3.2e-7
       },
       "contextLength": 32768,
       "maxCompletionTokens": 8192,
@@ -8429,7 +8463,6 @@
         "response_format",
         "seed",
         "stop",
-        "structured_outputs",
         "temperature",
         "tool_choice",
         "tools",
@@ -8500,7 +8533,8 @@
       "provider": "perplexity",
       "pricing": {
         "inputCostPerToken": 0.000001,
-        "outputCostPerToken": 0.000001
+        "outputCostPerToken": 0.000001,
+        "webSearchCostPerQuery": 0.005
       },
       "contextLength": 127072,
       "maxCompletionTokens": null,
@@ -8527,12 +8561,11 @@
       "name": "DeepSeek: R1 Distill Llama 70B",
       "provider": "deepseek",
       "pricing": {
-        "inputCostPerToken": 3e-8,
-        "outputCostPerToken": 1.1e-7,
-        "inputCacheReadPerToken": 1.5e-8
+        "inputCostPerToken": 7e-7,
+        "outputCostPerToken": 8e-7
       },
       "contextLength": 131072,
-      "maxCompletionTokens": 131072,
+      "maxCompletionTokens": 16384,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -8630,7 +8663,11 @@
         "temperature",
         "top_p"
       ],
-      "defaultParameters": {},
+      "defaultParameters": {
+        "temperature": null,
+        "topP": null,
+        "frequencyPenalty": null
+      },
       "modality": "text+image->text",
       "mode": "chat",
       "description": "MiniMax-01 is a combines MiniMax-Text-01 for text generation and MiniMax-VL-01 for image understanding. It has 456 billion parameters, with 45.9 billion parameters activated per inference, and can handle a context of up to 4 million tokens. The text model adopts a hybrid architecture that combines Lightning Attention, Softmax Attention, and Mixture-of-Experts (MoE). The image model adopts the “ViT-MLP-LLM” framework and is trained on top of the text model. To read more about the release, see: https://www.minimaxi.com/en/news/minimax-01-series-2",
@@ -8709,9 +8746,8 @@
       "name": "DeepSeek: DeepSeek V3",
       "provider": "deepseek",
       "pricing": {
-        "inputCostPerToken": 3e-7,
-        "outputCostPerToken": 0.0000012,
-        "inputCacheReadPerToken": 1.5e-7
+        "inputCostPerToken": 3.2e-7,
+        "outputCostPerToken": 8.9e-7
       },
       "contextLength": 163840,
       "maxCompletionTokens": 163840,
@@ -8724,7 +8760,6 @@
         "response_format",
         "seed",
         "stop",
-        "structured_outputs",
         "temperature",
         "tool_choice",
         "tools",
@@ -9106,12 +9141,11 @@
       "name": "Qwen2.5 Coder 32B Instruct",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 3e-8,
-        "outputCostPerToken": 1.1e-7,
-        "inputCacheReadPerToken": 1.5e-8
+        "inputCostPerToken": 2e-7,
+        "outputCostPerToken": 2e-7
       },
       "contextLength": 32768,
-      "maxCompletionTokens": 32768,
+      "maxCompletionTokens": 8192,
       "supportedParameters": [
         "frequency_penalty",
         "logit_bias",
@@ -9119,10 +9153,8 @@
         "min_p",
         "presence_penalty",
         "repetition_penalty",
-        "response_format",
         "seed",
         "stop",
-        "structured_outputs",
         "temperature",
         "top_k",
         "top_p"
@@ -9276,7 +9308,9 @@
       "provider": "anthropic",
       "pricing": {
         "inputCostPerToken": 0.000006,
-        "outputCostPerToken": 0.00003
+        "outputCostPerToken": 0.00003,
+        "inputCacheReadPerToken": 6e-7,
+        "inputCacheWritePerToken": 0.0000075
       },
       "contextLength": 200000,
       "maxCompletionTokens": 8192,
@@ -9294,74 +9328,6 @@
       "mode": "chat",
       "description": "New Claude 3.5 Sonnet delivers better-than-Opus capabilities, faster-than-Sonnet speeds, at the same Sonnet prices. Sonnet is particularly good at: - Coding: Scores ~49% on SWE-Bench Verified, higher than the last best score, and without any fancy prompt scaffolding - Data science: Augments human data science expertise; navigates unstructured data while using multiple tools for insights - Visual processing: excelling at interpreting charts, graphs, and images, accurately transcribing text to derive insights beyond just the text alone - Agentic tasks: exceptional tool use, making it great at agentic tasks (i.e. complex, multi-step problem solving tasks that require engaging with other systems) #multimodal",
       "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "mistralai/ministral-8b": {
-      "id": "mistralai/ministral-8b",
-      "name": "Mistral: Ministral 8B",
-      "provider": "mistralai",
-      "pricing": {
-        "inputCostPerToken": 1e-7,
-        "outputCostPerToken": 1e-7
-      },
-      "contextLength": 131072,
-      "maxCompletionTokens": null,
-      "supportedParameters": [
-        "frequency_penalty",
-        "max_tokens",
-        "presence_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": 0.3
-      },
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "Ministral 8B is an 8B parameter model featuring a unique interleaved sliding-window attention pattern for faster, memory-efficient inference. Designed for edge use cases, it supports up to 128k context length and excels in knowledge and reasoning tasks. It outperforms peers in the sub-10B category, making it perfect for low-latency, privacy-first applications.",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "mistralai/ministral-3b": {
-      "id": "mistralai/ministral-3b",
-      "name": "Mistral: Ministral 3B",
-      "provider": "mistralai",
-      "pricing": {
-        "inputCostPerToken": 4e-8,
-        "outputCostPerToken": 4e-8
-      },
-      "contextLength": 131072,
-      "maxCompletionTokens": null,
-      "supportedParameters": [
-        "frequency_penalty",
-        "max_tokens",
-        "presence_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": 0.3
-      },
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "Ministral 3B is a 3B parameter model optimized for on-device and edge computing. It excels in knowledge, commonsense reasoning, and function-calling, outperforming larger models like Mistral 7B on most benchmarks. Supporting up to 128k context length, it’s ideal for orchestrating agentic workflows and specialist tasks with efficient inference.",
-      "supportsImageInput": false,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
       "supportsAudioOutput": false
@@ -9684,44 +9650,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "mistralai/pixtral-12b": {
-      "id": "mistralai/pixtral-12b",
-      "name": "Mistral: Pixtral 12B",
-      "provider": "mistralai",
-      "pricing": {
-        "inputCostPerToken": 1e-7,
-        "outputCostPerToken": 1e-7
-      },
-      "contextLength": 32768,
-      "maxCompletionTokens": null,
-      "supportedParameters": [
-        "frequency_penalty",
-        "logit_bias",
-        "max_tokens",
-        "min_p",
-        "presence_penalty",
-        "repetition_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_k",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": 0.3
-      },
-      "modality": "text+image->text",
-      "mode": "chat",
-      "description": "The first multi-modal, text+image-to-text model from Mistral AI. Its weights were launched via torrent: https://x.com/mistralai/status/1833758285167722836.",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "cohere/command-r-08-2024": {
       "id": "cohere/command-r-08-2024",
       "name": "Cohere: Command R (08-2024)",
@@ -9916,39 +9844,6 @@
       "mode": "chat",
       "description": "Hermes 3 is a generalist language model with many improvements over Hermes 2, including advanced agentic capabilities, much better roleplaying, reasoning, multi-turn conversation, long context coherence, and improvements across the board. Hermes 3 405B is a frontier-level, full-parameter finetune of the Llama-3.1 405B foundation model, focused on aligning LLMs to the user, with powerful steering capabilities and control given to the end user. The Hermes 3 series builds and expands on the Hermes 2 set of capabilities, including more powerful and reliable function calling and structured output capabilities, generalist assistant capabilities, and improved code generation skills. Hermes 3 is competitive, if not superior, to Llama-3.1 Instruct models at general capabilities, with varying strengths and weaknesses attributable between the two.",
       "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "openai/chatgpt-4o-latest": {
-      "id": "openai/chatgpt-4o-latest",
-      "name": "OpenAI: ChatGPT-4o",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 0.000005,
-        "outputCostPerToken": 0.000015
-      },
-      "contextLength": 128000,
-      "maxCompletionTokens": 16384,
-      "supportedParameters": [
-        "frequency_penalty",
-        "logit_bias",
-        "logprobs",
-        "max_tokens",
-        "presence_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "top_logprobs",
-        "top_p"
-      ],
-      "defaultParameters": {},
-      "modality": "text+image->text",
-      "mode": "chat",
-      "description": "OpenAI ChatGPT 4o is continually updated by OpenAI to point to the current version of GPT-4o used by ChatGPT. It therefore differs slightly from the API version of [GPT-4o](/models/openai/gpt-4o) in that it has additional RLHF. It is intended for research and evaluation. OpenAI notes that this model is not suited for production use-cases as it may be removed or redirected to another model in the future.",
-      "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
       "supportsAudioOutput": false
@@ -10672,18 +10567,16 @@
       "name": "WizardLM-2 8x22B",
       "provider": "microsoft",
       "pricing": {
-        "inputCostPerToken": 4.8e-7,
-        "outputCostPerToken": 4.8e-7
+        "inputCostPerToken": 6.2e-7,
+        "outputCostPerToken": 6.2e-7
       },
-      "contextLength": 65536,
-      "maxCompletionTokens": 16384,
+      "contextLength": 65535,
+      "maxCompletionTokens": 8000,
       "supportedParameters": [
         "frequency_penalty",
         "max_tokens",
-        "min_p",
         "presence_penalty",
         "repetition_penalty",
-        "response_format",
         "seed",
         "stop",
         "temperature",
@@ -10868,40 +10761,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "mistralai/mistral-tiny": {
-      "id": "mistralai/mistral-tiny",
-      "name": "Mistral Tiny",
-      "provider": "mistralai",
-      "pricing": {
-        "inputCostPerToken": 2.5e-7,
-        "outputCostPerToken": 2.5e-7
-      },
-      "contextLength": 32768,
-      "maxCompletionTokens": null,
-      "supportedParameters": [
-        "frequency_penalty",
-        "max_tokens",
-        "presence_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": 0.3
-      },
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "Note: This model is being deprecated. Recommended replacement is the newer [Ministral 8B](/mistral/ministral-8b) This model is currently powered by Mistral-7B-v0.2, and incorporates a \"better\" fine-tuning than [Mistral 7B](/models/mistralai/mistral-7b-instruct-v0.1), inspired by community work. It's best used for large batch processing tasks where cost is a significant factor but reasoning capabilities are not crucial.",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "mistralai/mistral-7b-instruct-v0.2": {
       "id": "mistralai/mistral-7b-instruct-v0.2",
       "name": "Mistral: Mistral 7B Instruct v0.2",
@@ -11077,7 +10936,7 @@
       },
       "modality": "text+image+file+audio+video->text+image",
       "mode": "chat",
-      "description": "Your prompt will be processed by a meta-model and routed to one of dozens of models (see below), optimizing for the best possible output. To see which model was used, visit [Activity](/activity), or read the `model` attribute of the response. Your response will be priced at the same rate as the routed model. Learn more, including how to customize the models for routing, in our [docs](/docs/guides/routing/routers/auto-router). Requests will be routed to the following models: - [anthropic/claude-3-haiku](/anthropic/claude-3-haiku) - [anthropic/claude-3.5-haiku](/anthropic/claude-3.5-haiku) - [anthropic/claude-3.7-sonnet](/anthropic/claude-3.7-sonnet) - [anthropic/claude-haiku-4.5](/anthropic/claude-haiku-4.5) - [anthropic/claude-opus-4](/anthropic/claude-opus-4) - [anthropic/claude-opus-4.1](/anthropic/claude-opus-4.1) - [anthropic/claude-opus-4.5](/anthropic/claude-opus-4.5) - [anthropic/claude-sonnet-4](/anthropic/claude-sonnet-4) - [anthropic/claude-sonnet-4.5](/anthropic/claude-sonnet-4.5) - [cohere/command-r-08-2024](/cohere/command-r-08-2024) - [cohere/command-r-plus-08-2024](/cohere/command-r-plus-08-2024) - [deepseek/deepseek-r1](/deepseek/deepseek-r1) - [google/gemini-2.0-flash-001](/google/gemini-2.0-flash-001) - [google/gemini-2.5-flash](/google/gemini-2.5-flash) - [google/gemini-2.5-pro](/google/gemini-2.5-pro) - [google/gemini-3-flash-preview](/google/gemini-3-flash-preview) - [google/gemini-3-pro-preview](/google/gemini-3-pro-preview) - [meta-llama/llama-3-70b-instruct](/meta-llama/llama-3-70b-instruct) - [meta-llama/llama-3-8b-instruct](/meta-llama/llama-3-8b-instruct) - [meta-llama/llama-3.1-405b-instruct](/meta-llama/llama-3.1-405b-instruct) - [meta-llama/llama-3.1-70b-instruct](/meta-llama/llama-3.1-70b-instruct) - [meta-llama/llama-3.1-8b-instruct](/meta-llama/llama-3.1-8b-instruct) - [meta-llama/llama-3.3-70b-instruct](/meta-llama/llama-3.3-70b-instruct) - [mistralai/codestral-2508](/mistralai/codestral-2508) - [mistralai/mistral-7b-instruct](/mistralai/mistral-7b-instruct) - [mistralai/mistral-large](/mistralai/mistral-large) - [mistralai/mistral-large-2407](/mistralai/mistral-large-2407) - [mistralai/mistral-large-2411](/mistralai/mistral-large-2411) - [mistralai/mistral-medium-3.1](/mistralai/mistral-medium-3.1) - [mistralai/mistral-nemo](/mistralai/mistral-nemo) - [mistralai/mistral-small-3.2-24b-instruct-2506](/mistralai/mistral-small-3.2-24b-instruct-2506) - [mistralai/mixtral-8x22b-instruct](/mistralai/mixtral-8x22b-instruct) - [mistralai/mixtral-8x7b-instruct](/mistralai/mixtral-8x7b-instruct) - [moonshotai/kimi-k2-thinking](/moonshotai/kimi-k2-thinking) - [openai/chatgpt-4o-latest](/openai/chatgpt-4o-latest) - [openai/gpt-3.5-turbo](/openai/gpt-3.5-turbo) - [openai/gpt-4](/openai/gpt-4) - [openai/gpt-4-1106-preview](/openai/gpt-4-1106-preview) - [openai/gpt-4-turbo](/openai/gpt-4-turbo) - [openai/gpt-4-turbo-preview](/openai/gpt-4-turbo-preview) - [openai/gpt-4.1](/openai/gpt-4.1) - [openai/gpt-4.1-mini](/openai/gpt-4.1-mini) - [openai/gpt-4.1-nano](/openai/gpt-4.1-nano) - [openai/gpt-4o](/openai/gpt-4o) - [openai/gpt-4o-2024-05-13](/openai/gpt-4o-2024-05-13) - [openai/gpt-4o-2024-08-06](/openai/gpt-4o-2024-08-06) - [openai/gpt-4o-2024-11-20](/openai/gpt-4o-2024-11-20) - [openai/gpt-4o-mini](/openai/gpt-4o-mini) - [openai/gpt-4o-mini-2024-07-18](/openai/gpt-4o-mini-2024-07-18) - [openai/gpt-5](/openai/gpt-5) - [openai/gpt-5-mini](/openai/gpt-5-mini) - [openai/gpt-5-nano](/openai/gpt-5-nano) - [openai/gpt-5.1](/openai/gpt-5.1) - [openai/gpt-5.2](/openai/gpt-5.2) - [openai/gpt-5.2-pro](/openai/gpt-5.2-pro) - [openai/gpt-oss-120b](/openai/gpt-oss-120b) - [perplexity/sonar](/perplexity/sonar) - [qwen/qwen3-14b](/qwen/qwen3-14b) - [qwen/qwen3-235b-a22b](/qwen/qwen3-235b-a22b) - [qwen/qwen3-32b](/qwen/qwen3-32b) - [x-ai/grok-3](/x-ai/grok-3) - [x-ai/grok-3-mini](/x-ai/grok-3-mini) - [x-ai/grok-4](/x-ai/grok-4)",
+      "description": "Your prompt will be processed by a meta-model and routed to one of dozens of models (see below), optimizing for the best possible output. To see which model was used, visit [Activity](/activity), or read the `model` attribute of the response. Your response will be priced at the same rate as the routed model. Learn more, including how to customize the models for routing, in our [docs](/docs/guides/routing/routers/auto-router). Requests will be routed to the following models: - [anthropic/claude-haiku-4.5](/anthropic/claude-haiku-4.5) - [anthropic/claude-opus-4.6](/anthropic/claude-opus-4.6) - [anthropic/claude-sonnet-4.5](/anthropic/claude-sonnet-4.5) - [deepseek/deepseek-r1](/deepseek/deepseek-r1) - [google/gemini-2.5-flash-lite](/google/gemini-2.5-flash-lite) - [google/gemini-3-flash-preview](/google/gemini-3-flash-preview) - [google/gemini-3-pro-preview](/google/gemini-3-pro-preview) - [meta-llama/llama-3.3-70b-instruct](/meta-llama/llama-3.3-70b-instruct) - [mistralai/codestral-2508](/mistralai/codestral-2508) - [mistralai/mistral-large](/mistralai/mistral-large) - [mistralai/mistral-medium-3.1](/mistralai/mistral-medium-3.1) - [mistralai/mistral-small-3.2-24b-instruct-2506](/mistralai/mistral-small-3.2-24b-instruct-2506) - [moonshotai/kimi-k2-thinking](/moonshotai/kimi-k2-thinking) - [moonshotai/kimi-k2.5](/moonshotai/kimi-k2.5) - [openai/gpt-5](/openai/gpt-5) - [openai/gpt-5-mini](/openai/gpt-5-mini) - [openai/gpt-5-nano](/openai/gpt-5-nano) - [openai/gpt-5.1](/openai/gpt-5.1) - [openai/gpt-5.2](/openai/gpt-5.2) - [openai/gpt-5.2-pro](/openai/gpt-5.2-pro) - [openai/gpt-oss-120b](/openai/gpt-oss-120b) - [perplexity/sonar](/perplexity/sonar) - [qwen/qwen3-235b-a22b](/qwen/qwen3-235b-a22b) - [x-ai/grok-3](/x-ai/grok-3) - [x-ai/grok-3-mini](/x-ai/grok-3-mini) - [x-ai/grok-4](/x-ai/grok-4)",
       "supportsImageInput": true,
       "supportsAudioInput": true,
       "supportsImageOutput": true,
