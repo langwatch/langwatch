@@ -2,7 +2,6 @@ export interface MonitorSummary {
   id: string;
   checkType: string;
   name: string;
-  sample: number;
   threadIdleTimeout: number | null;
 }
 

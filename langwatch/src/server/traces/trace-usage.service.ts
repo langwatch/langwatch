@@ -241,7 +241,7 @@ export class TraceUsageService {
     const result = await this.clickHouseClient!.query({
       query: `
         SELECT TenantId, toString(count(DISTINCT TraceId)) AS Total
-        FROM trace_summaries FINAL
+        FROM trace_summaries
         WHERE TenantId IN ({projectIds:Array(String)})
           AND CreatedAt >= fromUnixTimestamp64Milli({monthStart:UInt64})
         GROUP BY TenantId

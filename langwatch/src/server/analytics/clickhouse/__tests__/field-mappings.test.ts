@@ -185,14 +185,14 @@ describe("field-mappings", () => {
 
     it("builds correct JOIN for stored_spans", () => {
       const join = buildJoinClause("stored_spans");
-      expect(join).toContain("JOIN stored_spans ss FINAL");
+      expect(join).toContain("JOIN stored_spans ss");
       expect(join).toContain("ts.TenantId = ss.TenantId");
       expect(join).toContain("ts.TraceId = ss.TraceId");
     });
 
     it("builds correct JOIN for evaluation_runs", () => {
       const join = buildJoinClause("evaluation_runs");
-      expect(join).toContain("JOIN evaluation_runs es FINAL");
+      expect(join).toContain("JOIN evaluation_runs es");
       expect(join).toContain("ts.TenantId = es.TenantId");
       expect(join).toContain("ts.TraceId = es.TraceId");
     });

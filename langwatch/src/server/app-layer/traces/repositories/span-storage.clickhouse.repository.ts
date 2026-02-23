@@ -116,9 +116,14 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
             \`Links.TraceId\` AS Links_TraceId,
             \`Links.SpanId\` AS Links_SpanId,
             \`Links.Attributes\` AS Links_Attributes
-          FROM ${TABLE_NAME} FINAL
-          WHERE TenantId = {tenantId:String}
-            AND TraceId = {traceId:String}
+          FROM (
+            SELECT *
+            FROM ${TABLE_NAME}
+            WHERE TenantId = {tenantId:String}
+              AND TraceId = {traceId:String}
+            ORDER BY SpanId ASC, StartTime DESC
+            LIMIT 1 BY TenantId, TraceId, SpanId
+          )
           ORDER BY StartTime ASC
         `,
         query_params: { tenantId, traceId },

@@ -22,6 +22,25 @@ import { createLogger } from "../../../utils/logger/server";
 
 const logger = createLogger("langwatch:analytics:aggregation-builder");
 
+/**
+ * Returns a deduped FROM-clause expression for trace_summaries.
+ *
+ * trace_summaries uses ReplacingMergeTree(LastUpdatedAt) which can return
+ * multiple versions of the same trace between merges. This wraps the table
+ * in a subquery that keeps only the latest version per TraceId.
+ *
+ * The TenantId filter is pushed into the subquery so ClickHouse can prune
+ * data early. All callers already bind `{tenantId:String}` in their params.
+ */
+function dedupedTraceSummaries(alias: string): string {
+  return `(
+    SELECT * FROM trace_summaries
+    WHERE TenantId = {tenantId:String}
+    ORDER BY TraceId, LastUpdatedAt DESC
+    LIMIT 1 BY TenantId, TraceId
+  ) ${alias}`;
+}
+
 /** Maximum number of filter options returned by filter queries */
 const MAX_FILTER_OPTIONS = 10000;
 
@@ -538,7 +557,7 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   const sql = `
     SELECT
       ${selectExprs.join(",\n      ")}
-    FROM trace_summaries ${ts} FINAL
+    FROM ${dedupedTraceSummaries(ts)}
     ${joinClauses}
     WHERE ${baseWhere}
       ${filterWhere}
@@ -655,7 +674,7 @@ function buildArrayJoinTimeseriesQuery(
     WITH deduped_traces AS (
       SELECT DISTINCT
         ${cteSelectExprs.join(",\n        ")}
-      FROM trace_summaries ${ts} FINAL
+      FROM ${dedupedTraceSummaries(ts)}
       ${joinClauses}
       WHERE ${baseWhere}
         ${filterWhere}
@@ -718,7 +737,7 @@ function buildSubqueryTimeseriesQuery(
           SELECT ${subquery.innerSelect}
           FROM (
             SELECT ${nested.select}
-            FROM trace_summaries ${ts} FINAL
+            FROM ${dedupedTraceSummaries(ts)}
             ${joinClauses}
             WHERE ${ts}.TenantId = {tenantId:String}
               AND ${ts}.OccurredAt >= {currentStart:DateTime64(3)}
@@ -740,7 +759,7 @@ function buildSubqueryTimeseriesQuery(
           SELECT ${subquery.innerSelect}
           FROM (
             SELECT ${nested.select}
-            FROM trace_summaries ${ts} FINAL
+            FROM ${dedupedTraceSummaries(ts)}
             ${joinClauses}
             WHERE ${ts}.TenantId = {tenantId:String}
               AND ${ts}.OccurredAt >= {previousStart:DateTime64(3)}
@@ -761,7 +780,7 @@ function buildSubqueryTimeseriesQuery(
         SELECT '${metric.alias}' AS metric_name, ${subquery.outerAggregation.replace(` AS ${metric.alias}`, "")} AS metric_value
         FROM (
           SELECT ${subquery.innerSelect}
-          FROM trace_summaries ${ts} FINAL
+          FROM ${dedupedTraceSummaries(ts)}
           ${joinClauses}
           WHERE ${ts}.TenantId = {tenantId:String}
             AND ${ts}.OccurredAt >= {currentStart:DateTime64(3)}
@@ -778,7 +797,7 @@ function buildSubqueryTimeseriesQuery(
         SELECT '${metric.alias}' AS metric_name, ${subquery.outerAggregation.replace(` AS ${metric.alias}`, "")} AS metric_value
         FROM (
           SELECT ${subquery.innerSelect}
-          FROM trace_summaries ${ts} FINAL
+          FROM ${dedupedTraceSummaries(ts)}
           ${joinClauses}
           WHERE ${ts}.TenantId = {tenantId:String}
             AND ${ts}.OccurredAt >= {previousStart:DateTime64(3)}
@@ -810,7 +829,7 @@ function buildSubqueryTimeseriesQuery(
       simple_metrics_current AS (
         SELECT
           ${simpleSelectExprs.join(",\n          ")}
-        FROM trace_summaries ${ts} FINAL
+        FROM ${dedupedTraceSummaries(ts)}
         ${joinClauses}
         WHERE ${ts}.TenantId = {tenantId:String}
           AND ${ts}.OccurredAt >= {currentStart:DateTime64(3)}
@@ -822,7 +841,7 @@ function buildSubqueryTimeseriesQuery(
       simple_metrics_previous AS (
         SELECT
           ${simpleSelectExprs.join(",\n          ")}
-        FROM trace_summaries ${ts} FINAL
+        FROM ${dedupedTraceSummaries(ts)}
         ${joinClauses}
         WHERE ${ts}.TenantId = {tenantId:String}
           AND ${ts}.OccurredAt >= {previousStart:DateTime64(3)}
@@ -1018,7 +1037,7 @@ export function buildDataForFilterQuery(
           ${ts}.TopicId AS field,
           ${ts}.TopicId AS label,
           count() AS count
-        FROM trace_summaries ${ts} FINAL
+        FROM ${dedupedTraceSummaries(ts)}
         ${filterJoins}
         WHERE ${ts}.TenantId = {tenantId:String}
           AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
@@ -1039,7 +1058,7 @@ export function buildDataForFilterQuery(
           ${ts}.SubTopicId AS field,
           ${ts}.SubTopicId AS label,
           count() AS count
-        FROM trace_summaries ${ts} FINAL
+        FROM ${dedupedTraceSummaries(ts)}
         ${filterJoins}
         WHERE ${ts}.TenantId = {tenantId:String}
           AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
@@ -1060,7 +1079,7 @@ export function buildDataForFilterQuery(
           ${ts}.Attributes['langwatch.user_id'] AS field,
           ${ts}.Attributes['langwatch.user_id'] AS label,
           count() AS count
-        FROM trace_summaries ${ts} FINAL
+        FROM ${dedupedTraceSummaries(ts)}
         ${filterJoins}
         WHERE ${ts}.TenantId = {tenantId:String}
           AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
@@ -1080,7 +1099,7 @@ export function buildDataForFilterQuery(
           ${ts}.Attributes['gen_ai.conversation.id'] AS field,
           ${ts}.Attributes['gen_ai.conversation.id'] AS label,
           count() AS count
-        FROM trace_summaries ${ts} FINAL
+        FROM ${dedupedTraceSummaries(ts)}
         ${filterJoins}
         WHERE ${ts}.TenantId = {tenantId:String}
           AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
@@ -1101,7 +1120,7 @@ export function buildDataForFilterQuery(
           ${ss}.SpanAttributes['gen_ai.request.model'] AS field,
           ${ss}.SpanAttributes['gen_ai.request.model'] AS label,
           count() AS count
-        FROM trace_summaries ${ts} FINAL
+        FROM ${dedupedTraceSummaries(ts)}
         ${joins}
         ${filterJoins}
         WHERE ${ts}.TenantId = {tenantId:String}
@@ -1123,7 +1142,7 @@ export function buildDataForFilterQuery(
           ${ss}.SpanAttributes['langwatch.span.type'] AS field,
           ${ss}.SpanAttributes['langwatch.span.type'] AS label,
           count() AS count
-        FROM trace_summaries ${ts} FINAL
+        FROM ${dedupedTraceSummaries(ts)}
         ${joins}
         ${filterJoins}
         WHERE ${ts}.TenantId = {tenantId:String}
@@ -1146,7 +1165,7 @@ export function buildDataForFilterQuery(
           ${es}.EvaluatorId AS field,
           concat('[', coalesce(${es}.EvaluatorName, ${es}.EvaluatorType, 'custom'), '] ', coalesce(${es}.EvaluatorName, '')) AS label,
           count() AS count
-        FROM trace_summaries ${ts} FINAL
+        FROM ${dedupedTraceSummaries(ts)}
         ${joins}
         ${filterJoins}
         WHERE ${ts}.TenantId = {tenantId:String}
@@ -1167,7 +1186,7 @@ export function buildDataForFilterQuery(
           if(toUInt8(coalesce(${ts}.ContainsErrorStatus, 0)) = 1, 'true', 'false') AS field,
           if(toUInt8(coalesce(${ts}.ContainsErrorStatus, 0)) = 1, 'Traces with error', 'Traces without error') AS label,
           count() AS count
-        FROM trace_summaries ${ts} FINAL
+        FROM ${dedupedTraceSummaries(ts)}
         ${filterJoins}
         WHERE ${ts}.TenantId = {tenantId:String}
           AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
@@ -1229,7 +1248,7 @@ export function buildTopDocumentsQuery(
         ${ts}.TraceId,
         toString(context.document_id) AS document_id,
         toString(context.content) AS content
-      FROM trace_summaries ${ts} FINAL
+      FROM ${dedupedTraceSummaries(ts)}
       JOIN stored_spans ${ss} ON ${ts}.TenantId = ${ss}.TenantId AND ${ts}.TraceId = ${ss}.TraceId
       ARRAY JOIN JSONExtract(${ss}.SpanAttributes['langwatch.rag.contexts'], 'Array(JSON)') AS context
       WHERE ${ts}.TenantId = {tenantId:String}
@@ -1252,7 +1271,7 @@ export function buildTopDocumentsQuery(
 
   const totalSql = `
     SELECT uniq(toString(context.document_id)) AS total
-    FROM trace_summaries ${ts} FINAL
+    FROM ${dedupedTraceSummaries(ts)}
     JOIN stored_spans ${ss} ON ${ts}.TenantId = ${ss}.TenantId AND ${ts}.TraceId = ${ss}.TraceId
     ARRAY JOIN JSONExtract(${ss}.SpanAttributes['langwatch.rag.contexts'], 'Array(JSON)') AS context
     WHERE ${ts}.TenantId = {tenantId:String}
@@ -1308,7 +1327,7 @@ export function buildFeedbacksQuery(
       toUnixTimestamp64Milli(event_timestamp) AS started_at,
       event_name AS event_type,
       event_attrs AS attributes
-    FROM trace_summaries ${ts} FINAL
+    FROM ${dedupedTraceSummaries(ts)}
     JOIN stored_spans ${ss} ON ${ts}.TenantId = ${ss}.TenantId AND ${ts}.TraceId = ${ss}.TraceId
     ARRAY JOIN
       ${ss}."Events.Timestamp" AS event_timestamp,

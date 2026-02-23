@@ -86,7 +86,7 @@ export const clickHouseFilterConditions: Record<
   // Evaluations - using evaluation_runs table with EXISTS subquery
   "evaluations.evaluator_id": (values, paramId) => ({
     sql: `EXISTS (
-      SELECT 1 FROM evaluation_runs es FINAL
+      SELECT 1 FROM evaluation_runs es
       WHERE es.TenantId = ts.TenantId
         AND es.TraceId = ts.TraceId
         AND es.EvaluatorId IN ({${paramId}_values:Array(String)})
@@ -96,7 +96,7 @@ export const clickHouseFilterConditions: Record<
 
   "evaluations.evaluator_id.guardrails_only": (values, paramId) => ({
     sql: `EXISTS (
-      SELECT 1 FROM evaluation_runs es FINAL
+      SELECT 1 FROM evaluation_runs es
       WHERE es.TenantId = ts.TenantId
         AND es.TraceId = ts.TraceId
         AND es.EvaluatorId IN ({${paramId}_values:Array(String)})
@@ -110,7 +110,7 @@ export const clickHouseFilterConditions: Record<
     const passedValues = values.map((v) => (v === "true" || v === "1" ? 1 : 0));
     return {
       sql: `EXISTS (
-        SELECT 1 FROM evaluation_runs es FINAL
+        SELECT 1 FROM evaluation_runs es
         WHERE es.TenantId = ts.TenantId
           AND es.TraceId = ts.TraceId
           AND es.EvaluatorId = {${paramId}_key:String}
@@ -136,7 +136,7 @@ export const clickHouseFilterConditions: Record<
     }
     return {
       sql: `EXISTS (
-        SELECT 1 FROM evaluation_runs es FINAL
+        SELECT 1 FROM evaluation_runs es
         WHERE es.TenantId = ts.TenantId
           AND es.TraceId = ts.TraceId
           AND es.EvaluatorId = {${paramId}_key:String}
@@ -155,7 +155,7 @@ export const clickHouseFilterConditions: Record<
     if (!key) return { sql: "1=0", params: {} };
     return {
       sql: `EXISTS (
-        SELECT 1 FROM evaluation_runs es FINAL
+        SELECT 1 FROM evaluation_runs es
         WHERE es.TenantId = ts.TenantId
           AND es.TraceId = ts.TraceId
           AND es.EvaluatorId = {${paramId}_key:String}
@@ -172,7 +172,7 @@ export const clickHouseFilterConditions: Record<
     if (!key) return { sql: "1=0", params: {} };
     return {
       sql: `EXISTS (
-        SELECT 1 FROM evaluation_runs es FINAL
+        SELECT 1 FROM evaluation_runs es
         WHERE es.TenantId = ts.TenantId
           AND es.TraceId = ts.TraceId
           AND es.EvaluatorId = {${paramId}_key:String}
@@ -188,7 +188,7 @@ export const clickHouseFilterConditions: Record<
   // Events - using stored_spans table with span attributes
   "events.event_type": (values, paramId) => ({
     sql: `EXISTS (
-      SELECT 1 FROM stored_spans sp FINAL
+      SELECT 1 FROM stored_spans sp
       WHERE sp.TenantId = ts.TenantId
         AND sp.TraceId = ts.TraceId
         AND sp.SpanAttributes['event.type'] IN ({${paramId}_values:Array(String)})
@@ -211,7 +211,7 @@ export const clickHouseFilterConditions: Record<
     });
     return {
       sql: `EXISTS (
-        SELECT 1 FROM stored_spans sp FINAL
+        SELECT 1 FROM stored_spans sp
         WHERE sp.TenantId = ts.TenantId
           AND sp.TraceId = ts.TraceId
           AND sp.SpanAttributes['event.type'] = {${paramId}_key:String}
@@ -234,7 +234,7 @@ export const clickHouseFilterConditions: Record<
     }
     return {
       sql: `EXISTS (
-        SELECT 1 FROM stored_spans sp FINAL
+        SELECT 1 FROM stored_spans sp
         WHERE sp.TenantId = ts.TenantId
           AND sp.TraceId = ts.TraceId
           AND sp.SpanAttributes['event.type'] = {${paramId}_key:String}
@@ -264,7 +264,7 @@ export const clickHouseFilterConditions: Record<
     });
     return {
       sql: `EXISTS (
-        SELECT 1 FROM stored_spans sp FINAL
+        SELECT 1 FROM stored_spans sp
         WHERE sp.TenantId = ts.TenantId
           AND sp.TraceId = ts.TraceId
           AND sp.SpanAttributes['event.type'] = {${paramId}_key:String}

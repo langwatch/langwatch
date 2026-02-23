@@ -60,9 +60,6 @@ export function createEvaluationTriggerReactor(
       const labels = parseLabels(attrs["langwatch.labels"]);
 
       for (const monitor of monitors) {
-        // Early sampling in reactor to avoid dispatching commands that get discarded
-        if (Math.random() > monitor.sample) continue;
-
         const evaluationId = generate(KSUID_RESOURCES.EVALUATION).toString();
         try {
           await deps.evaluation({

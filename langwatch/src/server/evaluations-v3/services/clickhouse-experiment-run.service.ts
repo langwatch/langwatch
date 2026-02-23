@@ -111,10 +111,14 @@ export class ClickHouseExperimentRunService {
           // Fetch run summaries
           const runsResult = await this.clickHouseClient.query({
             query: `
-              SELECT *
-              FROM experiment_runs FINAL
-              WHERE TenantId = {tenantId:String}
-                AND ExperimentId IN ({experimentIds:Array(String)})
+              SELECT * FROM (
+                SELECT *
+                FROM experiment_runs
+                WHERE TenantId = {tenantId:String}
+                  AND ExperimentId IN ({experimentIds:Array(String)})
+                ORDER BY RunId, UpdatedAt DESC
+                LIMIT 1 BY TenantId, RunId, ExperimentId
+              )
               ORDER BY CreatedAt DESC
             `,
             query_params: {
@@ -142,10 +146,15 @@ export class ClickHouseExperimentRunService {
                 avg(Score) AS avgScore,
                 if(countIf(Passed IS NOT NULL) > 0, countIf(Passed = 1) / countIf(Passed IS NOT NULL), NULL) AS passRate,
                 countIf(Passed IS NOT NULL) AS hasPassedCount
-              FROM experiment_run_items FINAL
-              WHERE TenantId = {tenantId:String}
-                AND RunId IN ({runIds:Array(String)})
-                AND ResultType = 'evaluator'
+              FROM (
+                SELECT *
+                FROM experiment_run_items
+                WHERE TenantId = {tenantId:String}
+                  AND RunId IN ({runIds:Array(String)})
+                ORDER BY Id, CreatedAt DESC
+                LIMIT 1 BY TenantId, RunId, Id
+              )
+              WHERE ResultType = 'evaluator'
                 AND EvaluationStatus = 'processed'
               GROUP BY RunId, EvaluatorId
             `,
@@ -180,9 +189,14 @@ export class ClickHouseExperimentRunService {
                 avgIf(TargetCost, ResultType = 'target' AND TargetCost IS NOT NULL) AS datasetAverageCost,
                 avgIf(TargetDurationMs, ResultType = 'target' AND TargetDurationMs IS NOT NULL) AS datasetAverageDuration,
                 avgIf(EvaluationCost, ResultType = 'evaluator' AND EvaluationCost IS NOT NULL) AS evaluationsAverageCost
-              FROM experiment_run_items FINAL
-              WHERE TenantId = {tenantId:String}
-                AND RunId IN ({runIds:Array(String)})
+              FROM (
+                SELECT *
+                FROM experiment_run_items
+                WHERE TenantId = {tenantId:String}
+                  AND RunId IN ({runIds:Array(String)})
+                ORDER BY Id, CreatedAt DESC
+                LIMIT 1 BY TenantId, RunId, Id
+              )
               GROUP BY RunId
             `,
             query_params: {
@@ -291,10 +305,11 @@ export class ClickHouseExperimentRunService {
           const runResult = await this.clickHouseClient.query({
             query: `
               SELECT *
-              FROM experiment_runs FINAL
+              FROM experiment_runs
               WHERE TenantId = {tenantId:String}
                 AND ExperimentId = {experimentId:String}
                 AND RunId = {runId:String}
+              ORDER BY UpdatedAt DESC
               LIMIT 1
             `,
             query_params: {
@@ -316,10 +331,14 @@ export class ClickHouseExperimentRunService {
           // Fetch all items for this run
           const itemsResult = await this.clickHouseClient.query({
             query: `
-              SELECT *
-              FROM experiment_run_items FINAL
-              WHERE TenantId = {tenantId:String}
-                AND RunId = {runId:String}
+              SELECT * FROM (
+                SELECT *
+                FROM experiment_run_items
+                WHERE TenantId = {tenantId:String}
+                  AND RunId = {runId:String}
+                ORDER BY Id, CreatedAt DESC
+                LIMIT 1 BY TenantId, RunId, Id
+              )
               ORDER BY RowIndex ASC, ResultType ASC
             `,
             query_params: {

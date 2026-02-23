@@ -402,9 +402,9 @@ export function buildJoinClause(table: CHTable): string {
 
   switch (table) {
     case "stored_spans":
-      return `JOIN stored_spans ${alias} FINAL ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
+      return `JOIN stored_spans ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
     case "evaluation_runs":
-      return `JOIN evaluation_runs ${alias} FINAL ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
+      return `JOIN evaluation_runs ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
     default:
       return "";
   }

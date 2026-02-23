@@ -44,7 +44,7 @@ interface CursorPayload {
 /**
  * ClickHouse-backed read service for simulation runs.
  *
- * Queries the `simulation_runs` ReplacingMergeTree table using FINAL
+ * Queries the `simulation_runs` ReplacingMergeTree table
  * to collapse versions. Returns data in the same ScenarioRunData shape
  * that the ES-backed ScenarioEventService produces, so callers can
  * switch backends transparently.
@@ -88,8 +88,14 @@ export class ClickHouseSimulationService {
         ScenarioSetId,
         toString(count(*)) AS ScenarioCount,
         toString(toUnixTimestamp64Milli(max(UpdatedAt))) AS LastRunAt
-       FROM ${TABLE_NAME} FINAL
-       WHERE TenantId = {tenantId:String} AND DeletedAt IS NULL
+       FROM (
+         SELECT *
+         FROM ${TABLE_NAME}
+         WHERE TenantId = {tenantId:String}
+         ORDER BY ScenarioRunId, UpdatedAt DESC
+         LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+       )
+       WHERE DeletedAt IS NULL
        GROUP BY ScenarioSetId
        ORDER BY LastRunAt DESC`,
       { tenantId: projectId },
@@ -114,9 +120,14 @@ export class ClickHouseSimulationService {
   }): Promise<ScenarioRunData | null> {
     const rows = await this.queryRows<ClickHouseSimulationRunRow>(
       `SELECT ${RUN_COLUMNS}
-       FROM ${TABLE_NAME} FINAL
-       WHERE TenantId = {tenantId:String} AND ScenarioRunId = {scenarioRunId:String}
-         AND DeletedAt IS NULL
+       FROM (
+         SELECT *
+         FROM ${TABLE_NAME}
+         WHERE TenantId = {tenantId:String} AND ScenarioRunId = {scenarioRunId:String}
+         ORDER BY UpdatedAt DESC
+         LIMIT 1
+       )
+       WHERE DeletedAt IS NULL
        LIMIT 1`,
       { tenantId: projectId, scenarioRunId },
     );
@@ -158,10 +169,15 @@ export class ClickHouseSimulationService {
     // Step 0: fetch total distinct batch count (runs in parallel with step 1)
     const totalCountPromise = this.queryRows<{ TotalBatchCount: string }>(
       `SELECT toString(count(DISTINCT BatchRunId)) AS TotalBatchCount
-       FROM ${TABLE_NAME} FINAL
-       WHERE TenantId = {tenantId:String}
-         AND ScenarioSetId = {scenarioSetId:String}
-         AND DeletedAt IS NULL`,
+       FROM (
+         SELECT *
+         FROM ${TABLE_NAME}
+         WHERE TenantId = {tenantId:String}
+           AND ScenarioSetId = {scenarioSetId:String}
+         ORDER BY ScenarioRunId, UpdatedAt DESC
+         LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+       )
+       WHERE DeletedAt IS NULL`,
       { tenantId: projectId, scenarioSetId },
     );
 
@@ -191,10 +207,15 @@ export class ClickHouseSimulationService {
         toString(toUnixTimestamp64Milli(
           maxIf(UpdatedAt, Status NOT IN ('STALLED','IN_PROGRESS','PENDING'))
         )) AS AllCompletedAt
-       FROM ${TABLE_NAME} FINAL
-       WHERE TenantId = {tenantId:String}
-         AND ScenarioSetId = {scenarioSetId:String}
-         AND DeletedAt IS NULL
+       FROM (
+         SELECT *
+         FROM ${TABLE_NAME}
+         WHERE TenantId = {tenantId:String}
+           AND ScenarioSetId = {scenarioSetId:String}
+         ORDER BY ScenarioRunId, UpdatedAt DESC
+         LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+       )
+       WHERE DeletedAt IS NULL
        GROUP BY BatchRunId
        ${cursorClause}
        ORDER BY LastRunAt DESC, BatchRunId ASC
@@ -238,11 +259,16 @@ export class ClickHouseSimulationService {
       MessagePreviewContents: string[];
     }>(
       `SELECT ${PREVIEW_COLUMNS}
-       FROM ${TABLE_NAME} FINAL
-       WHERE TenantId = {tenantId:String}
-         AND ScenarioSetId = {scenarioSetId:String}
-         AND BatchRunId IN ({batchRunIds:Array(String)})
-         AND DeletedAt IS NULL
+       FROM (
+         SELECT *
+         FROM ${TABLE_NAME}
+         WHERE TenantId = {tenantId:String}
+           AND ScenarioSetId = {scenarioSetId:String}
+           AND BatchRunId IN ({batchRunIds:Array(String)})
+         ORDER BY ScenarioRunId, UpdatedAt DESC
+         LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+       )
+       WHERE DeletedAt IS NULL
        ORDER BY CreatedAt ASC`,
       { tenantId: projectId, scenarioSetId, batchRunIds },
     );
@@ -334,7 +360,7 @@ export class ClickHouseSimulationService {
     if (sinceTimestamp !== undefined) {
       const tsRows = await this.queryRows<{ LastUpdatedAt: string }>(
         `SELECT toString(toUnixTimestamp64Milli(max(UpdatedAt))) AS LastUpdatedAt
-         FROM ${TABLE_NAME} FINAL
+         FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND BatchRunId = {batchRunId:String}
            AND DeletedAt IS NULL`,
@@ -348,11 +374,16 @@ export class ClickHouseSimulationService {
 
     const rows = await this.queryRows<ClickHouseSimulationRunRow>(
       `SELECT ${RUN_COLUMNS}
-       FROM ${TABLE_NAME} FINAL
-       WHERE TenantId = {tenantId:String}
-         AND ScenarioSetId = {scenarioSetId:String}
-         AND BatchRunId = {batchRunId:String}
-         AND DeletedAt IS NULL
+       FROM (
+         SELECT *
+         FROM ${TABLE_NAME}
+         WHERE TenantId = {tenantId:String}
+           AND ScenarioSetId = {scenarioSetId:String}
+           AND BatchRunId = {batchRunId:String}
+         ORDER BY ScenarioRunId, UpdatedAt DESC
+         LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+       )
+       WHERE DeletedAt IS NULL
        ORDER BY CreatedAt ASC`,
       { tenantId: projectId, scenarioSetId, batchRunId },
     );
@@ -378,10 +409,15 @@ export class ClickHouseSimulationService {
   }): Promise<number> {
     const rows = await this.queryRows<{ BatchRunCount: string }>(
       `SELECT toString(count(DISTINCT BatchRunId)) AS BatchRunCount
-       FROM ${TABLE_NAME} FINAL
-       WHERE TenantId = {tenantId:String}
-         AND ScenarioSetId = {scenarioSetId:String}
-         AND DeletedAt IS NULL`,
+       FROM (
+         SELECT *
+         FROM ${TABLE_NAME}
+         WHERE TenantId = {tenantId:String}
+           AND ScenarioSetId = {scenarioSetId:String}
+         ORDER BY ScenarioRunId, UpdatedAt DESC
+         LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+       )
+       WHERE DeletedAt IS NULL`,
       { tenantId: projectId, scenarioSetId },
     );
     return parseInt(rows[0]?.BatchRunCount ?? "0", 10);
@@ -400,10 +436,15 @@ export class ClickHouseSimulationService {
   }): Promise<ScenarioRunData[] | null> {
     const rows = await this.queryRows<ClickHouseSimulationRunRow>(
       `SELECT ${RUN_COLUMNS}
-       FROM ${TABLE_NAME} FINAL
-       WHERE TenantId = {tenantId:String}
-         AND ScenarioId = {scenarioId:String}
-         AND DeletedAt IS NULL
+       FROM (
+         SELECT *
+         FROM ${TABLE_NAME}
+         WHERE TenantId = {tenantId:String}
+           AND ScenarioId = {scenarioId:String}
+         ORDER BY ScenarioRunId, UpdatedAt DESC
+         LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+       )
+       WHERE DeletedAt IS NULL
        ORDER BY CreatedAt DESC`,
       { tenantId: projectId, scenarioId },
     );
@@ -426,10 +467,15 @@ export class ClickHouseSimulationService {
   }): Promise<ScenarioRunData[]> {
     const rows = await this.queryRows<ClickHouseSimulationRunRow>(
       `SELECT ${RUN_COLUMNS}
-       FROM ${TABLE_NAME} FINAL
-       WHERE TenantId = {tenantId:String}
-         AND ScenarioSetId = {scenarioSetId:String}
-         AND DeletedAt IS NULL
+       FROM (
+         SELECT *
+         FROM ${TABLE_NAME}
+         WHERE TenantId = {tenantId:String}
+           AND ScenarioSetId = {scenarioSetId:String}
+         ORDER BY ScenarioRunId, UpdatedAt DESC
+         LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+       )
+       WHERE DeletedAt IS NULL
        ORDER BY BatchRunId ASC, CreatedAt ASC`,
       { tenantId: projectId, scenarioSetId },
     );
@@ -468,10 +514,15 @@ export class ClickHouseSimulationService {
       `SELECT
         BatchRunId,
         toString(toUnixTimestamp64Milli(max(CreatedAt))) AS MaxCreatedAt
-       FROM ${TABLE_NAME} FINAL
-       WHERE TenantId = {tenantId:String}
-         AND ScenarioSetId = {scenarioSetId:String}
-         AND DeletedAt IS NULL
+       FROM (
+         SELECT *
+         FROM ${TABLE_NAME}
+         WHERE TenantId = {tenantId:String}
+           AND ScenarioSetId = {scenarioSetId:String}
+         ORDER BY ScenarioRunId, UpdatedAt DESC
+         LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+       )
+       WHERE DeletedAt IS NULL
        GROUP BY BatchRunId
        ${cursorClause}
        ORDER BY MaxCreatedAt DESC, BatchRunId ASC
@@ -537,10 +588,15 @@ export class ClickHouseSimulationService {
         BatchRunId,
         toString(toUnixTimestamp64Milli(max(CreatedAt))) AS MaxCreatedAt,
         any(ScenarioSetId) AS ScenarioSetId
-       FROM ${TABLE_NAME} FINAL
-       WHERE TenantId = {tenantId:String}
-         AND ScenarioSetId LIKE '__internal__%__suite'
-         AND DeletedAt IS NULL
+       FROM (
+         SELECT *
+         FROM ${TABLE_NAME}
+         WHERE TenantId = {tenantId:String}
+           AND ScenarioSetId LIKE '__internal__%__suite'
+         ORDER BY ScenarioRunId, UpdatedAt DESC
+         LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+       )
+       WHERE DeletedAt IS NULL
        GROUP BY BatchRunId
        ${cursorClause}
        ORDER BY MaxCreatedAt DESC, BatchRunId ASC
@@ -608,10 +664,15 @@ export class ClickHouseSimulationService {
 
     const rows = await this.queryRows<ClickHouseSimulationRunRow>(
       `SELECT ${RUN_COLUMNS}
-       FROM ${TABLE_NAME} FINAL
-       WHERE TenantId = {tenantId:String}
-         AND BatchRunId IN ({batchRunIds:Array(String)})
-         AND DeletedAt IS NULL
+       FROM (
+         SELECT *
+         FROM ${TABLE_NAME}
+         WHERE TenantId = {tenantId:String}
+           AND BatchRunId IN ({batchRunIds:Array(String)})
+         ORDER BY ScenarioRunId, UpdatedAt DESC
+         LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+       )
+       WHERE DeletedAt IS NULL
        ORDER BY CreatedAt ASC`,
       { tenantId: projectId, batchRunIds },
     );
