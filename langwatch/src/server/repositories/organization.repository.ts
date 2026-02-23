@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { PricingModel, PrismaClient } from "@prisma/client";
 
 /**
  * Repository for organization-related data access
@@ -26,5 +26,16 @@ export class OrganizationRepository {
       select: { organizationId: true },
     });
     return team?.organizationId ?? null;
+  }
+
+  /**
+   * Gets the pricing model for an organization
+   */
+  async getPricingModel(organizationId: string): Promise<PricingModel | null> {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { pricingModel: true },
+    });
+    return org?.pricingModel ?? null;
   }
 }

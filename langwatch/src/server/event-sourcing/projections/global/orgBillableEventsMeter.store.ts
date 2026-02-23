@@ -1,5 +1,5 @@
-import type { AppendStore } from "../../library/projections/mapProjection.types";
-import type { ProjectionStoreContext } from "../../library/projections/projectionStoreContext";
+import type { AppendStore } from "../mapProjection.types";
+import type { ProjectionStoreContext } from "../projectionStoreContext";
 import { getClickHouseClient } from "~/server/clickhouse/client";
 import { createLogger } from "~/utils/logger/server";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";

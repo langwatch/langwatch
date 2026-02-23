@@ -79,9 +79,9 @@ export async function queryBillableEventsTotal({
 
 /**
  * Approximate count of distinct billable events for an org in a billing month.
- * Uses HyperLogLog (~1% error, constant memory). Suitable for limit checking, not billing.
+ * Uses HyperLogLog (~1% error, constant memory).
  */
-export async function queryBillableEventsTotalApprox({
+export async function queryBillableEventsTotalUniq({
   organizationId,
   billingMonth,
 }: {
@@ -108,6 +108,50 @@ export async function queryBillableEventsTotalApprox({
         AND EventTimestamp < {endDate:DateTime64(3)}
     `,
     query_params: { organizationId, startDate, endDate },
+    format: "JSONEachRow",
+  });
+
+  const jsonResult = await result.json();
+  const rows = Array.isArray(jsonResult) ? jsonResult : [];
+  const firstRow = rows[0] as { total: string } | undefined;
+  return parseInt(firstRow?.total ?? "0", 10);
+}
+
+/**
+ * Approximate count of distinct trace events for an org in a current month.
+ * Uses HyperLogLog (~1% error, constant memory).
+ */
+export async function queryTraceSummariesTotalUniq({
+  projectIds,
+  billingMonth,
+}: {
+  projectIds: string[];
+  billingMonth: string;
+}): Promise<number | null> {
+  if (projectIds.length === 0) {
+    return 0;
+  }
+
+  const client = getClickHouseClient();
+  if (!client) {
+    logger.warn(
+      { projectIds },
+      "ClickHouse not available, skipping trace summaries query"
+    );
+    return null;
+  }
+
+  const [startDate, endDate] = billingMonthDateRange(billingMonth);
+
+  const result = await client.query({
+    query: `
+      SELECT uniq(TraceId) as total
+      FROM trace_summaries
+      WHERE TenantId IN {tenantIds:Array(String)}
+        AND CreatedAt >= {startDate:DateTime64(3)}
+        AND CreatedAt < {endDate:DateTime64(3)}
+    `,
+    query_params: { tenantIds: projectIds, startDate, endDate },
     format: "JSONEachRow",
   });
 

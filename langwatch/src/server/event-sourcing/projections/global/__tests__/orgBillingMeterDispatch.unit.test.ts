@@ -7,7 +7,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ProjectionStoreContext } from "../../../library/projections/projectionStoreContext";
+import type { ProjectionStoreContext } from "../../projectionStoreContext";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks

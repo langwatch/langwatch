@@ -1,5 +1,5 @@
-import type { AppendStore } from "../../library/projections/mapProjection.types";
-import type { ProjectionStoreContext } from "../../library/projections/projectionStoreContext";
+import type { AppendStore } from "../mapProjection.types";
+import type { ProjectionStoreContext } from "../projectionStoreContext";
 import { createLogger } from "~/utils/logger/server";
 import { USAGE_REPORTING_QUEUE } from "~/server/background/queues/constants";
 import type { OrgBillingMeterDispatchRecord } from "./orgBillingMeterDispatch.mapProjection";

@@ -1,5 +1,5 @@
-import type { Event } from "../../library/domain/types";
-import type { MapProjectionDefinition } from "../../library/projections/mapProjection.types";
+import type { Event } from "../../domain/types";
+import type { MapProjectionDefinition } from "../mapProjection.types";
 import { EVALUATION_STARTED_EVENT_TYPE } from "../../pipelines/evaluation-processing/schemas/constants";
 import { EXPERIMENT_RUN_EVENT_TYPES } from "../../pipelines/experiment-run-processing/schemas/constants";
 import { SPAN_RECEIVED_EVENT_TYPE } from "../../pipelines/trace-processing/schemas/constants";
