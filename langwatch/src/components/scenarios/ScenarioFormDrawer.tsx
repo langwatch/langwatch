@@ -2,7 +2,7 @@ import { Grid, GridItem, Heading } from "@chakra-ui/react";
 import type { Scenario } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
-import { useDrawer, useDrawerParams } from "../../hooks/useDrawer";
+import { getComplexProps, useDrawer, useDrawerParams } from "../../hooks/useDrawer";
 import { checkCompoundLimits } from "../../hooks/useCompoundLicenseCheck";
 import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -16,22 +16,34 @@ import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
 import { SaveAndRunMenu } from "./SaveAndRunMenu";
 import { ScenarioEditorSidebar } from "./ScenarioEditorSidebar";
-import { ScenarioForm, type ScenarioFormData } from "./ScenarioForm";
+import { ScenarioForm, type ScenarioFormData, type ScenarioInitialData } from "./ScenarioForm";
 import type { TargetValue } from "./TargetSelector";
+
 export type ScenarioFormDrawerProps = {
   open?: boolean;
   onClose?: () => void;
   onSuccess?: (scenario: Scenario) => void;
-};
+} & Partial<ScenarioInitialData>;
+
 /**
  * Drawer container for scenario create/edit form.
  * Two-column layout: form on left, help sidebar on right.
  * Bottom bar with Quick Test and Save and Run.
+ *
+ * When opened without a scenarioId (new scenario flow), the first save
+ * creates the record and transitions to edit mode by updating the URL
+ * with the new scenarioId. This prevents the double-save bug where
+ * subsequent saves would create duplicates.
  */
 export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const { project } = useOrganizationTeamProject();
-  const { closeDrawer } = useDrawer();
+  const { closeDrawer, openDrawer } = useDrawer();
   const params = useDrawerParams();
+  const rawComplexProps = getComplexProps();
+  const complexPropsData =
+    rawComplexProps && "initialFormData" in rawComplexProps
+      ? (rawComplexProps as Partial<ScenarioInitialData>)
+      : {};
   const utils = api.useContext();
   const [formInstance, setFormInstance] =
     useState<UseFormReturn<ScenarioFormData> | null>(null);
@@ -110,39 +122,62 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       });
     },
   });
+
+  /**
+   * Transition from create mode to edit mode after first save.
+   * Updates the URL with the new scenarioId so subsequent saves
+   * trigger updates instead of creating duplicates.
+   */
+  const transitionToEditMode = useCallback(
+    (newScenarioId: string) => {
+      openDrawer(
+        "scenarioEditor",
+        {
+          urlParams: { scenarioId: newScenarioId },
+        },
+        { resetStack: true }
+      );
+    },
+    [openDrawer],
+  );
+
   const handleSave = useCallback(
     async (data: ScenarioFormData): Promise<Scenario | null> => {
       if (!project?.id) return null;
+
+      // Edit mode: scenarioId is in URL and scenario data is loaded
       if (scenario) {
         return updateMutation.mutateAsync({
           projectId: project.id,
           id: scenario.id,
           ...data,
         });
-      } else {
-        // Check license limit before creating a new scenario
-        return new Promise((resolve) => {
-          checkCompoundLimits([scenarioEnforcement], async () => {
-            try {
-              const result = await createMutation.mutateAsync({
-                projectId: project.id,
-                ...data,
-              });
-              resolve(result);
-            } catch {
-              // Error already handled by global mutation cache if license error
-              resolve(null);
-            }
-          });
+      }
 
-          // If limit exceeded, modal is shown and callback won't run - resolve null
-          if (!scenarioEnforcement.isAllowed) {
+      // Create mode: no scenarioId in URL yet
+      return new Promise((resolve) => {
+        checkCompoundLimits([scenarioEnforcement], async () => {
+          try {
+            const result = await createMutation.mutateAsync({
+              projectId: project.id,
+              ...data,
+            });
+            // Transition to edit mode to prevent double-create on subsequent saves
+            transitionToEditMode(result.id);
+            resolve(result);
+          } catch {
+            // Error already handled by global mutation cache if license error
             resolve(null);
           }
         });
-      }
+
+        // If limit exceeded, modal is shown and callback won't run - resolve null
+        if (!scenarioEnforcement.isAllowed) {
+          resolve(null);
+        }
+      });
     },
-    [project?.id, scenario, createMutation, updateMutation, scenarioEnforcement],
+    [project?.id, scenario, createMutation, updateMutation, scenarioEnforcement, transitionToEditMode],
   );
   const handleSaveAndRun = useCallback(
     async (target: TargetValue) => {
@@ -199,10 +234,15 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   }, []);
   const isSubmitting =
     createMutation.isPending || updateMutation.isPending || isRunning;
+
+  // Use initial data from complexProps (new scenario from modal) or from DB (editing)
+  const initialFormData =
+    props.initialFormData ?? complexPropsData.initialFormData;
   const defaultValues: Partial<ScenarioFormData> | undefined = useMemo(
-    () => scenario ?? undefined,
-    [scenario],
+    () => scenario ?? initialFormData ?? undefined,
+    [scenario, initialFormData],
   );
+
   return (
     <Drawer.Root
       closeOnInteractOutside={false}
