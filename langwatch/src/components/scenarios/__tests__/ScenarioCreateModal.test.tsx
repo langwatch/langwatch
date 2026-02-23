@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, within, fireEvent, waitFor } from "@testing-library/react";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { ScenarioCreateModal } from "../ScenarioCreateModal";
@@ -45,18 +45,9 @@ vi.mock("~/stores/upgradeModalStore", () => ({
   },
 }));
 
-// Mock tRPC
-const mockMutateAsync = vi.fn();
+// Mock tRPC - no create mutation needed since modal no longer creates
 vi.mock("~/utils/api", () => ({
   api: {
-    scenarios: {
-      create: {
-        useMutation: () => ({
-          mutateAsync: mockMutateAsync,
-          isPending: false,
-        }),
-      },
-    },
     modelProvider: {
       getAllForProject: {
         useQuery: () => ({
@@ -131,9 +122,12 @@ function getDialogContent() {
 }
 
 describe("<ScenarioCreateModal/>", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
-    mockMutateAsync.mockResolvedValue({ id: "new-scenario-id", name: "Generated Scenario" });
     mockToasterCreate.mockClear();
     // Reset to having providers by default
     mockHasEnabledProviders = true;
@@ -265,7 +259,7 @@ describe("<ScenarioCreateModal/>", () => {
   });
 
   describe("when user clicks Generate with AI", () => {
-    it("calls AI generation API and creates scenario with generated content", async () => {
+    it("opens drawer with generated content without creating a DB record", async () => {
       render(
         <ScenarioCreateModal open={true} onClose={vi.fn()} />,
         { wrapper: Wrapper }
@@ -291,25 +285,12 @@ describe("<ScenarioCreateModal/>", () => {
         );
       });
 
-      // Verify scenario was created with generated content
-      await waitFor(() => {
-        expect(mockMutateAsync).toHaveBeenCalledWith({
-          projectId: "project-123",
-          name: "Generated Scenario",
-          situation: "A generated situation",
-          criteria: ["Criterion 1", "Criterion 2"],
-          labels: ["support"],
-        });
-      });
-
-      // Verify drawer was opened (without initialPrompt since content is already generated)
+      // Verify drawer was opened with generated data as initialFormData (no scenarioId)
       await waitFor(() => {
         expect(mockOpenDrawer).toHaveBeenCalledWith(
           "scenarioEditor",
           expect.objectContaining({
-            urlParams: {
-              scenarioId: "new-scenario-id",
-            },
+            initialFormData: mockGeneratedScenario,
           }),
           { resetStack: true }
         );
@@ -318,7 +299,7 @@ describe("<ScenarioCreateModal/>", () => {
   });
 
   describe("when user clicks Skip", () => {
-    it("creates scenario and opens drawer without initialPrompt", async () => {
+    it("opens drawer with empty initial data without creating a DB record", async () => {
       render(
         <ScenarioCreateModal open={true} onClose={vi.fn()} />,
         { wrapper: Wrapper }
@@ -326,74 +307,20 @@ describe("<ScenarioCreateModal/>", () => {
 
       const dialog = getDialogContent();
       fireEvent.click(within(dialog).getByRole("button", { name: /i'll write it myself/i }));
-
-      await waitFor(() => {
-        expect(mockMutateAsync).toHaveBeenCalledWith({
-          projectId: "project-123",
-          name: "Untitled",
-          situation: "",
-          criteria: [],
-          labels: [],
-        });
-      });
 
       await waitFor(() => {
         expect(mockOpenDrawer).toHaveBeenCalledWith(
           "scenarioEditor",
           expect.objectContaining({
-            urlParams: {
-              scenarioId: "new-scenario-id",
+            initialFormData: {
+              name: "",
+              situation: "",
+              criteria: [],
+              labels: [],
             },
           }),
           { resetStack: true }
         );
-      });
-    });
-  });
-
-  describe("when scenario creation fails", () => {
-    it("shows error toast with message", async () => {
-      const errorMessage = "Network error: Failed to connect";
-      mockMutateAsync.mockRejectedValueOnce(new Error(errorMessage));
-
-      render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
-
-      const dialog = getDialogContent();
-      fireEvent.click(within(dialog).getByRole("button", { name: /i'll write it myself/i }));
-
-      await waitFor(() => {
-        expect(mockToasterCreate).toHaveBeenCalledWith({
-          title: "Failed to create scenario",
-          description: errorMessage,
-          type: "error",
-          meta: { closable: true },
-        });
-      });
-
-      expect(mockOpenDrawer).not.toHaveBeenCalled();
-    });
-
-    it("shows generic error for non-Error exceptions", async () => {
-      mockMutateAsync.mockRejectedValueOnce("Unknown failure");
-
-      render(
-        <ScenarioCreateModal open={true} onClose={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
-
-      const dialog = getDialogContent();
-      fireEvent.click(within(dialog).getByRole("button", { name: /i'll write it myself/i }));
-
-      await waitFor(() => {
-        expect(mockToasterCreate).toHaveBeenCalledWith({
-          title: "Failed to create scenario",
-          description: "An unexpected error occurred",
-          type: "error",
-          meta: { closable: true },
-        });
       });
     });
   });
@@ -416,7 +343,6 @@ describe("<ScenarioCreateModal/>", () => {
   describe("when no model providers are configured", () => {
     beforeEach(() => {
       vi.clearAllMocks();
-      mockMutateAsync.mockResolvedValue({ id: "new-scenario-id", name: "Generated Scenario" });
       mockToasterCreate.mockClear();
       // Set to no providers
       mockHasEnabledProviders = false;
