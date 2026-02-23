@@ -1183,8 +1183,6 @@ export class ClickHouseTraceService {
           ts.SpanCount AS ts_SpanCount,
           ts.TotalDurationMs AS ts_TotalDurationMs,
           ts.ComputedIOSchemaVersion AS ts_ComputedIOSchemaVersion,
-          ts.ComputedInput AS ts_ComputedInput,
-          ts.ComputedOutput AS ts_ComputedOutput,
           ts.TimeToFirstTokenMs AS ts_TimeToFirstTokenMs,
           ts.TimeToLastTokenMs AS ts_TimeToLastTokenMs,
           ts.TokensPerSecond AS ts_TokensPerSecond,
@@ -1275,8 +1273,8 @@ export class ClickHouseTraceService {
       spanCount: row.ts_SpanCount,
       totalDurationMs: row.ts_TotalDurationMs,
       computedIOSchemaVersion: row.ts_ComputedIOSchemaVersion,
-      computedInput: row.ts_ComputedInput,
-      computedOutput: row.ts_ComputedOutput,
+      computedInput: row.ts_ComputedInput ?? null,
+      computedOutput: row.ts_ComputedOutput ?? null,
       timeToFirstTokenMs: row.ts_TimeToFirstTokenMs,
       timeToLastTokenMs: row.ts_TimeToLastTokenMs,
       tokensPerSecond: row.ts_TokensPerSecond,
@@ -1360,18 +1358,17 @@ export class ClickHouseTraceService {
           throw new Error("ClickHouse client not available");
         }
 
-        // Query trace summaries and spans with a JOIN
-        // We use LEFT JOIN to ensure we get trace summaries even if they have no spans
-        const result = await this.clickHouseClient.query({
-          query: `
+        // Two parallel queries: lightweight JOIN (no heavy text columns) + separate IO fetch
+        // This avoids decompressing ComputedInput/Output for every span row in the JOIN
+        const [joinResult, ioResult] = await Promise.all([
+          this.clickHouseClient.query({
+            query: `
         SELECT
-          -- Trace summary fields (prefixed with ts_)
+          -- Trace summary fields (prefixed with ts_) - excludes ComputedInput/Output
           ts.TraceId AS ts_TraceId,
           ts.SpanCount AS ts_SpanCount,
           ts.TotalDurationMs AS ts_TotalDurationMs,
           ts.ComputedIOSchemaVersion AS ts_ComputedIOSchemaVersion,
-          ts.ComputedInput AS ts_ComputedInput,
-          ts.ComputedOutput AS ts_ComputedOutput,
           ts.TimeToFirstTokenMs AS ts_TimeToFirstTokenMs,
           ts.TimeToLastTokenMs AS ts_TimeToLastTokenMs,
           ts.TokensPerSecond AS ts_TokensPerSecond,
@@ -1426,17 +1423,42 @@ export class ClickHouseTraceService {
           AND ts.TraceId IN ({traceIds:Array(String)})
         ORDER BY ts.TraceId, ss.StartTime ASC
       `,
-          query_params: {
-            tenantId: projectId,
-            traceIds,
-          },
-          format: "JSONEachRow",
-        });
+            query_params: { tenantId: projectId, traceIds },
+            format: "JSONEachRow",
+          }),
+          // Separate lightweight query for ComputedInput/Output (one row per trace, no JOIN multiplication)
+          this.clickHouseClient.query({
+            query: `
+        SELECT
+          TraceId,
+          ComputedInput,
+          ComputedOutput
+        FROM trace_summaries FINAL
+        WHERE TenantId = {tenantId:String}
+          AND TraceId IN ({traceIds:Array(String)})
+      `,
+            query_params: { tenantId: projectId, traceIds },
+            format: "JSONEachRow",
+          }),
+        ]);
 
-        const jsonResult = await result.json();
+        const jsonResult = await joinResult.json();
         const rows = Array.isArray(jsonResult)
           ? (jsonResult as JoinedTraceSpanRow[])
           : [];
+
+        // Build a map of TraceId -> ComputedInput/Output
+        const ioJsonResult = await ioResult.json();
+        const ioRows = Array.isArray(ioJsonResult)
+          ? (ioJsonResult as Array<{ TraceId: string; ComputedInput: string | null; ComputedOutput: string | null }>)
+          : [];
+        const ioMap = new Map<string, { computedInput: string | null; computedOutput: string | null }>();
+        for (const ioRow of ioRows) {
+          ioMap.set(ioRow.TraceId, {
+            computedInput: ioRow.ComputedInput,
+            computedOutput: ioRow.ComputedOutput,
+          });
+        }
 
         // Group results by TraceId
         const tracesMap = new Map<
@@ -1448,9 +1470,15 @@ export class ClickHouseTraceService {
           const traceId = row.ts_TraceId;
 
           if (!tracesMap.has(traceId)) {
-            // First row for this trace - extract summary
+            // First row for this trace - extract summary and merge IO data
+            const summary = this.extractTraceSummaryFromRow(row);
+            const io = ioMap.get(traceId);
+            if (io) {
+              summary.computedInput = io.computedInput;
+              summary.computedOutput = io.computedOutput;
+            }
             tracesMap.set(traceId, {
-              summary: this.extractTraceSummaryFromRow(row),
+              summary,
               spans: [],
             });
           }
@@ -1479,8 +1507,8 @@ export class ClickHouseTraceService {
       spanCount: row.ts_SpanCount,
       totalDurationMs: row.ts_TotalDurationMs,
       computedIOSchemaVersion: row.ts_ComputedIOSchemaVersion,
-      computedInput: row.ts_ComputedInput,
-      computedOutput: row.ts_ComputedOutput,
+      computedInput: row.ts_ComputedInput ?? null,
+      computedOutput: row.ts_ComputedOutput ?? null,
       timeToFirstTokenMs: row.ts_TimeToFirstTokenMs,
       timeToLastTokenMs: row.ts_TimeToLastTokenMs,
       tokensPerSecond: row.ts_TokensPerSecond,
@@ -1604,8 +1632,8 @@ interface TraceSummaryRow {
   ts_SpanCount: number;
   ts_TotalDurationMs: number;
   ts_ComputedIOSchemaVersion: string;
-  ts_ComputedInput: string | null;
-  ts_ComputedOutput: string | null;
+  ts_ComputedInput?: string | null;
+  ts_ComputedOutput?: string | null;
   ts_TimeToFirstTokenMs: number | null;
   ts_TimeToLastTokenMs: number | null;
   ts_TokensPerSecond: number | null;
