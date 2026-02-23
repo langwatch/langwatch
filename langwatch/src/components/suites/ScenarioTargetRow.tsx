@@ -20,17 +20,32 @@ function formatDuration(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
-function StatusIcon({ status }: { status: string }) {
-  if (status === ScenarioRunStatus.SUCCESS) {
-    return <CheckCircle size={14} color="var(--chakra-colors-green-500)" />;
+type StatusCategory = "success" | "failure" | "in_progress";
+
+function categorizeStatus(status: ScenarioRunStatus): StatusCategory {
+  switch (status) {
+    case ScenarioRunStatus.SUCCESS:
+      return "success";
+    case ScenarioRunStatus.ERROR:
+    case ScenarioRunStatus.FAILED:
+    case ScenarioRunStatus.STALLED:
+    case ScenarioRunStatus.CANCELLED:
+      return "failure";
+    case ScenarioRunStatus.IN_PROGRESS:
+    case ScenarioRunStatus.PENDING:
+      return "in_progress";
   }
-  if (
-    status === ScenarioRunStatus.ERROR ||
-    status === ScenarioRunStatus.FAILED
-  ) {
-    return <XCircle size={14} color="var(--chakra-colors-red-500)" />;
+}
+
+function StatusIcon({ status }: { status: ScenarioRunStatus }) {
+  switch (categorizeStatus(status)) {
+    case "success":
+      return <CheckCircle size={14} color="var(--chakra-colors-green-500)" />;
+    case "failure":
+      return <XCircle size={14} color="var(--chakra-colors-red-500)" />;
+    case "in_progress":
+      return <Loader size={14} color="var(--chakra-colors-orange-500)" style={{ animation: "spin 2s linear infinite" }} />;
   }
-  return <Loader size={14} color="var(--chakra-colors-orange-500)" style={{ animation: "spin 2s linear infinite" }} />;
 }
 
 export function ScenarioTargetRow({
@@ -43,11 +58,7 @@ export function ScenarioTargetRow({
     ? `${scenarioName} \u00d7 ${targetName}`
     : scenarioName;
 
-  const isSuccess = scenarioRun.status === ScenarioRunStatus.SUCCESS;
-  const isFinished =
-    scenarioRun.status === ScenarioRunStatus.SUCCESS ||
-    scenarioRun.status === ScenarioRunStatus.ERROR ||
-    scenarioRun.status === ScenarioRunStatus.FAILED;
+  const category = categorizeStatus(scenarioRun.status);
 
   return (
     <HStack
@@ -70,12 +81,12 @@ export function ScenarioTargetRow({
         {displayName}
       </Text>
       <HStack gap={2} flexShrink={0}>
-        {isFinished && (
-          <Text fontSize="xs" color={isSuccess ? "green.600" : "red.600"}>
-            {isSuccess ? "100%" : "0%"}
+        {category !== "in_progress" && (
+          <Text fontSize="xs" color={category === "success" ? "green.600" : "red.600"}>
+            {category === "success" ? "100%" : "0%"}
           </Text>
         )}
-        {!isFinished && (
+        {category === "in_progress" && (
           <Text fontSize="xs" color="orange.500">
             In progress
           </Text>
