@@ -290,7 +290,7 @@ export const organizationRouter = createTRPCRouter({
               slug: orgSlug,
               phoneNumber: input.phoneNumber,
               signupData: input.signUpData,
-              pricingModel: PricingModel.SEAT_EVENT,
+              pricingModel: PricingModel.TIERED,
             },
           });
 
