@@ -15,7 +15,6 @@ export class PrismaMonitorRepository implements MonitorRepository {
         id: true,
         checkType: true,
         name: true,
-        sample: true,
         threadIdleTimeout: true,
       },
     });
