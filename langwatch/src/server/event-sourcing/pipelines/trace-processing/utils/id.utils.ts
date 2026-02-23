@@ -1,7 +1,7 @@
 import { getEnvironment, Instance, Ksuid } from "@langwatch/ksuid";
 import { createHash } from "crypto";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { EventUtils } from "../../../library";
+import { EventUtils } from "../../../";
 import type { SpanReceivedEvent } from "../schemas/events";
 import { TraceRequestUtils } from "./traceRequest.utils";
 

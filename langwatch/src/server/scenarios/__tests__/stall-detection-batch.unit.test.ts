@@ -22,23 +22,21 @@ vi.mock("~/utils/logger/server", () => ({
   }),
 }));
 
-// Mock repository - expose mock fns for per-test configuration
+// Import AFTER mocks are declared
+import { ScenarioEventService } from "../scenario-event.service";
+
+// Mock repository fns for per-test configuration
 const mockGetRunStartedEvents = vi.fn();
 const mockGetMessageEvents = vi.fn();
 const mockGetRunFinishedEvents = vi.fn();
+const mockGetBatchRunIds = vi.fn();
 
-vi.mock("../scenario-event.repository", () => {
-  return {
-    ScenarioEventRepository: class {
-      getRunStartedEventsByScenarioRunIds = mockGetRunStartedEvents;
-      getLatestMessageSnapshotEventsByScenarioRunIds = mockGetMessageEvents;
-      getLatestRunFinishedEventsByScenarioRunIds = mockGetRunFinishedEvents;
-    },
-  };
-});
-
-// Import AFTER mocks are declared
-import { ScenarioEventService } from "../scenario-event.service";
+const mockRepo = {
+  getRunStartedEventsByScenarioRunIds: mockGetRunStartedEvents,
+  getLatestMessageSnapshotEventsByScenarioRunIds: mockGetMessageEvents,
+  getLatestRunFinishedEventsByScenarioRunIds: mockGetRunFinishedEvents,
+  getBatchRunIdsForScenarioSet: mockGetBatchRunIds,
+};
 
 const NOW = Date.now();
 
@@ -113,7 +111,7 @@ describe("getScenarioRunDataBatch()", () => {
           ])
         );
 
-        const service = new ScenarioEventService();
+        const service = new ScenarioEventService(mockRepo as any);
         const runs = await service.getScenarioRunDataBatch({
           projectId,
           scenarioRunIds: runIds,
@@ -127,6 +125,29 @@ describe("getScenarioRunDataBatch()", () => {
         expect(statusByRunId.get("run-B")).toBe(ScenarioRunStatus.STALLED);
         expect(statusByRunId.get("run-C")).toBe(ScenarioRunStatus.IN_PROGRESS);
       });
+    });
+  });
+});
+
+describe("getAllRunDataForScenarioSet()", () => {
+  describe("when the batch run count exceeds the page cap", () => {
+    it("throws with a helpful message", async () => {
+      // Return a unique cursor each call so the loop never breaks early
+      // and eventually hits ALL_RUNS_MAX_PAGES
+      let callCount = 0;
+      mockGetBatchRunIds.mockImplementation(() => {
+        callCount++;
+        return Promise.resolve({
+          batchRunIds: ["batch-1"],
+          nextCursor: `cursor-${callCount}`,
+          hasMore: true,
+        });
+      });
+
+      const service = new ScenarioEventService(mockRepo as any);
+      await expect(
+        service.getAllRunDataForScenarioSet({ projectId: "p1", scenarioSetId: "s1" })
+      ).rejects.toThrow(/Too many runs to fetch exhaustively/);
     });
   });
 });

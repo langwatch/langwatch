@@ -21,6 +21,7 @@
 		"verbatimModuleSyntax": true,
 		"paths": {
 			"~/*": ["./src/*"],
+			"@app/*": ["./src/server/app-layer/*"],
 			"@trpc-internal/parser": ["./node_modules/@trpc/server/dist/core/parser"],
 			"@trpc-internal/utils": [
 				"./node_modules/@trpc/server/dist/core/internals/utils"

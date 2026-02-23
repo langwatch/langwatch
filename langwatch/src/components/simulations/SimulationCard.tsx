@@ -102,6 +102,13 @@ export function SimulationCard({
       position="relative"
       boxShadow="lg"
       bg="bg.panel"
+      css={{
+        animation: "cardFadeIn 0.4s ease-out",
+        "@keyframes cardFadeIn": {
+          from: { opacity: 0, transform: "translateY(8px)" },
+          to: { opacity: 1, transform: "translateY(0)" },
+        },
+      }}
     >
       <VStack height="100%" gap={0}>
         <SimulationCardHeader title={title} status={status} />

@@ -20,7 +20,6 @@ export const KSUID_RESOURCES = {
   BATCH_RESULT: "batchresult",
   COST: "cost",
   EVALUATION: "eval",
-  EVALUATION_STATE: "evalstate",
   EVENT: "event",
   EXPERIMENT: "experiment",
   EXPERIMENT_RUN_RESULT: "exprunresult",

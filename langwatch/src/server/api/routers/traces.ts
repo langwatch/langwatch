@@ -1,23 +1,22 @@
-import { on } from "node:events";
 import { PublicShareResourceTypes } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import shuffle from "lodash-es/shuffle";
+import { on } from "node:events";
 import { z } from "zod";
 import {
   createTRPCRouter,
   protectedProcedure,
   publicProcedure,
 } from "~/server/api/trpc";
-import { sseService } from "~/server/services/sse.service";
-import { TraceService } from "~/server/traces/trace.service";
+import { getApp } from "~/server/app-layer";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
+import { TraceService } from "~/server/traces/trace.service";
 import { createLogger } from "~/utils/logger/server";
 import { sharedFiltersInputSchema } from "../../analytics/types";
 import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
 import { evaluatePreconditions } from "../../evaluations/preconditions";
 import { checkPreconditionSchema } from "../../evaluations/types.generated";
-import { checkPermissionOrPubliclyShared } from "../rbac";
-import { checkProjectPermission } from "../rbac";
+import { checkPermissionOrPubliclyShared, checkProjectPermission } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
 
 const tracesFilterInput = sharedFiltersInputSchema.extend({
@@ -262,7 +261,7 @@ export const tracesRouter = createTRPCRouter({
       );
 
       return Object.fromEntries(
-        traces.map((t) => [t.trace_id, formatSpansDigest(t.spans ?? [])]),
+        await Promise.all(traces.map(async (t) => [t.trace_id, await formatSpansDigest(t.spans ?? [])])),
       );
     }),
 
@@ -450,7 +449,7 @@ export const tracesRouter = createTRPCRouter({
     .use(checkProjectPermission("traces:view"))
     .subscription(async function* (opts) {
       const { projectId } = opts.input;
-      const emitter = sseService.getTenantEmitter(projectId);
+      const emitter = getApp().broadcast.getTenantEmitter(projectId);
 
       logger.info({ projectId }, "SSE subscription started");
 
@@ -468,7 +467,7 @@ export const tracesRouter = createTRPCRouter({
         logger.info({ projectId }, "SSE subscription ended normally");
       } finally {
         logger.debug({ projectId }, "SSE subscription cleanup");
-        sseService.cleanupTenantEmitter(projectId);
+        getApp().broadcast.cleanupTenantEmitter(projectId);
       }
     }),
 });

@@ -1,45 +1,38 @@
 import { Grid, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { SetCard } from "~/components/simulations";
 import ScenarioInfoCard from "~/components/simulations/ScenarioInfoCard";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
 import { api } from "~/utils/api";
 import { sortScenarioSets } from "~/features/simulations/sort-scenario-sets";
 
 function SimulationsPageContent() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
-  const [refetchInterval, setRefetchInterval] = useState(4000);
-
-  // Refetch interval is set to 4 seconds when the window is focused and 30 seconds when the window is blurred.
-  useEffect(() => {
-    const onFocus = () => setRefetchInterval(4000);
-    const onBlur = () => setRefetchInterval(30000);
-
-    window.addEventListener("focus", onFocus);
-    window.addEventListener("blur", onBlur);
-
-    return () => {
-      window.removeEventListener("focus", onFocus);
-      window.removeEventListener("blur", onBlur);
-    };
-  }, []);
 
   const {
     data: scenarioSetsData,
     isLoading,
     error,
+    refetch,
   } = api.scenarios.getScenarioSetsData.useQuery(
     { projectId: project?.id ?? "" },
     {
-      refetchInterval,
+      refetchInterval: 60_000,
       enabled: !!project,
     },
   );
+
+  useSimulationUpdateListener({
+    projectId: project?.id ?? "",
+    refetch,
+    enabled: !!project,
+  });
 
   const sortedScenarioSetsData = useMemo(() => {
     if (!scenarioSetsData) {

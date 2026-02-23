@@ -5,7 +5,6 @@ import type {
   SpanStatus,
 } from "@opentelemetry/api";
 import { SpanKind, SpanStatusCode, TraceFlags } from "@opentelemetry/api";
-import { judgeSpanDigestFormatter } from "@langwatch/scenario";
 import { emptyResource } from "@opentelemetry/resources";
 import type { ReadableSpan } from "@opentelemetry/sdk-trace-base";
 import type { Span, SpanTypes } from "./types";
@@ -115,7 +114,8 @@ function buildStatus(span: Span): SpanStatus {
   return { code: SpanStatusCode.OK };
 }
 
-export function formatSpansDigest(spans: Span[]): string {
+export async function formatSpansDigest(spans: Span[]): Promise<string> {
+  const { judgeSpanDigestFormatter } = await import("@langwatch/scenario");
   const readableSpans = spans.map(langwatchSpanToReadableSpan);
   return judgeSpanDigestFormatter.format(readableSpans);
 }

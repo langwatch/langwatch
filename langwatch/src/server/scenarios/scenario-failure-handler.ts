@@ -16,7 +16,7 @@ import {
   ScenarioRunStatus,
   Verdict,
 } from "~/server/scenarios/scenario-event.enums";
-import { ScenarioEventService } from "~/server/scenarios/scenario-event.service";
+import { SimulationService } from "~/server/simulations/simulation.service";
 import { createLogger } from "~/utils/logger/server";
 
 const tracer = getLangWatchTracer("langwatch.scenarios.failure-handler");
@@ -52,13 +52,13 @@ const TERMINAL_STATUSES = new Set([
  * instead of timing out.
  */
 export class ScenarioFailureHandler {
-  constructor(private readonly eventService: ScenarioEventService) {}
+  constructor(private readonly service: SimulationService) {}
 
   /**
    * Creates a new instance with default dependencies.
    */
   static create(): ScenarioFailureHandler {
-    return new ScenarioFailureHandler(new ScenarioEventService());
+    return new ScenarioFailureHandler(SimulationService.create());
   }
 
   /**
@@ -89,14 +89,16 @@ export class ScenarioFailureHandler {
         );
 
         // Check for existing events for this specific scenario
-        const allRuns = await this.eventService.getRunDataForBatchRun({
+        const batchRunResult = await this.service.getRunDataForBatchRun({
           projectId,
           scenarioSetId: setId,
           batchRunId,
         });
 
         // Filter by scenarioId to get the correct run for this scenario
-        const existingRun = allRuns.find((run) => run.scenarioId === scenarioId);
+        const existingRun = batchRunResult.changed
+          ? batchRunResult.runs.find((run) => run.scenarioId === scenarioId)
+          : undefined;
 
         // If run already has a terminal status, do nothing (idempotent)
         if (existingRun && TERMINAL_STATUSES.has(existingRun.status as ScenarioRunStatus)) {
@@ -116,7 +118,7 @@ export class ScenarioFailureHandler {
         // If no RUN_STARTED event exists, emit one
         if (!existingRun) {
           logger.debug({ projectId, scenarioId, scenarioRunId }, "Emitting RUN_STARTED event");
-          await this.eventService.saveScenarioEvent({
+          await this.service.saveScenarioEvent({
             projectId,
             type: ScenarioEventType.RUN_STARTED,
             scenarioId,
@@ -134,7 +136,7 @@ export class ScenarioFailureHandler {
 
         // Emit RUN_FINISHED with ERROR status
         logger.debug({ projectId, scenarioId, scenarioRunId }, "Emitting RUN_FINISHED event with ERROR status");
-        await this.eventService.saveScenarioEvent({
+        await this.service.saveScenarioEvent({
           projectId,
           type: ScenarioEventType.RUN_FINISHED,
           scenarioId,

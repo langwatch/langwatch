@@ -1,20 +1,16 @@
-import type { ConnectionOptions } from "bullmq";
+import type { ConnectionOptions, Job } from "bullmq";
 import {
   type EvaluationJob,
   getEvaluationId,
   getEvaluatorId,
 } from "~/server/background/types";
 import { traceCheckIndexId } from "~/server/elasticsearch";
-import { captureError, extractErrorMessage } from "../../../utils/captureError";
+import { captureError } from "../../../utils/captureError";
 import { createLogger } from "../../../utils/logger/server";
-import { captureException } from "../../../utils/posthogErrorCapture";
 import { safeTruncate } from "../../../utils/truncate";
-import { prisma } from "../../db";
 import { esClient, TRACE_INDEX, traceIndexId } from "../../elasticsearch";
-import { getEvaluationProcessingPipeline } from "../../event-sourcing/runtime/eventSourcing";
 import { connection } from "../../redis";
 import type { ElasticSearchEvaluation } from "../../tracer/types";
-import { runEvaluationJob } from "../workers/evaluationsWorker";
 import { EVALUATIONS_QUEUE } from "./constants";
 import { QueueWithFallback } from "./queueWithFallback";
 
@@ -22,27 +18,48 @@ export { EVALUATIONS_QUEUE } from "./constants";
 
 const logger = createLogger("langwatch:evaluations:queue");
 
+/**
+ * Register pattern: the fallback worker is set by evaluationsWorker.ts at startup.
+ * This avoids a circular import (evaluationsQueue ↔ evaluationsWorker).
+ */
+let fallbackWorkerFn: ((job: Job<EvaluationJob, any, string>) => Promise<any>) | null = null;
+
+export const registerEvaluationsFallbackWorker = (
+  fn: (job: Job<EvaluationJob, any, string>) => Promise<any>,
+) => {
+  fallbackWorkerFn = fn;
+};
+
 // Note: Job name is dynamic (evaluator type), not a constant
 export const evaluationsQueue = new QueueWithFallback<
   EvaluationJob,
   any,
   string
->(EVALUATIONS_QUEUE.NAME, runEvaluationJob, {
-  connection: connection as ConnectionOptions,
-  defaultJobOptions: {
-    backoff: {
-      type: "exponential",
-      delay: 1000,
-    },
-    attempts: 3,
-    removeOnComplete: {
-      age: 60 * 60, // Remove in 1 hour to prevent accidental reruns
-    },
-    removeOnFail: {
-      age: 60 * 60 * 24 * 3, // 3 days
+>(
+  EVALUATIONS_QUEUE.NAME,
+  async (job) => {
+    if (!fallbackWorkerFn) {
+      throw new Error("Evaluations fallback worker not registered");
+    }
+    return fallbackWorkerFn(job);
+  },
+  {
+    connection: connection as ConnectionOptions,
+    defaultJobOptions: {
+      backoff: {
+        type: "exponential",
+        delay: 1000,
+      },
+      attempts: 3,
+      removeOnComplete: {
+        age: 60 * 60, // Remove in 1 hour to prevent accidental reruns
+      },
+      removeOnFail: {
+        age: 60 * 60 * 24 * 3, // 3 days
+      },
     },
   },
-});
+);
 
 /**
  * Thread debounce configuration for thread-level evaluations.
@@ -88,40 +105,6 @@ export const scheduleEvaluation = async ({
     trace: trace,
     status: "scheduled",
   });
-
-  // Emit evaluation scheduled event to event sourcing pipeline
-  // Note: Feature flag lookup and event emission are best-effort - transient DB/queue errors
-  // should not abort the evaluation flow. Errors are captured for monitoring.
-  try {
-    const project = await prisma.project.findUnique({
-      where: { id: trace.project_id },
-      select: { featureEventSourcingEvaluationIngestion: true },
-    });
-    if (project?.featureEventSourcingEvaluationIngestion) {
-      await getEvaluationProcessingPipeline().commands.scheduleEvaluation.send({
-        tenantId: trace.project_id,
-        evaluationId: getEvaluationId(check),
-        evaluatorId: getEvaluatorId(check),
-        evaluatorType: check.type,
-        evaluatorName: check.name,
-        traceId: trace.trace_id,
-        isGuardrail: false,
-        occurredAt: Date.now(),
-      });
-    }
-  } catch (error) {
-    captureException(error, {
-      extra: {
-        projectId: trace.project_id,
-        evaluationId: getEvaluationId(check),
-        event: "scheduled",
-      },
-    });
-    logger.warn(
-      { error, check, trace },
-      "Failed to check feature flag or emit evaluation scheduled event",
-    );
-  }
 
   // For thread debouncing, use thread-based job ID; otherwise use trace-based
   const jobId = threadDebounce
@@ -344,65 +327,4 @@ export const updateEvaluationStatusInES = async ({
     refresh: true,
   });
 
-  // Emit evaluation events to event sourcing pipeline based on status
-  // Skip "scheduled" status here since it's handled in scheduleEvaluation()
-  // Note: Feature flag lookup and event emission are best-effort - transient DB/queue errors
-  // should not abort the evaluation flow. Errors are captured for monitoring.
-  if (status !== "scheduled") {
-    try {
-      const project = await prisma.project.findUnique({
-        where: { id: trace.project_id },
-        select: { featureEventSourcingEvaluationIngestion: true },
-      });
-      if (project?.featureEventSourcingEvaluationIngestion) {
-        const evaluationId = getEvaluationId(check);
-        if (status === "in_progress") {
-          // Emit started event
-          await getEvaluationProcessingPipeline().commands.startEvaluation.send(
-            {
-              tenantId: trace.project_id,
-              evaluationId,
-              evaluatorId: getEvaluatorId(check),
-              evaluatorType: check.type,
-              evaluatorName: check.name,
-              traceId: trace.trace_id,
-              isGuardrail: is_guardrail,
-              occurredAt: Date.now(),
-            },
-          );
-        } else if (
-          status === "processed" ||
-          status === "error" ||
-          status === "skipped"
-        ) {
-          // Emit completed event
-          await getEvaluationProcessingPipeline().commands.completeEvaluation.send(
-            {
-              tenantId: trace.project_id,
-              evaluationId,
-              status,
-              score,
-              passed,
-              label,
-              details,
-              error: extractErrorMessage(error),
-              occurredAt: Date.now(),
-            },
-          );
-        }
-      }
-    } catch (eventError) {
-      captureException(eventError, {
-        extra: {
-          projectId: trace.project_id,
-          evaluationId: getEvaluationId(check),
-          event: status,
-        },
-      });
-      logger.warn(
-        { error: eventError, check, trace, status },
-        "Failed to check feature flag or emit evaluation event",
-      );
-    }
-  }
 };

@@ -101,8 +101,3 @@ export type UsageStatsJob = {
   instance_id: string;
   timestamp: number;
 };
-
-export type EventSourcingJob = {
-  action: "maintenance" | "health_check";
-  timestamp: number;
-};

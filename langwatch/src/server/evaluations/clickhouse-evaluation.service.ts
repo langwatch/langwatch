@@ -3,19 +3,20 @@ import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { getClickHouseClient } from "~/server/clickhouse/client";
 import { prisma as defaultPrisma } from "~/server/db";
+import type { Protections } from "~/server/elasticsearch/protections";
 import { createLogger } from "~/utils/logger/server";
-import type { ClickHouseEvaluationStateRow } from "./evaluation-state.mappers";
-import { mapClickHouseEvaluationToTraceEvaluation } from "./evaluation-state.mappers";
-import type { TraceEvaluation } from "./evaluation-state.types";
+import type { ClickHouseEvaluationRunRow } from "./evaluation-run.mappers";
+import { mapClickHouseEvaluationToTraceEvaluation } from "./evaluation-run.mappers";
+import type { TraceEvaluation } from "./evaluation-run.types";
 import { isClickHouseReadEnabled } from "~/server/evaluations-v3/services/isClickHouseReadEnabled";
 
 /**
- * Service for fetching per-trace evaluation states from ClickHouse.
+ * Service for fetching per-trace evaluation runs from ClickHouse.
  *
  * Returns null when ClickHouse is not enabled for the project, allowing
  * the caller to fall back to Elasticsearch.
  *
- * Queries the `evaluation_states` table using `FINAL` to collapse
+ * Queries the `evaluation_runs` table using `FINAL` to collapse
  * ReplacingMergeTree versions.
  */
 export class ClickHouseEvaluationService {
@@ -76,9 +77,11 @@ export class ClickHouseEvaluationService {
   async getEvaluationsForTrace({
     projectId,
     traceId,
+    protections: _protections,
   }: {
     projectId: string;
     traceId: string;
+    protections?: Protections;
   }): Promise<TraceEvaluation[] | null> {
     return await this.tracer.withActiveSpan(
       "ClickHouseEvaluationService.getEvaluationsForTrace",
@@ -98,7 +101,7 @@ export class ClickHouseEvaluationService {
           const result = await this.clickHouseClient.query({
             query: `
               SELECT *
-              FROM evaluation_states FINAL
+              FROM evaluation_runs FINAL
               WHERE TenantId = {tenantId:String}
                 AND TraceId = {traceId:String}
             `,
@@ -110,7 +113,7 @@ export class ClickHouseEvaluationService {
           });
 
           const rows =
-            (await result.json()) as ClickHouseEvaluationStateRow[];
+            (await result.json()) as ClickHouseEvaluationRunRow[];
 
           return rows.map(mapClickHouseEvaluationToTraceEvaluation);
         } catch (error) {
@@ -140,9 +143,11 @@ export class ClickHouseEvaluationService {
   async getEvaluationsMultiple({
     projectId,
     traceIds,
+    protections: _protections,
   }: {
     projectId: string;
     traceIds: string[];
+    protections?: Protections;
   }): Promise<Record<string, TraceEvaluation[]> | null> {
     return await this.tracer.withActiveSpan(
       "ClickHouseEvaluationService.getEvaluationsMultiple",
@@ -171,7 +176,7 @@ export class ClickHouseEvaluationService {
           const result = await this.clickHouseClient.query({
             query: `
               SELECT *
-              FROM evaluation_states FINAL
+              FROM evaluation_runs FINAL
               WHERE TenantId = {tenantId:String}
                 AND TraceId IN ({traceIds:Array(String)})
             `,
@@ -183,7 +188,7 @@ export class ClickHouseEvaluationService {
           });
 
           const rows =
-            (await result.json()) as ClickHouseEvaluationStateRow[];
+            (await result.json()) as ClickHouseEvaluationRunRow[];
 
           // Group by TraceId
           const grouped: Record<string, TraceEvaluation[]> = {};

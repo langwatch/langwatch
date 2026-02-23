@@ -241,7 +241,7 @@ describe("ttlReconciler", () => {
         "event_log",
         "stored_spans",
         "trace_summaries",
-        "evaluation_states",
+        "evaluation_runs",
         "experiment_runs",
         "experiment_run_items",
       ]);

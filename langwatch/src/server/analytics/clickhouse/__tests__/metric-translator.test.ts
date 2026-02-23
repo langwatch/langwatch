@@ -137,7 +137,7 @@ describe("metric-translator", () => {
         );
         expect(result.selectExpression).toContain("es.Score");
         expect(result.selectExpression).toContain("Status = 'processed'");
-        expect(result.requiredJoins).toContain("evaluation_states");
+        expect(result.requiredJoins).toContain("evaluation_runs");
       });
 
       it("translates evaluations.evaluation_score with evaluator key using parameterized query", () => {
@@ -166,7 +166,7 @@ describe("metric-translator", () => {
           0
         );
         expect(result.selectExpression).toContain("es.Passed");
-        expect(result.requiredJoins).toContain("evaluation_states");
+        expect(result.requiredJoins).toContain("evaluation_runs");
       });
 
       it("translates evaluations.evaluation_runs", () => {
@@ -318,7 +318,7 @@ describe("metric-translator", () => {
         0,
         "eval-123"
       );
-      expect(result.requiredJoins).toContain("evaluation_states");
+      expect(result.requiredJoins).toContain("evaluation_runs");
     });
 
     it("handles threads.average_duration_per_thread with pipeline using nested subquery", () => {

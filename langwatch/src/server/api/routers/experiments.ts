@@ -23,6 +23,7 @@ import {
   workflowJsonSchema,
 } from "../../../optimization_studio/types/dsl";
 import { slugify } from "../../../utils/slugify";
+import { getClickHouseClient } from "../../clickhouse/client";
 import { DatasetService } from "../../datasets/dataset.service";
 import { prisma } from "../../db";
 import {
@@ -823,7 +824,7 @@ export const experimentsRouter = createTRPCRouter({
         });
       }
 
-      // Perform the deletion in a transaction to ensure consistency
+      // Perform the Prisma deletion in a transaction to ensure consistency
       await prisma.$transaction(async (tx) => {
         // Delete workflow versions if a workflow exists
         if (experiment.workflowId) {
@@ -891,9 +892,11 @@ export const experimentsRouter = createTRPCRouter({
             projectId: input.projectId,
           },
         });
+      });
 
-        // At last, delete experiment-related data in Elasticsearch
-        const client = await esClient({ projectId: input.projectId });
+      // Best-effort cleanup of ES and CH data outside the transaction
+      // (these are not atomic with Prisma and should not cause rollback)
+      const esCleanup = esClient({ projectId: input.projectId }).then(async (client) => {
         await client.deleteByQuery({
           index: BATCH_EVALUATION_INDEX.alias,
           body: {
@@ -908,7 +911,6 @@ export const experimentsRouter = createTRPCRouter({
           },
         });
 
-        // And delete DSPy steps in ES if applicable
         await client.deleteByQuery({
           index: DSPY_STEPS_INDEX.alias,
           body: {
@@ -922,7 +924,34 @@ export const experimentsRouter = createTRPCRouter({
             },
           },
         });
+      }).catch((err) => {
+        console.error("Best-effort ES cleanup failed for experiment deletion", { experimentId: input.experimentId, err });
       });
+
+      const chCleanup = Promise.resolve().then(async () => {
+        const chClient = getClickHouseClient();
+        if (!chClient) return;
+        await Promise.all([
+          chClient.command({
+            query: `DELETE FROM experiment_runs WHERE TenantId = {tenantId:String} AND ExperimentId = {experimentId:String}`,
+            query_params: {
+              tenantId: input.projectId,
+              experimentId: input.experimentId,
+            },
+          }),
+          chClient.command({
+            query: `DELETE FROM experiment_run_items WHERE TenantId = {tenantId:String} AND ExperimentId = {experimentId:String}`,
+            query_params: {
+              tenantId: input.projectId,
+              experimentId: input.experimentId,
+            },
+          }),
+        ]);
+      }).catch((err) => {
+        console.error("Best-effort CH cleanup failed for experiment deletion", { experimentId: input.experimentId, err });
+      });
+
+      await Promise.allSettled([esCleanup, chCleanup]);
 
       return { success: true };
     }),
@@ -1150,17 +1179,23 @@ const findNextDraftName = async (projectId: string) => {
     },
     where: {
       projectId: projectId,
+      name: {
+        startsWith: "Draft",
+      },
     },
   });
 
-  const draftCount = experiments.filter((draft) =>
-    draft.name?.startsWith("Draft"),
-  ).length;
-
-  const slugs = new Set(experiments.map((experiment) => experiment.slug));
+  const slugs = new Set(
+    (
+      await prisma.experiment.findMany({
+        select: { slug: true },
+        where: { projectId: projectId },
+      })
+    ).map((e) => e.slug),
+  );
 
   let draftName;
-  let index = draftCount + 1;
+  let index = experiments.length + 1;
   while (true) {
     draftName = `Draft Evaluation (${index})`;
     if (!slugs.has(slugify(draftName))) {

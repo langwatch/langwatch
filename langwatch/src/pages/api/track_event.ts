@@ -4,15 +4,15 @@ import { ESpanKind } from "@opentelemetry/otlp-transformer-next/build/esm/trace/
 import type { NextApiRequest, NextApiResponse } from "next";
 import { type ZodError, z } from "zod";
 import { fromZodError } from "zod-validation-error";
-import { getTraceProcessingPipeline } from "~/server/event-sourcing/runtime/eventSourcing";
-import { normalizeHeaderValue } from "~/utils/headers";
+import { getApp } from "~/server/app-layer/app";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import { normalizeHeaderValue } from "~/utils/headers";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { generateOtelSpanId } from "~/utils/trace";
 import { prisma } from "../../../src/server/db"; // Adjust the import based on your setup
 import type { TrackEventRESTParamsValidator } from "../../../src/server/tracer/types";
 import { trackEventRESTParamsValidatorSchema } from "../../../src/server/tracer/types.generated";
-import { trackEventsQueue, TRACK_EVENTS_QUEUE } from "../../server/background/queues/trackEventsQueue";
+import { TRACK_EVENTS_QUEUE, trackEventsQueue } from "../../server/background/queues/trackEventsQueue";
 import { createLogger } from "../../utils/logger/server";
 
 const thumbsUpDownSchema = z.object({
@@ -159,7 +159,7 @@ export default async function handler(
         }
       }
 
-      await getTraceProcessingPipeline().commands.recordSpan.send({
+      await getApp().traces.recordSpan({
         tenantId: project.id,
         span: {
           traceId: body.trace_id,
@@ -193,6 +193,7 @@ export default async function handler(
           name: "langwatch.track_event",
         },
         piiRedactionLevel: project.piiRedactionLevel,
+        occurredAt: Date.now(),
       });
     } catch (error) {
       logger.error(

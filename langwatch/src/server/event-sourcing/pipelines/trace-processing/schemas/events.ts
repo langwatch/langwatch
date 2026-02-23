@@ -1,10 +1,10 @@
 import { z } from "zod";
 
-import { EventSchema } from "../../../library/domain/types";
+import { EventSchema } from "../../../domain/types";
 import { piiRedactionLevelSchema } from "./commands";
 import {
-  SPAN_RECEIVED_EVENT_TYPE,
-  TOPIC_ASSIGNED_EVENT_TYPE,
+	SPAN_RECEIVED_EVENT_TYPE,
+	TOPIC_ASSIGNED_EVENT_TYPE,
 } from "./constants";
 import { instrumentationScopeSchema, resourceSchema, spanSchema } from "./otlp";
 

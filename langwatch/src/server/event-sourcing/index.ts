@@ -2,52 +2,73 @@
  * Event Sourcing Module
  *
  * This module provides event sourcing infrastructure for the LangWatch application.
- * Use the initialization functions during application startup before using pipelines.
+ * Create an EventSourcing instance during application startup with explicit dependencies.
  *
  * @example
  * ```typescript
- * // In app startup (start.ts, worker.ts)
- * import { initializeEventSourcing } from '~/server/event-sourcing';
- * import { getClickHouseClient } from '~/server/clickhouse/client';
- * import { connection as redis } from '~/server/redis';
+ * import { EventSourcing } from '~/server/event-sourcing';
  *
- * initializeEventSourcing({
- *   clickHouseClient: getClickHouseClient(),
- *   redisConnection: redis,
+ * const es = new EventSourcing({
+ *   clickhouse: clickhouseClient,
+ *   redis: redisConnection,
  * });
  *
  * // In tests
- * import { initializeEventSourcingForTesting } from '~/server/event-sourcing';
- *
- * beforeAll(() => {
- *   initializeEventSourcingForTesting();
- * });
+ * const es = EventSourcing.createForTesting({ eventStore: memoryStore });
  * ```
  */
 
-// Initialization functions (use during app startup)
-export {
-  initializeEventSourcing,
-  initializeEventSourcingForTesting,
-  getEventSourcingRuntime,
-  getEventSourcingRuntimeOrNull,
-  resetEventSourcingRuntime,
-} from "./runtime";
+// Domain types
+export type { AggregateType } from "./domain/aggregateType";
+export { createTenantId } from "./domain/tenantId";
+export type { TenantId } from "./domain/tenantId";
+export type { Event, Projection } from "./domain/types";
+export type { EventType } from "./domain/eventType";
 
-// Re-export commonly used types and classes from runtime
-export {
-  EventSourcingRuntime,
-  EventSourcingPipeline,
-  getEventSourcing,
-  getTraceProcessingPipeline,
-  getEvaluationProcessingPipeline,
-  createEventSourcingConfig,
-} from "./runtime";
+// Commands
+export type { Command, CommandHandler, CommandHandlerResult } from "./commands/command";
+export type { CommandHandlerClass } from "./commands/commandHandlerClass";
+export { defineCommandSchema } from "./commands/commandSchema";
+export type { CommandSchema } from "./commands/commandSchema";
+
+// Pipeline (static definitions)
+export { definePipeline } from "./pipeline/staticBuilder";
 export type {
-  EventSourcingConfig,
-  EventSourcingConfigOptions,
+  CommandHandlerOptions, NoCommands,
+  RegisteredCommand, StaticPipelineDefinition
+} from "./pipeline/staticBuilder.types";
+
+// Pipeline (runtime)
+export type {
   EventSourcingPipelineDefinition,
   PipelineMetadata,
   PipelineWithCommandHandlers,
-  RegisteredPipeline,
-} from "./runtime";
+  RegisteredPipeline
+} from "./pipeline/types";
+export { EventSourcingPipeline } from "./runtimePipeline";
+
+// Runtime
+export { EventSourcing } from "./eventSourcing";
+export type { EventSourcingOptions } from "./eventSourcing";
+
+// Stores
+export type { EventStore, EventStoreReadContext } from "./stores/eventStore.types";
+export type {
+  ProjectionStore,
+  ProjectionStoreReadContext,
+  ProjectionStoreWriteContext
+} from "./stores/projectionStore.types";
+
+// Projections
+export type { FoldProjectionDefinition, FoldProjectionStore } from "./projections/foldProjection.types";
+export type { AppendStore, MapProjectionDefinition } from "./projections/mapProjection.types";
+export type { ProjectionStoreContext } from "./projections/projectionStoreContext";
+
+// Queues
+export type { EventSourcedQueueProcessor, QueueProcessorFactory } from "./queues";
+
+// Services
+export { EventSourcingService } from "./services/eventSourcingService";
+
+// Utilities
+export { EventUtils } from "./utils/event.utils";

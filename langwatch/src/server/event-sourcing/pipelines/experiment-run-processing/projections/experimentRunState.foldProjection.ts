@@ -1,14 +1,13 @@
-import type { Projection } from "../../../library";
-import type { FoldProjectionDefinition } from "../../../library/projections/foldProjection.types";
+import type { Projection } from "../../../";
+import type { FoldProjectionDefinition, FoldProjectionStore } from "../../../projections/foldProjection.types";
 import { EXPERIMENT_RUN_PROCESSING_EVENT_TYPES, EXPERIMENT_RUN_PROJECTION_VERSIONS } from "../schemas/constants";
 import type { ExperimentRunProcessingEvent } from "../schemas/events";
 import {
-  isExperimentRunCompletedEvent,
-  isExperimentRunStartedEvent,
-  isEvaluatorResultEvent,
-  isTargetResultEvent,
+	isEvaluatorResultEvent,
+	isExperimentRunCompletedEvent,
+	isExperimentRunStartedEvent,
+	isTargetResultEvent,
 } from "../schemas/events";
-import { experimentRunStateFoldStore } from "../repositories/experimentRunStateFoldStore";
 
 /**
  * State data for an experiment run.
@@ -46,135 +45,137 @@ export interface ExperimentRunState extends Projection<ExperimentRunStateData> {
   data: ExperimentRunStateData;
 }
 
+function init(): ExperimentRunStateData {
+  return {
+    RunId: "",
+    ExperimentId: "",
+    WorkflowVersionId: null,
+    Total: 0,
+    Progress: 0,
+    CompletedCount: 0,
+    FailedCount: 0,
+    TotalCost: null,
+    TotalDurationMs: null,
+    AvgScore: null,
+    PassRate: null,
+    Targets: "[]",
+    StartedAt: null,
+    FinishedAt: null,
+    StoppedAt: null,
+    TotalScoreSum: 0,
+    ScoreCount: 0,
+    PassedCount: 0,
+    PassFailCount: 0,
+  };
+}
+
+function apply(
+  state: ExperimentRunStateData,
+  event: ExperimentRunProcessingEvent,
+): ExperimentRunStateData {
+  if (isExperimentRunStartedEvent(event)) {
+    return {
+      ...state,
+      RunId: event.data.runId,
+      ExperimentId: event.data.experimentId,
+      WorkflowVersionId: event.data.workflowVersionId ?? null,
+      Total: event.data.total,
+      Targets: JSON.stringify(event.data.targets),
+      StartedAt: event.occurredAt,
+    };
+  }
+
+  if (isTargetResultEvent(event)) {
+    let completedCount = state.CompletedCount;
+    let failedCount = state.FailedCount;
+
+    if (event.data.error) {
+      failedCount += 1;
+    } else {
+      completedCount += 1;
+    }
+
+    let totalCost = state.TotalCost;
+    if (event.data.cost != null) {
+      totalCost = (totalCost ?? 0) + event.data.cost;
+    }
+
+    let totalDurationMs = state.TotalDurationMs;
+    if (event.data.duration != null) {
+      totalDurationMs = (totalDurationMs ?? 0) + event.data.duration;
+    }
+
+    const progress = completedCount + failedCount;
+
+    return {
+      ...state,
+      CompletedCount: completedCount,
+      FailedCount: failedCount,
+      Progress: progress,
+      TotalCost: totalCost,
+      TotalDurationMs: totalDurationMs,
+    };
+  }
+
+  if (isEvaluatorResultEvent(event)) {
+    let { TotalScoreSum: totalScoreSum, ScoreCount: scoreCount, PassedCount: passedCount, PassFailCount: passFailCount, TotalCost: totalCost } = state;
+
+    if (event.data.status === "processed") {
+      if (event.data.score != null) {
+        totalScoreSum += event.data.score;
+        scoreCount += 1;
+      }
+      if (event.data.passed != null) {
+        passFailCount += 1;
+        if (event.data.passed) passedCount += 1;
+      }
+    }
+
+    if (event.data.cost != null) {
+      totalCost = (totalCost ?? 0) + event.data.cost;
+    }
+
+    const avgScore = scoreCount > 0 ? totalScoreSum / scoreCount : null;
+    const passRate = passFailCount > 0 ? passedCount / passFailCount : null;
+
+    return {
+      ...state,
+      TotalScoreSum: totalScoreSum,
+      ScoreCount: scoreCount,
+      PassedCount: passedCount,
+      PassFailCount: passFailCount,
+      TotalCost: totalCost,
+      AvgScore: avgScore,
+      PassRate: passRate,
+    };
+  }
+
+  if (isExperimentRunCompletedEvent(event)) {
+    return {
+      ...state,
+      FinishedAt: event.data.finishedAt ?? null,
+      StoppedAt: event.data.stoppedAt ?? null,
+    };
+  }
+
+  return state;
+}
+
 /**
- * FoldProjection definition for experiment run state.
+ * Creates FoldProjection definition for experiment run state.
  *
  * Fold state = stored data. Uses simple counters instead of Sets/arrays
  * so state round-trips through the store without loss.
  */
-export const experimentRunStateFoldProjection: FoldProjectionDefinition<
-  ExperimentRunStateData,
-  ExperimentRunProcessingEvent
-> = {
-  name: "experimentRunState",
-  version: EXPERIMENT_RUN_PROJECTION_VERSIONS.RUN_STATE,
-  eventTypes: EXPERIMENT_RUN_PROCESSING_EVENT_TYPES,
-
-  init(): ExperimentRunStateData {
-    return {
-      RunId: "",
-      ExperimentId: "",
-      WorkflowVersionId: null,
-      Total: 0,
-      Progress: 0,
-      CompletedCount: 0,
-      FailedCount: 0,
-      TotalCost: null,
-      TotalDurationMs: null,
-      AvgScore: null,
-      PassRate: null,
-      Targets: "[]",
-      StartedAt: null,
-      FinishedAt: null,
-      StoppedAt: null,
-      TotalScoreSum: 0,
-      ScoreCount: 0,
-      PassedCount: 0,
-      PassFailCount: 0,
-    };
-  },
-
-  apply(
-    state: ExperimentRunStateData,
-    event: ExperimentRunProcessingEvent,
-  ): ExperimentRunStateData {
-    if (isExperimentRunStartedEvent(event)) {
-      return {
-        ...state,
-        RunId: event.data.runId,
-        ExperimentId: event.data.experimentId,
-        WorkflowVersionId: event.data.workflowVersionId ?? null,
-        Total: event.data.total,
-        Targets: JSON.stringify(event.data.targets),
-        StartedAt: event.occurredAt,
-      };
-    }
-
-    if (isTargetResultEvent(event)) {
-      let completedCount = state.CompletedCount;
-      let failedCount = state.FailedCount;
-
-      if (event.data.error) {
-        failedCount += 1;
-      } else {
-        completedCount += 1;
-      }
-
-      let totalCost = state.TotalCost;
-      if (event.data.cost != null) {
-        totalCost = (totalCost ?? 0) + event.data.cost;
-      }
-
-      let totalDurationMs = state.TotalDurationMs;
-      if (event.data.duration != null) {
-        totalDurationMs = (totalDurationMs ?? 0) + event.data.duration;
-      }
-
-      const progress = completedCount + failedCount;
-
-      return {
-        ...state,
-        CompletedCount: completedCount,
-        FailedCount: failedCount,
-        Progress: progress,
-        TotalCost: totalCost,
-        TotalDurationMs: totalDurationMs,
-      };
-    }
-
-    if (isEvaluatorResultEvent(event)) {
-      let { TotalScoreSum: totalScoreSum, ScoreCount: scoreCount, PassedCount: passedCount, PassFailCount: passFailCount, TotalCost: totalCost } = state;
-
-      if (event.data.status === "processed") {
-        if (event.data.score != null) {
-          totalScoreSum += event.data.score;
-          scoreCount += 1;
-        }
-        if (event.data.passed != null) {
-          passFailCount += 1;
-          if (event.data.passed) passedCount += 1;
-        }
-      }
-
-      if (event.data.cost != null) {
-        totalCost = (totalCost ?? 0) + event.data.cost;
-      }
-
-      const avgScore = scoreCount > 0 ? totalScoreSum / scoreCount : null;
-      const passRate = passFailCount > 0 ? passedCount / passFailCount : null;
-
-      return {
-        ...state,
-        TotalScoreSum: totalScoreSum,
-        ScoreCount: scoreCount,
-        PassedCount: passedCount,
-        PassFailCount: passFailCount,
-        TotalCost: totalCost,
-        AvgScore: avgScore,
-        PassRate: passRate,
-      };
-    }
-
-    if (isExperimentRunCompletedEvent(event)) {
-      return {
-        ...state,
-        FinishedAt: event.data.finishedAt ?? null,
-        StoppedAt: event.data.stoppedAt ?? null,
-      };
-    }
-
-    return state;
-  },
-
-  store: experimentRunStateFoldStore,
-};
+export function createExperimentRunStateFoldProjection(deps: {
+  store: FoldProjectionStore<ExperimentRunStateData>;
+}): FoldProjectionDefinition<ExperimentRunStateData, ExperimentRunProcessingEvent> {
+  return {
+    name: "experimentRunState",
+    version: EXPERIMENT_RUN_PROJECTION_VERSIONS.RUN_STATE,
+    eventTypes: EXPERIMENT_RUN_PROCESSING_EVENT_TYPES,
+    init,
+    apply,
+    store: deps.store,
+  };
+}

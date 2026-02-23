@@ -1,11 +1,11 @@
-import type { Event } from "../../library/domain/types";
-import type { FoldProjectionDefinition } from "../../library/projections/foldProjection.types";
+import type { Event } from "../../domain/types";
 import { EVALUATION_STARTED_EVENT_TYPE } from "../../pipelines/evaluation-processing/schemas/constants";
 import { EXPERIMENT_RUN_EVENT_TYPES } from "../../pipelines/experiment-run-processing/schemas/constants";
 import { SPAN_RECEIVED_EVENT_TYPE } from "../../pipelines/trace-processing/schemas/constants";
+import type { FoldProjectionDefinition } from "../foldProjection.types";
 import {
-  projectDailyBillableEventsStore,
-  type ProjectDailyBillableEventsState,
+    projectDailyBillableEventsStore,
+    type ProjectDailyBillableEventsState,
 } from "./projectDailyBillableEvents.store";
 
 export const PROJECT_DAILY_BILLABLE_EVENTS_PROJECTION_VERSION =

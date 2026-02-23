@@ -1,9 +1,9 @@
 import type {
-  Projection,
-  ProjectionStore,
-  ProjectionStoreReadContext,
-  ProjectionStoreWriteContext,
-} from "../../../library";
+	Projection,
+	ProjectionStore,
+	ProjectionStoreReadContext,
+	ProjectionStoreWriteContext,
+} from "../../../";
 
 export interface ExperimentRunStateRepository<
   ProjectionType extends Projection = Projection,

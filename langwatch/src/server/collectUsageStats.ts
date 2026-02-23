@@ -1,3 +1,5 @@
+import type { ClickHouseClient } from "@clickhouse/client";
+import { getClickHouseClient } from "~/server/clickhouse/client";
 import { prisma } from "~/server/db";
 import { esClient, SCENARIO_EVENTS_INDEX, TRACE_INDEX } from "./elasticsearch";
 
@@ -8,14 +10,17 @@ export async function collectUsageStats(instanceId: string) {
     throw new Error("Invalid instance ID");
   }
 
-  const projectIds = await prisma.project
-    .findMany({
-      where: {
-        team: { organizationId },
-      },
-      select: { id: true },
-    })
-    .then((projects) => projects.map((project) => project.id));
+  const projects = await prisma.project.findMany({
+    where: {
+      team: { organizationId },
+    },
+    select: {
+      id: true,
+      featureClickHouseDataSourceTraces: true,
+      featureClickHouseDataSourceSimulations: true,
+    },
+  });
+  const projectIds = projects.map((p) => p.id);
 
   // Get total counts for each table that has projectId
   const [
@@ -66,8 +71,10 @@ export async function collectUsageStats(instanceId: string) {
     }),
   ]);
 
-  const { totalTraces } = await getTraceCount();
-  const { totalScenarioEvents } = await getScenariosCount();
+  const clickhouse = getClickHouseClient();
+
+  const totalTraces = await getTraceCount(projects, clickhouse);
+  const totalScenarioEvents = await getScenariosCount(projects, clickhouse);
 
   return {
     totalTraces,
@@ -87,42 +94,129 @@ export async function collectUsageStats(instanceId: string) {
   };
 }
 
-const getTraceCount = async () => {
+async function getTraceCount(
+  projects: Array<{
+    id: string;
+    featureClickHouseDataSourceTraces: boolean;
+  }>,
+  clickhouse: ClickHouseClient | null,
+): Promise<number> {
+  const chProjectIds = clickhouse
+    ? projects.filter((p) => p.featureClickHouseDataSourceTraces).map((p) => p.id)
+    : [];
+  const esProjectIds = projects
+    .filter((p) => !clickhouse || !p.featureClickHouseDataSourceTraces)
+    .map((p) => p.id);
+
+  const [chCount, esCount] = await Promise.all([
+    chProjectIds.length > 0
+      ? getChTraceCount(clickhouse!, chProjectIds)
+      : 0,
+    esProjectIds.length > 0
+      ? getEsTraceCount(esProjectIds)
+      : 0,
+  ]);
+
+  return chCount + esCount;
+}
+
+async function getChTraceCount(
+  clickhouse: ClickHouseClient,
+  projectIds: string[],
+): Promise<number> {
+  const result = await clickhouse.query({
+    query: `
+      SELECT toString(count(DISTINCT TraceId)) AS Total
+      FROM trace_summaries FINAL
+      WHERE TenantId IN ({projectIds:Array(String)})
+    `,
+    query_params: { projectIds },
+    format: "JSONEachRow",
+  });
+
+  const rows = (await result.json()) as Array<{ Total: string }>;
+  return parseInt(rows[0]?.Total ?? "0", 10);
+}
+
+async function getEsTraceCount(projectIds: string[]): Promise<number> {
   const client = await esClient();
 
   const result = await client.count({
     index: TRACE_INDEX.all,
     body: {
       query: {
-        match_all: {}, // Get all documents without any filter
+        terms: { project_id: projectIds },
       },
     },
   });
 
-  return {
-    totalTraces:
-      (result as { body?: { count?: number } }).body?.count ??
-      result.count ??
-      0,
-  };
-};
+  return (
+    (result as { body?: { count?: number } }).body?.count ??
+    result.count ??
+    0
+  );
+}
 
-const getScenariosCount = async () => {
+async function getScenariosCount(
+  projects: Array<{
+    id: string;
+    featureClickHouseDataSourceSimulations: boolean;
+  }>,
+  clickhouse: ClickHouseClient | null,
+): Promise<number> {
+  const chProjectIds = clickhouse
+    ? projects.filter((p) => p.featureClickHouseDataSourceSimulations).map((p) => p.id)
+    : [];
+  const esProjectIds = projects
+    .filter((p) => !clickhouse || !p.featureClickHouseDataSourceSimulations)
+    .map((p) => p.id);
+
+  const [chCount, esCount] = await Promise.all([
+    chProjectIds.length > 0
+      ? getChScenariosCount(clickhouse!, chProjectIds)
+      : 0,
+    esProjectIds.length > 0
+      ? getEsScenariosCount(esProjectIds)
+      : 0,
+  ]);
+
+  return chCount + esCount;
+}
+
+async function getChScenariosCount(
+  clickhouse: ClickHouseClient,
+  projectIds: string[],
+): Promise<number> {
+  const result = await clickhouse.query({
+    query: `
+      SELECT toString(count()) AS Total
+      FROM simulation_runs FINAL
+      WHERE TenantId IN ({projectIds:Array(String)})
+        AND DeletedAt IS NULL
+    `,
+    query_params: { projectIds },
+    format: "JSONEachRow",
+  });
+
+  const rows = (await result.json()) as Array<{ Total: string }>;
+  return parseInt(rows[0]?.Total ?? "0", 10);
+}
+
+async function getEsScenariosCount(projectIds: string[]): Promise<number> {
   const client = await esClient();
 
   const result = await client.count({
     index: SCENARIO_EVENTS_INDEX.alias,
     body: {
       query: {
-        match_all: {}, // Get all documents without any filter
+        terms: { project_id: projectIds },
       },
     },
   });
 
-  return {
-    totalScenarioEvents:
-      (result as { body?: { count?: number } }).body?.count ??
-      result.count ??
-      0,
-  };
-};
+  return (
+    (result as { body?: { count?: number } }).body?.count ??
+    result.count ??
+    0
+  );
+}

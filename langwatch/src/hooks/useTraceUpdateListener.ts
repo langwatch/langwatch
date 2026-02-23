@@ -88,9 +88,22 @@ export function useTraceUpdateListener({
           shouldProcessUpdate,
           timestamp: new Date().toISOString(),
         });
-        if (data.event === "trace_updated") {
-          console.log("🔄 Triggering debounced update for trace_updated event");
-          debouncedUpdate();
+        if (data.event) {
+          try {
+            const payload =
+              typeof data.event === "string" ? JSON.parse(data.event) : data.event;
+
+            if (payload.event === "trace_updated") {
+              console.log("🔄 Triggering debounced update for trace_updated event");
+              debouncedUpdate();
+            }
+          } catch {
+            // If payload isn't JSON, treat as a generic trace update
+            if (data.event === "trace_updated") {
+              console.log("🔄 Triggering debounced update for trace_updated event (plain string)");
+              debouncedUpdate();
+            }
+          }
         }
       },
       onError: (error) => {

@@ -1,8 +1,8 @@
 import type { MiddlewareHandler } from "hono";
 import { notifyPlanLimitReached } from "../../../../ee/billing";
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { SubscriptionHandler } from "~/server/subscriptionHandler";
-import { TraceUsageService } from "~/server/traces/trace-usage.service";
 import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:api:middleware:trace-limit");
@@ -15,9 +15,7 @@ export const blockTraceUsageExceededMiddleware: MiddlewareHandler = async (
   next,
 ) => {
   const project = c.get("project");
-  const service = TraceUsageService.create();
-
-  const result = await service.checkLimit({ teamId: project.teamId });
+  const result = await getApp().usage.checkLimit({ teamId: project.teamId });
 
   if (result.exceeded) {
     try {

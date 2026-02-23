@@ -1,3 +1,4 @@
+import type { ClickHouseClient } from "@clickhouse/client";
 import type {
   QueryDslBoolQuery,
   QueryDslQueryContainer,
@@ -12,16 +13,17 @@ import {
 } from "../../utils/constants";
 import { createLogger } from "../../utils/logger/server";
 import { getExtractedInput } from "../../utils/traceExtraction";
-import { createCostChecker } from "../license-enforcement/license-enforcement.repository";
 import {
   getProjectModelProviders,
   prepareLitellmParams,
 } from "../api/routers/modelProviders";
+import { getApp } from "../app-layer/app";
 import { scheduleTopicClusteringNextPage } from "../background/queues/topicClusteringQueue";
+import { getClickHouseClient } from "../clickhouse/client";
 import { prisma } from "../db";
 import { esClient, TRACE_INDEX, traceIndexId } from "../elasticsearch";
 import { getProjectEmbeddingsModel } from "../embeddings";
-import { getTraceProcessingPipeline } from "../event-sourcing/runtime/eventSourcing";
+import { createCostChecker } from "../license-enforcement/license-enforcement.repository";
 import { getPayloadSizeHistogram } from "../metrics";
 import type { ElasticSearchTrace, Trace } from "../tracer/types";
 import type {
@@ -62,99 +64,25 @@ export const clusterTopicsForProject = async (
     );
   }
 
-  const client = await esClient({ projectId });
+  const clickhouse = project.featureClickHouseDataSourceTraces
+    ? getClickHouseClient()
+    : null;
 
-  // Debug: Check total traces for this project
-  const totalTracesCount = await client.count({
-    index: TRACE_INDEX.alias,
-    body: {
-      query: {
-        term: {
-          project_id: projectId,
-        },
-      },
-    },
-  });
-
-  // Debug: Check traces with input
-  const tracesWithInputCount = await client.count({
-    index: TRACE_INDEX.alias,
-    body: {
-      query: {
-        bool: {
-          must: [
-            {
-              term: {
-                project_id: projectId,
-              },
-            },
-            {
-              exists: {
-                field: "input.value",
-              },
-            },
-          ],
-        } as QueryDslBoolQuery,
-      },
-    },
-  });
-
-  // Debug: Check recent traces (last 30 days)
-  const recentTracesCount = await client.count({
-    index: TRACE_INDEX.alias,
-    body: {
-      query: {
-        bool: {
-          must: [
-            {
-              term: {
-                project_id: projectId,
-              },
-            },
-            {
-              range: {
-                "timestamps.started_at": {
-                  gte: "now-30d",
-                },
-              },
-            },
-          ],
-        } as QueryDslBoolQuery,
-      },
-    },
-  });
+  const { totalTracesCount, tracesWithInputCount, recentTracesCount, assignedTracesCount } =
+    clickhouse
+      ? await fetchCountsFromClickHouse(clickhouse, projectId)
+      : await fetchCountsFromElasticsearch(projectId);
 
   logger.info(
     {
       projectId,
-      totalTraces: totalTracesCount.count,
-      tracesWithInput: tracesWithInputCount.count,
-      recentTraces: recentTracesCount.count,
+      totalTraces: totalTracesCount,
+      tracesWithInput: tracesWithInputCount,
+      recentTraces: recentTracesCount,
+      backend: clickhouse ? "clickhouse" : "elasticsearch",
     },
     "Debug: Project trace counts",
   );
-
-  const assignedTracesCount = await client.count({
-    index: TRACE_INDEX.alias,
-    body: {
-      query: {
-        bool: {
-          must: [
-            {
-              term: {
-                project_id: projectId,
-              },
-            },
-            {
-              exists: {
-                field: "metadata.topic_id",
-              },
-            },
-          ],
-        } as QueryDslBoolQuery,
-      },
-    },
-  });
 
   const topics = await prisma.topic.findMany({
     where: { projectId },
@@ -170,16 +98,16 @@ export const clusterTopicsForProject = async (
   // If we have topics and more than 1200 traces are already assigned, we are in incremental processing mode
   // This checks helps us getting back into batch mode if we simply delete all the topics for a given project
   const isIncrementalProcessing =
-    topicIds.length > 0 && assignedTracesCount.count >= 1200;
+    topicIds.length > 0 && assignedTracesCount >= 1200;
 
   const lastTopicCreatedAt = topics.reduce((acc, topic) => {
     return topic.createdAt > acc ? topic.createdAt : acc;
   }, new Date(0));
 
   const daysFrequency =
-    assignedTracesCount.count < 100
+    assignedTracesCount < 100
       ? 7
-      : assignedTracesCount.count < 500
+      : assignedTracesCount < 500
         ? 3
         : 2;
   if (
@@ -194,124 +122,34 @@ export const clusterTopicsForProject = async (
     return;
   }
 
-  let presenceCondition: QueryDslQueryContainer[] = [
-    {
-      range: {
-        "timestamps.started_at": {
-          gte: "now-12M", // Limit to last 12 months for full batch processing
-          lt: "now",
-        },
-      },
-    },
-  ];
-  if (isIncrementalProcessing) {
-    presenceCondition = [
-      {
-        range: {
-          "timestamps.started_at": {
-            gte: "now-12M", // grab only messages that were not classified in last 3 months for incremental processing
-            lt: "now",
-          },
-        },
-      },
-      {
-        // Must either not have any of the available topics, or available subtopics
-        bool: {
-          should: [
-            {
-              bool: {
-                must_not: topicIds.map((topicId) => ({
-                  term: {
-                    "metadata.topic_id": topicId,
-                  },
-                })) as QueryDslQueryContainer[],
-              } as QueryDslBoolQuery,
-            },
-            {
-              bool: {
-                must_not: subtopicIds.map((subtopicId) => ({
-                  term: {
-                    "metadata.subtopic_id": subtopicId,
-                  },
-                })) as QueryDslQueryContainer[],
-              } as QueryDslBoolQuery,
-            },
-          ],
-          minimum_should_match: 1,
-        },
-      },
-    ];
-  }
-
-  // Fetch last 2000 traces that were not classified in sorted and paginated, with only id, input fields and their current topics
-
   logger.info(
     {
       projectId,
       isIncrementalProcessing,
       topicIds: topicIds.length,
       subtopicIds: subtopicIds.length,
-      assignedTracesCount: assignedTracesCount.count,
+      assignedTracesCount,
       searchAfter,
     },
     "Starting trace search for topic clustering",
   );
 
-  const result = await client.search<Trace>({
-    index: TRACE_INDEX.alias,
-    body: {
-      query: {
-        bool: {
-          must: [
-            {
-              term: { project_id: projectId },
-            },
-            ...presenceCondition,
-          ],
-        } as QueryDslBoolQuery,
-      },
-      _source: [
-        "trace_id",
-        "input",
-        "metadata.topic_id",
-        "metadata.subtopic_id",
-        "timestamps.started_at",
-      ],
-      sort: [{ "timestamps.started_at": "desc" }, { trace_id: "asc" }],
-      ...(searchAfter ? { search_after: searchAfter } : {}),
-      size: 2000,
-    },
-  });
-
-  logger.info(
-    {
-      projectId,
-      totalHits: result.hits.total,
-      returnedHits: result.hits.hits.length,
-    },
-    "Elasticsearch search results",
-  );
-
-  const rawTraces = result.hits.hits.map((hit) => hit._source!);
-
-  const tracesWithInput = rawTraces.filter((trace) => {
-    const inputText = getExtractedInput(trace);
-    return inputText !== "<empty>" && inputText.length > 0;
-  });
-
-  const traces: TopicClusteringTrace[] = tracesWithInput.map((trace) => ({
-    trace_id: trace.trace_id,
-    input: getExtractedInput(trace).slice(0, 8192),
-    topic_id:
-      trace.metadata?.topic_id && topicIds.includes(trace.metadata.topic_id)
-        ? trace.metadata.topic_id
-        : null,
-    subtopic_id:
-      trace.metadata?.subtopic_id &&
-      subtopicIds.includes(trace.metadata.subtopic_id)
-        ? trace.metadata.subtopic_id
-        : null,
-  }));
+  const { traces, lastSort, returnedCount } = clickhouse
+    ? await fetchTracesFromClickHouse(
+        clickhouse,
+        projectId,
+        isIncrementalProcessing,
+        topicIds,
+        subtopicIds,
+        searchAfter,
+      )
+    : await fetchTracesFromElasticsearch(
+        projectId,
+        isIncrementalProcessing,
+        topicIds,
+        subtopicIds,
+        searchAfter,
+      );
 
   const minimumTraces = isIncrementalProcessing ? 1 : 10;
 
@@ -340,28 +178,381 @@ export const clusterTopicsForProject = async (
   }
 
   // If results are not close to empty, schedule the seek for next page
-  if (result.hits.hits.length > 10) {
-    const lastTraceSort = result.hits.hits.toReversed()[0]?.sort as
-      | [number, string]
-      | undefined;
-    if (lastTraceSort) {
+  if (returnedCount > 10 && lastSort) {
+    logger.info(
+      { projectId, lastTraceSort: lastSort },
+      "scheduling the next page for clustering",
+    );
+    if (scheduleNextPage) {
+      await scheduleTopicClusteringNextPage(projectId, lastSort);
+    } else {
       logger.info(
-        { projectId, lastTraceSort },
-        "scheduling the next page for clustering",
+        { projectId, lastTraceSort: lastSort },
+        "skipping scheduling next page for project",
       );
-      if (scheduleNextPage) {
-        await scheduleTopicClusteringNextPage(projectId, lastTraceSort);
-      } else {
-        logger.info(
-          { projectId, lastTraceSort },
-          "skipping scheduling next page for project",
-        );
-      }
     }
   }
 
   logger.info({ projectId }, "done! project");
 };
+
+// --- ClickHouse read helpers ---
+
+type TraceCounts = {
+  totalTracesCount: number;
+  tracesWithInputCount: number;
+  recentTracesCount: number;
+  assignedTracesCount: number;
+};
+
+type TraceSearchResult = {
+  traces: TopicClusteringTrace[];
+  lastSort: [number, string] | undefined;
+  returnedCount: number;
+};
+
+async function fetchCountsFromClickHouse(
+  clickhouse: ClickHouseClient,
+  projectId: string,
+): Promise<TraceCounts> {
+  const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+
+  const result = await clickhouse.query({
+    query: `
+      SELECT
+        toString(count(DISTINCT TraceId)) AS total,
+        toString(countDistinctIf(TraceId, ComputedInput IS NOT NULL AND ComputedInput != '')) AS withInput,
+        toString(countDistinctIf(TraceId, OccurredAt >= fromUnixTimestamp64Milli({thirtyDaysAgo:UInt64}))) AS recent,
+        toString(countDistinctIf(TraceId, TopicId IS NOT NULL AND TopicId != '')) AS assigned
+      FROM trace_summaries FINAL
+      WHERE TenantId = {tenantId:String}
+    `,
+    query_params: { tenantId: projectId, thirtyDaysAgo },
+    format: "JSONEachRow",
+  });
+
+  const rows = (await result.json()) as Array<{
+    total: string;
+    withInput: string;
+    recent: string;
+    assigned: string;
+  }>;
+  const row = rows[0];
+
+  return {
+    totalTracesCount: parseInt(row?.total ?? "0", 10),
+    tracesWithInputCount: parseInt(row?.withInput ?? "0", 10),
+    recentTracesCount: parseInt(row?.recent ?? "0", 10),
+    assignedTracesCount: parseInt(row?.assigned ?? "0", 10),
+  };
+}
+
+async function fetchCountsFromElasticsearch(
+  projectId: string,
+): Promise<TraceCounts> {
+  const client = await esClient({ projectId });
+
+  const [totalTracesCount, tracesWithInputCount, recentTracesCount, assignedTracesCount] =
+    await Promise.all([
+      client.count({
+        index: TRACE_INDEX.alias,
+        body: { query: { term: { project_id: projectId } } },
+      }),
+      client.count({
+        index: TRACE_INDEX.alias,
+        body: {
+          query: {
+            bool: {
+              must: [
+                { term: { project_id: projectId } },
+                { exists: { field: "input.value" } },
+              ],
+            } as QueryDslBoolQuery,
+          },
+        },
+      }),
+      client.count({
+        index: TRACE_INDEX.alias,
+        body: {
+          query: {
+            bool: {
+              must: [
+                { term: { project_id: projectId } },
+                { range: { "timestamps.started_at": { gte: "now-30d" } } },
+              ],
+            } as QueryDslBoolQuery,
+          },
+        },
+      }),
+      client.count({
+        index: TRACE_INDEX.alias,
+        body: {
+          query: {
+            bool: {
+              must: [
+                { term: { project_id: projectId } },
+                { exists: { field: "metadata.topic_id" } },
+              ],
+            } as QueryDslBoolQuery,
+          },
+        },
+      }),
+    ]);
+
+  return {
+    totalTracesCount: totalTracesCount.count,
+    tracesWithInputCount: tracesWithInputCount.count,
+    recentTracesCount: recentTracesCount.count,
+    assignedTracesCount: assignedTracesCount.count,
+  };
+}
+
+async function fetchTracesFromClickHouse(
+  clickhouse: ClickHouseClient,
+  projectId: string,
+  isIncrementalProcessing: boolean,
+  topicIds: string[],
+  subtopicIds: string[],
+  searchAfter?: [number, string],
+): Promise<TraceSearchResult> {
+  const twelveMonthsAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
+
+  const conditions = [
+    "TenantId = {tenantId:String}",
+    "OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})",
+    "OccurredAt < now64(3)",
+    "ComputedInput IS NOT NULL",
+    "ComputedInput != ''",
+  ];
+
+  if (isIncrementalProcessing && (topicIds.length > 0 || subtopicIds.length > 0)) {
+    // Must either not have any of the known topics, or not have any of the known subtopics
+    const topicCondition =
+      topicIds.length > 0
+        ? `(TopicId IS NULL OR TopicId NOT IN ({topicIds:Array(String)}))`
+        : "1=1";
+    const subtopicCondition =
+      subtopicIds.length > 0
+        ? `(SubTopicId IS NULL OR SubTopicId NOT IN ({subtopicIds:Array(String)}))`
+        : "1=1";
+    conditions.push(`(${topicCondition} OR ${subtopicCondition})`);
+  }
+
+  if (searchAfter) {
+    conditions.push(
+      "(toUnixTimestamp64Milli(OccurredAt), TraceId) < ({lastTs:UInt64}, {lastTraceId:String})",
+    );
+  }
+
+  const whereClause = conditions.join(" AND ");
+
+  const result = await clickhouse.query({
+    query: `
+      SELECT
+        TraceId,
+        ComputedInput,
+        TopicId,
+        SubTopicId,
+        toString(toUnixTimestamp64Milli(OccurredAt)) AS OccurredAtMs
+      FROM trace_summaries FINAL
+      WHERE ${whereClause}
+      ORDER BY OccurredAt DESC, TraceId ASC
+      LIMIT 2000
+    `,
+    query_params: {
+      tenantId: projectId,
+      twelveMonthsAgo,
+      topicIds: topicIds.length > 0 ? topicIds : ["__none__"],
+      subtopicIds: subtopicIds.length > 0 ? subtopicIds : ["__none__"],
+      ...(searchAfter
+        ? { lastTs: searchAfter[0], lastTraceId: searchAfter[1] }
+        : {}),
+    },
+    format: "JSONEachRow",
+  });
+
+  const rows = (await result.json()) as Array<{
+    TraceId: string;
+    ComputedInput: string;
+    TopicId: string | null;
+    SubTopicId: string | null;
+    OccurredAtMs: string;
+  }>;
+
+  const traces: TopicClusteringTrace[] = rows
+    .map((row) => {
+      const inputText = extractInputFromComputed(row.ComputedInput);
+      if (!inputText || inputText === "<empty>") return null;
+
+      return {
+        trace_id: row.TraceId,
+        input: inputText.slice(0, 8192),
+        topic_id:
+          row.TopicId && topicIds.includes(row.TopicId)
+            ? row.TopicId
+            : null,
+        subtopic_id:
+          row.SubTopicId && subtopicIds.includes(row.SubTopicId)
+            ? row.SubTopicId
+            : null,
+      };
+    })
+    .filter((t): t is TopicClusteringTrace => t !== null);
+
+  const lastRow = rows[rows.length - 1];
+  const lastSort: [number, string] | undefined = lastRow
+    ? [parseInt(lastRow.OccurredAtMs, 10), lastRow.TraceId]
+    : undefined;
+
+  return { traces, lastSort, returnedCount: rows.length };
+}
+
+/** Extract text from a ComputedInput JSON string (mirrors getExtractedInput logic) */
+function extractInputFromComputed(computedInput: string | null): string {
+  if (!computedInput) return "<empty>";
+
+  try {
+    const parsed = JSON.parse(computedInput);
+    // ComputedInput is typically the already-extracted input value as JSON
+    if (typeof parsed === "string") return parsed || "<empty>";
+    if (typeof parsed?.value === "string") {
+      let value = parsed.value;
+      try {
+        const inner = JSON.parse(value);
+        if (typeof inner?.input === "string" && inner.input.length > 0) {
+          value = inner.input;
+        }
+      } catch {
+        // value is already a string
+      }
+      return value || "<empty>";
+    }
+    if (typeof parsed?.input === "string") return parsed.input || "<empty>";
+    return typeof parsed === "object"
+      ? JSON.stringify(parsed)
+      : String(parsed) || "<empty>";
+  } catch {
+    return computedInput || "<empty>";
+  }
+}
+
+async function fetchTracesFromElasticsearch(
+  projectId: string,
+  isIncrementalProcessing: boolean,
+  topicIds: string[],
+  subtopicIds: string[],
+  searchAfter?: [number, string],
+): Promise<TraceSearchResult> {
+  const client = await esClient({ projectId });
+
+  let presenceCondition: QueryDslQueryContainer[] = [
+    {
+      range: {
+        "timestamps.started_at": {
+          gte: "now-12M",
+          lt: "now",
+        },
+      },
+    },
+  ];
+  if (isIncrementalProcessing) {
+    presenceCondition = [
+      {
+        range: {
+          "timestamps.started_at": {
+            gte: "now-12M",
+            lt: "now",
+          },
+        },
+      },
+      {
+        bool: {
+          should: [
+            {
+              bool: {
+                must_not: topicIds.map((topicId) => ({
+                  term: { "metadata.topic_id": topicId },
+                })) as QueryDslQueryContainer[],
+              } as QueryDslBoolQuery,
+            },
+            {
+              bool: {
+                must_not: subtopicIds.map((subtopicId) => ({
+                  term: { "metadata.subtopic_id": subtopicId },
+                })) as QueryDslQueryContainer[],
+              } as QueryDslBoolQuery,
+            },
+          ],
+          minimum_should_match: 1,
+        },
+      },
+    ];
+  }
+
+  const result = await client.search<Trace>({
+    index: TRACE_INDEX.alias,
+    body: {
+      query: {
+        bool: {
+          must: [
+            { term: { project_id: projectId } },
+            ...presenceCondition,
+          ],
+        } as QueryDslBoolQuery,
+      },
+      _source: [
+        "trace_id",
+        "input",
+        "metadata.topic_id",
+        "metadata.subtopic_id",
+        "timestamps.started_at",
+      ],
+      sort: [{ "timestamps.started_at": "desc" }, { trace_id: "asc" }],
+      ...(searchAfter ? { search_after: searchAfter } : {}),
+      size: 2000,
+    },
+  });
+
+  logger.info(
+    {
+      projectId,
+      totalHits: result.hits.total,
+      returnedHits: result.hits.hits.length,
+    },
+    "Elasticsearch search results",
+  );
+
+  const rawTraces = result.hits.hits.map((hit) => hit._source!);
+
+  const traces: TopicClusteringTrace[] = rawTraces
+    .filter((trace) => {
+      const inputText = getExtractedInput(trace);
+      return inputText !== "<empty>" && inputText.length > 0;
+    })
+    .map((trace) => ({
+      trace_id: trace.trace_id,
+      input: getExtractedInput(trace).slice(0, 8192),
+      topic_id:
+        trace.metadata?.topic_id && topicIds.includes(trace.metadata.topic_id)
+          ? trace.metadata.topic_id
+          : null,
+      subtopic_id:
+        trace.metadata?.subtopic_id &&
+        subtopicIds.includes(trace.metadata.subtopic_id)
+          ? trace.metadata.subtopic_id
+          : null,
+    }));
+
+  const lastTraceSort = result.hits.hits.toReversed()[0]?.sort as
+    | [number, string]
+    | undefined;
+
+  return {
+    traces,
+    lastSort: lastTraceSort,
+    returnedCount: result.hits.hits.length,
+  };
+}
 
 const getProjectTopicClusteringModelProvider = async (project: Project) => {
   const topicClusteringModel =
@@ -592,7 +783,7 @@ export const storeResults = async (
           "Skipping AssignTopic commands - event sourcing not enabled for project",
         );
       } else {
-        const pipeline = getTraceProcessingPipeline();
+        const app = getApp();
 
         // Build topic name lookup maps
         const topicNameMap = new Map(topics.map((t) => [t.id, t.name]));
@@ -601,7 +792,7 @@ export const storeResults = async (
         // Send commands in parallel (queue handles batching internally)
         await Promise.all(
           tracesToAssign.map(({ trace_id, topic_id, subtopic_id }) =>
-            pipeline.commands.assignTopic.send({
+            app.traces.assignTopic({
               tenantId: projectId,
               traceId: trace_id,
               topicId: topic_id,
@@ -611,6 +802,7 @@ export const storeResults = async (
                 ? (subtopicNameMap.get(subtopic_id) ?? null)
                 : null,
               isIncremental,
+              occurredAt: Date.now(),
             }),
           ),
         );

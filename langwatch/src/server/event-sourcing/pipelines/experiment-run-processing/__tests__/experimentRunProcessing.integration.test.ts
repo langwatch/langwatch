@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { AggregateType } from "../../../";
+import { definePipeline } from "../../../";
 import {
   getTestClickHouseClient,
   getTestRedisConnection,
@@ -8,26 +10,22 @@ import {
   createTestTenantId,
   getTenantIdString,
 } from "../../../__tests__/integration/testHelpers";
-import type { AggregateType } from "../../../library";
-import { definePipeline } from "../../../library";
-import { EventSourcing } from "../../../runtime/eventSourcing";
-import { EventSourcingRuntime } from "../../../runtime/eventSourcingRuntime";
-import type { PipelineWithCommandHandlers } from "../../../runtime/pipeline/types";
-import { BullmqQueueProcessorFactory } from "../../../runtime/queue/factory";
-import { EventStoreClickHouse } from "../../../runtime/stores/eventStoreClickHouse";
-import { EventRepositoryClickHouse } from "../../../runtime/stores/repositories/eventRepositoryClickHouse";
-import { StartExperimentRunCommand } from "../commands/startExperimentRun.command";
-import { RecordTargetResultCommand } from "../commands/recordTargetResult.command";
-import { RecordEvaluatorResultCommand } from "../commands/recordEvaluatorResult.command";
+import { EventSourcing } from "../../../eventSourcing";
+import type { PipelineWithCommandHandlers } from "../../../pipeline/types";
+import { BullmqQueueProcessorFactory } from "../../../queues/factory";
+import { EventStoreClickHouse } from "../../../stores/eventStoreClickHouse";
+import { EventRepositoryClickHouse } from "../../../stores/repositories/eventRepositoryClickHouse";
 import { CompleteExperimentRunCommand } from "../commands/completeExperimentRun.command";
-import { experimentRunStateFoldProjection } from "../projections/experimentRunState.foldProjection";
+import { RecordEvaluatorResultCommand } from "../commands/recordEvaluatorResult.command";
+import { RecordTargetResultCommand } from "../commands/recordTargetResult.command";
+import { StartExperimentRunCommand } from "../commands/startExperimentRun.command";
+import { createExperimentRunResultStorageMapProjection } from "../projections/experimentRunResultStorage.mapProjection";
 import type { ExperimentRunStateData } from "../projections/experimentRunState.foldProjection";
-import { experimentRunResultStorageMapProjection } from "../handlers/experimentRunResultStorage.mapProjection";
+import { createExperimentRunStateFoldProjection } from "../projections/experimentRunState.foldProjection";
+import { ExperimentRunStateRepositoryClickHouse } from "../repositories";
+import { createExperimentRunStateFoldStore } from "../projections/experimentRunState.store";
+import { createExperimentRunItemAppendStore } from "../projections/experimentRunResultStorage.store";
 import type { ExperimentRunProcessingEvent } from "../schemas/events";
-
-// ============================================================================
-// Test Helpers
-// ============================================================================
 
 function generateTestRunId(): string {
   return `run-${Date.now()}-${Math.random().toString(36).substring(7)}`;
@@ -74,26 +72,26 @@ function createExperimentRunTestPipeline(): PipelineWithCommandHandlers<
 
   const queueProcessorFactory = new BullmqQueueProcessorFactory(redisConnection);
 
-  const runtime = EventSourcingRuntime.createWithStores(
-    {
-      enabled: true,
-      clickHouseEnabled: true,
-      forceClickHouseInTests: true,
-      isTestEnvironment: true,
-      isBuildTime: false,
-      clickHouseClient,
-      redisConnection,
-    },
-    { eventStore, queueProcessorFactory },
-  );
+  const eventSourcing = EventSourcing.createWithStores({
+    eventStore,
+    queueProcessorFactory,
+    clickhouse: clickHouseClient,
+    redis: redisConnection,
+  });
 
-  const eventSourcing = new EventSourcing(runtime);
+  const repository = new ExperimentRunStateRepositoryClickHouse(clickHouseClient);
+  const experimentRunStateFoldStore = createExperimentRunStateFoldStore(repository);
+  const experimentRunItemAppendStore = createExperimentRunItemAppendStore(clickHouseClient);
 
   const pipelineDefinition = definePipeline<ExperimentRunProcessingEvent>()
     .withName(pipelineName)
     .withAggregateType("experiment_run" as AggregateType)
-    .withFoldProjection("experimentRunState", experimentRunStateFoldProjection as any)
-    .withMapProjection("experimentRunResultStorage", experimentRunResultStorageMapProjection as any)
+    .withFoldProjection("experimentRunState", createExperimentRunStateFoldProjection({
+      store: experimentRunStateFoldStore,
+    }) as any)
+    .withMapProjection("experimentRunResultStorage", createExperimentRunResultStorageMapProjection({
+      store: experimentRunItemAppendStore,
+    }) as any)
     .withCommand("startExperimentRun", StartExperimentRunCommand as any)
     .withCommand("recordTargetResult", RecordTargetResultCommand as any)
     .withCommand("recordEvaluatorResult", RecordEvaluatorResultCommand as any)
@@ -202,10 +200,6 @@ const CLICKHOUSE_CONSISTENCY_DELAY_MS = 200;
 async function waitForClickHouseConsistency(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, CLICKHOUSE_CONSISTENCY_DELAY_MS));
 }
-
-// ============================================================================
-// Integration Tests
-// ============================================================================
 
 const hasTestcontainers = !!(
   process.env.TEST_CLICKHOUSE_URL || process.env.CI_CLICKHOUSE_URL

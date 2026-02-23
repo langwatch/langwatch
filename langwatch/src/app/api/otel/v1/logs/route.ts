@@ -1,3 +1,4 @@
+import superjson from "superjson";
 import crypto from "node:crypto";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import type { IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer";
@@ -138,7 +139,7 @@ async function handleLogsRequest(req: NextRequest) {
           for (const traceForCollection of tracesGeneratedFromLogs) {
             const paramsMD5 = crypto
               .createHash("md5")
-              .update(JSON.stringify({ ...traceForCollection }))
+              .update(superjson.stringify({ ...traceForCollection }))
               .digest("hex");
             const existingTrace = await fetchExistingMD5s(
               traceForCollection.traceId,
@@ -149,20 +150,29 @@ async function handleLogsRequest(req: NextRequest) {
             }
 
             logger.info(
-              { traceId: traceForCollection.traceId },
+              {
+                traceId: traceForCollection.traceId,
+                logRequestSizeMb: parseFloat(
+                  (body.byteLength / (1024 * 1024)).toFixed(3),
+                ),
+              },
               "collecting traces from logs",
             );
 
             promises.push(
-              scheduleTraceCollectionWithFallback({
-                ...traceForCollection,
-                projectId: project.id,
-                existingTrace,
-                paramsMD5,
-                expectedOutput: void 0,
-                evaluations: void 0,
-                collectedAt: Date.now(),
-              }),
+              scheduleTraceCollectionWithFallback(
+                {
+                  ...traceForCollection,
+                  projectId: project.id,
+                  existingTrace,
+                  paramsMD5,
+                  expectedOutput: void 0,
+                  evaluations: void 0,
+                  collectedAt: Date.now(),
+                },
+                false,
+                body.byteLength,
+              ),
             );
           }
           return promises;

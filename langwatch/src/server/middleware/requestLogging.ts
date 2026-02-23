@@ -17,14 +17,16 @@ export interface RequestLogData {
 /**
  * Extracts HTTP status code from an error object.
  * Returns 500 for generic errors, 200 if no error.
+ * Checks both `status` (HttpError, Hono) and `httpStatus` (DomainError).
  */
 export function getStatusCodeFromError(error: unknown): number {
-  if (
-    error instanceof Error &&
-    "status" in error &&
-    typeof error.status === "number"
-  ) {
-    return error.status;
+  if (error instanceof Error) {
+    if ("httpStatus" in error && typeof error.httpStatus === "number") {
+      return error.httpStatus;
+    }
+    if ("status" in error && typeof error.status === "number") {
+      return error.status;
+    }
   }
 
   if (error) {

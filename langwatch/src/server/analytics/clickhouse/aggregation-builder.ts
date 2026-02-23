@@ -166,21 +166,21 @@ const groupByExpressions: Partial<
   }),
 
   "evaluations.evaluation_passed": (groupByKey) => ({
-    column: `${tableAliases.evaluation_states}.Passed`,
-    requiredJoins: ["evaluation_states"],
+    column: `${tableAliases.evaluation_runs}.Passed`,
+    requiredJoins: ["evaluation_runs"],
     additionalWhere: groupByKey
-      ? `${tableAliases.evaluation_states}.EvaluatorId = {groupByKey:String}`
+      ? `${tableAliases.evaluation_runs}.EvaluatorId = {groupByKey:String}`
       : undefined,
   }),
 
   "evaluations.evaluation_label": () => ({
-    column: `${tableAliases.evaluation_states}.Label`,
-    requiredJoins: ["evaluation_states"],
+    column: `${tableAliases.evaluation_runs}.Label`,
+    requiredJoins: ["evaluation_runs"],
   }),
 
   "evaluations.evaluation_processing_state": () => ({
-    column: `${tableAliases.evaluation_states}.Status`,
-    requiredJoins: ["evaluation_states"],
+    column: `${tableAliases.evaluation_runs}.Status`,
+    requiredJoins: ["evaluation_runs"],
   }),
 
   "events.event_type": () => ({
@@ -995,7 +995,7 @@ export function buildDataForFilterQuery(
 ): BuiltQuery {
   const ts = tableAliases.trace_summaries;
   const ss = tableAliases.stored_spans;
-  const es = tableAliases.evaluation_states;
+  const es = tableAliases.evaluation_runs;
 
   // Translate filters if provided
   const filterTranslation = translateAllFilters(filters ?? {});
@@ -1140,7 +1140,7 @@ export function buildDataForFilterQuery(
 
     case "evaluations.evaluator_id":
     case "evaluations.evaluator_id.guardrails_only":
-      joins = buildJoinClause("evaluation_states");
+      joins = buildJoinClause("evaluation_runs");
       sql = `
         SELECT
           ${es}.EvaluatorId AS field,

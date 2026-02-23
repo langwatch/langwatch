@@ -1,27 +1,27 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
+import type { Command, CommandHandler } from "../../../";
+import {
+	createTenantId,
+	defineCommandSchema,
+	EventUtils,
+} from "../../../";
 import { createLogger } from "../../../../../utils/logger/server";
-import type { Command, CommandHandler } from "../../../library";
 import {
-  createTenantId,
-  defineCommandSchema,
-  EventUtils,
-} from "../../../library";
-import type { OtlpSpan } from "../schemas/otlp";
-import {
-  DEFAULT_PII_REDACTION_LEVEL,
-  recordSpanCommandDataSchema,
-  type PIIRedactionLevel,
-  type RecordSpanCommandData,
+	DEFAULT_PII_REDACTION_LEVEL,
+	recordSpanCommandDataSchema,
+	type PIIRedactionLevel,
+	type RecordSpanCommandData,
 } from "../schemas/commands";
 import {
-  RECORD_SPAN_COMMAND_TYPE,
-  SPAN_RECEIVED_EVENT_TYPE,
-  SPAN_RECEIVED_EVENT_VERSION_LATEST,
+	RECORD_SPAN_COMMAND_TYPE,
+	SPAN_RECEIVED_EVENT_TYPE,
+	SPAN_RECEIVED_EVENT_VERSION_LATEST,
 } from "../schemas/constants";
 import type { SpanReceivedEvent } from "../schemas/events";
-import { OtlpSpanCostEnrichmentService } from "../services/otlpSpanCostEnrichmentService";
-import { OtlpSpanPiiRedactionService } from "../services/otlpSpanPiiRedactionService";
+import type { OtlpSpan } from "../schemas/otlp";
+import { OtlpSpanCostEnrichmentService } from "~/server/app-layer/traces/span-cost-enrichment.service";
+import { OtlpSpanPiiRedactionService } from "~/server/app-layer/traces/span-pii-redaction.service";
 import { TraceRequestUtils } from "../utils/traceRequest.utils";
 
 /**
@@ -158,6 +158,7 @@ export class RecordSpanCommand implements CommandHandler<
             piiRedactionLevel,
           },
           metadata: { traceId, spanId },
+          occurredAt: commandData.occurredAt,
         });
 
         this.logger.debug(

@@ -112,15 +112,15 @@ app.post(
 
     let traces: unknown[];
     if (format === "digest") {
-      traces = rawTraces.map((trace) => ({
+      traces = await Promise.all(rawTraces.map(async (trace) => ({
         trace_id: trace.trace_id,
-        formatted_trace: formatSpansDigest(trace.spans ?? []),
+        formatted_trace: await formatSpansDigest(trace.spans ?? []),
         input: trace.input,
         output: trace.output,
         timestamps: trace.timestamps,
         metadata: trace.metadata,
         error: trace.error,
-      }));
+      })));
     } else {
       traces = rawTraces;
     }
@@ -220,7 +220,7 @@ app.get(
     if (format === "digest") {
       return c.json({
         trace_id: traceId,
-        formatted_trace: formatSpansDigest(trace.spans ?? []),
+        formatted_trace: await formatSpansDigest(trace.spans ?? []),
         timestamps: trace.timestamps,
         metadata: trace.metadata,
         evaluations: trace.evaluations,

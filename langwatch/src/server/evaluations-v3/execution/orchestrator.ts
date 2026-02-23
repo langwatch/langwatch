@@ -10,6 +10,7 @@
  * 6. Checks abort flags between executions
  */
 
+import { generate } from "@langwatch/ksuid";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
 import type { EvaluationsV3State, TargetConfig } from "~/evaluations-v3/types";
 import { isRowEmpty } from "~/evaluations-v3/utils/emptyRowDetection";
@@ -17,11 +18,11 @@ import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import type { TypedAgent } from "~/server/agents/agent.repository";
-import { prisma } from "~/server/db";
+import { getApp } from "~/server/app-layer/app";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators.generated";
-import { ExperimentRunDispatcher } from "../dispatch";
 import type { ESBatchEvaluationTarget } from "~/server/experiments/types";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
 import { createLogger } from "~/utils/logger/server";
 import { generateOtelTraceId } from "~/utils/trace";
@@ -75,6 +76,8 @@ export type OrchestratorInput = {
   runId?: string;
   /** Concurrency limit for parallel execution (default 10) */
   concurrency?: number;
+  /** When ON, ES writes are handled by event sourcing reactors instead of direct writes */
+  featureEventSourcingEvaluationIngestion?: boolean;
 };
 
 /**
@@ -506,6 +509,7 @@ export async function* runOrchestrator(
     saveToEs = false,
     runId: providedRunId,
     concurrency: requestedConcurrency,
+    featureEventSourcingEvaluationIngestion = false,
   } = input;
 
   // Use requested concurrency, environment variable, or default
@@ -523,26 +527,27 @@ export async function* runOrchestrator(
   // Set running flag
   await abortManager.setRunning(runId);
 
-  // Check if ClickHouse dual-write is enabled for this project
-  const dispatcher = ExperimentRunDispatcher.create();
-  let clickHouseEnabled = false;
-  try {
-    clickHouseEnabled = await dispatcher.isClickHouseEnabled(projectId);
-  } catch (error) {
-    logger.warn(
-      { error, projectId },
-      "Failed to check ClickHouse enabled status, proceeding without dual-write",
-    );
-  }
+  // Get commands for ClickHouse dual-write (unconditional)
+  const commands = getApp().experimentRuns;
 
   // Get repository and initialize storage if enabled
+  // When featureEventSourcingEvaluationIngestion is ON, the experimentRunEsSync
+  // reactor handles ES writes — skip direct writes to avoid double-writing.
   const repository =
-    saveToEs && experimentId ? getDefaultBatchEvaluationRepository() : null;
+    saveToEs && experimentId && !featureEventSourcingEvaluationIngestion
+      ? getDefaultBatchEvaluationRepository()
+      : null;
+
+  // Track CH dispatch failures for observability
+  let chDispatchFailures = 0;
+  let chDispatchTotal = 0;
 
   // Accumulate results for batch saving
   const pendingDataset: DatasetEntry[] = [];
   const pendingEvaluations: EvaluationEntry[] = [];
   let pendingProgress = 0;
+  // Track traceId per cell so evaluator_result events can reference it
+  const cellTraceIds = new Map<string, string>();
   let lastSaveTime = Date.now();
   const SAVE_INTERVAL = 5000; // Save every 5 seconds
   const SAVE_THRESHOLD = 10; // Or every 10 events
@@ -602,19 +607,24 @@ export async function* runOrchestrator(
       total: totalCells,
       targets: targetMetadata,
     });
+  }
 
-    // Dispatch event to ClickHouse for dual-write (if enabled)
-    if (clickHouseEnabled) {
-      void dispatcher.startRun({
-        tenantId: projectId,
-        runId,
-        experimentId,
-        workflowVersionId: workflowVersionId ?? null,
-        total: totalCells,
-        targets: targetMetadata,
-        occurredAt: Date.now(),
-      });
-    }
+  // Dispatch event to ClickHouse — must fire regardless of repository (which is
+  // null when featureEventSourcingEvaluationIngestion is ON).
+  if (experimentId) {
+    chDispatchTotal++;
+    await commands.startExperimentRun({
+      tenantId: projectId,
+      runId,
+      experimentId,
+      workflowVersionId: workflowVersionId ?? null,
+      total: totalCells,
+      targets: targetMetadata,
+      occurredAt: Date.now(),
+    }).catch((err) => {
+      chDispatchFailures++;
+      logger.warn({ err, runId }, "Failed to dispatch startExperimentRun to CH");
+    });
   }
 
   // Helper to save pending results
@@ -646,28 +656,64 @@ export async function* runOrchestrator(
   };
 
   // Helper to process event for storage
-  const processEventForStorage = (event: EvaluationV3Event) => {
-    if (!repository || !experimentId) return;
+  const processEventForStorage = async (event: EvaluationV3Event) => {
+    // Track traceId from target_result so evaluator_result events can reference it.
+    // Must happen before the repository guard since repository is null when
+    // featureEventSourcingEvaluationIngestion is on.
+    if (event.type === "target_result" && event.traceId) {
+      cellTraceIds.set(`${event.rowIndex}:${event.targetId}`, event.traceId);
+    }
 
-    if (event.type === "target_result") {
-      // Get the dataset row entry for this row index
-      const datasetEntry = datasetRows[event.rowIndex] ?? {};
+    // Dispatch to evaluation processing pipeline for per-trace eval CH writes.
+    // Lives before the repository guard because repository is intentionally null
+    // when featureEventSourcingEvaluationIngestion is on.
+    if (event.type === "evaluator_result" && featureEventSourcingEvaluationIngestion) {
+      const evalResult = event.result as SingleEvaluationResult;
+      const evaluatorConfig = state.evaluators.find(
+        (e) => e.id === event.evaluatorId,
+      );
+      const dbEvaluator = evaluatorConfig?.dbEvaluatorId
+        ? loadedEvaluators?.get(evaluatorConfig.dbEvaluatorId)
+        : null;
+      const traceId = cellTraceIds.get(`${event.rowIndex}:${event.targetId}`);
+      const evaluationId = generate(KSUID_RESOURCES.EVALUATION).toString();
+      try {
+        const app = getApp();
+        await app.evaluations.startEvaluation({
+          tenantId: projectId,
+          evaluationId,
+          evaluatorId: event.evaluatorId,
+          evaluatorType: evaluatorConfig?.evaluatorType ?? "unknown",
+          evaluatorName: dbEvaluator?.name,
+          traceId,
+          occurredAt: Date.now(),
+        });
+        await app.evaluations.completeEvaluation({
+          tenantId: projectId,
+          evaluationId,
+          status: evalResult.status,
+          score: evalResult.status === "processed" ? (evalResult.score ?? undefined) : undefined,
+          passed: evalResult.status === "processed" ? (evalResult.passed ?? undefined) : undefined,
+          label: evalResult.status === "processed" ? (evalResult.label ?? undefined) : undefined,
+          details: evalResult.status === "processed" ? (evalResult.details ?? undefined) : undefined,
+          error: evalResult.status === "error" ? evalResult.details : undefined,
+          occurredAt: Date.now(),
+        });
+      } catch (error) {
+        logger.error(
+          { error, evaluationId, evaluatorId: event.evaluatorId },
+          "Failed to dispatch evaluator result to evaluation processing pipeline",
+        );
+      }
+    }
 
-      pendingDataset.push({
-        index: event.rowIndex,
-        target_id: event.targetId,
-        entry: datasetEntry,
-        predicted:
-          event.output !== undefined ? { output: event.output } : undefined,
-        cost: event.cost ?? null,
-        duration: event.duration ?? null,
-        error: event.error ?? null,
-        trace_id: event.traceId ?? null,
-      });
-
-      // Dispatch event to ClickHouse for dual-write (if enabled)
-      if (clickHouseEnabled) {
-        void dispatcher.recordTargetResult({
+    // Dispatch events to ClickHouse — must fire regardless of repository (which
+    // is null when featureEventSourcingEvaluationIngestion is ON).
+    if (experimentId) {
+      if (event.type === "target_result") {
+        const datasetEntry = datasetRows[event.rowIndex] ?? {};
+        chDispatchTotal++;
+        await commands.recordTargetResult({
           tenantId: projectId,
           runId,
           experimentId,
@@ -683,14 +729,88 @@ export async function* runOrchestrator(
           error: event.error ?? null,
           traceId: event.traceId ?? null,
           occurredAt: Date.now(),
+        }).catch((err) => {
+          chDispatchFailures++;
+          logger.warn({ err, runId }, "Failed to dispatch recordTargetResult to CH");
+        });
+      } else if (event.type === "error" && event.rowIndex !== undefined && event.targetId) {
+        const datasetEntry = datasetRows[event.rowIndex] ?? {};
+        chDispatchTotal++;
+        await commands.recordTargetResult({
+          tenantId: projectId,
+          runId,
+          experimentId,
+          index: event.rowIndex,
+          targetId: event.targetId,
+          entry: datasetEntry,
+          predicted: null,
+          cost: null,
+          duration: null,
+          error: event.message,
+          traceId: null,
+          occurredAt: Date.now(),
+        }).catch((err) => {
+          chDispatchFailures++;
+          logger.warn({ err, runId }, "Failed to dispatch recordTargetResult to CH");
+        });
+      } else if (event.type === "evaluator_result") {
+        const result = event.result as SingleEvaluationResult;
+        const evaluatorConfig = state.evaluators.find(
+          (e) => e.id === event.evaluatorId,
+        );
+        const dbEvaluator = evaluatorConfig?.dbEvaluatorId
+          ? loadedEvaluators?.get(evaluatorConfig.dbEvaluatorId)
+          : null;
+        chDispatchTotal++;
+        await commands.recordEvaluatorResult({
+          tenantId: projectId,
+          runId,
+          experimentId,
+          index: event.rowIndex,
+          targetId: event.targetId,
+          evaluatorId: event.evaluatorId,
+          evaluatorName: dbEvaluator?.name ?? null,
+          status: result.status,
+          score: result.status === "processed" ? result.score : null,
+          label: result.status === "processed" ? result.label : null,
+          passed: result.status === "processed" ? result.passed : null,
+          details:
+            result.status === "error"
+              ? result.details
+              : result.status === "processed"
+                ? result.details
+                : null,
+          occurredAt: Date.now(),
+          cost:
+            result.status === "processed" && result.cost
+              ? result.cost.amount
+              : null,
+        }).catch((err) => {
+          chDispatchFailures++;
+          logger.warn({ err, runId }, "Failed to dispatch recordEvaluatorResult to CH");
         });
       }
+    }
+
+    // ES storage — requires repository
+    if (!repository || !experimentId) return;
+
+    if (event.type === "target_result") {
+      const datasetEntry = datasetRows[event.rowIndex] ?? {};
+      pendingDataset.push({
+        index: event.rowIndex,
+        target_id: event.targetId,
+        entry: datasetEntry,
+        predicted:
+          event.output !== undefined ? { output: event.output } : undefined,
+        cost: event.cost ?? null,
+        duration: event.duration ?? null,
+        error: event.error ?? null,
+        trace_id: event.traceId ?? null,
+      });
     } else if (event.type === "error") {
-      // Store error events as dataset entries with the error message
-      // This captures errors that occur during cell execution (e.g., network errors)
       if (event.rowIndex !== undefined && event.targetId) {
         const datasetEntry = datasetRows[event.rowIndex] ?? {};
-
         pendingDataset.push({
           index: event.rowIndex,
           target_id: event.targetId,
@@ -701,28 +821,9 @@ export async function* runOrchestrator(
           error: event.message,
           trace_id: null,
         });
-
-        // Dispatch error as target result to ClickHouse (if enabled)
-        if (clickHouseEnabled) {
-          void dispatcher.recordTargetResult({
-            tenantId: projectId,
-            runId,
-            experimentId,
-            index: event.rowIndex,
-            targetId: event.targetId,
-            entry: datasetEntry,
-            predicted: null,
-            cost: null,
-            duration: null,
-            error: event.message,
-            traceId: null,
-            occurredAt: Date.now(),
-          });
-        }
       }
     } else if (event.type === "evaluator_result") {
       const result = event.result as SingleEvaluationResult;
-      // Find the evaluator config to get the DB evaluator ID, then look up name
       const evaluatorConfig = state.evaluators.find(
         (e) => e.id === event.evaluatorId,
       );
@@ -749,40 +850,11 @@ export async function* runOrchestrator(
             ? result.cost.amount
             : null,
       });
-
-      // Dispatch event to ClickHouse for dual-write (if enabled)
-      if (clickHouseEnabled) {
-        void dispatcher.recordEvaluatorResult({
-          tenantId: projectId,
-          runId,
-          experimentId,
-          index: event.rowIndex,
-          targetId: event.targetId,
-          evaluatorId: event.evaluatorId,
-          evaluatorName: dbEvaluator?.name ?? null,
-          status: result.status,
-          score: result.status === "processed" ? result.score : null,
-          label: result.status === "processed" ? result.label : null,
-          passed: result.status === "processed" ? result.passed : null,
-          details:
-            result.status === "error"
-              ? result.details
-              : result.status === "processed"
-                ? result.details
-                : null,
-          occurredAt: Date.now(),
-          cost:
-            result.status === "processed" && result.cost
-              ? result.cost.amount
-              : null,
-        });
-      }
     } else if (event.type === "progress") {
       pendingProgress = event.completed;
     }
 
-    // Fire-and-forget save check
-    void savePendingResults();
+    await savePendingResults();
   };
 
   // Emit execution_started
@@ -907,7 +979,7 @@ export async function* runOrchestrator(
               pushEvent(event);
 
               // Process for storage
-              processEventForStorage(event);
+              await processEventForStorage(event);
 
               // Track failures
               if (
@@ -942,7 +1014,7 @@ export async function* runOrchestrator(
               total: totalCells,
             };
             pushEvent(progressEvent);
-            processEventForStorage(progressEvent);
+            await processEventForStorage(progressEvent);
           } finally {
             semaphore.release();
           }
@@ -1004,17 +1076,6 @@ export async function* runOrchestrator(
           finishedAt: aborted ? undefined : finishedAt,
           stoppedAt: aborted ? finishedAt : undefined,
         });
-
-        // Dispatch completion event to ClickHouse for dual-write (if enabled)
-        if (clickHouseEnabled) {
-          void dispatcher.completeRun({
-            tenantId: projectId,
-            runId,
-            finishedAt: aborted ? null : finishedAt,
-            stoppedAt: aborted ? finishedAt : null,
-            occurredAt: Date.now(),
-          });
-        }
       } catch (error) {
         logger.error(
           { error, runId },
@@ -1022,6 +1083,30 @@ export async function* runOrchestrator(
         );
       }
     }
+
+    // Dispatch completion event to ClickHouse — must fire regardless of
+    // repository (which is null when featureEventSourcingEvaluationIngestion is ON).
+    if (experimentId) {
+      chDispatchTotal++;
+      await commands.completeExperimentRun({
+        tenantId: projectId,
+        runId,
+        finishedAt: aborted ? null : finishedAt,
+        stoppedAt: aborted ? finishedAt : null,
+        occurredAt: Date.now(),
+      }).catch((err) => {
+        chDispatchFailures++;
+        logger.warn({ err, runId }, "Failed to dispatch completeExperimentRun to CH");
+      });
+    }
+  }
+
+  // Log CH dispatch failure summary if any failed
+  if (chDispatchFailures > 0) {
+    logger.warn(
+      { runId, chDispatchFailures, chDispatchTotal },
+      `${chDispatchFailures} of ${chDispatchTotal} CH dispatches failed for run ${runId}`,
+    );
   }
 
   // Only emit done if not aborted
@@ -1041,6 +1126,7 @@ export async function* runOrchestrator(
       completedCells,
       failedCells,
       duration,
+      ...(chDispatchFailures > 0 && { chDispatchFailures }),
       timestamps: {
         startedAt: startTime,
         finishedAt,

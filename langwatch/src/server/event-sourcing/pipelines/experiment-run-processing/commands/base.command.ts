@@ -1,6 +1,6 @@
+import type { Command, CommandHandler } from "../../../";
+import { createTenantId, EventUtils } from "../../../";
 import { createLogger } from "../../../../../utils/logger";
-import type { Command, CommandHandler } from "../../../library";
-import { createTenantId, EventUtils } from "../../../library";
 import type { ExperimentRunProcessingEvent } from "../schemas/events";
 
 /**

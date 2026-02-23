@@ -970,7 +970,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
   },
   "evaluations.state": {
     name: "Evaluation Execution State",
-    urlKey: "evaluation_state",
+    urlKey: "evaluation_run",
     requiresKey: {
       filter: "evaluations.evaluator_id",
     },

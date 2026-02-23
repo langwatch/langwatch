@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { EventSchema } from "../../../library/domain/types";
+import { EventSchema } from "../../../domain/types";
 import { EXPERIMENT_RUN_EVENT_TYPES } from "./constants";
 import { targetSchema } from "./shared";
 
@@ -122,8 +122,7 @@ export type ExperimentRunProcessingEvent =
   | ExperimentRunCompletedEvent;
 
 export {
-  isExperimentRunCompletedEvent,
-  isExperimentRunStartedEvent,
-  isEvaluatorResultEvent,
-  isTargetResultEvent,
+	isEvaluatorResultEvent, isExperimentRunCompletedEvent,
+	isExperimentRunStartedEvent, isTargetResultEvent
 } from "./typeGuards";
+

@@ -6,6 +6,11 @@ import { createLogger } from "./utils/logger/server";
 loadEnvConfig(process.cwd());
 setEnvironment(process.env.ENVIRONMENT ?? "local");
 
+const { initializeWorkerApp } = require("./server/app-layer/presets") as {
+  initializeWorkerApp: () => void;
+};
+initializeWorkerApp();
+
 const logger = createLogger("langwatch:workers");
 
 logger.info("starting");

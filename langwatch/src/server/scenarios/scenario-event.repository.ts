@@ -27,6 +27,10 @@ const logger = createLogger("langwatch:scenario-events:repository");
 const projectIdSchema = z.string();
 const scenarioIdSchema = z.string();
 
+const QUERY_PAGE_LIMIT = 20;
+const DEDUP_OVERSAMPLE_FACTOR = 5; // fetch 5× to survive deduplication
+const DEDUP_MIN_REQUEST_SIZE = 1000; // minimum ES request size
+
 /**
  * Repository class for managing scenario events in Elasticsearch.
  * Handles CRUD operations and complex queries for scenario events, including:
@@ -561,15 +565,12 @@ export class ScenarioEventRepository {
     const validatedProjectId = projectIdSchema.parse(projectId);
     const client = await this.getClient();
 
-    const maxLimit = 20;
-    const actualLimit = Math.min(limit, maxLimit);
+    const actualLimit = Math.min(limit, QUERY_PAGE_LIMIT);
 
     const searchAfter = cursor ? this.decodeCursor(cursor) : undefined;
 
     // Request 5x the limit (min 1000) to account for deduplication
-    const oversampleFactor = 5;
-    const minRequestSize = 1000;
-    const requestSize = Math.max(actualLimit * oversampleFactor, minRequestSize);
+    const requestSize = Math.max(actualLimit * DEDUP_OVERSAMPLE_FACTOR, DEDUP_MIN_REQUEST_SIZE);
 
     const response = await client.search({
       index: SCENARIO_EVENTS_INDEX.alias,
@@ -1228,7 +1229,51 @@ export class ScenarioEventRepository {
   }
 
   /**
-   * Gets or creates a cached Elasticsearch client for test environment.
+   * Returns the maximum event timestamp for a specific batch run.
+   * Used for conditional fetching: if max timestamp <= sinceTimestamp, nothing changed.
+   *
+   * @param projectId - The project identifier
+   * @param batchRunId - The batch run identifier
+   * @returns Maximum event timestamp in milliseconds (0 if no events found)
+   */
+  async getMaxTimestampForBatchRun({
+    projectId,
+    batchRunId,
+  }: {
+    projectId: string;
+    batchRunId: string;
+  }): Promise<number> {
+    const validatedProjectId = projectIdSchema.parse(projectId);
+    const validatedBatchRunId = batchRunIdSchema.parse(batchRunId);
+    const client = await this.getClient();
+
+    const response = await client.search({
+      index: SCENARIO_EVENTS_INDEX.alias,
+      body: {
+        query: {
+          bool: {
+            filter: [
+              { term: { [ES_FIELDS.projectId]: validatedProjectId } },
+              { term: { [ES_FIELDS.batchRunId]: validatedBatchRunId } },
+            ],
+          },
+        },
+        aggs: {
+          max_timestamp: {
+            max: { field: "timestamp" },
+          },
+        },
+        size: 0,
+      },
+    });
+
+    return (response.aggregations as any)?.max_timestamp?.value ?? 0;
+  }
+
+  /**
+   * Gets or creates a cached Elasticsearch client.
+   * Uses { test: true } to skip per-org ES settings lookup — scenario events
+   * are stored in the platform-level index, not per-organization indexes.
    * Avoids recreating the client on every operation for better performance.
    *
    * @returns Promise resolving to an Elasticsearch client instance
