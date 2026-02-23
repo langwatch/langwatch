@@ -1,7 +1,9 @@
+import type { ProcessRole } from "../../app-layer/config";
 import { createLogger } from "~/utils/logger/server";
 import type { AggregateType } from "../domain/aggregateType";
 import type { Event } from "../domain/types";
 import type { QueueProcessorFactory } from "../queues";
+import type { ReactorDefinition } from "../reactors/reactor.types";
 import { ConfigurationError } from "../services/errorHandling";
 import { QueueManager } from "../services/queues/queueManager";
 import type { EventStoreReadContext } from "../stores/eventStore.types";
@@ -22,6 +24,7 @@ export class ProjectionRegistry<EventType extends Event = Event> {
   );
   private readonly foldProjections = new Map<string, FoldProjectionDefinition<any, EventType>>();
   private readonly mapProjections = new Map<string, MapProjectionDefinition<any, EventType>>();
+  private readonly reactors = new Map<string, { foldName: string; definition: ReactorDefinition<EventType> }>();
   private router?: ProjectionRouter<EventType>;
   private queueManager?: QueueManager<EventType>;
 
@@ -47,10 +50,28 @@ export class ProjectionRegistry<EventType extends Event = Event> {
     this.mapProjections.set(projection.name, projection);
   }
 
+  registerReactor(foldName: string, reactor: ReactorDefinition<EventType>): void {
+    if (!this.foldProjections.has(foldName)) {
+      throw new ConfigurationError(
+        "ProjectionRegistry",
+        `Cannot register reactor "${reactor.name}" on fold "${foldName}" — fold not registered`,
+        { foldName, reactorName: reactor.name },
+      );
+    }
+    if (this.reactors.has(reactor.name)) {
+      throw new ConfigurationError(
+        "ProjectionRegistry",
+        `Reactor "${reactor.name}" already registered`,
+        { reactorName: reactor.name },
+      );
+    }
+    this.reactors.set(reactor.name, { foldName, definition: reactor });
+  }
+
   /**
    * Initialize queue infrastructure. Call after registering projections.
    */
-  initialize(queueFactory: QueueProcessorFactory): void {
+  initialize(queueFactory: QueueProcessorFactory, processRole?: ProcessRole): void {
     if (this.queueManager) {
       throw new ConfigurationError(
         "ProjectionRegistry",
@@ -70,6 +91,8 @@ export class ProjectionRegistry<EventType extends Event = Event> {
       aggregateType,
       "global_projections",
       this.queueManager,
+      undefined, // featureFlagService
+      processRole,
     );
 
     for (const fold of this.foldProjections.values()) {
@@ -80,12 +103,20 @@ export class ProjectionRegistry<EventType extends Event = Event> {
       this.router.registerMapProjection(mapProj);
     }
 
+    for (const { foldName, definition } of this.reactors.values()) {
+      this.router.registerReactor(foldName, definition);
+    }
+
     if (this.foldProjections.size > 0) {
       this.router.initializeFoldQueues();
     }
 
     if (this.mapProjections.size > 0) {
       this.router.initializeMapQueues();
+    }
+
+    if (this.reactors.size > 0) {
+      this.router.initializeReactorQueues();
     }
   }
 
@@ -94,7 +125,7 @@ export class ProjectionRegistry<EventType extends Event = Event> {
   }
 
   get hasProjections(): boolean {
-    return this.foldProjections.size > 0 || this.mapProjections.size > 0;
+    return this.foldProjections.size > 0 || this.mapProjections.size > 0 || this.reactors.size > 0;
   }
 
   /**

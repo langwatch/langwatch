@@ -120,39 +120,45 @@ Feature: Billing Meter Dispatch
     And the error is captured for alerting
 
   # ============================================================================
-  # Billing Dispatch Handler — Event to Queue
+  # Billing Dispatch Reactor — Post-Fold Side Effect
   # ============================================================================
 
   @integration
-  Scenario: Enqueues job when billable event is received
+  Scenario: Dispatch fires after fold succeeds
     Given a project belonging to an organization
-    When a billable event is processed by the dispatch handler
-    Then a usage reporting job is enqueued for the organization
+    When a billable event fold completes successfully
+    Then the reactor enqueues a usage reporting job for the organization
+
+  @integration
+  Scenario: Dispatch does not fire if fold fails
+    Given a project belonging to an organization
+    When the billable event fold fails
+    Then no usage reporting job is enqueued
 
   @integration
   Scenario: Resolves organization from cache on subsequent events
     Given a project whose organization was previously resolved
-    When another billable event arrives for the same project
+    When another billable event fold completes for the same project
     Then the organization is resolved from cache without a DB query
 
   @integration
   Scenario: Skips orphan projects gracefully
     Given a project that does not belong to any organization
-    When a billable event is processed by the dispatch handler
+    When the billing dispatch reactor fires
     Then no job is enqueued
     And a warning is logged
 
   @integration
   Scenario: Skips silently when queue is unavailable
     Given the job queue is not available
-    When a billable event is processed by the dispatch handler
+    When the billing dispatch reactor fires
     Then no job is enqueued
     And no error is thrown
 
   @integration
   Scenario: Deduplicates concurrent events for the same organization
     Given multiple billable events for the same organization arrive rapidly
-    When the dispatch handler processes them
+    When the billing dispatch reactor processes them
     Then only one reporting job is active for the organization
 
   # ============================================================================

@@ -16,6 +16,8 @@ import type {
     PipelineWithCommandHandlers,
     RegisteredPipeline,
 } from "./pipeline/types";
+import { createBillingMeterDispatchReactor } from "./projections/global/billingMeterDispatch.reactor";
+import { orgBillableEventsMeterProjection } from "./projections/global/orgBillableEventsMeter.mapProjection";
 import { projectDailyBillableEventsProjection } from "./projections/global/projectDailyBillableEvents.foldProjection";
 import { projectDailySdkUsageProjection } from "./projections/global/projectDailySdkUsage.foldProjection";
 import { EventSourcingPipeline } from "./runtimePipeline";
@@ -99,6 +101,17 @@ export class EventSourcing {
       );
       this.projectionRegistry.registerFoldProjection(
         projectDailyBillableEventsProjection,
+      );
+      this.projectionRegistry.registerMapProjection(
+        orgBillableEventsMeterProjection,
+      );
+      this.projectionRegistry.registerReactor(
+        "projectDailyBillableEvents",
+        createBillingMeterDispatchReactor({
+          getUsageReportingQueue: async () =>
+            (await import("~/server/background/queues/usageReportingQueue"))
+              .usageReportingQueue,
+        }),
       );
     }
   }
@@ -207,7 +220,7 @@ export class EventSourcing {
           !this.projectionRegistry.isInitialized &&
           this.queueProcessorFactory
         ) {
-          this.projectionRegistry.initialize(this.queueProcessorFactory);
+          this.projectionRegistry.initialize(this.queueProcessorFactory, this._processRole);
         }
 
         // Create the pipeline
