@@ -101,3 +101,7 @@ export type UsageStatsJob = {
   instance_id: string;
   timestamp: number;
 };
+
+export type UsageReportingJob = {
+  organizationId: string;
+};

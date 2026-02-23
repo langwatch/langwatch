@@ -49,10 +49,19 @@ export type StripePriceMapping = Record<
   Record<StripeEnvironment, string>
 >;
 
+export const STRIPE_METER_NAMES = ["BILLABLE_EVENTS"] as const;
+export type StripeMeterName = (typeof STRIPE_METER_NAMES)[number];
+export type StripeMeterMapping = Record<
+  StripeMeterName,
+  Record<StripeEnvironment, string>
+>;
+export type StripeMeterMap = Record<StripeMeterName, string>;
+
 export type StripePricesFile = {
   schemaVersion: number;
   updatedAt: string;
   mapping: StripePriceMapping;
+  meters: StripeMeterMapping;
   prices: Record<string, StripePriceDetail>;
 };
 
@@ -90,9 +99,16 @@ export const stripePriceMappingSchema = z.object(
   ) as Record<StripePriceName, typeof stripeEnvironmentMappingSchema>,
 );
 
+export const stripeMeterMappingSchema = z.object(
+  Object.fromEntries(
+    STRIPE_METER_NAMES.map((key) => [key, stripeEnvironmentMappingSchema]),
+  ) as Record<StripeMeterName, typeof stripeEnvironmentMappingSchema>,
+);
+
 export const stripePricesFileSchema = z.object({
   schemaVersion: z.number(),
   updatedAt: z.string(),
   mapping: stripePriceMappingSchema,
+  meters: stripeMeterMappingSchema,
   prices: z.record(z.string(), stripePriceDetailSchema),
 });

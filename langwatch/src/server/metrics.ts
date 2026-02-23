@@ -92,6 +92,7 @@ type JobType =
   | "track_events"
   | "topic_clustering"
   | "usage_stats"
+  | "usage_reporting"
   | "event_sourcing"
   | "scenario";
 

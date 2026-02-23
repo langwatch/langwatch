@@ -172,6 +172,7 @@ model Organization {
     promoCode     String?
     stripeCustomerId String?      @unique
     currency      Currency         @default(EUR)
+    pricingModel  PricingModel     @default(TIERED)
     features      OrganizationFeature[]
     CustomRoles   CustomRole[]
     notifications Notification[]
@@ -195,6 +196,11 @@ enum PlanTypes {
     ACCELERATE
     LAUNCH_ANNUAL
     ACCELERATE_ANNUAL
+}
+
+enum PricingModel {
+    TIERED
+    SEAT_EVENT
 }
 
 enum SubscriptionStatus {
@@ -1127,4 +1133,15 @@ model ProjectDailyBillableEvents {
 
     @@unique([projectId, date])
     @@index([projectId, date])
+}
+
+model BillingMeterCheckpoint {
+    id                   String   @id @default(cuid())
+    organizationId       String
+    billingMonth         String   // "2026-02"
+    lastReportedTotal    Int      @default(0)
+    pendingReportedTotal Int?     // non-null = in-flight Stripe call
+    updatedAt            DateTime @updatedAt
+
+    @@unique([organizationId, billingMonth])
 }

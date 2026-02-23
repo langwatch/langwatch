@@ -36,6 +36,10 @@ const EXEMPT_MODELS = [
   "Scenario",
   "BatchEvaluation",
   "Agent",
+  /**
+   * Billing meter checkpoints are organization-level, keyed by organizationId + billingMonth
+   */
+  "BillingMeterCheckpoint",
 ];
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
