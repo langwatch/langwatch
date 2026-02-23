@@ -66,6 +66,7 @@ export function worstStatus(summary: RunGroupSummary): ScenarioRunStatus {
   return ScenarioRunStatus.SUCCESS;
 }
 
+
 type RunStatusCategory = "success" | "failure" | "stalled" | "cancelled" | "in_progress";
 
 function categorizeRunStatus(status: ScenarioRunStatus): RunStatusCategory {

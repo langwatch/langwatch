@@ -6,7 +6,8 @@
  */
 
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { CheckCircle, ChevronDown, ChevronRight, XCircle, Loader } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { SummaryStatusIcon } from "./SummaryStatusIcon";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { BatchRun, BatchRunSummary } from "./run-history-transforms";
 import { getScenarioDisplayNames } from "./run-history-transforms";
@@ -23,16 +24,6 @@ type RunRowProps = {
   expectedJobCount?: number;
   suiteName?: string; // displayed in All Runs view
 };
-
-function OverallStatusIcon({ summary }: { summary: BatchRunSummary }) {
-  if (summary.inProgressCount > 0) {
-    return <Loader size={14} color="var(--chakra-colors-orange-500)" style={{ animation: "spin 2s linear infinite" }} />;
-  }
-  if (summary.failedCount > 0) {
-    return <XCircle size={14} color="var(--chakra-colors-red-500)" />;
-  }
-  return <CheckCircle size={14} color="var(--chakra-colors-green-500)" />;
-}
 
 export function RunRow({
   batchRun,
@@ -104,10 +95,7 @@ export function RunRow({
           </Text>
         )}
         <Box flex={1} />
-        <Text fontSize="sm" color="fg.muted">
-          &middot;
-        </Text>
-        <OverallStatusIcon summary={summary} />
+        <SummaryStatusIcon summary={summary} />
         <Text
           fontSize="sm"
           fontWeight="medium"
@@ -153,6 +141,12 @@ export function RunRow({
         <HStack gap={3}>
           <Text color="green.600">{summary.passedCount} passed</Text>
           <Text color="red.600">{summary.failedCount} failed</Text>
+          {summary.stalledCount > 0 && (
+            <Text color="yellow.600">{summary.stalledCount} stalled</Text>
+          )}
+          {summary.cancelledCount > 0 && (
+            <Text color="fg.muted">{summary.cancelledCount} cancelled</Text>
+          )}
         </HStack>
       </HStack>
     </Box>

@@ -90,7 +90,7 @@ describe("<ScenarioTargetRow/>", () => {
   });
 
   describe("given a failed scenario run (ERROR status)", () => {
-    it("displays 0% for ERROR status", () => {
+    it("displays 'failed' label for ERROR status", () => {
       render(
         <ScenarioTargetRow
           scenarioRun={makeScenarioRunData({
@@ -102,12 +102,12 @@ describe("<ScenarioTargetRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("0%")).toBeInTheDocument();
+      expect(screen.getByText("failed")).toBeInTheDocument();
     });
   });
 
   describe("given a failed scenario run (FAILED status)", () => {
-    it("displays 0% for FAILED status", () => {
+    it("displays 'failed' label for FAILED status", () => {
       render(
         <ScenarioTargetRow
           scenarioRun={makeScenarioRunData({
@@ -119,12 +119,12 @@ describe("<ScenarioTargetRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("0%")).toBeInTheDocument();
+      expect(screen.getByText("failed")).toBeInTheDocument();
     });
   });
 
   describe("given an in-progress scenario run", () => {
-    it("displays In progress text instead of pass rate", () => {
+    it("displays 'running' label instead of pass rate", () => {
       render(
         <ScenarioTargetRow
           scenarioRun={makeScenarioRunData({
@@ -137,9 +137,44 @@ describe("<ScenarioTargetRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("In progress")).toBeInTheDocument();
+      expect(screen.getByText("running")).toBeInTheDocument();
       expect(screen.queryByText("100%")).not.toBeInTheDocument();
-      expect(screen.queryByText("0%")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a stalled scenario run", () => {
+    it("displays 'stalled' label", () => {
+      render(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({
+            status: ScenarioRunStatus.STALLED,
+            durationInMs: 0,
+          })}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByText("stalled")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a cancelled scenario run", () => {
+    it("displays 'cancelled' label", () => {
+      render(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({
+            status: ScenarioRunStatus.CANCELLED,
+            durationInMs: 0,
+          })}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByText("cancelled")).toBeInTheDocument();
     });
   });
 

@@ -61,6 +61,8 @@ export function makeSummary(
     passRate: 100,
     passedCount: 2,
     failedCount: 0,
+    stalledCount: 0,
+    cancelledCount: 0,
     totalCount: 2,
     inProgressCount: 0,
     ...overrides,
