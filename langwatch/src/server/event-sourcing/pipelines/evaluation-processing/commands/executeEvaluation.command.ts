@@ -81,7 +81,8 @@ function makeJobId(payload: ExecuteEvaluationCommandData): string {
  * The returned class closes over deps so the framework can instantiate it
  * with `new ()` (zero-arg constructor) as required by `withCommand`.
  *
- * Preconditions + sampling + execution -> emits [ScheduledEvent, CompletedEvent].
+ * Preconditions + execution -> emits [ScheduledEvent, CompletedEvent].
+ * Sampling is handled upstream in the evaluationTrigger reactor.
  * Results are persisted to CH via the evaluationRun fold projection.
  * Deduped by traceId + evaluatorId (makeJobId), delayed 30s.
  */
@@ -126,20 +127,7 @@ export function createExecuteEvaluationCommandClass(deps: ExecuteEvaluationComma
         });
       }
 
-      // 2. Sampling (must be here, not in reactor — see reactor comment)
-      if (Math.random() > monitor.sample) {
-        logger.debug(
-          {
-            tenantId: tenantId,
-            evaluatorId: data.evaluatorId,
-            sample: monitor.sample,
-          },
-          "Evaluation excluded by sampling",
-        );
-        return []; // No events — as if this evaluation never existed
-      }
-
-      // 3. Read spans from CH, check preconditions
+      // 2. Read spans from CH, check preconditions
       const spans = await deps.spanStorage.getSpansByTraceId({ tenantId, traceId: data.traceId });
 
       const preconditionTrace: PreconditionTrace = {
