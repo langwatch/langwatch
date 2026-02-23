@@ -225,7 +225,7 @@ async function fetchCountsFromClickHouse(
         toString(countDistinctIf(TraceId, length(ComputedInput) > 0)) AS withInput,
         toString(countDistinctIf(TraceId, OccurredAt >= fromUnixTimestamp64Milli({thirtyDaysAgo:UInt64}))) AS recent,
         toString(countDistinctIf(TraceId, TopicId IS NOT NULL AND TopicId != '')) AS assigned
-      FROM trace_summaries FINAL
+      FROM trace_summaries
       WHERE TenantId = {tenantId:String}
         AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})
     `,
@@ -356,8 +356,13 @@ async function fetchTracesFromClickHouse(
         TopicId,
         SubTopicId,
         toString(toUnixTimestamp64Milli(OccurredAt)) AS OccurredAtMs
-      FROM trace_summaries FINAL
-      WHERE ${whereClause}
+      FROM (
+        SELECT *
+        FROM trace_summaries
+        WHERE ${whereClause}
+        ORDER BY TraceId, LastUpdatedAt DESC
+        LIMIT 1 BY TraceId
+      )
       ORDER BY OccurredAt DESC, TraceId ASC
       LIMIT 2000
     `,

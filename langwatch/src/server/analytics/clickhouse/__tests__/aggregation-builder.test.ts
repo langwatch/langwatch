@@ -29,7 +29,7 @@ describe("aggregation-builder", () => {
       const result = buildTimeseriesQuery(baseInput);
 
       expect(result.sql).toContain("SELECT");
-      expect(result.sql).toContain("FROM trace_summaries ts FINAL");
+      expect(result.sql).toContain("FROM trace_summaries ts");
       expect(result.sql).toContain("WHERE");
       expect(result.sql).toContain("GROUP BY");
       expect(result.sql).toContain("period");

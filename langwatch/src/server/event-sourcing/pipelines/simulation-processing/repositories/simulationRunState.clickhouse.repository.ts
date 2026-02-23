@@ -160,7 +160,7 @@ export class SimulationRunStateRepositoryClickHouse<
             toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
             toUnixTimestamp64Milli(FinishedAt) AS FinishedAt,
             toUnixTimestamp64Milli(DeletedAt) AS DeletedAt
-          FROM ${TABLE_NAME} FINAL
+          FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String} AND ScenarioRunId = {scenarioRunId:String}
           ORDER BY UpdatedAt DESC
           LIMIT 1

@@ -152,7 +152,7 @@ export class ExperimentRunStateRepositoryClickHouse<
             toUnixTimestamp64Milli(StoppedAt) AS StoppedAt,
             LastProcessedEventId,
             TotalScoreSum, ScoreCount, PassedCount, PassFailCount
-          FROM ${TABLE_NAME} FINAL
+          FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String} AND RunId = {runId:String}
           ORDER BY UpdatedAt DESC
           LIMIT 1

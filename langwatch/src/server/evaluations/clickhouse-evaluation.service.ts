@@ -16,7 +16,7 @@ import { isClickHouseReadEnabled } from "~/server/evaluations-v3/services/isClic
  * Returns null when ClickHouse is not enabled for the project, allowing
  * the caller to fall back to Elasticsearch.
  *
- * Queries the `evaluation_runs` table using `FINAL` to collapse
+ * Queries the `evaluation_runs` table to collapse
  * ReplacingMergeTree versions.
  */
 export class ClickHouseEvaluationService {
@@ -101,9 +101,11 @@ export class ClickHouseEvaluationService {
           const result = await this.clickHouseClient.query({
             query: `
               SELECT *
-              FROM evaluation_runs FINAL
+              FROM evaluation_runs
               WHERE TenantId = {tenantId:String}
                 AND TraceId = {traceId:String}
+              ORDER BY EvaluationId, UpdatedAt DESC
+              LIMIT 1 BY TenantId, EvaluationId
             `,
             query_params: {
               tenantId: projectId,
@@ -176,9 +178,11 @@ export class ClickHouseEvaluationService {
           const result = await this.clickHouseClient.query({
             query: `
               SELECT *
-              FROM evaluation_runs FINAL
+              FROM evaluation_runs
               WHERE TenantId = {tenantId:String}
                 AND TraceId IN ({traceIds:Array(String)})
+              ORDER BY EvaluationId, UpdatedAt DESC
+              LIMIT 1 BY TenantId, EvaluationId
             `,
             query_params: {
               tenantId: projectId,

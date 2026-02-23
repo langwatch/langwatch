@@ -127,7 +127,7 @@ async function getChTraceCount(
   const result = await clickhouse.query({
     query: `
       SELECT toString(count(DISTINCT TraceId)) AS Total
-      FROM trace_summaries FINAL
+      FROM trace_summaries
       WHERE TenantId IN ({projectIds:Array(String)})
     `,
     query_params: { projectIds },
@@ -190,9 +190,14 @@ async function getChScenariosCount(
   const result = await clickhouse.query({
     query: `
       SELECT toString(count()) AS Total
-      FROM simulation_runs FINAL
-      WHERE TenantId IN ({projectIds:Array(String)})
-        AND DeletedAt IS NULL
+      FROM (
+        SELECT *
+        FROM simulation_runs
+        WHERE TenantId IN ({projectIds:Array(String)})
+        ORDER BY ScenarioRunId, UpdatedAt DESC
+        LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+      )
+      WHERE DeletedAt IS NULL
     `,
     query_params: { projectIds },
     format: "JSONEachRow",

@@ -140,7 +140,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
             TopicId,
             SubTopicId,
             HasAnnotation
-          FROM ${TABLE_NAME} FINAL
+          FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
             AND TraceId = {traceId:String}
           ORDER BY LastUpdatedAt DESC

@@ -122,7 +122,7 @@ export class EvaluationRunClickHouseRepository
             toUnixTimestamp64Milli(CompletedAt) AS CompletedAt,
             CostId,
             LastProcessedEventId
-          FROM ${TABLE_NAME} FINAL
+          FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
             AND EvaluationId = {evaluationId:String}
           ORDER BY UpdatedAt DESC
