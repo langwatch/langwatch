@@ -211,9 +211,12 @@ export const projectRouter = createTRPCRouter({
             ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
           capturedOutputVisibility:
             ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
-          featureEventSourcingTraceIngestion: Boolean(env.IS_SAAS),
-          featureEventSourcingEvaluationIngestion: Boolean(env.IS_SAAS),
+          featureClickHouseDataSourceSimulations: Boolean(env.IS_SAAS),
+          featureClickHouseDataSourceEvaluations: Boolean(env.IS_SAAS),
+          featureClickHouseDataSourceTraces: Boolean(env.IS_SAAS),
           featureEventSourcingSimulationIngestion: Boolean(env.IS_SAAS),
+          featureEventSourcingEvaluationIngestion: Boolean(env.IS_SAAS),
+          featureEventSourcingTraceIngestion: Boolean(env.IS_SAAS),
         },
       });
 
