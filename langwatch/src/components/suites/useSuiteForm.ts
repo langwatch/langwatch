@@ -3,7 +3,8 @@
  *
  * Uses react-hook-form + Zod validation, following the ScenarioForm pattern.
  * Error dismissal on typing is handled natively by react-hook-form's
- * mode: "onChange" revalidation after first submit.
+ * default reValidateMode ("onChange"), which re-checks fields on change
+ * after the first failed submit.
  *
  * Separated from SuiteFormDrawer to keep the drawer a thin UI orchestrator.
  */
