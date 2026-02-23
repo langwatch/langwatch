@@ -45,7 +45,6 @@ const defaultProps = {
   suites: [] as SimulationSuite[],
   selectedSuiteId: null,
   onSelectSuite: vi.fn(),
-  onNewSuite: vi.fn(),
   onRunSuite: vi.fn(),
   onContextMenu: vi.fn(),
 };
@@ -63,14 +62,6 @@ describe("<SuiteSidebar/>", () => {
       });
 
       expect(screen.getByText("No suites yet")).toBeInTheDocument();
-    });
-
-    it("displays the + New Suite button", () => {
-      render(<SuiteSidebar {...defaultProps} suites={[]} />, {
-        wrapper: Wrapper,
-      });
-
-      expect(screen.getByText("New Suite")).toBeInTheDocument();
     });
 
     it("displays the All Runs link", () => {
@@ -220,21 +211,6 @@ describe("<SuiteSidebar/>", () => {
 
         expect(screen.getByText("No matching suites")).toBeInTheDocument();
       });
-    });
-  });
-
-  describe("when + New Suite button is clicked", () => {
-    it("calls onNewSuite", async () => {
-      const user = userEvent.setup();
-      const onNewSuite = vi.fn();
-
-      render(
-        <SuiteSidebar {...defaultProps} onNewSuite={onNewSuite} />,
-        { wrapper: Wrapper },
-      );
-
-      await user.click(screen.getByText("New Suite"));
-      expect(onNewSuite).toHaveBeenCalledOnce();
     });
   });
 
@@ -451,7 +427,7 @@ describe("<SuiteSidebar/>", () => {
         { wrapper: Wrapper },
       );
 
-      const allRunsContainer = screen.getByText("All Runs").closest("button, [role=group]")!;
+      const allRunsContainer = screen.getByText("All Runs").closest("button, .group")!;
       expect(allRunsContainer).not.toBeNull();
       expect(allRunsContainer!.textContent).not.toMatch(/passed/);
     });
@@ -471,7 +447,7 @@ describe("<SuiteSidebar/>", () => {
           { wrapper: Wrapper },
         );
 
-        const suiteItem = screen.getByText("Critical Path").closest("[role=group]")!;
+        const suiteItem = screen.getByText("Critical Path").closest(".group")!;
         await user.hover(suiteItem);
 
         expect(screen.getByTestId("suite-menu-button")).toBeInTheDocument();
@@ -504,7 +480,7 @@ describe("<SuiteSidebar/>", () => {
           { wrapper: Wrapper },
         );
 
-        const suiteItem = screen.getByText("Critical Path").closest("[role=group]")!;
+        const suiteItem = screen.getByText("Critical Path").closest(".group")!;
         await user.hover(suiteItem);
 
         const menuButton = screen.getByTestId("suite-menu-button");

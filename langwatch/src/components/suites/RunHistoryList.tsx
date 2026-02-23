@@ -17,7 +17,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { parseSuiteTargets } from "~/server/suites/types";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
 import { api } from "~/utils/api";
-import { formatTimeAgo } from "~/utils/formatTimeAgo";
+import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { buildRoutePath } from "~/utils/routes";
 import { RunHistoryFilters } from "./RunHistoryFilters";
 import { RunHistoryFooter } from "./RunHistoryFooter";
@@ -372,7 +372,7 @@ export function RunHistoryList({ suite, onStatsReady }: RunHistoryListProps) {
       {lastActivityTimestamp && (
         <Box paddingX={6} paddingBottom={3}>
           <Text fontSize="xs" color="fg.muted">
-            {formatTimeAgo(lastActivityTimestamp)}
+            {formatTimeAgoCompact(lastActivityTimestamp)}
           </Text>
         </Box>
       )}

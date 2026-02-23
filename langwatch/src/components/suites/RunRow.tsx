@@ -7,7 +7,7 @@
 
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { CheckCircle, ChevronDown, ChevronRight, XCircle, Loader } from "lucide-react";
-import { formatTimeAgo } from "~/utils/formatTimeAgo";
+import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { BatchRun, BatchRunSummary } from "./run-history-transforms";
 import { ScenarioTargetRow } from "./ScenarioTargetRow";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
@@ -43,7 +43,7 @@ export function RunRow({
   expectedJobCount,
   suiteName,
 }: RunRowProps) {
-  const timeAgo = formatTimeAgo(batchRun.timestamp);
+  const timeAgo = formatTimeAgoCompact(batchRun.timestamp);
 
   return (
     <Box
@@ -81,19 +81,8 @@ export function RunRow({
             </Text>
           </>
         )}
-        <Text fontSize="sm" color="fg.muted">
+        <Text fontSize="xs" color="fg.subtle">
           {timeAgo}
-        </Text>
-        <Text fontSize="sm" color="fg.muted">
-          &middot;
-        </Text>
-        <OverallStatusIcon summary={summary} />
-        <Text
-          fontSize="sm"
-          fontWeight="medium"
-          color={summary.failedCount > 0 ? "red.600" : "green.600"}
-        >
-          {Math.round(summary.passRate)}%
         </Text>
         {expectedJobCount != null && summary.totalCount < expectedJobCount && (
           <Text fontSize="xs" color="fg.muted">
@@ -101,8 +90,13 @@ export function RunRow({
           </Text>
         )}
         <Box flex={1} />
-        <Text fontSize="xs" color="fg.muted">
-          Manual
+        <OverallStatusIcon summary={summary} />
+        <Text
+          fontSize="sm"
+          fontWeight="medium"
+          color={summary.failedCount > 0 ? "red.600" : "green.600"}
+        >
+          {Math.round(summary.passRate)}%
         </Text>
       </HStack>
 

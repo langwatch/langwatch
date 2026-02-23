@@ -160,7 +160,6 @@ describe("Suites Page Layout (Issue #1671)", () => {
           suites={suites}
           selectedSuiteId={null}
           onSelectSuite={vi.fn()}
-          onNewSuite={vi.fn()}
           onRunSuite={vi.fn()}
           onContextMenu={vi.fn()}
         />,

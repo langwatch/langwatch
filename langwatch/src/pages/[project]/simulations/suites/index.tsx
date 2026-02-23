@@ -6,9 +6,10 @@
  * Layout: sidebar (search, +New Suite, All Runs, suite list) + main panel.
  */
 
-import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Plus } from "lucide-react";
 import type { SimulationSuite } from "@prisma/client";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { AllRunsPanel } from "~/components/suites/AllRunsPanel";
@@ -17,7 +18,9 @@ import {
   SuiteDetailPanel,
   SuiteEmptyState,
 } from "~/components/suites/SuiteDetailPanel";
-import { SuiteSidebar } from "~/components/suites/SuiteSidebar";
+import { SuiteSidebar, type SuiteRunSummary } from "~/components/suites/SuiteSidebar";
+import { groupRunsByBatchId, computeBatchRunSummary } from "~/components/suites/run-history-transforms";
+import { extractSuiteId, isSuiteSetId } from "~/server/suites/suite-set-id";
 import {
   DialogRoot,
   DialogContent,
@@ -56,6 +59,48 @@ function SuitesPageContent() {
     { projectId: project?.id ?? "" },
     { enabled: !!project },
   );
+
+  const { data: allRunData } = api.scenarios.getAllSuiteRunData.useQuery(
+    { projectId: project?.id ?? "", limit: 100 },
+    { enabled: !!project, refetchInterval: 5000 },
+  );
+
+  const runSummaries = useMemo(() => {
+    if (!allRunData) return undefined;
+    const map = new Map<string, SuiteRunSummary>();
+
+    // Group runs by suite: scenarioSetIds maps batchRunId → scenarioSetId
+    const runsBySuite = new Map<string, typeof allRunData.runs>();
+    for (const run of allRunData.runs) {
+      const scenarioSetId = allRunData.scenarioSetIds[run.batchRunId];
+      if (!scenarioSetId || !isSuiteSetId(scenarioSetId)) continue;
+      const suiteId = extractSuiteId(scenarioSetId);
+      if (!suiteId) continue;
+
+      const existing = runsBySuite.get(suiteId);
+      if (existing) {
+        existing.push(run);
+      } else {
+        runsBySuite.set(suiteId, [run]);
+      }
+    }
+
+    // For each suite, get the most recent batch run and compute its summary
+    for (const [suiteId, runs] of runsBySuite) {
+      const batchRuns = groupRunsByBatchId({ runs });
+      const latestBatch = batchRuns[0]; // already sorted by timestamp desc
+      if (!latestBatch) continue;
+
+      const summary = computeBatchRunSummary({ batchRun: latestBatch });
+      map.set(suiteId, {
+        passedCount: summary.passedCount,
+        totalCount: summary.totalCount,
+        lastRunTimestamp: latestBatch.timestamp,
+      });
+    }
+
+    return map;
+  }, [allRunData]);
 
   const selectedSuite = typeof selectedSuiteId === "string" && selectedSuiteId !== "all-runs"
     ? suites?.find((s) => s.id === selectedSuiteId) ?? null
@@ -195,7 +240,13 @@ function SuitesPageContent() {
   return (
     <DashboardLayout>
       <PageLayout.Header>
-        <PageLayout.Heading>Suites</PageLayout.Heading>
+        <HStack justify="space-between" align="center" w="full">
+          <PageLayout.Heading>Suites</PageLayout.Heading>
+          <Spacer />
+          <PageLayout.HeaderButton onClick={handleNewSuite}>
+            <Plus size={16} /> New Suite
+          </PageLayout.HeaderButton>
+        </HStack>
       </PageLayout.Header>
       <HStack w="full" flex={1} alignItems="stretch" gap={0} overflow="hidden">
         {/* Sidebar */}
@@ -207,8 +258,8 @@ function SuitesPageContent() {
           <SuiteSidebar
             suites={suites ?? []}
             selectedSuiteId={selectedSuiteId}
+            runSummaries={runSummaries}
             onSelectSuite={setSelectedSuiteId}
-            onNewSuite={handleNewSuite}
             onRunSuite={handleRunSuite}
             onContextMenu={handleContextMenu}
           />
