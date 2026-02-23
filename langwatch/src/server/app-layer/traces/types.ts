@@ -71,6 +71,8 @@ export const traceSummaryDataSchema = z.object({
   totalCompletionTokenCount: z.number().nullable(),
   outputFromRootSpan: z.boolean(),
   outputSpanEndTimeMs: z.number(),
+  blockedByGuardrail: z.boolean(),
+  satisfactionScore: z.number().nullable(),
   topicId: z.string().nullable(),
   subTopicId: z.string().nullable(),
   hasAnnotation: z.boolean().nullable(),

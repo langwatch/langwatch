@@ -216,18 +216,20 @@ async function fetchCountsFromClickHouse(
   projectId: string,
 ): Promise<TraceCounts> {
   const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const twelveMonthsAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
 
   const result = await clickhouse.query({
     query: `
       SELECT
         toString(count(DISTINCT TraceId)) AS total,
-        toString(countDistinctIf(TraceId, ComputedInput IS NOT NULL AND ComputedInput != '')) AS withInput,
+        toString(countDistinctIf(TraceId, length(ComputedInput) > 0)) AS withInput,
         toString(countDistinctIf(TraceId, OccurredAt >= fromUnixTimestamp64Milli({thirtyDaysAgo:UInt64}))) AS recent,
         toString(countDistinctIf(TraceId, TopicId IS NOT NULL AND TopicId != '')) AS assigned
       FROM trace_summaries FINAL
       WHERE TenantId = {tenantId:String}
+        AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})
     `,
-    query_params: { tenantId: projectId, thirtyDaysAgo },
+    query_params: { tenantId: projectId, thirtyDaysAgo, twelveMonthsAgo },
     format: "JSONEachRow",
   });
 

@@ -1,8 +1,10 @@
+import crypto from "crypto";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { EventUtils } from "../../event-sourcing/utils/event.utils";
 import { createLogger } from "~/utils/logger/server";
 import { CanonicalizeSpanAttributesService } from "./canonicalisation";
+import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
 import type {
   OtlpInstrumentationScope,
   OtlpResource,
@@ -76,6 +78,9 @@ export class SpanNormalizationPipelineService {
           this.canonicalizeSpanAttributes(normalizedSpan);
         normalizedSpan.spanAttributes = canonicalizedResult.attributes;
         normalizedSpan.events = canonicalizedResult.events;
+
+        // Enrich RAG contexts with document IDs
+        enrichRagContextIds(normalizedSpan);
 
         return normalizedSpan;
       },
@@ -232,4 +237,77 @@ export class SpanNormalizationPipelineService {
       events: result.events,
     };
   }
+}
+
+/**
+ * Extracts textual content from a RAG chunk content value.
+ * Mirrors `extractChunkTextualContent` from collector/rag.ts.
+ */
+function extractChunkTextualContent(object: unknown): string {
+  let content = object;
+  if (typeof content === "string") {
+    try {
+      content = JSON.parse(content);
+    } catch {
+      return (object as string).trim();
+    }
+  }
+  if (Array.isArray(content)) {
+    return content
+      .map(extractChunkTextualContent)
+      .filter((x) => x)
+      .join("\n")
+      .trim();
+  }
+  if (typeof content === "object" && content !== null) {
+    return JSON.stringify(content);
+  }
+  return "";
+}
+
+/** @internal Exported for unit testing */
+export function generateDocumentId(content: unknown): string {
+  return crypto
+    .createHash("md5")
+    .update(extractChunkTextualContent(content))
+    .digest("hex");
+}
+
+/**
+ * Enriches RAG context entries that lack a `document_id` by generating
+ * an MD5 hash from their content. Mutates the span attributes in-place.
+ */
+function enrichRagContextIds(span: NormalizedSpan): void {
+  const raw =
+    span.spanAttributes[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS] ??
+    span.spanAttributes[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS_LEGACY];
+  if (typeof raw !== "string") return;
+
+  let contexts: unknown[];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return;
+    contexts = parsed;
+  } catch {
+    return;
+  }
+
+  const allMissingIds = contexts.every(
+    (ctx) => !ctx || typeof ctx !== "object" || !("document_id" in ctx),
+  );
+  if (!allMissingIds) return;
+
+  const enriched = contexts.filter(Boolean).map((ctx) => {
+    const ctxObj = ctx as Record<string, unknown>;
+    return {
+      document_id: generateDocumentId(
+        ctxObj.content !== undefined ? ctxObj.content : ctx,
+      ),
+      content: ctxObj.content !== undefined ? ctxObj.content : ctx,
+    };
+  });
+
+  // Write back to the canonical attribute key
+  span.spanAttributes[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS] =
+    JSON.stringify(enriched);
 }

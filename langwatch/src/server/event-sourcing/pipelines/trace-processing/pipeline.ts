@@ -3,6 +3,7 @@ import { definePipeline } from "../../";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { AppendStore } from "../../projections/mapProjection.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
+import { AssignSatisfactionScoreCommand } from "./commands/assignSatisfactionScoreCommand";
 import { AssignTopicCommand } from "./commands/assignTopicCommand";
 import { RecordSpanCommand } from "./commands/recordSpanCommand";
 import { createSpanStorageMapProjection } from "./projections/spanStorage.mapProjection";
@@ -15,6 +16,7 @@ export interface TraceProcessingPipelineDeps {
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
   evaluationTriggerReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   traceUpdateBroadcastReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+  satisfactionScoreReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
 }
 
 /**
@@ -36,7 +38,9 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
     }))
     .withReactor("traceSummary", "evaluationTrigger", deps.evaluationTriggerReactor)
     .withReactor("traceSummary", "traceUpdateBroadcast", deps.traceUpdateBroadcastReactor)
+    .withReactor("traceSummary", "satisfactionScore", deps.satisfactionScoreReactor)
     .withCommand("recordSpan", RecordSpanCommand)
     .withCommand("assignTopic", AssignTopicCommand)
+    .withCommand("assignSatisfactionScore", AssignSatisfactionScoreCommand)
     .build();
 }

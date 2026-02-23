@@ -17,6 +17,7 @@ export class App {
   readonly simulations: AppCommands["simulations"];
   readonly organizations: AppDependencies["organizations"];
   readonly projects: AppDependencies["projects"];
+  readonly tokenizer: AppDependencies["tokenizer"];
   readonly usage: AppDependencies["usage"];
 
   /** Keeps EventSourcing infrastructure safe from the greedy garbage men */
@@ -30,6 +31,7 @@ export class App {
     this.config = deps.config;
     this.organizations = deps.organizations;
     this.projects = deps.projects;
+    this.tokenizer = deps.tokenizer;
     this.usage = deps.usage;
     this.broadcast = deps.broadcast;
     this.traces = { ...deps.traces, ...deps.commands.traces };

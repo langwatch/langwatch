@@ -159,6 +159,53 @@ describe("applySpanToSummary cost computation", () => {
     });
   });
 
+  describe("when span is a guardrail with cost in output", () => {
+    it("extracts guardrail cost from langwatch.output JSON", () => {
+      const span = createTestSpan({
+        spanAttributes: {
+          "langwatch.span.type": "guardrail",
+          "langwatch.output": JSON.stringify({
+            passed: true,
+            cost: { amount: 0.0042, currency: "USD" },
+          }),
+        },
+      });
+
+      const result = applySpanToSummary(createInitState(), span);
+
+      expect(result.totalCost).toBeCloseTo(0.0042, 6);
+    });
+
+    it("ignores guardrail cost when currency is not USD", () => {
+      const span = createTestSpan({
+        spanAttributes: {
+          "langwatch.span.type": "guardrail",
+          "langwatch.output": JSON.stringify({
+            passed: true,
+            cost: { amount: 0.0042, currency: "EUR" },
+          }),
+        },
+      });
+
+      const result = applySpanToSummary(createInitState(), span);
+
+      expect(result.totalCost).toBeNull();
+    });
+
+    it("ignores guardrail cost when output is not valid JSON", () => {
+      const span = createTestSpan({
+        spanAttributes: {
+          "langwatch.span.type": "guardrail",
+          "langwatch.output": "not-json",
+        },
+      });
+
+      const result = applySpanToSummary(createInitState(), span);
+
+      expect(result.totalCost).toBeNull();
+    });
+  });
+
   describe("when custom rates have only inputCostPerToken", () => {
     it("computes cost using only input rate", () => {
       const span = createTestSpan({
@@ -174,6 +221,66 @@ describe("applySpanToSummary cost computation", () => {
 
       // 100 * 0.00001 + 50 * 0 = 0.001
       expect(result.totalCost).toBeCloseTo(0.001, 6);
+    });
+  });
+});
+
+describe("applySpanToSummary guardrail blocking detection", () => {
+  let extractSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    extractSpy = vi.spyOn(
+      TraceIOExtractionService.prototype,
+      "extractRichIOFromSpan",
+    );
+    extractSpy.mockReturnValue(null);
+  });
+
+  afterEach(() => {
+    extractSpy.mockRestore();
+  });
+
+  describe("when guardrail span has passed=false", () => {
+    it("sets blockedByGuardrail to true", () => {
+      const span = createTestSpan({
+        spanAttributes: {
+          "langwatch.span.type": "guardrail",
+          "langwatch.output": JSON.stringify({ passed: false }),
+        },
+      });
+
+      const result = applySpanToSummary(createInitState(), span);
+
+      expect(result.blockedByGuardrail).toBe(true);
+    });
+  });
+
+  describe("when guardrail span has passed=true", () => {
+    it("keeps blockedByGuardrail as false", () => {
+      const span = createTestSpan({
+        spanAttributes: {
+          "langwatch.span.type": "guardrail",
+          "langwatch.output": JSON.stringify({ passed: true }),
+        },
+      });
+
+      const result = applySpanToSummary(createInitState(), span);
+
+      expect(result.blockedByGuardrail).toBe(false);
+    });
+  });
+
+  describe("when non-guardrail span is processed", () => {
+    it("does not set blockedByGuardrail", () => {
+      const span = createTestSpan({
+        spanAttributes: {
+          "langwatch.span.type": "llm",
+        },
+      });
+
+      const result = applySpanToSummary(createInitState(), span);
+
+      expect(result.blockedByGuardrail).toBe(false);
     });
   });
 });

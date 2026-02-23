@@ -33,3 +33,14 @@ export const assignTopicCommandDataSchema = z.object({
 });
 
 export type AssignTopicCommandData = z.infer<typeof assignTopicCommandDataSchema>;
+
+export const assignSatisfactionScoreCommandDataSchema = z.object({
+  tenantId: z.string(),
+  traceId: z.string(),
+  satisfactionScore: z.number(),
+  occurredAt: z.number(),
+});
+
+export type AssignSatisfactionScoreCommandData = z.infer<
+  typeof assignSatisfactionScoreCommandDataSchema
+>;

@@ -14,6 +14,8 @@ export const executeEvaluationCommandDataSchema = z.object({
   evaluatorName: z.string().optional(),
   isGuardrail: z.boolean().optional(),
   occurredAt: z.number(),
+  // Thread debouncing: when > 0, traces in the same thread share one dedup key
+  threadIdleTimeout: z.number().optional(),
   // Trace metadata passed from evaluationTrigger reactor
   threadId: z.string().optional(),
   userId: z.string().optional(),

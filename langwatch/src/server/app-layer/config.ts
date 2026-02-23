@@ -29,6 +29,9 @@ export interface AppConfig {
 
   // order to skip using redis, we can probably remove this in with app layer.
   skipRedis?: boolean;
+
+  // Tokenization
+  disableTokenization?: boolean;
 }
 
 /** Reads config from createEnvConfig() — the ONE place that owns the schema. */
@@ -47,5 +50,6 @@ export function createAppConfigFromEnv(overrides?: { processRole?: ProcessRole }
     processRole: overrides?.processRole,
     isSaas: env.IS_SAAS,
     skipRedis: env.SKIP_REDIS,
+    disableTokenization: process.env.DISABLE_TOKENIZATION === "true",
   };
 }

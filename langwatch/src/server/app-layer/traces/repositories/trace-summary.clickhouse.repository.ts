@@ -45,6 +45,8 @@ interface ClickHouseSummaryRecord {
   TotalCompletionTokenCount: number | null;
   OutputFromRootSpan: number;
   OutputSpanEndTimeMs: number;
+  BlockedByGuardrail: number;
+  SatisfactionScore: number | null;
   TopicId: string | null;
   SubTopicId: string | null;
   HasAnnotation: number | null;
@@ -133,6 +135,8 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
             TotalCompletionTokenCount,
             OutputFromRootSpan,
             OutputSpanEndTimeMs,
+            BlockedByGuardrail,
+            SatisfactionScore,
             TopicId,
             SubTopicId,
             HasAnnotation
@@ -185,6 +189,8 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       totalCompletionTokenCount: record.TotalCompletionTokenCount,
       outputFromRootSpan: !!record.OutputFromRootSpan,
       outputSpanEndTimeMs: Number(record.OutputSpanEndTimeMs),
+      blockedByGuardrail: !!record.BlockedByGuardrail,
+      satisfactionScore: record.SatisfactionScore,
       topicId: record.TopicId,
       subTopicId: record.SubTopicId,
       hasAnnotation:
@@ -229,6 +235,8 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       TotalCompletionTokenCount: data.totalCompletionTokenCount,
       OutputFromRootSpan: data.outputFromRootSpan ? 1 : 0,
       OutputSpanEndTimeMs: data.outputSpanEndTimeMs,
+      BlockedByGuardrail: data.blockedByGuardrail ? 1 : 0,
+      SatisfactionScore: data.satisfactionScore,
       TopicId: data.topicId,
       SubTopicId: data.subTopicId,
       HasAnnotation:

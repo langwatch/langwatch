@@ -7,6 +7,7 @@ import type { EvaluationRunService } from "./evaluations/evaluation-run.service"
 import type { OrganizationService } from "./organizations/organization.service";
 import type { ProjectService } from "./projects/project.service";
 import type { SpanStorageService } from "./traces/span-storage.service";
+import type { TokenizerService } from "./traces/tokenizer.service";
 import type { TraceSummaryService } from "./traces/trace-summary.service";
 import type { UsageService } from "./usage/usage.service";
 
@@ -25,6 +26,7 @@ export interface AppDependencies {
   };
   organizations: OrganizationService;
   projects: ProjectService;
+  tokenizer: TokenizerService;
   usage: UsageService;
   commands: AppCommands;
 

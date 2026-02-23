@@ -26,6 +26,7 @@ import { EvaluationRunStore } from "./pipelines/evaluation-processing/projection
 import { createExecuteEvaluationCommandClass } from "./pipelines/evaluation-processing/commands/executeEvaluation.command";
 import { createEvaluationEsSyncReactor } from "./pipelines/evaluation-processing/reactors/evaluationEsSync.reactor";
 import { createEvaluationTriggerReactor } from "./pipelines/trace-processing/reactors/evaluationTrigger.reactor";
+import { createSatisfactionScoreReactor } from "./pipelines/trace-processing/reactors/satisfactionScore.reactor";
 import { createTraceUpdateBroadcastReactor } from "./pipelines/trace-processing/reactors/traceUpdateBroadcast.reactor";
 import {
   ExperimentRunStateRepositoryClickHouse,
@@ -112,14 +113,38 @@ export class PipelineRegistry {
       hasRedis: !!this.deps.eventSourcing.redisConnection,
     });
 
-    return this.deps.eventSourcing.register(
+    // Mutable ref: the reactor closure captures this, we fill it after registration
+    const satisfactionCommandRef: {
+      dispatch: AppCommands["traces"]["assignSatisfactionScore"] | null;
+    } = { dispatch: null };
+
+    const satisfactionScoreReactor = createSatisfactionScoreReactor({
+      assignSatisfactionScore: (data) => {
+        if (!satisfactionCommandRef.dispatch) {
+          throw new Error(
+            "assignSatisfactionScore command not yet wired — pipeline not registered",
+          );
+        }
+        return satisfactionCommandRef.dispatch(data);
+      },
+      nlpServiceUrl: process.env.LANGWATCH_NLP_SERVICE,
+    });
+
+    const tracePipeline = this.deps.eventSourcing.register(
       createTraceProcessingPipeline({
         spanAppendStore: new SpanAppendStore(this.deps.traces.spans.repository),
         traceSummaryStore: new TraceSummaryStore(this.deps.traces.summary.repository),
         evaluationTriggerReactor,
         traceUpdateBroadcastReactor,
+        satisfactionScoreReactor,
       }),
     );
+
+    // Complete the wiring now that the pipeline is registered
+    satisfactionCommandRef.dispatch =
+      mapCommands(tracePipeline.commands).assignSatisfactionScore;
+
+    return tracePipeline;
   }
 
   private registerSimulationPipeline() {

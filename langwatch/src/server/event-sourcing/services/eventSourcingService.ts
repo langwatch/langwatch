@@ -1,7 +1,12 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import type { FeatureFlagServiceInterface } from "~/server/featureFlag";
+import { performance } from "node:perf_hooks";
 import { createLogger } from "~/utils/logger/server";
+import {
+  eventSourcingStoreDurationHistogram,
+  getEventSourcingEventsStoredCounter,
+} from "~/server/metrics";
 import type { AggregateType } from "../domain/aggregateType";
 import type { Event, Projection } from "../domain/types";
 import type { ProjectionRegistry } from "../projections/projectionRegistry";
@@ -178,6 +183,7 @@ export class EventSourcingService<
         },
       },
       async (span) => {
+        const storeStart = performance.now();
         EventUtils.validateTenantId(context, "storeEvents");
 
         // Pre-fetch traceparent once for the batch
@@ -262,6 +268,14 @@ export class EventSourcingService<
             );
           }
         }
+
+        // Record throughput and duration metrics
+        getEventSourcingEventsStoredCounter(this.pipelineName).inc(
+          enrichedEvents.length,
+        );
+        eventSourcingStoreDurationHistogram
+          .labels(this.pipelineName)
+          .observe(performance.now() - storeStart);
       },
     );
   }
