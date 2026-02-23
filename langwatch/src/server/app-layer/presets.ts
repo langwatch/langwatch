@@ -14,6 +14,7 @@ import { MonitorService } from "./monitors/monitor.service";
 import { OrganizationService } from "./organizations/organization.service";
 import { ProjectService } from "./projects/project.service";
 import { SpanStorageService } from "./traces/span-storage.service";
+import { TokenizerService } from "./traces/tokenizer.service";
 import { TraceSummaryService } from "./traces/trace-summary.service";
 import { UsageService } from "./usage/usage.service";
 
@@ -53,6 +54,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const projects = ProjectService.create(prisma);
   const usage = UsageService.create({ prisma, organizationService: organizations });
   const monitors = MonitorService.create(prisma);
+  const tokenizer = TokenizerService.create(config);
 
   const es = new EventSourcing({
     clickhouse: clickhouse ?? void 0,
@@ -112,6 +114,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     evaluations,
     organizations,
     projects,
+    tokenizer,
     usage,
     commands,
     _eventSourcing: es,
@@ -140,9 +143,10 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     },
     organizations: OrganizationService.create(null),
     projects: ProjectService.create(null),
+    tokenizer: TokenizerService.create({ disableTokenization: true }),
     usage: UsageService.create({ prisma: null, organizationService: OrganizationService.create(null) }),
     commands: {
-      traces: { recordSpan: noop, assignTopic: noop } as AppCommands["traces"],
+      traces: { recordSpan: noop, assignTopic: noop, assignSatisfactionScore: noop } as AppCommands["traces"],
       evaluations: {
         executeEvaluation: noop,
         startEvaluation: noop,
