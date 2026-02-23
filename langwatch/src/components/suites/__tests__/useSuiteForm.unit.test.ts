@@ -3,7 +3,7 @@
  *
  * Unit tests for the useSuiteForm hook.
  *
- * Tests validation logic, toggle actions, filtering, and buildFormData.
+ * Tests validation logic, toggle actions, filtering, and form data shape.
  */
 
 import { renderHook, act } from "@testing-library/react";
@@ -25,76 +25,100 @@ const baseParams = {
 
 describe("useSuiteForm()", () => {
   describe("given a fresh form in create mode", () => {
-    describe("when validate is called with empty fields", () => {
-      it("returns false and sets name error", () => {
+    describe("when validation is triggered with empty fields", () => {
+      it("produces a name error", async () => {
         const { result } = renderHook(() => useSuiteForm(baseParams));
 
-        let isValid: boolean;
-        act(() => {
-          isValid = result.current.validate();
+        let capturedErrors: Record<string, { message?: string }> = {};
+        await act(async () => {
+          await result.current.form.handleSubmit(
+            () => {},
+            (errors) => {
+              capturedErrors = errors;
+            },
+          )();
         });
 
-        expect(isValid!).toBe(false);
-        expect(result.current.errors.name).toBe("Name is required");
+        expect(capturedErrors.name?.message).toBe("Name is required");
       });
 
-      it("sets scenarios error when no scenarios selected", () => {
+      it("produces a scenarios error when no scenarios selected", async () => {
         const { result } = renderHook(() => useSuiteForm(baseParams));
 
         act(() => {
-          result.current.setName("Test Suite");
+          result.current.form.setValue("name", "Test Suite");
         });
 
-        act(() => {
-          result.current.validate();
+        let capturedErrors: Record<string, { message?: string }> = {};
+        await act(async () => {
+          await result.current.form.handleSubmit(
+            () => {},
+            (errors) => {
+              capturedErrors = errors;
+            },
+          )();
         });
 
-        expect(result.current.errors.scenarios).toBe(
+        expect(capturedErrors.selectedScenarioIds?.message).toBe(
           "At least one scenario is required",
         );
       });
 
-      it("sets targets error when no targets selected", () => {
+      it("produces a targets error when no targets selected", async () => {
         const { result } = renderHook(() => useSuiteForm(baseParams));
 
         act(() => {
-          result.current.setName("Test Suite");
+          result.current.form.setValue("name", "Test Suite");
         });
         act(() => {
           result.current.toggleScenario("scen_1");
         });
 
-        act(() => {
-          result.current.validate();
+        let capturedErrors: Record<string, { message?: string }> = {};
+        await act(async () => {
+          await result.current.form.handleSubmit(
+            () => {},
+            (errors) => {
+              capturedErrors = errors;
+            },
+          )();
         });
 
-        expect(result.current.errors.targets).toBe(
+        expect(capturedErrors.selectedTargets?.message).toBe(
           "At least one target is required",
         );
       });
     });
 
-    describe("when validate is called with all required fields filled", () => {
-      it("returns true with no errors", () => {
+    describe("when validation is triggered with all required fields filled", () => {
+      it("produces no errors", async () => {
         const { result } = renderHook(() => useSuiteForm(baseParams));
 
         act(() => {
-          result.current.setName("Test Suite");
+          result.current.form.setValue("name", "Test Suite");
         });
         act(() => {
           result.current.toggleScenario("scen_1");
         });
         act(() => {
-          result.current.toggleTarget({ type: "http", referenceId: "agent_1" });
+          result.current.toggleTarget({
+            type: "http",
+            referenceId: "agent_1",
+          });
         });
 
-        let isValid: boolean;
-        act(() => {
-          isValid = result.current.validate();
+        let submitCalled = false;
+        await act(async () => {
+          await result.current.form.handleSubmit(
+            () => {
+              submitCalled = true;
+            },
+            () => {},
+          )();
         });
 
-        expect(isValid!).toBe(true);
-        expect(Object.keys(result.current.errors)).toHaveLength(0);
+        expect(submitCalled).toBe(true);
+        expect(result.current.form.formState.errors).toEqual({});
       });
     });
   });
@@ -165,7 +189,10 @@ describe("useSuiteForm()", () => {
         const { result } = renderHook(() => useSuiteForm(baseParams));
 
         act(() => {
-          result.current.toggleTarget({ type: "http", referenceId: "agent_1" });
+          result.current.toggleTarget({
+            type: "http",
+            referenceId: "agent_1",
+          });
         });
 
         expect(result.current.selectedTargets).toEqual([
@@ -180,10 +207,16 @@ describe("useSuiteForm()", () => {
         const { result } = renderHook(() => useSuiteForm(baseParams));
 
         act(() => {
-          result.current.toggleTarget({ type: "http", referenceId: "agent_1" });
+          result.current.toggleTarget({
+            type: "http",
+            referenceId: "agent_1",
+          });
         });
         act(() => {
-          result.current.toggleTarget({ type: "http", referenceId: "agent_1" });
+          result.current.toggleTarget({
+            type: "http",
+            referenceId: "agent_1",
+          });
         });
 
         expect(result.current.selectedTargets).toEqual([]);
@@ -236,67 +269,52 @@ describe("useSuiteForm()", () => {
     });
   });
 
-  describe("given buildFormData", () => {
-    describe("when called with valid state", () => {
+  describe("given form data via getValues", () => {
+    describe("when form fields are populated", () => {
       it("returns correctly shaped form data", () => {
         const { result } = renderHook(() => useSuiteForm(baseParams));
 
         act(() => {
-          result.current.setName("  My Suite  ");
+          result.current.form.setValue("name", "  My Suite  ");
         });
         act(() => {
-          result.current.setDescription("  Suite description  ");
+          result.current.form.setValue("description", "  Suite description  ");
         });
         act(() => {
           result.current.toggleScenario("scen_1");
         });
         act(() => {
-          result.current.toggleTarget({ type: "http", referenceId: "agent_1" });
+          result.current.toggleTarget({
+            type: "http",
+            referenceId: "agent_1",
+          });
         });
 
-        const data = result.current.buildFormData({ projectId: "proj_1" });
+        const data = result.current.form.getValues();
 
         expect(data).toEqual({
-          projectId: "proj_1",
-          name: "My Suite",
-          description: "Suite description",
-          scenarioIds: ["scen_1"],
-          targets: [{ type: "http", referenceId: "agent_1" }],
+          name: "  My Suite  ",
+          description: "  Suite description  ",
+          selectedScenarioIds: ["scen_1"],
+          selectedTargets: [{ type: "http", referenceId: "agent_1" }],
           repeatCount: 1,
           labels: [],
         });
       });
     });
 
-    describe("when repeatCountStr is set to a custom value", () => {
-      it("parses repeatCount as a number with minimum of 1", () => {
+    describe("when repeatCount is set to a custom value", () => {
+      it("stores repeatCount as a number", () => {
         const { result } = renderHook(() => useSuiteForm(baseParams));
 
         act(() => {
-          result.current.setName("Suite");
+          result.current.form.setValue("name", "Suite");
         });
         act(() => {
-          result.current.setRepeatCountStr("5");
+          result.current.form.setValue("repeatCount", 5);
         });
 
-        const data = result.current.buildFormData({ projectId: "proj_1" });
-        expect(data.repeatCount).toBe(5);
-      });
-    });
-
-    describe("when repeatCountStr is invalid", () => {
-      it("defaults repeatCount to 1", () => {
-        const { result } = renderHook(() => useSuiteForm(baseParams));
-
-        act(() => {
-          result.current.setName("Suite");
-        });
-        act(() => {
-          result.current.setRepeatCountStr("abc");
-        });
-
-        const data = result.current.buildFormData({ projectId: "proj_1" });
-        expect(data.repeatCount).toBe(1);
+        expect(result.current.form.getValues("repeatCount")).toBe(5);
       });
     });
   });
@@ -383,7 +401,10 @@ describe("useSuiteForm()", () => {
         const { result } = renderHook(() => useSuiteForm(baseParams));
 
         act(() => {
-          result.current.toggleTarget({ type: "http", referenceId: "agent_1" });
+          result.current.toggleTarget({
+            type: "http",
+            referenceId: "agent_1",
+          });
         });
 
         expect(result.current.staleTargetIds).toEqual([]);
