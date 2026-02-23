@@ -245,8 +245,8 @@ async def execute_http_node(
     # Build headers
     headers = build_headers(config)
 
-    # Configure timeout (default 30 seconds)
-    timeout_seconds = (config.timeout_ms / 1000) if config.timeout_ms else 30.0
+    # Configure timeout (default 5 minutes for slow RAG agents)
+    timeout_seconds = (config.timeout_ms / 1000) if config.timeout_ms else 300.0
 
     try:
         async with httpx.AsyncClient(timeout=timeout_seconds) as client:
