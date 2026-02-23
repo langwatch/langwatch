@@ -25,15 +25,28 @@ const getImportedModelCosts = () => {
       // Make vendor prefix optional in regex (e.g., both "gpt-4o" and "openai/gpt-4o" should match)
       const hasVendorPrefix = modelId.includes("/");
       const vendorPrefix = hasVendorPrefix ? modelId.split("/")[0] : null;
-      const modelName = hasVendorPrefix ? modelId.split("/").slice(1).join("/") : modelId;
+      const modelName = hasVendorPrefix
+        ? modelId.split("/").slice(1).join("/")
+        : modelId;
 
       const escapedModelName = escapeStringRegexp(modelName)
+        // Convert any hex-escaped hyphens (\x2d) to literal hyphens for readability
         .replaceAll("\\x2d", "-")
+        // Also convert escaped hyphens (\-) to literal hyphens since they don't need escaping outside character classes
+        .replaceAll("\\-", "-")
         // Fix for langchain using vertexai while litellm uses vertex_ai
-        .replace("vertex_ai", "(vertex_ai|vertexai)");
+        .replace("vertex_ai", "(vertex_ai|vertexai)")
+        // Allow version numbers to use either dots or hyphens (e.g., "4.6" or "4-6")
+        .replaceAll("\\.", "[.-]");
+
+      const escapedVendorPrefix = hasVendorPrefix
+        ? escapeStringRegexp(vendorPrefix!)
+            .replaceAll("\\x2d", "-")
+            .replaceAll("\\-", "-")
+        : "";
 
       const regex = hasVendorPrefix
-        ? `^(${escapeStringRegexp(vendorPrefix!)}\\/)?${escapedModelName}$`
+        ? `^(${escapedVendorPrefix}\\/)?${escapedModelName}$`
         : `^${escapedModelName}$`;
 
       tokenModels[modelId] = {
