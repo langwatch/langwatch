@@ -14,7 +14,11 @@ import {
   TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
 } from "../schemas/constants";
 import type { TraceProcessingEvent } from "../schemas/events";
-import { isSpanReceivedEvent, isTopicAssignedEvent } from "../schemas/events";
+import {
+  isSpanReceivedEvent,
+  isSatisfactionScoreAssignedEvent,
+  isTopicAssignedEvent,
+} from "../schemas/events";
 import type { NormalizedSpan } from "../schemas/spans";
 import { NormalizedStatusCode as StatusCode } from "../schemas/spans";
 import { SpanNormalizationPipelineService } from "~/server/app-layer/traces/span-normalization.service";
@@ -140,6 +144,31 @@ function extractTokenMetricsFromSpan(span: NormalizedSpan): SpanTokenMetrics {
     const spanCost = attrs[ATTR_KEYS.LANGWATCH_SPAN_COST];
     if (typeof spanCost === "number" && spanCost > 0) {
       cost = spanCost;
+    }
+  }
+
+  // Guardrail cost: extract from langwatch.output JSON when span is a guardrail
+  if (cost === 0) {
+    const spanType = attrs[ATTR_KEYS.SPAN_TYPE];
+    if (spanType === "guardrail") {
+      const rawOutput = attrs[ATTR_KEYS.LANGWATCH_OUTPUT];
+      if (typeof rawOutput === "string") {
+        try {
+          const parsed = JSON.parse(rawOutput) as Record<string, unknown>;
+          const costObj = parsed.cost as
+            | { amount?: number; currency?: string }
+            | undefined;
+          if (
+            costObj &&
+            typeof costObj.amount === "number" &&
+            costObj.currency === "USD"
+          ) {
+            cost = costObj.amount;
+          }
+        } catch {
+          // Ignore parse errors
+        }
+      }
     }
   }
 
@@ -409,6 +438,22 @@ export function applySpanToSummary(
   const spanType = span.spanAttributes[ATTR_KEYS.SPAN_TYPE];
   const isExcludedType = spanType === "evaluation" || spanType === "guardrail";
 
+  // Detect guardrail blocking
+  let blockedByGuardrail = state.blockedByGuardrail;
+  if (spanType === "guardrail") {
+    const rawOutput = span.spanAttributes[ATTR_KEYS.LANGWATCH_OUTPUT];
+    if (typeof rawOutput === "string") {
+      try {
+        const parsed = JSON.parse(rawOutput) as Record<string, unknown>;
+        if (parsed.passed === false) {
+          blockedByGuardrail = true;
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    }
+  }
+
   let computedInput = state.computedInput;
   let computedOutput = state.computedOutput;
   let outputFromRoot = state.outputFromRootSpan;
@@ -476,6 +521,7 @@ export function applySpanToSummary(
     timeToFirstTokenMs: timeToFirstTokenMs,
     timeToLastTokenMs: timeToLastTokenMs,
     tokensPerSecond: tokensPerSecond,
+    blockedByGuardrail: blockedByGuardrail,
     attributes: mergedAttributes,
   };
 }
@@ -520,6 +566,8 @@ export function createTraceSummaryFoldProjection({
         totalCompletionTokenCount: null,
         outputFromRootSpan: false,
         outputSpanEndTimeMs: 0,
+        blockedByGuardrail: false,
+        satisfactionScore: null,
         topicId: null,
         subTopicId: null,
         hasAnnotation: null,
@@ -557,6 +605,14 @@ export function createTraceSummaryFoldProjection({
           ...state,
           topicId: event.data.topicId ?? state.topicId,
           subTopicId: event.data.subtopicId ?? state.subTopicId,
+          lastUpdatedAt: event.timestamp,
+        };
+      }
+
+      if (isSatisfactionScoreAssignedEvent(event)) {
+        return {
+          ...state,
+          satisfactionScore: event.data.satisfactionScore,
           lastUpdatedAt: event.timestamp,
         };
       }
