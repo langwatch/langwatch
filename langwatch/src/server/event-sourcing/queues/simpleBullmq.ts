@@ -1,11 +1,10 @@
 import {
-	type Job,
-	type JobsOptions,
-  type BulkJobOptions,
-	Queue,
-	type QueueOptions,
-	Worker,
-	type WorkerOptions,
+  type Job,
+  type JobsOptions,
+  Queue,
+  type QueueOptions,
+  Worker,
+  type WorkerOptions
 } from "bullmq";
 import { BullMQOtel } from "bullmq-otel";
 import type IORedis from "ioredis";
@@ -13,26 +12,26 @@ import type { Cluster } from "ioredis";
 import type { SemConvAttributes } from "langwatch/observability";
 import { createLogger } from "../../../utils/logger/server";
 import {
-	type JobContextMetadata,
-	getJobContextMetadata,
+  type JobContextMetadata,
+  getJobContextMetadata,
 } from "../../context/asyncContext";
 import { connection } from "../../redis";
 import type {
-	DeduplicationConfig,
-	EventSourcedQueueDefinition,
-	EventSourcedQueueProcessor,
+  DeduplicationConfig,
+  EventSourcedQueueDefinition,
+  EventSourcedQueueProcessor,
 } from "../queues";
 import {
-	ConfigurationError,
-	QueueError,
+  ConfigurationError,
+  QueueError,
 } from "../services/errorHandling";
 
 import { trace } from "@opentelemetry/api";
 import {
-	JOB_RETRY_CONFIG,
-	collectBullMQMetrics,
-	extractJobPayload,
-	processJobWithContext,
+  JOB_RETRY_CONFIG,
+  collectBullMQMetrics,
+  extractJobPayload,
+  processJobWithContext,
 } from "./shared";
 
 /**
@@ -40,7 +39,7 @@ import {
  */
 const SIMPLE_QUEUE_CONFIG = {
   /** Default concurrency */
-  defaultConcurrency: 20,
+  defaultConcurrency: 40,
   /** Interval for collecting queue metrics in milliseconds */
   metricsIntervalMs: 15000,
   /** Maximum time to wait for graceful shutdown in milliseconds */
