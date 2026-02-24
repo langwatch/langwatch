@@ -260,6 +260,34 @@ export function computeGroupSummary({
   };
 }
 
+const MAX_DISPLAYED_SCENARIO_NAMES = 3;
+
+/**
+ * Extracts unique scenario display names from a batch run's scenario runs,
+ * sorted alphabetically. Falls back to scenarioId when name is null/undefined.
+ * Truncates to first 3 names with "+N more" format when there are more.
+ */
+export function getScenarioDisplayNames({
+  scenarioRuns,
+}: {
+  scenarioRuns: ScenarioRunData[];
+}): string {
+  if (scenarioRuns.length === 0) return "";
+
+  const uniqueNames = [
+    ...new Set(scenarioRuns.map((run) => run.name ?? run.scenarioId)),
+  ].sort((a, b) => a.localeCompare(b));
+
+  const displayed = uniqueNames.slice(0, MAX_DISPLAYED_SCENARIO_NAMES);
+  const remaining = uniqueNames.length - displayed.length;
+
+  if (remaining > 0) {
+    return `${displayed.join(", ")} +${remaining} more`;
+  }
+
+  return displayed.join(", ");
+}
+
 /**
  * Computes aggregate totals across all batch runs.
  */

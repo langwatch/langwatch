@@ -6,6 +6,7 @@ import {
   computeBatchRunSummary,
   computeRunHistoryTotals,
   computeSuiteRunSummaries,
+  getScenarioDisplayNames,
   type BatchRun,
   type RunGroup,
 } from "../run-history-transforms";
@@ -622,6 +623,97 @@ describe("computeSuiteRunSummaries()", () => {
       const result = computeSuiteRunSummaries({ runs, scenarioSetIds });
 
       expect(result.size).toBe(0);
+    });
+  });
+});
+
+describe("getScenarioDisplayNames()", () => {
+  describe("when given scenario runs with duplicate names", () => {
+    it("returns unique sorted names", () => {
+      const scenarioRuns = [
+        makeScenarioRunData({ name: "Login Flow", scenarioRunId: "r1" }),
+        makeScenarioRunData({ name: "Checkout Flow", scenarioRunId: "r2" }),
+        makeScenarioRunData({ name: "Login Flow", scenarioRunId: "r3" }),
+      ];
+
+      const result = getScenarioDisplayNames({ scenarioRuns });
+      expect(result).toBe("Checkout Flow, Login Flow");
+    });
+  });
+
+  describe("when a scenario run has null name", () => {
+    it("falls back to scenarioId", () => {
+      const scenarioRuns = [
+        makeScenarioRunData({
+          name: null,
+          scenarioId: "scenario-abc",
+          scenarioRunId: "r1",
+        }),
+      ];
+
+      const result = getScenarioDisplayNames({ scenarioRuns });
+      expect(result).toBe("scenario-abc");
+    });
+  });
+
+  describe("when a scenario run has undefined name", () => {
+    it("falls back to scenarioId", () => {
+      const scenarioRuns = [
+        makeScenarioRunData({
+          name: undefined,
+          scenarioId: "scenario-xyz",
+          scenarioRunId: "r1",
+        }),
+      ];
+
+      const result = getScenarioDisplayNames({ scenarioRuns });
+      expect(result).toBe("scenario-xyz");
+    });
+  });
+
+  describe("when there are more than 3 unique names", () => {
+    it("truncates to first 3 with +N more", () => {
+      const scenarioRuns = [
+        makeScenarioRunData({ name: "Alpha", scenarioRunId: "r1" }),
+        makeScenarioRunData({ name: "Beta", scenarioRunId: "r2" }),
+        makeScenarioRunData({ name: "Gamma", scenarioRunId: "r3" }),
+        makeScenarioRunData({ name: "Delta", scenarioRunId: "r4" }),
+        makeScenarioRunData({ name: "Epsilon", scenarioRunId: "r5" }),
+      ];
+
+      const result = getScenarioDisplayNames({ scenarioRuns });
+      expect(result).toBe("Alpha, Beta, Delta +2 more");
+    });
+  });
+
+  describe("when there are exactly 3 unique names", () => {
+    it("displays all 3 without truncation", () => {
+      const scenarioRuns = [
+        makeScenarioRunData({ name: "Alpha", scenarioRunId: "r1" }),
+        makeScenarioRunData({ name: "Beta", scenarioRunId: "r2" }),
+        makeScenarioRunData({ name: "Gamma", scenarioRunId: "r3" }),
+      ];
+
+      const result = getScenarioDisplayNames({ scenarioRuns });
+      expect(result).toBe("Alpha, Beta, Gamma");
+    });
+  });
+
+  describe("when there are no scenario runs", () => {
+    it("returns an empty string", () => {
+      const result = getScenarioDisplayNames({ scenarioRuns: [] });
+      expect(result).toBe("");
+    });
+  });
+
+  describe("when there is a single scenario run", () => {
+    it("returns the single name", () => {
+      const scenarioRuns = [
+        makeScenarioRunData({ name: "Login Flow", scenarioRunId: "r1" }),
+      ];
+
+      const result = getScenarioDisplayNames({ scenarioRuns });
+      expect(result).toBe("Login Flow");
     });
   });
 });
