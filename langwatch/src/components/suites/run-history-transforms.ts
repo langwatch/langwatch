@@ -275,7 +275,7 @@ export function getScenarioDisplayNames({
   if (scenarioRuns.length === 0) return "";
 
   const uniqueNames = [
-    ...new Set(scenarioRuns.map((run) => run.name ?? run.scenarioId)),
+    ...new Set(scenarioRuns.map((run) => run.name || run.scenarioId)),
   ].sort((a, b) => a.localeCompare(b));
 
   const displayed = uniqueNames.slice(0, MAX_DISPLAYED_SCENARIO_NAMES);
