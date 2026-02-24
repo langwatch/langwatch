@@ -12,6 +12,7 @@ import {
   categorizeError,
   handleError,
 } from "../services/errorHandling";
+import type { ProcessRole } from "~/server/app-layer/config";
 import type { QueueManager } from "../services/queues/queueManager";
 import type {
   EventStoreReadContext,
@@ -52,7 +53,7 @@ export class ProjectionRouter<
     private readonly pipelineName: string,
     private readonly queueManager: QueueManager<EventType>,
     private readonly featureFlagService?: FeatureFlagServiceInterface,
-    private readonly processRole?: "web" | "worker",
+    private readonly processRole?: ProcessRole,
   ) {}
 
   registerFoldProjection(projection: FoldProjectionDefinition<any, EventType>): void {

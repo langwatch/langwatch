@@ -37,7 +37,7 @@ export function createBillingMeterDispatchReactor(deps: {
     },
 
     async handle(event, context) {
-      const orgId = await resolveOrganizationId(String(context.tenantId));
+      const orgId = await resolveOrganizationId(`${context.tenantId}`);
 
       if (!orgId) {
         logger.warn(
