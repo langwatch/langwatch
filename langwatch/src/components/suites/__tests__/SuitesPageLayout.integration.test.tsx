@@ -33,6 +33,18 @@ vi.mock("~/utils/api", () => ({
       },
       run: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
     },
+    scenarios: {
+      getAllSuiteRunData: {
+        useQuery: () => ({
+          data: { runs: [], scenarioSetIds: {}, hasMore: false, nextCursor: undefined },
+          isLoading: false,
+          error: null,
+        }),
+      },
+      getAll: {
+        useQuery: () => ({ data: [], isLoading: false, error: null }),
+      },
+    },
   },
 }));
 
@@ -51,6 +63,11 @@ vi.mock("~/hooks/useDrawer", () => ({
     openDrawer: vi.fn(),
     setFlowCallbacks: vi.fn(),
   }),
+}));
+
+// Mock AllRunsPanel to avoid deep server-side imports in jsdom
+vi.mock("~/components/suites/AllRunsPanel", () => ({
+  AllRunsPanel: () => <div data-testid="all-runs-panel">All Runs</div>,
 }));
 
 // Mock next/router
@@ -143,7 +160,6 @@ describe("Suites Page Layout (Issue #1671)", () => {
           suites={suites}
           selectedSuiteId={null}
           onSelectSuite={vi.fn()}
-          onNewSuite={vi.fn()}
           onRunSuite={vi.fn()}
           onContextMenu={vi.fn()}
         />,

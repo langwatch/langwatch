@@ -6,9 +6,10 @@
  * Layout: sidebar (search, +New Suite, All Runs, suite list) + main panel.
  */
 
-import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Plus } from "lucide-react";
 import type { SimulationSuite } from "@prisma/client";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { AllRunsPanel } from "~/components/suites/AllRunsPanel";
@@ -18,6 +19,7 @@ import {
   SuiteEmptyState,
 } from "~/components/suites/SuiteDetailPanel";
 import { SuiteSidebar } from "~/components/suites/SuiteSidebar";
+import { computeSuiteRunSummaries } from "~/components/suites/run-history-transforms";
 import {
   DialogRoot,
   DialogContent,
@@ -56,6 +58,19 @@ function SuitesPageContent() {
     { projectId: project?.id ?? "" },
     { enabled: !!project },
   );
+
+  const { data: allRunData } = api.scenarios.getAllSuiteRunData.useQuery(
+    { projectId: project?.id ?? "", limit: 100 },
+    { enabled: !!project, refetchInterval: 5000 },
+  );
+
+  const runSummaries = useMemo(() => {
+    if (!allRunData) return undefined;
+    return computeSuiteRunSummaries({
+      runs: allRunData.runs,
+      scenarioSetIds: allRunData.scenarioSetIds,
+    });
+  }, [allRunData]);
 
   const selectedSuite = typeof selectedSuiteId === "string" && selectedSuiteId !== "all-runs"
     ? suites?.find((s) => s.id === selectedSuiteId) ?? null
@@ -195,7 +210,13 @@ function SuitesPageContent() {
   return (
     <DashboardLayout>
       <PageLayout.Header>
-        <PageLayout.Heading>Suites</PageLayout.Heading>
+        <HStack justify="space-between" align="center" w="full">
+          <PageLayout.Heading>Suites</PageLayout.Heading>
+          <Spacer />
+          <PageLayout.HeaderButton onClick={handleNewSuite}>
+            <Plus size={16} /> New Suite
+          </PageLayout.HeaderButton>
+        </HStack>
       </PageLayout.Header>
       <HStack w="full" flex={1} alignItems="stretch" gap={0} overflow="hidden">
         {/* Sidebar */}
@@ -207,8 +228,8 @@ function SuitesPageContent() {
           <SuiteSidebar
             suites={suites ?? []}
             selectedSuiteId={selectedSuiteId}
+            runSummaries={runSummaries}
             onSelectSuite={setSelectedSuiteId}
-            onNewSuite={handleNewSuite}
             onRunSuite={handleRunSuite}
             onContextMenu={handleContextMenu}
           />

@@ -44,7 +44,15 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 }));
 
 vi.mock("~/utils/formatTimeAgo", () => ({
-  formatTimeAgo: (ts: number) => "2h ago",
+  formatTimeAgoCompact: (ts: number) => "2h ago",
+}));
+
+vi.mock("next/router", () => ({
+  useRouter: () => ({
+    query: {},
+    push: mockRouterPush,
+    isReady: true,
+  }),
 }));
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
