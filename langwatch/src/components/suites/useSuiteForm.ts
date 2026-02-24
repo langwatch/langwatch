@@ -1,16 +1,47 @@
 /**
  * Custom hook encapsulating all form state and logic for suite creation/editing.
  *
- * Manages: form fields, search/filter state, validation, derived lists,
- * toggle/select actions, and initialization from existing suite data.
+ * Uses react-hook-form + Zod validation, following the ScenarioForm pattern.
+ * Error dismissal on typing is handled natively by react-hook-form's
+ * default reValidateMode ("onChange"), which re-checks fields on change
+ * after the first failed submit.
  *
  * Separated from SuiteFormDrawer to keep the drawer a thin UI orchestrator.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useEffect, useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
-import { parseSuiteTargets, type SuiteTarget } from "~/server/suites/types";
+import {
+  parseSuiteTargets,
+  suiteTargetSchema,
+  type SuiteTarget,
+} from "~/server/suites/types";
 import type { SimulationSuite } from "@prisma/client";
+
+export const suiteFormSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  description: z.string(),
+  labels: z.array(z.string()),
+  selectedScenarioIds: z
+    .array(z.string())
+    .min(1, "At least one scenario is required"),
+  selectedTargets: z
+    .array(suiteTargetSchema)
+    .min(1, "At least one target is required"),
+  repeatCount: z.coerce
+    .number()
+    .int()
+    .min(1, `Repeat count must be between 1 and ${MAX_REPEAT_COUNT}`)
+    .max(
+      MAX_REPEAT_COUNT,
+      `Repeat count must be between 1 and ${MAX_REPEAT_COUNT}`,
+    ),
+});
+
+export type SuiteFormData = z.infer<typeof suiteFormSchema>;
 
 interface Scenario {
   id: string;
@@ -49,6 +80,15 @@ interface UseSuiteFormParams {
   prompts: Prompt[] | undefined;
 }
 
+const defaultValues: SuiteFormData = {
+  name: "",
+  description: "",
+  labels: [],
+  selectedScenarioIds: [],
+  selectedTargets: [],
+  repeatCount: 1,
+};
+
 export function useSuiteForm({
   suite,
   isOpen,
@@ -57,24 +97,24 @@ export function useSuiteForm({
   agents,
   prompts,
 }: UseSuiteFormParams) {
-  // -- Form state --
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [labels, setLabels] = useState<string[]>([]);
-  const [selectedScenarioIds, setSelectedScenarioIds] = useState<string[]>([]);
-  const [selectedTargets, setSelectedTargets] = useState<SuiteTarget[]>([]);
-  const [repeatCountStr, setRepeatCountStr] = useState("1");
-  const [executionOptionsOpen, setExecutionOptionsOpen] = useState(false);
+  const form = useForm<SuiteFormData>({
+    defaultValues,
+    resolver: zodResolver(suiteFormSchema),
+    mode: "onSubmit",
+  });
 
-  // -- Search state --
+  // -- UI state (not form data) --
+  const [executionOptionsOpen, setExecutionOptionsOpen] = useState(false);
   const [scenarioSearch, setScenarioSearch] = useState("");
   const [targetSearch, setTargetSearch] = useState("");
   const [activeLabelFilter, setActiveLabelFilter] = useState<string | null>(
     null,
   );
 
-  // -- Validation state --
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  // -- Watch form values for derived state --
+  const selectedScenarioIds = form.watch("selectedScenarioIds");
+  const selectedTargets = form.watch("selectedTargets");
+  const labels = form.watch("labels");
 
   // -- Derived: available targets from agents + prompts --
   const availableTargets = useMemo(() => {
@@ -145,21 +185,16 @@ export function useSuiteForm({
   // -- Initialize form for edit mode / reset for create mode --
   useEffect(() => {
     if (suite && isOpen) {
-      setName(suite.name);
-      setDescription(suite.description ?? "");
-      setLabels(suite.labels);
-      setSelectedScenarioIds(suite.scenarioIds);
-      setSelectedTargets(parseSuiteTargets(suite.targets));
-      setRepeatCountStr(String(suite.repeatCount));
-      setErrors({});
+      form.reset({
+        name: suite.name,
+        description: suite.description ?? "",
+        labels: suite.labels,
+        selectedScenarioIds: suite.scenarioIds,
+        selectedTargets: parseSuiteTargets(suite.targets),
+        repeatCount: suite.repeatCount,
+      });
     } else if (isOpen) {
-      setName("");
-      setDescription("");
-      setLabels([]);
-      setSelectedScenarioIds([]);
-      setSelectedTargets([]);
-      setRepeatCountStr("1");
-      setErrors({});
+      form.reset(defaultValues);
       setScenarioSearch("");
       setTargetSearch("");
       setActiveLabelFilter(null);
@@ -170,24 +205,25 @@ export function useSuiteForm({
   // -- Actions --
 
   const toggleScenario = (id: string) => {
-    setSelectedScenarioIds((prev) =>
-      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
-    );
+    const current = form.getValues("selectedScenarioIds");
+    const next = current.includes(id)
+      ? current.filter((s) => s !== id)
+      : [...current, id];
+    form.setValue("selectedScenarioIds", next);
   };
 
   const toggleTarget = (target: SuiteTarget) => {
-    setSelectedTargets((prev) => {
-      const exists = prev.some(
-        (t) => t.type === target.type && t.referenceId === target.referenceId,
-      );
-      if (exists) {
-        return prev.filter(
+    const current = form.getValues("selectedTargets");
+    const exists = current.some(
+      (t) => t.type === target.type && t.referenceId === target.referenceId,
+    );
+    const next = exists
+      ? current.filter(
           (t) =>
             !(t.type === target.type && t.referenceId === target.referenceId),
-        );
-      }
-      return [...prev, target];
-    });
+        )
+      : [...current, target];
+    form.setValue("selectedTargets", next);
   };
 
   const isTargetSelected = (type: string, referenceId: string) =>
@@ -197,79 +233,48 @@ export function useSuiteForm({
 
   const selectAllScenarios = () => {
     if (filteredScenarios) {
-      setSelectedScenarioIds((prev) => {
-        const merged = new Set([...prev, ...filteredScenarios.map((s) => s.id)]);
-        return Array.from(merged);
-      });
+      const current = form.getValues("selectedScenarioIds");
+      const merged = new Set([
+        ...current,
+        ...filteredScenarios.map((s) => s.id),
+      ]);
+      form.setValue("selectedScenarioIds", Array.from(merged));
     }
   };
 
   const clearScenarios = () => {
-    setSelectedScenarioIds([]);
+    form.setValue("selectedScenarioIds", []);
   };
 
   const addLabel = (label: string) => {
-    if (label && !labels.includes(label)) {
-      setLabels((prev) => [...prev, label]);
+    const current = form.getValues("labels");
+    if (label && !current.includes(label)) {
+      form.setValue("labels", [...current, label]);
     }
   };
 
   const removeLabel = (label: string) => {
-    setLabels((prev) => prev.filter((l) => l !== label));
+    const current = form.getValues("labels");
+    form.setValue(
+      "labels",
+      current.filter((l) => l !== label),
+    );
   };
 
-  const validate = useCallback((): boolean => {
-    const newErrors: Record<string, string> = {};
-    if (!name.trim()) {
-      newErrors.name = "Name is required";
-    }
-    if (selectedScenarioIds.length === 0) {
-      newErrors.scenarios = "At least one scenario is required";
-    }
-    if (selectedTargets.length === 0) {
-      newErrors.targets = "At least one target is required";
-    }
-    const parsedRepeat = parseInt(repeatCountStr, 10);
-    if (isNaN(parsedRepeat) || parsedRepeat < 1 || parsedRepeat > MAX_REPEAT_COUNT) {
-      newErrors.repeatCount = `Repeat count must be between 1 and ${MAX_REPEAT_COUNT}`;
-    }
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  }, [name, selectedScenarioIds, selectedTargets, repeatCountStr]);
-
-  const buildFormData = useCallback(
-    ({ projectId }: { projectId: string }) => {
-      const repeatCount = Math.min(MAX_REPEAT_COUNT, Math.max(1, parseInt(repeatCountStr, 10) || 1));
-      return {
-        projectId,
-        name: name.trim(),
-        description: description.trim() || undefined,
-        scenarioIds: selectedScenarioIds,
-        targets: selectedTargets,
-        repeatCount,
-        labels,
-      };
-    },
-    [name, description, selectedScenarioIds, selectedTargets, repeatCountStr, labels],
-  );
-
   return {
-    // Form fields
-    name,
-    setName,
-    description,
-    setDescription,
+    // react-hook-form instance
+    form,
+
+    // Form field values (watched)
     labels,
-    setLabels,
-    addLabel,
-    removeLabel,
-    repeatCountStr,
-    setRepeatCountStr,
+    selectedScenarioIds,
+    selectedTargets,
+
+    // UI state
     executionOptionsOpen,
     setExecutionOptionsOpen,
 
     // Scenario state
-    selectedScenarioIds,
     scenarioSearch,
     setScenarioSearch,
     activeLabelFilter,
@@ -282,7 +287,6 @@ export function useSuiteForm({
     totalScenarioCount: scenarios?.length ?? 0,
 
     // Target state
-    selectedTargets,
     targetSearch,
     setTargetSearch,
     availableTargets,
@@ -291,11 +295,8 @@ export function useSuiteForm({
     isTargetSelected,
     staleTargetIds,
 
-    // Validation
-    errors,
-    validate,
-
-    // Form data builder
-    buildFormData,
+    // Actions
+    addLabel,
+    removeLabel,
   };
 }

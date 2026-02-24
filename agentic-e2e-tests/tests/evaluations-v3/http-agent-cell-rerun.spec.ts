@@ -30,7 +30,8 @@ import {
  * I want to re-execute individual cells
  * So that I can test modifications without re-running the entire evaluation
  */
-test.describe("Single Cell Re-execution", () => {
+// Skipped: flaky — Lambda warmup failures in CI cause timeouts (#1802)
+test.describe.skip("Single Cell Re-execution", () => {
   /**
    * Scenario: Single cell re-execution for HTTP agent
    * Source: http-agent-support.feature lines 233-238

@@ -286,6 +286,44 @@ describe("<SuiteFormDrawer/>", () => {
         ).toBeInTheDocument();
       });
     });
+
+    describe("when typing in the name field after validation errors are shown", () => {
+      it("clears the name error but keeps scenario and target errors", async () => {
+        const user = userEvent.setup();
+
+        render(<SuiteFormDrawer />, { wrapper: Wrapper });
+
+        // Click Save with all fields empty to trigger all validation errors
+        const saveButton = screen.getByRole("button", { name: /^Save$/i });
+        await user.click(saveButton);
+
+        // All three errors visible
+        expect(screen.getByText("Name is required")).toBeInTheDocument();
+        expect(
+          screen.getByText("At least one scenario is required"),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByText("At least one target is required"),
+        ).toBeInTheDocument();
+
+        // Type in the name field
+        const nameInput = screen.getByPlaceholderText(
+          "e.g., Critical Path Suite",
+        );
+        await user.type(nameInput, "My Suite");
+
+        // Name error is gone
+        expect(screen.queryByText("Name is required")).not.toBeInTheDocument();
+
+        // Other errors persist
+        expect(
+          screen.getByText("At least one scenario is required"),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByText("At least one target is required"),
+        ).toBeInTheDocument();
+      });
+    });
   });
 
   describe("given the drawer is open in edit mode", () => {

@@ -35,7 +35,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
-import { useSuiteForm } from "./useSuiteForm";
+import { useSuiteForm, type SuiteFormData } from "./useSuiteForm";
 import { InlineTagsInput } from "../scenarios/ui/InlineTagsInput";
 import { ScenarioPicker } from "./ScenarioPicker";
 import { TargetPicker } from "./TargetPicker";
@@ -45,6 +45,19 @@ export type SuiteFormDrawerProps = {
   onSaved?: (suite: SimulationSuite) => void;
   onRan?: (suiteId: string) => void;
 };
+
+/** Build the mutation payload from validated form data. */
+function buildMutationPayload(data: SuiteFormData, projectId: string) {
+  return {
+    projectId,
+    name: data.name.trim(),
+    description: data.description.trim() || undefined,
+    scenarioIds: data.selectedScenarioIds,
+    targets: data.selectedTargets,
+    repeatCount: data.repeatCount,
+    labels: data.labels,
+  };
+}
 
 export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
   const { project } = useOrganizationTeamProject();
@@ -85,7 +98,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
   const isEditMode = !!suiteId;
   const title = isEditMode ? "Edit Suite" : "New Suite";
 
-  const form = useSuiteForm({
+  const suiteForm = useSuiteForm({
     suite: suite ?? null,
     isOpen,
     suiteId,
@@ -93,6 +106,9 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
     agents,
     prompts,
   });
+
+  const { form } = suiteForm;
+  const errors = form.formState.errors;
 
   // -- Mutations --
 
@@ -160,41 +176,54 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
     },
   });
 
-  const handleSave = useCallback(() => {
-    if (!form.validate() || !project) return;
-    const data = form.buildFormData({ projectId: project.id });
+  const submitForm = useCallback(
+    (data: SuiteFormData) => {
+      if (!project) return;
+      const payload = buildMutationPayload(data, project.id);
 
-    if (isEditMode && suite) {
-      updateMutation.mutate({ ...data, id: suite.id });
-    } else {
-      createMutation.mutate(data);
-    }
-  }, [form, project, isEditMode, suite, createMutation, updateMutation]);
+      if (isEditMode && suite) {
+        updateMutation.mutate({ ...payload, id: suite.id });
+      } else {
+        createMutation.mutate(payload);
+      }
+    },
+    [project, isEditMode, suite, createMutation, updateMutation],
+  );
+
+  const submitAndRun = useCallback(
+    (data: SuiteFormData) => {
+      if (!project) return;
+      const payload = buildMutationPayload(data, project.id);
+
+      const onSuccess = (saved: SimulationSuite) => {
+        runMutation.mutate({ projectId: payload.projectId, id: saved.id });
+        onRan?.(saved.id);
+      };
+
+      if (isEditMode && suite) {
+        updateMutation.mutate({ ...payload, id: suite.id }, { onSuccess });
+      } else {
+        createMutation.mutate(payload, { onSuccess });
+      }
+    },
+    [
+      project,
+      isEditMode,
+      suite,
+      createMutation,
+      updateMutation,
+      runMutation,
+      onRan,
+    ],
+  );
+
+  const handleSave = useCallback(() => {
+    void form.handleSubmit(submitForm)();
+  }, [form, submitForm]);
 
   const handleRunNow = useCallback(() => {
-    if (!form.validate() || !project) return;
-    const data = form.buildFormData({ projectId: project.id });
-
-    const onSuccess = (saved: SimulationSuite) => {
-      runMutation.mutate({ projectId: data.projectId, id: saved.id });
-      onRan?.(saved.id);
-    };
-
-    if (isEditMode && suite) {
-      updateMutation.mutate({ ...data, id: suite.id }, { onSuccess });
-    } else {
-      createMutation.mutate(data, { onSuccess });
-    }
-  }, [
-    form,
-    project,
-    isEditMode,
-    suite,
-    createMutation,
-    updateMutation,
-    runMutation,
-    onRan,
-  ]);
+    void form.handleSubmit(submitAndRun)();
+  }, [form, submitAndRun]);
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
@@ -222,13 +251,12 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
               </Text>
               <Input
                 placeholder="e.g., Critical Path Suite"
-                value={form.name}
-                onChange={(e) => form.setName(e.target.value)}
-                borderColor={form.errors.name ? "red.500" : undefined}
+                {...form.register("name")}
+                borderColor={errors.name ? "red.500" : undefined}
               />
-              {form.errors.name && (
+              {errors.name && (
                 <Text fontSize="xs" color="red.500">
-                  {form.errors.name}
+                  {errors.name.message}
                 </Text>
               )}
             </VStack>
@@ -240,8 +268,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
               </Text>
               <Textarea
                 placeholder="Core journeys that must pass before deploy"
-                value={form.description}
-                onChange={(e) => form.setDescription(e.target.value)}
+                {...form.register("description")}
                 rows={2}
               />
             </VStack>
@@ -252,8 +279,8 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                 Labels
               </Text>
               <InlineTagsInput
-                value={form.labels}
-                onChange={form.setLabels}
+                value={suiteForm.labels}
+                onChange={(newLabels) => form.setValue("labels", newLabels)}
                 placeholder="Add label..."
               />
             </VStack>
@@ -264,23 +291,23 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                 Scenarios *
               </Text>
               <ScenarioPicker
-                scenarios={form.filteredScenarios}
-                selectedIds={form.selectedScenarioIds}
-                totalCount={form.totalScenarioCount}
-                onToggle={form.toggleScenario}
-                onSelectAll={form.selectAllScenarios}
-                onClear={form.clearScenarios}
-                searchQuery={form.scenarioSearch}
-                onSearchChange={form.setScenarioSearch}
-                allLabels={form.allLabels}
-                activeLabelFilter={form.activeLabelFilter}
-                onLabelFilterChange={form.setActiveLabelFilter}
+                scenarios={suiteForm.filteredScenarios}
+                selectedIds={suiteForm.selectedScenarioIds}
+                totalCount={suiteForm.totalScenarioCount}
+                onToggle={suiteForm.toggleScenario}
+                onSelectAll={suiteForm.selectAllScenarios}
+                onClear={suiteForm.clearScenarios}
+                searchQuery={suiteForm.scenarioSearch}
+                onSearchChange={suiteForm.setScenarioSearch}
+                allLabels={suiteForm.allLabels}
+                activeLabelFilter={suiteForm.activeLabelFilter}
+                onLabelFilterChange={suiteForm.setActiveLabelFilter}
                 onCreateNew={() => openDrawer("scenarioEditor")}
-                hasError={!!form.errors.scenarios}
+                hasError={!!errors.selectedScenarioIds}
               />
-              {form.errors.scenarios && (
+              {errors.selectedScenarioIds && (
                 <Text fontSize="xs" color="red.500">
-                  {form.errors.scenarios}
+                  {errors.selectedScenarioIds.message}
                 </Text>
               )}
             </VStack>
@@ -291,27 +318,27 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                 Target(s) *
               </Text>
               <TargetPicker
-                targets={form.filteredTargets}
-                selectedTargets={form.selectedTargets}
-                totalCount={form.availableTargets.length}
-                isTargetSelected={form.isTargetSelected}
-                onToggle={form.toggleTarget}
-                searchQuery={form.targetSearch}
-                onSearchChange={form.setTargetSearch}
+                targets={suiteForm.filteredTargets}
+                selectedTargets={suiteForm.selectedTargets}
+                totalCount={suiteForm.availableTargets.length}
+                isTargetSelected={suiteForm.isTargetSelected}
+                onToggle={suiteForm.toggleTarget}
+                searchQuery={suiteForm.targetSearch}
+                onSearchChange={suiteForm.setTargetSearch}
                 onCreateAgent={() => openDrawer("agentHttpEditor")}
                 onCreatePrompt={() => {
                   if (project?.slug) {
                     window.open(`/${project.slug}/prompts`, "_blank");
                   }
                 }}
-                hasError={!!form.errors.targets}
+                hasError={!!errors.selectedTargets}
               />
-              {form.errors.targets && (
+              {errors.selectedTargets && (
                 <Text fontSize="xs" color="red.500">
-                  {form.errors.targets}
+                  {errors.selectedTargets.message}
                 </Text>
               )}
-              {form.staleTargetIds.length > 0 && (
+              {suiteForm.staleTargetIds.length > 0 && (
                 <HStack
                   gap={2}
                   padding={2}
@@ -322,9 +349,9 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                 >
                   <AlertTriangle size={14} color="var(--chakra-colors-orange-500)" />
                   <Text fontSize="xs" color="orange.700" _dark={{ color: "orange.200" }}>
-                    {form.staleTargetIds.length === 1
+                    {suiteForm.staleTargetIds.length === 1
                       ? "1 target is no longer available and may have been deleted."
-                      : `${form.staleTargetIds.length} targets are no longer available and may have been deleted.`}
+                      : `${suiteForm.staleTargetIds.length} targets are no longer available and may have been deleted.`}
                   </Text>
                 </HStack>
               )}
@@ -332,12 +359,12 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
 
             {/* Execution Options */}
             <Collapsible.Root
-              open={form.executionOptionsOpen}
-              onOpenChange={(d) => form.setExecutionOptionsOpen(d.open)}
+              open={suiteForm.executionOptionsOpen}
+              onOpenChange={(d) => suiteForm.setExecutionOptionsOpen(d.open)}
             >
               <Collapsible.Trigger asChild>
                 <HStack cursor="pointer" gap={2}>
-                  {form.executionOptionsOpen ? (
+                  {suiteForm.executionOptionsOpen ? (
                     <ChevronDown size={14} />
                   ) : (
                     <ChevronRight size={14} />
@@ -364,17 +391,20 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                         width="80px"
                         min={1}
                         max={MAX_REPEAT_COUNT}
-                        value={form.repeatCountStr}
-                        onChange={(e) => form.setRepeatCountStr(e.target.value)}
-                        borderColor={form.errors.repeatCount ? "red.500" : undefined}
+                        {...form.register("repeatCount", {
+                          valueAsNumber: true,
+                        })}
+                        borderColor={
+                          errors.repeatCount ? "red.500" : undefined
+                        }
                       />
                       <Text fontSize="xs" color="fg.muted">
                         times per scenario x target (max {MAX_REPEAT_COUNT})
                       </Text>
                     </HStack>
-                    {form.errors.repeatCount && (
+                    {errors.repeatCount && (
                       <Text fontSize="xs" color="red.500">
-                        {form.errors.repeatCount}
+                        {errors.repeatCount.message}
                       </Text>
                     )}
                   </VStack>

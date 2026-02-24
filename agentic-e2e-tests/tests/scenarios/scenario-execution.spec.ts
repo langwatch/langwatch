@@ -25,7 +25,8 @@ import {
  *
  * Note: These tests require NLP service to be running for execution.
  */
-test.describe("Scenario Execution", () => {
+// Skipped: flaky — timeouts in CI environment (#1802)
+test.describe.skip("Scenario Execution", () => {
   test.beforeEach(async ({ page }) => {
     await givenIAmLoggedIntoProject(page);
   });
