@@ -43,10 +43,13 @@ export const isGrowthSeatEventPlan = (plan: string): boolean =>
   plan.startsWith("GROWTH_SEAT_");
 
 /** Builds the plan type string from currency + billing interval. */
-export const resolveGrowthSeatPlanType = (
-  currency: Currency,
-  interval: BillingInterval,
-): PlanType =>
+export const resolveGrowthSeatPlanType = ({
+  currency,
+  interval,
+}: {
+  currency: Currency;
+  interval: BillingInterval;
+}): PlanType =>
   `GROWTH_SEAT_${currency}_${interval.toUpperCase()}` as PlanType;
 
 /** Extracts currency and billing interval from a GROWTH_SEAT plan type. */
@@ -123,3 +126,4 @@ export const createCheckoutLineItems = ({
     },
   ];
 };
+>>>>>>> 9dec1e009 (fix(billing): use TRPCError for org-not-found and guard price resolvers)

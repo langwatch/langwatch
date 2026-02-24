@@ -664,7 +664,10 @@ export const organizationRouter = createTRPCRouter({
       });
 
       if (!organization) {
-        throw new OrganizationNotFoundError();
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Organization not found",
+        });
       }
 
       return organization;
@@ -763,7 +766,10 @@ export const organizationRouter = createTRPCRouter({
       });
 
       if (!organization) {
-        throw new OrganizationNotFoundError();
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Organization not found",
+        });
       }
 
       const inviteService = InviteService.create(prisma);
