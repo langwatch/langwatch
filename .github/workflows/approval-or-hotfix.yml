@@ -2,7 +2,7 @@ name: Approval or Exception Required
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, labeled, unlabeled, ready_for_review]
+    types: [labeled, unlabeled]
   pull_request_review:
     types: [submitted]
 

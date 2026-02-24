@@ -8,41 +8,20 @@
  */
 
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import {
-  CheckCircle,
-  ChevronDown,
-  ChevronRight,
-  XCircle,
-  Loader,
-} from "lucide-react";
-import type { RunGroup, BatchRunSummary } from "./run-history-transforms";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { SummaryStatusIcon } from "./SummaryStatusIcon";
+import type { RunGroup, RunGroupSummary } from "./run-history-transforms";
 import { ScenarioTargetRow } from "./ScenarioTargetRow";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 
 type GroupRowProps = {
   group: RunGroup;
-  summary: BatchRunSummary;
+  summary: RunGroupSummary;
   isExpanded: boolean;
   onToggle: () => void;
   onScenarioRunClick: (scenarioRun: ScenarioRunData) => void;
   targetName?: string | null;
 };
-
-function GroupStatusIcon({ summary }: { summary: BatchRunSummary }) {
-  if (summary.inProgressCount > 0) {
-    return (
-      <Loader
-        size={14}
-        color="var(--chakra-colors-orange-500)"
-        style={{ animation: "spin 2s linear infinite" }}
-      />
-    );
-  }
-  if (summary.failedCount > 0) {
-    return <XCircle size={14} color="var(--chakra-colors-red-500)" />;
-  }
-  return <CheckCircle size={14} color="var(--chakra-colors-green-500)" />;
-}
 
 export function GroupRow({
   group,
@@ -86,7 +65,7 @@ export function GroupRow({
         <Text fontSize="sm" color="fg.muted">
           &middot;
         </Text>
-        <GroupStatusIcon summary={summary} />
+        <SummaryStatusIcon summary={summary} />
         <Text
           fontSize="sm"
           fontWeight="medium"
@@ -141,6 +120,12 @@ export function GroupRow({
         <HStack gap={3}>
           <Text color="green.600">{summary.passedCount} passed</Text>
           <Text color="red.600">{summary.failedCount} failed</Text>
+          {summary.stalledCount > 0 && (
+            <Text color="yellow.600">{summary.stalledCount} stalled</Text>
+          )}
+          {summary.cancelledCount > 0 && (
+            <Text color="fg.muted">{summary.cancelledCount} cancelled</Text>
+          )}
         </HStack>
       </HStack>
     </Box>

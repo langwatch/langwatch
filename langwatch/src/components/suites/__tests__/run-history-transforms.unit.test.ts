@@ -7,8 +7,6 @@ import {
   computeRunHistoryTotals,
   computeSuiteRunSummaries,
   getScenarioDisplayNames,
-  type BatchRun,
-  type RunGroup,
 } from "../run-history-transforms";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { makeBatchRun, makeScenarioRunData } from "./test-helpers";
@@ -240,40 +238,17 @@ describe("computeBatchRunSummary()", () => {
 });
 
 describe("computeRunHistoryTotals()", () => {
-  describe("when given multiple batch runs", () => {
-    it("sums up totals across all batches", () => {
-      const batchRuns: BatchRun[] = [
-        makeBatchRun({
-          batchRunId: "batch_1",
-          timestamp: Date.now(),
-          scenarioRuns: [
-            makeScenarioRunData({ status: ScenarioRunStatus.SUCCESS }),
-            makeScenarioRunData({
-              status: ScenarioRunStatus.SUCCESS,
-              scenarioRunId: "run_2",
-            }),
-          ],
-        }),
-        makeBatchRun({
-          batchRunId: "batch_2",
-          timestamp: Date.now() - 1000,
-          scenarioRuns: [
-            makeScenarioRunData({
-              status: ScenarioRunStatus.SUCCESS,
-              batchRunId: "batch_2",
-              scenarioRunId: "run_3",
-            }),
-            makeScenarioRunData({
-              status: ScenarioRunStatus.ERROR,
-              batchRunId: "batch_2",
-              scenarioRunId: "run_4",
-            }),
-          ],
-        }),
+  describe("when given multiple runs", () => {
+    it("sums up totals across all runs", () => {
+      const runs = [
+        makeScenarioRunData({ status: ScenarioRunStatus.SUCCESS, scenarioRunId: "run_1" }),
+        makeScenarioRunData({ status: ScenarioRunStatus.SUCCESS, scenarioRunId: "run_2" }),
+        makeScenarioRunData({ status: ScenarioRunStatus.SUCCESS, scenarioRunId: "run_3" }),
+        makeScenarioRunData({ status: ScenarioRunStatus.ERROR, scenarioRunId: "run_4" }),
       ];
 
-      const totals = computeRunHistoryTotals({ batchRuns });
-      expect(totals.runCount).toBe(2);
+      const totals = computeRunHistoryTotals({ runs });
+      expect(totals.runCount).toBe(4);
       expect(totals.passedCount).toBe(3);
       expect(totals.failedCount).toBe(1);
     });
@@ -281,10 +256,25 @@ describe("computeRunHistoryTotals()", () => {
 
   describe("when given an empty array", () => {
     it("returns zeros", () => {
-      const totals = computeRunHistoryTotals({ batchRuns: [] });
+      const totals = computeRunHistoryTotals({ runs: [] });
       expect(totals.runCount).toBe(0);
       expect(totals.passedCount).toBe(0);
       expect(totals.failedCount).toBe(0);
+    });
+  });
+
+  describe("when given stalled and cancelled runs", () => {
+    it("counts them as failed", () => {
+      const runs = [
+        makeScenarioRunData({ status: ScenarioRunStatus.SUCCESS, scenarioRunId: "run_1" }),
+        makeScenarioRunData({ status: ScenarioRunStatus.STALLED, scenarioRunId: "run_2" }),
+        makeScenarioRunData({ status: ScenarioRunStatus.CANCELLED, scenarioRunId: "run_3" }),
+      ];
+
+      const totals = computeRunHistoryTotals({ runs });
+      expect(totals.runCount).toBe(3);
+      expect(totals.passedCount).toBe(1);
+      expect(totals.failedCount).toBe(2);
     });
   });
 });
