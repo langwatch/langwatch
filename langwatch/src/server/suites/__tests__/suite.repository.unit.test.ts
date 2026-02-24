@@ -1,10 +1,11 @@
 /**
  * Unit tests for SuiteRepository.
  *
- * Tests CRUD operations (create, findById, findAll, update, archive)
- * using a mocked PrismaClient.
+ * Tests CRUD operations (create, findById, findByIdIncludingArchived,
+ * findAll, findAllArchived, update, archive, restore) using a mocked PrismaClient.
  *
  * @see specs/suites/suite-workflow.feature
+ * @see specs/suites/suite-archiving.feature
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -210,7 +211,10 @@ describe("SuiteRepository", () => {
         expect(result).toBe(archived);
         expect(prisma.simulationSuite.update).toHaveBeenCalledWith({
           where: { id: "suite_abc123", projectId: "proj_1" },
-          data: { archivedAt: expect.any(Date) },
+          data: {
+            archivedAt: expect.any(Date),
+            slug: "critical-path--archived",
+          },
         });
       });
     });
@@ -233,8 +237,8 @@ describe("SuiteRepository", () => {
     describe("given an already-archived suite", () => {
       it("preserves the original archivedAt timestamp", async () => {
         const originalDate = new Date("2026-01-15");
-        const existing = makeSuiteRow({ archivedAt: originalDate });
-        const archived = makeSuiteRow({ archivedAt: originalDate });
+        const existing = makeSuiteRow({ archivedAt: originalDate, slug: "critical-path--archived" });
+        const archived = makeSuiteRow({ archivedAt: originalDate, slug: "critical-path--archived" });
 
         (prisma.simulationSuite.findFirst as ReturnType<typeof vi.fn>)
           .mockResolvedValue(existing);
@@ -249,6 +253,167 @@ describe("SuiteRepository", () => {
         const updateCall = (prisma.simulationSuite.update as ReturnType<typeof vi.fn>)
           .mock.calls[0]![0];
         expect(updateCall.data.archivedAt).toBe(originalDate);
+      });
+
+      it("does not stack --archived suffixes", async () => {
+        const existing = makeSuiteRow({
+          archivedAt: new Date("2026-01-15"),
+          slug: "critical-path--archived",
+        });
+
+        (prisma.simulationSuite.findFirst as ReturnType<typeof vi.fn>)
+          .mockResolvedValue(existing);
+        (prisma.simulationSuite.update as ReturnType<typeof vi.fn>)
+          .mockResolvedValue(existing);
+
+        await repository.archive({
+          id: "suite_abc123",
+          projectId: "proj_1",
+        });
+
+        const updateCall = (prisma.simulationSuite.update as ReturnType<typeof vi.fn>)
+          .mock.calls[0]![0];
+        expect(updateCall.data.slug).toBe("critical-path--archived");
+      });
+    });
+  });
+
+  describe("findByIdIncludingArchived()", () => {
+    describe("given an archived suite", () => {
+      it("returns the suite without filtering by archivedAt", async () => {
+        const archived = makeSuiteRow({ archivedAt: new Date("2026-02-01") });
+        (prisma.simulationSuite.findFirst as ReturnType<typeof vi.fn>)
+          .mockResolvedValue(archived);
+
+        const result = await repository.findByIdIncludingArchived({
+          id: "suite_abc123",
+          projectId: "proj_1",
+        });
+
+        expect(result).toBe(archived);
+        expect(prisma.simulationSuite.findFirst).toHaveBeenCalledWith({
+          where: {
+            id: "suite_abc123",
+            projectId: "proj_1",
+          },
+        });
+      });
+    });
+
+    describe("given a non-existent suite", () => {
+      it("returns null", async () => {
+        (prisma.simulationSuite.findFirst as ReturnType<typeof vi.fn>)
+          .mockResolvedValue(null);
+
+        const result = await repository.findByIdIncludingArchived({
+          id: "suite_nonexistent",
+          projectId: "proj_1",
+        });
+
+        expect(result).toBeNull();
+      });
+    });
+  });
+
+  describe("findAllArchived()", () => {
+    describe("given a project with archived suites", () => {
+      it("returns only archived suites ordered by archivedAt desc", async () => {
+        const archivedSuites = [
+          makeSuiteRow({ id: "suite_1", archivedAt: new Date("2026-02-01") }),
+          makeSuiteRow({ id: "suite_2", archivedAt: new Date("2026-01-15") }),
+        ];
+        (prisma.simulationSuite.findMany as ReturnType<typeof vi.fn>)
+          .mockResolvedValue(archivedSuites);
+
+        const result = await repository.findAllArchived({ projectId: "proj_1" });
+
+        expect(result).toEqual(archivedSuites);
+        expect(prisma.simulationSuite.findMany).toHaveBeenCalledWith({
+          where: {
+            projectId: "proj_1",
+            archivedAt: { not: null },
+          },
+          orderBy: { archivedAt: "desc" },
+        });
+      });
+    });
+
+    describe("given no archived suites", () => {
+      it("returns an empty array", async () => {
+        (prisma.simulationSuite.findMany as ReturnType<typeof vi.fn>)
+          .mockResolvedValue([]);
+
+        const result = await repository.findAllArchived({ projectId: "proj_1" });
+
+        expect(result).toEqual([]);
+      });
+    });
+  });
+
+  describe("restore()", () => {
+    describe("given an archived suite with --archived slug", () => {
+      it("strips the --archived suffix and clears archivedAt", async () => {
+        const archived = makeSuiteRow({
+          archivedAt: new Date("2026-02-01"),
+          slug: "critical-path--archived",
+        });
+        const restored = makeSuiteRow({ archivedAt: null, slug: "critical-path" });
+
+        (prisma.simulationSuite.findFirst as ReturnType<typeof vi.fn>)
+          .mockResolvedValue(archived);
+        (prisma.simulationSuite.update as ReturnType<typeof vi.fn>)
+          .mockResolvedValue(restored);
+
+        const result = await repository.restore({
+          id: "suite_abc123",
+          projectId: "proj_1",
+        });
+
+        expect(result).toBe(restored);
+        expect(prisma.simulationSuite.update).toHaveBeenCalledWith({
+          where: { id: "suite_abc123", projectId: "proj_1" },
+          data: { archivedAt: null, slug: "critical-path" },
+        });
+      });
+    });
+
+    describe("given an archived suite without --archived suffix", () => {
+      it("preserves the slug as-is and clears archivedAt", async () => {
+        const archived = makeSuiteRow({
+          archivedAt: new Date("2026-02-01"),
+          slug: "legacy-slug",
+        });
+        const restored = makeSuiteRow({ archivedAt: null, slug: "legacy-slug" });
+
+        (prisma.simulationSuite.findFirst as ReturnType<typeof vi.fn>)
+          .mockResolvedValue(archived);
+        (prisma.simulationSuite.update as ReturnType<typeof vi.fn>)
+          .mockResolvedValue(restored);
+
+        await repository.restore({
+          id: "suite_abc123",
+          projectId: "proj_1",
+        });
+
+        expect(prisma.simulationSuite.update).toHaveBeenCalledWith({
+          where: { id: "suite_abc123", projectId: "proj_1" },
+          data: { archivedAt: null, slug: "legacy-slug" },
+        });
+      });
+    });
+
+    describe("given a non-existent suite", () => {
+      it("returns null without attempting update", async () => {
+        (prisma.simulationSuite.findFirst as ReturnType<typeof vi.fn>)
+          .mockResolvedValue(null);
+
+        const result = await repository.restore({
+          id: "suite_nonexistent",
+          projectId: "proj_1",
+        });
+
+        expect(result).toBeNull();
+        expect(prisma.simulationSuite.update).not.toHaveBeenCalled();
       });
     });
   });

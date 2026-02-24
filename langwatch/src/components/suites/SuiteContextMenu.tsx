@@ -1,6 +1,6 @@
 /**
  * Context menu for suite sidebar items.
- * Shows Edit, Duplicate, and Delete actions.
+ * Shows Edit, Duplicate, and Archive actions.
  */
 
 import { Box, Text, VStack } from "@chakra-ui/react";
@@ -11,7 +11,7 @@ type SuiteContextMenuProps = {
   y: number;
   onEdit: () => void;
   onDuplicate: () => void;
-  onDelete: () => void;
+  onArchive: () => void;
   onClose: () => void;
 };
 
@@ -20,7 +20,7 @@ export function SuiteContextMenu({
   y,
   onEdit,
   onDuplicate,
-  onDelete,
+  onArchive,
   onClose,
 }: SuiteContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
@@ -54,9 +54,9 @@ export function SuiteContextMenu({
         <ContextMenuItem label="Edit" onClick={() => { onEdit(); onClose(); }} />
         <ContextMenuItem label="Duplicate" onClick={() => { onDuplicate(); onClose(); }} />
         <ContextMenuItem
-          label="Delete"
-          onClick={() => { onDelete(); onClose(); }}
-          color="red.500"
+          label="Archive"
+          onClick={() => { onArchive(); onClose(); }}
+          color="orange.500"
         />
       </VStack>
     </Box>

@@ -26,9 +26,11 @@ import { parseSuiteTargets, type SuiteTarget } from "./types";
 import {
   InvalidScenarioReferencesError,
   InvalidTargetReferencesError,
+  SlugConflictError,
   SuiteDomainError,
 } from "./errors";
 import { createLogger } from "~/utils/logger/server";
+import { ARCHIVED_SLUG_SUFFIX } from "./constants";
 import { slugify } from "~/utils/slugify";
 
 const tracer = getLangWatchTracer("langwatch.suites.service");
@@ -223,12 +225,12 @@ export class SuiteService {
     );
   }
 
-  async delete(params: {
+  async archive(params: {
     id: string;
     projectId: string;
   }): Promise<SimulationSuite | null> {
     return tracer.withActiveSpan(
-      "SuiteService.delete",
+      "SuiteService.archive",
       {
         kind: SpanKind.INTERNAL,
         attributes: {
@@ -239,9 +241,109 @@ export class SuiteService {
       async (span) => {
         logger.debug(
           { projectId: params.projectId, suiteId: params.id },
-          "Deleting suite",
+          "Archiving suite",
         );
         const result = await this.repository.archive(params);
+        span.setAttribute("result.found", result !== null);
+        return result;
+      },
+    );
+  }
+
+  /**
+   * Restore an archived suite.
+   * Checks for slug conflicts with active suites before restoring.
+   *
+   * @throws {SlugConflictError} if an active suite has the same slug
+   */
+  async restore(params: {
+    id: string;
+    projectId: string;
+  }): Promise<SimulationSuite | null> {
+    return tracer.withActiveSpan(
+      "SuiteService.restore",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": params.projectId,
+          "suite.id": params.id,
+        },
+      },
+      async (span) => {
+        logger.debug(
+          { projectId: params.projectId, suiteId: params.id },
+          "Restoring suite",
+        );
+        const suite = await this.repository.findByIdIncludingArchived(params);
+        if (!suite) {
+          span.setAttribute("result.found", false);
+          return null;
+        }
+
+        // If the suite is not archived, restoring is a no-op
+        if (!suite.archivedAt) {
+          span.setAttribute("result.found", true);
+          return suite;
+        }
+
+        // Check for slug conflict using the restored (suffix-stripped) slug
+        const restoredSlug = suite.slug.endsWith(ARCHIVED_SLUG_SUFFIX)
+          ? suite.slug.slice(0, -ARCHIVED_SLUG_SUFFIX.length)
+          : suite.slug;
+        const conflicting = await this.repository.findBySlug({
+          slug: restoredSlug,
+          projectId: params.projectId,
+        });
+        if (conflicting && conflicting.id !== suite.id) {
+          throw new SlugConflictError(restoredSlug);
+        }
+
+        const result = await this.repository.restore(params);
+        span.setAttribute("result.found", result !== null);
+        return result;
+      },
+    );
+  }
+
+  async getAllArchived(params: {
+    projectId: string;
+  }): Promise<SimulationSuite[]> {
+    return tracer.withActiveSpan(
+      "SuiteService.getAllArchived",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": params.projectId,
+        },
+      },
+      async (span) => {
+        logger.debug({ projectId: params.projectId }, "Fetching all archived suites");
+        const result = await this.repository.findAllArchived(params);
+        span.setAttribute("result.count", result.length);
+        return result;
+      },
+    );
+  }
+
+  async getByIdIncludingArchived(params: {
+    id: string;
+    projectId: string;
+  }): Promise<SimulationSuite | null> {
+    return tracer.withActiveSpan(
+      "SuiteService.getByIdIncludingArchived",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "tenant.id": params.projectId,
+          "suite.id": params.id,
+        },
+      },
+      async (span) => {
+        logger.debug(
+          { projectId: params.projectId, suiteId: params.id },
+          "Fetching suite by id including archived",
+        );
+        const result = await this.repository.findByIdIncludingArchived(params);
         span.setAttribute("result.found", result !== null);
         return result;
       },

@@ -6,13 +6,14 @@
  * Layout: sidebar (search, +New Suite, All Runs, suite list) + main panel.
  */
 
-import { Box, Button, HStack, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 import type { SimulationSuite } from "@prisma/client";
 import { useCallback, useMemo, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { AllRunsPanel } from "~/components/suites/AllRunsPanel";
+import { SuiteArchiveDialog } from "~/components/suites/SuiteArchiveDialog";
 import { SuiteContextMenu } from "~/components/suites/SuiteContextMenu";
 import {
   SuiteDetailPanel,
@@ -20,15 +21,6 @@ import {
 } from "~/components/suites/SuiteDetailPanel";
 import { SuiteSidebar } from "~/components/suites/SuiteSidebar";
 import { computeSuiteRunSummaries } from "~/components/suites/run-history-transforms";
-import {
-  DialogRoot,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogBody,
-  DialogFooter,
-  DialogCloseTrigger,
-} from "~/components/ui/dialog";
 import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useDrawer } from "~/hooks/useDrawer";
@@ -47,7 +39,7 @@ function SuitesPageContent() {
     y: number;
     suiteId: string;
   } | null>(null);
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [archiveConfirmId, setArchiveConfirmId] = useState<string | null>(null);
 
   // Queries
   const {
@@ -76,23 +68,27 @@ function SuitesPageContent() {
     ? suites?.find((s) => s.id === selectedSuiteId) ?? null
     : null;
 
+  const archiveTargetSuite = archiveConfirmId
+    ? suites?.find((s) => s.id === archiveConfirmId)
+    : null;
+
   // Mutations
-  const deleteMutation = api.suites.delete.useMutation({
+  const archiveMutation = api.suites.archive.useMutation({
     onSuccess: () => {
       void utils.suites.getAll.invalidate();
-      if (selectedSuiteId === deleteConfirmId) {
+      if (selectedSuiteId === archiveConfirmId) {
         setSelectedSuiteId("all-runs");
       }
-      setDeleteConfirmId(null);
+      setArchiveConfirmId(null);
       toaster.create({
-        title: "Suite deleted",
+        title: "Suite archived",
         type: "success",
         meta: { closable: true },
       });
     },
     onError: (err) => {
       toaster.create({
-        title: "Failed to delete suite",
+        title: "Failed to archive suite",
         description: err.message,
         type: "error",
         meta: { closable: true },
@@ -186,18 +182,18 @@ function SuitesPageContent() {
     [project, duplicateMutation],
   );
 
-  const handleDeleteSuite = useCallback(
+  const handleArchiveSuite = useCallback(
     (suiteId: string) => {
       if (!project) return;
-      setDeleteConfirmId(suiteId);
+      setArchiveConfirmId(suiteId);
     },
     [project],
   );
 
-  const confirmDelete = useCallback(() => {
-    if (!project || !deleteConfirmId) return;
-    deleteMutation.mutate({ projectId: project.id, id: deleteConfirmId });
-  }, [project, deleteConfirmId, deleteMutation]);
+  const confirmArchive = useCallback(() => {
+    if (!project || !archiveConfirmId) return;
+    archiveMutation.mutate({ projectId: project.id, id: archiveConfirmId });
+  }, [project, archiveConfirmId, archiveMutation]);
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent, suiteId: string) => {
@@ -237,31 +233,16 @@ function SuitesPageContent() {
 
         {/* Main Panel */}
         <Box flex={1} overflow="auto">
-          {error && (
-            <VStack gap={4} align="center" py={8}>
-              <Text color="red.500">Error loading suites</Text>
-              <Text fontSize="sm" color="fg.muted">
-                {error.message}
-              </Text>
-            </VStack>
-          )}
-
-          {!error && selectedSuiteId === "all-runs" && <AllRunsPanel />}
-
-          {!error && !selectedSuiteId && <SuiteEmptyState onNewSuite={handleNewSuite} />}
-
-          {selectedSuite && (
-            <SuiteDetailPanel
-              suite={selectedSuite}
-              onEdit={() => handleEditSuite(selectedSuite.id)}
-              onRun={() => handleRunSuite(selectedSuite.id)}
-              isRunning={runMutation.isPending}
-            />
-          )}
-
-          {!error && selectedSuiteId && selectedSuiteId !== "all-runs" && !selectedSuite && !isLoading && (
-            <SuiteEmptyState onNewSuite={handleNewSuite} />
-          )}
+          <MainPanel
+            error={error ?? null}
+            selectedSuiteId={selectedSuiteId}
+            selectedSuite={selectedSuite}
+            isLoading={isLoading}
+            onNewSuite={handleNewSuite}
+            onEditSuite={handleEditSuite}
+            onRunSuite={handleRunSuite}
+            isRunning={runMutation.isPending}
+          />
         </Box>
       </HStack>
 
@@ -272,48 +253,73 @@ function SuitesPageContent() {
           y={contextMenu.y}
           onEdit={() => handleEditSuite(contextMenu.suiteId)}
           onDuplicate={() => handleDuplicateSuite(contextMenu.suiteId)}
-          onDelete={() => handleDeleteSuite(contextMenu.suiteId)}
+          onArchive={() => handleArchiveSuite(contextMenu.suiteId)}
           onClose={() => setContextMenu(null)}
         />
       )}
 
-      {/* Delete confirmation dialog */}
-      <DialogRoot
-        open={!!deleteConfirmId}
-        onOpenChange={(e) => {
-          if (!e.open) setDeleteConfirmId(null);
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Suite</DialogTitle>
-            <DialogCloseTrigger />
-          </DialogHeader>
-          <DialogBody>
-            <Text>
-              Are you sure you want to delete this suite? This action cannot be
-              undone.
-            </Text>
-          </DialogBody>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setDeleteConfirmId(null)}
-            >
-              Cancel
-            </Button>
-            <Button
-              colorPalette="red"
-              onClick={confirmDelete}
-              loading={deleteMutation.isPending}
-            >
-              Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </DialogRoot>
+      {/* Archive confirmation dialog */}
+      <SuiteArchiveDialog
+        open={!!archiveConfirmId}
+        onClose={() => setArchiveConfirmId(null)}
+        onConfirm={confirmArchive}
+        suiteName={archiveTargetSuite?.name ?? ""}
+        isLoading={archiveMutation.isPending}
+      />
     </DashboardLayout>
   );
+}
+
+function MainPanel({
+  error,
+  selectedSuiteId,
+  selectedSuite,
+  isLoading,
+  onNewSuite,
+  onEditSuite,
+  onRunSuite,
+  isRunning,
+}: {
+  error: { message: string } | null;
+  selectedSuiteId: string | "all-runs" | null;
+  selectedSuite: SimulationSuite | null;
+  isLoading: boolean;
+  onNewSuite: () => void;
+  onEditSuite: (id: string) => void;
+  onRunSuite: (id: string) => void;
+  isRunning: boolean;
+}) {
+  if (error) {
+    return (
+      <VStack gap={4} align="center" py={8}>
+        <Text color="red.500">Error loading suites</Text>
+        <Text fontSize="sm" color="fg.muted">
+          {error.message}
+        </Text>
+      </VStack>
+    );
+  }
+
+  if (selectedSuiteId === "all-runs") {
+    return <AllRunsPanel />;
+  }
+
+  if (selectedSuite) {
+    return (
+      <SuiteDetailPanel
+        suite={selectedSuite}
+        onEdit={() => onEditSuite(selectedSuite.id)}
+        onRun={() => onRunSuite(selectedSuite.id)}
+        isRunning={isRunning}
+      />
+    );
+  }
+
+  if (!selectedSuiteId || !isLoading) {
+    return <SuiteEmptyState onNewSuite={onNewSuite} />;
+  }
+
+  return null;
 }
 
 export default withPermissionGuard("scenarios:view", {
