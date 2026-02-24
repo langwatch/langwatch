@@ -60,8 +60,6 @@ export const createSubscriptionRouter = () => {
   return createSubscriptionRouterFactory({ customerService, subscriptionService });
 };
 
-export { createCurrencyRouter };
-
 let seatSyncServiceInstance: ReturnType<typeof createSeatSyncService> | null = null;
 
 export const getSeatSyncService = () => {
