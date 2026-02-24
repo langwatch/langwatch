@@ -71,6 +71,11 @@ vi.mock("~/components/DashboardLayout", () => ({
   },
 }));
 
+// Mock AllRunsPanel to avoid deep dependency tree (now renders by default)
+vi.mock("~/components/suites/AllRunsPanel", () => ({
+  AllRunsPanel: () => <div data-testid="all-runs-panel">All Runs Panel</div>,
+}));
+
 // We import after mocks are set up
 import { SuiteSidebar } from "../SuiteSidebar";
 
