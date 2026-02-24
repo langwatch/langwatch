@@ -9,10 +9,8 @@
 
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { SCENARIO_RUN_STATUS_CONFIG } from "~/server/scenarios/status-config";
-import { STATUS_ICON_CONFIG } from "./status-icons";
+import { SummaryStatusIcon } from "./SummaryStatusIcon";
 import type { RunGroup, RunGroupSummary } from "./run-history-transforms";
-import { worstStatus } from "./run-history-transforms";
 import { ScenarioTargetRow } from "./ScenarioTargetRow";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 
@@ -24,20 +22,6 @@ type GroupRowProps = {
   onScenarioRunClick: (scenarioRun: ScenarioRunData) => void;
   targetName?: string | null;
 };
-
-function GroupStatusIcon({ summary }: { summary: RunGroupSummary }) {
-  const status = worstStatus(summary);
-  const config = SCENARIO_RUN_STATUS_CONFIG[status];
-  const iconConfig = STATUS_ICON_CONFIG[status];
-  const Icon = iconConfig.icon;
-  return (
-    <Icon
-      size={14}
-      color={`var(--chakra-colors-${config.colorPalette}-500)`}
-      style={iconConfig.animate ? { animation: "spin 2s linear infinite" } : undefined}
-    />
-  );
-}
 
 export function GroupRow({
   group,
@@ -81,7 +65,7 @@ export function GroupRow({
         <Text fontSize="sm" color="fg.muted">
           &middot;
         </Text>
-        <GroupStatusIcon summary={summary} />
+        <SummaryStatusIcon summary={summary} />
         <Text
           fontSize="sm"
           fontWeight="medium"
