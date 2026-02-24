@@ -5,8 +5,9 @@
  */
 
 import { HStack, Text } from "@chakra-ui/react";
-import { CheckCircle, XCircle, Loader } from "lucide-react";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { SCENARIO_RUN_STATUS_CONFIG } from "~/server/scenarios/status-config";
+import { STATUS_ICON_CONFIG } from "./status-icons";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 
 type ScenarioTargetRowProps = {
@@ -20,17 +21,17 @@ function formatDuration(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
-function StatusIcon({ status }: { status: string }) {
-  if (status === ScenarioRunStatus.SUCCESS) {
-    return <CheckCircle size={14} color="var(--chakra-colors-green-500)" />;
-  }
-  if (
-    status === ScenarioRunStatus.ERROR ||
-    status === ScenarioRunStatus.FAILED
-  ) {
-    return <XCircle size={14} color="var(--chakra-colors-red-500)" />;
-  }
-  return <Loader size={14} color="var(--chakra-colors-orange-500)" style={{ animation: "spin 2s linear infinite" }} />;
+function StatusIcon({ status }: { status: ScenarioRunStatus }) {
+  const config = SCENARIO_RUN_STATUS_CONFIG[status];
+  const iconConfig = STATUS_ICON_CONFIG[status];
+  const Icon = iconConfig.icon;
+  return (
+    <Icon
+      size={14}
+      color={`var(--chakra-colors-${config.colorPalette}-500)`}
+      style={iconConfig.animate ? { animation: "spin 2s linear infinite" } : undefined}
+    />
+  );
 }
 
 export function ScenarioTargetRow({
@@ -43,11 +44,7 @@ export function ScenarioTargetRow({
     ? `${scenarioName} \u00d7 ${targetName}`
     : scenarioName;
 
-  const isSuccess = scenarioRun.status === ScenarioRunStatus.SUCCESS;
-  const isFinished =
-    scenarioRun.status === ScenarioRunStatus.SUCCESS ||
-    scenarioRun.status === ScenarioRunStatus.ERROR ||
-    scenarioRun.status === ScenarioRunStatus.FAILED;
+  const config = SCENARIO_RUN_STATUS_CONFIG[scenarioRun.status];
 
   return (
     <HStack
@@ -70,14 +67,13 @@ export function ScenarioTargetRow({
         {displayName}
       </Text>
       <HStack gap={2} flexShrink={0}>
-        {isFinished && (
-          <Text fontSize="xs" color={isSuccess ? "green.600" : "red.600"}>
-            {isSuccess ? "100%" : "0%"}
+        {config.isComplete ? (
+          <Text fontSize="xs" color={config.fgColor}>
+            {scenarioRun.status === ScenarioRunStatus.SUCCESS ? "100%" : config.label}
           </Text>
-        )}
-        {!isFinished && (
-          <Text fontSize="xs" color="orange.500">
-            In progress
+        ) : (
+          <Text fontSize="xs" color={config.fgColor}>
+            {config.label}
           </Text>
         )}
         {scenarioRun.durationInMs > 0 && (
