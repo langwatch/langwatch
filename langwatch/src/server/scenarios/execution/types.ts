@@ -207,5 +207,6 @@ export const ChildProcessJobDataSchema = z.object({
   adapterData: TargetAdapterDataSchema,
   modelParams: LiteLLMParamsSchema,
   nlpServiceUrl: z.string(),
+  target: TargetConfigSchema,
 });
 export type ChildProcessJobData = z.infer<typeof ChildProcessJobDataSchema>;

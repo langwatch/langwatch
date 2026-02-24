@@ -251,6 +251,7 @@ describe("simulationRunnerRouter.run", () => {
             model: "openai/gpt-4",
           },
           nlpServiceUrl: "http://localhost:8080",
+          target: { type: "prompt", referenceId: "prompt_123" },
         },
         telemetry: {
           endpoint: "http://localhost:3000",

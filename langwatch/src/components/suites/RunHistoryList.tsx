@@ -2,32 +2,36 @@
  * Run history list for a suite.
  *
  * Fetches run data from ElasticSearch via the existing scenarioEvents tRPC endpoint,
- * groups results by batch run, and renders collapsible run rows with filters and footer.
+ * groups results by batch run (default), scenario, or target, and renders collapsible
+ * rows with filters and footer.
  *
  * Uses the suite's setId (__internal__<suiteId>__suite) to query the scenario events.
  */
 
 import { Box, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { SimulationSuite } from "@prisma/client";
+import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { parseSuiteTargets } from "~/server/suites/types";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
 import { api } from "~/utils/api";
-import { formatTimeAgo } from "~/utils/formatTimeAgo";
+import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { buildRoutePath } from "~/utils/routes";
-import {
-  RunHistoryFilters,
-  type RunHistoryFilterValues,
-} from "./RunHistoryFilters";
+import { RunHistoryFilters } from "./RunHistoryFilters";
 import { RunHistoryFooter } from "./RunHistoryFooter";
 import { RunRow } from "./RunRow";
+import { GroupRow } from "./GroupRow";
 import { QueueStatusBanner } from "./QueueStatusBanner";
+import { useRunHistoryStore } from "./useRunHistoryStore";
 import {
   computeBatchRunSummary,
+  computeGroupSummary,
   computeRunHistoryTotals,
   groupRunsByBatchId,
+  groupRunsByScenarioId,
+  groupRunsByTarget,
 } from "./run-history-transforms";
 
 export type RunHistoryStats = {
@@ -43,14 +47,50 @@ type RunHistoryListProps = {
 
 export function RunHistoryList({ suite, onStatsReady }: RunHistoryListProps) {
   const { project } = useOrganizationTeamProject();
+  const router = useRouter();
   const setId = getSuiteSetId(suite.id);
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const hasAutoExpanded = useRef(false);
-  const [filters, setFilters] = useState<RunHistoryFilterValues>({
-    scenarioId: "",
-    passFailStatus: "",
-  });
+
+  // Use zustand store for filters and groupBy
+  const groupBy = useRunHistoryStore((s) => s.groupBy);
+  const filters = useRunHistoryStore((s) => s.filters);
+  const setGroupBy = useRunHistoryStore((s) => s.setGroupBy);
+  const setFilters = useRunHistoryStore((s) => s.setFilters);
+  const syncToUrl = useRunHistoryStore((s) => s.syncToUrl);
+  const hydrateFromUrl = useRunHistoryStore((s) => s.hydrateFromUrl);
+
+  // Hydrate from URL on mount
+  const hasHydrated = useRef(false);
+  useEffect(() => {
+    if (!hasHydrated.current && router.isReady) {
+      hydrateFromUrl(router.query);
+      hasHydrated.current = true;
+    }
+  }, [router.isReady, router.query, hydrateFromUrl]);
+
+  // Sync to URL on state changes (after initial hydration)
+  const prevGroupBy = useRef(groupBy);
+  const prevFilters = useRef(filters);
+  useEffect(() => {
+    if (!hasHydrated.current) return;
+    if (prevGroupBy.current !== groupBy || prevFilters.current !== filters) {
+      prevGroupBy.current = groupBy;
+      prevFilters.current = filters;
+      syncToUrl(router);
+    }
+  }, [groupBy, filters, syncToUrl, router]);
+
+  // Reset expanded state when groupBy changes
+  const prevGroupByForExpansion = useRef(groupBy);
+  useEffect(() => {
+    if (prevGroupByForExpansion.current !== groupBy) {
+      setExpandedIds(new Set());
+      hasAutoExpanded.current = false;
+      prevGroupByForExpansion.current = groupBy;
+    }
+  }, [groupBy]);
 
   // Fetch queue status for pending/active jobs
   const { data: queueStatus } = api.suites.getQueueStatus.useQuery(
@@ -147,20 +187,23 @@ export function RunHistoryList({ suite, onStatsReady }: RunHistoryListProps) {
       .filter(Boolean) as Array<{ id: string; name: string }>;
   }, [scenarios, suite.scenarioIds]);
 
-  // Group runs by batch and apply filters
-  const batchRuns = useMemo(() => {
+  // Apply filters to raw run data
+  const filteredRuns = useMemo(() => {
     if (!runData) return [];
 
-    let runs = runData;
+    let runs: ScenarioRunData[] = runData;
 
-    // Filter by scenario
     if (filters.scenarioId) {
       runs = runs.filter((r) => r.scenarioId === filters.scenarioId);
     }
 
-    const grouped = groupRunsByBatchId({ runs });
+    return runs;
+  }, [runData, filters.scenarioId]);
 
-    // Filter by pass/fail
+  // Group filtered runs by batch (for "none" grouping and pass/fail filtering)
+  const batchRuns = useMemo(() => {
+    const grouped = groupRunsByBatchId({ runs: filteredRuns });
+
     if (filters.passFailStatus === "pass") {
       return grouped.filter((b) => {
         const summary = computeBatchRunSummary({ batchRun: b });
@@ -175,51 +218,83 @@ export function RunHistoryList({ suite, onStatsReady }: RunHistoryListProps) {
     }
 
     return grouped;
-  }, [runData, filters]);
+  }, [filteredRuns, filters.passFailStatus]);
 
-  // Auto-expand the most recent run when data first loads
+  // Group filtered runs by scenario or target (when groupBy is not "none")
+  const groups = useMemo(() => {
+    if (groupBy === "none") return [];
+
+    const grouped =
+      groupBy === "scenario"
+        ? groupRunsByScenarioId({ runs: filteredRuns })
+        : groupRunsByTarget({ runs: filteredRuns, targetNameMap });
+
+    if (filters.passFailStatus === "pass") {
+      return grouped.filter((g) => {
+        const summary = computeGroupSummary({ group: g });
+        return summary.failedCount === 0 && summary.passedCount > 0;
+      });
+    }
+    if (filters.passFailStatus === "fail") {
+      return grouped.filter((g) => {
+        const summary = computeGroupSummary({ group: g });
+        return summary.failedCount > 0;
+      });
+    }
+
+    return grouped;
+  }, [groupBy, filteredRuns, targetNameMap, filters.passFailStatus]);
+
+  // Auto-expand the most recent group when data first loads
   useEffect(() => {
-    if (!hasAutoExpanded.current && batchRuns.length > 0) {
-      const firstId = batchRuns[0]?.batchRunId;
-      if (firstId) {
-        setExpandedIds(new Set([firstId]));
-        hasAutoExpanded.current = true;
+    if (!hasAutoExpanded.current) {
+      if (groupBy === "none" && batchRuns.length > 0) {
+        const firstId = batchRuns[0]?.batchRunId;
+        if (firstId) {
+          setExpandedIds(new Set([firstId]));
+          hasAutoExpanded.current = true;
+        }
+      } else if (groupBy !== "none" && groups.length > 0) {
+        const firstId = groups[0]?.groupKey;
+        if (firstId) {
+          setExpandedIds(new Set([firstId]));
+          hasAutoExpanded.current = true;
+        }
       }
     }
-  }, [batchRuns]);
+  }, [batchRuns, groups, groupBy]);
 
   const totals = useMemo(
-    () => computeRunHistoryTotals({ batchRuns }),
-    [batchRuns],
+    () => computeRunHistoryTotals({ runs: filteredRuns }),
+    [filteredRuns],
   );
 
-  const lastActivityTimestamp = batchRuns[0]?.timestamp ?? null;
+  const lastActivityTimestamp =
+    groupBy === "none"
+      ? batchRuns[0]?.timestamp ?? null
+      : groups[0]?.timestamp ?? null;
 
   // Notify parent when stats are ready
   useEffect(() => {
     if (onStatsReady) {
-      const totalRunCount = batchRuns.reduce(
-        (sum, batch) => sum + batch.scenarioRuns.length,
-        0,
-      );
       const finishedCount = totals.passedCount + totals.failedCount;
       const passRate = finishedCount > 0 ? (totals.passedCount / finishedCount) * 100 : 0;
 
       onStatsReady({
-        runCount: totalRunCount,
+        runCount: totals.runCount,
         passRate,
         lastActivityTimestamp,
       });
     }
-  }, [batchRuns, totals, lastActivityTimestamp, onStatsReady]);
+  }, [totals, lastActivityTimestamp, onStatsReady]);
 
-  const handleToggle = useCallback((batchRunId: string) => {
+  const handleToggle = useCallback((id: string) => {
     setExpandedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(batchRunId)) {
-        next.delete(batchRunId);
+      if (next.has(id)) {
+        next.delete(id);
       } else {
-        next.add(batchRunId);
+        next.add(id);
       }
       return next;
     });
@@ -237,6 +312,13 @@ export function RunHistoryList({ suite, onStatsReady }: RunHistoryListProps) {
       window.open(url, "_blank");
     },
     [project, setId],
+  );
+
+  const handleFiltersChange = useCallback(
+    (newFilters: { scenarioId: string; passFailStatus: string }) => {
+      setFilters(newFilters);
+    },
+    [setFilters],
   );
 
   if (isLoading) {
@@ -284,17 +366,19 @@ export function RunHistoryList({ suite, onStatsReady }: RunHistoryListProps) {
       {lastActivityTimestamp && (
         <Box paddingX={6} paddingBottom={3}>
           <Text fontSize="xs" color="fg.muted">
-            {formatTimeAgo(lastActivityTimestamp)}
+            {formatTimeAgoCompact(lastActivityTimestamp)}
           </Text>
         </Box>
       )}
 
-      {/* Filter bar */}
+      {/* Filter bar with group-by selector */}
       <Box paddingX={6} paddingBottom={4}>
         <RunHistoryFilters
           scenarioOptions={scenarioOptions}
           filters={filters}
-          onFiltersChange={setFilters}
+          onFiltersChange={handleFiltersChange}
+          groupBy={groupBy}
+          onGroupByChange={setGroupBy}
         />
       </Box>
 
@@ -307,21 +391,36 @@ export function RunHistoryList({ suite, onStatsReady }: RunHistoryListProps) {
 
       {/* Run history rows */}
       <VStack align="stretch" gap={2} paddingX={6} flex={1} overflow="auto">
-        {batchRuns.map((batchRun) => {
-          const summary = computeBatchRunSummary({ batchRun });
-          return (
-            <RunRow
-              key={batchRun.batchRunId}
-              batchRun={batchRun}
-              summary={summary}
-              isExpanded={expandedIds.has(batchRun.batchRunId)}
-              onToggle={() => handleToggle(batchRun.batchRunId)}
-              targetName={singleTargetName}
-              onScenarioRunClick={handleScenarioRunClick}
-              expectedJobCount={expectedJobCount}
-            />
-          );
-        })}
+        {groupBy === "none"
+          ? batchRuns.map((batchRun) => {
+              const summary = computeBatchRunSummary({ batchRun });
+              return (
+                <RunRow
+                  key={batchRun.batchRunId}
+                  batchRun={batchRun}
+                  summary={summary}
+                  isExpanded={expandedIds.has(batchRun.batchRunId)}
+                  onToggle={() => handleToggle(batchRun.batchRunId)}
+                  targetName={singleTargetName}
+                  onScenarioRunClick={handleScenarioRunClick}
+                  expectedJobCount={expectedJobCount}
+                />
+              );
+            })
+          : groups.map((group) => {
+              const summary = computeGroupSummary({ group });
+              return (
+                <GroupRow
+                  key={group.groupKey}
+                  group={group}
+                  summary={summary}
+                  isExpanded={expandedIds.has(group.groupKey)}
+                  onToggle={() => handleToggle(group.groupKey)}
+                  onScenarioRunClick={handleScenarioRunClick}
+                  targetName={singleTargetName}
+                />
+              );
+            })}
       </VStack>
 
       {/* Footer */}

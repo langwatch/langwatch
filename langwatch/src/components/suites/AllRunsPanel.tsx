@@ -119,18 +119,16 @@ export function AllRunsPanel() {
     return scenarios.map((s) => ({ id: s.id, name: s.name }));
   }, [scenarios]);
 
-  // Group runs by batch and apply filters
-  const batchRuns = useMemo(() => {
+  // Apply filters to raw runs
+  const filteredRuns = useMemo(() => {
     if (allRuns.length === 0) return [];
 
     let runs = allRuns;
 
-    // Filter by scenario
     if (filters.scenarioId) {
       runs = runs.filter((r) => r.scenarioId === filters.scenarioId);
     }
 
-    // Filter by pass/fail status
     if (filters.passFailStatus === "pass") {
       runs = runs.filter((r) => r.status === "SUCCESS");
     } else if (filters.passFailStatus === "fail") {
@@ -139,24 +137,21 @@ export function AllRunsPanel() {
       );
     }
 
+    return runs;
+  }, [allRuns, filters]);
+
+  // Group filtered runs by batch
+  const batchRuns = useMemo(() => {
     return groupRunsByBatchId({
-      runs,
+      runs: filteredRuns,
       scenarioSetIds: allScenarioSetIds,
     });
-  }, [allRuns, allScenarioSetIds, filters]);
+  }, [filteredRuns, allScenarioSetIds]);
 
-  // Compute totals
+  // Compute totals from flat filtered runs
   const totals = useMemo(() => {
-    return computeRunHistoryTotals({ batchRuns });
-  }, [batchRuns]);
-
-  // Get single run count across all batches
-  const totalRunCount = useMemo(() => {
-    return batchRuns.reduce(
-      (sum, batch) => sum + batch.scenarioRuns.length,
-      0,
-    );
-  }, [batchRuns]);
+    return computeRunHistoryTotals({ runs: filteredRuns });
+  }, [filteredRuns]);
 
   // Toggle batch expansion
   const toggleExpanded = useCallback((batchRunId: string) => {
@@ -219,8 +214,8 @@ export function AllRunsPanel() {
           All Runs
         </Text>
         <Text fontSize="sm" color="fg.muted">
-          {totals.runCount} {totals.runCount === 1 ? "execution" : "executions"} · {totalRunCount}{" "}
-          {totalRunCount === 1 ? "run" : "runs"}
+          {batchRuns.length} {batchRuns.length === 1 ? "execution" : "executions"} · {totals.runCount}{" "}
+          {totals.runCount === 1 ? "run" : "runs"}
         </Text>
       </Box>
 

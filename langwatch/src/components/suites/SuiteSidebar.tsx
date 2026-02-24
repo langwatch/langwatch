@@ -2,25 +2,32 @@
  * Suite sidebar with search, new suite button, all runs link, and suite list.
  */
 
-import { Box, HStack, Separator, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  HStack,
+  Separator,
+  Spacer,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import type { SimulationSuite } from "@prisma/client";
-import { FolderOpen, List, Play, Plus } from "lucide-react";
+import {
+  CircleAlert,
+  CircleCheck,
+  List,
+  MoreVertical,
+  Play,
+} from "lucide-react";
 import { useMemo, useState } from "react";
-import { formatTimeAgo } from "~/utils/formatTimeAgo";
+import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
+import type { SuiteRunSummary } from "./run-history-transforms";
 import { SearchInput } from "../ui/SearchInput";
-
-export type SuiteRunSummary = {
-  passedCount: number;
-  totalCount: number;
-  lastRunTimestamp: number | null;
-};
 
 type SuiteSidebarProps = {
   suites: SimulationSuite[];
   selectedSuiteId: string | "all-runs" | null;
   runSummaries?: Map<string, SuiteRunSummary>;
   onSelectSuite: (id: string | "all-runs") => void;
-  onNewSuite: () => void;
   onRunSuite: (id: string) => void;
   onContextMenu: (e: React.MouseEvent, suiteId: string) => void;
 };
@@ -30,7 +37,6 @@ export function SuiteSidebar({
   selectedSuiteId,
   runSummaries,
   onSelectSuite,
-  onNewSuite,
   onRunSuite,
   onContextMenu,
 }: SuiteSidebarProps) {
@@ -58,14 +64,6 @@ export function SuiteSidebar({
           placeholder="Search..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-        />
-      </Box>
-
-      <Box paddingX={2}>
-        <SidebarButton
-          icon={<Plus size={14} />}
-          label="New Suite"
-          onClick={onNewSuite}
         />
       </Box>
 
@@ -156,6 +154,26 @@ function SidebarButton({
   );
 }
 
+function StatusIcon({ passed, total }: { passed: number; total: number }) {
+  if (total === 0) return null;
+  if (passed === total) {
+    return (
+      <CircleCheck
+        size={12}
+        color="var(--chakra-colors-green-500)"
+        data-testid="status-icon-pass"
+      />
+    );
+  }
+  return (
+    <CircleAlert
+      size={12}
+      color="var(--chakra-colors-red-500)"
+      data-testid="status-icon-fail"
+    />
+  );
+}
+
 function SuiteListItem({
   suite,
   isSelected,
@@ -173,60 +191,105 @@ function SuiteListItem({
 }) {
   return (
     <HStack
-      role="group"
-      paddingX={2}
-      paddingY={2}
+      className="group"
+      data-testid="suite-list-item"
+      paddingX={3}
+      position="relative"
+      paddingY={3}
       borderRadius="md"
       cursor="pointer"
-      bg={isSelected ? "bg.emphasized" : "transparent"}
+      bg={isSelected ? "bg.subtle" : "transparent"}
+      border={isSelected ? "1px solid border.emphasized" : "none"}
       _hover={{ bg: isSelected ? "bg.emphasized" : "bg.subtle" }}
       onContextMenu={onContextMenu}
+      onClick={onSelect}
       justify="space-between"
       width="full"
+      _before={{
+        content: '""',
+        position: "absolute",
+        transform: "translateY(-50%)",
+        top: "50%",
+        left: 0,
+        width: "2px",
+        height: "33%",
+        backgroundColor: "border.emphasized",
+        display: isSelected ? "block" : "none",
+      }}
     >
       <VStack
-        as="button"
         align="start"
         gap={0}
         flex={1}
         overflow="hidden"
-        onClick={onSelect}
         textAlign="left"
-        cursor="pointer"
-        bg="transparent"
-        border="none"
-        padding={0}
       >
-        <HStack gap={1.5}>
-          <FolderOpen size={14} />
+        <HStack gap={1.5} width="full">
           <Text fontSize="sm" fontWeight="medium" truncate>
             {suite.name}
           </Text>
+          <Spacer />
+          <HStack gap={0} flexShrink={0}>
+            <Box
+              as="button"
+              onClick={(e: React.MouseEvent) => {
+                e.stopPropagation();
+                onRun();
+              }}
+              paddingX={1}
+              paddingY={0.5}
+              borderRadius="sm"
+              _hover={{ bg: "bg.muted" }}
+              cursor="pointer"
+              display="flex"
+              alignItems="center"
+              gap={1}
+              flexShrink={0}
+            >
+              <Play size={12} />
+              <Text fontSize="xs">Run</Text>
+            </Box>
+            <Box
+              as="button"
+              aria-label="Suite options"
+              data-testid="suite-menu-button"
+              onClick={(e: React.MouseEvent) => {
+                e.stopPropagation();
+                onContextMenu(e);
+              }}
+              paddingX={1}
+              paddingY={0.5}
+              borderRadius="sm"
+              _hover={{ bg: "bg.muted" }}
+              display="flex"
+              alignItems="center"
+              opacity={0}
+              _groupHover={{ opacity: 1 }}
+              transition="opacity 150ms"
+              cursor="pointer"
+            >
+              <MoreVertical size={14} />
+            </Box>
+          </HStack>
         </HStack>
         {runSummary && runSummary.totalCount > 0 && (
-          <Text fontSize="xs" color="fg.muted" paddingLeft={5}>
-            {runSummary.passedCount}/{runSummary.totalCount} passed
-            {runSummary.lastRunTimestamp && (
-              <> · {formatTimeAgo(runSummary.lastRunTimestamp)}</>
-            )}
-          </Text>
+          <HStack gap={1}>
+            <StatusIcon
+              passed={runSummary.passedCount}
+              total={runSummary.totalCount}
+            />
+            <Text fontSize="xs">
+              {runSummary.passedCount}/{runSummary.totalCount} passed
+              {runSummary.lastRunTimestamp && (
+                <Text as="span" color="fg.muted">
+                  {" · "}
+                  {formatTimeAgoCompact(runSummary.lastRunTimestamp)}
+                </Text>
+              )}
+            </Text>
+          </HStack>
         )}
       </VStack>
-      <Box
-        as="button"
-        onClick={onRun}
-        paddingX={1}
-        paddingY={0.5}
-        borderRadius="sm"
-        _hover={{ bg: "bg.muted" }}
-        display="flex"
-        alignItems="center"
-        gap={1}
-        flexShrink={0}
-      >
-        <Play size={12} />
-        <Text fontSize="xs">Run</Text>
-      </Box>
     </HStack>
   );
 }
