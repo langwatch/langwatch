@@ -2,11 +2,12 @@
  * Suite sidebar with search, new suite button, all runs link, and suite list.
  */
 
-import { Box, HStack, Input, Separator, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Separator, Text, VStack } from "@chakra-ui/react";
 import type { SimulationSuite } from "@prisma/client";
 import { FolderOpen, List, Play, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
+import { SearchInput } from "../ui/SearchInput";
 
 export type SuiteRunSummary = {
   passedCount: number;
@@ -52,7 +53,7 @@ export function SuiteSidebar({
       gap={0}
     >
       <Box paddingX={3} paddingTop={3} paddingBottom={2}>
-        <Input
+        <SearchInput
           size="sm"
           placeholder="Search..."
           value={searchQuery}

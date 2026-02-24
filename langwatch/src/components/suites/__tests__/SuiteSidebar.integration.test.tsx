@@ -176,6 +176,18 @@ describe("<SuiteSidebar/>", () => {
       });
     });
 
+    describe("when looking at the search field", () => {
+      it("displays a search icon inside the input", () => {
+        render(<SuiteSidebar {...defaultProps} suites={suites} />, {
+          wrapper: Wrapper,
+        });
+
+        expect(
+          screen.getByRole("img", { name: "Search" }),
+        ).toBeInTheDocument();
+      });
+    });
+
     describe("when typing 'billing' in the search box", () => {
       it("filters to only show Billing Edge", async () => {
         const user = userEvent.setup();

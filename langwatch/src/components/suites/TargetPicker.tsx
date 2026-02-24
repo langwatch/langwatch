@@ -5,10 +5,11 @@
  * "Add New Agent" and "Add New Prompt" action rows, and a count footer.
  */
 
-import { Box, HStack, Input, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 import type { SuiteTarget } from "~/server/suites/types";
 import { Checkbox } from "../ui/checkbox";
+import { SearchInput } from "../ui/SearchInput";
 
 interface AvailableTarget {
   name: string;
@@ -59,7 +60,7 @@ export function TargetPicker({
       width="full"
     >
       <Box paddingX={3} paddingY={2}>
-        <Input
+        <SearchInput
           size="sm"
           placeholder="Search targets..."
           value={searchQuery}
