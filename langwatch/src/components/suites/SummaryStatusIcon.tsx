@@ -4,7 +4,7 @@
  * Used by both RunRow and GroupRow headers.
  */
 
-import { SCENARIO_RUN_STATUS_CONFIG } from "~/server/scenarios/status-config";
+import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
 import { STATUS_ICON_CONFIG } from "./status-icons";
 import type { RunGroupSummary } from "./run-history-transforms";
 import { worstStatus } from "./run-history-transforms";
