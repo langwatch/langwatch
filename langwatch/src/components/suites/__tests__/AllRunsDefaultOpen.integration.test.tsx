@@ -56,6 +56,15 @@ vi.mock("~/utils/api", () => ({
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },
     },
+    scenarios: {
+      getAllSuiteRunData: {
+        useQuery: () => ({
+          data: { runs: [], scenarioSetIds: {}, hasMore: false, nextCursor: undefined },
+          isLoading: false,
+          error: null,
+        }),
+      },
+    },
   },
 }));
 
