@@ -1,14 +1,14 @@
 /**
  * tRPC router for simulation suite configurations.
  *
- * Provides CRUD, duplicate, archive/restore, and run endpoints.
+ * Provides CRUD, duplicate, archive, and run endpoints.
  */
 
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { SuiteService } from "~/server/suites/suite.service";
-import { SlugConflictError, SuiteDomainError } from "~/server/suites/errors";
+import { SuiteDomainError } from "~/server/suites/errors";
 import { createSuiteRunDependencies, getOrganizationIdForProject } from "~/server/suites/suite-run-dependencies";
 import { checkProjectPermission } from "../../rbac";
 import { createSuiteSchema, projectSchema, updateSuiteSchema } from "./schemas";
@@ -85,54 +85,6 @@ export const suiteRouter = createTRPCRouter({
         });
       }
       return result;
-    }),
-
-  restore: protectedProcedure
-    .input(projectSchema.extend({ id: z.string() }))
-    .use(checkProjectPermission("scenarios:manage"))
-    .mutation(async ({ ctx, input }) => {
-      const service = SuiteService.fromPrisma(ctx.prisma);
-      try {
-        const result = await service.restore(input);
-        if (!result) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Suite not found",
-          });
-        }
-        return result;
-      } catch (error) {
-        if (error instanceof SlugConflictError) {
-          throw new TRPCError({
-            code: "CONFLICT",
-            message: error.message,
-          });
-        }
-        throw error;
-      }
-    }),
-
-  getAllArchived: protectedProcedure
-    .input(projectSchema)
-    .use(checkProjectPermission("scenarios:view"))
-    .query(async ({ ctx, input }) => {
-      const service = SuiteService.fromPrisma(ctx.prisma);
-      return service.getAllArchived(input);
-    }),
-
-  getByIdIncludingArchived: protectedProcedure
-    .input(projectSchema.extend({ id: z.string() }))
-    .use(checkProjectPermission("scenarios:view"))
-    .query(async ({ ctx, input }) => {
-      const service = SuiteService.fromPrisma(ctx.prisma);
-      const suite = await service.getByIdIncludingArchived(input);
-      if (!suite) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Suite not found",
-        });
-      }
-      return suite;
     }),
 
   getQueueStatus: protectedProcedure

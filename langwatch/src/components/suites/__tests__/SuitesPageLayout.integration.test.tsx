@@ -19,7 +19,6 @@ vi.mock("~/utils/api", () => ({
     useContext: () => ({
       suites: {
         getAll: { invalidate: vi.fn() },
-        getAllArchived: { invalidate: vi.fn() },
       },
     }),
     suites: {
@@ -30,15 +29,7 @@ vi.mock("~/utils/api", () => ({
           error: null,
         }),
       },
-      getAllArchived: {
-        useQuery: () => ({
-          data: [],
-          isLoading: false,
-          error: null,
-        }),
-      },
       archive: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
-      restore: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
       duplicate: {
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },

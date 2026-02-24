@@ -24,14 +24,6 @@ export class InvalidScenarioReferencesError extends SuiteDomainError {
   }
 }
 
-/** Thrown when restoring a suite whose slug conflicts with an active suite */
-export class SlugConflictError extends SuiteDomainError {
-  constructor(slug: string) {
-    super(`A suite with the slug "${slug}" already exists`);
-    this.name = "SlugConflictError";
-  }
-}
-
 /** Thrown when a suite references targets that do not exist */
 export class InvalidTargetReferencesError extends SuiteDomainError {
   readonly invalidIds: string[];

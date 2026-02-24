@@ -31,15 +31,6 @@ Feature: Suite Archiving
     When I navigate to the All Runs view
     Then the test runs for "Regression Suite" are still accessible
 
-  @e2e
-  Scenario: Restore an archived suite
-    Given "Edge Case Suite" has been archived
-    When I navigate to the archived suites view
-    Then I see "Edge Case Suite" listed as archived
-    When I click "Restore" on "Edge Case Suite"
-    Then "Edge Case Suite" reappears in the sidebar
-    And I can run "Edge Case Suite" again
-
   # ============================================================================
   # Integration: Context Menu — Archive replaces Delete
   # ============================================================================
@@ -82,34 +73,15 @@ Feature: Suite Archiving
     Then no matching suites are shown
 
   # ============================================================================
-  # Integration: Viewing and Restoring Archived Suites
-  # ============================================================================
-
-  @integration
-  Scenario: Archived suites view lists all archived suites
-    Given "Edge Case Suite" has been archived
-    And "Regression Suite" has been archived
-    When I navigate to the archived suites view
-    Then I see both "Edge Case Suite" and "Regression Suite"
-    And each suite shows its archived date
-
-  @integration
-  Scenario: Restored suite appears in the default suite list
-    Given "Edge Case Suite" has been archived
-    When I restore "Edge Case Suite"
-    Then "Edge Case Suite" appears in the default suite list
-
-  # ============================================================================
   # Integration: Soft Archive Backend Behavior
   # ============================================================================
 
   @integration
-  Scenario: Archived suite is retrievable when including archived
+  Scenario: Archived suite is soft-deleted and hidden from active list
     Given I am authenticated in project "test-project"
     And suite "To Archive" exists
     When I archive "To Archive"
-    Then "To Archive" appears when listing suites including archived
-    And "To Archive" does not appear when listing active suites
+    Then "To Archive" does not appear when listing active suites
 
   @integration
   Scenario: Archived suite preserves associated test runs
@@ -119,11 +91,11 @@ Feature: Suite Archiving
     Then all 3 runs for "To Archive" are returned by the runs API
 
   @integration
-  Scenario: Archived suite is returned when queried including archived
+  Scenario: Archiving frees up the suite name for reuse
     Given I am authenticated in project "test-project"
-    And suite "Archived Suite" has been archived
-    When I look up "Archived Suite" including archived
-    Then "Archived Suite" is returned and marked as archived
+    And suite "My Suite" exists
+    When I archive "My Suite"
+    Then I can create a new suite named "My Suite"
 
   # ============================================================================
   # Integration: Negative Paths
@@ -148,19 +120,3 @@ Feature: Suite Archiving
     Given I am authenticated in project "test-project"
     When I archive "nonexistent-id"
     Then I receive a not found error
-
-  @integration
-  Scenario: Restoring a suite whose slug conflicts with an active suite fails with error
-    Given I am authenticated in project "test-project"
-    And suite "Duplicate Suite" exists and has been archived
-    And a new suite "Duplicate Suite" exists with the same slug
-    When I restore the archived "Duplicate Suite"
-    Then I receive an error indicating the slug is already in use
-
-  @integration
-  Scenario: Restoring a non-archived suite is a no-op
-    Given I am authenticated in project "test-project"
-    And suite "Active Suite" exists and is not archived
-    When I restore "Active Suite"
-    Then the request succeeds without error
-    And "Active Suite" remains in the default suite list

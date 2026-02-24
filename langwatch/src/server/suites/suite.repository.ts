@@ -198,81 +198,6 @@ export class SuiteRepository {
   }
 
   /**
-   * Find a suite by ID regardless of its archived status.
-   * Used for viewing run results of suites that may have been archived.
-   */
-  async findByIdIncludingArchived(params: {
-    id: string;
-    projectId: string;
-  }): Promise<SimulationSuite | null> {
-    return tracer.withActiveSpan(
-      "SuiteRepository.findByIdIncludingArchived",
-      {
-        kind: SpanKind.CLIENT,
-        attributes: {
-          "db.system": "postgresql",
-          "db.operation": "SELECT",
-          "db.table": "SimulationSuite",
-          "tenant.id": params.projectId,
-          "suite.id": params.id,
-        },
-      },
-      async (span) => {
-        logger.debug(
-          { projectId: params.projectId, suiteId: params.id, operation: "SELECT" },
-          "Finding suite by id including archived",
-        );
-        const result =
-          await this.prisma.simulationSuite.findFirst({
-            where: {
-              id: params.id,
-              projectId: params.projectId,
-            },
-          });
-        span.setAttribute("result.found", result !== null);
-        return result;
-      },
-    );
-  }
-
-  /**
-   * Find all archived suites for a project.
-   * Returns suites where archivedAt is not null, ordered by archivedAt desc.
-   */
-  async findAllArchived(params: {
-    projectId: string;
-  }): Promise<SimulationSuite[]> {
-    return tracer.withActiveSpan(
-      "SuiteRepository.findAllArchived",
-      {
-        kind: SpanKind.CLIENT,
-        attributes: {
-          "db.system": "postgresql",
-          "db.operation": "SELECT",
-          "db.table": "SimulationSuite",
-          "tenant.id": params.projectId,
-        },
-      },
-      async (span) => {
-        logger.debug(
-          { projectId: params.projectId, operation: "SELECT" },
-          "Finding all archived suites",
-        );
-        const result =
-          await this.prisma.simulationSuite.findMany({
-            where: {
-              projectId: params.projectId,
-              archivedAt: { not: null },
-            },
-            orderBy: { archivedAt: "desc" },
-          });
-        span.setAttribute("result.count", result.length);
-        return result;
-      },
-    );
-  }
-
-  /**
    * Soft-archive a suite by setting its archivedAt timestamp.
    * Returns the updated suite, or null if not found.
    */
@@ -314,53 +239,6 @@ export class SuiteRepository {
             archivedAt: suite.archivedAt ?? new Date(),
             slug: archivedSlug,
           },
-        });
-        span.setAttribute("result.found", true);
-        return result;
-      },
-    );
-  }
-
-  /**
-   * Restore an archived suite by clearing its archivedAt timestamp.
-   * Strips the `--archived` suffix from the slug.
-   * Returns the updated suite, or null if not found.
-   */
-  async restore(params: {
-    id: string;
-    projectId: string;
-  }): Promise<SimulationSuite | null> {
-    return tracer.withActiveSpan(
-      "SuiteRepository.restore",
-      {
-        kind: SpanKind.CLIENT,
-        attributes: {
-          "db.system": "postgresql",
-          "db.operation": "UPDATE",
-          "db.table": "SimulationSuite",
-          "tenant.id": params.projectId,
-          "suite.id": params.id,
-        },
-      },
-      async (span) => {
-        logger.debug(
-          { projectId: params.projectId, suiteId: params.id, operation: "UPDATE" },
-          "Restoring suite",
-        );
-        const suite =
-          await this.prisma.simulationSuite.findFirst({
-            where: { id: params.id, projectId: params.projectId },
-          });
-        if (!suite) {
-          span.setAttribute("result.found", false);
-          return null;
-        }
-        const restoredSlug = suite.slug.endsWith(ARCHIVED_SLUG_SUFFIX)
-          ? suite.slug.slice(0, -ARCHIVED_SLUG_SUFFIX.length)
-          : suite.slug;
-        const result = await this.prisma.simulationSuite.update({
-          where: { id: params.id, projectId: params.projectId },
-          data: { archivedAt: null, slug: restoredSlug },
         });
         span.setAttribute("result.found", true);
         return result;
