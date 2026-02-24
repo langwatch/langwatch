@@ -1,0 +1,50 @@
+name: Approval or Hotfix Required
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled, ready_for_review]
+
+jobs:
+  check-approval:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+
+    steps:
+      - name: Check approval or hotfix label
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+
+            // Check if hotfix label exists
+            const hasHotfixLabel = pr.labels.some(label => label.name === "hotfix");
+
+            // Get reviews
+            const reviews = await github.rest.pulls.listReviews({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+            });
+
+            // Count unique approvals
+            const approvedUsers = new Set();
+            for (const review of reviews.data) {
+              if (review.state === "APPROVED") {
+                approvedUsers.add(review.user.login);
+              }
+            }
+
+            const approvalCount = approvedUsers.size;
+
+            if (hasHotfixLabel) {
+              core.info("Hotfix label found. Passing check.");
+              return;
+            }
+
+            if (approvalCount >= 1) {
+              core.info("At least one approval found. Passing check.");
+              return;
+            }
+
+            core.setFailed("PR requires at least 1 approval or the 'hotfix' label.");
