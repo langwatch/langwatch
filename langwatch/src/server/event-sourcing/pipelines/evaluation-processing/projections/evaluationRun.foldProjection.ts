@@ -94,7 +94,7 @@ export function createEvaluationRunFoldProjection({
         return {
           ...state,
           status: event.data.status,
-          score: event.data.score ?? null,
+          score: typeof event.data.score === 'number' ? event.data.score : null,
           passed: event.data.passed ?? null,
           label: event.data.label ?? null,
           details: event.data.details ?? null,

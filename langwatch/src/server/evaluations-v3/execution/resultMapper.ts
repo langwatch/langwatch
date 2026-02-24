@@ -207,9 +207,15 @@ export const mapEvaluatorResult = (
           // Strip score for guardrail-type evaluators where score is just 0 or 1
           score: options?.stripScore
             ? undefined
-            : (executionState.outputs?.score as number | undefined),
-          passed: executionState.outputs?.passed as boolean | undefined,
-          label: executionState.outputs?.label as string | undefined,
+            : typeof executionState.outputs?.score === 'number'
+              ? executionState.outputs.score
+              : undefined,
+          passed: typeof executionState.outputs?.passed === 'boolean'
+            ? executionState.outputs.passed
+            : undefined,
+          label: typeof executionState.outputs?.label === 'string'
+            ? executionState.outputs.label
+            : undefined,
           details: executionState.outputs?.details as string | undefined,
           cost: executionState.cost
             ? { currency: "USD", amount: executionState.cost }

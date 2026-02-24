@@ -115,7 +115,7 @@ export function createExperimentRunEsSyncReactor(
                     target_id: event.data.targetId,
                     index: event.data.index,
                     status: event.data.status,
-                    score: event.data.score ?? null,
+                    score: typeof event.data.score === 'number' ? event.data.score : null,
                     label: event.data.label ?? null,
                     passed: event.data.passed ?? null,
                     details: event.data.details ?? null,
