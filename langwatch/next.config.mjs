@@ -91,6 +91,7 @@ const config = {
     "pino-opentelemetry-transport",
     "thread-stream",
     "async_hooks",
+    "geoip-country",
   ],
 
   experimental: {
