@@ -8,16 +8,18 @@
  */
 
 import "dotenv/config";
+
 import { createBullBoard } from "@bull-board/api";
 import { BullMQAdapter } from "@bull-board/api/bullMQAdapter";
 import { HonoAdapter } from "@bull-board/hono";
-import { serveStatic } from "@hono/node-server/serve-static";
 import { serve } from "@hono/node-server";
+import { serveStatic } from "@hono/node-server/serve-static";
 import { Queue } from "bullmq";
 import { Hono } from "hono";
+import { basicAuth } from "hono/basic-auth";
 import IORedis from "ioredis";
-import { createGroupQueueRoutes } from "./groupQueues";
-import { discoverQueueNames, isGroupQueue, stripHashTag } from "./redisQueues";
+import { createGroupQueueRoutes } from "./groupQueues.ts";
+import { discoverQueueNames, isGroupQueue, stripHashTag } from "./redisQueues.ts";
 
 const PORT = parseInt(process.env.BULLBOARD_PORT ?? "6380", 10);
 if (Number.isNaN(PORT) || PORT < 1 || PORT > 65535) {
@@ -61,6 +63,16 @@ async function main() {
   });
 
   const app = new Hono({ strict: false });
+
+  // Health check endpoint (no auth required)
+  app.get("/health", (c) => c.text("OK"));
+
+  // Basic auth middleware (skip /health)
+  const username = process.env.BULLBOARD_USERNAME;
+  const password = process.env.BULLBOARD_PASSWORD;
+  if (username && password) {
+    app.use("*", basicAuth({ username, password }));
+  }
 
   // Mount group queue routes before BullBoard so /groups and /api/group-queues are matched first
   app.route("/", createGroupQueueRoutes(connection, groupQueueNames));
