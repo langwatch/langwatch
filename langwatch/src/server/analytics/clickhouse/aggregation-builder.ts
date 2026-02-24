@@ -223,15 +223,15 @@ const groupByExpressions: Partial<
     // Events.Name and Events.Attributes are parallel arrays, so we zip them to filter
     column: `arrayJoin(
       arrayMap(
-        (n, a) -> multiIf(
+        a -> multiIf(
           toInt32OrNull(a['event.metrics.vote']) = 1, 'thumbs_up',
           toInt32OrNull(a['event.metrics.vote']) = -1, 'thumbs_down',
           ''
         ),
         arrayFilter(
-          (n, a) -> n = 'thumbs_up_down' AND mapContains(a, 'event.metrics.vote'),
-          ${tableAliases.stored_spans}."Events.Name",
-          ${tableAliases.stored_spans}."Events.Attributes"
+          (a, n) -> n = 'thumbs_up_down' AND mapContains(a, 'event.metrics.vote'),
+          ${tableAliases.stored_spans}."Events.Attributes",
+          ${tableAliases.stored_spans}."Events.Name"
         )
       )
     )`,
