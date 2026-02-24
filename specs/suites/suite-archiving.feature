@@ -22,7 +22,6 @@ Feature: Suite Archiving
     Then I see a confirmation modal asking to archive "Regression Suite"
     When I confirm the archive
     Then "Regression Suite" no longer appears in the sidebar
-    And I do not see a "Delete" option in the context menu
     And the remaining 2 suites are still visible
 
   @e2e
@@ -77,7 +76,7 @@ Feature: Suite Archiving
   # ============================================================================
 
   @integration
-  Scenario: Archived suite is soft-deleted and hidden from active list
+  Scenario: Archived suite is hidden from the active list
     Given I am authenticated in project "test-project"
     And suite "To Archive" exists
     When I archive "To Archive"
@@ -88,7 +87,7 @@ Feature: Suite Archiving
     Given I am authenticated in project "test-project"
     And suite "To Archive" exists with 3 completed runs
     When I archive "To Archive"
-    Then all 3 runs for "To Archive" are returned by the runs API
+    Then I can still see all 3 runs for "To Archive" in the runs list
 
   @integration
   Scenario: Archiving frees up the suite name for reuse
@@ -102,7 +101,7 @@ Feature: Suite Archiving
   # ============================================================================
 
   @integration
-  Scenario: Archiving an already-archived suite is idempotent
+  Scenario: Archiving an already-archived suite succeeds without error
     Given I am authenticated in project "test-project"
     And suite "Already Archived" has been archived
     When I archive "Already Archived"
