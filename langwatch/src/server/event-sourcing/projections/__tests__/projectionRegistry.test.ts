@@ -206,7 +206,7 @@ describe("ProjectionRegistry", () => {
   });
 
   describe("hasProjections", () => {
-    describe("when only reactors are registered", () => {
+    describe("when reactors are registered alongside their folds", () => {
       it("returns true", () => {
         const registry = new ProjectionRegistry();
         const fold = createMockFoldProjectionDefinition("myFold");
