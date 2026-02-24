@@ -16,7 +16,7 @@ import {
  *
  * Scenario: Admin creates an immediate invite (lines 19-24)
  */
-// Skipped: flaky — fails consistently in CI environment
+// Skipped: flaky — fails consistently in CI environment (#1802)
 test.describe.skip("Invitation Approval - Admin Creates Immediate Invite", () => {
   /**
    * Scenario: Admin creates an immediate invite

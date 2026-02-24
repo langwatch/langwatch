@@ -16,7 +16,7 @@ import {
  *
  * Scenario: Admin rejects an invitation request (lines 36-42)
  */
-// Skipped: flaky — fails consistently in CI environment
+// Skipped: flaky — fails consistently in CI environment (#1802)
 test.describe.skip("Invitation Approval - Admin Rejects Request", () => {
   /**
    * Scenario: Admin rejects an invitation request

@@ -26,7 +26,7 @@ import {
  * I want to use HTTP agents as targets in Evaluations V3
  * So that I can evaluate external APIs that expose my agent via HTTP endpoints
  */
-// Skipped: flaky — Lambda warmup failures in CI cause timeouts
+// Skipped: flaky — Lambda warmup failures in CI cause timeouts (#1802)
 test.describe.skip("Full Evaluation Run with HTTP Agent Target", () => {
   /**
    * Scenario: Full evaluation run with HTTP agent target
