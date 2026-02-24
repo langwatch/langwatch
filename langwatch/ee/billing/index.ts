@@ -13,6 +13,7 @@ import * as subscriptionItemCalculator from "./services/subscriptionItemCalculat
 import { createWebhookService } from "./services/webhookService";
 import { createStripeClient } from "./stripe/stripeClient";
 import { meters } from "./stripe/stripePriceCatalog";
+import { createCurrencyRouter } from "./currencyRouter";
 import { createSubscriptionRouterFactory } from "./subscriptionRouter";
 import { createStripeWebhookHandlerFactory } from "./stripeWebhook";
 
@@ -40,6 +41,8 @@ const getStripe = () => {
   if (!stripe) stripe = createStripeClient();
   return stripe;
 };
+
+export { createCurrencyRouter };
 
 export const createSubscriptionRouter = () => {
   const s = getStripe();

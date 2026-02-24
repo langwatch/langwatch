@@ -19,10 +19,6 @@ const FIVE_MINUTES_MS = 5 * 60 * 1000;
  *   only triggers one within the TTL window.
  * - BullMQ per-org: jobId `usage_report_${orgId}` ensures only one reporting
  *   job per org is active within the delay window.
- *
- * NOTE: context.foldState is always synthetic { count: 1 } for the
- * projectDailyBillableEvents fold because its store's get() returns null
- * (atomic SQL increment pattern). Do not use foldState here.
  */
 export function createBillingMeterDispatchReactor(deps: {
   getUsageReportingQueue: () => Promise<Queue | null>;
@@ -37,7 +33,7 @@ export function createBillingMeterDispatchReactor(deps: {
     },
 
     async handle(event, context) {
-      const orgId = await resolveOrganizationId(`${context.tenantId}`);
+      const orgId = await resolveOrganizationId(context.tenantId);
 
       if (!orgId) {
         logger.warn(

@@ -191,6 +191,10 @@ enum PlanTypes {
     FREE
     PRO
     GROWTH
+    GROWTH_SEAT_EUR_MONTHLY
+    GROWTH_SEAT_EUR_ANNUAL
+    GROWTH_SEAT_USD_MONTHLY
+    GROWTH_SEAT_USD_ANNUAL
     ENTERPRISE
     LAUNCH
     ACCELERATE
@@ -296,6 +300,7 @@ enum INVITE_STATUS {
     PENDING
     ACCEPTED
     WAITING_APPROVAL
+    PAYMENT_PENDING
 }
 
 model OrganizationInvite {
@@ -311,6 +316,7 @@ model OrganizationInvite {
     role            OrganizationUserRole
     requestedBy     String?
     requestedByUser User?                @relation(fields: [requestedBy], references: [id])
+    subscriptionId  String?
     createdAt       DateTime             @default(now())
     updatedAt       DateTime             @default(now()) @updatedAt
 

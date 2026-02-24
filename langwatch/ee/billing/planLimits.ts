@@ -1,5 +1,6 @@
 import type { PlanInfo } from "../licensing/planInfo";
 import { PlanTypes, type PlanTypes as PlanType } from "./planTypes";
+import { GROWTH_SEAT_PLAN_TYPES } from "./utils/growthSeatEvent";
 
 const PAID_FEATURES = {
   maxWorkflows: 9999,
@@ -151,6 +152,21 @@ export const PLAN_LIMITS: Record<PlanType, PlanInfo> = {
       EUR: 399,
     },
   }),
+  ...(Object.fromEntries(
+    GROWTH_SEAT_PLAN_TYPES.map((type) => [
+      type,
+      definePaidPlan({
+        type,
+        name: "Growth",
+        maxMembers: 20,
+        maxProjects: 99,
+        maxMessagesPerMonth: 200_000,
+        evaluationsCredit: 9999,
+        userPrice: { EUR: 29, USD: 32 },
+        prices: { USD: 0, EUR: 0 },
+      }),
+    ]),
+  ) as Record<(typeof GROWTH_SEAT_PLAN_TYPES)[number], PlanInfo>),
   [PlanTypes.ENTERPRISE]: definePaidPlan({
     type: PlanTypes.ENTERPRISE,
     name: "Enterprise",

@@ -1,11 +1,11 @@
 import { createTRPCRouter } from "~/server/api/trpc";
-import { env } from "~/env.mjs";
 import { agentsRouter } from "./routers/agents";
 import { analyticsRouter } from "./routers/analytics";
 import { annotationRouter } from "./routers/annotation";
 import { annotationScoreRouter } from "./routers/annotationScore";
 import { batchRecordRouter } from "./routers/batchRecord";
 import { costsRouter } from "./routers/costs";
+import { currencyRouter } from "./routers/currency";
 import { dashboardsRouter } from "./routers/dashboards";
 import { datasetRouter } from "./routers/dataset";
 import { datasetRecordRouter } from "./routers/datasetRecord";
@@ -93,27 +93,20 @@ const coreRouters = {
   licenseEnforcement: licenseEnforcementRouter,
 };
 
-const baseAppRouter = createTRPCRouter({
-  ...coreRouters,
-});
+const eeRouters = {
+  subscription: subscriptionRouter,
+  currency: currencyRouter,
+};
 
-const eeRouters = env.IS_SAAS
-  ? ({ subscription: subscriptionRouter } as const)
-  : {};
 /**
  * This is the primary router for your server.
  *
  * All routers added in /api/routers should be manually added here.
  */
-// EE routers are merged at runtime via `as any` because the conditional
-// shape (`{ subscription: ... } | {}`) cannot be expressed statically
-// without a broader AppRouter redesign. The baseAppRouter type is used
-// as the canonical type export so callers always see the core surface.
-// TODO: Follow-up issue for full type-safe EE conditional composition.
 export const appRouter = createTRPCRouter({
   ...coreRouters,
-  ...(eeRouters as any),
-}) as typeof baseAppRouter;
+  ...eeRouters,
+});
 
 // export type definition of API
-export type AppRouter = typeof baseAppRouter;
+export type AppRouter = typeof appRouter;
