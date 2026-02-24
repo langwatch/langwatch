@@ -1,7 +1,7 @@
 /**
  * tRPC router for simulation suite configurations.
  *
- * Provides CRUD, duplicate, delete, and run endpoints.
+ * Provides CRUD, duplicate, archive, and run endpoints.
  */
 
 import { TRPCError } from "@trpc/server";
@@ -72,12 +72,12 @@ export const suiteRouter = createTRPCRouter({
       }
     }),
 
-  delete: protectedProcedure
+  archive: protectedProcedure
     .input(projectSchema.extend({ id: z.string() }))
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
       const service = SuiteService.fromPrisma(ctx.prisma);
-      const result = await service.delete(input);
+      const result = await service.archive(input);
       if (!result) {
         throw new TRPCError({
           code: "NOT_FOUND",

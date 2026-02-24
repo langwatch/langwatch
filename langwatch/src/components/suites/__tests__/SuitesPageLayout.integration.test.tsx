@@ -17,7 +17,9 @@ import type { SimulationSuite } from "@prisma/client";
 vi.mock("~/utils/api", () => ({
   api: {
     useContext: () => ({
-      suites: { getAll: { invalidate: vi.fn() } },
+      suites: {
+        getAll: { invalidate: vi.fn() },
+      },
     }),
     suites: {
       getAll: {
@@ -27,7 +29,7 @@ vi.mock("~/utils/api", () => ({
           error: null,
         }),
       },
-      delete: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
+      archive: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
       duplicate: {
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },

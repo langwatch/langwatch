@@ -70,6 +70,22 @@ function makeDeps(overrides: Partial<SuiteRunDependencies> = {}): SuiteRunDepend
   };
 }
 
+type MockRepository = {
+  [K in keyof SuiteRepository]: ReturnType<typeof vi.fn>;
+};
+
+function makeMockRepository(overrides: Partial<MockRepository> = {}): MockRepository {
+  return {
+    create: vi.fn(),
+    findById: vi.fn(),
+    findBySlug: vi.fn().mockResolvedValue(null),
+    findAll: vi.fn(),
+    update: vi.fn(),
+    archive: vi.fn(),
+    ...overrides,
+  };
+}
+
 describe("SuiteService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -114,15 +130,7 @@ describe("SuiteService", () => {
     let service: SuiteService;
 
     beforeEach(() => {
-      const mockRepository: Pick<SuiteRepository, "create" | "findById" | "findBySlug" | "findAll" | "update" | "archive"> = {
-        create: vi.fn(),
-        findById: vi.fn(),
-        findBySlug: vi.fn(),
-        findAll: vi.fn(),
-        update: vi.fn(),
-        archive: vi.fn(),
-      };
-      service = new SuiteService(mockRepository as SuiteRepository);
+      service = new SuiteService(makeMockRepository() as unknown as SuiteRepository);
     });
 
     describe("given a suite with 3 scenarios, 2 targets, and repeat count 1", () => {
@@ -300,24 +308,10 @@ describe("SuiteService", () => {
 
   describe("duplicate()", () => {
     let service: SuiteService;
-    let mockRepository: {
-      create: ReturnType<typeof vi.fn>;
-      findById: ReturnType<typeof vi.fn>;
-      findBySlug: ReturnType<typeof vi.fn>;
-      findAll: ReturnType<typeof vi.fn>;
-      update: ReturnType<typeof vi.fn>;
-      archive: ReturnType<typeof vi.fn>;
-    };
+    let mockRepository: MockRepository;
 
     beforeEach(() => {
-      mockRepository = {
-        create: vi.fn(),
-        findById: vi.fn(),
-        findBySlug: vi.fn().mockResolvedValue(null),
-        findAll: vi.fn(),
-        update: vi.fn(),
-        archive: vi.fn(),
-      };
+      mockRepository = makeMockRepository();
       service = new SuiteService(mockRepository as unknown as SuiteRepository);
     });
 
@@ -412,36 +406,22 @@ describe("SuiteService", () => {
     });
   });
 
-  describe("delete()", () => {
+  describe("archive()", () => {
     let service: SuiteService;
-    let mockRepository: {
-      create: ReturnType<typeof vi.fn>;
-      findById: ReturnType<typeof vi.fn>;
-      findBySlug: ReturnType<typeof vi.fn>;
-      findAll: ReturnType<typeof vi.fn>;
-      update: ReturnType<typeof vi.fn>;
-      archive: ReturnType<typeof vi.fn>;
-    };
+    let mockRepository: MockRepository;
 
     beforeEach(() => {
-      mockRepository = {
-        create: vi.fn(),
-        findById: vi.fn(),
-        findBySlug: vi.fn().mockResolvedValue(null),
-        findAll: vi.fn(),
-        update: vi.fn(),
-        archive: vi.fn(),
-      };
+      mockRepository = makeMockRepository();
       service = new SuiteService(mockRepository as unknown as SuiteRepository);
     });
 
     describe("given an existing suite", () => {
-      describe("when delete is called", () => {
+      describe("when archive is called", () => {
         it("archives the suite via the repository", async () => {
           const archived = makeSuite({ archivedAt: new Date() });
           mockRepository.archive.mockResolvedValue(archived);
 
-          const result = await service.delete({
+          const result = await service.archive({
             id: "suite_1",
             projectId: "proj_1",
           });
@@ -456,11 +436,11 @@ describe("SuiteService", () => {
     });
 
     describe("given a non-existent suite", () => {
-      describe("when delete is called", () => {
+      describe("when archive is called", () => {
         it("returns null", async () => {
           mockRepository.archive.mockResolvedValue(null);
 
-          const result = await service.delete({
+          const result = await service.archive({
             id: "suite_missing",
             projectId: "proj_1",
           });

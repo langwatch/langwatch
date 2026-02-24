@@ -9,8 +9,8 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-// Capture the delete mutation's onSuccess so tests can trigger it manually
-let capturedDeleteOnSuccess: (() => void) | undefined;
+// Capture the archive mutation's onSuccess so tests can trigger it manually
+let capturedArchiveOnSuccess: (() => void) | undefined;
 
 vi.mock("~/utils/api", () => ({
   api: {
@@ -40,9 +40,9 @@ vi.mock("~/utils/api", () => ({
           error: null,
         }),
       },
-      delete: {
+      archive: {
         useMutation: (opts: { onSuccess?: () => void }) => {
-          capturedDeleteOnSuccess = opts.onSuccess;
+          capturedArchiveOnSuccess = opts.onSuccess;
           return {
             mutate: vi.fn(),
             isPending: false,
@@ -116,7 +116,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 describe("All Runs default selection (Issue #1771)", () => {
   afterEach(() => {
     cleanup();
-    capturedDeleteOnSuccess = undefined;
+    capturedArchiveOnSuccess = undefined;
     vi.restoreAllMocks();
   });
 
@@ -134,7 +134,7 @@ describe("All Runs default selection (Issue #1771)", () => {
     });
   });
 
-  describe("when the user deletes the selected suite", () => {
+  describe("when the user archives the selected suite", () => {
     it("falls back to 'All Runs' and displays the All Runs panel", async () => {
       const { default: SuitesPage } = await import(
         "~/pages/[project]/simulations/suites/index"
@@ -151,22 +151,22 @@ describe("All Runs default selection (Issue #1771)", () => {
       expect(screen.getByTestId("suite-detail-panel")).toBeInTheDocument();
       expect(screen.queryByTestId("all-runs-panel")).not.toBeInTheDocument();
 
-      // Open context menu on the suite and click "Delete" to set deleteConfirmId
+      // Open context menu on the suite and click "Archive" to set archiveConfirmId
       const suiteTexts = screen.getAllByText("My Suite");
       act(() => {
         fireEvent.contextMenu(suiteTexts[0]!);
       });
       act(() => {
-        screen.getByText("Delete").click();
+        screen.getByText("Archive").click();
       });
 
-      // Simulate the delete mutation's onSuccess callback
+      // Simulate the archive mutation's onSuccess callback
       // (bypasses the Chakra dialog which doesn't render properly in JSDOM)
       act(() => {
-        capturedDeleteOnSuccess?.();
+        capturedArchiveOnSuccess?.();
       });
 
-      // All Runs panel is back after deletion
+      // All Runs panel is back after archiving
       expect(screen.getByTestId("all-runs-panel")).toBeInTheDocument();
       expect(screen.queryByTestId("suite-detail-panel")).not.toBeInTheDocument();
     });

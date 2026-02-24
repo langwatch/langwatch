@@ -212,7 +212,7 @@ Feature: Suite Workflow — Create, Run, See Results
   Scenario: Context menu actions on sidebar suite item
     Given suite "Critical Path" exists
     When I right-click "Critical Path" in the sidebar
-    Then I see a context menu with "Edit", "Duplicate", and "Delete"
+    Then I see a context menu with "Edit", "Duplicate", and "Archive"
 
   @e2e
   Scenario: Duplicate suite
@@ -222,14 +222,7 @@ Feature: Suite Workflow — Create, Run, See Results
     Then a new suite "Critical Path (copy)" appears in the sidebar
     And it has the same scenarios and targets as the original
 
-  @e2e
-  Scenario: Delete suite
-    Given suite "Critical Path" exists
-    When I right-click "Critical Path" in the sidebar
-    And I click "Delete"
-    Then I see a confirmation dialog
-    When I confirm deletion
-    Then "Critical Path" is removed from the sidebar
+  # Archive suite scenarios are in suite-archiving.feature
 
   # ============================================================================
   # Run Suite

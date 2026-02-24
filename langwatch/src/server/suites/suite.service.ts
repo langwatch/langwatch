@@ -223,12 +223,12 @@ export class SuiteService {
     );
   }
 
-  async delete(params: {
+  async archive(params: {
     id: string;
     projectId: string;
   }): Promise<SimulationSuite | null> {
     return tracer.withActiveSpan(
-      "SuiteService.delete",
+      "SuiteService.archive",
       {
         kind: SpanKind.INTERNAL,
         attributes: {
@@ -239,7 +239,7 @@ export class SuiteService {
       async (span) => {
         logger.debug(
           { projectId: params.projectId, suiteId: params.id },
-          "Deleting suite",
+          "Archiving suite",
         );
         const result = await this.repository.archive(params);
         span.setAttribute("result.found", result !== null);

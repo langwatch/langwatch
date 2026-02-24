@@ -13,6 +13,7 @@ import type {
 } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { nanoid } from "nanoid";
+import { ARCHIVED_SLUG_SUFFIX } from "./constants";
 import { createLogger } from "~/utils/logger/server";
 
 const tracer = getLangWatchTracer("langwatch.suites.repository");
@@ -229,9 +230,15 @@ export class SuiteRepository {
           span.setAttribute("result.found", false);
           return null;
         }
+        const archivedSlug = suite.slug.endsWith(ARCHIVED_SLUG_SUFFIX)
+          ? suite.slug
+          : `${suite.slug}${ARCHIVED_SLUG_SUFFIX}`;
         const result = await this.prisma.simulationSuite.update({
           where: { id: params.id, projectId: params.projectId },
-          data: { archivedAt: suite.archivedAt ?? new Date() },
+          data: {
+            archivedAt: suite.archivedAt ?? new Date(),
+            slug: archivedSlug,
+          },
         });
         span.setAttribute("result.found", true);
         return result;

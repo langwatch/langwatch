@@ -3,10 +3,10 @@
  *
  * Integration tests for SuiteContextMenu component.
  *
- * Tests that the context menu renders Edit, Duplicate, and Delete actions,
+ * Tests that the context menu renders Edit, Duplicate, and Archive actions,
  * fires the correct callbacks, and closes after action selection.
  *
- * @see specs/suites/suite-workflow.feature - "Context menu actions on sidebar suite item"
+ * @see specs/suites/suite-archiving.feature - "Archive a suite via the context menu"
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -23,7 +23,7 @@ const defaultProps = {
   y: 200,
   onEdit: vi.fn(),
   onDuplicate: vi.fn(),
-  onDelete: vi.fn(),
+  onArchive: vi.fn(),
   onClose: vi.fn(),
 };
 
@@ -34,12 +34,18 @@ describe("<SuiteContextMenu/>", () => {
   });
 
   describe("given the context menu is rendered", () => {
-    it("displays Edit, Duplicate, and Delete actions", () => {
+    it("displays Edit, Duplicate, and Archive actions", () => {
       render(<SuiteContextMenu {...defaultProps} />, { wrapper: Wrapper });
 
       expect(screen.getByText("Edit")).toBeInTheDocument();
       expect(screen.getByText("Duplicate")).toBeInTheDocument();
-      expect(screen.getByText("Delete")).toBeInTheDocument();
+      expect(screen.getByText("Archive")).toBeInTheDocument();
+    });
+
+    it("does not display a Delete action", () => {
+      render(<SuiteContextMenu {...defaultProps} />, { wrapper: Wrapper });
+
+      expect(screen.queryByText("Delete")).not.toBeInTheDocument();
     });
   });
 
@@ -81,23 +87,23 @@ describe("<SuiteContextMenu/>", () => {
     });
   });
 
-  describe("when Delete is clicked", () => {
-    it("calls onDelete and onClose", async () => {
+  describe("when Archive is clicked", () => {
+    it("calls onArchive and onClose", async () => {
       const user = userEvent.setup();
-      const onDelete = vi.fn();
+      const onArchive = vi.fn();
       const onClose = vi.fn();
 
       render(
         <SuiteContextMenu
           {...defaultProps}
-          onDelete={onDelete}
+          onArchive={onArchive}
           onClose={onClose}
         />,
         { wrapper: Wrapper },
       );
 
-      await user.click(screen.getByText("Delete"));
-      expect(onDelete).toHaveBeenCalledOnce();
+      await user.click(screen.getByText("Archive"));
+      expect(onArchive).toHaveBeenCalledOnce();
       expect(onClose).toHaveBeenCalledOnce();
     });
   });

@@ -5,6 +5,7 @@
  * using a mocked PrismaClient.
  *
  * @see specs/suites/suite-workflow.feature
+ * @see specs/suites/suite-archiving.feature
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -210,7 +211,10 @@ describe("SuiteRepository", () => {
         expect(result).toBe(archived);
         expect(prisma.simulationSuite.update).toHaveBeenCalledWith({
           where: { id: "suite_abc123", projectId: "proj_1" },
-          data: { archivedAt: expect.any(Date) },
+          data: {
+            archivedAt: expect.any(Date),
+            slug: "critical-path--archived",
+          },
         });
       });
     });
@@ -233,8 +237,8 @@ describe("SuiteRepository", () => {
     describe("given an already-archived suite", () => {
       it("preserves the original archivedAt timestamp", async () => {
         const originalDate = new Date("2026-01-15");
-        const existing = makeSuiteRow({ archivedAt: originalDate });
-        const archived = makeSuiteRow({ archivedAt: originalDate });
+        const existing = makeSuiteRow({ archivedAt: originalDate, slug: "critical-path--archived" });
+        const archived = makeSuiteRow({ archivedAt: originalDate, slug: "critical-path--archived" });
 
         (prisma.simulationSuite.findFirst as ReturnType<typeof vi.fn>)
           .mockResolvedValue(existing);
@@ -249,6 +253,27 @@ describe("SuiteRepository", () => {
         const updateCall = (prisma.simulationSuite.update as ReturnType<typeof vi.fn>)
           .mock.calls[0]![0];
         expect(updateCall.data.archivedAt).toBe(originalDate);
+      });
+
+      it("does not stack --archived suffixes", async () => {
+        const existing = makeSuiteRow({
+          archivedAt: new Date("2026-01-15"),
+          slug: "critical-path--archived",
+        });
+
+        (prisma.simulationSuite.findFirst as ReturnType<typeof vi.fn>)
+          .mockResolvedValue(existing);
+        (prisma.simulationSuite.update as ReturnType<typeof vi.fn>)
+          .mockResolvedValue(existing);
+
+        await repository.archive({
+          id: "suite_abc123",
+          projectId: "proj_1",
+        });
+
+        const updateCall = (prisma.simulationSuite.update as ReturnType<typeof vi.fn>)
+          .mock.calls[0]![0];
+        expect(updateCall.data.slug).toBe("critical-path--archived");
       });
     });
   });
