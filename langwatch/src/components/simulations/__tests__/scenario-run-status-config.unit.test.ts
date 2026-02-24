@@ -51,13 +51,15 @@ describe("scenario-run-status-config", () => {
 
   describe("getIconAndColor", () => {
     describe("when called with undefined status", () => {
-      it("returns the PENDING icon and green.fg color", () => {
+      it("returns the PENDING icon and PENDING fgColor", () => {
         const result = getIconAndColor(undefined);
 
         expect(result.icon).toBe(
           SCENARIO_RUN_STATUS_ICONS[ScenarioRunStatus.PENDING],
         );
-        expect(result.color).toBe("green.fg");
+        expect(result.color).toBe(
+          SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.PENDING].fgColor,
+        );
       });
     });
 

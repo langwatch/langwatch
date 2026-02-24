@@ -18,7 +18,7 @@ export function getIconAndColor(status: ScenarioRunStatus | undefined): {
   if (status === undefined) {
     return {
       icon: SCENARIO_RUN_STATUS_ICONS[ScenarioRunStatus.PENDING],
-      color: "green.fg",
+      color: SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.PENDING].fgColor,
     };
   }
 
