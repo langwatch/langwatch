@@ -664,10 +664,7 @@ export const organizationRouter = createTRPCRouter({
       });
 
       if (!organization) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Organization not found",
-        });
+        throw new OrganizationNotFoundError();
       }
 
       return organization;
@@ -766,10 +763,7 @@ export const organizationRouter = createTRPCRouter({
       });
 
       if (!organization) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Organization not found",
-        });
+        throw new OrganizationNotFoundError();
       }
 
       const inviteService = InviteService.create(prisma);
@@ -931,8 +925,7 @@ export const organizationRouter = createTRPCRouter({
     .input(z.object({ inviteId: z.string(), organizationId: z.string() }))
     .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input, ctx }) => {
-      const prisma = ctx.prisma;
-      await prisma.organizationInvite.delete({
+      await ctx.prisma.organizationInvite.delete({
         where: { id: input.inviteId, organizationId: input.organizationId },
       });
     }),
