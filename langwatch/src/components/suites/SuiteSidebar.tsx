@@ -31,7 +31,7 @@ import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { SuiteRunSummary } from "./run-history-transforms";
 import { SearchInput } from "../ui/SearchInput";
 
-export const SUITE_SIDEBAR_COLLAPSED_KEY = "suite-sidebar-collapsed";
+export const SUITE_SIDEBAR_COLLAPSED_KEY = "suite-sidebar-collapsed" as const;
 
 
 type SuiteSidebarProps = {
@@ -82,6 +82,7 @@ export function SuiteSidebar({
         width="48px"
         minWidth="48px"
         height="100%"
+        overflowY="auto"
         borderRight="1px solid"
         borderColor="border"
         align="center"
