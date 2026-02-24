@@ -1,4 +1,5 @@
 import type { Currency } from "@prisma/client";
+import { InvalidSeatCountError } from "../errors";
 import { prices } from "../stripe/stripePriceCatalog";
 import type { StripePriceName } from "../stripe/stripePrices.types";
 import { PlanTypes, type PlanTypes as PlanType } from "../planTypes";
@@ -38,8 +39,10 @@ export const GROWTH_SEAT_PLAN_TYPES = [
 ] as const;
 
 /** Type guard: returns true for any of the four GROWTH_SEAT_* plan types. */
-export const isGrowthSeatEventPlan = (plan: string): boolean =>
-  plan.startsWith("GROWTH_SEAT_");
+export const isGrowthSeatEventPlan = (
+  plan: string,
+): plan is (typeof GROWTH_SEAT_PLAN_TYPES)[number] =>
+  GROWTH_SEAT_PLAN_TYPES.includes(plan as (typeof GROWTH_SEAT_PLAN_TYPES)[number]);
 
 /** Builds the plan type string from currency + billing interval. */
 export const resolveGrowthSeatPlanType = ({
@@ -111,12 +114,17 @@ export const createCheckoutLineItems = ({
   coreMembers: number;
   currency: Currency;
   interval: BillingInterval;
-}) => [
-  {
-    price: resolveGrowthSeatPriceId({ currency, interval }),
-    quantity: coreMembers,
-  },
-  {
-    price: resolveGrowthEventsPriceId({ currency, interval }),
-  },
-];
+}) => {
+  if (coreMembers < 1) {
+    throw new InvalidSeatCountError(coreMembers);
+  }
+  return [
+    {
+      price: resolveGrowthSeatPriceId({ currency, interval }),
+      quantity: coreMembers,
+    },
+    {
+      price: resolveGrowthEventsPriceId({ currency, interval }),
+    },
+  ];
+};
