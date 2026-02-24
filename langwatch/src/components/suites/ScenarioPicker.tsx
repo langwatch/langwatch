@@ -10,12 +10,12 @@ import {
   Box,
   Button,
   HStack,
-  Input,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 import { Checkbox } from "../ui/checkbox";
+import { SearchInput } from "../ui/SearchInput";
 
 interface Scenario {
   id: string;
@@ -75,7 +75,7 @@ export function ScenarioPicker({
       width="full"
     >
       <Box paddingX={3} paddingY={2}>
-        <Input
+        <SearchInput
           size="sm"
           placeholder="Search scenarios..."
           value={searchQuery}
