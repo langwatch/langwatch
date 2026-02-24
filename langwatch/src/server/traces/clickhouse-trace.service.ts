@@ -317,7 +317,7 @@ export class ClickHouseTraceService {
               SELECT DISTINCT TraceId
               FROM trace_summaries
               WHERE TenantId = {tenantId:String}
-                AND Attributes['gen_ai.conversation.id'] = {threadId:String}
+                AND Attributes['gen_ai.conversation.id'] IN ({threadIds:Array(String)})
               ORDER BY CreatedAt ASC
               LIMIT 1000
             `,
