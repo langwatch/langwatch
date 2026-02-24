@@ -91,7 +91,7 @@ function getPlanPrice(
       billingPeriod === "annual"
         ? Math.round(p[currency].annual / 12)
         : p[currency].monthly;
-    return `${formatPrice(cents, currency)} per seat/month`;
+    return `${formatPrice({ cents, currency })} per seat/month`;
   }
   return "Custom pricing";
 }

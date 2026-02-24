@@ -206,9 +206,9 @@ export function SubscriptionPage() {
     : billingSeats;
 
   const billingPriceCents = billingSeats * seatPricePerPeriodCents;
-  const billingPriceFormatted = `${formatPrice(billingPriceCents, effectiveCurrency)}${periodSuffix}`;
+  const billingPriceFormatted = `${formatPrice({ cents: billingPriceCents, currency: effectiveCurrency })}${periodSuffix}`;
   const upgradeBillingPriceCents = upgradeBillingSeats * seatPricePerPeriodCents;
-  const upgradeBillingPriceFormatted = `${formatPrice(upgradeBillingPriceCents, effectiveCurrency)}${periodSuffix}`;
+  const upgradeBillingPriceFormatted = `${formatPrice({ cents: upgradeBillingPriceCents, currency: effectiveCurrency })}${periodSuffix}`;
 
   const handleDrawerSave = (result: DrawerSaveResult) => {
     // 1. Store new seats for upgrade flow (manually-added only)
@@ -292,7 +292,7 @@ export function SubscriptionPage() {
     isTieredPricingModel || isDeveloperPlan
       ? undefined
       : {
-          totalPrice: `${formatPrice(seatPricePerPeriodCents * (plan?.maxMembers ?? 1), effectiveCurrency)}${periodSuffix}`,
+          totalPrice: `${formatPrice({ cents: seatPricePerPeriodCents * (plan?.maxMembers ?? 1), currency: effectiveCurrency })}${periodSuffix}`,
           seatCount: plan?.maxMembers ?? 1,
           perSeatPrice: monthlyEquivalent,
         };

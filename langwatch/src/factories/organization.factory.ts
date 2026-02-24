@@ -32,5 +32,4 @@ export const organizationFactory = Factory.define<
   license: null,
   licenseExpiresAt: null,
   licenseLastValidatedAt: null,
-  pricingModel: "TIERED",
 }));

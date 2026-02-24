@@ -92,7 +92,7 @@ export const createSeatEventSubscriptionFns = ({
         data: {
           organizationId,
           status: SubscriptionStatus.PENDING,
-          plan: resolveGrowthSeatPlanType(currency, billingInterval),
+          plan: resolveGrowthSeatPlanType({ currency, interval: billingInterval }),
           maxMembers: membersToAdd,
         },
       });

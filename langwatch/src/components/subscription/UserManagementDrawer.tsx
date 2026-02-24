@@ -336,7 +336,7 @@ export function UserManagementDrawer({
               <HStack justify="space-between">
                 <Text fontWeight="bold">{priceLabel}</Text>
                 <Text fontWeight="bold" color="blue.600" data-testid="monthly-price-footer">
-                  {formatPrice(totalPriceCentsInDrawer, currency)}{periodSuffix}
+                  {formatPrice({ cents: totalPriceCentsInDrawer, currency })}{periodSuffix}
                 </Text>
               </HStack>
             </VStack>
