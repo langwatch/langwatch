@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { parseSuiteTargets } from "~/server/suites/types";
-import { formatTimeAgo } from "~/utils/formatTimeAgo";
+import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { RunHistoryList, type RunHistoryStats } from "./RunHistoryList";
 
 type SuiteDetailPanelProps = {
@@ -142,7 +142,7 @@ export function SuiteDetailPanel({
               {liveStats.lastActivityTimestamp && (
                 <StatPill
                   icon={<Clock size={14} />}
-                  value={formatTimeAgo(liveStats.lastActivityTimestamp) ?? ""}
+                  value={formatTimeAgoCompact(liveStats.lastActivityTimestamp)}
                   label=""
                   colorScheme="gray"
                 />

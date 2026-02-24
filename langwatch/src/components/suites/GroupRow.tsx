@@ -1,44 +1,37 @@
 /**
- * Collapsible row for a single batch run in the run history list.
+ * Collapsible row for a grouped set of scenario runs.
  *
- * Header: [chevron] [suiteName] · [scenarioNames] · [timeAgo] · [spacer] · [statusIcon] [passRate%]
- * Expanded: shows ScenarioTargetRow for each scenario run in the batch.
+ * Used when group-by is set to "scenario" or "target".
+ * Header: [chevron] [group_name (bold)] [status_icon] [pass_rate] ... [N runs]
+ * Footer: [N passed] [N failed]
+ * Expanded: ScenarioTargetRow for each run in the group.
  */
 
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { SummaryStatusIcon } from "./SummaryStatusIcon";
-import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
-import type { BatchRun, BatchRunSummary } from "./run-history-transforms";
-import { getScenarioDisplayNames } from "./run-history-transforms";
+import type { RunGroup, RunGroupSummary } from "./run-history-transforms";
 import { ScenarioTargetRow } from "./ScenarioTargetRow";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 
-type RunRowProps = {
-  batchRun: BatchRun;
-  summary: BatchRunSummary;
+type GroupRowProps = {
+  group: RunGroup;
+  summary: RunGroupSummary;
   isExpanded: boolean;
   onToggle: () => void;
-  targetName: string | null;
   onScenarioRunClick: (scenarioRun: ScenarioRunData) => void;
-  expectedJobCount?: number;
-  suiteName?: string; // displayed in All Runs view
+  targetName?: string | null;
 };
 
-export function RunRow({
-  batchRun,
+export function GroupRow({
+  group,
   summary,
   isExpanded,
   onToggle,
-  targetName,
   onScenarioRunClick,
-  expectedJobCount,
-  suiteName,
-}: RunRowProps) {
-  const timeAgo = formatTimeAgoCompact(batchRun.timestamp);
-  const scenarioNames = suiteName
-    ? getScenarioDisplayNames({ scenarioRuns: batchRun.scenarioRuns })
-    : "";
+  targetName,
+}: GroupRowProps) {
+  const runCount = group.scenarioRuns.length;
 
   return (
     <Box
@@ -47,7 +40,7 @@ export function RunRow({
       borderRadius="md"
       overflow="hidden"
     >
-      {/* Run header - clickable to expand/collapse */}
+      {/* Group header - clickable to expand/collapse */}
       <HStack
         as="button"
         width="full"
@@ -59,42 +52,19 @@ export function RunRow({
         onClick={onToggle}
         role="button"
         aria-expanded={isExpanded}
-        aria-label={`Run from ${timeAgo ?? "unknown time"}`}
+        aria-label={`${group.groupLabel} group`}
       >
         {isExpanded ? (
           <ChevronDown size={14} />
         ) : (
           <ChevronRight size={14} />
         )}
-        {suiteName && (
-          <>
-            <Text fontSize="sm" fontWeight="medium" color="fg.default">
-              {suiteName}
-            </Text>
-            <Text fontSize="sm" color="fg.muted">
-              &middot;
-            </Text>
-          </>
-        )}
-        {scenarioNames && (
-          <>
-            <Text fontSize="sm" color="fg.muted" truncate minWidth={0}>
-              {scenarioNames}
-            </Text>
-            <Text fontSize="sm" color="fg.muted">
-              &middot;
-            </Text>
-          </>
-        )}
-        <Text fontSize="xs" color="fg.subtle">
-          {timeAgo}
+        <Text fontSize="sm" fontWeight="bold" color="fg.default">
+          {group.groupLabel}
         </Text>
-        {expectedJobCount != null && summary.totalCount < expectedJobCount && (
-          <Text fontSize="xs" color="fg.muted">
-            {summary.totalCount} of {expectedJobCount}
-          </Text>
-        )}
-        <Box flex={1} />
+        <Text fontSize="sm" color="fg.muted">
+          &middot;
+        </Text>
         <SummaryStatusIcon summary={summary} />
         <Text
           fontSize="sm"
@@ -103,28 +73,37 @@ export function RunRow({
         >
           {Math.round(summary.passRate)}%
         </Text>
+        <Box flex={1} />
+        <Text fontSize="xs" color="fg.muted">
+          {runCount} {runCount === 1 ? "run" : "runs"}
+        </Text>
       </HStack>
 
-      {/* Expanded content - scenario x target rows */}
+      {/* Expanded content - individual scenario runs */}
       {isExpanded && (
-        <VStack align="stretch" gap={0} borderTop="1px solid" borderColor="border">
-          {batchRun.scenarioRuns.map((scenarioRun) => (
+        <VStack
+          align="stretch"
+          gap={0}
+          borderTop="1px solid"
+          borderColor="border"
+        >
+          {group.scenarioRuns.map((scenarioRun) => (
             <ScenarioTargetRow
               key={scenarioRun.scenarioRunId}
               scenarioRun={scenarioRun}
-              targetName={targetName}
+              targetName={targetName ?? null}
               onClick={() => onScenarioRunClick(scenarioRun)}
             />
           ))}
-          {batchRun.scenarioRuns.length === 0 && (
+          {group.scenarioRuns.length === 0 && (
             <Text fontSize="sm" color="fg.muted" paddingX={4} paddingY={3}>
-              No scenario runs in this batch.
+              No scenario runs in this group.
             </Text>
           )}
         </VStack>
       )}
 
-      {/* Per-batch footer stats */}
+      {/* Per-group footer stats */}
       <HStack
         paddingX={4}
         paddingY={2}

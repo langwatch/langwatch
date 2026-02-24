@@ -31,7 +31,7 @@ describe("SerializedHttpAgentAdapter", () => {
     messages: [{ role: "user", content: "Hello" }],
     newMessages: [{ role: "user", content: "Hello" }],
     requestedRole: AgentRole.AGENT,
-    judgmentRequest: false,
+
     scenarioState: {} as AgentInput["scenarioState"],
     scenarioConfig: {} as AgentInput["scenarioConfig"],
   };

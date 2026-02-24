@@ -227,6 +227,7 @@ export function createTestJobData(
       model: "openai/gpt-4o-mini",
     },
     nlpServiceUrl: "http://localhost:8080",
+    target: { type: "http", referenceId: "test-agent" },
     ...overrides,
   };
 }

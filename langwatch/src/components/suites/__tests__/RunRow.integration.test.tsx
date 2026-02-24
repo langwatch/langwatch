@@ -241,4 +241,112 @@ describe("<RunRow/>", () => {
       expect(screen.queryByText(/of \d+/)).not.toBeInTheDocument();
     });
   });
+
+  describe("when suiteName is provided (All Runs view)", () => {
+    describe("when collapsed with multiple scenarios", () => {
+      it("displays scenario names after suite name", () => {
+        const batchRun = makeBatchRun({
+          scenarioRuns: [
+            makeScenarioRunData({ name: "Login Flow", scenarioRunId: "r1" }),
+            makeScenarioRunData({ name: "Checkout Flow", scenarioRunId: "r2" }),
+          ],
+        });
+
+        render(
+          <RunRow
+            batchRun={batchRun}
+            summary={makeSummary()}
+            isExpanded={false}
+            onToggle={vi.fn()}
+            targetName={null}
+            onScenarioRunClick={vi.fn()}
+            suiteName="My Suite"
+          />,
+          { wrapper: Wrapper },
+        );
+
+        expect(screen.getByText("My Suite")).toBeInTheDocument();
+        expect(screen.getByText("Checkout Flow, Login Flow")).toBeInTheDocument();
+      });
+    });
+
+    describe("when collapsed with a single scenario", () => {
+      it("displays the single scenario name", () => {
+        const batchRun = makeBatchRun({
+          scenarioRuns: [
+            makeScenarioRunData({ name: "Login Flow", scenarioRunId: "r1" }),
+          ],
+        });
+
+        render(
+          <RunRow
+            batchRun={batchRun}
+            summary={makeSummary({ totalCount: 1, passedCount: 1 })}
+            isExpanded={false}
+            onToggle={vi.fn()}
+            targetName={null}
+            onScenarioRunClick={vi.fn()}
+            suiteName="My Suite"
+          />,
+          { wrapper: Wrapper },
+        );
+
+        expect(screen.getByText("Login Flow")).toBeInTheDocument();
+      });
+    });
+
+    describe("when collapsed with more than 3 scenarios", () => {
+      it("truncates with +N more", () => {
+        const batchRun = makeBatchRun({
+          scenarioRuns: [
+            makeScenarioRunData({ name: "Alpha", scenarioRunId: "r1" }),
+            makeScenarioRunData({ name: "Beta", scenarioRunId: "r2" }),
+            makeScenarioRunData({ name: "Gamma", scenarioRunId: "r3" }),
+            makeScenarioRunData({ name: "Delta", scenarioRunId: "r4" }),
+            makeScenarioRunData({ name: "Epsilon", scenarioRunId: "r5" }),
+          ],
+        });
+
+        render(
+          <RunRow
+            batchRun={batchRun}
+            summary={makeSummary({ totalCount: 5, passedCount: 5 })}
+            isExpanded={false}
+            onToggle={vi.fn()}
+            targetName={null}
+            onScenarioRunClick={vi.fn()}
+            suiteName="My Suite"
+          />,
+          { wrapper: Wrapper },
+        );
+
+        expect(screen.getByText("Alpha, Beta, Delta +2 more")).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("when suiteName is not provided (Suite-specific view)", () => {
+    it("does not display scenario names in header", () => {
+      const batchRun = makeBatchRun({
+        scenarioRuns: [
+          makeScenarioRunData({ name: "Login Flow", scenarioRunId: "r1" }),
+          makeScenarioRunData({ name: "Checkout Flow", scenarioRunId: "r2" }),
+        ],
+      });
+
+      render(
+        <RunRow
+          batchRun={batchRun}
+          summary={makeSummary()}
+          isExpanded={false}
+          onToggle={vi.fn()}
+          targetName="Prod Agent"
+          onScenarioRunClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.queryByText("Checkout Flow, Login Flow")).not.toBeInTheDocument();
+    });
+  });
 });

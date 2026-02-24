@@ -33,6 +33,18 @@ vi.mock("~/utils/api", () => ({
       },
       run: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
     },
+    scenarios: {
+      getAllSuiteRunData: {
+        useQuery: () => ({
+          data: { runs: [], scenarioSetIds: {}, hasMore: false, nextCursor: undefined },
+          isLoading: false,
+          error: null,
+        }),
+      },
+      getAll: {
+        useQuery: () => ({ data: [], isLoading: false, error: null }),
+      },
+    },
   },
 }));
 
@@ -53,6 +65,11 @@ vi.mock("~/hooks/useDrawer", () => ({
   }),
 }));
 
+// Mock AllRunsPanel to avoid deep server-side imports in jsdom
+vi.mock("~/components/suites/AllRunsPanel", () => ({
+  AllRunsPanel: () => <div data-testid="all-runs-panel">All Runs</div>,
+}));
+
 // Mock next/router
 vi.mock("next/router", () => ({
   useRouter: () => ({
@@ -69,6 +86,11 @@ vi.mock("~/components/DashboardLayout", () => ({
     dashboardLayoutRenderCount++;
     return <div data-testid="dashboard-layout">{children}</div>;
   },
+}));
+
+// Mock AllRunsPanel to avoid deep dependency tree (now renders by default)
+vi.mock("~/components/suites/AllRunsPanel", () => ({
+  AllRunsPanel: () => <div data-testid="all-runs-panel">All Runs Panel</div>,
 }));
 
 // We import after mocks are set up
@@ -138,7 +160,6 @@ describe("Suites Page Layout (Issue #1671)", () => {
           suites={suites}
           selectedSuiteId={null}
           onSelectSuite={vi.fn()}
-          onNewSuite={vi.fn()}
           onRunSuite={vi.fn()}
           onContextMenu={vi.fn()}
         />,
