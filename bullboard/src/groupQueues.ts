@@ -8,7 +8,7 @@
 
 import { Hono } from "hono";
 import type IORedis from "ioredis";
-import { stripHashTag } from "./redisQueues";
+import { stripHashTag } from "./redisQueues.ts";
 
 /**
  * Lua script to atomically unblock a group.
