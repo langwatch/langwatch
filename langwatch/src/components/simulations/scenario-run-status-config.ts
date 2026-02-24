@@ -1,6 +1,13 @@
-import { ScenarioRunStatus } from "./scenario-event.enums";
+import {
+  AlertTriangle,
+  Check,
+  Clock,
+  XCircle,
+  type LucideIcon,
+} from "lucide-react";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 
-export interface StatusConfig {
+export interface ScenarioRunStatusConfig {
   /** Chakra colorPalette token */
   colorPalette: string;
   /** Human-readable label for badges */
@@ -13,7 +20,7 @@ export interface StatusConfig {
 
 export const SCENARIO_RUN_STATUS_CONFIG: Record<
   ScenarioRunStatus,
-  StatusConfig
+  ScenarioRunStatusConfig
 > = {
   [ScenarioRunStatus.SUCCESS]: {
     colorPalette: "green",
@@ -58,3 +65,14 @@ export const SCENARIO_RUN_STATUS_CONFIG: Record<
     fgColor: "fg.muted",
   },
 };
+
+export const SCENARIO_RUN_STATUS_ICONS: Record<ScenarioRunStatus, LucideIcon> =
+  {
+    [ScenarioRunStatus.SUCCESS]: Check,
+    [ScenarioRunStatus.FAILED]: XCircle,
+    [ScenarioRunStatus.ERROR]: XCircle,
+    [ScenarioRunStatus.CANCELLED]: XCircle,
+    [ScenarioRunStatus.STALLED]: AlertTriangle,
+    [ScenarioRunStatus.IN_PROGRESS]: Clock,
+    [ScenarioRunStatus.PENDING]: Clock,
+  };

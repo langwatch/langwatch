@@ -2,7 +2,7 @@ import { Box, Text, VStack } from "@chakra-ui/react";
 import type { FC } from "react";
 import { AlertCircle, AlertTriangle, Check, X } from "react-feather";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import { SCENARIO_RUN_STATUS_CONFIG } from "~/server/scenarios/status-config";
+import { SCENARIO_RUN_STATUS_CONFIG } from "./scenario-run-status-config";
 import { useColorModeValue } from "../ui/color-mode";
 
 interface OverlayConfig {

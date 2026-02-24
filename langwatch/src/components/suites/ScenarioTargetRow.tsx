@@ -6,7 +6,7 @@
 
 import { HStack, Text } from "@chakra-ui/react";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import { SCENARIO_RUN_STATUS_CONFIG } from "~/server/scenarios/status-config";
+import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
 import { STATUS_ICON_CONFIG } from "./status-icons";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 

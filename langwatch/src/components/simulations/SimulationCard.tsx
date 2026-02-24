@@ -1,6 +1,6 @@
 import { Badge, Box, Card, HStack, Text, VStack } from "@chakra-ui/react";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import { SCENARIO_RUN_STATUS_CONFIG } from "~/server/scenarios/status-config";
+import { SCENARIO_RUN_STATUS_CONFIG } from "./scenario-run-status-config";
 import { SimulationStatusOverlay } from "./SimulationStatusOverlay";
 
 export interface SimulationCardMessage {
