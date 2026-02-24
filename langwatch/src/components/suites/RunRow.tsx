@@ -1,7 +1,7 @@
 /**
  * Collapsible row for a single batch run in the run history list.
  *
- * Header: [chevron] [relative_time] . [status_icon] [pass_rate] [trigger_type]
+ * Header: [chevron] [suiteName] · [scenarioNames] · [timeAgo] · [spacer] · [statusIcon] [passRate%]
  * Expanded: shows ScenarioTargetRow for each scenario run in the batch.
  */
 
@@ -9,6 +9,7 @@ import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { CheckCircle, ChevronDown, ChevronRight, XCircle, Loader } from "lucide-react";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { BatchRun, BatchRunSummary } from "./run-history-transforms";
+import { getScenarioDisplayNames } from "./run-history-transforms";
 import { ScenarioTargetRow } from "./ScenarioTargetRow";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 
@@ -44,6 +45,9 @@ export function RunRow({
   suiteName,
 }: RunRowProps) {
   const timeAgo = formatTimeAgoCompact(batchRun.timestamp);
+  const scenarioNames = suiteName
+    ? getScenarioDisplayNames({ scenarioRuns: batchRun.scenarioRuns })
+    : "";
 
   return (
     <Box
@@ -81,6 +85,16 @@ export function RunRow({
             </Text>
           </>
         )}
+        {scenarioNames && (
+          <>
+            <Text fontSize="sm" color="fg.muted" truncate minWidth={0}>
+              {scenarioNames}
+            </Text>
+            <Text fontSize="sm" color="fg.muted">
+              &middot;
+            </Text>
+          </>
+        )}
         <Text fontSize="xs" color="fg.subtle">
           {timeAgo}
         </Text>
@@ -90,6 +104,9 @@ export function RunRow({
           </Text>
         )}
         <Box flex={1} />
+        <Text fontSize="sm" color="fg.muted">
+          &middot;
+        </Text>
         <OverallStatusIcon summary={summary} />
         <Text
           fontSize="sm"
