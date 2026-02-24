@@ -9,7 +9,7 @@ import {
 } from "@chakra-ui/react";
 import React, { useMemo } from "react";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import { SCENARIO_RUN_STATUS_CONFIG } from "~/server/scenarios/status-config";
+import { SCENARIO_RUN_STATUS_CONFIG } from "./scenario-run-status-config";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { ScenarioRunStatusIcon } from "~/components/simulations/ScenarioRunStatusIcon";
 
