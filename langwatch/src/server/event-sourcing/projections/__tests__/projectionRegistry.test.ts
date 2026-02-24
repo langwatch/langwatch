@@ -10,6 +10,7 @@ import {
 } from "../../services/__tests__/testHelpers";
 import type { Event } from "../../domain/types";
 import type { EventSourcedQueueProcessor, QueueProcessorFactory } from "../../queues";
+import type { ReactorDefinition } from "../../reactors/reactor.types";
 
 function createMockQueueFactory(): QueueProcessorFactory {
   return {
@@ -19,6 +20,13 @@ function createMockQueueFactory(): QueueProcessorFactory {
       close: vi.fn().mockResolvedValue(void 0),
       waitUntilReady: vi.fn().mockResolvedValue(void 0),
     } satisfies EventSourcedQueueProcessor<any>),
+  };
+}
+
+function createMockReactor(name: string): ReactorDefinition<Event> {
+  return {
+    name,
+    handle: vi.fn().mockResolvedValue(void 0),
   };
 }
 
@@ -152,6 +160,83 @@ describe("ProjectionRegistry", () => {
         await registry.dispatch(events, { tenantId });
 
         // Queue factory should have created queues for the fold projection
+        expect(queueFactory.create).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("registerReactor", () => {
+    describe("when fold exists", () => {
+      it("registers successfully", () => {
+        const registry = new ProjectionRegistry();
+        const fold = createMockFoldProjectionDefinition("myFold");
+        registry.registerFoldProjection(fold);
+
+        const reactor = createMockReactor("myReactor");
+        expect(() => registry.registerReactor("myFold", reactor)).not.toThrow();
+      });
+    });
+
+    describe("when fold does not exist", () => {
+      it("throws immediately", () => {
+        const registry = new ProjectionRegistry();
+        const reactor = createMockReactor("myReactor");
+
+        expect(() => registry.registerReactor("missingFold", reactor)).toThrow(
+          /fold "missingFold" — fold not registered/,
+        );
+      });
+    });
+
+    describe("when reactor name is duplicate", () => {
+      it("throws ConfigurationError", () => {
+        const registry = new ProjectionRegistry();
+        const fold = createMockFoldProjectionDefinition("myFold");
+        registry.registerFoldProjection(fold);
+
+        const reactor1 = createMockReactor("sameName");
+        const reactor2 = createMockReactor("sameName");
+
+        registry.registerReactor("myFold", reactor1);
+        expect(() => registry.registerReactor("myFold", reactor2)).toThrow(
+          /already registered/,
+        );
+      });
+    });
+  });
+
+  describe("hasProjections", () => {
+    describe("when reactors are registered alongside their folds", () => {
+      it("returns true", () => {
+        const registry = new ProjectionRegistry();
+        const fold = createMockFoldProjectionDefinition("myFold");
+        registry.registerFoldProjection(fold);
+        registry.registerReactor("myFold", createMockReactor("myReactor"));
+
+        expect(registry.hasProjections).toBe(true);
+      });
+    });
+
+    describe("when nothing is registered", () => {
+      it("returns false", () => {
+        const registry = new ProjectionRegistry();
+        expect(registry.hasProjections).toBe(false);
+      });
+    });
+  });
+
+  describe("initialize with reactors", () => {
+    describe("when reactors are registered", () => {
+      it("creates reactor queues", () => {
+        const registry = new ProjectionRegistry();
+        const fold = createMockFoldProjectionDefinition("myFold");
+        registry.registerFoldProjection(fold);
+        registry.registerReactor("myFold", createMockReactor("myReactor"));
+
+        const queueFactory = createMockQueueFactory();
+        expect(() => registry.initialize(queueFactory)).not.toThrow();
+
+        // Queue factory should have been called for fold + reactor queues
         expect(queueFactory.create).toHaveBeenCalled();
       });
     });

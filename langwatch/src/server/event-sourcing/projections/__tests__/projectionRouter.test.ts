@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ProjectionRouter } from "../projectionRouter";
 import type { QueueManager } from "../../services/queues/queueManager";
 import type { Event } from "../../domain/types";
+import type { ReactorDefinition } from "../../reactors/reactor.types";
 import {
   createMockFoldProjectionDefinition,
   createMockFoldProjectionStore,
@@ -179,6 +180,49 @@ describe("ProjectionRouter", () => {
           // Should contain errors from both fold and map
           expect(aggErr.errors.length).toBeGreaterThanOrEqual(2);
         }
+      });
+    });
+
+    describe("when a fold projection throws", () => {
+      it("does not dispatch to reactors registered on that fold", async () => {
+        const queueManager = createMockQueueManager();
+        const router = new ProjectionRouter(
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          queueManager,
+        );
+
+        const failingStore = createMockFoldProjectionStore<{ count: number }>();
+        (failingStore.get as ReturnType<typeof vi.fn>).mockRejectedValue(
+          new Error("fold exploded"),
+        );
+
+        const fold = createMockFoldProjectionDefinition("exploding-fold", {
+          store: failingStore,
+          init: () => ({ count: 0 }),
+          apply: (state: { count: number }) => ({ count: state.count + 1 }),
+        });
+
+        router.registerFoldProjection(fold);
+
+        const reactorHandle = vi.fn().mockResolvedValue(undefined);
+        const reactor: ReactorDefinition<Event> = {
+          name: "should-not-fire",
+          handle: reactorHandle,
+        };
+        router.registerReactor("exploding-fold", reactor);
+
+        const event = createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        );
+
+        await expect(
+          router.dispatch([event], { tenantId }),
+        ).rejects.toThrow(AggregateError);
+
+        expect(reactorHandle).not.toHaveBeenCalled();
       });
     });
 
