@@ -24,8 +24,9 @@ import {
  * I want to create and edit scenario specifications
  * So that I can define behavioral test cases for my agents
  */
-// Skipped: flaky — timeouts in CI environment (#1802)
-test.describe.skip("Scenario Editor", () => {
+test.describe("Scenario Editor", () => {
+  // fixme(#1811): flaky — timeouts in CI environment
+  test.fixme();
   // Background: Given I am logged into project
   test.beforeEach(async ({ page }) => {
     await givenIAmLoggedIntoProject(page);
