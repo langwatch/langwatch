@@ -8,7 +8,7 @@ const DEFAULT_CURRENCY = Currency.EUR;
 export const EUR_COUNTRIES = new Set([
   "AT", "BE", "CY", "EE", "FI", "FR", "DE", "GR", "IE", "IT",
   "LV", "LT", "LU", "MT", "NL", "PT", "SK", "SI", "ES",
-  "HR", "AD", "MC", "SM", "VA", "ME", "XK",
+  "HR", "BG", "AD", "MC", "SM", "VA", "ME", "XK",
 ]);
 
 export const getCurrencyFromCountry = (countryCode: string | null | undefined): Currency => {

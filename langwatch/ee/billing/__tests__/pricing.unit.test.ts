@@ -36,19 +36,19 @@ describe("pricing", () => {
 
   describe("formatPrice()", () => {
     it("formats whole EUR amount without decimals", () => {
-      expect(formatPrice(2900, "EUR")).toBe("\u20AC29");
+      expect(formatPrice({ cents: 2900, currency: "EUR" })).toBe("\u20AC29");
     });
 
     it("formats fractional USD amount with decimals", () => {
-      expect(formatPrice(35328, "USD")).toBe("$353.28");
+      expect(formatPrice({ cents: 35328, currency: "USD" })).toBe("$353.28");
     });
 
     it("formats large EUR amount with thousands separator", () => {
-      expect(formatPrice(128000, "EUR")).toBe("\u20AC1,280");
+      expect(formatPrice({ cents: 128000, currency: "EUR" })).toBe("\u20AC1,280");
     });
 
     it("formats zero correctly", () => {
-      expect(formatPrice(0, "EUR")).toBe("\u20AC0");
+      expect(formatPrice({ cents: 0, currency: "EUR" })).toBe("\u20AC0");
     });
   });
 });

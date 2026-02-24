@@ -42,10 +42,13 @@ export const isGrowthSeatEventPlan = (plan: string): boolean =>
   plan.startsWith("GROWTH_SEAT_");
 
 /** Builds the plan type string from currency + billing interval. */
-export const resolveGrowthSeatPlanType = (
-  currency: Currency,
-  interval: BillingInterval,
-): PlanType =>
+export const resolveGrowthSeatPlanType = ({
+  currency,
+  interval,
+}: {
+  currency: Currency;
+  interval: BillingInterval;
+}): PlanType =>
   `GROWTH_SEAT_${currency}_${interval.toUpperCase()}` as PlanType;
 
 /** Extracts currency and billing interval from a GROWTH_SEAT plan type. */
@@ -61,23 +64,37 @@ export const parseGrowthSeatPlanType = (
 };
 
 /** Resolves the Stripe price ID for a Growth seat given currency and interval. */
-export const resolveGrowthSeatPriceId = (
-  currency: Currency,
-  interval: BillingInterval,
-): string => {
+export const resolveGrowthSeatPriceId = ({
+  currency,
+  interval,
+}: {
+  currency: Currency;
+  interval: BillingInterval;
+}): string => {
   const key =
     `GROWTH_SEAT_${currency}_${interval.toUpperCase()}` as StripePriceName;
-  return prices[key];
+  const priceId = prices[key];
+  if (!priceId) {
+    throw new Error(`Unsupported Growth seat price: ${currency}/${interval}`);
+  }
+  return priceId;
 };
 
 /** Resolves the Stripe price ID for Growth events given currency and interval. */
-export const resolveGrowthEventsPriceId = (
-  currency: Currency,
-  interval: BillingInterval,
-): string => {
+export const resolveGrowthEventsPriceId = ({
+  currency,
+  interval,
+}: {
+  currency: Currency;
+  interval: BillingInterval;
+}): string => {
   const key =
     `GROWTH_EVENTS_${currency}_${interval.toUpperCase()}` as StripePriceName;
-  return prices[key];
+  const priceId = prices[key];
+  if (!priceId) {
+    throw new Error(`Unsupported Growth events price: ${currency}/${interval}`);
+  }
+  return priceId;
 };
 
 /**
@@ -96,10 +113,10 @@ export const createCheckoutLineItems = ({
   interval: BillingInterval;
 }) => [
   {
-    price: resolveGrowthSeatPriceId(currency, interval),
+    price: resolveGrowthSeatPriceId({ currency, interval }),
     quantity: coreMembers,
   },
   {
-    price: resolveGrowthEventsPriceId(currency, interval),
+    price: resolveGrowthEventsPriceId({ currency, interval }),
   },
 ];

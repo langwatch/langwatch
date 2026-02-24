@@ -40,7 +40,13 @@ export function getAnnualDiscountPercent(currency: Currency): number {
  * Format cents to display price with currency symbol.
  * Uses Intl.NumberFormat for proper thousands separators and decimal handling.
  */
-export function formatPrice(cents: number, currency: Currency): string {
+export function formatPrice({
+  cents,
+  currency,
+}: {
+  cents: number;
+  currency: Currency;
+}): string {
   const amount = cents / 100;
   return new Intl.NumberFormat(currency === Currency.EUR ? "en-IE" : "en-US", {
     style: "currency",
