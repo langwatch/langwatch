@@ -57,7 +57,7 @@ export function createEvaluationEsSyncReactor(
         name: foldState.evaluatorName ?? foldState.evaluatorType,
         status: foldState.status,
         is_guardrail: foldState.isGuardrail,
-        ...(foldState.score !== null && { score: foldState.score }),
+        ...(typeof foldState.score === 'number' && { score: foldState.score }),
         ...(foldState.passed !== null && { passed: foldState.passed }),
         ...(foldState.label !== null && { label: foldState.label }),
         ...(foldState.details !== null && { details: foldState.details }),

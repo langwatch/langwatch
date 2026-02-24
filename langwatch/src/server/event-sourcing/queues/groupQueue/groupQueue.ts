@@ -1,11 +1,11 @@
 import {
-	type Job,
-	type JobsOptions,
-	Queue,
-	QueueEvents,
-	type QueueOptions,
-	Worker,
-	type WorkerOptions,
+  type Job,
+  type JobsOptions,
+  Queue,
+  QueueEvents,
+  type QueueOptions,
+  Worker,
+  type WorkerOptions,
 } from "bullmq";
 import { BullMQOtel } from "bullmq-otel";
 import type IORedis from "ioredis";
@@ -13,35 +13,35 @@ import type { Cluster } from "ioredis";
 import type { SemConvAttributes } from "langwatch/observability";
 import { createLogger } from "../../../../utils/logger/server";
 import {
-	type JobContextMetadata,
-	getJobContextMetadata,
+  type JobContextMetadata,
+  getJobContextMetadata,
 } from "../../../context/asyncContext";
 import { connection } from "../../../redis";
 import type {
-	DeduplicationConfig,
-	EventSourcedQueueDefinition,
-	EventSourcedQueueProcessor,
+  DeduplicationConfig,
+  EventSourcedQueueDefinition,
+  EventSourcedQueueProcessor,
 } from "../../queues";
 import {
-	ConfigurationError,
-	QueueError,
+  ConfigurationError,
+  QueueError,
 } from "../../services/errorHandling";
 
 import { TraceFlags, context as otelContext, trace } from "@opentelemetry/api";
 import {
-	JOB_RETRY_CONFIG,
-	collectBullMQMetrics,
-	extractJobPayload,
-	processJobWithContext,
+  JOB_RETRY_CONFIG,
+  collectBullMQMetrics,
+  extractJobPayload,
+  processJobWithContext,
 } from "../shared";
 import {
-	gqActiveGroups,
-	gqGroupsBlockedTotal,
-	gqJobsCompletedTotal,
-	gqJobsDedupedTotal,
-	gqJobsDispatchedTotal,
-	gqJobsStagedTotal,
-	gqPendingGroups,
+  gqActiveGroups,
+  gqGroupsBlockedTotal,
+  gqJobsCompletedTotal,
+  gqJobsDedupedTotal,
+  gqJobsDispatchedTotal,
+  gqJobsStagedTotal,
+  gqPendingGroups,
 } from "./metrics";
 import { GroupStagingScripts } from "./scripts";
 
@@ -50,7 +50,7 @@ import { GroupStagingScripts } from "./scripts";
  */
 const GROUP_QUEUE_CONFIG = {
   /** Default global concurrency (max parallel groups) */
-  defaultGlobalConcurrency: 20,
+  defaultGlobalConcurrency: 40,
   /** TTL for the active key (safety net for crashes), in seconds */
   activeTtlSec: 300,
   /** BRPOP timeout in seconds (fallback polling interval) */

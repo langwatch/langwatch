@@ -258,7 +258,7 @@ export const updateEvaluationStatusInES = async ({
     ...(check.name && { name: check.name }),
     ...(is_guardrail !== undefined && { is_guardrail }),
     ...(evaluation_thread_id && { evaluation_thread_id }),
-    ...(score !== undefined && { score }),
+    ...(typeof score === "number" && { score }),
     ...(passed !== undefined && { passed }),
     ...(label !== undefined && { label }),
     ...(error && { error: captureError(error) }),

@@ -95,7 +95,7 @@ export const evaluationsRouter = createTRPCRouter({
               tenantId: input.projectId,
               evaluationId,
               status: result.status,
-              score: result.status === "processed" ? (result.score ?? undefined) : undefined,
+              score: result.status === "processed" && typeof result.score === 'number' ? result.score : undefined,
               passed: result.status === "processed" ? (result.passed ?? undefined) : undefined,
               label: result.status === "processed" ? (result.label ?? undefined) : undefined,
               details: result.status === "error" ? result.details : result.status === "processed" ? (result.details ?? undefined) : undefined,

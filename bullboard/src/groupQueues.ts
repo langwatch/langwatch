@@ -66,7 +66,7 @@ interface GroupInfo {
   isBlocked: boolean;
   oldestJobMs: number | null;
   newestJobMs: number | null;
-  jobs: JobInfo[];
+  isStaleBlock: boolean;
 }
 
 interface QueueInfo {
@@ -114,38 +114,39 @@ async function scanGroupQueues(
       groupIds.add(groupId);
     }
 
-    const groups: GroupInfo[] = [];
-    for (const groupId of groupIds) {
+    // Pipeline all per-group commands in a single round-trip
+    const groupIdArr = Array.from(groupIds);
+    const pipeline = redis.pipeline();
+    for (const groupId of groupIdArr) {
       const jobsKey = `${prefix}group:${groupId}:jobs`;
       const activeKey = `${prefix}group:${groupId}:active`;
-      const dataKey = `${prefix}group:${groupId}:data`;
+      pipeline.zcard(jobsKey);
+      pipeline.get(activeKey);
+      pipeline.zrange(jobsKey, 0, 0, "WITHSCORES");
+      pipeline.zrange(jobsKey, -1, -1, "WITHSCORES");
+    }
 
-      const [pendingJobs, activeJobId, jobsWithScores, jobDataHash] =
-        await Promise.all([
-          redis.zcard(jobsKey),
-          redis.get(activeKey),
-          redis.zrange(jobsKey, 0, -1, "WITHSCORES"),
-          redis.hgetall(dataKey),
-        ]);
+    const pipelineResults = await pipeline.exec();
 
-      const jobs: JobInfo[] = [];
-      for (let i = 0; i < jobsWithScores.length; i += 2) {
-        const stagedJobId = jobsWithScores[i]!;
-        const dispatchAfter = parseFloat(jobsWithScores[i + 1]!);
+    const groups: GroupInfo[] = [];
+    for (let i = 0; i < groupIdArr.length; i++) {
+      const groupId = groupIdArr[i]!;
+      const base = i * 4;
 
-        let data: Record<string, unknown> | null = null;
-        const rawData = jobDataHash[stagedJobId];
-        if (rawData) {
-          try {
-            data = JSON.parse(rawData);
-          } catch {
-            data = null;
-          }
-        }
-        jobs.push({ stagedJobId, dispatchAfter, data });
-      }
+      const pendingJobs = (pipelineResults?.[base]?.[1] as number) ?? 0;
+      const activeJobId =
+        (pipelineResults?.[base + 1]?.[1] as string) ?? null;
+      const oldestArr =
+        (pipelineResults?.[base + 2]?.[1] as string[]) ?? [];
+      const newestArr =
+        (pipelineResults?.[base + 3]?.[1] as string[]) ?? [];
 
-      jobs.sort((a, b) => a.dispatchAfter - b.dispatchAfter);
+      const oldestJobMs =
+        oldestArr.length >= 2 ? parseFloat(oldestArr[1]!) : null;
+      const newestJobMs =
+        newestArr.length >= 2 ? parseFloat(newestArr[1]!) : null;
+
+      const isBlocked = blockedSet.has(groupId);
 
       groups.push({
         groupId,
@@ -153,11 +154,10 @@ async function scanGroupQueues(
         score: readyScores.get(groupId) ?? 0,
         hasActiveJob: activeJobId !== null,
         activeJobId,
-        isBlocked: blockedSet.has(groupId),
-        oldestJobMs: jobs.length > 0 ? jobs[0]!.dispatchAfter : null,
-        newestJobMs:
-          jobs.length > 0 ? jobs[jobs.length - 1]!.dispatchAfter : null,
-        jobs,
+        isBlocked,
+        oldestJobMs,
+        newestJobMs,
+        isStaleBlock: isBlocked && pendingJobs === 0 && activeJobId === null,
       });
     }
 
@@ -225,6 +225,80 @@ export function createGroupQueueRoutes(
       ok: true,
       wasBlocked: unblockResult === 1,
     });
+  });
+
+  app.get("/api/group-queues/jobs", async (c) => {
+    const queueName = c.req.query("queue");
+    const groupId = c.req.query("groupId");
+
+    if (!queueName || !groupId) {
+      return c.json({ error: "queue and groupId are required" }, 400);
+    }
+
+    if (!groupQueueNames.includes(queueName)) {
+      return c.json({ error: "Unknown queue name" }, 404);
+    }
+
+    const prefix = `${queueName}:gq:`;
+    const jobsKey = `${prefix}group:${groupId}:jobs`;
+    const dataKey = `${prefix}group:${groupId}:data`;
+
+    const [jobsWithScores, jobDataHash] = await Promise.all([
+      redis.zrange(jobsKey, 0, -1, "WITHSCORES"),
+      redis.hgetall(dataKey),
+    ]);
+
+    const jobs: JobInfo[] = [];
+    for (let i = 0; i < jobsWithScores.length; i += 2) {
+      const stagedJobId = jobsWithScores[i]!;
+      const dispatchAfter = parseFloat(jobsWithScores[i + 1]!);
+      let data: Record<string, unknown> | null = null;
+      const rawData = jobDataHash[stagedJobId];
+      if (rawData) {
+        try {
+          data = JSON.parse(rawData);
+        } catch {
+          data = null;
+        }
+      }
+      jobs.push({ stagedJobId, dispatchAfter, data });
+    }
+
+    jobs.sort((a, b) => a.dispatchAfter - b.dispatchAfter);
+    return c.json({ jobs });
+  });
+
+  app.post("/api/group-queues/unblock-all", async (c) => {
+    const body = await c.req.json<{ queueName: string }>();
+    const { queueName } = body;
+
+    if (!queueName) {
+      return c.json({ error: "queueName is required" }, 400);
+    }
+
+    if (!groupQueueNames.includes(queueName)) {
+      return c.json({ error: "Unknown queue name" }, 404);
+    }
+
+    const prefix = `${queueName}:gq:`;
+    const blockedMembers = await redis.smembers(`${prefix}blocked`);
+
+    let unblockedCount = 0;
+    for (const groupId of blockedMembers) {
+      const result = await redis.eval(
+        UNBLOCK_LUA,
+        5,
+        `${prefix}blocked`,
+        `${prefix}group:${groupId}:active`,
+        `${prefix}group:${groupId}:jobs`,
+        `${prefix}ready`,
+        `${prefix}signal`,
+        groupId,
+      );
+      if (result === 1) unblockedCount++;
+    }
+
+    return c.json({ ok: true, unblockedCount });
   });
 
   app.get("/groups", async (c) => {
@@ -339,6 +413,18 @@ function groupsPageHtml(): string {
     .btn-unblock:hover { background: #2a5a8f; }
     .btn-unblock:disabled { opacity: 0.5; cursor: default; }
 
+    .btn-unblock-all {
+      display: inline-block; margin-left: 8px; padding: 2px 10px;
+      border-radius: 12px; font-size: 11px; font-weight: 600;
+      background: #5f1e1e; color: #ef9a9a; border: 1px solid #8f3a3a;
+      cursor: pointer;
+    }
+    .btn-unblock-all:hover { background: #8f3a3a; }
+    .btn-unblock-all:disabled { opacity: 0.5; cursor: default; }
+
+    .pill-stale { background: #5f4a1e; color: #ffd54f; }
+    tr.stale-blocked td { background: rgba(255,213,79,0.08); }
+
     .time-ago { color: #888; font-size: 12px; white-space: nowrap; }
     .active-id {
       font-family: monospace; font-size: 11px; color: #81c784;
@@ -383,6 +469,7 @@ function groupsPageHtml(): string {
   var closedSections  = {};   // queueName -> true
   var expandedQueues  = {};   // queueName -> true  (show all groups)
   var expandedPayloads = {};  // "queueName::groupId" -> true
+  var jobCache = {};          // "queueName::groupId" -> JobInfo[] (lazy loaded)
   var DEFAULT_VISIBLE = 10;
 
   // ---- DOM refs keyed by id ----
@@ -436,6 +523,24 @@ function groupsPageHtml(): string {
   document.addEventListener("click", function(e) {
     var target = e.target;
 
+    // unblock all button (check before queue header toggle since button is inside header)
+    var uba = target.closest("[data-unblock-all]");
+    if (uba) {
+      e.stopPropagation();
+      var ubaQueue = uba.getAttribute("data-unblock-all");
+      uba.disabled = true;
+      uba.textContent = "Unblocking...";
+      fetch("/api/group-queues/unblock-all", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ queueName: ubaQueue }),
+      }).then(function(res) { return res.json(); })
+        .then(function() { refresh(); })
+        .catch(function(err) { alert("Unblock all failed: " + err.message); })
+        .finally(function() { uba.disabled = false; uba.textContent = "Unblock All"; });
+      return;
+    }
+
     // queue header toggle
     var hdr = target.closest("[data-queue-toggle]");
     if (hdr) {
@@ -455,14 +560,43 @@ function groupsPageHtml(): string {
       return;
     }
 
-    // payload toggle
+    // payload toggle (lazy-fetch from /api/group-queues/jobs)
     var pt = target.closest("[data-payload-toggle]");
     if (pt) {
       var key = pt.getAttribute("data-payload-toggle");
       expandedPayloads[key] = !expandedPayloads[key];
-      var box = pt.parentNode.querySelector(".payload-box");
-      if (box) box.style.display = expandedPayloads[key] ? "block" : "none";
-      setText(pt, expandedPayloads[key] ? "hide" : "show");
+
+      if (!expandedPayloads[key]) {
+        var box = pt.parentNode.querySelector(".payload-box");
+        if (box) box.style.display = "none";
+        var cnt = pt.getAttribute("data-job-count") || "?";
+        pt.textContent = "show (" + cnt + " jobs)";
+        return;
+      }
+
+      if (jobCache[key]) {
+        var box = pt.parentNode.querySelector(".payload-box");
+        if (box) { box.textContent = formatJobs(jobCache[key]); box.style.display = "block"; }
+        pt.textContent = "hide";
+        return;
+      }
+
+      var parts = key.split("::");
+      var qn2 = parts[0];
+      var gid2 = parts.slice(1).join("::");
+      pt.textContent = "loading...";
+      fetch("/api/group-queues/jobs?queue=" + encodeURIComponent(qn2) + "&groupId=" + encodeURIComponent(gid2))
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          jobCache[key] = data.jobs;
+          var box = pt.parentNode.querySelector(".payload-box");
+          if (box) { box.textContent = formatJobs(data.jobs); box.style.display = "block"; }
+          pt.textContent = "hide";
+        })
+        .catch(function() {
+          pt.textContent = "error";
+          expandedPayloads[key] = false;
+        });
       return;
     }
 
@@ -576,7 +710,13 @@ function groupsPageHtml(): string {
     bBlocked.style.display = q.blockedGroupCount > 0 ? "" : "none";
     var bActive  = makeBadge("badge-active",  q.activeGroupCount + " active");
 
-    badges.append(bJobs, bPending, bBlocked, bActive);
+    var bUnblockAll = document.createElement("button");
+    bUnblockAll.className = "btn-unblock-all";
+    bUnblockAll.setAttribute("data-unblock-all", q.name);
+    bUnblockAll.textContent = "Unblock All";
+    bUnblockAll.style.display = q.blockedGroupCount > 0 ? "" : "none";
+
+    badges.append(bJobs, bPending, bBlocked, bActive, bUnblockAll);
     header.append(chevron, nameSpan, link, badges);
 
     // body
@@ -608,7 +748,7 @@ function groupsPageHtml(): string {
     queueEls[q.name] = {
       section: section,
       chevron: chevron,
-      badges: { jobs: bJobs, pending: bPending, blocked: bBlocked, active: bActive },
+      badges: { jobs: bJobs, pending: bPending, blocked: bBlocked, active: bActive, unblockAll: bUnblockAll },
       body: body,
       tbody: tbody,
       showMore: showMore,
@@ -631,6 +771,7 @@ function groupsPageHtml(): string {
     setText(el.badges.blocked, q.blockedGroupCount + " blocked");
     el.badges.blocked.style.display = q.blockedGroupCount > 0 ? "" : "none";
     setText(el.badges.active,  q.activeGroupCount + " active");
+    el.badges.unblockAll.style.display = q.blockedGroupCount > 0 ? "" : "none";
 
     patchGroups(q.name, q);
   }
@@ -727,7 +868,8 @@ function groupsPageHtml(): string {
   function createGroupRow(queueName, tbody, g) {
     var key = queueName + "::" + g.groupId;
     var tr = document.createElement("tr");
-    if (g.isBlocked) tr.className = "blocked";
+    if (g.isStaleBlock) tr.className = "stale-blocked";
+    else if (g.isBlocked) tr.className = "blocked";
 
     // Group ID
     var tdId = document.createElement("td");
@@ -775,8 +917,9 @@ function groupsPageHtml(): string {
     // Status
     var tdStatus = document.createElement("td");
     var statusPill = document.createElement("span");
-    statusPill.className = "pill " + (g.isBlocked ? "pill-blocked" : "pill-ok");
-    statusPill.textContent = g.isBlocked ? "Blocked" : "OK";
+    if (g.isStaleBlock) { statusPill.className = "pill pill-stale"; statusPill.textContent = "Stale"; }
+    else if (g.isBlocked) { statusPill.className = "pill pill-blocked"; statusPill.textContent = "Blocked"; }
+    else { statusPill.className = "pill pill-ok"; statusPill.textContent = "OK"; }
     tdStatus.appendChild(statusPill);
     if (g.isBlocked) {
       var unblockBtn = document.createElement("button");
@@ -813,7 +956,7 @@ function groupsPageHtml(): string {
     var el = groupEls[key];
     if (!el) return;
 
-    el.tr.className = g.isBlocked ? "blocked" : "";
+    el.tr.className = g.isStaleBlock ? "stale-blocked" : (g.isBlocked ? "blocked" : "");
 
     // pending count
     setText(el.pending, String(g.pendingJobs));
@@ -851,8 +994,16 @@ function groupsPageHtml(): string {
     }
 
     // status
-    el.statusPill.className = "pill " + (g.isBlocked ? "pill-blocked" : "pill-ok");
-    setText(el.statusPill, g.isBlocked ? "Blocked" : "OK");
+    if (g.isStaleBlock) {
+      el.statusPill.className = "pill pill-stale";
+      setText(el.statusPill, "Stale");
+    } else if (g.isBlocked) {
+      el.statusPill.className = "pill pill-blocked";
+      setText(el.statusPill, "Blocked");
+    } else {
+      el.statusPill.className = "pill pill-ok";
+      setText(el.statusPill, "OK");
+    }
 
     // unblock button
     var existingBtn = el.statusCell.querySelector(".btn-unblock");
@@ -878,16 +1029,28 @@ function groupsPageHtml(): string {
     var isOpen = expandedPayloads[payloadId];
 
     td.innerHTML = "";
-    if (g.jobs && g.jobs.length > 0 && g.jobs[0].data) {
+    if (g.pendingJobs > 0) {
       var toggle = document.createElement("span");
       toggle.className = "payload-toggle";
       toggle.setAttribute("data-payload-toggle", payloadId);
-      toggle.textContent = (isOpen ? "hide" : "show") + " (" + g.jobs.length + " jobs)";
+      toggle.setAttribute("data-job-count", String(g.pendingJobs));
+
+      if (isOpen && jobCache[payloadId]) {
+        toggle.textContent = "hide";
+      } else if (isOpen) {
+        toggle.textContent = "loading...";
+      } else {
+        toggle.textContent = "show (" + g.pendingJobs + " jobs)";
+      }
 
       var box = document.createElement("div");
       box.className = "payload-box";
-      box.style.display = isOpen ? "block" : "none";
-      box.textContent = formatJobs(g.jobs);
+      if (isOpen && jobCache[payloadId]) {
+        box.textContent = formatJobs(jobCache[payloadId]);
+        box.style.display = "block";
+      } else {
+        box.style.display = "none";
+      }
 
       td.append(toggle, box);
     } else {
@@ -920,6 +1083,7 @@ function groupsPageHtml(): string {
       var res = await fetch("/api/group-queues");
       if (!res.ok) throw new Error(res.statusText);
       var data = await res.json();
+      jobCache = {};
       patch(data);
       statusDot.className  = "status-dot";
       statusText.textContent = "Live (5s)";

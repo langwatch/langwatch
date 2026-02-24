@@ -697,11 +697,17 @@ export const runEvaluation = async ({
     }
   }
 
-  const result = ((await response.json()) as BatchEvaluationResult)[0];
-  if (!result) {
+  const raw = ((await response.json()) as BatchEvaluationResult)[0];
+  if (!raw) {
     getEvaluationStatusCounter(builtInEvaluatorType, "error").inc();
     throw "Unexpected response: empty results";
   }
+
+  const result: typeof raw = {
+    ...raw,
+    ...("score" in raw && { score: typeof raw.score === "number" ? raw.score : undefined }),
+    ...("passed" in raw && { passed: typeof raw.passed === "boolean" ? raw.passed : undefined }),
+  };
 
   getEvaluationStatusCounter(builtInEvaluatorType, result.status).inc();
 
