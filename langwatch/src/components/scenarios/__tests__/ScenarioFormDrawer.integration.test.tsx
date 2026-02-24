@@ -24,10 +24,26 @@ vi.mock("../../prompts/PromptEditorDrawer", () => ({
   PromptEditorDrawer: () => null,
 }));
 vi.mock("../SaveAndRunMenu", () => ({
-  SaveAndRunMenu: ({ onSaveWithoutRunning }: { onSaveWithoutRunning?: () => void }) => (
+  SaveAndRunMenu: ({
+    onSaveWithoutRunning,
+    onSaveAndRun,
+    selectedTarget,
+  }: {
+    onSaveWithoutRunning?: () => void;
+    onSaveAndRun?: (target: { type: string; id: string }) => void;
+    selectedTarget?: { type: string; id: string } | null;
+  }) => (
     <div data-testid="save-and-run-menu">
       <button data-testid="save-button" onClick={onSaveWithoutRunning}>
         Save
+      </button>
+      <button
+        data-testid="save-and-run-button"
+        onClick={() =>
+          onSaveAndRun?.(selectedTarget ?? { type: "http", id: "agent-1" })
+        }
+      >
+        Save and Run
       </button>
     </div>
   ),
@@ -47,6 +63,7 @@ const mocks = vi.hoisted(() => ({
   mockComplexProps: {} as Record<string, unknown>,
   mockOpenDrawer: vi.fn(),
   mockCloseDrawer: vi.fn(),
+  mockRunScenario: vi.fn(),
   mockGetByIdData: null as { id: string; name: string; situation: string; criteria: string[]; labels: string[] } | null,
 }));
 
@@ -54,21 +71,31 @@ vi.mock("~/utils/api", () => ({
   api: {
     scenarios: {
       create: {
-        useMutation: ({ onSuccess }: { onSuccess?: (data: unknown) => void }) => ({
+        useMutation: ({ onSuccess, onError }: { onSuccess?: (data: unknown) => void; onError?: (error: Error) => void }) => ({
           mutateAsync: vi.fn(async (input: unknown) => {
-            const result = await mocks.mockCreateMutateAsync(input);
-            onSuccess?.(result);
-            return result;
+            try {
+              const result = await mocks.mockCreateMutateAsync(input);
+              onSuccess?.(result);
+              return result;
+            } catch (error) {
+              onError?.(error as Error);
+              throw error;
+            }
           }),
           isPending: false,
         }),
       },
       update: {
-        useMutation: ({ onSuccess }: { onSuccess?: (data: unknown) => void }) => ({
+        useMutation: ({ onSuccess, onError }: { onSuccess?: (data: unknown) => void; onError?: (error: Error) => void }) => ({
           mutateAsync: vi.fn(async (input: unknown) => {
-            const result = await mocks.mockUpdateMutateAsync(input);
-            onSuccess?.(result);
-            return result;
+            try {
+              const result = await mocks.mockUpdateMutateAsync(input);
+              onSuccess?.(result);
+              return result;
+            } catch (error) {
+              onError?.(error as Error);
+              throw error;
+            }
           }),
           isPending: false,
         }),
@@ -128,7 +155,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 
 vi.mock("~/hooks/useRunScenario", () => ({
   useRunScenario: () => ({
-    runScenario: vi.fn(),
+    runScenario: mocks.mockRunScenario,
     isRunning: false,
   }),
 }));
@@ -221,10 +248,8 @@ describe("<ScenarioFormDrawer/>", () => {
       });
     });
 
-    describe("when user saves the form", () => {
-      it("transitions to edit mode with the new scenarioId", async () => {
-        const user = userEvent.setup();
-
+    describe("when user saves the form without running", () => {
+      beforeEach(() => {
         mocks.mockComplexProps = {
           initialFormData: {
             name: "Refund Request Test",
@@ -233,8 +258,13 @@ describe("<ScenarioFormDrawer/>", () => {
             labels: [],
           },
         };
+      });
 
-        render(<ScenarioFormDrawer open={true} />, { wrapper: Wrapper });
+      it("closes the drawer after successful create", async () => {
+        const user = userEvent.setup();
+        const onClose = vi.fn();
+
+        render(<ScenarioFormDrawer open={true} onClose={onClose} />, { wrapper: Wrapper });
 
         const saveButton = screen.getByTestId("save-button");
         await user.click(saveButton);
@@ -244,12 +274,23 @@ describe("<ScenarioFormDrawer/>", () => {
         });
 
         await waitFor(() => {
-          expect(mocks.mockOpenDrawer).toHaveBeenCalledWith(
-            "scenarioEditor",
-            { urlParams: { scenarioId: "new-scenario-id" } },
-            { resetStack: true }
-          );
+          expect(onClose).toHaveBeenCalledTimes(1);
         });
+      });
+
+      it("does not transition to edit mode when save-without-running", async () => {
+        const user = userEvent.setup();
+
+        render(<ScenarioFormDrawer open={true} onClose={vi.fn()} />, { wrapper: Wrapper });
+
+        const saveButton = screen.getByTestId("save-button");
+        await user.click(saveButton);
+
+        await waitFor(() => {
+          expect(mocks.mockCreateMutateAsync).toHaveBeenCalledTimes(1);
+        });
+
+        expect(mocks.mockOpenDrawer).not.toHaveBeenCalled();
       });
     });
 
@@ -277,12 +318,128 @@ describe("<ScenarioFormDrawer/>", () => {
         criteria: ["Existing criterion"],
         labels: ["billing"],
       };
+      mocks.mockUpdateMutateAsync.mockResolvedValue({
+        id: "existing-scenario-id",
+        name: "Existing Scenario",
+        situation: "Existing situation",
+        criteria: ["Existing criterion"],
+        labels: ["billing"],
+      });
     });
 
     it("displays 'Edit Scenario' heading", () => {
       render(<ScenarioFormDrawer open={true} />, { wrapper: Wrapper });
 
       expect(screen.getByText("Edit Scenario")).toBeInTheDocument();
+    });
+
+    describe("when user saves without running", () => {
+      it("closes the drawer after successful update", async () => {
+        const user = userEvent.setup();
+        const onClose = vi.fn();
+
+        render(<ScenarioFormDrawer open={true} onClose={onClose} />, { wrapper: Wrapper });
+
+        const saveButton = screen.getByTestId("save-button");
+        await user.click(saveButton);
+
+        await waitFor(() => {
+          expect(mocks.mockUpdateMutateAsync).toHaveBeenCalledTimes(1);
+        });
+
+        await waitFor(() => {
+          expect(onClose).toHaveBeenCalledTimes(1);
+        });
+      });
+    });
+  });
+
+  describe("when save fails", () => {
+    beforeEach(() => {
+      mocks.mockDrawerParams = { scenarioId: "existing-scenario-id" };
+      mocks.mockGetByIdData = {
+        id: "existing-scenario-id",
+        name: "Existing Scenario",
+        situation: "Existing situation",
+        criteria: ["Existing criterion"],
+        labels: ["billing"],
+      };
+      mocks.mockUpdateMutateAsync.mockRejectedValue(
+        new Error("Network error")
+      );
+    });
+
+    it("keeps the drawer open", async () => {
+      const user = userEvent.setup();
+      const onClose = vi.fn();
+
+      render(<ScenarioFormDrawer open={true} onClose={onClose} />, { wrapper: Wrapper });
+
+      const saveButton = screen.getByTestId("save-button");
+      await user.click(saveButton);
+
+      await waitFor(() => {
+        expect(mocks.mockUpdateMutateAsync).toHaveBeenCalledTimes(1);
+      });
+
+      // Drawer should remain open - onClose should not be called
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it("displays an error message", async () => {
+      const user = userEvent.setup();
+
+      render(<ScenarioFormDrawer open={true} onClose={vi.fn()} />, { wrapper: Wrapper });
+
+      const saveButton = screen.getByTestId("save-button");
+      await user.click(saveButton);
+
+      await waitFor(() => {
+        expect(mockToasterCreate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            title: "Failed to update scenario",
+            type: "error",
+          })
+        );
+      });
+    });
+  });
+
+  describe("when user clicks save-and-run", () => {
+    beforeEach(() => {
+      mocks.mockDrawerParams = { scenarioId: "existing-scenario-id" };
+      mocks.mockGetByIdData = {
+        id: "existing-scenario-id",
+        name: "Refund Flow",
+        situation: "User requests a refund",
+        criteria: ["Agent acknowledges the issue"],
+        labels: [],
+      };
+      mocks.mockUpdateMutateAsync.mockResolvedValue({
+        id: "existing-scenario-id",
+        name: "Refund Flow",
+        situation: "User requests a refund",
+        criteria: ["Agent acknowledges the issue"],
+        labels: [],
+      });
+      mocks.mockRunScenario.mockResolvedValue(undefined);
+    });
+
+    it("keeps the drawer open", async () => {
+      const user = userEvent.setup();
+      const onClose = vi.fn();
+
+      render(<ScenarioFormDrawer open={true} onClose={onClose} />, { wrapper: Wrapper });
+
+      const saveAndRunButton = screen.getByTestId("save-and-run-button");
+      await user.click(saveAndRunButton);
+
+      await waitFor(() => {
+        expect(mocks.mockUpdateMutateAsync).toHaveBeenCalledTimes(1);
+      });
+
+      // Drawer should remain open after save-and-run
+      expect(onClose).not.toHaveBeenCalled();
     });
   });
 });
