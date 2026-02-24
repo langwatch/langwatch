@@ -111,7 +111,7 @@ export function SuiteSidebar({
 
         <Separator />
 
-        {suites.map((suite) => (
+        {filteredSuites.map((suite) => (
           <Tooltip
             key={suite.id}
             content={suite.name}

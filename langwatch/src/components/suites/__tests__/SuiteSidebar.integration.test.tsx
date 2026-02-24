@@ -619,6 +619,24 @@ describe("<SuiteSidebar/>", () => {
       });
     });
 
+    describe("when search is active before collapsing", () => {
+      it("filters collapsed icons to match the search query", async () => {
+        const { user } = renderSidebar();
+
+        await user.type(screen.getByPlaceholderText("Search..."), "Critical");
+        await user.click(
+          screen.getByRole("button", { name: "Collapse sidebar" }),
+        );
+
+        expect(
+          screen.getByRole("button", { name: "Critical Path" }),
+        ).toBeInTheDocument();
+        expect(
+          screen.queryByRole("button", { name: "Billing Edge" }),
+        ).not.toBeInTheDocument();
+      });
+    });
+
     describe("when localStorage has collapsed state set", () => {
       it("reads collapsed state from localStorage on mount", () => {
         localStorage.setItem(SUITE_SIDEBAR_COLLAPSED_KEY, "true");
