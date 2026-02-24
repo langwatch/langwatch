@@ -25,8 +25,7 @@ import {
  *
  * Note: These tests require NLP service to be running for execution.
  */
-// Skipped: flaky — timeouts in CI environment (#1802)
-test.describe.skip("Scenario Execution", () => {
+test.describe("Scenario Execution", () => {
   test.beforeEach(async ({ page }) => {
     await givenIAmLoggedIntoProject(page);
   });
@@ -55,7 +54,8 @@ test.describe.skip("Scenario Execution", () => {
    * Workflow test: creates scenario, runs it, and verifies results appear.
    * Requires NLP service to be running.
    */
-  test("executes scenario and displays run results", async ({ page }) => {
+  // fixme(#1811): flaky — toBeVisible fails consistently in CI
+  test.fixme("executes scenario and displays run results", async ({ page }) => {
     // Create a scenario first
     await givenIAmOnTheScenariosListPage(page);
     await whenIClickNewScenario(page);
