@@ -142,7 +142,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   );
 
   const handleSave = useCallback(
-    async (data: ScenarioFormData): Promise<Scenario | null> => {
+    async (data: ScenarioFormData, { skipTransition = false } = {}): Promise<Scenario | null> => {
       if (!project?.id) return null;
 
       // Edit mode: scenarioId is in URL and scenario data is loaded
@@ -162,8 +162,11 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
               projectId: project.id,
               ...data,
             });
-            // Transition to edit mode to prevent double-create on subsequent saves
-            transitionToEditMode(result.id);
+            // Transition to edit mode to prevent double-create on subsequent saves.
+            // Skip when the drawer is about to close (save-without-running).
+            if (!skipTransition) {
+              transitionToEditMode(result.id);
+            }
             resolve(result);
           } catch {
             // Error already handled by global mutation cache if license error
@@ -219,16 +222,21 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     const form = formInstance;
     if (!form) return;
     await form.handleSubmit(async (data) => {
-      const saved = await handleSave(data);
-      if (saved) {
-        toaster.create({
-          title: scenario ? "Scenario updated" : "Scenario created",
-          type: "success",
-          meta: { closable: true },
-        });
+      try {
+        const saved = await handleSave(data, { skipTransition: true });
+        if (saved) {
+          toaster.create({
+            title: scenario ? "Scenario updated" : "Scenario created",
+            type: "success",
+            meta: { closable: true },
+          });
+          onClose();
+        }
+      } catch {
+        // Error already handled by mutation onError callback
       }
     })();
-  }, [handleSave, scenario, formInstance]);
+  }, [handleSave, scenario, formInstance, onClose]);
   const setFormRef = useCallback((form: UseFormReturn<ScenarioFormData>) => {
     setFormInstance(form);
   }, []);
