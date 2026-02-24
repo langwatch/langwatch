@@ -1,4 +1,5 @@
 import { Box, HStack, Progress, Text, VStack } from "@chakra-ui/react";
+import { type PricingModel } from "@prisma/client";
 import { Info } from "lucide-react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
@@ -7,6 +8,42 @@ import { Link } from "../ui/link";
 import { Tooltip } from "../ui/tooltip";
 
 const MENU_ITEM_HEIGHT = "32px";
+
+export type UsageDisplay =
+  | { visible: true; unitLabel: string }
+  | { visible: false };
+
+/**
+ * Determines whether the sidebar usage bar is visible and which unit label
+ * to display.
+ *
+ * Self-hosted: always visible, label = "traces"
+ * SaaS + TIERED: always visible, label = "traces"
+ * SaaS + SEAT_EVENT + free: visible, label = "events"
+ * SaaS + SEAT_EVENT + paid: not visible
+ */
+export function getUsageDisplay({
+  isSaaS,
+  pricingModel,
+  isFree,
+}: {
+  isSaaS: boolean;
+  pricingModel: PricingModel | undefined | null;
+  isFree: boolean;
+}): UsageDisplay {
+  if (!isSaaS) {
+    return { visible: true, unitLabel: "traces" };
+  }
+
+  if (pricingModel === "SEAT_EVENT") {
+    return isFree
+      ? { visible: true, unitLabel: "events" }
+      : { visible: false };
+  }
+
+  // TIERED or no pricing model: always show traces
+  return { visible: true, unitLabel: "traces" };
+}
 
 export type UsageIndicatorProps = {
   showLabel?: boolean;
@@ -26,9 +63,16 @@ export const UsageIndicator = ({ showLabel = true }: UsageIndicatorProps) => {
     },
   );
 
-  if (!usage.data || !isSaaS) {
+  if (!usage.data) {
     return null;
   }
+
+  const display = getUsageDisplay({
+    isSaaS: !!isSaaS,
+    pricingModel: organization?.pricingModel,
+    isFree: usage.data.activePlan.free,
+  });
+  if (!display.visible) return null;
 
   const percentage = Math.min(
     (usage.data.currentMonthMessagesCount /
@@ -39,7 +83,7 @@ export const UsageIndicator = ({ showLabel = true }: UsageIndicatorProps) => {
 
   return (
     <Tooltip
-      content={`You have used ${usage.data.currentMonthMessagesCount.toLocaleString()} traces out of ${usage.data.activePlan.maxMessagesPerMonth.toLocaleString()} this month.`}
+      content={`You have used ${usage.data.currentMonthMessagesCount.toLocaleString()} ${display.unitLabel} out of ${usage.data.activePlan.maxMessagesPerMonth.toLocaleString()} this month.`}
       positioning={{ placement: "right", offset: { mainAxis: 8 } }}
     >
       <Link href="/settings/usage" width={showLabel ? "full" : "auto"}>
