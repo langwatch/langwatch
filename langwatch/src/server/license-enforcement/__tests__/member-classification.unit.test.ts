@@ -5,7 +5,7 @@ import {
   isViewOnlyCustomRole,
   classifyMemberType,
   isFullMember,
-  isMemberLite,
+  isLiteMember,
   getRoleChangeType,
 } from "../member-classification";
 
@@ -15,8 +15,8 @@ import {
  * These pure functions determine member types based on roles and permissions:
  * - isViewOnlyPermission: checks if a single permission is view-only
  * - isViewOnlyCustomRole: checks if all permissions in a role are view-only
- * - classifyMemberType: classifies as FullMember or MemberLite (Lite Member)
- * - isFullMember/isMemberLite: convenience predicates
+ * - classifyMemberType: classifies as FullMember or LiteMember (Lite Member)
+ * - isFullMember/isLiteMember: convenience predicates
  *
  * Note: The EXTERNAL enum value corresponds to "Lite Member" in user-facing terminology.
  */
@@ -126,28 +126,28 @@ describe("classifyMemberType", () => {
       ).toBe("FullMember");
     });
 
-    it("returns MemberLite for EXTERNAL role with no permissions (Lite Member)", () => {
+    it("returns LiteMember for EXTERNAL role with no permissions (Lite Member)", () => {
       expect(classifyMemberType(OrganizationUserRole.EXTERNAL, undefined)).toBe(
-        "MemberLite"
+        "LiteMember"
       );
     });
   });
 
   describe("EXTERNAL role (Lite Member) with custom permissions", () => {
-    it("returns MemberLite for view-only permissions", () => {
+    it("returns LiteMember for view-only permissions", () => {
       expect(
         classifyMemberType(OrganizationUserRole.EXTERNAL, ["project:view"])
-      ).toBe("MemberLite");
+      ).toBe("LiteMember");
     });
 
-    it("returns MemberLite for multiple view-only permissions", () => {
+    it("returns LiteMember for multiple view-only permissions", () => {
       expect(
         classifyMemberType(OrganizationUserRole.EXTERNAL, [
           "project:view",
           "analytics:view",
           "traces:view",
         ])
-      ).toBe("MemberLite");
+      ).toBe("LiteMember");
     });
 
     it("returns FullMember for manage permission", () => {
@@ -195,9 +195,9 @@ describe("classifyMemberType", () => {
       ).toBe("FullMember");
     });
 
-    it("returns MemberLite for empty permissions array", () => {
+    it("returns LiteMember for empty permissions array", () => {
       expect(classifyMemberType(OrganizationUserRole.EXTERNAL, [])).toBe(
-        "MemberLite"
+        "LiteMember"
       );
     });
   });
@@ -232,18 +232,18 @@ describe("isFullMember", () => {
   });
 });
 
-describe("isMemberLite", () => {
+describe("isLiteMember", () => {
   it("returns false for ADMIN role", () => {
-    expect(isMemberLite(OrganizationUserRole.ADMIN, undefined)).toBe(false);
+    expect(isLiteMember(OrganizationUserRole.ADMIN, undefined)).toBe(false);
   });
 
   it("returns false for MEMBER role", () => {
-    expect(isMemberLite(OrganizationUserRole.MEMBER, undefined)).toBe(false);
+    expect(isLiteMember(OrganizationUserRole.MEMBER, undefined)).toBe(false);
   });
 
   it("returns false for EXTERNAL with non-view permissions", () => {
     expect(
-      isMemberLite(OrganizationUserRole.EXTERNAL, [
+      isLiteMember(OrganizationUserRole.EXTERNAL, [
         "project:view",
         "project:manage",
       ])
@@ -252,16 +252,16 @@ describe("isMemberLite", () => {
 
   it("returns true for EXTERNAL with view-only permissions", () => {
     expect(
-      isMemberLite(OrganizationUserRole.EXTERNAL, ["project:view"])
+      isLiteMember(OrganizationUserRole.EXTERNAL, ["project:view"])
     ).toBe(true);
   });
 
   it("returns true for EXTERNAL with no permissions", () => {
-    expect(isMemberLite(OrganizationUserRole.EXTERNAL, undefined)).toBe(true);
+    expect(isLiteMember(OrganizationUserRole.EXTERNAL, undefined)).toBe(true);
   });
 
   it("returns true for EXTERNAL with empty permissions array", () => {
-    expect(isMemberLite(OrganizationUserRole.EXTERNAL, [])).toBe(true);
+    expect(isLiteMember(OrganizationUserRole.EXTERNAL, [])).toBe(true);
   });
 });
 
