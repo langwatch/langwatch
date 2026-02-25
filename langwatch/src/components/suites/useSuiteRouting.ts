@@ -27,6 +27,7 @@ export function useSuiteRouting(): SuiteRouting {
 
   const navigateToSuite = useCallback(
     (id: string | typeof ALL_RUNS_ID) => {
+      if (!projectSlug) return;
       const basePath = `/${projectSlug}/simulations/suites`;
       const path = id === ALL_RUNS_ID ? basePath : `${basePath}/${id}`;
       void push(path, undefined, { shallow: true });

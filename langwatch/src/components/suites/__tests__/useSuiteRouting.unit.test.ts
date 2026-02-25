@@ -107,4 +107,18 @@ describe("useSuiteRouting()", () => {
       expect(result.current.selectedSuiteId).toBeNull();
     });
   });
+
+  describe("when projectSlug is undefined", () => {
+    it("does not navigate", () => {
+      mockRouter.query = {};
+
+      const { result } = renderHook(() => useSuiteRouting());
+
+      act(() => {
+        result.current.navigateToSuite("suite_456");
+      });
+
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+  });
 });
