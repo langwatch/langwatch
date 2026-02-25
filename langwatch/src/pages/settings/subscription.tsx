@@ -4,8 +4,11 @@ import { usePublicEnv } from "~/hooks/usePublicEnv";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Link } from "../../components/ui/link";
 
-const EESubscriptionPage = dynamic(
-  () => import("../../../ee/billing/components/SubscriptionPage"),
+const SubscriptionPage = dynamic(
+  () =>
+    import("~/components/subscription/SubscriptionPage").then(
+      (mod) => mod.SubscriptionPage
+    ),
   { ssr: false }
 );
 
@@ -14,7 +17,7 @@ export default function Subscription() {
   const isSaaS = publicEnv.data?.IS_SAAS;
 
   if (isSaaS) {
-    return <EESubscriptionPage />;
+    return <SubscriptionPage />;
   }
 
   return (

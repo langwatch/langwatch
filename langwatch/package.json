@@ -32,6 +32,7 @@
     "test:ci": "pnpm run test:unit",
     "test:integration": "NODE_ENV=test PINO_LOG_LEVEL=warn vitest -c vitest.integration.config.ts",
     "test:stress": "NODE_ENV=test PINO_LOG_LEVEL=warn vitest -c vitest.stress.config.ts",
+    "test:stripe-integration": "NODE_ENV=test PINO_LOG_LEVEL=warn vitest -c vitest.stripe-integration.config.ts",
     "task": " tsx --tsconfig tsconfig.workers.json src/task.ts",
     "prisma:generate:typescript": "pnpm prisma generate",
     "prisma:generate:migration": "pnpm prisma migrate dev --create-only",

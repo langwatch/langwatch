@@ -60,6 +60,7 @@ describe("webhookService", () => {
     itemCalculator = createMockItemCalculator();
     service = createWebhookService({
       db: db as any,
+      stripe: {} as any,
       itemCalculator,
     });
   });

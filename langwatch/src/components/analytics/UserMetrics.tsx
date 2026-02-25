@@ -120,7 +120,7 @@ export function UserMetrics() {
       gap={6}
     >
       <GridItem>
-        <Card.Root>
+        <Card.Root border="1px solid" borderColor="border.emphasized">
           <Card.Body>
             <Tabs.Root variant="plain" defaultValue="messages">
               <Tabs.List gap={8}>
