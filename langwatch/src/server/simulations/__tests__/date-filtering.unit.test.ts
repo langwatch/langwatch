@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { ClickHouseSimulationService } from "../clickhouse-simulation.service";
 
-function makeRunRow(overrides: Record<string, string | null> = {}) {
+function makeRunRow(overrides: Record<string, unknown> = {}) {
   return {
     ScenarioRunId: "run-1",
     ScenarioId: "scenario-1",
@@ -11,12 +11,16 @@ function makeRunRow(overrides: Record<string, string | null> = {}) {
     Status: "SUCCESS",
     Name: "Test run",
     Description: "A test",
-    Messages: "[]",
-    TraceIds: "[]",
+    "Messages.Id": [] as string[],
+    "Messages.Role": [] as string[],
+    "Messages.Content": [] as string[],
+    "Messages.TraceId": [] as string[],
+    "Messages.Rest": [] as string[],
+    TraceIds: [] as string[],
     Verdict: "success",
     Reasoning: "All good",
-    MetCriteria: "[]",
-    UnmetCriteria: "[]",
+    MetCriteria: [] as string[],
+    UnmetCriteria: [] as string[],
     Error: null,
     DurationMs: "1500",
     CreatedAt: "1000",

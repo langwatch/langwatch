@@ -203,8 +203,9 @@ describe("<AllRunsPanel/>", () => {
       );
 
       // The latest call uses the new period dates (pagination was reset)
-      const lastCall = mockRunDataQuery.mock.calls[mockRunDataQuery.mock.calls.length - 1];
-      expect(lastCall[0]).toMatchObject({
+      const lastCall = mockRunDataQuery.mock.calls.at(-1);
+      expect(lastCall).toBeDefined();
+      expect(lastCall![0]).toMatchObject({
         startDate: period2.startDate.getTime(),
         endDate: period2.endDate.getTime(),
       });
