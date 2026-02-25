@@ -1,5 +1,67 @@
 # Changelog
 
+## [2.5.0](https://github.com/langwatch/langwatch/compare/langwatch@v2.4.2...langwatch@v2.5.0) (2026-02-25)
+
+
+### Features
+
+* add /watch-ci and /launch skills ([#1784](https://github.com/langwatch/langwatch/issues/1784)) ([ba1e76a](https://github.com/langwatch/langwatch/commit/ba1e76a37e1d7b5d999804925c90df5724f177c7))
+* add group-by selector for suite run history ([#1743](https://github.com/langwatch/langwatch/issues/1743)) ([ba7fee5](https://github.com/langwatch/langwatch/commit/ba7fee5f1753708e8e144fe3eb8884bfef6896f9))
+* add platform MCP tools for evaluators and model providers ([#1762](https://github.com/langwatch/langwatch/issues/1762)) ([6339001](https://github.com/langwatch/langwatch/commit/6339001ffae3c83f7c3ea0cdadf480f4ec47f3cc))
+* **billing:** add billing foundation for seat+event pricing model ([#1800](https://github.com/langwatch/langwatch/issues/1800)) ([48f2e54](https://github.com/langwatch/langwatch/commit/48f2e54c8931fa641218f0769362b1068cc94f4f))
+* **billing:** add usage reporting worker and billing meter dispatch ([#1733](https://github.com/langwatch/langwatch/issues/1733)) ([d8e5fa7](https://github.com/langwatch/langwatch/commit/d8e5fa7ea35c4cea490cf354eb3972025b8ef41e))
+* collapsible suite sidebar ([#1817](https://github.com/langwatch/langwatch/issues/1817)) ([6a28431](https://github.com/langwatch/langwatch/commit/6a284315c504e9fe48c22664fb099c6230309a16))
+* convert scenario BatchActionBar to floating bottom bar ([#1766](https://github.com/langwatch/langwatch/issues/1766)) ([5063299](https://github.com/langwatch/langwatch/commit/50632992a0ed10664ed20b77dad8370b720c394a))
+* convert scenario BatchActionBar to floating bottom bar ([#1787](https://github.com/langwatch/langwatch/issues/1787)) ([5063299](https://github.com/langwatch/langwatch/commit/50632992a0ed10664ed20b77dad8370b720c394a))
+* default to "All Runs" view when opening Suites page ([c2dd1dd](https://github.com/langwatch/langwatch/commit/c2dd1dd1cc57b2f9b6640594884bc5c2b454a72f)), closes [#1771](https://github.com/langwatch/langwatch/issues/1771)
+* default to All Runs view when opening Suites page ([#1813](https://github.com/langwatch/langwatch/issues/1813)) ([c2dd1dd](https://github.com/langwatch/langwatch/commit/c2dd1dd1cc57b2f9b6640594884bc5c2b454a72f))
+* defer scenario persistence until explicit Save ([#1783](https://github.com/langwatch/langwatch/issues/1783)) ([b21337d](https://github.com/langwatch/langwatch/commit/b21337da242cc05760d629e13113f013b86e6216)), closes [#1769](https://github.com/langwatch/langwatch/issues/1769)
+* display scenario names in All Runs row headers ([#1816](https://github.com/langwatch/langwatch/issues/1816)) ([618dfda](https://github.com/langwatch/langwatch/commit/618dfda09dc093650033e38f3541332d2ff42842))
+* remove label generation from AI scenario creation ([#1770](https://github.com/langwatch/langwatch/issues/1770)) ([112cee9](https://github.com/langwatch/langwatch/commit/112cee9833062520fc230825bafda9384b9d6bd1))
+* remove label generation from AI scenario creation ([#1788](https://github.com/langwatch/langwatch/issues/1788)) ([112cee9](https://github.com/langwatch/langwatch/commit/112cee9833062520fc230825bafda9384b9d6bd1))
+* rework event sourcing, move product to dual write, improve scenarios and platform performance ([#1704](https://github.com/langwatch/langwatch/issues/1704)) ([b0048b8](https://github.com/langwatch/langwatch/commit/b0048b8dfb39f0343a87966dbebf951d978fe52d))
+* **skills:** check for existing feature files before creating new ones ([#1791](https://github.com/langwatch/langwatch/issues/1791)) ([e41a7ac](https://github.com/langwatch/langwatch/commit/e41a7acaf852beb713d9e5dc50c366c229d70834))
+* skip hostname and TLS validation in scenario runner for on-prem ([#1818](https://github.com/langwatch/langwatch/issues/1818)) ([93b2a7a](https://github.com/langwatch/langwatch/commit/93b2a7aa34ea1002baebb12eb2f16bd61a24a21e))
+* skip hostname/TLS validation in scenario runner for on-prem ([#1821](https://github.com/langwatch/langwatch/issues/1821)) ([93b2a7a](https://github.com/langwatch/langwatch/commit/93b2a7aa34ea1002baebb12eb2f16bd61a24a21e))
+* standardize search fields with shared SearchInput component ([#1672](https://github.com/langwatch/langwatch/issues/1672)) ([72e82e2](https://github.com/langwatch/langwatch/commit/72e82e2657782f1f5fa2485a8e07369d52ab1ce5))
+* standardize search fields with shared SearchInput component ([#1815](https://github.com/langwatch/langwatch/issues/1815)) ([72e82e2](https://github.com/langwatch/langwatch/commit/72e82e2657782f1f5fa2485a8e07369d52ab1ce5))
+* suite sidebar shows pass count, recency, and three-dot menu ([#1776](https://github.com/langwatch/langwatch/issues/1776)) ([a3d3d96](https://github.com/langwatch/langwatch/commit/a3d3d9605f702353c1bafe388509ed9b25e99c83))
+* **suites:** archive instead of hard delete ([#1808](https://github.com/langwatch/langwatch/issues/1808)) ([8314ad9](https://github.com/langwatch/langwatch/commit/8314ad9c1eb095ac49a4c0d740a232d651050669))
+
+
+### Bug Fixes
+
+* adding StatementEnd + ENVSUB OFF ([#1797](https://github.com/langwatch/langwatch/issues/1797)) ([2c324a6](https://github.com/langwatch/langwatch/commit/2c324a69d50b843a73a9bf2b35aa525a44d8e16c))
+* bump clickhouse migration version from 00024 to 00025 ([#1796](https://github.com/langwatch/langwatch/issues/1796)) ([782cd07](https://github.com/langwatch/langwatch/commit/782cd0776df329ffc595b8d421b91feff2729109))
+* change default pricing model from SEAT_EVENT to TIERED  ([5bc983b](https://github.com/langwatch/langwatch/commit/5bc983b5b3466d69521d1352465f93f4e1274bea))
+* change default pricing model from SEAT_EVENT to TIERED ([#1798](https://github.com/langwatch/langwatch/issues/1798)) ([5bc983b](https://github.com/langwatch/langwatch/commit/5bc983b5b3466d69521d1352465f93f4e1274bea))
+* close scenario drawer after save completes ([#1785](https://github.com/langwatch/langwatch/issues/1785)) ([3170e04](https://github.com/langwatch/langwatch/commit/3170e046901aef760b152f289b91efaf5d823099))
+* close scenario drawer after save completes ([#1810](https://github.com/langwatch/langwatch/issues/1810)) ([3170e04](https://github.com/langwatch/langwatch/commit/3170e046901aef760b152f289b91efaf5d823099))
+* event-sourcing review comments ([#1795](https://github.com/langwatch/langwatch/issues/1795)) ([a78e8b4](https://github.com/langwatch/langwatch/commit/a78e8b40df4d9dce08f5505e362b59b47d48353b))
+* increase HTTP agent default timeout to 5 minutes ([#1786](https://github.com/langwatch/langwatch/issues/1786)) ([06f93d1](https://github.com/langwatch/langwatch/commit/06f93d1eba6e913a1a44affc762e938437e160a9))
+* normalize defaultModel with provider prefix for litellm routing ([cc7798e](https://github.com/langwatch/langwatch/commit/cc7798ecb229654f371912e7863ca20364ceb7fa))
+* recreate billable_events with ReplacingMergeTree engine ([#1794](https://github.com/langwatch/langwatch/issues/1794)) ([3637ca8](https://github.com/langwatch/langwatch/commit/3637ca804fe01ecbf000bece639eba15ac78126d))
+* remove padding for scenario library page ([#1758](https://github.com/langwatch/langwatch/issues/1758)) ([5226da4](https://github.com/langwatch/langwatch/commit/5226da4b02e71d7c76999104ae2c72bc5da6a230))
+* remove unnecessary RAG mention in timeout comment ([#1789](https://github.com/langwatch/langwatch/issues/1789)) ([6a60d33](https://github.com/langwatch/langwatch/commit/6a60d335c26fb3d372c9a40b5fbd4a62dc2baece))
+* use KSUID with provider_ prefix for model provider IDs and fix empty state icon ([0b2669f](https://github.com/langwatch/langwatch/commit/0b2669ffd0fbeb2468714e12fb4cdddae1aa22ad))
+
+
+### Miscellaneous
+
+* event sourcing improvements + evaluation fixes ([#1805](https://github.com/langwatch/langwatch/issues/1805)) ([9964a08](https://github.com/langwatch/langwatch/commit/9964a082eb27a4d74d4d50cd5bcb8e1a215ce21c))
+* fix clickhouse analytics query + prepare bullboard for containerisation ([#1820](https://github.com/langwatch/langwatch/issues/1820)) ([f2bbd1c](https://github.com/langwatch/langwatch/commit/f2bbd1cc0542726133dc3ea28fe3dc87df9025fb))
+* more event sourcing improvements + gaps ([#1793](https://github.com/langwatch/langwatch/issues/1793)) ([7e43524](https://github.com/langwatch/langwatch/commit/7e43524c3f39f050beaceb16bda5115879254da8))
+* sample fix and reduce FINAL usage for clickhouse ([#1799](https://github.com/langwatch/langwatch/issues/1799)) ([9982949](https://github.com/langwatch/langwatch/commit/9982949cedf7c20282a589fb638a082265dc3c56))
+* sync model registry ([b47eee8](https://github.com/langwatch/langwatch/commit/b47eee886ba7501df734a7f2360ee73a321f871a))
+* sync model registry (329 models) ([#1765](https://github.com/langwatch/langwatch/issues/1765)) ([b47eee8](https://github.com/langwatch/langwatch/commit/b47eee886ba7501df734a7f2360ee73a321f871a))
+
+
+### Code Refactoring
+
+* **billing:** replace dispatch map projection with reactor ([#1801](https://github.com/langwatch/langwatch/issues/1801)) ([35017cb](https://github.com/langwatch/langwatch/commit/35017cb763a3fb0f4543651fb42d595b5c8f4e83))
+* move scenario run status config from server/ to components/ ([#1809](https://github.com/langwatch/langwatch/issues/1809)) ([4020fed](https://github.com/langwatch/langwatch/commit/4020feda1443a26e90deb9e1dee2ba51a4e9dfa2))
+* replace useState form management with react-hook-form + Zod in suite form ([#1775](https://github.com/langwatch/langwatch/issues/1775)) ([683f162](https://github.com/langwatch/langwatch/commit/683f162c8588bd15d6455c9dcd369eec03ffc110))
+
 ## [2.4.2](https://github.com/langwatch/langwatch/compare/langwatch@v2.4.1...langwatch@v2.4.2) (2026-02-20)
 
 
