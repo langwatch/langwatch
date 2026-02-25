@@ -14,6 +14,11 @@ const projectSchema = z.object({
   projectId: z.string(),
 });
 
+const dateRangeFields = {
+  startDate: z.number().int().nonnegative().optional(),
+  endDate: z.number().int().nonnegative().optional(),
+} as const;
+
 export const scenarioEventsRouter = createTRPCRouter({
   // Get scenario sets data for a project
   getScenarioSetsData: protectedProcedure
@@ -31,11 +36,13 @@ export const scenarioEventsRouter = createTRPCRouter({
   // Get all run data for a scenario set
   getScenarioSetRunData: protectedProcedure
     .input(
-      projectSchema.extend({
-        scenarioSetId: z.string(),
-        limit: z.number().min(1).max(100).default(20),
-        cursor: z.string().optional(), // Cursor for pagination
-      }),
+      projectSchema
+        .extend({
+          scenarioSetId: z.string(),
+          limit: z.number().min(1).max(100).default(20),
+          cursor: z.string().optional(),
+        })
+        .extend(dateRangeFields),
     )
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
@@ -49,6 +56,8 @@ export const scenarioEventsRouter = createTRPCRouter({
         scenarioSetId: input.scenarioSetId,
         limit: input.limit,
         cursor: input.cursor,
+        startDate: input.startDate,
+        endDate: input.endDate,
       });
       return data;
     }),
@@ -175,10 +184,12 @@ export const scenarioEventsRouter = createTRPCRouter({
   // Get run data for all suites (cross-suite view)
   getAllSuiteRunData: protectedProcedure
     .input(
-      projectSchema.extend({
-        limit: z.number().min(1).max(100).default(20),
-        cursor: z.string().optional(),
-      }),
+      projectSchema
+        .extend({
+          limit: z.number().min(1).max(100).default(20),
+          cursor: z.string().optional(),
+        })
+        .extend(dateRangeFields),
     )
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
@@ -188,6 +199,8 @@ export const scenarioEventsRouter = createTRPCRouter({
         projectId: input.projectId,
         limit: input.limit,
         cursor: input.cursor,
+        startDate: input.startDate,
+        endDate: input.endDate,
       });
       return data;
     }),

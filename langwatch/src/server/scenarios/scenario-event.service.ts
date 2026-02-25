@@ -280,11 +280,15 @@ export class ScenarioEventService {
     scenarioSetId,
     limit = 20,
     cursor,
+    startDate,
+    endDate,
   }: {
     projectId: string;
     scenarioSetId: string;
     limit?: number;
     cursor?: string;
+    startDate?: number;
+    endDate?: number;
   }) {
     return tracer.withActiveSpan(
       "ScenarioEventService.getRunDataForScenarioSet",
@@ -309,6 +313,8 @@ export class ScenarioEventService {
           scenarioSetId,
           limit: validatedLimit,
           cursor,
+          startDate,
+          endDate,
         });
 
         if (result.batchRunIds.length === 0) {
@@ -789,10 +795,14 @@ export class ScenarioEventService {
     projectId,
     limit = 20,
     cursor,
+    startDate,
+    endDate,
   }: {
     projectId: string;
     limit?: number;
     cursor?: string;
+    startDate?: number;
+    endDate?: number;
   }) {
     return tracer.withActiveSpan(
       "ScenarioEventService.getRunDataForAllSuites",
@@ -815,6 +825,8 @@ export class ScenarioEventService {
           projectId,
           limit: validatedLimit,
           cursor,
+          startDate,
+          endDate,
         });
 
         if (result.batchRunIds.length === 0) {

@@ -112,6 +112,8 @@ export class SimulationService {
     scenarioSetId: string;
     limit?: number;
     cursor?: string;
+    startDate?: number;
+    endDate?: number;
   }) {
     if (await this.isClickHouseEnabled(params.projectId)) {
       return this.chService!.getRunDataForScenarioSet(params);
@@ -153,6 +155,8 @@ export class SimulationService {
     projectId: string;
     limit?: number;
     cursor?: string;
+    startDate?: number;
+    endDate?: number;
   }) {
     if (await this.isClickHouseEnabled(params.projectId)) {
       return this.chService!.getRunDataForAllSuites(params);

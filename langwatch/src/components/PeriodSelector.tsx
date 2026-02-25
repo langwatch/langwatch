@@ -21,6 +21,9 @@ import { Calendar, ChevronDown } from "react-feather";
 import { LuCalendar } from "react-icons/lu";
 import { Popover } from "./ui/popover";
 
+/** Date range used for time-based filtering across the app. */
+export type Period = { startDate: Date; endDate: Date };
+
 const getDaysDifference = (startDate: Date, endDate: Date) =>
   differenceInCalendarDays(endDate, startDate) + 1;
 

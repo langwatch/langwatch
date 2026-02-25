@@ -29,6 +29,7 @@ import {
 import { useState } from "react";
 import { parseSuiteTargets } from "~/server/suites/types";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
+import type { Period } from "~/components/PeriodSelector";
 import { RunHistoryList, type RunHistoryStats } from "./RunHistoryList";
 
 type SuiteDetailPanelProps = {
@@ -36,6 +37,7 @@ type SuiteDetailPanelProps = {
   onEdit: () => void;
   onRun: () => void;
   isRunning?: boolean;
+  period: Period;
 };
 
 export function SuiteDetailPanel({
@@ -43,6 +45,7 @@ export function SuiteDetailPanel({
   onEdit,
   onRun,
   isRunning = false,
+  period,
 }: SuiteDetailPanelProps) {
   const targets = (() => {
     try {
@@ -170,7 +173,7 @@ export function SuiteDetailPanel({
       <Separator />
 
       {/* Run history list */}
-      <RunHistoryList suite={suite} onStatsReady={setLiveStats} />
+      <RunHistoryList suite={suite} onStatsReady={setLiveStats} period={period} />
     </VStack>
   );
 }

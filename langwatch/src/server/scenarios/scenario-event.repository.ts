@@ -32,6 +32,24 @@ const DEDUP_OVERSAMPLE_FACTOR = 5; // fetch 5× to survive deduplication
 const DEDUP_MIN_REQUEST_SIZE = 1000; // minimum ES request size
 
 /**
+ * Builds an ES range filter on the `timestamp` field for optional date bounds.
+ * Returns null when neither bound is specified.
+ */
+function buildEsDateRangeFilter({
+  startDate,
+  endDate,
+}: {
+  startDate?: number;
+  endDate?: number;
+}): Record<string, unknown> | null {
+  if (startDate === undefined && endDate === undefined) return null;
+  const range: Record<string, number> = {};
+  if (startDate !== undefined) range.gte = startDate;
+  if (endDate !== undefined) range.lte = endDate;
+  return { range: { timestamp: range } };
+}
+
+/**
  * Repository class for managing scenario events in Elasticsearch.
  * Handles CRUD operations and complex queries for scenario events, including:
  * - Individual scenario events
@@ -491,11 +509,15 @@ export class ScenarioEventRepository {
     scenarioSetId,
     limit,
     cursor,
+    startDate,
+    endDate,
   }: {
     projectId: string;
     scenarioSetId: string;
     limit: number;
     cursor?: string;
+    startDate?: number;
+    endDate?: number;
   }): Promise<{
     batchRunIds: string[];
     nextCursor?: string;
@@ -508,6 +530,8 @@ export class ScenarioEventRepository {
       limit,
       cursor,
       setFilter: { term: { [ES_FIELDS.scenarioSetId]: validatedScenarioSetId } },
+      startDate,
+      endDate,
     });
   }
 
@@ -520,10 +544,14 @@ export class ScenarioEventRepository {
     projectId,
     limit,
     cursor,
+    startDate,
+    endDate,
   }: {
     projectId: string;
     limit: number;
     cursor?: string;
+    startDate?: number;
+    endDate?: number;
   }): Promise<{
     batchRunIds: string[];
     scenarioSetIds: Record<string, string>;
@@ -534,6 +562,8 @@ export class ScenarioEventRepository {
       projectId,
       limit,
       cursor,
+      startDate,
+      endDate,
       trackScenarioSetIds: true,
     });
 
@@ -550,12 +580,16 @@ export class ScenarioEventRepository {
     cursor,
     setFilter,
     trackScenarioSetIds = false,
+    startDate,
+    endDate,
   }: {
     projectId: string;
     limit: number;
     cursor?: string;
-    setFilter?: Record<string, any>;
+    setFilter?: Record<string, unknown>;
     trackScenarioSetIds?: boolean;
+    startDate?: number;
+    endDate?: number;
   }): Promise<{
     batchRunIds: string[];
     scenarioSetIds: Record<string, string>;
@@ -572,6 +606,9 @@ export class ScenarioEventRepository {
     // Request 5x the limit (min 1000) to account for deduplication
     const requestSize = Math.max(actualLimit * DEDUP_OVERSAMPLE_FACTOR, DEDUP_MIN_REQUEST_SIZE);
 
+    // Build optional date range filter
+    const dateRangeFilter = buildEsDateRangeFilter({ startDate, endDate });
+
     const response = await client.search({
       index: SCENARIO_EVENTS_INDEX.alias,
       body: {
@@ -581,6 +618,7 @@ export class ScenarioEventRepository {
               { term: { [ES_FIELDS.projectId]: validatedProjectId } },
               ...(setFilter ? [setFilter] : []),
               { exists: { field: ES_FIELDS.batchRunId } },
+              ...(dateRangeFilter ? [dateRangeFilter] : []),
             ],
           },
         },

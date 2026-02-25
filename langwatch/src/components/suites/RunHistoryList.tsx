@@ -19,6 +19,7 @@ import { getSuiteSetId } from "~/server/suites/suite-set-id";
 import { api } from "~/utils/api";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { buildRoutePath } from "~/utils/routes";
+import type { Period } from "~/components/PeriodSelector";
 import { RunHistoryFilters } from "./RunHistoryFilters";
 import { RunHistoryFooter } from "./RunHistoryFooter";
 import { RunRow } from "./RunRow";
@@ -43,9 +44,10 @@ export type RunHistoryStats = {
 type RunHistoryListProps = {
   suite: SimulationSuite;
   onStatsReady?: (stats: RunHistoryStats) => void;
+  period?: Period;
 };
 
-export function RunHistoryList({ suite, onStatsReady }: RunHistoryListProps) {
+export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListProps) {
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
   const setId = getSuiteSetId(suite.id);
@@ -112,7 +114,8 @@ export function RunHistoryList({ suite, onStatsReady }: RunHistoryListProps) {
   const hasQueuedJobs =
     (queueStatus?.waiting ?? 0) > 0 || (queueStatus?.active ?? 0) > 0;
 
-  // Fetch run data using existing scenario events endpoint
+  // Fetch all run data for this suite (unpaginated).
+  // Date filtering is applied client-side to avoid capping results.
   const {
     data: runData,
     isLoading,
@@ -187,18 +190,24 @@ export function RunHistoryList({ suite, onStatsReady }: RunHistoryListProps) {
       .filter(Boolean) as Array<{ id: string; name: string }>;
   }, [scenarios, suite.scenarioIds]);
 
-  // Apply filters to raw run data
+  // Apply filters to raw run data (date filtering is done server-side)
   const filteredRuns = useMemo(() => {
     if (!runData) return [];
 
     let runs: ScenarioRunData[] = runData;
+
+    if (period) {
+      const startMs = period.startDate.getTime();
+      const endMs = period.endDate.getTime();
+      runs = runs.filter((r) => r.timestamp >= startMs && r.timestamp <= endMs);
+    }
 
     if (filters.scenarioId) {
       runs = runs.filter((r) => r.scenarioId === filters.scenarioId);
     }
 
     return runs;
-  }, [runData, filters.scenarioId]);
+  }, [runData, filters.scenarioId, period]);
 
   // Group filtered runs by batch (for "none" grouping and pass/fail filtering)
   const batchRuns = useMemo(() => {

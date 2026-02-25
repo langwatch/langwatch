@@ -51,6 +51,11 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
+const defaultPeriod = {
+  startDate: new Date("2024-01-01T00:00:00Z"),
+  endDate: new Date("2024-12-31T23:59:59Z"),
+};
+
 describe("<AllRunsPanel/>", () => {
   afterEach(() => {
     cleanup();
@@ -67,7 +72,7 @@ describe("<AllRunsPanel/>", () => {
       });
       mockScenariosQuery.mockReturnValue({ data: undefined });
 
-      const { container } = render(<AllRunsPanel />, { wrapper: Wrapper });
+      const { container } = render(<AllRunsPanel period={defaultPeriod} />, { wrapper: Wrapper });
 
       // Check for spinner element
       expect(container.querySelector(".chakra-spinner")).toBeInTheDocument();
@@ -84,7 +89,7 @@ describe("<AllRunsPanel/>", () => {
       });
       mockScenariosQuery.mockReturnValue({ data: [] });
 
-      render(<AllRunsPanel />, { wrapper: Wrapper });
+      render(<AllRunsPanel period={defaultPeriod} />, { wrapper: Wrapper });
 
       expect(screen.getByText(/Error loading runs/i)).toBeInTheDocument();
       expect(screen.getByText(/Network error/i)).toBeInTheDocument();
@@ -101,7 +106,7 @@ describe("<AllRunsPanel/>", () => {
       });
       mockScenariosQuery.mockReturnValue({ data: [] });
 
-      render(<AllRunsPanel />, { wrapper: Wrapper });
+      render(<AllRunsPanel period={defaultPeriod} />, { wrapper: Wrapper });
 
       expect(
         screen.getByText(/No runs yet. Execute a suite to see results here./i),
@@ -138,9 +143,72 @@ describe("<AllRunsPanel/>", () => {
       });
       mockScenariosQuery.mockReturnValue({ data: [] });
 
-      render(<AllRunsPanel />, { wrapper: Wrapper });
+      render(<AllRunsPanel period={defaultPeriod} />, { wrapper: Wrapper });
 
       expect(screen.getByText("All Runs")).toBeInTheDocument();
+    });
+  });
+
+  describe("when the period changes", () => {
+    it("passes startDate and endDate to the query", () => {
+      const period = {
+        startDate: new Date("2024-06-01T00:00:00Z"),
+        endDate: new Date("2024-06-30T23:59:59Z"),
+      };
+
+      mockSuitesQuery.mockReturnValue({ data: [] });
+      mockRunDataQuery.mockReturnValue({
+        data: { runs: [], scenarioSetIds: {}, hasMore: false },
+        isLoading: false,
+        error: null,
+      });
+      mockScenariosQuery.mockReturnValue({ data: [] });
+
+      render(<AllRunsPanel period={period} />, { wrapper: Wrapper });
+
+      expect(mockRunDataQuery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          startDate: period.startDate.getTime(),
+          endDate: period.endDate.getTime(),
+        }),
+        expect.anything(),
+      );
+    });
+
+    it("resets pagination when re-rendered with a new period", () => {
+      const period1 = {
+        startDate: new Date("2024-01-01T00:00:00Z"),
+        endDate: new Date("2024-06-30T23:59:59Z"),
+      };
+      const period2 = {
+        startDate: new Date("2024-07-01T00:00:00Z"),
+        endDate: new Date("2024-12-31T23:59:59Z"),
+      };
+
+      mockSuitesQuery.mockReturnValue({ data: [] });
+      mockRunDataQuery.mockReturnValue({
+        data: { runs: [], scenarioSetIds: {}, hasMore: false },
+        isLoading: false,
+        error: null,
+      });
+      mockScenariosQuery.mockReturnValue({ data: [] });
+
+      const { rerender } = render(<AllRunsPanel period={period1} />, { wrapper: Wrapper });
+
+      // Re-render with a different period
+      rerender(
+        <Wrapper>
+          <AllRunsPanel period={period2} />
+        </Wrapper>,
+      );
+
+      // The latest call uses the new period dates (pagination was reset)
+      const lastCall = mockRunDataQuery.mock.calls.at(-1);
+      expect(lastCall).toBeDefined();
+      expect(lastCall![0]).toMatchObject({
+        startDate: period2.startDate.getTime(),
+        endDate: period2.endDate.getTime(),
+      });
     });
   });
 });

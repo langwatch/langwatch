@@ -308,6 +308,72 @@ describe("ClickHouseSimulationService", () => {
         );
       });
     });
+
+    describe("when startDate and endDate are provided", () => {
+      it("includes date parameters in the query", async () => {
+        setQueryResults(clickhouse, [
+          [{ BatchRunId: "batch-1", MaxCreatedAt: "3000" }],
+          [makeRunRow({ ScenarioRunId: "run-1", BatchRunId: "batch-1" })],
+        ]);
+
+        await service.getRunDataForScenarioSet({
+          projectId: "proj-1",
+          scenarioSetId: "set-1",
+          startDate: 1000,
+          endDate: 5000,
+        });
+
+        expect(clickhouse.query).toHaveBeenCalledWith(
+          expect.objectContaining({
+            query_params: expect.objectContaining({
+              startDateMs: "1000",
+              endDateMs: "5000",
+            }),
+          }),
+        );
+      });
+
+      it("uses HAVING clause with max(CreatedAt) for atomic batch filtering", async () => {
+        setQueryResults(clickhouse, [
+          [{ BatchRunId: "batch-1", MaxCreatedAt: "3000" }],
+          [makeRunRow({ ScenarioRunId: "run-1", BatchRunId: "batch-1" })],
+        ]);
+
+        await service.getRunDataForScenarioSet({
+          projectId: "proj-1",
+          scenarioSetId: "set-1",
+          startDate: 1000,
+          endDate: 5000,
+        });
+
+        const call = (clickhouse.query as ReturnType<typeof vi.fn>).mock
+          .calls[0]![0] as { query: string };
+        expect(call.query).toContain("toUnixTimestamp64Milli(max(CreatedAt)) >= toUInt64({startDateMs:String})");
+        expect(call.query).toContain("toUnixTimestamp64Milli(max(CreatedAt)) <= toUInt64({endDateMs:String})");
+      });
+    });
+
+    describe("when no date range is provided", () => {
+      it("omits date parameters from the query", async () => {
+        setQueryResults(clickhouse, [
+          [{ BatchRunId: "batch-1", MaxCreatedAt: "3000" }],
+          [makeRunRow({ ScenarioRunId: "run-1", BatchRunId: "batch-1" })],
+        ]);
+
+        await service.getRunDataForScenarioSet({
+          projectId: "proj-1",
+          scenarioSetId: "set-1",
+        });
+
+        expect(clickhouse.query).toHaveBeenCalledWith(
+          expect.objectContaining({
+            query_params: expect.not.objectContaining({
+              startDateMs: expect.any(String),
+            }),
+          }),
+        );
+      });
+    });
   });
 
   describe("getRunDataForAllSuites()", () => {
