@@ -86,6 +86,14 @@ export const createSeatEventSubscriptionFns = ({
       });
     }
 
+    // Build line items BEFORE persisting anything so a validation failure
+    // doesn't leave orphaned pending records in the database.
+    const lineItems = createCheckoutLineItems({
+      coreMembers: membersToAdd,
+      currency,
+      interval: billingInterval,
+    });
+
     // Create subscription + invites in a transaction
     const subscription = await db.$transaction(async (tx) => {
       const sub = await tx.subscription.create({
@@ -127,12 +135,6 @@ export const createSeatEventSubscriptionFns = ({
       }
 
       return sub;
-    });
-
-    const lineItems = createCheckoutLineItems({
-      coreMembers: membersToAdd,
-      currency,
-      interval: billingInterval,
     });
 
     const selectedOptionsMetadata = {

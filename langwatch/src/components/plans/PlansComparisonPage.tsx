@@ -279,6 +279,7 @@ export function PlansComparisonPage({
             <Box
               key={opt.value}
               as="button"
+              aria-pressed={billingPeriod === opt.value}
               onClick={() => setBillingPeriod(opt.value)}
               paddingX={4}
               paddingY={1.5}

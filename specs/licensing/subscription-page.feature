@@ -259,7 +259,8 @@ Feature: Subscription Page Plan Management
   @integration
   Scenario: Upgrade block total updates when switching currency or billing period
     Given the organization has 3 core members
-    When I switch the currency to USD or toggle billing period
+    When I switch the currency to USD
+    And I toggle the billing period
     Then the upgrade block total recalculates accordingly
 
   @integration

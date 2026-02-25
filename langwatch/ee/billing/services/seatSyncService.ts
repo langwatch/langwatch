@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import { PricingModel, type PrismaClient } from "@prisma/client";
 import type { SeatEventSubscriptionFns } from "./seatEventSubscription";
 
 export const createSeatSyncService = ({
@@ -20,7 +20,7 @@ export const createSeatSyncService = ({
       select: { pricingModel: true },
     });
 
-    if (org?.pricingModel !== "SEAT_EVENT") {
+    if (org?.pricingModel !== PricingModel.SEAT_EVENT) {
       return false;
     }
 

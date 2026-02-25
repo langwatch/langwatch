@@ -54,7 +54,7 @@ export function useSubscriptionActions({
       const invitesWithEmail = plannedUsers
         .filter((u) => u.email.trim() !== "")
         .map((u) => ({
-          email: u.email,
+          email: u.email.trim(),
           role: memberTypeToRole(u.memberType),
         }));
 

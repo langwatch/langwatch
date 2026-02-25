@@ -102,7 +102,7 @@ export function UserManagementDrawer({
 
   const handleAddSeat = () => {
     const newPlannedUser: PlannedUser = {
-      id: `planned-${Date.now()}-${localPlannedUsers.length}`,
+      id: `planned-${crypto.randomUUID()}`,
       email: "",
       memberType: "FullMember",
     };
