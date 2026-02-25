@@ -1,9 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   createSSRFValidator,
   isBlockedCloudDomain,
   isPrivateOrLocalhostIP,
-  validateUrlForSSRF,
 } from "../ssrfProtection";
 
 describe("isPrivateOrLocalhostIP", () => {
@@ -96,18 +95,14 @@ describe("isBlockedCloudDomain", () => {
 });
 
 describe("validateUrlForSSRF", () => {
-  const originalEnv = process.env;
-
-  beforeEach(() => {
-    vi.resetModules();
-    process.env = { ...originalEnv, NODE_ENV: "production" };
+  // Use injected SaaS config for deterministic behavior regardless of env
+  const saasValidator = createSSRFValidator({
+    isDevelopment: false,
+    allowedDevHosts: [],
+    isSaaS: true,
   });
 
-  afterEach(() => {
-    process.env = originalEnv;
-  });
-
-  // [url, expectedError] - urls that should be blocked
+  // [url, expectedError] - urls that should be blocked in SaaS mode
   const blockedCases: [string, string][] = [
     ["not-a-url", "Invalid URL format"],
     ["http://169.254.169.254/latest/meta-data/", "cloud metadata endpoints"],
@@ -121,7 +116,7 @@ describe("validateUrlForSSRF", () => {
   ];
 
   it.each(blockedCases)("blocks %s", async (url, expectedError) => {
-    await expect(validateUrlForSSRF(url)).rejects.toThrow(expectedError);
+    await expect(saasValidator(url)).rejects.toThrow(expectedError);
   });
 
   // URLs that should be blocked but error message varies (IPv6 edge cases)
@@ -129,11 +124,11 @@ describe("validateUrlForSSRF", () => {
     "http://[fd00:ec2::254]/latest/meta-data/",
     "http://[::1]:8080/api",
   ])("blocks %s (any error)", async (url) => {
-    await expect(validateUrlForSSRF(url)).rejects.toThrow();
+    await expect(saasValidator(url)).rejects.toThrow();
   });
 
   it("allows public IP and returns resolved result", async () => {
-    const result = await validateUrlForSSRF("http://8.8.8.8/dns");
+    const result = await saasValidator("http://8.8.8.8/dns");
     expect(result.type).toBe("resolved");
     if (result.type === "resolved") {
       expect(result.resolvedIp).toBe("8.8.8.8");
@@ -142,17 +137,17 @@ describe("validateUrlForSSRF", () => {
   });
 
   it("allows googleapis.com (not blocked in AWS-only config)", async () => {
-    const result = await validateUrlForSSRF(
+    const result = await saasValidator(
       "http://storage.googleapis.com/bucket",
     );
     expect(result.hostname).toBe("storage.googleapis.com");
   });
 
   it("returns discriminated union with correct type for development bypass", async () => {
-    // Use injected config to test development behavior (avoids module-load-time env capture)
     const devValidator = createSSRFValidator({
       isDevelopment: true,
       allowedDevHosts: [],
+      isSaaS: true,
     });
     // In development mode without allowlist, unresolvable hostnames return development-bypass
     const result = await devValidator(
@@ -170,6 +165,7 @@ describe("createSSRFValidator (dependency injection)", () => {
     const validator = createSSRFValidator({
       isDevelopment: false,
       allowedDevHosts: [],
+      isSaaS: true,
     });
 
     // Should block private IPs in production config
@@ -182,6 +178,7 @@ describe("createSSRFValidator (dependency injection)", () => {
     const validator = createSSRFValidator({
       isDevelopment: true,
       allowedDevHosts: ["myhost.local"],
+      isSaaS: true,
     });
 
     // myhost.local is in the allowlist, but it's also a cloud domain pattern
@@ -195,6 +192,7 @@ describe("createSSRFValidator (dependency injection)", () => {
     const validator = createSSRFValidator({
       isDevelopment: true,
       allowedDevHosts: [],
+      isSaaS: true,
     });
 
     // In dev mode without allowlist, private IPs are allowed
@@ -209,6 +207,7 @@ describe("createSSRFValidator (dependency injection)", () => {
     const validator = createSSRFValidator({
       isDevelopment: true,
       allowedDevHosts: ["169.254.169.254"],
+      isSaaS: true,
     });
 
     // Metadata endpoints are always blocked, even if allowlisted
