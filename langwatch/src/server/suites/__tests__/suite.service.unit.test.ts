@@ -5,9 +5,12 @@ import {
   type SuiteTarget,
 } from "../suite.service";
 import {
+  AllScenariosArchivedError,
+  AllTargetsArchivedError,
   InvalidScenarioReferencesError,
   InvalidTargetReferencesError,
 } from "../errors";
+import type { ResolvedReferences } from "../suite-run-dependencies";
 import type { SuiteRepository } from "../suite.repository";
 import type { SimulationSuite } from "@prisma/client";
 
@@ -62,10 +65,18 @@ function makeSuite(
   };
 }
 
+function makeAllActiveResolution(ids: string[]): ResolvedReferences {
+  return { active: ids, archived: [], missing: [] };
+}
+
 function makeDeps(overrides: Partial<SuiteRunDependencies> = {}): SuiteRunDependencies {
   return {
-    validateScenarioExists: vi.fn(() => Promise.resolve(true)),
-    validateTargetExists: vi.fn(() => Promise.resolve(true)),
+    resolveScenarioReferences: vi.fn(async ({ ids }) =>
+      makeAllActiveResolution(ids),
+    ),
+    resolveTargetReferences: vi.fn(async ({ targets }) =>
+      makeAllActiveResolution(targets.map((t: SuiteTarget) => t.referenceId)),
+    ),
     ...overrides,
   };
 }
@@ -264,9 +275,11 @@ describe("SuiteService", () => {
             scenarioIds: ["scen_1", "deleted-scenario"],
           });
           const deps = makeDeps({
-            validateScenarioExists: vi.fn(async ({ id }) =>
-              id !== "deleted-scenario",
-            ),
+            resolveScenarioReferences: vi.fn(async () => ({
+              active: ["scen_1"],
+              archived: [],
+              missing: ["deleted-scenario"],
+            })),
           });
 
           await expect(
@@ -289,9 +302,11 @@ describe("SuiteService", () => {
             ] as SuiteTarget[],
           });
           const deps = makeDeps({
-            validateTargetExists: vi.fn(async ({ referenceId }) =>
-              referenceId !== "removed-target",
-            ),
+            resolveTargetReferences: vi.fn(async () => ({
+              active: [],
+              archived: [],
+              missing: ["removed-target"],
+            })),
           });
 
           await expect(
@@ -301,6 +316,220 @@ describe("SuiteService", () => {
             service.run({ suite, projectId: "proj_1", organizationId: "org_1", deps }),
           ).rejects.toThrow("Invalid target references: removed-target");
           expect(mockScheduleScenarioRun).not.toHaveBeenCalled();
+        });
+      });
+    });
+
+    // --- New tests for archived dependency exclusion ---
+
+    describe("given a suite with mixed active and archived scenarios", () => {
+      describe("when the suite run is triggered", () => {
+        it("schedules jobs only for active scenarios", async () => {
+          const suite = makeSuite({
+            scenarioIds: ["scen_1", "scen_2", "scen_archived"],
+            targets: [
+              { type: "http", referenceId: "agent_1" },
+            ] as SuiteTarget[],
+          });
+          const deps = makeDeps({
+            resolveScenarioReferences: vi.fn(async () => ({
+              active: ["scen_1", "scen_2"],
+              archived: ["scen_archived"],
+              missing: [],
+            })),
+          });
+
+          const result = await service.run({
+            suite, projectId: "proj_1", organizationId: "org_1", deps,
+          });
+
+          expect(result.jobCount).toBe(2);
+          expect(mockScheduleScenarioRun).toHaveBeenCalledTimes(2);
+          const scheduledScenarioIds = mockScheduleScenarioRun.mock.calls.map(
+            (call) => call[0]?.scenarioId,
+          );
+          expect(scheduledScenarioIds).toContain("scen_1");
+          expect(scheduledScenarioIds).toContain("scen_2");
+          expect(scheduledScenarioIds).not.toContain("scen_archived");
+        });
+
+        it("returns skipped archived scenarios in the result", async () => {
+          const suite = makeSuite({
+            scenarioIds: ["scen_1", "scen_archived"],
+            targets: [
+              { type: "http", referenceId: "agent_1" },
+            ] as SuiteTarget[],
+          });
+          const deps = makeDeps({
+            resolveScenarioReferences: vi.fn(async () => ({
+              active: ["scen_1"],
+              archived: ["scen_archived"],
+              missing: [],
+            })),
+          });
+
+          const result = await service.run({
+            suite, projectId: "proj_1", organizationId: "org_1", deps,
+          });
+
+          expect(result.skippedArchived.scenarios).toEqual(["scen_archived"]);
+          expect(result.skippedArchived.targets).toEqual([]);
+        });
+      });
+    });
+
+    describe("given a suite with mixed active and archived targets", () => {
+      describe("when the suite run is triggered", () => {
+        it("schedules jobs only against active targets", async () => {
+          const suite = makeSuite({
+            scenarioIds: ["scen_1"],
+            targets: [
+              { type: "http", referenceId: "agent_1" },
+              { type: "http", referenceId: "agent_archived" },
+            ] as SuiteTarget[],
+          });
+          const deps = makeDeps({
+            resolveTargetReferences: vi.fn(async () => ({
+              active: ["agent_1"],
+              archived: ["agent_archived"],
+              missing: [],
+            })),
+          });
+
+          const result = await service.run({
+            suite, projectId: "proj_1", organizationId: "org_1", deps,
+          });
+
+          expect(result.jobCount).toBe(1);
+          const scheduledTargetIds = mockScheduleScenarioRun.mock.calls.map(
+            (call) => call[0]?.target.referenceId,
+          );
+          expect(scheduledTargetIds).toContain("agent_1");
+          expect(scheduledTargetIds).not.toContain("agent_archived");
+        });
+
+        it("returns skipped archived targets in the result", async () => {
+          const suite = makeSuite({
+            scenarioIds: ["scen_1"],
+            targets: [
+              { type: "http", referenceId: "agent_1" },
+              { type: "http", referenceId: "agent_archived" },
+            ] as SuiteTarget[],
+          });
+          const deps = makeDeps({
+            resolveTargetReferences: vi.fn(async () => ({
+              active: ["agent_1"],
+              archived: ["agent_archived"],
+              missing: [],
+            })),
+          });
+
+          const result = await service.run({
+            suite, projectId: "proj_1", organizationId: "org_1", deps,
+          });
+
+          expect(result.skippedArchived.targets).toEqual(["agent_archived"]);
+        });
+      });
+    });
+
+    describe("given all scenarios in a suite are archived", () => {
+      describe("when the suite run is triggered", () => {
+        it("throws AllScenariosArchivedError", async () => {
+          const suite = makeSuite({
+            scenarioIds: ["scen_archived_1", "scen_archived_2"],
+          });
+          const deps = makeDeps({
+            resolveScenarioReferences: vi.fn(async () => ({
+              active: [],
+              archived: ["scen_archived_1", "scen_archived_2"],
+              missing: [],
+            })),
+          });
+
+          await expect(
+            service.run({ suite, projectId: "proj_1", organizationId: "org_1", deps }),
+          ).rejects.toThrow(AllScenariosArchivedError);
+          expect(mockScheduleScenarioRun).not.toHaveBeenCalled();
+        });
+      });
+    });
+
+    describe("given all targets in a suite are archived", () => {
+      describe("when the suite run is triggered", () => {
+        it("throws AllTargetsArchivedError", async () => {
+          const suite = makeSuite({
+            targets: [
+              { type: "http", referenceId: "agent_archived" },
+            ] as SuiteTarget[],
+          });
+          const deps = makeDeps({
+            resolveTargetReferences: vi.fn(async () => ({
+              active: [],
+              archived: ["agent_archived"],
+              missing: [],
+            })),
+          });
+
+          await expect(
+            service.run({ suite, projectId: "proj_1", organizationId: "org_1", deps }),
+          ).rejects.toThrow(AllTargetsArchivedError);
+          expect(mockScheduleScenarioRun).not.toHaveBeenCalled();
+        });
+      });
+    });
+
+    describe("given 3 scenario references, 2 target references, 1 scenario archived, 1 target archived, repeat count 1", () => {
+      describe("when the suite run is triggered", () => {
+        it("schedules 2 jobs (2 active scenarios x 1 active target)", async () => {
+          const suite = makeSuite({
+            scenarioIds: ["scen_1", "scen_2", "scen_archived"],
+            targets: [
+              { type: "http", referenceId: "agent_1" },
+              { type: "http", referenceId: "agent_archived" },
+            ] as SuiteTarget[],
+            repeatCount: 1,
+          });
+          const deps = makeDeps({
+            resolveScenarioReferences: vi.fn(async () => ({
+              active: ["scen_1", "scen_2"],
+              archived: ["scen_archived"],
+              missing: [],
+            })),
+            resolveTargetReferences: vi.fn(async () => ({
+              active: ["agent_1"],
+              archived: ["agent_archived"],
+              missing: [],
+            })),
+          });
+
+          const result = await service.run({
+            suite, projectId: "proj_1", organizationId: "org_1", deps,
+          });
+
+          expect(result.jobCount).toBe(2);
+          expect(result.skippedArchived).toEqual({
+            scenarios: ["scen_archived"],
+            targets: ["agent_archived"],
+          });
+        });
+      });
+    });
+
+    describe("given no scenarios or targets are archived", () => {
+      describe("when the suite run is triggered", () => {
+        it("returns empty skippedArchived", async () => {
+          const suite = makeSuite();
+          const deps = makeDeps();
+
+          const result = await service.run({
+            suite, projectId: "proj_1", organizationId: "org_1", deps,
+          });
+
+          expect(result.skippedArchived).toEqual({
+            scenarios: [],
+            targets: [],
+          });
         });
       });
     });

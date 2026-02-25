@@ -25,59 +25,112 @@ function makeMockPrisma(overrides: {
 }
 
 describe("createSuiteRunDependencies()", () => {
-  describe("validateScenarioExists", () => {
-    describe("when scenario exists", () => {
-      it("returns true", async () => {
-        const prisma = makeMockPrisma({
-          scenarioFindFirst: vi.fn(() =>
-            Promise.resolve({ id: "scen_1" }),
-          ),
-        });
-        const deps = createSuiteRunDependencies({ prisma });
-
-        const result = await deps.validateScenarioExists({
-          id: "scen_1",
-          projectId: "proj_1",
-        });
-
-        expect(result).toBe(true);
-      });
-
-      it("queries with archivedAt: null", async () => {
-        const findFirst = vi.fn(() => Promise.resolve({ id: "scen_1" }));
+  describe("resolveScenarioReferences", () => {
+    describe("when all scenarios are active", () => {
+      it("returns all IDs in the active list", async () => {
+        const findFirst = vi.fn()
+          .mockResolvedValueOnce({ id: "scen_1", archivedAt: null })
+          .mockResolvedValueOnce({ id: "scen_2", archivedAt: null });
         const prisma = makeMockPrisma({ scenarioFindFirst: findFirst });
         const deps = createSuiteRunDependencies({ prisma });
 
-        await deps.validateScenarioExists({
-          id: "scen_1",
+        const result = await deps.resolveScenarioReferences({
+          ids: ["scen_1", "scen_2"],
           projectId: "proj_1",
         });
 
-        expect(findFirst).toHaveBeenCalledWith({
-          where: { id: "scen_1", projectId: "proj_1", archivedAt: null },
+        expect(result).toEqual({
+          active: ["scen_1", "scen_2"],
+          archived: [],
+          missing: [],
         });
       });
     });
 
-    describe("when scenario does not exist", () => {
-      it("returns false", async () => {
-        const prisma = makeMockPrisma();
+    describe("when a scenario is archived", () => {
+      it("places it in the archived list", async () => {
+        const findFirst = vi.fn()
+          .mockResolvedValueOnce({ id: "scen_1", archivedAt: null })
+          .mockResolvedValueOnce({ id: "scen_2", archivedAt: new Date() });
+        const prisma = makeMockPrisma({ scenarioFindFirst: findFirst });
         const deps = createSuiteRunDependencies({ prisma });
 
-        const result = await deps.validateScenarioExists({
-          id: "scen_missing",
+        const result = await deps.resolveScenarioReferences({
+          ids: ["scen_1", "scen_2"],
           projectId: "proj_1",
         });
 
-        expect(result).toBe(false);
+        expect(result).toEqual({
+          active: ["scen_1"],
+          archived: ["scen_2"],
+          missing: [],
+        });
+      });
+    });
+
+    describe("when a scenario does not exist", () => {
+      it("places it in the missing list", async () => {
+        const findFirst = vi.fn()
+          .mockResolvedValueOnce({ id: "scen_1", archivedAt: null })
+          .mockResolvedValueOnce(null);
+        const prisma = makeMockPrisma({ scenarioFindFirst: findFirst });
+        const deps = createSuiteRunDependencies({ prisma });
+
+        const result = await deps.resolveScenarioReferences({
+          ids: ["scen_1", "scen_missing"],
+          projectId: "proj_1",
+        });
+
+        expect(result).toEqual({
+          active: ["scen_1"],
+          archived: [],
+          missing: ["scen_missing"],
+        });
+      });
+    });
+
+    describe("when all scenarios are archived", () => {
+      it("returns an empty active list", async () => {
+        const findFirst = vi.fn()
+          .mockResolvedValueOnce({ id: "scen_1", archivedAt: new Date() })
+          .mockResolvedValueOnce({ id: "scen_2", archivedAt: new Date() });
+        const prisma = makeMockPrisma({ scenarioFindFirst: findFirst });
+        const deps = createSuiteRunDependencies({ prisma });
+
+        const result = await deps.resolveScenarioReferences({
+          ids: ["scen_1", "scen_2"],
+          projectId: "proj_1",
+        });
+
+        expect(result).toEqual({
+          active: [],
+          archived: ["scen_1", "scen_2"],
+          missing: [],
+        });
+      });
+    });
+
+    it("queries without archivedAt filter to detect both active and archived", async () => {
+      const findFirst = vi.fn(() => Promise.resolve({ id: "scen_1", archivedAt: null }));
+      const prisma = makeMockPrisma({ scenarioFindFirst: findFirst });
+      const deps = createSuiteRunDependencies({ prisma });
+
+      await deps.resolveScenarioReferences({
+        ids: ["scen_1"],
+        projectId: "proj_1",
+      });
+
+      expect(findFirst).toHaveBeenCalledWith({
+        where: { id: "scen_1", projectId: "proj_1" },
+        select: { id: true, archivedAt: true },
       });
     });
   });
 
-  describe("validateTargetExists", () => {
+  describe("resolveTargetReferences", () => {
     describe("when type is 'prompt'", () => {
-      describe("when prompt exists in same project", () => {
-        it("returns true", async () => {
+      describe("when prompt exists", () => {
+        it("places it in the active list", async () => {
           const prisma = makeMockPrisma({
             llmPromptConfigFindFirst: vi.fn(() =>
               Promise.resolve({ id: "prompt_1" }),
@@ -85,214 +138,142 @@ describe("createSuiteRunDependencies()", () => {
           });
           const deps = createSuiteRunDependencies({ prisma });
 
-          const result = await deps.validateTargetExists({
-            referenceId: "prompt_1",
-            type: "prompt",
+          const result = await deps.resolveTargetReferences({
+            targets: [{ type: "prompt", referenceId: "prompt_1" }],
             projectId: "proj_1",
             organizationId: "org_1",
           });
 
-          expect(result).toBe(true);
-        });
-      });
-
-      describe("when prompt is org-scoped from another project", () => {
-        it("queries with OR pattern including org scope", async () => {
-          const findFirst = vi.fn(() => Promise.resolve({ id: "prompt_org" }));
-          const prisma = makeMockPrisma({ llmPromptConfigFindFirst: findFirst });
-          const deps = createSuiteRunDependencies({ prisma });
-
-          await deps.validateTargetExists({
-            referenceId: "prompt_org",
-            type: "prompt",
-            projectId: "proj_1",
-            organizationId: "org_1",
-          });
-
-          expect(findFirst).toHaveBeenCalledWith({
-            where: {
-              id: "prompt_org",
-              deletedAt: null,
-              OR: [
-                { projectId: "proj_1" },
-                { organizationId: "org_1", scope: "ORGANIZATION" },
-              ],
-            },
-          });
-        });
-
-        it("returns true", async () => {
-          const prisma = makeMockPrisma({
-            llmPromptConfigFindFirst: vi.fn(() =>
-              Promise.resolve({ id: "prompt_org" }),
-            ),
-          });
-          const deps = createSuiteRunDependencies({ prisma });
-
-          const result = await deps.validateTargetExists({
-            referenceId: "prompt_org",
-            type: "prompt",
-            projectId: "proj_1",
-            organizationId: "org_1",
-          });
-
-          expect(result).toBe(true);
+          expect(result.active).toEqual(["prompt_1"]);
+          expect(result.archived).toEqual([]);
+          expect(result.missing).toEqual([]);
         });
       });
 
       describe("when prompt does not exist", () => {
-        it("returns false", async () => {
+        it("places it in the missing list", async () => {
           const prisma = makeMockPrisma();
           const deps = createSuiteRunDependencies({ prisma });
 
-          const result = await deps.validateTargetExists({
-            referenceId: "prompt_missing",
-            type: "prompt",
+          const result = await deps.resolveTargetReferences({
+            targets: [{ type: "prompt", referenceId: "prompt_missing" }],
             projectId: "proj_1",
             organizationId: "org_1",
           });
 
-          expect(result).toBe(false);
+          expect(result.missing).toEqual(["prompt_missing"]);
         });
       });
 
-      describe("when prompt is soft-deleted", () => {
-        it("returns false", async () => {
-          // findFirst returns null because deletedAt filter excludes it
-          const prisma = makeMockPrisma({
-            llmPromptConfigFindFirst: vi.fn(() => Promise.resolve(null)),
-          });
-          const deps = createSuiteRunDependencies({ prisma });
+      it("queries with OR pattern including org scope", async () => {
+        const findFirst = vi.fn(() => Promise.resolve({ id: "prompt_1" }));
+        const prisma = makeMockPrisma({ llmPromptConfigFindFirst: findFirst });
+        const deps = createSuiteRunDependencies({ prisma });
 
-          const result = await deps.validateTargetExists({
-            referenceId: "prompt_deleted",
-            type: "prompt",
-            projectId: "proj_1",
-            organizationId: "org_1",
-          });
-
-          expect(result).toBe(false);
+        await deps.resolveTargetReferences({
+          targets: [{ type: "prompt", referenceId: "prompt_1" }],
+          projectId: "proj_1",
+          organizationId: "org_1",
         });
 
-        it("queries with deletedAt: null to exclude soft-deleted prompts", async () => {
-          const findFirst = vi.fn(() => Promise.resolve(null));
-          const prisma = makeMockPrisma({ llmPromptConfigFindFirst: findFirst });
-          const deps = createSuiteRunDependencies({ prisma });
-
-          await deps.validateTargetExists({
-            referenceId: "prompt_deleted",
-            type: "prompt",
-            projectId: "proj_1",
-            organizationId: "org_1",
-          });
-
-          expect(findFirst).toHaveBeenCalledWith(
-            expect.objectContaining({
-              where: expect.objectContaining({ deletedAt: null }),
-            }),
-          );
-        });
-      });
-
-      describe("when prompt belongs to a different organization", () => {
-        it("returns false for org-scoped prompt from org_B accessed via org_A", async () => {
-          // The mock returns null because the query filters by organizationId: "org_A"
-          // but the prompt belongs to org_B
-          const findFirst = vi.fn(() => Promise.resolve(null));
-          const prisma = makeMockPrisma({ llmPromptConfigFindFirst: findFirst });
-          const deps = createSuiteRunDependencies({ prisma });
-
-          const result = await deps.validateTargetExists({
-            referenceId: "prompt_org_b",
-            type: "prompt",
-            projectId: "proj_a",
-            organizationId: "org_A",
-          });
-
-          expect(result).toBe(false);
-          // Verify the query only allows access to prompts in org_A, not org_B
-          expect(findFirst).toHaveBeenCalledWith({
-            where: {
-              id: "prompt_org_b",
-              deletedAt: null,
-              OR: [
-                { projectId: "proj_a" },
-                { organizationId: "org_A", scope: "ORGANIZATION" },
-              ],
-            },
-          });
+        expect(findFirst).toHaveBeenCalledWith({
+          where: {
+            id: "prompt_1",
+            deletedAt: null,
+            OR: [
+              { projectId: "proj_1" },
+              { organizationId: "org_1", scope: "ORGANIZATION" },
+            ],
+          },
         });
       });
     });
 
     describe("when type is 'http'", () => {
-      describe("when agent exists", () => {
-        it("returns true", async () => {
+      describe("when agent is active", () => {
+        it("places it in the active list", async () => {
           const prisma = makeMockPrisma({
             agentFindFirst: vi.fn(() =>
-              Promise.resolve({ id: "agent_1" }),
+              Promise.resolve({ id: "agent_1", archivedAt: null }),
             ),
           });
           const deps = createSuiteRunDependencies({ prisma });
 
-          const result = await deps.validateTargetExists({
-            referenceId: "agent_1",
-            type: "http",
+          const result = await deps.resolveTargetReferences({
+            targets: [{ type: "http", referenceId: "agent_1" }],
             projectId: "proj_1",
             organizationId: "org_1",
           });
 
-          expect(result).toBe(true);
+          expect(result.active).toEqual(["agent_1"]);
         });
+      });
 
-        it("queries with archivedAt: null", async () => {
-          const findFirst = vi.fn(() => Promise.resolve({ id: "agent_1" }));
-          const prisma = makeMockPrisma({ agentFindFirst: findFirst });
+      describe("when agent is archived", () => {
+        it("places it in the archived list", async () => {
+          const prisma = makeMockPrisma({
+            agentFindFirst: vi.fn(() =>
+              Promise.resolve({ id: "agent_1", archivedAt: new Date() }),
+            ),
+          });
           const deps = createSuiteRunDependencies({ prisma });
 
-          await deps.validateTargetExists({
-            referenceId: "agent_1",
-            type: "http",
+          const result = await deps.resolveTargetReferences({
+            targets: [{ type: "http", referenceId: "agent_1" }],
             projectId: "proj_1",
             organizationId: "org_1",
           });
 
-          expect(findFirst).toHaveBeenCalledWith({
-            where: { id: "agent_1", projectId: "proj_1", archivedAt: null },
-          });
+          expect(result.archived).toEqual(["agent_1"]);
+          expect(result.active).toEqual([]);
         });
       });
 
       describe("when agent does not exist", () => {
-        it("returns false", async () => {
+        it("places it in the missing list", async () => {
           const prisma = makeMockPrisma();
           const deps = createSuiteRunDependencies({ prisma });
 
-          const result = await deps.validateTargetExists({
-            referenceId: "agent_missing",
-            type: "http",
+          const result = await deps.resolveTargetReferences({
+            targets: [{ type: "http", referenceId: "agent_missing" }],
             projectId: "proj_1",
             organizationId: "org_1",
           });
 
-          expect(result).toBe(false);
+          expect(result.missing).toEqual(["agent_missing"]);
+        });
+      });
+
+      it("queries without archivedAt filter to detect both active and archived", async () => {
+        const findFirst = vi.fn(() => Promise.resolve({ id: "agent_1", archivedAt: null }));
+        const prisma = makeMockPrisma({ agentFindFirst: findFirst });
+        const deps = createSuiteRunDependencies({ prisma });
+
+        await deps.resolveTargetReferences({
+          targets: [{ type: "http", referenceId: "agent_1" }],
+          projectId: "proj_1",
+          organizationId: "org_1",
+        });
+
+        expect(findFirst).toHaveBeenCalledWith({
+          where: { id: "agent_1", projectId: "proj_1" },
+          select: { id: true, archivedAt: true },
         });
       });
     });
 
     describe("when type is unknown", () => {
-      it("returns false", async () => {
+      it("places it in the missing list", async () => {
         const prisma = makeMockPrisma();
         const deps = createSuiteRunDependencies({ prisma });
 
-        const result = await deps.validateTargetExists({
-          referenceId: "unknown_1",
-          type: "unknown",
+        const result = await deps.resolveTargetReferences({
+          targets: [{ type: "unknown" as "http", referenceId: "unknown_1" }],
           projectId: "proj_1",
           organizationId: "org_1",
         });
 
-        expect(result).toBe(false);
+        expect(result.missing).toEqual(["unknown_1"]);
       });
     });
   });

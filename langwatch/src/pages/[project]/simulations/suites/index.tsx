@@ -118,18 +118,56 @@ function SuitesPageContent() {
 
   const runMutation = api.suites.run.useMutation({
     onSuccess: (result) => {
-      toaster.create({
-        title: `Suite run scheduled (${result.jobCount} jobs)`,
-        type: "success",
-        meta: { closable: true },
-      });
+      const archivedCount =
+        (result.skippedArchived?.scenarios?.length ?? 0) +
+        (result.skippedArchived?.targets?.length ?? 0);
+
+      if (archivedCount > 0) {
+        const parts: string[] = [];
+        if (result.skippedArchived.scenarios.length > 0) {
+          parts.push(`${result.skippedArchived.scenarios.length} archived scenario${result.skippedArchived.scenarios.length > 1 ? "s" : ""}`);
+        }
+        if (result.skippedArchived.targets.length > 0) {
+          parts.push(`${result.skippedArchived.targets.length} archived target${result.skippedArchived.targets.length > 1 ? "s" : ""}`);
+        }
+
+        toaster.create({
+          title: `Suite run scheduled (${result.jobCount} jobs)`,
+          description: `${parts.join(" and ")} skipped.`,
+          type: "warning",
+          meta: { closable: true },
+          action: {
+            label: "Edit Suite",
+            onClick: () => {
+              const suiteId = runMutation.variables?.id;
+              if (suiteId) handleEditSuite(suiteId);
+            },
+          },
+        });
+      } else {
+        toaster.create({
+          title: `Suite run scheduled (${result.jobCount} jobs)`,
+          type: "success",
+          meta: { closable: true },
+        });
+      }
     },
     onError: (err) => {
+      const isAllArchived = err.message.includes("All scenarios") || err.message.includes("All targets");
       toaster.create({
-        title: "Failed to run suite",
+        title: isAllArchived ? "Cannot run suite" : "Failed to run suite",
         description: err.message,
         type: "error",
         meta: { closable: true },
+        ...(isAllArchived ? {
+          action: {
+            label: "Edit Suite",
+            onClick: () => {
+              const suiteId = runMutation.variables?.id;
+              if (suiteId) handleEditSuite(suiteId);
+            },
+          },
+        } : {}),
       });
     },
   });
