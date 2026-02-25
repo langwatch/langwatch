@@ -313,12 +313,13 @@ describe("SuiteService", () => {
             scenarioIds: ["scen_1", "deleted-scenario"],
           });
 
-          await expect(
-            service.run({ suite, projectId: "proj_1", organizationId: "org_1" }),
-          ).rejects.toThrow(InvalidScenarioReferencesError);
-          await expect(
-            service.run({ suite, projectId: "proj_1", organizationId: "org_1" }),
-          ).rejects.toThrow("Invalid scenario references: deleted-scenario");
+          const error = await service
+            .run({ suite, projectId: "proj_1", organizationId: "org_1" })
+            .catch((e: unknown) => e);
+          expect(error).toBeInstanceOf(InvalidScenarioReferencesError);
+          expect((error as Error).message).toBe(
+            "Invalid scenario references: deleted-scenario",
+          );
           expect(mockScheduleScenarioRun).not.toHaveBeenCalled();
         });
       });
@@ -340,12 +341,13 @@ describe("SuiteService", () => {
             ] as SuiteTarget[],
           });
 
-          await expect(
-            service.run({ suite, projectId: "proj_1", organizationId: "org_1" }),
-          ).rejects.toThrow(InvalidTargetReferencesError);
-          await expect(
-            service.run({ suite, projectId: "proj_1", organizationId: "org_1" }),
-          ).rejects.toThrow("Invalid target references: removed-target");
+          const error = await service
+            .run({ suite, projectId: "proj_1", organizationId: "org_1" })
+            .catch((e: unknown) => e);
+          expect(error).toBeInstanceOf(InvalidTargetReferencesError);
+          expect((error as Error).message).toBe(
+            "Invalid target references: removed-target",
+          );
           expect(mockScheduleScenarioRun).not.toHaveBeenCalled();
         });
       });
@@ -365,12 +367,13 @@ describe("SuiteService", () => {
             ] as SuiteTarget[],
           });
 
-          await expect(
-            service.run({ suite, projectId: "proj_1", organizationId: "org_1" }),
-          ).rejects.toThrow(InvalidTargetReferencesError);
-          await expect(
-            service.run({ suite, projectId: "proj_1", organizationId: "org_1" }),
-          ).rejects.toThrow("Invalid target references: deleted-prompt");
+          const error = await service
+            .run({ suite, projectId: "proj_1", organizationId: "org_1" })
+            .catch((e: unknown) => e);
+          expect(error).toBeInstanceOf(InvalidTargetReferencesError);
+          expect((error as Error).message).toBe(
+            "Invalid target references: deleted-prompt",
+          );
           expect(mockScheduleScenarioRun).not.toHaveBeenCalled();
         });
       });

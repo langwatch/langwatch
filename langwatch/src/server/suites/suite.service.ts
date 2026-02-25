@@ -416,7 +416,7 @@ export class SuiteService {
 
   private async validateTargetExists(params: {
     referenceId: string;
-    type: string;
+    type: SuiteTarget["type"];
     projectId: string;
     organizationId: string;
   }): Promise<boolean> {

@@ -17,7 +17,7 @@ export class ProjectRepository {
   }): Promise<string | null> {
     const project = await this.prisma.project.findUnique({
       where: { id: params.projectId },
-      include: { team: { include: { organization: true } } },
+      include: { team: true },
     });
     return project?.team?.organizationId ?? null;
   }

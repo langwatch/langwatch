@@ -119,18 +119,18 @@ export const suiteRouter = createTRPCRouter({
         });
       }
 
-      try {
-        const projectRepository = new ProjectRepository(ctx.prisma);
-        const organizationId = await projectRepository.getOrganizationId({
-          projectId: input.projectId,
+      const projectRepository = new ProjectRepository(ctx.prisma);
+      const organizationId = await projectRepository.getOrganizationId({
+        projectId: input.projectId,
+      });
+      if (!organizationId) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Organization not found for project",
         });
-        if (!organizationId) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Organization not found for project",
-          });
-        }
+      }
 
+      try {
         const result = await service.run({
           suite,
           projectId: input.projectId,
