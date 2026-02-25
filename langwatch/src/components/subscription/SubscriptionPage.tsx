@@ -143,7 +143,7 @@ export function SubscriptionPage() {
   const isDeveloperPlan = plan?.free ?? true;
   const isTieredPricingModel = organization?.pricingModel === PricingModel.TIERED;
   const isEnterprisePlan = plan?.type === "ENTERPRISE";
-  const isTieredLegacyPaidPlan = isTieredPricingModel && !isDeveloperPlan && !isEnterprisePlan;
+  const isTieredLegacyPaidPlan = isTieredPricingModel && isDeveloperPlan && !isEnterprisePlan;
 
   useEffect(() => {
     if (isTieredLegacyPaidPlan && plan && isAnnualTieredPlan(plan.type)) {
@@ -334,10 +334,16 @@ export function SubscriptionPage() {
     (plannedUsers.length > 0 || deletedSeatCount > 0);
   const isUpgradePlanRequired =
     ((isDeveloperPlan && (plannedUsers.length > 0 || deletedSeatCount > 0))
-    || isTieredLegacyPaidPlan)
+    || (isTieredLegacyPaidPlan || isDeveloperPlan))
+    && !isEnterprisePlan;
+    const isUpgradePlanRequiredForFreePlan =
+    ((isDeveloperPlan && (plannedUsers.length > 0 || deletedSeatCount > 0))
+    || (isTieredLegacyPaidPlan))
     && !isEnterprisePlan;
 
-  const updateRequired = isUpgradeSeatsRequired || isUpgradePlanRequired;
+    const freePlanUpgradeRequired = isDeveloperPlan ? isUpgradePlanRequiredForFreePlan : isUpgradePlanRequired;
+
+  const updateRequired = isUpgradeSeatsRequired || freePlanUpgradeRequired;
 
   return (
     <SettingsLayout>
