@@ -1,12 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-02-18T18:34:12.013Z",
-  "meters": {
-    "BILLABLE_EVENTS": {
-      "test": "mtr_test_61UBL0fe0hM4Csg7x41IMsTw08cudQaG",
-      "live": "mtr_61UBLon1Ka5iWAcoH41IMsTw08cudD7o"
-    }
-  },
+  "updatedAt": "2026-02-25T13:02:54.780Z",
   "mapping": {
     "PRO": {
       "test": "price_1P6bSyIMsTw08cudmzoqwBVN",
@@ -82,19 +76,25 @@
     },
     "GROWTH_EVENTS_EUR_MONTHLY": {
       "test": "price_1T291RIMsTw08cudnqymaTXk",
-      "live": "price_1T1xt4IMsTw08cudXgZytO75"
+      "live": "price_1T2FSiIMsTw08cud5q01SFk9"
     },
     "GROWTH_EVENTS_EUR_ANNUAL": {
       "test": "price_1T291dIMsTw08cudihCUhsUX",
-      "live": "price_1T1xt6IMsTw08cudwOa7jzz8"
+      "live": "price_1T2FSoIMsTw08cudCc7v2cVI"
     },
     "GROWTH_EVENTS_USD_MONTHLY": {
       "test": "price_1T291fIMsTw08cudzZ6ohXsq",
-      "live": "price_1T1xt9IMsTw08cudx6VGnQvS"
+      "live": "price_1T2FSuIMsTw08cudD5hbFicc"
     },
     "GROWTH_EVENTS_USD_ANNUAL": {
       "test": "price_1T291iIMsTw08cudWlyDf1pH",
-      "live": "price_1T1xtBIMsTw08cudaHu01HNk"
+      "live": "price_1T2FT0IMsTw08cudNjcizYxH"
+    }
+  },
+  "meters": {
+    "BILLABLE_EVENTS": {
+      "test": "mtr_test_61UBL0fe0hM4Csg7x41IMsTw08cudQaG",
+      "live": "mtr_61UBLon1Ka5iWAcoH41IMsTw08cudD7o"
     }
   },
   "prices": {
@@ -1382,7 +1382,7 @@
       "active": true,
       "livemode": true,
       "product": "prod_TzxoIMJy1hzZc6",
-      "unitAmount": 3200,
+      "unitAmount": 3400,
       "currency": "usd",
       "type": "recurring",
       "recurring": {
@@ -1398,7 +1398,7 @@
       "active": true,
       "livemode": true,
       "product": "prod_TzxoIMJy1hzZc6",
-      "unitAmount": 35328,
+      "unitAmount": 37536,
       "currency": "usd",
       "type": "recurring",
       "recurring": {
@@ -1411,7 +1411,7 @@
     },
     "price_1T1xt4IMsTw08cudXgZytO75": {
       "id": "price_1T1xt4IMsTw08cudXgZytO75",
-      "active": true,
+      "active": false,
       "livemode": true,
       "product": "prod_TzxoIMJy1hzZc6",
       "unitAmount": null,
@@ -1422,12 +1422,12 @@
         "intervalCount": 1
       },
       "nickname": "Growth Events - EUR Monthly",
-      "lookupKey": "GROWTH_EVENTS_EUR_MONTHLY",
+      "lookupKey": null,
       "metadata": {}
     },
     "price_1T1xt6IMsTw08cudwOa7jzz8": {
       "id": "price_1T1xt6IMsTw08cudwOa7jzz8",
-      "active": true,
+      "active": false,
       "livemode": true,
       "product": "prod_TzxoIMJy1hzZc6",
       "unitAmount": null,
@@ -1438,12 +1438,12 @@
         "intervalCount": 1
       },
       "nickname": "Growth Events - EUR Annual",
-      "lookupKey": "GROWTH_EVENTS_EUR_ANNUAL",
+      "lookupKey": null,
       "metadata": {}
     },
     "price_1T1xt9IMsTw08cudx6VGnQvS": {
       "id": "price_1T1xt9IMsTw08cudx6VGnQvS",
-      "active": true,
+      "active": false,
       "livemode": true,
       "product": "prod_TzxoIMJy1hzZc6",
       "unitAmount": null,
@@ -1454,12 +1454,12 @@
         "intervalCount": 1
       },
       "nickname": "Growth Events - USD Monthly",
-      "lookupKey": "GROWTH_EVENTS_USD_MONTHLY",
+      "lookupKey": null,
       "metadata": {}
     },
     "price_1T1xtBIMsTw08cudaHu01HNk": {
       "id": "price_1T1xtBIMsTw08cudaHu01HNk",
-      "active": true,
+      "active": false,
       "livemode": true,
       "product": "prod_TzxoIMJy1hzZc6",
       "unitAmount": null,
@@ -1470,7 +1470,7 @@
         "intervalCount": 1
       },
       "nickname": "Growth Events - USD Annual",
-      "lookupKey": "GROWTH_EVENTS_USD_ANNUAL",
+      "lookupKey": null,
       "metadata": {}
     },
     "price_1T291dIMsTw08cudihCUhsUX": {
@@ -1535,6 +1535,70 @@
       },
       "nickname": "Growth Events - EUR Monthly",
       "lookupKey": "GROWTH_EVENTS_EUR_MONTHLY",
+      "metadata": {}
+    },
+    "price_1T2FSiIMsTw08cud5q01SFk9": {
+      "id": "price_1T2FSiIMsTw08cud5q01SFk9",
+      "active": true,
+      "livemode": true,
+      "product": "prod_U0FxIOn91twEaC",
+      "unitAmount": null,
+      "currency": "eur",
+      "type": "recurring",
+      "recurring": {
+        "interval": "month",
+        "intervalCount": 1
+      },
+      "nickname": "Growth Events - EUR Monthly",
+      "lookupKey": "GROWTH_EVENTS_EUR_MONTHLY",
+      "metadata": {}
+    },
+    "price_1T2FSoIMsTw08cudCc7v2cVI": {
+      "id": "price_1T2FSoIMsTw08cudCc7v2cVI",
+      "active": true,
+      "livemode": true,
+      "product": "prod_U0FxIOn91twEaC",
+      "unitAmount": null,
+      "currency": "eur",
+      "type": "recurring",
+      "recurring": {
+        "interval": "year",
+        "intervalCount": 1
+      },
+      "nickname": "Growth Events - EUR Annual",
+      "lookupKey": "GROWTH_EVENTS_EUR_ANNUAL",
+      "metadata": {}
+    },
+    "price_1T2FSuIMsTw08cudD5hbFicc": {
+      "id": "price_1T2FSuIMsTw08cudD5hbFicc",
+      "active": true,
+      "livemode": true,
+      "product": "prod_U0FxIOn91twEaC",
+      "unitAmount": null,
+      "currency": "usd",
+      "type": "recurring",
+      "recurring": {
+        "interval": "month",
+        "intervalCount": 1
+      },
+      "nickname": "Growth Events - USD Monthly",
+      "lookupKey": "GROWTH_EVENTS_USD_MONTHLY",
+      "metadata": {}
+    },
+    "price_1T2FT0IMsTw08cudNjcizYxH": {
+      "id": "price_1T2FT0IMsTw08cudNjcizYxH",
+      "active": true,
+      "livemode": true,
+      "product": "prod_U0FxIOn91twEaC",
+      "unitAmount": null,
+      "currency": "usd",
+      "type": "recurring",
+      "recurring": {
+        "interval": "year",
+        "intervalCount": 1
+      },
+      "nickname": "Growth Events - USD Annual",
+      "lookupKey": "GROWTH_EVENTS_USD_ANNUAL",
       "metadata": {}
     }
   }
