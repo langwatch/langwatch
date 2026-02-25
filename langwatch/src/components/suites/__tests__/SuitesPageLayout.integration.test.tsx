@@ -67,17 +67,13 @@ vi.mock("~/hooks/useDrawer", () => ({
   }),
 }));
 
-// Mock AllRunsPanel to avoid deep server-side imports in jsdom
-vi.mock("~/components/suites/AllRunsPanel", () => ({
-  AllRunsPanel: () => <div data-testid="all-runs-panel">All Runs</div>,
-}));
-
 // Mock next/router
 vi.mock("next/router", () => ({
   useRouter: () => ({
     query: { project: "my-project" },
-    asPath: "/my-project/suites",
+    asPath: "/my-project/simulations/suites",
     push: vi.fn(),
+    isReady: true,
   }),
 }));
 
@@ -133,7 +129,7 @@ describe("Suites Page Layout (Issue #1671)", () => {
     it("renders PageLayout.Header with a 'Suites' heading", async () => {
       // Dynamic import to ensure mocks are applied
       const { default: SuitesPage } = await import(
-        "~/pages/[project]/simulations/suites/index"
+        "~/pages/[project]/simulations/suites/[[...suiteId]]"
       );
 
       render(<SuitesPage />, { wrapper: Wrapper });
@@ -145,7 +141,7 @@ describe("Suites Page Layout (Issue #1671)", () => {
     it("does not render DashboardLayout twice", async () => {
       dashboardLayoutRenderCount = 0;
       const { default: SuitesPage } = await import(
-        "~/pages/[project]/simulations/suites/index"
+        "~/pages/[project]/simulations/suites/[[...suiteId]]"
       );
 
       render(<SuitesPage />, { wrapper: Wrapper });

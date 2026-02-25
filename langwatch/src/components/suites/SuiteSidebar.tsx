@@ -29,6 +29,7 @@ import { useMemo, useState } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { SuiteRunSummary } from "./run-history-transforms";
+import { ALL_RUNS_ID } from "./useSuiteRouting";
 import { SearchInput } from "../ui/SearchInput";
 
 export const SUITE_SIDEBAR_COLLAPSED_KEY = "suite-sidebar-collapsed" as const;
@@ -36,9 +37,9 @@ export const SUITE_SIDEBAR_COLLAPSED_KEY = "suite-sidebar-collapsed" as const;
 
 type SuiteSidebarProps = {
   suites: SimulationSuite[];
-  selectedSuiteId: string | "all-runs" | null;
+  selectedSuiteId: string | typeof ALL_RUNS_ID | null;
   runSummaries?: Map<string, SuiteRunSummary>;
-  onSelectSuite: (id: string | "all-runs") => void;
+  onSelectSuite: (id: string | typeof ALL_RUNS_ID) => void;
   onRunSuite: (id: string) => void;
   onContextMenu: (e: React.MouseEvent, suiteId: string) => void;
 };
@@ -102,8 +103,8 @@ export function SuiteSidebar({
           <IconButton
             aria-label="All Runs"
             size="sm"
-            variant={selectedSuiteId === "all-runs" ? "solid" : "ghost"}
-            onClick={() => onSelectSuite("all-runs")}
+            variant={selectedSuiteId === ALL_RUNS_ID ? "solid" : "ghost"}
+            onClick={() => onSelectSuite(ALL_RUNS_ID)}
           >
             <List size={16} />
           </IconButton>
@@ -177,8 +178,8 @@ export function SuiteSidebar({
         <SidebarButton
           icon={<List size={14} />}
           label="All Runs"
-          isSelected={selectedSuiteId === "all-runs"}
-          onClick={() => onSelectSuite("all-runs")}
+          isSelected={selectedSuiteId === ALL_RUNS_ID}
+          onClick={() => onSelectSuite(ALL_RUNS_ID)}
         />
       </Box>
 

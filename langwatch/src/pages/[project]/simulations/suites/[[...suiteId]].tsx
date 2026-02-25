@@ -1,7 +1,9 @@
-"use client";
-
 /**
  * Suites page - Create, manage, and run simulation suites.
+ *
+ * Uses an optional catch-all route to support both:
+ *   /simulations/suites       (all runs view)
+ *   /simulations/suites/{id}  (specific suite view)
  *
  * Layout: sidebar (search, +New Suite, All Runs, suite list) + main panel.
  */
@@ -21,6 +23,7 @@ import {
 } from "~/components/suites/SuiteDetailPanel";
 import { SuiteSidebar } from "~/components/suites/SuiteSidebar";
 import { computeSuiteRunSummaries } from "~/components/suites/run-history-transforms";
+import { ALL_RUNS_ID, useSuiteRouting } from "~/components/suites/useSuiteRouting";
 import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useDrawer } from "~/hooks/useDrawer";
@@ -31,9 +34,9 @@ function SuitesPageContent() {
   const { project } = useOrganizationTeamProject();
   const { openDrawer, setFlowCallbacks } = useDrawer();
   const utils = api.useContext();
+  const { selectedSuiteId, navigateToSuite } = useSuiteRouting();
 
   // State
-  const [selectedSuiteId, setSelectedSuiteId] = useState<string | "all-runs" | null>("all-runs");
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -64,7 +67,7 @@ function SuitesPageContent() {
     });
   }, [allRunData]);
 
-  const selectedSuite = typeof selectedSuiteId === "string" && selectedSuiteId !== "all-runs"
+  const selectedSuite = typeof selectedSuiteId === "string" && selectedSuiteId !== ALL_RUNS_ID
     ? suites?.find((s) => s.id === selectedSuiteId) ?? null
     : null;
 
@@ -77,7 +80,7 @@ function SuitesPageContent() {
     onSuccess: () => {
       void utils.suites.getAll.invalidate();
       if (selectedSuiteId === archiveConfirmId) {
-        setSelectedSuiteId("all-runs");
+        navigateToSuite(ALL_RUNS_ID);
       }
       setArchiveConfirmId(null);
       toaster.create({
@@ -99,7 +102,7 @@ function SuitesPageContent() {
   const duplicateMutation = api.suites.duplicate.useMutation({
     onSuccess: (data) => {
       void utils.suites.getAll.invalidate();
-      setSelectedSuiteId(data.id);
+      navigateToSuite(data.id);
       toaster.create({
         title: "Suite duplicated",
         type: "success",
@@ -137,14 +140,14 @@ function SuitesPageContent() {
   // Handlers
   const handleSuiteSaved = useCallback(
     (suite: SimulationSuite) => {
-      setSelectedSuiteId(suite.id);
+      navigateToSuite(suite.id);
     },
-    [],
+    [navigateToSuite],
   );
 
   const handleSuiteRan = useCallback((suiteId: string) => {
-    setSelectedSuiteId(suiteId);
-  }, []);
+    navigateToSuite(suiteId);
+  }, [navigateToSuite]);
 
   const handleNewSuite = useCallback(() => {
     setFlowCallbacks("suiteEditor", {
@@ -168,10 +171,10 @@ function SuitesPageContent() {
   const handleRunSuite = useCallback(
     (suiteId: string) => {
       if (!project || runMutation.isPending) return;
-      setSelectedSuiteId(suiteId);
+      navigateToSuite(suiteId);
       runMutation.mutate({ projectId: project.id, id: suiteId });
     },
-    [project, runMutation],
+    [project, runMutation, navigateToSuite],
   );
 
   const handleDuplicateSuite = useCallback(
@@ -225,7 +228,7 @@ function SuitesPageContent() {
             suites={suites ?? []}
             selectedSuiteId={selectedSuiteId}
             runSummaries={runSummaries}
-            onSelectSuite={setSelectedSuiteId}
+            onSelectSuite={navigateToSuite}
             onRunSuite={handleRunSuite}
             onContextMenu={handleContextMenu}
           />
@@ -281,7 +284,7 @@ function MainPanel({
   isRunning,
 }: {
   error: { message: string } | null;
-  selectedSuiteId: string | "all-runs" | null;
+  selectedSuiteId: string | typeof ALL_RUNS_ID | null;
   selectedSuite: SimulationSuite | null;
   isLoading: boolean;
   onNewSuite: () => void;
@@ -300,7 +303,7 @@ function MainPanel({
     );
   }
 
-  if (selectedSuiteId === "all-runs") {
+  if (selectedSuiteId === ALL_RUNS_ID) {
     return <AllRunsPanel />;
   }
 

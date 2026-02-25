@@ -7,6 +7,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 // Capture the archive mutation's onSuccess so tests can trigger it manually
@@ -83,11 +84,15 @@ vi.mock("~/hooks/useDrawer", () => ({
   }),
 }));
 
+const mockPush = vi.fn();
+let mockRouterQuery: Record<string, string | string[] | undefined> = { project: "my-project" };
+
 vi.mock("next/router", () => ({
   useRouter: () => ({
-    query: { project: "my-project" },
-    asPath: "/my-project/suites",
-    push: vi.fn(),
+    query: mockRouterQuery,
+    asPath: "/my-project/simulations/suites",
+    push: mockPush,
+    isReady: true,
   }),
 }));
 
@@ -117,13 +122,17 @@ describe("All Runs default selection (Issue #1771)", () => {
   afterEach(() => {
     cleanup();
     capturedArchiveOnSuccess = undefined;
+    mockRouterQuery = { project: "my-project" };
+    mockPush.mockClear();
     vi.restoreAllMocks();
   });
 
-  describe("when the page loads", () => {
+  describe("when the page loads with no suiteId in URL", () => {
     it("selects 'All Runs' as the default sidebar item and displays the All Runs panel", async () => {
+      mockRouterQuery = { project: "my-project" };
+
       const { default: SuitesPage } = await import(
-        "~/pages/[project]/simulations/suites/index"
+        "~/pages/[project]/simulations/suites/[[...suiteId]]"
       );
 
       render(<SuitesPage />, { wrapper: Wrapper });
@@ -135,19 +144,19 @@ describe("All Runs default selection (Issue #1771)", () => {
   });
 
   describe("when the user archives the selected suite", () => {
-    it("falls back to 'All Runs' and displays the All Runs panel", async () => {
+    it("navigates to all-runs after archiving", async () => {
+      // Start with a suite selected in the URL
+      mockRouterQuery = { project: "my-project", suiteId: ["suite_1"] };
+
       const { default: SuitesPage } = await import(
-        "~/pages/[project]/simulations/suites/index"
+        "~/pages/[project]/simulations/suites/[[...suiteId]]"
       );
 
       render(<SuitesPage />, { wrapper: Wrapper });
 
-      // Select a suite by clicking its name in the sidebar
-      act(() => {
-        screen.getByText("My Suite").click();
-      });
+      const user = userEvent.setup();
 
-      // Suite detail panel is now shown instead of All Runs
+      // Suite detail panel is shown
       expect(screen.getByTestId("suite-detail-panel")).toBeInTheDocument();
       expect(screen.queryByTestId("all-runs-panel")).not.toBeInTheDocument();
 
@@ -156,19 +165,19 @@ describe("All Runs default selection (Issue #1771)", () => {
       act(() => {
         fireEvent.contextMenu(suiteTexts[0]!);
       });
-      act(() => {
-        screen.getByText("Archive").click();
-      });
+      await user.click(screen.getByText("Archive"));
 
       // Simulate the archive mutation's onSuccess callback
-      // (bypasses the Chakra dialog which doesn't render properly in JSDOM)
       act(() => {
         capturedArchiveOnSuccess?.();
       });
 
-      // All Runs panel is back after archiving
-      expect(screen.getByTestId("all-runs-panel")).toBeInTheDocument();
-      expect(screen.queryByTestId("suite-detail-panel")).not.toBeInTheDocument();
+      // Archiving the currently selected suite navigates to all-runs
+      expect(mockPush).toHaveBeenCalledWith(
+        "/my-project/simulations/suites",
+        undefined,
+        { shallow: true },
+      );
     });
   });
 });

@@ -16,6 +16,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SimulationSuite } from "@prisma/client";
 import { SuiteSidebar, SUITE_SIDEBAR_COLLAPSED_KEY } from "../SuiteSidebar";
+import { ALL_RUNS_ID } from "../useSuiteRouting";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -402,7 +403,7 @@ describe("<SuiteSidebar/>", () => {
       );
 
       await user.click(screen.getByText("All Runs"));
-      expect(onSelectSuite).toHaveBeenCalledWith("all-runs");
+      expect(onSelectSuite).toHaveBeenCalledWith(ALL_RUNS_ID);
     });
 
     it("does not show a status summary for All Runs", () => {
@@ -423,7 +424,7 @@ describe("<SuiteSidebar/>", () => {
           {...defaultProps}
           suites={suites}
           runSummaries={runSummaries}
-          selectedSuiteId="all-runs"
+          selectedSuiteId={ALL_RUNS_ID}
         />,
         { wrapper: Wrapper },
       );
