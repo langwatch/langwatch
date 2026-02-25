@@ -3,8 +3,8 @@
  *
  * Integration tests for suite URL routing.
  *
- * Verifies that suite selection is driven by URL, navigation updates URL,
- * and direct navigation to suite URLs works correctly.
+ * Verifies that suite selection is driven by URL query param (?suite=slug),
+ * navigation updates the query param, and direct navigation works correctly.
  *
  * @see specs/features/suites/suite-url-routing.feature
  */
@@ -20,7 +20,9 @@ let mockQuery: Record<string, string | string[] | undefined> = { project: "my-pr
 vi.mock("next/router", () => ({
   useRouter: () => ({
     query: mockQuery,
-    asPath: "/my-project/simulations/suites",
+    asPath: mockQuery.suite
+      ? `/my-project/simulations/suites?suite=${mockQuery.suite as string}`
+      : "/my-project/simulations/suites",
     push: mockPush,
     isReady: true,
   }),
@@ -138,7 +140,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 async function renderSuitesPage() {
-  const mod = await import("~/pages/[project]/simulations/suites/[[...suiteId]]");
+  const mod = await import("~/pages/[project]/simulations/suites/index");
   const SuitesPage = mod.default;
   return render(<SuitesPage />, { wrapper: Wrapper });
 }
@@ -154,7 +156,7 @@ describe("Suite URL Routing", () => {
     vi.restoreAllMocks();
   });
 
-  describe("when navigating to base suites URL (no suiteId)", () => {
+  describe("when navigating to base suites URL (no suite param)", () => {
     it("shows the all runs view", async () => {
       mockQuery = { project: "my-project" };
 
@@ -164,9 +166,9 @@ describe("Suite URL Routing", () => {
     });
   });
 
-  describe("when navigating directly to a suite URL", () => {
+  describe("when navigating directly to a suite URL via query param", () => {
     it("shows that suite's details", async () => {
-      mockQuery = { project: "my-project", suiteId: ["suite_a"] };
+      mockQuery = { project: "my-project", suite: "suite-a" };
 
       await renderSuitesPage();
 
@@ -175,9 +177,9 @@ describe("Suite URL Routing", () => {
     });
   });
 
-  describe("when navigating to a non-existent suite ID", () => {
+  describe("when navigating to a non-existent suite slug", () => {
     it("shows the empty state", async () => {
-      mockQuery = { project: "my-project", suiteId: ["non-existent-id"] };
+      mockQuery = { project: "my-project", suite: "non-existent-slug" };
 
       await renderSuitesPage();
 
@@ -186,7 +188,7 @@ describe("Suite URL Routing", () => {
   });
 
   describe("when clicking a suite in the sidebar", () => {
-    it("navigates to the suite URL with shallow routing", async () => {
+    it("navigates with suite slug as query param", async () => {
       mockQuery = { project: "my-project" };
       const user = userEvent.setup();
 
@@ -195,16 +197,19 @@ describe("Suite URL Routing", () => {
       await user.click(screen.getByText("Suite A"));
 
       expect(mockPush).toHaveBeenCalledWith(
-        "/my-project/simulations/suites/suite_a",
-        undefined,
+        {
+          pathname: "/[project]/simulations/suites",
+          query: { project: "my-project", suite: "suite-a" },
+        },
+        "/my-project/simulations/suites?suite=suite-a",
         { shallow: true },
       );
     });
   });
 
   describe("when clicking All Runs in the sidebar", () => {
-    it("navigates to the base suites URL with shallow routing", async () => {
-      mockQuery = { project: "my-project", suiteId: ["suite_a"] };
+    it("removes the suite query param", async () => {
+      mockQuery = { project: "my-project", suite: "suite-a" };
       const user = userEvent.setup();
 
       await renderSuitesPage();
@@ -212,8 +217,11 @@ describe("Suite URL Routing", () => {
       await user.click(screen.getByText("All Runs"));
 
       expect(mockPush).toHaveBeenCalledWith(
+        {
+          pathname: "/[project]/simulations/suites",
+          query: { project: "my-project" },
+        },
         "/my-project/simulations/suites",
-        undefined,
         { shallow: true },
       );
     });

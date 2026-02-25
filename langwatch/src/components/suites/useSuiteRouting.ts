@@ -1,8 +1,8 @@
 /**
  * Hook for URL-based suite routing.
  *
- * Reads suite ID from the optional catch-all route `[[...suiteId]]`
- * and provides navigation helpers for shallow client-side transitions.
+ * Reads suite slug from the `?suite=` query parameter and provides
+ * navigation helpers for shallow client-side transitions.
  */
 import { useCallback } from "react";
 import { useRouter } from "next/router";
@@ -10,47 +10,57 @@ import { useRouter } from "next/router";
 export const ALL_RUNS_ID = "all-runs" as const;
 
 type SuiteRouting = {
-  selectedSuiteId: string | typeof ALL_RUNS_ID | null;
-  navigateToSuite: (id: string | typeof ALL_RUNS_ID) => void;
+  selectedSuiteSlug: string | typeof ALL_RUNS_ID | null;
+  navigateToSuite: (slug: string | typeof ALL_RUNS_ID) => void;
 };
 
 export function useSuiteRouting(): SuiteRouting {
   const router = useRouter();
 
-  const selectedSuiteId = deriveSelectedSuiteId({
+  const selectedSuiteSlug = deriveSelectedSuiteSlug({
     isReady: router.isReady,
-    suiteIdParam: router.query.suiteId,
+    suiteParam: router.query.suite,
   });
 
   const projectSlug = router.query.project as string | undefined;
-  const { push } = router;
 
   const navigateToSuite = useCallback(
-    (id: string | typeof ALL_RUNS_ID) => {
+    (slug: string | typeof ALL_RUNS_ID) => {
       if (!projectSlug) return;
+
       const basePath = `/${projectSlug}/simulations/suites`;
-      const path = id === ALL_RUNS_ID ? basePath : `${basePath}/${id}`;
-      void push(path, undefined, { shallow: true });
+      const asUrl =
+        slug === ALL_RUNS_ID ? basePath : `${basePath}?suite=${slug}`;
+
+      void router.push(
+        {
+          pathname: "/[project]/simulations/suites",
+          query:
+            slug === ALL_RUNS_ID
+              ? { project: projectSlug }
+              : { project: projectSlug, suite: slug },
+        },
+        asUrl,
+        { shallow: true },
+      );
     },
-    [push, projectSlug],
+    [router, projectSlug],
   );
 
-  return { selectedSuiteId, navigateToSuite };
+  return { selectedSuiteSlug, navigateToSuite };
 }
 
-function deriveSelectedSuiteId({
+function deriveSelectedSuiteSlug({
   isReady,
-  suiteIdParam,
+  suiteParam,
 }: {
   isReady: boolean;
-  suiteIdParam: string | string[] | undefined;
+  suiteParam: string | string[] | undefined;
 }): string | typeof ALL_RUNS_ID | null {
   if (!isReady) return null;
 
-  if (!suiteIdParam || (Array.isArray(suiteIdParam) && suiteIdParam.length === 0)) {
-    return ALL_RUNS_ID;
-  }
+  if (!suiteParam) return ALL_RUNS_ID;
 
-  const id = Array.isArray(suiteIdParam) ? suiteIdParam[0] : suiteIdParam;
-  return id ?? ALL_RUNS_ID;
+  const slug = Array.isArray(suiteParam) ? suiteParam[0] : suiteParam;
+  return slug ?? ALL_RUNS_ID;
 }

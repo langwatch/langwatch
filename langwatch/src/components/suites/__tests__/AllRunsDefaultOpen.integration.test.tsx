@@ -8,7 +8,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Capture the archive mutation's onSuccess so tests can trigger it manually
 let capturedArchiveOnSuccess: (() => void) | undefined;
@@ -90,7 +90,9 @@ let mockRouterQuery: Record<string, string | string[] | undefined> = { project: 
 vi.mock("next/router", () => ({
   useRouter: () => ({
     query: mockRouterQuery,
-    asPath: "/my-project/simulations/suites",
+    asPath: mockRouterQuery.suite
+      ? `/my-project/simulations/suites?suite=${mockRouterQuery.suite as string}`
+      : "/my-project/simulations/suites",
     push: mockPush,
     isReady: true,
   }),
@@ -119,20 +121,23 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 describe("All Runs default selection (Issue #1771)", () => {
+  beforeEach(() => {
+    mockRouterQuery = { project: "my-project" };
+    mockPush.mockClear();
+  });
+
   afterEach(() => {
     cleanup();
     capturedArchiveOnSuccess = undefined;
-    mockRouterQuery = { project: "my-project" };
-    mockPush.mockClear();
     vi.restoreAllMocks();
   });
 
-  describe("when the page loads with no suiteId in URL", () => {
+  describe("when the page loads with no suite param in URL", () => {
     it("selects 'All Runs' as the default sidebar item and displays the All Runs panel", async () => {
       mockRouterQuery = { project: "my-project" };
 
       const { default: SuitesPage } = await import(
-        "~/pages/[project]/simulations/suites/[[...suiteId]]"
+        "~/pages/[project]/simulations/suites/index"
       );
 
       render(<SuitesPage />, { wrapper: Wrapper });
@@ -146,10 +151,10 @@ describe("All Runs default selection (Issue #1771)", () => {
   describe("when the user archives the selected suite", () => {
     it("navigates to all-runs after archiving", async () => {
       // Start with a suite selected in the URL
-      mockRouterQuery = { project: "my-project", suiteId: ["suite_1"] };
+      mockRouterQuery = { project: "my-project", suite: "my-suite" };
 
       const { default: SuitesPage } = await import(
-        "~/pages/[project]/simulations/suites/[[...suiteId]]"
+        "~/pages/[project]/simulations/suites/index"
       );
 
       render(<SuitesPage />, { wrapper: Wrapper });
@@ -174,8 +179,11 @@ describe("All Runs default selection (Issue #1771)", () => {
 
       // Archiving the currently selected suite navigates to all-runs
       expect(mockPush).toHaveBeenCalledWith(
+        {
+          pathname: "/[project]/simulations/suites",
+          query: { project: "my-project" },
+        },
         "/my-project/simulations/suites",
-        undefined,
         { shallow: true },
       );
     });

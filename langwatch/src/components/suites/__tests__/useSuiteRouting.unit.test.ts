@@ -3,7 +3,7 @@
  *
  * Unit tests for useSuiteRouting hook.
  *
- * Verifies URL-based suite selection: reading suiteId from router query,
+ * Verifies URL-based suite selection: reading suite slug from query param,
  * navigating to suites, and navigating to all-runs.
  *
  * @see specs/features/suites/suite-url-routing.feature
@@ -31,57 +31,46 @@ describe("useSuiteRouting()", () => {
     mockRouter.isReady = true;
   });
 
-  describe("when no suiteId is in the URL", () => {
-    it("returns 'all-runs' as selectedSuiteId", () => {
-      mockRouter.query = { project: "my-project" };
-
+  describe("when no suite param is in the URL", () => {
+    it("returns 'all-runs' as selectedSuiteSlug", () => {
       const { result } = renderHook(() => useSuiteRouting());
 
-      expect(result.current.selectedSuiteId).toBe(ALL_RUNS_ID);
+      expect(result.current.selectedSuiteSlug).toBe(ALL_RUNS_ID);
     });
   });
 
-  describe("when suiteId is in the URL", () => {
-    it("returns the suiteId as selectedSuiteId", () => {
-      mockRouter.query = { project: "my-project", suiteId: ["suite_123"] };
+  describe("when suite param is in the URL", () => {
+    it("returns the slug as selectedSuiteSlug", () => {
+      mockRouter.query = { project: "my-project", suite: "my-regression-suite" };
 
       const { result } = renderHook(() => useSuiteRouting());
 
-      expect(result.current.selectedSuiteId).toBe("suite_123");
+      expect(result.current.selectedSuiteSlug).toBe("my-regression-suite");
     });
   });
 
-  describe("when suiteId is an empty array", () => {
-    it("returns 'all-runs' as selectedSuiteId", () => {
-      mockRouter.query = { project: "my-project", suiteId: [] };
-
-      const { result } = renderHook(() => useSuiteRouting());
-
-      expect(result.current.selectedSuiteId).toBe(ALL_RUNS_ID);
-    });
-  });
-
-  describe("when navigateToSuite is called with a suite ID", () => {
-    it("pushes to the suite URL with shallow routing", () => {
-      mockRouter.query = { project: "my-project" };
-
+  describe("when navigateToSuite is called with a slug", () => {
+    it("pushes with href object and as URL using shallow routing", () => {
       const { result } = renderHook(() => useSuiteRouting());
 
       act(() => {
-        result.current.navigateToSuite("suite_456");
+        result.current.navigateToSuite("my-regression-suite");
       });
 
       expect(mockPush).toHaveBeenCalledWith(
-        "/my-project/simulations/suites/suite_456",
-        undefined,
+        {
+          pathname: "/[project]/simulations/suites",
+          query: { project: "my-project", suite: "my-regression-suite" },
+        },
+        "/my-project/simulations/suites?suite=my-regression-suite",
         { shallow: true },
       );
     });
   });
 
   describe("when navigateToSuite is called with 'all-runs'", () => {
-    it("pushes to the base suites URL with shallow routing", () => {
-      mockRouter.query = { project: "my-project", suiteId: ["suite_123"] };
+    it("pushes to base path without suite param", () => {
+      mockRouter.query = { project: "my-project", suite: "my-regression-suite" };
 
       const { result } = renderHook(() => useSuiteRouting());
 
@@ -90,21 +79,24 @@ describe("useSuiteRouting()", () => {
       });
 
       expect(mockPush).toHaveBeenCalledWith(
+        {
+          pathname: "/[project]/simulations/suites",
+          query: { project: "my-project" },
+        },
         "/my-project/simulations/suites",
-        undefined,
         { shallow: true },
       );
     });
   });
 
   describe("when router is not ready", () => {
-    it("returns null as selectedSuiteId", () => {
+    it("returns null as selectedSuiteSlug", () => {
       mockRouter.isReady = false;
       mockRouter.query = {};
 
       const { result } = renderHook(() => useSuiteRouting());
 
-      expect(result.current.selectedSuiteId).toBeNull();
+      expect(result.current.selectedSuiteSlug).toBeNull();
     });
   });
 
@@ -115,7 +107,7 @@ describe("useSuiteRouting()", () => {
       const { result } = renderHook(() => useSuiteRouting());
 
       act(() => {
-        result.current.navigateToSuite("suite_456");
+        result.current.navigateToSuite("some-suite");
       });
 
       expect(mockPush).not.toHaveBeenCalled();

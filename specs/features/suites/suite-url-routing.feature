@@ -5,25 +5,25 @@ Feature: URL routing for direct suite access
 
   Background:
     Given a project with slug "my-project"
-    And the project has suites "Suite A" and "Suite B"
+    And the project has suites "Suite A" (slug "suite-a") and "Suite B" (slug "suite-b")
 
   # Routing: suite selection reflected in URL
   @integration
-  Scenario: Selecting a suite updates the URL to include the suite ID
+  Scenario: Selecting a suite updates the URL to include the suite slug
     Given I am on the suites page at "/my-project/simulations/suites"
     When I click on "Suite A" in the sidebar
-    Then the URL changes to "/my-project/simulations/suites/{suite-a-id}"
+    Then the URL changes to "/my-project/simulations/suites?suite=suite-a"
 
   @integration
-  Scenario: Selecting "All Runs" updates the URL to the base suites path
-    Given I am viewing "Suite A" at "/my-project/simulations/suites/{suite-a-id}"
+  Scenario: Selecting "All Runs" removes the suite query param
+    Given I am viewing "Suite A" at "/my-project/simulations/suites?suite=suite-a"
     When I click "All Runs" in the sidebar
     Then the URL changes to "/my-project/simulations/suites"
 
   # Direct navigation via URL
   @integration
   Scenario: Navigating directly to a suite URL opens that suite
-    When I navigate to "/my-project/simulations/suites/{suite-a-id}"
+    When I navigate to "/my-project/simulations/suites?suite=suite-a"
     Then "Suite A" is selected in the sidebar
     And the main content shows "Suite A" details
 
@@ -34,15 +34,15 @@ Feature: URL routing for direct suite access
     And the main content shows the all runs view
 
   @integration
-  Scenario: Navigating to a non-existent suite ID shows empty state
-    When I navigate to "/my-project/simulations/suites/non-existent-id"
+  Scenario: Navigating to a non-existent suite slug shows empty state
+    When I navigate to "/my-project/simulations/suites?suite=non-existent-slug"
     Then the main content shows an empty state
     And the sidebar does not highlight any suite
 
   # Post-mutation navigation
   @integration
   Scenario: Archiving the current suite navigates to base path
-    Given I am viewing "Suite A" at "/my-project/simulations/suites/{suite-a-id}"
+    Given I am viewing "Suite A" at "/my-project/simulations/suites?suite=suite-a"
     When I archive "Suite A"
     Then the URL changes to "/my-project/simulations/suites"
 
@@ -53,7 +53,7 @@ Feature: URL routing for direct suite access
     And I am viewing "Suite A"
     When I click on "Suite B" in the sidebar
     And I press the browser back button
-    Then the URL contains the ID for "Suite A"
+    Then the URL contains "suite=suite-a"
     And "Suite A" is selected in the sidebar
 
   @e2e
@@ -61,7 +61,7 @@ Feature: URL routing for direct suite access
     Given I am logged in
     And I navigated from "Suite A" to "Suite B" and pressed back
     When I press the browser forward button
-    Then the URL contains the ID for "Suite B"
+    Then the URL contains "suite=suite-b"
     And "Suite B" is selected in the sidebar
 
   # Happy path - full system flow

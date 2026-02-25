@@ -138,15 +138,16 @@ describe("useRunHistoryStore", () => {
       );
     });
 
-    it("preserves existing query params from router", () => {
+    it("preserves existing query params from router but excludes path params", () => {
+      mockRouter.query.suite = "my-suite";
       getState(store).setGroupBy("target");
       getState(store).syncToUrl(mockRouter);
 
-      expect(mockRouter.push).toHaveBeenCalledWith(
-        { query: expect.objectContaining({ project: "my-project", groupBy: "target" }) },
-        undefined,
-        { shallow: true },
-      );
+      const call = vi.mocked(mockRouter.push).mock.calls[0]!;
+      const query = (call[0] as { query: Record<string, string> }).query;
+      expect(query).toHaveProperty("suite", "my-suite");
+      expect(query).toHaveProperty("groupBy", "target");
+      expect(query).not.toHaveProperty("project");
     });
 
     it("omits empty filter values", () => {

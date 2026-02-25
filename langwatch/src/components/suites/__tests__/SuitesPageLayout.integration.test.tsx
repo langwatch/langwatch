@@ -129,7 +129,7 @@ describe("Suites Page Layout (Issue #1671)", () => {
     it("renders PageLayout.Header with a 'Suites' heading", async () => {
       // Dynamic import to ensure mocks are applied
       const { default: SuitesPage } = await import(
-        "~/pages/[project]/simulations/suites/[[...suiteId]]"
+        "~/pages/[project]/simulations/suites/index"
       );
 
       render(<SuitesPage />, { wrapper: Wrapper });
@@ -141,7 +141,7 @@ describe("Suites Page Layout (Issue #1671)", () => {
     it("does not render DashboardLayout twice", async () => {
       dashboardLayoutRenderCount = 0;
       const { default: SuitesPage } = await import(
-        "~/pages/[project]/simulations/suites/[[...suiteId]]"
+        "~/pages/[project]/simulations/suites/index"
       );
 
       render(<SuitesPage />, { wrapper: Wrapper });
@@ -156,7 +156,7 @@ describe("Suites Page Layout (Issue #1671)", () => {
       render(
         <SuiteSidebar
           suites={suites}
-          selectedSuiteId={null}
+          selectedSuiteSlug={null}
           onSelectSuite={vi.fn()}
           onRunSuite={vi.fn()}
           onContextMenu={vi.fn()}
