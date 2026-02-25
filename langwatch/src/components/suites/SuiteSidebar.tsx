@@ -1,10 +1,14 @@
 /**
  * Suite sidebar with search, new suite button, all runs link, and suite list.
+ * Supports expanded (280px) and collapsed (48px icon strip) modes with
+ * localStorage persistence.
  */
 
 import {
   Box,
+  Center,
   HStack,
+  IconButton,
   Separator,
   Spacer,
   Text,
@@ -12,16 +16,23 @@ import {
 } from "@chakra-ui/react";
 import type { SimulationSuite } from "@prisma/client";
 import {
+  ChevronsLeft,
+  ChevronsRight,
   CircleAlert,
   CircleCheck,
   List,
   MoreVertical,
   Play,
 } from "lucide-react";
+import type React from "react";
 import { useMemo, useState } from "react";
+import { Tooltip } from "~/components/ui/tooltip";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { SuiteRunSummary } from "./run-history-transforms";
 import { SearchInput } from "../ui/SearchInput";
+
+export const SUITE_SIDEBAR_COLLAPSED_KEY = "suite-sidebar-collapsed" as const;
+
 
 type SuiteSidebarProps = {
   suites: SimulationSuite[];
@@ -41,12 +52,93 @@ export function SuiteSidebar({
   onContextMenu,
 }: SuiteSidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(SUITE_SIDEBAR_COLLAPSED_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleCollapsed = () => {
+    const next = !isCollapsed;
+    setIsCollapsed(next);
+    try {
+      localStorage.setItem(SUITE_SIDEBAR_COLLAPSED_KEY, String(next));
+    } catch {
+      // localStorage unavailable
+    }
+  };
 
   const filteredSuites = useMemo(() => {
     if (!searchQuery.trim()) return suites;
     const query = searchQuery.toLowerCase();
     return suites.filter((s) => s.name.toLowerCase().includes(query));
   }, [suites, searchQuery]);
+
+  if (isCollapsed) {
+    return (
+      <VStack
+        width="48px"
+        minWidth="48px"
+        height="100%"
+        overflowY="auto"
+        borderRight="1px solid"
+        borderColor="border"
+        align="center"
+        gap={1}
+        paddingY={2}
+      >
+        <IconButton
+          aria-label="Expand sidebar"
+          size="sm"
+          variant="ghost"
+          onClick={toggleCollapsed}
+        >
+          <ChevronsRight size={16} />
+        </IconButton>
+
+        <Tooltip content="All Runs" positioning={{ placement: "right" }}>
+          <IconButton
+            aria-label="All Runs"
+            size="sm"
+            variant={selectedSuiteId === "all-runs" ? "solid" : "ghost"}
+            onClick={() => onSelectSuite("all-runs")}
+          >
+            <List size={16} />
+          </IconButton>
+        </Tooltip>
+
+        <Separator />
+
+        {filteredSuites.map((suite) => (
+          <Tooltip
+            key={suite.id}
+            content={suite.name}
+            positioning={{ placement: "right" }}
+          >
+            <IconButton
+              aria-label={suite.name}
+              size="sm"
+              variant={suite.id === selectedSuiteId ? "solid" : "ghost"}
+              onClick={() => onSelectSuite(suite.id)}
+            >
+              <Center
+                width="24px"
+                height="24px"
+                borderRadius="full"
+                bg="bg.emphasized"
+                fontSize="xs"
+                fontWeight="bold"
+              >
+                {suite.name.charAt(0).toUpperCase()}
+              </Center>
+            </IconButton>
+          </Tooltip>
+        ))}
+      </VStack>
+    );
+  }
 
   return (
     <VStack
@@ -58,7 +150,21 @@ export function SuiteSidebar({
       align="stretch"
       gap={0}
     >
-      <Box paddingX={3} paddingTop={3} paddingBottom={2}>
+      <HStack paddingX={3} paddingTop={3} paddingBottom={1} justify="space-between">
+        <Text fontSize="xs" fontWeight="bold" color="fg.muted" letterSpacing="wider">
+          SUITES
+        </Text>
+        <IconButton
+          aria-label="Collapse sidebar"
+          size="xs"
+          variant="ghost"
+          onClick={toggleCollapsed}
+        >
+          <ChevronsLeft size={14} />
+        </IconButton>
+      </HStack>
+
+      <Box paddingX={3} paddingBottom={2}>
         <SearchInput
           size="sm"
           placeholder="Search..."

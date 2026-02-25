@@ -15,7 +15,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SimulationSuite } from "@prisma/client";
-import { SuiteSidebar } from "../SuiteSidebar";
+import { SuiteSidebar, SUITE_SIDEBAR_COLLAPSED_KEY } from "../SuiteSidebar";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -53,6 +53,7 @@ describe("<SuiteSidebar/>", () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    localStorage.clear();
   });
 
   describe("given no suites exist", () => {
@@ -490,6 +491,164 @@ describe("<SuiteSidebar/>", () => {
           expect.any(Object),
           "suite_1",
         );
+      });
+    });
+  });
+
+  describe("collapsible sidebar", () => {
+    const suites = [
+      makeSuite({ id: "suite_1", name: "Critical Path" }),
+      makeSuite({ id: "suite_2", name: "Billing Edge" }),
+    ];
+
+    function renderSidebar() {
+      const user = userEvent.setup();
+      const props = {
+        ...defaultProps,
+        suites,
+        onSelectSuite: vi.fn(),
+      };
+
+      render(<SuiteSidebar {...props} />, { wrapper: Wrapper });
+
+      return { user, props };
+    }
+
+    describe("when expanded (default state)", () => {
+      it("is expanded by default", () => {
+        renderSidebar();
+
+        expect(screen.getByPlaceholderText("Search...")).toBeInTheDocument();
+        expect(screen.getByText("Critical Path")).toBeInTheDocument();
+        expect(screen.getByText("Billing Edge")).toBeInTheDocument();
+      });
+
+      it("displays the collapse button", () => {
+        renderSidebar();
+
+        expect(
+          screen.getByRole("button", { name: "Collapse sidebar" }),
+        ).toBeInTheDocument();
+      });
+    });
+
+    describe("when the collapse button is clicked", () => {
+      it("hides search box", async () => {
+        const { user } = renderSidebar();
+
+        await user.click(
+          screen.getByRole("button", { name: "Collapse sidebar" }),
+        );
+
+        expect(screen.queryByPlaceholderText("Search...")).not.toBeInTheDocument();
+      });
+
+      it("shows suite avatar icons", async () => {
+        const { user } = renderSidebar();
+
+        await user.click(
+          screen.getByRole("button", { name: "Collapse sidebar" }),
+        );
+
+        expect(screen.getByText("C")).toBeInTheDocument();
+        expect(screen.getByText("B")).toBeInTheDocument();
+      });
+
+      it("shows the expand button", async () => {
+        const { user } = renderSidebar();
+
+        await user.click(
+          screen.getByRole("button", { name: "Collapse sidebar" }),
+        );
+
+        expect(
+          screen.getByRole("button", { name: "Expand sidebar" }),
+        ).toBeInTheDocument();
+      });
+
+      it("shows the all runs icon button", async () => {
+        const { user } = renderSidebar();
+
+        await user.click(
+          screen.getByRole("button", { name: "Collapse sidebar" }),
+        );
+
+        expect(
+          screen.getByRole("button", { name: "All Runs" }),
+        ).toBeInTheDocument();
+      });
+
+      it("persists collapsed state to localStorage", async () => {
+        const { user } = renderSidebar();
+
+        await user.click(
+          screen.getByRole("button", { name: "Collapse sidebar" }),
+        );
+
+        expect(localStorage.getItem(SUITE_SIDEBAR_COLLAPSED_KEY)).toBe("true");
+      });
+    });
+
+    describe("when the expand button is clicked after collapsing", () => {
+      it("restores search box", async () => {
+        const { user } = renderSidebar();
+
+        await user.click(
+          screen.getByRole("button", { name: "Collapse sidebar" }),
+        );
+        await user.click(
+          screen.getByRole("button", { name: "Expand sidebar" }),
+        );
+
+        expect(screen.getByPlaceholderText("Search...")).toBeInTheDocument();
+      });
+    });
+
+    describe("when a suite icon is clicked in collapsed mode", () => {
+      it("navigates to that suite", async () => {
+        const { user, props } = renderSidebar();
+
+        await user.click(
+          screen.getByRole("button", { name: "Collapse sidebar" }),
+        );
+        await user.click(
+          screen.getByRole("button", { name: "Critical Path" }),
+        );
+
+        expect(props.onSelectSuite).toHaveBeenCalledWith("suite_1");
+      });
+    });
+
+    describe("when search is active before collapsing", () => {
+      it("filters collapsed icons to match the search query", async () => {
+        const { user } = renderSidebar();
+
+        await user.type(screen.getByPlaceholderText("Search..."), "Critical");
+        await user.click(
+          screen.getByRole("button", { name: "Collapse sidebar" }),
+        );
+
+        expect(
+          screen.getByRole("button", { name: "Critical Path" }),
+        ).toBeInTheDocument();
+        expect(
+          screen.queryByRole("button", { name: "Billing Edge" }),
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    describe("when localStorage has collapsed state set", () => {
+      it("reads collapsed state from localStorage on mount", () => {
+        localStorage.setItem(SUITE_SIDEBAR_COLLAPSED_KEY, "true");
+
+        render(<SuiteSidebar {...defaultProps} suites={suites} />, {
+          wrapper: Wrapper,
+        });
+
+        expect(
+          screen.getByRole("button", { name: "Expand sidebar" }),
+        ).toBeInTheDocument();
+        expect(screen.queryByPlaceholderText("Search...")).not.toBeInTheDocument();
       });
     });
   });

@@ -155,7 +155,7 @@ describe("Suites Page Layout (Issue #1671)", () => {
   });
 
   describe("when rendering the SuiteSidebar", () => {
-    it("does not render a duplicate 'Suites' label", () => {
+    it("renders a 'SUITES' section header in the sidebar", () => {
       const suites = [makeSuite()];
       render(
         <SuiteSidebar
@@ -168,16 +168,9 @@ describe("Suites Page Layout (Issue #1671)", () => {
         { wrapper: Wrapper },
       );
 
-      // The sidebar should NOT have an uppercase "SUITES" or "Suites" label
-      // since the heading is now in PageLayout.Header
-      const suitesLabels = screen.queryAllByText(/^Suites$/i);
-      // Filter to only text elements that are labels (not suite names)
-      const labelElements = suitesLabels.filter(
-        (el) =>
-          el.tagName !== "H1" &&
-          el.textContent?.trim().toUpperCase() === "SUITES",
-      );
-      expect(labelElements).toHaveLength(0);
+      // The sidebar has a "SUITES" section header for the collapsible sidebar
+      const suitesLabels = screen.queryAllByText(/^SUITES$/);
+      expect(suitesLabels).toHaveLength(1);
     });
   });
 });
