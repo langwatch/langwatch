@@ -53,8 +53,8 @@ export const resolveGrowthSeatPlanType = ({
 }: {
   currency: Currency;
   interval: BillingInterval;
-}): PlanType =>
-  `GROWTH_SEAT_${currency}_${interval.toUpperCase()}` as PlanType;
+}): GrowthSeatPlanType =>
+  `GROWTH_SEAT_${currency}_${interval.toUpperCase()}` as GrowthSeatPlanType;
 
 /** Extracts currency and billing interval from a GROWTH_SEAT plan type. */
 export const parseGrowthSeatPlanType = (

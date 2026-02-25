@@ -12,6 +12,7 @@ import {
 import { Check } from "lucide-react";
 import { Link } from "~/components/ui/link";
 import { ENTERPRISE_PLAN_FEATURES } from "./billing-plans";
+import { CONTACT_SALES_URL } from "../plans/constants";
 
 export function ContactSalesBlock() {
   return (
@@ -42,7 +43,7 @@ export function ContactSalesBlock() {
         <Flex justifyContent="flex-end" marginTop={6}>
           <Button asChild variant="outline" size="sm" colorPalette="orange">
             <Link
-              href="https://meetings-eu1.hubspot.com/manouk-draisma?uuid=3c29cf0c-03e5-4a53-81fd-94abb0b66cfd"
+              href={CONTACT_SALES_URL}
               isExternal
               fontWeight="semibold"
             >

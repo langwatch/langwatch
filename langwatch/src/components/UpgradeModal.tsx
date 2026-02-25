@@ -121,7 +121,6 @@ function SeatsContent({
   ) as
     | {
         data?: {
-          formattedAmountDue: string;
           formattedRecurringTotal: string;
           billingInterval: string;
         };

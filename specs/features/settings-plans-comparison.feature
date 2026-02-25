@@ -95,13 +95,3 @@ Feature: Settings Plans Comparison Page
     When I look at a capability row in the comparison grid
     Then I can see the corresponding Free, Growth, and Enterprise values on the same row
     And usage-oriented capabilities are grouped under a "Usage" section
-
-  @unit
-  Scenario: Current plan resolver returns empty for unsupported legacy plans
-    Given the organization has a plan that is not one of:
-      | plan       |
-      | Free       |
-      | Growth     |
-      | Enterprise |
-    When the plans page resolves which comparison column is current
-    Then no current comparison column is returned

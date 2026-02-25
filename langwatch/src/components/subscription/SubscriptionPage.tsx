@@ -60,6 +60,7 @@ import { UpdateSeatsBlock } from "./UpdateSeatsBlock";
 import { UpgradePlanBlock } from "./UpgradePlanBlock";
 import { ContactSalesBlock } from "./ContactSalesBlock";
 import { UserManagementDrawer } from "./UserManagementDrawer";
+import { CONTACT_SALES_URL } from "../plans/constants";
 
 const currencyOptions = [
   { label: "\u20AC EUR", value: PrismaCurrency.EUR },
@@ -445,7 +446,7 @@ export function SubscriptionPage() {
           isManageLoading={isManageLoading}
           deprecatedNotice={isTieredLegacyPaidPlan}
           contactSalesUrl={isEnterprisePlan
-            ? "https://meetings-eu1.hubspot.com/manouk-draisma?uuid=3c29cf0c-03e5-4a53-81fd-94abb0b66cfd"
+            ? CONTACT_SALES_URL
             : undefined
           }
         />

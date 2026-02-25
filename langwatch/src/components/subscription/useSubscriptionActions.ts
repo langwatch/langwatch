@@ -1,28 +1,14 @@
 import { toaster } from "~/components/ui/toaster";
 import { useUpgradeModalStore } from "../../stores/upgradeModalStore";
 import { api } from "~/utils/api";
-import type { Currency, BillingInterval } from "./billing-plans";
+import {
+  type Currency,
+  type BillingInterval,
+  resolveGrowthSeatPlanType,
+} from "./billing-plans";
 import { type PlannedUser } from "./subscription-types";
 import { type MemberType } from "~/server/license-enforcement/member-classification";
-import {
-  isGrowthSeatEventPlan,
-  type GrowthSeatPlanType,
-} from "../../../ee/billing/utils/growthSeatEvent";
-import { PlanTypes } from "@prisma/client";
-
-const GROWTH_SEAT_PLAN_MAP: Record<`${Currency}_${BillingInterval}`, GrowthSeatPlanType> = {
-  EUR_monthly: PlanTypes.GROWTH_SEAT_EUR_MONTHLY,
-  EUR_annual: PlanTypes.GROWTH_SEAT_EUR_ANNUAL,
-  USD_monthly: PlanTypes.GROWTH_SEAT_USD_MONTHLY,
-  USD_annual: PlanTypes.GROWTH_SEAT_USD_ANNUAL,
-};
-
-function resolveGrowthSeatPlanType(
-  currency: Currency,
-  billingPeriod: BillingInterval,
-): GrowthSeatPlanType {
-  return GROWTH_SEAT_PLAN_MAP[`${currency}_${billingPeriod}`];
-}
+import { isGrowthSeatEventPlan } from "../../../ee/billing/utils/growthSeatEvent";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type TRPCRefetchFn = { refetch: () => any };
@@ -92,7 +78,7 @@ export function useSubscriptionActions({
       const result = await createSubscription.mutateAsync({
         organizationId,
         baseUrl: window.location.origin,
-        plan: resolveGrowthSeatPlanType(currency, billingPeriod),
+        plan: resolveGrowthSeatPlanType({ currency, interval: billingPeriod }),
         membersToAdd: totalFullMembers,
         currency,
         billingInterval: billingPeriod,
@@ -125,7 +111,7 @@ export function useSubscriptionActions({
         try {
           const plan = activePlanType && isGrowthSeatEventPlan(activePlanType)
             ? activePlanType
-            : resolveGrowthSeatPlanType(currency, billingPeriod);
+            : resolveGrowthSeatPlanType({ currency, interval: billingPeriod });
 
           await addTeamMemberOrEvents.mutateAsync({
             organizationId,

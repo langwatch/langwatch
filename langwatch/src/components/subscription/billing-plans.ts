@@ -14,7 +14,10 @@ export {
   getAnnualDiscountPercent,
   formatPrice,
 } from "../../../ee/billing/pricing";
-export { parseGrowthSeatPlanType } from "../../../ee/billing/utils/growthSeatEvent";
+export {
+  parseGrowthSeatPlanType,
+  resolveGrowthSeatPlanType,
+} from "../../../ee/billing/utils/growthSeatEvent";
 export { isAnnualTieredPlan } from "../../../ee/billing/planTypes";
 export type { BillingInterval } from "../../../ee/billing/utils/growthSeatEvent";
 

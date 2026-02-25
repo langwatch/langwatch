@@ -20,6 +20,7 @@ import {
   type ComparisonPlanId,
   resolveCurrentComparisonPlan,
 } from "./planCurrentResolver";
+import { CONTACT_SALES_URL } from "./constants";
 import {
   type Currency,
   type BillingInterval,
@@ -65,7 +66,7 @@ const PLAN_COLUMNS: PlanColumn[] = [
     name: "Enterprise",
     subtitle: "Regulated and high-volume deployments",
     actionLabel: "Contact Sales",
-    actionHref: "https://meetings-eu1.hubspot.com/manouk-draisma?uuid=3c29cf0c-03e5-4a53-81fd-94abb0b66cfd",
+    actionHref: CONTACT_SALES_URL,
     actionColor: "blue",
     features: ENTERPRISE_PLAN_FEATURES,
   },
@@ -130,7 +131,7 @@ function PlanCardActions({
   if (plan.id === "enterprise" && currentPlan !== "enterprise") {
     return (
       <Button asChild width="full" colorPalette="muted" variant="outline">
-        <Link href="https://meetings-eu1.hubspot.com/manouk-draisma?uuid=3c29cf0c-03e5-4a53-81fd-94abb0b66cfd" isExternal>
+        <Link href={CONTACT_SALES_URL} isExternal>
           Contact Sales
         </Link>
       </Button>

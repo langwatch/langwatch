@@ -16,7 +16,7 @@ export function PricingSummary({
       <Text data-testid={totalTestId} fontSize="sm" color="gray.700">
         {totalPrice} for {seatCount} seat{seatCount !== 1 ? "s" : ""}
       </Text>
-      {perSeatPrice && seatCount >1 && (
+      {perSeatPrice && seatCount > 1 && (
         <Text fontSize="xs" color="gray.500">
           {perSeatPrice}
         </Text>
