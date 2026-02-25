@@ -1,7 +1,9 @@
-"use client";
-
 /**
  * Suites page - Create, manage, and run simulation suites.
+ *
+ * Uses a query parameter `?suite=<slug>` to select a suite:
+ *   /simulations/suites              (all runs view)
+ *   /simulations/suites?suite=my-slug (specific suite view)
  *
  * Layout: sidebar (search, +New Suite, All Runs, suite list) + main panel.
  */
@@ -21,6 +23,7 @@ import {
 } from "~/components/suites/SuiteDetailPanel";
 import { SuiteSidebar } from "~/components/suites/SuiteSidebar";
 import { computeSuiteRunSummaries } from "~/components/suites/run-history-transforms";
+import { ALL_RUNS_ID, useSuiteRouting } from "~/components/suites/useSuiteRouting";
 import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useDrawer } from "~/hooks/useDrawer";
@@ -31,9 +34,9 @@ function SuitesPageContent() {
   const { project } = useOrganizationTeamProject();
   const { openDrawer, setFlowCallbacks } = useDrawer();
   const utils = api.useContext();
+  const { selectedSuiteSlug, navigateToSuite } = useSuiteRouting();
 
   // State
-  const [selectedSuiteId, setSelectedSuiteId] = useState<string | "all-runs" | null>("all-runs");
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -64,9 +67,10 @@ function SuitesPageContent() {
     });
   }, [allRunData]);
 
-  const selectedSuite = typeof selectedSuiteId === "string" && selectedSuiteId !== "all-runs"
-    ? suites?.find((s) => s.id === selectedSuiteId) ?? null
-    : null;
+  const selectedSuite = useMemo(() => {
+    if (!selectedSuiteSlug || selectedSuiteSlug === ALL_RUNS_ID) return null;
+    return suites?.find((s) => s.slug === selectedSuiteSlug) ?? null;
+  }, [selectedSuiteSlug, suites]);
 
   const archiveTargetSuite = archiveConfirmId
     ? suites?.find((s) => s.id === archiveConfirmId)
@@ -76,8 +80,9 @@ function SuitesPageContent() {
   const archiveMutation = api.suites.archive.useMutation({
     onSuccess: () => {
       void utils.suites.getAll.invalidate();
-      if (selectedSuiteId === archiveConfirmId) {
-        setSelectedSuiteId("all-runs");
+      const archivedSuite = suites?.find((s) => s.id === archiveConfirmId);
+      if (archivedSuite && archivedSuite.slug === selectedSuiteSlug) {
+        navigateToSuite(ALL_RUNS_ID);
       }
       setArchiveConfirmId(null);
       toaster.create({
@@ -99,7 +104,7 @@ function SuitesPageContent() {
   const duplicateMutation = api.suites.duplicate.useMutation({
     onSuccess: (data) => {
       void utils.suites.getAll.invalidate();
-      setSelectedSuiteId(data.id);
+      navigateToSuite(data.slug);
       toaster.create({
         title: "Suite duplicated",
         type: "success",
@@ -137,14 +142,15 @@ function SuitesPageContent() {
   // Handlers
   const handleSuiteSaved = useCallback(
     (suite: SimulationSuite) => {
-      setSelectedSuiteId(suite.id);
+      navigateToSuite(suite.slug);
     },
-    [],
+    [navigateToSuite],
   );
 
   const handleSuiteRan = useCallback((suiteId: string) => {
-    setSelectedSuiteId(suiteId);
-  }, []);
+    const suite = suites?.find((s) => s.id === suiteId);
+    if (suite) navigateToSuite(suite.slug);
+  }, [navigateToSuite, suites]);
 
   const handleNewSuite = useCallback(() => {
     setFlowCallbacks("suiteEditor", {
@@ -168,10 +174,11 @@ function SuitesPageContent() {
   const handleRunSuite = useCallback(
     (suiteId: string) => {
       if (!project || runMutation.isPending) return;
-      setSelectedSuiteId(suiteId);
+      const suite = suites?.find((s) => s.id === suiteId);
+      if (suite) navigateToSuite(suite.slug);
       runMutation.mutate({ projectId: project.id, id: suiteId });
     },
-    [project, runMutation],
+    [project, runMutation, navigateToSuite, suites],
   );
 
   const handleDuplicateSuite = useCallback(
@@ -223,9 +230,9 @@ function SuitesPageContent() {
         ) : (
           <SuiteSidebar
             suites={suites ?? []}
-            selectedSuiteId={selectedSuiteId}
+            selectedSuiteSlug={selectedSuiteSlug}
             runSummaries={runSummaries}
-            onSelectSuite={setSelectedSuiteId}
+            onSelectSuite={navigateToSuite}
             onRunSuite={handleRunSuite}
             onContextMenu={handleContextMenu}
           />
@@ -235,7 +242,7 @@ function SuitesPageContent() {
         <Box flex={1} overflow="auto">
           <MainPanel
             error={error ?? null}
-            selectedSuiteId={selectedSuiteId}
+            selectedSuiteSlug={selectedSuiteSlug}
             selectedSuite={selectedSuite}
             isLoading={isLoading}
             onNewSuite={handleNewSuite}
@@ -272,7 +279,7 @@ function SuitesPageContent() {
 
 function MainPanel({
   error,
-  selectedSuiteId,
+  selectedSuiteSlug,
   selectedSuite,
   isLoading,
   onNewSuite,
@@ -281,7 +288,7 @@ function MainPanel({
   isRunning,
 }: {
   error: { message: string } | null;
-  selectedSuiteId: string | "all-runs" | null;
+  selectedSuiteSlug: string | typeof ALL_RUNS_ID | null;
   selectedSuite: SimulationSuite | null;
   isLoading: boolean;
   onNewSuite: () => void;
@@ -300,7 +307,11 @@ function MainPanel({
     );
   }
 
-  if (selectedSuiteId === "all-runs") {
+  if (selectedSuiteSlug === null) {
+    return null;
+  }
+
+  if (selectedSuiteSlug === ALL_RUNS_ID) {
     return <AllRunsPanel />;
   }
 
@@ -315,7 +326,7 @@ function MainPanel({
     );
   }
 
-  if (!selectedSuiteId || !isLoading) {
+  if (!selectedSuiteSlug || !isLoading) {
     return <SuiteEmptyState onNewSuite={onNewSuite} />;
   }
 

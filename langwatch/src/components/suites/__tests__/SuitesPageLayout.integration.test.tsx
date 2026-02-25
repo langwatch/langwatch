@@ -67,17 +67,13 @@ vi.mock("~/hooks/useDrawer", () => ({
   }),
 }));
 
-// Mock AllRunsPanel to avoid deep server-side imports in jsdom
-vi.mock("~/components/suites/AllRunsPanel", () => ({
-  AllRunsPanel: () => <div data-testid="all-runs-panel">All Runs</div>,
-}));
-
 // Mock next/router
 vi.mock("next/router", () => ({
   useRouter: () => ({
     query: { project: "my-project" },
-    asPath: "/my-project/suites",
+    asPath: "/my-project/simulations/suites",
     push: vi.fn(),
+    isReady: true,
   }),
 }));
 
@@ -160,7 +156,7 @@ describe("Suites Page Layout (Issue #1671)", () => {
       render(
         <SuiteSidebar
           suites={suites}
-          selectedSuiteId={null}
+          selectedSuiteSlug={null}
           onSelectSuite={vi.fn()}
           onRunSuite={vi.fn()}
           onContextMenu={vi.fn()}

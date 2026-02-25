@@ -16,6 +16,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SimulationSuite } from "@prisma/client";
 import { SuiteSidebar, SUITE_SIDEBAR_COLLAPSED_KEY } from "../SuiteSidebar";
+import { ALL_RUNS_ID } from "../useSuiteRouting";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -43,7 +44,7 @@ function makeSuite(
 
 const defaultProps = {
   suites: [] as SimulationSuite[],
-  selectedSuiteId: null,
+  selectedSuiteSlug: null,
   onSelectSuite: vi.fn(),
   onRunSuite: vi.fn(),
   onContextMenu: vi.fn(),
@@ -76,9 +77,9 @@ describe("<SuiteSidebar/>", () => {
 
   describe("given suites exist", () => {
     const suites = [
-      makeSuite({ id: "suite_1", name: "Critical Path" }),
-      makeSuite({ id: "suite_2", name: "Billing Edge" }),
-      makeSuite({ id: "suite_3", name: "Quick Run" }),
+      makeSuite({ id: "suite_1", name: "Critical Path", slug: "critical-path" }),
+      makeSuite({ id: "suite_2", name: "Billing Edge", slug: "billing-edge" }),
+      makeSuite({ id: "suite_3", name: "Quick Run", slug: "quick-run" }),
     ];
 
     it("displays all suite names", () => {
@@ -97,7 +98,7 @@ describe("<SuiteSidebar/>", () => {
           <SuiteSidebar
             {...defaultProps}
             suites={suites}
-            selectedSuiteId="suite_2"
+            selectedSuiteSlug="billing-edge"
           />,
           { wrapper: Wrapper },
         );
@@ -122,7 +123,7 @@ describe("<SuiteSidebar/>", () => {
         );
 
         await user.click(screen.getByText("Critical Path"));
-        expect(onSelectSuite).toHaveBeenCalledWith("suite_1");
+        expect(onSelectSuite).toHaveBeenCalledWith("critical-path");
       });
     });
 
@@ -402,7 +403,7 @@ describe("<SuiteSidebar/>", () => {
       );
 
       await user.click(screen.getByText("All Runs"));
-      expect(onSelectSuite).toHaveBeenCalledWith("all-runs");
+      expect(onSelectSuite).toHaveBeenCalledWith(ALL_RUNS_ID);
     });
 
     it("does not show a status summary for All Runs", () => {
@@ -423,7 +424,7 @@ describe("<SuiteSidebar/>", () => {
           {...defaultProps}
           suites={suites}
           runSummaries={runSummaries}
-          selectedSuiteId="all-runs"
+          selectedSuiteSlug={ALL_RUNS_ID}
         />,
         { wrapper: Wrapper },
       );
@@ -497,8 +498,8 @@ describe("<SuiteSidebar/>", () => {
 
   describe("collapsible sidebar", () => {
     const suites = [
-      makeSuite({ id: "suite_1", name: "Critical Path" }),
-      makeSuite({ id: "suite_2", name: "Billing Edge" }),
+      makeSuite({ id: "suite_1", name: "Critical Path", slug: "critical-path" }),
+      makeSuite({ id: "suite_2", name: "Billing Edge", slug: "billing-edge" }),
     ];
 
     function renderSidebar() {
@@ -615,7 +616,7 @@ describe("<SuiteSidebar/>", () => {
           screen.getByRole("button", { name: "Critical Path" }),
         );
 
-        expect(props.onSelectSuite).toHaveBeenCalledWith("suite_1");
+        expect(props.onSelectSuite).toHaveBeenCalledWith("critical-path");
       });
     });
 
