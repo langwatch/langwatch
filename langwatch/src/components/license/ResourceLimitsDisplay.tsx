@@ -1,4 +1,4 @@
-import { Box, VStack } from "@chakra-ui/react";
+import { SimpleGrid } from "@chakra-ui/react";
 import { ResourceLimitRow } from "./ResourceLimitRow";
 import type { PlanInfo } from "../../../ee/licensing/planInfo";
 import { LIMIT_TYPE_DISPLAY_LABELS } from "~/server/license-enforcement/constants";
@@ -16,6 +16,8 @@ export type ResourceKey =
   | "agents"
   | "experiments"
   | "messagesPerMonth"
+  | "eventsPerMonth"
+  | "tracesPerMonth"
   | "evaluationsCredit";
 
 /**
@@ -24,21 +26,28 @@ export type ResourceKey =
  * resource-specific labels that are used only in the usage display.
  */
 export const RESOURCE_LABELS: Record<ResourceKey, string> = {
-  // Core limit types - imported from centralized constants
   ...LIMIT_TYPE_DISPLAY_LABELS,
-  // Extended resource types - only used in usage display (not for limit enforcement)
   membersLite: "Lite Members",
-  messagesPerMonth: "Messages/Month",
+  // Default label is "Events / Month"; for TIERED orgs this is overridden
+  // via the `messagesLabel` prop so they can display a different label
+  // (e.g. "Traces / Month"). See ResourceLimitsDisplay component.
+  messagesPerMonth: "Events / Month",
+  // Label-only keys: not part of the ResourceLimits interface but included
+  // here so that dynamic label resolution in usage.tsx (around line 109) can
+  // look up a human-readable name for these resource types at runtime.
+  eventsPerMonth: "Events / Month",
+  tracesPerMonth: "Traces / Month",
   evaluationsCredit: "Evaluations Credit",
-  // Note: "agents" is now in LIMIT_TYPE_DISPLAY_LABELS, no override needed
 } as const;
 
 /** Ordered list of resource keys for consistent rendering */
-const RESOURCE_ORDER: ResourceKey[] = [
+const RESOURCE_ORDER: (keyof ResourceLimits)[] = [
   "members",
   "membersLite",
   "messagesPerMonth",
 ] as const;
+
+const ALWAYS_COUNT_ONLY = new Set<ResourceKey>(["messagesPerMonth"]);
 
 export interface ResourceLimits {
   members: { current: number; max: number };
@@ -148,31 +157,31 @@ export function mapUsageToLimits(
 
 export interface ResourceLimitsDisplayProps {
   limits: ResourceLimits;
+  /** When true, show "current / max" for member resources. Typically only for free plans. */
+  showLimits?: boolean;
+  /** Override label for the messagesPerMonth resource (e.g. "Traces / Month" for TIERED plans). */
+  messagesLabel?: string;
 }
 
 /**
  * Displays resource limits in a consistent format.
  * Used by both licensed plan and free tier sections on the usage page.
  */
-export function ResourceLimitsDisplay({ limits }: ResourceLimitsDisplayProps) {
+export function ResourceLimitsDisplay({ limits, showLimits = false, messagesLabel }: ResourceLimitsDisplayProps) {
   return (
-    <Box
-      borderWidth="1px"
-      borderRadius="lg"
-      padding={6}
-      width="full"
-      maxWidth="md"
-    >
-      <VStack align="start" gap={2}>
-        {RESOURCE_ORDER.map((key) => (
+    <SimpleGrid columns={{ base: 1, md: 3 }} gap={3} width="full">
+      {RESOURCE_ORDER.map((key) => {
+        const hideMax = ALWAYS_COUNT_ONLY.has(key) || !showLimits;
+        const label = key === "messagesPerMonth" && messagesLabel ? messagesLabel : RESOURCE_LABELS[key];
+        return (
           <ResourceLimitRow
             key={key}
-            label={RESOURCE_LABELS[key]}
+            label={label}
             current={limits[key].current}
-            max={limits[key].max}
+            max={hideMax ? undefined : limits[key].max}
           />
-        ))}
-      </VStack>
-    </Box>
+        );
+      })}
+    </SimpleGrid>
   );
 }

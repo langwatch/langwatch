@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import { Currency, type OrganizationUserRole, type PrismaClient } from "@prisma/client";
 import type Stripe from "stripe";
 import { notifySubscriptionEvent } from "../notifications/notificationHandlers";
 import {
@@ -13,6 +13,13 @@ import type {
   prices,
 } from "./subscriptionItemCalculator";
 import { isStripePriceName } from "../stripe/stripePriceCatalog";
+import {
+  InvalidPlanError,
+  OrganizationNotFoundError,
+  SeatBillingUnavailableError,
+} from "../errors";
+import { isGrowthSeatEventPlan, type BillingInterval } from "../utils/growthSeatEvent";
+import type { SeatEventSubscriptionFns } from "./seatEventSubscription";
 
 type ItemCalculator = {
   getItemsToUpdate: typeof getItemsToUpdate;
@@ -37,16 +44,28 @@ export type SubscriptionService = {
     membersToAdd?: number;
     tracesToAdd?: number;
     customerId: string;
+    currency?: Currency;
+    billingInterval?: BillingInterval;
   }): Promise<{ url: string | null }>;
 
   createBillingPortalSession(params: {
     customerId: string;
     baseUrl: string;
+    organizationId: string;
   }): Promise<{ url: string }>;
 
   getLastNonCancelledSubscription(
     organizationId: string,
   ): Promise<Awaited<ReturnType<PrismaClient["subscription"]["findFirst"]>>>;
+
+  previewProration(params: {
+    organizationId: string;
+    newTotalSeats: number;
+  }): Promise<{
+    formattedAmountDue: string;
+    formattedRecurringTotal: string;
+    billingInterval: string;
+  }>;
 
   notifyProspective(params: {
     organizationId: string;
@@ -56,16 +75,28 @@ export type SubscriptionService = {
     note?: string;
     actorEmail: string;
   }): Promise<{ success: boolean }>;
+
+  createSubscriptionWithInvites(params: {
+    organizationId: string;
+    baseUrl: string;
+    membersToAdd: number;
+    customerId: string;
+    currency?: Currency;
+    billingInterval?: BillingInterval;
+    invites: Array<{ email: string; role: OrganizationUserRole }>;
+  }): Promise<{ url: string | null }>;
 };
 
 export const createSubscriptionService = ({
   stripe,
   db,
   itemCalculator,
+  seatEventFns,
 }: {
   stripe: Stripe;
   db: PrismaClient;
   itemCalculator: ItemCalculator;
+  seatEventFns?: SeatEventSubscriptionFns;
 }): SubscriptionService => {
   const getLastNonCancelledSubscription = async (organizationId: string) => {
     return await db.subscription.findFirst({
@@ -86,6 +117,19 @@ export const createSubscriptionService = ({
       totalMembers,
       totalTraces,
     }) {
+      if (seatEventFns) {
+        const org = await db.organization.findUnique({
+          where: { id: organizationId },
+          select: { pricingModel: true },
+        });
+        if (org?.pricingModel === "SEAT_EVENT") {
+          return seatEventFns.updateSeatEventItems({
+            organizationId,
+            totalMembers,
+          });
+        }
+      }
+
       const lastSubscription =
         await getLastNonCancelledSubscription(organizationId);
 
@@ -125,7 +169,26 @@ export const createSubscriptionService = ({
       membersToAdd = 0,
       tracesToAdd = 0,
       customerId,
+      currency,
+      billingInterval,
     }) {
+      if (isGrowthSeatEventPlan(plan) && seatEventFns) {
+        const org = await db.organization.findUnique({
+          where: { id: organizationId },
+          select: { pricingModel: true },
+        });
+
+        return seatEventFns.createSeatEventCheckout({
+          organizationId,
+          customerId,
+          baseUrl,
+          currency: currency ?? Currency.EUR,
+          billingInterval: billingInterval ?? "monthly",
+          membersToAdd,
+          isUpgradeFromTiered: org?.pricingModel === "TIERED",
+        });
+      }
+
       const lastSubscription =
         await getLastNonCancelledSubscription(organizationId);
 
@@ -195,7 +258,7 @@ export const createSubscriptionService = ({
 
 
       if (!isStripePriceName(plan as StripePriceName)) {
-        throw new Error(`Plan ${plan} does not have an associated Stripe price`);
+        throw new InvalidPlanError(plan);
       }
       
       itemsToAdd.push({
@@ -225,7 +288,20 @@ export const createSubscriptionService = ({
       return { url: session.url };
     },
 
-    async createBillingPortalSession({ customerId, baseUrl }) {
+    async createBillingPortalSession({ customerId, baseUrl, organizationId }) {
+      if (seatEventFns && organizationId) {
+        const org = await db.organization.findUnique({
+          where: { id: organizationId },
+          select: { pricingModel: true },
+        });
+        if (org?.pricingModel === "SEAT_EVENT") {
+          return seatEventFns.seatEventBillingPortalUrl({
+            customerId,
+            baseUrl,
+          });
+        }
+      }
+
       const session = await stripe.billingPortal.sessions.create({
         customer: customerId,
         return_url: `${baseUrl}/settings/subscription`,
@@ -235,6 +311,56 @@ export const createSubscriptionService = ({
     },
 
     getLastNonCancelledSubscription,
+
+    async previewProration({ organizationId, newTotalSeats }) {
+      if (!seatEventFns) {
+        throw new SeatBillingUnavailableError();
+      }
+      return seatEventFns.previewProration({ organizationId, newTotalSeats });
+    },
+
+    async createSubscriptionWithInvites({
+      organizationId,
+      baseUrl,
+      membersToAdd,
+      customerId,
+      currency,
+      billingInterval,
+      invites,
+    }) {
+      if (!seatEventFns) {
+        throw new SeatBillingUnavailableError();
+      }
+
+      // Resolve the first team in the org for deterministic team assignment
+      const firstTeam = await db.team.findFirst({
+        where: { organizationId },
+        orderBy: { createdAt: "asc" },
+        select: { id: true },
+      });
+
+      const teamIds = firstTeam?.id ?? "";
+
+      const org = await db.organization.findUnique({
+        where: { id: organizationId },
+        select: { pricingModel: true },
+      });
+
+      return seatEventFns.createSeatEventCheckout({
+        organizationId,
+        customerId,
+        baseUrl,
+        currency: currency ?? Currency.EUR,
+        billingInterval: billingInterval ?? "monthly",
+        membersToAdd,
+        isUpgradeFromTiered: org?.pricingModel === "TIERED",
+        invites: invites.map((inv) => ({
+          email: inv.email,
+          role: inv.role,
+          teamIds,
+        })),
+      });
+    },
 
     async notifyProspective({
       organizationId,
@@ -249,7 +375,7 @@ export const createSubscriptionService = ({
       });
 
       if (!organization) {
-        throw new Error("Organization not found");
+        throw new OrganizationNotFoundError();
       }
 
       await notifySubscriptionEvent({

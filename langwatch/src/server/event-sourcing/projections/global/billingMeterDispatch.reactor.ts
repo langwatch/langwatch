@@ -29,7 +29,7 @@ export function createBillingMeterDispatchReactor(deps: {
       runIn: ["worker"],
       makeJobId: (payload) =>
         `billing_dispatch_${payload.event.tenantId}`,
-      ttl: 300_000, // 5 min dedup window
+      ttl: 10_000,
     },
 
     async handle(event, context) {

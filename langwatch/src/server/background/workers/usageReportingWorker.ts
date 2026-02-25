@@ -22,6 +22,8 @@ import {
   billingMonthDateRange,
   queryBillableEventsTotal,
 } from "../../../../ee/billing/services/billableEventsQuery";
+import { SUBSCRIBABLE_PLANS } from "../../../../ee/billing/planTypes";
+import { PricingModel } from "@prisma/client";
 
 // Re-export for existing test imports
 export { getBillingMonth, getPreviousBillingMonth, billingMonthDateRange };
@@ -253,16 +255,19 @@ export async function runUsageReportingJob(
     // ----------------------------------------------------------------
     // 1. Resolve org from DB
     // ----------------------------------------------------------------
-    const org = await prisma.organization.findUnique({
-      where: { id: organizationId },
+    const org = await prisma.organization.findFirst({
+      where: { id: organizationId, pricingModel: PricingModel.SEAT_EVENT },
       select: {
         id: true,
         stripeCustomerId: true,
         pricingModel: true,
         subscriptions: {
-          where: { status: "ACTIVE" },
+          where: { 
+            status: "ACTIVE",
+            plan: { in: [...SUBSCRIBABLE_PLANS] }
+          },
           take: 1,
-          select: { id: true },
+          select: { id: true }, orderBy: { startDate: "desc" },
         },
       },
     });
@@ -286,15 +291,6 @@ export async function runUsageReportingJob(
       logger.debug(
         { organizationId },
         "no active subscription, skipping usage reporting",
-      );
-      getJobProcessingCounter("usage_reporting", "completed").inc();
-      return;
-    }
-
-    if (org.pricingModel !== "SEAT_EVENT") {
-      logger.debug(
-        { organizationId, pricingModel: org.pricingModel },
-        "organization not on SEAT_EVENT pricing, skipping usage reporting",
       );
       getJobProcessingCounter("usage_reporting", "completed").inc();
       return;
