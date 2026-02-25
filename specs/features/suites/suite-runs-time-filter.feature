@@ -32,11 +32,11 @@ Feature: Time filter for suite runs
     And only the first page of filtered results is shown
 
   @unit
-  Scenario: Run data query includes date range parameters
+  Scenario: Selected date range limits displayed run data
     Given a date range is selected
     When run data is requested
-    Then the query includes startDate and endDate constraints
-    And only matching rows are returned
+    Then only runs within the selected date range are shown
+    And runs outside the selected date range are not shown
 
   @integration
   Scenario: Batch runs are included or excluded atomically

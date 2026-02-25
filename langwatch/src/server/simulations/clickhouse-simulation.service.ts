@@ -536,15 +536,15 @@ export class ClickHouseSimulationService {
     const validatedLimit = Math.min(Math.max(1, limit), 100);
     const decoded = cursor ? this.decodeCursor(cursor) : null;
 
-    const cursorClause = decoded
-      ? `HAVING (toString(toUnixTimestamp64Milli(max(CreatedAt))) < {cursorTs:String})
-         OR (toString(toUnixTimestamp64Milli(max(CreatedAt))) = {cursorTs:String} AND BatchRunId > {cursorBatchRunId:String})`
-      : "HAVING 1 = 1";
+    const cursorPredicate = decoded
+      ? `(
+          (toString(toUnixTimestamp64Milli(max(CreatedAt))) < {cursorTs:String})
+          OR (toString(toUnixTimestamp64Milli(max(CreatedAt))) = {cursorTs:String} AND BatchRunId > {cursorBatchRunId:String})
+        )`
+      : "1 = 1";
 
     const dateFilter = buildDateHavingFilter({ startDate, endDate });
-    const combinedHaving = dateFilter.clause
-      ? `${cursorClause} AND ${dateFilter.clause}`
-      : cursorClause;
+    const combinedHaving = `HAVING ${[cursorPredicate, dateFilter.clause].filter(Boolean).join(" AND ")}`;
 
     const batchRows = await this.queryRows<{
       BatchRunId: string;
@@ -618,15 +618,15 @@ export class ClickHouseSimulationService {
     const validatedLimit = Math.min(Math.max(1, limit), 100);
     const decoded = cursor ? this.decodeCursor(cursor) : null;
 
-    const cursorClause = decoded
-      ? `HAVING (toString(toUnixTimestamp64Milli(max(CreatedAt))) < {cursorTs:String})
-         OR (toString(toUnixTimestamp64Milli(max(CreatedAt))) = {cursorTs:String} AND BatchRunId > {cursorBatchRunId:String})`
-      : "HAVING 1 = 1";
+    const cursorPredicate = decoded
+      ? `(
+          (toString(toUnixTimestamp64Milli(max(CreatedAt))) < {cursorTs:String})
+          OR (toString(toUnixTimestamp64Milli(max(CreatedAt))) = {cursorTs:String} AND BatchRunId > {cursorBatchRunId:String})
+        )`
+      : "1 = 1";
 
     const dateFilter = buildDateHavingFilter({ startDate, endDate });
-    const combinedHaving = dateFilter.clause
-      ? `${cursorClause} AND ${dateFilter.clause}`
-      : cursorClause;
+    const combinedHaving = `HAVING ${[cursorPredicate, dateFilter.clause].filter(Boolean).join(" AND ")}`;
 
     const batchRows = await this.queryRows<{
       BatchRunId: string;

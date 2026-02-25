@@ -114,24 +114,16 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
   const hasQueuedJobs =
     (queueStatus?.waiting ?? 0) > 0 || (queueStatus?.active ?? 0) > 0;
 
-  // Fetch run data using paginated endpoint with server-side date filtering.
-  // This ensures batch atomicity: entire batches are included/excluded based
-  // on their max(CreatedAt) via a HAVING clause in ClickHouse.
+  // Fetch all run data for this suite (unpaginated).
+  // Date filtering is applied client-side to avoid capping results.
   const {
-    data: runDataResult,
+    data: runData,
     isLoading,
     error,
-  } = api.scenarios.getScenarioSetRunData.useQuery(
+  } = api.scenarios.getAllScenarioSetRunData.useQuery(
     {
       projectId: project?.id ?? "",
       scenarioSetId: setId,
-      limit: 100,
-      ...(period
-        ? {
-            startDate: period.startDate.getTime(),
-            endDate: period.endDate.getTime(),
-          }
-        : {}),
     },
     {
       enabled: !!project,
@@ -139,8 +131,6 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
       refetchInterval: hasQueuedJobs ? 3000 : 5000,
     },
   );
-
-  const runData = runDataResult?.runs;
 
   // Fetch scenarios for filter options and name resolution
   const { data: scenarios } = api.scenarios.getAll.useQuery(
@@ -206,12 +196,18 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
 
     let runs: ScenarioRunData[] = runData;
 
+    if (period) {
+      const startMs = period.startDate.getTime();
+      const endMs = period.endDate.getTime();
+      runs = runs.filter((r) => r.timestamp >= startMs && r.timestamp <= endMs);
+    }
+
     if (filters.scenarioId) {
       runs = runs.filter((r) => r.scenarioId === filters.scenarioId);
     }
 
     return runs;
-  }, [runData, filters.scenarioId]);
+  }, [runData, filters.scenarioId, period]);
 
   // Group filtered runs by batch (for "none" grouping and pass/fail filtering)
   const batchRuns = useMemo(() => {
