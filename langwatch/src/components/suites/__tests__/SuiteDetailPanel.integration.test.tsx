@@ -249,7 +249,7 @@ describe("<SuiteDetailPanel/>", () => {
   });
 
   describe("when a period is provided", () => {
-    it("passes period dates to the run data query", () => {
+    it("renders without error and queries run data", () => {
       const period = {
         startDate: new Date("2024-06-01T00:00:00Z"),
         endDate: new Date("2024-06-07T23:59:59Z"),
@@ -265,8 +265,8 @@ describe("<SuiteDetailPanel/>", () => {
         { wrapper: Wrapper },
       );
 
-      // RunHistoryList uses getAllScenarioSetRunData (unpaginated) and filters client-side.
-      // Verify the query was called with the project and scenario set IDs.
+      // RunHistoryList uses getAllScenarioSetRunData (unpaginated) and filters
+      // client-side by period. Verify the query is called for this suite.
       expect(mockUseQuery).toHaveBeenCalledWith(
         expect.objectContaining({
           projectId: expect.any(String),
