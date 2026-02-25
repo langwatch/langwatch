@@ -71,6 +71,8 @@ export class EESubscriptionService implements SubscriptionService {
   async updateSubscriptionItems({
     organizationId,
     plan,
+    upgradeMembers,
+    upgradeTraces,
     totalMembers,
     totalTraces,
   }: {
@@ -81,6 +83,9 @@ export class EESubscriptionService implements SubscriptionService {
     totalMembers: number;
     totalTraces: number;
   }): Promise<{ success: boolean }> {
+    const effectiveMembers = upgradeMembers ? totalMembers : 0;
+    const effectiveTraces = upgradeTraces ? totalTraces : 0;
+
     if (this.seatEventFns) {
       const org = await this.prisma.organization.findUnique({
         where: { id: organizationId },
@@ -89,7 +94,7 @@ export class EESubscriptionService implements SubscriptionService {
       if (org?.pricingModel === "SEAT_EVENT") {
         return this.seatEventFns.updateSeatEventItems({
           organizationId,
-          totalMembers,
+          totalMembers: effectiveMembers,
         });
       }
     }
@@ -111,8 +116,8 @@ export class EESubscriptionService implements SubscriptionService {
       const itemsToUpdate = this.itemCalculator.getItemsToUpdate({
         currentItems,
         plan,
-        tracesToAdd: totalTraces,
-        membersToAdd: totalMembers,
+        tracesToAdd: effectiveTraces,
+        membersToAdd: effectiveMembers,
       });
 
       await this.stripe.subscriptions.update(
@@ -419,24 +424,24 @@ export class EESubscriptionService implements SubscriptionService {
     customerId: string;
     baseUrl: string;
   }): Promise<{ url: string | null }> {
+    if (!isStripePriceName(plan as StripePriceName)) {
+      throw new InvalidPlanError(plan);
+    }
+
     const itemsToAdd = this.itemCalculator.createItemsToAdd(
       plan,
       { quantity: tracesToAdd },
       { quantity: membersToAdd },
     );
 
-    const subscription = await this.repository.createPending({
-      organizationId,
-      plan,
-    });
-
-    if (!isStripePriceName(plan as StripePriceName)) {
-      throw new InvalidPlanError(plan);
-    }
-
     itemsToAdd.push({
       price: this.itemCalculator.prices[plan as StripePriceName],
       quantity: 1,
+    });
+
+    const subscription = await this.repository.createPending({
+      organizationId,
+      plan,
     });
 
     const session = await this.stripe.checkout.sessions.create({

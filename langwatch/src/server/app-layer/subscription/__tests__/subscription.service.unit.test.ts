@@ -13,18 +13,22 @@ import type { EESubscriptionService } from "../../../../../ee/billing/services/s
 // --------------------------------------------------------------------------
 // Type-level conformance checks (compile-time only, no runtime cost)
 // --------------------------------------------------------------------------
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-type _AssertEEConforms = EESubscriptionService extends SubscriptionService
-  ? true
-  : never;
+type Assert<T extends true> = T;
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-type _AssertNullServiceConforms =
-  NullSubscriptionService extends SubscriptionService ? true : never;
+type _AssertEEConforms = Assert<
+  EESubscriptionService extends SubscriptionService ? true : false
+>;
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-type _AssertNullRepoConforms =
-  NullSubscriptionRepository extends SubscriptionRepository ? true : never;
+type _AssertNullServiceConforms = Assert<
+  NullSubscriptionService extends SubscriptionService ? true : false
+>;
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _AssertNullRepoConforms = Assert<
+  NullSubscriptionRepository extends SubscriptionRepository ? true : false
+>;
 
 describe("NullSubscriptionService", () => {
   const service = new NullSubscriptionService();

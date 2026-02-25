@@ -9,7 +9,7 @@ import type Stripe from "stripe";
 import { notifySubscriptionEvent } from "../notifications/notificationHandlers";
 import { PlanTypes, SubscriptionStatus } from "../planTypes";
 import { EESubscriptionService } from "../services/subscription.service";
-import { OrganizationNotFoundError } from "../errors";
+import { InvalidPlanError, OrganizationNotFoundError } from "../errors";
 import type { SubscriptionRepository } from "../../../src/server/app-layer/subscription/subscription.repository";
 
 const mockNotifySubscriptionEvent = notifySubscriptionEvent as ReturnType<
@@ -109,6 +109,70 @@ describe("EESubscriptionService", () => {
         expect(stripe.subscriptions.update).toHaveBeenCalledWith(
           "sub_stripe_1",
           { items: [{ id: "si_1", quantity: 1 }] },
+        );
+      });
+    });
+
+    describe("when upgradeTraces is false", () => {
+      it("passes zero traces to the item calculator", async () => {
+        repository.findLastNonCancelled.mockResolvedValue({
+          id: "sub_db_1",
+          stripeSubscriptionId: "sub_stripe_1",
+          status: SubscriptionStatus.ACTIVE,
+          plan: PlanTypes.LAUNCH,
+        });
+        stripe.subscriptions.retrieve.mockResolvedValue({
+          items: { data: [{ id: "si_1", price: { id: "price_launch" } }] },
+        });
+        itemCalculator.getItemsToUpdate.mockReturnValue([]);
+        stripe.subscriptions.update.mockResolvedValue({});
+
+        await service.updateSubscriptionItems({
+          organizationId: "org_123",
+          plan: PlanTypes.LAUNCH,
+          upgradeMembers: true,
+          upgradeTraces: false,
+          totalMembers: 5,
+          totalTraces: 30_000,
+        });
+
+        expect(itemCalculator.getItemsToUpdate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            tracesToAdd: 0,
+            membersToAdd: 5,
+          }),
+        );
+      });
+    });
+
+    describe("when upgradeMembers is false", () => {
+      it("passes zero members to the item calculator", async () => {
+        repository.findLastNonCancelled.mockResolvedValue({
+          id: "sub_db_1",
+          stripeSubscriptionId: "sub_stripe_1",
+          status: SubscriptionStatus.ACTIVE,
+          plan: PlanTypes.LAUNCH,
+        });
+        stripe.subscriptions.retrieve.mockResolvedValue({
+          items: { data: [{ id: "si_1", price: { id: "price_launch" } }] },
+        });
+        itemCalculator.getItemsToUpdate.mockReturnValue([]);
+        stripe.subscriptions.update.mockResolvedValue({});
+
+        await service.updateSubscriptionItems({
+          organizationId: "org_123",
+          plan: PlanTypes.LAUNCH,
+          upgradeMembers: false,
+          upgradeTraces: true,
+          totalMembers: 5,
+          totalTraces: 30_000,
+        });
+
+        expect(itemCalculator.getItemsToUpdate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            tracesToAdd: 30_000,
+            membersToAdd: 0,
+          }),
         );
       });
     });
@@ -216,6 +280,23 @@ describe("EESubscriptionService", () => {
             client_reference_id: "subscription_setup_sub_new",
           }),
         );
+      });
+    });
+
+    describe("when plan is invalid", () => {
+      it("throws InvalidPlanError without creating a pending subscription", async () => {
+        repository.findLastNonCancelled.mockResolvedValue(null);
+
+        await expect(
+          service.createOrUpdateSubscription({
+            organizationId: "org_123",
+            baseUrl: "https://app.test",
+            plan: "INVALID_PLAN" as any,
+            customerId: "cus_123",
+          }),
+        ).rejects.toThrow(InvalidPlanError);
+
+        expect(repository.createPending).not.toHaveBeenCalled();
       });
     });
 
