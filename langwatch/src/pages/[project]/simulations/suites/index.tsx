@@ -13,6 +13,7 @@ import { Plus } from "lucide-react";
 import type { SimulationSuite } from "@prisma/client";
 import { useCallback, useMemo, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
+import { PeriodSelector, usePeriodSelector, type Period } from "~/components/PeriodSelector";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { AllRunsPanel } from "~/components/suites/AllRunsPanel";
 import { SuiteArchiveDialog } from "~/components/suites/SuiteArchiveDialog";
@@ -35,6 +36,7 @@ function SuitesPageContent() {
   const { openDrawer, setFlowCallbacks } = useDrawer();
   const utils = api.useContext();
   const { selectedSuiteSlug, navigateToSuite } = useSuiteRouting();
+  const { period, setPeriod } = usePeriodSelector(30);
 
   // State
   const [contextMenu, setContextMenu] = useState<{
@@ -55,7 +57,12 @@ function SuitesPageContent() {
   );
 
   const { data: allRunData } = api.scenarios.getAllSuiteRunData.useQuery(
-    { projectId: project?.id ?? "", limit: 100 },
+    {
+      projectId: project?.id ?? "",
+      limit: 100,
+      startDate: period.startDate.getTime(),
+      endDate: period.endDate.getTime(),
+    },
     { enabled: !!project, refetchInterval: 5000 },
   );
 
@@ -216,6 +223,7 @@ function SuitesPageContent() {
         <HStack justify="space-between" align="center" w="full">
           <PageLayout.Heading>Suites</PageLayout.Heading>
           <Spacer />
+          <PeriodSelector period={period} setPeriod={setPeriod} />
           <PageLayout.HeaderButton onClick={handleNewSuite}>
             <Plus size={16} /> New Suite
           </PageLayout.HeaderButton>
@@ -249,6 +257,7 @@ function SuitesPageContent() {
             onEditSuite={handleEditSuite}
             onRunSuite={handleRunSuite}
             isRunning={runMutation.isPending}
+            period={period}
           />
         </Box>
       </HStack>
@@ -286,6 +295,7 @@ function MainPanel({
   onEditSuite,
   onRunSuite,
   isRunning,
+  period,
 }: {
   error: { message: string } | null;
   selectedSuiteSlug: string | typeof ALL_RUNS_ID | null;
@@ -295,6 +305,7 @@ function MainPanel({
   onEditSuite: (id: string) => void;
   onRunSuite: (id: string) => void;
   isRunning: boolean;
+  period: Period;
 }) {
   if (error) {
     return (
@@ -312,7 +323,7 @@ function MainPanel({
   }
 
   if (selectedSuiteSlug === ALL_RUNS_ID) {
-    return <AllRunsPanel />;
+    return <AllRunsPanel period={period} />;
   }
 
   if (selectedSuite) {
@@ -322,6 +333,7 @@ function MainPanel({
         onEdit={() => onEditSuite(selectedSuite.id)}
         onRun={() => onRunSuite(selectedSuite.id)}
         isRunning={isRunning}
+        period={period}
       />
     );
   }

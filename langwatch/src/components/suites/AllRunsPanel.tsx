@@ -11,6 +11,7 @@ import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { buildRoutePath } from "~/utils/routes";
+import type { Period } from "~/components/PeriodSelector";
 import {
   RunHistoryFilters,
   type RunHistoryFilterValues,
@@ -24,7 +25,11 @@ import {
   groupRunsByBatchId,
 } from "./run-history-transforms";
 
-export function AllRunsPanel() {
+type AllRunsPanelProps = {
+  period: Period;
+};
+
+export function AllRunsPanel({ period }: AllRunsPanelProps) {
   const { project } = useOrganizationTeamProject();
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [filters, setFilters] = useState<RunHistoryFilterValues>({
@@ -32,6 +37,14 @@ export function AllRunsPanel() {
     passFailStatus: "",
   });
   const [cursor, setCursor] = useState<string | undefined>(undefined);
+
+  // Reset pagination when period changes
+  const startDateMs = period.startDate.getTime();
+  const endDateMs = period.endDate.getTime();
+  useEffect(() => {
+    setCursor(undefined);
+    setPages([]);
+  }, [startDateMs, endDateMs]);
 
   // Accumulate pages for true "Load More" behavior
   type PageData = {
@@ -70,6 +83,8 @@ export function AllRunsPanel() {
       projectId: project?.id ?? "",
       limit: 20,
       cursor,
+      startDate: startDateMs,
+      endDate: endDateMs,
     },
     {
       enabled: !!project,

@@ -22,7 +22,7 @@ const mockRouterPush = vi.hoisted(() => vi.fn());
 vi.mock("~/utils/api", () => ({
   api: {
     scenarios: {
-      getAllScenarioSetRunData: { useQuery: mockUseQuery },
+      getScenarioSetRunData: { useQuery: mockUseQuery },
       getAll: { useQuery: vi.fn(() => ({ data: [] })) },
     },
     agents: {
@@ -87,6 +87,11 @@ function makeSuite(
   };
 }
 
+const defaultPeriod = {
+  startDate: new Date("2024-01-01T00:00:00Z"),
+  endDate: new Date("2024-12-31T23:59:59Z"),
+};
+
 describe("<SuiteDetailPanel/>", () => {
   afterEach(() => {
     cleanup();
@@ -94,9 +99,9 @@ describe("<SuiteDetailPanel/>", () => {
   });
 
   beforeEach(() => {
-    // Default: no run data
+    // Default: no run data (paginated endpoint returns { runs, hasMore })
     mockUseQuery.mockReturnValue({
-      data: [],
+      data: { runs: [], hasMore: false },
       isLoading: false,
       error: null,
     });
@@ -109,6 +114,7 @@ describe("<SuiteDetailPanel/>", () => {
           suite={makeSuite()}
           onEdit={vi.fn()}
           onRun={vi.fn()}
+          period={defaultPeriod}
         />,
         { wrapper: Wrapper },
       );
@@ -122,6 +128,7 @@ describe("<SuiteDetailPanel/>", () => {
           suite={makeSuite()}
           onEdit={vi.fn()}
           onRun={vi.fn()}
+          period={defaultPeriod}
         />,
         { wrapper: Wrapper },
       );
@@ -135,6 +142,7 @@ describe("<SuiteDetailPanel/>", () => {
           suite={makeSuite()}
           onEdit={vi.fn()}
           onRun={vi.fn()}
+          period={defaultPeriod}
         />,
         { wrapper: Wrapper },
       );
@@ -150,6 +158,7 @@ describe("<SuiteDetailPanel/>", () => {
           suite={makeSuite()}
           onEdit={vi.fn()}
           onRun={vi.fn()}
+          period={defaultPeriod}
         />,
         { wrapper: Wrapper },
       );
@@ -169,6 +178,7 @@ describe("<SuiteDetailPanel/>", () => {
           suite={makeSuite({ repeatCount: 3 })}
           onEdit={vi.fn()}
           onRun={vi.fn()}
+          period={defaultPeriod}
         />,
         { wrapper: Wrapper },
       );
@@ -183,6 +193,7 @@ describe("<SuiteDetailPanel/>", () => {
           suite={makeSuite({ repeatCount: 3 })}
           onEdit={vi.fn()}
           onRun={vi.fn()}
+          period={defaultPeriod}
         />,
         { wrapper: Wrapper },
       );
@@ -202,6 +213,7 @@ describe("<SuiteDetailPanel/>", () => {
           suite={makeSuite()}
           onEdit={onEdit}
           onRun={vi.fn()}
+          period={defaultPeriod}
         />,
         { wrapper: Wrapper },
       );
@@ -221,6 +233,7 @@ describe("<SuiteDetailPanel/>", () => {
           suite={makeSuite()}
           onEdit={vi.fn()}
           onRun={onRun}
+          period={defaultPeriod}
         />,
         { wrapper: Wrapper },
       );
@@ -232,6 +245,34 @@ describe("<SuiteDetailPanel/>", () => {
       expect(runButton).toBeDefined();
       await user.click(runButton!);
       expect(onRun).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("when a period is provided", () => {
+    it("passes period dates to the run data query", () => {
+      const period = {
+        startDate: new Date("2024-06-01T00:00:00Z"),
+        endDate: new Date("2024-06-07T23:59:59Z"),
+      };
+
+      render(
+        <SuiteDetailPanel
+          suite={makeSuite()}
+          onEdit={vi.fn()}
+          onRun={vi.fn()}
+          period={period}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      // RunHistoryList now uses getScenarioSetRunData with date params
+      expect(mockUseQuery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          startDate: period.startDate.getTime(),
+          endDate: period.endDate.getTime(),
+        }),
+        expect.anything(),
+      );
     });
   });
 });

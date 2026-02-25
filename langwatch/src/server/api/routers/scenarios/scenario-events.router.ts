@@ -34,7 +34,9 @@ export const scenarioEventsRouter = createTRPCRouter({
       projectSchema.extend({
         scenarioSetId: z.string(),
         limit: z.number().min(1).max(100).default(20),
-        cursor: z.string().optional(), // Cursor for pagination
+        cursor: z.string().optional(),
+        startDate: z.number().optional(),
+        endDate: z.number().optional(),
       }),
     )
     .use(checkProjectPermission("scenarios:view"))
@@ -49,6 +51,8 @@ export const scenarioEventsRouter = createTRPCRouter({
         scenarioSetId: input.scenarioSetId,
         limit: input.limit,
         cursor: input.cursor,
+        startDate: input.startDate,
+        endDate: input.endDate,
       });
       return data;
     }),
@@ -178,6 +182,8 @@ export const scenarioEventsRouter = createTRPCRouter({
       projectSchema.extend({
         limit: z.number().min(1).max(100).default(20),
         cursor: z.string().optional(),
+        startDate: z.number().optional(),
+        endDate: z.number().optional(),
       }),
     )
     .use(checkProjectPermission("scenarios:view"))
@@ -188,6 +194,8 @@ export const scenarioEventsRouter = createTRPCRouter({
         projectId: input.projectId,
         limit: input.limit,
         cursor: input.cursor,
+        startDate: input.startDate,
+        endDate: input.endDate,
       });
       return data;
     }),

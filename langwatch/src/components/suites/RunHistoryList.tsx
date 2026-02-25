@@ -19,6 +19,7 @@ import { getSuiteSetId } from "~/server/suites/suite-set-id";
 import { api } from "~/utils/api";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { buildRoutePath } from "~/utils/routes";
+import type { Period } from "~/components/PeriodSelector";
 import { RunHistoryFilters } from "./RunHistoryFilters";
 import { RunHistoryFooter } from "./RunHistoryFooter";
 import { RunRow } from "./RunRow";
@@ -43,9 +44,10 @@ export type RunHistoryStats = {
 type RunHistoryListProps = {
   suite: SimulationSuite;
   onStatsReady?: (stats: RunHistoryStats) => void;
+  period?: Period;
 };
 
-export function RunHistoryList({ suite, onStatsReady }: RunHistoryListProps) {
+export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListProps) {
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
   const setId = getSuiteSetId(suite.id);
@@ -112,15 +114,24 @@ export function RunHistoryList({ suite, onStatsReady }: RunHistoryListProps) {
   const hasQueuedJobs =
     (queueStatus?.waiting ?? 0) > 0 || (queueStatus?.active ?? 0) > 0;
 
-  // Fetch run data using existing scenario events endpoint
+  // Fetch run data using paginated endpoint with server-side date filtering.
+  // This ensures batch atomicity: entire batches are included/excluded based
+  // on their max(CreatedAt) via a HAVING clause in ClickHouse.
   const {
-    data: runData,
+    data: runDataResult,
     isLoading,
     error,
-  } = api.scenarios.getAllScenarioSetRunData.useQuery(
+  } = api.scenarios.getScenarioSetRunData.useQuery(
     {
       projectId: project?.id ?? "",
       scenarioSetId: setId,
+      limit: 100,
+      ...(period
+        ? {
+            startDate: period.startDate.getTime(),
+            endDate: period.endDate.getTime(),
+          }
+        : {}),
     },
     {
       enabled: !!project,
@@ -128,6 +139,8 @@ export function RunHistoryList({ suite, onStatsReady }: RunHistoryListProps) {
       refetchInterval: hasQueuedJobs ? 3000 : 5000,
     },
   );
+
+  const runData = runDataResult?.runs;
 
   // Fetch scenarios for filter options and name resolution
   const { data: scenarios } = api.scenarios.getAll.useQuery(
@@ -187,7 +200,7 @@ export function RunHistoryList({ suite, onStatsReady }: RunHistoryListProps) {
       .filter(Boolean) as Array<{ id: string; name: string }>;
   }, [scenarios, suite.scenarioIds]);
 
-  // Apply filters to raw run data
+  // Apply filters to raw run data (date filtering is done server-side)
   const filteredRuns = useMemo(() => {
     if (!runData) return [];
 
