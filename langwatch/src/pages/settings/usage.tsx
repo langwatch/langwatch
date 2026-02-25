@@ -11,7 +11,7 @@ import {
 } from "@chakra-ui/react";
 import { ArrowRight } from "lucide-react";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
-import { usePlanManagementUrl, getPlanActionLabel } from "~/hooks/usePlanManagementUrl";
+import { usePlanManagementUrl, getPlanActionLabel, shouldShowPlanLimits } from "~/hooks/usePlanManagementUrl";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Link } from "../../components/ui/link";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
@@ -23,7 +23,6 @@ import {
   mapLicenseStatusToLimits,
   mapUsageToLimits,
 } from "../../components/license/ResourceLimitsDisplay";
-import { shouldShowPlanLimits } from "~/hooks/usePlanManagementUrl";
 import { FREE_PLAN } from "../../../ee/licensing/constants";
 import { PricingModel } from "@prisma/client";
 import { PlanTypes } from "../../../ee/billing/planTypes";
@@ -156,7 +155,7 @@ function Usage() {
             planLabel={saasPlan?.free ? "Free" : (saasPlan?.name ?? "Plan")}
             planColorPalette={saasPlan?.free ? "gray" : "blue"}
             subtitle={`Current usage versus ${saasPlan?.free ? "free tier" : "your plan"} limits`}
-            limits={mapUsageToLimits(usage.data, usage.data.activePlan)}
+            limits={mapUsageToLimits(usage.data, saasPlan ?? usage.data.activePlan)}
             showLimits={showLimits}
             showLiteMembers={showLiteMembers}
             actionHref={planManagementUrl}
