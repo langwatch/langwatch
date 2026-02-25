@@ -36,3 +36,28 @@ export function getPlanManagementUrl(isSaaS: boolean): string {
 export function getPlanManagementButtonLabel(isSaaS: boolean): string {
   return isSaaS ? "Upgrade plan" : "Upgrade license";
 }
+
+/**
+ * Returns a context-aware label for plan management actions on the usage page.
+ * Unlike `getPlanManagementButtonLabel` which always says "Upgrade", this
+ * reflects the user's current billing state (e.g. "Manage Subscription" for
+ * paid users).
+ */
+export function getPlanActionLabel({
+  isSaaS,
+  isFree,
+  isEnterprise,
+  hasValidLicense,
+}: {
+  isSaaS: boolean;
+  isFree: boolean;
+  isEnterprise: boolean;
+  hasValidLicense: boolean;
+}): string {
+  if (!isSaaS) {
+    return hasValidLicense ? "Manage License" : "Upgrade License";
+  }
+  if (isEnterprise) return "Manage Subscription";
+  if (isFree) return "Upgrade Plan";
+  return "Manage Subscription";
+}

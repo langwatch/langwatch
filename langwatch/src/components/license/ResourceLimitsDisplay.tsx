@@ -47,8 +47,6 @@ const RESOURCE_ORDER: (keyof ResourceLimits)[] = [
   "messagesPerMonth",
 ] as const;
 
-const ALWAYS_COUNT_ONLY = new Set<ResourceKey>(["messagesPerMonth"]);
-
 export interface ResourceLimits {
   members: { current: number; max: number };
   membersLite: { current: number; max: number };
@@ -161,17 +159,23 @@ export interface ResourceLimitsDisplayProps {
   showLimits?: boolean;
   /** Override label for the messagesPerMonth resource (e.g. "Traces / Month" for TIERED plans). */
   messagesLabel?: string;
+  /** When true, show the Lite Members row. Only applies to SEAT_EVENT pricing model. */
+  showLiteMembers?: boolean;
 }
 
 /**
  * Displays resource limits in a consistent format.
  * Used by both licensed plan and free tier sections on the usage page.
  */
-export function ResourceLimitsDisplay({ limits, showLimits = false, messagesLabel }: ResourceLimitsDisplayProps) {
+export function ResourceLimitsDisplay({ limits, showLimits = false, messagesLabel, showLiteMembers = false }: ResourceLimitsDisplayProps) {
+  const visibleKeys = showLiteMembers
+    ? RESOURCE_ORDER
+    : RESOURCE_ORDER.filter((key) => key !== "membersLite");
+
   return (
     <SimpleGrid columns={{ base: 1, md: 3 }} gap={3} width="full">
-      {RESOURCE_ORDER.map((key) => {
-        const hideMax = ALWAYS_COUNT_ONLY.has(key) || !showLimits;
+      {visibleKeys.map((key) => {
+        const hideMax = !showLimits;
         const label = key === "messagesPerMonth" && messagesLabel ? messagesLabel : RESOURCE_LABELS[key];
         return (
           <ResourceLimitRow

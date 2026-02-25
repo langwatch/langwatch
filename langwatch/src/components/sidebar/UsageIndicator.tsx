@@ -1,5 +1,5 @@
 import { Box, HStack, Progress, Text, VStack } from "@chakra-ui/react";
-import { type PricingModel } from "@prisma/client";
+import { PricingModel } from "@prisma/client";
 import { Info } from "lucide-react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
@@ -35,7 +35,7 @@ export function getUsageDisplay({
     return { visible: true, unitLabel: "traces" };
   }
 
-  if (pricingModel === "SEAT_EVENT") {
+  if (pricingModel === PricingModel.SEAT_EVENT) {
     return isFree
       ? { visible: true, unitLabel: "events" }
       : { visible: false };
@@ -43,6 +43,29 @@ export function getUsageDisplay({
 
   // TIERED or no pricing model: always show traces
   return { visible: true, unitLabel: "traces" };
+}
+
+/**
+ * Determines whether the usage page should display "current / max" limit
+ * format for each resource.
+ *
+ * Free plans: always show limits
+ * Enterprise: never show limits
+ * Paid + TIERED: show limits (plan has hard caps)
+ * Paid + SEAT_EVENT: hide limits (usage-based billing)
+ */
+export function shouldShowPlanLimits({
+  isFree,
+  isEnterprise,
+  pricingModel,
+}: {
+  isFree: boolean;
+  isEnterprise: boolean;
+  pricingModel: PricingModel | undefined | null;
+}): boolean {
+  if (isEnterprise) return false;
+  if (isFree) return true;
+  return pricingModel === PricingModel.TIERED;
 }
 
 export type UsageIndicatorProps = {

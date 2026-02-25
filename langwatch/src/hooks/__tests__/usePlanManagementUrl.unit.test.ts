@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getPlanManagementUrl,
   getPlanManagementButtonLabel,
+  getPlanActionLabel,
 } from "../usePlanManagementUrl";
 
 /**
@@ -27,5 +28,41 @@ describe("getPlanManagementButtonLabel", () => {
 
   it("returns 'Upgrade license' in self-hosted mode", () => {
     expect(getPlanManagementButtonLabel(false)).toBe("Upgrade license");
+  });
+});
+
+describe("getPlanActionLabel", () => {
+  describe("when in SaaS mode", () => {
+    it("returns 'Upgrade Plan' for free tier", () => {
+      expect(
+        getPlanActionLabel({ isSaaS: true, isFree: true, isEnterprise: false, hasValidLicense: false })
+      ).toBe("Upgrade Plan");
+    });
+
+    it("returns 'Manage Subscription' for paid non-enterprise plan", () => {
+      expect(
+        getPlanActionLabel({ isSaaS: true, isFree: false, isEnterprise: false, hasValidLicense: false })
+      ).toBe("Manage Subscription");
+    });
+
+    it("returns 'Manage Subscription' for enterprise plan", () => {
+      expect(
+        getPlanActionLabel({ isSaaS: true, isFree: false, isEnterprise: true, hasValidLicense: false })
+      ).toBe("Manage Subscription");
+    });
+  });
+
+  describe("when self-hosted", () => {
+    it("returns 'Manage License' with a valid license", () => {
+      expect(
+        getPlanActionLabel({ isSaaS: false, isFree: false, isEnterprise: false, hasValidLicense: true })
+      ).toBe("Manage License");
+    });
+
+    it("returns 'Upgrade License' without a valid license", () => {
+      expect(
+        getPlanActionLabel({ isSaaS: false, isFree: false, isEnterprise: false, hasValidLicense: false })
+      ).toBe("Upgrade License");
+    });
   });
 });
