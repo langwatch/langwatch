@@ -13,6 +13,7 @@ import { Link } from "~/components/ui/link";
 import { Radio, RadioGroup } from "~/components/ui/radio";
 import { Tooltip } from "~/components/ui/tooltip";
 import { formatFileSize } from "./licenseStatusUtils";
+import { CONTACT_SALES_URL } from "../plans/constants";
 
 type ActivationMethod = "file" | "key";
 
@@ -242,7 +243,7 @@ export function NoLicenseCard({
               </Button>
             </Tooltip>
             <Link
-              href="mailto:sales@langwatch.ai"
+              href={CONTACT_SALES_URL}
               isExternal
               color="blue.fg"
               fontSize="sm"
