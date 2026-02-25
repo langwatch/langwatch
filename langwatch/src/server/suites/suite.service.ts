@@ -30,6 +30,9 @@ import {
 } from "./errors";
 import { createLogger } from "~/utils/logger/server";
 import { slugify } from "~/utils/slugify";
+import { ScenarioRepository } from "../scenarios/scenario.repository";
+import { AgentRepository } from "../agents/agent.repository";
+import { LlmConfigRepository } from "../prompt-config/repositories/llm-config.repository";
 
 const tracer = getLangWatchTracer("langwatch.suites.service");
 const logger = createLogger("langwatch:suites:service");
@@ -50,25 +53,24 @@ export type QueueStatus = {
   active: number;
 };
 
-/** Dependencies for validating references before a run */
-export interface SuiteRunDependencies {
-  validateScenarioExists: (params: {
-    id: string;
-    projectId: string;
-  }) => Promise<boolean>;
-  validateTargetExists: (params: {
-    referenceId: string;
-    type: string;
-    projectId: string;
-    organizationId: string;
-  }) => Promise<boolean>;
-}
-
 export class SuiteService {
-  constructor(private readonly repository: SuiteRepository) {}
+  constructor(
+    private readonly repository: SuiteRepository,
+    private readonly scenarioRepository: ScenarioRepository,
+    private readonly agentRepository: AgentRepository,
+    private readonly llmConfigRepository: LlmConfigRepository,
+  ) {}
 
-  static fromPrisma(prisma: PrismaClient): SuiteService {
-    return new SuiteService(new SuiteRepository(prisma));
+  /**
+   * Static factory method for creating a SuiteService with proper DI.
+   */
+  static create(prisma: PrismaClient): SuiteService {
+    return new SuiteService(
+      new SuiteRepository(prisma),
+      new ScenarioRepository(prisma),
+      new AgentRepository(prisma),
+      new LlmConfigRepository(prisma),
+    );
   }
 
   async create(
@@ -262,7 +264,6 @@ export class SuiteService {
     suite: SimulationSuite;
     projectId: string;
     organizationId: string;
-    deps: SuiteRunDependencies;
   }): Promise<SuiteRunResult> {
     return tracer.withActiveSpan(
       "SuiteService.run",
@@ -276,11 +277,11 @@ export class SuiteService {
         },
       },
       async (span) => {
-        const { suite, projectId, organizationId, deps } = params;
+        const { suite, projectId, organizationId } = params;
         const targets = parseSuiteTargets(suite.targets);
         span.setAttribute("suite.target_count", targets.length);
 
-        await this.validateReferences({ suite, projectId, organizationId, targets, deps });
+        await this.validateReferences({ suite, projectId, organizationId, targets });
 
         const batchRunId = generateBatchRunId();
         const setId = getSuiteSetId(suite.id);
@@ -375,17 +376,16 @@ export class SuiteService {
     projectId: string;
     organizationId: string;
     targets: SuiteTarget[];
-    deps: SuiteRunDependencies;
   }): Promise<void> {
-    const { suite, projectId, organizationId, targets, deps } = params;
+    const { suite, projectId, organizationId, targets } = params;
 
     const invalidScenarios: string[] = [];
     for (const scenarioId of suite.scenarioIds) {
-      const exists = await deps.validateScenarioExists({
+      const scenario = await this.scenarioRepository.findById({
         id: scenarioId,
         projectId,
       });
-      if (!exists) {
+      if (!scenario) {
         invalidScenarios.push(scenarioId);
       }
     }
@@ -397,7 +397,7 @@ export class SuiteService {
 
     const invalidTargets: string[] = [];
     for (const target of targets) {
-      const exists = await deps.validateTargetExists({
+      const exists = await this.validateTargetExists({
         referenceId: target.referenceId,
         type: target.type,
         projectId,
@@ -412,6 +412,27 @@ export class SuiteService {
         invalidIds: invalidTargets,
       });
     }
+  }
+
+  private async validateTargetExists(params: {
+    referenceId: string;
+    type: string;
+    projectId: string;
+    organizationId: string;
+  }): Promise<boolean> {
+    const { referenceId, type, projectId, organizationId } = params;
+
+    if (type === "http") {
+      return this.agentRepository.exists({ id: referenceId, projectId });
+    }
+    if (type === "prompt") {
+      return this.llmConfigRepository.existsForProjectOrOrg({
+        id: referenceId,
+        projectId,
+        organizationId,
+      });
+    }
+    return false;
   }
 
   private async scheduleJobs(params: {
