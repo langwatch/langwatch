@@ -34,3 +34,19 @@ export class InvalidTargetReferencesError extends SuiteDomainError {
     this.invalidIds = invalidIds;
   }
 }
+
+/** Thrown when all scenarios in a suite are archived */
+export class AllScenariosArchivedError extends SuiteDomainError {
+  constructor() {
+    super("All scenarios in this suite are archived. Update the suite to include active scenarios.");
+    this.name = "AllScenariosArchivedError";
+  }
+}
+
+/** Thrown when all targets in a suite are archived */
+export class AllTargetsArchivedError extends SuiteDomainError {
+  constructor() {
+    super("All targets in this suite are archived. Update the suite to include active targets.");
+    this.name = "AllTargetsArchivedError";
+  }
+}

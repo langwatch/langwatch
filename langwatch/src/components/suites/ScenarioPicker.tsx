@@ -13,7 +13,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Plus } from "lucide-react";
+import { AlertTriangle, Plus, X } from "lucide-react";
 import { Checkbox } from "../ui/checkbox";
 import { SearchInput } from "../ui/SearchInput";
 
@@ -50,6 +50,10 @@ export interface ScenarioPickerProps {
   onCreateNew: () => void;
   /** Whether to show error styling on the border. */
   hasError?: boolean;
+  /** IDs of archived scenarios still linked to the suite. */
+  archivedIds?: string[];
+  /** Handler to remove an archived scenario. */
+  onRemoveArchived?: (id: string) => void;
 }
 
 export function ScenarioPicker({
@@ -66,6 +70,8 @@ export function ScenarioPicker({
   onLabelFilterChange,
   onCreateNew,
   hasError,
+  archivedIds = [],
+  onRemoveArchived,
 }: ScenarioPickerProps) {
   return (
     <Box
@@ -148,6 +154,44 @@ export function ScenarioPicker({
           </HStack>
         ))}
       </VStack>
+
+      {/* Archived scenarios warning */}
+      {archivedIds.length > 0 && (
+        <VStack
+          paddingX={3}
+          paddingY={2}
+          gap={1}
+          align="stretch"
+          borderTopWidth="1px"
+          borderColor="border.muted"
+          data-testid="archived-scenarios-section"
+        >
+          <HStack gap={2}>
+            <AlertTriangle size={14} color="var(--chakra-colors-orange-500)" />
+            <Text fontSize="xs" color="orange.700" _dark={{ color: "orange.200" }}>
+              {archivedIds.length} archived scenario{archivedIds.length > 1 ? "s" : ""} linked:
+            </Text>
+          </HStack>
+          {archivedIds.map((id) => (
+            <HStack key={id} gap={2} paddingLeft={5}>
+              <Text fontSize="sm" color="fg.muted" flex={1} fontStyle="italic">
+                {id}
+              </Text>
+              {onRemoveArchived && (
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  onClick={() => onRemoveArchived(id)}
+                  data-testid={`remove-archived-scenario-${id}`}
+                >
+                  <X size={12} />
+                  Remove
+                </Button>
+              )}
+            </HStack>
+          ))}
+        </VStack>
+      )}
 
       {/* Add new scenario */}
       <HStack

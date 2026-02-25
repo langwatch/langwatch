@@ -5,8 +5,8 @@
  * "Add New Agent" and "Add New Prompt" action rows, and a count footer.
  */
 
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { Plus } from "lucide-react";
+import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { AlertTriangle, Plus, X } from "lucide-react";
 import type { SuiteTarget } from "~/server/suites/types";
 import { Checkbox } from "../ui/checkbox";
 import { SearchInput } from "../ui/SearchInput";
@@ -38,6 +38,10 @@ export interface TargetPickerProps {
   onCreatePrompt: () => void;
   /** Whether to show error styling on the border. */
   hasError?: boolean;
+  /** Archived targets still linked to the suite. */
+  archivedTargets?: SuiteTarget[];
+  /** Handler to remove an archived target. */
+  onRemoveArchived?: (target: SuiteTarget) => void;
 }
 
 export function TargetPicker({
@@ -51,6 +55,8 @@ export function TargetPicker({
   onCreateAgent,
   onCreatePrompt,
   hasError,
+  archivedTargets = [],
+  onRemoveArchived,
 }: TargetPickerProps) {
   return (
     <Box
@@ -109,6 +115,44 @@ export function TargetPicker({
           </Text>
         )}
       </VStack>
+
+      {/* Archived targets warning */}
+      {archivedTargets.length > 0 && (
+        <VStack
+          paddingX={3}
+          paddingY={2}
+          gap={1}
+          align="stretch"
+          borderTopWidth="1px"
+          borderColor="border.muted"
+          data-testid="archived-targets-section"
+        >
+          <HStack gap={2}>
+            <AlertTriangle size={14} color="var(--chakra-colors-orange-500)" />
+            <Text fontSize="xs" color="orange.700" _dark={{ color: "orange.200" }}>
+              {archivedTargets.length} archived target{archivedTargets.length > 1 ? "s" : ""} linked:
+            </Text>
+          </HStack>
+          {archivedTargets.map((target) => (
+            <HStack key={`${target.type}-${target.referenceId}`} gap={2} paddingLeft={5}>
+              <Text fontSize="sm" color="fg.muted" flex={1} fontStyle="italic">
+                {target.referenceId}
+              </Text>
+              {onRemoveArchived && (
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  onClick={() => onRemoveArchived(target)}
+                  data-testid={`remove-archived-target-${target.referenceId}`}
+                >
+                  <X size={12} />
+                  Remove
+                </Button>
+              )}
+            </HStack>
+          ))}
+        </VStack>
+      )}
 
       {/* Add new agent */}
       <HStack

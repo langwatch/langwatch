@@ -149,6 +149,24 @@ export function useSuiteForm({
       .map((t) => t.referenceId);
   }, [selectedTargets, availableTargets, agents, prompts]);
 
+  // -- Derived: archived scenario IDs (selected but not in active scenarios query) --
+  const archivedScenarioIds = useMemo(() => {
+    if (!scenarios) return [];
+    const activeIds = new Set(scenarios.map((s) => s.id));
+    return selectedScenarioIds.filter((id) => !activeIds.has(id));
+  }, [selectedScenarioIds, scenarios]);
+
+  // -- Derived: archived targets (selected but no longer available, with full type info) --
+  const archivedTargets = useMemo(() => {
+    if (!agents || !prompts) return [];
+    return selectedTargets.filter(
+      (t) =>
+        !availableTargets.some(
+          (a) => a.type === t.type && a.referenceId === t.referenceId,
+        ),
+    );
+  }, [selectedTargets, availableTargets, agents, prompts]);
+
   // -- Derived: unique scenario labels --
   const allLabels = useMemo(() => {
     if (!scenarios) return [];
@@ -261,6 +279,21 @@ export function useSuiteForm({
     );
   };
 
+  const removeArchivedScenario = (id: string) => {
+    const current = form.getValues("selectedScenarioIds");
+    form.setValue("selectedScenarioIds", current.filter((s) => s !== id));
+  };
+
+  const removeArchivedTarget = (target: Pick<SuiteTarget, "type" | "referenceId">) => {
+    const current = form.getValues("selectedTargets");
+    form.setValue(
+      "selectedTargets",
+      current.filter(
+        (t) => !(t.type === target.type && t.referenceId === target.referenceId),
+      ),
+    );
+  };
+
   return {
     // react-hook-form instance
     form,
@@ -294,6 +327,12 @@ export function useSuiteForm({
     toggleTarget,
     isTargetSelected,
     staleTargetIds,
+
+    // Archived references
+    archivedScenarioIds,
+    archivedTargets,
+    removeArchivedScenario,
+    removeArchivedTarget,
 
     // Actions
     addLabel,

@@ -160,11 +160,32 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
 
   const runMutation = api.suites.run.useMutation({
     onSuccess: (result) => {
-      toaster.create({
-        title: `Suite run scheduled (${result.jobCount} jobs)`,
-        type: "success",
-        meta: { closable: true },
-      });
+      const archivedCount =
+        (result.skippedArchived?.scenarios?.length ?? 0) +
+        (result.skippedArchived?.targets?.length ?? 0);
+
+      if (archivedCount > 0) {
+        const parts: string[] = [];
+        if (result.skippedArchived.scenarios.length > 0) {
+          parts.push(`${result.skippedArchived.scenarios.length} archived scenario${result.skippedArchived.scenarios.length > 1 ? "s" : ""}`);
+        }
+        if (result.skippedArchived.targets.length > 0) {
+          parts.push(`${result.skippedArchived.targets.length} archived target${result.skippedArchived.targets.length > 1 ? "s" : ""}`);
+        }
+
+        toaster.create({
+          title: `Suite run scheduled (${result.jobCount} jobs)`,
+          description: `${parts.join(" and ")} skipped.`,
+          type: "warning",
+          meta: { closable: true },
+        });
+      } else {
+        toaster.create({
+          title: `Suite run scheduled (${result.jobCount} jobs)`,
+          type: "success",
+          meta: { closable: true },
+        });
+      }
     },
     onError: (err) => {
       toaster.create({
@@ -304,6 +325,8 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                 onLabelFilterChange={suiteForm.setActiveLabelFilter}
                 onCreateNew={() => openDrawer("scenarioEditor")}
                 hasError={!!errors.selectedScenarioIds}
+                archivedIds={suiteForm.archivedScenarioIds}
+                onRemoveArchived={suiteForm.removeArchivedScenario}
               />
               {errors.selectedScenarioIds && (
                 <Text fontSize="xs" color="red.500">
@@ -332,6 +355,8 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                   }
                 }}
                 hasError={!!errors.selectedTargets}
+                archivedTargets={suiteForm.archivedTargets}
+                onRemoveArchived={suiteForm.removeArchivedTarget}
               />
               {errors.selectedTargets && (
                 <Text fontSize="xs" color="red.500">
