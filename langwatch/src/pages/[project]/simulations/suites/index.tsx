@@ -307,6 +307,10 @@ function MainPanel({
     );
   }
 
+  if (selectedSuiteSlug === null) {
+    return null;
+  }
+
   if (selectedSuiteSlug === ALL_RUNS_ID) {
     return <AllRunsPanel />;
   }
