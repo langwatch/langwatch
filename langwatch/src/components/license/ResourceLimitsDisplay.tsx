@@ -16,6 +16,8 @@ export type ResourceKey =
   | "agents"
   | "experiments"
   | "messagesPerMonth"
+  | "eventsPerMonth"
+  | "tracesPerMonth"
   | "evaluationsCredit";
 
 /**
@@ -27,11 +29,13 @@ export const RESOURCE_LABELS: Record<ResourceKey, string> = {
   ...LIMIT_TYPE_DISPLAY_LABELS,
   membersLite: "Lite Members",
   messagesPerMonth: "Events / Month",
+  eventsPerMonth: "Events / Month",
+  tracesPerMonth: "Traces / Month",
   evaluationsCredit: "Evaluations Credit",
 } as const;
 
 /** Ordered list of resource keys for consistent rendering */
-const RESOURCE_ORDER: ResourceKey[] = [
+const RESOURCE_ORDER: (keyof ResourceLimits)[] = [
   "members",
   "membersLite",
   "messagesPerMonth",
@@ -149,21 +153,24 @@ export interface ResourceLimitsDisplayProps {
   limits: ResourceLimits;
   /** When true, show "current / max" for member resources. Typically only for free plans. */
   showLimits?: boolean;
+  /** Override label for the messagesPerMonth resource (e.g. "Traces / Month" for TIERED plans). */
+  messagesLabel?: string;
 }
 
 /**
  * Displays resource limits in a consistent format.
  * Used by both licensed plan and free tier sections on the usage page.
  */
-export function ResourceLimitsDisplay({ limits, showLimits = false }: ResourceLimitsDisplayProps) {
+export function ResourceLimitsDisplay({ limits, showLimits = false, messagesLabel }: ResourceLimitsDisplayProps) {
   return (
     <SimpleGrid columns={{ base: 1, md: 3 }} gap={3} width="full">
       {RESOURCE_ORDER.map((key) => {
         const hideMax = ALWAYS_COUNT_ONLY.has(key) || !showLimits;
+        const label = key === "messagesPerMonth" && messagesLabel ? messagesLabel : RESOURCE_LABELS[key];
         return (
           <ResourceLimitRow
             key={key}
-            label={RESOURCE_LABELS[key]}
+            label={label}
             current={limits[key].current}
             max={hideMax ? undefined : limits[key].max}
           />

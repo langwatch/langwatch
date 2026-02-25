@@ -22,11 +22,13 @@ import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import {
+  RESOURCE_LABELS,
   ResourceLimitsDisplay,
   mapLicenseStatusToLimits,
   mapUsageToLimits,
 } from "../../components/license/ResourceLimitsDisplay";
 import { FREE_PLAN } from "../../../ee/licensing/constants";
+import { PricingModel } from "@prisma/client";
 
 function ResourceLimitsCard({
   planLabel,
@@ -36,6 +38,7 @@ function ResourceLimitsCard({
   showLimits,
   actionHref,
   actionLabel,
+  messagesLabel,
 }: {
   planLabel: string;
   planColorPalette: string;
@@ -44,6 +47,7 @@ function ResourceLimitsCard({
   showLimits?: boolean;
   actionHref: string;
   actionLabel: string;
+  messagesLabel?: string;
 }) {
   return (
     <Card.Root borderWidth={1} borderColor="gray.200">
@@ -76,7 +80,7 @@ function ResourceLimitsCard({
               </Link>
             </Button>
           </Flex>
-          <ResourceLimitsDisplay limits={limits} showLimits={showLimits} />
+          <ResourceLimitsDisplay limits={limits} showLimits={showLimits} messagesLabel={messagesLabel} />
         </VStack>
       </Card.Body>
     </Card.Root>
@@ -101,6 +105,8 @@ function Usage() {
     { organizationId },
     { ...queryOpts, enabled: !!organization && !isSaaS },
   );
+
+  const messagesLabel = organization?.pricingModel === PricingModel.TIERED ? RESOURCE_LABELS.tracesPerMonth : RESOURCE_LABELS.eventsPerMonth;
 
   const isSelfHosted = !isSaaS;
   const isLoadingLimits =
@@ -148,6 +154,7 @@ function Usage() {
             showLimits={activePlan.data?.free}
             actionHref={planManagementUrl}
             actionLabel={planButtonLabel}
+            messagesLabel={messagesLabel}
           />
         )}
 
@@ -206,6 +213,7 @@ function Usage() {
               limits={mapLicenseStatusToLimits(licenseStatus.data)}
               actionHref={planManagementUrl}
               actionLabel={planButtonLabel}
+              messagesLabel={messagesLabel}
             />
           )}
 
@@ -219,6 +227,7 @@ function Usage() {
             showLimits
             actionHref="/settings/license"
             actionLabel="Manage license"
+            messagesLabel={messagesLabel}
           />
         )}
       </VStack>
