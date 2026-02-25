@@ -24,10 +24,13 @@ import {
 } from "../scenarios/scenario.queue";
 import { parseSuiteTargets, type SuiteTarget } from "./types";
 import {
+  AllScenariosArchivedError,
+  AllTargetsArchivedError,
   InvalidScenarioReferencesError,
   InvalidTargetReferencesError,
   SuiteDomainError,
 } from "./errors";
+
 import { createLogger } from "~/utils/logger/server";
 import { slugify } from "~/utils/slugify";
 import { ScenarioRepository } from "../scenarios/scenario.repository";
@@ -45,12 +48,23 @@ export type SuiteRunResult = {
   batchRunId: string;
   setId: string;
   jobCount: number;
+  skippedArchived: {
+    scenarios: string[];
+    targets: string[];
+  };
 };
 
 /** Queue status counts for a suite's pending/active jobs */
 export type QueueStatus = {
   waiting: number;
   active: number;
+};
+
+/** Result of resolving a list of references against the database */
+type ResolvedReferences = {
+  active: string[];
+  archived: string[];
+  missing: string[];
 };
 
 export class SuiteService {
@@ -253,12 +267,14 @@ export class SuiteService {
   /**
    * Schedule a suite run.
    *
-   * Validates all scenario and target references, then schedules
-   * N scenarios x M targets x repeatCount jobs.
+   * Resolves all scenario and target references, filtering out archived ones.
+   * Schedules N active-scenarios x M active-targets x repeatCount jobs.
    *
-   * @returns The batch run ID and job count
-   * @throws {InvalidScenarioReferencesError} if any scenario references are invalid
-   * @throws {InvalidTargetReferencesError} if any target references are invalid
+   * @returns The batch run ID, job count, and any skipped archived references
+   * @throws {InvalidScenarioReferencesError} if any scenario references are missing (deleted)
+   * @throws {InvalidTargetReferencesError} if any target references are missing (deleted)
+   * @throws {AllScenariosArchivedError} if all scenarios are archived
+   * @throws {AllTargetsArchivedError} if all targets are archived
    */
   async run(params: {
     suite: SimulationSuite;
@@ -281,7 +297,7 @@ export class SuiteService {
         const targets = parseSuiteTargets(suite.targets);
         span.setAttribute("suite.target_count", targets.length);
 
-        await this.validateReferences({ suite, projectId, organizationId, targets });
+        const resolved = await this.resolveReferences({ suite, projectId, organizationId, targets });
 
         const batchRunId = generateBatchRunId();
         const setId = getSuiteSetId(suite.id);
@@ -292,19 +308,23 @@ export class SuiteService {
             suiteId: suite.id,
             projectId,
             batchRunId,
-            scenarioCount: suite.scenarioIds.length,
-            targetCount: targets.length,
+            activeScenarioCount: resolved.activeScenarioIds.length,
+            activeTargetCount: resolved.activeTargets.length,
+            skippedArchivedScenarios: resolved.skippedArchived.scenarios.length,
+            skippedArchivedTargets: resolved.skippedArchived.targets.length,
             repeatCount: suite.repeatCount,
           },
           "Scheduling suite run",
         );
 
         const jobCount = await this.scheduleJobs({
-          suite,
-          targets,
+          scenarioIds: resolved.activeScenarioIds,
+          targets: resolved.activeTargets,
+          suiteId: suite.id,
           projectId,
           setId,
           batchRunId,
+          repeatCount: suite.repeatCount,
         });
 
         span.setAttribute("suite.job_count", jobCount);
@@ -314,7 +334,12 @@ export class SuiteService {
           "Suite run scheduled",
         );
 
-        return { batchRunId, setId, jobCount };
+        return {
+          batchRunId,
+          setId,
+          jobCount,
+          skippedArchived: resolved.skippedArchived,
+        };
       },
     );
   }
@@ -371,85 +396,142 @@ export class SuiteService {
     }
   }
 
-  private async validateReferences(params: {
+  private async resolveReferences(params: {
     suite: SimulationSuite;
     projectId: string;
     organizationId: string;
     targets: SuiteTarget[];
-  }): Promise<void> {
+  }): Promise<{
+    activeScenarioIds: string[];
+    activeTargets: SuiteTarget[];
+    skippedArchived: { scenarios: string[]; targets: string[] };
+  }> {
     const { suite, projectId, organizationId, targets } = params;
 
-    const invalidScenarios: string[] = [];
-    for (const scenarioId of suite.scenarioIds) {
-      const scenario = await this.scenarioRepository.findById({
-        id: scenarioId,
-        projectId,
-      });
-      if (!scenario) {
-        invalidScenarios.push(scenarioId);
-      }
-    }
-    if (invalidScenarios.length > 0) {
+    const scenarioResolution = await this.resolveScenarioReferences({
+      ids: suite.scenarioIds,
+      projectId,
+    });
+
+    if (scenarioResolution.missing.length > 0) {
       throw new InvalidScenarioReferencesError({
-        invalidIds: invalidScenarios,
+        invalidIds: scenarioResolution.missing,
       });
     }
 
-    const invalidTargets: string[] = [];
-    for (const target of targets) {
-      const exists = await this.validateTargetExists({
-        referenceId: target.referenceId,
-        type: target.type,
-        projectId,
-        organizationId,
-      });
-      if (!exists) {
-        invalidTargets.push(target.referenceId);
-      }
+    if (scenarioResolution.active.length === 0) {
+      throw new AllScenariosArchivedError();
     }
-    if (invalidTargets.length > 0) {
+
+    const targetResolution = await this.resolveTargetReferences({
+      targets,
+      projectId,
+      organizationId,
+    });
+
+    if (targetResolution.missing.length > 0) {
       throw new InvalidTargetReferencesError({
-        invalidIds: invalidTargets,
+        invalidIds: targetResolution.missing,
       });
     }
+
+    if (targetResolution.active.length === 0) {
+      throw new AllTargetsArchivedError();
+    }
+
+    const activeTargetIds = new Set(targetResolution.active);
+    const activeTargets = targets.filter((t) => activeTargetIds.has(t.referenceId));
+
+    return {
+      activeScenarioIds: scenarioResolution.active,
+      activeTargets,
+      skippedArchived: {
+        scenarios: scenarioResolution.archived,
+        targets: targetResolution.archived,
+      },
+    };
   }
 
-  private async validateTargetExists(params: {
-    referenceId: string;
-    type: SuiteTarget["type"];
+  private async resolveScenarioReferences(params: {
+    ids: string[];
+    projectId: string;
+  }): Promise<ResolvedReferences> {
+    const { ids, projectId } = params;
+    const active: string[] = [];
+    const archived: string[] = [];
+    const missing: string[] = [];
+
+    for (const id of ids) {
+      const scenario = await this.scenarioRepository.findByIdIncludingArchived({ id, projectId });
+      if (!scenario) {
+        missing.push(id);
+      } else if (scenario.archivedAt) {
+        archived.push(id);
+      } else {
+        active.push(id);
+      }
+    }
+
+    return { active, archived, missing };
+  }
+
+  private async resolveTargetReferences(params: {
+    targets: SuiteTarget[];
     projectId: string;
     organizationId: string;
-  }): Promise<boolean> {
-    const { referenceId, type, projectId, organizationId } = params;
+  }): Promise<ResolvedReferences> {
+    const { targets, projectId, organizationId } = params;
+    const active: string[] = [];
+    const archived: string[] = [];
+    const missing: string[] = [];
 
-    switch (type) {
-      case "http":
-        return this.agentRepository.exists({ id: referenceId, projectId });
-      case "prompt":
-        return this.llmConfigRepository.existsForProjectOrOrg({
-          id: referenceId,
+    for (const target of targets) {
+      if (target.type === "prompt") {
+        const exists = await this.llmConfigRepository.existsForProjectOrOrg({
+          id: target.referenceId,
           projectId,
           organizationId,
         });
-      default:
-        console.error(`Unknown suite target type: ${type as string}`);
-        return false;
+        if (exists) {
+          active.push(target.referenceId);
+        } else {
+          missing.push(target.referenceId);
+        }
+      } else if (target.type === "http") {
+        const agent = await this.agentRepository.findByIdIncludingArchived({
+          id: target.referenceId,
+          projectId,
+        });
+        if (!agent) {
+          missing.push(target.referenceId);
+        } else if (agent.archivedAt) {
+          archived.push(target.referenceId);
+        } else {
+          active.push(target.referenceId);
+        }
+      } else {
+        missing.push(target.referenceId);
+      }
     }
+
+    return { active, archived, missing };
   }
 
   private async scheduleJobs(params: {
-    suite: SimulationSuite;
+    scenarioIds: string[];
     targets: SuiteTarget[];
+    suiteId: string;
     projectId: string;
     setId: string;
     batchRunId: string;
+    repeatCount: number;
   }): Promise<number> {
-    const { suite, targets, projectId, setId, batchRunId } = params;
+    const { scenarioIds, targets, projectId, setId, batchRunId, repeatCount } = params;
 
     const jobPromises: Promise<{ id?: string | null }>[] = [];
-    for (const scenarioId of suite.scenarioIds) {
+    for (const scenarioId of scenarioIds) {
       for (const target of targets) {
-        for (let repeat = 0; repeat < suite.repeatCount; repeat++) {
+        for (let repeat = 0; repeat < repeatCount; repeat++) {
           jobPromises.push(
             scheduleScenarioRun({
               projectId,
@@ -477,7 +559,7 @@ export class SuiteService {
     if (rejected.length > 0) {
       logger.error(
         {
-          suiteId: suite.id,
+          suiteId: params.suiteId,
           batchRunId,
           totalJobs: results.length,
           failedCount: rejected.length,
