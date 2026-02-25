@@ -45,29 +45,6 @@ export function getUsageDisplay({
   return { visible: true, unitLabel: "traces" };
 }
 
-/**
- * Determines whether the usage page should display "current / max" limit
- * format for each resource.
- *
- * Free plans: always show limits
- * Enterprise: never show limits
- * Paid + TIERED: show limits (plan has hard caps)
- * Paid + SEAT_EVENT: hide limits (usage-based billing)
- */
-export function shouldShowPlanLimits({
-  isFree,
-  isEnterprise,
-  pricingModel,
-}: {
-  isFree: boolean;
-  isEnterprise: boolean;
-  pricingModel: PricingModel | undefined | null;
-}): boolean {
-  if (isEnterprise) return false;
-  if (isFree) return true;
-  return pricingModel === PricingModel.TIERED;
-}
-
 export type UsageIndicatorProps = {
   showLabel?: boolean;
 };

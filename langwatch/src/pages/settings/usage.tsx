@@ -23,7 +23,7 @@ import {
   mapLicenseStatusToLimits,
   mapUsageToLimits,
 } from "../../components/license/ResourceLimitsDisplay";
-import { shouldShowPlanLimits } from "../../components/sidebar/UsageIndicator";
+import { shouldShowPlanLimits } from "~/hooks/usePlanManagementUrl";
 import { FREE_PLAN } from "../../../ee/licensing/constants";
 import { PricingModel } from "@prisma/client";
 import { PlanTypes } from "../../../ee/billing/planTypes";

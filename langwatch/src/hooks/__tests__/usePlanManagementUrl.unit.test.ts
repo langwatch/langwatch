@@ -1,8 +1,10 @@
+import { PricingModel } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import {
   getPlanManagementUrl,
   getPlanManagementButtonLabel,
   getPlanActionLabel,
+  shouldShowPlanLimits,
 } from "../usePlanManagementUrl";
 
 /**
@@ -63,6 +65,102 @@ describe("getPlanActionLabel", () => {
       expect(
         getPlanActionLabel({ isSaaS: false, isFree: false, isEnterprise: false, hasValidLicense: false })
       ).toBe("Upgrade License");
+    });
+  });
+});
+
+describe("shouldShowPlanLimits()", () => {
+  describe("given a free plan", () => {
+    it("returns true for SEAT_EVENT pricing model", () => {
+      expect(
+        shouldShowPlanLimits({
+          isFree: true,
+          isEnterprise: false,
+          pricingModel: PricingModel.SEAT_EVENT,
+        })
+      ).toBe(true);
+    });
+
+    it("returns true for TIERED pricing model", () => {
+      expect(
+        shouldShowPlanLimits({
+          isFree: true,
+          isEnterprise: false,
+          pricingModel: PricingModel.TIERED,
+        })
+      ).toBe(true);
+    });
+  });
+
+  describe("given a paid non-enterprise plan", () => {
+    describe("when pricing model is TIERED", () => {
+      it("returns true", () => {
+        expect(
+          shouldShowPlanLimits({
+            isFree: false,
+            isEnterprise: false,
+            pricingModel: PricingModel.TIERED,
+          })
+        ).toBe(true);
+      });
+    });
+
+    describe("when pricing model is SEAT_EVENT", () => {
+      it("returns false", () => {
+        expect(
+          shouldShowPlanLimits({
+            isFree: false,
+            isEnterprise: false,
+            pricingModel: PricingModel.SEAT_EVENT,
+          })
+        ).toBe(false);
+      });
+    });
+
+    describe("when pricing model is undefined", () => {
+      it("returns true", () => {
+        expect(
+          shouldShowPlanLimits({
+            isFree: false,
+            isEnterprise: false,
+            pricingModel: undefined,
+          })
+        ).toBe(true);
+      });
+    });
+
+    describe("when pricing model is null", () => {
+      it("returns true", () => {
+        expect(
+          shouldShowPlanLimits({
+            isFree: false,
+            isEnterprise: false,
+            pricingModel: null,
+          })
+        ).toBe(true);
+      });
+    });
+  });
+
+  describe("given an enterprise plan", () => {
+    it("returns false for TIERED pricing model", () => {
+      expect(
+        shouldShowPlanLimits({
+          isFree: false,
+          isEnterprise: true,
+          pricingModel: PricingModel.TIERED,
+        })
+      ).toBe(false);
+    });
+
+    it("returns false for SEAT_EVENT pricing model", () => {
+      expect(
+        shouldShowPlanLimits({
+          isFree: false,
+          isEnterprise: true,
+          pricingModel: PricingModel.SEAT_EVENT,
+        })
+      ).toBe(false);
     });
   });
 });
