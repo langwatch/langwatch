@@ -355,7 +355,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                   }
                 }}
                 hasError={!!errors.selectedTargets}
-                archivedIds={suiteForm.archivedTargetIds}
+                archivedTargets={suiteForm.archivedTargets}
                 onRemoveArchived={suiteForm.removeArchivedTarget}
               />
               {errors.selectedTargets && (

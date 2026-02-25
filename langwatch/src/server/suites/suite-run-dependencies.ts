@@ -48,15 +48,19 @@ export function createSuiteRunDependencies({
 }): SuiteRunDependencies {
   return {
     resolveScenarioReferences: async ({ ids, projectId }) => {
+      const scenarios = await prisma.scenario.findMany({
+        where: { id: { in: ids }, projectId },
+        select: { id: true, archivedAt: true },
+      });
+
+      const lookup = new Map(scenarios.map((s) => [s.id, s]));
+
       const active: string[] = [];
       const archived: string[] = [];
       const missing: string[] = [];
 
       for (const id of ids) {
-        const scenario = await prisma.scenario.findFirst({
-          where: { id, projectId },
-          select: { id: true, archivedAt: true },
-        });
+        const scenario = lookup.get(id);
         if (!scenario) {
           missing.push(id);
         } else if (scenario.archivedAt) {
@@ -70,32 +74,51 @@ export function createSuiteRunDependencies({
     },
 
     resolveTargetReferences: async ({ targets, projectId, organizationId }) => {
+      const promptIds = targets
+        .filter((t) => t.type === "prompt")
+        .map((t) => t.referenceId);
+      const agentIds = targets
+        .filter((t) => t.type === "http")
+        .map((t) => t.referenceId);
+
+      const [prompts, agents] = await Promise.all([
+        promptIds.length > 0
+          ? prisma.llmPromptConfig.findMany({
+              where: {
+                id: { in: promptIds },
+                deletedAt: null,
+                OR: [
+                  { projectId },
+                  { organizationId, scope: "ORGANIZATION" },
+                ],
+              },
+              select: { id: true },
+            })
+          : Promise.resolve([]),
+        agentIds.length > 0
+          ? prisma.agent.findMany({
+              where: { id: { in: agentIds }, projectId },
+              select: { id: true, archivedAt: true },
+            })
+          : Promise.resolve([]),
+      ]);
+
+      const promptLookup = new Set(prompts.map((p) => p.id));
+      const agentLookup = new Map(agents.map((a) => [a.id, a]));
+
       const active: string[] = [];
       const archived: string[] = [];
       const missing: string[] = [];
 
       for (const target of targets) {
         if (target.type === "prompt") {
-          const prompt = await prisma.llmPromptConfig.findFirst({
-            where: {
-              id: target.referenceId,
-              deletedAt: null,
-              OR: [
-                { projectId },
-                { organizationId, scope: "ORGANIZATION" },
-              ],
-            },
-          });
-          if (prompt) {
+          if (promptLookup.has(target.referenceId)) {
             active.push(target.referenceId);
           } else {
             missing.push(target.referenceId);
           }
         } else if (target.type === "http") {
-          const agent = await prisma.agent.findFirst({
-            where: { id: target.referenceId, projectId },
-            select: { id: true, archivedAt: true },
-          });
+          const agent = agentLookup.get(target.referenceId);
           if (!agent) {
             missing.push(target.referenceId);
           } else if (agent.archivedAt) {

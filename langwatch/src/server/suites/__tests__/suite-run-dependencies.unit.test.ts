@@ -3,20 +3,20 @@ import { createSuiteRunDependencies, getOrganizationIdForProject } from "../suit
 import type { PrismaClient } from "@prisma/client";
 
 function makeMockPrisma(overrides: {
-  scenarioFindFirst?: ReturnType<typeof vi.fn>;
-  llmPromptConfigFindFirst?: ReturnType<typeof vi.fn>;
-  agentFindFirst?: ReturnType<typeof vi.fn>;
+  scenarioFindMany?: ReturnType<typeof vi.fn>;
+  llmPromptConfigFindMany?: ReturnType<typeof vi.fn>;
+  agentFindMany?: ReturnType<typeof vi.fn>;
   projectFindUnique?: ReturnType<typeof vi.fn>;
 } = {}) {
   return {
     scenario: {
-      findFirst: overrides.scenarioFindFirst ?? vi.fn(() => Promise.resolve(null)),
+      findMany: overrides.scenarioFindMany ?? vi.fn(() => Promise.resolve([])),
     },
     llmPromptConfig: {
-      findFirst: overrides.llmPromptConfigFindFirst ?? vi.fn(() => Promise.resolve(null)),
+      findMany: overrides.llmPromptConfigFindMany ?? vi.fn(() => Promise.resolve([])),
     },
     agent: {
-      findFirst: overrides.agentFindFirst ?? vi.fn(() => Promise.resolve(null)),
+      findMany: overrides.agentFindMany ?? vi.fn(() => Promise.resolve([])),
     },
     project: {
       findUnique: overrides.projectFindUnique ?? vi.fn(() => Promise.resolve(null)),
@@ -28,10 +28,12 @@ describe("createSuiteRunDependencies()", () => {
   describe("resolveScenarioReferences", () => {
     describe("when all scenarios are active", () => {
       it("returns all IDs in the active list", async () => {
-        const findFirst = vi.fn()
-          .mockResolvedValueOnce({ id: "scen_1", archivedAt: null })
-          .mockResolvedValueOnce({ id: "scen_2", archivedAt: null });
-        const prisma = makeMockPrisma({ scenarioFindFirst: findFirst });
+        const prisma = makeMockPrisma({
+          scenarioFindMany: vi.fn(() => Promise.resolve([
+            { id: "scen_1", archivedAt: null },
+            { id: "scen_2", archivedAt: null },
+          ])),
+        });
         const deps = createSuiteRunDependencies({ prisma });
 
         const result = await deps.resolveScenarioReferences({
@@ -49,10 +51,12 @@ describe("createSuiteRunDependencies()", () => {
 
     describe("when a scenario is archived", () => {
       it("places it in the archived list", async () => {
-        const findFirst = vi.fn()
-          .mockResolvedValueOnce({ id: "scen_1", archivedAt: null })
-          .mockResolvedValueOnce({ id: "scen_2", archivedAt: new Date() });
-        const prisma = makeMockPrisma({ scenarioFindFirst: findFirst });
+        const prisma = makeMockPrisma({
+          scenarioFindMany: vi.fn(() => Promise.resolve([
+            { id: "scen_1", archivedAt: null },
+            { id: "scen_2", archivedAt: new Date() },
+          ])),
+        });
         const deps = createSuiteRunDependencies({ prisma });
 
         const result = await deps.resolveScenarioReferences({
@@ -70,10 +74,11 @@ describe("createSuiteRunDependencies()", () => {
 
     describe("when a scenario does not exist", () => {
       it("places it in the missing list", async () => {
-        const findFirst = vi.fn()
-          .mockResolvedValueOnce({ id: "scen_1", archivedAt: null })
-          .mockResolvedValueOnce(null);
-        const prisma = makeMockPrisma({ scenarioFindFirst: findFirst });
+        const prisma = makeMockPrisma({
+          scenarioFindMany: vi.fn(() => Promise.resolve([
+            { id: "scen_1", archivedAt: null },
+          ])),
+        });
         const deps = createSuiteRunDependencies({ prisma });
 
         const result = await deps.resolveScenarioReferences({
@@ -91,10 +96,12 @@ describe("createSuiteRunDependencies()", () => {
 
     describe("when all scenarios are archived", () => {
       it("returns an empty active list", async () => {
-        const findFirst = vi.fn()
-          .mockResolvedValueOnce({ id: "scen_1", archivedAt: new Date() })
-          .mockResolvedValueOnce({ id: "scen_2", archivedAt: new Date() });
-        const prisma = makeMockPrisma({ scenarioFindFirst: findFirst });
+        const prisma = makeMockPrisma({
+          scenarioFindMany: vi.fn(() => Promise.resolve([
+            { id: "scen_1", archivedAt: new Date() },
+            { id: "scen_2", archivedAt: new Date() },
+          ])),
+        });
         const deps = createSuiteRunDependencies({ prisma });
 
         const result = await deps.resolveScenarioReferences({
@@ -110,18 +117,21 @@ describe("createSuiteRunDependencies()", () => {
       });
     });
 
-    it("queries without archivedAt filter to detect both active and archived", async () => {
-      const findFirst = vi.fn(() => Promise.resolve({ id: "scen_1", archivedAt: null }));
-      const prisma = makeMockPrisma({ scenarioFindFirst: findFirst });
+    it("uses a batched findMany query with in-clause", async () => {
+      const findMany = vi.fn(() => Promise.resolve([
+        { id: "scen_1", archivedAt: null },
+      ]));
+      const prisma = makeMockPrisma({ scenarioFindMany: findMany });
       const deps = createSuiteRunDependencies({ prisma });
 
       await deps.resolveScenarioReferences({
-        ids: ["scen_1"],
+        ids: ["scen_1", "scen_2"],
         projectId: "proj_1",
       });
 
-      expect(findFirst).toHaveBeenCalledWith({
-        where: { id: "scen_1", projectId: "proj_1" },
+      expect(findMany).toHaveBeenCalledTimes(1);
+      expect(findMany).toHaveBeenCalledWith({
+        where: { id: { in: ["scen_1", "scen_2"] }, projectId: "proj_1" },
         select: { id: true, archivedAt: true },
       });
     });
@@ -132,9 +142,9 @@ describe("createSuiteRunDependencies()", () => {
       describe("when prompt exists", () => {
         it("places it in the active list", async () => {
           const prisma = makeMockPrisma({
-            llmPromptConfigFindFirst: vi.fn(() =>
-              Promise.resolve({ id: "prompt_1" }),
-            ),
+            llmPromptConfigFindMany: vi.fn(() => Promise.resolve([
+              { id: "prompt_1" },
+            ])),
           });
           const deps = createSuiteRunDependencies({ prisma });
 
@@ -166,8 +176,8 @@ describe("createSuiteRunDependencies()", () => {
       });
 
       it("queries with OR pattern including org scope", async () => {
-        const findFirst = vi.fn(() => Promise.resolve({ id: "prompt_1" }));
-        const prisma = makeMockPrisma({ llmPromptConfigFindFirst: findFirst });
+        const findMany = vi.fn(() => Promise.resolve([{ id: "prompt_1" }]));
+        const prisma = makeMockPrisma({ llmPromptConfigFindMany: findMany });
         const deps = createSuiteRunDependencies({ prisma });
 
         await deps.resolveTargetReferences({
@@ -176,15 +186,16 @@ describe("createSuiteRunDependencies()", () => {
           organizationId: "org_1",
         });
 
-        expect(findFirst).toHaveBeenCalledWith({
+        expect(findMany).toHaveBeenCalledWith({
           where: {
-            id: "prompt_1",
+            id: { in: ["prompt_1"] },
             deletedAt: null,
             OR: [
               { projectId: "proj_1" },
               { organizationId: "org_1", scope: "ORGANIZATION" },
             ],
           },
+          select: { id: true },
         });
       });
     });
@@ -193,9 +204,9 @@ describe("createSuiteRunDependencies()", () => {
       describe("when agent is active", () => {
         it("places it in the active list", async () => {
           const prisma = makeMockPrisma({
-            agentFindFirst: vi.fn(() =>
-              Promise.resolve({ id: "agent_1", archivedAt: null }),
-            ),
+            agentFindMany: vi.fn(() => Promise.resolve([
+              { id: "agent_1", archivedAt: null },
+            ])),
           });
           const deps = createSuiteRunDependencies({ prisma });
 
@@ -212,9 +223,9 @@ describe("createSuiteRunDependencies()", () => {
       describe("when agent is archived", () => {
         it("places it in the archived list", async () => {
           const prisma = makeMockPrisma({
-            agentFindFirst: vi.fn(() =>
-              Promise.resolve({ id: "agent_1", archivedAt: new Date() }),
-            ),
+            agentFindMany: vi.fn(() => Promise.resolve([
+              { id: "agent_1", archivedAt: new Date() },
+            ])),
           });
           const deps = createSuiteRunDependencies({ prisma });
 
@@ -244,9 +255,11 @@ describe("createSuiteRunDependencies()", () => {
         });
       });
 
-      it("queries without archivedAt filter to detect both active and archived", async () => {
-        const findFirst = vi.fn(() => Promise.resolve({ id: "agent_1", archivedAt: null }));
-        const prisma = makeMockPrisma({ agentFindFirst: findFirst });
+      it("uses a batched findMany query with in-clause", async () => {
+        const findMany = vi.fn(() => Promise.resolve([
+          { id: "agent_1", archivedAt: null },
+        ]));
+        const prisma = makeMockPrisma({ agentFindMany: findMany });
         const deps = createSuiteRunDependencies({ prisma });
 
         await deps.resolveTargetReferences({
@@ -255,8 +268,9 @@ describe("createSuiteRunDependencies()", () => {
           organizationId: "org_1",
         });
 
-        expect(findFirst).toHaveBeenCalledWith({
-          where: { id: "agent_1", projectId: "proj_1" },
+        expect(findMany).toHaveBeenCalledTimes(1);
+        expect(findMany).toHaveBeenCalledWith({
+          where: { id: { in: ["agent_1"] }, projectId: "proj_1" },
           select: { id: true, archivedAt: true },
         });
       });
@@ -274,6 +288,33 @@ describe("createSuiteRunDependencies()", () => {
         });
 
         expect(result.missing).toEqual(["unknown_1"]);
+      });
+    });
+
+    describe("when targets include both prompts and agents", () => {
+      it("batches queries by type and resolves correctly", async () => {
+        const prisma = makeMockPrisma({
+          llmPromptConfigFindMany: vi.fn(() => Promise.resolve([
+            { id: "prompt_1" },
+          ])),
+          agentFindMany: vi.fn(() => Promise.resolve([
+            { id: "agent_1", archivedAt: null },
+          ])),
+        });
+        const deps = createSuiteRunDependencies({ prisma });
+
+        const result = await deps.resolveTargetReferences({
+          targets: [
+            { type: "prompt", referenceId: "prompt_1" },
+            { type: "http", referenceId: "agent_1" },
+          ],
+          projectId: "proj_1",
+          organizationId: "org_1",
+        });
+
+        expect(result.active).toEqual(["prompt_1", "agent_1"]);
+        expect(result.archived).toEqual([]);
+        expect(result.missing).toEqual([]);
       });
     });
   });

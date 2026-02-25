@@ -156,17 +156,15 @@ export function useSuiteForm({
     return selectedScenarioIds.filter((id) => !activeIds.has(id));
   }, [selectedScenarioIds, scenarios]);
 
-  // -- Derived: archived target IDs (selected but not in available targets) --
-  const archivedTargetIds = useMemo(() => {
+  // -- Derived: archived targets (selected but no longer available, with full type info) --
+  const archivedTargets = useMemo(() => {
     if (!agents || !prompts) return [];
-    return selectedTargets
-      .filter(
-        (t) =>
-          !availableTargets.some(
-            (a) => a.type === t.type && a.referenceId === t.referenceId,
-          ),
-      )
-      .map((t) => t.referenceId);
+    return selectedTargets.filter(
+      (t) =>
+        !availableTargets.some(
+          (a) => a.type === t.type && a.referenceId === t.referenceId,
+        ),
+    );
   }, [selectedTargets, availableTargets, agents, prompts]);
 
   // -- Derived: unique scenario labels --
@@ -286,11 +284,13 @@ export function useSuiteForm({
     form.setValue("selectedScenarioIds", current.filter((s) => s !== id));
   };
 
-  const removeArchivedTarget = (referenceId: string) => {
+  const removeArchivedTarget = (target: Pick<SuiteTarget, "type" | "referenceId">) => {
     const current = form.getValues("selectedTargets");
     form.setValue(
       "selectedTargets",
-      current.filter((t) => t.referenceId !== referenceId),
+      current.filter(
+        (t) => !(t.type === target.type && t.referenceId === target.referenceId),
+      ),
     );
   };
 
@@ -330,7 +330,7 @@ export function useSuiteForm({
 
     // Archived references
     archivedScenarioIds,
-    archivedTargetIds,
+    archivedTargets,
     removeArchivedScenario,
     removeArchivedTarget,
 
