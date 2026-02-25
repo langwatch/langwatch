@@ -1,10 +1,13 @@
 import { buffer } from "micro";
 import type { NextApiRequest, NextApiResponse } from "next";
 import type Stripe from "stripe";
+import { Currency } from "@prisma/client";
 import { env } from "../../src/env.mjs";
 import { prisma } from "../../src/server/db";
 import { createLogger } from "../../src/utils/logger";
 import type { WebhookService } from "./services/webhookService";
+
+const VALID_CURRENCIES = new Set<string>(Object.values(Currency));
 
 const logger = createLogger("langwatch:billing:stripeWebhook");
 
@@ -98,11 +101,14 @@ export const createStripeWebhookHandlerFactory = ({
           case "checkout.session.completed": {
             const checkoutSession = event.data.object as Stripe.Checkout.Session;
             const clientReferenceId = checkoutSession.client_reference_id;
-            const selectedCurrency = checkoutSession.metadata?.selectedCurrency;
+            const selectedCurrencyRaw = checkoutSession.metadata?.selectedCurrency;
+            const selectedCurrency = selectedCurrencyRaw && VALID_CURRENCIES.has(selectedCurrencyRaw)
+              ? selectedCurrencyRaw
+              : null;
             const result = await webhookService.handleCheckoutCompleted({
               subscriptionId,
               clientReferenceId: clientReferenceId ?? null,
-              selectedCurrency: selectedCurrency ?? null,
+              selectedCurrency,
             });
             if (result.earlyReturn) {
               logger.error(

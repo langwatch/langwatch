@@ -94,21 +94,32 @@ export function CurrentPlanBlock({
               <Text color="gray.500" fontSize="sm">
                 Members / Seats
               </Text>
-              <Box
-                as="button"
-                onClick={onUserCountClick}
-                textDecoration="underline"
-                _hover={{ color: "blue.600", cursor: "pointer" }}
-                color="gray.900"
-              >
+              {onUserCountClick ? (
+                <Box
+                  as="button"
+                  onClick={onUserCountClick}
+                  textDecoration="underline"
+                  _hover={{ color: "blue.600", cursor: "pointer" }}
+                  color="gray.900"
+                >
+                  <Text
+                    fontWeight="semibold"
+                    fontSize="lg"
+                    data-testid="user-count-link"
+                  >
+                    {maxSeats != null ? `${userCount}/${maxSeats}` : userCount}
+                  </Text>
+                </Box>
+              ) : (
                 <Text
                   fontWeight="semibold"
                   fontSize="lg"
+                  color="gray.900"
                   data-testid="user-count-link"
                 >
                   {maxSeats != null ? `${userCount}/${maxSeats}` : userCount}
                 </Text>
-              </Box>
+              )}
             </VStack>
           </Flex>
           {features && (

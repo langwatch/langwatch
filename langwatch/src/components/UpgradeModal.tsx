@@ -112,12 +112,15 @@ function SeatsContent({
   // SaaS-only: subscription API may not exist in OSS builds.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const subscriptionApi = (api as any).subscription;
+  // Build-time invariant: subscriptionApi shape is fixed per build (SaaS vs OSS)
+  const hasSubscriptionApi = !!subscriptionApi;
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   const prorationQuery = subscriptionApi?.previewProration?.useQuery(
     {
       organizationId: variant.organizationId,
       newTotalSeats: variant.newSeats,
     },
-    { enabled: open },
+    { enabled: open && hasSubscriptionApi },
   ) as
     | {
         data?: {

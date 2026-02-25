@@ -138,18 +138,21 @@ function Usage() {
         </Flex>
 
         {/* SaaS: Resource limits from active plan */}
-        {usage.data && isSaaS && (
-          <ResourceLimitsCard
-            planLabel={activePlan.data?.free ? "Free" : (activePlan.data?.name ?? "Plan")}
-            planColorPalette={activePlan.data?.free ? "gray" : "blue"}
-            subtitle={`Current usage versus ${activePlan.data?.free ? "free tier" : "your plan"} limits`}
-            limits={mapUsageToLimits(usage.data, usage.data.activePlan)}
-            showLimits={activePlan.data?.free}
-            actionHref={planManagementUrl}
-            actionLabel={planButtonLabel}
-            messagesLabel={messagesLabel}
-          />
-        )}
+        {usage.data && isSaaS && (() => {
+          const saasPlan = activePlan.data ?? usage.data.activePlan;
+          return (
+            <ResourceLimitsCard
+              planLabel={saasPlan?.free ? "Free" : (saasPlan?.name ?? "Plan")}
+              planColorPalette={saasPlan?.free ? "gray" : "blue"}
+              subtitle={`Current usage versus ${saasPlan?.free ? "free tier" : "your plan"} limits`}
+              limits={mapUsageToLimits(usage.data, usage.data.activePlan)}
+              showLimits={saasPlan?.free}
+              actionHref={planManagementUrl}
+              actionLabel={planButtonLabel}
+              messagesLabel={messagesLabel}
+            />
+          );
+        })()}
 
         {/* Self-hosted: Loading state */}
         {isLoadingLimits && (

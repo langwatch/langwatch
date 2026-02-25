@@ -192,13 +192,16 @@ export function SubscriptionPage() {
   // Manual planned seats only (NOT pending invites — they're already in maxMembers)
   const newPlannedFullMembers = countFullMembers(plannedUsers);
 
-  // Single source of truth for billing seat count
+  // Single source of truth for billing seat count (never below existing members)
   const billingSeats = isDeveloperPlan
     ? Math.max(
         totalFullMembers,
         (effectiveMaxSeats ?? 0) + newPlannedFullMembers - deletedSeatCount
       )
-    : (effectiveMaxSeats ?? totalFullMembers) + newPlannedFullMembers - deletedSeatCount;
+    : Math.max(
+        existingCoreMembers,
+        (effectiveMaxSeats ?? totalFullMembers) + newPlannedFullMembers - deletedSeatCount,
+      );
 
   // For tiered legacy plans upgrading to seat-based, use actual member count
   // (not the old plan's maxMembers capacity which is irrelevant for the new model)

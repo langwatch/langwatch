@@ -228,15 +228,25 @@ export function useInviteActions({
         currentSeats: limitInfo.max,
         newSeats,
         onConfirm: async () => {
-          await expandSeatsMutation.mutateAsync({
-            organizationId,
-            plan: activePlanType,
-            upgradeMembers: true,
-            upgradeTraces: false,
-            totalMembers: newSeats,
-            totalTraces: 0,
-          });
-          performMutation(data);
+          try {
+            await expandSeatsMutation.mutateAsync({
+              organizationId,
+              plan: activePlanType,
+              upgradeMembers: true,
+              upgradeTraces: false,
+              totalMembers: newSeats,
+              totalTraces: 0,
+            });
+            performMutation(data);
+          } catch (err) {
+            toaster.create({
+              title: "Failed to expand seats",
+              description: err instanceof Error ? err.message : "Please try again",
+              type: "error",
+              duration: 5000,
+              meta: { closable: true },
+            });
+          }
         },
       });
     } else {

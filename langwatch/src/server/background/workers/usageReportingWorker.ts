@@ -22,9 +22,7 @@ import {
   billingMonthDateRange,
   queryBillableEventsTotal,
 } from "../../../../ee/billing/services/billableEventsQuery";
-import { 
-  type PlanTypes, 
-  SUBSCRIBABLE_PLANS } from "../../../../ee/billing/planTypes";
+import { SUBSCRIBABLE_PLANS } from "../../../../ee/billing/planTypes";
 import { PricingModel } from "@prisma/client";
 
 // Re-export for existing test imports
@@ -265,8 +263,8 @@ export async function runUsageReportingJob(
         pricingModel: true,
         subscriptions: {
           where: { 
-            status: "ACTIVE", 
-            plan: { in: SUBSCRIBABLE_PLANS as unknown as PlanTypes[] } 
+            status: "ACTIVE",
+            plan: { in: [...SUBSCRIBABLE_PLANS] }
           },
           take: 1,
           select: { id: true }, orderBy: { startDate: "desc" },
