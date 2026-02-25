@@ -422,17 +422,19 @@ export class SuiteService {
   }): Promise<boolean> {
     const { referenceId, type, projectId, organizationId } = params;
 
-    if (type === "http") {
-      return this.agentRepository.exists({ id: referenceId, projectId });
+    switch (type) {
+      case "http":
+        return this.agentRepository.exists({ id: referenceId, projectId });
+      case "prompt":
+        return this.llmConfigRepository.existsForProjectOrOrg({
+          id: referenceId,
+          projectId,
+          organizationId,
+        });
+      default:
+        console.error(`Unknown suite target type: ${type as string}`);
+        return false;
     }
-    if (type === "prompt") {
-      return this.llmConfigRepository.existsForProjectOrOrg({
-        id: referenceId,
-        projectId,
-        organizationId,
-      });
-    }
-    return false;
   }
 
   private async scheduleJobs(params: {
