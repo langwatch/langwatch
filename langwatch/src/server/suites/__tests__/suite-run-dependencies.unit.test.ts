@@ -293,13 +293,15 @@ describe("createSuiteRunDependencies()", () => {
 
     describe("when targets include both prompts and agents", () => {
       it("batches queries by type and resolves correctly", async () => {
+        const llmPromptConfigFindMany = vi.fn(() => Promise.resolve([
+          { id: "prompt_1" },
+        ]));
+        const agentFindMany = vi.fn(() => Promise.resolve([
+          { id: "agent_1", archivedAt: null },
+        ]));
         const prisma = makeMockPrisma({
-          llmPromptConfigFindMany: vi.fn(() => Promise.resolve([
-            { id: "prompt_1" },
-          ])),
-          agentFindMany: vi.fn(() => Promise.resolve([
-            { id: "agent_1", archivedAt: null },
-          ])),
+          llmPromptConfigFindMany,
+          agentFindMany,
         });
         const deps = createSuiteRunDependencies({ prisma });
 
@@ -315,6 +317,25 @@ describe("createSuiteRunDependencies()", () => {
         expect(result.active).toEqual(["prompt_1", "agent_1"]);
         expect(result.archived).toEqual([]);
         expect(result.missing).toEqual([]);
+
+        expect(llmPromptConfigFindMany).toHaveBeenCalledTimes(1);
+        expect(llmPromptConfigFindMany).toHaveBeenCalledWith({
+          where: {
+            id: { in: ["prompt_1"] },
+            deletedAt: null,
+            OR: [
+              { projectId: "proj_1" },
+              { organizationId: "org_1", scope: "ORGANIZATION" },
+            ],
+          },
+          select: { id: true },
+        });
+
+        expect(agentFindMany).toHaveBeenCalledTimes(1);
+        expect(agentFindMany).toHaveBeenCalledWith({
+          where: { id: { in: ["agent_1"] }, projectId: "proj_1" },
+          select: { id: true, archivedAt: true },
+        });
       });
     });
   });
