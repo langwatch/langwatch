@@ -41,7 +41,7 @@ const {
   });
 
   const mockPrisma = {
-    organization: { findUnique: vi.fn() },
+    organization: { findFirst: vi.fn() },
     billingMeterCheckpoint: {
       findUnique: vi.fn(),
       upsert: vi.fn(),
@@ -183,14 +183,14 @@ describe("runUsageReportingJob", () => {
 
       await runUsageReportingJob(makeJob("org-1"));
 
-      expect(mockPrisma.organization.findUnique).not.toHaveBeenCalled();
+      expect(mockPrisma.organization.findFirst).not.toHaveBeenCalled();
       expect(mockReportUsageDelta).not.toHaveBeenCalled();
     });
   });
 
   describe("given org has no stripeCustomerId", () => {
     it("skips reporting", async () => {
-      mockPrisma.organization.findUnique.mockResolvedValue(
+      mockPrisma.organization.findFirst.mockResolvedValue(
         makeOrg({ stripeCustomerId: null }),
       );
       const { runUsageReportingJob } = await import(
@@ -205,7 +205,7 @@ describe("runUsageReportingJob", () => {
 
   describe("given org has no active subscription", () => {
     it("skips reporting", async () => {
-      mockPrisma.organization.findUnique.mockResolvedValue(
+      mockPrisma.organization.findFirst.mockResolvedValue(
         makeOrg({ hasSubscription: false }),
       );
       const { runUsageReportingJob } = await import(
@@ -220,7 +220,7 @@ describe("runUsageReportingJob", () => {
 
   describe("given org not on SEAT_EVENT pricing", () => {
     it("skips reporting", async () => {
-      mockPrisma.organization.findUnique.mockResolvedValue(
+      mockPrisma.organization.findFirst.mockResolvedValue(
         makeOrg({ pricingModel: "TIERED" }),
       );
       const { runUsageReportingJob } = await import(
@@ -235,7 +235,7 @@ describe("runUsageReportingJob", () => {
 
   describe("given ClickHouse not available", () => {
     it("skips usage reporting", async () => {
-      mockPrisma.organization.findUnique.mockResolvedValue(makeOrg());
+      mockPrisma.organization.findFirst.mockResolvedValue(makeOrg());
       mockGetClickHouseClient.mockReturnValue(null);
       mockPrisma.billingMeterCheckpoint.findUnique.mockResolvedValue(null);
       const { runUsageReportingJob } = await import(
@@ -250,7 +250,7 @@ describe("runUsageReportingJob", () => {
 
   describe("given delta is zero", () => {
     it("skips reporting", async () => {
-      mockPrisma.organization.findUnique.mockResolvedValue(makeOrg());
+      mockPrisma.organization.findFirst.mockResolvedValue(makeOrg());
       mockPrisma.billingMeterCheckpoint.findUnique.mockResolvedValue({
         lastReportedTotal: 100,
         pendingReportedTotal: null,
@@ -272,7 +272,7 @@ describe("runUsageReportingJob", () => {
 
   describe("given org with billable events and active subscription", () => {
     it("reports delta and updates checkpoint", async () => {
-      mockPrisma.organization.findUnique.mockResolvedValue(makeOrg());
+      mockPrisma.organization.findFirst.mockResolvedValue(makeOrg());
       mockPrisma.billingMeterCheckpoint.findUnique.mockResolvedValue({
         lastReportedTotal: 100,
         pendingReportedTotal: null,
@@ -314,7 +314,7 @@ describe("runUsageReportingJob", () => {
 
   describe("given first run for new org (no checkpoint)", () => {
     it("creates checkpoint at reported total", async () => {
-      mockPrisma.organization.findUnique.mockResolvedValue(makeOrg());
+      mockPrisma.organization.findFirst.mockResolvedValue(makeOrg());
       mockPrisma.billingMeterCheckpoint.findUnique.mockResolvedValue(null);
       mockClickHouseTotal(50);
       mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
@@ -353,7 +353,7 @@ describe("runUsageReportingJob", () => {
 
   describe("given ClickHouse returns deduped count", () => {
     it("queries by organizationId and date range", async () => {
-      mockPrisma.organization.findUnique.mockResolvedValue(makeOrg());
+      mockPrisma.organization.findFirst.mockResolvedValue(makeOrg());
       mockPrisma.billingMeterCheckpoint.findUnique.mockResolvedValue(null);
       mockClickHouseTotal(75);
       mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
@@ -382,7 +382,7 @@ describe("runUsageReportingJob", () => {
 
   describe("given delta > 0", () => {
     it("self-re-triggers with delayed job", async () => {
-      mockPrisma.organization.findUnique.mockResolvedValue(makeOrg());
+      mockPrisma.organization.findFirst.mockResolvedValue(makeOrg());
       mockPrisma.billingMeterCheckpoint.findUnique.mockResolvedValue({
         lastReportedTotal: 0,
         pendingReportedTotal: null,
@@ -414,7 +414,7 @@ describe("runUsageReportingJob", () => {
 
   describe("given pending checkpoint (crash recovery)", () => {
     it("uses pending value with same idempotency key", async () => {
-      mockPrisma.organization.findUnique.mockResolvedValue(makeOrg());
+      mockPrisma.organization.findFirst.mockResolvedValue(makeOrg());
       mockPrisma.billingMeterCheckpoint.findUnique.mockResolvedValue({
         lastReportedTotal: 100,
         pendingReportedTotal: 200,
@@ -446,7 +446,7 @@ describe("runUsageReportingJob", () => {
 
   describe("given successful report", () => {
     it("clears pending and updates lastReportedTotal", async () => {
-      mockPrisma.organization.findUnique.mockResolvedValue(makeOrg());
+      mockPrisma.organization.findFirst.mockResolvedValue(makeOrg());
       mockPrisma.billingMeterCheckpoint.findUnique.mockResolvedValue({
         lastReportedTotal: 100,
         pendingReportedTotal: 200,
@@ -474,7 +474,7 @@ describe("runUsageReportingJob", () => {
 
   describe("given permanent Stripe rejection", () => {
     it("clears pending checkpoint without advancing lastReportedTotal and captures error", async () => {
-      mockPrisma.organization.findUnique.mockResolvedValue(makeOrg());
+      mockPrisma.organization.findFirst.mockResolvedValue(makeOrg());
       mockPrisma.billingMeterCheckpoint.findUnique.mockResolvedValue({
         lastReportedTotal: 100,
         pendingReportedTotal: null,
@@ -526,7 +526,7 @@ describe("runUsageReportingJob", () => {
 
   describe("when service throws retryable error", () => {
     it("re-throws for BullMQ retry", async () => {
-      mockPrisma.organization.findUnique.mockResolvedValue(makeOrg());
+      mockPrisma.organization.findFirst.mockResolvedValue(makeOrg());
       mockPrisma.billingMeterCheckpoint.findUnique.mockResolvedValue({
         lastReportedTotal: 0,
         pendingReportedTotal: null,
@@ -551,7 +551,7 @@ describe("runUsageReportingJob", () => {
 
   describe("given first day of month", () => {
     it("reports both previous and current month", async () => {
-      mockPrisma.organization.findUnique.mockResolvedValue(makeOrg());
+      mockPrisma.organization.findFirst.mockResolvedValue(makeOrg());
       // Return null checkpoint for all months
       mockPrisma.billingMeterCheckpoint.findUnique.mockResolvedValue(null);
       mockClickHouseTotal(25);
@@ -582,7 +582,7 @@ describe("runUsageReportingJob", () => {
 
   describe("given third day of month (within grace period)", () => {
     it("reports both previous and current month", async () => {
-      mockPrisma.organization.findUnique.mockResolvedValue(makeOrg());
+      mockPrisma.organization.findFirst.mockResolvedValue(makeOrg());
       mockPrisma.billingMeterCheckpoint.findUnique.mockResolvedValue(null);
       mockClickHouseTotal(25);
       mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
@@ -613,7 +613,7 @@ describe("runUsageReportingJob", () => {
 
   describe("given fourth day of month (past grace period)", () => {
     it("reports only current month", async () => {
-      mockPrisma.organization.findUnique.mockResolvedValue(makeOrg());
+      mockPrisma.organization.findFirst.mockResolvedValue(makeOrg());
       mockPrisma.billingMeterCheckpoint.findUnique.mockResolvedValue(null);
       mockClickHouseTotal(25);
       mockReportUsageDelta.mockResolvedValue([{ reported: true }]);

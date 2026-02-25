@@ -1040,7 +1040,7 @@ describe("<SubscriptionPage/>", () => {
       expect(mockMutateAsync).toHaveBeenCalledWith(
         expect.objectContaining({
           organizationId: "test-org-id",
-          plan: "GROWTH",
+          plan: "GROWTH_SEAT_EUR_MONTHLY",
           upgradeMembers: true,
           upgradeTraces: false,
           totalMembers: 3,

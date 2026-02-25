@@ -1,8 +1,16 @@
 import { Heading, HStack, Text, VStack } from "@chakra-ui/react";
+import dynamic from "next/dynamic";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
-import { SubscriptionPage } from "~/components/subscription/SubscriptionPage";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Link } from "../../components/ui/link";
+
+const SubscriptionPage = dynamic(
+  () =>
+    import("~/components/subscription/SubscriptionPage").then(
+      (mod) => mod.SubscriptionPage
+    ),
+  { ssr: false }
+);
 
 export default function Subscription() {
   const publicEnv = usePublicEnv();

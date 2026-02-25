@@ -217,15 +217,12 @@ export const createSeatEventSubscriptionFns = ({
       return { success: false };
     }
 
-    // If the sub was scheduled for cancellation, reactivate it — the user
-    // is choosing to keep their subscription by updating seats.
-    if (stripeSubscription.canceled_at) {
-      await stripe.subscriptions.update(lastSubscription.stripeSubscriptionId, {
-        cancel_at_period_end: false,
-      });
-    }
-
+    // Update seats (and reactivate if scheduled for cancellation — the user
+    // is choosing to keep their subscription by updating seats).
     await stripe.subscriptions.update(lastSubscription.stripeSubscriptionId, {
+      ...(stripeSubscription.canceled_at
+        ? { cancel_at_period_end: false }
+        : {}),
       items: [{ id: seatItem.id, quantity: totalMembers }],
     });
 

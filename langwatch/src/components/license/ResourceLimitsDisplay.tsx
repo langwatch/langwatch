@@ -28,7 +28,13 @@ export type ResourceKey =
 export const RESOURCE_LABELS: Record<ResourceKey, string> = {
   ...LIMIT_TYPE_DISPLAY_LABELS,
   membersLite: "Lite Members",
+  // Default label is "Events / Month"; for TIERED orgs this is overridden
+  // via the `messagesLabel` prop so they can display a different label
+  // (e.g. "Traces / Month"). See ResourceLimitsDisplay component.
   messagesPerMonth: "Events / Month",
+  // Label-only keys: not part of the ResourceLimits interface but included
+  // here so that dynamic label resolution in usage.tsx (around line 109) can
+  // look up a human-readable name for these resource types at runtime.
   eventsPerMonth: "Events / Month",
   tracesPerMonth: "Traces / Month",
   evaluationsCredit: "Evaluations Credit",

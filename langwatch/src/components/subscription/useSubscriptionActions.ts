@@ -1,12 +1,14 @@
-import { PlanTypes } from "@prisma/client";
 import { toaster } from "~/components/ui/toaster";
 import { useUpgradeModalStore } from "../../stores/upgradeModalStore";
 import { api } from "~/utils/api";
 import type { Currency, BillingInterval } from "./billing-plans";
 import { type PlannedUser } from "./subscription-types";
 import { type MemberType } from "~/server/license-enforcement/member-classification";
-
-type GrowthSeatPlanType = Extract<PlanTypes, `GROWTH_SEAT_${string}`>;
+import {
+  isGrowthSeatEventPlan,
+  type GrowthSeatPlanType,
+} from "../../../ee/billing/utils/growthSeatEvent";
+import { PlanTypes } from "@prisma/client";
 
 const GROWTH_SEAT_PLAN_MAP: Record<`${Currency}_${BillingInterval}`, GrowthSeatPlanType> = {
   EUR_monthly: PlanTypes.GROWTH_SEAT_EUR_MONTHLY,
@@ -61,42 +63,52 @@ export function useSubscriptionActions({
   const handleUpgrade = async () => {
     if (!organizationId) return;
 
-    // Separate invites (have email) from empty seats
-    const invitesWithEmail = plannedUsers
-      .filter((u) => u.email.trim() !== "")
-      .map((u) => ({
-        email: u.email,
-        role: memberTypeToRole(u.memberType),
-      }));
+    try {
+      // Separate invites (have email) from empty seats
+      const invitesWithEmail = plannedUsers
+        .filter((u) => u.email.trim() !== "")
+        .map((u) => ({
+          email: u.email,
+          role: memberTypeToRole(u.memberType),
+        }));
 
-    if (invitesWithEmail.length > 0) {
-      const result = await upgradeWithInvites.mutateAsync({
+      if (invitesWithEmail.length > 0) {
+        const result = await upgradeWithInvites.mutateAsync({
+          organizationId,
+          baseUrl: window.location.origin,
+          currency,
+          billingInterval: billingPeriod,
+          totalSeats: totalFullMembers,
+          invites: invitesWithEmail,
+        });
+
+        if (result.url) {
+          window.location.href = result.url;
+        }
+        return;
+      }
+
+      // Fallback to create mutation (no invites)
+      const result = await createSubscription.mutateAsync({
         organizationId,
         baseUrl: window.location.origin,
+        plan: resolveGrowthSeatPlanType(currency, billingPeriod),
+        membersToAdd: totalFullMembers,
         currency,
         billingInterval: billingPeriod,
-        totalSeats: totalFullMembers,
-        invites: invitesWithEmail,
       });
 
       if (result.url) {
         window.location.href = result.url;
       }
-      return;
-    }
-
-    // Fallback to create mutation (no invites)
-    const result = await createSubscription.mutateAsync({
-      organizationId,
-      baseUrl: window.location.origin,
-      plan: resolveGrowthSeatPlanType(currency, billingPeriod),
-      membersToAdd: totalFullMembers,
-      currency,
-      billingInterval: billingPeriod,
-    });
-
-    if (result.url) {
-      window.location.href = result.url;
+    } catch (err) {
+      toaster.create({
+        title: "Error upgrading subscription",
+        description:
+          err instanceof Error ? err.message : "An unexpected error occurred",
+        type: "error",
+        meta: { closable: true },
+      });
     }
   };
 
@@ -110,20 +122,34 @@ export function useSubscriptionActions({
       currentSeats: currentMaxMembers ?? totalFullMembers,
       newSeats: updateTotalMembers,
       onConfirm: async () => {
-        await addTeamMemberOrEvents.mutateAsync({
-          organizationId,
-          plan: (activePlanType as GrowthSeatPlanType) ?? resolveGrowthSeatPlanType(currency, billingPeriod),
-          upgradeMembers: true,
-          upgradeTraces: false,
-          totalMembers: updateTotalMembers,
-          totalTraces: 0,
-        });
-        onSeatsUpdated();
-        toaster.create({
-          title: "Seats updated successfully",
-          type: "success",
-        });
-        void organizationWithMembers.refetch();
+        try {
+          const plan = activePlanType && isGrowthSeatEventPlan(activePlanType)
+            ? activePlanType
+            : resolveGrowthSeatPlanType(currency, billingPeriod);
+
+          await addTeamMemberOrEvents.mutateAsync({
+            organizationId,
+            plan,
+            upgradeMembers: true,
+            upgradeTraces: false,
+            totalMembers: updateTotalMembers,
+            totalTraces: 0,
+          });
+          onSeatsUpdated();
+          toaster.create({
+            title: "Seats updated successfully",
+            type: "success",
+          });
+          void organizationWithMembers.refetch();
+        } catch (err) {
+          toaster.create({
+            title: "Error updating seats",
+            description:
+              err instanceof Error ? err.message : "An unexpected error occurred",
+            type: "error",
+            meta: { closable: true },
+          });
+        }
       },
     });
   };
@@ -131,13 +157,23 @@ export function useSubscriptionActions({
   const handleManageSubscription = async () => {
     if (!organizationId) return;
 
-    const result = await manageSubscription.mutateAsync({
-      organizationId,
-      baseUrl: window.location.origin,
-    });
+    try {
+      const result = await manageSubscription.mutateAsync({
+        organizationId,
+        baseUrl: window.location.origin,
+      });
 
-    if (result.url) {
-      window.location.href = result.url;
+      if (result.url) {
+        window.location.href = result.url;
+      }
+    } catch (err) {
+      toaster.create({
+        title: "Error opening subscription portal",
+        description:
+          err instanceof Error ? err.message : "An unexpected error occurred",
+        type: "error",
+        meta: { closable: true },
+      });
     }
   };
 

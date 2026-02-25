@@ -12,10 +12,6 @@ import {
 import { ArrowRight } from "lucide-react";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { usePlanManagementUrl } from "~/hooks/usePlanManagementUrl";
-import {
-  PeriodSelector,
-  usePeriodSelector,
-} from "../../components/PeriodSelector";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Link } from "../../components/ui/link";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
@@ -89,8 +85,6 @@ function ResourceLimitsCard({
 
 function Usage() {
   const { organization } = useOrganizationTeamProject();
-  const { period, setPeriod } = usePeriodSelector(30);
-
   const publicEnv = usePublicEnv();
   const isSaaS = publicEnv.data?.IS_SAAS;
   const { url: planManagementUrl, buttonLabel: planButtonLabel } =
@@ -103,12 +97,12 @@ function Usage() {
   const usage = api.limits.getUsage.useQuery({ organizationId }, queryOpts);
   const licenseStatus = api.license.getStatus.useQuery(
     { organizationId },
-    { ...queryOpts, enabled: !!organization && !isSaaS },
+    { ...queryOpts, enabled: !!organization && isSaaS === false },
   );
 
   const messagesLabel = organization?.pricingModel === PricingModel.TIERED ? RESOURCE_LABELS.tracesPerMonth : RESOURCE_LABELS.eventsPerMonth;
 
-  const isSelfHosted = !isSaaS;
+  const isSelfHosted = isSaaS === false;
   const isLoadingLimits =
     isSelfHosted &&
     (licenseStatus.isLoading || usage.isLoading) &&
@@ -141,7 +135,6 @@ function Usage() {
               Monitor your resource consumption and plan limits
             </Text>
           </VStack>
-          <PeriodSelector period={period} setPeriod={setPeriod} />
         </Flex>
 
         {/* SaaS: Resource limits from active plan */}

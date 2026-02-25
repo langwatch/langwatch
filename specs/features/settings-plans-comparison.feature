@@ -42,7 +42,7 @@ Feature: Settings Plans Comparison Page
 
   @integration
   Scenario: TIERED organizations see a discontinued plan migration notice
-    Given my organization uses the TIERED pricing model
+    Given my organization is on a legacy pricing plan that has been discontinued
     When I view /settings/plans
     Then I see a notice that my current pricing model has been discontinued
     And the notice contains a link to /settings/subscription to update my plan

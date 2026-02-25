@@ -38,9 +38,13 @@ export const GROWTH_SEAT_PLAN_TYPES = [
   PlanTypes.GROWTH_SEAT_USD_ANNUAL,
 ] as const;
 
+export type GrowthSeatPlanType = (typeof GROWTH_SEAT_PLAN_TYPES)[number];
+
 /** Type guard: returns true for any of the four GROWTH_SEAT_* plan types. */
-export const isGrowthSeatEventPlan = (plan: string): boolean =>
-  plan.startsWith("GROWTH_SEAT_");
+export const isGrowthSeatEventPlan = (
+  planType: string,
+): planType is GrowthSeatPlanType =>
+  (GROWTH_SEAT_PLAN_TYPES as readonly string[]).includes(planType);
 
 /** Builds the plan type string from currency + billing interval. */
 export const resolveGrowthSeatPlanType = ({

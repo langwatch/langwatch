@@ -273,11 +273,23 @@ export function SubscriptionPage() {
     activePlanType: plan?.type,
   });
 
-  if (!organization || !plan || detectedCurrency.isLoading) {
+  if (!organization || activePlan.isLoading || detectedCurrency.isLoading) {
     return (
       <SettingsLayout>
         <Flex justifyContent="center" padding={8}>
           <Spinner />
+        </Flex>
+      </SettingsLayout>
+    );
+  }
+
+  if (activePlan.isError || !plan) {
+    return (
+      <SettingsLayout>
+        <Flex justifyContent="center" padding={8}>
+          <Text color="red.500">
+            Failed to load subscription information. Please try again later.
+          </Text>
         </Flex>
       </SettingsLayout>
     );

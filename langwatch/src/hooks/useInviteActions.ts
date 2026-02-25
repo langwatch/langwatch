@@ -51,7 +51,8 @@ export function useInviteActions({
   // SaaS-only: subscription API for seat expansion (not available in OSS builds).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const subscriptionApi = (api as any).subscription;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // Build-time invariant: subscriptionApi shape is fixed per build (SaaS vs OSS)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, react-hooks/rules-of-hooks
   const expandSeatsMutation = subscriptionApi?.addTeamMemberOrEvents?.useMutation() as
     | { mutateAsync: (input: Record<string, unknown>) => Promise<unknown> }
     | undefined;

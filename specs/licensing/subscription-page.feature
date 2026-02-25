@@ -347,7 +347,7 @@ Feature: Subscription Page Plan Management
 
   @integration
   Scenario: Usage page reflects purchased seat count as team member limit
-    Given the organization has an active Growth Seat Usage subscription with 4 seats
+    Given the organization has an active Growth subscription with 4 seats
     And the organization has 2 current core members
     When I navigate to the usage page
     Then the "Team Members" resource shows "2 / 4"

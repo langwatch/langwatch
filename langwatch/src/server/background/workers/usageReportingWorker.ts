@@ -257,7 +257,7 @@ export async function runUsageReportingJob(
     // ----------------------------------------------------------------
     // 1. Resolve org from DB
     // ----------------------------------------------------------------
-    const org = await prisma.organization.findUnique({
+    const org = await prisma.organization.findFirst({
       where: { id: organizationId, pricingModel: PricingModel.SEAT_EVENT },
       select: {
         id: true,
