@@ -740,6 +740,29 @@ export class LlmConfigRepository {
     }
   }
 
+  /**
+   * Checks whether a non-deleted LLM prompt config exists for the given id,
+   * accessible from the specified project or organization (org-scoped).
+   */
+  async existsForProjectOrOrg(params: {
+    id: string;
+    projectId: string;
+    organizationId: string;
+  }): Promise<boolean> {
+    const config = await this.prisma.llmPromptConfig.findFirst({
+      where: {
+        id: params.id,
+        deletedAt: null,
+        OR: [
+          { projectId: params.projectId },
+          { organizationId: params.organizationId, scope: "ORGANIZATION" },
+        ],
+      },
+      select: { id: true },
+    });
+    return config !== null;
+  }
+
   private generateConfigId() {
     return `prompt_${nanoid()}`;
   }

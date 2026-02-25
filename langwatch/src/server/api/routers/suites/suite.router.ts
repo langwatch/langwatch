@@ -9,7 +9,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { SuiteService } from "~/server/suites/suite.service";
 import { SuiteDomainError } from "~/server/suites/errors";
-import { createSuiteRunDependencies, getOrganizationIdForProject } from "~/server/suites/suite-run-dependencies";
+import { ProjectRepository } from "~/server/projects/project.repository";
 import { checkProjectPermission } from "../../rbac";
 import { createSuiteSchema, projectSchema, updateSuiteSchema } from "./schemas";
 
@@ -18,7 +18,7 @@ export const suiteRouter = createTRPCRouter({
     .input(createSuiteSchema)
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
-      const service = SuiteService.fromPrisma(ctx.prisma);
+      const service = SuiteService.create(ctx.prisma);
       return service.create(input);
     }),
 
@@ -26,7 +26,7 @@ export const suiteRouter = createTRPCRouter({
     .input(projectSchema)
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ ctx, input }) => {
-      const service = SuiteService.fromPrisma(ctx.prisma);
+      const service = SuiteService.create(ctx.prisma);
       return service.getAll(input);
     }),
 
@@ -34,7 +34,7 @@ export const suiteRouter = createTRPCRouter({
     .input(projectSchema.extend({ id: z.string() }))
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ ctx, input }) => {
-      const service = SuiteService.fromPrisma(ctx.prisma);
+      const service = SuiteService.create(ctx.prisma);
       const suite = await service.getById(input);
       if (!suite) {
         throw new TRPCError({
@@ -50,7 +50,7 @@ export const suiteRouter = createTRPCRouter({
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
       const { id, projectId, ...data } = input;
-      const service = SuiteService.fromPrisma(ctx.prisma);
+      const service = SuiteService.create(ctx.prisma);
       return service.update({ id, projectId, data });
     }),
 
@@ -58,7 +58,7 @@ export const suiteRouter = createTRPCRouter({
     .input(projectSchema.extend({ id: z.string() }))
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
-      const service = SuiteService.fromPrisma(ctx.prisma);
+      const service = SuiteService.create(ctx.prisma);
       try {
         return await service.duplicate(input);
       } catch (error) {
@@ -76,7 +76,7 @@ export const suiteRouter = createTRPCRouter({
     .input(projectSchema.extend({ id: z.string() }))
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
-      const service = SuiteService.fromPrisma(ctx.prisma);
+      const service = SuiteService.create(ctx.prisma);
       const result = await service.archive(input);
       if (!result) {
         throw new TRPCError({
@@ -92,7 +92,7 @@ export const suiteRouter = createTRPCRouter({
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ ctx, input }) => {
       // Verify suite belongs to the authorized project
-      const service = SuiteService.fromPrisma(ctx.prisma);
+      const service = SuiteService.create(ctx.prisma);
       const suite = await service.getById({
         id: input.suiteId,
         projectId: input.projectId,
@@ -110,7 +110,7 @@ export const suiteRouter = createTRPCRouter({
     .input(projectSchema.extend({ id: z.string() }))
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
-      const service = SuiteService.fromPrisma(ctx.prisma);
+      const service = SuiteService.create(ctx.prisma);
       const suite = await service.getById(input);
       if (!suite) {
         throw new TRPCError({
@@ -119,24 +119,22 @@ export const suiteRouter = createTRPCRouter({
         });
       }
 
-      try {
-        const organizationId = await getOrganizationIdForProject({
-          prisma: ctx.prisma,
-          projectId: input.projectId,
+      const projectRepository = new ProjectRepository(ctx.prisma);
+      const organizationId = await projectRepository.getOrganizationId({
+        projectId: input.projectId,
+      });
+      if (!organizationId) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Organization not found for project",
         });
-        if (!organizationId) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Organization not found for project",
-          });
-        }
+      }
 
-        const deps = createSuiteRunDependencies({ prisma: ctx.prisma });
+      try {
         const result = await service.run({
           suite,
           projectId: input.projectId,
           organizationId,
-          deps,
         });
 
         return {

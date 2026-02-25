@@ -129,6 +129,22 @@ export class AgentRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   /**
+   * Checks whether a non-archived agent exists for the given id and project.
+   * Lightweight: does NOT parse config through Zod.
+   */
+  async exists(input: { id: string; projectId: string }): Promise<boolean> {
+    const agent = await this.prisma.agent.findFirst({
+      where: {
+        id: input.id,
+        projectId: input.projectId,
+        archivedAt: null,
+      },
+      select: { id: true },
+    });
+    return agent !== null;
+  }
+
+  /**
    * Finds a single agent by id within a project.
    * Excludes archived agents by default.
    * Returns typed agent with parsed config.
