@@ -38,10 +38,10 @@ export interface TargetPickerProps {
   onCreatePrompt: () => void;
   /** Whether to show error styling on the border. */
   hasError?: boolean;
-  /** IDs of archived targets still linked to the suite. */
-  archivedIds?: string[];
+  /** Archived targets still linked to the suite. */
+  archivedTargets?: SuiteTarget[];
   /** Handler to remove an archived target. */
-  onRemoveArchived?: (id: string) => void;
+  onRemoveArchived?: (target: SuiteTarget) => void;
 }
 
 export function TargetPicker({
@@ -55,7 +55,7 @@ export function TargetPicker({
   onCreateAgent,
   onCreatePrompt,
   hasError,
-  archivedIds = [],
+  archivedTargets = [],
   onRemoveArchived,
 }: TargetPickerProps) {
   return (
@@ -117,7 +117,7 @@ export function TargetPicker({
       </VStack>
 
       {/* Archived targets warning */}
-      {archivedIds.length > 0 && (
+      {archivedTargets.length > 0 && (
         <VStack
           paddingX={3}
           paddingY={2}
@@ -130,20 +130,20 @@ export function TargetPicker({
           <HStack gap={2}>
             <AlertTriangle size={14} color="var(--chakra-colors-orange-500)" />
             <Text fontSize="xs" color="orange.700" _dark={{ color: "orange.200" }}>
-              {archivedIds.length} archived target{archivedIds.length > 1 ? "s" : ""} linked:
+              {archivedTargets.length} archived target{archivedTargets.length > 1 ? "s" : ""} linked:
             </Text>
           </HStack>
-          {archivedIds.map((id) => (
-            <HStack key={id} gap={2} paddingLeft={5}>
+          {archivedTargets.map((target) => (
+            <HStack key={`${target.type}-${target.referenceId}`} gap={2} paddingLeft={5}>
               <Text fontSize="sm" color="fg.muted" flex={1} fontStyle="italic">
-                {id}
+                {target.referenceId}
               </Text>
               {onRemoveArchived && (
                 <Button
                   size="xs"
                   variant="ghost"
-                  onClick={() => onRemoveArchived(id)}
-                  data-testid={`remove-archived-target-${id}`}
+                  onClick={() => onRemoveArchived(target)}
+                  data-testid={`remove-archived-target-${target.referenceId}`}
                 >
                   <X size={12} />
                   Remove

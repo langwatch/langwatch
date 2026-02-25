@@ -129,7 +129,8 @@ function SuitesPageContent() {
   });
 
   const runMutation = api.suites.run.useMutation({
-    onSuccess: (result) => {
+    onSuccess: (result, variables) => {
+      const suiteIdForToast = variables.id;
       const archivedCount =
         (result.skippedArchived?.scenarios?.length ?? 0) +
         (result.skippedArchived?.targets?.length ?? 0);
@@ -150,10 +151,7 @@ function SuitesPageContent() {
           meta: { closable: true },
           action: {
             label: "Edit Suite",
-            onClick: () => {
-              const suiteId = runMutation.variables?.id;
-              if (suiteId) handleEditSuite(suiteId);
-            },
+            onClick: () => handleEditSuite(suiteIdForToast),
           },
         });
       } else {
@@ -164,8 +162,10 @@ function SuitesPageContent() {
         });
       }
     },
-    onError: (err) => {
-      const isAllArchived = err.message.includes("All scenarios") || err.message.includes("All targets");
+    onError: (err, variables) => {
+      const suiteIdForToast = variables.id;
+      const isAllArchived = err.data?.code === "BAD_REQUEST" &&
+        (err.message.includes("All scenarios") || err.message.includes("All targets"));
       toaster.create({
         title: isAllArchived ? "Cannot run suite" : "Failed to run suite",
         description: err.message,
@@ -174,10 +174,7 @@ function SuitesPageContent() {
         ...(isAllArchived ? {
           action: {
             label: "Edit Suite",
-            onClick: () => {
-              const suiteId = runMutation.variables?.id;
-              if (suiteId) handleEditSuite(suiteId);
-            },
+            onClick: () => handleEditSuite(suiteIdForToast),
           },
         } : {}),
       });
