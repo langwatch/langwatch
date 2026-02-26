@@ -5,13 +5,11 @@ import type { Event, Projection } from "../domain/types";
 import type { FoldProjectionDefinition } from "../projections/foldProjection.types";
 import type { MapProjectionDefinition } from "../projections/mapProjection.types";
 import type { ProjectionRegistry } from "../projections/projectionRegistry";
-import type {
-  EventSourcedQueueProcessor,
-  QueueProcessorFactory,
-} from "../queues";
+import type { EventSourcedQueueProcessor } from "../queues";
 import type { ReactorDefinition } from "../reactors/reactor.types";
 import type { CommandHandlerOptions } from "../services/commands/commandDispatcher";
 import type { EventSourcingService } from "../services/eventSourcingService";
+import type { JobRegistryEntry } from "../services/queues/queueManager";
 import type { EventStore } from "../stores/eventStore.types";
 
 /**
@@ -45,7 +43,8 @@ export interface EventSourcingPipelineDefinition<
   foldProjections?: FoldProjectionDefinition<any, EventType>[];
   mapProjections?: MapProjectionDefinition<any, EventType>[];
   reactors?: Array<{ foldName: string; definition: ReactorDefinition<EventType> }>;
-  queueProcessorFactory?: QueueProcessorFactory;
+  globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
+  globalJobRegistry?: Map<string, JobRegistryEntry>;
   featureFlagService?: FeatureFlagServiceInterface;
   commandRegistrations?: Array<{
     name: string;
