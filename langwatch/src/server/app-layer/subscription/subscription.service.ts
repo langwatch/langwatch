@@ -3,8 +3,6 @@ import type {
   OrganizationUserRole,
   Subscription,
 } from "@prisma/client";
-import { SubscriptionServiceUnavailableError } from "./errors";
-
 export type BillingInterval = "monthly" | "annual";
 
 /**
@@ -77,9 +75,7 @@ export interface SubscriptionService {
 
 /**
  * Null implementation for self-hosted deployments.
- * - Read/query methods return empty/null (safe defaults).
- * - Stripe-dependent mutations throw SubscriptionServiceUnavailableError.
- * - Notifications silently return { success: false }.
+ * All methods return safe defaults (no-ops). Notifications return { success: false }.
  */
 export class NullSubscriptionService implements SubscriptionService {
   async getLastNonCancelledSubscription(
@@ -96,7 +92,7 @@ export class NullSubscriptionService implements SubscriptionService {
     totalMembers: number;
     totalTraces: number;
   }): Promise<{ success: boolean }> {
-    throw new SubscriptionServiceUnavailableError();
+    return { success: false };
   }
 
   async createOrUpdateSubscription(_params: {
@@ -109,7 +105,7 @@ export class NullSubscriptionService implements SubscriptionService {
     currency?: Currency;
     billingInterval?: BillingInterval;
   }): Promise<{ url: string | null }> {
-    throw new SubscriptionServiceUnavailableError();
+    return { url: null };
   }
 
   async createBillingPortalSession(_params: {
@@ -117,7 +113,7 @@ export class NullSubscriptionService implements SubscriptionService {
     baseUrl: string;
     organizationId: string;
   }): Promise<{ url: string }> {
-    throw new SubscriptionServiceUnavailableError();
+    return { url: "" };
   }
 
   async previewProration(_params: {
@@ -128,7 +124,11 @@ export class NullSubscriptionService implements SubscriptionService {
     formattedRecurringTotal: string;
     billingInterval: string;
   }> {
-    throw new SubscriptionServiceUnavailableError();
+    return {
+      formattedAmountDue: "",
+      formattedRecurringTotal: "",
+      billingInterval: "",
+    };
   }
 
   async createSubscriptionWithInvites(_params: {
@@ -140,7 +140,7 @@ export class NullSubscriptionService implements SubscriptionService {
     billingInterval?: BillingInterval;
     invites: Array<{ email: string; role: OrganizationUserRole }>;
   }): Promise<{ url: string | null }> {
-    throw new SubscriptionServiceUnavailableError();
+    return { url: null };
   }
 
   async notifyProspective(_params: {

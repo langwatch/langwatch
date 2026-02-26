@@ -1,5 +1,4 @@
 import type { Subscription } from "@prisma/client";
-import { SubscriptionServiceUnavailableError } from "./errors";
 
 export interface SubscriptionRepository {
   findLastNonCancelled(organizationId: string): Promise<Subscription | null>;
@@ -31,20 +30,20 @@ export class NullSubscriptionRepository implements SubscriptionRepository {
     organizationId: string;
     plan: string;
   }): Promise<Subscription> {
-    throw new SubscriptionServiceUnavailableError();
+    return {} as Subscription;
   }
 
   async updateStatus(_input: {
     id: string;
     status: string;
   }): Promise<Subscription> {
-    throw new SubscriptionServiceUnavailableError();
+    return {} as Subscription;
   }
 
   async updatePlan(_input: {
     id: string;
     plan: string;
   }): Promise<Subscription> {
-    throw new SubscriptionServiceUnavailableError();
+    return {} as Subscription;
   }
 }

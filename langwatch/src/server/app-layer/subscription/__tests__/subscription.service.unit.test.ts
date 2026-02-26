@@ -7,7 +7,6 @@ import {
   NullSubscriptionRepository,
   type SubscriptionRepository,
 } from "../subscription.repository";
-import { SubscriptionServiceUnavailableError } from "../errors";
 import type { EESubscriptionService } from "../../../../../ee/billing/services/subscription.service";
 
 // --------------------------------------------------------------------------
@@ -60,75 +59,79 @@ describe("NullSubscriptionService", () => {
 
   describe("updateSubscriptionItems()", () => {
     describe("when called in self-hosted mode", () => {
-      it("throws SubscriptionServiceUnavailableError", async () => {
-        await expect(
-          service.updateSubscriptionItems({
-            organizationId: "org_123",
-            plan: "LAUNCH",
-            upgradeMembers: true,
-            upgradeTraces: true,
-            totalMembers: 5,
-            totalTraces: 30_000,
-          }),
-        ).rejects.toThrow(SubscriptionServiceUnavailableError);
+      it("returns success false", async () => {
+        const result = await service.updateSubscriptionItems({
+          organizationId: "org_123",
+          plan: "LAUNCH",
+          upgradeMembers: true,
+          upgradeTraces: true,
+          totalMembers: 5,
+          totalTraces: 30_000,
+        });
+
+        expect(result).toEqual({ success: false });
       });
     });
   });
 
   describe("createOrUpdateSubscription()", () => {
     describe("when called in self-hosted mode", () => {
-      it("throws SubscriptionServiceUnavailableError", async () => {
-        await expect(
-          service.createOrUpdateSubscription({
-            organizationId: "org_123",
-            baseUrl: "https://app.test",
-            plan: "LAUNCH",
-            customerId: "cus_123",
-          }),
-        ).rejects.toThrow(SubscriptionServiceUnavailableError);
+      it("returns null url", async () => {
+        const result = await service.createOrUpdateSubscription({
+          organizationId: "org_123",
+          baseUrl: "https://app.test",
+          plan: "LAUNCH",
+          customerId: "cus_123",
+        });
+
+        expect(result).toEqual({ url: null });
       });
     });
   });
 
   describe("createBillingPortalSession()", () => {
     describe("when called in self-hosted mode", () => {
-      it("throws SubscriptionServiceUnavailableError", async () => {
-        await expect(
-          service.createBillingPortalSession({
-            customerId: "cus_123",
-            baseUrl: "https://app.test",
-            organizationId: "org_123",
-          }),
-        ).rejects.toThrow(SubscriptionServiceUnavailableError);
+      it("returns empty url", async () => {
+        const result = await service.createBillingPortalSession({
+          customerId: "cus_123",
+          baseUrl: "https://app.test",
+          organizationId: "org_123",
+        });
+
+        expect(result).toEqual({ url: "" });
       });
     });
   });
 
   describe("previewProration()", () => {
     describe("when called in self-hosted mode", () => {
-      it("throws SubscriptionServiceUnavailableError", async () => {
-        await expect(
-          service.previewProration({
-            organizationId: "org_123",
-            newTotalSeats: 5,
-          }),
-        ).rejects.toThrow(SubscriptionServiceUnavailableError);
+      it("returns empty strings", async () => {
+        const result = await service.previewProration({
+          organizationId: "org_123",
+          newTotalSeats: 5,
+        });
+
+        expect(result).toEqual({
+          formattedAmountDue: "",
+          formattedRecurringTotal: "",
+          billingInterval: "",
+        });
       });
     });
   });
 
   describe("createSubscriptionWithInvites()", () => {
     describe("when called in self-hosted mode", () => {
-      it("throws SubscriptionServiceUnavailableError", async () => {
-        await expect(
-          service.createSubscriptionWithInvites({
-            organizationId: "org_123",
-            baseUrl: "https://app.test",
-            membersToAdd: 3,
-            customerId: "cus_123",
-            invites: [{ email: "user@example.com", role: "MEMBER" }],
-          }),
-        ).rejects.toThrow(SubscriptionServiceUnavailableError);
+      it("returns null url", async () => {
+        const result = await service.createSubscriptionWithInvites({
+          organizationId: "org_123",
+          baseUrl: "https://app.test",
+          membersToAdd: 3,
+          customerId: "cus_123",
+          invites: [{ email: "user@example.com", role: "MEMBER" }],
+        });
+
+        expect(result).toEqual({ url: null });
       });
     });
   });
@@ -149,39 +152,39 @@ describe("NullSubscriptionRepository", () => {
 
   describe("createPending()", () => {
     describe("when called in self-hosted mode", () => {
-      it("throws SubscriptionServiceUnavailableError", async () => {
+      it("resolves without throwing", async () => {
         await expect(
           repository.createPending({
             organizationId: "org_123",
             plan: "LAUNCH",
           }),
-        ).rejects.toThrow(SubscriptionServiceUnavailableError);
+        ).resolves.not.toThrow();
       });
     });
   });
 
   describe("updateStatus()", () => {
     describe("when called in self-hosted mode", () => {
-      it("throws SubscriptionServiceUnavailableError", async () => {
+      it("resolves without throwing", async () => {
         await expect(
           repository.updateStatus({
             id: "sub_123",
             status: "ACTIVE",
           }),
-        ).rejects.toThrow(SubscriptionServiceUnavailableError);
+        ).resolves.not.toThrow();
       });
     });
   });
 
   describe("updatePlan()", () => {
     describe("when called in self-hosted mode", () => {
-      it("throws SubscriptionServiceUnavailableError", async () => {
+      it("resolves without throwing", async () => {
         await expect(
           repository.updatePlan({
             id: "sub_123",
             plan: "LAUNCH",
           }),
-        ).rejects.toThrow(SubscriptionServiceUnavailableError);
+        ).resolves.not.toThrow();
       });
     });
   });
