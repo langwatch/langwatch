@@ -38,8 +38,8 @@ interface ClickHouseExperimentRunRecord {
   FailedCount: number;
   TotalCost: number | null;
   TotalDurationMs: string | null;
-  AvgScore: number | null;
-  PassRate: number | null;
+  AvgScoreBps: number | null;
+  PassRateBps: number | null;
   Targets: string;
   CreatedAt: number;
   UpdatedAt: number;
@@ -50,7 +50,7 @@ interface ClickHouseExperimentRunRecord {
   TotalScoreSum: number;
   ScoreCount: number;
   PassedCount: number;
-  PassFailCount: number;
+  GradedCount: number;
 }
 
 type ClickHouseExperimentRunWriteRecord = WithDateWrites<
@@ -79,8 +79,8 @@ export class ExperimentRunStateRepositoryClickHouse<
       TotalDurationMs: record.TotalDurationMs
         ? parseInt(record.TotalDurationMs, 10)
         : null,
-      AvgScore: record.AvgScore,
-      PassRate: record.PassRate,
+      AvgScoreBps: record.AvgScoreBps,
+      PassRateBps: record.PassRateBps,
       Targets: record.Targets,
       StartedAt: record.StartedAt === null ? null : Number(record.StartedAt),
       FinishedAt: record.FinishedAt === null ? null : Number(record.FinishedAt),
@@ -88,7 +88,7 @@ export class ExperimentRunStateRepositoryClickHouse<
       TotalScoreSum: record.TotalScoreSum ?? 0,
       ScoreCount: record.ScoreCount ?? 0,
       PassedCount: record.PassedCount ?? 0,
-      PassFailCount: record.PassFailCount ?? 0,
+      GradedCount: record.GradedCount ?? 0,
     };
   }
 
@@ -113,8 +113,8 @@ export class ExperimentRunStateRepositoryClickHouse<
       FailedCount: data.FailedCount,
       TotalCost: data.TotalCost,
       TotalDurationMs: data.TotalDurationMs?.toString() ?? null,
-      AvgScore: data.AvgScore,
-      PassRate: data.PassRate,
+      AvgScoreBps: data.AvgScoreBps,
+      PassRateBps: data.PassRateBps,
       Targets: data.Targets,
       StartedAt: data.StartedAt != null ? new Date(data.StartedAt) : null,
       FinishedAt: data.FinishedAt != null ? new Date(data.FinishedAt) : null,
@@ -123,7 +123,7 @@ export class ExperimentRunStateRepositoryClickHouse<
       TotalScoreSum: data.TotalScoreSum,
       ScoreCount: data.ScoreCount,
       PassedCount: data.PassedCount,
-      PassFailCount: data.PassFailCount,
+      GradedCount: data.GradedCount,
     };
   }
 
@@ -145,14 +145,14 @@ export class ExperimentRunStateRepositoryClickHouse<
             Id, TenantId, RunId, ExperimentId, WorkflowVersionId, Version,
             Total, Progress, CompletedCount, FailedCount, TotalCost,
             toString(TotalDurationMs) AS TotalDurationMs,
-            AvgScore, PassRate, Targets,
+            AvgScoreBps, PassRateBps, Targets,
             toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
             toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
             toUnixTimestamp64Milli(StartedAt) AS StartedAt,
             toUnixTimestamp64Milli(FinishedAt) AS FinishedAt,
             toUnixTimestamp64Milli(StoppedAt) AS StoppedAt,
             LastProcessedEventId,
-            TotalScoreSum, ScoreCount, PassedCount, PassFailCount
+            TotalScoreSum, ScoreCount, PassedCount, GradedCount
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String} AND RunId = {runId:String}
           ORDER BY UpdatedAt DESC

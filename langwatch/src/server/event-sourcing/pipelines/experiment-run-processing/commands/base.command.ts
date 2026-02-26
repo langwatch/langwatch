@@ -2,6 +2,7 @@ import type { Command, CommandHandler } from "../../../";
 import { createTenantId, EventUtils } from "../../../";
 import { createLogger } from "../../../../../utils/logger";
 import type { ExperimentRunProcessingEvent } from "../schemas/events";
+import { makeExperimentRunKey } from "../utils/compositeKey";
 
 /**
  * Configuration for an experiment run command handler.
@@ -32,7 +33,7 @@ export interface ExperimentRunCommandConfig<TCommandData, TEventData> {
  * @returns A command handler that processes commands and emits events
  */
 export function createExperimentRunCommandHandler<
-  TCommandData extends { tenantId: string; runId: string; occurredAt: number },
+  TCommandData extends { tenantId: string; experimentId: string; runId: string; occurredAt: number },
   TEvent extends ExperimentRunProcessingEvent,
   TEventData,
 >(
@@ -50,12 +51,13 @@ export function createExperimentRunCommandHandler<
   ): Promise<ExperimentRunProcessingEvent[]> => {
     const { tenantId: tenantIdStr, data: commandData } = command;
     const tenantId = createTenantId(tenantIdStr);
-    const { runId } = commandData;
+    const { experimentId, runId } = commandData;
 
     logger.info(
       {
         tenantId,
         runId,
+        experimentId,
         ...config.getLogContext(commandData),
       },
       config.handleLogMessage,
@@ -63,7 +65,7 @@ export function createExperimentRunCommandHandler<
 
     const event = EventUtils.createEvent<TEvent>({
       aggregateType: "experiment_run",
-      aggregateId: runId,
+      aggregateId: makeExperimentRunKey(experimentId, runId),
       tenantId,
       type: config.eventType as TEvent["type"],
       version: config.eventVersion as TEvent["version"],

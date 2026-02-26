@@ -19,7 +19,7 @@ export function createSimulationRunStateFoldStore(
       state: SimulationRunStateData,
       context: ProjectionStoreContext,
     ): Promise<void> {
-      const projectionId = `simulation_run_state:${context.tenantId}:${state.ScenarioRunId}`;
+      const projectionId = `simulation_run_state:${context.tenantId}:${context.aggregateId}`;
 
       const projection: SimulationRunState = {
         id: projectionId,

@@ -103,11 +103,12 @@ export class SimulationRunStateRepositoryClickHouse<
     tenantId: string,
     projectionId: string,
     projectionVersion: string,
+    scenarioRunId: string,
   ): ClickHouseSimulationRunWriteRecord {
     return {
       Id: projectionId,
       TenantId: tenantId,
-      ScenarioRunId: data.ScenarioRunId,
+      ScenarioRunId: scenarioRunId || data.ScenarioRunId,
       ScenarioId: data.ScenarioId,
       BatchRunId: data.BatchRunId,
       ScenarioSetId: data.ScenarioSetId,
@@ -231,6 +232,7 @@ export class SimulationRunStateRepositoryClickHouse<
         String(context.tenantId),
         projection.id,
         projection.version,
+        scenarioRunId,
       );
 
       await this.clickHouseClient.insert({

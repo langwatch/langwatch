@@ -19,14 +19,18 @@ export function createExperimentRunStateFoldStore(
       state: ExperimentRunStateData,
       context: ProjectionStoreContext,
     ): Promise<void> {
-      const projectionId = `experiment_run_state:${context.tenantId}:${context.aggregateId}`;
+      // Override RunId with the composite aggregate key so the ClickHouse
+      // row is always keyed consistently, even before the "started" event
+      // sets ExperimentId via apply().
+      const stateWithKey: ExperimentRunStateData = { ...state, RunId: context.aggregateId };
+      const projectionId = `experiment_run_state:${context.tenantId}:${stateWithKey.RunId}`;
 
       const projection: ExperimentRunState = {
         id: projectionId,
         aggregateId: context.aggregateId,
         tenantId: context.tenantId,
         version: EXPERIMENT_RUN_PROJECTION_VERSIONS.RUN_STATE,
-        data: state,
+        data: stateWithKey,
       };
 
       await repository.storeProjection(projection, { tenantId: context.tenantId });

@@ -17,7 +17,10 @@ export class TraceSummaryStore
     context: ProjectionStoreContext,
   ): Promise<void> {
     if (state.spanCount === 0) return;
-    await this.repo.upsert(state, String(context.tenantId));
+    const stateWithId = state.traceId
+      ? state
+      : { ...state, traceId: String(context.aggregateId) };
+    await this.repo.upsert(stateWithId, String(context.tenantId));
   }
 
   async get(

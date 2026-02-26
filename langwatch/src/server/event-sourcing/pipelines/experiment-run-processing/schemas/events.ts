@@ -95,6 +95,7 @@ export type EvaluatorResultEvent = z.infer<typeof evaluatorResultEventSchema>;
  */
 export const experimentRunCompletedEventDataSchema = z.object({
   runId: z.string(),
+  experimentId: z.string(),
   finishedAt: z.number().nullable().optional(),
   stoppedAt: z.number().nullable().optional(),
 });

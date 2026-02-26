@@ -58,6 +58,7 @@ export type RecordEvaluatorResultCommandData = z.infer<
 export const completeExperimentRunCommandDataSchema = z.object({
   tenantId: z.string(),
   runId: z.string(),
+  experimentId: z.string(),
   finishedAt: z.number().nullable().optional(),
   stoppedAt: z.number().nullable().optional(),
   occurredAt: z.number(),

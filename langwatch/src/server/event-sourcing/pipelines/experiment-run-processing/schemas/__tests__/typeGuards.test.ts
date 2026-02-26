@@ -120,6 +120,7 @@ describe("typeGuards", () => {
         version: EXPERIMENT_RUN_EVENT_VERSIONS.COMPLETED,
         data: {
           runId: "run-123",
+          experimentId: "exp-1",
           finishedAt: 1000,
         },
       };
@@ -136,6 +137,7 @@ describe("typeGuards", () => {
         version: EXPERIMENT_RUN_EVENT_VERSIONS.COMPLETED,
         data: {
           runId: "run-123",
+          experimentId: "exp-1",
           finishedAt: 1000,
         },
       };

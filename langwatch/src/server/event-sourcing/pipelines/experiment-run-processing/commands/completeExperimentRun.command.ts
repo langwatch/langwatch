@@ -21,6 +21,7 @@ import {
 	type ExperimentRunCommandConfig,
 	makeJobIdWithSuffix,
 } from "./base.command";
+import { makeExperimentRunKey } from "../utils/compositeKey";
 
 const config: ExperimentRunCommandConfig<
   CompleteExperimentRunCommandData,
@@ -33,6 +34,7 @@ const config: ExperimentRunCommandConfig<
   emitLogMessage: "Emitting experiment run completed event",
   mapToEventData: (commandData) => ({
     runId: commandData.runId,
+    experimentId: commandData.experimentId,
     finishedAt: commandData.finishedAt,
     stoppedAt: commandData.stoppedAt,
   }),
@@ -72,7 +74,7 @@ export class CompleteExperimentRunCommand
   }
 
   static getAggregateId(payload: CompleteExperimentRunCommandData): string {
-    return payload.runId;
+    return makeExperimentRunKey(payload.experimentId, payload.runId);
   }
 
   static getSpanAttributes(

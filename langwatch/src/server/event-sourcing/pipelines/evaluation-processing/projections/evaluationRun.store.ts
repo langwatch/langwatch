@@ -16,7 +16,10 @@ export class EvaluationRunStore
     state: EvaluationRunData,
     context: ProjectionStoreContext,
   ): Promise<void> {
-    await this.repo.upsert(state, String(context.tenantId));
+    const stateWithId = state.evaluationId
+      ? state
+      : { ...state, evaluationId: String(context.aggregateId) };
+    await this.repo.upsert(stateWithId, String(context.tenantId));
   }
 
   async storeBatch(

@@ -5,6 +5,7 @@ import type { ReactorContext, ReactorDefinition } from "../../../reactors/reacto
 import type { ExperimentRunStateData } from "../projections/experimentRunState.foldProjection";
 import type { ExperimentRunProcessingEvent } from "../schemas/events";
 import { EXPERIMENT_RUN_EVENT_TYPES } from "../schemas/constants";
+import { parseExperimentRunKey } from "../utils/compositeKey";
 
 const logger = createLogger(
   "langwatch:experiment-run-processing:es-sync-reactor",
@@ -45,7 +46,8 @@ export function createExperimentRunEsSyncReactor(
 
       const { repository } = deps;
       const experimentId = foldState.ExperimentId;
-      const runId = foldState.RunId;
+      // foldState.RunId is the composite key; extract the slug for ES
+      const { runId } = parseExperimentRunKey(foldState.RunId);
 
       if (!experimentId || !runId) {
         logger.debug(

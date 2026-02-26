@@ -115,6 +115,7 @@ function createCompletedEvent(
     version: EXPERIMENT_RUN_EVENT_VERSIONS.COMPLETED,
     data: {
       runId: "run-123",
+      experimentId: "exp-1",
       finishedAt: 4000,
       ...overrides,
     },
@@ -170,7 +171,7 @@ describe("experimentRunStateFoldProjection", () => {
     expect(state.FailedCount).toBe(1);
   });
 
-  it("computes average score from EvaluatorResultEvents", () => {
+  it("computes average score in basis points from EvaluatorResultEvents", () => {
     const state = foldEvents([
       createStartedEvent(),
       createTargetResultEvent(),
@@ -185,10 +186,11 @@ describe("experimentRunStateFoldProjection", () => {
       ),
     ]);
 
-    expect(state.AvgScore).toBeCloseTo(0.8, 5);
+    // (0.6 + 0.8 + 1.0) / 3 = 0.8 → 8000 bps
+    expect(state.AvgScoreBps).toBe(8000);
   });
 
-  it("computes pass rate from evaluator results", () => {
+  it("computes pass rate in basis points from evaluator results", () => {
     const state = foldEvents([
       createStartedEvent(),
       createTargetResultEvent(),
@@ -203,7 +205,8 @@ describe("experimentRunStateFoldProjection", () => {
       ),
     ]);
 
-    expect(state.PassRate).toBeCloseTo(2 / 3, 5);
+    // 2/3 → 6667 bps (rounded)
+    expect(state.PassRateBps).toBe(6667);
   });
 
   it("marks completion from ExperimentRunCompletedEvent", () => {
@@ -247,7 +250,8 @@ describe("experimentRunStateFoldProjection", () => {
     ]);
 
     // Only 2 processed evaluators (1 passed, 1 failed), skipped/error excluded
-    expect(state.PassRate).toBeCloseTo(1 / 2, 5);
+    // 1/2 → 5000 bps
+    expect(state.PassRateBps).toBe(5000);
   });
 
   it("excludes score-only evaluators from pass rate denominator", () => {
@@ -266,10 +270,10 @@ describe("experimentRunStateFoldProjection", () => {
       ),
     ]);
 
-    // pass rate: 1/2 (score-only eval excluded from denominator)
-    expect(state.PassRate).toBeCloseTo(1 / 2, 5);
-    // avg score still includes all 3
-    expect(state.AvgScore).toBeCloseTo((0.8 + 0.8 + 0.9) / 3, 5);
+    // pass rate: 1/2 → 5000 bps (score-only eval excluded from denominator)
+    expect(state.PassRateBps).toBe(5000);
+    // avg score still includes all 3: (0.8 + 0.8 + 0.9) / 3 ≈ 0.8333 → 8333 bps
+    expect(state.AvgScoreBps).toBe(8333);
   });
 
   it("accumulates costs from target and evaluator results", () => {
