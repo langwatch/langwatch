@@ -71,6 +71,16 @@ describe("<SuiteArchiveDialog/>", () => {
       await user.click(screen.getByText("Cancel"));
       expect(onClose).toHaveBeenCalledOnce();
     });
+
+    it("does not call onConfirm", async () => {
+      const user = userEvent.setup();
+      const onConfirm = vi.fn();
+
+      render(<SuiteArchiveDialog {...defaultProps} onConfirm={onConfirm} />, { wrapper: Wrapper });
+
+      await user.click(screen.getByText("Cancel"));
+      expect(onConfirm).not.toHaveBeenCalled();
+    });
   });
 
   describe("when Archive is clicked", () => {
@@ -102,6 +112,13 @@ describe("<SuiteArchiveDialog/>", () => {
         (btn) => btn.textContent !== "Cancel" && !btn.getAttribute("aria-label"),
       );
       expect(archiveButton).toBeDisabled();
+    });
+
+    it("shows a loading spinner instead of Archive text", () => {
+      render(<SuiteArchiveDialog {...defaultProps} isLoading={true} />, { wrapper: Wrapper });
+
+      expect(screen.queryByText("Archive")).not.toBeInTheDocument();
+      expect(document.querySelector(".chakra-spinner")).toBeInTheDocument();
     });
   });
 });
