@@ -22,9 +22,7 @@ export function bridgeTraceIdFromAdapterToJudge({
   const originalCall = judge.call.bind(judge);
   judge.call = async (input) => {
     const traceId = adapter.getTraceId();
-    if (traceId) {
-      judge.setTraceId(traceId);
-    }
+    judge.setTraceId(traceId);
     return originalCall(input);
   };
 }

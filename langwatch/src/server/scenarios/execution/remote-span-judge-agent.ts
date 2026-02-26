@@ -23,6 +23,8 @@ import { createLogger } from "~/utils/logger/server";
 import { collectRemoteSpans } from "./remote-span-collector";
 import type { SpanQueryFn } from "./types";
 
+const DEFAULT_SCENARIO_THREAD_ID = "scenario-test";
+
 const logger = createLogger("RemoteSpanJudgeAgent");
 
 interface RemoteSpanJudgeAgentParams {
@@ -56,13 +58,13 @@ export class RemoteSpanJudgeAgent extends JudgeAgentAdapter {
   }
 
   /** Sets the trace ID captured during HTTP adapter calls. */
-  setTraceId(traceId: string): void {
+  setTraceId(traceId: string | undefined): void {
     this.explicitTraceId = traceId;
   }
 
   async call(input: AgentInput): Promise<AgentReturnTypes> {
     const traceId = this.explicitTraceId;
-    const threadId = input.threadId;
+    const threadId = input.threadId ?? DEFAULT_SCENARIO_THREAD_ID;
 
     let spanCollector;
     if (traceId) {

@@ -64,7 +64,7 @@ describe("bridgeTraceIdFromAdapterToJudge()", () => {
   });
 
   describe("when adapter has no trace ID", () => {
-    it("does not call setTraceId on the judge", async () => {
+    it("clears the judge trace ID to prevent stale reuse", async () => {
       const adapter = createMockAdapter(undefined);
       const judge = createJudge();
       const setTraceIdSpy = vi.spyOn(judge, "setTraceId");
@@ -73,7 +73,7 @@ describe("bridgeTraceIdFromAdapterToJudge()", () => {
       await judge.call(stubInput);
 
       expect(adapter.getTraceId).toHaveBeenCalled();
-      expect(setTraceIdSpy).not.toHaveBeenCalled();
+      expect(setTraceIdSpy).toHaveBeenCalledWith(undefined);
     });
   });
 

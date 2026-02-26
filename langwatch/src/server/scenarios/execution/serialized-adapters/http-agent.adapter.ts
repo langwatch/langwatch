@@ -75,9 +75,7 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
     Object.assign(headers, applyAuthentication(this.config.auth));
 
     const { traceId } = injectTraceContextHeaders({ headers, batchRunId: this.batchRunId });
-    if (traceId) {
-      this.capturedTraceId = traceId;
-    }
+    this.capturedTraceId = traceId;
 
     return headers;
   }

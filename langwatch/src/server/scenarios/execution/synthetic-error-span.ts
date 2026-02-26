@@ -32,13 +32,14 @@ export function createSyntheticErrorSpan({
   const seconds = Math.trunc(now / 1000);
   const nanoseconds = (now % 1000) * 1_000_000;
   const startTime: [number, number] = [seconds, nanoseconds];
+  const spanId = generateSpanId();
 
   return {
     name: ERROR_SPAN_NAME,
     kind: SpanKind.INTERNAL,
     spanContext: () => ({
       traceId,
-      spanId: generateSpanId(),
+      spanId,
       traceFlags: TraceFlags.SAMPLED,
     }),
     parentSpanContext: undefined,
