@@ -31,13 +31,30 @@ jobs:
           gh pr view "$PR_NUMBER" --json files --jq '.files[].path' > /tmp/pr_files.txt
           gh pr diff "$PR_NUMBER" > /tmp/pr_diff.txt
 
-          # Truncate diff to ~100k chars to stay within token limits
-          head -c 100000 /tmp/pr_diff.txt > /tmp/pr_diff_truncated.txt
+          # Fail closed if diff exceeds model window — large PRs could hide risky changes
+          DIFF_LIMIT=100000
+          DIFF_SIZE=$(wc -c < /tmp/pr_diff.txt)
+          if [ "$DIFF_SIZE" -gt "$DIFF_LIMIT" ]; then
+            echo "PR diff is ${DIFF_SIZE} chars (> ${DIFF_LIMIT}); too large for automated evaluation."
+            echo "oversized=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "oversized=false" >> "$GITHUB_OUTPUT"
+            cp /tmp/pr_diff.txt /tmp/pr_diff_truncated.txt
+          fi
+
+      - name: Fail fast for oversized diffs
+        id: oversized
+        if: steps.pr-data.outputs.oversized == 'true'
+        run: |
+          echo "qualifies=false" >> "$GITHUB_OUTPUT"
+          echo "scope=Diff too large for automated evaluation" >> "$GITHUB_OUTPUT"
+          echo "reasoning=This PR's diff exceeds the size limit for automated low-risk evaluation. Manual review required." >> "$GITHUB_OUTPUT"
 
       - name: Check for restricted paths
         id: path-check
+        if: steps.pr-data.outputs.oversized == 'false'
         run: |
-          RESTRICTED_PATTERN='^(\.github/workflows/|.*/(auth|security|migrations|prisma)/|prisma/migrations/)'
+          RESTRICTED_PATTERN='^(\.github/workflows/|(auth|security|migrations|prisma)/|.*/(auth|security|migrations|prisma)/)'
           if grep -qE "$RESTRICTED_PATTERN" /tmp/pr_files.txt; then
             echo "Restricted paths detected:"
             grep -E "$RESTRICTED_PATTERN" /tmp/pr_files.txt
@@ -56,7 +73,7 @@ jobs:
 
       - name: Evaluate PR with OpenAI
         id: evaluate
-        if: steps.path-check.outputs.blocked == 'false'
+        if: steps.pr-data.outputs.oversized == 'false' && steps.path-check.outputs.blocked == 'false'
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
@@ -74,7 +91,23 @@ jobs:
             '{
               model: "gpt-5-mini",
               temperature: 0,
-              response_format: { type: "json_object" },
+              response_format: {
+                type: "json_schema",
+                json_schema: {
+                  name: "low_risk_evaluation",
+                  strict: true,
+                  schema: {
+                    type: "object",
+                    properties: {
+                      qualifies: { type: "boolean", description: "true if the PR meets ALL low-risk criteria" },
+                      reasoning: { type: "string", description: "2-3 sentence explanation of the assessment" },
+                      scope: { type: "string", description: "Brief summary of what the PR changes" }
+                    },
+                    required: ["qualifies", "reasoning", "scope"],
+                    additionalProperties: false
+                  }
+                }
+              },
               messages: [
                 {
                   role: "system",
@@ -127,9 +160,9 @@ jobs:
         uses: actions/github-script@v7
         env:
           PR_NUMBER: ${{ inputs.pr_number }}
-          QUALIFIES: ${{ steps.restricted.outputs.qualifies || steps.evaluate.outputs.qualifies }}
-          SCOPE: ${{ steps.restricted.outputs.scope || steps.evaluate.outputs.scope }}
-          REASONING: ${{ steps.restricted.outputs.reasoning || steps.evaluate.outputs.reasoning }}
+          QUALIFIES: ${{ steps.oversized.outputs.qualifies || steps.restricted.outputs.qualifies || steps.evaluate.outputs.qualifies }}
+          SCOPE: ${{ steps.oversized.outputs.scope || steps.restricted.outputs.scope || steps.evaluate.outputs.scope }}
+          REASONING: ${{ steps.oversized.outputs.reasoning || steps.restricted.outputs.reasoning || steps.evaluate.outputs.reasoning }}
         with:
           script: |
             const prNumber = parseInt(process.env.PR_NUMBER, 10);
@@ -165,6 +198,17 @@ jobs:
 
               core.info(`PR #${prNumber} labeled as low-risk-change.`);
             } else {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  name: "low-risk-change",
+                });
+              } catch (error) {
+                if (error.status !== 404) throw error;
+              }
+
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
