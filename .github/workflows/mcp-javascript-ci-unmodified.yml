@@ -1,22 +1,20 @@
+# Complementary stub for mcp-javascript-ci.yml
+# Job names and paths-ignore MUST mirror the real workflow's jobs and paths.
 name: mcp-javascript-ci
 
 on:
   pull_request:
     paths-ignore:
       - "mcp-server/**"
+      - ".github/.release-please-manifest.json"
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "no modifications, skipping tests"
-        
   typecheck:
     runs-on: ubuntu-latest
     steps:
       - run: echo "no modifications, skipping typecheck"
-        
-  build:
+
+  build_and_test:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "no modifications, skipping build"
+      - run: echo "no modifications, skipping build and tests"
