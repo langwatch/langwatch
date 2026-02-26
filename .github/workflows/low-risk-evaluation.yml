@@ -28,13 +28,35 @@ jobs:
         run: |
           gh pr view "$PR_NUMBER" --json title,body --template '{{.title}}' > /tmp/pr_title.txt
           gh pr view "$PR_NUMBER" --json title,body --template '{{.body}}' > /tmp/pr_body.txt
+          gh pr view "$PR_NUMBER" --json files --jq '.files[].path' > /tmp/pr_files.txt
           gh pr diff "$PR_NUMBER" > /tmp/pr_diff.txt
 
           # Truncate diff to ~100k chars to stay within token limits
           head -c 100000 /tmp/pr_diff.txt > /tmp/pr_diff_truncated.txt
 
+      - name: Check for restricted paths
+        id: path-check
+        run: |
+          RESTRICTED_PATTERN='^(\.github/workflows/|.*/(auth|security|migrations|prisma)/|prisma/migrations/)'
+          if grep -qE "$RESTRICTED_PATTERN" /tmp/pr_files.txt; then
+            echo "Restricted paths detected:"
+            grep -E "$RESTRICTED_PATTERN" /tmp/pr_files.txt
+            echo "blocked=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "blocked=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Fail fast for restricted paths
+        id: restricted
+        if: steps.path-check.outputs.blocked == 'true'
+        run: |
+          echo "qualifies=false" >> "$GITHUB_OUTPUT"
+          echo "scope=Changes include restricted paths (workflows, auth, migrations, etc.)" >> "$GITHUB_OUTPUT"
+          echo "reasoning=This PR modifies files in restricted directories that require manual review per policy." >> "$GITHUB_OUTPUT"
+
       - name: Evaluate PR with OpenAI
         id: evaluate
+        if: steps.path-check.outputs.blocked == 'false'
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
@@ -86,20 +108,28 @@ jobs:
           SCOPE=$(echo "$RESULT" | jq -r '.scope')
 
           echo "qualifies=$QUALIFIES" >> "$GITHUB_OUTPUT"
-          echo "scope<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$SCOPE" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
-          echo "reasoning<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$REASONING" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
+
+          SCOPE_DELIM="$(openssl rand -hex 16)"
+          {
+            echo "scope<<$SCOPE_DELIM"
+            echo "$SCOPE"
+            echo "$SCOPE_DELIM"
+          } >> "$GITHUB_OUTPUT"
+
+          REASONING_DELIM="$(openssl rand -hex 16)"
+          {
+            echo "reasoning<<$REASONING_DELIM"
+            echo "$REASONING"
+            echo "$REASONING_DELIM"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Apply label and comment
         uses: actions/github-script@v7
         env:
           PR_NUMBER: ${{ inputs.pr_number }}
-          QUALIFIES: ${{ steps.evaluate.outputs.qualifies }}
-          SCOPE: ${{ steps.evaluate.outputs.scope }}
-          REASONING: ${{ steps.evaluate.outputs.reasoning }}
+          QUALIFIES: ${{ steps.restricted.outputs.qualifies || steps.evaluate.outputs.qualifies }}
+          SCOPE: ${{ steps.restricted.outputs.scope || steps.evaluate.outputs.scope }}
+          REASONING: ${{ steps.restricted.outputs.reasoning || steps.evaluate.outputs.reasoning }}
         with:
           script: |
             const prNumber = parseInt(process.env.PR_NUMBER, 10);

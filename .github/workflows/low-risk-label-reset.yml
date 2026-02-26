@@ -35,7 +35,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: prNumber,
-              body: "The `low-risk-change` label was removed because new commits were pushed. Please re-run the [Low-Risk PR Evaluation](../actions/workflows/low-risk-evaluation.yml) workflow if this PR still qualifies.",
+              body: `The \`low-risk-change\` label was removed because new commits were pushed. Please re-run the [Low-Risk PR Evaluation](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/workflows/low-risk-evaluation.yml) workflow if this PR still qualifies.`,
             });
 
             core.info(`Removed low-risk-change label from PR #${prNumber}.`);
