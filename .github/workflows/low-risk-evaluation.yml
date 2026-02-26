@@ -24,9 +24,8 @@ jobs:
         id: pr-data
         env:
           GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr_number }}
         run: |
-          PR_NUMBER=${{ inputs.pr_number }}
-
           gh pr view "$PR_NUMBER" --json title,body --template '{{.title}}' > /tmp/pr_title.txt
           gh pr view "$PR_NUMBER" --json title,body --template '{{.body}}' > /tmp/pr_body.txt
           gh pr diff "$PR_NUMBER" > /tmp/pr_diff.txt
@@ -66,7 +65,7 @@ jobs:
               ]
             }')
 
-          RESPONSE=$(curl -s https://api.openai.com/v1/chat/completions \
+          RESPONSE=$(curl -s --max-time 60 https://api.openai.com/v1/chat/completions \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $OPENAI_API_KEY" \
             -d "$PAYLOAD")
@@ -96,12 +95,17 @@ jobs:
 
       - name: Apply label and comment
         uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ inputs.pr_number }}
+          QUALIFIES: ${{ steps.evaluate.outputs.qualifies }}
+          SCOPE: ${{ steps.evaluate.outputs.scope }}
+          REASONING: ${{ steps.evaluate.outputs.reasoning }}
         with:
           script: |
-            const prNumber = ${{ inputs.pr_number }};
-            const qualifies = ${{ steps.evaluate.outputs.qualifies }};
-            const scope = `${{ steps.evaluate.outputs.scope }}`;
-            const reasoning = `${{ steps.evaluate.outputs.reasoning }}`;
+            const prNumber = parseInt(process.env.PR_NUMBER, 10);
+            const qualifies = process.env.QUALIFIES === 'true';
+            const scope = process.env.SCOPE;
+            const reasoning = process.env.REASONING;
 
             if (qualifies) {
               await github.rest.issues.addLabels({
