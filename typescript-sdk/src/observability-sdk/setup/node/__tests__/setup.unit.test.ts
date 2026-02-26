@@ -868,6 +868,54 @@ describe("error handling in setup", () => {
   });
 });
 
+describe("auto-shutdown signal handlers", () => {
+  let processOnSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetObservabilitySdkConfig();
+    processOnSpy = vi.spyOn(process, "on");
+  });
+
+  afterEach(() => {
+    trace.disable();
+    resetObservabilitySdkConfig();
+    processOnSpy.mockRestore();
+  });
+
+  it("registers beforeExit, SIGINT, and SIGTERM handlers by default", () => {
+    const logger = new MockLogger({});
+    createAndStartNodeSdk(
+      { ...defaultOptions, debug: { logger } },
+      logger,
+      resourceFromAttributes({}),
+    );
+
+    const registeredSignals = processOnSpy.mock.calls.map(([event]) => event);
+    expect(registeredSignals).toContain("beforeExit");
+    expect(registeredSignals).toContain("SIGINT");
+    expect(registeredSignals).toContain("SIGTERM");
+  });
+
+  it("does not register signal handlers when disableAutoShutdown is true", () => {
+    const logger = new MockLogger({});
+    createAndStartNodeSdk(
+      {
+        ...defaultOptions,
+        debug: { logger },
+        advanced: { disableAutoShutdown: true },
+      },
+      logger,
+      resourceFromAttributes({}),
+    );
+
+    const registeredSignals = processOnSpy.mock.calls.map(([event]) => event);
+    expect(registeredSignals).not.toContain("beforeExit");
+    expect(registeredSignals).not.toContain("SIGINT");
+    expect(registeredSignals).not.toContain("SIGTERM");
+  });
+});
+
 describe("NodeSDK configuration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
