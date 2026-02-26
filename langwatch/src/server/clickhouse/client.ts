@@ -42,6 +42,7 @@ export function getClickHouseClient(): ClickHouseClient | null {
       url,
       clickhouse_settings: {
         date_time_input_format: "best_effort",
+        wait_for_async_insert: 1,
       },
     });
   }

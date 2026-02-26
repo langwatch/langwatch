@@ -1091,6 +1091,7 @@ export async function* runOrchestrator(
       await commands.completeExperimentRun({
         tenantId: projectId,
         runId,
+        experimentId,
         finishedAt: aborted ? null : finishedAt,
         stoppedAt: aborted ? finishedAt : null,
         occurredAt: Date.now(),

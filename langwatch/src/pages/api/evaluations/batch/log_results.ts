@@ -485,6 +485,7 @@ const dispatchToClickHouse = async (
       await getApp().experimentRuns.completeExperimentRun({
         tenantId: project.id,
         runId,
+        experimentId,
         finishedAt: batchEvaluation.timestamps.finished_at ?? undefined,
         stoppedAt: batchEvaluation.timestamps.stopped_at ?? undefined,
         occurredAt: Date.now(),

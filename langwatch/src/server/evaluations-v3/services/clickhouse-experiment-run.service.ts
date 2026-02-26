@@ -4,6 +4,7 @@ import { getLangWatchTracer } from "langwatch";
 import { getClickHouseClient } from "~/server/clickhouse/client";
 import { prisma as defaultPrisma } from "~/server/db";
 import { createLogger } from "~/utils/logger/server";
+import { makeExperimentRunKey } from "~/server/event-sourcing/pipelines/experiment-run-processing/utils/compositeKey";
 import { getVersionMap } from "./getVersionMap";
 import { isClickHouseReadEnabled } from "./isClickHouseReadEnabled";
 import type {
@@ -301,21 +302,22 @@ export class ClickHouseExperimentRunService {
         );
 
         try {
+          // Compose composite key for querying
+          const compositeRunId = makeExperimentRunKey(experimentId, runId);
+
           // Fetch run summary
           const runResult = await this.clickHouseClient.query({
             query: `
               SELECT *
               FROM experiment_runs
               WHERE TenantId = {tenantId:String}
-                AND ExperimentId = {experimentId:String}
                 AND RunId = {runId:String}
               ORDER BY UpdatedAt DESC
               LIMIT 1
             `,
             query_params: {
               tenantId: projectId,
-              experimentId,
-              runId,
+              runId: compositeRunId,
             },
             format: "JSONEachRow",
           });
@@ -343,7 +345,7 @@ export class ClickHouseExperimentRunService {
             `,
             query_params: {
               tenantId: projectId,
-              runId,
+              runId: compositeRunId,
             },
             format: "JSONEachRow",
           });
