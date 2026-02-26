@@ -26,7 +26,7 @@ export class ProjectDailyBillableEventsStore
     state: ProjectDailyBillableEventsState,
     context: ProjectionStoreContext,
   ): Promise<void> {
-    const id = context.key ?? `${state.projectId}:${state.date}`;
+    const id = `${state.projectId}:${state.date}`;
 
     const lastEventTimestamp =
       state.lastEventTimestamp != null

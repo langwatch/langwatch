@@ -67,7 +67,7 @@ describe("projectDailySdkUsageProjection", () => {
 
       const key = projectDailySdkUsageProjection.key!(event as Event);
       expect(key).toBe(
-        `${tenantId}:2023-11-14:langwatch-observability-sdk:0.13.0:python`,
+        `2023-11-14:langwatch-observability-sdk:0.13.0:python`,
       );
     });
 

@@ -650,11 +650,20 @@ export class GroupQueueProcessorBullMq<
 
   /**
    * Generates a unique staged job ID.
+   *
+   * Incorporates routing metadata (__jobType/__jobName) when present so that
+   * different job types processing the same event (e.g. fold and map projections)
+   * get distinct staged job IDs and don't overwrite each other in the staging layer.
    */
   private generateStagedJobId(payload: Payload): string {
-    const payloadWithId = payload as { id?: string };
-    const payloadId = payloadWithId.id ?? crypto.randomUUID();
-    return payloadId;
+    const p = payload as Record<string, unknown>;
+    const baseId = (p.id as string) ?? crypto.randomUUID();
+    const jobType = p.__jobType as string | undefined;
+    const jobName = p.__jobName as string | undefined;
+    if (jobType && jobName) {
+      return `${baseId}/${jobType}/${jobName}`;
+    }
+    return baseId;
   }
 
   /**

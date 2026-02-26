@@ -29,9 +29,7 @@ export class ProjectDailySdkUsageStore
     state: ProjectDailySdkUsageState,
     context: ProjectionStoreContext,
   ): Promise<void> {
-    const id =
-      context.key ??
-      `${state.projectId}:${state.date}:${state.sdkName}:${state.sdkVersion}:${state.sdkLanguage}`;
+    const id = `${state.projectId}:${state.date}:${state.sdkName}:${state.sdkVersion}:${state.sdkLanguage}`;
 
     const lastEventTimestamp =
       state.lastEventTimestamp != null

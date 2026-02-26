@@ -112,7 +112,7 @@ export const projectDailySdkUsageProjection: FoldProjectionDefinition<
   key: (event) => {
     const { sdkName, sdkVersion, sdkLanguage } = extractSdkInfoFromEvent(event);
     const date = toUTCDateString(event.timestamp);
-    return `${String(event.tenantId)}:${date}:${sdkName}:${sdkVersion}:${sdkLanguage}`;
+    return `${date}:${sdkName}:${sdkVersion}:${sdkLanguage}`;
   },
 
   init: () => ({

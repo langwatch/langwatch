@@ -255,10 +255,11 @@ export class QueueManager<EventType extends Event = Event> {
         continue;
       }
 
+      const customGroupKeyFn = projectionDef.groupKeyFn;
       const entry: JobRegistryEntry = {
-        groupKeyFn: projectionDef.groupKeyFn
+        groupKeyFn: customGroupKeyFn
           ? (event: any) =>
-              `${String(event.tenantId)}:${projectionDef.groupKeyFn!(event)}`
+              `${String(event.tenantId)}:${customGroupKeyFn(event)}`
           : (event: any) =>
               `${String(event.tenantId)}:${event.aggregateType}:${String(event.aggregateId)}`,
         scoreFn: (event: any) => event.timestamp,

@@ -44,7 +44,7 @@ describe("projectDailyBillableEventsProjection", () => {
       );
 
       const key = projectDailyBillableEventsProjection.key!(event as Event);
-      expect(key).toBe(`${tenantId}:2023-11-14`);
+      expect(key).toBe(`2023-11-14`);
     });
 
     it("generates key from tenantId and UTC date for evaluation events", () => {
@@ -57,7 +57,7 @@ describe("projectDailyBillableEventsProjection", () => {
       );
 
       const key = projectDailyBillableEventsProjection.key!(event as Event);
-      expect(key).toBe(`${tenantId}:2023-11-14`);
+      expect(key).toBe(`2023-11-14`);
     });
 
     it("generates key from tenantId and UTC date for experiment run events", () => {
@@ -70,7 +70,7 @@ describe("projectDailyBillableEventsProjection", () => {
       );
 
       const key = projectDailyBillableEventsProjection.key!(event as Event);
-      expect(key).toBe(`${tenantId}:2023-11-14`);
+      expect(key).toBe(`2023-11-14`);
     });
 
     it("groups events from the same project and day together", () => {
