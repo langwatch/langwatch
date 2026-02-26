@@ -199,7 +199,6 @@ Use `EventSourcing.createWithStores()` for integration tests with explicit store
 ```typescript
 const es = EventSourcing.createWithStores({
   eventStore: new EventStoreMemory(new EventRepositoryMemory()),
-  queueProcessorFactory: new DefaultQueueProcessorFactory(null),
 });
 ```
 
@@ -230,7 +229,7 @@ All paths below are relative to `src/server/event-sourcing/`.
 | `services/` | `EventSourcingService` (main orchestration), `CommandDispatcher`, `QueueManager` |
 | `projections/` | Projection executors: `FoldProjectionExecutor`, `MapProjectionExecutor`, `ProjectionRouter`, `ProjectionRegistry` |
 | `reactors/` | Reactor type definitions |
-| `queues/` | Queue implementations: `GroupQueue`, `SimpleQueue` (BullMQ), `MemoryQueue` |
+| `queues/` | Queue implementations: `GroupQueue` (BullMQ), `MemoryQueue` |
 | `stores/` | Event store implementations: `EventStoreClickHouse`, `EventStoreMemory`, projection store interfaces |
 | `utils/` | `EventUtils` (event creation, validation), `KillSwitch` |
 | `schemas/` | Shared type identifiers |
