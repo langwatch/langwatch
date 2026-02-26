@@ -4,15 +4,8 @@ export type {
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
   EventSourcedQueueProcessorOptions,
-  QueueProcessorFactory,
+  QueueSendOptions,
 } from "./queue.types";
 export { resolveDeduplicationStrategy } from "./queue.types";
 export { GroupQueueProcessorBullMq } from "./groupQueue/groupQueue";
-export { SimpleBullmqQueueProcessor } from "./simpleBullmq";
-export {
-  BullmqQueueProcessorFactory,
-  DefaultQueueProcessorFactory,
-  defaultQueueProcessorFactory,
-  MemoryQueueProcessorFactory,
-} from "./factory";
 export { EventSourcedQueueProcessorMemory } from "./memory";
