@@ -9,6 +9,8 @@ import { getVercelAIModel } from "../modelProviders/utils";
 import { PromptService } from "../prompt-config/prompt.service";
 import { HttpAgentAdapter } from "./adapters/http-agent.adapter";
 import { PromptConfigAdapter } from "./adapters/prompt-config.adapter";
+import { EsBackedJudgeAgent } from "./execution/es-backed-judge-agent";
+import { createTraceApiSpanQuery } from "./execution/trace-api-span-query";
 import { ScenarioService } from "./scenario.service";
 
 /** Generates a unique batch run ID for grouping scenario executions */
@@ -78,7 +80,7 @@ export class SimulationRunnerService {
         { targetType: target.type, referenceId: target.referenceId, projectId },
         "Resolving target to adapter",
       );
-      const adapter = this.resolveAdapter(target, projectId);
+      const adapter = this.resolveAdapter(target, projectId, batchRunId);
       logger.debug(
         { adapterName: adapter.name, adapterRole: adapter.role },
         "Adapter resolved",
@@ -109,6 +111,41 @@ export class SimulationRunnerService {
       // Run in headless mode on server (don't open browser tabs)
       process.env.SCENARIO_HEADLESS = "true";
 
+      // For HTTP targets, use ES-backed judge to collect spans from the
+      // user's agent. For other targets, use standard in-process judge.
+      const langwatchEndpoint = this.getLangWatchEndpoint();
+      let esBackedJudge: EsBackedJudgeAgent | undefined;
+      const judgeAgentInstance =
+        target.type === "http"
+          ? (() => {
+              esBackedJudge = new EsBackedJudgeAgent({
+                criteria: scenario.criteria,
+                model: judgeModel,
+                projectId,
+                querySpans: createTraceApiSpanQuery({
+                  endpoint: langwatchEndpoint,
+                  apiKey: project.apiKey,
+                }),
+              });
+              return esBackedJudge;
+            })()
+          : ScenarioRunner.judgeAgent({
+              model: judgeModel,
+              criteria: scenario.criteria,
+            });
+
+      // Hook trace ID capture: after adapter calls, pass trace ID to judge
+      if (esBackedJudge && adapter instanceof HttpAgentAdapter) {
+        const originalCall = esBackedJudge.call.bind(esBackedJudge);
+        esBackedJudge.call = async (input) => {
+          const traceId = adapter.getTraceId();
+          if (traceId) {
+            esBackedJudge!.setTraceId(traceId);
+          }
+          return originalCall(input);
+        };
+      }
+
       const result = await ScenarioRunner.run(
         {
           id: scenarioId,
@@ -118,17 +155,14 @@ export class SimulationRunnerService {
           agents: [
             adapter,
             ScenarioRunner.userSimulatorAgent({ model: simulatorModel }),
-            ScenarioRunner.judgeAgent({
-              model: judgeModel,
-              criteria: scenario.criteria,
-            }),
+            judgeAgentInstance,
           ],
           verbose: true,
         },
         {
           batchRunId,
           langwatch: {
-            endpoint: this.getLangWatchEndpoint(),
+            endpoint: langwatchEndpoint,
             apiKey: project.apiKey,
           },
         },
@@ -160,6 +194,7 @@ export class SimulationRunnerService {
   private resolveAdapter(
     target: SimulationTarget,
     projectId: string,
+    batchRunId?: string,
   ): AgentAdapter {
     switch (target.type) {
       case "prompt":
@@ -173,6 +208,7 @@ export class SimulationRunnerService {
           agentId: target.referenceId,
           projectId,
           prisma: this.prisma,
+          batchRunId,
         });
       case "code":
         throw new Error(

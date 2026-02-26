@@ -2,6 +2,16 @@ import { createServer } from "node:http";
 import { createOpenAI } from "@ai-sdk/openai";
 import { generateText } from "ai";
 
+// Conditionally initialize LangWatch SDK for trace correlation during smoke testing
+if (process.env.LANGWATCH_API_KEY) {
+  import("langwatch").then(({ LangWatch }) => {
+    new LangWatch();
+    console.log("[ai-server] LangWatch SDK initialized for trace correlation");
+  }).catch((err) => {
+    console.warn("[ai-server] Failed to initialize LangWatch SDK:", err);
+  });
+}
+
 /**
  * Test AI Server
  *
@@ -48,6 +58,15 @@ function jsonResponse(
 const server = createServer(async (req, res) => {
   const timestamp = new Date().toISOString();
   console.log(`[${timestamp}] ${req.method} ${req.url}`);
+
+  // Log trace context headers when present (for OTEL propagation debugging)
+  const traceparent = req.headers["traceparent"];
+  const scenarioRun = req.headers["x-langwatch-scenario-run"];
+  if (traceparent) {
+    console.log(
+      `[${timestamp}] Trace context: traceparent=${traceparent}, scenario-run=${scenarioRun ?? "none"}`,
+    );
+  }
 
   // CORS headers for browser testing
   res.setHeader("Access-Control-Allow-Origin", "*");

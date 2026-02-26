@@ -11,12 +11,18 @@ import { JSONPath } from "jsonpath-plus";
 import { Liquid } from "liquidjs";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 import { applyAuthentication } from "../../adapters/auth.strategies";
+import { injectTraceContextHeaders } from "../trace-context-headers";
 import type { HttpAgentData } from "../types";
 
 // Shared Liquid engine instance for template interpolation
 const liquid = new Liquid();
 
 const DEFAULT_SCENARIO_THREAD_ID = "scenario-test";
+
+interface SerializedHttpAgentAdapterParams {
+  config: HttpAgentData;
+  batchRunId?: string;
+}
 
 /**
  * Serialized HTTP agent adapter that uses pre-fetched configuration.
@@ -25,9 +31,26 @@ const DEFAULT_SCENARIO_THREAD_ID = "scenario-test";
 export class SerializedHttpAgentAdapter extends AgentAdapter {
   role = AgentRole.AGENT;
 
-  constructor(private readonly config: HttpAgentData) {
+  private readonly config: HttpAgentData;
+  private readonly batchRunId?: string;
+  private capturedTraceId: string | undefined;
+
+  constructor(params: HttpAgentData | SerializedHttpAgentAdapterParams) {
     super();
     this.name = "SerializedHttpAgentAdapter";
+
+    // Support both legacy (HttpAgentData) and new (params object) constructors
+    if ("config" in params) {
+      this.config = params.config;
+      this.batchRunId = params.batchRunId;
+    } else {
+      this.config = params;
+    }
+  }
+
+  /** Returns the trace ID captured during the most recent HTTP request. */
+  getTraceId(): string | undefined {
+    return this.capturedTraceId;
   }
 
   async call(input: AgentInput): Promise<string> {
@@ -50,6 +73,11 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
     }
 
     Object.assign(headers, applyAuthentication(this.config.auth));
+
+    const { traceId } = injectTraceContextHeaders({ headers, batchRunId: this.batchRunId });
+    if (traceId) {
+      this.capturedTraceId = traceId;
+    }
 
     return headers;
   }

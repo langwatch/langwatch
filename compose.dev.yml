@@ -276,6 +276,7 @@ services:
       - "${AI_SERVER_PORT:-3456}:3456"
     environment:
       COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+      LANGWATCH_ENDPOINT: "http://app:3000"
     env_file:
       - langwatch/.env
     depends_on:
@@ -284,7 +285,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 128m
+          memory: 256m
           cpus: "0.25"
 
 volumes:

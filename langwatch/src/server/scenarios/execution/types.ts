@@ -179,6 +179,17 @@ export const TargetConfigSchema = z.object({
 export type TargetConfig = z.infer<typeof TargetConfigSchema>;
 
 // ============================================================================
+// Span Query Types
+// ============================================================================
+
+/** Function that queries spans from a data source (ES, trace API, etc.) by trace ID */
+export interface SpanQueryFn {
+  (params: { projectId: string; traceId: string }): Promise<
+    import("../../tracer/types").Span[]
+  >;
+}
+
+// ============================================================================
 // Result Types
 // ============================================================================
 

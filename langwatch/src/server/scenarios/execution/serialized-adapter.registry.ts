@@ -24,6 +24,7 @@ type AdapterFactory = (params: {
   data: TargetAdapterData;
   modelParams: LiteLLMParams;
   nlpServiceUrl: string;
+  batchRunId?: string;
 }) => AgentAdapter;
 
 /**
@@ -37,7 +38,11 @@ export const SERIALIZED_ADAPTER_FACTORIES: Record<string, AdapterFactory> = {
       modelParams,
       nlpServiceUrl,
     ),
-  http: ({ data }) => new SerializedHttpAgentAdapter(data as HttpAgentData),
+  http: ({ data, batchRunId }) =>
+    new SerializedHttpAgentAdapter({
+      config: data as HttpAgentData,
+      batchRunId,
+    }),
   code: ({ data, modelParams, nlpServiceUrl }) =>
     new SerializedCodeAgentAdapter(
       data as CodeAgentData,
@@ -55,10 +60,12 @@ export function createAdapter({
   adapterData,
   modelParams,
   nlpServiceUrl,
+  batchRunId,
 }: {
   adapterData: TargetAdapterData;
   modelParams: LiteLLMParams;
   nlpServiceUrl: string;
+  batchRunId?: string;
 }): AgentAdapter {
   const factory = SERIALIZED_ADAPTER_FACTORIES[adapterData.type];
 
@@ -66,5 +73,5 @@ export function createAdapter({
     throw new Error(`Unknown adapter type: ${adapterData.type}`);
   }
 
-  return factory({ data: adapterData, modelParams, nlpServiceUrl });
+  return factory({ data: adapterData, modelParams, nlpServiceUrl, batchRunId });
 }
