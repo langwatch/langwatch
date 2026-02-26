@@ -869,18 +869,23 @@ describe("error handling in setup", () => {
 });
 
 describe("auto-shutdown signal handlers", () => {
-  let processOnSpy: ReturnType<typeof vi.spyOn>;
+  let processOnCalls: string[];
 
   beforeEach(() => {
     vi.clearAllMocks();
     resetObservabilitySdkConfig();
-    processOnSpy = vi.spyOn(process, "on");
+    processOnCalls = [];
+    const originalOn = process.on.bind(process);
+    vi.spyOn(process, "on").mockImplementation(((event: string, listener: (...args: unknown[]) => void) => {
+      processOnCalls.push(event);
+      return originalOn(event, listener);
+    }) as typeof process.on);
   });
 
   afterEach(() => {
     trace.disable();
     resetObservabilitySdkConfig();
-    processOnSpy.mockRestore();
+    vi.mocked(process.on).mockRestore();
   });
 
   it("registers beforeExit, SIGINT, and SIGTERM handlers by default", () => {
@@ -891,10 +896,9 @@ describe("auto-shutdown signal handlers", () => {
       resourceFromAttributes({}),
     );
 
-    const registeredSignals = processOnSpy.mock.calls.map(([event]) => event);
-    expect(registeredSignals).toContain("beforeExit");
-    expect(registeredSignals).toContain("SIGINT");
-    expect(registeredSignals).toContain("SIGTERM");
+    expect(processOnCalls).toContain("beforeExit");
+    expect(processOnCalls).toContain("SIGINT");
+    expect(processOnCalls).toContain("SIGTERM");
   });
 
   it("does not register signal handlers when disableAutoShutdown is true", () => {
@@ -909,10 +913,9 @@ describe("auto-shutdown signal handlers", () => {
       resourceFromAttributes({}),
     );
 
-    const registeredSignals = processOnSpy.mock.calls.map(([event]) => event);
-    expect(registeredSignals).not.toContain("beforeExit");
-    expect(registeredSignals).not.toContain("SIGINT");
-    expect(registeredSignals).not.toContain("SIGTERM");
+    expect(processOnCalls).not.toContain("beforeExit");
+    expect(processOnCalls).not.toContain("SIGINT");
+    expect(processOnCalls).not.toContain("SIGTERM");
   });
 });
 
