@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { env } from "../../src/env.mjs";
 import type { PlanInfo } from "../licensing/planInfo";
-import { PLAN_LIMITS } from "./planLimits";
+import { PLAN_LIMITS, getFreePlanLimits } from "./planLimits";
 import { PlanTypes, SubscriptionStatus } from "./planTypes";
 
 type MinimalUser = {
@@ -26,6 +26,14 @@ const isAdmin = (user?: { email?: string | null }) => {
 
   const adminSet = new Set(adminEmails.split(",").map((s) => s.trim()));
   return adminSet.has(user.email);
+};
+
+const getOrgPricingModel = async (db: PrismaClient, organizationId: string) => {
+  const org = await db.organization.findUnique({
+    where: { id: organizationId },
+    select: { pricingModel: true },
+  });
+  return org?.pricingModel ?? null;
 };
 
 export type SaaSPlanProvider = {
@@ -72,20 +80,28 @@ export const createSaaSPlanProvider = (
       }
 
       if (!activeSubscription) {
+        const pricingModel = await getOrgPricingModel(db, organizationId);
         return {
-          ...PLAN_LIMITS[PlanTypes.FREE],
+          ...getFreePlanLimits(pricingModel),
           overrideAddingLimitations,
         };
       }
 
       const subscriptionPlan = activeSubscription.plan as string | undefined;
-      const resolvedPlan =
-        subscriptionPlan && subscriptionPlan in PLAN_LIMITS
-          ? (subscriptionPlan as keyof typeof PLAN_LIMITS)
-          : PlanTypes.FREE;
+      const isKnownPlan =
+        subscriptionPlan != null && subscriptionPlan in PLAN_LIMITS;
 
+      if (isKnownPlan) {
+        return {
+          ...PLAN_LIMITS[subscriptionPlan as keyof typeof PLAN_LIMITS],
+          ...customLimits,
+          overrideAddingLimitations,
+        };
+      }
+
+      const pricingModel = await getOrgPricingModel(db, organizationId);
       return {
-        ...PLAN_LIMITS[resolvedPlan],
+        ...getFreePlanLimits(pricingModel),
         ...customLimits,
         overrideAddingLimitations,
       };

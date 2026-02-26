@@ -1,6 +1,9 @@
+import type { PricingModel } from "@prisma/client";
 import type { PlanInfo } from "../licensing/planInfo";
 import { PlanTypes, type PlanTypes as PlanType } from "./planTypes";
 import { GROWTH_SEAT_PLAN_TYPES } from "./utils/growthSeatEvent";
+
+const FREE_SEAT_EVENT_MESSAGES_PER_MONTH = 50_000;
 
 const PAID_FEATURES = {
   maxWorkflows: 9999,
@@ -179,4 +182,33 @@ export const PLAN_LIMITS: Record<PlanType, PlanInfo> = {
       EUR: 999,
     },
   }),
+};
+
+/**
+ * Returns the FREE plan limits adjusted for the organization's pricing model.
+ *
+ * SEAT_EVENT organizations get a higher message allowance (50,000/month) on the
+ * free tier, while TIERED, null, and undefined pricing models get the default
+ * FREE plan limit (1,000/month).
+ */
+export const getFreePlanLimits = (
+  pricingModel?: PricingModel | null,
+): PlanInfo => {
+  const baseFree = PLAN_LIMITS[PlanTypes.FREE];
+
+  switch (pricingModel) {
+    case "SEAT_EVENT":
+      return {
+        ...baseFree,
+        maxMessagesPerMonth: FREE_SEAT_EVENT_MESSAGES_PER_MONTH,
+      };
+    case "TIERED":
+    case null:
+    case undefined:
+      return baseFree;
+    default: {
+      const _exhaustive: never = pricingModel;
+      return baseFree;
+    }
+  }
 };
