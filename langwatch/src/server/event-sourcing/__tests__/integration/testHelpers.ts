@@ -5,7 +5,6 @@ import type {
 	PipelineWithCommandHandlers,
 	RegisteredPipeline,
 } from "../../pipeline/types";
-import { BullmqQueueProcessorFactory } from "../../queues/factory";
 import { EventStoreClickHouse } from "../../stores/eventStoreClickHouse";
 import { EventRepositoryClickHouse } from "../../stores/repositories/eventRepositoryClickHouse";
 import {
@@ -80,14 +79,8 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
     new EventRepositoryClickHouse(clickHouseClient),
   );
 
-  // Create queue factory that uses BullMQ with test Redis connection
-  const queueProcessorFactory = new BullmqQueueProcessorFactory(
-    redisConnection,
-  );
-
   const eventSourcing = EventSourcing.createWithStores({
     eventStore,
-    queueProcessorFactory,
     clickhouse: clickHouseClient,
     redis: redisConnection,
   });

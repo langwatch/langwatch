@@ -99,29 +99,25 @@ describe("EventSourcingService - Handler Flows", () => {
   });
 
   describe("when using queue-based processing", () => {
-    it("calls map function directly via queue", async () => {
+    it("dispatches events via global queue", async () => {
       const eventStore = createMockEventStore<Event>();
       const mapDef = createMockMapProjectionDefinition("handler");
 
-      const mockQueueFactory = {
-        create: vi.fn().mockImplementation((definition: any) => {
-          // Simulate queue: call process immediately on send
-          return {
-            send: vi.fn().mockImplementation(async (payload: any) => {
-              await definition.process(payload);
-            }),
-            close: vi.fn().mockResolvedValue(void 0),
-            waitUntilReady: vi.fn().mockResolvedValue(void 0),
-          };
-        }),
+      const globalQueue = {
+        send: vi.fn().mockResolvedValue(void 0),
+        sendBatch: vi.fn().mockResolvedValue(void 0),
+        close: vi.fn().mockResolvedValue(void 0),
+        waitUntilReady: vi.fn().mockResolvedValue(void 0),
       };
+      const globalJobRegistry = new Map();
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
         mapProjections: [mapDef],
-        queueFactory: mockQueueFactory,
+        globalQueue,
+        globalJobRegistry,
       });
 
       const event = createTestEvent(
@@ -132,7 +128,8 @@ describe("EventSourcingService - Handler Flows", () => {
 
       await service.storeEvents([event], context);
 
-      expect(mapDef.map).toHaveBeenCalledWith(event);
+      // Events are dispatched via the global queue (map projections use sendBatch)
+      expect(globalQueue.sendBatch).toHaveBeenCalled();
     });
   });
 });

@@ -71,11 +71,17 @@ describe("EventSourcing", () => {
   });
 
   describe("createWithStores", () => {
-    it("uses injected event store and queue factory", () => {
+    it("uses injected event store and global queue", () => {
       const mockEventStore = createMockEventStore<Event>();
+      const mockGlobalQueue = {
+        send: vi.fn().mockResolvedValue(void 0),
+        sendBatch: vi.fn().mockResolvedValue(void 0),
+        close: vi.fn().mockResolvedValue(void 0),
+        waitUntilReady: vi.fn().mockResolvedValue(void 0),
+      };
       const es = EventSourcing.createWithStores({
         eventStore: mockEventStore,
-        queueProcessorFactory: { create: vi.fn() } as any,
+        globalQueue: mockGlobalQueue,
       });
 
       expect(es.getEventStore()).toBe(mockEventStore);

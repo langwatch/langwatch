@@ -13,10 +13,9 @@ import type { Event, Projection } from "../../domain/types";
 import type { FoldProjectionDefinition, FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { AppendStore, MapProjectionDefinition } from "../../projections/mapProjection.types";
 import type {
-  EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
-  QueueProcessorFactory,
 } from "../../queues";
+import type { JobRegistryEntry } from "../../services/queues/queueManager";
 import { createTestEvent } from "../../services/__tests__/testHelpers";
 import type { EventStore } from "../../stores/eventStore.types";
 import { definePipeline } from "../staticBuilder";
@@ -55,50 +54,23 @@ export function createMockEventStore<T extends Event>(): EventStore<T> {
 }
 
 /**
- * Creates a mock QueueProcessorFactory that creates spyable processors.
- * The created processors store their process function for testing.
+ * Creates a mock global queue and job registry for testing.
+ * The global queue has mocked send, sendBatch, close, and waitUntilReady methods.
  */
-export function createMockQueueProcessorFactory(): QueueProcessorFactory & {
-  getCreatedProcessors: () => Array<{
-    name: string;
-    process: (payload: Record<string, unknown>) => Promise<void>;
-    definition: EventSourcedQueueDefinition<Record<string, unknown>>;
-  }>;
+export function createMockGlobalQueue(): {
+  globalQueue: EventSourcedQueueProcessor<Record<string, unknown>>;
+  globalJobRegistry: Map<string, JobRegistryEntry>;
 } {
-  const createdProcessors: Array<{
-    name: string;
-    process: (payload: Record<string, unknown>) => Promise<void>;
-    definition: EventSourcedQueueDefinition<Record<string, unknown>>;
-  }> = [];
-
-  const factory = {
-    create<Payload extends Record<string, unknown>>(
-      definition: EventSourcedQueueDefinition<Payload>,
-    ): EventSourcedQueueProcessor<Payload> {
-      const processFn = definition.process;
-      const processor: EventSourcedQueueProcessor<Payload> = {
-        send: vi.fn().mockImplementation(async (payload: Payload) => {
-          await processFn(payload);
-        }),
-        sendBatch: vi.fn().mockImplementation(async (payloads: Payload[]) => {
-          for (const payload of payloads) {
-            await processFn(payload);
-          }
-        }),
-        close: vi.fn().mockResolvedValue(void 0),
-        waitUntilReady: vi.fn().mockResolvedValue(void 0),
-      };
-      createdProcessors.push({
-        name: definition.name,
-        process: processFn as (payload: Record<string, unknown>) => Promise<void>,
-        definition: definition as unknown as EventSourcedQueueDefinition<Record<string, unknown>>,
-      });
-      return processor;
-    },
-    getCreatedProcessors: () => createdProcessors,
+  const globalQueue: EventSourcedQueueProcessor<Record<string, unknown>> = {
+    send: vi.fn().mockResolvedValue(void 0),
+    sendBatch: vi.fn().mockResolvedValue(void 0),
+    close: vi.fn().mockResolvedValue(void 0),
+    waitUntilReady: vi.fn().mockResolvedValue(void 0),
   };
 
-  return factory;
+  const globalJobRegistry = new Map<string, JobRegistryEntry>();
+
+  return { globalQueue, globalJobRegistry };
 }
 
 /**
@@ -305,11 +277,11 @@ export const BASE_COMMAND_HANDLER_SCHEMA = defineCommandSchema(
 
 /**
  * Creates a minimal pipeline definition setup for common test patterns.
- * Returns eventStore, factory, and a helper function to build a pipeline definition with a handler.
+ * Returns eventStore, globalQueue, globalJobRegistry, and a helper function to build a pipeline definition with a handler.
  */
 export function createMinimalPipelineDefinition() {
   const eventStore = createMockEventStore<TestEvent>();
-  const factory = createMockQueueProcessorFactory();
+  const { globalQueue, globalJobRegistry } = createMockGlobalQueue();
 
   const buildPipelineWithHandler = (
     HandlerClass: CommandHandlerClass<
@@ -325,5 +297,5 @@ export function createMinimalPipelineDefinition() {
       .build();
   };
 
-  return { eventStore, factory, buildPipelineWithHandler };
+  return { eventStore, globalQueue, globalJobRegistry, buildPipelineWithHandler };
 }
