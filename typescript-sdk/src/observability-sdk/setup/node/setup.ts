@@ -31,7 +31,7 @@ const getLangWatchConfig = (options: SetupObservabilityOptions) => {
     disabled: isDisabled,
     apiKey: isDisabled ? void 0 : (config.apiKey ?? process.env.LANGWATCH_API_KEY),
     endpoint: isDisabled ? void 0 : (config.endpoint ?? process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT),
-    processorType: config.processorType ?? 'simple'
+    processorType: config.processorType ?? 'batch'
   };
 };
 
@@ -274,18 +274,38 @@ export function createAndStartNodeSdk(
   }
 
   if (!options.advanced?.disableAutoShutdown) {
-    process.on('SIGTERM', () => {
-      void (async () => {
-        logger.debug('SIGTERM received: shutting down OpenTelemetry...');
-        try {
-          await sdk.shutdown();
-          logger.debug('OpenTelemetry shutdown complete');
-        } catch (err) {
-          logger.error('Error shutting down OpenTelemetry', err);
-        } finally {
+    let isShuttingDown = false;
+
+    const gracefulShutdown = async ({ signal, exitAfter }: { signal: string; exitAfter: boolean }) => {
+      if (isShuttingDown) return;
+      isShuttingDown = true;
+
+      logger.debug(`${signal}: shutting down OpenTelemetry...`);
+      try {
+        await sdk.shutdown();
+        logger.debug('OpenTelemetry shutdown complete');
+      } catch (err) {
+        logger.error('Error shutting down OpenTelemetry', err);
+      } finally {
+        if (exitAfter) {
           process.exit(0);
         }
-      })();
+      }
+    };
+
+    // Normal process exit when event loop drains (e.g. CLI scripts, one-shot programs)
+    process.on('beforeExit', () => {
+      void gracefulShutdown({ signal: 'beforeExit', exitAfter: false });
+    });
+
+    // Ctrl+C
+    process.on('SIGINT', () => {
+      void gracefulShutdown({ signal: 'SIGINT', exitAfter: true });
+    });
+
+    // External kill / Docker stop / k8s pod termination
+    process.on('SIGTERM', () => {
+      void gracefulShutdown({ signal: 'SIGTERM', exitAfter: true });
     });
   }
 
