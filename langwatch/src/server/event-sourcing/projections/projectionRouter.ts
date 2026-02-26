@@ -534,12 +534,25 @@ export class ProjectionRouter<
           try {
             await queueProcessor.send({ event, foldState });
           } catch (error) {
+            this.logger.error(
+              {
+                reactorName: reactor.name,
+                foldName,
+                eventId: event.id,
+                error: error instanceof Error ? error.message : String(error),
+              },
+              "Failed to dispatch event to reactor queue",
+            );
             errors.push(error instanceof Error ? error : new Error(String(error)));
           }
         } else {
           // Queue expected but not found — fall back to inline execution
           this.logger.warn(
-            { reactorName: reactor.name, foldName, eventId: event.id },
+            {
+              reactorName: reactor.name,
+              foldName,
+              eventId: event.id,
+            },
             "Reactor queue not found, falling back to inline execution",
           );
           try {
@@ -549,6 +562,18 @@ export class ProjectionRouter<
               foldState,
             });
           } catch (error) {
+            this.logger.error(
+              {
+                reactorName: reactor.name,
+                foldName,
+                eventId: event.id,
+                eventType: event.type,
+                aggregateId: String(event.aggregateId),
+                tenantId: event.tenantId,
+                error: error instanceof Error ? error.message : String(error),
+              },
+              "Reactor failed during inline fallback execution",
+            );
             errors.push(error instanceof Error ? error : new Error(String(error)));
           }
         }
@@ -561,6 +586,18 @@ export class ProjectionRouter<
             foldState,
           });
         } catch (error) {
+          this.logger.error(
+            {
+              reactorName: reactor.name,
+              foldName,
+              eventId: event.id,
+              eventType: event.type,
+              aggregateId: String(event.aggregateId),
+              tenantId: event.tenantId,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            "Reactor failed during inline execution — fold state persisted in CH but reactor side-effect (e.g. ES sync) was lost",
+          );
           errors.push(error instanceof Error ? error : new Error(String(error)));
         }
       }

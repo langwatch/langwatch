@@ -2,10 +2,10 @@ import type { ProcessRole } from "../../app-layer/config";
 import { createLogger } from "~/utils/logger/server";
 import type { AggregateType } from "../domain/aggregateType";
 import type { Event } from "../domain/types";
-import type { QueueProcessorFactory } from "../queues";
+import type { EventSourcedQueueProcessor } from "../queues";
 import type { ReactorDefinition } from "../reactors/reactor.types";
 import { ConfigurationError } from "../services/errorHandling";
-import { QueueManager } from "../services/queues/queueManager";
+import { QueueManager, type JobRegistryEntry } from "../services/queues/queueManager";
 import type { EventStoreReadContext } from "../stores/eventStore.types";
 import type { FoldProjectionDefinition } from "./foldProjection.types";
 import type { MapProjectionDefinition } from "./mapProjection.types";
@@ -71,7 +71,11 @@ export class ProjectionRegistry<EventType extends Event = Event> {
   /**
    * Initialize queue infrastructure. Call after registering projections.
    */
-  initialize(queueFactory: QueueProcessorFactory, processRole?: ProcessRole): void {
+  initialize(
+    globalQueue: EventSourcedQueueProcessor<Record<string, unknown>>,
+    globalJobRegistry: Map<string, JobRegistryEntry>,
+    processRole?: ProcessRole,
+  ): void {
     if (this.queueManager) {
       throw new ConfigurationError(
         "ProjectionRegistry",
@@ -83,7 +87,8 @@ export class ProjectionRegistry<EventType extends Event = Event> {
     this.queueManager = new QueueManager<EventType>({
       aggregateType,
       pipelineName: "global_projections",
-      queueFactory,
+      globalQueue,
+      globalJobRegistry,
     });
 
     // Create router — all projections are incremental
