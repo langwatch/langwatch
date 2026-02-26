@@ -107,4 +107,22 @@ describe("<SuiteContextMenu/>", () => {
       expect(onClose).toHaveBeenCalledOnce();
     });
   });
+
+  describe("when clicking outside the menu", () => {
+    it("calls onClose", async () => {
+      const user = userEvent.setup();
+      const onClose = vi.fn();
+
+      render(
+        <div>
+          <span data-testid="outside">Outside</span>
+          <SuiteContextMenu {...defaultProps} onClose={onClose} />
+        </div>,
+        { wrapper: Wrapper },
+      );
+
+      await user.click(screen.getByTestId("outside"));
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+  });
 });
