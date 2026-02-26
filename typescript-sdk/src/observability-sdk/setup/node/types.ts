@@ -71,7 +71,7 @@ export interface SetupObservabilityOptions {
          * - 'simple': Exports spans immediately (good for debugging)
          * - 'batch': Batches spans for better performance (recommended for production)
          *
-         * @default 'simple'
+         * @default 'batch'
          */
         processorType?: "simple" | "batch";
       }

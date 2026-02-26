@@ -46,16 +46,15 @@ describe('setupObservability Integration - Configuration Options', () => {
     const span = tracer.startSpan('test-span');
     span.end();
 
-    // Wait a bit for SimpleSpanProcessor to export
-    await new Promise(resolve => setTimeout(resolve, 100));
-
     // Force flush to ensure spans are exported immediately
     const provider = trace.getTracerProvider() as any;
     if (provider.forceFlush) {
       await provider.forceFlush();
     }
 
-    await handle.shutdown();
+    // Shutdown may throw DNS errors from the LangWatch exporter trying to
+    // reach the fake endpoint — that's fine, we only care about the spy.
+    await handle.shutdown().catch(() => {});
     expect(exportSpy).toHaveBeenCalled();
   });
 

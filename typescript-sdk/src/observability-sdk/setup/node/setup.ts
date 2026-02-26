@@ -31,7 +31,7 @@ const getLangWatchConfig = (options: SetupObservabilityOptions) => {
     disabled: isDisabled,
     apiKey: isDisabled ? void 0 : (config.apiKey ?? process.env.LANGWATCH_API_KEY),
     endpoint: isDisabled ? void 0 : (config.endpoint ?? process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT),
-    processorType: config.processorType ?? 'simple'
+    processorType: config.processorType ?? 'batch'
   };
 };
 

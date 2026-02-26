@@ -116,7 +116,7 @@ describe("langwatch configuration", () => {
     resetObservabilitySdkConfig();
   });
 
-  it("uses simple processor by default", () => {
+  it("uses batch processor by default", () => {
     const logger = new MockLogger({});
     const sdk = createAndStartNodeSdk({
       langwatch: { apiKey: "test" },
@@ -124,7 +124,7 @@ describe("langwatch configuration", () => {
     }, logger, resourceFromAttributes({}));
 
     expect(logger.debug).toHaveBeenCalledWith(
-      "Added LangWatch simple SpanProcessor and LogRecordProcessor to SDK"
+      "Added LangWatch batch SpanProcessor and LogRecordProcessor to SDK"
     );
     expect(sdk).toBeDefined();
   });
@@ -545,7 +545,7 @@ describe("log record processors configuration", () => {
 
     expect(sdk).toBeDefined();
     expect(logger.debug).toHaveBeenCalledWith(
-      "Added LangWatch simple SpanProcessor and LogRecordProcessor to SDK",
+      "Added LangWatch batch SpanProcessor and LogRecordProcessor to SDK",
     );
   });
 
@@ -623,7 +623,7 @@ describe("span processors configuration", () => {
 
     expect(sdk).toBeDefined();
     expect(logger.debug).toHaveBeenCalledWith(
-      "Added LangWatch simple SpanProcessor and LogRecordProcessor to SDK",
+      "Added LangWatch batch SpanProcessor and LogRecordProcessor to SDK",
     );
   });
 
@@ -821,7 +821,7 @@ describe("error handling in setup", () => {
 
     // Since the setup is actually succeeding now, we need to check for the success message
     expect(logger.debug).toHaveBeenCalledWith(
-      expect.stringContaining("Added LangWatch simple SpanProcessor and LogRecordProcessor to SDK"),
+      expect.stringContaining("Added LangWatch batch SpanProcessor and LogRecordProcessor to SDK"),
     );
   });
 
