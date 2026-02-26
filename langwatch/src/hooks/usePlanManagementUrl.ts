@@ -1,3 +1,4 @@
+import { PricingModel } from "@prisma/client";
 import { usePublicEnv } from "./usePublicEnv";
 
 /**
@@ -35,4 +36,53 @@ export function getPlanManagementUrl(isSaaS: boolean): string {
  */
 export function getPlanManagementButtonLabel(isSaaS: boolean): string {
   return isSaaS ? "Upgrade plan" : "Upgrade license";
+}
+
+/**
+ * Determines whether the usage page should display "current / max" limit
+ * format for each resource.
+ *
+ * Free plans: always show limits
+ * Enterprise: never show limits
+ * Paid + TIERED: show limits (plan has hard caps)
+ * Paid + SEAT_EVENT: hide limits (usage-based billing)
+ * No pricing model (legacy): show limits (safe default)
+ */
+export function shouldShowPlanLimits({
+  isFree,
+  isEnterprise,
+  pricingModel,
+}: {
+  isFree: boolean;
+  isEnterprise: boolean;
+  pricingModel: PricingModel | undefined | null;
+}): boolean {
+  if (isEnterprise) return false;
+  if (isFree) return true;
+  return pricingModel !== PricingModel.SEAT_EVENT;
+}
+
+/**
+ * Returns a context-aware label for plan management actions on the usage page.
+ * Unlike `getPlanManagementButtonLabel` which always says "Upgrade", this
+ * reflects the user's current billing state (e.g. "Manage Subscription" for
+ * paid users).
+ */
+export function getPlanActionLabel({
+  isSaaS,
+  isFree,
+  isEnterprise,
+  hasValidLicense,
+}: {
+  isSaaS: boolean;
+  isFree: boolean;
+  isEnterprise: boolean;
+  hasValidLicense: boolean;
+}): string {
+  if (!isSaaS) {
+    return hasValidLicense ? "Manage License" : "Upgrade License";
+  }
+  if (isEnterprise) return "Manage Subscription";
+  if (isFree) return "Upgrade Plan";
+  return "Manage Subscription";
 }

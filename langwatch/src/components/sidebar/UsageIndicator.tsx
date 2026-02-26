@@ -1,5 +1,5 @@
 import { Box, HStack, Progress, Text, VStack } from "@chakra-ui/react";
-import { type PricingModel } from "@prisma/client";
+import { PricingModel } from "@prisma/client";
 import { Info } from "lucide-react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
@@ -35,7 +35,7 @@ export function getUsageDisplay({
     return { visible: true, unitLabel: "traces" };
   }
 
-  if (pricingModel === "SEAT_EVENT") {
+  if (pricingModel === PricingModel.SEAT_EVENT) {
     return isFree
       ? { visible: true, unitLabel: "events" }
       : { visible: false };

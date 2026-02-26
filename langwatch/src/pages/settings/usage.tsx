@@ -11,7 +11,7 @@ import {
 } from "@chakra-ui/react";
 import { ArrowRight } from "lucide-react";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
-import { usePlanManagementUrl } from "~/hooks/usePlanManagementUrl";
+import { usePlanManagementUrl, getPlanActionLabel, shouldShowPlanLimits } from "~/hooks/usePlanManagementUrl";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Link } from "../../components/ui/link";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
@@ -25,6 +25,7 @@ import {
 } from "../../components/license/ResourceLimitsDisplay";
 import { FREE_PLAN } from "../../../ee/licensing/constants";
 import { PricingModel } from "@prisma/client";
+import { PlanTypes } from "../../../ee/billing/planTypes";
 
 function ResourceLimitsCard({
   planLabel,
@@ -32,6 +33,7 @@ function ResourceLimitsCard({
   subtitle,
   limits,
   showLimits,
+  showLiteMembers,
   actionHref,
   actionLabel,
   messagesLabel,
@@ -41,6 +43,7 @@ function ResourceLimitsCard({
   subtitle: string;
   limits: React.ComponentProps<typeof ResourceLimitsDisplay>["limits"];
   showLimits?: boolean;
+  showLiteMembers?: boolean;
   actionHref: string;
   actionLabel: string;
   messagesLabel?: string;
@@ -76,7 +79,7 @@ function ResourceLimitsCard({
               </Link>
             </Button>
           </Flex>
-          <ResourceLimitsDisplay limits={limits} showLimits={showLimits} messagesLabel={messagesLabel} />
+          <ResourceLimitsDisplay limits={limits} showLimits={showLimits} showLiteMembers={showLiteMembers} messagesLabel={messagesLabel} />
         </VStack>
       </Card.Body>
     </Card.Root>
@@ -87,8 +90,7 @@ function Usage() {
   const { organization } = useOrganizationTeamProject();
   const publicEnv = usePublicEnv();
   const isSaaS = publicEnv.data?.IS_SAAS;
-  const { url: planManagementUrl, buttonLabel: planButtonLabel } =
-    usePlanManagementUrl();
+  const { url: planManagementUrl } = usePlanManagementUrl();
 
   const organizationId = organization?.id ?? "";
   const queryOpts = { enabled: !!organization, refetchOnWindowFocus: false, refetchOnMount: false } as const;
@@ -99,8 +101,8 @@ function Usage() {
     { organizationId },
     { ...queryOpts, enabled: !!organization && isSaaS === false },
   );
-
   const messagesLabel = organization?.pricingModel === PricingModel.TIERED ? RESOURCE_LABELS.tracesPerMonth : RESOURCE_LABELS.eventsPerMonth;
+  const showLiteMembers = organization?.pricingModel === PricingModel.SEAT_EVENT || isSaaS === false;
 
   const isSelfHosted = isSaaS === false;
   const isLoadingLimits =
@@ -110,11 +112,6 @@ function Usage() {
     !usage.data;
   const hasLimitsError =
     isSelfHosted && (licenseStatus.isError || usage.isError);
-  const hasCorruptedLicense =
-    isSelfHosted &&
-    licenseStatus.data?.hasLicense &&
-    "corrupted" in licenseStatus.data &&
-    licenseStatus.data.corrupted;
   const hasValidLicense =
     isSelfHosted &&
     licenseStatus.data?.hasLicense &&
@@ -124,6 +121,21 @@ function Usage() {
     licenseStatus.data &&
     !licenseStatus.data.hasLicense &&
     usage.data;
+
+  const saasPlan = activePlan.data ?? usage.data?.activePlan;
+  const showLimits = shouldShowPlanLimits({
+    isFree: saasPlan?.free ?? true,
+    isEnterprise: saasPlan?.type === PlanTypes.ENTERPRISE,
+    pricingModel: organization?.pricingModel,
+  });
+  const saasActionLabel = getPlanActionLabel({
+    isSaaS: true,
+    isFree: saasPlan?.free ?? true,
+    isEnterprise: saasPlan?.type === PlanTypes.ENTERPRISE,
+    hasValidLicense: false,
+  });
+  const licensedActionLabel = getPlanActionLabel({ isSaaS: false, isFree: false, isEnterprise: false, hasValidLicense: true });
+  const unlicensedActionLabel = getPlanActionLabel({ isSaaS: false, isFree: false, isEnterprise: false, hasValidLicense: false });
 
   return (
     <SettingsLayout>
@@ -138,21 +150,19 @@ function Usage() {
         </Flex>
 
         {/* SaaS: Resource limits from active plan */}
-        {usage.data && isSaaS && (() => {
-          const saasPlan = activePlan.data ?? usage.data.activePlan;
-          return (
-            <ResourceLimitsCard
-              planLabel={saasPlan?.free ? "Free" : (saasPlan?.name ?? "Plan")}
-              planColorPalette={saasPlan?.free ? "gray" : "blue"}
-              subtitle={`Current usage versus ${saasPlan?.free ? "free tier" : "your plan"} limits`}
-              limits={mapUsageToLimits(usage.data, usage.data.activePlan)}
-              showLimits={saasPlan?.free}
-              actionHref={planManagementUrl}
-              actionLabel={planButtonLabel}
-              messagesLabel={messagesLabel}
-            />
-          );
-        })()}
+        {usage.data && isSaaS && (
+          <ResourceLimitsCard
+            planLabel={saasPlan?.free ? "Free" : (saasPlan?.name ?? "Plan")}
+            planColorPalette={saasPlan?.free ? "gray" : "blue"}
+            subtitle={`Current usage versus ${saasPlan?.free ? "free tier" : "your plan"} limits`}
+            limits={mapUsageToLimits(usage.data, saasPlan ?? usage.data.activePlan)}
+            showLimits={showLimits}
+            showLiteMembers={showLiteMembers}
+            actionHref={planManagementUrl}
+            actionLabel={saasActionLabel}
+            messagesLabel={messagesLabel}
+          />
+        )}
 
         {/* Self-hosted: Loading state */}
         {isLoadingLimits && (
@@ -179,25 +189,6 @@ function Usage() {
           </Card.Root>
         )}
 
-        {/* Self-hosted: Corrupted license */}
-        {hasCorruptedLicense && (
-          <Card.Root borderWidth={1} borderColor="orange.200" backgroundColor="orange.50">
-            <Card.Body paddingY={5} paddingX={6}>
-              <VStack align="start" gap={2}>
-                <Text fontWeight="semibold" fontSize="lg">Resource Limits</Text>
-                <Text color="orange.700" fontSize="sm">
-                  Your license appears to be corrupted. Please re-upload your
-                  license on the{" "}
-                  <Link href="/settings/license" textDecoration="underline" fontWeight="semibold">
-                    License page
-                  </Link>
-                  .
-                </Text>
-              </VStack>
-            </Card.Body>
-          </Card.Root>
-        )}
-
         {/* Self-hosted: Valid license */}
         {hasValidLicense &&
           licenseStatus.data &&
@@ -207,8 +198,9 @@ function Usage() {
               planColorPalette="green"
               subtitle="Current resource usage"
               limits={mapLicenseStatusToLimits(licenseStatus.data)}
+              showLiteMembers={showLiteMembers}
               actionHref={planManagementUrl}
-              actionLabel={planButtonLabel}
+              actionLabel={licensedActionLabel}
               messagesLabel={messagesLabel}
             />
           )}
@@ -221,8 +213,9 @@ function Usage() {
             subtitle="Current usage versus free tier limits"
             limits={mapUsageToLimits(usage.data, FREE_PLAN)}
             showLimits
+            showLiteMembers={showLiteMembers}
             actionHref="/settings/license"
-            actionLabel="Manage license"
+            actionLabel={unlicensedActionLabel}
             messagesLabel={messagesLabel}
           />
         )}
