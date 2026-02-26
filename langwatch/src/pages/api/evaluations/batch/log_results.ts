@@ -415,7 +415,7 @@ const dispatchToClickHouse = async (
       tenantId: project.id,
       runId,
       experimentId,
-      total: batchEvaluation.total ?? batchEvaluation.dataset.length,
+      total: batchEvaluation.total ?? batchEvaluation.dataset.length ?? 0,
       targets,
       occurredAt: Date.now(),
     });

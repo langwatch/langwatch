@@ -98,11 +98,12 @@ export class ExperimentRunStateRepositoryClickHouse<
     projectionId: string,
     projectionVersion: string,
     lastProcessedEventId: string,
+    runId: string,
   ): ClickHouseExperimentRunWriteRecord {
     return {
       Id: projectionId,
       TenantId: tenantId,
-      RunId: data.RunId,
+      RunId: runId || data.RunId,
       ExperimentId: data.ExperimentId,
       WorkflowVersionId: data.WorkflowVersionId,
       Version: projectionVersion,
@@ -224,6 +225,7 @@ export class ExperimentRunStateRepositoryClickHouse<
         projection.id,
         projection.version,
         projection.id,
+        runId,
       );
 
       await this.clickHouseClient.insert({

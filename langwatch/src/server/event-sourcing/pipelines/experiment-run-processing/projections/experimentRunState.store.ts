@@ -19,7 +19,7 @@ export function createExperimentRunStateFoldStore(
       state: ExperimentRunStateData,
       context: ProjectionStoreContext,
     ): Promise<void> {
-      const projectionId = `experiment_run_state:${context.tenantId}:${state.RunId}`;
+      const projectionId = `experiment_run_state:${context.tenantId}:${context.aggregateId}`;
 
       const projection: ExperimentRunState = {
         id: projectionId,

@@ -522,6 +522,7 @@ export class ProjectionRouter<
     foldState: unknown,
   ): Promise<void> {
     const hasReactorQueues = this.queueManager.hasReactorQueues();
+    const errors: Error[] = [];
 
     for (const reactor of reactors) {
       if (reactor.options?.disabled) continue;
@@ -533,15 +534,22 @@ export class ProjectionRouter<
           try {
             await queueProcessor.send({ event, foldState });
           } catch (error) {
-            this.logger.error(
-              {
-                reactorName: reactor.name,
-                foldName,
-                eventId: event.id,
-                error: error instanceof Error ? error.message : String(error),
-              },
-              "Failed to dispatch event to reactor queue",
-            );
+            errors.push(error instanceof Error ? error : new Error(String(error)));
+          }
+        } else {
+          // Queue expected but not found — fall back to inline execution
+          this.logger.warn(
+            { reactorName: reactor.name, foldName, eventId: event.id },
+            "Reactor queue not found, falling back to inline execution",
+          );
+          try {
+            await reactor.handle(event, {
+              tenantId: event.tenantId,
+              aggregateId: String(event.aggregateId),
+              foldState,
+            });
+          } catch (error) {
+            errors.push(error instanceof Error ? error : new Error(String(error)));
           }
         }
       } else {
@@ -553,20 +561,13 @@ export class ProjectionRouter<
             foldState,
           });
         } catch (error) {
-          this.logger.error(
-            {
-              reactorName: reactor.name,
-              foldName,
-              eventId: event.id,
-              eventType: event.type,
-              aggregateId: String(event.aggregateId),
-              tenantId: event.tenantId,
-              error: error instanceof Error ? error.message : String(error),
-            },
-            "Reactor failed during inline execution — fold state persisted in CH but reactor side-effect (e.g. ES sync) was lost",
-          );
+          errors.push(error instanceof Error ? error : new Error(String(error)));
         }
       }
+    }
+
+    if (errors.length > 0) {
+      throw new AggregateError(errors, `${errors.length} reactor(s) failed during dispatch`);
     }
   }
 

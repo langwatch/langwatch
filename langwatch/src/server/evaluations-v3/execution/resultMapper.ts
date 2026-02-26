@@ -53,6 +53,33 @@ export const isEvaluatorNode = (nodeId: string): boolean => {
 };
 
 /**
+ * Coerces a value to a number score.
+ * Handles native numbers and string representations (e.g. "0.85" from workflow evaluators).
+ */
+export const coerceScore = (value: unknown): number | undefined => {
+  if (typeof value === "number") return value;
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = parseFloat(value);
+    if (!isNaN(parsed)) return parsed;
+  }
+  return undefined;
+};
+
+/**
+ * Coerces a value to a boolean passed status.
+ * Handles native booleans and string representations (e.g. "true"/"false" from workflow evaluators).
+ */
+export const coercePassed = (value: unknown): boolean | undefined => {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const lower = value.toLowerCase().trim();
+    if (lower === "true") return true;
+    if (lower === "false") return false;
+  }
+  return undefined;
+};
+
+/**
  * Checks if outputs are from an evaluator (has passed/score/label fields).
  */
 const isEvaluatorOutput = (
@@ -207,12 +234,8 @@ export const mapEvaluatorResult = (
           // Strip score for guardrail-type evaluators where score is just 0 or 1
           score: options?.stripScore
             ? undefined
-            : typeof executionState.outputs?.score === 'number'
-              ? executionState.outputs.score
-              : undefined,
-          passed: typeof executionState.outputs?.passed === 'boolean'
-            ? executionState.outputs.passed
-            : undefined,
+            : coerceScore(executionState.outputs?.score),
+          passed: coercePassed(executionState.outputs?.passed),
           label: typeof executionState.outputs?.label === 'string'
             ? executionState.outputs.label
             : undefined,

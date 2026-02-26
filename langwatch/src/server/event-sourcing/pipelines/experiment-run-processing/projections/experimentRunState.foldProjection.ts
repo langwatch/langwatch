@@ -79,9 +79,9 @@ function apply(
       RunId: event.data.runId,
       ExperimentId: event.data.experimentId,
       WorkflowVersionId: event.data.workflowVersionId ?? null,
-      Total: event.data.total,
+      Total: Math.max(state.Total, event.data.total),
       Targets: JSON.stringify(event.data.targets),
-      StartedAt: event.occurredAt,
+      StartedAt: state.StartedAt ?? event.occurredAt,
     };
   }
 

@@ -42,5 +42,19 @@ export async function isClickHouseReadEnabled(
     );
   }
 
+  // Log when write flag is ON but read flag is OFF — reads go to ES via reactor sync
+  const writeOnReadOffKey = `${projectId}:write-on-read-off`;
+  if (
+    !readEnabled &&
+    project?.featureEventSourcingEvaluationIngestion &&
+    !warnedProjects.has(writeOnReadOffKey)
+  ) {
+    warnedProjects.add(writeOnReadOffKey);
+    logger.info(
+      { projectId },
+      "Write flag (featureEventSourcingEvaluationIngestion) is ON but read flag (featureClickHouseDataSourceEvaluations) is OFF — data is written to ClickHouse via event sourcing, reads still go to ElasticSearch via reactor sync",
+    );
+  }
+
   return readEnabled;
 }
