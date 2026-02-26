@@ -6,10 +6,11 @@ import type { Event, EventOrderingStrategy } from "../domain/types";
 import type { FoldProjectionDefinition } from "../projections/foldProjection.types";
 import type { MapProjectionDefinition } from "../projections/mapProjection.types";
 import type { ProjectionRegistry } from "../projections/projectionRegistry";
-import type { QueueProcessorFactory } from "../queues";
+import type { EventSourcedQueueProcessor } from "../queues";
 import type { ReactorDefinition } from "../reactors/reactor.types";
 import type { EventStore } from "../stores/eventStore.types";
 import type { CommandHandlerOptions } from "./commands/commandDispatcher";
+import type { JobRegistryEntry } from "./queues/queueManager";
 
 /**
  * Options for configuring event sourcing behavior.
@@ -58,9 +59,13 @@ export interface EventSourcingServiceOptions<
    */
   logger?: ReturnType<typeof createLogger>;
   /**
-   * Optional queue factory for creating queues for event handlers.
+   * Global queue processor shared across all pipelines.
    */
-  queueFactory?: QueueProcessorFactory;
+  globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
+  /**
+   * Global job registry shared across all pipelines.
+   */
+  globalJobRegistry?: Map<string, JobRegistryEntry>;
   /**
    * Optional feature flag service for kill switches.
    */
