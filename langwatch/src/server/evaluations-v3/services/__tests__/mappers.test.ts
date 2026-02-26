@@ -21,7 +21,7 @@ import type { ESBatchEvaluation } from "~/server/experiments/types";
 const baseClickHouseRun: ClickHouseExperimentRunRow = {
   Id: "id-1",
   TenantId: "project-1",
-  RunId: "exp-1:run-1",
+  RunId: "run-1",
   ExperimentId: "exp-1",
   WorkflowVersionId: "wfv-1",
   Version: "1",
@@ -49,7 +49,7 @@ const workflowVersion: ExperimentRunWorkflowVersion = {
 
 const evaluatorBreakdown: ClickHouseEvaluatorBreakdownRow[] = [
   {
-    RunId: "exp-1:run-1",
+    RunId: "run-1",
     EvaluatorId: "eval-1",
     EvaluatorName: "Accuracy",
     avgScore: 0.9,
@@ -57,7 +57,7 @@ const evaluatorBreakdown: ClickHouseEvaluatorBreakdownRow[] = [
     hasPassedCount: 4,
   },
   {
-    RunId: "exp-1:run-1",
+    RunId: "run-1",
     EvaluatorId: "eval-2",
     EvaluatorName: null,
     avgScore: 0.7,
@@ -165,7 +165,7 @@ describe("mapClickHouseItemsToRunWithItems", () => {
   const targetItem: ClickHouseExperimentRunItemRow = {
     Id: "item-1",
     TenantId: "project-1",
-    RunId: "exp-1:run-1",
+    RunId: "run-1",
     ExperimentId: "exp-1",
     RowIndex: 0,
     TargetId: "target-1",
@@ -190,7 +190,7 @@ describe("mapClickHouseItemsToRunWithItems", () => {
   const evaluatorItem: ClickHouseExperimentRunItemRow = {
     Id: "item-2",
     TenantId: "project-1",
-    RunId: "exp-1:run-1",
+    RunId: "run-1",
     ExperimentId: "exp-1",
     RowIndex: 0,
     TargetId: "target-1",

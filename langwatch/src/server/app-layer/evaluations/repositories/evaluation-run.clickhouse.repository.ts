@@ -58,7 +58,7 @@ export class EvaluationRunClickHouseRepository
           data.evaluationId,
           data.scheduledAt,
         )
-      : `evaluation_run:${tenantId}:${data.evaluationId}`;
+      : data.evaluationId;
 
     try {
       const record = this.toClickHouseRecord(

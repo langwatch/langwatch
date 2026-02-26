@@ -2,7 +2,6 @@ import type { AppendStore, MapProjectionDefinition } from "../../../projections/
 import { EXPERIMENT_RUN_EVENT_TYPES } from "../schemas/constants";
 import type { EvaluatorResultEvent, TargetResultEvent } from "../schemas/events";
 import { isEvaluatorResultEvent, isTargetResultEvent } from "../schemas/typeGuards";
-import { makeExperimentRunKey } from "../utils/compositeKey";
 import { IdUtils } from "../utils/id.utils";
 
 /**
@@ -54,7 +53,7 @@ function mapTargetResultToRecord(
   return {
     Id: id,
     TenantId: event.tenantId,
-    RunId: makeExperimentRunKey(event.data.experimentId, event.data.runId),
+    RunId: event.data.runId,
     ExperimentId: event.data.experimentId,
     RowIndex: event.data.index,
     TargetId: event.data.targetId,
@@ -96,7 +95,7 @@ function mapEvaluatorResultToRecord(
   return {
     Id: id,
     TenantId: event.tenantId,
-    RunId: makeExperimentRunKey(event.data.experimentId, event.data.runId),
+    RunId: event.data.runId,
     ExperimentId: event.data.experimentId,
     RowIndex: event.data.index,
     TargetId: event.data.targetId,

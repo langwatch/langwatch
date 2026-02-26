@@ -155,10 +155,10 @@ async function waitForExperimentRunState(
 
 /**
  * Waits for experiment run items to appear in ClickHouse.
- * Uses the composite RunId for querying.
+ * Uses the raw RunId slug for querying.
  */
 async function waitForExperimentRunItems(
-  compositeRunId: string,
+  runId: string,
   tenantId: string,
   expectedCount: number,
   timeoutMs = 15000,
@@ -176,7 +176,7 @@ async function waitForExperimentRunItems(
           WHERE RunId = {runId:String}
             AND TenantId = {tenantId:String}
         `,
-        query_params: { runId: compositeRunId, tenantId },
+        query_params: { runId, tenantId },
         format: "JSONEachRow",
       });
       const rows = await result.json<{ count: number | string }>();
@@ -190,7 +190,7 @@ async function waitForExperimentRunItems(
   }
 
   throw new Error(
-    `Timeout waiting for experiment run items. Expected ${expectedCount} for run ${compositeRunId}`,
+    `Timeout waiting for experiment run items. Expected ${expectedCount} for run ${runId}`,
   );
 }
 
@@ -326,7 +326,7 @@ describe.skipIf(!hasTestcontainers)(
         );
         const data = projection?.data as ExperimentRunStateData;
 
-        expect(data.RunId).toBe(compositeKey);
+        expect(data.RunId).toBe(runId);
         expect(data.ExperimentId).toBe(experimentId);
         expect(data.Total).toBe(2);
         expect(data.CompletedCount).toBe(2);
@@ -482,7 +482,6 @@ describe.skipIf(!hasTestcontainers)(
       it("writes result records to experiment_run_items via map projection", async () => {
         const runId = generateTestRunId();
         const experimentId = generateTestExperimentId();
-        const compositeKey = makeExperimentRunKey(experimentId, runId);
         const targetId = "target-1";
 
         await pipeline.commands.startExperimentRun.send({
@@ -525,7 +524,7 @@ describe.skipIf(!hasTestcontainers)(
         });
 
         // 1 target result + 1 evaluator result = 2 items
-        const count = await waitForExperimentRunItems(compositeKey, tenantIdString, 2);
+        const count = await waitForExperimentRunItems(runId, tenantIdString, 2);
         expect(count).toBeGreaterThanOrEqual(2);
       });
     });

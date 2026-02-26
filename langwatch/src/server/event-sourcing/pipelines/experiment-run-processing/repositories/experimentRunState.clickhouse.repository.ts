@@ -18,6 +18,7 @@ import type {
 	ExperimentRunStateData,
 } from "../projections/experimentRunState.foldProjection";
 import type { ExperimentRunStateRepository } from "./experimentRunState.repository";
+import { parseExperimentRunKey } from "../utils/compositeKey";
 
 const TABLE_NAME = "experiment_runs" as const;
 
@@ -136,7 +137,8 @@ export class ExperimentRunStateRepositoryClickHouse<
       "ExperimentRunStateRepositoryClickHouse.getProjection",
     );
 
-    const runId = String(aggregateId);
+    // aggregateId is the composite key (experimentId:runId) — parse to raw values
+    const { experimentId, runId } = parseExperimentRunKey(String(aggregateId));
 
     try {
       const result = await this.clickHouseClient.query({
@@ -154,11 +156,13 @@ export class ExperimentRunStateRepositoryClickHouse<
             LastProcessedEventId,
             TotalScoreSum, ScoreCount, PassedCount, GradedCount
           FROM ${TABLE_NAME}
-          WHERE TenantId = {tenantId:String} AND RunId = {runId:String}
+          WHERE TenantId = {tenantId:String}
+            AND RunId = {runId:String}
+            AND ExperimentId = {experimentId:String}
           ORDER BY UpdatedAt DESC
           LIMIT 1
         `,
-        query_params: { tenantId: context.tenantId, runId },
+        query_params: { tenantId: context.tenantId, runId, experimentId },
         format: "JSONEachRow",
       });
 

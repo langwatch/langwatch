@@ -9,7 +9,6 @@ import type {
   ESBatchEvaluation,
   ESBatchEvaluationTarget,
 } from "~/server/experiments/types";
-import { parseExperimentRunKey } from "~/server/event-sourcing/pipelines/experiment-run-processing/utils/compositeKey";
 import type {
   ExperimentRun,
   ExperimentRunDatasetEntry,
@@ -142,12 +141,9 @@ export function mapClickHouseRunToExperimentRun({
     evaluations,
   };
 
-  // RunId is a composite key (experimentId:slug) — extract the slug for the public API
-  const { runId: runSlug } = parseExperimentRunKey(record.RunId);
-
   return {
     experimentId: record.ExperimentId,
-    runId: runSlug,
+    runId: record.RunId,
     workflowVersion: workflowVersion ?? null,
     timestamps: {
       createdAt: parseClickHouseDateTime(record.CreatedAt),
@@ -240,12 +236,9 @@ export function mapClickHouseItemsToRunWithItems({
     }
   }
 
-  // RunId is a composite key (experimentId:slug) — extract the slug for the public API
-  const { runId: runSlug } = parseExperimentRunKey(runRecord.RunId);
-
   return {
     experimentId: runRecord.ExperimentId,
-    runId: runSlug,
+    runId: runRecord.RunId,
     projectId,
     workflowVersionId: runRecord.WorkflowVersionId,
     progress: runRecord.Progress,
