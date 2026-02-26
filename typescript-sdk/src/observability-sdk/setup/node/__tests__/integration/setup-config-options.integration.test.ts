@@ -54,6 +54,7 @@ describe('setupObservability Integration - Configuration Options', () => {
 
     // Shutdown may throw DNS errors from the LangWatch exporter trying to
     // reach the fake endpoint — that's fine, we only care about the spy.
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
     await handle.shutdown().catch(() => {});
     expect(exportSpy).toHaveBeenCalled();
   });
