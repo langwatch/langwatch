@@ -870,22 +870,23 @@ describe("error handling in setup", () => {
 
 describe("auto-shutdown signal handlers", () => {
   let processOnCalls: string[];
+  let processOnMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     resetObservabilitySdkConfig();
     processOnCalls = [];
     const originalOn = process.on.bind(process);
-    vi.spyOn(process, "on").mockImplementation(((event: string, listener: (...args: unknown[]) => void) => {
+    processOnMock = vi.fn(((event: string, listener: (...args: unknown[]) => void) => {
       processOnCalls.push(event);
       return originalOn(event, listener);
     }) as typeof process.on);
+    process.on = processOnMock as typeof process.on;
   });
 
   afterEach(() => {
     trace.disable();
     resetObservabilitySdkConfig();
-    vi.mocked(process.on).mockRestore();
   });
 
   it("registers beforeExit, SIGINT, and SIGTERM handlers by default", () => {
