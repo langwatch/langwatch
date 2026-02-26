@@ -143,7 +143,7 @@ export function SubscriptionPage() {
   const isDeveloperPlan = plan?.free ?? true;
   const isTieredPricingModel = organization?.pricingModel === PricingModel.TIERED;
   const isEnterprisePlan = plan?.type === "ENTERPRISE";
-  const isTieredLegacyPaidPlan = isTieredPricingModel && isDeveloperPlan && !isEnterprisePlan;
+  const isTieredLegacyPaidPlan = isTieredPricingModel && !isDeveloperPlan && !isEnterprisePlan;
 
   useEffect(() => {
     if (isTieredLegacyPaidPlan && plan && isAnnualTieredPlan(plan.type)) {
