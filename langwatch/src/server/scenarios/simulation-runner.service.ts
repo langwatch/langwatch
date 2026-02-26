@@ -9,6 +9,7 @@ import { getVercelAIModel } from "../modelProviders/utils";
 import { PromptService } from "../prompt-config/prompt.service";
 import { HttpAgentAdapter } from "./adapters/http-agent.adapter";
 import { PromptConfigAdapter } from "./adapters/prompt-config.adapter";
+import { bridgeTraceIdFromAdapterToJudge } from "./execution/bridge-trace-id";
 import { RemoteSpanJudgeAgent } from "./execution/remote-span-judge-agent";
 import { createTraceApiSpanQuery } from "./execution/trace-api-span-query";
 import { ScenarioService } from "./scenario.service";
@@ -136,14 +137,7 @@ export class SimulationRunnerService {
 
       // Hook trace ID capture: after adapter calls, pass trace ID to judge
       if (remoteSpanJudge && adapter instanceof HttpAgentAdapter) {
-        const originalCall = remoteSpanJudge.call.bind(remoteSpanJudge);
-        remoteSpanJudge.call = async (input) => {
-          const traceId = adapter.getTraceId();
-          if (traceId) {
-            remoteSpanJudge!.setTraceId(traceId);
-          }
-          return originalCall(input);
-        };
+        bridgeTraceIdFromAdapterToJudge({ adapter, judge: remoteSpanJudge });
       }
 
       const result = await ScenarioRunner.run(
