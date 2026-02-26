@@ -97,7 +97,7 @@ export class GroupQueueProcessorBullMq<
   private readonly spanAttributes?: (payload: Payload) => SemConvAttributes;
   private readonly queue: Queue<Payload, unknown, string>;
   private readonly worker: Worker<Payload> | null;
-  private readonly queueEvents: QueueEvents;
+  private readonly queueEvents: QueueEvents | null;
   private readonly delay?: number;
   private readonly deduplication?: DeduplicationConfig<Payload>;
   private readonly groupKey: (payload: Payload) => string;
@@ -144,12 +144,15 @@ export class GroupQueueProcessorBullMq<
     }
 
     this.redisConnection = effectiveConnection;
-    // Dedicated connection for BRPOP to avoid blocking the shared connection
-    this.blockingConnection =
-      "duplicate" in effectiveConnection &&
-      typeof effectiveConnection.duplicate === "function"
-        ? effectiveConnection.duplicate()
-        : effectiveConnection;
+    this.consumerEnabled = options?.consumerEnabled ?? true;
+    // Dedicated connection for BRPOP to avoid blocking the shared connection.
+    // Only needed when the dispatcher loop runs (consumer mode).
+    this.blockingConnection = this.consumerEnabled
+      ? ("duplicate" in effectiveConnection &&
+         typeof effectiveConnection.duplicate === "function"
+          ? effectiveConnection.duplicate()
+          : effectiveConnection)
+      : effectiveConnection;
     this.spanAttributes = spanAttributes;
     this.delay = delay;
     this.deduplication = deduplication;
@@ -158,7 +161,6 @@ export class GroupQueueProcessorBullMq<
     this.queueName = name;
     this.jobName = "queue";
     this.process = process;
-    this.consumerEnabled = options?.consumerEnabled ?? true;
     this.globalConcurrency =
       defOptions?.globalConcurrency ?? GROUP_QUEUE_CONFIG.defaultGlobalConcurrency;
 
@@ -243,30 +245,31 @@ export class GroupQueueProcessorBullMq<
       this.worker = null;
     }
 
-    // BullMQ QueueEvents for deduplication logging
-    this.queueEvents = new QueueEvents(this.queueName, {
-      connection: this.redisConnection,
-    });
-
-    this.queueEvents.on(
-      "deduplicated",
-      ({ jobId, deduplicationId, deduplicatedJobId }) => {
-        this.logger.debug(
-          {
-            queueName: this.queueName,
-            existingJobId: jobId,
-            deduplicationId,
-            deduplicatedJobId,
-          },
-          "BullMQ job deduplicated",
-        );
-      },
-    );
-
-    // Start dispatcher loop and metrics collection (consumer only)
+    // BullMQ QueueEvents + dispatcher + metrics — consumer only
     if (this.consumerEnabled) {
+      this.queueEvents = new QueueEvents(this.queueName, {
+        connection: this.redisConnection,
+      });
+
+      this.queueEvents.on(
+        "deduplicated",
+        ({ jobId, deduplicationId, deduplicatedJobId }) => {
+          this.logger.debug(
+            {
+              queueName: this.queueName,
+              existingJobId: jobId,
+              deduplicationId,
+              deduplicatedJobId,
+            },
+            "BullMQ job deduplicated",
+          );
+        },
+      );
+
       this.startDispatcher();
       this.startMetricsCollection();
+    } else {
+      this.queueEvents = null;
     }
   }
 
