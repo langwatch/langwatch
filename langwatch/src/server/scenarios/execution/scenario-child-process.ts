@@ -28,7 +28,7 @@ import * as ScenarioRunner from "@langwatch/scenario";
 import type { ChildProcessJobData } from "./types";
 import { createModelFromParams } from "./model.factory";
 import { createAdapter } from "./serialized-adapter.registry";
-import { EsBackedJudgeAgent } from "./es-backed-judge-agent";
+import { RemoteSpanJudgeAgent } from "./remote-span-judge-agent";
 import { createTraceApiSpanQuery } from "./trace-api-span-query";
 import { SerializedHttpAgentAdapter } from "./serialized-adapters/http-agent.adapter";
 import { bridgeTraceIdFromAdapterToJudge } from "./bridge-trace-id";
@@ -103,14 +103,14 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
   });
   const model = createModelFromParams(modelParams, nlpServiceUrl);
 
-  // For HTTP targets, use an ES-backed judge that queries spans from
+  // For HTTP targets, use a remote span judge that queries spans from
   // the platform API before evaluation. The trace ID will be captured
   // from the adapter after the conversation completes.
-  let esBackedJudge: EsBackedJudgeAgent | undefined;
+  let remoteSpanJudge: RemoteSpanJudgeAgent | undefined;
   const judgeAgent =
     target.type === "http"
       ? (() => {
-          esBackedJudge = new EsBackedJudgeAgent({
+          remoteSpanJudge = new RemoteSpanJudgeAgent({
             criteria: scenario.criteria,
             model,
             projectId: context.projectId,
@@ -119,7 +119,7 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
               apiKey: langwatchApiKey,
             }),
           });
-          return esBackedJudge;
+          return remoteSpanJudge;
         })()
       : ScenarioRunner.judgeAgent({ criteria: scenario.criteria, model });
 
@@ -128,8 +128,8 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
 
   // Hook into the scenario lifecycle to capture the trace ID from the adapter
   // before judge evaluation. The adapter captures it during HTTP calls.
-  if (esBackedJudge && adapter instanceof SerializedHttpAgentAdapter) {
-    bridgeTraceIdFromAdapterToJudge({ adapter, judge: esBackedJudge });
+  if (remoteSpanJudge && adapter instanceof SerializedHttpAgentAdapter) {
+    bridgeTraceIdFromAdapterToJudge({ adapter, judge: remoteSpanJudge });
   }
 
   const result = await ScenarioRunner.run(
@@ -145,6 +145,7 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
       ],
       verbose,
       metadata: {
+        labels: ["scenario-runner", target.type],
         langwatch: {
           targetReferenceId: target.referenceId,
           targetType: target.type,

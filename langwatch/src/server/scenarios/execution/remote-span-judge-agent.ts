@@ -1,13 +1,13 @@
 /**
- * Judge agent wrapper that collects spans from Elasticsearch before evaluation.
+ * Judge agent wrapper that collects spans remotely before evaluation.
  *
  * The standard judge agent reads spans from an in-memory collector populated
- * by OTEL instrumentation in the same process. For HTTP targets, spans live
- * in Elasticsearch. This wrapper queries ES for the trace's spans, populates
- * a JudgeSpanCollector, then delegates to a fresh judge agent instance
+ * by OTEL instrumentation in the same process. For HTTP targets, spans are
+ * stored remotely. This wrapper queries the platform API for the trace's spans,
+ * populates a JudgeSpanCollector, then delegates to a fresh judge agent instance
  * configured with that collector.
  *
- * The ES query happens inside call() (async) so it runs between the final
+ * The remote query happens inside call() (async) so it runs between the final
  * conversation turn and the actual judge evaluation.
  */
 
@@ -20,12 +20,12 @@ import {
   type JudgeAgentConfig,
 } from "@langwatch/scenario";
 import { createLogger } from "~/utils/logger/server";
-import { collectSpansFromEs } from "./es-span-collector";
+import { collectRemoteSpans } from "./remote-span-collector";
 import type { SpanQueryFn } from "./types";
 
-const logger = createLogger("EsBackedJudgeAgent");
+const logger = createLogger("RemoteSpanJudgeAgent");
 
-interface EsBackedJudgeAgentParams {
+interface RemoteSpanJudgeAgentParams {
   criteria: string[];
   model: JudgeAgentConfig["model"];
   projectId: string;
@@ -35,21 +35,21 @@ interface EsBackedJudgeAgentParams {
 }
 
 /**
- * Judge agent that queries ES for spans before delegating to the standard judge.
+ * Judge agent that queries spans remotely before delegating to the standard judge.
  *
  * The trace ID is captured at adapter call time and passed explicitly via
  * `setTraceId()` or the constructor, rather than reading from ambient OTEL context.
  */
-export class EsBackedJudgeAgent extends JudgeAgentAdapter {
+export class RemoteSpanJudgeAgent extends JudgeAgentAdapter {
   role = AgentRole.JUDGE;
   criteria: string[];
 
-  private readonly params: EsBackedJudgeAgentParams;
+  private readonly params: RemoteSpanJudgeAgentParams;
   private explicitTraceId: string | undefined;
 
-  constructor(params: EsBackedJudgeAgentParams) {
+  constructor(params: RemoteSpanJudgeAgentParams) {
     super();
-    this.name = "EsBackedJudgeAgent";
+    this.name = "RemoteSpanJudgeAgent";
     this.criteria = params.criteria;
     this.params = params;
     this.explicitTraceId = params.traceId;
@@ -68,10 +68,10 @@ export class EsBackedJudgeAgent extends JudgeAgentAdapter {
     if (traceId) {
       logger.info(
         { traceId, threadId, projectId: this.params.projectId },
-        "Collecting spans from ES before judge evaluation",
+        "Collecting remote spans before judge evaluation",
       );
 
-      spanCollector = await collectSpansFromEs({
+      spanCollector = await collectRemoteSpans({
         traceId,
         projectId: this.params.projectId,
         threadId,
@@ -79,7 +79,7 @@ export class EsBackedJudgeAgent extends JudgeAgentAdapter {
         timeoutMs: this.params.spanCollectionTimeoutMs,
       });
     } else {
-      logger.debug("No trace ID provided, skipping ES span collection");
+      logger.debug("No trace ID provided, skipping remote span collection");
     }
 
     // Create a standard judge agent with the collected spans

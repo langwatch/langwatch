@@ -5,11 +5,11 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AgentInput, JudgeAgentConfig } from "@langwatch/scenario";
 import { bridgeTraceIdFromAdapterToJudge } from "../bridge-trace-id";
-import { EsBackedJudgeAgent } from "../es-backed-judge-agent";
+import { RemoteSpanJudgeAgent } from "../remote-span-judge-agent";
 
-// Mock the ES-backed judge agent's dependencies so we can construct it
-vi.mock("../es-span-collector", () => ({
-  collectSpansFromEs: vi.fn().mockResolvedValue({
+// Mock the remote span collector's dependencies so we can construct the judge
+vi.mock("../remote-span-collector", () => ({
+  collectRemoteSpans: vi.fn().mockResolvedValue({
     getSpansForThread: vi.fn().mockReturnValue([]),
   }),
 }));
@@ -30,8 +30,8 @@ function createMockAdapter(traceId: string | undefined) {
   };
 }
 
-function createJudge(): EsBackedJudgeAgent {
-  return new EsBackedJudgeAgent({
+function createJudge(): RemoteSpanJudgeAgent {
+  return new RemoteSpanJudgeAgent({
     criteria: ["test criterion"],
     model: { provider: "openai", model: "gpt-4o" } as unknown as JudgeAgentConfig["model"],
     projectId: "project_123",

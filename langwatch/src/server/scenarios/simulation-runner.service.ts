@@ -9,7 +9,7 @@ import { getVercelAIModel } from "../modelProviders/utils";
 import { PromptService } from "../prompt-config/prompt.service";
 import { HttpAgentAdapter } from "./adapters/http-agent.adapter";
 import { PromptConfigAdapter } from "./adapters/prompt-config.adapter";
-import { EsBackedJudgeAgent } from "./execution/es-backed-judge-agent";
+import { RemoteSpanJudgeAgent } from "./execution/remote-span-judge-agent";
 import { createTraceApiSpanQuery } from "./execution/trace-api-span-query";
 import { ScenarioService } from "./scenario.service";
 
@@ -111,14 +111,14 @@ export class SimulationRunnerService {
       // Run in headless mode on server (don't open browser tabs)
       process.env.SCENARIO_HEADLESS = "true";
 
-      // For HTTP targets, use ES-backed judge to collect spans from the
+      // For HTTP targets, use remote span judge to collect spans from the
       // user's agent. For other targets, use standard in-process judge.
       const langwatchEndpoint = this.getLangWatchEndpoint();
-      let esBackedJudge: EsBackedJudgeAgent | undefined;
+      let remoteSpanJudge: RemoteSpanJudgeAgent | undefined;
       const judgeAgentInstance =
         target.type === "http"
           ? (() => {
-              esBackedJudge = new EsBackedJudgeAgent({
+              remoteSpanJudge = new RemoteSpanJudgeAgent({
                 criteria: scenario.criteria,
                 model: judgeModel,
                 projectId,
@@ -127,7 +127,7 @@ export class SimulationRunnerService {
                   apiKey: project.apiKey,
                 }),
               });
-              return esBackedJudge;
+              return remoteSpanJudge;
             })()
           : ScenarioRunner.judgeAgent({
               model: judgeModel,
@@ -135,12 +135,12 @@ export class SimulationRunnerService {
             });
 
       // Hook trace ID capture: after adapter calls, pass trace ID to judge
-      if (esBackedJudge && adapter instanceof HttpAgentAdapter) {
-        const originalCall = esBackedJudge.call.bind(esBackedJudge);
-        esBackedJudge.call = async (input) => {
+      if (remoteSpanJudge && adapter instanceof HttpAgentAdapter) {
+        const originalCall = remoteSpanJudge.call.bind(remoteSpanJudge);
+        remoteSpanJudge.call = async (input) => {
           const traceId = adapter.getTraceId();
           if (traceId) {
-            esBackedJudge!.setTraceId(traceId);
+            remoteSpanJudge!.setTraceId(traceId);
           }
           return originalCall(input);
         };

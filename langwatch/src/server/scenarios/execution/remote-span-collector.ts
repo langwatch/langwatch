@@ -1,9 +1,9 @@
 /**
- * Collects spans from Elasticsearch for judge evaluation in HTTP scenario targets.
+ * Collects spans remotely for judge evaluation in HTTP scenario targets.
  *
- * Queries ES by trace ID, filters out scenario infrastructure spans,
- * converts LangWatch spans to ReadableSpan format, and populates a
- * JudgeSpanCollector instance for the judge agent.
+ * Queries spans by trace ID via the injected SpanQueryFn, filters out scenario
+ * infrastructure spans, converts LangWatch spans to ReadableSpan format, and
+ * populates a JudgeSpanCollector instance for the judge agent.
  *
  * Retries with backoff since spans arrive asynchronously from the user's
  * OTEL SDK pipeline.
@@ -18,7 +18,7 @@ import { langwatchSpanToReadableSpan } from "../../tracer/spanToReadableSpan";
 import { createSyntheticErrorSpan } from "./synthetic-error-span";
 import type { SpanQueryFn } from "./types";
 
-const logger = createLogger("EsSpanCollector");
+const logger = createLogger("RemoteSpanCollector");
 
 /** Spans with these attributes are scenario infrastructure, not user agent spans */
 const INFRASTRUCTURE_SPAN_PREFIXES = [
@@ -29,7 +29,7 @@ const INFRASTRUCTURE_SPAN_PREFIXES = [
 
 /**
  * The JudgeSpanCollector groups spans by thread ID using this attribute.
- * We must tag ES spans with it so getSpansForThread() can find them.
+ * We must tag remote spans with it so getSpansForThread() can find them.
  */
 const LANGWATCH_THREAD_ID_ATTR = "langwatch.thread.id";
 
@@ -43,12 +43,12 @@ interface CollectSpansParams {
 }
 
 /**
- * Queries ES for spans matching the given trace ID and populates
- * a JudgeSpanCollector. Retries until spans are found or timeout.
+ * Queries spans matching the given trace ID and populates a JudgeSpanCollector.
+ * Retries until spans are found or timeout.
  *
  * Returns a JudgeSpanCollector pre-populated with the collected spans.
  */
-export async function collectSpansFromEs({
+export async function collectRemoteSpans({
   traceId,
   projectId,
   threadId,
@@ -79,7 +79,7 @@ export async function collectSpansFromEs({
   } catch (error) {
     const reason =
       error instanceof Error ? error.message : String(error);
-    logger.warn({ traceId, error: reason }, "ES span query failed");
+    logger.warn({ traceId, error: reason }, "Remote span query failed");
 
     const errorSpan = createSyntheticErrorSpan({
       traceId,

@@ -4,7 +4,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import type { Span } from "../../../tracer/types";
-import { collectSpansFromEs } from "../es-span-collector";
+import { collectRemoteSpans } from "../remote-span-collector";
 
 // Use real JudgeSpanCollector from SDK - no mocking needed for integration tests
 
@@ -19,7 +19,7 @@ function createTestSpan(overrides: Partial<Span> = {}): Span {
   } as Span;
 }
 
-describe("collectSpansFromEs()", () => {
+describe("collectRemoteSpans()", () => {
   const threadId = "test-thread";
   const defaultParams = {
     traceId: "trace_abc",
@@ -29,13 +29,13 @@ describe("collectSpansFromEs()", () => {
     retryIntervalMs: 50,
   };
 
-  describe("when spans are available in ES", () => {
+  describe("when spans are available", () => {
     it("returns a collector populated with user agent spans", async () => {
       const querySpans = vi.fn().mockResolvedValue([
         createTestSpan({ name: "my-agent-llm-call", span_id: "span1" }),
       ]);
 
-      const collector = await collectSpansFromEs({
+      const collector = await collectRemoteSpans({
         ...defaultParams,
         querySpans,
       });
@@ -56,7 +56,7 @@ describe("collectSpansFromEs()", () => {
           createTestSpan({ name: "delayed-span", span_id: "span2" }),
         ]);
 
-      const collector = await collectSpansFromEs({
+      const collector = await collectRemoteSpans({
         ...defaultParams,
         querySpans,
       });
@@ -69,7 +69,7 @@ describe("collectSpansFromEs()", () => {
     it("returns empty collector after timeout when no spans arrive", async () => {
       const querySpans = vi.fn().mockResolvedValue([]);
 
-      const collector = await collectSpansFromEs({
+      const collector = await collectRemoteSpans({
         ...defaultParams,
         timeoutMs: 150,
         retryIntervalMs: 50,
@@ -86,7 +86,7 @@ describe("collectSpansFromEs()", () => {
     });
   });
 
-  describe("when ES contains infrastructure spans", () => {
+  describe("when response contains infrastructure spans", () => {
     it("filters out scenario infrastructure spans", async () => {
       const querySpans = vi.fn().mockResolvedValue([
         createTestSpan({ name: "my-agent-tool-call", span_id: "user1" }),
@@ -105,7 +105,7 @@ describe("collectSpansFromEs()", () => {
         createTestSpan({ name: "another-user-span", span_id: "user2" }),
       ]);
 
-      const collector = await collectSpansFromEs({
+      const collector = await collectRemoteSpans({
         ...defaultParams,
         querySpans,
       });
@@ -119,13 +119,13 @@ describe("collectSpansFromEs()", () => {
     });
   });
 
-  describe("when ES query fails", () => {
+  describe("when the span query fails", () => {
     it("produces a collector with a synthetic error span", async () => {
       const querySpans = vi
         .fn()
         .mockRejectedValue(new Error("Connection refused"));
 
-      const collector = await collectSpansFromEs({
+      const collector = await collectRemoteSpans({
         ...defaultParams,
         querySpans,
       });
@@ -139,7 +139,7 @@ describe("collectSpansFromEs()", () => {
     });
   });
 
-  describe("when ES contains a realistic tool-call span with hierarchy", () => {
+  describe("when response contains a realistic tool-call span with hierarchy", () => {
     it("preserves tool-call attributes and parent span through the full pipeline", async () => {
       const parentSpan = createTestSpan({
         span_id: "parent_llm_span",
@@ -190,7 +190,7 @@ describe("collectSpansFromEs()", () => {
 
       const querySpans = vi.fn().mockResolvedValue([parentSpan, toolCallSpan]);
 
-      const collector = await collectSpansFromEs({
+      const collector = await collectRemoteSpans({
         ...defaultParams,
         querySpans,
       });
@@ -220,7 +220,7 @@ describe("collectSpansFromEs()", () => {
       const querySpans = vi.fn().mockResolvedValue([]);
 
       const start = Date.now();
-      const collector = await collectSpansFromEs({
+      const collector = await collectRemoteSpans({
         ...defaultParams,
         timeoutMs: 200,
         retryIntervalMs: 50,

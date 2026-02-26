@@ -5,7 +5,7 @@
 import { AgentRole, type AgentInput } from "@langwatch/scenario";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Span } from "../../../tracer/types";
-import { EsBackedJudgeAgent } from "../es-backed-judge-agent";
+import { RemoteSpanJudgeAgent } from "../remote-span-judge-agent";
 
 function createTestSpan(overrides: Partial<Span> = {}): Span {
   return {
@@ -18,7 +18,7 @@ function createTestSpan(overrides: Partial<Span> = {}): Span {
   } as Span;
 }
 
-describe("EsBackedJudgeAgent", () => {
+describe("RemoteSpanJudgeAgent", () => {
   const defaultInput: AgentInput = {
     threadId: "test-thread",
     messages: [
@@ -39,7 +39,7 @@ describe("EsBackedJudgeAgent", () => {
   });
 
   it("has JUDGE role", () => {
-    const agent = new EsBackedJudgeAgent({
+    const agent = new RemoteSpanJudgeAgent({
       criteria: ["test"],
       model: undefined,
       projectId: "project_123",
@@ -50,7 +50,7 @@ describe("EsBackedJudgeAgent", () => {
   });
 
   it("has criteria from params", () => {
-    const agent = new EsBackedJudgeAgent({
+    const agent = new RemoteSpanJudgeAgent({
       criteria: ["criterion-1", "criterion-2"],
       model: undefined,
       projectId: "project_123",
@@ -61,12 +61,12 @@ describe("EsBackedJudgeAgent", () => {
   });
 
   describe("when trace ID is set explicitly", () => {
-    it("queries spans from ES before delegating to judge", async () => {
+    it("queries remote spans before delegating to judge", async () => {
       const querySpans = vi.fn().mockResolvedValue([
         createTestSpan({ name: "tool-call", span_id: "s1" }),
       ]);
 
-      const agent = new EsBackedJudgeAgent({
+      const agent = new RemoteSpanJudgeAgent({
         criteria: ["Agent must use tools"],
         model: undefined,
         projectId: "project_123",
@@ -92,7 +92,7 @@ describe("EsBackedJudgeAgent", () => {
     it("uses trace ID set via setTraceId()", async () => {
       const querySpans = vi.fn().mockResolvedValue([]);
 
-      const agent = new EsBackedJudgeAgent({
+      const agent = new RemoteSpanJudgeAgent({
         criteria: ["Agent must respond"],
         model: undefined,
         projectId: "project_123",
@@ -116,10 +116,10 @@ describe("EsBackedJudgeAgent", () => {
   });
 
   describe("when no trace ID is provided", () => {
-    it("skips ES span collection and delegates directly", async () => {
+    it("skips remote span collection and delegates directly", async () => {
       const querySpans = vi.fn();
 
-      const agent = new EsBackedJudgeAgent({
+      const agent = new RemoteSpanJudgeAgent({
         criteria: ["Agent must respond"],
         model: undefined,
         projectId: "project_123",

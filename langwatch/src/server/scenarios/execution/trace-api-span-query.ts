@@ -25,7 +25,7 @@ interface TraceApiResponse {
  * Creates a span query function that fetches spans via the LangWatch trace API.
  *
  * Returns a function compatible with the SpanQueryFn interface expected by
- * collectSpansFromEs and EsBackedJudgeAgent.
+ * collectRemoteSpans and RemoteSpanJudgeAgent.
  */
 export function createTraceApiSpanQuery({
   endpoint,
