@@ -238,7 +238,14 @@ export function mapClickHouseItemsToRunWithItems({
         passed: item.Passed !== null ? item.Passed === 1 : null,
         details: item.EvaluationDetails,
         cost: item.EvaluationCost,
-        inputs: item.EvaluationInputs ? JSON.parse(item.EvaluationInputs) : null,
+        inputs: (() => {
+          if (!item.EvaluationInputs) return null;
+          try {
+            return JSON.parse(item.EvaluationInputs);
+          } catch {
+            return null;
+          }
+        })(),
         duration: item.EvaluationDurationMs ?? null,
       });
     }
