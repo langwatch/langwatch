@@ -120,7 +120,7 @@
     "@react-email/render": "^1.0.3",
     "@react-email/section": "0.0.16",
     "@react-email/text": "0.1.1",
-    "@sendgrid/mail": "^8.1.1",
+    "@sendgrid/mail": "^8.1.6",
     "@slack/webhook": "7.0.5",
     "@t3-oss/env-nextjs": "^0.6.0",
     "@tanstack/react-query": "^4.29.25",
