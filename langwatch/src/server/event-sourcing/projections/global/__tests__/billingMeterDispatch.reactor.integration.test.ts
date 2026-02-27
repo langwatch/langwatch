@@ -368,7 +368,7 @@ describe("billingMeterDispatchReactor", () => {
       });
 
       expect(reactor.options?.runIn).toEqual(["worker"]);
-      expect(reactor.options?.ttl).toBe(10_000);
+      expect(reactor.options?.ttl).toBe(300_000);
 
       const payload = { event: makeEvent("proj-1"), foldState: {} };
       expect(reactor.options?.makeJobId?.(payload)).toBe(

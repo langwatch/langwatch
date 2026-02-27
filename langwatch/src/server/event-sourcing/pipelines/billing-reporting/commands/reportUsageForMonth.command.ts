@@ -99,8 +99,9 @@ export function createReportUsageForMonthCommandClass(
     async handle(
       command: Command<ReportUsageForMonthCommandData>,
     ): Promise<Event[]> {
-      const { organizationId, billingMonth } = command.data;
+      const { organizationId, billingMonth, tenantId } = command.data;
 
+      let shouldSelfDispatch = false;
       try {
         // 1. Skip conditions
         const org = await deps.prisma.organization.findFirst({
@@ -146,21 +147,11 @@ export function createReportUsageForMonthCommandClass(
         }
 
         // 2. Report for billing month
-        const shouldSelfDispatch = await this.reportForBillingMonth({
+        shouldSelfDispatch = await this.reportForBillingMonth({
           organizationId,
           billingMonth,
           stripeCustomerId: org.stripeCustomerId,
         });
-
-        // 3. Self-dispatch for convergence loop
-        if (shouldSelfDispatch) {
-          await deps.selfDispatch({
-            organizationId,
-            billingMonth,
-            tenantId: organizationId,
-            occurredAt: Date.now(),
-          });
-        }
       } catch (error) {
         // Never propagate to framework — log and return empty events
         logger.error(
@@ -172,6 +163,17 @@ export function createReportUsageForMonthCommandClass(
           scope.setExtra?.("organizationId", organizationId);
           scope.setExtra?.("billingMonth", billingMonth);
           captureException(error);
+        });
+        return [];
+      }
+
+      // 3. Self-dispatch for convergence loop (outside try/catch so failures propagate)
+      if (shouldSelfDispatch) {
+        await deps.selfDispatch({
+          organizationId,
+          billingMonth,
+          tenantId,
+          occurredAt: Date.now(),
         });
       }
 
