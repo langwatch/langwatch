@@ -1,35 +1,9 @@
-import type { PrismaClient, Subscription } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 import { env } from "../../src/env.mjs";
 import type { PlanInfo } from "../licensing/planInfo";
 import { PLAN_LIMITS, getFreePlanLimits } from "./planLimits";
+import { NUMERIC_OVERRIDE_FIELDS } from "./planOverrideFields";
 import { PlanTypes, SubscriptionStatus } from "./planTypes";
-
-// Fields that exist on both PlanInfo (as number) and Subscription (as Int?)
-type NumericOverrideField = {
-  [K in keyof PlanInfo & keyof Subscription]: PlanInfo[K] extends number
-    ? K
-    : never;
-}[keyof PlanInfo & keyof Subscription];
-
-export const NUMERIC_OVERRIDE_FIELDS: NumericOverrideField[] = [
-  "maxMembers",
-  "maxMembersLite",
-  "maxProjects",
-  "maxMessagesPerMonth",
-  "evaluationsCredit",
-  "maxWorkflows",
-  "maxTeams",
-  "maxPrompts",
-  "maxEvaluators",
-  "maxScenarios",
-  "maxAgents",
-  "maxExperiments",
-  "maxOnlineEvaluations",
-  "maxDatasets",
-  "maxDashboards",
-  "maxCustomGraphs",
-  "maxAutomations",
-];
 
 type MinimalUser = {
   id?: string;
@@ -39,7 +13,6 @@ type MinimalUser = {
     email?: string | null;
   };
 };
-
 
 const isAdmin = (user?: { email?: string | null }) => {
   if (!user?.email) {

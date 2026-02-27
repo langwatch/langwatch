@@ -2,7 +2,7 @@ import { Currency, type PrismaClient } from "@prisma/client";
 import type Stripe from "stripe";
 import { createLogger } from "../../../src/utils/logger";
 import { notifySubscriptionEvent } from "../notifications/notificationHandlers";
-import { NUMERIC_OVERRIDE_FIELDS } from "../planProvider";
+import { NUMERIC_OVERRIDE_FIELDS } from "../planOverrideFields";
 import { PlanTypes, SubscriptionStatus } from "../planTypes";
 import type { calculateQuantityForPrice, prices } from "./subscriptionItemCalculator";
 import { isGrowthEventsPrice, isGrowthSeatEventPlan, isGrowthSeatPrice } from "../utils/growthSeatEvent";
@@ -173,7 +173,7 @@ export const createWebhookService = ({
     }
   };
 
-  const cancellationData = () => ({
+  const buildCancellationUpdate = () => ({
     status: SubscriptionStatus.CANCELLED,
     endDate: new Date(),
     ...Object.fromEntries(NUMERIC_OVERRIDE_FIELDS.map((f) => [f, null])),
@@ -309,7 +309,7 @@ export const createWebhookService = ({
 
       await db.subscription.update({
         where: { id: existingSubscription.id },
-        data: cancellationData(),
+        data: buildCancellationUpdate(),
       });
     },
 
@@ -338,7 +338,7 @@ export const createWebhookService = ({
         // which is handled by handleSubscriptionDeleted.
         await db.subscription.update({
           where: { id: existingSubForUpdate.id },
-          data: cancellationData(),
+          data: buildCancellationUpdate(),
         });
       } else if (subscription.status === "active") {
         const shouldNotify =

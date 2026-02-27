@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PLAN_LIMITS, getFreePlanLimits } from "../planLimits";
-import { NUMERIC_OVERRIDE_FIELDS } from "../planProvider";
+import { NUMERIC_OVERRIDE_FIELDS } from "../planOverrideFields";
 import { PlanTypes, SubscriptionStatus } from "../planTypes";
 
 vi.mock("../../../src/env.mjs", () => ({
@@ -215,7 +215,7 @@ describe("createSaaSPlanProvider", () => {
     });
 
     describe("when maxWorkflows override is set", () => {
-      it("applies the override (bug fix)", async () => {
+      it("applies the workflow override", async () => {
         const subscription = {
           plan: PlanTypes.LAUNCH,
           status: SubscriptionStatus.ACTIVE,
@@ -294,40 +294,44 @@ describe("createSaaSPlanProvider", () => {
     });
 
     describe("when plan key not in PLAN_LIMITS", () => {
-      it("falls back to FREE", async () => {
-        const subscription = {
-          plan: "NONEXISTENT_PLAN",
-          status: SubscriptionStatus.ACTIVE,
-          ...Object.fromEntries(
-            NUMERIC_OVERRIDE_FIELDS.map((f) => [f, null]),
-          ),
-        };
+      describe("when all overrides are null", () => {
+        it("falls back to FREE", async () => {
+          const subscription = {
+            plan: "NONEXISTENT_PLAN",
+            status: SubscriptionStatus.ACTIVE,
+            ...Object.fromEntries(
+              NUMERIC_OVERRIDE_FIELDS.map((f) => [f, null]),
+            ),
+          };
 
-        const db = createMockDb({ findFirstResult: subscription });
-        const provider = createSaaSPlanProvider(db);
-        const plan = await provider.getActivePlan("org_1");
+          const db = createMockDb({ findFirstResult: subscription });
+          const provider = createSaaSPlanProvider(db);
+          const plan = await provider.getActivePlan("org_1");
 
-        expect(plan.type).toBe(PlanTypes.FREE);
+          expect(plan.type).toBe(PlanTypes.FREE);
+        });
       });
 
-      it("applies overrides over free defaults", async () => {
-        const subscription = {
-          plan: "NONEXISTENT_PLAN",
-          status: SubscriptionStatus.ACTIVE,
-          maxWorkflows: 50,
-          ...Object.fromEntries(
-            NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxWorkflows").map(
-              (f) => [f, null],
+      describe("when a workflow override is set", () => {
+        it("applies overrides over free defaults", async () => {
+          const subscription = {
+            plan: "NONEXISTENT_PLAN",
+            status: SubscriptionStatus.ACTIVE,
+            maxWorkflows: 50,
+            ...Object.fromEntries(
+              NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxWorkflows").map(
+                (f) => [f, null],
+              ),
             ),
-          ),
-        };
+          };
 
-        const db = createMockDb({ findFirstResult: subscription });
-        const provider = createSaaSPlanProvider(db);
-        const plan = await provider.getActivePlan("org_1");
+          const db = createMockDb({ findFirstResult: subscription });
+          const provider = createSaaSPlanProvider(db);
+          const plan = await provider.getActivePlan("org_1");
 
-        expect(plan.type).toBe(PlanTypes.FREE);
-        expect(plan.maxWorkflows).toBe(50);
+          expect(plan.type).toBe(PlanTypes.FREE);
+          expect(plan.maxWorkflows).toBe(50);
+        });
       });
 
       describe("when SEAT_EVENT org has unknown plan key", () => {

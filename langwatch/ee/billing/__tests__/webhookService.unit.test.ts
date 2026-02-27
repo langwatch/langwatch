@@ -5,7 +5,7 @@ vi.mock("../notifications/notificationHandlers", () => ({
 }));
 
 import { notifySubscriptionEvent } from "../notifications/notificationHandlers";
-import { NUMERIC_OVERRIDE_FIELDS } from "../planProvider";
+import { NUMERIC_OVERRIDE_FIELDS } from "../planOverrideFields";
 import { SubscriptionStatus } from "../planTypes";
 import { createWebhookService } from "../services/webhookService";
 
