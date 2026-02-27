@@ -12,9 +12,18 @@ vi.mock("~/utils/ssrfProtection", () => ({
   ssrfSafeFetch: vi.fn(),
 }));
 
+vi.mock("../../trace-context-headers", () => ({
+  injectTraceContextHeaders: vi.fn(({ headers }: { headers: Record<string, string> }) => ({
+    headers,
+    traceId: undefined,
+  })),
+}));
+
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
+import { injectTraceContextHeaders } from "../../trace-context-headers";
 
 const mockSsrfSafeFetch = vi.mocked(ssrfSafeFetch);
+const mockInjectTraceContextHeaders = vi.mocked(injectTraceContextHeaders);
 
 describe("SerializedHttpAgentAdapter", () => {
   const defaultConfig: HttpAgentData = {
@@ -264,6 +273,56 @@ describe("SerializedHttpAgentAdapter", () => {
         const body = JSON.parse(callArgs?.body as string);
         expect(body.mode).toBe("search");
         expect(body.query).toBe("search for cats");
+      });
+    });
+  });
+
+  describe("trace ID capture", () => {
+    it("exposes captured trace ID after a request", async () => {
+      mockInjectTraceContextHeaders.mockImplementation(({ headers }) => ({
+        headers,
+        traceId: "captured_trace_id_123",
+      }));
+
+      const adapter = new SerializedHttpAgentAdapter(defaultConfig);
+      await adapter.call(defaultInput);
+
+      expect(adapter.getTraceId()).toBe("captured_trace_id_123");
+    });
+
+    it("returns undefined when no trace ID was captured", () => {
+      const adapter = new SerializedHttpAgentAdapter(defaultConfig);
+      expect(adapter.getTraceId()).toBeUndefined();
+    });
+  });
+
+  describe("trace context injection", () => {
+    it("calls injectTraceContextHeaders on each request", async () => {
+      const adapter = new SerializedHttpAgentAdapter(defaultConfig);
+
+      await adapter.call(defaultInput);
+
+      expect(mockInjectTraceContextHeaders).toHaveBeenCalledWith({
+        headers: expect.objectContaining({ "Content-Type": "application/json" }),
+      });
+    });
+
+    describe("when custom headers are configured", () => {
+      it("calls injection after custom headers are applied", async () => {
+        const config: HttpAgentData = {
+          ...defaultConfig,
+          headers: [{ key: "X-Custom", value: "custom-value" }],
+        };
+        const adapter = new SerializedHttpAgentAdapter(config);
+
+        await adapter.call(defaultInput);
+
+        expect(mockInjectTraceContextHeaders).toHaveBeenCalledWith({
+          headers: expect.objectContaining({
+            "Content-Type": "application/json",
+            "X-Custom": "custom-value",
+          }),
+        });
       });
     });
   });

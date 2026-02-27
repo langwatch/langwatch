@@ -9,6 +9,7 @@ import {
   AgentRepository,
   type AgentRepository as AgentRepositoryType,
 } from "../../agents/agent.repository";
+import { injectTraceContextHeaders } from "../execution/trace-context-headers";
 import { applyAuthentication } from "./auth.strategies";
 
 const logger = createLogger("HttpAgentAdapter");
@@ -31,6 +32,7 @@ export class HttpAgentAdapter extends AgentAdapter {
   private readonly agentId: string;
   private readonly projectId: string;
   private readonly agentRepository: AgentRepositoryType;
+  private capturedTraceId: string | undefined;
 
   constructor({ agentId, projectId, agentRepository }: HttpAgentAdapterParams) {
     super();
@@ -38,6 +40,11 @@ export class HttpAgentAdapter extends AgentAdapter {
     this.agentId = agentId;
     this.projectId = projectId;
     this.agentRepository = agentRepository;
+  }
+
+  /** Returns the trace ID captured during the most recent HTTP request. */
+  getTraceId(): string | undefined {
+    return this.capturedTraceId;
   }
 
   static create({
@@ -126,6 +133,8 @@ export class HttpAgentAdapter extends AgentAdapter {
     };
     this.applyCustomHeaders(headers, config.headers);
     this.applyAuthenticationHeaders(headers, config.auth);
+    const { traceId } = injectTraceContextHeaders({ headers });
+    this.capturedTraceId = traceId;
     return headers;
   }
 
