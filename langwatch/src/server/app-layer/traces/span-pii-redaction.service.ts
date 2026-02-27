@@ -3,6 +3,7 @@ import {
   clearPII as defaultClearPII,
   type PIICheckOptions,
 } from "~/server/background/workers/collector/piiCheck";
+import { createLogger } from "~/utils/logger/server";
 import {
   DEFAULT_PII_REDACTION_LEVEL,
   type PIIRedactionLevel,
@@ -31,6 +32,13 @@ export const DEFAULT_PII_BEARING_ATTRIBUTE_KEYS = new Set([
 ]);
 
 /**
+ * Maximum attribute value length (in characters) for PII redaction.
+ * Matches the Presidio truncation limit in piiCheck.ts — values beyond this
+ * are only partially scanned anyway, so skip the expensive call entirely.
+ */
+export const DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH = 250_000;
+
+/**
  * Function type for PII clearing.
  */
 export type ClearPIIFunction = (
@@ -51,6 +59,8 @@ export interface OtlpSpanPiiRedactionServiceDependencies {
   isLangevalsConfigured: boolean;
   /** Whether running in production (NODE_ENV === "production") */
   isProduction: boolean;
+  /** Maximum attribute value length for PII redaction; values exceeding this are skipped */
+  piiRedactionMaxAttributeLength: number;
 }
 
 /** Cached default dependencies, lazily initialized */
@@ -64,6 +74,8 @@ function getDefaultDependencies(): OtlpSpanPiiRedactionServiceDependencies {
       piiBearingAttributeKeys: DEFAULT_PII_BEARING_ATTRIBUTE_KEYS,
       isLangevalsConfigured: !!env.LANGEVALS_ENDPOINT,
       isProduction: env.NODE_ENV === "production",
+      piiRedactionMaxAttributeLength:
+        DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH,
     };
   }
   return cachedDefaultDependencies;
@@ -77,6 +89,9 @@ function getDefaultDependencies(): OtlpSpanPiiRedactionServiceDependencies {
  */
 export class OtlpSpanPiiRedactionService {
   private readonly deps: OtlpSpanPiiRedactionServiceDependencies;
+  private readonly logger = createLogger(
+    "langwatch:trace-processing:span-pii-redaction-service",
+  );
 
   constructor(deps: Partial<OtlpSpanPiiRedactionServiceDependencies> = {}) {
     this.deps = { ...getDefaultDependencies(), ...deps };
@@ -174,6 +189,20 @@ export class OtlpSpanPiiRedactionService {
         attr.value.stringValue !== undefined &&
         attr.value.stringValue !== null
       ) {
+        if (
+          attr.value.stringValue.length >
+          this.deps.piiRedactionMaxAttributeLength
+        ) {
+          this.logger.warn(
+            {
+              attributeKey: attr.key,
+              valueLength: attr.value.stringValue.length,
+              maxLength: this.deps.piiRedactionMaxAttributeLength,
+            },
+            "Skipping PII redaction for oversized attribute value",
+          );
+          continue;
+        }
         promises.push(this.deps.clearPII(attr.value, ["stringValue"], options));
       }
     }
