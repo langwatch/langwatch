@@ -202,7 +202,6 @@ export class SimulationRunnerService {
           agentId: target.referenceId,
           projectId,
           prisma: this.prisma,
-          batchRunId,
         });
       case "code":
         throw new Error(

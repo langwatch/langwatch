@@ -673,37 +673,6 @@ describe("HttpAgentAdapter", () => {
 
       expect(mockInjectTraceContextHeaders).toHaveBeenCalledWith({
         headers: expect.objectContaining({ "Content-Type": "application/json" }),
-        batchRunId: undefined,
-      });
-    });
-
-    describe("when constructed with batchRunId", () => {
-      it("passes batchRunId to injectTraceContextHeaders", async () => {
-        const { ssrfSafeFetch } = await import("~/utils/ssrfProtection");
-        const mockFetch = vi.mocked(ssrfSafeFetch);
-        mockFetch.mockResolvedValue(
-          new Response(JSON.stringify({ result: "ok" }), {
-            headers: { "content-type": "application/json" },
-          }),
-        );
-
-        const agent = createHttpAgent();
-        const repository = createMockAgentRepository(agent);
-        const adapter = new HttpAgentAdapter({
-          agentId: "agent-123",
-          projectId: "project-123",
-          agentRepository: repository,
-          batchRunId: "batch_abc123",
-        });
-
-        await adapter.call(
-          createAgentInput([{ role: "user", content: "Hello" }]),
-        );
-
-        expect(mockInjectTraceContextHeaders).toHaveBeenCalledWith({
-          headers: expect.any(Object),
-          batchRunId: "batch_abc123",
-        });
       });
     });
 
@@ -725,7 +694,6 @@ describe("HttpAgentAdapter", () => {
           agentId: "agent-123",
           projectId: "project-123",
           agentRepository: repository,
-          batchRunId: "batch_xyz",
         });
 
         await adapter.call(
@@ -737,7 +705,6 @@ describe("HttpAgentAdapter", () => {
             "Content-Type": "application/json",
             "X-Custom": "custom-value",
           }),
-          batchRunId: "batch_xyz",
         });
       });
     });

@@ -20,7 +20,6 @@ interface HttpAgentAdapterParams {
   agentId: string;
   projectId: string;
   agentRepository: AgentRepositoryType;
-  batchRunId?: string;
 }
 
 /**
@@ -33,16 +32,14 @@ export class HttpAgentAdapter extends AgentAdapter {
   private readonly agentId: string;
   private readonly projectId: string;
   private readonly agentRepository: AgentRepositoryType;
-  private readonly batchRunId?: string;
   private capturedTraceId: string | undefined;
 
-  constructor({ agentId, projectId, agentRepository, batchRunId }: HttpAgentAdapterParams) {
+  constructor({ agentId, projectId, agentRepository }: HttpAgentAdapterParams) {
     super();
     this.name = "HttpAgentAdapter";
     this.agentId = agentId;
     this.projectId = projectId;
     this.agentRepository = agentRepository;
-    this.batchRunId = batchRunId;
   }
 
   /** Returns the trace ID captured during the most recent HTTP request. */
@@ -54,18 +51,15 @@ export class HttpAgentAdapter extends AgentAdapter {
     agentId,
     projectId,
     prisma,
-    batchRunId,
   }: {
     agentId: string;
     projectId: string;
     prisma: PrismaClient;
-    batchRunId?: string;
   }): HttpAgentAdapter {
     return new HttpAgentAdapter({
       agentId,
       projectId,
       agentRepository: new AgentRepository(prisma),
-      batchRunId,
     });
   }
 
@@ -139,7 +133,7 @@ export class HttpAgentAdapter extends AgentAdapter {
     };
     this.applyCustomHeaders(headers, config.headers);
     this.applyAuthenticationHeaders(headers, config.auth);
-    const { traceId } = injectTraceContextHeaders({ headers, batchRunId: this.batchRunId });
+    const { traceId } = injectTraceContextHeaders({ headers });
     this.capturedTraceId = traceId;
     return headers;
   }

@@ -304,23 +304,6 @@ describe("SerializedHttpAgentAdapter", () => {
 
       expect(mockInjectTraceContextHeaders).toHaveBeenCalledWith({
         headers: expect.objectContaining({ "Content-Type": "application/json" }),
-        batchRunId: undefined,
-      });
-    });
-
-    describe("when constructed with batchRunId", () => {
-      it("passes batchRunId to injectTraceContextHeaders", async () => {
-        const adapter = new SerializedHttpAgentAdapter({
-          config: defaultConfig,
-          batchRunId: "batch_abc123",
-        });
-
-        await adapter.call(defaultInput);
-
-        expect(mockInjectTraceContextHeaders).toHaveBeenCalledWith({
-          headers: expect.any(Object),
-          batchRunId: "batch_abc123",
-        });
       });
     });
 
@@ -330,10 +313,7 @@ describe("SerializedHttpAgentAdapter", () => {
           ...defaultConfig,
           headers: [{ key: "X-Custom", value: "custom-value" }],
         };
-        const adapter = new SerializedHttpAgentAdapter({
-          config,
-          batchRunId: "batch_xyz",
-        });
+        const adapter = new SerializedHttpAgentAdapter(config);
 
         await adapter.call(defaultInput);
 
@@ -342,7 +322,6 @@ describe("SerializedHttpAgentAdapter", () => {
             "Content-Type": "application/json",
             "X-Custom": "custom-value",
           }),
-          batchRunId: "batch_xyz",
         });
       });
     });
