@@ -128,10 +128,9 @@ const server = createServer(async (req, res) => {
 
   // Log trace context headers when present (for OTEL propagation debugging)
   const traceparent = req.headers["traceparent"];
-  const scenarioRun = req.headers["x-langwatch-scenario-run"];
   if (traceparent) {
     console.log(
-      `[${timestamp}] Trace context: traceparent=${traceparent}, scenario-run=${scenarioRun ?? "none"}`,
+      `[${timestamp}] Trace context: traceparent=${traceparent}`,
     );
   }
 

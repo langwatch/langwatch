@@ -99,7 +99,6 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
     adapterData,
     modelParams,
     nlpServiceUrl,
-    batchRunId: context.batchRunId,
   });
   const model = createModelFromParams(modelParams, nlpServiceUrl);
 

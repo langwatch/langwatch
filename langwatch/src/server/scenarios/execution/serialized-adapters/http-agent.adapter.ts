@@ -19,11 +19,6 @@ const liquid = new Liquid();
 
 const DEFAULT_SCENARIO_THREAD_ID = "scenario-test";
 
-interface SerializedHttpAgentAdapterParams {
-  config: HttpAgentData;
-  batchRunId?: string;
-}
-
 /**
  * Serialized HTTP agent adapter that uses pre-fetched configuration.
  * No database access required.
@@ -32,20 +27,12 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
   role = AgentRole.AGENT;
 
   private readonly config: HttpAgentData;
-  private readonly batchRunId?: string;
   private capturedTraceId: string | undefined;
 
-  constructor(params: HttpAgentData | SerializedHttpAgentAdapterParams) {
+  constructor(config: HttpAgentData) {
     super();
     this.name = "SerializedHttpAgentAdapter";
-
-    // Support both legacy (HttpAgentData) and new (params object) constructors
-    if ("config" in params) {
-      this.config = params.config;
-      this.batchRunId = params.batchRunId;
-    } else {
-      this.config = params;
-    }
+    this.config = config;
   }
 
   /** Returns the trace ID captured during the most recent HTTP request. */
@@ -74,7 +61,7 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
 
     Object.assign(headers, applyAuthentication(this.config.auth));
 
-    const { traceId } = injectTraceContextHeaders({ headers, batchRunId: this.batchRunId });
+    const { traceId } = injectTraceContextHeaders({ headers });
     this.capturedTraceId = traceId;
 
     return headers;

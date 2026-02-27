@@ -40,10 +40,7 @@ We will propagate W3C trace context headers in HTTP adapter requests and query t
 
 ### Header injection
 
-Both `HttpAgentAdapter` (direct execution) and `SerializedHttpAgentAdapter` (child process) will inject two headers on every outbound request:
-
-- **`traceparent`**: Standard W3C trace context header, propagated from the active OTEL context using `@opentelemetry/api` propagation. The child process's own TracerProvider supplies the trace ID, which remains consistent across all turns of a conversation.
-- **`x-langwatch-scenario-run`**: LangWatch-specific correlation header containing the batch run ID. Enables platform-level correlation independent of OTEL.
+Both `HttpAgentAdapter` (direct execution) and `SerializedHttpAgentAdapter` (child process) will inject the standard W3C `traceparent` header on every outbound request, propagated from the active OTEL context using `@opentelemetry/api` propagation. The child process's own TracerProvider supplies the trace ID, which remains consistent across all turns of a conversation.
 
 When no active OTEL context exists, requests proceed without trace headers — no error thrown.
 

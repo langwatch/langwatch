@@ -1,12 +1,9 @@
 /**
- * Injects W3C trace context and LangWatch correlation headers
- * into outbound HTTP requests for scenario execution.
+ * Injects W3C trace context headers into outbound HTTP requests
+ * for scenario execution.
  *
  * Uses @opentelemetry/api propagation to inject `traceparent` from the
- * active OTEL context, and adds `x-langwatch-scenario-run` for
- * platform-level correlation.
- *
- * Silently no-ops when no active OTEL context exists.
+ * active OTEL context. Silently no-ops when no active OTEL context exists.
  */
 
 import {
@@ -14,8 +11,6 @@ import {
   propagation,
   trace,
 } from "@opentelemetry/api";
-
-const LANGWATCH_SCENARIO_RUN_HEADER = "x-langwatch-scenario-run";
 
 interface InjectResult {
   headers: Record<string, string>;
@@ -27,17 +22,12 @@ interface InjectResult {
  * Mutates the headers object in place and returns it along with the captured trace ID.
  *
  * - Injects `traceparent` (and optionally `tracestate`) via W3C propagation
- * - Injects `x-langwatch-scenario-run` with the batch run ID
  * - Captures the active trace ID for explicit propagation to the judge
- *
- * When no active OTEL context exists, only the correlation header is added.
  */
 export function injectTraceContextHeaders({
   headers,
-  batchRunId,
 }: {
   headers: Record<string, string>;
-  batchRunId?: string;
 }): InjectResult {
   // Inject W3C traceparent from active OTEL context
   const activeContext = otelContext.active();
@@ -45,11 +35,6 @@ export function injectTraceContextHeaders({
 
   // Capture trace ID at injection time for explicit propagation
   const traceId = getActiveTraceId();
-
-  // Inject LangWatch correlation header
-  if (batchRunId) {
-    headers[LANGWATCH_SCENARIO_RUN_HEADER] = batchRunId;
-  }
 
   return { headers, traceId };
 }

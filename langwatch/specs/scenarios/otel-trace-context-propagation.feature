@@ -6,7 +6,7 @@ Feature: OTEL Trace Context Propagation for HTTP Scenario Targets
   query ES for those spans before judge evaluation.
 
   This feature covers:
-  1. Header injection (traceparent + x-langwatch-scenario-run)
+  1. Header injection (traceparent)
   2. Trace ID collection across conversation turns
   3. ES span query with retry (spans arrive asynchronously)
   4. Feeding spans to judge via JudgeSpanCollector interface
@@ -27,22 +27,10 @@ Feature: OTEL Trace Context Propagation for HTTP Scenario Targets
     And the trace ID in the header matches the child process trace context
 
   @unit
-  Scenario: Serialized HTTP adapter injects LangWatch correlation header
-    Given a scenario run with a known batch run ID
-    When the serialized HTTP adapter makes a request to the agent endpoint
-    Then the request includes an "x-langwatch-scenario-run" header with the batch run ID
-
-  @unit
   Scenario: Direct HTTP adapter injects traceparent header
     Given an active OTEL trace context in the main process
     When the direct HTTP adapter makes a request to the agent endpoint
     Then the request includes a valid W3C "traceparent" header
-
-  @unit
-  Scenario: Direct HTTP adapter injects LangWatch correlation header
-    Given a scenario run with a known batch run ID
-    When the direct HTTP adapter makes a request to the agent endpoint
-    Then the request includes an "x-langwatch-scenario-run" header with the batch run ID
 
   @unit
   Scenario: Trace headers coexist with custom headers

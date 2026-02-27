@@ -9,7 +9,6 @@
  *
  * Covers feature spec scenarios:
  * - Serialized HTTP adapter injects traceparent header
- * - Serialized HTTP adapter injects LangWatch correlation header
  * - Trace headers coexist with custom headers
  * - Same trace ID is propagated across all turns of a conversation
  * - Adapter records the propagated trace ID for later ES query
@@ -116,29 +115,6 @@ describe("HTTP trace context propagation", () => {
         expect(traceparent).toMatch(W3C_TRACEPARENT_REGEX);
       });
 
-      it("includes x-langwatch-scenario-run header with the batch run ID", async () => {
-        const tracer = trace.getTracer("test");
-        const span = tracer.startSpan("test-scenario");
-        const ctx = trace.setSpan(context.active(), span);
-        const batchRunId = "batch_test_123";
-
-        try {
-          await context.with(ctx, async () => {
-            const adapter = new SerializedHttpAgentAdapter({
-              config: createConfig(),
-              batchRunId,
-            });
-            await adapter.call(createInput());
-          });
-        } finally {
-          span.end();
-        }
-
-        const requests = echoServer.getReceivedRequests();
-        const lastRequest = requests[requests.length - 1]!;
-        expect(lastRequest.headers["x-langwatch-scenario-run"]).toBe(batchRunId);
-      });
-
       it("returns the propagated trace ID via getTraceId()", async () => {
         const tracer = trace.getTracer("test");
         const span = tracer.startSpan("test-scenario");
@@ -172,10 +148,7 @@ describe("HTTP trace context propagation", () => {
 
         try {
           await context.with(ctx, async () => {
-            const adapter = new SerializedHttpAgentAdapter({
-              config: createConfig(),
-              batchRunId: "batch_multi",
-            });
+            const adapter = new SerializedHttpAgentAdapter(createConfig());
 
             // Simulate 3 turns
             await adapter.call(createInput({
@@ -233,15 +206,14 @@ describe("HTTP trace context propagation", () => {
 
         try {
           await context.with(ctx, async () => {
-            const adapter = new SerializedHttpAgentAdapter({
-              config: createConfig({
+            const adapter = new SerializedHttpAgentAdapter(
+              createConfig({
                 headers: [
                   { key: "X-Custom-Auth", value: "token-abc" },
                   { key: "X-Request-Source", value: "test-suite" },
                 ],
               }),
-              batchRunId: "batch_custom",
-            });
+            );
             await adapter.call(createInput());
           });
         } finally {
@@ -255,9 +227,8 @@ describe("HTTP trace context propagation", () => {
         expect(lastRequest.headers["x-custom-auth"]).toBe("token-abc");
         expect(lastRequest.headers["x-request-source"]).toBe("test-suite");
 
-        // Trace headers are also present
+        // Trace header is also present
         expect(lastRequest.headers["traceparent"]).toMatch(W3C_TRACEPARENT_REGEX);
-        expect(lastRequest.headers["x-langwatch-scenario-run"]).toBe("batch_custom");
       });
     });
   });

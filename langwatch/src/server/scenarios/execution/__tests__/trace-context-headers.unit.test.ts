@@ -58,14 +58,6 @@ describe("injectTraceContextHeaders()", () => {
       );
     });
 
-    it("injects x-langwatch-scenario-run header with batch run ID", () => {
-      const headers: Record<string, string> = {};
-
-      const result = injectTraceContextHeaders({ headers, batchRunId: "batch_abc123" });
-
-      expect(result.headers["x-langwatch-scenario-run"]).toBe("batch_abc123");
-    });
-
     it("returns the captured trace ID", () => {
       const headers: Record<string, string> = {};
 
@@ -80,12 +72,11 @@ describe("injectTraceContextHeaders()", () => {
         "X-Custom": "custom-value",
       };
 
-      const result = injectTraceContextHeaders({ headers, batchRunId: "batch_abc123" });
+      const result = injectTraceContextHeaders({ headers });
 
       expect(result.headers["Content-Type"]).toBe("application/json");
       expect(result.headers["X-Custom"]).toBe("custom-value");
       expect(result.headers["traceparent"]).toBeDefined();
-      expect(result.headers["x-langwatch-scenario-run"]).toBe("batch_abc123");
     });
   });
 
@@ -118,23 +109,6 @@ describe("injectTraceContextHeaders()", () => {
       expect(result.traceId).toBeUndefined();
     });
 
-    it("still injects correlation header when batchRunId provided", () => {
-      const headers: Record<string, string> = {};
-
-      injectTraceContextHeaders({ headers, batchRunId: "batch_xyz" });
-
-      expect(headers["x-langwatch-scenario-run"]).toBe("batch_xyz");
-    });
-  });
-
-  describe("when batchRunId is not provided", () => {
-    it("does not add x-langwatch-scenario-run header", () => {
-      const headers: Record<string, string> = {};
-
-      injectTraceContextHeaders({ headers });
-
-      expect(headers["x-langwatch-scenario-run"]).toBeUndefined();
-    });
   });
 });
 
