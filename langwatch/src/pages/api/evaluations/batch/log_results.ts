@@ -1,11 +1,9 @@
-import { generate } from "@langwatch/ksuid";
 import { ExperimentType, type Project } from "@prisma/client";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { type ZodError, z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { getApp } from "~/server/app-layer/app";
 import { DomainError } from "~/server/app-layer/domain-error";
-import { KSUID_RESOURCES } from "~/utils/constants";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { prisma } from "../../../../server/db";
 import {
@@ -502,7 +500,10 @@ const dispatchToClickHouse = async (
   if (project.featureEventSourcingEvaluationIngestion) {
     const app = getApp();
     for (const evaluation of batchEvaluation.evaluations) {
-      const evaluationId = generate(KSUID_RESOURCES.EVALUATION).toString();
+      // Use a deterministic ID so repeated API calls (e.g. SDK progress
+      // updates) don't create duplicate evaluation aggregates.
+      const targetId = evaluation.target_id ?? "default";
+      const evaluationId = `local_eval_${runId}_${evaluation.evaluator}_${evaluation.index}_${targetId}`;
       try {
         await app.evaluations.startEvaluation({
           tenantId: project.id,
