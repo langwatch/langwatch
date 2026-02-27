@@ -17,7 +17,6 @@ import { SpanStorageService } from "./traces/span-storage.service";
 import { TokenizerService } from "./traces/tokenizer.service";
 import { TraceSummaryService } from "./traces/trace-summary.service";
 import type { SubscriptionService } from "./subscription/subscription.service";
-import { NullSubscriptionService } from "./subscription/subscription.service";
 import { EESubscriptionService } from "../../../ee/billing/services/subscription.service";
 import { createStripeClient } from "../../../ee/billing/stripe/stripeClient";
 import { createSeatEventSubscriptionFns } from "../../../ee/billing/services/seatEventSubscription";
@@ -60,7 +59,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const projects = ProjectService.create(prisma);
   const usage = UsageService.create({ prisma, organizationService: organizations });
 
-  let subscription: SubscriptionService;
+  let subscription: SubscriptionService | undefined;
   if (config.isSaas) {
     const stripeClient = createStripeClient();
     const seatEventFns = createSeatEventSubscriptionFns({ stripe: stripeClient, db: prisma });
@@ -70,8 +69,6 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       itemCalculator: subscriptionItemCalculator,
       seatEventFns,
     });
-  } else {
-    subscription = new NullSubscriptionService();
   }
 
   const monitors = MonitorService.create(prisma);
@@ -167,7 +164,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     projects: ProjectService.create(null),
     tokenizer: TokenizerService.create({ disableTokenization: true }),
     usage: UsageService.create({ prisma: null, organizationService: OrganizationService.create(null) }),
-    subscription: new NullSubscriptionService(),
+    subscription: undefined,
     commands: {
       traces: { recordSpan: noop, assignTopic: noop, assignSatisfactionScore: noop } as AppCommands["traces"],
       evaluations: {

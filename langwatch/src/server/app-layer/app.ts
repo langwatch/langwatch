@@ -19,7 +19,7 @@ export class App {
   readonly projects: AppDependencies["projects"];
   readonly tokenizer: AppDependencies["tokenizer"];
   readonly usage: AppDependencies["usage"];
-  readonly subscription: AppDependencies["subscription"];
+  readonly subscription?: AppDependencies["subscription"];
 
   /** Keeps EventSourcing infrastructure safe from the greedy garbage men */
   private readonly _eventSourcing?: EventSourcing;

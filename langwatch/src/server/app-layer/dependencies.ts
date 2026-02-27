@@ -29,7 +29,7 @@ export interface AppDependencies {
   projects: ProjectService;
   tokenizer: TokenizerService;
   usage: UsageService;
-  subscription: SubscriptionService;
+  subscription?: SubscriptionService;
   commands: AppCommands;
 
   /** Internal — keeps EventSourcing infrastructure alive for GC. */
