@@ -1,0 +1,36 @@
+{
+  "name": "skynet",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -n server,vite -c blue,green \"SKYNET_SKIP_AUTH=1 node --experimental-transform-types src/server/main.ts\" \"vite\"",
+    "build": "vite build",
+    "start": "node --experimental-transform-types src/server/main.ts"
+  },
+  "dependencies": {
+    "@chakra-ui/icons": "^2.2.4",
+    "@chakra-ui/react": "^2.10.4",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@tanstack/react-virtual": "^3.13.19",
+    "bullmq": "^5.70.1",
+    "dotenv": "^17.3.1",
+    "express": "^5.1.0",
+    "framer-motion": "^11.18.0",
+    "ioredis": "^5.9.3",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.1.0",
+    "recharts": "^2.15.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "concurrently": "^9.1.0",
+    "typescript": "^5.9.3",
+    "vite": "^6.0.0"
+  }
+}
