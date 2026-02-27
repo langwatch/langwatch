@@ -71,7 +71,7 @@ export interface SetupObservabilityOptions {
          * - 'simple': Exports spans immediately (good for debugging)
          * - 'batch': Batches spans for better performance (recommended for production)
          *
-         * @default 'simple'
+         * @default 'batch'
          */
         processorType?: "simple" | "batch";
       }
@@ -332,6 +332,13 @@ export interface SetupObservabilityOptions {
      * Disable the automatic shutdown of the observability system when the application
      * terminates.
      *
+     * When enabled (default), the SDK registers handlers for `beforeExit` (event loop
+     * drains), `SIGINT` (Ctrl+C), and `SIGTERM` (external kill / Docker stop) to flush
+     * pending traces before the process exits.
+     *
+     * Note: `process.exit()` calls (e.g. from test runners like vitest) bypass these
+     * handlers. In those environments, call `shutdown()` explicitly in your teardown.
+     *
      * @default false
      */
     disableAutoShutdown?: boolean;
@@ -340,18 +347,19 @@ export interface SetupObservabilityOptions {
 
 /**
  * Handle returned from observability setup. If you disable the automatic shutdown,
- * do you are running in an environment where you can't listen to SIGTERM to handle
- * shutdowns, you can use the shutdown function to manually shut down the
- * observability system, and ensure that no data is lost.
+ * or are running in an environment where process signals are not available (e.g.
+ * test runners that call `process.exit()`), you can use the shutdown function to
+ * manually shut down the observability system and ensure that no data is lost.
  *
  * @example
  * ```typescript
- * const { shutdown } = setupObservability(options);
+ * const { shutdown } = setupObservability({
+ *   advanced: { disableAutoShutdown: true }
+ * });
  *
- * // Shutdown when the application is terminating
- * process.on('SIGTERM', async () => {
+ * // Manual shutdown in test teardown
+ * afterAll(async () => {
  *   await shutdown();
- *   process.exit(0);
  * });
  * ```
  */
