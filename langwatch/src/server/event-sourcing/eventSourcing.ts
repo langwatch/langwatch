@@ -302,26 +302,30 @@ export class EventSourcing {
 
   /**
    * Strips routing metadata and looks up the registry entry for a job payload.
+   * Returns null when the job type is not (yet) registered — e.g. stale Redis
+   * jobs from a previous deployment picked up before all pipelines register.
    */
-  private lookupEntry(payload: Record<string, unknown>): { entry: JobRegistryEntry; clean: Record<string, unknown> } {
+  private lookupEntry(payload: Record<string, unknown>): { entry: JobRegistryEntry; clean: Record<string, unknown> } | null {
     const pipelineName = payload.__pipelineName as string;
     const jobType = payload.__jobType as string;
     const jobName = payload.__jobName as string;
 
     if (!pipelineName || !jobType || !jobName) {
-      throw new ConfigurationError(
-        "EventSourcing",
-        `Job payload missing routing metadata (__pipelineName=${pipelineName}, __jobType=${jobType}, __jobName=${jobName})`,
+      logger.warn(
+        { pipelineName, jobType, jobName },
+        "Job payload missing routing metadata, skipping",
       );
+      return null;
     }
 
     const registryKey = `${pipelineName}:${jobType}:${jobName}`;
     const entry = this._globalJobRegistry.get(registryKey);
     if (!entry) {
-      throw new ConfigurationError(
-        "EventSourcing",
-        `Unknown job "${registryKey}" in global queue`,
+      logger.warn(
+        { registryKey },
+        "Unknown job in global queue (pipeline not yet registered or removed), skipping",
       );
+      return null;
     }
     const { __pipelineName: _p, __jobType: _t, __jobName: _n, ...clean } = payload;
     return { entry, clean };
@@ -368,21 +372,28 @@ export class EventSourcing {
     const definition = {
       name: queueName,
       groupKey: (payload: Record<string, unknown>) => {
-        const { entry, clean } = this.lookupEntry(payload);
-        return entry.groupKeyFn(clean);
+        const result = this.lookupEntry(payload);
+        if (!result) return "__unknown__";
+        return result.entry.groupKeyFn(result.clean);
       },
       score: (payload: Record<string, unknown>) => {
-        const { entry, clean } = this.lookupEntry(payload);
-        return entry.scoreFn(clean);
+        const result = this.lookupEntry(payload);
+        if (!result) return 0;
+        return result.entry.scoreFn(result.clean);
       },
       spanAttributes: (payload: Record<string, unknown>) => {
-        const { entry, clean } = this.lookupEntry(payload);
-        if (!entry.spanAttributes) return {};
-        return entry.spanAttributes(clean);
+        const result = this.lookupEntry(payload);
+        if (!result) return {};
+        if (!result.entry.spanAttributes) return {};
+        return result.entry.spanAttributes(result.clean);
       },
       process: async (payload: Record<string, unknown>) => {
-        const { entry, clean } = this.lookupEntry(payload);
-        await entry.process(clean);
+        const result = this.lookupEntry(payload);
+        if (!result) {
+          logger.warn({ payload }, "Skipping unknown job in global queue");
+          return;
+        }
+        await result.entry.process(result.clean);
       },
     };
 
