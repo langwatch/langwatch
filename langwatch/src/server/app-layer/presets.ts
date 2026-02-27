@@ -184,6 +184,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         finishRun: noop,
         deleteRun: noop,
       } as AppCommands["simulations"],
+      billing: {
+        reportUsageForMonth: noop,
+      } as AppCommands["billing"],
     },
     ...overrides,
   });
