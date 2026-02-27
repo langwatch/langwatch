@@ -99,7 +99,7 @@ describe("billingMeterDispatchReactor", () => {
       clearOrgCache();
 
       const reactor = createBillingMeterDispatchReactor({
-        dispatchReportUsageForMonth: mockDispatch,
+        getDispatch: () => mockDispatch,
       });
 
       // Use a date in the middle of the month (past grace period)
@@ -148,7 +148,7 @@ describe("billingMeterDispatchReactor", () => {
       clearOrgCache();
 
       const reactor = createBillingMeterDispatchReactor({
-        dispatchReportUsageForMonth: mockDispatch,
+        getDispatch: () => mockDispatch,
       });
 
       vi.useFakeTimers();
@@ -192,7 +192,7 @@ describe("billingMeterDispatchReactor", () => {
       clearOrgCache();
 
       const reactor = createBillingMeterDispatchReactor({
-        dispatchReportUsageForMonth: mockDispatch,
+        getDispatch: () => mockDispatch,
       });
 
       await reactor.handle(makeEvent("orphan-proj"), makeContext("orphan-proj"));
@@ -222,7 +222,7 @@ describe("billingMeterDispatchReactor", () => {
       clearOrgCache();
 
       const reactor = createBillingMeterDispatchReactor({
-        dispatchReportUsageForMonth: mockDispatch,
+        getDispatch: () => mockDispatch,
       });
 
       vi.useFakeTimers();
@@ -260,7 +260,7 @@ describe("billingMeterDispatchReactor", () => {
       clearOrgCache();
 
       const reactor = createBillingMeterDispatchReactor({
-        dispatchReportUsageForMonth: mockDispatch,
+        getDispatch: () => mockDispatch,
       });
 
       vi.useFakeTimers();
@@ -310,7 +310,7 @@ describe("billingMeterDispatchReactor", () => {
       clearOrgCache();
 
       const reactor = createBillingMeterDispatchReactor({
-        dispatchReportUsageForMonth: mockDispatch,
+        getDispatch: () => mockDispatch,
       });
 
       vi.useFakeTimers();
@@ -342,7 +342,7 @@ describe("billingMeterDispatchReactor", () => {
       clearOrgCache();
 
       const reactor = createBillingMeterDispatchReactor({
-        dispatchReportUsageForMonth: mockDispatch,
+        getDispatch: () => mockDispatch,
       });
 
       vi.useFakeTimers();
@@ -364,7 +364,7 @@ describe("billingMeterDispatchReactor", () => {
       );
 
       const reactor = createBillingMeterDispatchReactor({
-        dispatchReportUsageForMonth: vi.fn(),
+        getDispatch: () => vi.fn(),
       });
 
       expect(reactor.options?.runIn).toEqual(["worker"]);

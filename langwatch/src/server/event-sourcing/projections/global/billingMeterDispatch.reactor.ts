@@ -28,9 +28,7 @@ const GRACE_PERIOD_DAYS = 3;
  * current and previous billing month to catch late-arriving events.
  */
 export function createBillingMeterDispatchReactor(deps: {
-  dispatchReportUsageForMonth: (
-    data: ReportUsageForMonthCommandData,
-  ) => Promise<void>;
+  getDispatch: () => (data: ReportUsageForMonthCommandData) => Promise<void>;
 }): ReactorDefinition<Event> {
   return {
     name: "billingMeterDispatch",
@@ -56,10 +54,12 @@ export function createBillingMeterDispatchReactor(deps: {
       const billingMonth = getBillingMonth(now);
 
       try {
+        const dispatch = deps.getDispatch();
+
         // Grace period: dispatch for previous month during first days of a new month
         if (now.getUTCDate() <= GRACE_PERIOD_DAYS) {
           const prevMonth = getPreviousBillingMonth(now);
-          await deps.dispatchReportUsageForMonth({
+          await dispatch({
             organizationId: orgId,
             billingMonth: prevMonth,
             tenantId: orgId,
@@ -68,7 +68,7 @@ export function createBillingMeterDispatchReactor(deps: {
         }
 
         // Always dispatch for current month
-        await deps.dispatchReportUsageForMonth({
+        await dispatch({
           organizationId: orgId,
           billingMonth,
           tenantId: orgId,
