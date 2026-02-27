@@ -115,7 +115,7 @@ ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_summaries RENAME COLUMN IF EXISTS Proje
 
 -- Recreate experiment_run_items with original Id column name
 -- +goose StatementBegin
-DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.experiment_run_items SYNC;
+-- DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.experiment_run_items SYNC;
 -- +goose StatementEnd
 
 -- +goose StatementBegin
