@@ -266,6 +266,7 @@ describe("orgBillableEventsMeterStore", () => {
           }),
         ],
         format: "JSONEachRow",
+        clickhouse_settings: { wait_for_async_insert: 1 },
       });
     });
   });

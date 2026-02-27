@@ -72,6 +72,7 @@ export class EvaluationRunClickHouseRepository
         table: TABLE_NAME,
         values: [record],
         format: "JSONEachRow",
+        clickhouse_settings: { wait_for_async_insert: 1 },
       });
 
       logger.debug(
