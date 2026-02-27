@@ -9,7 +9,6 @@ function generateDeterministicResultId({
   targetId,
   resultType,
   evaluatorId,
-  timestampMs,
 }: {
   tenantId: string;
   runId: string;
@@ -17,7 +16,6 @@ function generateDeterministicResultId({
   targetId: string;
   resultType: "target" | "evaluator";
   evaluatorId: string | null;
-  timestampMs: number;
 }): string {
   if (resultType === "evaluator" && !evaluatorId) {
     throw new Error("evaluatorId is required for evaluator results");
@@ -33,7 +31,8 @@ function generateDeterministicResultId({
   const hash = createHash("sha256").update(hashInput).digest();
   const instanceIdentifier = new Uint8Array(hash.subarray(0, 8));
   const instance = new Instance(Instance.schemes.RANDOM, instanceIdentifier);
-  const timestampSeconds = Math.floor(timestampMs / 1000);
+  // Use epoch 0 so the ID depends only on the business key hash
+  const timestampSeconds = 0;
   const sequenceId = 0;
 
   const ksuid = new Ksuid(

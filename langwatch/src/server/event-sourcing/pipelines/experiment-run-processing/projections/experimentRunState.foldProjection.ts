@@ -45,6 +45,27 @@ export interface ExperimentRunState extends Projection<ExperimentRunStateData> {
   data: ExperimentRunStateData;
 }
 
+function mergeTargetsJson(
+  existingJson: string,
+  incoming: Array<{ id: string; [k: string]: unknown }>,
+): string {
+  if (incoming.length === 0) return existingJson;
+
+  let existing: Array<{ id: string; [k: string]: unknown }> = [];
+  try {
+    existing = JSON.parse(existingJson);
+  } catch {
+    // keep empty
+  }
+
+  const byId = new Map(existing.map((t) => [t.id, t]));
+  for (const t of incoming) {
+    byId.set(t.id, t);
+  }
+
+  return JSON.stringify(Array.from(byId.values()));
+}
+
 function init(): ExperimentRunStateData {
   return {
     RunId: "",
@@ -80,7 +101,7 @@ function apply(
       ExperimentId: event.data.experimentId,
       WorkflowVersionId: event.data.workflowVersionId ?? null,
       Total: Math.max(state.Total, event.data.total),
-      Targets: JSON.stringify(event.data.targets),
+      Targets: mergeTargetsJson(state.Targets, event.data.targets ?? []),
       StartedAt: state.StartedAt ?? event.occurredAt,
     };
   }

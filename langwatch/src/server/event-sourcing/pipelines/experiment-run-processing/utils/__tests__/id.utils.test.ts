@@ -10,7 +10,6 @@ describe("IdUtils", () => {
       targetId: "target-1",
       resultType: "target" as const,
       evaluatorId: null,
-      timestampMs: 1000000,
     };
 
     it("generates deterministic IDs (same input = same output)", () => {

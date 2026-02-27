@@ -49,7 +49,6 @@ function mapTargetResultToRecord(
     targetId: event.data.targetId,
     resultType: "target",
     evaluatorId: null,
-    timestampMs: event.timestamp,
   });
 
   return {
@@ -93,7 +92,6 @@ function mapEvaluatorResultToRecord(
     targetId: event.data.targetId,
     resultType: "evaluator",
     evaluatorId: event.data.evaluatorId,
-    timestampMs: event.timestamp,
   });
 
   return {
