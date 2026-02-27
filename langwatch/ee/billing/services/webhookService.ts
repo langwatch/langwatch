@@ -2,6 +2,7 @@ import { Currency, type PrismaClient } from "@prisma/client";
 import type Stripe from "stripe";
 import { createLogger } from "../../../src/utils/logger";
 import { notifySubscriptionEvent } from "../notifications/notificationHandlers";
+import { NUMERIC_OVERRIDE_FIELDS } from "../planProvider";
 import { PlanTypes, SubscriptionStatus } from "../planTypes";
 import type { calculateQuantityForPrice, prices } from "./subscriptionItemCalculator";
 import { isGrowthEventsPrice, isGrowthSeatEventPlan, isGrowthSeatPrice } from "../utils/growthSeatEvent";
@@ -175,10 +176,7 @@ export const createWebhookService = ({
   const cancellationData = () => ({
     status: SubscriptionStatus.CANCELLED,
     endDate: new Date(),
-    maxMembers: null,
-    maxMessagesPerMonth: null,
-    maxProjects: null,
-    evaluationsCredit: null,
+    ...Object.fromEntries(NUMERIC_OVERRIDE_FIELDS.map((f) => [f, null])),
   });
 
   return {

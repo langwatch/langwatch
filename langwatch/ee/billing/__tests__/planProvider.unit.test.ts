@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PLAN_LIMITS, getFreePlanLimits } from "../planLimits";
+import { NUMERIC_OVERRIDE_FIELDS } from "../planProvider";
 import { PlanTypes, SubscriptionStatus } from "../planTypes";
 
 vi.mock("../../../src/env.mjs", () => ({
@@ -200,20 +201,95 @@ describe("createSaaSPlanProvider", () => {
         const subscription = {
           plan: PlanTypes.LAUNCH,
           status: SubscriptionStatus.ACTIVE,
-          maxMembers: 0,
-          maxProjects: 0,
-          maxMessagesPerMonth: 0,
-          evaluationsCredit: 0,
+          ...Object.fromEntries(NUMERIC_OVERRIDE_FIELDS.map((f) => [f, 0])),
         };
 
         const db = createMockDb({ findFirstResult: subscription });
         const provider = createSaaSPlanProvider(db);
         const plan = await provider.getActivePlan("org_1");
 
-        expect(plan.maxMembers).toBe(0);
-        expect(plan.maxProjects).toBe(0);
-        expect(plan.maxMessagesPerMonth).toBe(0);
-        expect(plan.evaluationsCredit).toBe(0);
+        for (const field of NUMERIC_OVERRIDE_FIELDS) {
+          expect(plan[field], `expected ${field} to be 0`).toBe(0);
+        }
+      });
+    });
+
+    describe("when maxWorkflows override is set", () => {
+      it("applies the override (bug fix)", async () => {
+        const subscription = {
+          plan: PlanTypes.LAUNCH,
+          status: SubscriptionStatus.ACTIVE,
+          maxWorkflows: 25,
+          ...Object.fromEntries(
+            NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxWorkflows").map(
+              (f) => [f, null],
+            ),
+          ),
+        };
+
+        const db = createMockDb({ findFirstResult: subscription });
+        const provider = createSaaSPlanProvider(db);
+        const plan = await provider.getActivePlan("org_1");
+
+        expect(plan.maxWorkflows).toBe(25);
+      });
+    });
+
+    describe("when new override fields are set", () => {
+      it.each([
+        ["maxMembersLite", 15],
+        ["maxTeams", 10],
+        ["maxPrompts", 30],
+        ["maxEvaluators", 40],
+        ["maxScenarios", 20],
+        ["maxAgents", 12],
+        ["maxExperiments", 50],
+        ["maxOnlineEvaluations", 18],
+        ["maxDatasets", 25],
+        ["maxDashboards", 8],
+        ["maxCustomGraphs", 15],
+        ["maxAutomations", 22],
+      ] as const)("applies %s override when set to %d", async (field, value) => {
+        const subscription = {
+          plan: PlanTypes.LAUNCH,
+          status: SubscriptionStatus.ACTIVE,
+          [field]: value,
+          ...Object.fromEntries(
+            NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== field).map((f) => [
+              f,
+              null,
+            ]),
+          ),
+        };
+
+        const db = createMockDb({ findFirstResult: subscription });
+        const provider = createSaaSPlanProvider(db);
+        const plan = await provider.getActivePlan("org_1");
+
+        expect(plan[field]).toBe(value);
+      });
+    });
+
+    describe("when all overrides are null", () => {
+      it("falls back to plan defaults for every field", async () => {
+        const subscription = {
+          plan: PlanTypes.LAUNCH,
+          status: SubscriptionStatus.ACTIVE,
+          ...Object.fromEntries(
+            NUMERIC_OVERRIDE_FIELDS.map((f) => [f, null]),
+          ),
+        };
+
+        const db = createMockDb({ findFirstResult: subscription });
+        const provider = createSaaSPlanProvider(db);
+        const plan = await provider.getActivePlan("org_1");
+
+        const basePlan = PLAN_LIMITS[PlanTypes.LAUNCH];
+        for (const field of NUMERIC_OVERRIDE_FIELDS) {
+          expect(plan[field], `expected ${field} to match plan default`).toBe(
+            basePlan[field],
+          );
+        }
       });
     });
 
@@ -222,10 +298,9 @@ describe("createSaaSPlanProvider", () => {
         const subscription = {
           plan: "NONEXISTENT_PLAN",
           status: SubscriptionStatus.ACTIVE,
-          maxMembers: null,
-          maxProjects: null,
-          maxMessagesPerMonth: null,
-          evaluationsCredit: null,
+          ...Object.fromEntries(
+            NUMERIC_OVERRIDE_FIELDS.map((f) => [f, null]),
+          ),
         };
 
         const db = createMockDb({ findFirstResult: subscription });
@@ -235,15 +310,34 @@ describe("createSaaSPlanProvider", () => {
         expect(plan.type).toBe(PlanTypes.FREE);
       });
 
+      it("applies overrides over free defaults", async () => {
+        const subscription = {
+          plan: "NONEXISTENT_PLAN",
+          status: SubscriptionStatus.ACTIVE,
+          maxWorkflows: 50,
+          ...Object.fromEntries(
+            NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxWorkflows").map(
+              (f) => [f, null],
+            ),
+          ),
+        };
+
+        const db = createMockDb({ findFirstResult: subscription });
+        const provider = createSaaSPlanProvider(db);
+        const plan = await provider.getActivePlan("org_1");
+
+        expect(plan.type).toBe(PlanTypes.FREE);
+        expect(plan.maxWorkflows).toBe(50);
+      });
+
       describe("when SEAT_EVENT org has unknown plan key", () => {
         it("returns FREE with 50,000 messages per month", async () => {
           const subscription = {
             plan: "NONEXISTENT_PLAN",
             status: SubscriptionStatus.ACTIVE,
-            maxMembers: null,
-            maxProjects: null,
-            maxMessagesPerMonth: null,
-            evaluationsCredit: null,
+            ...Object.fromEntries(
+              NUMERIC_OVERRIDE_FIELDS.map((f) => [f, null]),
+            ),
           };
 
           const db = createMockDb({
@@ -264,9 +358,11 @@ describe("createSaaSPlanProvider", () => {
             plan: "NONEXISTENT_PLAN",
             status: SubscriptionStatus.ACTIVE,
             maxMembers: 15,
-            maxProjects: null,
-            maxMessagesPerMonth: null,
-            evaluationsCredit: null,
+            ...Object.fromEntries(
+              NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxMembers").map(
+                (f) => [f, null],
+              ),
+            ),
           };
 
           const db = createMockDb({

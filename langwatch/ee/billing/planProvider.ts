@@ -1,8 +1,35 @@
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient, Subscription } from "@prisma/client";
 import { env } from "../../src/env.mjs";
 import type { PlanInfo } from "../licensing/planInfo";
 import { PLAN_LIMITS, getFreePlanLimits } from "./planLimits";
 import { PlanTypes, SubscriptionStatus } from "./planTypes";
+
+// Fields that exist on both PlanInfo (as number) and Subscription (as Int?)
+type NumericOverrideField = {
+  [K in keyof PlanInfo & keyof Subscription]: PlanInfo[K] extends number
+    ? K
+    : never;
+}[keyof PlanInfo & keyof Subscription];
+
+export const NUMERIC_OVERRIDE_FIELDS: NumericOverrideField[] = [
+  "maxMembers",
+  "maxMembersLite",
+  "maxProjects",
+  "maxMessagesPerMonth",
+  "evaluationsCredit",
+  "maxWorkflows",
+  "maxTeams",
+  "maxPrompts",
+  "maxEvaluators",
+  "maxScenarios",
+  "maxAgents",
+  "maxExperiments",
+  "maxOnlineEvaluations",
+  "maxDatasets",
+  "maxDashboards",
+  "maxCustomGraphs",
+  "maxAutomations",
+];
 
 type MinimalUser = {
   id?: string;
@@ -65,18 +92,10 @@ export const createSaaSPlanProvider = (
       });
 
       const customLimits: Partial<PlanInfo> = {};
-      if (activeSubscription?.maxMembers != null) {
-        customLimits.maxMembers = activeSubscription.maxMembers;
-      }
-      if (activeSubscription?.maxProjects != null) {
-        customLimits.maxProjects = activeSubscription.maxProjects;
-      }
-      if (activeSubscription?.maxMessagesPerMonth != null) {
-        customLimits.maxMessagesPerMonth =
-          activeSubscription.maxMessagesPerMonth;
-      }
-      if (activeSubscription?.evaluationsCredit != null) {
-        customLimits.evaluationsCredit = activeSubscription.evaluationsCredit;
+      for (const field of NUMERIC_OVERRIDE_FIELDS) {
+        if (activeSubscription?.[field] != null) {
+          customLimits[field] = activeSubscription[field]!;
+        }
       }
 
       if (!activeSubscription) {
