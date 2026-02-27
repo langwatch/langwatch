@@ -21,6 +21,7 @@ import type {
   DeduplicationConfig,
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
+  QueueSendOptions,
 } from "../../queues";
 import {
   ConfigurationError,
@@ -50,7 +51,7 @@ import { GroupStagingScripts } from "./scripts";
  */
 const GROUP_QUEUE_CONFIG = {
   /** Default global concurrency (max parallel groups) */
-  defaultGlobalConcurrency: 40,
+  defaultGlobalConcurrency: 120,
   /** TTL for the active key (safety net for crashes), in seconds */
   activeTtlSec: 300,
   /** BRPOP timeout in seconds (fallback polling interval) */
@@ -95,8 +96,8 @@ export class GroupQueueProcessorBullMq<
   private readonly process: (payload: Payload) => Promise<void>;
   private readonly spanAttributes?: (payload: Payload) => SemConvAttributes;
   private readonly queue: Queue<Payload, unknown, string>;
-  private readonly worker: Worker<Payload>;
-  private readonly queueEvents: QueueEvents;
+  private readonly worker: Worker<Payload> | null;
+  private readonly queueEvents: QueueEvents | null;
   private readonly delay?: number;
   private readonly deduplication?: DeduplicationConfig<Payload>;
   private readonly groupKey: (payload: Payload) => string;
@@ -105,6 +106,7 @@ export class GroupQueueProcessorBullMq<
   private readonly blockingConnection: IORedis | Cluster;
   private readonly scripts: GroupStagingScripts;
   private readonly globalConcurrency: number;
+  private readonly consumerEnabled: boolean;
 
   private shutdownRequested = false;
   private dispatcherRunning = false;
@@ -113,11 +115,12 @@ export class GroupQueueProcessorBullMq<
   constructor(
     definition: EventSourcedQueueDefinition<Payload>,
     redisConnection?: IORedis | Cluster,
+    options?: { consumerEnabled?: boolean },
   ) {
     const {
       name,
       process,
-      options,
+      options: defOptions,
       delay,
       spanAttributes,
       deduplication,
@@ -141,12 +144,15 @@ export class GroupQueueProcessorBullMq<
     }
 
     this.redisConnection = effectiveConnection;
-    // Dedicated connection for BRPOP to avoid blocking the shared connection
-    this.blockingConnection =
-      "duplicate" in effectiveConnection &&
-      typeof effectiveConnection.duplicate === "function"
-        ? effectiveConnection.duplicate()
-        : effectiveConnection;
+    this.consumerEnabled = options?.consumerEnabled ?? true;
+    // Dedicated connection for BRPOP to avoid blocking the shared connection.
+    // Only needed when the dispatcher loop runs (consumer mode).
+    this.blockingConnection = this.consumerEnabled
+      ? ("duplicate" in effectiveConnection &&
+         typeof effectiveConnection.duplicate === "function"
+          ? effectiveConnection.duplicate()
+          : effectiveConnection)
+      : effectiveConnection;
     this.spanAttributes = spanAttributes;
     this.delay = delay;
     this.deduplication = deduplication;
@@ -156,7 +162,7 @@ export class GroupQueueProcessorBullMq<
     this.jobName = "queue";
     this.process = process;
     this.globalConcurrency =
-      options?.globalConcurrency ?? GROUP_QUEUE_CONFIG.defaultGlobalConcurrency;
+      defOptions?.globalConcurrency ?? GROUP_QUEUE_CONFIG.defaultGlobalConcurrency;
 
     // Initialize Lua scripts wrapper
     this.scripts = new GroupStagingScripts(
@@ -188,82 +194,89 @@ export class GroupQueueProcessorBullMq<
       queueOptions,
     );
 
-    // BullMQ Worker - concurrency matches global group concurrency
-    const workerOptions: WorkerOptions = {
-      connection: this.redisConnection,
-      concurrency: this.globalConcurrency,
-      telemetry: new BullMQOtel(this.queueName),
-    };
-    this.worker = new Worker<Payload>(
-      this.queueName,
-      async (job, token) => this.processJob(job, token),
-      workerOptions,
-    );
-
-    this.worker.on("ready", () => {
-      this.logger.info(
-        { queueName: this.queueName },
-        "Group queue worker ready",
-      );
-    });
-
-    this.worker.on("failed", (job, error) => {
-      this.logger.error(
-        {
-          queueName: this.queueName,
-          jobId: job?.id,
-          error: error instanceof Error ? error.message : String(error),
-          errorStack: error instanceof Error ? error.stack : void 0,
-        },
-        "Group queue job failed",
+    // BullMQ Worker - only created when consuming is enabled (worker processes)
+    if (this.consumerEnabled) {
+      const workerOptions: WorkerOptions = {
+        connection: this.redisConnection,
+        concurrency: this.globalConcurrency,
+        telemetry: new BullMQOtel(this.queueName),
+      };
+      this.worker = new Worker<Payload>(
+        this.queueName,
+        async (job, token) => this.processJob(job, token),
+        workerOptions,
       );
 
-      // On exhausted retries, block the group
-      if (job && job.attemptsMade >= JOB_RETRY_CONFIG.maxAttempts) {
-        const metadata = this.extractGroupMetadata(job);
-        if (metadata) {
-          void this.handleExhaustedRetries(metadata);
-        }
-      }
-    });
+      this.worker.on("ready", () => {
+        this.logger.info(
+          { queueName: this.queueName },
+          "Group queue worker ready",
+        );
+      });
 
-    // Listen for completed jobs to trigger group completion
-    this.worker.on("completed", (job) => {
-      const metadata = this.extractGroupMetadata(job);
-      if (metadata) {
-        void this.handleJobCompleted(metadata);
-      }
-    });
-
-    // BullMQ QueueEvents for deduplication logging
-    this.queueEvents = new QueueEvents(this.queueName, {
-      connection: this.redisConnection,
-    });
-
-    this.queueEvents.on(
-      "deduplicated",
-      ({ jobId, deduplicationId, deduplicatedJobId }) => {
-        this.logger.debug(
+      this.worker.on("failed", (job, error) => {
+        this.logger.error(
           {
             queueName: this.queueName,
-            existingJobId: jobId,
-            deduplicationId,
-            deduplicatedJobId,
+            jobId: job?.id,
+            error: error instanceof Error ? error.message : String(error),
+            errorStack: error instanceof Error ? error.stack : void 0,
           },
-          "BullMQ job deduplicated",
+          "Group queue job failed",
         );
-      },
-    );
 
-    // Start dispatcher loop and metrics collection
-    this.startDispatcher();
-    this.startMetricsCollection();
+        // On exhausted retries, block the group
+        if (job && job.attemptsMade >= JOB_RETRY_CONFIG.maxAttempts) {
+          const metadata = this.extractGroupMetadata(job);
+          if (metadata) {
+            void this.handleExhaustedRetries(metadata);
+          }
+        }
+      });
+
+      // Listen for completed jobs to trigger group completion
+      this.worker.on("completed", (job) => {
+        const metadata = this.extractGroupMetadata(job);
+        if (metadata) {
+          void this.handleJobCompleted(metadata);
+        }
+      });
+    } else {
+      this.worker = null;
+    }
+
+    // BullMQ QueueEvents + dispatcher + metrics — consumer only
+    if (this.consumerEnabled) {
+      this.queueEvents = new QueueEvents(this.queueName, {
+        connection: this.redisConnection,
+      });
+
+      this.queueEvents.on(
+        "deduplicated",
+        ({ jobId, deduplicationId, deduplicatedJobId }) => {
+          this.logger.debug(
+            {
+              queueName: this.queueName,
+              existingJobId: jobId,
+              deduplicationId,
+              deduplicatedJobId,
+            },
+            "BullMQ job deduplicated",
+          );
+        },
+      );
+
+      this.startDispatcher();
+      this.startMetricsCollection();
+    } else {
+      this.queueEvents = null;
+    }
   }
 
   /**
    * Stages a job into the group queue's Redis staging layer.
    */
-  async send(payload: Payload): Promise<void> {
+  async send(payload: Payload, options?: QueueSendOptions<Payload>): Promise<void> {
     if (this.shutdownRequested) {
       throw new QueueError(
         this.queueName,
@@ -272,17 +285,20 @@ export class GroupQueueProcessorBullMq<
       );
     }
 
+    const delay = options?.delay ?? this.delay;
+    const dedup = options?.deduplication ?? this.deduplication;
+
     const groupId = this.groupKey(payload);
     const stagedJobId = this.generateStagedJobId(payload);
     const score = this.score?.(payload) ?? Date.now();
-    const dispatchAfterMs = score + (this.delay ?? 0);
+    const dispatchAfterMs = score + (delay ?? 0);
 
     // Get dedup config
     let dedupId = "";
     let dedupTtlMs = 0;
-    if (this.deduplication) {
-      dedupId = this.deduplication.makeId(payload).replaceAll(":", ".");
-      dedupTtlMs = this.deduplication.ttlMs ?? DEFAULT_DEDUPLICATION_TTL_MS;
+    if (dedup) {
+      dedupId = dedup.makeId(payload).replaceAll(":", ".");
+      dedupTtlMs = dedup.ttlMs ?? DEFAULT_DEDUPLICATION_TTL_MS;
     }
 
     // Attach context metadata to the payload
@@ -327,7 +343,7 @@ export class GroupQueueProcessorBullMq<
     );
   }
 
-  async sendBatch(payloads: Payload[]): Promise<void> {
+  async sendBatch(payloads: Payload[], options?: QueueSendOptions<Payload>): Promise<void> {
     if (this.shutdownRequested) {
       throw new QueueError(
         this.queueName,
@@ -340,6 +356,9 @@ export class GroupQueueProcessorBullMq<
       return;
     }
 
+    const delay = options?.delay ?? this.delay;
+    const dedup = options?.deduplication ?? this.deduplication;
+
     const contextMetadata = getJobContextMetadata();
     const now = Date.now();
 
@@ -348,13 +367,13 @@ export class GroupQueueProcessorBullMq<
       const stagedJobId = this.generateStagedJobId(payload);
       const score = this.score?.(payload) ?? now;
       // Add index to ensure FIFO order within the batch even if timestamps are identical
-      const dispatchAfterMs = score + (this.delay ?? 0) + index;
+      const dispatchAfterMs = score + (delay ?? 0) + index;
 
       let dedupId = "";
       let dedupTtlMs = 0;
-      if (this.deduplication) {
-        dedupId = this.deduplication.makeId(payload).replaceAll(":", ".");
-        dedupTtlMs = this.deduplication.ttlMs ?? DEFAULT_DEDUPLICATION_TTL_MS;
+      if (dedup) {
+        dedupId = dedup.makeId(payload).replaceAll(":", ".");
+        dedupTtlMs = dedup.ttlMs ?? DEFAULT_DEDUPLICATION_TTL_MS;
       }
 
       const payloadWithContext = {
@@ -631,11 +650,20 @@ export class GroupQueueProcessorBullMq<
 
   /**
    * Generates a unique staged job ID.
+   *
+   * Incorporates routing metadata (__jobType/__jobName) when present so that
+   * different job types processing the same event (e.g. fold and map projections)
+   * get distinct staged job IDs and don't overwrite each other in the staging layer.
    */
   private generateStagedJobId(payload: Payload): string {
-    const payloadWithId = payload as { id?: string };
-    const payloadId = payloadWithId.id ?? crypto.randomUUID();
-    return payloadId;
+    const p = payload as Record<string, unknown>;
+    const baseId = (p.id as string) ?? crypto.randomUUID();
+    const jobType = p.__jobType as string | undefined;
+    const jobName = p.__jobName as string | undefined;
+    if (jobType && jobName) {
+      return `${baseId}/${jobType}/${jobName}`;
+    }
+    return baseId;
   }
 
   /**
@@ -685,7 +713,9 @@ export class GroupQueueProcessorBullMq<
   }
 
   async waitUntilReady(): Promise<void> {
-    await this.worker.waitUntilReady();
+    if (this.worker) {
+      await this.worker.waitUntilReady();
+    }
   }
 
   async close(): Promise<void> {

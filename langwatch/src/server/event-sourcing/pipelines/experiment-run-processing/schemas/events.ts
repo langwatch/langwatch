@@ -77,6 +77,8 @@ export const evaluatorResultEventDataSchema = z.object({
   passed: z.boolean().nullable().optional(),
   details: z.string().nullable().optional(),
   cost: z.number().nullable().optional(),
+  inputs: z.record(z.unknown()).nullable().optional(),
+  duration: z.number().nullable().optional(),
 });
 
 export const evaluatorResultEventSchema = EventSchema.extend({
@@ -95,6 +97,7 @@ export type EvaluatorResultEvent = z.infer<typeof evaluatorResultEventSchema>;
  */
 export const experimentRunCompletedEventDataSchema = z.object({
   runId: z.string(),
+  experimentId: z.string(),
   finishedAt: z.number().nullable().optional(),
   stoppedAt: z.number().nullable().optional(),
 });

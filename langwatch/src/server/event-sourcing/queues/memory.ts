@@ -6,6 +6,7 @@ import type {
 	DeduplicationConfig,
 	EventSourcedQueueDefinition,
 	EventSourcedQueueProcessor,
+	QueueSendOptions,
 } from "../queues";
 
 
@@ -13,6 +14,7 @@ interface QueuedJob<Payload> {
   payload: Payload;
   jobId: string;
   deduplicationId?: string;
+  delay?: number;
   resolve: () => void;
   reject: (error: Error) => void;
 }
@@ -82,12 +84,15 @@ export class EventSourcedQueueProcessorMemory<
     return `${this.queueName}:${payloadId}`;
   }
 
-  async send(payload: Payload): Promise<void> {
+  async send(payload: Payload, options?: QueueSendOptions<Payload>): Promise<void> {
     // Memory implementation allows sends after close since it has no persistent state
     // This is different from BullMQ which should reject sends after shutdown
 
+    const dedup = options?.deduplication ?? this.deduplication;
+    const effectiveDelay = options?.delay ?? this.delay;
+
     const jobId = this.generateJobId(payload);
-    const deduplicationId = this.deduplication?.makeId(payload);
+    const deduplicationId = dedup?.makeId(payload);
 
     // Simple job deduplication: replace existing job with same deduplication ID
     if (deduplicationId) {
@@ -109,6 +114,7 @@ export class EventSourcedQueueProcessorMemory<
         payload,
         jobId,
         deduplicationId,
+        delay: effectiveDelay,
         resolve,
         reject,
       };
@@ -123,8 +129,8 @@ export class EventSourcedQueueProcessorMemory<
     });
   }
 
-  async sendBatch(payloads: Payload[]): Promise<void> {
-    await Promise.all(payloads.map((payload) => this.send(payload)));
+  async sendBatch(payloads: Payload[], options?: QueueSendOptions<Payload>): Promise<void> {
+    await Promise.all(payloads.map((payload) => this.send(payload, options)));
   }
 
   /**
@@ -157,9 +163,10 @@ export class EventSourcedQueueProcessorMemory<
    * Processes a single job with tracing and error handling.
    */
   private async processJob(job: QueuedJob<Payload>): Promise<void> {
-    // Apply delay if configured
-    if (this.delay && this.delay > 0) {
-      await new Promise((resolve) => setTimeout(resolve, this.delay));
+    // Apply delay if configured (per-job delay takes precedence over instance delay)
+    const delay = job.delay;
+    if (delay && delay > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
 
     const baseAttributes: Record<string, string | number | boolean> = {

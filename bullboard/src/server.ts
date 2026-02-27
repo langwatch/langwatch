@@ -27,6 +27,9 @@ if (Number.isNaN(PORT) || PORT < 1 || PORT > 65535) {
   process.exit(1);
 }
 
+/** How often to re-scan Redis for newly created queues (ms). */
+const QUEUE_DISCOVERY_INTERVAL_MS = 10_000;
+
 async function main() {
   const redisUrl = process.env.REDIS_URL;
   if (!redisUrl) {
@@ -57,10 +60,37 @@ async function main() {
     miscLinks: [{ text: "Groups", url: "/groups" }],
   });
 
-  createBullBoard({
+  const { addQueue } = createBullBoard({
     queues,
     serverAdapter,
   });
+
+  // Track known queue names so we only add truly new ones
+  const knownQueueNames = new Set(queueNames);
+
+  // Periodically re-scan Redis for new queues created after startup
+  setInterval(async () => {
+    try {
+      const currentNames = await discoverQueueNames(connection);
+      for (const name of currentNames) {
+        if (!knownQueueNames.has(name)) {
+          knownQueueNames.add(name);
+          addQueue(
+            new BullMQAdapter(
+              new Queue(name, { connection }),
+              { displayName: stripHashTag(name) },
+            ),
+          );
+          if (isGroupQueue(name)) {
+            groupQueueNames.push(name);
+          }
+          console.log("Discovered new queue:", stripHashTag(name));
+        }
+      }
+    } catch (error) {
+      console.error("Queue re-discovery failed:", error);
+    }
+  }, QUEUE_DISCOVERY_INTERVAL_MS);
 
   const app = new Hono({ strict: false });
 

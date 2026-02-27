@@ -14,7 +14,7 @@ const logger = createLogger(
 );
 
 interface ClickHouseEvaluationRunRecord {
-  Id: string;
+  ProjectionId: string;
   TenantId: string;
   EvaluationId: string;
   Version: string;
@@ -58,7 +58,7 @@ export class EvaluationRunClickHouseRepository
           data.evaluationId,
           data.scheduledAt,
         )
-      : `evaluation_run:${tenantId}:${data.evaluationId}`;
+      : data.evaluationId;
 
     try {
       const record = this.toClickHouseRecord(
@@ -72,6 +72,7 @@ export class EvaluationRunClickHouseRepository
         table: TABLE_NAME,
         values: [record],
         format: "JSONEachRow",
+        clickhouse_settings: { wait_for_async_insert: 1 },
       });
 
       logger.debug(
@@ -102,7 +103,7 @@ export class EvaluationRunClickHouseRepository
       const result = await this.clickHouseClient.query({
         query: `
           SELECT
-            Id,
+            ProjectionId,
             TenantId,
             EvaluationId,
             Version,
@@ -180,7 +181,7 @@ export class EvaluationRunClickHouseRepository
     version: string,
   ): ClickHouseEvaluationRunWriteRecord {
     return {
-      Id: projectionId,
+      ProjectionId: projectionId,
       TenantId: tenantId,
       EvaluationId: data.evaluationId,
       Version: version,

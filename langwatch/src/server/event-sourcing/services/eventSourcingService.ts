@@ -12,6 +12,7 @@ import type { Event, Projection } from "../domain/types";
 import type { ProjectionRegistry } from "../projections/projectionRegistry";
 import { ProjectionRouter } from "../projections/projectionRouter";
 import type { EventSourcedQueueProcessor } from "../queues";
+import type { JobRegistryEntry } from "./queues/queueManager";
 import type {
   EventStore,
   EventStoreReadContext,
@@ -59,7 +60,8 @@ export class EventSourcingService<
     reactors,
     serviceOptions,
     logger,
-    queueFactory,
+    globalQueue,
+    globalJobRegistry,
     featureFlagService,
     commandRegistrations,
     globalRegistry,
@@ -75,23 +77,24 @@ export class EventSourcingService<
     this.featureFlagService = featureFlagService;
     this.globalRegistry = globalRegistry;
 
-    // Warn in production if queue factory is not provided
+    // Warn in production if global queue is not provided
     if (
       process.env.NODE_ENV === "production" &&
-      !queueFactory &&
+      !globalQueue &&
       ((foldProjections && foldProjections.length > 0) ||
         (mapProjections && mapProjections.length > 0))
     ) {
       this.logger.warn(
         { aggregateType },
-        "[PERFORMANCE] EventSourcingService initialized without queue processor factory in production. Projections will be executed synchronously.",
+        "[PERFORMANCE] EventSourcingService initialized without global queue in production. Projections will be executed synchronously.",
       );
     }
 
     this.queueManager = new QueueManager<EventType>({
       aggregateType,
       pipelineName: this.pipelineName,
-      queueFactory,
+      globalQueue,
+      globalJobRegistry,
       featureFlagService: this.featureFlagService,
     });
 
@@ -125,30 +128,23 @@ export class EventSourcingService<
       }
     }
 
-    // Web processes only dispatch commands — they skip BullMQ consumer workers
-    // to avoid competing with HTTP request handling on the event loop.
-    const consumeQueues = processRole !== "web";
+    // All processes register all entries — the shared pipeline queue's Worker
+    // must know every job type so it can dispatch any job it picks up.
+    if (globalQueue && mapProjections && mapProjections.length > 0) {
+      this.router.initializeMapQueues();
+    }
 
-    if (consumeQueues) {
-      // Initialize queue processors for map projections (handler queues)
-      if (queueFactory && mapProjections && mapProjections.length > 0) {
-        this.router.initializeMapQueues();
-      }
+    if (globalQueue && foldProjections && foldProjections.length > 0) {
+      this.router.initializeFoldQueues();
+    }
 
-      // Initialize queue processors for fold projections (projection queues)
-      if (queueFactory && foldProjections && foldProjections.length > 0) {
-        this.router.initializeFoldQueues();
-      }
-
-      // Initialize queue processors for reactors
-      if (queueFactory && reactors && reactors.length > 0) {
-        this.router.initializeReactorQueues();
-      }
+    if (globalQueue && reactors && reactors.length > 0) {
+      this.router.initializeReactorQueues();
     }
 
     // Command queues always initialize — they're needed for dispatching
     if (
-      queueFactory &&
+      globalQueue &&
       commandRegistrations &&
       commandRegistrations.length > 0
     ) {

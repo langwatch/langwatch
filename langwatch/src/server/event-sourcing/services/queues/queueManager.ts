@@ -1,28 +1,48 @@
-import { makeQueueName } from "~/server/background/queues/makeQueueName";
 import { createLogger } from "~/utils/logger/server";
+import { mapZodIssuesToLogContext } from "~/utils/zod";
 import type { FeatureFlagServiceInterface } from "../../../featureFlag/types";
-import type {
-  DeduplicationStrategy,
-  EventSourcedQueueProcessor,
-  QueueProcessorFactory,
-} from "../../queues";
-import { resolveDeduplicationStrategy } from "../../queues";
+import type { Command, CommandHandler } from "../../commands/command";
 import type { CommandHandlerClass } from "../../commands/commandHandlerClass";
+import type { CommandSchema } from "../../commands/commandSchema";
 import type { AggregateType } from "../../domain/aggregateType";
+import type { CommandType } from "../../domain/commandType";
 import type { Event } from "../../domain/types";
 import type { KillSwitchOptions } from "../../pipeline/staticBuilder.types";
+import type {
+  DeduplicationConfig,
+  DeduplicationStrategy,
+  EventSourcedQueueProcessor,
+  QueueSendOptions,
+} from "../../queues";
+import { resolveDeduplicationStrategy } from "../../queues";
 import type { EventStoreReadContext } from "../../stores/eventStore.types";
 import {
-  createCommandDispatcher,
+  processCommand,
   type CommandHandlerOptions,
 } from "../commands/commandDispatcher";
-import { ConfigurationError } from "../errorHandling";
+import { ConfigurationError, ValidationError } from "../errorHandling";
 
 const logger = createLogger("langwatch:event-sourcing:queue-manager");
 
 /**
- * Manages queues for event handlers, projections, and commands.
- * Handles initialization, lifecycle, and job ID generation.
+ * Metadata stored per job type in the global job registry.
+ * Used by the global queue's process/groupKey/score callbacks to dispatch to the right handler.
+ */
+export interface JobRegistryEntry {
+  process: (payload: any) => Promise<void>;
+  groupKeyFn: (payload: any) => string;
+  scoreFn: (payload: any) => number;
+  delay?: number;
+  deduplication?: DeduplicationConfig<any>;
+  spanAttributes?: (payload: any) => Record<string, string | number | boolean>;
+}
+
+/**
+ * Manages queue facades for event handlers, projections, commands, and reactors.
+ *
+ * Creates per-job-type facades that inject routing metadata (__pipelineName, __jobType, __jobName)
+ * into a global shared queue. The global queue and job registry are owned by EventSourcing
+ * and shared across all pipelines.
  */
 export class QueueManager<EventType extends Event = Event> {
   private readonly aggregateType: AggregateType;
@@ -30,7 +50,8 @@ export class QueueManager<EventType extends Event = Event> {
   private readonly logger = createLogger(
     "langwatch:event-sourcing:queue-manager",
   );
-  private readonly queueFactory?: QueueProcessorFactory;
+  private readonly globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
+  private readonly globalJobRegistry?: Map<string, JobRegistryEntry>;
   private readonly featureFlagService?: FeatureFlagServiceInterface;
   private readonly queues = new Map<
     string,
@@ -43,22 +64,21 @@ export class QueueManager<EventType extends Event = Event> {
   constructor({
     aggregateType,
     pipelineName,
-    queueFactory,
+    globalQueue,
+    globalJobRegistry,
     featureFlagService,
   }: {
     aggregateType: AggregateType;
     pipelineName: string;
-    queueFactory?: QueueProcessorFactory;
+    globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
+    globalJobRegistry?: Map<string, JobRegistryEntry>;
     featureFlagService?: FeatureFlagServiceInterface;
   }) {
     this.aggregateType = aggregateType;
     this.pipelineName = pipelineName;
-    this.queueFactory = queueFactory;
+    this.globalQueue = globalQueue;
+    this.globalJobRegistry = globalJobRegistry;
     this.featureFlagService = featureFlagService;
-  }
-
-  private makePipelineQueueName(suffix: string): string {
-    return makeQueueName(`${this.pipelineName}/${suffix}`);
   }
 
   private createDefaultDeduplicationId(event: EventType): string {
@@ -70,6 +90,86 @@ export class QueueManager<EventType extends Event = Event> {
     name: string,
   ): string {
     return `${type}:${name}`;
+  }
+
+  /**
+   * Builds a globally unique registry key for this pipeline's job entry.
+   */
+  private registryKey(jobType: string, jobName: string): string {
+    return `${this.pipelineName}:${jobType}:${jobName}`;
+  }
+
+  /**
+   * Creates a facade that wraps the global queue, injecting __pipelineName/__jobType/__jobName
+   * metadata on every send and namespacing dedup IDs.
+   *
+   * Registers the entry into the global job registry so the global queue's
+   * process/groupKey/score callbacks can dispatch to the right handler.
+   */
+  private createFacade<P extends Record<string, unknown>>(
+    jobType: string,
+    jobName: string,
+    entry: JobRegistryEntry,
+  ): EventSourcedQueueProcessor<P> {
+    if (!this.globalQueue || !this.globalJobRegistry) {
+      throw new ConfigurationError(
+        "QueueManager",
+        "Cannot create facade without global queue and registry",
+      );
+    }
+
+    const regKey = this.registryKey(jobType, jobName);
+    this.globalJobRegistry.set(regKey, entry);
+
+    const globalQueue = this.globalQueue;
+    const pipelineName = this.pipelineName;
+
+    // Namespace dedup IDs to avoid cross-pipeline/cross-type collisions
+    const namespacedDedup: DeduplicationConfig<any> | undefined =
+      entry.deduplication
+        ? {
+            ...entry.deduplication,
+            makeId: (payload: any) => {
+              const { __pipelineName: _p, __jobType: _t, __jobName: _n, ...clean } = payload;
+              return `${pipelineName}/${jobType}/${jobName}/${entry.deduplication!.makeId(clean)}`;
+            },
+          }
+        : undefined;
+
+    const facade: EventSourcedQueueProcessor<P> = {
+      send: async (payload: P, options?: QueueSendOptions<P>) => {
+        await globalQueue.send(
+          { ...payload, __pipelineName: pipelineName, __jobType: jobType, __jobName: jobName },
+          {
+            delay: options?.delay ?? entry.delay,
+            deduplication:
+              (options?.deduplication as DeduplicationConfig<any> | undefined) ??
+              namespacedDedup,
+          },
+        );
+      },
+      sendBatch: async (payloads: P[], options?: QueueSendOptions<P>) => {
+        await globalQueue.sendBatch(
+          payloads.map((p) => ({
+            ...p,
+            __pipelineName: pipelineName,
+            __jobType: jobType,
+            __jobName: jobName,
+          })),
+          {
+            delay: options?.delay ?? entry.delay,
+            deduplication:
+              (options?.deduplication as DeduplicationConfig<any> | undefined) ??
+              namespacedDedup,
+          },
+        );
+      },
+      // Global queue lifecycle is owned by EventSourcing — facade close is a no-op
+      close: async () => {},
+      waitUntilReady: () => globalQueue.waitUntilReady(),
+    };
+
+    return facade;
   }
 
   initializeHandlerQueues(
@@ -92,7 +192,7 @@ export class QueueManager<EventType extends Event = Event> {
       context: EventStoreReadContext<EventType>,
     ) => Promise<void>,
   ): void {
-    if (!this.queueFactory) {
+    if (!this.globalQueue) {
       return;
     }
 
@@ -104,27 +204,29 @@ export class QueueManager<EventType extends Event = Event> {
         continue;
       }
 
-      const queueName = this.makePipelineQueueName(`handler/${handlerName}`);
-
-      const queueProcessor = this.queueFactory.create<EventType>({
-        name: queueName,
+      const entry: JobRegistryEntry = {
+        groupKeyFn: (event: any) =>
+          `${String(event.tenantId)}:${event.aggregateType}:${String(event.aggregateId)}`,
+        scoreFn: (event: any) => event.timestamp,
+        process: async (event: any) => {
+          await onEvent(handlerName, event, {
+            tenantId: event.tenantId,
+          });
+        },
         delay: handlerDef.options.delay,
         deduplication: resolveDeduplicationStrategy(
           handlerDef.options.deduplication,
           this.createDefaultDeduplicationId.bind(this),
         ),
-        options: handlerDef.options.concurrency
-          ? { concurrency: handlerDef.options.concurrency }
-          : void 0,
         spanAttributes: handlerDef.options.spanAttributes,
-        process: async (event: EventType) => {
-          await onEvent(handlerName, event, {
-            tenantId: event.tenantId,
-          });
-        },
-      });
+      };
 
-      this.queues.set(this.key("handler", handlerName), queueProcessor);
+      const facade = this.createFacade<EventType>(
+        "handler",
+        handlerName,
+        entry,
+      );
+      this.queues.set(this.key("handler", handlerName), facade);
       this.handlerCount++;
     }
   }
@@ -143,7 +245,7 @@ export class QueueManager<EventType extends Event = Event> {
       context: EventStoreReadContext<EventType>,
     ) => Promise<void>,
   ): void {
-    if (!this.queueFactory) {
+    if (!this.globalQueue) {
       return;
     }
 
@@ -153,33 +255,33 @@ export class QueueManager<EventType extends Event = Event> {
         continue;
       }
 
-      const queueName = this.makePipelineQueueName(
-        `projection/${projectionName}`,
-      );
-
-      const queueProcessor = this.queueFactory.create<EventType>({
-        name: queueName,
-        spanAttributes: (event) => ({
+      const customGroupKeyFn = projectionDef.groupKeyFn;
+      const entry: JobRegistryEntry = {
+        groupKeyFn: customGroupKeyFn
+          ? (event: any) =>
+              `${String(event.tenantId)}:${customGroupKeyFn(event)}`
+          : (event: any) =>
+              `${String(event.tenantId)}:${event.aggregateType}:${String(event.aggregateId)}`,
+        scoreFn: (event: any) => event.timestamp,
+        process: async (event: any) => {
+          await onEvent(projectionName, event, {
+            tenantId: event.tenantId,
+          });
+        },
+        spanAttributes: (event: any) => ({
           "projection.name": projectionName,
           "event.type": event.type,
           "event.id": event.id,
           "event.aggregate_id": String(event.aggregateId),
         }),
-        groupKey: projectionDef.groupKeyFn
-          ? (event: EventType) => `${String(event.tenantId)}:${projectionDef.groupKeyFn!(event)}`
-          : (event: EventType) => `${String(event.tenantId)}:${event.aggregateType}:${String(event.aggregateId)}`,
-        score: (event: EventType) => event.timestamp,
-        process: async (event: EventType) => {
-          await onEvent(projectionName, event, {
-            tenantId: event.tenantId,
-          });
-        },
-      });
+      };
 
-      this.queues.set(
-        this.key("projection", projectionName),
-        queueProcessor,
+      const facade = this.createFacade<EventType>(
+        "projection",
+        projectionName,
+        entry,
       );
+      this.queues.set(this.key("projection", projectionName), facade);
       this.projectionCount++;
     }
   }
@@ -196,9 +298,25 @@ export class QueueManager<EventType extends Event = Event> {
     ) => Promise<void>,
     pipelineName: string,
   ): void {
-    if (!this.queueFactory) {
+    if (!this.globalQueue) {
       return;
     }
+
+    // Step 1: Build handler registry
+    interface CommandRegistryEntry {
+      handler: CommandHandler<Command<any>, EventType>;
+      schema: CommandSchema<any, CommandType>;
+      getAggregateId: (payload: any) => string;
+      options: CommandHandlerOptions<any>;
+      commandName: string;
+      commandType: CommandType;
+      killSwitchOptions?: KillSwitchOptions;
+      spanAttributes?: (
+        payload: any,
+      ) => Record<string, string | number | boolean>;
+    }
+
+    const commandRegistry = new Map<string, CommandRegistryEntry>();
 
     for (const registration of commandRegistrations) {
       const handlerClass = registration.handlerClass;
@@ -210,17 +328,6 @@ export class QueueManager<EventType extends Event = Event> {
         registration.options?.getAggregateId ??
         handlerClass.getAggregateId.bind(handlerClass);
 
-      const options: CommandHandlerOptions<Payload> = {
-        delay: registration.options?.delay,
-        deduplication: registration.options?.deduplication,
-        concurrency: registration.options?.concurrency,
-        spanAttributes:
-          registration.options?.spanAttributes ??
-          handlerClass.getSpanAttributes?.bind(handlerClass),
-        killSwitch: registration.options?.killSwitch,
-
-      };
-
       const commandName = handlerClass.dispatcherName ?? registration.name;
 
       if (this.queues.has(this.key("command", commandName))) {
@@ -231,25 +338,111 @@ export class QueueManager<EventType extends Event = Event> {
         );
       }
 
-      const queueName = this.makePipelineQueueName(`command/${commandName}`);
-
-      const dispatcher = createCommandDispatcher({
-        commandType,
-        commandSchema: schema,
+      commandRegistry.set(commandName, {
         handler: handlerInstance,
-        options,
+        schema,
         getAggregateId,
-        queueName,
-        storeEventsFn: storeEvents,
-        factory: this.queueFactory,
-        aggregateType: this.aggregateType,
+        options: registration.options ?? {},
         commandName,
-        featureFlagService: this.featureFlagService,
+        commandType,
         killSwitchOptions: registration.options?.killSwitch,
-        logger,
+        spanAttributes:
+          registration.options?.spanAttributes ??
+          handlerClass.getSpanAttributes?.bind(handlerClass),
       });
+    }
 
-      this.queues.set(this.key("command", commandName), dispatcher);
+    if (commandRegistry.size === 0) {
+      return;
+    }
+
+    // Step 2: Register each command in the global queue and create facades
+    for (const [cmdName, cmdEntry] of commandRegistry) {
+      const rawDedup = resolveDeduplicationStrategy(
+        cmdEntry.options.deduplication as
+          | DeduplicationStrategy<any>
+          | undefined,
+        (payload: any) => {
+          const aggregateId = cmdEntry.getAggregateId(payload);
+          return `${String(payload.tenantId)}:${this.aggregateType}:${String(aggregateId)}`;
+        },
+      );
+
+      const jobEntry: JobRegistryEntry = {
+        groupKeyFn: (payload: any) => {
+          const aggregateId = cmdEntry.getAggregateId(payload);
+          return `${String(payload.tenantId)}:${this.aggregateType}:${String(aggregateId)}`;
+        },
+        scoreFn: (payload: any) => payload.occurredAt as number,
+        process: async (payload: any) => {
+          await processCommand({
+            payload,
+            commandType: cmdEntry.commandType,
+            commandSchema: cmdEntry.schema,
+            handler: cmdEntry.handler,
+            getAggregateId: cmdEntry.getAggregateId,
+            storeEventsFn: storeEvents,
+            aggregateType: this.aggregateType,
+            commandName: cmdEntry.commandName,
+            featureFlagService: this.featureFlagService,
+            killSwitchOptions: cmdEntry.killSwitchOptions,
+            logger,
+          });
+        },
+        delay: cmdEntry.options.delay,
+        deduplication: rawDedup,
+        spanAttributes: cmdEntry.spanAttributes,
+      };
+
+      const baseFacade = this.createFacade<Record<string, unknown>>(
+        "command",
+        cmdName,
+        jobEntry,
+      );
+
+      // Wrap with pre-send validation
+      const validatingFacade: EventSourcedQueueProcessor<any> = {
+        send: async (payload: any, options?: QueueSendOptions<any>) => {
+          const validation = cmdEntry.schema.validate(payload);
+          if (!validation.success) {
+            throw new ValidationError(
+              `Invalid payload for command type "${cmdEntry.commandType}". Validation failed.`,
+              "payload",
+              undefined,
+              {
+                commandType: cmdEntry.commandType,
+                zodIssues: mapZodIssuesToLogContext(
+                  validation.error.issues,
+                ),
+              },
+            );
+          }
+          return baseFacade.send(payload, options);
+        },
+        sendBatch: async (payloads: any[], options?: QueueSendOptions<any>) => {
+          for (const payload of payloads) {
+            const validation = cmdEntry.schema.validate(payload);
+            if (!validation.success) {
+              throw new ValidationError(
+                `Invalid payload for command type "${cmdEntry.commandType}". Validation failed.`,
+                "payload",
+                undefined,
+                {
+                  commandType: cmdEntry.commandType,
+                  zodIssues: mapZodIssuesToLogContext(
+                    validation.error.issues,
+                  ),
+                },
+              );
+            }
+          }
+          return baseFacade.sendBatch(payloads, options);
+        },
+        close: baseFacade.close,
+        waitUntilReady: baseFacade.waitUntilReady,
+      };
+
+      this.queues.set(this.key("command", cmdName), validatingFacade);
     }
   }
 
@@ -270,15 +463,20 @@ export class QueueManager<EventType extends Event = Event> {
       context: EventStoreReadContext<EventType>,
     ) => Promise<void>,
   ): void {
-    if (!this.queueFactory) {
+    if (!this.globalQueue) {
       return;
     }
 
     for (const [reactorName, reactorDef] of Object.entries(reactors)) {
-      const queueName = this.makePipelineQueueName(`reactor/${reactorName}`);
-
-      const queueProcessor = this.queueFactory.create<{ event: EventType; foldState: unknown }>({
-        name: queueName,
+      const entry: JobRegistryEntry = {
+        groupKeyFn: (payload: any) =>
+          `${String(payload.event.tenantId)}:${payload.event.aggregateType}:${String(payload.event.aggregateId)}`,
+        scoreFn: (payload: any) => payload.event.timestamp,
+        process: async (payload: any) => {
+          await onEvent(reactorName, payload, {
+            tenantId: payload.event.tenantId,
+          });
+        },
         delay: reactorDef.options?.delay,
         deduplication: reactorDef.options?.deduplication
           ? resolveDeduplicationStrategy(
@@ -286,20 +484,20 @@ export class QueueManager<EventType extends Event = Event> {
               (payload) => this.createDefaultDeduplicationId(payload.event),
             )
           : undefined,
-        spanAttributes: (payload) => ({
+        spanAttributes: (payload: any) => ({
           "reactor.name": reactorName,
           "event.type": payload.event.type,
           "event.id": payload.event.id,
           "event.aggregate_id": String(payload.event.aggregateId),
         }),
-        process: async (payload: { event: EventType; foldState: unknown }) => {
-          await onEvent(reactorName, payload, {
-            tenantId: payload.event.tenantId,
-          });
-        },
-      });
+      };
 
-      this.queues.set(this.key("reactor", reactorName), queueProcessor);
+      const facade = this.createFacade<{ event: EventType; foldState: unknown }>(
+        "reactor",
+        reactorName,
+        entry,
+      );
+      this.queues.set(this.key("reactor", reactorName), facade);
       this.reactorCount++;
     }
   }
@@ -360,13 +558,15 @@ export class QueueManager<EventType extends Event = Event> {
   }
 
   async waitUntilReady(): Promise<void> {
-    await Promise.all(
-      [...this.queues.values()].map((q) => q.waitUntilReady()),
-    );
+    if (this.globalQueue) {
+      await this.globalQueue.waitUntilReady();
+    }
     this.logger.debug({ queueCount: this.queues.size }, "All queues ready");
   }
 
   async close(): Promise<void> {
+    // Global queue lifecycle is owned by EventSourcing — facade close is a no-op.
+    // We still call close on all facades for consistent behavior.
     await Promise.allSettled(
       [...this.queues.values()].map((q) => q.close()),
     );

@@ -27,8 +27,8 @@ export interface ExperimentRunStateData {
   FailedCount: number;
   TotalCost: number | null;
   TotalDurationMs: number | null;
-  AvgScore: number | null;
-  PassRate: number | null;
+  AvgScoreBps: number | null;
+  PassRateBps: number | null;
   Targets: string;
   StartedAt: number | null;
   FinishedAt: number | null;
@@ -38,11 +38,32 @@ export interface ExperimentRunStateData {
   TotalScoreSum: number;
   ScoreCount: number;
   PassedCount: number;
-  PassFailCount: number;
+  GradedCount: number;
 }
 
 export interface ExperimentRunState extends Projection<ExperimentRunStateData> {
   data: ExperimentRunStateData;
+}
+
+function mergeTargetsJson(
+  existingJson: string,
+  incoming: Array<{ id: string; [k: string]: unknown }>,
+): string {
+  if (incoming.length === 0) return existingJson;
+
+  let existing: Array<{ id: string; [k: string]: unknown }> = [];
+  try {
+    existing = JSON.parse(existingJson);
+  } catch {
+    // keep empty
+  }
+
+  const byId = new Map(existing.map((t) => [t.id, t]));
+  for (const t of incoming) {
+    byId.set(t.id, t);
+  }
+
+  return JSON.stringify(Array.from(byId.values()));
 }
 
 function init(): ExperimentRunStateData {
@@ -56,8 +77,8 @@ function init(): ExperimentRunStateData {
     FailedCount: 0,
     TotalCost: null,
     TotalDurationMs: null,
-    AvgScore: null,
-    PassRate: null,
+    AvgScoreBps: null,
+    PassRateBps: null,
     Targets: "[]",
     StartedAt: null,
     FinishedAt: null,
@@ -65,7 +86,7 @@ function init(): ExperimentRunStateData {
     TotalScoreSum: 0,
     ScoreCount: 0,
     PassedCount: 0,
-    PassFailCount: 0,
+    GradedCount: 0,
   };
 }
 
@@ -80,7 +101,7 @@ function apply(
       ExperimentId: event.data.experimentId,
       WorkflowVersionId: event.data.workflowVersionId ?? null,
       Total: Math.max(state.Total, event.data.total),
-      Targets: JSON.stringify(event.data.targets),
+      Targets: mergeTargetsJson(state.Targets, event.data.targets ?? []),
       StartedAt: state.StartedAt ?? event.occurredAt,
     };
   }
@@ -118,15 +139,15 @@ function apply(
   }
 
   if (isEvaluatorResultEvent(event)) {
-    let { TotalScoreSum: totalScoreSum, ScoreCount: scoreCount, PassedCount: passedCount, PassFailCount: passFailCount, TotalCost: totalCost } = state;
+    let { TotalScoreSum: totalScoreSum, ScoreCount: scoreCount, PassedCount: passedCount, GradedCount: gradedCount, TotalCost: totalCost } = state;
 
     if (event.data.status === "processed") {
       if (event.data.score != null) {
-        totalScoreSum += event.data.score;
+        totalScoreSum += Math.round(event.data.score * 10000);
         scoreCount += 1;
       }
       if (event.data.passed != null) {
-        passFailCount += 1;
+        gradedCount += 1;
         if (event.data.passed) passedCount += 1;
       }
     }
@@ -135,18 +156,18 @@ function apply(
       totalCost = (totalCost ?? 0) + event.data.cost;
     }
 
-    const avgScore = scoreCount > 0 ? totalScoreSum / scoreCount : null;
-    const passRate = passFailCount > 0 ? passedCount / passFailCount : null;
+    const avgScoreBps = scoreCount > 0 ? Math.round(totalScoreSum / scoreCount) : null;
+    const passRateBps = gradedCount > 0 ? Math.round((passedCount / gradedCount) * 10000) : null;
 
     return {
       ...state,
       TotalScoreSum: totalScoreSum,
       ScoreCount: scoreCount,
       PassedCount: passedCount,
-      PassFailCount: passFailCount,
+      GradedCount: gradedCount,
       TotalCost: totalCost,
-      AvgScore: avgScore,
-      PassRate: passRate,
+      AvgScoreBps: avgScoreBps,
+      PassRateBps: passRateBps,
     };
   }
 

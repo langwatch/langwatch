@@ -56,7 +56,7 @@ See: [`projections/foldProjection.types.ts`](./projections/foldProjection.types.
 
 #### Map Projection (stateless, parallel)
 
-Transforms individual events into records and appends them to a store. Stateless -- each event is processed independently with no ordering guarantees. Uses **SimpleQueue** (parallel BullMQ workers).
+Transforms individual events into records and appends them to a store. Stateless -- each event is processed independently with no ordering guarantees. Dispatched through the global **GroupQueue**.
 
 **Lifecycle:**
 
@@ -94,7 +94,7 @@ graph TB
 
     subgraph "Projections & Side Effects"
         ES --> |"GroupQueue<br/>(per-aggregate FIFO)"| FP[Fold Projection]
-        ES --> |"SimpleQueue<br/>(parallel)"| MP[Map Projection]
+        ES --> |"GroupQueue<br/>(parallel)"| MP[Map Projection]
         FP --> |"store.store(state)"| FS[(Fold Store)]
         MP --> |"store.append(record)"| AS[(Append Store)]
         FP --> |"on success"| R[Reactor]
@@ -133,11 +133,9 @@ Each aggregate gets its own virtual queue. A worker picks up the next job for ea
 
 See: [`queues/groupQueue/groupQueue.ts`](./queues/groupQueue/groupQueue.ts)
 
-### SimpleQueue (for maps and reactors)
+### Global Queue (unified)
 
-Map projections and reactors are stateless or idempotent and do not require ordering. The `SimpleQueue` dispatches jobs to a pool of parallel BullMQ workers.
-
-See: [`queues/simpleBullmq.ts`](./queues/simpleBullmq.ts)
+All projections (folds, maps, and reactors) are dispatched through a single global `GroupQueue`. Map projections and reactors share the same queue infrastructure; they simply use different group keys and do not rely on per-aggregate ordering.
 
 ### Memory Queue (for testing / no Redis)
 
@@ -165,7 +163,7 @@ Unlike traditional event sourcing systems that use checkpoint stores to track pr
 
 ## Global Projection Registry
 
-In SaaS mode, the system registers **global fold projections** that span all pipelines. These projections (billing events, SDK usage) are registered in a virtual `global_projections` pipeline and receive events from all pipelines.
+In SaaS mode, the system registers **global fold projections** that span all pipelines. These projections (billing events, SDK usage) are registered in a virtual `global` pipeline and receive events from all pipelines.
 
 See: [`projections/global/`](./projections/global/) for SaaS-only projections, [`projections/projectionRegistry.ts`](./projections/projectionRegistry.ts) for the registry.
 
@@ -198,8 +196,6 @@ All operations are scoped to `tenantId`. Events, projections, and stores enforce
 | Projection router | [`projections/projectionRouter.ts`](./projections/projectionRouter.ts) |
 | Reactor types | [`reactors/reactor.types.ts`](./reactors/reactor.types.ts) |
 | GroupQueue | [`queues/groupQueue/groupQueue.ts`](./queues/groupQueue/groupQueue.ts) |
-| SimpleQueue | [`queues/simpleBullmq.ts`](./queues/simpleBullmq.ts) |
-| Queue factory | [`queues/factory.ts`](./queues/factory.ts) |
 | Event store (interface) | [`stores/eventStore.types.ts`](./stores/eventStore.types.ts) |
 | Event store (ClickHouse) | [`stores/eventStoreClickHouse.ts`](./stores/eventStoreClickHouse.ts) |
 | Event store (Memory) | [`stores/eventStoreMemory.ts`](./stores/eventStoreMemory.ts) |

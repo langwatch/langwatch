@@ -3,15 +3,11 @@ import { SpanKind } from "@opentelemetry/api";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import { getLangWatchTracer } from "langwatch";
-import type { Event, Projection } from "./domain/types";
-import type { NoCommands, RegisteredCommand, StaticPipelineDefinition } from "./pipeline/staticBuilder.types";
-import { ProjectionRegistry } from "./projections/projectionRegistry";
-import type { EventSourcedQueueProcessor, QueueProcessorFactory } from "./queues";
-import { DefaultQueueProcessorFactory } from "./queues";
-import type { EventStore } from "./stores/eventStore.types";
-
+import { makeQueueName } from "~/server/background/queues/makeQueueName";
 import { createLogger } from "~/utils/logger/server";
 import { DisabledPipeline } from "./disabledPipeline";
+import type { Event, Projection } from "./domain/types";
+import type { NoCommands, RegisteredCommand, StaticPipelineDefinition } from "./pipeline/staticBuilder.types";
 import type {
     PipelineWithCommandHandlers,
     RegisteredPipeline,
@@ -20,9 +16,16 @@ import { createBillingMeterDispatchReactor } from "./projections/global/billingM
 import { orgBillableEventsMeterProjection } from "./projections/global/orgBillableEventsMeter.mapProjection";
 import { projectDailyBillableEventsProjection } from "./projections/global/projectDailyBillableEvents.foldProjection";
 import { projectDailySdkUsageProjection } from "./projections/global/projectDailySdkUsage.foldProjection";
+import { ProjectionRegistry } from "./projections/projectionRegistry";
+import type { EventSourcedQueueProcessor } from "./queues";
+import { GroupQueueProcessorBullMq } from "./queues/groupQueue/groupQueue";
+import { EventSourcedQueueProcessorMemory } from "./queues/memory";
 import { EventSourcingPipeline } from "./runtimePipeline";
+import type { JobRegistryEntry } from "./services/queues/queueManager";
+import { ConfigurationError } from "./services/errorHandling";
 import { EventStoreClickHouse } from "./stores/eventStoreClickHouse";
 import { EventStoreMemory } from "./stores/eventStoreMemory";
+import type { EventStore } from "./stores/eventStore.types";
 import { EventRepositoryClickHouse } from "./stores/repositories/eventRepositoryClickHouse";
 import { EventRepositoryMemory } from "./stores/repositories/eventRepositoryMemory";
 
@@ -44,7 +47,7 @@ export interface EventSourcingOptions {
  */
 interface RuntimeStores {
   eventStore: EventStore;
-  queueProcessorFactory?: QueueProcessorFactory;
+  globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
 }
 
 /**
@@ -57,16 +60,15 @@ type CommandsToProcessors<Commands extends RegisteredCommand> = {
 /**
  * Central class for event sourcing infrastructure.
  *
- * Owns the event store, queue processor factory, projection registry,
- * and all registered pipelines. Replaces the previous two-layer
- * EventSourcing + EventSourcingRuntime hierarchy.
+ * Owns the event store, ONE global queue, a global job registry,
+ * the projection registry, and all registered pipelines.
  *
  * Features:
  * - Lazy initialization: stores are created on first access
  * - Graceful degradation: if disabled, no errors are thrown
  * - Environment-aware: auto-selects ClickHouse or Memory stores
  * - Testable: supports dependency injection via createForTesting() / createWithStores()
- * - Closeable: close() shuts down all pipelines and the projection registry
+ * - Closeable: close() shuts down all pipelines, the projection registry, and the global queue
  */
 export class EventSourcing {
   private readonly tracer = getLangWatchTracer(
@@ -77,7 +79,8 @@ export class EventSourcing {
 
   // Infrastructure — lazily initialized
   private _eventStore?: EventStore;
-  private _queueProcessorFactory?: QueueProcessorFactory;
+  private _globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
+  private readonly _globalJobRegistry = new Map<string, JobRegistryEntry>();
   private _initialized = false;
   private _loggedDisabledWarning = false;
 
@@ -125,9 +128,13 @@ export class EventSourcing {
     return this._eventStore;
   }
 
-  get queueProcessorFactory(): QueueProcessorFactory | undefined {
+  get globalQueue(): EventSourcedQueueProcessor<Record<string, unknown>> | undefined {
     this.ensureInitialized();
-    return this._queueProcessorFactory;
+    return this._globalQueue;
+  }
+
+  get globalJobRegistry(): Map<string, JobRegistryEntry> {
+    return this._globalJobRegistry;
   }
 
   get redisConnection(): IORedis | Cluster | undefined | null {
@@ -218,9 +225,13 @@ export class EventSourcing {
         if (
           this.projectionRegistry.hasProjections &&
           !this.projectionRegistry.isInitialized &&
-          this.queueProcessorFactory
+          this._globalQueue
         ) {
-          this.projectionRegistry.initialize(this.queueProcessorFactory, this._processRole);
+          this.projectionRegistry.initialize(
+            this._globalQueue,
+            this._globalJobRegistry,
+            this._processRole,
+          );
         }
 
         // Create the pipeline
@@ -229,7 +240,8 @@ export class EventSourcing {
           aggregateType: definition.metadata.aggregateType,
           eventStore,
           ...serviceOptions,
-          queueProcessorFactory: this.queueProcessorFactory,
+          globalQueue: this._globalQueue,
+          globalJobRegistry: this._globalJobRegistry,
           metadata: definition.metadata,
           featureFlagService: definition.featureFlagService,
           globalRegistry: this.projectionRegistry,
@@ -254,7 +266,7 @@ export class EventSourcing {
   }
 
   /**
-   * Gracefully closes all pipelines and the projection registry.
+   * Gracefully closes all pipelines, the projection registry, and the global queue.
    */
   async close(): Promise<void> {
     for (const [name, pipeline] of this.pipelines) {
@@ -266,6 +278,10 @@ export class EventSourcing {
     }
     if (this.projectionRegistry.isInitialized) {
       await this.projectionRegistry.close();
+    }
+    // Close the global queue after all consumers are shut down
+    if (this._globalQueue) {
+      await this._globalQueue.close();
     }
     this.pipelines.clear();
   }
@@ -282,6 +298,37 @@ export class EventSourcing {
     }
 
     this.initializeStores();
+  }
+
+  /**
+   * Strips routing metadata and looks up the registry entry for a job payload.
+   * Returns null when the job type is not (yet) registered — e.g. stale Redis
+   * jobs from a previous deployment picked up before all pipelines register.
+   */
+  private lookupEntry(payload: Record<string, unknown>): { entry: JobRegistryEntry; clean: Record<string, unknown> } | null {
+    const pipelineName = payload.__pipelineName as string;
+    const jobType = payload.__jobType as string;
+    const jobName = payload.__jobName as string;
+
+    if (!pipelineName || !jobType || !jobName) {
+      logger.warn(
+        { pipelineName, jobType, jobName },
+        "Job payload missing routing metadata, skipping",
+      );
+      return null;
+    }
+
+    const registryKey = `${pipelineName}:${jobType}:${jobName}`;
+    const entry = this._globalJobRegistry.get(registryKey);
+    if (!entry) {
+      logger.warn(
+        { registryKey },
+        "Unknown job in global queue (pipeline not yet registered or removed), skipping",
+      );
+      return null;
+    }
+    const { __pipelineName: _p, __jobType: _t, __jobName: _n, ...clean } = payload;
+    return { entry, clean };
   }
 
   private initializeStores(): void {
@@ -307,18 +354,59 @@ export class EventSourcing {
       return;
     }
 
-    // Create queue processor factory
-    this._queueProcessorFactory = new DefaultQueueProcessorFactory(
-      this._redis,
-    );
+    // Create the ONE global queue
+    this.createGlobalQueue();
 
     logger.info(
       {
         eventStore: this._eventStore?.constructor.name ?? "none",
-        queueProcessor: this._redis ? "GroupQueue" : "Memory",
+        queueProcessor: this._globalQueue ? (this._redis ? "GroupQueue" : "Memory") : "none",
       },
       "Event sourcing runtime initialized",
     );
+  }
+
+  private createGlobalQueue(): void {
+    const queueName = makeQueueName("event-sourcing/jobs");
+
+    const definition = {
+      name: queueName,
+      groupKey: (payload: Record<string, unknown>) => {
+        const result = this.lookupEntry(payload);
+        if (!result) return "__unknown__";
+        return result.entry.groupKeyFn(result.clean);
+      },
+      score: (payload: Record<string, unknown>) => {
+        const result = this.lookupEntry(payload);
+        if (!result) return 0;
+        return result.entry.scoreFn(result.clean);
+      },
+      spanAttributes: (payload: Record<string, unknown>) => {
+        const result = this.lookupEntry(payload);
+        if (!result) return {};
+        if (!result.entry.spanAttributes) return {};
+        return result.entry.spanAttributes(result.clean);
+      },
+      process: async (payload: Record<string, unknown>) => {
+        const result = this.lookupEntry(payload);
+        if (!result) {
+          logger.warn({ payload }, "Skipping unknown job in global queue");
+          return;
+        }
+        await result.entry.process(result.clean);
+      },
+    };
+
+    const effectiveRedis = this._redis;
+    if (effectiveRedis) {
+      this._globalQueue = new GroupQueueProcessorBullMq(
+        definition,
+        effectiveRedis,
+        { consumerEnabled: this._processRole !== "web" },
+      );
+    } else {
+      this._globalQueue = new EventSourcedQueueProcessorMemory(definition);
+    }
   }
 
   private logDisabledWarning(context: { pipeline?: string; command?: string }): void {
@@ -349,7 +437,7 @@ export class EventSourcing {
     // Mark as initialized and inject stores directly
     es._initialized = true;
     es._eventStore = stores.eventStore;
-    es._queueProcessorFactory = stores.queueProcessorFactory;
+    es._globalQueue = stores.globalQueue;
 
     return es;
   }
@@ -359,7 +447,7 @@ export class EventSourcing {
    */
   static createWithStores(options: {
     eventStore: EventStore;
-    queueProcessorFactory: QueueProcessorFactory;
+    globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
     clickhouse?: ClickHouseClient;
     redis?: IORedis | Cluster;
   }): EventSourcing {
@@ -371,7 +459,11 @@ export class EventSourcing {
 
     es._initialized = true;
     es._eventStore = options.eventStore;
-    es._queueProcessorFactory = options.queueProcessorFactory;
+    if (options.globalQueue) {
+      es._globalQueue = options.globalQueue;
+    } else {
+      es.createGlobalQueue();
+    }
 
     return es;
   }

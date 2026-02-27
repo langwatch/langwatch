@@ -21,6 +21,7 @@ import {
 	type ExperimentRunCommandConfig,
 	makeEvaluatorResultJobId,
 } from "./base.command";
+import { makeExperimentRunKey } from "../utils/compositeKey";
 
 const config: ExperimentRunCommandConfig<
   RecordEvaluatorResultCommandData,
@@ -44,6 +45,8 @@ const config: ExperimentRunCommandConfig<
     passed: commandData.passed,
     details: commandData.details,
     cost: commandData.cost,
+    inputs: commandData.inputs,
+    duration: commandData.duration,
   }),
   getLogContext: (commandData) => ({
     index: commandData.index,
@@ -83,7 +86,7 @@ export class RecordEvaluatorResultCommand
   }
 
   static getAggregateId(payload: RecordEvaluatorResultCommandData): string {
-    return payload.runId;
+    return makeExperimentRunKey(payload.experimentId, payload.runId);
   }
 
   static getSpanAttributes(

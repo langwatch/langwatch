@@ -6,6 +6,7 @@ import type {
 } from "./experimentRunState.foldProjection";
 import { EXPERIMENT_RUN_PROJECTION_VERSIONS } from "../schemas/constants";
 import type { ExperimentRunStateRepository } from "../repositories/experimentRunState.repository";
+import { parseExperimentRunKey } from "../utils/compositeKey";
 
 /**
  * Creates a FoldProjectionStore for experiment run state.
@@ -19,14 +20,25 @@ export function createExperimentRunStateFoldStore(
       state: ExperimentRunStateData,
       context: ProjectionStoreContext,
     ): Promise<void> {
-      const projectionId = `experiment_run_state:${context.tenantId}:${context.aggregateId}`;
+      // Extract raw experimentId and runId from the composite aggregate key
+      // so that RunId and ExperimentId are always populated consistently,
+      // even before the "started" event sets them via apply().
+      // This prevents the split-row bug where ExperimentId mutates from ""
+      // to the real value between writes.
+      const { experimentId, runId } = parseExperimentRunKey(context.aggregateId);
+      const stateWithKeys: ExperimentRunStateData = {
+        ...state,
+        RunId: runId,
+        ExperimentId: experimentId,
+      };
+      const projectionId = context.aggregateId;
 
       const projection: ExperimentRunState = {
         id: projectionId,
         aggregateId: context.aggregateId,
         tenantId: context.tenantId,
         version: EXPERIMENT_RUN_PROJECTION_VERSIONS.RUN_STATE,
-        data: state,
+        data: stateWithKeys,
       };
 
       await repository.storeProjection(projection, { tenantId: context.tenantId });

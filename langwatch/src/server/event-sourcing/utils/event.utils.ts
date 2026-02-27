@@ -17,25 +17,13 @@ import {
 import { SecurityError } from "../services/errorHandling";
 
 /**
- * Generates a unique event ID with entropy to prevent predictability and replay attacks.
- * Format: {timestamp}:{tenantId}:{aggregateId}:{aggregateType}:{ksuid}
- * The KSUID component ensures uniqueness even when timestamps collide and prevents.
- *
- * @param timestamp - Event timestamp in milliseconds
- * @param tenantId - The tenant ID
- * @param aggregateId - The aggregate ID
- * @param aggregateType - The aggregate type
- * @returns Event ID in format {timestamp}:{tenantId}:{aggregateId}:{aggregateType}:{ksuid}
+ * Generates a unique, k-sortable event ID using a KSUID.
+ * The KSUID embeds a second-precision timestamp, making it naturally sortable.
+ * All contextual fields (tenantId, aggregateId, etc.) are stored as separate
+ * columns on the event, so the ID needs no composite structure.
  */
-function generateEventId(
-  timestamp: number,
-  tenantId: string,
-  aggregateId: string,
-  aggregateType: string,
-): string {
-  return `${timestamp}:${tenantId}:${aggregateId}:${aggregateType}:${generate(
-    "event",
-  ).toString()}`;
+function generateEventId(): string {
+  return generate("event").toString();
 }
 
 /**
@@ -46,7 +34,7 @@ export interface CreateEventParams<
   TMetadata extends EventMetadataBase = EventMetadataBase,
   TType extends EventType = EventType,
 > {
-  /** The aggregate type (used for event ID generation) */
+  /** The aggregate type */
   aggregateType: AggregateType;
   /** The aggregate this event belongs to */
   aggregateId: string;
@@ -117,12 +105,7 @@ function createEvent<
     Object.keys(finalMetadata as Record<string, unknown>).length > 0;
 
   return {
-    id: generateEventId(
-      eventTimestamp,
-      String(tenantId),
-      aggregateId,
-      aggregateType,
-    ),
+    id: generateEventId(),
     version,
     aggregateId,
     aggregateType,

@@ -18,6 +18,7 @@ import type {
 	ExperimentRunStateData,
 } from "../projections/experimentRunState.foldProjection";
 import type { ExperimentRunStateRepository } from "./experimentRunState.repository";
+import { makeExperimentRunKey, parseExperimentRunKey } from "../utils/compositeKey";
 
 const TABLE_NAME = "experiment_runs" as const;
 
@@ -26,7 +27,7 @@ const logger = createLogger(
 );
 
 interface ClickHouseExperimentRunRecord {
-  Id: string;
+  ProjectionId: string;
   TenantId: string;
   RunId: string;
   ExperimentId: string;
@@ -38,8 +39,8 @@ interface ClickHouseExperimentRunRecord {
   FailedCount: number;
   TotalCost: number | null;
   TotalDurationMs: string | null;
-  AvgScore: number | null;
-  PassRate: number | null;
+  AvgScoreBps: number | null;
+  PassRateBps: number | null;
   Targets: string;
   CreatedAt: number;
   UpdatedAt: number;
@@ -50,7 +51,7 @@ interface ClickHouseExperimentRunRecord {
   TotalScoreSum: number;
   ScoreCount: number;
   PassedCount: number;
-  PassFailCount: number;
+  GradedCount: number;
 }
 
 type ClickHouseExperimentRunWriteRecord = WithDateWrites<
@@ -79,8 +80,8 @@ export class ExperimentRunStateRepositoryClickHouse<
       TotalDurationMs: record.TotalDurationMs
         ? parseInt(record.TotalDurationMs, 10)
         : null,
-      AvgScore: record.AvgScore,
-      PassRate: record.PassRate,
+      AvgScoreBps: record.AvgScoreBps,
+      PassRateBps: record.PassRateBps,
       Targets: record.Targets,
       StartedAt: record.StartedAt === null ? null : Number(record.StartedAt),
       FinishedAt: record.FinishedAt === null ? null : Number(record.FinishedAt),
@@ -88,7 +89,7 @@ export class ExperimentRunStateRepositoryClickHouse<
       TotalScoreSum: record.TotalScoreSum ?? 0,
       ScoreCount: record.ScoreCount ?? 0,
       PassedCount: record.PassedCount ?? 0,
-      PassFailCount: record.PassFailCount ?? 0,
+      GradedCount: record.GradedCount ?? 0,
     };
   }
 
@@ -101,9 +102,9 @@ export class ExperimentRunStateRepositoryClickHouse<
     runId: string,
   ): ClickHouseExperimentRunWriteRecord {
     return {
-      Id: projectionId,
+      ProjectionId: projectionId,
       TenantId: tenantId,
-      RunId: runId || data.RunId,
+      RunId: data.RunId || runId,
       ExperimentId: data.ExperimentId,
       WorkflowVersionId: data.WorkflowVersionId,
       Version: projectionVersion,
@@ -113,8 +114,8 @@ export class ExperimentRunStateRepositoryClickHouse<
       FailedCount: data.FailedCount,
       TotalCost: data.TotalCost,
       TotalDurationMs: data.TotalDurationMs?.toString() ?? null,
-      AvgScore: data.AvgScore,
-      PassRate: data.PassRate,
+      AvgScoreBps: data.AvgScoreBps,
+      PassRateBps: data.PassRateBps,
       Targets: data.Targets,
       StartedAt: data.StartedAt != null ? new Date(data.StartedAt) : null,
       FinishedAt: data.FinishedAt != null ? new Date(data.FinishedAt) : null,
@@ -123,7 +124,7 @@ export class ExperimentRunStateRepositoryClickHouse<
       TotalScoreSum: data.TotalScoreSum,
       ScoreCount: data.ScoreCount,
       PassedCount: data.PassedCount,
-      PassFailCount: data.PassFailCount,
+      GradedCount: data.GradedCount,
     };
   }
 
@@ -136,29 +137,32 @@ export class ExperimentRunStateRepositoryClickHouse<
       "ExperimentRunStateRepositoryClickHouse.getProjection",
     );
 
-    const runId = String(aggregateId);
+    // aggregateId is the composite key (experimentId:runId) — parse to raw values
+    const { experimentId, runId } = parseExperimentRunKey(String(aggregateId));
 
     try {
       const result = await this.clickHouseClient.query({
         query: `
           SELECT
-            Id, TenantId, RunId, ExperimentId, WorkflowVersionId, Version,
+            ProjectionId, TenantId, RunId, ExperimentId, WorkflowVersionId, Version,
             Total, Progress, CompletedCount, FailedCount, TotalCost,
             toString(TotalDurationMs) AS TotalDurationMs,
-            AvgScore, PassRate, Targets,
+            AvgScoreBps, PassRateBps, Targets,
             toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
             toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
             toUnixTimestamp64Milli(StartedAt) AS StartedAt,
             toUnixTimestamp64Milli(FinishedAt) AS FinishedAt,
             toUnixTimestamp64Milli(StoppedAt) AS StoppedAt,
             LastProcessedEventId,
-            TotalScoreSum, ScoreCount, PassedCount, PassFailCount
+            TotalScoreSum, ScoreCount, PassedCount, GradedCount
           FROM ${TABLE_NAME}
-          WHERE TenantId = {tenantId:String} AND RunId = {runId:String}
+          WHERE TenantId = {tenantId:String}
+            AND RunId = {runId:String}
+            AND ExperimentId = {experimentId:String}
           ORDER BY UpdatedAt DESC
           LIMIT 1
         `,
-        query_params: { tenantId: context.tenantId, runId },
+        query_params: { tenantId: context.tenantId, runId, experimentId },
         format: "JSONEachRow",
       });
 
@@ -167,8 +171,8 @@ export class ExperimentRunStateRepositoryClickHouse<
       if (!row) return null;
 
       const projection: ExperimentRunState = {
-        id: row.Id,
-        aggregateId: runId,
+        id: row.ProjectionId,
+        aggregateId: makeExperimentRunKey(experimentId, runId),
         tenantId: createTenantId(context.tenantId),
         version: row.Version,
         data: this.mapClickHouseRecordToProjectionData(row),
@@ -218,7 +222,7 @@ export class ExperimentRunStateRepositoryClickHouse<
     }
 
     try {
-      const runId = String(projection.aggregateId);
+      const { runId } = parseExperimentRunKey(String(projection.aggregateId));
       const projectionRecord = this.mapProjectionDataToClickHouseRecord(
         projection.data as ExperimentRunStateData,
         String(context.tenantId),
@@ -232,6 +236,7 @@ export class ExperimentRunStateRepositoryClickHouse<
         table: TABLE_NAME,
         values: [projectionRecord],
         format: "JSONEachRow",
+        clickhouse_settings: { wait_for_async_insert: 1 },
       });
 
       logger.debug({ tenantId: context.tenantId, runId, projectionId: projection.id },

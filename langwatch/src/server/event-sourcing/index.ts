@@ -65,7 +65,8 @@ export type { AppendStore, MapProjectionDefinition } from "./projections/mapProj
 export type { ProjectionStoreContext } from "./projections/projectionStoreContext";
 
 // Queues
-export type { EventSourcedQueueProcessor, QueueProcessorFactory } from "./queues";
+export type { EventSourcedQueueProcessor } from "./queues";
+export type { JobRegistryEntry } from "./services/queues/queueManager";
 
 // Services
 export { EventSourcingService } from "./services/eventSourcingService";

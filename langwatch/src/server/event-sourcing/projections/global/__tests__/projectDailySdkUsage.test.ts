@@ -67,7 +67,7 @@ describe("projectDailySdkUsageProjection", () => {
 
       const key = projectDailySdkUsageProjection.key!(event as Event);
       expect(key).toBe(
-        `${tenantId}:2023-11-14:langwatch-observability-sdk:0.13.0:python`,
+        `test-tenant:2023-11-14:langwatch-observability-sdk:0.13.0:python`,
       );
     });
 
@@ -117,6 +117,55 @@ describe("projectDailySdkUsageProjection", () => {
       const key1 = projectDailySdkUsageProjection.key!(event1 as Event);
       const key2 = projectDailySdkUsageProjection.key!(event2 as Event);
       expect(key1).toBe(key2);
+    });
+
+    it("separates events from different tenants with same SDK and day", () => {
+      const dayMs = 1_700_000_000_000;
+      const otherTenantId = createTestTenantId("other-tenant");
+      const spanData = {
+        span: {},
+        resource: {
+          attributes: [
+            {
+              key: "langwatch.sdk.name",
+              value: { stringValue: "langwatch-observability-sdk" },
+            },
+            {
+              key: "langwatch.sdk.version",
+              value: { stringValue: "0.13.0" },
+            },
+            {
+              key: "langwatch.sdk.language",
+              value: { stringValue: "python" },
+            },
+          ],
+        },
+        instrumentationScope: null,
+        piiRedactionLevel: "STRICT",
+      };
+
+      const event1 = createTestEvent(
+        "agg-1",
+        TEST_CONSTANTS.AGGREGATE_TYPE,
+        tenantId,
+        SPAN_RECEIVED_EVENT_TYPE,
+        dayMs,
+        "2025-12-14",
+        spanData,
+      );
+      const event2 = createTestEvent(
+        "agg-2",
+        TEST_CONSTANTS.AGGREGATE_TYPE,
+        otherTenantId,
+        SPAN_RECEIVED_EVENT_TYPE,
+        dayMs,
+        "2025-12-14",
+        spanData,
+      );
+
+      const key1 = projectDailySdkUsageProjection.key!(event1 as Event);
+      const key2 = projectDailySdkUsageProjection.key!(event2 as Event);
+      expect(key1).not.toBe(key2);
     });
   });
 

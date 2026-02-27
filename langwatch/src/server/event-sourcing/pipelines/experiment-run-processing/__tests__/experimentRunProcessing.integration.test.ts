@@ -12,7 +12,6 @@ import {
 } from "../../../__tests__/integration/testHelpers";
 import { EventSourcing } from "../../../eventSourcing";
 import type { PipelineWithCommandHandlers } from "../../../pipeline/types";
-import { BullmqQueueProcessorFactory } from "../../../queues/factory";
 import { EventStoreClickHouse } from "../../../stores/eventStoreClickHouse";
 import { EventRepositoryClickHouse } from "../../../stores/repositories/eventRepositoryClickHouse";
 import { CompleteExperimentRunCommand } from "../commands/completeExperimentRun.command";
@@ -26,6 +25,7 @@ import { ExperimentRunStateRepositoryClickHouse } from "../repositories";
 import { createExperimentRunStateFoldStore } from "../projections/experimentRunState.store";
 import { createExperimentRunItemAppendStore } from "../projections/experimentRunResultStorage.store";
 import type { ExperimentRunProcessingEvent } from "../schemas/events";
+import { makeExperimentRunKey } from "../utils/compositeKey";
 
 function generateTestRunId(): string {
   return `run-${Date.now()}-${Math.random().toString(36).substring(7)}`;
@@ -70,11 +70,8 @@ function createExperimentRunTestPipeline(): PipelineWithCommandHandlers<
     new EventRepositoryClickHouse(clickHouseClient),
   );
 
-  const queueProcessorFactory = new BullmqQueueProcessorFactory(redisConnection);
-
   const eventSourcing = EventSourcing.createWithStores({
     eventStore,
-    queueProcessorFactory,
     clickhouse: clickHouseClient,
     redis: redisConnection,
   });
@@ -109,11 +106,12 @@ function createExperimentRunTestPipeline(): PipelineWithCommandHandlers<
 }
 
 /**
- * Waits for the experiment run fold projection to have a matching RunId.
+ * Waits for the experiment run fold projection to match a predicate.
+ * Uses the composite aggregateId (experimentId:runId) for lookups.
  */
 async function waitForExperimentRunState(
   pipeline: ReturnType<typeof createExperimentRunTestPipeline>,
-  runId: string,
+  compositeKey: string,
   tenantId: ReturnType<typeof createTestTenantId>,
   predicate: (data: ExperimentRunStateData) => boolean,
   timeoutMs = 15000,
@@ -125,7 +123,7 @@ async function waitForExperimentRunState(
     try {
       const projection = await pipeline.service.getProjectionByName(
         "experimentRunState",
-        runId,
+        compositeKey,
         { tenantId },
       );
       const data = projection?.data as ExperimentRunStateData | undefined;
@@ -144,19 +142,20 @@ async function waitForExperimentRunState(
   // Final attempt with diagnostic info
   const projection = await pipeline.service.getProjectionByName(
     "experimentRunState",
-    runId,
+    compositeKey,
     { tenantId },
   ).catch(() => null);
   const data = projection?.data as ExperimentRunStateData | undefined;
 
   throw new Error(
-    `Timeout waiting for experiment run state for run ${runId}. ` +
+    `Timeout waiting for experiment run state for key ${compositeKey}. ` +
     `Current state: ${data ? JSON.stringify({ RunId: data.RunId, Progress: data.Progress, Total: data.Total, FinishedAt: data.FinishedAt }) : "null"}`,
   );
 }
 
 /**
  * Waits for experiment run items to appear in ClickHouse.
+ * Uses the raw RunId slug for querying.
  */
 async function waitForExperimentRunItems(
   runId: string,
@@ -229,6 +228,7 @@ describe.skipIf(!hasTestcontainers)(
       it("processes start → target results → evaluator results → complete", async () => {
         const runId = generateTestRunId();
         const experimentId = generateTestExperimentId();
+        const compositeKey = makeExperimentRunKey(experimentId, runId);
         const targetId = "target-1";
 
         // Start
@@ -308,19 +308,20 @@ describe.skipIf(!hasTestcontainers)(
           tenantId: tenantIdString,
           occurredAt: Date.now(),
           runId,
+          experimentId,
           finishedAt,
         });
 
         await waitForExperimentRunState(
           pipeline,
-          runId,
+          compositeKey,
           tenantId,
           (data) => data.FinishedAt !== null,
         );
 
         const projection = await pipeline.service.getProjectionByName(
           "experimentRunState",
-          runId,
+          compositeKey,
           { tenantId },
         );
         const data = projection?.data as ExperimentRunStateData;
@@ -332,8 +333,8 @@ describe.skipIf(!hasTestcontainers)(
         expect(data.FailedCount).toBe(0);
         expect(data.Progress).toBe(2);
         expect(data.TotalCost).toBeCloseTo(0.005, 4);
-        expect(data.AvgScore).toBe(1.0);
-        expect(data.PassRate).toBe(1.0);
+        expect(data.AvgScoreBps).toBe(10000); // 1.0 → 10000 bps
+        expect(data.PassRateBps).toBe(10000); // 1.0 → 10000 bps
         expect(data.FinishedAt).not.toBeNull();
       });
     });
@@ -342,6 +343,7 @@ describe.skipIf(!hasTestcontainers)(
       it("tracks completed and failed counts separately", async () => {
         const runId = generateTestRunId();
         const experimentId = generateTestExperimentId();
+        const compositeKey = makeExperimentRunKey(experimentId, runId);
         const targetId = "target-1";
 
         await pipeline.commands.startExperimentRun.send({
@@ -393,14 +395,14 @@ describe.skipIf(!hasTestcontainers)(
 
         await waitForExperimentRunState(
           pipeline,
-          runId,
+          compositeKey,
           tenantId,
           (data) => data.Progress >= 3,
         );
 
         const projection = await pipeline.service.getProjectionByName(
           "experimentRunState",
-          runId,
+          compositeKey,
           { tenantId },
         );
         const data = projection?.data as ExperimentRunStateData;
@@ -412,9 +414,10 @@ describe.skipIf(!hasTestcontainers)(
     });
 
     describe("given evaluator results with mixed scores", () => {
-      it("computes average score and pass rate", async () => {
+      it("computes average score and pass rate in basis points", async () => {
         const runId = generateTestRunId();
         const experimentId = generateTestExperimentId();
+        const compositeKey = makeExperimentRunKey(experimentId, runId);
         const targetId = "target-1";
 
         await pipeline.commands.startExperimentRun.send({
@@ -458,20 +461,20 @@ describe.skipIf(!hasTestcontainers)(
 
         await waitForExperimentRunState(
           pipeline,
-          runId,
+          compositeKey,
           tenantId,
           (data) => data.ScoreCount >= 2,
         );
 
         const projection = await pipeline.service.getProjectionByName(
           "experimentRunState",
-          runId,
+          compositeKey,
           { tenantId },
         );
         const data = projection?.data as ExperimentRunStateData;
 
-        expect(data.AvgScore).toBeCloseTo(0.6, 4); // (0.8 + 0.4) / 2
-        expect(data.PassRate).toBeCloseTo(0.5, 4); // 1 passed / 2 total
+        expect(data.AvgScoreBps).toBe(6000); // (0.8 + 0.4) / 2 = 0.6 → 6000 bps
+        expect(data.PassRateBps).toBe(5000); // 1 passed / 2 total = 0.5 → 5000 bps
       });
     });
 
@@ -530,6 +533,7 @@ describe.skipIf(!hasTestcontainers)(
       it("records stoppedAt in the fold state", async () => {
         const runId = generateTestRunId();
         const experimentId = generateTestExperimentId();
+        const compositeKey = makeExperimentRunKey(experimentId, runId);
 
         await pipeline.commands.startExperimentRun.send({
           tenantId: tenantIdString,
@@ -546,19 +550,20 @@ describe.skipIf(!hasTestcontainers)(
           tenantId: tenantIdString,
           occurredAt: Date.now(),
           runId,
+          experimentId,
           stoppedAt,
         });
 
         await waitForExperimentRunState(
           pipeline,
-          runId,
+          compositeKey,
           tenantId,
           (data) => data.StoppedAt !== null,
         );
 
         const projection = await pipeline.service.getProjectionByName(
           "experimentRunState",
-          runId,
+          compositeKey,
           { tenantId },
         );
         const data = projection?.data as ExperimentRunStateData;

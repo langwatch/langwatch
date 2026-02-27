@@ -8,7 +8,7 @@ import { IdUtils } from "../utils/id.utils";
  * Record type matching the experiment_run_items ClickHouse table schema.
  */
 export interface ClickHouseExperimentRunResultRecord {
-  Id: string;
+  ProjectionId: string;
   TenantId: string;
   RunId: string;
   ExperimentId: string;
@@ -29,6 +29,8 @@ export interface ClickHouseExperimentRunResultRecord {
   Passed: number | null;
   EvaluationDetails: string | null;
   EvaluationCost: number | null;
+  EvaluationInputs: string | null;
+  EvaluationDurationMs: number | null;
   OccurredAt: Date;
 }
 
@@ -47,11 +49,10 @@ function mapTargetResultToRecord(
     targetId: event.data.targetId,
     resultType: "target",
     evaluatorId: null,
-    timestampMs: event.timestamp,
   });
 
   return {
-    Id: id,
+    ProjectionId: id,
     TenantId: event.tenantId,
     RunId: event.data.runId,
     ExperimentId: event.data.experimentId,
@@ -72,6 +73,8 @@ function mapTargetResultToRecord(
     Passed: null,
     EvaluationDetails: null,
     EvaluationCost: null,
+    EvaluationInputs: null,
+    EvaluationDurationMs: null,
     OccurredAt: new Date(event.occurredAt),
   };
 }
@@ -89,11 +92,10 @@ function mapEvaluatorResultToRecord(
     targetId: event.data.targetId,
     resultType: "evaluator",
     evaluatorId: event.data.evaluatorId,
-    timestampMs: event.timestamp,
   });
 
   return {
-    Id: id,
+    ProjectionId: id,
     TenantId: event.tenantId,
     RunId: event.data.runId,
     ExperimentId: event.data.experimentId,
@@ -119,6 +121,8 @@ function mapEvaluatorResultToRecord(
           : 0,
     EvaluationDetails: event.data.details ?? null,
     EvaluationCost: event.data.cost ?? null,
+    EvaluationInputs: event.data.inputs ? JSON.stringify(event.data.inputs) : null,
+    EvaluationDurationMs: event.data.duration ?? null,
     OccurredAt: new Date(event.occurredAt),
   };
 }

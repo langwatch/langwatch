@@ -5,7 +5,7 @@ export interface EventSourcedQueueProcessorOptions {
   /**
    * Maximum number of groups that can be processed in parallel.
    * Only used by GroupQueueProcessorBullMq.
-   * @default 20
+   * @default 120
    */
   globalConcurrency?: number;
 }
@@ -142,9 +142,18 @@ export interface EventSourcedQueueDefinition<Payload extends Record<string, unkn
   score?: (payload: Payload) => number;
 }
 
+/**
+ * Options for per-send overrides of queue behavior.
+ * Allows individual send calls to override the queue-level delay and deduplication.
+ */
+export interface QueueSendOptions<Payload> {
+  delay?: number;
+  deduplication?: DeduplicationConfig<Payload>;
+}
+
 export interface EventSourcedQueueProcessor<Payload extends Record<string, unknown>> {
-  send(payload: Payload): Promise<void>;
-  sendBatch(payloads: Payload[]): Promise<void>;
+  send(payload: Payload, options?: QueueSendOptions<Payload>): Promise<void>;
+  sendBatch(payloads: Payload[], options?: QueueSendOptions<Payload>): Promise<void>;
   /**
    * Gracefully closes the queue processor, waiting for in-flight jobs to complete.
    * Should be called during application shutdown.
@@ -156,18 +165,4 @@ export interface EventSourcedQueueProcessor<Payload extends Record<string, unkno
    * For memory queues, this resolves immediately.
    */
   waitUntilReady(): Promise<void>;
-}
-
-/**
- * Factory interface for creating queue processors.
- * Allows dependency injection for testing and explicit control over implementation.
- */
-export interface QueueProcessorFactory {
-  /**
-   * Creates a queue processor based on the provided definition.
-   * The factory decides which implementation (BullMQ or memory) to use.
-   */
-  create<Payload extends Record<string, unknown>>(
-    definition: EventSourcedQueueDefinition<Payload>,
-  ): EventSourcedQueueProcessor<Payload>;
 }

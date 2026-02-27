@@ -26,7 +26,7 @@ const logger = createLogger(
 );
 
 interface ClickHouseSimulationRunRecord {
-  Id: string;
+  ProjectionId: string;
   TenantId: string;
   ScenarioRunId: string;
   ScenarioId: string;
@@ -103,11 +103,12 @@ export class SimulationRunStateRepositoryClickHouse<
     tenantId: string,
     projectionId: string,
     projectionVersion: string,
+    scenarioRunId: string,
   ): ClickHouseSimulationRunWriteRecord {
     return {
-      Id: projectionId,
+      ProjectionId: projectionId,
       TenantId: tenantId,
-      ScenarioRunId: data.ScenarioRunId,
+      ScenarioRunId: scenarioRunId || data.ScenarioRunId,
       ScenarioId: data.ScenarioId,
       BatchRunId: data.BatchRunId,
       ScenarioSetId: data.ScenarioSetId,
@@ -149,7 +150,7 @@ export class SimulationRunStateRepositoryClickHouse<
       const result = await this.clickHouseClient.query({
         query: `
           SELECT
-            Id, TenantId, ScenarioRunId, ScenarioId, BatchRunId, ScenarioSetId,
+            ProjectionId, TenantId, ScenarioRunId, ScenarioId, BatchRunId, ScenarioSetId,
             Version, Status, Name, Description,
             \`Messages.Id\`, \`Messages.Role\`, \`Messages.Content\`,
             \`Messages.TraceId\`, \`Messages.Rest\`,
@@ -174,7 +175,7 @@ export class SimulationRunStateRepositoryClickHouse<
       if (!row) return null;
 
       const projection: SimulationRunState = {
-        id: row.Id,
+        id: row.ProjectionId,
         aggregateId: scenarioRunId,
         tenantId: createTenantId(context.tenantId),
         version: row.Version,
@@ -231,12 +232,14 @@ export class SimulationRunStateRepositoryClickHouse<
         String(context.tenantId),
         projection.id,
         projection.version,
+        scenarioRunId,
       );
 
       await this.clickHouseClient.insert({
         table: TABLE_NAME,
         values: [projectionRecord],
         format: "JSONEachRow",
+        clickhouse_settings: { wait_for_async_insert: 1 },
       });
 
       logger.debug({ tenantId: context.tenantId, scenarioRunId, projectionId: projection.id },

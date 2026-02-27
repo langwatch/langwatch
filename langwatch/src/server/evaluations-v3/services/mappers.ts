@@ -26,7 +26,7 @@ import type {
 
 /** Row shape returned from the `experiment_runs` ClickHouse table. */
 export interface ClickHouseExperimentRunRow {
-  Id: string;
+  ProjectionId: string;
   TenantId: string;
   RunId: string;
   ExperimentId: string;
@@ -38,8 +38,8 @@ export interface ClickHouseExperimentRunRow {
   FailedCount: number;
   TotalCost: number | null;
   TotalDurationMs: number | null;
-  AvgScore: number | null;
-  PassRate: number | null;
+  AvgScoreBps: number | null;
+  PassRateBps: number | null;
   Targets: string;
   CreatedAt: string;
   UpdatedAt: string;
@@ -49,7 +49,7 @@ export interface ClickHouseExperimentRunRow {
 
 /** Row shape returned from the `experiment_run_items` ClickHouse table. */
 export interface ClickHouseExperimentRunItemRow {
-  Id: string;
+  ProjectionId: string;
   TenantId: string;
   RunId: string;
   ExperimentId: string;
@@ -70,6 +70,8 @@ export interface ClickHouseExperimentRunItemRow {
   Passed: number | null; // UInt8 in ClickHouse
   EvaluationDetails: string | null;
   EvaluationCost: number | null;
+  EvaluationInputs: string | null;
+  EvaluationDurationMs: number | null;
   CreatedAt: string;
 }
 
@@ -91,6 +93,7 @@ export interface ClickHouseCostSummaryRow {
   datasetAverageCost: number | null;
   datasetAverageDuration: number | null;
   evaluationsAverageCost: number | null;
+  evaluationsAverageDuration: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -138,6 +141,7 @@ export function mapClickHouseRunToExperimentRun({
     datasetAverageCost: costSummary?.datasetAverageCost ?? undefined,
     datasetAverageDuration: costSummary?.datasetAverageDuration ?? undefined,
     evaluationsAverageCost: costSummary?.evaluationsAverageCost ?? undefined,
+    evaluationsAverageDuration: costSummary?.evaluationsAverageDuration ?? undefined,
     evaluations,
   };
 
@@ -209,9 +213,10 @@ export function mapClickHouseItemsToRunWithItems({
         }
       }
 
+      const targetId = item.TargetId && item.TargetId !== "default" ? item.TargetId : null;
       dataset.push({
         index: item.RowIndex,
-        targetId: item.TargetId || null,
+        targetId,
         entry,
         predicted,
         cost: item.TargetCost,
@@ -220,10 +225,11 @@ export function mapClickHouseItemsToRunWithItems({
         traceId: item.TraceId,
       });
     } else if (item.ResultType === "evaluator") {
+      const targetId = item.TargetId && item.TargetId !== "default" ? item.TargetId : null;
       evaluations.push({
         evaluator: item.EvaluatorId ?? "",
         name: item.EvaluatorName,
-        targetId: item.TargetId || null,
+        targetId,
         status: (item.EvaluationStatus as "processed" | "skipped" | "error") ||
           "error",
         index: item.RowIndex,
@@ -232,6 +238,15 @@ export function mapClickHouseItemsToRunWithItems({
         passed: item.Passed !== null ? item.Passed === 1 : null,
         details: item.EvaluationDetails,
         cost: item.EvaluationCost,
+        inputs: (() => {
+          if (!item.EvaluationInputs) return null;
+          try {
+            return JSON.parse(item.EvaluationInputs);
+          } catch {
+            return null;
+          }
+        })(),
+        duration: item.EvaluationDurationMs ?? null,
       });
     }
   }

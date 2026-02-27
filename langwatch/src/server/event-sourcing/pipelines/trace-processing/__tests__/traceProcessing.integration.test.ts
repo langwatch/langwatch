@@ -14,7 +14,6 @@ import {
 } from "../../../__tests__/integration/testHelpers";
 import { EventSourcing } from "../../../eventSourcing";
 import type { PipelineWithCommandHandlers } from "../../../pipeline/types";
-import { BullmqQueueProcessorFactory } from "../../../queues/factory";
 import { EventStoreClickHouse } from "../../../stores/eventStoreClickHouse";
 import { EventRepositoryClickHouse } from "../../../stores/repositories/eventRepositoryClickHouse";
 import { AssignTopicCommand } from "../commands/assignTopicCommand";
@@ -113,11 +112,8 @@ function createTraceTestPipeline(): PipelineWithCommandHandlers<
     new EventRepositoryClickHouse(clickHouseClient),
   );
 
-  const queueProcessorFactory = new BullmqQueueProcessorFactory(redisConnection);
-
   const eventSourcing = EventSourcing.createWithStores({
     eventStore,
-    queueProcessorFactory,
     clickhouse: clickHouseClient,
     redis: redisConnection,
   });

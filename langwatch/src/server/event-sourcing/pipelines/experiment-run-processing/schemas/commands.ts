@@ -48,6 +48,8 @@ export const recordEvaluatorResultCommandDataSchema = z.object({
   passed: z.boolean().nullable().optional(),
   details: z.string().nullable().optional(),
   cost: z.number().nullable().optional(),
+  inputs: z.record(z.unknown()).nullable().optional(),
+  duration: z.number().nullable().optional(),
   occurredAt: z.number(),
 });
 
@@ -58,6 +60,7 @@ export type RecordEvaluatorResultCommandData = z.infer<
 export const completeExperimentRunCommandDataSchema = z.object({
   tenantId: z.string(),
   runId: z.string(),
+  experimentId: z.string(),
   finishedAt: z.number().nullable().optional(),
   stoppedAt: z.number().nullable().optional(),
   occurredAt: z.number(),

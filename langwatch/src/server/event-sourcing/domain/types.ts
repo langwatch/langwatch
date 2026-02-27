@@ -42,7 +42,7 @@ export type EventMetadataBase = z.infer<typeof EventMetadataBaseSchema>;
  * For LangWatch Observability events, this would be: `lw.obs.<aggregate-type>.<event-name>`
  */
 export const EventSchema = z.object({
-  /** Unique identifier for the event. The general format is {timestamp}:{tenantId}:{aggregateId}:{aggregateType}:{ksuid} */
+  /** Unique identifier for the event (pure KSUID). */
   id: z.string(),
   /** Unique identifier for the aggregate this event belongs to */
   aggregateId: z.string(),

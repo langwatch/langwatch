@@ -21,6 +21,7 @@ import {
 	type ExperimentRunCommandConfig,
 	makeResultJobId,
 } from "./base.command";
+import { makeExperimentRunKey } from "../utils/compositeKey";
 
 const config: ExperimentRunCommandConfig<
   RecordTargetResultCommandData,
@@ -80,7 +81,7 @@ export class RecordTargetResultCommand
   }
 
   static getAggregateId(payload: RecordTargetResultCommandData): string {
-    return payload.runId;
+    return makeExperimentRunKey(payload.experimentId, payload.runId);
   }
 
   static getSpanAttributes(

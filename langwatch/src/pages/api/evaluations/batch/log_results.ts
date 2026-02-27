@@ -1,11 +1,9 @@
-import { generate } from "@langwatch/ksuid";
 import { ExperimentType, type Project } from "@prisma/client";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { type ZodError, z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { getApp } from "~/server/app-layer/app";
 import { DomainError } from "~/server/app-layer/domain-error";
-import { KSUID_RESOURCES } from "~/utils/constants";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { prisma } from "../../../../server/db";
 import {
@@ -415,7 +413,7 @@ const dispatchToClickHouse = async (
       tenantId: project.id,
       runId,
       experimentId,
-      total: batchEvaluation.total ?? batchEvaluation.dataset.length ?? 0,
+      total: batchEvaluation.total || batchEvaluation.dataset.length,
       targets,
       occurredAt: Date.now(),
     });
@@ -435,7 +433,7 @@ const dispatchToClickHouse = async (
         runId,
         experimentId,
         index: entry.index,
-        targetId: entry.target_id ?? "default",
+        targetId: entry.target_id ?? "",
         entry: entry.entry,
         predicted: entry.predicted ?? undefined,
         cost: entry.cost ?? undefined,
@@ -456,7 +454,7 @@ const dispatchToClickHouse = async (
         runId,
         experimentId,
         index: evaluation.index,
-        targetId: evaluation.target_id ?? "default",
+        targetId: evaluation.target_id ?? "",
         evaluatorId: evaluation.evaluator,
         evaluatorName: evaluation.name ?? undefined,
         status: evaluation.status,
@@ -465,6 +463,8 @@ const dispatchToClickHouse = async (
         passed: evaluation.passed ?? undefined,
         details: evaluation.details ?? undefined,
         cost: evaluation.cost ?? undefined,
+        inputs: evaluation.inputs ?? undefined,
+        duration: typeof evaluation.duration === 'number' ? evaluation.duration : undefined,
         occurredAt: Date.now(),
       }).catch((err) => {
         logger.warn(
@@ -485,6 +485,7 @@ const dispatchToClickHouse = async (
       await getApp().experimentRuns.completeExperimentRun({
         tenantId: project.id,
         runId,
+        experimentId,
         finishedAt: batchEvaluation.timestamps.finished_at ?? undefined,
         stoppedAt: batchEvaluation.timestamps.stopped_at ?? undefined,
         occurredAt: Date.now(),
@@ -501,7 +502,10 @@ const dispatchToClickHouse = async (
   if (project.featureEventSourcingEvaluationIngestion) {
     const app = getApp();
     for (const evaluation of batchEvaluation.evaluations) {
-      const evaluationId = generate(KSUID_RESOURCES.EVALUATION).toString();
+      // Use a deterministic ID so repeated API calls (e.g. SDK progress
+      // updates) don't create duplicate evaluation aggregates.
+      const targetId = evaluation.target_id ?? "";
+      const evaluationId = `local_eval_${runId}_${evaluation.evaluator}_${evaluation.index}_${targetId}`;
       try {
         await app.evaluations.startEvaluation({
           tenantId: project.id,

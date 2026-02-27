@@ -13,7 +13,7 @@ import type { TraceEvaluation } from "../evaluation-run.types";
 // ---------------------------------------------------------------------------
 
 const baseCHRow: ClickHouseEvaluationRunRow = {
-  Id: "row-1",
+  ProjectionId: "row-1",
   TenantId: "project-1",
   EvaluationId: "eval-001",
   Version: "1",
