@@ -27,7 +27,6 @@ export function createBillingReportingPipeline(
     .withAggregateType("billing_report")
     .withCommand("reportUsageForMonth", deps.ReportUsageForMonthCommand, {
       delay: 300_000, // 5 min delay (initial + re-trigger)
-      globalConcurrency: 2, // match old worker, Stripe rate limits
       deduplication: {
         makeId: (p: { organizationId: string; billingMonth: string }) =>
           `${p.organizationId}:${p.billingMonth}`,

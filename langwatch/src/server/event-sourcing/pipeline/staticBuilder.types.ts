@@ -26,8 +26,6 @@ export interface CommandHandlerOptions<Payload = any> {
   makeJobId?: (payload: Payload) => string;
   delay?: number;
   concurrency?: number;
-  /** Maximum number of groups processed in parallel (GroupQueue only). */
-  globalConcurrency?: number;
   deduplication?: DeduplicationStrategy<Payload>;
   spanAttributes?: (
     payload: Payload,
