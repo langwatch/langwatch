@@ -83,8 +83,9 @@ export async function processCommand<EventType extends Event>(
     );
   }
 
-  const tenantId = createTenantId(String(payload.tenantId));
-  const aggregateId = getAggregateId(payload);
+  const validated = validation.data;
+  const tenantId = createTenantId(String(validated.tenantId));
+  const aggregateId = getAggregateId(validated);
 
   const disabled = await isComponentDisabled({
     featureFlagService,
@@ -103,7 +104,7 @@ export async function processCommand<EventType extends Event>(
     tenantId,
     aggregateId,
     commandType,
-    payload,
+    validated,
   );
 
   const events = await handler.handle(command);
