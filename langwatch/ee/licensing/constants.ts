@@ -119,6 +119,7 @@ export const UNLIMITED_PLAN: PlanInfo = {
   maxCustomGraphs: Number.MAX_SAFE_INTEGER,
   maxAutomations: Number.MAX_SAFE_INTEGER,
   canPublish: true,
+  usageUnit: "traces",
   prices: {
     USD: 0,
     EUR: 0,
@@ -155,6 +156,7 @@ export const FREE_PLAN: PlanInfo = {
   maxCustomGraphs: FREE_TIER_LIMITS.CUSTOM_GRAPHS,
   maxAutomations: FREE_TIER_LIMITS.AUTOMATIONS,
   canPublish: false,
+  usageUnit: "traces",
   prices: {
     USD: 0,
     EUR: 0,

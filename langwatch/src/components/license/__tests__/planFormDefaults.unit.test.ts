@@ -22,6 +22,7 @@ describe("planFormDefaults", () => {
         maxScenarios: PRO_TEMPLATE.maxScenarios,
         maxAgents: PRO_TEMPLATE.maxAgents,
         canPublish: PRO_TEMPLATE.canPublish,
+        usageUnit: PRO_TEMPLATE.usageUnit,
       });
     });
 
@@ -40,6 +41,7 @@ describe("planFormDefaults", () => {
         maxScenarios: ENTERPRISE_TEMPLATE.maxScenarios,
         maxAgents: ENTERPRISE_TEMPLATE.maxAgents,
         canPublish: ENTERPRISE_TEMPLATE.canPublish,
+        usageUnit: ENTERPRISE_TEMPLATE.usageUnit,
       });
     });
 
@@ -66,6 +68,11 @@ describe("planFormDefaults", () => {
       expect(proDefaults.maxEvaluators).toBe(PRO_TEMPLATE.maxEvaluators);
       expect(proDefaults.maxScenarios).toBe(PRO_TEMPLATE.maxScenarios);
       expect(proDefaults.maxAgents).toBe(PRO_TEMPLATE.maxAgents);
+    });
+
+    it("includes usageUnit in PRO and ENTERPRISE defaults", () => {
+      expect(PLAN_DEFAULTS.PRO.usageUnit).toBe("traces");
+      expect(PLAN_DEFAULTS.ENTERPRISE.usageUnit).toBe("traces");
     });
 
     it("ENTERPRISE defaults match ENTERPRISE_TEMPLATE values without fallbacks", () => {

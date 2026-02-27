@@ -50,6 +50,10 @@ describe("PRO_TEMPLATE", () => {
   it("has canPublish true", () => {
     expect(PRO_TEMPLATE.canPublish).toBe(true);
   });
+
+  it("has usageUnit of traces", () => {
+    expect(PRO_TEMPLATE.usageUnit).toBe("traces");
+  });
 });
 
 describe("ENTERPRISE_TEMPLATE", () => {
@@ -99,6 +103,10 @@ describe("ENTERPRISE_TEMPLATE", () => {
 
   it("has canPublish true", () => {
     expect(ENTERPRISE_TEMPLATE.canPublish).toBe(true);
+  });
+
+  it("has usageUnit of traces", () => {
+    expect(ENTERPRISE_TEMPLATE.usageUnit).toBe("traces");
   });
 });
 

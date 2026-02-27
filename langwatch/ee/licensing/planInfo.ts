@@ -30,6 +30,7 @@ export type PlanInfo = {
   maxCustomGraphs: number;
   maxAutomations: number;
   canPublish: boolean;
+  usageUnit?: string;
   userPrice?: {
     USD: number;
     EUR: number;

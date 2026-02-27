@@ -152,6 +152,39 @@ describe("mapToPlanInfo", () => {
     expect(result.maxMembersLite).toBe(DEFAULT_MEMBERS_LITE);
   });
 
+  it("maps usageUnit from license data", () => {
+    const licenseData = createLicenseData({ usageUnit: "events" });
+
+    const result = mapToPlanInfo(licenseData);
+
+    expect(result.usageUnit).toBe("events");
+  });
+
+  it("defaults usageUnit to traces for legacy licenses", () => {
+    const oldLicenseData: LicenseData = {
+      licenseId: "lic-old-002",
+      version: 1,
+      organizationName: "Legacy Org",
+      email: "legacy@example.com",
+      issuedAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+      plan: {
+        type: "PRO",
+        name: "Pro",
+        maxMembers: 10,
+        maxProjects: 99,
+        maxMessagesPerMonth: 100_000,
+        evaluationsCredit: 100,
+        maxWorkflows: 50,
+        canPublish: true,
+      },
+    };
+
+    const result = mapToPlanInfo(oldLicenseData);
+
+    expect(result.usageUnit).toBe("traces");
+  });
+
   it("uses DEFAULT_LIMIT which is JSON-serializable", () => {
     // Ensure DEFAULT_LIMIT can be serialized (not Infinity)
     const serialized = JSON.stringify({ limit: DEFAULT_LIMIT });
