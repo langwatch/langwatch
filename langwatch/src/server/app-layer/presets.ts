@@ -22,6 +22,8 @@ import { createStripeClient } from "../../../ee/billing/stripe/stripeClient";
 import { createSeatEventSubscriptionFns } from "../../../ee/billing/services/seatEventSubscription";
 import * as subscriptionItemCalculator from "../../../ee/billing/services/subscriptionItemCalculator";
 import { UsageService } from "./usage/usage.service";
+import { StripeUsageReportingService } from "../../../ee/billing/services/usageReportingService";
+import { meters } from "../../../ee/billing/stripe/stripePriceCatalog";
 
 export function initializeWebApp(): App {
   return initializeDefaultApp({ processRole: "web" });
@@ -60,8 +62,10 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const usage = UsageService.create({ prisma, organizationService: organizations });
 
   let subscription: SubscriptionService | undefined;
+  let usageReportingService: StripeUsageReportingService | undefined;
   if (config.isSaas) {
     const stripeClient = createStripeClient();
+    usageReportingService = new StripeUsageReportingService({ stripe: stripeClient, meterId: meters.BILLABLE_EVENTS });
     const seatEventFns = createSeatEventSubscriptionFns({ stripe: stripeClient, db: prisma });
     subscription = EESubscriptionService.create({
       stripe: stripeClient,
@@ -92,6 +96,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     traces,
     evaluations: { runs: evaluations.runs, execution: evaluations.execution },
     esSync: { esClient, traceIndex: TRACE_INDEX, traceIndexId },
+    usageReportingService,
   });
   const commands = registry.registerAll();
 

@@ -1,6 +1,6 @@
 import Stripe from "stripe";
 import { afterAll, describe, expect, it } from "vitest";
-import { createUsageReportingService } from "../services/usageReportingService";
+import { StripeUsageReportingService } from "../services/usageReportingService";
 import { meters } from "../stripe/stripePriceCatalog";
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
@@ -22,7 +22,7 @@ const describeIfStripeKey = STRIPE_SECRET_KEY ? describe : describe.skip;
 
 describeIfStripeKey("Usage reporting integration", () => {
   const stripe = new Stripe(STRIPE_SECRET_KEY!, { apiVersion: "2024-04-10" });
-  const service = createUsageReportingService({
+  const service = new StripeUsageReportingService({
     stripe,
     meterId: meters.BILLABLE_EVENTS,
   });

@@ -104,7 +104,6 @@ function makeOrg({
   return {
     id,
     stripeCustomerId,
-    pricingModel: "SEAT_EVENT",
     subscriptions: hasSubscription ? [{ id: "sub-1" }] : [],
   };
 }
@@ -133,8 +132,12 @@ async function createHandler() {
 // ---------------------------------------------------------------------------
 
 describe("ReportUsageForMonthCommand", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    const { clearOrgCache } = await import(
+      "../reportUsageForMonth.command"
+    );
+    clearOrgCache();
   });
 
   // ========================================================================

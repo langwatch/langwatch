@@ -8,6 +8,7 @@ import type { EvaluationExecutionService } from "../app-layer/evaluations/evalua
 import type { ProjectService } from "../app-layer/projects/project.service";
 import type { MonitorService } from "../app-layer/monitors/monitor.service";
 import type { EvaluationEsSyncReactorDeps } from "./pipelines/evaluation-processing/reactors/evaluationEsSync.reactor";
+import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";
 import { createTraceProcessingPipeline } from "./pipelines/trace-processing/pipeline";
 import { createEvaluationProcessingPipeline } from "./pipelines/evaluation-processing/pipeline";
 import { createExperimentRunProcessingPipeline } from "./pipelines/experiment-run-processing/pipeline";
@@ -59,6 +60,7 @@ export interface PipelineRegistryDeps {
     execution: EvaluationExecutionService;
   };
   esSync: EvaluationEsSyncReactorDeps;
+  usageReportingService?: UsageReportingService;
 }
 
 /**
@@ -174,11 +176,7 @@ export class PipelineRegistry {
     const ReportUsageForMonthCommand =
       createReportUsageForMonthCommandClass({
         prisma: this.deps.prisma,
-        getUsageReportingService: () => {
-          // eslint-disable-next-line @typescript-eslint/no-require-imports
-          const { getUsageReportingService } = require("../../../ee/billing/index");
-          return getUsageReportingService();
-        },
+        getUsageReportingService: () => this.deps.usageReportingService,
         queryBillableEventsTotal,
         selfDispatch: (data) => {
           const pipeline = this.deps.eventSourcing.getPipeline(BILLING_REPORTING_PIPELINE_NAME);

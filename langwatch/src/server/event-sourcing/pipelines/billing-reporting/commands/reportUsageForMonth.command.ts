@@ -7,8 +7,9 @@ import {
   captureException,
   withScope,
 } from "~/utils/posthogErrorCapture";
-import { SUBSCRIBABLE_PLANS } from "../../../../../../ee/billing/planTypes";
+import { GROWTH_SEAT_PLAN_TYPES } from "../../../../../../ee/billing/utils/growthSeatEvent";
 import type { UsageReportingService } from "../../../../../../ee/billing/services/usageReportingService";
+import { TtlCache } from "~/server/utils/ttlCache";
 import type { queryBillableEventsTotal as QueryBillableEventsTotalFn } from "../../../../../../ee/billing/services/billableEventsQuery";
 import type { ReportUsageForMonthCommandData } from "../schemas/commands";
 import { reportUsageForMonthCommandDataSchema } from "../schemas/commands";
@@ -25,9 +26,24 @@ const BILLABLE_EVENTS_EVENT_NAME = "langwatch_billable_events";
 /** Maximum consecutive failures before circuit-breaker trips. */
 const MAX_CONSECUTIVE_FAILURES = 5;
 
+const ONE_MINUTE_MS = 60 * 1000;
+
+type CachedOrgData = {
+  id: string;
+  stripeCustomerId: string | null;
+  subscriptions: { id: string }[];
+};
+
+const orgCache = new TtlCache<CachedOrgData>(ONE_MINUTE_MS);
+
+/** Exposed for testing: clears the org cache. */
+export function clearOrgCache(): void {
+  orgCache.clear();
+}
+
 export interface ReportUsageForMonthCommandDeps {
   prisma: PrismaClient;
-  getUsageReportingService: () => UsageReportingService;
+  getUsageReportingService: () => UsageReportingService | undefined;
   queryBillableEventsTotal: typeof QueryBillableEventsTotalFn;
   selfDispatch: (data: ReportUsageForMonthCommandData) => Promise<void>;
 }
@@ -104,23 +120,28 @@ export function createReportUsageForMonthCommandClass(
       let shouldSelfDispatch = false;
       try {
         // 1. Skip conditions
-        const org = await deps.prisma.organization.findFirst({
-          where: { id: organizationId, pricingModel: PricingModel.SEAT_EVENT },
-          select: {
-            id: true,
-            stripeCustomerId: true,
-            pricingModel: true,
-            subscriptions: {
-              where: {
-                status: "ACTIVE",
-                plan: { in: [...SUBSCRIBABLE_PLANS] },
+        let org = orgCache.get(organizationId) ?? null;
+        if (!org) {
+          org = await deps.prisma.organization.findFirst({
+            where: { id: organizationId, pricingModel: PricingModel.SEAT_EVENT },
+            select: {
+              id: true,
+              stripeCustomerId: true,
+              subscriptions: {
+                where: {
+                  status: "ACTIVE",
+                  plan: { in: [...GROWTH_SEAT_PLAN_TYPES] },
+                },
+                take: 1,
+                select: { id: true },
+                orderBy: { startDate: "desc" },
               },
-              take: 1,
-              select: { id: true },
-              orderBy: { startDate: "desc" },
             },
-          },
-        });
+          });
+          if (org) {
+            orgCache.set(organizationId, org);
+          }
+        }
 
         if (!org) {
           logger.warn(
@@ -290,9 +311,17 @@ export function createReportUsageForMonthCommandClass(
         targetTotal,
       });
 
+      const usageReportingService = deps.getUsageReportingService();
+      if (!usageReportingService) {
+        logger.error(
+          { organizationId, billingMonth },
+          "usageReportingService not available — billing requires isSaas, this is a configuration error",
+        );
+        return false;
+      }
+
       try {
-        const results = await deps
-          .getUsageReportingService()
+        const results = await usageReportingService
           .reportUsageDelta({
             stripeCustomerId,
             organizationId,
