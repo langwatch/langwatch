@@ -18,7 +18,7 @@ import type {
 	ExperimentRunStateData,
 } from "../projections/experimentRunState.foldProjection";
 import type { ExperimentRunStateRepository } from "./experimentRunState.repository";
-import { parseExperimentRunKey } from "../utils/compositeKey";
+import { makeExperimentRunKey, parseExperimentRunKey } from "../utils/compositeKey";
 
 const TABLE_NAME = "experiment_runs" as const;
 
@@ -104,7 +104,7 @@ export class ExperimentRunStateRepositoryClickHouse<
     return {
       ProjectionId: projectionId,
       TenantId: tenantId,
-      RunId: runId || data.RunId,
+      RunId: data.RunId || runId,
       ExperimentId: data.ExperimentId,
       WorkflowVersionId: data.WorkflowVersionId,
       Version: projectionVersion,
@@ -172,7 +172,7 @@ export class ExperimentRunStateRepositoryClickHouse<
 
       const projection: ExperimentRunState = {
         id: row.ProjectionId,
-        aggregateId: runId,
+        aggregateId: makeExperimentRunKey(experimentId, runId),
         tenantId: createTenantId(context.tenantId),
         version: row.Version,
         data: this.mapClickHouseRecordToProjectionData(row),
@@ -222,7 +222,7 @@ export class ExperimentRunStateRepositoryClickHouse<
     }
 
     try {
-      const runId = String(projection.aggregateId);
+      const { runId } = parseExperimentRunKey(String(projection.aggregateId));
       const projectionRecord = this.mapProjectionDataToClickHouseRecord(
         projection.data as ExperimentRunStateData,
         String(context.tenantId),
