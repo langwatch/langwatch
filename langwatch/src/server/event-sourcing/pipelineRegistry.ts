@@ -82,21 +82,19 @@ export class PipelineRegistry {
     // === Register billing reactor BEFORE pipelines ===
     // Must be before first register() call (which triggers ProjectionRegistry.initialize()).
     // Fold "projectDailyBillableEvents" is registered in EventSourcing constructor.
-    if (this.deps.eventSourcing.isSaas) {
-      this.deps.eventSourcing.registerGlobalReactor(
-        "projectDailyBillableEvents",
-        createBillingMeterDispatchReactor({
-          dispatchReportUsageForMonth: (data) => {
-            if (!reportUsageRef.dispatch) {
-              throw new Error(
-                "reportUsageForMonth command not yet wired",
-              );
-            }
-            return reportUsageRef.dispatch(data);
-          },
-        }),
-      );
-    }
+    this.deps.eventSourcing.registerGlobalReactor(
+      "projectDailyBillableEvents",
+      createBillingMeterDispatchReactor({
+        dispatchReportUsageForMonth: (data) => {
+          if (!reportUsageRef.dispatch) {
+            throw new Error(
+              "reportUsageForMonth command not yet wired",
+            );
+          }
+          return reportUsageRef.dispatch(data);
+        },
+      }),
+    );
 
     // === Register pipelines (triggers ProjectionRegistry.initialize on first call) ===
     const evalPipeline = this.registerEvaluationPipeline();
@@ -109,24 +107,20 @@ export class PipelineRegistry {
       dispatch: ((data: ReportUsageForMonthCommandData) => Promise<void>) | null;
     } = { dispatch: null };
 
-    const billingPipeline = this.deps.eventSourcing.isSaas
-      ? this.registerBillingReportingPipeline({
-          selfDispatch: (data) => {
-            if (!selfDispatchRef.dispatch) {
-              throw new Error("selfDispatch not yet wired");
-            }
-            return selfDispatchRef.dispatch(data);
-          },
-        })
-      : null;
+    const billingPipeline = this.registerBillingReportingPipeline({
+      selfDispatch: (data) => {
+        if (!selfDispatchRef.dispatch) {
+          throw new Error("selfDispatch not yet wired");
+        }
+        return selfDispatchRef.dispatch(data);
+      },
+    });
 
     // === Wire refs ===
-    if (billingPipeline) {
-      const reportUsageCommand =
-        mapCommands(billingPipeline.commands).reportUsageForMonth;
-      reportUsageRef.dispatch = reportUsageCommand;
-      selfDispatchRef.dispatch = reportUsageCommand;
-    }
+    const reportUsageCommand =
+      mapCommands(billingPipeline.commands).reportUsageForMonth;
+    reportUsageRef.dispatch = reportUsageCommand;
+    selfDispatchRef.dispatch = reportUsageCommand;
 
     logger.info("All pipelines registered");
 
@@ -135,9 +129,7 @@ export class PipelineRegistry {
       evaluations: mapCommands(evalPipeline.commands),
       experimentRuns: mapCommands(experimentRunPipeline.commands),
       simulations: mapCommands(simulationPipeline.commands),
-      ...(billingPipeline
-        ? { billing: mapCommands(billingPipeline.commands) }
-        : {}),
+      billing: mapCommands(billingPipeline.commands),
     };
   }
 
