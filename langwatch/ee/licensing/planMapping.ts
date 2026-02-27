@@ -28,6 +28,7 @@ export function mapToPlanInfo(licenseData: LicenseData): PlanInfo {
     maxCustomGraphs: resolved.maxCustomGraphs,
     maxAutomations: resolved.maxAutomations,
     canPublish: resolved.canPublish,
+    usageUnit: resolved.usageUnit,
     prices: {
       USD: 0,
       EUR: 0,

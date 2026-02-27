@@ -364,6 +364,7 @@ describe("License Router Integration", () => {
         maxAgents: 50,
         maxExperiments: 50,
         canPublish: true,
+        usageUnit: "traces" as const,
       },
     });
 
@@ -442,6 +443,7 @@ describe("License Router Integration", () => {
           maxAgents: ENTERPRISE_TEMPLATE.maxAgents ?? 1000,
           maxExperiments: ENTERPRISE_TEMPLATE.maxExperiments ?? 1000,
           canPublish: true,
+          usageUnit: "traces" as const,
         },
       });
 
@@ -487,6 +489,25 @@ describe("License Router Integration", () => {
           },
         })
       ).rejects.toThrow();
+    });
+
+    it("includes usageUnit in generated license", async () => {
+      const result = await adminCaller.license.generate(getValidInput());
+
+      const parsedLicense = parseLicenseKey(result.licenseKey);
+      expect(parsedLicense?.data.plan.usageUnit).toBe("traces");
+    });
+
+    it("generates license with events usageUnit", async () => {
+      const input = {
+        ...getValidInput(),
+        plan: { ...getValidInput().plan, usageUnit: "events" as const },
+      };
+
+      const result = await adminCaller.license.generate(input);
+
+      const parsedLicense = parseLicenseKey(result.licenseKey);
+      expect(parsedLicense?.data.plan.usageUnit).toBe("events");
     });
 
     it("throws UNAUTHORIZED when member tries to generate", async () => {
