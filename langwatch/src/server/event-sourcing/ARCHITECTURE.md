@@ -163,7 +163,7 @@ Unlike traditional event sourcing systems that use checkpoint stores to track pr
 
 ## Global Projection Registry
 
-In SaaS mode, the system registers **global fold projections** that span all pipelines. These projections (billing events, SDK usage) are registered in a virtual `global_projections` pipeline and receive events from all pipelines.
+In SaaS mode, the system registers **global fold projections** that span all pipelines. These projections (billing events, SDK usage) are registered in a virtual `global` pipeline and receive events from all pipelines.
 
 See: [`projections/global/`](./projections/global/) for SaaS-only projections, [`projections/projectionRegistry.ts`](./projections/projectionRegistry.ts) for the registry.
 
