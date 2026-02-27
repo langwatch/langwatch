@@ -142,17 +142,22 @@ export class ClickHouseExperimentRunService {
               SELECT
                 RunId,
                 EvaluatorId,
-                any(EvaluatorName) AS EvaluatorName,
+                max(EvaluatorName) AS EvaluatorName,
                 avg(Score) AS avgScore,
                 if(countIf(Passed IS NOT NULL) > 0, countIf(Passed = 1) / countIf(Passed IS NOT NULL), NULL) AS passRate,
                 countIf(Passed IS NOT NULL) AS hasPassedCount
               FROM (
                 SELECT *
-                FROM experiment_run_items
-                WHERE TenantId = {tenantId:String}
-                  AND RunId IN ({runIds:Array(String)})
-                ORDER BY Id, CreatedAt DESC
-                LIMIT 1 BY TenantId, RunId, Id
+                FROM (
+                  SELECT *
+                  FROM experiment_run_items
+                  WHERE TenantId = {tenantId:String}
+                    AND RunId IN ({runIds:Array(String)})
+                  ORDER BY ProjectionId, CreatedAt DESC
+                  LIMIT 1 BY TenantId, RunId, ProjectionId
+                )
+                ORDER BY CreatedAt DESC
+                LIMIT 1 BY RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')
               )
               WHERE ResultType = 'evaluator'
                 AND EvaluationStatus = 'processed'
@@ -188,14 +193,20 @@ export class ClickHouseExperimentRunService {
                 sumIf(EvaluationCost, ResultType = 'evaluator') AS evaluationsCost,
                 avgIf(TargetCost, ResultType = 'target' AND TargetCost IS NOT NULL) AS datasetAverageCost,
                 avgIf(TargetDurationMs, ResultType = 'target' AND TargetDurationMs IS NOT NULL) AS datasetAverageDuration,
-                avgIf(EvaluationCost, ResultType = 'evaluator' AND EvaluationCost IS NOT NULL) AS evaluationsAverageCost
+                avgIf(EvaluationCost, ResultType = 'evaluator' AND EvaluationCost IS NOT NULL) AS evaluationsAverageCost,
+                avgIf(EvaluationDurationMs, ResultType = 'evaluator' AND EvaluationDurationMs IS NOT NULL) AS evaluationsAverageDuration
               FROM (
                 SELECT *
-                FROM experiment_run_items
-                WHERE TenantId = {tenantId:String}
-                  AND RunId IN ({runIds:Array(String)})
-                ORDER BY Id, CreatedAt DESC
-                LIMIT 1 BY TenantId, RunId, Id
+                FROM (
+                  SELECT *
+                  FROM experiment_run_items
+                  WHERE TenantId = {tenantId:String}
+                    AND RunId IN ({runIds:Array(String)})
+                  ORDER BY ProjectionId, CreatedAt DESC
+                  LIMIT 1 BY TenantId, RunId, ProjectionId
+                )
+                ORDER BY CreatedAt DESC
+                LIMIT 1 BY RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')
               )
               GROUP BY RunId
             `,
@@ -329,15 +340,23 @@ export class ClickHouseExperimentRunService {
           }
 
           // Fetch all items for this run
+          // Two-level dedup: first by ProjectionId (handles un-merged ReplacingMergeTree parts),
+          // then by business key (handles duplicate writes from SDK progress updates that
+          // produce different ProjectionIds due to timestamp in the KSUID).
           const itemsResult = await this.clickHouseClient.query({
             query: `
               SELECT * FROM (
                 SELECT *
-                FROM experiment_run_items
-                WHERE TenantId = {tenantId:String}
-                  AND RunId = {runId:String}
-                ORDER BY Id, CreatedAt DESC
-                LIMIT 1 BY TenantId, RunId, Id
+                FROM (
+                  SELECT *
+                  FROM experiment_run_items
+                  WHERE TenantId = {tenantId:String}
+                    AND RunId = {runId:String}
+                  ORDER BY ProjectionId, CreatedAt DESC
+                  LIMIT 1 BY TenantId, RunId, ProjectionId
+                )
+                ORDER BY CreatedAt DESC
+                LIMIT 1 BY RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')
               )
               ORDER BY RowIndex ASC, ResultType ASC
             `,
