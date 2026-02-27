@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SKYNET // Neural Net Operations</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: #000408;
+        font-family: 'Share Tech Mono', monospace;
+        color: #b0c4d8;
+      }
+
+      /* CRT scan line overlay */
+      #root::after {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 9999;
+        background: repeating-linear-gradient(
+          0deg,
+          rgba(0, 240, 255, 0.015) 0px,
+          rgba(0, 240, 255, 0.015) 1px,
+          transparent 1px,
+          transparent 3px
+        );
+      }
+
+      /* Pulsing glow animation */
+      @keyframes pulseGlow {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
+
+      /* Subtle CRT flicker */
+      @keyframes crtFlicker {
+        0% { opacity: 1; }
+        5% { opacity: 0.97; }
+        10% { opacity: 1; }
+        15% { opacity: 0.98; }
+        20% { opacity: 1; }
+        100% { opacity: 1; }
+      }
+
+      /* Status dot pulse */
+      @keyframes statusPulse {
+        0%, 100% { box-shadow: 0 0 4px currentColor; }
+        50% { box-shadow: 0 0 10px currentColor, 0 0 20px currentColor; }
+      }
+
+      /* Scrollbar styling */
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
+      ::-webkit-scrollbar-track { background: #0a0e17; }
+      ::-webkit-scrollbar-thumb { background: rgba(0, 240, 255, 0.2); border-radius: 3px; }
+      ::-webkit-scrollbar-thumb:hover { background: rgba(0, 240, 255, 0.4); }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/client/main.tsx"></script>
+  </body>
+</html>

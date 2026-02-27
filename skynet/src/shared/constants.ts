@@ -1,0 +1,13 @@
+export const SSE_PUSH_INTERVAL_MS = 2_000;
+export const SSE_HEARTBEAT_INTERVAL_MS = 15_000;
+export const QUEUE_DISCOVERY_INTERVAL_MS = 10_000;
+export const METRICS_COLLECT_INTERVAL_MS = 2_000;
+export const THROUGHPUT_BUFFER_SIZE = 900; // 30 min at 2s interval
+export const JOBS_PAGE_SIZE = 50;
+export const FAILED_JOBS_PAGE_SIZE = 50;
+export const BULLMQ_JOBS_PAGE_SIZE = 50;
+export const DEFAULT_PORT = 6380;
+export const ANTI_FLICKER_DURATION_MS = 10_000;
+export const DEFAULT_GROUPS_DISPLAY_LIMIT = 25;
+export const SSE_RECYCLE_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes — prevents browser response body buffering
+export const SEARCH_DEBOUNCE_MS = 250;
