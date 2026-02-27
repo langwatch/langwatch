@@ -12,8 +12,7 @@ describe("EventUtils - Event ID", () => {
   const eventType = EVENT_TYPES[0];
 
   describe("createEvent - event ID format", () => {
-    it("generates event ID in correct format: {timestamp}:{tenantId}:{aggregateId}:{aggregateType}", () => {
-      const timestamp = 1000000;
+    it("generates a KSUID-based event ID", () => {
       const event = EventUtils.createEvent({
         aggregateType,
         aggregateId,
@@ -21,24 +20,14 @@ describe("EventUtils - Event ID", () => {
         type: eventType,
         version: eventVersion,
         data: { test: "data" },
-        timestamp,
+        timestamp: 1000000,
       });
 
-      // Event ID should be timestamp:tenantId:aggregateId:aggregateType:ksuid
-      // KSUID is added for entropy and uniqueness
-      expect(event.id).toMatch(/^\d+:[^:]+:[^:]+:[^:]+:.+$/);
-      const parts = event.id.split(":");
-      expect(parts.length).toBeGreaterThanOrEqual(5); // At least 5 parts (timestamp, tenantId, aggregateId, aggregateType, ksuid)
-      expect(parts[0]).toBe(String(timestamp));
-      expect(parts[1]).toBe(String(tenantId));
-      expect(parts[2]).toBe(aggregateId);
-      expect(parts[3]).toBe(aggregateType);
+      expect(event.id).toMatch(/^event_/);
+      expect(event.id).not.toContain(":");
     });
 
-    it("auto-generates event ID with current timestamp when not provided", () => {
-      const timestamp1 = 1000000;
-      const timestamp2 = 1000001;
-
+    it("generates unique IDs for different events", () => {
       const event1 = EventUtils.createEvent({
         aggregateType,
         aggregateId,
@@ -46,7 +35,7 @@ describe("EventUtils - Event ID", () => {
         type: eventType,
         version: eventVersion,
         data: { test: "data" },
-        timestamp: timestamp1,
+        timestamp: 1000000,
       });
 
       const event2 = EventUtils.createEvent({
@@ -56,33 +45,10 @@ describe("EventUtils - Event ID", () => {
         type: eventType,
         version: eventVersion,
         data: { test: "data" },
-        timestamp: timestamp2, // Different timestamp = different Event ID
+        timestamp: 1000001,
       });
 
-      // IDs should be different due to different timestamps
       expect(event1.id).not.toBe(event2.id);
-    });
-
-    it("includes correct timestamp, tenantId, aggregateId, and aggregateType in event ID", () => {
-      const timestamp = 1234567890;
-      const customAggregateId = "custom-aggregate-123";
-      const customAggregateType = "custom_type" as AggregateType;
-
-      const event = EventUtils.createEvent({
-        aggregateType: customAggregateType,
-        aggregateId: customAggregateId,
-        tenantId,
-        type: eventType,
-        version: eventVersion,
-        data: { test: "data" },
-        timestamp,
-      });
-
-      const parts = event.id.split(":");
-      expect(parts[0]).toBe(String(timestamp));
-      expect(parts[1]).toBe(String(tenantId));
-      expect(parts[2]).toBe(customAggregateId);
-      expect(parts[3]).toBe(customAggregateType);
     });
   });
 
@@ -139,8 +105,7 @@ describe("EventUtils - Event ID", () => {
   });
 
   describe("createEvent with trace context - event ID format", () => {
-    it("generates event ID in correct format", () => {
-      const timestamp = 2000000;
+    it("generates a KSUID-based event ID", () => {
       const event = EventUtils.createEvent({
         aggregateType,
         aggregateId,
@@ -148,16 +113,12 @@ describe("EventUtils - Event ID", () => {
         type: eventType,
         version: eventVersion,
         data: { test: "data" },
-        timestamp,
+        timestamp: 2000000,
         includeTraceContext: true,
       });
 
-      const parts = event.id.split(":");
-      expect(parts.length).toBeGreaterThanOrEqual(5); // At least 5 parts (timestamp, tenantId, aggregateId, aggregateType, ksuid)
-      expect(parts[0]).toBe(String(timestamp));
-      expect(parts[1]).toBe(String(tenantId));
-      expect(parts[2]).toBe(aggregateId);
-      expect(parts[3]).toBe(aggregateType);
+      expect(event.id).toMatch(/^event_/);
+      expect(event.id).not.toContain(":");
     });
   });
 });
