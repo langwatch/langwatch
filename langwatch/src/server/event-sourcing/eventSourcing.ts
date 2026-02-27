@@ -86,12 +86,14 @@ export class EventSourcing {
 
   // Options
   private readonly _enabled: boolean;
+  private readonly _isSaas: boolean;
   private readonly _clickhouse?: ClickHouseClient | null;
   private readonly _redis?: IORedis | Cluster | null;
   private readonly _processRole?: "web" | "worker";
 
   constructor(options: EventSourcingOptions = {}) {
     this._enabled = options.enabled ?? true;
+    this._isSaas = options.isSaas ?? false;
     this._clickhouse = options.clickhouse;
     this._redis = options.redis;
     this._processRole = options.processRole;
@@ -114,6 +116,10 @@ export class EventSourcing {
 
   get isEnabled(): boolean {
     return this._enabled;
+  }
+
+  get isSaas(): boolean {
+    return this._isSaas;
   }
 
   get eventStore(): EventStore | undefined {

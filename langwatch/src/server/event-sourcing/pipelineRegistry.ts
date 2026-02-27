@@ -61,7 +61,6 @@ export interface PipelineRegistryDeps {
     execution: EvaluationExecutionService;
   };
   esSync: EvaluationEsSyncReactorDeps;
-  isSaas?: boolean;
 }
 
 /**
@@ -83,7 +82,7 @@ export class PipelineRegistry {
     // === Register billing reactor BEFORE pipelines ===
     // Must be before first register() call (which triggers ProjectionRegistry.initialize()).
     // Fold "projectDailyBillableEvents" is registered in EventSourcing constructor.
-    if (this.deps.isSaas) {
+    if (this.deps.eventSourcing.isSaas) {
       this.deps.eventSourcing.registerGlobalReactor(
         "projectDailyBillableEvents",
         createBillingMeterDispatchReactor({
@@ -110,7 +109,7 @@ export class PipelineRegistry {
       dispatch: ((data: ReportUsageForMonthCommandData) => Promise<void>) | null;
     } = { dispatch: null };
 
-    const billingPipeline = this.deps.isSaas
+    const billingPipeline = this.deps.eventSourcing.isSaas
       ? this.registerBillingReportingPipeline({
           selfDispatch: (data) => {
             if (!selfDispatchRef.dispatch) {
