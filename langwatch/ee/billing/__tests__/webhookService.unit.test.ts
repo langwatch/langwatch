@@ -5,6 +5,7 @@ vi.mock("../notifications/notificationHandlers", () => ({
 }));
 
 import { notifySubscriptionEvent } from "../notifications/notificationHandlers";
+import { NUMERIC_OVERRIDE_FIELDS } from "../planProvider";
 import { SubscriptionStatus } from "../planTypes";
 import { createWebhookService } from "../services/webhookService";
 
@@ -194,7 +195,7 @@ describe("webhookService", () => {
     });
 
     describe("when subscription exists", () => {
-      it("cancels and nullifies limits", async () => {
+      it("cancels and nullifies all override fields", async () => {
         db.subscription.findUnique.mockResolvedValue({
           id: "sub_db_1",
         });
@@ -204,15 +205,16 @@ describe("webhookService", () => {
           stripeSubscriptionId: "sub_stripe_1",
         });
 
+        const expectedNulledFields = Object.fromEntries(
+          NUMERIC_OVERRIDE_FIELDS.map((f) => [f, null]),
+        );
+
         expect(db.subscription.update).toHaveBeenCalledWith({
           where: { id: "sub_db_1" },
           data: {
             status: SubscriptionStatus.CANCELLED,
             endDate: expect.any(Date),
-            maxMembers: null,
-            maxMessagesPerMonth: null,
-            maxProjects: null,
-            evaluationsCredit: null,
+            ...expectedNulledFields,
           },
         });
       });

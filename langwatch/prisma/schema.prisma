@@ -1093,6 +1093,18 @@ model Subscription {
     evaluationsCredit     Int?
     maxWorkflows          Int?
     maxRetentionDays      Int?
+    maxMembersLite        Int?
+    maxTeams              Int?
+    maxPrompts            Int?
+    maxEvaluators         Int?
+    maxScenarios          Int?
+    maxAgents             Int?
+    maxExperiments        Int?
+    maxOnlineEvaluations  Int?
+    maxDatasets           Int?
+    maxDashboards         Int?
+    maxCustomGraphs       Int?
+    maxAutomations        Int?
 
     organization Organization @relation(fields: [organizationId], references: [id])
     invoices     Invoice[]
