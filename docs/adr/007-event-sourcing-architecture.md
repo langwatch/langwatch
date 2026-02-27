@@ -73,7 +73,7 @@ This eliminated the checkpoint store (ClickHouse table + Redis cache), the check
 
 ## Decision — Global Projection Registry
 
-Cross-pipeline projections (e.g., daily event counts, SDK usage) use a `ProjectionRegistry` that receives events from all pipelines after local dispatch. The registry creates its own `ProjectionRouter` and `QueueManager` with the virtual pipeline name `global_projections`.
+Cross-pipeline projections (e.g., daily event counts, SDK usage) use a `ProjectionRegistry` that receives events from all pipelines after local dispatch. The registry creates its own `ProjectionRouter` and `QueueManager` with the virtual pipeline name `global`.
 
 Events flow: `EventSourcingService.storeEvents()` → local `ProjectionRouter.dispatch()` → `ProjectionRegistry.dispatch()`.
 
