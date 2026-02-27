@@ -122,7 +122,7 @@ function apply(
 
     if (event.data.status === "processed") {
       if (event.data.score != null) {
-        totalScoreSum += event.data.score;
+        totalScoreSum += Math.round(event.data.score * 10000);
         scoreCount += 1;
       }
       if (event.data.passed != null) {
@@ -135,7 +135,7 @@ function apply(
       totalCost = (totalCost ?? 0) + event.data.cost;
     }
 
-    const avgScoreBps = scoreCount > 0 ? Math.round((totalScoreSum / scoreCount) * 10000) : null;
+    const avgScoreBps = scoreCount > 0 ? Math.round(totalScoreSum / scoreCount) : null;
     const passRateBps = gradedCount > 0 ? Math.round((passedCount / gradedCount) * 10000) : null;
 
     return {
