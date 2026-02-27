@@ -116,7 +116,7 @@
     "@react-email/container": "^0.0.10",
     "@react-email/heading": "^0.0.15",
     "@react-email/html": "^0.0.6",
-    "@react-email/img": "^0.0.6",
+    "@react-email/img": "^0.0.12",
     "@react-email/render": "^1.0.3",
     "@react-email/section": "0.0.16",
     "@react-email/text": "0.1.1",
