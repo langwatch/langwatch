@@ -112,3 +112,8 @@ export class SubscriptionRecordNotFoundError extends BillingError {
     this.name = "SubscriptionRecordNotFoundError";
   }
 }
+
+// Re-export from app-layer for backwards compatibility.
+// The canonical definition lives in the app-layer so that Null implementations
+// can throw it without depending on ee/billing.
+export { SubscriptionServiceUnavailableError } from "../../src/server/app-layer/subscription/errors";

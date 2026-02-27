@@ -16,6 +16,11 @@ import { ProjectService } from "./projects/project.service";
 import { SpanStorageService } from "./traces/span-storage.service";
 import { TokenizerService } from "./traces/tokenizer.service";
 import { TraceSummaryService } from "./traces/trace-summary.service";
+import type { SubscriptionService } from "./subscription/subscription.service";
+import { EESubscriptionService } from "../../../ee/billing/services/subscription.service";
+import { createStripeClient } from "../../../ee/billing/stripe/stripeClient";
+import { createSeatEventSubscriptionFns } from "../../../ee/billing/services/seatEventSubscription";
+import * as subscriptionItemCalculator from "../../../ee/billing/services/subscriptionItemCalculator";
 import { UsageService } from "./usage/usage.service";
 
 export function initializeWebApp(): App {
@@ -53,6 +58,19 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const organizations = OrganizationService.create(prisma);
   const projects = ProjectService.create(prisma);
   const usage = UsageService.create({ prisma, organizationService: organizations });
+
+  let subscription: SubscriptionService | undefined;
+  if (config.isSaas) {
+    const stripeClient = createStripeClient();
+    const seatEventFns = createSeatEventSubscriptionFns({ stripe: stripeClient, db: prisma });
+    subscription = EESubscriptionService.create({
+      stripe: stripeClient,
+      db: prisma,
+      itemCalculator: subscriptionItemCalculator,
+      seatEventFns,
+    });
+  }
+
   const monitors = MonitorService.create(prisma);
   const tokenizer = TokenizerService.create(config);
 
@@ -116,6 +134,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     projects,
     tokenizer,
     usage,
+    subscription,
     commands,
     _eventSourcing: es,
     _gracefulCloseables: gracefulCloseables,
@@ -145,6 +164,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     projects: ProjectService.create(null),
     tokenizer: TokenizerService.create({ disableTokenization: true }),
     usage: UsageService.create({ prisma: null, organizationService: OrganizationService.create(null) }),
+    subscription: undefined,
     commands: {
       traces: { recordSpan: noop, assignTopic: noop, assignSatisfactionScore: noop } as AppCommands["traces"],
       evaluations: {
