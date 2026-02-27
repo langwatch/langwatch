@@ -265,7 +265,7 @@
     "@types/react-dom": "^19.0.3",
     "@types/semver": "^7.7.1",
     "@types/ws": "^8.18.1",
-    "@typescript/native-preview": "^7.0.0-dev.20251222.1",
+    "@typescript/native-preview": "^7.0.0-dev.20260227.1",
     "@vitest/coverage-v8": "^4.0.17",
     "@vitest/ui": "^4.0.17",
     "babel-plugin-react-compiler": "^1.0.0",
