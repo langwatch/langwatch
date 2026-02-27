@@ -41,7 +41,7 @@ export const projectDailyBillableEventsProjection: FoldProjectionDefinition<
 
   key: (event) => {
     const date = toUTCDateString(event.timestamp);
-    return date;
+    return `${String(event.tenantId)}:${date}`;
   },
 
   init: () => ({
