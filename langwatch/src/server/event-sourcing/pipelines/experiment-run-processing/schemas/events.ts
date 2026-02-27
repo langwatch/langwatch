@@ -77,6 +77,8 @@ export const evaluatorResultEventDataSchema = z.object({
   passed: z.boolean().nullable().optional(),
   details: z.string().nullable().optional(),
   cost: z.number().nullable().optional(),
+  inputs: z.record(z.unknown()).nullable().optional(),
+  duration: z.number().nullable().optional(),
 });
 
 export const evaluatorResultEventSchema = EventSchema.extend({

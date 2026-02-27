@@ -45,6 +45,8 @@ const config: ExperimentRunCommandConfig<
     passed: commandData.passed,
     details: commandData.details,
     cost: commandData.cost,
+    inputs: commandData.inputs,
+    duration: commandData.duration,
   }),
   getLogContext: (commandData) => ({
     index: commandData.index,

@@ -19,7 +19,7 @@ type ClickHouseSummaryWriteRecord = WithDateWrites<
 >;
 
 interface ClickHouseSummaryRecord {
-  Id: string;
+  ProjectionId: string;
   TenantId: string;
   TraceId: string;
   Version: string;
@@ -109,7 +109,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       const result = await this.clickHouseClient.query({
         query: `
           SELECT
-            Id,
+            ProjectionId,
             TenantId,
             TraceId,
             Version,
@@ -209,7 +209,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     version: string,
   ): ClickHouseSummaryWriteRecord {
     return {
-      Id: projectionId,
+      ProjectionId: projectionId,
       TenantId: tenantId,
       TraceId: data.traceId,
       Version: version,

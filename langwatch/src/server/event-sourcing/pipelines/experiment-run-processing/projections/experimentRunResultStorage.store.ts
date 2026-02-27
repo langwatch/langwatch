@@ -26,7 +26,7 @@ export function createExperimentRunItemAppendStore(
     ): Promise<void> {
       if (!clickhouse) {
         logger.warn(
-          { recordId: record.Id },
+          { recordId: record.ProjectionId },
           "ClickHouse client not available, skipping experiment run result storage",
         );
         return;

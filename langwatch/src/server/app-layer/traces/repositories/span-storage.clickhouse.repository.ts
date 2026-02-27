@@ -19,7 +19,7 @@ type ClickHouseSpanWriteRecord = WithDateWrites<
 >;
 
 interface ClickHouseSpanRecord {
-  Id: string;
+  ProjectionId: string;
   TenantId: string;
   TraceId: string;
   SpanId: string;
@@ -219,7 +219,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       typeof serviceNameAny === "string" ? serviceNameAny : "unknown";
 
     return {
-      Id: span.id,
+      ProjectionId: span.id,
       TenantId: span.tenantId,
       TraceId: span.traceId,
       SpanId: span.spanId,

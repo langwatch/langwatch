@@ -14,7 +14,7 @@ const logger = createLogger(
 );
 
 interface ClickHouseEvaluationRunRecord {
-  Id: string;
+  ProjectionId: string;
   TenantId: string;
   EvaluationId: string;
   Version: string;
@@ -102,7 +102,7 @@ export class EvaluationRunClickHouseRepository
       const result = await this.clickHouseClient.query({
         query: `
           SELECT
-            Id,
+            ProjectionId,
             TenantId,
             EvaluationId,
             Version,
@@ -180,7 +180,7 @@ export class EvaluationRunClickHouseRepository
     version: string,
   ): ClickHouseEvaluationRunWriteRecord {
     return {
-      Id: projectionId,
+      ProjectionId: projectionId,
       TenantId: tenantId,
       EvaluationId: data.evaluationId,
       Version: version,

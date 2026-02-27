@@ -5,7 +5,7 @@ import type { TraceEvaluation } from "./evaluation-run.types";
  * ClickHouse evaluation_runs row shape (PascalCase, matching the table schema).
  */
 export interface ClickHouseEvaluationRunRow {
-  Id: string;
+  ProjectionId: string;
   TenantId: string;
   EvaluationId: string;
   Version: string;

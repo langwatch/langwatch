@@ -27,7 +27,7 @@ const logger = createLogger(
 );
 
 interface ClickHouseExperimentRunRecord {
-  Id: string;
+  ProjectionId: string;
   TenantId: string;
   RunId: string;
   ExperimentId: string;
@@ -102,7 +102,7 @@ export class ExperimentRunStateRepositoryClickHouse<
     runId: string,
   ): ClickHouseExperimentRunWriteRecord {
     return {
-      Id: projectionId,
+      ProjectionId: projectionId,
       TenantId: tenantId,
       RunId: runId || data.RunId,
       ExperimentId: data.ExperimentId,
@@ -144,7 +144,7 @@ export class ExperimentRunStateRepositoryClickHouse<
       const result = await this.clickHouseClient.query({
         query: `
           SELECT
-            Id, TenantId, RunId, ExperimentId, WorkflowVersionId, Version,
+            ProjectionId, TenantId, RunId, ExperimentId, WorkflowVersionId, Version,
             Total, Progress, CompletedCount, FailedCount, TotalCost,
             toString(TotalDurationMs) AS TotalDurationMs,
             AvgScoreBps, PassRateBps, Targets,
@@ -171,7 +171,7 @@ export class ExperimentRunStateRepositoryClickHouse<
       if (!row) return null;
 
       const projection: ExperimentRunState = {
-        id: row.Id,
+        id: row.ProjectionId,
         aggregateId: runId,
         tenantId: createTenantId(context.tenantId),
         version: row.Version,

@@ -26,7 +26,7 @@ const logger = createLogger(
 );
 
 interface ClickHouseSimulationRunRecord {
-  Id: string;
+  ProjectionId: string;
   TenantId: string;
   ScenarioRunId: string;
   ScenarioId: string;
@@ -106,7 +106,7 @@ export class SimulationRunStateRepositoryClickHouse<
     scenarioRunId: string,
   ): ClickHouseSimulationRunWriteRecord {
     return {
-      Id: projectionId,
+      ProjectionId: projectionId,
       TenantId: tenantId,
       ScenarioRunId: scenarioRunId || data.ScenarioRunId,
       ScenarioId: data.ScenarioId,
@@ -150,7 +150,7 @@ export class SimulationRunStateRepositoryClickHouse<
       const result = await this.clickHouseClient.query({
         query: `
           SELECT
-            Id, TenantId, ScenarioRunId, ScenarioId, BatchRunId, ScenarioSetId,
+            ProjectionId, TenantId, ScenarioRunId, ScenarioId, BatchRunId, ScenarioSetId,
             Version, Status, Name, Description,
             \`Messages.Id\`, \`Messages.Role\`, \`Messages.Content\`,
             \`Messages.TraceId\`, \`Messages.Rest\`,
@@ -175,7 +175,7 @@ export class SimulationRunStateRepositoryClickHouse<
       if (!row) return null;
 
       const projection: SimulationRunState = {
-        id: row.Id,
+        id: row.ProjectionId,
         aggregateId: scenarioRunId,
         tenantId: createTenantId(context.tenantId),
         version: row.Version,

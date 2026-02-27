@@ -19,7 +19,7 @@ import type { ESBatchEvaluation } from "~/server/experiments/types";
 // ---------------------------------------------------------------------------
 
 const baseClickHouseRun: ClickHouseExperimentRunRow = {
-  Id: "id-1",
+  ProjectionId: "id-1",
   TenantId: "project-1",
   RunId: "run-1",
   ExperimentId: "exp-1",
@@ -163,7 +163,7 @@ describe("mapClickHouseRunToExperimentRun", () => {
 
 describe("mapClickHouseItemsToRunWithItems", () => {
   const targetItem: ClickHouseExperimentRunItemRow = {
-    Id: "item-1",
+    ProjectionId: "item-1",
     TenantId: "project-1",
     RunId: "run-1",
     ExperimentId: "exp-1",
@@ -184,11 +184,13 @@ describe("mapClickHouseItemsToRunWithItems", () => {
     Passed: null,
     EvaluationDetails: null,
     EvaluationCost: null,
+    EvaluationInputs: null,
+    EvaluationDurationMs: null,
     CreatedAt: "2024-01-15 10:30:00.000",
   };
 
   const evaluatorItem: ClickHouseExperimentRunItemRow = {
-    Id: "item-2",
+    ProjectionId: "item-2",
     TenantId: "project-1",
     RunId: "run-1",
     ExperimentId: "exp-1",
@@ -209,6 +211,8 @@ describe("mapClickHouseItemsToRunWithItems", () => {
     Passed: 1,
     EvaluationDetails: "looks good",
     EvaluationCost: 0.001,
+    EvaluationInputs: null,
+    EvaluationDurationMs: null,
     CreatedAt: "2024-01-15 10:30:01.000",
   };
 
