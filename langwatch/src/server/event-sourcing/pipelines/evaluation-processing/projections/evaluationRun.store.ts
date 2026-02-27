@@ -26,9 +26,12 @@ export class EvaluationRunStore
     entries: Array<{ state: EvaluationRunData; context: ProjectionStoreContext }>,
   ): Promise<void> {
     await Promise.all(
-      entries.map(({ state, context }) =>
-        this.repo.upsert(state, String(context.tenantId)),
-      ),
+      entries.map(({ state, context }) => {
+        const stateWithId = state.evaluationId
+          ? state
+          : { ...state, evaluationId: String(context.aggregateId) };
+        return this.repo.upsert(stateWithId, String(context.tenantId));
+      }),
     );
   }
 
