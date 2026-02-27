@@ -201,7 +201,7 @@
     "react-dnd": "^16.0.1",
     "react-dnd-html5-backend": "^16.0.1",
     "react-dom": "^19.0.0",
-    "react-error-boundary": "^5.0.0",
+    "react-error-boundary": "^6.1.1",
     "react-feather": "^2.0.10",
     "react-hook-form": "^7.47.0",
     "react-icons": "^5.5.0",
