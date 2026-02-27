@@ -178,6 +178,8 @@ export interface CommandHandlerOptions<Payload> {
   delay?: number;
   deduplication?: DeduplicationStrategy<Payload>;
   concurrency?: number;
+  /** Maximum number of groups processed in parallel (GroupQueue only). */
+  globalConcurrency?: number;
   spanAttributes?: (
     payload: Payload,
   ) => Record<string, string | number | boolean>;

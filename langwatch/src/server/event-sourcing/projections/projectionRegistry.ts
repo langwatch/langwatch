@@ -70,6 +70,13 @@ export class ProjectionRegistry<EventType extends Event = Event> {
 		foldName: string,
 		reactor: ReactorDefinition<EventType>,
 	): void {
+		if (this.queueManager) {
+			throw new ConfigurationError(
+				"ProjectionRegistry",
+				`Cannot register reactor "${reactor.name}" after initialization`,
+				{ reactorName: reactor.name },
+			);
+		}
 		if (!this.foldProjections.has(foldName)) {
 			throw new ConfigurationError(
 				"ProjectionRegistry",

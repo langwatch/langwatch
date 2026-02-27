@@ -4,6 +4,7 @@ import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import { getLangWatchTracer } from "langwatch";
 import { makeQueueName } from "~/server/background/queues/makeQueueName";
+import type { ReactorDefinition } from "./reactors/reactor.types";
 import { createLogger } from "~/utils/logger/server";
 import { DisabledPipeline } from "./disabledPipeline";
 import type { Event, Projection } from "./domain/types";
@@ -12,7 +13,6 @@ import type {
     PipelineWithCommandHandlers,
     RegisteredPipeline,
 } from "./pipeline/types";
-import { createBillingMeterDispatchReactor } from "./projections/global/billingMeterDispatch.reactor";
 import { orgBillableEventsMeterProjection } from "./projections/global/orgBillableEventsMeter.mapProjection";
 import { projectDailyBillableEventsProjection } from "./projections/global/projectDailyBillableEvents.foldProjection";
 import { projectDailySdkUsageProjection } from "./projections/global/projectDailySdkUsage.foldProjection";
@@ -108,14 +108,7 @@ export class EventSourcing {
       this.projectionRegistry.registerMapProjection(
         orgBillableEventsMeterProjection,
       );
-      this.projectionRegistry.registerReactor(
-        "projectDailyBillableEvents",
-        createBillingMeterDispatchReactor({
-          getUsageReportingQueue: async () =>
-            (await import("~/server/background/queues/usageReportingQueue"))
-              .usageReportingQueue,
-        }),
-      );
+      // Billing reactor registered in PipelineRegistry.registerAll() via registerGlobalReactor()
     }
   }
 
@@ -143,6 +136,22 @@ export class EventSourcing {
 
   getEventStore<EventType extends Event>(): EventStore<EventType> | undefined {
     return this.eventStore as EventStore<EventType> | undefined;
+  }
+
+  /**
+   * Registers a reactor on a global fold projection.
+   *
+   * Must be called BEFORE the first register() call, which triggers
+   * ProjectionRegistry.initialize(). The projection registry enforces this
+   * with an initialization guard.
+   *
+   * @see PipelineRegistry.registerAll() — composition root that wires billing reactor
+   */
+  registerGlobalReactor(
+    foldName: string,
+    reactor: ReactorDefinition<Event>,
+  ): void {
+    this.projectionRegistry.registerReactor(foldName, reactor);
   }
 
   /**

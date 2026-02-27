@@ -36,6 +36,11 @@ import { createExperimentRunStateFoldStore } from "./pipelines/experiment-run-pr
 import { createExperimentRunItemAppendStore } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
 import type { EventSourcing } from "./eventSourcing";
 import { mapCommands } from "./mapCommands";
+import { createBillingMeterDispatchReactor } from "./projections/global/billingMeterDispatch.reactor";
+import { createBillingReportingPipeline } from "./pipelines/billing-reporting/pipeline";
+import { createReportUsageForMonthCommandClass } from "./pipelines/billing-reporting/commands/reportUsageForMonth.command";
+import type { ReportUsageForMonthCommandData } from "./pipelines/billing-reporting/schemas/commands";
+import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
 import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:event-sourcing:pipeline-registry");
@@ -56,6 +61,7 @@ export interface PipelineRegistryDeps {
     execution: EvaluationExecutionService;
   };
   esSync: EvaluationEsSyncReactorDeps;
+  isSaas?: boolean;
 }
 
 /**
@@ -69,10 +75,59 @@ export class PipelineRegistry {
   constructor(private readonly deps: PipelineRegistryDeps) {}
 
   registerAll() {
+    // === Mutable refs (wired after pipeline registration) ===
+    const reportUsageRef: {
+      dispatch: ((data: ReportUsageForMonthCommandData) => Promise<void>) | null;
+    } = { dispatch: null };
+
+    // === Register billing reactor BEFORE pipelines ===
+    // Must be before first register() call (which triggers ProjectionRegistry.initialize()).
+    // Fold "projectDailyBillableEvents" is registered in EventSourcing constructor.
+    if (this.deps.isSaas) {
+      this.deps.eventSourcing.registerGlobalReactor(
+        "projectDailyBillableEvents",
+        createBillingMeterDispatchReactor({
+          dispatchReportUsageForMonth: (data) => {
+            if (!reportUsageRef.dispatch) {
+              throw new Error(
+                "reportUsageForMonth command not yet wired",
+              );
+            }
+            return reportUsageRef.dispatch(data);
+          },
+        }),
+      );
+    }
+
+    // === Register pipelines (triggers ProjectionRegistry.initialize on first call) ===
     const evalPipeline = this.registerEvaluationPipeline();
     const tracePipeline = this.registerTracePipeline(evalPipeline);
     const experimentRunPipeline = this.registerExperimentRunPipeline();
     const simulationPipeline = this.registerSimulationPipeline();
+
+    // selfDispatch ref: command handler dispatches itself for convergence loop
+    const selfDispatchRef: {
+      dispatch: ((data: ReportUsageForMonthCommandData) => Promise<void>) | null;
+    } = { dispatch: null };
+
+    const billingPipeline = this.deps.isSaas
+      ? this.registerBillingReportingPipeline({
+          selfDispatch: (data) => {
+            if (!selfDispatchRef.dispatch) {
+              throw new Error("selfDispatch not yet wired");
+            }
+            return selfDispatchRef.dispatch(data);
+          },
+        })
+      : null;
+
+    // === Wire refs ===
+    if (billingPipeline) {
+      const reportUsageCommand =
+        mapCommands(billingPipeline.commands).reportUsageForMonth;
+      reportUsageRef.dispatch = reportUsageCommand;
+      selfDispatchRef.dispatch = reportUsageCommand;
+    }
 
     logger.info("All pipelines registered");
 
@@ -81,6 +136,9 @@ export class PipelineRegistry {
       evaluations: mapCommands(evalPipeline.commands),
       experimentRuns: mapCommands(experimentRunPipeline.commands),
       simulations: mapCommands(simulationPipeline.commands),
+      ...(billingPipeline
+        ? { billing: mapCommands(billingPipeline.commands) }
+        : {}),
     };
   }
 
@@ -161,6 +219,28 @@ export class PipelineRegistry {
       createSimulationProcessingPipeline({
         simulationRunStore,
         snapshotUpdateBroadcastReactor,
+      }),
+    );
+  }
+
+  private registerBillingReportingPipeline(selfDispatchDeps: {
+    selfDispatch: (data: ReportUsageForMonthCommandData) => Promise<void>;
+  }) {
+    const ReportUsageForMonthCommand =
+      createReportUsageForMonthCommandClass({
+        prisma: this.deps.prisma,
+        getUsageReportingService: () => {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          const { getUsageReportingService } = require("../../../ee/billing/index");
+          return getUsageReportingService();
+        },
+        queryBillableEventsTotal,
+        selfDispatch: selfDispatchDeps.selfDispatch,
+      });
+
+    return this.deps.eventSourcing.register(
+      createBillingReportingPipeline({
+        ReportUsageForMonthCommand,
       }),
     );
   }

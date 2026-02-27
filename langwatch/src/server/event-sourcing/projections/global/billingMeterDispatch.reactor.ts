@@ -1,27 +1,36 @@
-import type { Queue } from "bullmq";
 import { createLogger } from "~/utils/logger/server";
-import { USAGE_REPORTING_QUEUE } from "~/server/background/queues/constants";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
+import {
+  getBillingMonth,
+  getPreviousBillingMonth,
+} from "../../../../../ee/billing/services/billableEventsQuery";
+import type { ReportUsageForMonthCommandData } from "../../pipelines/billing-reporting/schemas/commands";
 import type { Event } from "../../domain/types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
 
 const logger = createLogger("langwatch:billing:meterDispatch");
 
-const FIVE_MINUTES_MS = 5 * 60 * 1000;
+/** Number of days at the start of a new month to also check the previous month. */
+const GRACE_PERIOD_DAYS = 3;
 
 /**
- * Reactor that dispatches billing usage reporting jobs after
+ * Reactor that dispatches billing usage reporting commands after
  * the projectDailyBillableEvents fold succeeds.
  *
  * Two dedup layers:
  * - Reactor-level per-project: makeJobId creates one reactor job per project.
  *   An org with N active projects creates N reactor jobs but each project
  *   only triggers one within the TTL window.
- * - BullMQ per-org: jobId `usage_report_${orgId}` ensures only one reporting
- *   job per org is active within the delay window.
+ * - Framework per-org: command dedup via makeId `${orgId}:${billingMonth}`, 310s TTL
+ *   ensures only one reporting command per org per month is pending.
+ *
+ * Grace period: during the first 3 days of a month, dispatches for both
+ * current and previous billing month to catch late-arriving events.
  */
 export function createBillingMeterDispatchReactor(deps: {
-  getUsageReportingQueue: () => Promise<Queue | null>;
+  dispatchReportUsageForMonth: (
+    data: ReportUsageForMonthCommandData,
+  ) => Promise<void>;
 }): ReactorDefinition<Event> {
   return {
     name: "billingMeterDispatch",
@@ -29,7 +38,7 @@ export function createBillingMeterDispatchReactor(deps: {
       runIn: ["worker"],
       makeJobId: (payload) =>
         `billing_dispatch_${payload.event.tenantId}`,
-      ttl: 10_000,
+      ttl: 300_000,
     },
 
     async handle(event, context) {
@@ -43,22 +52,32 @@ export function createBillingMeterDispatchReactor(deps: {
         return;
       }
 
-      const queue = await deps.getUsageReportingQueue();
-      if (!queue) return;
+      const now = new Date();
+      const billingMonth = getBillingMonth(now);
 
       try {
-        await queue.add(
-          USAGE_REPORTING_QUEUE.JOB,
-          { organizationId: orgId },
-          {
-            jobId: `usage_report_${orgId}`,
-            delay: FIVE_MINUTES_MS,
-          },
-        );
+        // Grace period: dispatch for previous month during first days of a new month
+        if (now.getUTCDate() <= GRACE_PERIOD_DAYS) {
+          const prevMonth = getPreviousBillingMonth(now);
+          await deps.dispatchReportUsageForMonth({
+            organizationId: orgId,
+            billingMonth: prevMonth,
+            tenantId: orgId,
+            occurredAt: Date.now(),
+          });
+        }
+
+        // Always dispatch for current month
+        await deps.dispatchReportUsageForMonth({
+          organizationId: orgId,
+          billingMonth,
+          tenantId: orgId,
+          occurredAt: Date.now(),
+        });
       } catch (error) {
         logger.warn(
           { organizationId: orgId, error },
-          "failed to enqueue usage reporting job, events are safe in ClickHouse",
+          "failed to dispatch usage reporting command, events are safe in ClickHouse",
         );
       }
     },

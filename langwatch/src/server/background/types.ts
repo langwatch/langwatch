@@ -102,6 +102,3 @@ export type UsageStatsJob = {
   timestamp: number;
 };
 
-export type UsageReportingJob = {
-  organizationId: string;
-};

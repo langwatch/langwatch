@@ -92,6 +92,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     traces,
     evaluations: { runs: evaluations.runs, execution: evaluations.execution },
     esSync: { esClient, traceIndex: TRACE_INDEX, traceIndexId },
+    isSaas: config.isSaas,
   });
   const commands = registry.registerAll();
 
