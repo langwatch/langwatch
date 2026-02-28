@@ -70,7 +70,7 @@ spec:
         {{- end }}
         {{- if .Values.opensearch.chartManaged }}
         - name: wait-for-opensearch
-          image: curlimages/curl:latest
+          image: "{{ .Values.cronjobs.image.repository }}:{{ .Values.cronjobs.image.tag }}"
           command: ['sh', '-c']
           args:
             - |
@@ -93,6 +93,7 @@ spec:
           imagePullPolicy: "{{ .Values.images.app.pullPolicy }}"
           command: ['pnpm']
           args: ['run', 'start:workers']
+          workingDir: /app/langwatch
           env:
             - name: NODE_ENV
               value: {{ .Values.app.nodeEnv | default .Values.global.env | default "production" }}
