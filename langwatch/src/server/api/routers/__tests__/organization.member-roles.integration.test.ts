@@ -33,20 +33,6 @@ vi.mock("../../rbac", async (importOriginal) => {
   };
 });
 
-vi.mock("../../../subscriptionHandler", async (importOriginal) => {
-  const original = await importOriginal<typeof import("../../../subscriptionHandler")>();
-  return {
-    ...original,
-    SubscriptionHandler: {
-      getActivePlan: vi.fn().mockResolvedValue({
-        maxMembers: 100,
-        maxMembersLite: 100,
-        overrideAddingLimitations: true,
-      }),
-    },
-  };
-});
-
 vi.mock("../../../license-enforcement/license-enforcement.repository", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../license-enforcement/license-enforcement.repository")>();
   return {
