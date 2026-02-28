@@ -40,8 +40,3 @@ export const USAGE_STATS_QUEUE = {
   JOB: "usage_stats",
 } as const;
 
-/** Usage reporting queue - reports billable usage to billing provider */
-export const USAGE_REPORTING_QUEUE = {
-  NAME: makeQueueName("usage_reporting"),
-  JOB: "usage_reporting",
-} as const;

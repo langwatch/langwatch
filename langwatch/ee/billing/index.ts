@@ -11,11 +11,9 @@ import { createSeatEventSubscriptionFns } from "./services/seatEventSubscription
 import { InviteService } from "../../src/server/invites/invite.service";
 import { createSeatSyncService } from "./services/seatSyncService";
 import { createSubscriptionService } from "./services/subscriptionService";
-import { createUsageReportingService } from "./services/usageReportingService";
 import * as subscriptionItemCalculator from "./services/subscriptionItemCalculator";
 import { createWebhookService } from "./services/webhookService";
 import { createStripeClient } from "./stripe/stripeClient";
-import { meters } from "./stripe/stripePriceCatalog";
 import { createCurrencyRouter } from "./currencyRouter";
 import { createSubscriptionRouterFactory } from "./subscriptionRouter";
 import { createStripeWebhookHandlerFactory } from "./stripeWebhook";
@@ -91,19 +89,6 @@ export const getSaaSPlanProvider = () => {
   }
 
   return saasPlanProvider;
-};
-
-let usageReportingService: ReturnType<typeof createUsageReportingService> | null =
-  null;
-
-export const getUsageReportingService = () => {
-  if (!usageReportingService) {
-    usageReportingService = createUsageReportingService({
-      stripe: getStripe(),
-      meterId: meters.BILLABLE_EVENTS,
-    });
-  }
-  return usageReportingService;
 };
 
 let planLimitNotifier: ReturnType<typeof createPlanLimitNotifier> | null = null;

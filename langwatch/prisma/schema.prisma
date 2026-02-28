@@ -1159,6 +1159,7 @@ model BillingMeterCheckpoint {
     billingMonth         String   // "2026-02"
     lastReportedTotal    Int      @default(0)
     pendingReportedTotal Int?     // non-null = in-flight Stripe call
+    consecutiveFailures  Int      @default(0)
     updatedAt            DateTime @updatedAt
 
     @@unique([organizationId, billingMonth])

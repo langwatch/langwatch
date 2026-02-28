@@ -4,6 +4,8 @@ import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import { getLangWatchTracer } from "langwatch";
 import { makeQueueName } from "~/server/background/queues/makeQueueName";
+import { createBillingMeterDispatchReactor } from "./projections/global/billingMeterDispatch.reactor";
+import { BILLING_REPORTING_PIPELINE_NAME } from "./pipelines/billing-reporting/pipeline";
 import { createLogger } from "~/utils/logger/server";
 import { DisabledPipeline } from "./disabledPipeline";
 import type { Event, Projection } from "./domain/types";
@@ -12,7 +14,6 @@ import type {
     PipelineWithCommandHandlers,
     RegisteredPipeline,
 } from "./pipeline/types";
-import { createBillingMeterDispatchReactor } from "./projections/global/billingMeterDispatch.reactor";
 import { orgBillableEventsMeterProjection } from "./projections/global/orgBillableEventsMeter.mapProjection";
 import { projectDailyBillableEventsProjection } from "./projections/global/projectDailyBillableEvents.foldProjection";
 import { projectDailySdkUsageProjection } from "./projections/global/projectDailySdkUsage.foldProjection";
@@ -22,7 +23,6 @@ import { GroupQueueProcessorBullMq } from "./queues/groupQueue/groupQueue";
 import { EventSourcedQueueProcessorMemory } from "./queues/memory";
 import { EventSourcingPipeline } from "./runtimePipeline";
 import type { JobRegistryEntry } from "./services/queues/queueManager";
-import { ConfigurationError } from "./services/errorHandling";
 import { EventStoreClickHouse } from "./stores/eventStoreClickHouse";
 import { EventStoreMemory } from "./stores/eventStoreMemory";
 import type { EventStore } from "./stores/eventStore.types";
@@ -111,9 +111,10 @@ export class EventSourcing {
       this.projectionRegistry.registerReactor(
         "projectDailyBillableEvents",
         createBillingMeterDispatchReactor({
-          getUsageReportingQueue: async () =>
-            (await import("~/server/background/queues/usageReportingQueue"))
-              .usageReportingQueue,
+          getDispatch: () => {
+            const pipeline = this.getPipeline(BILLING_REPORTING_PIPELINE_NAME);
+            return (data) => pipeline.commands.reportUsageForMonth.send(data);
+          },
         }),
       );
     }
@@ -122,6 +123,7 @@ export class EventSourcing {
   get isEnabled(): boolean {
     return this._enabled;
   }
+
 
   get eventStore(): EventStore | undefined {
     this.ensureInitialized();
