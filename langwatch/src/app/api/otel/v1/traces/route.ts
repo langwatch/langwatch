@@ -13,7 +13,6 @@ import {
   scheduleTraceCollectionWithFallback,
 } from "../../../../../server/background/workers/collectorWorker";
 import { prisma } from "../../../../../server/db";
-import { SubscriptionHandler } from "../../../../../server/subscriptionHandler";
 import { openTelemetryTraceRequestToTracesForCollection } from "../../../../../server/tracer/otel.traces";
 import { TraceRequestCollectionService } from "../../../../../server/traces/trace-request-collection.service";
 import { getApp } from "../../../../../server/app-layer/app";
@@ -90,9 +89,9 @@ async function handleTracesRequest(req: NextRequest) {
 
         if (limitResult.exceeded) {
           try {
-            const activePlan = await SubscriptionHandler.getActivePlan(
-              project.team.organizationId,
-            );
+            const activePlan = await getApp().planProvider.getActivePlan({
+              organizationId: project.team.organizationId,
+            });
             await notifyPlanLimitReached({
               organizationId: project.team.organizationId,
               planName: activePlan.name ?? "free",
