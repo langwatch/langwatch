@@ -4,6 +4,7 @@ import type { ITraceUsageService } from "./licenseHandler";
 import { PUBLIC_KEY } from "./constants";
 import { LicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
 import { TraceUsageService } from "~/server/traces/trace-usage.service";
+import type { PlanResolver } from "~/server/app-layer/subscription/plan-provider";
 
 /**
  * Factory function for creating a LicenseHandler instance.
@@ -23,7 +24,20 @@ export function createLicenseHandler(
   publicKey: string = PUBLIC_KEY,
 ): LicenseHandler {
   const repository = new LicenseEnforcementRepository(prisma);
-  const traceUsageService: ITraceUsageService = TraceUsageService.create(prisma);
+
+  // Safety: LicenseHandler only calls TraceUsageService.getCurrentMonthCount
+  // and getCountByProjects — never checkLimit — so this resolver is never
+  // invoked at runtime. We provide a clear error if that invariant is broken.
+  const licenseHandlerPlanResolver: PlanResolver = () => {
+    throw new Error(
+      "PlanResolver must not be called from within LicenseHandler. " +
+        "LicenseHandler owns plan resolution itself.",
+    );
+  };
+  const traceUsageService: ITraceUsageService = TraceUsageService.create(
+    prisma,
+    licenseHandlerPlanResolver,
+  );
 
   return new LicenseHandler({
     prisma,

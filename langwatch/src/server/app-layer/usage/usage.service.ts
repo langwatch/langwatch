@@ -1,8 +1,9 @@
 import type { PrismaClient } from "@prisma/client";
-import { SubscriptionHandler } from "~/server/subscriptionHandler";
+import { getApp } from "~/server/app-layer";
 import { FREE_PLAN } from "../../../../ee/licensing/constants";
 import { env } from "../../../env.mjs";
 import { TraceUsageService } from "../../traces/trace-usage.service";
+import type { PlanResolver } from "../subscription/plan-provider";
 import { getCurrentMonthStartDateString } from "../../utils/dateUtils";
 import { TtlCache } from "../../utils/ttlCache";
 import { OrganizationNotFoundForTeamError } from "../organizations/errors";
@@ -41,7 +42,7 @@ export class UsageService {
     private readonly repo: UsageRepository,
     private readonly organizationService: OrganizationService,
     private readonly esTraceUsageService: TraceUsageService,
-    private readonly subscriptionHandler: typeof SubscriptionHandler,
+    private readonly planResolver: PlanResolver,
   ) {
     this.cache = new TtlCache<number>(CACHE_TTL_MS);
   }
@@ -49,11 +50,11 @@ export class UsageService {
   static create({
     prisma,
     organizationService,
-    subscriptionHandler = SubscriptionHandler,
+    planResolver,
   }: {
     prisma: PrismaClient | null;
     organizationService: OrganizationService;
-    subscriptionHandler?: typeof SubscriptionHandler;
+    planResolver?: PlanResolver;
   }): UsageService {
     const repo = prisma
       ? new PrismaUsageRepository(prisma)
@@ -61,11 +62,15 @@ export class UsageService {
     const esTraceUsageService = prisma
       ? TraceUsageService.create(prisma)
       : TraceUsageService.create();
+    const resolver: PlanResolver =
+      planResolver ??
+      ((organizationId) =>
+        getApp().planProvider.getActivePlan({ organizationId }));
     return new UsageService(
       repo,
       organizationService,
       esTraceUsageService,
-      subscriptionHandler,
+      resolver,
     );
   }
 
@@ -78,7 +83,7 @@ export class UsageService {
 
     const [count, plan] = await Promise.all([
       this.getCurrentMonthCount({ organizationId }),
-      this.subscriptionHandler.getActivePlan(organizationId),
+      this.planResolver(organizationId),
     ]);
     
 

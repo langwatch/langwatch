@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TtlCache } from "~/server/utils/ttlCache";
+import type { PlanResolver } from "../../subscription/plan-provider";
 import type { OrganizationService } from "../../organizations/organization.service";
 import type { UsageRepository } from "../repositories/usage.repository";
 import { UsageService } from "../usage.service";
@@ -28,9 +29,7 @@ describe("UsageService", () => {
     getCountByProjects: vi.fn(),
   };
 
-  const mockSubscriptionHandler = {
-    getActivePlan: vi.fn(),
-  };
+  const mockPlanResolver = vi.fn() as unknown as PlanResolver;
 
   let service: UsageService;
 
@@ -41,7 +40,7 @@ describe("UsageService", () => {
       repo: mockRepo,
       organizationService: mockOrgService,
       esTraceUsageService: mockEsTraceUsageService,
-      subscriptionHandler: mockSubscriptionHandler,
+      planResolver: mockPlanResolver,
       cache: new TtlCache<number>(30_000),
     });
   });
@@ -71,7 +70,7 @@ describe("UsageService", () => {
         mockEsTraceUsageService.getCountByProjects.mockResolvedValue([
           { projectId: "proj-1", count: 1000 },
         ]);
-        mockSubscriptionHandler.getActivePlan.mockResolvedValue({
+        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
           name: "free",
           maxMessagesPerMonth: 1000,
         });
@@ -88,6 +87,12 @@ describe("UsageService", () => {
         expect(result.maxMessagesPerMonth).toBe(1000);
         expect(result.planName).toBe("free");
       });
+
+      it("calls planResolver with organizationId", async () => {
+        await service.checkLimit({ teamId: "team-123" });
+
+        expect(mockPlanResolver).toHaveBeenCalledWith("org-123");
+      });
     });
 
     describe("when count < maxMessagesPerMonth", () => {
@@ -102,7 +107,7 @@ describe("UsageService", () => {
         mockEsTraceUsageService.getCountByProjects.mockResolvedValue([
           { projectId: "proj-1", count: 500 },
         ]);
-        mockSubscriptionHandler.getActivePlan.mockResolvedValue({
+        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
           maxMessagesPerMonth: 1000,
         });
 
@@ -136,7 +141,7 @@ describe("UsageService", () => {
         mockEsTraceUsageService.getCountByProjects.mockResolvedValue([
           { projectId: "proj-1", count: 5000 },
         ]);
-        mockSubscriptionHandler.getActivePlan.mockResolvedValue({ ...FREE_PLAN });
+        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({ ...FREE_PLAN });
 
         const result = await service.checkLimit({ teamId: "team-123" });
 
@@ -157,7 +162,7 @@ describe("UsageService", () => {
         mockEsTraceUsageService.getCountByProjects.mockResolvedValue([
           { projectId: "proj-1", count: 5000 },
         ]);
-        mockSubscriptionHandler.getActivePlan.mockResolvedValue({
+        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
           type: "PRO",
           name: "Pro",
           maxMessagesPerMonth: 1000,

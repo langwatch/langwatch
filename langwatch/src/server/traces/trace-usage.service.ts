@@ -3,7 +3,8 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { FREE_PLAN } from "../../../ee/licensing/constants";
 import { type PrismaClient, PricingModel } from "@prisma/client";
 import { env } from "~/env.mjs";
-import { SubscriptionHandler } from "~/server/subscriptionHandler";
+import { getApp } from "~/server/app-layer";
+import type { PlanResolver } from "~/server/app-layer/subscription/plan-provider";
 import { getClickHouseClient } from "~/server/clickhouse/client";
 import { prisma } from "~/server/db";
 import {
@@ -43,7 +44,7 @@ export class TraceUsageService {
   constructor(
     private readonly organizationRepository: OrganizationRepository,
     private readonly esClientFactory: EsClientFactory,
-    private readonly subscriptionHandler: typeof SubscriptionHandler,
+    private readonly planResolver: PlanResolver,
     private readonly prisma: PrismaClient,
     private readonly clickHouseClient: ClickHouseClient | null,
   ) {}
@@ -51,11 +52,18 @@ export class TraceUsageService {
   /**
    * Static factory method for creating TraceUsageService with proper DI
    */
-  static create(db: PrismaClient = prisma): TraceUsageService {
+  static create(
+    db: PrismaClient = prisma,
+    planResolver?: PlanResolver,
+  ): TraceUsageService {
+    const resolver: PlanResolver =
+      planResolver ??
+      ((organizationId) =>
+        getApp().planProvider.getActivePlan({ organizationId }));
     return new TraceUsageService(
       new OrganizationRepository(db),
       defaultEsClient,
-      SubscriptionHandler,
+      resolver,
       db,
       getClickHouseClient(),
     );
@@ -83,7 +91,7 @@ export class TraceUsageService {
 
     const [count, plan] = await Promise.all([
       this.getCurrentMonthCount({ organizationId, pricingModel }),
-      this.subscriptionHandler.getActivePlan(organizationId),
+      this.planResolver(organizationId),
     ]);
 
     // Self-hosted = unlimited traces

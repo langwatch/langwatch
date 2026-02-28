@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OrganizationRepository } from "~/server/repositories/organization.repository";
+import type { PlanResolver } from "~/server/app-layer/subscription/plan-provider";
 import {
   clearMonthCountCache,
   TraceUsageService,
@@ -52,9 +53,7 @@ describe("TraceUsageService", () => {
 
   const mockEsClientFactory = vi.fn().mockResolvedValue(mockEsClient);
 
-  const mockSubscriptionHandler = {
-    getActivePlan: vi.fn(),
-  };
+  const mockPlanResolver = vi.fn() as unknown as PlanResolver;
 
   const mockPrisma = {
     project: {
@@ -79,7 +78,7 @@ describe("TraceUsageService", () => {
     service = new TraceUsageService(
       mockOrganizationRepository,
       mockEsClientFactory,
-      mockSubscriptionHandler as any,
+      mockPlanResolver,
       mockPrisma as any,
       mockClickHouseClient as any,
     );
@@ -114,7 +113,7 @@ describe("TraceUsageService", () => {
           { id: "proj-1", featureClickHouseDataSourceTraces: false },
         ]);
         mockEsClient.count.mockResolvedValue({ count: 1000 });
-        mockSubscriptionHandler.getActivePlan.mockResolvedValue({
+        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
           name: "free",
           maxMessagesPerMonth: 1000,
         });
@@ -140,6 +139,12 @@ describe("TraceUsageService", () => {
         const result = await service.checkLimit({ teamId: "team-123" });
         expect(result.planName).toBe("free");
       });
+
+      it("calls planResolver with organizationId", async () => {
+        await service.checkLimit({ teamId: "team-123" });
+
+        expect(mockPlanResolver).toHaveBeenCalledWith("org-123");
+      });
     });
 
     describe("when count < maxMessagesPerMonth", () => {
@@ -154,7 +159,7 @@ describe("TraceUsageService", () => {
           { id: "proj-1", featureClickHouseDataSourceTraces: false },
         ]);
         mockEsClient.count.mockResolvedValue({ count: 500 });
-        mockSubscriptionHandler.getActivePlan.mockResolvedValue({
+        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
           maxMessagesPerMonth: 1000,
         });
 
@@ -181,7 +186,7 @@ describe("TraceUsageService", () => {
       it("returns exceeded: false for a FREE plan clone", async () => {
         const { env } = await import("~/env.mjs");
         vi.mocked(env).IS_SAAS = false;
-        mockSubscriptionHandler.getActivePlan.mockResolvedValue({ ...FREE_PLAN });
+        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({ ...FREE_PLAN });
 
         const result = await service.checkLimit({ teamId: "team-123" });
 
@@ -193,7 +198,7 @@ describe("TraceUsageService", () => {
       it("enforces limits for non-FREE plan types", async () => {
         const { env } = await import("~/env.mjs");
         vi.mocked(env).IS_SAAS = false;
-        mockSubscriptionHandler.getActivePlan.mockResolvedValue({
+        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
           type: "PRO",
           name: "Pro",
           maxMessagesPerMonth: 1000,
@@ -216,7 +221,7 @@ describe("TraceUsageService", () => {
         vi.mocked(mockOrganizationRepository.getProjectIds).mockResolvedValue([
           "proj-1",
         ]);
-        mockSubscriptionHandler.getActivePlan.mockResolvedValue({
+        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
           name: "pro",
           maxMessagesPerMonth: 10000,
         });

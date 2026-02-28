@@ -1,5 +1,7 @@
 import type { PlanInfo } from "../../../../ee/licensing/planInfo";
 
+export type PlanResolver = (organizationId: string) => Promise<PlanInfo>;
+
 export type PlanProviderUser = {
   id?: string;
   email?: string | null;
