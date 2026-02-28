@@ -36,8 +36,8 @@ importers:
         specifier: ^3.25.76
         version: 3.25.76
       zod-validation-error:
-        specifier: ^3.5.3
-        version: 3.5.3(zod@3.25.76)
+        specifier: ^5.0.0
+        version: 5.0.0(zod@3.25.76)
     devDependencies:
       '@ai-sdk/anthropic':
         specifier: ^2.0.15
@@ -2410,8 +2410,8 @@ packages:
     peerDependencies:
       zod: ^3.25 || ^4
 
-  zod-validation-error@3.5.3:
-    resolution: {integrity: sha512-OT5Y8lbUadqVZCsnyFaTQ4/O2mys4tj7PqhdbBCp7McPwvIEKfPtdA6QfPeFQK2/Rz5LgwmAXRJTugBNBi0btw==}
+  zod-validation-error@5.0.0:
+    resolution: {integrity: sha512-hmk+pkyKq7Q71PiWVSDUc3VfpzpvcRHZ3QPw9yEMVvmtCekaMeOHnbr3WbxfrgEnQTv6haGP4cmv0Ojmihzsxw==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
       zod: ^3.25.0 || ^4.0.0
@@ -4673,7 +4673,7 @@ snapshots:
     dependencies:
       zod: 3.25.76
 
-  zod-validation-error@3.5.3(zod@3.25.76):
+  zod-validation-error@5.0.0(zod@3.25.76):
     dependencies:
       zod: 3.25.76
 
