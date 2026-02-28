@@ -4,36 +4,33 @@
  * Integration tests for Limits tRPC endpoints.
  * Tests the router layer including message limit status calculation.
  */
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 import { OrganizationUserRole } from "@prisma/client";
+import { createTestApp, resetApp } from "../../../app-layer";
+import { globalForApp } from "../../../app-layer/app";
+import { PlanProviderService } from "../../../app-layer/subscription/plan-provider";
 
-// Mock trace usage service to control message counts
-const mockGetCurrentMonthCount = vi.fn();
-vi.mock("../../../traces/trace-usage.service", () => ({
-  TraceUsageService: {
-    create: () => ({
-      getCurrentMonthCount: mockGetCurrentMonthCount,
-    }),
-  },
+// Hoisted mocks for deterministic control (must use vi.hoisted to survive vi.mock hoisting)
+const { mockGetCurrentMonthCount, mockGetActivePlan } = vi.hoisted(() => ({
+  mockGetCurrentMonthCount: vi.fn(),
+  mockGetActivePlan: vi.fn().mockResolvedValue({
+    type: "PRO",
+    name: "Pro",
+    maxMessagesPerMonth: 1000,
+  }),
 }));
 
-// Mock subscription handler to control plan limits.
-// NOTE: After PR4, direct plan lookups in updateTeamMemberRole/updateMemberRole
-// use getApp().planProvider, NOT SubscriptionHandler. This mock affects legacy
-// paths that still resolve plans via SubscriptionHandler (e.g., InviteService).
+// Mock subscription handler — still consumed by UsageStatsService internally (line 129).
+// Will be removed when UsageStatsService is migrated to PlanProvider (PR8).
 vi.mock("../../../subscriptionHandler", async (importOriginal) => {
   const original = await importOriginal<typeof import("../../../subscriptionHandler")>();
   return {
     ...original,
     SubscriptionHandler: {
-      getActivePlan: vi.fn().mockResolvedValue({
-        type: "PRO",
-        name: "Pro",
-        maxMessagesPerMonth: 1000,
-      }),
+      getActivePlan: mockGetActivePlan,
     },
   };
 });
@@ -44,6 +41,14 @@ describe("Limits Router Integration", () => {
   let caller: ReturnType<typeof appRouter.createCaller>;
 
   beforeAll(async () => {
+    // Wire App singleton so UsageStatsService.create() can call getApp().usage
+    globalForApp.__langwatch_app = createTestApp({
+      usage: { getCurrentMonthCount: mockGetCurrentMonthCount } as any,
+      planProvider: PlanProviderService.create({
+        getActivePlan: mockGetActivePlan,
+      }),
+    });
+
     const organization = await prisma.organization.upsert({
       where: { slug: testOrgSlug },
       update: {},
@@ -87,7 +92,12 @@ describe("Limits Router Integration", () => {
     caller = appRouter.createCaller(ctx);
   });
 
+  afterEach(() => {
+    resetApp();
+  });
+
   afterAll(async () => {
+    resetApp();
     await prisma.organizationUser.deleteMany({
       where: { organizationId },
     });
@@ -102,6 +112,18 @@ describe("Limits Router Integration", () => {
   describe("getUsage", () => {
     beforeEach(() => {
       mockGetCurrentMonthCount.mockReset();
+      mockGetActivePlan.mockResolvedValue({
+        type: "PRO",
+        name: "Pro",
+        maxMessagesPerMonth: 1000,
+      });
+      resetApp();
+      globalForApp.__langwatch_app = createTestApp({
+        usage: { getCurrentMonthCount: mockGetCurrentMonthCount } as any,
+        planProvider: PlanProviderService.create({
+          getActivePlan: mockGetActivePlan,
+        }),
+      });
     });
 
     describe("when usage is below 80% threshold", () => {
