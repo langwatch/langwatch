@@ -88,7 +88,7 @@ function useSpanIdFromUrl() {
  * @param spanData - The span data containing LLM configuration
  * @returns Initial form values for a new prompt
  */
-function createDefaultPromptFormValues(
+export function createDefaultPromptFormValues(
   spanData: RouterOutputs["spans"]["getForPromptStudio"],
 ): PromptConfigFormValues {
   if (!spanData.llmConfig?.model) {
@@ -118,7 +118,7 @@ function createDefaultPromptFormValues(
           // The model should always be available here, but we fall back to the default model if it's not.
           model: spanData.llmConfig.model ?? DEFAULT_MODEL,
           temperature: spanData.llmConfig.temperature ?? undefined,
-          maxTokens: spanData.llmConfig.maxTokens,
+          maxTokens: spanData.llmConfig.maxTokens ?? undefined,
         },
         inputs: [],
         outputs: [{ identifier: "output", type: "str" }],
