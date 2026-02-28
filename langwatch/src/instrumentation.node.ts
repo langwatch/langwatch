@@ -11,6 +11,58 @@ import { detectResources } from "@opentelemetry/resources";
 import { BatchLogRecordProcessor } from "@opentelemetry/sdk-logs";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-node";
 import { setupObservability } from "langwatch/observability/node";
+import { createLogger } from "./utils/logger/server";
+
+// Route Node.js warnings through the custom logger
+const nodeLogger = createLogger("node");
+process.on("warning", (warning) => {
+  nodeLogger.warn(
+    {
+      name: warning.name,
+      code: (warning as NodeJS.ErrnoException).code,
+      stack: warning.stack,
+    },
+    warning.message
+  );
+});
+
+// Route console methods through the custom logger
+const consoleLogger = createLogger("console");
+const originalLog = console.log;
+const originalInfo = console.info;
+const originalWarn = console.warn;
+const originalError = console.error;
+
+const formatArgs = (args: unknown[]) =>
+  args
+    .map((arg) =>
+      typeof arg === "object" ? JSON.stringify(arg) : String(arg)
+    )
+    .join(" ");
+
+console.log = (...args: unknown[]) => {
+  consoleLogger.info(formatArgs(args));
+};
+
+console.info = (...args: unknown[]) => {
+  consoleLogger.info(formatArgs(args));
+};
+
+console.warn = (...args: unknown[]) => {
+  consoleLogger.warn(formatArgs(args));
+};
+
+console.error = (...args: unknown[]) => {
+  consoleLogger.error(formatArgs(args));
+};
+
+// Keep original methods available if needed
+export const originalConsole = {
+  log: originalLog,
+  info: originalInfo,
+  warn: originalWarn,
+  error: originalError,
+};
 
 const explicitEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
 
