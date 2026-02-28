@@ -16,8 +16,12 @@ import { ProjectService } from "./projects/project.service";
 import { SpanStorageService } from "./traces/span-storage.service";
 import { TokenizerService } from "./traces/tokenizer.service";
 import { TraceSummaryService } from "./traces/trace-summary.service";
+import { PlanProviderService } from "./subscription/plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import { EESubscriptionService } from "../../../ee/billing/services/subscription.service";
+import { getSaaSPlanProvider } from "../../../ee/billing";
+import { getLicenseHandler } from "../subscriptionHandler";
+import { FREE_PLAN } from "../../../ee/licensing/constants";
 import { createStripeClient } from "../../../ee/billing/stripe/stripeClient";
 import { createSeatEventSubscriptionFns } from "../../../ee/billing/services/seatEventSubscription";
 import * as subscriptionItemCalculator from "../../../ee/billing/services/subscriptionItemCalculator";
@@ -60,6 +64,16 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const organizations = OrganizationService.create(prisma);
   const projects = ProjectService.create(prisma);
   const usage = UsageService.create({ prisma, organizationService: organizations });
+
+  const planProvider = config.isSaas
+    ? PlanProviderService.create({
+        getActivePlan: ({ organizationId, user }) =>
+          getSaaSPlanProvider().getActivePlan(organizationId, user),
+      })
+    : PlanProviderService.create({
+        getActivePlan: ({ organizationId }) =>
+          getLicenseHandler().getActivePlan(organizationId),
+      });
 
   let subscription: SubscriptionService | undefined;
   let usageReportingService: StripeUsageReportingService | undefined;
@@ -139,6 +153,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     projects,
     tokenizer,
     usage,
+    planProvider,
     subscription,
     commands,
     _eventSourcing: es,
@@ -169,6 +184,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     projects: ProjectService.create(null),
     tokenizer: TokenizerService.create({ disableTokenization: true }),
     usage: UsageService.create({ prisma: null, organizationService: OrganizationService.create(null) }),
+    planProvider: PlanProviderService.create({
+      getActivePlan: async () => FREE_PLAN,
+    }),
     subscription: undefined,
     commands: {
       traces: { recordSpan: noop, assignTopic: noop, assignSatisfactionScore: noop } as AppCommands["traces"],
