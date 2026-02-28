@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
-import { SubscriptionHandler } from "~/server/subscriptionHandler";
+import type { PlanInfo } from "../../../ee/licensing/planInfo";
+import type { PlanProvider } from "../app-layer/subscription/plan-provider";
 import { formatNumber, formatPercent } from "../../utils/formatNumber";
 import { getApp } from "../app-layer/app";
 import {
@@ -82,9 +83,7 @@ export interface UsageStats {
   projectsCount: number;
   currentMonthMessagesCount: number;
   currentMonthCost: number;
-  activePlan: Awaited<
-    ReturnType<typeof SubscriptionHandler.getActivePlan>
-  >;
+  activePlan: PlanInfo;
   maxMonthlyUsageLimit: number;
   membersCount: number;
   membersLiteCount: number;
@@ -105,7 +104,7 @@ export interface UsageStats {
  * Coordinates between:
  * - LicenseEnforcementRepository (Prisma queries)
  * - TraceUsageService (Elasticsearch queries)
- * - SubscriptionHandler (plan info)
+ * - PlanProvider (plan info)
  *
  * This is the proper service layer - routers call this instead of
  * manually wiring dependencies.
@@ -114,7 +113,7 @@ export class UsageStatsService {
   constructor(
     private readonly repository: ILicenseEnforcementRepository,
     private readonly traceUsageService: ITraceUsageService,
-    private readonly subscriptionHandler: typeof SubscriptionHandler,
+    private readonly planProvider: PlanProvider,
   ) {}
 
   /**
@@ -126,7 +125,7 @@ export class UsageStatsService {
     return new UsageStatsService(
       repository,
       getApp().usage,
-      SubscriptionHandler,
+      getApp().planProvider,
     );
   }
 
@@ -158,7 +157,7 @@ export class UsageStatsService {
       this.repository.getProjectCount(organizationId),
       this.traceUsageService.getCurrentMonthCount({ organizationId }),
       this.repository.getCurrentMonthCost(organizationId),
-      this.subscriptionHandler.getActivePlan(organizationId, user),
+      this.planProvider.getActivePlan({ organizationId, user }),
       this.getMaxMonthlyUsageLimit(organizationId),
       this.repository.getMemberCount(organizationId),
       this.repository.getMembersLiteCount(organizationId),

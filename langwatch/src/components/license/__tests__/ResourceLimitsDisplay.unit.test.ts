@@ -4,7 +4,7 @@ import {
   mapUsageToLimits,
   type ResourceLimits,
 } from "../ResourceLimitsDisplay";
-import type { PlanInfo } from "~/server/subscriptionHandler";
+import type { PlanInfo } from "../../../../ee/licensing/planInfo";
 
 /**
  * Pure unit tests for ResourceLimitsDisplay mapping functions.

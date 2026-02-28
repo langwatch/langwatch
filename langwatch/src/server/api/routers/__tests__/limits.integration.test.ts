@@ -23,17 +23,6 @@ const { mockGetCurrentMonthCount, mockGetActivePlan } = vi.hoisted(() => ({
   }),
 }));
 
-// Mock subscription handler — still consumed by UsageStatsService internally (line 129).
-// Will be removed when UsageStatsService is migrated to PlanProvider (PR8).
-vi.mock("../../../subscriptionHandler", async (importOriginal) => {
-  const original = await importOriginal<typeof import("../../../subscriptionHandler")>();
-  return {
-    ...original,
-    SubscriptionHandler: {
-      getActivePlan: mockGetActivePlan,
-    },
-  };
-});
 
 describe("Limits Router Integration", () => {
   const testOrgSlug = "limits-router-test-org";

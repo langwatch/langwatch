@@ -73,8 +73,7 @@ describe("organizationRouter member role validation", () => {
     vi.clearAllMocks();
     resetApp();
 
-    // Wire App singleton with planProvider matching old SubscriptionHandler mock values.
-    // Old mock returned: { maxMembers: 100, maxMembersLite: 100, overrideAddingLimitations: true }
+    // Wire App singleton with permissive PlanProvider mock values.
     globalForApp.__langwatch_app = createTestApp({
       planProvider: PlanProviderService.create({
         getActivePlan: vi.fn().mockResolvedValue({
