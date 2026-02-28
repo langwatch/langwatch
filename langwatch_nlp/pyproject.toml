@@ -42,7 +42,7 @@ dev = [
     "pip-licenses>=5.5.0",
     "pytest-httpx >= 0.30.0",
     "pytest-asyncio >= 0.23.8, < 0.24",
-    "ipykernel >= 6.29.5, < 7",
+    "ipykernel >= 6.29.5, < 8",
     "watchdog >= 5.0.3, < 6",
     "ruff >= 0.11.1",
 ]
