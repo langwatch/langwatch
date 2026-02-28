@@ -159,6 +159,83 @@ class TestReasoningModelConfig:
         call_kwargs = mock_dspy_lm.call_args.kwargs
         assert call_kwargs.get("temperature") == 1.0
 
+    # Auto-correct max_tokens for models with reasoning enabled (non-OpenAI)
+    # When effort/reasoning/thinkingLevel is set, LiteLLM may auto-enable extended
+    # thinking with budget_tokens that can exceed max_tokens.
+
+    def test_autocorrect_max_tokens_for_anthropic_with_effort(self, mock_dspy_lm):
+        """Given effort='high' for claude-opus-4.5, auto-corrects max_tokens to 16000."""
+        config = LLMConfig(
+            model="anthropic/claude-opus-4.5", effort="high", max_tokens=4096
+        )
+
+        node_llm_config_to_dspy_lm(config)
+
+        mock_dspy_lm.assert_called_once()
+        call_kwargs = mock_dspy_lm.call_args.kwargs
+        assert call_kwargs.get("max_tokens") == 16000
+
+    def test_anthropic_with_effort_preserves_temperature(self, mock_dspy_lm):
+        """Given effort='high' for Anthropic, temperature is NOT forced to 1.0."""
+        config = LLMConfig(
+            model="anthropic/claude-opus-4.5", effort="high", temperature=0.7
+        )
+
+        node_llm_config_to_dspy_lm(config)
+
+        mock_dspy_lm.assert_called_once()
+        call_kwargs = mock_dspy_lm.call_args.kwargs
+        # Temperature should be preserved (clamped to 1.0 max for Anthropic)
+        assert call_kwargs.get("temperature") == 0.7
+
+    def test_autocorrect_max_tokens_for_model_with_unified_reasoning(self, mock_dspy_lm):
+        """Given reasoning='high' for any model, auto-corrects max_tokens to 16000."""
+        config = LLMConfig(
+            model="anthropic/claude-opus-4.5", reasoning="high", max_tokens=4096
+        )
+
+        node_llm_config_to_dspy_lm(config)
+
+        mock_dspy_lm.assert_called_once()
+        call_kwargs = mock_dspy_lm.call_args.kwargs
+        assert call_kwargs.get("max_tokens") == 16000
+
+    def test_autocorrect_max_tokens_for_gemini_with_thinkinglevel(self, mock_dspy_lm):
+        """Given thinkingLevel='high' for Gemini, auto-corrects max_tokens to 16000."""
+        config = LLMConfig(
+            model="google/gemini-2.5-pro", thinkingLevel="high", max_tokens=4096
+        )
+
+        node_llm_config_to_dspy_lm(config)
+
+        mock_dspy_lm.assert_called_once()
+        call_kwargs = mock_dspy_lm.call_args.kwargs
+        assert call_kwargs.get("max_tokens") == 16000
+
+    def test_non_reasoning_anthropic_preserves_max_tokens(self, mock_dspy_lm):
+        """Given Anthropic model without reasoning, max_tokens is preserved."""
+        config = LLMConfig(
+            model="anthropic/claude-sonnet-4", max_tokens=4096
+        )
+
+        node_llm_config_to_dspy_lm(config)
+
+        mock_dspy_lm.assert_called_once()
+        call_kwargs = mock_dspy_lm.call_args.kwargs
+        assert call_kwargs.get("max_tokens") == 4096
+
+    def test_model_with_high_max_tokens_and_reasoning_preserves_value(self, mock_dspy_lm):
+        """Given max_tokens=32000 with effort='high', value is preserved (above minimum)."""
+        config = LLMConfig(
+            model="anthropic/claude-opus-4.5", effort="high", max_tokens=32000
+        )
+
+        node_llm_config_to_dspy_lm(config)
+
+        mock_dspy_lm.assert_called_once()
+        call_kwargs = mock_dspy_lm.call_args.kwargs
+        assert call_kwargs.get("max_tokens") == 32000
+
     # Reasoning parameters passthrough
 
     def test_reasoning_effort_passed_to_dspy_lm(self, mock_dspy_lm):

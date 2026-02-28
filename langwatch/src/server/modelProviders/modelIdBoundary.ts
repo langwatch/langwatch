@@ -22,7 +22,6 @@ const MODEL_ALIASES: Record<string, string> = {
   "anthropic/claude-sonnet-4": "anthropic/claude-sonnet-4-20250514",
   "anthropic/claude-opus-4": "anthropic/claude-opus-4-20250514",
   "anthropic/claude-3.5-haiku": "anthropic/claude-3-5-haiku-20241022",
-  "anthropic/claude-3.5-sonnet": "anthropic/claude-3-5-sonnet-20240620"
 };
 
 /**
