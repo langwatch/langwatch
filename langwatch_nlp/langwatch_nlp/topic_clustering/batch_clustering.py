@@ -100,6 +100,22 @@ def setup_endpoints(app: FastAPI):
             set_log_context(project_id=params.project_id)
             logger.info("Starting batch clustering", trace_count=len(params.traces))
 
+            # Validate model and API key configuration
+            model = params.litellm_params.get("model", "")
+            if not model:
+                logger.warning("No model configured for topic clustering, skipping")
+                return {"topics": [], "subtopics": [], "traces": [], "cost": {"amount": 0, "currency": "USD"}}
+
+            api_key = params.litellm_params.get("api_key", "")
+            embeddings_api_key = params.embeddings_litellm_params.get("api_key", "")
+            if api_key in ("", "dummy") or embeddings_api_key in ("", "dummy"):
+                logger.warning(
+                    "Invalid API key for topic clustering, skipping",
+                    has_model_key=bool(api_key and api_key != "dummy"),
+                    has_embeddings_key=bool(embeddings_api_key and embeddings_api_key != "dummy"),
+                )
+                return {"topics": [], "subtopics": [], "traces": [], "cost": {"amount": 0, "currency": "USD"}}
+
             model = params.litellm_params["model"]
             if model.startswith("azure/") and params.deployment_name:
                 model = f"azure/{params.deployment_name}"
