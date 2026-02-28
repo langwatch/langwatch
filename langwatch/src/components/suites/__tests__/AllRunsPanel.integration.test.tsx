@@ -208,6 +208,7 @@ describe("<AllRunsPanel/>", () => {
       expect(lastCall![0]).toMatchObject({
         startDate: period2.startDate.getTime(),
         endDate: period2.endDate.getTime(),
+        cursor: undefined,
       });
     });
   });
