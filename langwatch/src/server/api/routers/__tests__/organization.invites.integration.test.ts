@@ -47,7 +47,10 @@ vi.mock("../../../../env.mjs", async (importOriginal) => {
   };
 });
 
-// Mock subscription handler to control plan limits
+// Mock subscription handler to control plan limits.
+// NOTE: After PR4, direct plan lookups in updateTeamMemberRole/updateMemberRole
+// use getApp().planProvider, NOT SubscriptionHandler. This mock only affects
+// InviteService-internal plan resolution (invite.service.ts factory binding).
 vi.mock("../../../subscriptionHandler", async (importOriginal) => {
   const original = await importOriginal<typeof import("../../../subscriptionHandler")>();
   return {

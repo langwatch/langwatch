@@ -1,7 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { OrganizationUserRole, TeamUserRole, type PrismaClient } from "@prisma/client";
 import { organizationRouter, LITE_MEMBER_VIEWER_ONLY_ERROR } from "../organization";
 import { createInnerTRPCContext } from "../../trpc";
+import { createTestApp, resetApp } from "~/server/app-layer";
+import { globalForApp } from "~/server/app-layer/app";
+import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
 
 vi.mock("../../../auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
@@ -82,6 +85,19 @@ describe("organizationRouter member role validation", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetApp();
+
+    // Wire App singleton with planProvider matching old SubscriptionHandler mock values.
+    // Old mock returned: { maxMembers: 100, maxMembersLite: 100, overrideAddingLimitations: true }
+    globalForApp.__langwatch_app = createTestApp({
+      planProvider: PlanProviderService.create({
+        getActivePlan: vi.fn().mockResolvedValue({
+          maxMembers: 100,
+          maxMembersLite: 100,
+          overrideAddingLimitations: true,
+        }),
+      } as any),
+    });
 
     txMock = {
       team: {
@@ -115,6 +131,10 @@ describe("organizationRouter member role validation", () => {
 
     ctx.prisma = prismaMock as unknown as PrismaClient;
     caller = organizationRouter.createCaller(ctx);
+  });
+
+  afterEach(() => {
+    resetApp();
   });
 
   describe("updateTeamMemberRole", () => {

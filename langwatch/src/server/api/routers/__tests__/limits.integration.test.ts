@@ -20,7 +20,10 @@ vi.mock("../../../traces/trace-usage.service", () => ({
   },
 }));
 
-// Mock subscription handler to control plan limits
+// Mock subscription handler to control plan limits.
+// NOTE: After PR4, direct plan lookups in updateTeamMemberRole/updateMemberRole
+// use getApp().planProvider, NOT SubscriptionHandler. This mock affects legacy
+// paths that still resolve plans via SubscriptionHandler (e.g., InviteService).
 vi.mock("../../../subscriptionHandler", async (importOriginal) => {
   const original = await importOriginal<typeof import("../../../subscriptionHandler")>();
   return {
