@@ -164,7 +164,7 @@ describe("TraceUsageService", () => {
       });
     });
 
-    describe("when self-hosted (IS_SAAS=false) with FREE_PLAN", () => {
+    describe("when self-hosted (IS_SAAS=false)", () => {
       beforeEach(() => {
         vi.mocked(
           mockOrganizationRepository.getOrganizationIdByTeamId,
@@ -176,35 +176,33 @@ describe("TraceUsageService", () => {
           { id: "proj-1", featureClickHouseDataSourceTraces: false },
         ]);
         mockEsClient.count.mockResolvedValue({ count: 5000 }); // Over any limit
-        mockSubscriptionHandler.getActivePlan.mockResolvedValue(FREE_PLAN);
       });
 
-      it("returns exceeded: false regardless of count", async () => {
+      it("returns exceeded: false for a FREE plan clone", async () => {
         const { env } = await import("~/env.mjs");
         vi.mocked(env).IS_SAAS = false;
+        mockSubscriptionHandler.getActivePlan.mockResolvedValue({ ...FREE_PLAN });
 
         const result = await service.checkLimit({ teamId: "team-123" });
 
         expect(result.exceeded).toBe(false);
 
-        // Reset for other tests
         vi.mocked(env).IS_SAAS = true;
       });
 
-      it("still fetches organization and plan to determine if FREE_PLAN", async () => {
+      it("enforces limits for non-FREE plan types", async () => {
         const { env } = await import("~/env.mjs");
         vi.mocked(env).IS_SAAS = false;
+        mockSubscriptionHandler.getActivePlan.mockResolvedValue({
+          type: "PRO",
+          name: "Pro",
+          maxMessagesPerMonth: 1000,
+        });
 
-        await service.checkLimit({ teamId: "team-123" });
+        const result = await service.checkLimit({ teamId: "team-123" });
 
-        expect(
-          mockOrganizationRepository.getOrganizationIdByTeamId,
-        ).toHaveBeenCalledWith("team-123");
-        expect(mockSubscriptionHandler.getActivePlan).toHaveBeenCalledWith(
-          "org-123",
-        );
+        expect(result.exceeded).toBe(true);
 
-        // Reset for other tests
         vi.mocked(env).IS_SAAS = true;
       });
     });

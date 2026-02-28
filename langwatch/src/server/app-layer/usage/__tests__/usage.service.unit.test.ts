@@ -112,13 +112,13 @@ describe("UsageService", () => {
       });
     });
 
-    describe("when self-hosted (IS_SAAS=false) with FREE_PLAN", () => {
+    describe("when self-hosted (IS_SAAS=false)", () => {
       afterEach(async () => {
         const { env } = await import("~/env.mjs");
         vi.mocked(env).IS_SAAS = true;
       });
 
-      it("returns exceeded: false regardless of count", async () => {
+      it("returns exceeded: false for a FREE plan clone", async () => {
         const { env } = await import("~/env.mjs");
         vi.mocked(env).IS_SAAS = false;
 
@@ -136,11 +136,36 @@ describe("UsageService", () => {
         mockEsTraceUsageService.getCountByProjects.mockResolvedValue([
           { projectId: "proj-1", count: 5000 },
         ]);
-        mockSubscriptionHandler.getActivePlan.mockResolvedValue(FREE_PLAN);
+        mockSubscriptionHandler.getActivePlan.mockResolvedValue({ ...FREE_PLAN });
 
         const result = await service.checkLimit({ teamId: "team-123" });
 
         expect(result.exceeded).toBe(false);
+      });
+
+      it("enforces limits for non-FREE plan types", async () => {
+        const { env } = await import("~/env.mjs");
+        vi.mocked(env).IS_SAAS = false;
+
+        vi.mocked(
+          mockOrgService.getOrganizationIdByTeamId,
+        ).mockResolvedValue("org-123");
+        vi.mocked(mockOrgService.getProjectIds).mockResolvedValue([
+          "proj-1",
+        ]);
+        vi.mocked(mockOrgService.isFeatureEnabled).mockResolvedValue(false);
+        mockEsTraceUsageService.getCountByProjects.mockResolvedValue([
+          { projectId: "proj-1", count: 5000 },
+        ]);
+        mockSubscriptionHandler.getActivePlan.mockResolvedValue({
+          type: "PRO",
+          name: "Pro",
+          maxMessagesPerMonth: 1000,
+        });
+
+        const result = await service.checkLimit({ teamId: "team-123" });
+
+        expect(result.exceeded).toBe(true);
       });
     });
   });

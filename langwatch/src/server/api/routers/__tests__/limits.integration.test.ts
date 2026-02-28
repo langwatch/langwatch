@@ -159,6 +159,20 @@ describe("Limits Router Integration", () => {
         expect(result.messageLimitInfo.status).toBe("exceeded");
         expect(result.messageLimitInfo.message).toMatch(/reached the limit/);
       });
+
+      it("keeps enforcement behavior when plan provider returns a copied FREE plan object", async () => {
+        mockGetCurrentMonthCount.mockResolvedValue(1500);
+        mockGetActivePlan.mockResolvedValue({
+          type: "FREE",
+          name: "Free",
+          maxMessagesPerMonth: 1000,
+        });
+
+        const result = await caller.limits.getUsage({ organizationId });
+
+        expect(result.messageLimitInfo.status).toBe("exceeded");
+        expect(result.messageLimitInfo.max).toBe(1000);
+      });
     });
   });
 });

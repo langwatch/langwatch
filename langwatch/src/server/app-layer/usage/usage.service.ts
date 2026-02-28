@@ -12,6 +12,9 @@ import {
   NullUsageRepository,
   type UsageRepository,
 } from "./repositories/usage.repository";
+import { createLogger } from "~/utils/logger/server";
+
+const logger = createLogger("langwatch:usage:usageService");
 
 const CACHE_TTL_MS = 30_000; // 30 seconds
 const BILLABLE_EVENTS_FEATURE = "billable_events_usage";
@@ -77,9 +80,11 @@ export class UsageService {
       this.getCurrentMonthCount({ organizationId }),
       this.subscriptionHandler.getActivePlan(organizationId),
     ]);
+    
 
     // Self-hosted = unlimited traces
-    if (!env.IS_SAAS && plan === FREE_PLAN) {
+    // Preventing customers from getting blocked when no license is active
+    if (!env.IS_SAAS && plan.type === FREE_PLAN.type) {
       return { exceeded: false };
     }
 

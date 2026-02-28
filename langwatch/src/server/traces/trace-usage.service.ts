@@ -88,7 +88,7 @@ export class TraceUsageService {
 
     // Self-hosted = unlimited traces
     // Preventing customers from getting blocked when no license is active
-    if (!env.IS_SAAS && plan === FREE_PLAN) {
+    if (!env.IS_SAAS && plan.type === FREE_PLAN.type) {
       return { exceeded: false };
     }
 
