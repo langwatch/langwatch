@@ -33,10 +33,7 @@ describe("CanonicalizeSpanAttributesService — structured IO", () => {
         stubSpan as any,
       );
 
-      const parsed = JSON.parse(
-        result.attributes["gen_ai.input.messages"] as string,
-      );
-      expect(parsed).toEqual(messages);
+      expect(result.attributes["gen_ai.input.messages"]).toEqual(messages);
     });
 
     it("upgrades span type to llm", () => {
@@ -85,8 +82,11 @@ describe("CanonicalizeSpanAttributesService — structured IO", () => {
         stubSpan as any,
       );
 
-      // The raw wrapper string is re-set back to langwatch.input
-      expect(result.attributes["langwatch.input"]).toBe(wrapper);
+      // The wrapper object is re-set back to langwatch.input
+      expect(result.attributes["langwatch.input"]).toEqual({
+        type: "chat_messages",
+        value: [{ role: "user", content: "Hello" }],
+      });
     });
 
     it("records input type in langwatch.reserved.value_types", () => {
@@ -121,10 +121,7 @@ describe("CanonicalizeSpanAttributesService — structured IO", () => {
         stubSpan as any,
       );
 
-      const parsed = JSON.parse(
-        result.attributes["gen_ai.output.messages"] as string,
-      );
-      expect(parsed).toEqual(messages);
+      expect(result.attributes["gen_ai.output.messages"]).toEqual(messages);
     });
 
     it("keeps unwrapped messages in langwatch.output", () => {
@@ -140,10 +137,7 @@ describe("CanonicalizeSpanAttributesService — structured IO", () => {
         stubSpan as any,
       );
 
-      const parsed = JSON.parse(
-        result.attributes["langwatch.output"] as string,
-      );
-      expect(parsed).toEqual(messages);
+      expect(result.attributes["langwatch.output"]).toEqual(messages);
     });
 
     it("records output type in langwatch.reserved.value_types", () => {
@@ -201,10 +195,7 @@ describe("CanonicalizeSpanAttributesService — structured IO", () => {
         stubSpan as any,
       );
 
-      const parsed = JSON.parse(
-        result.attributes["gen_ai.output.messages"] as string,
-      );
-      expect(parsed).toEqual([
+      expect(result.attributes["gen_ai.output.messages"]).toEqual([
         { role: "assistant", content: "answer: 42\nconfidence: high" },
       ]);
     });
@@ -264,8 +255,8 @@ describe("CanonicalizeSpanAttributesService — structured IO", () => {
         stubSpan as any,
       );
 
-      // Value is unwrapped (object gets JSON.stringified by toAttrValue)
-      expect(JSON.parse(result.attributes["langwatch.input"] as string)).toEqual(rawData);
+      // Value is unwrapped (object stored directly)
+      expect(result.attributes["langwatch.input"]).toEqual(rawData);
       expect(result.attributes["langwatch.reserved.value_types"]).toEqual([
         "langwatch.input=raw",
       ]);
@@ -343,8 +334,7 @@ describe("CanonicalizeSpanAttributesService — structured IO", () => {
         stubSpan as any,
       );
 
-      const output = result.attributes["langwatch.input"];
-      expect(JSON.parse(output as string)).toEqual(obj);
+      expect(result.attributes["langwatch.input"]).toEqual(obj);
     });
 
     it("does not set langwatch.reserved.value_types for non-structured inputs", () => {

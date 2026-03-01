@@ -35,17 +35,15 @@
 
 import { ATTR_KEYS } from "./_constants";
 import {
-  asNumber,
-  coerceToStringArray,
   extractInputMessages,
   extractModelToBoth,
   extractOutputMessages,
-  extractSystemInstructionFromMessages,
   extractUsageTokens,
-  isRecord,
-  safeJsonParse,
+  recordValueType,
   spanTypeToGenAiOperationName,
-} from "./_helpers";
+} from "./_extraction";
+import { asNumber, coerceToStringArray, isRecord } from "./_guards";
+import { extractSystemInstructionFromMessages } from "./_messages";
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 
 export class GenAIExtractor implements CanonicalAttributesExtractor {
@@ -126,6 +124,10 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
       `${this.id}:input.messages`,
     );
 
+    if (inputExtracted) {
+      recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
+    }
+
     // If gen_ai.input.messages was already present (e.g. from OpenClaw/OTEL
     // GenAI spec), extractInputMessages skips it. Still extract system
     // instruction from the existing messages if not already set.
@@ -133,7 +135,7 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
       !inputExtracted &&
       !attrs.has(ATTR_KEYS.GEN_AI_REQUEST_SYSTEM_INSTRUCTION)
     ) {
-      const existing = attrs.getParsed(ATTR_KEYS.GEN_AI_INPUT_MESSAGES);
+      const existing = attrs.get(ATTR_KEYS.GEN_AI_INPUT_MESSAGES);
       if (Array.isArray(existing)) {
         const sysInstruction = extractSystemInstructionFromMessages(existing);
         if (sysInstruction !== null) {
@@ -143,6 +145,8 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
           );
           ctx.recordRule(`${this.id}:system_instruction(existing)`);
         }
+        // Annotate existing messages as chat_messages type
+        recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
       }
     }
 
@@ -154,7 +158,7 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
     // Note: langwatch.output is handled by the LangWatch extractor which
     // directly produces gen_ai.output.messages when structured format is detected
     // ─────────────────────────────────────────────────────────────────────────
-    extractOutputMessages(
+    const outputExtracted = extractOutputMessages(
       ctx,
       [
         {
@@ -164,6 +168,10 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
       ],
       `${this.id}:output.messages`,
     );
+
+    if (outputExtracted) {
+      recordValueType(ctx, ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, "chat_messages");
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // Usage Tokens
@@ -189,7 +197,7 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
     // Request Parameters (from legacy llm.invocation_parameters)
     // Extracts model parameters like temperature, max_tokens, etc.
     // ─────────────────────────────────────────────────────────────────────────
-    const invocationParams = ctx.bag.attrs.getParsed(
+    const invocationParams = ctx.bag.attrs.get(
       ATTR_KEYS.LLM_INVOCATION_PARAMETERS,
     );
     if (isRecord(invocationParams)) {

@@ -26,13 +26,12 @@
  */
 
 import { ATTR_KEYS } from "./_constants";
+import { ALLOWED_SPAN_TYPES } from "./_extraction";
+import { isRecord } from "./_guards";
 import {
-  ALLOWED_SPAN_TYPES,
   extractSystemInstructionFromMessages,
-  isRecord,
   normalizeToMessages,
-  safeJsonParse,
-} from "./_helpers";
+} from "./_messages";
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 
 /**
@@ -143,15 +142,14 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Metadata JSON - Extract labels from metadata attribute
-    // SDK may send labels inside a metadata JSON object: { labels: [...] }
-    // Read without consuming so aggregation service can still access it
+    // Metadata JSON - Extract and hoist all metadata fields
+    // SDK may send labels, reserved fields, and custom metadata inside a
+    // metadata JSON object. Consume the blob with take() and hoist every
+    // field so downstream code uses canonical keys only.
     // ─────────────────────────────────────────────────────────────────────────
-    const metadataJson = attrs.get("metadata") ?? attrs.get("langwatch.metadata");
-    if (typeof metadataJson === "string") {
-      const parsed = safeJsonParse(metadataJson);
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-        const parsedObj = parsed as Record<string, unknown>;
+    const metadata = attrs.take("metadata") ?? attrs.take("langwatch.metadata");
+    if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
+        const parsedObj = metadata as Record<string, unknown>;
         // Extract labels if not already set
         if (Array.isArray(parsedObj.labels)) {
           ctx.setAttrIfAbsent(
@@ -188,7 +186,32 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
           );
           ctx.recordRule(`${this.id}:metadata.customer_id`);
         }
-      }
+
+        // Hoist remaining custom metadata fields as metadata.{key} canonical
+        // attributes so they are available as first-class trace summary attrs.
+        const RESERVED_METADATA_KEYS = new Set([
+          "labels",
+          "user_id", "userId",
+          "thread_id", "threadId",
+          "customer_id", "customerId",
+        ]);
+        for (const [key, value] of Object.entries(parsedObj)) {
+          if (RESERVED_METADATA_KEYS.has(key)) continue;
+          if (value !== null && value !== undefined) {
+            ctx.setAttrIfAbsent(
+              `metadata.${key}`,
+              typeof value === "string" ? value : JSON.stringify(value),
+            );
+          }
+        }
+        ctx.recordRule(`${this.id}:metadata.hoisted`);
+    } else if (metadata !== undefined && metadata !== null) {
+        // Invalid metadata (string, array, number) — store as metadata._raw
+        ctx.setAttrIfAbsent(
+          "metadata._raw",
+          typeof metadata === "string" ? metadata : JSON.stringify(metadata),
+        );
+        ctx.recordRule(`${this.id}:metadata._raw`);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -211,18 +234,16 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
 
     const rawInput = attrs.take(ATTR_KEYS.LANGWATCH_INPUT);
     if (rawInput !== void 0) {
-      const parsedInput = safeJsonParse(rawInput);
-
-      if (isLangWatchStructuredValue(parsedInput)) {
+      if (isLangWatchStructuredValue(rawInput)) {
         reservedTypes.push(
-          `${ATTR_KEYS.LANGWATCH_INPUT}=${parsedInput.type}`,
+          `${ATTR_KEYS.LANGWATCH_INPUT}=${rawInput.type}`,
         );
 
         if (
-          parsedInput.type === "chat_messages" &&
-          Array.isArray(parsedInput.value)
+          rawInput.type === "chat_messages" &&
+          Array.isArray(rawInput.value)
         ) {
-          const messages = normalizeToMessages(parsedInput.value, "user");
+          const messages = normalizeToMessages(rawInput.value, "user");
 
           if (messages) {
             ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, messages);
@@ -242,21 +263,21 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
             ctx.setAttr(ATTR_KEYS.SPAN_TYPE, "llm");
             ctx.recordRule(`${this.id}:type=llm`);
 
-            // Keep raw wrapper for langwatch.input display (preserves full structure)
+            // Keep structured wrapper for langwatch.input display
             ctx.setAttr(ATTR_KEYS.LANGWATCH_INPUT, rawInput);
             ctx.recordRule(`${this.id}:input`);
           }
         } else {
           // text, json, raw, list — unwrap value, don't coerce to gen_ai
-          ctx.setAttr(ATTR_KEYS.LANGWATCH_INPUT, parsedInput.value);
+          ctx.setAttr(ATTR_KEYS.LANGWATCH_INPUT, rawInput.value);
           ctx.recordRule(`${this.id}:input`);
         }
       } else {
         // Legacy behavior: flatten single-element arrays
         const normalizedInput =
-          Array.isArray(parsedInput) && parsedInput.length === 1
-            ? parsedInput[0]
-            : parsedInput;
+          Array.isArray(rawInput) && rawInput.length === 1
+            ? rawInput[0]
+            : rawInput;
         ctx.setAttr(ATTR_KEYS.LANGWATCH_INPUT, normalizedInput);
         ctx.recordRule(`${this.id}:input`);
       }
@@ -264,18 +285,16 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
 
     const rawOutput = attrs.take(ATTR_KEYS.LANGWATCH_OUTPUT);
     if (rawOutput !== undefined) {
-      const parsedOutput = safeJsonParse(rawOutput);
-
-      if (isLangWatchStructuredValue(parsedOutput)) {
+      if (isLangWatchStructuredValue(rawOutput)) {
         reservedTypes.push(
-          `${ATTR_KEYS.LANGWATCH_OUTPUT}=${parsedOutput.type}`,
+          `${ATTR_KEYS.LANGWATCH_OUTPUT}=${rawOutput.type}`,
         );
 
         if (
-          parsedOutput.type === "chat_messages" &&
-          Array.isArray(parsedOutput.value)
+          rawOutput.type === "chat_messages" &&
+          Array.isArray(rawOutput.value)
         ) {
-          const messages = normalizeToMessages(parsedOutput.value, "assistant");
+          const messages = normalizeToMessages(rawOutput.value, "assistant");
 
           if (messages && messages.length > 0) {
             ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, messages);
@@ -288,10 +307,10 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
             ctx.recordRule(`${this.id}:output`);
           }
         } else if (
-          parsedOutput.type === "json" &&
-          Array.isArray(parsedOutput.value)
+          rawOutput.type === "json" &&
+          Array.isArray(rawOutput.value)
         ) {
-          const content = parsedOutput.value
+          const content = (rawOutput.value as unknown[])
             .map((item) =>
               typeof item === "string" ? item : JSON.stringify(item),
             )
@@ -304,19 +323,19 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
           }
 
           // Store unwrapped value in langwatch.output
-          ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, parsedOutput.value);
+          ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, rawOutput.value);
           ctx.recordRule(`${this.id}:output`);
         } else {
           // text, raw, list — unwrap value, don't coerce to gen_ai
-          ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, parsedOutput.value);
+          ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, rawOutput.value);
           ctx.recordRule(`${this.id}:output`);
         }
       } else {
         // Legacy behavior: flatten single-element arrays
         const normalizedOutput =
-          Array.isArray(parsedOutput) && parsedOutput.length === 1
-            ? parsedOutput[0]
-            : parsedOutput;
+          Array.isArray(rawOutput) && rawOutput.length === 1
+            ? rawOutput[0]
+            : rawOutput;
         ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, normalizedOutput);
         ctx.recordRule(`${this.id}:output`);
       }
@@ -334,9 +353,8 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
     // ─────────────────────────────────────────────────────────────────────────
     const rawMetrics = attrs.take(ATTR_KEYS.LANGWATCH_METRICS);
     if (rawMetrics !== undefined) {
-      const parsed = safeJsonParse(rawMetrics);
-      if (isLangWatchStructuredValue(parsed) && isRecord(parsed.value)) {
-        const metricsValue = parsed.value as Record<string, unknown>;
+      if (isLangWatchStructuredValue(rawMetrics) && isRecord(rawMetrics.value)) {
+        const metricsValue = rawMetrics.value as Record<string, unknown>;
 
         // Extract token counts (setAttrIfAbsent — GenAI extractor may have set these)
         const promptTokens = metricsValue.promptTokens;

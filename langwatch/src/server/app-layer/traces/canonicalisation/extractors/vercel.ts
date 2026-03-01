@@ -29,11 +29,11 @@ import { ATTR_KEYS } from "./_constants";
 import {
   extractModelToBoth,
   extractUsageTokens,
-  inferSpanTypeIfAbsent,
-  isRecord,
   normaliseModelFromAiModelObject,
-  safeJsonParse,
-} from "./_helpers";
+  recordValueType,
+} from "./_extraction";
+import { isRecord } from "./_guards";
+import { extractSystemInstructionFromMessages } from "./_messages";
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 
 const AI_SDK_SPAN_TYPE_MAP: Record<string, string> = {
@@ -90,7 +90,7 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
       !extractModelToBoth(
         ctx,
         ATTR_KEYS.AI_MODEL,
-        (raw) => normaliseModelFromAiModelObject(safeJsonParse(raw)),
+        (raw) => normaliseModelFromAiModelObject(raw),
         `${this.id}:ai.model->gen_ai.*.model`,
       )
     ) {
@@ -114,10 +114,9 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
     // Note: Custom handling required due to Vercel's flexible format
     // ─────────────────────────────────────────────────────────────────────────
     if (!attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES)) {
-      const promptRaw =
+      const prompt =
         attrs.take(ATTR_KEYS.AI_PROMPT_MESSAGES) ??
         attrs.take(ATTR_KEYS.AI_PROMPT);
-      const prompt = safeJsonParse(promptRaw);
 
       if (typeof prompt === "string") {
         // Simple string prompt → wrap as user message
@@ -137,12 +136,29 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
         ctx.recordRule(
           `${this.id}:ai.prompt.messages[]->gen_ai.input.messages`,
         );
-      } else if (promptRaw !== undefined) {
+      } else if (prompt !== undefined) {
         // Unknown format → best effort wrap as user message
         ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, [
           { role: "user", content: prompt },
         ]);
         ctx.recordRule(`${this.id}:ai.prompt(unknown)->gen_ai.input.messages`);
+      }
+
+      // Annotate input messages as chat_messages if we set them
+      if (ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] !== undefined) {
+        recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
+
+        // Extract system instruction from input messages
+        const inputMsgs = ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES];
+        if (Array.isArray(inputMsgs)) {
+          const sysInstruction = extractSystemInstructionFromMessages(inputMsgs);
+          if (sysInstruction !== null) {
+            ctx.setAttrIfAbsent(
+              ATTR_KEYS.GEN_AI_REQUEST_SYSTEM_INSTRUCTION,
+              sysInstruction,
+            );
+          }
+        }
       }
     } else {
       // Output already exists, just consume to reduce leftovers
@@ -158,10 +174,9 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
     // Note: Custom handling required for toolCalls extraction
     // ─────────────────────────────────────────────────────────────────────────
     if (!attrs.has(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES)) {
-      const response = safeJsonParse(
+      const response =
         attrs.take(ATTR_KEYS.AI_RESPONSE) ??
-          attrs.take(ATTR_KEYS.AI_RESPONSE_TEXT),
-      );
+          attrs.take(ATTR_KEYS.AI_RESPONSE_TEXT);
 
       if (isRecord(response)) {
         const responseObj = response as Record<string, unknown>;
@@ -192,6 +207,11 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
         ctx.recordRule(
           `${this.id}:ai.response(string)->gen_ai.output.messages`,
         );
+      }
+
+      // Annotate output messages as chat_messages if we set them
+      if (ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES] !== undefined) {
+        recordValueType(ctx, ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, "chat_messages");
       }
     } else {
       // Output already exists, just consume to reduce leftovers

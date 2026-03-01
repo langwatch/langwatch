@@ -13,6 +13,33 @@ const logger = createLogger(
   "langwatch:app-layer:traces:span-storage-repository",
 );
 
+/**
+ * Serializes attribute values for ClickHouse Map(String, String) columns.
+ * Non-scalar values are JSON-stringified at the write boundary.
+ */
+function serializeAttributes(
+  attrs: Record<string, unknown>,
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(attrs)) {
+    if (
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "boolean" ||
+      typeof value === "bigint"
+    ) {
+      result[key] = value;
+    } else if (value !== null && value !== undefined) {
+      try {
+        result[key] = JSON.stringify(value);
+      } catch {
+        // skip unserializable values
+      }
+    }
+  }
+  return result;
+}
+
 type ClickHouseSpanWriteRecord = WithDateWrites<
   ClickHouseSpanRecord,
   "StartTime" | "EndTime" | "Events.Timestamp" | "CreatedAt" | "UpdatedAt"
@@ -233,18 +260,18 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       SpanName: span.name,
       SpanKind: span.kind,
       ServiceName: serviceName,
-      ResourceAttributes: span.resourceAttributes,
-      SpanAttributes: span.spanAttributes,
+      ResourceAttributes: serializeAttributes(span.resourceAttributes),
+      SpanAttributes: serializeAttributes(span.spanAttributes),
       StatusCode: span.statusCode,
       StatusMessage: span.statusMessage,
       ScopeName: span.instrumentationScope.name,
       ScopeVersion: span.instrumentationScope.version ?? null,
       "Events.Timestamp": span.events.map((e) => new Date(e.timeUnixMs)),
       "Events.Name": span.events.map((e) => e.name),
-      "Events.Attributes": span.events.map((e) => e.attributes),
+      "Events.Attributes": span.events.map((e) => serializeAttributes(e.attributes)),
       "Links.TraceId": span.links.map((l) => l.traceId),
       "Links.SpanId": span.links.map((l) => l.spanId),
-      "Links.Attributes": span.links.map((l) => l.attributes),
+      "Links.Attributes": span.links.map((l) => serializeAttributes(l.attributes)),
       DroppedAttributesCount: 0,
       DroppedEventsCount: 0,
       DroppedLinksCount: 0,

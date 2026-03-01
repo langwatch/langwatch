@@ -1,88 +1,46 @@
-import type {
-  NormalizedAttributes,
-  NormalizedAttrValue,
-} from "../../../event-sourcing/pipelines/trace-processing/schemas/spans";
-import { createLogger } from "~/utils/logger/server";
-
-const logger = createLogger("langwatch:attribute-bag");
+import type { NormalizedAttributes } from "../../../event-sourcing/pipelines/trace-processing/schemas/spans";
 
 export class AttributeBag {
-  private readonly map: Map<string, NormalizedAttrValue>;
-  private readonly parsedCache = new Map<string, unknown>();
+  private readonly map: Map<string, unknown>;
 
   constructor(input: NormalizedAttributes) {
-    this.map = new Map(
-      Object.entries(input) as Array<[string, NormalizedAttrValue]>,
-    );
+    this.map = new Map(Object.entries(input));
   }
 
   has(key: string): boolean {
     return this.map.has(key);
   }
 
-  get(key: string): NormalizedAttrValue | undefined {
+  get(key: string): unknown {
     return this.map.get(key);
   }
 
   /**
-   * Gets a parsed JSON value for the given attribute key.
-   * Result is memoized for subsequent calls.
-   *
-   * @param key - Attribute key
-   * @param maxSafeSize - Maximum size in characters to attempt JSON parsing (default: 2MB)
-   * @returns Parsed JSON value, or the original value if not JSON or too large.
+   * @deprecated Values are now pre-parsed during normalization.
+   * Use `get()` instead — it returns the already-parsed value.
    */
-  getParsed(key: string, maxSafeSize = 2_000_000): unknown {
-    if (this.parsedCache.has(key)) {
-      return this.parsedCache.get(key);
-    }
-
-    const val = this.map.get(key);
-    if (typeof val !== "string") {
-      return val;
-    }
-
-    const trimmed = val.trim();
-    if (trimmed.length < 2) return val;
-
-    // Fast check if it looks like JSON
-    const looksJson =
-      (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
-      (trimmed.startsWith("[") && trimmed.endsWith("]"));
-
-    if (!looksJson) return val;
-
-    // Safety guard for large strings to avoid blocking the event loop
-    if (trimmed.length > maxSafeSize) {
-      logger.warn(
-        { key, size: trimmed.length },
-        "Attribute too large for synchronous JSON parsing, skipping",
-      );
-      return val;
-    }
-
-    try {
-      const parsed = JSON.parse(trimmed);
-      this.parsedCache.set(key, parsed);
-      return parsed;
-    } catch {
-      this.parsedCache.set(key, val);
-      return val;
-    }
+  getParsed(key: string, _maxSafeSize?: number): unknown {
+    return this.map.get(key);
   }
 
-  take(key: string): NormalizedAttrValue | undefined {
+  take(key: string): unknown {
     const v = this.map.get(key);
     if (v !== undefined) {
       this.map.delete(key);
-      this.parsedCache.delete(key);
     }
     return v;
   }
 
+  /**
+   * @deprecated Use `take()` instead — values are already parsed.
+   */
+  takeParsed(key: string): unknown {
+    return this.take(key);
+  }
+
   takeAny(
     keys: readonly string[],
-  ): { key: string; value: NormalizedAttrValue } | null {
+  ): { key: string; value: unknown } | null {
     for (const k of keys) {
       const v = this.take(k);
       if (v !== undefined) return { key: k, value: v };
@@ -92,7 +50,6 @@ export class AttributeBag {
 
   delete(key: string): void {
     this.map.delete(key);
-    this.parsedCache.delete(key);
   }
 
   remaining(): NormalizedAttributes {

@@ -17,7 +17,45 @@ import type {
   ExtractorContext,
 } from "./extractors/_types";
 import { SpanDataBag } from "./spanDataBag";
-import { toAttrValue } from "./utils";
+
+/**
+ * Parses JSON-looking string values in attrs so that extractors always receive
+ * pre-parsed values. In production, `normalizeOtlpAttributes()` already calls
+ * `parseJsonStringValues()` before canonicalization, so this is a fast no-op
+ * for already-parsed values.
+ */
+function parseJsonStringAttrs(
+  attrs: NormalizedAttributes,
+): NormalizedAttributes {
+  const result: NormalizedAttributes = {};
+  for (const [key, value] of Object.entries(attrs)) {
+    if (typeof value !== "string") {
+      result[key] = value;
+      continue;
+    }
+    const trimmed = value.trim();
+    if (
+      trimmed.length < 2 ||
+      trimmed.length > 2_000_000
+    ) {
+      result[key] = value;
+      continue;
+    }
+    const looksJson =
+      (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+      (trimmed.startsWith("[") && trimmed.endsWith("]"));
+    if (!looksJson) {
+      result[key] = value;
+      continue;
+    }
+    try {
+      result[key] = JSON.parse(trimmed);
+    } catch {
+      result[key] = value;
+    }
+  }
+  return result;
+}
 
 export type CanonicalizeResult = {
   attributes: NormalizedAttributes;
@@ -56,16 +94,15 @@ export class CanonicalizeSpanAttributesService {
     events: NormalizedEvent[],
     spanForContext: ExtractorContext["span"],
   ): CanonicalizeResult {
-    const bag = new SpanDataBag(spanAttributes, events);
+    const bag = new SpanDataBag(parseJsonStringAttrs(spanAttributes), events);
     const out: NormalizedAttributes = {};
     const appliedRules: string[] = [];
 
     const recordRule = (ruleId: string) => appliedRules.push(ruleId);
 
     const setAttr = (key: string, value: unknown) => {
-      const av = toAttrValue(value);
-      if (av === null) return;
-      out[key] = av;
+      if (value === null || value === undefined) return;
+      out[key] = value;
     };
 
     const setAttrIfAbsent = (key: string, value: unknown) => {

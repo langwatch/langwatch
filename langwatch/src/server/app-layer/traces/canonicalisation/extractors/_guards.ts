@@ -40,3 +40,25 @@ export const coerceToStringArray = (v: unknown): string[] | null => {
   const out = xs.map(String).filter((s) => s.length > 0);
   return out.length ? out : null;
 };
+
+/**
+ * Best-effort JSON parse for edge cases where a value might still be
+ * a JSON string (e.g., event attributes that bypass normalization).
+ */
+export const safeJsonParse = (v: unknown): unknown => {
+  if (typeof v !== "string") return v;
+  const s = v.trim();
+  if (s.length < 2) return v;
+
+  const looksJson =
+    (s.startsWith("{") && s.endsWith("}")) ||
+    (s.startsWith("[") && s.endsWith("]"));
+
+  if (!looksJson) return v;
+
+  try {
+    return JSON.parse(s);
+  } catch {
+    return v;
+  }
+};
