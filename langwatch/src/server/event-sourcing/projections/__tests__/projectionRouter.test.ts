@@ -446,6 +446,107 @@ describe("ProjectionRouter", () => {
     });
   });
 
+  describe("map reactors", () => {
+    describe("when a map reactor is registered on a map projection", () => {
+      it("fires after map projection succeeds inline", async () => {
+        const queueManager = createMockQueueManager();
+        const router = new ProjectionRouter(
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          queueManager,
+        );
+
+        const mapStore = createMockAppendStore<Record<string, unknown>>();
+        const mapProj = createMockMapProjectionDefinition("my-map", {
+          store: mapStore,
+          eventTypes: [],
+        });
+
+        router.registerMapProjection(mapProj);
+
+        const reactorHandle = vi.fn().mockResolvedValue(undefined);
+        const reactor: ReactorDefinition<Event> = {
+          name: "map-reactor",
+          handle: reactorHandle,
+        };
+        router.registerMapReactor("my-map", reactor);
+
+        const event = createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        );
+
+        await router.dispatch([event], { tenantId });
+
+        expect(mapStore.append).toHaveBeenCalled();
+        expect(reactorHandle).toHaveBeenCalled();
+      });
+    });
+
+    describe("when a map projection fails", () => {
+      it("does not dispatch to map reactors", async () => {
+        const queueManager = createMockQueueManager();
+        const router = new ProjectionRouter(
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          queueManager,
+        );
+
+        const failingStore = createMockAppendStore<Record<string, unknown>>();
+        (failingStore.append as ReturnType<typeof vi.fn>).mockRejectedValue(
+          new Error("append failure"),
+        );
+
+        const mapProj = createMockMapProjectionDefinition("failing-map", {
+          store: failingStore,
+          eventTypes: [],
+        });
+
+        router.registerMapProjection(mapProj);
+
+        const reactorHandle = vi.fn().mockResolvedValue(undefined);
+        const reactor: ReactorDefinition<Event> = {
+          name: "should-not-fire",
+          handle: reactorHandle,
+        };
+        router.registerMapReactor("failing-map", reactor);
+
+        const event = createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        );
+
+        await expect(
+          router.dispatch([event], { tenantId }),
+        ).rejects.toThrow(AggregateError);
+
+        expect(reactorHandle).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when registering a map reactor on a non-existent map", () => {
+      it("throws ConfigurationError", () => {
+        const queueManager = createMockQueueManager();
+        const router = new ProjectionRouter(
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          queueManager,
+        );
+
+        const reactor: ReactorDefinition<Event> = {
+          name: "orphan-reactor",
+          handle: vi.fn(),
+        };
+
+        expect(() => router.registerMapReactor("non-existent", reactor)).toThrow(
+          /map "non-existent" — map not found/,
+        );
+      });
+    });
+  });
+
   describe("getProjectionByName", () => {
     describe("when a custom key is provided", () => {
       it("calls store.get with the custom key", async () => {

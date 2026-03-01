@@ -37,6 +37,10 @@ export class ProjectionRegistry<EventType extends Event = Event> {
 		string,
 		{ foldName: string; definition: ReactorDefinition<EventType> }
 	>();
+	private readonly mapReactorEntries = new Map<
+		string,
+		{ mapName: string; definition: ReactorDefinition<EventType> }
+	>();
 	private router?: ProjectionRouter<EventType>;
 	private queueManager?: QueueManager<EventType>;
 
@@ -87,6 +91,27 @@ export class ProjectionRegistry<EventType extends Event = Event> {
 		this.reactors.set(reactor.name, { foldName, definition: reactor });
 	}
 
+	registerMapReactor(
+		mapName: string,
+		reactor: ReactorDefinition<EventType>,
+	): void {
+		if (!this.mapProjections.has(mapName)) {
+			throw new ConfigurationError(
+				"ProjectionRegistry",
+				`Cannot register reactor "${reactor.name}" on map "${mapName}" — map not registered`,
+				{ mapName, reactorName: reactor.name },
+			);
+		}
+		if (this.mapReactorEntries.has(reactor.name)) {
+			throw new ConfigurationError(
+				"ProjectionRegistry",
+				`Map reactor "${reactor.name}" already registered`,
+				{ reactorName: reactor.name },
+			);
+		}
+		this.mapReactorEntries.set(reactor.name, { mapName, definition: reactor });
+	}
+
 	/**
 	 * Initialize queue infrastructure. Call after registering projections.
 	 */
@@ -131,6 +156,10 @@ export class ProjectionRegistry<EventType extends Event = Event> {
 			this.router.registerReactor(foldName, definition);
 		}
 
+		for (const { mapName, definition } of this.mapReactorEntries.values()) {
+			this.router.registerMapReactor(mapName, definition);
+		}
+
 		if (this.foldProjections.size > 0) {
 			this.router.initializeFoldQueues();
 		}
@@ -139,7 +168,7 @@ export class ProjectionRegistry<EventType extends Event = Event> {
 			this.router.initializeMapQueues();
 		}
 
-		if (this.reactors.size > 0) {
+		if (this.reactors.size > 0 || this.mapReactorEntries.size > 0) {
 			this.router.initializeReactorQueues();
 		}
 	}
@@ -152,7 +181,8 @@ export class ProjectionRegistry<EventType extends Event = Event> {
 		return (
 			this.foldProjections.size > 0 ||
 			this.mapProjections.size > 0 ||
-			this.reactors.size > 0
+			this.reactors.size > 0 ||
+			this.mapReactorEntries.size > 0
 		);
 	}
 

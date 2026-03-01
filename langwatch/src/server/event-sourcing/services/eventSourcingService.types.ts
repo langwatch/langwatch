@@ -83,6 +83,10 @@ export interface EventSourcingServiceOptions<
    */
   reactors?: Array<{ foldName: string; definition: ReactorDefinition<EventType> }>;
   /**
+   * Reactors (post-map side-effect handlers) for this pipeline.
+   */
+  mapReactors?: Array<{ mapName: string; definition: ReactorDefinition<EventType> }>;
+  /**
    * Optional global projection registry for cross-pipeline projections.
    * When provided, events are dispatched to global projections after local dispatch.
    * Uses base Event type because the registry receives events from all pipelines.
