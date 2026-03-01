@@ -48,6 +48,17 @@ export class AttributeBag {
     return null;
   }
 
+  takeByPrefix(prefix: string): Array<{ key: string; value: unknown }> {
+    const results: Array<{ key: string; value: unknown }> = [];
+    for (const [key, value] of this.map) {
+      if (key.startsWith(prefix)) {
+        results.push({ key, value });
+        this.map.delete(key);
+      }
+    }
+    return results;
+  }
+
   delete(key: string): void {
     this.map.delete(key);
   }

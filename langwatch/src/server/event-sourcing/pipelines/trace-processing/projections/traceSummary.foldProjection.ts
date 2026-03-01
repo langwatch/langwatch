@@ -1,3 +1,6 @@
+import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
+import { SpanNormalizationPipelineService } from "~/server/app-layer/traces/span-normalization.service";
+import { traceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import {
   estimateCost,
@@ -8,21 +11,18 @@ import type {
   FoldProjectionStore,
 } from "~/server/event-sourcing/projections";
 import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
-import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import {
   TRACE_PROCESSING_EVENT_TYPES,
   TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
 } from "../schemas/constants";
 import type { TraceProcessingEvent } from "../schemas/events";
 import {
-  isSpanReceivedEvent,
   isSatisfactionScoreAssignedEvent,
+  isSpanReceivedEvent,
   isTopicAssignedEvent,
 } from "../schemas/events";
 import type { NormalizedSpan } from "../schemas/spans";
 import { NormalizedStatusCode as StatusCode } from "../schemas/spans";
-import { SpanNormalizationPipelineService } from "~/server/app-layer/traces/span-normalization.service";
-import { traceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 
 export type { TraceSummaryData };
 
@@ -141,7 +141,11 @@ function extractTokenMetricsFromSpan(span: NormalizedSpan): SpanTokenMetrics {
     const spanType = attrs[ATTR_KEYS.SPAN_TYPE];
     if (spanType === "guardrail") {
       const rawOutput = attrs[ATTR_KEYS.LANGWATCH_OUTPUT];
-      if (rawOutput && typeof rawOutput === "object" && !Array.isArray(rawOutput)) {
+      if (
+        rawOutput &&
+        typeof rawOutput === "object" &&
+        !Array.isArray(rawOutput)
+      ) {
         const parsed = rawOutput as Record<string, unknown>;
         const costObj = parsed.cost as
           | { amount?: number; currency?: string }
@@ -289,6 +293,17 @@ function extractAttributesFromSpan(
   if (typeof customerId === "string")
     attributes["langwatch.customer_id"] = customerId;
 
+  // Agent/Provider info from canonical span attributes
+  const agentName = spanAttrs[ATTR_KEYS.GEN_AI_AGENT_NAME];
+  const agentId = spanAttrs[ATTR_KEYS.GEN_AI_AGENT_ID];
+  const providerName = spanAttrs[ATTR_KEYS.GEN_AI_PROVIDER_NAME];
+
+  if (typeof agentName === "string")
+    attributes["gen_ai.agent.name"] = agentName;
+  if (typeof agentId === "string") attributes["gen_ai.agent.id"] = agentId;
+  if (typeof providerName === "string")
+    attributes["gen_ai.provider.name"] = providerName;
+
   // LangGraph metadata
   const langgraphThreadId = spanAttrs[ATTR_KEYS.LANGWATCH_LANGGRAPH_THREAD_ID];
   if (typeof langgraphThreadId === "string")
@@ -392,7 +407,11 @@ export function applySpanToSummary(
   let blockedByGuardrail = state.blockedByGuardrail;
   if (spanType === "guardrail") {
     const rawOutput = span.spanAttributes[ATTR_KEYS.LANGWATCH_OUTPUT];
-    if (rawOutput && typeof rawOutput === "object" && !Array.isArray(rawOutput)) {
+    if (
+      rawOutput &&
+      typeof rawOutput === "object" &&
+      !Array.isArray(rawOutput)
+    ) {
       const parsed = rawOutput as Record<string, unknown>;
       if (parsed.passed === false) {
         blockedByGuardrail = true;
@@ -462,7 +481,8 @@ export function applySpanToSummary(
     newOutputSource ?? currentOutputSource;
 
   // PII redaction status tracking — accumulate span IDs by severity
-  const piiStatus = span.spanAttributes[ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_STATUS];
+  const piiStatus =
+    span.spanAttributes[ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_STATUS];
   if (piiStatus === "partial") {
     const key = ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_PARTIAL_SPAN_IDS;
     const existing = mergedAttributes[key];

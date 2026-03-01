@@ -44,6 +44,7 @@ function createLogfireContext(
     instrumentationScope: { name: "logfire", version: null },
     statusMessage: null,
     statusCode: null,
+    parentSpanId: "abc123",
   };
 
   return { bag, out, span, recordRule, setAttr, setAttrIfAbsent };

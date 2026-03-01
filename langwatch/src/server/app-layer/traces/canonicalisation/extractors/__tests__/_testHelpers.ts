@@ -76,6 +76,7 @@ export function createExtractorContext(
     instrumentationScope: { name: "test", version: null },
     statusMessage: null,
     statusCode: null,
+    parentSpanId: "abc123",
     ...spanOverrides,
   };
 
