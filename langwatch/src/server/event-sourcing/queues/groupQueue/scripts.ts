@@ -128,10 +128,11 @@ for _, groupId in ipairs(groups) do
 
     if not activeJob then
       local jobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
-      local results = redis.call("ZRANGEBYSCORE", jobsKey, "-inf", nowMs, "LIMIT", 0, 1)
+      local results = redis.call("ZRANGEBYSCORE", jobsKey, "-inf", nowMs, "WITHSCORES", "LIMIT", 0, 1)
 
-      if #results > 0 then
+      if #results >= 2 then
         local stagedJobId = results[1]
+        local originalScore = results[2]
         redis.call("ZREM", jobsKey, stagedJobId)
         redis.call("SET", activeKey, stagedJobId, "EX", activeTtlSec)
 
@@ -147,7 +148,7 @@ for _, groupId in ipairs(groups) do
         local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
         redis.call("HDEL", dataKey, stagedJobId)
 
-        return {stagedJobId, groupId, jobDataJson or ""}
+        return {stagedJobId, groupId, jobDataJson or "", originalScore}
       end
     end
   end
@@ -207,13 +208,12 @@ local activeKey  = KEYS[2]
 local groupId      = ARGV[1]
 local stagedJobId  = ARGV[2]
 
-local currentActive = redis.call("GET", activeKey)
--- Only skip if a DIFFERENT job is active (stale worker).
--- Block if activeKey matches OR has expired (false in Redis Lua).
-if currentActive and currentActive ~= stagedJobId then
-  return 0
-end
-
+-- Always block the group when retries are exhausted.
+-- Previously we skipped blocking if a different job was active (stale worker check),
+-- but this allowed cascading failures: active key TTL expires mid-retry → dispatcher
+-- dispatches another job → old job's final failure can't block → repeat until staging
+-- is drained. Always blocking is safe because COMPLETE_LUA on a healthy active job
+-- will remove the block.
 redis.call("SADD", blockedKey, groupId)
 
 return 1
@@ -227,6 +227,7 @@ export interface DispatchResult {
   stagedJobId: string;
   groupId: string;
   jobDataJson: string;
+  originalScore: number;
 }
 
 /**
@@ -353,7 +354,7 @@ export class GroupStagingScripts {
       String(activeTtlSec),
     );
 
-    if (!result || !Array.isArray(result) || result.length < 3) {
+    if (!result || !Array.isArray(result) || result.length < 4) {
       return null;
     }
 
@@ -361,6 +362,7 @@ export class GroupStagingScripts {
       stagedJobId: String(result[0]),
       groupId: String(result[1]),
       jobDataJson: String(result[2]),
+      originalScore: Number(result[3]),
     };
   }
 

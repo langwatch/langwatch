@@ -229,8 +229,8 @@ export class GroupQueueProcessorBullMq<Payload extends Record<string, unknown>>
         if (!metadata) return;
 
         if (job.attemptsMade >= JOB_RETRY_CONFIG.maxAttempts) {
-          // Exhausted retries: block the group
-          this.handleExhaustedRetries(metadata).catch((err) => {
+          // Exhausted retries: re-stage the job and block the group
+          this.handleExhaustedRetries(job, metadata).catch((err) => {
             this.logger.error(
               {
                 queueName: this.queueName,
@@ -534,7 +534,7 @@ export class GroupQueueProcessorBullMq<Payload extends Record<string, unknown>>
       return false;
     }
 
-    const { stagedJobId, groupId, jobDataJson } = result;
+    const { stagedJobId, groupId, jobDataJson, originalScore } = result;
 
     // Parse the stored job data
     let jobData: Record<string, unknown>;
@@ -555,6 +555,7 @@ export class GroupQueueProcessorBullMq<Payload extends Record<string, unknown>>
       ...jobData,
       __groupId: groupId,
       __stagedJobId: stagedJobId,
+      __dispatchScore: originalScore,
     };
 
     // Generate a BullMQ-safe job ID
@@ -607,6 +608,7 @@ export class GroupQueueProcessorBullMq<Payload extends Record<string, unknown>>
     const { payload, contextMetadata } = extractJobPayload<Payload>(job, [
       "__groupId",
       "__stagedJobId",
+      "__dispatchScore",
     ]);
 
     return processJobWithContext({
@@ -683,13 +685,50 @@ export class GroupQueueProcessorBullMq<Payload extends Record<string, unknown>>
   }
 
   /**
-   * Handle exhausted retries: block the group.
+   * Handle exhausted retries: re-stage the failed job's data back into the
+   * staging layer (so it isn't lost), then block the group.
    */
   private async handleExhaustedRetries(
+    job: Job<Payload>,
     metadata: GroupJobMetadata,
   ): Promise<void> {
+    // 1. Extract payload and original score
+    const { payload } = extractJobPayload<Payload>(job, [
+      "__groupId",
+      "__stagedJobId",
+      "__dispatchScore",
+    ]);
+    const rawScore = (job.data as Record<string, unknown>).__dispatchScore;
+    const score =
+      typeof rawScore === "number"
+        ? rawScore
+        : (this.score?.(payload) ?? 0);
+
+    // 2. Re-stage with a new ID to avoid BullMQ job ID collision
+    const newStagedJobId = `${metadata.__stagedJobId}/r/${Date.now()}`;
+    const jobDataJson = JSON.stringify({
+      ...(payload as Record<string, unknown>),
+      __context: (job.data as Record<string, unknown>).__context,
+    });
+
+    const prefix = this.scripts.getKeyPrefix();
+    const groupId = metadata.__groupId;
+    await this.redisConnection
+      .pipeline()
+      .zadd(`${prefix}group:${groupId}:jobs`, score, newStagedJobId)
+      .hset(`${prefix}group:${groupId}:data`, newStagedJobId, jobDataJson)
+      .exec();
+
+    // 3. Update ready set score so the group remains visible
+    const pendingCount = await this.redisConnection.zcard(
+      `${prefix}group:${groupId}:jobs`,
+    );
+    const readyScore = Math.sqrt(pendingCount);
+    await this.redisConnection.zadd(`${prefix}ready`, readyScore, groupId);
+
+    // 4. Block the group (if this job is still the active one)
     const blocked = await this.scripts.fail({
-      groupId: metadata.__groupId,
+      groupId,
       stagedJobId: metadata.__stagedJobId,
     });
 
@@ -698,11 +737,19 @@ export class GroupQueueProcessorBullMq<Payload extends Record<string, unknown>>
       this.logger.error(
         {
           queueName: this.queueName,
-          groupId: metadata.__groupId,
+          groupId,
           stagedJobId: metadata.__stagedJobId,
+          restagedAs: newStagedJobId,
         },
-        "Group blocked after exhausted retries",
+        "Group blocked after exhausted retries, job re-staged",
       );
+    }
+
+    // 5. Clean up BullMQ failed job (best-effort)
+    try {
+      await job.remove();
+    } catch {
+      // Job may already be removed by removeOnFail TTL
     }
   }
 
