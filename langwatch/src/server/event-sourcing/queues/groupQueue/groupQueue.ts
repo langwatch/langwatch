@@ -1,3 +1,4 @@
+import { context as otelContext, trace, TraceFlags } from "@opentelemetry/api";
 import {
   type Job,
   type JobsOptions,
@@ -13,8 +14,8 @@ import type { Cluster } from "ioredis";
 import type { SemConvAttributes } from "langwatch/observability";
 import { createLogger } from "../../../../utils/logger/server";
 import {
-  type JobContextMetadata,
   getJobContextMetadata,
+  type JobContextMetadata,
 } from "../../../context/asyncContext";
 import { connection } from "../../../redis";
 import type {
@@ -23,16 +24,11 @@ import type {
   EventSourcedQueueProcessor,
   QueueSendOptions,
 } from "../../queues";
+import { ConfigurationError, QueueError } from "../../services/errorHandling";
 import {
-  ConfigurationError,
-  QueueError,
-} from "../../services/errorHandling";
-
-import { TraceFlags, context as otelContext, trace } from "@opentelemetry/api";
-import {
-  JOB_RETRY_CONFIG,
   collectBullMQMetrics,
   extractJobPayload,
+  JOB_RETRY_CONFIG,
   processJobWithContext,
 } from "../shared";
 import {
@@ -60,7 +56,8 @@ const GROUP_QUEUE_CONFIG = {
   metricsIntervalMs: 15000,
   /** Maximum time to wait for graceful shutdown in milliseconds */
   shutdownTimeoutMs:
-    process.env.NODE_ENV === "development" || process.env.ENVIRONMENT === "local"
+    process.env.NODE_ENV === "development" ||
+    process.env.ENVIRONMENT === "local"
       ? 2000
       : 20000,
 } as const;
@@ -85,9 +82,9 @@ interface GroupJobMetadata {
  * - Per-group sequential processing eliminates ordering errors and distributed lock contention
  * - Weighted round-robin (sqrt(pendingCount)) provides fair scheduling across groups
  */
-export class GroupQueueProcessorBullMq<
-  Payload extends Record<string, unknown>,
-> implements EventSourcedQueueProcessor<Payload> {
+export class GroupQueueProcessorBullMq<Payload extends Record<string, unknown>>
+  implements EventSourcedQueueProcessor<Payload>
+{
   private readonly logger = createLogger(
     "langwatch:event-sourcing:group-queue",
   );
@@ -148,10 +145,10 @@ export class GroupQueueProcessorBullMq<
     // Dedicated connection for BRPOP to avoid blocking the shared connection.
     // Only needed when the dispatcher loop runs (consumer mode).
     this.blockingConnection = this.consumerEnabled
-      ? ("duplicate" in effectiveConnection &&
-         typeof effectiveConnection.duplicate === "function"
-          ? effectiveConnection.duplicate()
-          : effectiveConnection)
+      ? "duplicate" in effectiveConnection &&
+        typeof effectiveConnection.duplicate === "function"
+        ? effectiveConnection.duplicate()
+        : effectiveConnection
       : effectiveConnection;
     this.spanAttributes = spanAttributes;
     this.delay = delay;
@@ -162,7 +159,8 @@ export class GroupQueueProcessorBullMq<
     this.jobName = "queue";
     this.process = process;
     this.globalConcurrency =
-      defOptions?.globalConcurrency ?? GROUP_QUEUE_CONFIG.defaultGlobalConcurrency;
+      defOptions?.globalConcurrency ??
+      GROUP_QUEUE_CONFIG.defaultGlobalConcurrency;
 
     // Initialize Lua scripts wrapper
     this.scripts = new GroupStagingScripts(
@@ -311,7 +309,10 @@ export class GroupQueueProcessorBullMq<
   /**
    * Stages a job into the group queue's Redis staging layer.
    */
-  async send(payload: Payload, options?: QueueSendOptions<Payload>): Promise<void> {
+  async send(
+    payload: Payload,
+    options?: QueueSendOptions<Payload>,
+  ): Promise<void> {
     if (this.shutdownRequested) {
       throw new QueueError(
         this.queueName,
@@ -378,7 +379,10 @@ export class GroupQueueProcessorBullMq<
     );
   }
 
-  async sendBatch(payloads: Payload[], options?: QueueSendOptions<Payload>): Promise<void> {
+  async sendBatch(
+    payloads: Payload[],
+    options?: QueueSendOptions<Payload>,
+  ): Promise<void> {
     if (this.shutdownRequested) {
       throw new QueueError(
         this.queueName,
@@ -467,7 +471,8 @@ export class GroupQueueProcessorBullMq<
         } catch (error) {
           if (this.shutdownRequested) break;
 
-          const errorMessage = error instanceof Error ? error.message : String(error);
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
 
           // Treat closed connections as an implicit shutdown signal
           if (errorMessage.includes("Connection is closed")) {
@@ -649,9 +654,7 @@ export class GroupQueueProcessorBullMq<
    * Refresh the activeKey TTL during intermediate retries to prevent
    * the safety-net TTL from expiring before all retries complete.
    */
-  private async refreshActiveKeyTtl(
-    metadata: GroupJobMetadata,
-  ): Promise<void> {
+  private async refreshActiveKeyTtl(metadata: GroupJobMetadata): Promise<void> {
     const refreshed = await this.scripts.refreshActiveKey({
       groupId: metadata.__groupId,
       stagedJobId: metadata.__stagedJobId,
@@ -666,6 +669,15 @@ export class GroupQueueProcessorBullMq<
           stagedJobId: metadata.__stagedJobId,
         },
         "Refreshed active key TTL for retry",
+      );
+    } else {
+      this.logger.warn(
+        {
+          queueName: this.queueName,
+          groupId: metadata.__groupId,
+          stagedJobId: metadata.__stagedJobId,
+        },
+        "Stale TTL refresh (active key doesn't match)",
       );
     }
   }
