@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.6.0](https://github.com/langwatch/langwatch/compare/mcp-server@v0.5.0...mcp-server@v0.6.0) (2026-03-01)
+
+
+### Features
+
+* add platform MCP tools for evaluators and model providers ([#1762](https://github.com/langwatch/langwatch/issues/1762)) ([6339001](https://github.com/langwatch/langwatch/commit/6339001ffae3c83f7c3ea0cdadf480f4ec47f3cc))
+* prefix platform MCP tools with `platform_` and add disambiguation notes ([#1760](https://github.com/langwatch/langwatch/issues/1760)) ([91851ee](https://github.com/langwatch/langwatch/commit/91851ee28aff1b3b75d92ce46aec6ae5072ff625))
+
+
+### Bug Fixes
+
+* normalize defaultModel with provider prefix for litellm routing ([cc7798e](https://github.com/langwatch/langwatch/commit/cc7798ecb229654f371912e7863ca20364ceb7fa))
+
 ## [0.5.0](https://github.com/langwatch/langwatch/compare/mcp-server@v0.4.0...mcp-server@v0.5.0) (2026-02-20)
 
 
