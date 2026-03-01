@@ -178,7 +178,7 @@ export class UsageService {
     const pricingModel =
       await this.organizationRepository.getPricingModel(organizationId);
     const plan = await this.planResolver(organizationId);
-    const hasValidLicenseOverride = !plan.free;
+    const hasValidLicenseOverride = plan.planSource === "license";
 
     const decision = resolveUsageMeter({
       pricingModel,

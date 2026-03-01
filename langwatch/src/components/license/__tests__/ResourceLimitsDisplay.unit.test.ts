@@ -144,6 +144,7 @@ describe("mapUsageToLimits", () => {
   };
 
   const basePlan: PlanInfo = {
+    planSource: "subscription",
     type: "test-plan",
     name: "Test Plan",
     free: false,
@@ -212,6 +213,7 @@ describe("mapUsageToLimits", () => {
 
   it("handles free plan with limited resources", () => {
     const freePlan: PlanInfo = {
+      planSource: "free",
       type: "free",
       name: "Free",
       free: true,
@@ -246,6 +248,7 @@ describe("mapUsageToLimits", () => {
 
   it("handles unlimited plan values", () => {
     const unlimitedPlan: PlanInfo = {
+      planSource: "subscription",
       type: "test-plan",
       name: "Test Plan",
       free: false,

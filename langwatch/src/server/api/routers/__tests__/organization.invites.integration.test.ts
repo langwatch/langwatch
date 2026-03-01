@@ -57,6 +57,7 @@ vi.mock("../../../../env.mjs", async (importOriginal) => {
 /** Default plan info for tests (all fields required by PlanInfo). */
 function makeTestPlan(overrides: Record<string, unknown> = {}) {
   return {
+    planSource: "subscription" as const,
     type: "PRO",
     name: "Pro",
     free: false,

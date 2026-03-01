@@ -151,6 +151,7 @@ function MembersList({
     pricingModel: (organization as { pricingModel?: string }).pricingModel,
     activePlanFree: activePlan.free,
     activePlanType: activePlan.type,
+    activePlanSource: activePlan.planSource,
   });
 
   const deleteMember = (userId: string) => {

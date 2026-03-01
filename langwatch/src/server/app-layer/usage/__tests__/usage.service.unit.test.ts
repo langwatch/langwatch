@@ -267,8 +267,9 @@ describe("UsageService", () => {
         // First call with default (traces) unit
         await service.getCurrentMonthCount({ organizationId: "org-123" });
 
-        // Change plan to non-free (license override) with events unit
+        // Change plan to license override with events unit
         (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
+          planSource: "license",
           type: "ENTERPRISE",
           free: false,
           maxMessagesPerMonth: 100_000,
@@ -325,6 +326,7 @@ describe("UsageService", () => {
       beforeEach(() => {
         // License override plan with events unit
         (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
+          planSource: "license",
           type: "ENTERPRISE",
           free: false,
           maxMessagesPerMonth: 100_000,
@@ -381,6 +383,7 @@ describe("UsageService", () => {
       beforeEach(() => {
         // License override plan with events unit
         (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
+          planSource: "license",
           type: "ENTERPRISE",
           free: false,
           maxMessagesPerMonth: 100_000,

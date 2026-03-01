@@ -9,6 +9,7 @@ vi.mock("~/env.mjs", () => ({
 }));
 
 const ENTERPRISE_LICENSE_PLAN: PlanInfo = {
+  planSource: "license",
   type: "ENTERPRISE",
   name: "Enterprise",
   free: false,
@@ -36,6 +37,7 @@ const ENTERPRISE_LICENSE_PLAN: PlanInfo = {
 };
 
 const SAAS_PRO_PLAN: PlanInfo = {
+  planSource: "subscription",
   type: "PRO",
   name: "Pro",
   free: false,

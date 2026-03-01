@@ -25,11 +25,16 @@ export function createCompositePlanProvider({
       const licensePlan =
         await licensePlanProvider.getActivePlan({ organizationId });
 
-      const selectedPlan: PlanInfo = licensePlan.free
-        ? // 2. License is free/absent — fall through to SaaS
-          await saasPlanProvider.getActivePlan({ organizationId, user })
-        : // License is valid — use it as the complete plan
-          licensePlan;
+      // 2. Select plan source — composite is the single canonical authority for planSource
+      let selectedPlan: PlanInfo;
+      if (licensePlan.free) {
+        // License is free/absent — fall through to SaaS
+        const saasPlan = await saasPlanProvider.getActivePlan({ organizationId, user });
+        selectedPlan = { ...saasPlan, planSource: saasPlan.free ? "free" : "subscription" };
+      } else {
+        // License is valid — use it as the complete plan
+        selectedPlan = { ...licensePlan, planSource: "license" };
+      }
 
       // 3. Recompute overrideAddingLimitations from user context (not plan source)
       return {

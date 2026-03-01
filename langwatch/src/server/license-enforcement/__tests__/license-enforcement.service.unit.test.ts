@@ -22,6 +22,7 @@ describe("LicenseEnforcementService", () => {
   let mockPlanProvider: PlanProvider;
 
   const basePlan: PlanInfo = {
+    planSource: "subscription",
     type: "test",
     name: "Test Plan",
     free: false,

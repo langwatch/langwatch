@@ -80,8 +80,10 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
         }),
       )
     : PlanProviderService.create({
-        getActivePlan: ({ organizationId }) =>
-          getLicenseHandler().getActivePlan(organizationId),
+        getActivePlan: async ({ organizationId }) => {
+          const plan = await getLicenseHandler().getActivePlan(organizationId);
+          return { ...plan, planSource: plan.free ? "free" as const : "license" as const };
+        },
       });
 
   let subscription: SubscriptionService | undefined;
