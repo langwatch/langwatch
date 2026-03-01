@@ -1,5 +1,6 @@
 import type { Response } from "express";
-import { SSE_HEARTBEAT_INTERVAL_MS } from "../../shared/constants.ts";
+import { SSE_HEARTBEAT_INTERVAL_MS, SSE_PUSH_INTERVAL_MS } from "../../shared/constants.ts";
+import type { MetricsCollector } from "../services/metricsCollector.ts";
 
 interface SSEClient {
   id: string;
@@ -9,7 +10,9 @@ interface SSEClient {
 export class SSEManager {
   private clients: SSEClient[] = [];
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+  private dashboardInterval: ReturnType<typeof setInterval> | null = null;
   private clientCounter = 0;
+  private metrics: MetricsCollector | null = null;
 
   start(): void {
     this.heartbeatInterval = setInterval(() => {
@@ -17,10 +20,27 @@ export class SSEManager {
     }, SSE_HEARTBEAT_INTERVAL_MS);
   }
 
+  startDashboardBroadcast(metrics: MetricsCollector): void {
+    this.metrics = metrics;
+    this.dashboardInterval = setInterval(() => {
+      try {
+        if (this.clients.length === 0) return;
+        const data = metrics.getDashboardData();
+        this.broadcast("dashboard", data);
+      } catch (err) {
+        console.error("Dashboard broadcast error:", err);
+      }
+    }, SSE_PUSH_INTERVAL_MS);
+  }
+
   stop(): void {
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
       this.heartbeatInterval = null;
+    }
+    if (this.dashboardInterval) {
+      clearInterval(this.dashboardInterval);
+      this.dashboardInterval = null;
     }
     for (const client of this.clients) {
       client.res.end();

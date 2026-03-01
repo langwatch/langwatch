@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
-  Box, Table, Thead, Tbody, Tr, Th, Td, Text, Badge, HStack, VStack,
+  Box, Table, Thead, Tbody, Tr, Th, Td, Text, Badge, HStack, VStack, Code,
   Input, Button, Collapse, useDisclosure, Tooltip, useToast,
   Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalCloseButton,
   AlertDialog, AlertDialogOverlay, AlertDialogContent, AlertDialogHeader,
@@ -10,11 +10,11 @@ import { keyframes } from "@emotion/react";
 import { ChevronRightIcon, ChevronDownIcon, TriangleUpIcon, TriangleDownIcon } from "@chakra-ui/icons";
 import { useNavigate } from "react-router-dom";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import type { QueueInfo, GroupInfo } from "../../../shared/types.ts";
+import type { QueueInfo, GroupInfo, GroupDetailData } from "../../../shared/types.ts";
 import type { SortColumn, SortDir } from "../../hooks/useGroupsData.ts";
 import { QueueSummary } from "../dashboard/QueueSummary.tsx";
 import { useTickingTimeAgo } from "../../hooks/useTickingTimeAgo.ts";
-import { apiPost } from "../../hooks/useApi.ts";
+import { apiFetch, apiPost } from "../../hooks/useApi.ts";
 import { ANTI_FLICKER_DURATION_MS, DEFAULT_GROUPS_DISPLAY_LIMIT, SEARCH_DEBOUNCE_MS } from "../../../shared/constants.ts";
 import { CopyButton } from "../CopyButton.tsx";
 
@@ -65,10 +65,26 @@ interface GroupDetailModalProps {
 
 function GroupDetailModal({ isOpen, onClose, group, queueName }: GroupDetailModalProps) {
   const navigate = useNavigate();
+  const toast = useToast();
   const { isOpen: timingOpen, onToggle: toggleTiming } = useDisclosure({ defaultIsOpen: true });
+  const { isOpen: errorOpen, onToggle: toggleError } = useDisclosure({ defaultIsOpen: true });
   const { isOpen: isDrainOpen, onOpen: onDrainOpen, onClose: onDrainClose } = useDisclosure();
   const drainCancelRef = useRef<HTMLButtonElement>(null);
   const [draining, setDraining] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+  const [blockDetail, setBlockDetail] = useState<GroupDetailData | null>(null);
+
+  // Fetch block error details when a blocked group modal is opened
+  useEffect(() => {
+    if (!isOpen || !group?.isBlocked) {
+      setBlockDetail(null);
+      return;
+    }
+    const qs = `?queue=${encodeURIComponent(queueName)}`;
+    apiFetch<GroupDetailData>(`/api/groups/${encodeURIComponent(group.groupId)}${qs}`)
+      .then(setBlockDetail)
+      .catch(() => {});
+  }, [isOpen, group?.groupId, group?.isBlocked, queueName]);
 
   if (!group) return null;
 
@@ -85,14 +101,30 @@ function GroupDetailModal({ isOpen, onClose, group, queueName }: GroupDetailModa
     }
   };
 
+  const handleRetry = async () => {
+    if (!group.activeJobId) return;
+    setRetrying(true);
+    try {
+      await apiPost("/api/actions/retry-blocked", { queueName, groupId: group.groupId, jobId: group.activeJobId });
+      toast({ title: "Job retried and group unblocked", status: "success", duration: 2000, isClosable: true });
+      setBlockDetail(null);
+    } catch (err) {
+      toast({ title: "Failed to retry", description: err instanceof Error ? err.message : "Unknown error", status: "error", duration: 4000, isClosable: true });
+    } finally {
+      setRetrying(false);
+    }
+  };
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="xl" isCentered>
       <ModalOverlay bg="rgba(0, 0, 0, 0.7)" />
       <ModalContent
         bg="#0a0e17"
         border="1px solid"
-        borderColor="rgba(0, 240, 255, 0.4)"
-        boxShadow="0 0 30px rgba(0, 240, 255, 0.15), inset 0 0 20px rgba(0, 240, 255, 0.03)"
+        borderColor={group.isBlocked ? "rgba(255, 0, 51, 0.4)" : "rgba(0, 240, 255, 0.4)"}
+        boxShadow={group.isBlocked
+          ? "0 0 30px rgba(255, 0, 51, 0.15), inset 0 0 20px rgba(255, 0, 51, 0.03)"
+          : "0 0 30px rgba(0, 240, 255, 0.15), inset 0 0 20px rgba(0, 240, 255, 0.03)"}
         borderRadius="2px"
         maxW="750px"
       >
@@ -145,6 +177,57 @@ function GroupDetailModal({ isOpen, onClose, group, queueName }: GroupDetailModa
               </HStack>
             )}
 
+            {/* Block error accordion — shown when group is blocked and error data is available */}
+            {group.isBlocked && blockDetail?.blockError && (
+              <Box
+                mt={1}
+                border="1px solid"
+                borderColor="rgba(255, 0, 51, 0.2)"
+                borderRadius="2px"
+                overflow="hidden"
+              >
+                <HStack
+                  px={3}
+                  py={2}
+                  cursor="pointer"
+                  onClick={toggleError}
+                  _hover={{ bg: "rgba(255, 0, 51, 0.04)" }}
+                  userSelect="none"
+                >
+                  <Box color="#ff0033" fontSize="xs">
+                    {errorOpen ? <ChevronDownIcon /> : <ChevronRightIcon />}
+                  </Box>
+                  <Text fontSize="xs" color="#ff0033" textTransform="uppercase" letterSpacing="0.1em">
+                    Block Error
+                  </Text>
+                </HStack>
+                <Collapse in={errorOpen}>
+                  <VStack align="stretch" spacing={2} px={3} pb={3}>
+                    <Text fontSize="xs" color="#ff6666" wordBreak="break-all">
+                      {blockDetail.blockError}
+                    </Text>
+                    {blockDetail.blockStacktrace && blockDetail.blockStacktrace.length > 0 && (
+                      <Code
+                        display="block"
+                        whiteSpace="pre-wrap"
+                        wordBreak="break-all"
+                        p={3}
+                        bg="#060a12"
+                        border="1px solid rgba(255, 0, 51, 0.1)"
+                        borderRadius="2px"
+                        fontSize="10px"
+                        color="#cc6666"
+                        maxH="200px"
+                        overflow="auto"
+                      >
+                        {blockDetail.blockStacktrace.join("\n")}
+                      </Code>
+                    )}
+                  </VStack>
+                </Collapse>
+              </Box>
+            )}
+
             {/* Timing accordion */}
             <Box
               mt={1}
@@ -189,6 +272,23 @@ function GroupDetailModal({ isOpen, onClose, group, queueName }: GroupDetailModa
             </Box>
 
             <HStack spacing={2} alignSelf="flex-end">
+              {group.isBlocked && group.activeJobId && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  color="#ffaa00"
+                  borderColor="rgba(255, 170, 0, 0.3)"
+                  borderRadius="2px"
+                  _hover={{ borderColor: "#ffaa00", boxShadow: "0 0 12px rgba(255, 170, 0, 0.3)" }}
+                  textTransform="uppercase"
+                  letterSpacing="0.1em"
+                  fontSize="xs"
+                  onClick={handleRetry}
+                  isLoading={retrying}
+                >
+                  Retry
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant="outline"

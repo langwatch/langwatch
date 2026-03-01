@@ -9,6 +9,7 @@ import { JobDetailPage } from "./pages/JobDetailPage.tsx";
 import { ErrorInspectorPage } from "./pages/ErrorInspectorPage.tsx";
 import { QueueListPage } from "./pages/QueueListPage.tsx";
 import { QueueDetailPage } from "./pages/QueueDetailPage.tsx";
+import { StatsPage } from "./pages/StatsPage.tsx";
 import { useDashboardData } from "./hooks/useDashboardData.ts";
 import { useGroupsData } from "./hooks/useGroupsData.ts";
 
@@ -55,6 +56,7 @@ export function App() {
               />
             }
           />
+          <Route path="stats" element={<StatsPage data={data} />} />
           <Route path="groups/:groupId" element={<GroupDetailPage />} />
           <Route path="jobs/:jobId" element={<JobDetailPage />} />
           <Route path="errors" element={<ErrorInspectorPage />} />
