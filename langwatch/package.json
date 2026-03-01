@@ -85,7 +85,7 @@
     "@google-cloud/dlp": "^5.12.0",
     "@hono/node-server": "^1.19.9",
     "@hono/zod-validator": "^0.4.3",
-    "@hookform/resolvers": "^3.3.2",
+    "@hookform/resolvers": "^5.2.2",
     "@langwatch/ksuid": "^2.0.2",
     "@langwatch/scenario": "file:vendor/langwatch-scenario-0.4.3.tgz",
     "@microlink/react-json-view": "^1.27.1",
