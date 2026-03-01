@@ -129,7 +129,7 @@
     "@trpc/client": "^10.34.0",
     "@trpc/next": "^10.34.0",
     "@trpc/react-query": "^10.34.0",
-    "@trpc/server": "^10.45.3",
+    "@trpc/server": "^11.10.0",
     "@xyflow/react": "^12.1.0",
     "ai": "^5.0.53",
     "ajv": "^8.17.1",
