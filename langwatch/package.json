@@ -255,7 +255,7 @@
     "@types/lodash.omit": "^4.5.9",
     "@types/lodash.throttle": "^4.1.9",
     "@types/mermaid": "^9.1.0",
-    "@types/mustache": "^4.2.5",
+    "@types/mustache": "^4.2.6",
     "@types/node": "^18.16.0",
     "@types/nprogress": "^0.2.1",
     "@types/numeral": "^2.0.5",
