@@ -125,10 +125,10 @@ export const registry: IntegrationRegistry = [
     ),
     install: {
       js: {
-        npm: "npm i @mastra/core @mastra/evals @mastra/libsql @mastra/loggers @mastra/memory @mastra/otel-exporter",
-        pnpm: "pnpm add @mastra/core @mastra/evals @mastra/libsql @mastra/loggers @mastra/memory @mastra/otel-exporter",
-        yarn: "yarn add @mastra/core @mastra/evals @mastra/libsql @mastra/loggers @mastra/memory @mastra/otel-exporter",
-        bun: "bun add @mastra/core @mastra/evals @mastra/libsql @mastra/loggers @mastra/memory @mastra/otel-exporter",
+        npm: "npm i @mastra/core @mastra/evals @mastra/libsql @mastra/loggers @mastra/memory @mastra/otel-exporter @mastra/observability",
+        pnpm: "pnpm add @mastra/core @mastra/evals @mastra/libsql @mastra/loggers @mastra/memory @mastra/otel-exporter @mastra/observability",
+        yarn: "yarn add @mastra/core @mastra/evals @mastra/libsql @mastra/loggers @mastra/memory @mastra/otel-exporter @mastra/observability",
+        bun: "bun add @mastra/core @mastra/evals @mastra/libsql @mastra/loggers @mastra/memory @mastra/otel-exporter @mastra/observability",
       },
     },
     snippet: tsRef(mastraTsSource as unknown as string),
