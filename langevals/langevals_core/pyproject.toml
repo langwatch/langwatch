@@ -1,6 +1,6 @@
 [project]
 name = "langevals-core"
-version = "2.2.0"
+version = "2.3.0"
 description = "Core package for LLM evaluation platform, providing base classes and utilities."
 authors = [
     {name = "Rogerio Chaves", email = "rogerio@langwatch.ai"},
