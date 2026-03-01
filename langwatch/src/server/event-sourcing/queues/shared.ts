@@ -19,7 +19,7 @@ export const JOB_RETRY_CONFIG = {
   maxAttempts: 15,
   backoffDelayMs: 2000,
   removeOnCompleteAgeSec: 3600,
-  removeOnCompleteCount: 100,
+  removeOnCompleteCount: 1000,
   removeOnFailAgeSec: 60 * 60 * 24 * 7, // 7 days
 } as const;
 

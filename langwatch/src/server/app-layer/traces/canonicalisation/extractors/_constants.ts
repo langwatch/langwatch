@@ -103,6 +103,14 @@ export const ATTR_KEYS = {
   LANGWATCH_LABELS: "langwatch.labels",
   LANGWATCH_TAGS: "langwatch.tags", // Legacy/alternative name
 
+  // LangWatch reserved attributes
+  LANGWATCH_RESERVED_PII_REDACTION_STATUS:
+    "langwatch.reserved.pii_redaction_status",
+  LANGWATCH_RESERVED_PII_REDACTION_PARTIAL_SPAN_IDS:
+    "langwatch.reserved.pii_redaction_partial_span_ids",
+  LANGWATCH_RESERVED_PII_REDACTION_SKIPPED_SPAN_IDS:
+    "langwatch.reserved.pii_redaction_skipped_span_ids",
+
   // Error attributes
   ERROR_TYPE: "error.type",
   ERROR_MESSAGE: "error.message",

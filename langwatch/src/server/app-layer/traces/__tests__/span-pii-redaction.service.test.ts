@@ -4,6 +4,7 @@ import type { PIIRedactionLevel } from "../../../event-sourcing/pipelines/trace-
 import type { OtlpKeyValue, OtlpSpan } from "../../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import {
   DEFAULT_PII_BEARING_ATTRIBUTE_KEYS,
+  DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH,
   OtlpSpanPiiRedactionService,
   type ClearPIIFunction,
 } from "../span-pii-redaction.service";
@@ -273,6 +274,19 @@ describe("OtlpSpanPiiRedactionService", () => {
         );
       });
 
+      it("does not add pii_redaction_status attribute when redaction succeeds", async () => {
+        const span = createMockOtlpSpan([
+          { key: "gen_ai.prompt", value: { stringValue: "user@email.com" } },
+        ]);
+
+        await service.redactSpan(span, "STRICT");
+
+        const statusAttr = span.attributes.find(
+          (a) => a.key === "langwatch.reserved.pii_redaction_status",
+        );
+        expect(statusAttr).toBeUndefined();
+      });
+
       it("does not modify non-string attribute values", async () => {
         const span = createMockOtlpSpan([
           { key: "gen_ai.prompt", value: { intValue: 123 } },
@@ -461,6 +475,108 @@ describe("OtlpSpanPiiRedactionService", () => {
     it("exports default keys for extension", () => {
       expect(DEFAULT_PII_BEARING_ATTRIBUTE_KEYS).toContain("gen_ai.prompt");
       expect(DEFAULT_PII_BEARING_ATTRIBUTE_KEYS).toContain("langwatch.input");
+    });
+  });
+
+  describe("when attribute value exceeds maximum length", () => {
+    let maxLengthService: OtlpSpanPiiRedactionService;
+    let maxLengthClearPIISpy: ReturnType<typeof vi.fn>;
+    const MAX_LENGTH = 10;
+
+    beforeEach(() => {
+      const { mockClearPII, clearPIISpy: spy } = createMockClearPII();
+      maxLengthClearPIISpy = spy;
+      maxLengthService = new OtlpSpanPiiRedactionService({
+        clearPII: mockClearPII,
+        isLangevalsConfigured: true,
+        isProduction: false,
+        piiRedactionMaxAttributeLength: MAX_LENGTH,
+      });
+    });
+
+    it("leaves oversized value unmodified and does not call clearPII", async () => {
+      const oversizedValue = "x".repeat(MAX_LENGTH + 1);
+      const span = createMockOtlpSpan([
+        { key: "gen_ai.prompt", value: { stringValue: oversizedValue } },
+      ]);
+
+      await maxLengthService.redactSpan(span, "STRICT");
+
+      expect(span.attributes[0]!.value.stringValue).toBe(oversizedValue);
+      expect(maxLengthClearPIISpy).not.toHaveBeenCalled();
+    });
+
+    it("sets pii_redaction_status to 'none' when all PII attributes exceed max length", async () => {
+      const oversizedValue = "x".repeat(MAX_LENGTH + 1);
+      const span = createMockOtlpSpan([
+        { key: "gen_ai.prompt", value: { stringValue: oversizedValue } },
+      ]);
+
+      await maxLengthService.redactSpan(span, "STRICT");
+
+      const statusAttr = span.attributes.find(
+        (a) => a.key === "langwatch.reserved.pii_redaction_status",
+      );
+      expect(statusAttr).toBeDefined();
+      expect(statusAttr!.value.stringValue).toBe("none");
+    });
+
+    it("redacts value at exactly the max length without adding status attribute", async () => {
+      const exactValue = "x".repeat(MAX_LENGTH);
+      const span = createMockOtlpSpan([
+        { key: "gen_ai.prompt", value: { stringValue: exactValue } },
+      ]);
+
+      await maxLengthService.redactSpan(span, "STRICT");
+
+      expect(span.attributes[0]!.value.stringValue).toBe("[REDACTED]");
+      expect(maxLengthClearPIISpy).toHaveBeenCalledTimes(1);
+      const statusAttr = span.attributes.find(
+        (a) => a.key === "langwatch.reserved.pii_redaction_status",
+      );
+      expect(statusAttr).toBeUndefined();
+    });
+
+    it("sets pii_redaction_status to 'partial' when some attributes exceed size and others are redacted", async () => {
+      const oversizedValue = "x".repeat(MAX_LENGTH + 1);
+      const normalValue = "short";
+      const span = createMockOtlpSpan([
+        { key: "gen_ai.prompt", value: { stringValue: oversizedValue } },
+        { key: "langwatch.input", value: { stringValue: normalValue } },
+      ]);
+
+      await maxLengthService.redactSpan(span, "STRICT");
+
+      expect(span.attributes[0]!.value.stringValue).toBe(oversizedValue);
+      expect(span.attributes[1]!.value.stringValue).toBe("[REDACTED]");
+      expect(maxLengthClearPIISpy).toHaveBeenCalledTimes(1);
+      const statusAttr = span.attributes.find(
+        (a) => a.key === "langwatch.reserved.pii_redaction_status",
+      );
+      expect(statusAttr).toBeDefined();
+      expect(statusAttr!.value.stringValue).toBe("partial");
+    });
+
+    it("sets pii_redaction_status to 'none' when multiple PII attributes all exceed size", async () => {
+      const oversized1 = "x".repeat(MAX_LENGTH + 1);
+      const oversized2 = "y".repeat(MAX_LENGTH + 5);
+      const span = createMockOtlpSpan([
+        { key: "gen_ai.prompt", value: { stringValue: oversized1 } },
+        { key: "langwatch.input", value: { stringValue: oversized2 } },
+      ]);
+
+      await maxLengthService.redactSpan(span, "STRICT");
+
+      expect(maxLengthClearPIISpy).not.toHaveBeenCalled();
+      const statusAttr = span.attributes.find(
+        (a) => a.key === "langwatch.reserved.pii_redaction_status",
+      );
+      expect(statusAttr).toBeDefined();
+      expect(statusAttr!.value.stringValue).toBe("none");
+    });
+
+    it("exports the default max attribute length constant", () => {
+      expect(DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH).toBe(250_000);
     });
   });
 });

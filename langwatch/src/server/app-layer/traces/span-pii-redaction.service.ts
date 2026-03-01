@@ -3,11 +3,13 @@ import {
   clearPII as defaultClearPII,
   type PIICheckOptions,
 } from "~/server/background/workers/collector/piiCheck";
+import { createLogger } from "~/utils/logger/server";
 import {
   DEFAULT_PII_REDACTION_LEVEL,
   type PIIRedactionLevel,
 } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
 import type { OtlpKeyValue, OtlpSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
 
 /**
  * Default attribute keys known to contain PII-bearing content.
@@ -31,6 +33,13 @@ export const DEFAULT_PII_BEARING_ATTRIBUTE_KEYS = new Set([
 ]);
 
 /**
+ * Maximum attribute value length (in characters) for PII redaction.
+ * Matches the Presidio truncation limit in piiCheck.ts — values beyond this
+ * are only partially scanned anyway, so skip the expensive call entirely.
+ */
+export const DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH = 250_000;
+
+/**
  * Function type for PII clearing.
  */
 export type ClearPIIFunction = (
@@ -51,6 +60,8 @@ export interface OtlpSpanPiiRedactionServiceDependencies {
   isLangevalsConfigured: boolean;
   /** Whether running in production (NODE_ENV === "production") */
   isProduction: boolean;
+  /** Maximum attribute value length for PII redaction; values exceeding this are skipped */
+  piiRedactionMaxAttributeLength: number;
 }
 
 /** Cached default dependencies, lazily initialized */
@@ -64,6 +75,8 @@ function getDefaultDependencies(): OtlpSpanPiiRedactionServiceDependencies {
       piiBearingAttributeKeys: DEFAULT_PII_BEARING_ATTRIBUTE_KEYS,
       isLangevalsConfigured: !!env.LANGEVALS_ENDPOINT,
       isProduction: env.NODE_ENV === "production",
+      piiRedactionMaxAttributeLength:
+        DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH,
     };
   }
   return cachedDefaultDependencies;
@@ -77,9 +90,18 @@ function getDefaultDependencies(): OtlpSpanPiiRedactionServiceDependencies {
  */
 export class OtlpSpanPiiRedactionService {
   private readonly deps: OtlpSpanPiiRedactionServiceDependencies;
+  private readonly logger = createLogger(
+    "langwatch:trace-processing:span-pii-redaction-service",
+  );
 
   constructor(deps: Partial<OtlpSpanPiiRedactionServiceDependencies> = {}) {
-    this.deps = { ...getDefaultDependencies(), ...deps };
+    const merged = { ...getDefaultDependencies(), ...deps };
+    const maxLen = merged.piiRedactionMaxAttributeLength;
+    merged.piiRedactionMaxAttributeLength =
+      Number.isFinite(maxLen) && maxLen >= 0
+        ? Math.floor(maxLen)
+        : DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH;
+    this.deps = merged;
   }
 
   /**
@@ -131,30 +153,54 @@ export class OtlpSpanPiiRedactionService {
     };
 
     const redactionPromises: Promise<void>[] = [];
+    let anySkipped = false;
+    let anyRedacted = false;
 
     // Redact only PII-bearing attributes in span
-    this.collectPiiBearingAttributeRedactions(
+    const spanResult = this.collectPiiBearingAttributeRedactions(
       span.attributes,
       options,
       redactionPromises,
     );
+    anySkipped = anySkipped || spanResult.skipped;
+    anyRedacted = anyRedacted || spanResult.redacted;
 
     // Redact PII-bearing attributes in events
     for (const event of span.events) {
-      this.collectPiiBearingAttributeRedactions(
+      const eventResult = this.collectPiiBearingAttributeRedactions(
         event.attributes,
         options,
         redactionPromises,
       );
+      anySkipped = anySkipped || eventResult.skipped;
+      anyRedacted = anyRedacted || eventResult.redacted;
     }
 
     // Redact PII-bearing attributes in links
     for (const link of span.links) {
-      this.collectPiiBearingAttributeRedactions(
+      const linkResult = this.collectPiiBearingAttributeRedactions(
         link.attributes,
         options,
         redactionPromises,
       );
+      anySkipped = anySkipped || linkResult.skipped;
+      anyRedacted = anyRedacted || linkResult.redacted;
+    }
+
+    // Mark span with pii_redaction_status when any attributes were skipped
+    if (anySkipped) {
+      const statusValue = anyRedacted ? "partial" : "none";
+      const existingIdx = span.attributes.findIndex(
+        (a) => a.key === ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_STATUS,
+      );
+      if (existingIdx !== -1) {
+        span.attributes[existingIdx]!.value.stringValue = statusValue;
+      } else {
+        span.attributes.push({
+          key: ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_STATUS,
+          value: { stringValue: statusValue },
+        });
+      }
     }
 
     await Promise.all(redactionPromises);
@@ -162,20 +208,41 @@ export class OtlpSpanPiiRedactionService {
 
   /**
    * Collects redaction promises for attributes with PII-bearing keys.
+   * Returns { skipped, redacted } indicating whether any attributes were
+   * skipped due to exceeding the max length, and whether any were sent for redaction.
    */
   private collectPiiBearingAttributeRedactions(
     attributes: OtlpKeyValue[],
     options: PIICheckOptions,
     promises: Promise<void>[],
-  ): void {
+  ): { skipped: boolean; redacted: boolean } {
+    let skipped = false;
+    let redacted = false;
     for (const attr of attributes) {
       if (
         this.deps.piiBearingAttributeKeys.has(attr.key) &&
         attr.value.stringValue !== undefined &&
         attr.value.stringValue !== null
       ) {
+        if (
+          attr.value.stringValue.length >
+          this.deps.piiRedactionMaxAttributeLength
+        ) {
+          this.logger.warn(
+            {
+              attributeKey: attr.key,
+              valueLength: attr.value.stringValue.length,
+              maxLength: this.deps.piiRedactionMaxAttributeLength,
+            },
+            "Skipping PII redaction for oversized attribute value",
+          );
+          skipped = true;
+          continue;
+        }
+        redacted = true;
         promises.push(this.deps.clearPII(attr.value, ["stringValue"], options));
       }
     }
+    return { skipped, redacted };
   }
 }
