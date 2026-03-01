@@ -23,6 +23,7 @@ import { Tooltip } from "../../components/ui/tooltip";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { useMinimumSpinDuration } from "../../hooks/useMinimumSpinDuration";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { useTraceUpdateListener } from "../../hooks/useTraceUpdateListener";
 import type { ElasticSearchEvaluation } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import { getSingleQueryParam } from "../../utils/getSingleQueryParam";
@@ -96,15 +97,15 @@ export function MessagesList() {
     }
   }, [evaluations.data]);
 
-  useEffect(() => {
-    const onFocus = () => {
-      setTimeout(() => {
-        void traceGroups.refetch();
-      }, 500);
-    };
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
-  }, [traceGroups]);
+  useTraceUpdateListener({
+    projectId: project?.id ?? "",
+    refetch: () => {
+      void traceGroups.refetch();
+      void evaluations.refetch();
+    },
+    enabled: !!project,
+    pageOffset: navigationFooter.pageOffset,
+  });
 
   return (
     <>

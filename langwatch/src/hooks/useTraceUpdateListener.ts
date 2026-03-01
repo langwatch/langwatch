@@ -5,6 +5,7 @@ import { useSSESubscription } from "./useSSESubscription";
 
 interface UseTraceUpdateListenerOptions {
   projectId: string;
+  traceId?: string;
   refetch?: () => void | Promise<void>;
   enabled?: boolean;
   debounceMs?: number;
@@ -19,6 +20,7 @@ interface UseTraceUpdateListenerOptions {
  *
  * @param options - Configuration options
  * @param options.projectId - The project/tenant ID to subscribe to
+ * @param options.traceId - Optional trace ID to filter events to a specific trace
  * @param options.refetch - Function to call when traces are updated (usually a query refetch function)
  * @param options.enabled - Whether the subscription should be active (default: true)
  * @param options.debounceMs - Debounce delay in milliseconds (default: 1000)
@@ -27,6 +29,7 @@ interface UseTraceUpdateListenerOptions {
  */
 export function useTraceUpdateListener({
   projectId,
+  traceId,
   refetch,
   enabled = true,
   debounceMs = 1000,
@@ -76,53 +79,28 @@ export function useTraceUpdateListener({
     { event: string; timestamp: number },
     { projectId: string }
   >(
-    // @ts-expect-error - tRPC subscription type is not compatible with the useSSESubscription hook
-    // it's 6:30am and i do not care anymore
+    // @ts-expect-error - tRPC subscription type mismatch with useSSESubscription hook
     api.traces.onTraceUpdate,
     { projectId },
     {
-      enabled: Boolean(enabled && projectId), // Ensure we have a projectId
+      enabled: Boolean(enabled && projectId),
       onData: (data) => {
-        console.log("📨 Trace update received via SSE:", data, {
-          projectId,
-          shouldProcessUpdate,
-          timestamp: new Date().toISOString(),
-        });
         if (data.event) {
           try {
             const payload =
               typeof data.event === "string" ? JSON.parse(data.event) : data.event;
 
             if (payload.event === "trace_updated") {
-              console.log("🔄 Triggering debounced update for trace_updated event");
+              if (traceId && payload.traceId !== traceId) return;
               debouncedUpdate();
             }
           } catch {
             // If payload isn't JSON, treat as a generic trace update
             if (data.event === "trace_updated") {
-              console.log("🔄 Triggering debounced update for trace_updated event (plain string)");
               debouncedUpdate();
             }
           }
         }
-      },
-      onError: (error) => {
-        console.error("❌ Trace SSE subscription error:", error, { projectId });
-      },
-      onConnected: () => {
-        console.log("✅ Trace SSE subscription connected", {
-          projectId,
-          timestamp: new Date().toISOString(),
-        });
-      },
-      onDisconnected: () => {
-        console.log("🔌 Trace SSE subscription disconnected", { projectId });
-      },
-      onStarted: () => {
-        console.log("▶️ Trace SSE subscription started", { projectId });
-      },
-      onStopped: () => {
-        console.log("⏹️ Trace SSE subscription stopped", { projectId });
       },
     },
   );
