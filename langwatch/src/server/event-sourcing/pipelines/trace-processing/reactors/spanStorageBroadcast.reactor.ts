@@ -13,12 +13,11 @@ export interface SpanStorageBroadcastReactorDeps {
 }
 
 /**
- * Reactor that broadcasts trace updates after span storage completes.
+ * Reactor that broadcasts span storage events to connected SSE clients.
  *
- * Shares the same dedup key (`trace-update:{tenantId}:{traceId}`) and TTL as
- * the fold-based traceUpdateBroadcast reactor. This means at most ONE broadcast
- * fires per trace per second — whichever projection (fold or map) completes last
- * within the TTL window triggers the actual broadcast.
+ * Uses a separate dedup key (`span-stored:{tenantId}:{traceId}`) from the
+ * fold-based traceUpdateBroadcast reactor so both event types can fire
+ * independently within the same TTL window.
  */
 export function createSpanStorageBroadcastReactor(
   deps: SpanStorageBroadcastReactorDeps,
@@ -29,7 +28,7 @@ export function createSpanStorageBroadcastReactor(
       runIn: ["worker"],
       disabled: deps.hasRedis === false,
       makeJobId: (payload) =>
-        `trace-update:${payload.event.tenantId}:${payload.event.aggregateId}`,
+        `span-stored:${payload.event.tenantId}:${payload.event.aggregateId}`,
       ttl: 1000,
     },
 
@@ -39,7 +38,7 @@ export function createSpanStorageBroadcastReactor(
 
       try {
         const payload = JSON.stringify({
-          event: "trace_updated",
+          event: "span_stored",
           traceId,
         });
 

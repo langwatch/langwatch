@@ -52,6 +52,7 @@ function createStrandsContext(
     instrumentationScope: { name: "strands.telemetry.tracer", version: null },
     statusMessage: null,
     statusCode: null,
+    parentSpanId: "abc123",
     ...spanOverrides,
   };
 
