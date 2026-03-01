@@ -217,8 +217,8 @@ local stagedJobId  = ARGV[2]
 -- Previously we skipped blocking if a different job was active (stale worker check),
 -- but this allowed cascading failures: active key TTL expires mid-retry → dispatcher
 -- dispatches another job → old job's final failure can't block → repeat until staging
--- is drained. Always blocking is safe because COMPLETE_LUA on a healthy active job
--- will remove the block.
+-- is drained. Always blocking is safe because blocked groups require explicit
+-- operator unblock (via Skynet) to resume processing.
 redis.call("SADD", blockedKey, groupId)
 
 return 1
