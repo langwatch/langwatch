@@ -23,9 +23,13 @@ export class SSEManager {
   startDashboardBroadcast(metrics: MetricsCollector): void {
     this.metrics = metrics;
     this.dashboardInterval = setInterval(() => {
-      if (this.clients.length === 0) return;
-      const data = metrics.getDashboardData();
-      this.broadcast("dashboard", data);
+      try {
+        if (this.clients.length === 0) return;
+        const data = metrics.getDashboardData();
+        this.broadcast("dashboard", data);
+      } catch (err) {
+        console.error("Dashboard broadcast error:", err);
+      }
     }, SSE_PUSH_INTERVAL_MS);
   }
 

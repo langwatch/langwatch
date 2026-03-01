@@ -65,6 +65,7 @@ export class MetricsCollector {
   private queueCache = new Map<string, Queue>();
   private peakJobNames = new Map<string, { completedPerSec: number; failedPerSec: number; latencyP50Ms: number; latencyP99Ms: number }>();
   private currentJobNameMetrics: JobNameMetrics[] = [];
+  private isCollecting = false;
 
   constructor(redis: IORedis, groupQueueNames: string[]) {
     this.redis = redis;
@@ -317,7 +318,7 @@ export class MetricsCollector {
     for (const key of allJobNameKeys) {
       const counts = jobNameCounts.get(key);
       const info = jobNamePhases.get(key);
-      const jobName = info?.jobName ?? counts ? key.split("::")[1] ?? key : key;
+      const jobName = info?.jobName ?? key.split("::")[1] ?? key;
       const pipelineName = info?.pipelineName ?? counts?.pipelineName ?? "unknown";
       const phase = info?.phase ?? counts?.phase ?? "commands";
 
@@ -423,6 +424,8 @@ export class MetricsCollector {
   }
 
   private async collect(): Promise<void> {
+    if (this.isCollecting) return;
+    this.isCollecting = true;
     try {
       const [queues, redisInfo] = await Promise.all([
         scanGroupQueues(this.redis, this.groupQueueNames),
@@ -517,6 +520,8 @@ export class MetricsCollector {
       this.persistState().catch((err) => console.warn("Failed to persist metrics state:", err));
     } catch (err) {
       console.error("Metrics collection error:", err);
+    } finally {
+      this.isCollecting = false;
     }
   }
 }

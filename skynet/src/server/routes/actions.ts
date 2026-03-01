@@ -3,8 +3,8 @@ import type IORedis from "ioredis";
 import { UNBLOCK_LUA, DRAIN_GROUP_LUA } from "../services/luaScripts.ts";
 import { retryJob } from "../services/bullmqService.ts";
 
-function isValidGroupId(id: string): boolean {
-  return id.length > 0 && id.length <= 512;
+function isValidGroupId(id: unknown): id is string {
+  return typeof id === "string" && id.length > 0 && id.length <= 512;
 }
 
 export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => string[]): Router {
