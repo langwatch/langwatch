@@ -187,6 +187,19 @@ redis.call("LPUSH", signalKey, "1")
 return 1
 `;
 
+const REFRESH_LUA = `
+local activeKey    = KEYS[1]
+local stagedJobId  = ARGV[1]
+local activeTtlSec = tonumber(ARGV[2])
+
+local currentActive = redis.call("GET", activeKey)
+if currentActive == stagedJobId then
+  redis.call("EXPIRE", activeKey, activeTtlSec)
+  return 1
+end
+return 0
+`;
+
 const FAIL_LUA = `
 local blockedKey = KEYS[1]
 local activeKey  = KEYS[2]
@@ -195,7 +208,9 @@ local groupId      = ARGV[1]
 local stagedJobId  = ARGV[2]
 
 local currentActive = redis.call("GET", activeKey)
-if currentActive ~= stagedJobId then
+-- Only skip if a DIFFERENT job is active (stale worker).
+-- Block if activeKey matches OR has expired (false in Redis Lua).
+if currentActive and currentActive ~= stagedJobId then
   return 0
 end
 
@@ -377,6 +392,33 @@ export class GroupStagingScripts {
       blockedKey,
       groupId,
       stagedJobId,
+    );
+
+    return result === 1;
+  }
+
+  /**
+   * Refresh the activeKey TTL during intermediate retries to prevent expiration.
+   *
+   * @returns true if refreshed, false if activeKey doesn't match (stale)
+   */
+  async refreshActiveKey({
+    groupId,
+    stagedJobId,
+    activeTtlSec,
+  }: {
+    groupId: string;
+    stagedJobId: string;
+    activeTtlSec: number;
+  }): Promise<boolean> {
+    const activeKey = `${this.keyPrefix}group:${groupId}:active`;
+
+    const result = await this.redis.eval(
+      REFRESH_LUA,
+      1,
+      activeKey,
+      stagedJobId,
+      String(activeTtlSec),
     );
 
     return result === 1;

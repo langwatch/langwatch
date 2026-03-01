@@ -14,10 +14,11 @@ local activeKey  = KEYS[2]
 local groupId      = ARGV[1]
 local stagedJobId  = ARGV[2]
 
--- Verify the active job matches
+-- Only skip if a DIFFERENT job is active (stale worker).
+-- Block if activeKey matches OR has expired (false in Redis Lua).
 local currentActive = redis.call("GET", activeKey)
-if currentActive ~= stagedJobId then
-  return 0 -- stale
+if currentActive and currentActive ~= stagedJobId then
+  return 0 -- stale: a different job took over
 end
 
 -- Add group to blocked set (active key stays to keep group stalled)

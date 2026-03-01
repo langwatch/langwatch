@@ -225,12 +225,37 @@ export class GroupQueueProcessorBullMq<
           "Group queue job failed",
         );
 
-        // On exhausted retries, block the group
-        if (job && job.attemptsMade >= JOB_RETRY_CONFIG.maxAttempts) {
-          const metadata = this.extractGroupMetadata(job);
-          if (metadata) {
-            void this.handleExhaustedRetries(metadata);
-          }
+        if (!job) return;
+
+        const metadata = this.extractGroupMetadata(job);
+        if (!metadata) return;
+
+        if (job.attemptsMade >= JOB_RETRY_CONFIG.maxAttempts) {
+          // Exhausted retries: block the group
+          this.handleExhaustedRetries(metadata).catch((err) => {
+            this.logger.error(
+              {
+                queueName: this.queueName,
+                groupId: metadata.__groupId,
+                stagedJobId: metadata.__stagedJobId,
+                error: err instanceof Error ? err.message : String(err),
+              },
+              "CRITICAL: Failed to block group after exhausted retries - group may accept new jobs incorrectly",
+            );
+          });
+        } else {
+          // Intermediate retry: refresh activeKey TTL to prevent expiration
+          this.refreshActiveKeyTtl(metadata).catch((err) => {
+            this.logger.error(
+              {
+                queueName: this.queueName,
+                groupId: metadata.__groupId,
+                stagedJobId: metadata.__stagedJobId,
+                error: err instanceof Error ? err.message : String(err),
+              },
+              "Failed to refresh active key TTL during retry",
+            );
+          });
         }
       });
 
@@ -238,7 +263,17 @@ export class GroupQueueProcessorBullMq<
       this.worker.on("completed", (job) => {
         const metadata = this.extractGroupMetadata(job);
         if (metadata) {
-          void this.handleJobCompleted(metadata);
+          this.handleJobCompleted(metadata).catch((err) => {
+            this.logger.error(
+              {
+                queueName: this.queueName,
+                groupId: metadata.__groupId,
+                stagedJobId: metadata.__stagedJobId,
+                error: err instanceof Error ? err.message : String(err),
+              },
+              "CRITICAL: Failed to complete group job - group may be stuck",
+            );
+          });
         }
       });
     } else {
@@ -606,6 +641,31 @@ export class GroupQueueProcessorBullMq<
           stagedJobId: metadata.__stagedJobId,
         },
         "Stale completion (active key doesn't match)",
+      );
+    }
+  }
+
+  /**
+   * Refresh the activeKey TTL during intermediate retries to prevent
+   * the safety-net TTL from expiring before all retries complete.
+   */
+  private async refreshActiveKeyTtl(
+    metadata: GroupJobMetadata,
+  ): Promise<void> {
+    const refreshed = await this.scripts.refreshActiveKey({
+      groupId: metadata.__groupId,
+      stagedJobId: metadata.__stagedJobId,
+      activeTtlSec: GROUP_QUEUE_CONFIG.activeTtlSec,
+    });
+
+    if (refreshed) {
+      this.logger.debug(
+        {
+          queueName: this.queueName,
+          groupId: metadata.__groupId,
+          stagedJobId: metadata.__stagedJobId,
+        },
+        "Refreshed active key TTL for retry",
       );
     }
   }
