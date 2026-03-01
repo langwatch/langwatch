@@ -284,7 +284,7 @@ function enrichRagContextIds(span: NormalizedSpan): void {
     span.spanAttributes[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS_LEGACY];
   if (!Array.isArray(raw)) return;
 
-  const enriched = raw.filter(Boolean).map((ctx) => {
+  const enriched = raw.map((ctx) => {
     if (!ctx || typeof ctx !== "object") return ctx;
     const ctxObj = ctx as Record<string, unknown>;
     // Skip items that already have a document_id

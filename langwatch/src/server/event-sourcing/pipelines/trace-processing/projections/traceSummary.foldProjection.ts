@@ -321,7 +321,11 @@ function extractAttributesFromSpan(
 
   // Labels (canonical key only — canonicalization already promoted from metadata)
   const labels = spanAttrs[ATTR_KEYS.LANGWATCH_LABELS];
-  if (typeof labels === "string") attributes["langwatch.labels"] = labels;
+  if (typeof labels === "string") {
+    attributes["langwatch.labels"] = labels;
+  } else if (Array.isArray(labels)) {
+    attributes["langwatch.labels"] = JSON.stringify(labels);
+  }
 
   // Custom metadata fields — canonicalization hoists them as metadata.{key}
   // so we just need to forward any metadata.* attributes
