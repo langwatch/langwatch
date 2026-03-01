@@ -1,5 +1,52 @@
 # Changelog
 
+## [2.6.0](https://github.com/langwatch/langwatch/compare/langwatch@v2.5.0...langwatch@v2.6.0) (2026-03-01)
+
+
+### Features
+
+* add new event sourcing observability tooling, called skynet ([#1865](https://github.com/langwatch/langwatch/issues/1865)) ([b759012](https://github.com/langwatch/langwatch/commit/b75901283d238dbf32df4f80e3eda4f95c561232))
+* **billing:** add subscription override support for all plan limit fields ([3ac5ba7](https://github.com/langwatch/langwatch/commit/3ac5ba768a790761f32850a113ddfcac0970374d))
+* **billing:** add subscription override support for all plan limit fields ([#1862](https://github.com/langwatch/langwatch/issues/1862)) ([3ac5ba7](https://github.com/langwatch/langwatch/commit/3ac5ba768a790761f32850a113ddfcac0970374d))
+* encrypt model provider API keys at rest ([#1764](https://github.com/langwatch/langwatch/issues/1764)) ([7f194b2](https://github.com/langwatch/langwatch/commit/7f194b27579c0c26ffe351c778ab89d47d1cb545))
+* evaluation fixes  ([#1839](https://github.com/langwatch/langwatch/issues/1839)) ([a31f460](https://github.com/langwatch/langwatch/commit/a31f460490b03bf66857ab21c88eaa135cb2ad06))
+* **licensing:** add usageUnit to license schema and generation ([#1860](https://github.com/langwatch/langwatch/issues/1860)) ([2fc56ec](https://github.com/langwatch/langwatch/commit/2fc56ecad0512f92e87179f1b5a79cbc74d9e9b6))
+* otel trace context propagation for HTTP scenario targets ([#1840](https://github.com/langwatch/langwatch/issues/1840)) ([5b0507d](https://github.com/langwatch/langwatch/commit/5b0507dddf88c1d600416e4c5866549a6f5dfcca))
+* **subscription:** implement new billing model ([#1742](https://github.com/langwatch/langwatch/issues/1742)) ([bda81e8](https://github.com/langwatch/langwatch/commit/bda81e836568327a210d8cf5bcb6e2469c59e6bb))
+* **suites:** add time filter for suite runs ([#1827](https://github.com/langwatch/langwatch/issues/1827)) ([8b8cc84](https://github.com/langwatch/langwatch/commit/8b8cc84cef6375a359efe35bacabe4232cc94fce))
+
+
+### Bug Fixes
+
+* actually use, not just enable, async inserts in clickhouse inserts ([#1876](https://github.com/langwatch/langwatch/issues/1876)) ([745a1a8](https://github.com/langwatch/langwatch/commit/745a1a83c71683c855acbbc5616bb5d3750c8b02))
+* **billing:** make FREE plan limits pricing-model-aware for SEAT_EVENT orgs ([c7b2f74](https://github.com/langwatch/langwatch/commit/c7b2f74d81dc77e5c555e12580c522e26bb8f815))
+* **billing:** make plan limits as pricing-model-aware for orgs ([#1850](https://github.com/langwatch/langwatch/issues/1850)) ([c7b2f74](https://github.com/langwatch/langwatch/commit/c7b2f74d81dc77e5c555e12580c522e26bb8f815))
+* change default org pricing model from TIERED to SEAT_EVENT ([209c21f](https://github.com/langwatch/langwatch/commit/209c21fbaba0c5abdc6bcd3b879716e3358bdcf9))
+* change default org pricing model to SEAT_EVENT ([#1832](https://github.com/langwatch/langwatch/issues/1832)) ([209c21f](https://github.com/langwatch/langwatch/commit/209c21fbaba0c5abdc6bcd3b879716e3358bdcf9))
+* **contact:** update contact link from mail to HubSpot link ([#1835](https://github.com/langwatch/langwatch/issues/1835)) ([c919520](https://github.com/langwatch/langwatch/commit/c9195206f3d84bfa99f1a2dae0e3db2239083170))
+* **contact:** update contact linkt from mail to hubspot link ([c919520](https://github.com/langwatch/langwatch/commit/c9195206f3d84bfa99f1a2dae0e3db2239083170))
+* **event-sourcing:** increase global concurrency ([#1877](https://github.com/langwatch/langwatch/issues/1877)) ([5f76fb3](https://github.com/langwatch/langwatch/commit/5f76fb37c9d80d94ba877bcf8b26737b93b8ad67))
+* **event-sourcing:** race condition in redis lua group queues handling ([#1873](https://github.com/langwatch/langwatch/issues/1873)) ([82a6e26](https://github.com/langwatch/langwatch/commit/82a6e26b3a160e82b4f784cc17c2d1088be787c6))
+* missing started at in simulation projection ([#1874](https://github.com/langwatch/langwatch/issues/1874)) ([da8e7c0](https://github.com/langwatch/langwatch/commit/da8e7c0a56452b97251143de54a3682c3f9dc40c))
+* **subscription:** correct legacy paid plan detection logic ([de73e28](https://github.com/langwatch/langwatch/commit/de73e28de1f856514a0b894a695b70d752d99d22))
+* **subscription:** correct legacy paid plan detection logic ([#1842](https://github.com/langwatch/langwatch/issues/1842)) ([de73e28](https://github.com/langwatch/langwatch/commit/de73e28de1f856514a0b894a695b70d752d99d22))
+* **suites:** use query param routing with slugs for direct suite access ([#1826](https://github.com/langwatch/langwatch/issues/1826)) ([2613a77](https://github.com/langwatch/langwatch/commit/2613a77b30b7e63b87ebc28d406bc5efa168bb5a))
+
+
+### Miscellaneous
+
+* add length limit to PII detection, matching the limit of the library itself ([#1864](https://github.com/langwatch/langwatch/issues/1864)) ([2f14579](https://github.com/langwatch/langwatch/commit/2f14579d13fe554d641a4e7d1e6269ca5e05669f))
+* **billing:** update stripe catalog with new growth event prices ([#1829](https://github.com/langwatch/langwatch/issues/1829)) ([627285c](https://github.com/langwatch/langwatch/commit/627285ca877a78ab905938b5e0c0ea45c1278cc5))
+
+
+### Code Refactoring
+
+* **billing:** move usage reporting into event sourcing framework ([#1863](https://github.com/langwatch/langwatch/issues/1863)) ([9fe011a](https://github.com/langwatch/langwatch/commit/9fe011ab89a9c1563c8b714006795132f6481871))
+* **event-sourcing:** global queue consolidation and ClickHouse experiment run fixes ([#1861](https://github.com/langwatch/langwatch/issues/1861)) ([00795de](https://github.com/langwatch/langwatch/commit/00795de770f27b6db64a05e349b8c9a7cb7c662e))
+* **subscription:** extract SubscriptionService interface and EE implementation ([#1838](https://github.com/langwatch/langwatch/issues/1838)) ([d98c18e](https://github.com/langwatch/langwatch/commit/d98c18e075ebc3e707fafc4da664ec8e9d1ef4a9))
+* **suites:** extract suite-run dependencies into proper repositories ([#1836](https://github.com/langwatch/langwatch/issues/1836)) ([bc64d1e](https://github.com/langwatch/langwatch/commit/bc64d1ea5078cd096fddec943e556972a08f307b))
+* **usage:** update usage page to support license/subscription ([#1837](https://github.com/langwatch/langwatch/issues/1837)) ([f8e0de2](https://github.com/langwatch/langwatch/commit/f8e0de263c8b8f0a1a27ad2811f8000ad8499e33))
+
 ## [2.5.0](https://github.com/langwatch/langwatch/compare/langwatch@v2.4.2...langwatch@v2.5.0) (2026-02-25)
 
 
