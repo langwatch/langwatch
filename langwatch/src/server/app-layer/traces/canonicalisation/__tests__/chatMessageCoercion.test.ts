@@ -102,8 +102,13 @@ describe("CanonicalizeSpanAttributesService — chat message coercion", () => {
         stubSpan as any,
       );
 
-      // Messages with parts format should be preserved
-      expect(result.attributes["gen_ai.input.messages"]).toEqual(messages);
+      // System messages stripped; only non-system messages preserved
+      expect(result.attributes["gen_ai.input.messages"]).toEqual([
+        {
+          role: "user",
+          parts: [{ type: "text", content: "Hello" }],
+        },
+      ]);
 
       // System instruction extracted from content blocks using 'content' field
       expect(result.attributes["gen_ai.request.system_instruction"]).toBe(

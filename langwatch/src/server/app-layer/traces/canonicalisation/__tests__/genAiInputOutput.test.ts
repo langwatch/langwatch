@@ -111,8 +111,13 @@ describe("CanonicalizeSpanAttributesService", () => {
         stubSpan as any,
       );
 
-      // Messages preserved as-is with parts
-      expect(result.attributes["gen_ai.input.messages"]).toEqual(inputMessages);
+      // System messages stripped; only non-system messages preserved
+      expect(result.attributes["gen_ai.input.messages"]).toEqual([
+        {
+          role: "user",
+          parts: [{ type: "text", content: "[Sun 2026-02-08 20:58 UTC] hi" }],
+        },
+      ]);
       expect(result.attributes["gen_ai.output.messages"]).toEqual(outputMessages);
 
       // System instruction extracted from content blocks using 'content' field
