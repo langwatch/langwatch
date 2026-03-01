@@ -30,6 +30,35 @@ export interface ThroughputPoint {
   failedPerSec: number;
 }
 
+export interface PhaseMetrics {
+  pending: number;
+  active: number;
+  completedPerSec: number;
+  failedPerSec: number;
+  latencyP50Ms: number;
+  latencyP99Ms: number;
+  peakCompletedPerSec: number;
+  peakFailedPerSec: number;
+  peakLatencyP50Ms: number;
+  peakLatencyP99Ms: number;
+}
+
+export interface JobNameMetrics {
+  jobName: string;
+  pipelineName: string;
+  phase: "commands" | "projections" | "reactions";
+  pending: number;
+  active: number;
+  completedPerSec: number;
+  failedPerSec: number;
+  latencyP50Ms: number;
+  latencyP99Ms: number;
+  peakCompletedPerSec: number;
+  peakFailedPerSec: number;
+  peakLatencyP50Ms: number;
+  peakLatencyP99Ms: number;
+}
+
 export interface PipelineNode {
   name: string;
   pending: number;
@@ -47,6 +76,9 @@ export interface DashboardData {
   totalFailed: number;
   completedPerSec: number;
   failedPerSec: number;
+  peakCompletedPerSec: number;
+  peakFailedPerSec: number;
+  peakStagedPerSec: number;
   redisMemoryUsed: string;
   redisMemoryPeak: string;
   redisMemoryUsedBytes: number;
@@ -59,6 +91,16 @@ export interface DashboardData {
   throughputHistory: ThroughputPoint[];
   pipelineTree: PipelineNode[];
   queues: QueueInfo[];
+  latencyP50Ms: number;
+  latencyP99Ms: number;
+  peakLatencyP50Ms: number;
+  peakLatencyP99Ms: number;
+  phases: {
+    commands: PhaseMetrics;
+    projections: PhaseMetrics;
+    reactions: PhaseMetrics;
+  };
+  jobNameMetrics: JobNameMetrics[];
 }
 
 export interface JobInfo {
@@ -79,6 +121,8 @@ export interface GroupDetailData {
   pipelineName: string | null;
   jobType: string | null;
   jobName: string | null;
+  blockError?: string;
+  blockStacktrace?: string[];
 }
 
 export interface FailedJob {

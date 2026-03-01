@@ -32,10 +32,8 @@ export function createApp({ redis, sseManager, metrics, getGroupQueueNames, getQ
   // Health check — no auth
   app.use(healthRouter);
 
-  // Auth (always applied; skipped only when SKYNET_SKIP_AUTH is explicitly set for local dev)
-  if (process.env.SKYNET_SKIP_AUTH !== "1") {
-    app.use(basicAuth);
-  }
+  // Auth (no-op when SKYNET_USERNAME/SKYNET_PASSWORD are not set)
+  app.use(basicAuth);
 
   const clientDir = path.resolve(__dirname, "../../dist/client");
 

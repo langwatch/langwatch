@@ -36,7 +36,7 @@ export function DashboardPage({ data, queues, onPause, onResume, sortColumn, sor
         SYSTEM OVERVIEW
       </Text>
       <RedisStats data={data} />
-      <StatCards data={data} />
+      <StatCards data={data} queues={queues} />
       <Grid templateColumns={{ base: "1fr", lg: "3fr 2fr" }} gap={4} mb={6}>
         <GridItem>
           <ThroughputChart data={data.throughputHistory} />

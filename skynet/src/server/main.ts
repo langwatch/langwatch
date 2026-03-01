@@ -8,7 +8,7 @@ import { evictStaleQueueCache } from "./services/bullmqService.ts";
 import { SSEManager } from "./sse/sseManager.ts";
 import { createApp } from "./app.ts";
 
-const PORT = parseInt(process.env.BULLBOARD_PORT ?? String(DEFAULT_PORT), 10);
+const PORT = parseInt(process.env.SKYNET_PORT ?? process.env.BULLBOARD_PORT ?? String(DEFAULT_PORT), 10);
 
 async function main() {
   const redis = getRedis();
@@ -21,7 +21,7 @@ async function main() {
   console.log(`Discovered ${allQueueNames.length} queues (${groupQueueNames.length} group queues)`);
 
   // Auth warning at startup
-  if (process.env.SKYNET_SKIP_AUTH !== "1" && (!process.env.SKYNET_USERNAME || !process.env.SKYNET_PASSWORD)) {
+  if (!process.env.SKYNET_USERNAME || !process.env.SKYNET_PASSWORD) {
     console.warn(
       "WARNING: SKYNET_USERNAME and/or SKYNET_PASSWORD are not set. " +
       "All routes will be unauthenticated. Set these environment variables to enable Basic Auth."
@@ -29,23 +29,24 @@ async function main() {
   }
 
   const metrics = new MetricsCollector(redis, currentGroupQueueNames);
-  metrics.start();
+  await metrics.start();
 
   const sseManager = new SSEManager();
   sseManager.start();
+  sseManager.startDashboardBroadcast(metrics);
 
   // Periodic queue discovery
   setInterval(async () => {
     try {
       const names = await discoverQueueNames(redis);
-      const newNames = names.filter((n) => !currentQueueNames.includes(n));
-      if (newNames.length > 0) {
-        console.log(`Discovered ${newNames.length} new queue(s)`);
-        currentQueueNames = [...new Set([...currentQueueNames, ...names])];
-        currentGroupQueueNames = currentQueueNames.filter(isGroupQueue);
-        metrics.updateGroupQueueNames(currentGroupQueueNames);
-        evictStaleQueueCache(currentQueueNames);
-      }
+      const added = names.filter((n) => !currentQueueNames.includes(n));
+      const removed = currentQueueNames.filter((n) => !names.includes(n));
+      if (added.length > 0) console.log(`Discovered ${added.length} new queue(s): ${added.join(", ")}`);
+      if (removed.length > 0) console.log(`Removed ${removed.length} stale queue(s): ${removed.join(", ")}`);
+      currentQueueNames = names;
+      currentGroupQueueNames = currentQueueNames.filter(isGroupQueue);
+      metrics.updateGroupQueueNames(currentGroupQueueNames);
+      evictStaleQueueCache(currentQueueNames);
     } catch (err) {
       console.error("Queue discovery error:", err);
     }

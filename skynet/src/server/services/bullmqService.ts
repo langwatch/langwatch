@@ -9,7 +9,9 @@ const queueCache = new Map<string, Queue>();
 function getQueue(name: string, connection: IORedis): Queue {
   let q = queueCache.get(name);
   if (!q) {
-    q = new Queue(name, { connection });
+    // Type assertion: ioredis versions diverge in pnpm virtual store (project 5.10.0 vs bullmq's 5.9.3)
+    // but are runtime-compatible
+    q = new Queue(name, { connection: connection as never });
     queueCache.set(name, q);
   }
   return q;

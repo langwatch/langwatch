@@ -11,6 +11,9 @@ const INITIAL: DashboardData = {
   totalFailed: 0,
   completedPerSec: 0,
   failedPerSec: 0,
+  peakCompletedPerSec: 0,
+  peakFailedPerSec: 0,
+  peakStagedPerSec: 0,
   redisMemoryUsed: "-",
   redisMemoryPeak: "-",
   redisMemoryUsedBytes: 0,
@@ -23,6 +26,16 @@ const INITIAL: DashboardData = {
   throughputHistory: [],
   pipelineTree: [],
   queues: [],
+  latencyP50Ms: 0,
+  latencyP99Ms: 0,
+  peakLatencyP50Ms: 0,
+  peakLatencyP99Ms: 0,
+  phases: {
+    commands: { pending: 0, active: 0, completedPerSec: 0, failedPerSec: 0, latencyP50Ms: 0, latencyP99Ms: 0, peakCompletedPerSec: 0, peakFailedPerSec: 0, peakLatencyP50Ms: 0, peakLatencyP99Ms: 0 },
+    projections: { pending: 0, active: 0, completedPerSec: 0, failedPerSec: 0, latencyP50Ms: 0, latencyP99Ms: 0, peakCompletedPerSec: 0, peakFailedPerSec: 0, peakLatencyP50Ms: 0, peakLatencyP99Ms: 0 },
+    reactions: { pending: 0, active: 0, completedPerSec: 0, failedPerSec: 0, latencyP50Ms: 0, latencyP99Ms: 0, peakCompletedPerSec: 0, peakFailedPerSec: 0, peakLatencyP50Ms: 0, peakLatencyP99Ms: 0 },
+  },
+  jobNameMetrics: [],
 };
 
 export function useDashboardData(pausedRef: React.RefObject<boolean>): {
