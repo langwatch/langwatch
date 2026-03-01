@@ -173,7 +173,12 @@ if currentActive ~= stagedJobId then
 end
 
 redis.call("DEL", activeKey)
-redis.call("SREM", blockedKey, groupId)
+
+-- Do NOT auto-unblock here. If the group was blocked (e.g. by a cascading
+-- failure), only an explicit Skynet unblock should remove it. This prevents
+-- a concurrent successful job from silently unblocking a group that has
+-- ordering violations from the cascade.
+-- redis.call("SREM", blockedKey, groupId)
 
 local pendingCount = redis.call("ZCARD", jobsKey)
 if pendingCount > 0 then
@@ -428,8 +433,7 @@ export class GroupStagingScripts {
 
   /**
    * Mark a group as blocked after exhausted retries.
-   *
-   * @returns true if blocked, false if stale
+   * Always blocks unconditionally — COMPLETE_LUA on a healthy job will remove the block.
    */
   async fail({
     groupId,
