@@ -67,6 +67,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         table: TABLE_NAME,
         values: [record],
         format: "JSONEachRow",
+        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
     } catch (error) {
       logger.error(

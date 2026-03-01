@@ -287,7 +287,7 @@ export class EventRepositoryClickHouse implements EventRepository {
         table: "event_log",
         values: records,
         format: "JSONEachRow",
-        clickhouse_settings: { wait_for_async_insert: 1 },
+        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
 
       this.logger.info(
