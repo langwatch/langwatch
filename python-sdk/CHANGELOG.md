@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.13.0...python-sdk@v0.14.0) (2026-03-01)
+
+
+### Features
+
+* **examples:** add metadata and labels examples for TypeScript and Python SDKs ([#1585](https://github.com/langwatch/langwatch/issues/1585)) ([7d09ab8](https://github.com/langwatch/langwatch/commit/7d09ab805146542921e8b1f1258d5e6e59462bfe))
+
 ## [0.13.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.12.0...python-sdk@v0.13.0) (2026-02-15)
 
 
