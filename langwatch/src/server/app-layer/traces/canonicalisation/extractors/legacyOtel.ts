@@ -124,6 +124,11 @@ export class LegacyOtelTracesExtractor implements CanonicalAttributesExtractor {
     if (toolArgs !== undefined) {
       ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_INPUT, toolArgs);
       ctx.recordRule(`${this.id}:ai.toolCall.args->langwatch.input`);
+      recordValueType(
+        ctx,
+        ATTR_KEYS.LANGWATCH_INPUT,
+        typeof toolArgs === "string" ? "text" : "json",
+      );
     }
 
     // ─────────────────────────────────────────────────────────────────────────

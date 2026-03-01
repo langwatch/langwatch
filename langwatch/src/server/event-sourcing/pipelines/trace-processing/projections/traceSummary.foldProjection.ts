@@ -311,7 +311,11 @@ function extractAttributesFromSpan(
 
   // Labels (canonical key only — canonicalization already promoted from metadata)
   const labels = spanAttrs[ATTR_KEYS.LANGWATCH_LABELS];
-  if (typeof labels === "string") attributes["langwatch.labels"] = labels;
+  if (typeof labels === "string") {
+    attributes["langwatch.labels"] = labels;
+  } else if (Array.isArray(labels)) {
+    attributes["langwatch.labels"] = JSON.stringify(labels);
+  }
 
   // Custom metadata fields — canonicalization hoists them as metadata.{key}
   // so we just need to forward any metadata.* attributes
@@ -486,13 +490,19 @@ export function applySpanToSummary(
   if (piiStatus === "partial") {
     const key = ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_PARTIAL_SPAN_IDS;
     const existing = mergedAttributes[key];
-    const ids: string[] = existing ? (JSON.parse(existing) as string[]) : [];
+    let ids: string[] = [];
+    if (existing) {
+      try { ids = JSON.parse(existing) as string[]; } catch { ids = []; }
+    }
     ids.push(span.spanId);
     mergedAttributes[key] = JSON.stringify(ids);
   } else if (piiStatus === "none") {
     const key = ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_SKIPPED_SPAN_IDS;
     const existing = mergedAttributes[key];
-    const ids: string[] = existing ? (JSON.parse(existing) as string[]) : [];
+    let ids: string[] = [];
+    if (existing) {
+      try { ids = JSON.parse(existing) as string[]; } catch { ids = []; }
+    }
     ids.push(span.spanId);
     mergedAttributes[key] = JSON.stringify(ids);
   }

@@ -19,17 +19,19 @@ const logger = createLogger(
  */
 function serializeAttributes(
   attrs: Record<string, unknown>,
-): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
+): Record<string, string> {
+  const result: Record<string, string> = {};
   for (const [key, value] of Object.entries(attrs)) {
-    if (
-      typeof value === "string" ||
+    if (value === null || value === undefined) continue;
+    if (typeof value === "string") {
+      result[key] = value;
+    } else if (
       typeof value === "number" ||
       typeof value === "boolean" ||
       typeof value === "bigint"
     ) {
-      result[key] = value;
-    } else if (value !== null && value !== undefined) {
+      result[key] = String(value);
+    } else {
       try {
         result[key] = JSON.stringify(value);
       } catch {
@@ -60,18 +62,18 @@ interface ClickHouseSpanRecord {
   SpanName: string;
   SpanKind: number;
   ServiceName: string;
-  ResourceAttributes: Record<string, unknown>;
-  SpanAttributes: Record<string, unknown>;
+  ResourceAttributes: Record<string, string>;
+  SpanAttributes: Record<string, string>;
   StatusCode: number | null;
   StatusMessage: string | null;
   ScopeName: string;
   ScopeVersion: string | null;
   "Events.Timestamp": number[];
   "Events.Name": string[];
-  "Events.Attributes": Record<string, unknown>[];
+  "Events.Attributes": Record<string, string>[];
   "Links.TraceId": string[];
   "Links.SpanId": string[];
-  "Links.Attributes": Record<string, unknown>[];
+  "Links.Attributes": Record<string, string>[];
   DroppedAttributesCount: 0;
   DroppedEventsCount: 0;
   DroppedLinksCount: 0;

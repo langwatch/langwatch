@@ -246,28 +246,25 @@ export const extractErrorInfo = (ctx: ExtractorContext): void => {
 
   // Priority 1: Explicit span error flag with message
   if (
-    typeof spanErrorHas === "boolean" &&
-    spanErrorHas &&
+    (spanErrorHas === true || spanErrorHas === "true") &&
     isNonEmptyString(spanErrorMsg)
   ) {
-    ctx.setAttrIfAbsent(ATTR_KEYS.ERROR_TYPE, spanErrorMsg);
+    ctx.setAttrIfAbsent(ATTR_KEYS.ERROR_MESSAGE, spanErrorMsg);
     ctx.recordRule("error:span.error");
     return;
   }
 
   // Priority 2: Exception type and message
   if (isNonEmptyString(exceptionType) && isNonEmptyString(exceptionMsg)) {
-    ctx.setAttrIfAbsent(
-      ATTR_KEYS.ERROR_TYPE,
-      `${exceptionType}: ${exceptionMsg}`,
-    );
+    ctx.setAttrIfAbsent(ATTR_KEYS.ERROR_TYPE, exceptionType);
+    ctx.setAttrIfAbsent(ATTR_KEYS.ERROR_MESSAGE, exceptionMsg);
     ctx.recordRule("error:exception");
     return;
   }
 
   // Priority 3: Status message fallback
   if (isNonEmptyString(statusMsg)) {
-    ctx.setAttrIfAbsent(ATTR_KEYS.ERROR_TYPE, statusMsg);
+    ctx.setAttrIfAbsent(ATTR_KEYS.ERROR_MESSAGE, statusMsg);
     ctx.recordRule("error:status.message");
   }
 };

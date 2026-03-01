@@ -242,7 +242,7 @@ describe("RecordSpanCommand", () => {
       });
     });
 
-    describe("reserved attribute stripping", () => {
+    describe("when reserved attributes are present", () => {
       it("strips langwatch.reserved.* attributes from span before processing", async () => {
         const command = createMockCommand(
           "project-123",
