@@ -1,4 +1,4 @@
-import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import { createClient } from "@clickhouse/client";
 
 import { createLogger } from "../../utils/logger/server";
 import { parseConnectionUrl } from "./goose";
@@ -24,9 +24,39 @@ export interface TableTTLEntry {
  */
 export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
   {
+    table: "billable_events",
+    ttlColumn: "CreatedAt",
+    envVar: "TIERED_BILLABLE_EVENTS_TABLE_HOT_DAYS",
+    hardcodedDefault: 30,
+  },
+  {
+    table: "evaluation_runs",
+    ttlColumn: "UpdatedAt",
+    envVar: "TIERED_EVALUATION_RUNS_TABLE_HOT_DAYS",
+    hardcodedDefault: 30,
+  },
+  {
     table: "event_log",
     ttlColumn: "CreatedAt",
     envVar: "TIERED_EVENT_LOG_TABLE_HOT_DAYS",
+    hardcodedDefault: 30,
+  },
+  {
+    table: "experiment_run_items",
+    ttlColumn: "CreatedAt",
+    envVar: "TIERED_BATCH_EVAL_RESULTS_TABLE_HOT_DAYS",
+    hardcodedDefault: 30,
+  },
+  {
+    table: "experiment_runs",
+    ttlColumn: "CreatedAt",
+    envVar: "TIERED_BATCH_EVAL_RUNS_TABLE_HOT_DAYS",
+    hardcodedDefault: 30,
+  },
+  {
+    table: "simulation_runs",
+    ttlColumn: "CreatedAt",
+    envVar: "TIERED_SIMULATION_RUNS_TABLE_HOT_DAYS",
     hardcodedDefault: 30,
   },
   {
@@ -39,24 +69,6 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
     table: "trace_summaries",
     ttlColumn: "LastUpdatedAt",
     envVar: "TIERED_TRACE_SUMMARIES_TABLE_HOT_DAYS",
-    hardcodedDefault: 30,
-  },
-  {
-    table: "evaluation_runs",
-    ttlColumn: "UpdatedAt",
-    envVar: "TIERED_EVALUATION_RUNS_TABLE_HOT_DAYS",
-    hardcodedDefault: 30,
-  },
-  {
-    table: "experiment_runs",
-    ttlColumn: "CreatedAt",
-    envVar: "TIERED_BATCH_EVAL_RUNS_TABLE_HOT_DAYS",
-    hardcodedDefault: 30,
-  },
-  {
-    table: "experiment_run_items",
-    ttlColumn: "CreatedAt",
-    envVar: "TIERED_BATCH_EVAL_RESULTS_TABLE_HOT_DAYS",
     hardcodedDefault: 30,
   },
 ] as const;

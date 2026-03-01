@@ -48,6 +48,7 @@ interface ClickHouseSimulationRunRecord {
   UnmetCriteria: string[];
   Error: string | null;
   DurationMs: string | null;
+  StartedAt: number | null;
   CreatedAt: number;
   UpdatedAt: number;
   FinishedAt: number | null;
@@ -56,7 +57,7 @@ interface ClickHouseSimulationRunRecord {
 
 type ClickHouseSimulationRunWriteRecord = WithDateWrites<
   ClickHouseSimulationRunRecord,
-  "CreatedAt" | "UpdatedAt" | "FinishedAt" | "DeletedAt"
+  "StartedAt" | "CreatedAt" | "UpdatedAt" | "FinishedAt" | "DeletedAt"
 >;
 
 export class SimulationRunStateRepositoryClickHouse<
@@ -91,6 +92,7 @@ export class SimulationRunStateRepositoryClickHouse<
       UnmetCriteria: record.UnmetCriteria ?? [],
       Error: record.Error,
       DurationMs: record.DurationMs ? parseInt(record.DurationMs, 10) : null,
+      StartedAt: record.StartedAt === null ? null : Number(record.StartedAt),
       CreatedAt: Number(record.CreatedAt),
       UpdatedAt: Number(record.UpdatedAt),
       FinishedAt: record.FinishedAt === null ? null : Number(record.FinishedAt),
@@ -128,6 +130,7 @@ export class SimulationRunStateRepositoryClickHouse<
       UnmetCriteria: data.UnmetCriteria,
       Error: data.Error,
       DurationMs: data.DurationMs?.toString() ?? null,
+      StartedAt: data.StartedAt != null ? new Date(data.StartedAt) : null,
       CreatedAt: new Date(data.CreatedAt),
       UpdatedAt: new Date(data.UpdatedAt),
       FinishedAt: data.FinishedAt != null ? new Date(data.FinishedAt) : null,
@@ -157,6 +160,7 @@ export class SimulationRunStateRepositoryClickHouse<
             TraceIds,
             Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
             toString(DurationMs) AS DurationMs,
+            toUnixTimestamp64Milli(StartedAt) AS StartedAt,
             toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
             toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
             toUnixTimestamp64Milli(FinishedAt) AS FinishedAt,
