@@ -49,6 +49,7 @@ export class EventSourcingPipeline<
       foldProjections: definition.foldProjections,
       mapProjections: definition.mapProjections,
       reactors: definition.reactors,
+      mapReactors: definition.mapReactors,
       globalQueue: definition.globalQueue,
       globalJobRegistry: definition.globalJobRegistry,
       featureFlagService: definition.featureFlagService,

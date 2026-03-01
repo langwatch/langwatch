@@ -503,9 +503,17 @@ function buildServiceOptions<
       : undefined;
 
   const reactors =
-    definition.reactors.size > 0
-      ? Array.from(definition.reactors.values()).map((entry) => ({
-          foldName: entry.foldName,
+    definition.foldReactors.size > 0
+      ? Array.from(definition.foldReactors.values()).map((entry) => ({
+          foldName: entry.projectionName,
+          definition: entry.definition,
+        }))
+      : undefined;
+
+  const mapReactors =
+    definition.mapReactors.size > 0
+      ? Array.from(definition.mapReactors.values()).map((entry) => ({
+          mapName: entry.projectionName,
           definition: entry.definition,
         }))
       : undefined;
@@ -515,5 +523,6 @@ function buildServiceOptions<
     mapProjections: mapProjections.length > 0 ? mapProjections : undefined,
     commandRegistrations,
     reactors,
+    mapReactors,
   };
 }
