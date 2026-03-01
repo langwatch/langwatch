@@ -35,21 +35,10 @@ import {
 } from "../license-enforcement/license-enforcement.repository";
 import { LICENSE_LIMIT_ERRORS } from "../license-enforcement/license-limit-guard";
 import { sendInviteEmail } from "../mailer/inviteEmail";
-import { SubscriptionHandler } from "~/server/subscriptionHandler";
 import { TeamUserRole } from "@prisma/client";
 import type { Session } from "next-auth";
-import type { PlanInfo } from "../subscriptionHandler";
-
-/**
- * Interface for subscription plan retrieval.
- * Enables dependency injection and testing.
- */
-export interface ISubscriptionHandler {
-  getActivePlan(
-    organizationId: string,
-    user?: Session["user"]
-  ): Promise<PlanInfo>;
-}
+import type { PlanProvider } from "../app-layer/subscription/plan-provider";
+import { getApp } from "../app-layer";
 
 /**
  * Team assignment input for invite creation.
@@ -154,21 +143,21 @@ export class InviteService {
   constructor(
     private readonly prisma: PrismaClient | Prisma.TransactionClient,
     private readonly licenseRepo: ILicenseEnforcementRepository,
-    private readonly subscriptionHandler: ISubscriptionHandler
+    private readonly planProvider: PlanProvider
   ) {}
 
   /**
    * Factory method for creating InviteService with default dependencies.
    * Use this in production code for convenience.
+   * Pass options.planProvider to override the default app singleton (useful in tests).
    */
-  static create(prisma: PrismaClient | Prisma.TransactionClient): InviteService {
+  static create(
+    prisma: PrismaClient | Prisma.TransactionClient,
+    options?: { planProvider?: PlanProvider }
+  ): InviteService {
     const licenseRepo = new LicenseEnforcementRepository(prisma);
-    const subscriptionHandler = {
-      getActivePlan: SubscriptionHandler.getActivePlan.bind(
-        SubscriptionHandler
-      ),
-    };
-    return new InviteService(prisma, licenseRepo, subscriptionHandler);
+    const provider = options?.planProvider ?? getApp().planProvider;
+    return new InviteService(prisma, licenseRepo, provider);
   }
 
   /**
@@ -230,10 +219,10 @@ export class InviteService {
     }>;
     user: Session["user"];
   }): Promise<void> {
-    const subscriptionLimits = await this.subscriptionHandler.getActivePlan(
+    const subscriptionLimits = await this.planProvider.getActivePlan({
       organizationId,
-      user
-    );
+      user,
+    });
 
     const currentFullMembers = await this.licenseRepo.getMemberCount(
       organizationId

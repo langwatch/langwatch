@@ -4,36 +4,25 @@
  * Integration tests for Limits tRPC endpoints.
  * Tests the router layer including message limit status calculation.
  */
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 import { OrganizationUserRole } from "@prisma/client";
+import { createTestApp, resetApp } from "../../../app-layer";
+import { globalForApp } from "../../../app-layer/app";
+import { PlanProviderService } from "../../../app-layer/subscription/plan-provider";
 
-// Mock trace usage service to control message counts
-const mockGetCurrentMonthCount = vi.fn();
-vi.mock("../../../traces/trace-usage.service", () => ({
-  TraceUsageService: {
-    create: () => ({
-      getCurrentMonthCount: mockGetCurrentMonthCount,
-    }),
-  },
+// Hoisted mocks for deterministic control (must use vi.hoisted to survive vi.mock hoisting)
+const { mockGetCurrentMonthCount, mockGetActivePlan } = vi.hoisted(() => ({
+  mockGetCurrentMonthCount: vi.fn(),
+  mockGetActivePlan: vi.fn().mockResolvedValue({
+    type: "PRO",
+    name: "Pro",
+    maxMessagesPerMonth: 1000,
+  }),
 }));
 
-// Mock subscription handler to control plan limits
-vi.mock("../../../subscriptionHandler", async (importOriginal) => {
-  const original = await importOriginal<typeof import("../../../subscriptionHandler")>();
-  return {
-    ...original,
-    SubscriptionHandler: {
-      getActivePlan: vi.fn().mockResolvedValue({
-        type: "PRO",
-        name: "Pro",
-        maxMessagesPerMonth: 1000,
-      }),
-    },
-  };
-});
 
 describe("Limits Router Integration", () => {
   const testOrgSlug = "limits-router-test-org";
@@ -41,6 +30,14 @@ describe("Limits Router Integration", () => {
   let caller: ReturnType<typeof appRouter.createCaller>;
 
   beforeAll(async () => {
+    // Wire App singleton so UsageStatsService.create() can call getApp().usage
+    globalForApp.__langwatch_app = createTestApp({
+      usage: { getCurrentMonthCount: mockGetCurrentMonthCount } as any,
+      planProvider: PlanProviderService.create({
+        getActivePlan: mockGetActivePlan,
+      }),
+    });
+
     const organization = await prisma.organization.upsert({
       where: { slug: testOrgSlug },
       update: {},
@@ -84,7 +81,12 @@ describe("Limits Router Integration", () => {
     caller = appRouter.createCaller(ctx);
   });
 
+  afterEach(() => {
+    resetApp();
+  });
+
   afterAll(async () => {
+    resetApp();
     await prisma.organizationUser.deleteMany({
       where: { organizationId },
     });
@@ -99,6 +101,18 @@ describe("Limits Router Integration", () => {
   describe("getUsage", () => {
     beforeEach(() => {
       mockGetCurrentMonthCount.mockReset();
+      mockGetActivePlan.mockResolvedValue({
+        type: "PRO",
+        name: "Pro",
+        maxMessagesPerMonth: 1000,
+      });
+      resetApp();
+      globalForApp.__langwatch_app = createTestApp({
+        usage: { getCurrentMonthCount: mockGetCurrentMonthCount } as any,
+        planProvider: PlanProviderService.create({
+          getActivePlan: mockGetActivePlan,
+        }),
+      });
     });
 
     describe("when usage is below 80% threshold", () => {
@@ -133,6 +147,20 @@ describe("Limits Router Integration", () => {
 
         expect(result.messageLimitInfo.status).toBe("exceeded");
         expect(result.messageLimitInfo.message).toMatch(/reached the limit/);
+      });
+
+      it("keeps enforcement behavior when plan provider returns a copied FREE plan object", async () => {
+        mockGetCurrentMonthCount.mockResolvedValue(1500);
+        mockGetActivePlan.mockResolvedValue({
+          type: "FREE",
+          name: "Free",
+          maxMessagesPerMonth: 1000,
+        });
+
+        const result = await caller.limits.getUsage({ organizationId });
+
+        expect(result.messageLimitInfo.status).toBe("exceeded");
+        expect(result.messageLimitInfo.max).toBe(1000);
       });
     });
   });

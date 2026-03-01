@@ -12,11 +12,11 @@ import { OrganizationUserRole } from "@prisma/client";
 import {
   classifyInvitesByMemberType,
   InviteService,
-  type ISubscriptionHandler,
 } from "../invite.service";
 import type { ILicenseEnforcementRepository } from "../../license-enforcement/license-enforcement.repository";
 import { LicenseLimitError } from "../errors";
 import { LICENSE_LIMIT_ERRORS } from "../../license-enforcement/license-limit-guard";
+import type { PlanProvider } from "../../app-layer/subscription/plan-provider";
 
 const { mockSendInviteEmail } = vi.hoisted(() => ({
   mockSendInviteEmail: vi.fn(),
@@ -131,7 +131,7 @@ describe("classifyInvitesByMemberType()", () => {
 describe("InviteService", () => {
   let mockPrisma: any;
   let mockLicenseRepo: ILicenseEnforcementRepository;
-  let mockSubscriptionHandler: ISubscriptionHandler;
+  let mockPlanProvider: PlanProvider;
   let service: InviteService;
 
   beforeEach(() => {
@@ -157,14 +157,14 @@ describe("InviteService", () => {
       getMembersLiteCount: vi.fn(),
     } as any;
 
-    mockSubscriptionHandler = {
+    mockPlanProvider = {
       getActivePlan: vi.fn(),
     };
 
     service = new InviteService(
       mockPrisma,
       mockLicenseRepo,
-      mockSubscriptionHandler
+      mockPlanProvider
     );
   });
 
@@ -224,7 +224,7 @@ describe("InviteService", () => {
       it("throws LicenseLimitError", async () => {
         vi.mocked(mockLicenseRepo.getMemberCount).mockResolvedValue(10);
         vi.mocked(mockLicenseRepo.getMembersLiteCount).mockResolvedValue(0);
-        vi.mocked(mockSubscriptionHandler.getActivePlan).mockResolvedValue({
+        vi.mocked(mockPlanProvider.getActivePlan).mockResolvedValue({
           maxMembers: 10,
           maxMembersLite: 100,
           overrideAddingLimitations: false,
@@ -252,7 +252,7 @@ describe("InviteService", () => {
       it("throws LicenseLimitError", async () => {
         vi.mocked(mockLicenseRepo.getMemberCount).mockResolvedValue(0);
         vi.mocked(mockLicenseRepo.getMembersLiteCount).mockResolvedValue(5);
-        vi.mocked(mockSubscriptionHandler.getActivePlan).mockResolvedValue({
+        vi.mocked(mockPlanProvider.getActivePlan).mockResolvedValue({
           maxMembers: 100,
           maxMembersLite: 5,
           overrideAddingLimitations: false,
@@ -277,10 +277,31 @@ describe("InviteService", () => {
     });
 
     describe("when limits are not exceeded", () => {
+      it("forwards user to planProvider", async () => {
+        vi.mocked(mockLicenseRepo.getMemberCount).mockResolvedValue(5);
+        vi.mocked(mockLicenseRepo.getMembersLiteCount).mockResolvedValue(2);
+        vi.mocked(mockPlanProvider.getActivePlan).mockResolvedValue({
+          maxMembers: 100,
+          maxMembersLite: 100,
+          overrideAddingLimitations: false,
+        } as any);
+
+        await service.checkLicenseLimits({
+          organizationId: "org-1",
+          newInvites: [{ role: OrganizationUserRole.MEMBER }],
+          user: { id: "user-1" } as any,
+        });
+
+        expect(mockPlanProvider.getActivePlan).toHaveBeenCalledWith({
+          organizationId: "org-1",
+          user: expect.objectContaining({ id: "user-1" }),
+        });
+      });
+
       it("does not throw", async () => {
         vi.mocked(mockLicenseRepo.getMemberCount).mockResolvedValue(5);
         vi.mocked(mockLicenseRepo.getMembersLiteCount).mockResolvedValue(2);
-        vi.mocked(mockSubscriptionHandler.getActivePlan).mockResolvedValue({
+        vi.mocked(mockPlanProvider.getActivePlan).mockResolvedValue({
           maxMembers: 100,
           maxMembersLite: 100,
           overrideAddingLimitations: false,
@@ -300,7 +321,7 @@ describe("InviteService", () => {
       it("does not enforce limits", async () => {
         vi.mocked(mockLicenseRepo.getMemberCount).mockResolvedValue(1000);
         vi.mocked(mockLicenseRepo.getMembersLiteCount).mockResolvedValue(1000);
-        vi.mocked(mockSubscriptionHandler.getActivePlan).mockResolvedValue({
+        vi.mocked(mockPlanProvider.getActivePlan).mockResolvedValue({
           maxMembers: 1,
           maxMembersLite: 1,
           overrideAddingLimitations: true,

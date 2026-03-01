@@ -99,7 +99,7 @@ const defaultFormData: FormData = {
   maxAgents: ENTERPRISE_TEMPLATE.maxAgents ?? 1000,
   maxExperiments: ENTERPRISE_TEMPLATE.maxExperiments ?? 1000,
   canPublish: ENTERPRISE_TEMPLATE.canPublish,
-  usageUnit: (ENTERPRISE_TEMPLATE.usageUnit as "traces" | "events") ?? "traces",
+  usageUnit: (ENTERPRISE_TEMPLATE.usageUnit as "traces" | "events") ?? "events",
 };
 
 function downloadLicenseFile(license: string, organizationName: string) {

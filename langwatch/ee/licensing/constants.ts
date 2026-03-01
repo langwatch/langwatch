@@ -97,6 +97,7 @@ const FREE_TIER_LIMITS = {
  * - The value is 9,007,199,254,740,991 - far beyond any real limit
  */
 export const UNLIMITED_PLAN: PlanInfo = {
+  planSource: "free",
   type: "OPEN_SOURCE",
   name: "Open Source",
   free: true,
@@ -131,6 +132,7 @@ export const UNLIMITED_PLAN: PlanInfo = {
  * Provides minimal access to encourage license renewal.
  */
 export const FREE_PLAN: PlanInfo = {
+  planSource: "free",
   type: "FREE",
   name: "Free",
   free: true,

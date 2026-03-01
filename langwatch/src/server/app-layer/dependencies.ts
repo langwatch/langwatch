@@ -9,6 +9,7 @@ import type { ProjectService } from "./projects/project.service";
 import type { SpanStorageService } from "./traces/span-storage.service";
 import type { TokenizerService } from "./traces/tokenizer.service";
 import type { TraceSummaryService } from "./traces/trace-summary.service";
+import type { PlanProvider } from "./subscription/plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import type { UsageService } from "./usage/usage.service";
 
@@ -29,6 +30,7 @@ export interface AppDependencies {
   projects: ProjectService;
   tokenizer: TokenizerService;
   usage: UsageService;
+  planProvider: PlanProvider;
   subscription?: SubscriptionService;
   commands: AppCommands;
 

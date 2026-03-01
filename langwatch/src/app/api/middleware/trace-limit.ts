@@ -2,7 +2,6 @@ import type { MiddlewareHandler } from "hono";
 import { notifyPlanLimitReached } from "../../../../ee/billing";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
-import { SubscriptionHandler } from "~/server/subscriptionHandler";
 import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:api:middleware:trace-limit");
@@ -25,9 +24,9 @@ export const blockTraceUsageExceededMiddleware: MiddlewareHandler = async (
       });
 
       if (team?.organizationId) {
-        const activePlan = await SubscriptionHandler.getActivePlan(
-          team.organizationId,
-        );
+        const activePlan = await getApp().planProvider.getActivePlan({
+          organizationId: team.organizationId,
+        });
 
         await notifyPlanLimitReached({
           organizationId: team.organizationId,
