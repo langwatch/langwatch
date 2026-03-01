@@ -4,6 +4,7 @@ import numeral from "numeral";
 import { useEffect, useState } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
+import { useTraceUpdateListener } from "../../hooks/useTraceUpdateListener";
 import type { Span } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import {
@@ -271,7 +272,7 @@ export function SpanTree(props: SpanTreeProps) {
     {
       enabled: !!project && !!traceId,
       refetchOnWindowFocus: false,
-      refetchInterval: keepRefetching ? 1_000 : undefined,
+      refetchInterval: keepRefetching ? 5_000 : undefined,
     },
   );
 
@@ -286,6 +287,14 @@ export function SpanTree(props: SpanTreeProps) {
     }, 10_000);
     return () => clearTimeout(timeout);
   }, [trace.data?.timestamps.inserted_at]);
+
+  useTraceUpdateListener({
+    projectId: project?.id ?? "",
+    traceId,
+    onSpanStored: (_traceIds) => void spans.refetch(),
+    onTraceSummaryUpdated: (_traceIds) => void trace.refetch(),
+    enabled: !!project && !!traceId,
+  });
 
   const span = spanId
     ? spans.data?.find((span) => span.span_id === spanId)

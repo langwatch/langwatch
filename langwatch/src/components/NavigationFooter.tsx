@@ -236,6 +236,8 @@ export function MessagesNavigationFooter({
   changePageSize: (size: number) => void;
   scrollId?: string | null;
 }) {
+  if (totalHits === 0 && pageOffset === 0 && !useCursorPagination) return null;
+
   const isPrevDisabled = !useCursorPagination && pageOffset === 0;
   const isNextDisabled = useCursorPagination
     ? !scrollId

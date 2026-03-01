@@ -29,6 +29,7 @@ import { createEvaluationEsSyncReactor } from "./pipelines/evaluation-processing
 import { createEvaluationTriggerReactor } from "./pipelines/trace-processing/reactors/evaluationTrigger.reactor";
 import { createSatisfactionScoreReactor } from "./pipelines/trace-processing/reactors/satisfactionScore.reactor";
 import { createTraceUpdateBroadcastReactor } from "./pipelines/trace-processing/reactors/traceUpdateBroadcast.reactor";
+import { createSpanStorageBroadcastReactor } from "./pipelines/trace-processing/reactors/spanStorageBroadcast.reactor";
 import {
   ExperimentRunStateRepositoryClickHouse,
   ExperimentRunStateRepositoryMemory,
@@ -120,6 +121,11 @@ export class PipelineRegistry {
       hasRedis: !!this.deps.eventSourcing.redisConnection,
     });
 
+    const spanStorageBroadcastReactor = createSpanStorageBroadcastReactor({
+      broadcast: this.deps.broadcast,
+      hasRedis: !!this.deps.eventSourcing.redisConnection,
+    });
+
     // Mutable ref: the reactor closure captures this, we fill it after registration
     const satisfactionCommandRef: {
       dispatch: AppCommands["traces"]["assignSatisfactionScore"] | null;
@@ -144,6 +150,7 @@ export class PipelineRegistry {
         evaluationTriggerReactor,
         traceUpdateBroadcastReactor,
         satisfactionScoreReactor,
+        spanStorageBroadcastReactor,
       }),
     );
 

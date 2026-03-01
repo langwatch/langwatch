@@ -12,14 +12,13 @@ import type {
  * Known attribute keys that map to reserved TraceMetadata fields.
  */
 const RESERVED_ATTRIBUTE_MAPPINGS: Record<string, keyof TraceMetadata> = {
-  "thread.id": "thread_id",
-  "langwatch.thread_id": "thread_id",
-  "langgraph.thread_id": "thread_id",
+  // Canonical keys (set by canonicalization)
   "gen_ai.conversation.id": "thread_id",
-  "user.id": "user_id",
   "langwatch.user_id": "user_id",
-  "customer.id": "customer_id",
   "langwatch.customer_id": "customer_id",
+  // LangGraph thread ID (forwarded from fold projection)
+  "langgraph.thread_id": "thread_id",
+  // SDK info (extracted from resource attributes)
   "sdk.name": "sdk_name",
   "sdk.version": "sdk_version",
   "sdk.language": "sdk_language",
@@ -187,6 +186,37 @@ function extractMessageContent(msg: unknown): string | null {
     return texts.length > 0 ? texts.join("\n") : null;
   }
 
+  // Handle parts format (Mastra): { parts: [{ type: "text", content: "..." }] }
+  if (Array.isArray(obj.parts)) {
+    const texts = obj.parts
+      .filter(
+        (p: unknown): p is Record<string, unknown> =>
+          typeof p === "object" && p !== null,
+      )
+      .map((p) => {
+        if (typeof p.content === "string") return p.content;
+        if (typeof p.text === "string") return p.text;
+        return null;
+      })
+      .filter((t): t is string => typeof t === "string");
+    return texts.length > 0 ? texts.join("\n") : null;
+  }
+
+  return null;
+}
+
+/**
+ * Extracts the text content of the last user message from an array of messages.
+ */
+function extractLastUserMessageText(messages: unknown[]): string | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (!msg || typeof msg !== "object") continue;
+    const obj = msg as Record<string, unknown>;
+    if (obj.role !== "user") continue;
+    const text = extractMessageContent(obj);
+    if (text) return text;
+  }
   return null;
 }
 
@@ -223,7 +253,12 @@ function extractTextFromMessages(
     const { type, value } = data;
 
     if (type === "chat_messages" && Array.isArray(value)) {
-      // Extract text from chat messages array
+      // For input mode, extract only the last user message
+      if (mode === "input") {
+        const lastUserText = extractLastUserMessageText(value);
+        if (lastUserText) return lastUserText;
+      }
+      // Fallback: concatenate all messages
       const texts = value
         .map((msg) => extractMessageContent(msg))
         .filter((t): t is string => t !== null);
@@ -248,6 +283,12 @@ function extractTextFromMessages(
 
   // Handle array of messages directly
   if (Array.isArray(data)) {
+    // For input mode, extract only the last user message
+    if (mode === "input") {
+      const lastUserText = extractLastUserMessageText(data);
+      if (lastUserText) return lastUserText;
+    }
+    // Fallback: concatenate all messages
     const texts = data
       .map((msg) => extractMessageContent(msg))
       .filter((t): t is string => t !== null);
@@ -263,22 +304,56 @@ function extractTextFromMessages(
 }
 
 /**
+ * Reads annotated value types from the trace summary attributes.
+ * Returns true if the given attribute key has the specified type.
+ */
+function hasAnnotatedType(
+  attributes: Record<string, string>,
+  attrKey: string,
+  type: string,
+): boolean {
+  const raw = attributes["langwatch.reserved.value_types"];
+  if (!raw) return false;
+  try {
+    const arr: string[] = JSON.parse(raw);
+    return arr.includes(`${attrKey}=${type}`);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Parses the computed input string to TraceInput format.
- * Attempts to extract text from chat message formats.
+ * Uses value type annotations from attributes when available to avoid
+ * heuristic guessing.
  *
  * @param computedInput - The computed input string from ClickHouse
+ * @param attributes - Trace summary attributes (for value type hints)
  * @returns TraceInput with extracted text value
  */
 function parseComputedInput(
   computedInput: string | null,
+  attributes: Record<string, string>,
 ): TraceInput | undefined {
   if (!computedInput) {
     return void 0;
   }
 
+  // Check value type annotation for a hint
+  const isChatMessages =
+    hasAnnotatedType(attributes, "gen_ai.input.messages", "chat_messages") ||
+    hasAnnotatedType(attributes, "langwatch.input", "chat_messages");
+
   // Try to parse as JSON and extract text from chat messages
   try {
     const parsed = JSON.parse(computedInput);
+
+    // If annotated as chat_messages, treat as message array
+    if (isChatMessages && Array.isArray(parsed)) {
+      const text = extractTextFromMessages(parsed, "input");
+      if (text) return { value: text };
+    }
+
     const text = extractTextFromMessages(parsed, "input");
     if (text) {
       return { value: text };
@@ -294,21 +369,36 @@ function parseComputedInput(
 
 /**
  * Parses the computed output string to TraceOutput format.
- * Attempts to extract text from chat message formats.
+ * Uses value type annotations from attributes when available to avoid
+ * heuristic guessing.
  *
  * @param computedOutput - The computed output string from ClickHouse
+ * @param attributes - Trace summary attributes (for value type hints)
  * @returns TraceOutput with extracted text value
  */
 function parseComputedOutput(
   computedOutput: string | null,
+  attributes: Record<string, string>,
 ): TraceOutput | undefined {
   if (!computedOutput) {
     return void 0;
   }
 
+  // Check value type annotation for a hint
+  const isChatMessages =
+    hasAnnotatedType(attributes, "gen_ai.output.messages", "chat_messages") ||
+    hasAnnotatedType(attributes, "langwatch.output", "chat_messages");
+
   // Try to parse as JSON and extract text from chat messages
   try {
     const parsed = JSON.parse(computedOutput);
+
+    // If annotated as chat_messages, treat as message array
+    if (isChatMessages && Array.isArray(parsed)) {
+      const text = extractTextFromMessages(parsed, "output");
+      if (text) return { value: text };
+    }
+
     const text = extractTextFromMessages(parsed, "output");
     if (text) {
       return { value: text };
@@ -364,8 +454,8 @@ export function mapTraceSummaryToTrace(
       inserted_at: summary.createdAt,
       updated_at: summary.lastUpdatedAt,
     },
-    input: parseComputedInput(summary.computedInput),
-    output: parseComputedOutput(summary.computedOutput),
+    input: parseComputedInput(summary.computedInput, summary.attributes),
+    output: parseComputedOutput(summary.computedOutput, summary.attributes),
     metrics: {
       first_token_ms: summary.timeToFirstTokenMs,
       total_time_ms: summary.totalDurationMs,

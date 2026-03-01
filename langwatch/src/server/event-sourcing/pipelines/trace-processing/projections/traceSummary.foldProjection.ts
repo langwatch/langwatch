@@ -1,3 +1,6 @@
+import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
+import { SpanNormalizationPipelineService } from "~/server/app-layer/traces/span-normalization.service";
+import { traceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import {
   estimateCost,
@@ -8,21 +11,18 @@ import type {
   FoldProjectionStore,
 } from "~/server/event-sourcing/projections";
 import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
-import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import {
   TRACE_PROCESSING_EVENT_TYPES,
   TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
 } from "../schemas/constants";
 import type { TraceProcessingEvent } from "../schemas/events";
 import {
-  isSpanReceivedEvent,
   isSatisfactionScoreAssignedEvent,
+  isSpanReceivedEvent,
   isTopicAssignedEvent,
 } from "../schemas/events";
 import type { NormalizedSpan } from "../schemas/spans";
 import { NormalizedStatusCode as StatusCode } from "../schemas/spans";
-import { SpanNormalizationPipelineService } from "~/server/app-layer/traces/span-normalization.service";
-import { traceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 
 export type { TraceSummaryData };
 
@@ -64,8 +64,6 @@ function extractModelsFromSpan(span: NormalizedSpan): string[] {
   const candidates = [
     attrs[ATTR_KEYS.GEN_AI_RESPONSE_MODEL],
     attrs[ATTR_KEYS.GEN_AI_REQUEST_MODEL],
-    attrs[ATTR_KEYS.LLM_MODEL_NAME],
-    attrs[ATTR_KEYS.AI_MODEL],
   ];
 
   for (const model of candidates) {
@@ -91,24 +89,15 @@ function extractTokenMetricsFromSpan(span: NormalizedSpan): SpanTokenMetrics {
   let cost = 0;
   let estimated = false;
 
-  // Token counts
+  // Token counts (canonicalization guarantees these canonical keys)
   const inputTokens = attrs[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS];
-  const genAiPromptTokens = attrs[ATTR_KEYS.GEN_AI_USAGE_PROMPT_TOKENS];
   if (typeof inputTokens === "number" && inputTokens > 0) {
     promptTokens = inputTokens;
-  } else if (typeof genAiPromptTokens === "number" && genAiPromptTokens > 0) {
-    promptTokens = genAiPromptTokens;
   }
 
   const outputTokens = attrs[ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS];
-  const genAiCompletionTokens = attrs[ATTR_KEYS.GEN_AI_USAGE_COMPLETION_TOKENS];
   if (typeof outputTokens === "number" && outputTokens > 0) {
     completionTokens = outputTokens;
-  } else if (
-    typeof genAiCompletionTokens === "number" &&
-    genAiCompletionTokens > 0
-  ) {
-    completionTokens = genAiCompletionTokens;
   }
 
   // Cost: compute from model pricing instead of reading SDK cost directly
@@ -147,26 +136,26 @@ function extractTokenMetricsFromSpan(span: NormalizedSpan): SpanTokenMetrics {
     }
   }
 
-  // Guardrail cost: extract from langwatch.output JSON when span is a guardrail
+  // Guardrail cost: extract from langwatch.output when span is a guardrail
   if (cost === 0) {
     const spanType = attrs[ATTR_KEYS.SPAN_TYPE];
     if (spanType === "guardrail") {
       const rawOutput = attrs[ATTR_KEYS.LANGWATCH_OUTPUT];
-      if (typeof rawOutput === "string") {
-        try {
-          const parsed = JSON.parse(rawOutput) as Record<string, unknown>;
-          const costObj = parsed.cost as
-            | { amount?: number; currency?: string }
-            | undefined;
-          if (
-            costObj &&
-            typeof costObj.amount === "number" &&
-            costObj.currency === "USD"
-          ) {
-            cost = costObj.amount;
-          }
-        } catch {
-          // Ignore parse errors
+      if (
+        rawOutput &&
+        typeof rawOutput === "object" &&
+        !Array.isArray(rawOutput)
+      ) {
+        const parsed = rawOutput as Record<string, unknown>;
+        const costObj = parsed.cost as
+          | { amount?: number; currency?: string }
+          | undefined;
+        if (
+          costObj &&
+          typeof costObj.amount === "number" &&
+          costObj.currency === "USD"
+        ) {
+          cost = costObj.amount;
         }
       }
     }
@@ -293,22 +282,10 @@ function extractAttributesFromSpan(
     }
   }
 
-  // Thread/User context from span attributes
-  const threadId =
-    spanAttrs[ATTR_KEYS.GEN_AI_CONVERSATION_ID] ??
-    spanAttrs[ATTR_KEYS.LANGWATCH_THREAD_ID] ??
-    spanAttrs[ATTR_KEYS.LANGWATCH_THREAD_ID_LEGACY] ??
-    spanAttrs[ATTR_KEYS.LANGWATCH_THREAD_ID_LEGACY_ROOT];
-
-  const userId =
-    spanAttrs[ATTR_KEYS.LANGWATCH_USER_ID] ??
-    spanAttrs[ATTR_KEYS.LANGWATCH_USER_ID_LEGACY] ??
-    spanAttrs[ATTR_KEYS.LANGWATCH_USER_ID_LEGACY_ROOT];
-
-  const customerId =
-    spanAttrs[ATTR_KEYS.LANGWATCH_CUSTOMER_ID] ??
-    spanAttrs[ATTR_KEYS.LANGWATCH_CUSTOMER_ID_LEGACY] ??
-    spanAttrs[ATTR_KEYS.LANGWATCH_CUSTOMER_ID_LEGACY_ROOT];
+  // Thread/User context from canonical span attributes (set by canonicalization)
+  const threadId = spanAttrs[ATTR_KEYS.GEN_AI_CONVERSATION_ID];
+  const userId = spanAttrs[ATTR_KEYS.LANGWATCH_USER_ID];
+  const customerId = spanAttrs[ATTR_KEYS.LANGWATCH_CUSTOMER_ID];
 
   if (typeof threadId === "string")
     attributes["gen_ai.conversation.id"] = threadId;
@@ -316,43 +293,35 @@ function extractAttributesFromSpan(
   if (typeof customerId === "string")
     attributes["langwatch.customer_id"] = customerId;
 
+  // Agent/Provider info from canonical span attributes
+  const agentName = spanAttrs[ATTR_KEYS.GEN_AI_AGENT_NAME];
+  const agentId = spanAttrs[ATTR_KEYS.GEN_AI_AGENT_ID];
+  const providerName = spanAttrs[ATTR_KEYS.GEN_AI_PROVIDER_NAME];
+
+  if (typeof agentName === "string")
+    attributes["gen_ai.agent.name"] = agentName;
+  if (typeof agentId === "string") attributes["gen_ai.agent.id"] = agentId;
+  if (typeof providerName === "string")
+    attributes["gen_ai.provider.name"] = providerName;
+
   // LangGraph metadata
   const langgraphThreadId = spanAttrs[ATTR_KEYS.LANGWATCH_LANGGRAPH_THREAD_ID];
   if (typeof langgraphThreadId === "string")
     attributes["langgraph.thread_id"] = langgraphThreadId;
 
-  // Labels
+  // Labels (canonical key only — canonicalization already promoted from metadata)
   const labels = spanAttrs[ATTR_KEYS.LANGWATCH_LABELS];
-  if (typeof labels === "string") attributes["langwatch.labels"] = labels;
-
-  const metadataLabels = spanAttrs["metadata.labels"];
-  if (typeof metadataLabels === "string" && !attributes["langwatch.labels"]) {
-    attributes["langwatch.labels"] = metadataLabels;
+  if (typeof labels === "string") {
+    attributes["langwatch.labels"] = labels;
+  } else if (Array.isArray(labels)) {
+    attributes["langwatch.labels"] = JSON.stringify(labels);
   }
 
-  // Parse metadata JSON
-  const metadataJson = spanAttrs["metadata"];
-  if (typeof metadataJson === "string") {
-    try {
-      const parsed = JSON.parse(metadataJson) as unknown;
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-        const parsedObj = parsed as Record<string, unknown>;
-        if (
-          Array.isArray(parsedObj.labels) &&
-          !attributes["langwatch.labels"]
-        ) {
-          attributes["langwatch.labels"] = JSON.stringify(parsedObj.labels);
-        }
-        for (const [key, value] of Object.entries(parsedObj)) {
-          if (key !== "labels" && value !== null && value !== undefined) {
-            const dotKey = `metadata.${key}`;
-            attributes[dotKey] =
-              typeof value === "string" ? value : JSON.stringify(value);
-          }
-        }
-      }
-    } catch {
-      // Ignore parse errors
+  // Custom metadata fields — canonicalization hoists them as metadata.{key}
+  // so we just need to forward any metadata.* attributes
+  for (const [key, value] of Object.entries(spanAttrs)) {
+    if (key.startsWith("metadata.") && typeof value === "string") {
+      attributes[key] = value;
     }
   }
 
@@ -442,14 +411,14 @@ export function applySpanToSummary(
   let blockedByGuardrail = state.blockedByGuardrail;
   if (spanType === "guardrail") {
     const rawOutput = span.spanAttributes[ATTR_KEYS.LANGWATCH_OUTPUT];
-    if (typeof rawOutput === "string") {
-      try {
-        const parsed = JSON.parse(rawOutput) as Record<string, unknown>;
-        if (parsed.passed === false) {
-          blockedByGuardrail = true;
-        }
-      } catch {
-        // Ignore parse errors
+    if (
+      rawOutput &&
+      typeof rawOutput === "object" &&
+      !Array.isArray(rawOutput)
+    ) {
+      const parsed = rawOutput as Record<string, unknown>;
+      if (parsed.passed === false) {
+        blockedByGuardrail = true;
       }
     }
   }
@@ -458,6 +427,10 @@ export function applySpanToSummary(
   let computedOutput = state.computedOutput;
   let outputFromRoot = state.outputFromRootSpan;
   let outputSpanEndTimeMs = state.outputSpanEndTimeMs;
+  // Track whether current output came from explicit (langwatch.*) vs inferred (gen_ai.*) source
+  const currentOutputSource =
+    state.attributes["langwatch.reserved.output_source"] ?? "inferred";
+  let newOutputSource: string | undefined;
 
   if (!isExcludedType) {
     const inputResult = traceIOExtractionService.extractRichIOFromSpan(
@@ -479,16 +452,26 @@ export function applySpanToSummary(
     );
     if (outputResult) {
       const isRootSpan = !span.parentSpanId;
-      // Root always wins; among non-root, last-finishing wins (matches batch logic)
+      const isExplicit = outputResult.source === "langwatch";
+      const currentIsExplicit = currentOutputSource === "explicit";
+
+      // Override rules:
+      // 1. Root always wins
+      // 2. Explicit (langwatch.output) beats inferred (gen_ai.output.messages)
+      // 3. Among same source type, last-finishing wins
       const shouldOverride =
         isRootSpan ||
-        (!outputFromRoot && span.endTimeUnixMs >= outputSpanEndTimeMs);
+        (!outputFromRoot &&
+          ((isExplicit && !currentIsExplicit) ||
+            (isExplicit === currentIsExplicit &&
+              span.endTimeUnixMs >= outputSpanEndTimeMs)));
 
       if (shouldOverride) {
         const raw = outputResult.raw;
         computedOutput = typeof raw === "string" ? raw : JSON.stringify(raw);
         outputFromRoot = isRootSpan;
         outputSpanEndTimeMs = span.endTimeUnixMs;
+        newOutputSource = isExplicit ? "explicit" : "inferred";
       }
     }
   }
@@ -496,6 +479,33 @@ export function applySpanToSummary(
   // Attributes (first-wins per key)
   const spanAttributes = extractAttributesFromSpan(span);
   const mergedAttributes = { ...spanAttributes, ...state.attributes };
+
+  // Track output source in attributes for cross-span override decisions
+  mergedAttributes["langwatch.reserved.output_source"] =
+    newOutputSource ?? currentOutputSource;
+
+  // PII redaction status tracking — accumulate span IDs by severity
+  const piiStatus =
+    span.spanAttributes[ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_STATUS];
+  if (piiStatus === "partial") {
+    const key = ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_PARTIAL_SPAN_IDS;
+    const existing = mergedAttributes[key];
+    let ids: string[] = [];
+    if (existing) {
+      try { ids = JSON.parse(existing) as string[]; } catch { ids = []; }
+    }
+    ids.push(span.spanId);
+    mergedAttributes[key] = JSON.stringify(ids);
+  } else if (piiStatus === "none") {
+    const key = ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_SKIPPED_SPAN_IDS;
+    const existing = mergedAttributes[key];
+    let ids: string[] = [];
+    if (existing) {
+      try { ids = JSON.parse(existing) as string[]; } catch { ids = []; }
+    }
+    ids.push(span.spanId);
+    mergedAttributes[key] = JSON.stringify(ids);
+  }
 
   return {
     ...state,

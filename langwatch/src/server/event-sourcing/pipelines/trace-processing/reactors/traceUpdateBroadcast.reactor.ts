@@ -42,7 +42,7 @@ export function createTraceUpdateBroadcastReactor(
 
       try {
         const payload = JSON.stringify({
-          event: "trace_updated",
+          event: "trace_summary_updated",
           traceId,
         });
 

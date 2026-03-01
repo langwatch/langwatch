@@ -78,7 +78,7 @@ describe("GenAIExtractor", () => {
       extractor.apply(ctx);
 
       expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toEqual(
-        JSON.stringify([{ role: "user", content: "What is 2+2?" }]),
+        [{ role: "user", content: "What is 2+2?" }],
       );
     });
 
@@ -99,6 +99,45 @@ describe("GenAIExtractor", () => {
     });
   });
 
+  describe("when gen_ai.input.messages already in bag with system message", () => {
+    it("strips system messages and sets system_instruction", () => {
+      const messages = [
+        { role: "system", content: "You are a helpful assistant." },
+        { role: "user", content: "Hello" },
+        { role: "assistant", content: "Hi there" },
+      ];
+      const ctx = createExtractorContext({
+        [ATTR_KEYS.GEN_AI_INPUT_MESSAGES]: messages,
+      });
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_REQUEST_SYSTEM_INSTRUCTION]).toBe(
+        "You are a helpful assistant.",
+      );
+      expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toEqual([
+        { role: "user", content: "Hello" },
+        { role: "assistant", content: "Hi there" },
+      ]);
+    });
+
+    it("leaves messages unchanged when no system message present", () => {
+      const messages = [
+        { role: "user", content: "Hello" },
+        { role: "assistant", content: "Hi" },
+      ];
+      const ctx = createExtractorContext({
+        [ATTR_KEYS.GEN_AI_INPUT_MESSAGES]: messages,
+      });
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_REQUEST_SYSTEM_INSTRUCTION]).toBeUndefined();
+      // Messages stay in bag (not re-set via ctx.setAttr)
+      expect(ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES)).toBe(true);
+    });
+  });
+
   describe("when gen_ai.completion is present", () => {
     it("maps to gen_ai.output.messages as assistant message", () => {
       const ctx = createExtractorContext({
@@ -108,7 +147,7 @@ describe("GenAIExtractor", () => {
       extractor.apply(ctx);
 
       expect(ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES]).toEqual(
-        JSON.stringify([{ role: "assistant", content: "The answer is 4." }]),
+        [{ role: "assistant", content: "The answer is 4." }],
       );
     });
   });
@@ -122,9 +161,7 @@ describe("GenAIExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toEqual(
-        JSON.stringify(messages),
-      );
+      expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toEqual(messages);
     });
   });
 
@@ -137,9 +174,7 @@ describe("GenAIExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES]).toEqual(
-        JSON.stringify(messages),
-      );
+      expect(ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES]).toEqual(messages);
     });
   });
 
@@ -182,6 +217,102 @@ describe("GenAIExtractor", () => {
       extractor.apply(ctx);
 
       expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS]).toBe(75);
+    });
+  });
+
+  describe("when reasoning tokens arrive as a string", () => {
+    it("coerces string to number", () => {
+      const ctx = createExtractorContext({
+        [ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS]: "720",
+      });
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS]).toBe(720);
+    });
+
+    it("leaves numeric values untouched (passes through remaining)", () => {
+      const ctx = createExtractorContext({
+        [ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS]: 500,
+      });
+
+      extractor.apply(ctx);
+
+      // Numeric values stay in the bag and pass through remaining()
+      expect(ctx.bag.attrs.get(ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS)).toBe(
+        500,
+      );
+    });
+  });
+
+  describe("when cache tokens arrive as strings", () => {
+    it("coerces cache_read.input_tokens string to number", () => {
+      const ctx = createExtractorContext({
+        [ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]: "1024",
+      });
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(
+        1024,
+      );
+    });
+
+    it("coerces cache_creation.input_tokens string to number", () => {
+      const ctx = createExtractorContext({
+        [ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]: "256",
+      });
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]).toBe(
+        256,
+      );
+    });
+  });
+
+  describe("when request parameters arrive as strings", () => {
+    it("coerces temperature string to number", () => {
+      const ctx = createExtractorContext({
+        [ATTR_KEYS.GEN_AI_REQUEST_TEMPERATURE]: "1",
+      });
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_REQUEST_TEMPERATURE]).toBe(1);
+    });
+
+    it("coerces max_tokens string to number", () => {
+      const ctx = createExtractorContext({
+        [ATTR_KEYS.GEN_AI_REQUEST_MAX_TOKENS]: "4096",
+      });
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_REQUEST_MAX_TOKENS]).toBe(4096);
+    });
+
+    it("coerces top_p string to number", () => {
+      const ctx = createExtractorContext({
+        [ATTR_KEYS.GEN_AI_REQUEST_TOP_P]: "0.9",
+      });
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_REQUEST_TOP_P]).toBe(0.9);
+    });
+
+    it("leaves numeric values untouched (passes through remaining)", () => {
+      const ctx = createExtractorContext({
+        [ATTR_KEYS.GEN_AI_REQUEST_TEMPERATURE]: 0.7,
+      });
+
+      extractor.apply(ctx);
+
+      // Numeric values stay in the bag and pass through remaining()
+      expect(ctx.bag.attrs.get(ATTR_KEYS.GEN_AI_REQUEST_TEMPERATURE)).toBe(
+        0.7,
+      );
     });
   });
 

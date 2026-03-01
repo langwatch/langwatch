@@ -18,7 +18,7 @@
  */
 
 import { ATTR_KEYS } from "./_constants";
-import { inferSpanTypeIfAbsent } from "./_helpers";
+import { extractErrorInfo, inferSpanTypeIfAbsent } from "./_extraction";
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 
 export class FallbackExtractor implements CanonicalAttributesExtractor {
@@ -27,8 +27,9 @@ export class FallbackExtractor implements CanonicalAttributesExtractor {
   apply(ctx: ExtractorContext): void {
     const { attrs } = ctx.bag;
 
-    // Skip if type is already set
-    if (attrs.has(ATTR_KEYS.SPAN_TYPE)) {
+    // Skip type inference if already set (in bag or by a previous extractor)
+    if (attrs.has(ATTR_KEYS.SPAN_TYPE) || ctx.out[ATTR_KEYS.SPAN_TYPE] !== undefined) {
+      extractErrorInfo(ctx);
       return;
     }
 
@@ -92,5 +93,12 @@ export class FallbackExtractor implements CanonicalAttributesExtractor {
     if (hasGenAiSignals || hasVercelSignals || hasLegacyLlmSignals) {
       inferSpanTypeIfAbsent(ctx, "llm", `${this.id}:llm`);
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Error Consolidation
+    // Runs for every span regardless of SDK. Consolidates exception.*,
+    // error.*, status.message, span.error.* into canonical error.type.
+    // ─────────────────────────────────────────────────────────────────────────
+    extractErrorInfo(ctx);
   }
 }

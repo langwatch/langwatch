@@ -298,7 +298,7 @@ const INDEXED_KEY_REGEX = /^(.+?)\.(\d+)\.(.+)$/;
 
 type ArrayPatternMap = Map<
   string,
-  Map<number, Map<string, NormalizedAttributes[string]>>
+  Map<number, Map<string, unknown>>
 >;
 
 /**
@@ -387,7 +387,7 @@ const isValidArrayPattern = (
  *   { message: { content: "hello", role: "user" } }
  */
 const unflattenObject = (
-  flatMap: Map<string, NormalizedAttributes[string]>,
+  flatMap: Map<string, unknown>,
 ): Record<string, unknown> => {
   const result: Record<string, unknown> = {};
 
@@ -419,7 +419,7 @@ const unflattenObject = (
  *   "llm.input_messages.1.message.content" => "hi"
  *
  * Into:
- *   "llm.input_messages" => '[{"message":{"content":"hello","role":"user"}},{"message":{"content":"hi"}}]'
+ *   "llm.input_messages" => [{message:{content:"hello",role:"user"}},{message:{content:"hi"}}]
  */
 const reconstructFlattenedArrays = (
   attrs: NormalizedAttributes,
@@ -463,8 +463,56 @@ const reconstructFlattenedArrays = (
       arrayItems.push(item);
     }
 
-    // Store as JSON string
-    result[prefix] = JSON.stringify(arrayItems);
+    // Store as real array (not JSON string)
+    result[prefix] = arrayItems;
+  }
+
+  return result;
+};
+
+/**
+ * Maximum string size to attempt synchronous JSON parsing.
+ * Strings larger than this are left as-is to avoid blocking the event loop.
+ */
+const MAX_JSON_PARSE_SIZE = 2_000_000;
+
+/**
+ * Parses string values that look like JSON into their parsed form.
+ * Scalars and already-parsed values pass through unchanged.
+ *
+ * Fast-path: only attempts parse if the trimmed string starts with `{` or `[`.
+ */
+const parseJsonStringValues = (
+  attrs: NormalizedAttributes,
+): NormalizedAttributes => {
+  const result: NormalizedAttributes = {};
+
+  for (const [key, value] of Object.entries(attrs)) {
+    if (typeof value !== "string") {
+      result[key] = value;
+      continue;
+    }
+
+    const trimmed = value.trim();
+    if (trimmed.length < 2 || trimmed.length > MAX_JSON_PARSE_SIZE) {
+      result[key] = value;
+      continue;
+    }
+
+    const looksJson =
+      (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+      (trimmed.startsWith("[") && trimmed.endsWith("]"));
+
+    if (!looksJson) {
+      result[key] = value;
+      continue;
+    }
+
+    try {
+      result[key] = JSON.parse(trimmed);
+    } catch {
+      result[key] = value;
+    }
   }
 
   return result;
@@ -486,8 +534,9 @@ const normalizeOtlpAttributes = (
     }
   }
 
-  // Post-process to reconstruct flattened arrays into JSON strings
-  return reconstructFlattenedArrays(normalizedAttributes);
+  // Post-process: reconstruct flattened arrays, then parse JSON string values
+  const reconstructed = reconstructFlattenedArrays(normalizedAttributes);
+  return parseJsonStringValues(reconstructed);
 };
 
 const convertUnixNanoToUnixMs = (unixNano: number): number => {

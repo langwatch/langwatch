@@ -282,24 +282,13 @@ function enrichRagContextIds(span: NormalizedSpan): void {
   const raw =
     span.spanAttributes[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS] ??
     span.spanAttributes[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS_LEGACY];
-  if (typeof raw !== "string") return;
+  if (!Array.isArray(raw)) return;
 
-  let contexts: unknown[];
-  try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return;
-    contexts = parsed;
-  } catch {
-    return;
-  }
-
-  const allMissingIds = contexts.every(
-    (ctx) => !ctx || typeof ctx !== "object" || !("document_id" in ctx),
-  );
-  if (!allMissingIds) return;
-
-  const enriched = contexts.filter(Boolean).map((ctx) => {
+  const enriched = raw.map((ctx) => {
+    if (!ctx || typeof ctx !== "object") return ctx;
     const ctxObj = ctx as Record<string, unknown>;
+    // Skip items that already have a document_id
+    if ("document_id" in ctxObj && ctxObj.document_id) return ctxObj;
     return {
       ...ctxObj,
       document_id: generateDocumentId(
@@ -308,7 +297,6 @@ function enrichRagContextIds(span: NormalizedSpan): void {
     };
   });
 
-  // Write back to the canonical attribute key
-  span.spanAttributes[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS] =
-    JSON.stringify(enriched);
+  // Write back to the canonical attribute key (as real array)
+  span.spanAttributes[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS] = enriched;
 }

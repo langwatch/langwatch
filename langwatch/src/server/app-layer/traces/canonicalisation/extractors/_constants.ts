@@ -102,6 +102,12 @@ export const ATTR_KEYS = {
   LANGWATCH_LANGGRAPH_STEP: "langwatch.langgraph.langgraph_step",
   LANGWATCH_LABELS: "langwatch.labels",
   LANGWATCH_TAGS: "langwatch.tags", // Legacy/alternative name
+  LANGWATCH_RESERVED_PII_REDACTION_STATUS:
+    "langwatch.reserved.pii_redaction_status",
+  LANGWATCH_RESERVED_PII_REDACTION_PARTIAL_SPAN_IDS:
+    "langwatch.reserved.pii_redaction_partial_span_ids",
+  LANGWATCH_RESERVED_PII_REDACTION_SKIPPED_SPAN_IDS:
+    "langwatch.reserved.pii_redaction_skipped_span_ids",
 
   // Error attributes
   ERROR_TYPE: "error.type",
@@ -138,10 +144,23 @@ export const ATTR_KEYS = {
   // Logfire attributes
   RAW_INPUT: "raw_input",
 
+  // Extended GenAI usage tokens
+  GEN_AI_USAGE_REASONING_TOKENS: "gen_ai.usage.reasoning_tokens",
+  GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS: "gen_ai.usage.cache_read.input_tokens",
+  GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS:
+    "gen_ai.usage.cache_creation.input_tokens",
+  GEN_AI_USAGE_CACHED_INPUT_TOKENS: "gen_ai.usage.cached_input_tokens", // Mastra non-standard
+
   // Mastra attributes
   MASTRA_INPUT: "input",
   MASTRA_OUTPUT: "mastra.output",
   MASTRA_SPAN_TYPE: "mastra.span.type",
+  MASTRA_AGENT_RUN_INPUT: "mastra.agent_run.input",
+  MASTRA_AGENT_RUN_OUTPUT: "mastra.agent_run.output",
+  MASTRA_MODEL_STEP_OUTPUT: "mastra.model_step.output",
+  MASTRA_METADATA_THREAD_ID: "mastra.metadata.threadId",
+  MASTRA_MODEL_STEP_INPUT: "mastra.model_step.input",
+  MASTRA_METADATA_PREFIX: "mastra.metadata.",
 } as const;
 
 export const SPAN_TYPE_TO_GEN_AI_OP: Record<string, string> = {

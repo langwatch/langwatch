@@ -160,14 +160,14 @@ describe("applySpanToSummary cost computation", () => {
   });
 
   describe("when span is a guardrail with cost in output", () => {
-    it("extracts guardrail cost from langwatch.output JSON", () => {
+    it("extracts guardrail cost from langwatch.output object", () => {
       const span = createTestSpan({
         spanAttributes: {
           "langwatch.span.type": "guardrail",
-          "langwatch.output": JSON.stringify({
+          "langwatch.output": {
             passed: true,
             cost: { amount: 0.0042, currency: "USD" },
-          }),
+          },
         },
       });
 
@@ -180,10 +180,10 @@ describe("applySpanToSummary cost computation", () => {
       const span = createTestSpan({
         spanAttributes: {
           "langwatch.span.type": "guardrail",
-          "langwatch.output": JSON.stringify({
+          "langwatch.output": {
             passed: true,
             cost: { amount: 0.0042, currency: "EUR" },
-          }),
+          },
         },
       });
 
@@ -192,7 +192,7 @@ describe("applySpanToSummary cost computation", () => {
       expect(result.totalCost).toBeNull();
     });
 
-    it("ignores guardrail cost when output is not valid JSON", () => {
+    it("ignores guardrail cost when output is a string", () => {
       const span = createTestSpan({
         spanAttributes: {
           "langwatch.span.type": "guardrail",
@@ -245,7 +245,7 @@ describe("applySpanToSummary guardrail blocking detection", () => {
       const span = createTestSpan({
         spanAttributes: {
           "langwatch.span.type": "guardrail",
-          "langwatch.output": JSON.stringify({ passed: false }),
+          "langwatch.output": { passed: false },
         },
       });
 
@@ -260,7 +260,7 @@ describe("applySpanToSummary guardrail blocking detection", () => {
       const span = createTestSpan({
         spanAttributes: {
           "langwatch.span.type": "guardrail",
-          "langwatch.output": JSON.stringify({ passed: true }),
+          "langwatch.output": { passed: true },
         },
       });
 

@@ -1,73 +1,141 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { api } from "~/utils/api";
 import { usePageVisibility } from "./usePageVisibility";
 import { useSSESubscription } from "./useSSESubscription";
 
 interface UseTraceUpdateListenerOptions {
   projectId: string;
-  refetch?: () => void | Promise<void>;
+  traceId?: string;
+  onSpanStored?: (traceIds: string[]) => void | Promise<void>;
+  onTraceSummaryUpdated?: (traceIds: string[]) => void | Promise<void>;
   enabled?: boolean;
-  debounceMs?: number;
   pageOffset?: number;
   cursorPageNumber?: number;
+  debounceMs?: number;
+}
+
+interface TraceBroadcastPayload {
+  event: string;
+  traceId?: string;
 }
 
 /**
  * Hook for subscribing to real-time trace updates via tRPC subscriptions.
- * Automatically connects to SSE when enabled and calls refetch when traces are updated.
- * Includes optimizations to reduce unnecessary updates based on page visibility and pagination.
+ * Differentiates between span storage events and trace summary updates
+ * so callers can refetch only the relevant data.
  *
- * @param options - Configuration options
- * @param options.projectId - The project/tenant ID to subscribe to
- * @param options.refetch - Function to call when traces are updated (usually a query refetch function)
- * @param options.enabled - Whether the subscription should be active (default: true)
- * @param options.debounceMs - Debounce delay in milliseconds (default: 1000)
- * @param options.pageOffset - Current page offset for offset-based pagination
- * @param options.cursorPageNumber - Current page number for cursor-based pagination
+ * Uses trailing-edge debounce: events accumulate traceIds during the window,
+ * callback fires only after `debounceMs` of silence. This gives the backend
+ * time to finish processing before we fetch.
+ *
+ * Callbacks receive the accumulated traceIds from the debounce window so
+ * callers can decide whether to refetch (visible trace updated) or just
+ * bump a counter (new trace not on screen).
  */
 export function useTraceUpdateListener({
   projectId,
-  refetch,
+  traceId,
+  onSpanStored,
+  onTraceSummaryUpdated,
   enabled = true,
-  debounceMs = 1000,
   pageOffset,
   cursorPageNumber,
+  debounceMs = 5000,
 }: UseTraceUpdateListenerOptions) {
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isVisible = usePageVisibility();
 
-  // Check if we should process updates based on optimization conditions
-  const shouldProcessUpdate = useMemo(() => {
-    // Don't process if tab is not visible
-    if (!isVisible) return false;
+  // Track when the page became hidden so we can keep processing for a grace period
+  const hiddenAtRef = useRef<number>(0);
+  const HIDDEN_GRACE_MS = 3 * 60_000; // 3 minutes
 
-    // only update if on first page
-    if (pageOffset !== void 0 && pageOffset > 0) return false;
-    // only update if on first page
-    if (cursorPageNumber !== void 0 && cursorPageNumber > 1) return false;
-
-    return true;
-  }, [isVisible, pageOffset, cursorPageNumber]);
-
-  // Debounced update handler
-  const debouncedUpdate = useCallback(() => {
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-      debounceTimerRef.current = null;
+  useEffect(() => {
+    if (isVisible) {
+      hiddenAtRef.current = 0;
+    } else if (hiddenAtRef.current === 0) {
+      hiddenAtRef.current = Date.now();
     }
+  }, [isVisible]);
 
-    debounceTimerRef.current = setTimeout(() => {
-      if (shouldProcessUpdate && refetch) {
-        void refetch();
+  const isOnFirstPage =
+    (pageOffset === void 0 || pageOffset === 0) &&
+    (cursorPageNumber === void 0 || cursorPageNumber <= 1);
+
+  // Evaluated at call time (not memoized) so the grace-period check uses fresh timestamps
+  const shouldProcessUpdateNow = useCallback(() => {
+    if (!isOnFirstPage) return false;
+    if (isVisible) return true;
+    // Page is hidden — allow for a grace period
+    return (
+      hiddenAtRef.current > 0 &&
+      Date.now() - hiddenAtRef.current < HIDDEN_GRACE_MS
+    );
+  }, [isVisible, isOnFirstPage]);
+
+  // Stable refs for callbacks to avoid stale closures in timers
+  const onSpanStoredRef = useRef(onSpanStored);
+  onSpanStoredRef.current = onSpanStored;
+
+  const onTraceSummaryUpdatedRef = useRef(onTraceSummaryUpdated);
+  onTraceSummaryUpdatedRef.current = onTraceSummaryUpdated;
+
+  // Trailing-edge debounce state for span events
+  const spanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const spanTraceIdsRef = useRef<Set<string>>(new Set());
+
+  // Trailing-edge debounce state for summary events
+  const summaryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const summaryTraceIdsRef = useRef<Set<string>>(new Set());
+
+  const scheduleSpanUpdate = useCallback(
+    (eventTraceId: string | undefined) => {
+      if (!shouldProcessUpdateNow()) return;
+
+      if (eventTraceId) {
+        spanTraceIdsRef.current.add(eventTraceId);
       }
-    }, debounceMs);
-  }, [shouldProcessUpdate, debounceMs, refetch]);
 
-  // Cleanup debounce timer on unmount
+      if (spanTimerRef.current) {
+        clearTimeout(spanTimerRef.current);
+      }
+      spanTimerRef.current = setTimeout(() => {
+        spanTimerRef.current = null;
+        const ids = [...spanTraceIdsRef.current];
+        spanTraceIdsRef.current = new Set();
+        void onSpanStoredRef.current?.(ids);
+      }, debounceMs);
+    },
+    [shouldProcessUpdateNow, debounceMs],
+  );
+
+  const scheduleSummaryUpdate = useCallback(
+    (eventTraceId: string | undefined) => {
+      if (!shouldProcessUpdateNow()) return;
+
+      if (eventTraceId) {
+        summaryTraceIdsRef.current.add(eventTraceId);
+      }
+
+      if (summaryTimerRef.current) {
+        clearTimeout(summaryTimerRef.current);
+      }
+      summaryTimerRef.current = setTimeout(() => {
+        summaryTimerRef.current = null;
+        const ids = [...summaryTraceIdsRef.current];
+        summaryTraceIdsRef.current = new Set();
+        void onTraceSummaryUpdatedRef.current?.(ids);
+      }, debounceMs);
+    },
+    [shouldProcessUpdateNow, debounceMs],
+  );
+
+  // Cleanup timers on unmount
   useEffect(() => {
     return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
+      if (spanTimerRef.current) {
+        clearTimeout(spanTimerRef.current);
+      }
+      if (summaryTimerRef.current) {
+        clearTimeout(summaryTimerRef.current);
       }
     };
   }, []);
@@ -76,53 +144,31 @@ export function useTraceUpdateListener({
     { event: string; timestamp: number },
     { projectId: string }
   >(
-    // @ts-expect-error - tRPC subscription type is not compatible with the useSSESubscription hook
-    // it's 6:30am and i do not care anymore
+    // @ts-expect-error - tRPC subscription type mismatch with useSSESubscription hook
     api.traces.onTraceUpdate,
     { projectId },
     {
-      enabled: Boolean(enabled && projectId), // Ensure we have a projectId
+      enabled: Boolean(enabled && projectId),
       onData: (data) => {
-        console.log("📨 Trace update received via SSE:", data, {
-          projectId,
-          shouldProcessUpdate,
-          timestamp: new Date().toISOString(),
-        });
-        if (data.event) {
-          try {
-            const payload =
-              typeof data.event === "string" ? JSON.parse(data.event) : data.event;
+        if (!shouldProcessUpdateNow()) return;
+        if (!data.event) return;
 
-            if (payload.event === "trace_updated") {
-              console.log("🔄 Triggering debounced update for trace_updated event");
-              debouncedUpdate();
-            }
-          } catch {
-            // If payload isn't JSON, treat as a generic trace update
-            if (data.event === "trace_updated") {
-              console.log("🔄 Triggering debounced update for trace_updated event (plain string)");
-              debouncedUpdate();
-            }
+        try {
+          const payload: TraceBroadcastPayload =
+            typeof data.event === "string"
+              ? JSON.parse(data.event)
+              : data.event;
+
+          if (traceId && payload.traceId !== traceId) return;
+
+          if (payload.event === "span_stored") {
+            scheduleSpanUpdate(payload.traceId);
+          } else if (payload.event === "trace_summary_updated") {
+            scheduleSummaryUpdate(payload.traceId);
           }
+        } catch {
+          // Non-JSON payload — ignore
         }
-      },
-      onError: (error) => {
-        console.error("❌ Trace SSE subscription error:", error, { projectId });
-      },
-      onConnected: () => {
-        console.log("✅ Trace SSE subscription connected", {
-          projectId,
-          timestamp: new Date().toISOString(),
-        });
-      },
-      onDisconnected: () => {
-        console.log("🔌 Trace SSE subscription disconnected", { projectId });
-      },
-      onStarted: () => {
-        console.log("▶️ Trace SSE subscription started", { projectId });
-      },
-      onStopped: () => {
-        console.log("⏹️ Trace SSE subscription stopped", { projectId });
       },
     },
   );

@@ -24,12 +24,8 @@
  */
 
 import { ATTR_KEYS } from "./_constants";
-import {
-  ALLOWED_SPAN_TYPES,
-  inferSpanTypeIfAbsent,
-  isNonEmptyString,
-  safeJsonParse,
-} from "./_helpers";
+import { ALLOWED_SPAN_TYPES, inferSpanTypeIfAbsent, recordValueType } from "./_extraction";
+import { isNonEmptyString } from "./_guards";
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 
 export class LegacyOtelTracesExtractor implements CanonicalAttributesExtractor {
@@ -99,18 +95,25 @@ export class LegacyOtelTracesExtractor implements CanonicalAttributesExtractor {
     const inputValue =
       attrs.take(ATTR_KEYS.INPUT_VALUE) ?? attrs.take(ATTR_KEYS.INPUT);
     if (inputValue !== undefined) {
-      ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_INPUT, safeJsonParse(inputValue));
+      ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_INPUT, inputValue);
       ctx.recordRule(`${this.id}:input->langwatch.input`);
+      recordValueType(
+        ctx,
+        ATTR_KEYS.LANGWATCH_INPUT,
+        typeof inputValue === "string" ? "text" : "json",
+      );
     }
 
     const outputValue =
       attrs.take(ATTR_KEYS.OUTPUT_VALUE) ?? attrs.take(ATTR_KEYS.OUTPUT);
     if (outputValue !== undefined) {
-      ctx.setAttrIfAbsent(
-        ATTR_KEYS.LANGWATCH_OUTPUT,
-        safeJsonParse(outputValue),
-      );
+      ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_OUTPUT, outputValue);
       ctx.recordRule(`${this.id}:output->langwatch.output`);
+      recordValueType(
+        ctx,
+        ATTR_KEYS.LANGWATCH_OUTPUT,
+        typeof outputValue === "string" ? "text" : "json",
+      );
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -119,8 +122,13 @@ export class LegacyOtelTracesExtractor implements CanonicalAttributesExtractor {
     // ─────────────────────────────────────────────────────────────────────────
     const toolArgs = attrs.take(ATTR_KEYS.AI_TOOL_CALL_ARGS);
     if (toolArgs !== undefined) {
-      ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_INPUT, safeJsonParse(toolArgs));
+      ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_INPUT, toolArgs);
       ctx.recordRule(`${this.id}:ai.toolCall.args->langwatch.input`);
+      recordValueType(
+        ctx,
+        ATTR_KEYS.LANGWATCH_INPUT,
+        typeof toolArgs === "string" ? "text" : "json",
+      );
     }
 
     // ─────────────────────────────────────────────────────────────────────────
