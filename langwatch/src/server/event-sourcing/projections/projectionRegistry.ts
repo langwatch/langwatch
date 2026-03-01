@@ -88,6 +88,13 @@ export class ProjectionRegistry<EventType extends Event = Event> {
 				{ reactorName: reactor.name },
 			);
 		}
+		if (this.mapReactorEntries.has(reactor.name)) {
+			throw new ConfigurationError(
+				"ProjectionRegistry",
+				`Reactor "${reactor.name}" already registered`,
+				{ reactorName: reactor.name },
+			);
+		}
 		this.reactors.set(reactor.name, { foldName, definition: reactor });
 	}
 
@@ -100,6 +107,13 @@ export class ProjectionRegistry<EventType extends Event = Event> {
 				"ProjectionRegistry",
 				`Cannot register reactor "${reactor.name}" on map "${mapName}" — map not registered`,
 				{ mapName, reactorName: reactor.name },
+			);
+		}
+		if (this.reactors.has(reactor.name)) {
+			throw new ConfigurationError(
+				"ProjectionRegistry",
+				`Map reactor "${reactor.name}" already registered`,
+				{ reactorName: reactor.name },
 			);
 		}
 		if (this.mapReactorEntries.has(reactor.name)) {
