@@ -291,10 +291,8 @@ export function SpanTree(props: SpanTreeProps) {
   useTraceUpdateListener({
     projectId: project?.id ?? "",
     traceId,
-    refetch: () => {
-      void trace.refetch();
-      void spans.refetch();
-    },
+    onSpanStored: (_traceIds) => void spans.refetch(),
+    onTraceSummaryUpdated: (_traceIds) => void trace.refetch(),
     enabled: !!project && !!traceId,
   });
 

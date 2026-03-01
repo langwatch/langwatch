@@ -13,7 +13,7 @@ import {
 } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import { useRouter } from "next/router";
-import React, { createRef, useEffect, useState } from "react";
+import React, { createRef, useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, Maximize2 } from "react-feather";
 import { LuLayers, LuRefreshCw } from "react-icons/lu";
 import { formatMilliseconds } from "~/utils/formatMilliseconds";
@@ -45,13 +45,24 @@ export function MessagesList() {
   const { filterParams, queryOpts } = useFilterParams();
   const navigationFooter = useNavigationFooter();
 
+  // Live endDate that gets bumped to "now" on SSE events so the query
+  // window extends to include newly-arrived traces.
+  const [liveEndDate, setLiveEndDate] = useState(filterParams.endDate);
+  useEffect(() => {
+    setLiveEndDate(filterParams.endDate);
+  }, [filterParams.endDate]);
+
+  const urlScrollId = getSingleQueryParam(router.query.scrollId);
+
   const traceGroups = api.traces.getAllForProject.useQuery(
     {
       ...filterParams,
+      endDate: liveEndDate,
       query: getSingleQueryParam(router.query.query),
       groupBy,
       pageOffset: navigationFooter.pageOffset,
       pageSize: navigationFooter.pageSize,
+      scrollId: urlScrollId,
     },
     queryOpts,
   );
@@ -97,11 +108,28 @@ export function MessagesList() {
     }
   }, [evaluations.data]);
 
+  // Ref to access current trace data inside SSE callback without stale closures
+  const traceGroupsDataRef = useRef(traceGroups.data);
+  traceGroupsDataRef.current = traceGroups.data;
+
   useTraceUpdateListener({
     projectId: project?.id ?? "",
-    refetch: () => {
-      void traceGroups.refetch();
-      void evaluations.refetch();
+    onTraceSummaryUpdated: (traceIds) => {
+      const displayedIds = new Set(
+        traceGroupsDataRef.current?.groups.flatMap((g) =>
+          g.map((t) => t.trace_id),
+        ) ?? [],
+      );
+
+      // If no traceIds (defensive) or any traceId is currently displayed,
+      // refetch to update visible data.
+      if (
+        traceIds.length === 0 ||
+        traceIds.some((id) => displayedIds.has(id))
+      ) {
+        void traceGroups.refetch();
+      }
+      // New traces in card view: no pending UI, they appear on next manual refresh
     },
     enabled: !!project,
     pageOffset: navigationFooter.pageOffset,
@@ -114,10 +142,7 @@ export function MessagesList() {
         <Tooltip content="Refresh">
           <PageLayout.HeaderButton
             variant="ghost"
-            onClick={() => {
-              void traceGroups.refetch();
-              void evaluations.refetch();
-            }}
+            onClick={() => setLiveEndDate(Date.now())}
           >
             <LuRefreshCw
               className={
@@ -165,7 +190,10 @@ export function MessagesList() {
                 <MessageSkeleton />
               </>
             )}
-            <NavigationFooter {...navigationFooter} />
+            <NavigationFooter
+              {...navigationFooter}
+              scrollId={traceGroups.data?.scrollId}
+            />
           </VStack>
           <FilterSidebar defaultShowFilters={true} />
         </HStack>
