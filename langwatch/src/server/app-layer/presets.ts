@@ -17,6 +17,7 @@ import { SpanStorageService } from "./traces/span-storage.service";
 import { TokenizerService } from "./traces/tokenizer.service";
 import { TraceSummaryService } from "./traces/trace-summary.service";
 import { PlanProviderService } from "./subscription/plan-provider";
+import { createCompositePlanProvider } from "./subscription/composite-plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import { EESubscriptionService } from "../../../ee/billing/services/subscription.service";
 import { getSaaSPlanProvider } from "../../../ee/billing";
@@ -66,10 +67,18 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const usage = UsageService.create({ prisma, organizationService: organizations });
 
   const planProvider = config.isSaas
-    ? PlanProviderService.create({
-        getActivePlan: ({ organizationId, user }) =>
-          getSaaSPlanProvider().getActivePlan(organizationId, user),
-      })
+    ? PlanProviderService.create(
+        createCompositePlanProvider({
+          saasPlanProvider: {
+            getActivePlan: ({ organizationId, user }) =>
+              getSaaSPlanProvider().getActivePlan(organizationId, user),
+          },
+          licensePlanProvider: {
+            getActivePlan: ({ organizationId }) =>
+              getLicenseHandler().getActivePlan(organizationId),
+          },
+        }),
+      )
     : PlanProviderService.create({
         getActivePlan: ({ organizationId }) =>
           getLicenseHandler().getActivePlan(organizationId),

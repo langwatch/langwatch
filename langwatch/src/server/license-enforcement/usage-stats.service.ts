@@ -103,7 +103,7 @@ export interface UsageStats {
  *
  * Coordinates between:
  * - LicenseEnforcementRepository (Prisma queries)
- * - TraceUsageService (Elasticsearch queries)
+ * - UsageService (orchestrated counting via meter policy)
  * - PlanProvider (plan info)
  *
  * This is the proper service layer - routers call this instead of
