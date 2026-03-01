@@ -6,12 +6,14 @@ interface LLMIntegrationPromptProps {
   docs: { internal?: string; external?: string };
   code: string;
   codeLanguage: string;
+  instrumentationCode?: string;
+  runCommand?: string;
 }
 
 export function generateLLMIntegrationPrompt(
   props: LLMIntegrationPromptProps,
 ): string {
-  const { frameworkLabel, install, docs, code, codeLanguage } = props;
+  const { frameworkLabel, install, docs, code, codeLanguage, instrumentationCode, runCommand } = props;
 
   let prompt = `# Integrate LangWatch with ${frameworkLabel}\n\n`;
 
@@ -42,6 +44,20 @@ export function generateLLMIntegrationPrompt(
     if (install.go) {
       if (install.go["go get"])
         prompt += `\`\`\`bash\n${install.go["go get"]}\n\`\`\`\n\n`;
+    }
+  }
+
+  // Instrumentation file section (if applicable)
+  if (instrumentationCode) {
+    prompt += `## Instrumentation Setup\n`;
+    prompt += `Create an \`instrumentation.ts\` file that initializes observability before your application starts:\n\n`;
+    prompt += `\`\`\`typescript\n${instrumentationCode}\n\`\`\`\n\n`;
+    if (runCommand) {
+      prompt += `Run your application with the following command:\n\n`;
+      prompt += `\`\`\`bash\n${runCommand}\n\`\`\`\n\n`;
+    } else {
+      prompt += `Run your application with the \`--import\` flag to ensure observability is initialized before any other modules load:\n\n`;
+      prompt += `\`\`\`bash\nnode --import ./instrumentation.ts app.ts\n\`\`\`\n\n`;
     }
   }
 

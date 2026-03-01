@@ -6,12 +6,11 @@ import {
   Icon,
   IconButton,
 } from "@chakra-ui/react";
-import { Eye, EyeOff, WandSparkles } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
 import type { HighlighterGeneric } from "shiki";
 import { useColorMode } from "../../../../../components/ui/color-mode";
-import { toaster } from "../../../../../components/ui/toaster";
 import { Tooltip } from "../../../../../components/ui/tooltip";
 
 interface CodePreviewProps {
@@ -24,7 +23,6 @@ interface CodePreviewProps {
   enableVisibilityToggle?: boolean;
   isVisible?: boolean;
   onToggleVisibility?: () => void;
-  llmPrompt?: string;
 }
 
 export function CodePreview({
@@ -37,7 +35,6 @@ export function CodePreview({
   enableVisibilityToggle,
   isVisible: controlledIsVisible,
   onToggleVisibility,
-  llmPrompt,
 }: CodePreviewProps): React.ReactElement | null {
   const { colorMode } = useColorMode();
   const [internalIsVisible, setInternalIsVisible] = useState(false);
@@ -75,31 +72,6 @@ export function CodePreview({
       onToggleVisibility();
     } else {
       setInternalIsVisible((prev) => !prev);
-    }
-  }
-
-  async function copyLLMPrompt(): Promise<void> {
-    if (!llmPrompt) return;
-
-    try {
-      await navigator.clipboard.writeText(llmPrompt);
-      toaster.create({
-        title: "Copied LLM prompt",
-        description: "Integration prompt copied to clipboard",
-        type: "success",
-        meta: {
-          closable: true,
-        },
-      });
-    } catch {
-      toaster.create({
-        title: "Failed to copy",
-        description: "Could not copy to clipboard",
-        type: "error",
-        meta: {
-          closable: true,
-        },
-      });
     }
   }
 
@@ -149,22 +121,6 @@ export function CodePreview({
                       }
                     >
                       {isVisible ? <EyeOff /> : <Eye />}
-                    </IconButton>
-                  </Tooltip>
-                )}
-                {llmPrompt && (
-                  <Tooltip
-                    content="Copy LLM-optimized integration prompt"
-                    openDelay={0}
-                    showArrow
-                  >
-                    <IconButton
-                      size="2xs"
-                      variant="ghost"
-                      onClick={() => void copyLLMPrompt()}
-                      aria-label="Copy LLM-optimized integration prompt"
-                    >
-                      <WandSparkles />
                     </IconButton>
                   </Tooltip>
                 )}

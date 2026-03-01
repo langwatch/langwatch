@@ -27,6 +27,7 @@ import openaiPySource from "./snippets/python/openai.snippet.py";
 import openaiAgentsPySource from "./snippets/python/openaiagents.snippet.py";
 import pydanticPySource from "./snippets/python/pydanticai.snippet.py";
 import strandsPySource from "./snippets/python/strandsagents.snippet.py";
+import instrumentationTsSource from "./snippets/typescript/instrumentation.snippet.sts";
 import langchainTsSource from "./snippets/typescript/langchain.snippet.sts";
 import langgraphTsSource from "./snippets/typescript/langgraph.snippet.sts";
 import mastraTsSource from "./snippets/typescript/mastra.snippet.sts";
@@ -53,6 +54,8 @@ export interface IntegrationSpec {
   docs: Docs;
   install?: InstallMatrix;
   snippet?: SnippetRef;
+  instrumentation?: SnippetRef;
+  runCommand?: string;
   customComponent?: React.ComponentType;
 }
 
@@ -84,6 +87,12 @@ const bashRef = (file: string): SnippetRef => ({
   language: "bash",
   filename: "run.sh",
 });
+
+const instrumentationRef: SnippetRef = {
+  file: instrumentationTsSource as unknown as string,
+  language: "typescript",
+  filename: "instrumentation.ts",
+};
 
 export const registry: IntegrationRegistry = [
   // TypeScript
@@ -125,13 +134,15 @@ export const registry: IntegrationRegistry = [
     ),
     install: {
       js: {
-        npm: "npm i langwatch @mastra/core @ai-sdk/openai @mastra/otel-exporter @mastra/loggers @mastra/libsql",
-        pnpm: "pnpm add langwatch @mastra/core @ai-sdk/openai @mastra/otel-exporter @mastra/loggers @mastra/libsql",
-        yarn: "yarn add langwatch @mastra/core @ai-sdk/openai @mastra/otel-exporter @mastra/loggers @mastra/libsql",
-        bun: "bun add langwatch @mastra/core @ai-sdk/openai @mastra/otel-exporter @mastra/loggers @mastra/libsql",
+        npm: "npm i langwatch @mastra/core @ai-sdk/openai @mastra/observability @mastra/otel-bridge",
+        pnpm: "pnpm add langwatch @mastra/core @ai-sdk/openai @mastra/observability @mastra/otel-bridge",
+        yarn: "yarn add langwatch @mastra/core @ai-sdk/openai @mastra/observability @mastra/otel-bridge",
+        bun: "bun add langwatch @mastra/core @ai-sdk/openai @mastra/observability @mastra/otel-bridge",
       },
     },
     snippet: tsRef(mastraTsSource as unknown as string),
+    instrumentation: instrumentationRef,
+    runCommand: 'mastra dev -c "--import=$PWD/src/instrumentation.ts"',
   },
   {
     platform: "typescript",
