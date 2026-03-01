@@ -497,6 +497,22 @@ export function applySpanToSummary(
   const spanAttributes = extractAttributesFromSpan(span);
   const mergedAttributes = { ...spanAttributes, ...state.attributes };
 
+  // PII redaction status tracking — accumulate span IDs by severity
+  const piiStatus = span.spanAttributes[ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_STATUS];
+  if (piiStatus === "partial") {
+    const key = ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_PARTIAL_SPAN_IDS;
+    const existing = mergedAttributes[key];
+    const ids: string[] = existing ? (JSON.parse(existing) as string[]) : [];
+    ids.push(span.spanId);
+    mergedAttributes[key] = JSON.stringify(ids);
+  } else if (piiStatus === "none") {
+    const key = ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_SKIPPED_SPAN_IDS;
+    const existing = mergedAttributes[key];
+    const ids: string[] = existing ? (JSON.parse(existing) as string[]) : [];
+    ids.push(span.spanId);
+    mergedAttributes[key] = JSON.stringify(ids);
+  }
+
   return {
     ...state,
     traceId: state.traceId || span.traceId,

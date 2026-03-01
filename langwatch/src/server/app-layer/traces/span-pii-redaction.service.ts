@@ -9,6 +9,7 @@ import {
   type PIIRedactionLevel,
 } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
 import type { OtlpKeyValue, OtlpSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
 
 /**
  * Default attribute keys known to contain PII-bearing content.
@@ -146,30 +147,46 @@ export class OtlpSpanPiiRedactionService {
     };
 
     const redactionPromises: Promise<void>[] = [];
+    let anySkipped = false;
+    let anyRedacted = false;
 
     // Redact only PII-bearing attributes in span
-    this.collectPiiBearingAttributeRedactions(
+    const spanResult = this.collectPiiBearingAttributeRedactions(
       span.attributes,
       options,
       redactionPromises,
     );
+    anySkipped = anySkipped || spanResult.skipped;
+    anyRedacted = anyRedacted || spanResult.redacted;
 
     // Redact PII-bearing attributes in events
     for (const event of span.events) {
-      this.collectPiiBearingAttributeRedactions(
+      const eventResult = this.collectPiiBearingAttributeRedactions(
         event.attributes,
         options,
         redactionPromises,
       );
+      anySkipped = anySkipped || eventResult.skipped;
+      anyRedacted = anyRedacted || eventResult.redacted;
     }
 
     // Redact PII-bearing attributes in links
     for (const link of span.links) {
-      this.collectPiiBearingAttributeRedactions(
+      const linkResult = this.collectPiiBearingAttributeRedactions(
         link.attributes,
         options,
         redactionPromises,
       );
+      anySkipped = anySkipped || linkResult.skipped;
+      anyRedacted = anyRedacted || linkResult.redacted;
+    }
+
+    // Mark span with pii_redaction_status when any attributes were skipped
+    if (anySkipped) {
+      span.attributes.push({
+        key: ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_STATUS,
+        value: { stringValue: anyRedacted ? "partial" : "none" },
+      });
     }
 
     await Promise.all(redactionPromises);
@@ -177,12 +194,16 @@ export class OtlpSpanPiiRedactionService {
 
   /**
    * Collects redaction promises for attributes with PII-bearing keys.
+   * Returns { skipped, redacted } indicating whether any attributes were
+   * skipped due to exceeding the max length, and whether any were sent for redaction.
    */
   private collectPiiBearingAttributeRedactions(
     attributes: OtlpKeyValue[],
     options: PIICheckOptions,
     promises: Promise<void>[],
-  ): void {
+  ): { skipped: boolean; redacted: boolean } {
+    let skipped = false;
+    let redacted = false;
     for (const attr of attributes) {
       if (
         this.deps.piiBearingAttributeKeys.has(attr.key) &&
@@ -201,10 +222,13 @@ export class OtlpSpanPiiRedactionService {
             },
             "Skipping PII redaction for oversized attribute value",
           );
+          skipped = true;
           continue;
         }
+        redacted = true;
         promises.push(this.deps.clearPII(attr.value, ["stringValue"], options));
       }
     }
+    return { skipped, redacted };
   }
 }
