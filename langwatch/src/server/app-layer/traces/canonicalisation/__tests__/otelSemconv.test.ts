@@ -151,7 +151,13 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
         clientSpan as any,
       );
 
-      expect(result.attributes["gen_ai.input.messages"]).toEqual(inputMessages);
+      // System messages stripped; only non-system messages preserved
+      expect(result.attributes["gen_ai.input.messages"]).toEqual([
+        {
+          role: "user",
+          parts: [{ type: "text", content: "What is the capital of France?" }],
+        },
+      ]);
     });
 
     it("preserves tool_call parts in assistant messages", () => {
@@ -584,8 +590,15 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
       expect(result.attributes["gen_ai.usage.input_tokens"]).toBe(45);
       expect(result.attributes["gen_ai.usage.output_tokens"]).toBe(22);
 
-      // Messages preserved as-is
-      expect(result.attributes["gen_ai.input.messages"]).toEqual(inputMessages);
+      // System messages stripped from input; output preserved as-is
+      expect(result.attributes["gen_ai.input.messages"]).toEqual([
+        {
+          role: "user",
+          parts: [
+            { type: "text", content: "What is the weather in Paris?" },
+          ],
+        },
+      ]);
       expect(result.attributes["gen_ai.output.messages"]).toEqual(outputMessages);
 
       // System instruction extracted from parts-based message
@@ -620,7 +633,10 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
         clientSpan as any,
       );
 
-      expect(result.attributes["gen_ai.input.messages"]).toEqual(inputMessages);
+      // System messages stripped; only non-system messages preserved
+      expect(result.attributes["gen_ai.input.messages"]).toEqual([
+        { role: "user", content: "Hello" },
+      ]);
 
       // System instruction extraction from direct string content
       expect(result.attributes["gen_ai.request.system_instruction"]).toBe(

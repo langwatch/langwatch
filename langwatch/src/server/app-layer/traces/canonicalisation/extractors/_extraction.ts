@@ -38,7 +38,21 @@ export const extractInputMessages = (
           if (msgs) {
             const systemInstruction =
               extractSystemInstructionFromMessages(msgs);
-            ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, msgs);
+            // Strip system messages — they go to gen_ai.request.system_instruction
+            const chatMsgs = systemInstruction
+              ? msgs.filter(
+                  (m) =>
+                    !(
+                      m &&
+                      typeof m === "object" &&
+                      (m as Record<string, unknown>).role === "system"
+                    ),
+                )
+              : msgs;
+            ctx.setAttr(
+              ATTR_KEYS.GEN_AI_INPUT_MESSAGES,
+              chatMsgs.length > 0 ? chatMsgs : msgs,
+            );
             if (systemInstruction !== null) {
               ctx.setAttrIfAbsent(
                 ATTR_KEYS.GEN_AI_REQUEST_SYSTEM_INSTRUCTION,
@@ -277,13 +291,18 @@ export const ALLOWED_SPAN_TYPES = new Set([
 
 /**
  * Infers and sets span type if it's not already set.
+ * Checks both the bag (raw attributes) and out (set by previous extractors).
  */
 export const inferSpanTypeIfAbsent = (
   ctx: ExtractorContext,
   type: string,
   ruleId: string,
 ): void => {
-  if (!ctx.bag.attrs.has(ATTR_KEYS.SPAN_TYPE) && ALLOWED_SPAN_TYPES.has(type)) {
+  if (
+    !ctx.bag.attrs.has(ATTR_KEYS.SPAN_TYPE) &&
+    ctx.out[ATTR_KEYS.SPAN_TYPE] === undefined &&
+    ALLOWED_SPAN_TYPES.has(type)
+  ) {
     ctx.setAttr(ATTR_KEYS.SPAN_TYPE, type);
     ctx.recordRule(ruleId);
   }

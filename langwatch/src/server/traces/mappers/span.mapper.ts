@@ -24,6 +24,19 @@ type JsonSerializable =
   | unknown[];
 
 /**
+ * Coerces a value to a number or returns null.
+ * Handles historical data where numbers may be stored as strings.
+ */
+function asNumberOrNull(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string" && v.trim() !== "") {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+/**
  * Converts attribute values to JSON-serializable format.
  * Handles bigint conversion to number.
  */
@@ -153,47 +166,49 @@ function extractOutput(
 function extractMetrics(
   spanAttributes: NormalizedAttributes,
 ): SpanMetrics | null {
-  const promptTokens =
+  const promptTokens = asNumberOrNull(
     spanAttributes["gen_ai.usage.input_tokens"] ??
-    spanAttributes["gen_ai.usage.prompt_tokens"];
+      spanAttributes["gen_ai.usage.prompt_tokens"],
+  );
 
-  const completionTokens =
+  const completionTokens = asNumberOrNull(
     spanAttributes["gen_ai.usage.output_tokens"] ??
-    spanAttributes["gen_ai.usage.completion_tokens"];
+      spanAttributes["gen_ai.usage.completion_tokens"],
+  );
 
-  const reasoningTokens = spanAttributes["gen_ai.usage.reasoning_tokens"];
-  const cost = spanAttributes["langwatch.span.cost"];
+  const reasoningTokens = asNumberOrNull(
+    spanAttributes["gen_ai.usage.reasoning_tokens"],
+  );
+  const cost = asNumberOrNull(spanAttributes["langwatch.span.cost"]);
   const tokensEstimated = spanAttributes["langwatch.tokens.estimated"];
 
-  const cacheReadInputTokens =
-    spanAttributes["gen_ai.usage.cache_read.input_tokens"];
-  const cacheCreationInputTokens =
-    spanAttributes["gen_ai.usage.cache_creation.input_tokens"];
+  // Canonical name with Mastra non-standard fallback
+  const cacheReadInputTokens = asNumberOrNull(
+    spanAttributes["gen_ai.usage.cache_read.input_tokens"] ??
+      spanAttributes["gen_ai.usage.cached_input_tokens"],
+  );
+  const cacheCreationInputTokens = asNumberOrNull(
+    spanAttributes["gen_ai.usage.cache_creation.input_tokens"],
+  );
 
   if (
-    promptTokens === undefined &&
-    completionTokens === undefined &&
-    reasoningTokens === undefined &&
-    cost === undefined &&
-    cacheReadInputTokens === undefined &&
-    cacheCreationInputTokens === undefined
+    promptTokens === null &&
+    completionTokens === null &&
+    reasoningTokens === null &&
+    cost === null &&
+    cacheReadInputTokens === null &&
+    cacheCreationInputTokens === null
   ) {
     return null;
   }
 
   return {
-    prompt_tokens: typeof promptTokens === "number" ? promptTokens : null,
-    completion_tokens:
-      typeof completionTokens === "number" ? completionTokens : null,
-    reasoning_tokens:
-      typeof reasoningTokens === "number" ? reasoningTokens : null,
-    cache_read_input_tokens:
-      typeof cacheReadInputTokens === "number" ? cacheReadInputTokens : null,
-    cache_creation_input_tokens:
-      typeof cacheCreationInputTokens === "number"
-        ? cacheCreationInputTokens
-        : null,
-    cost: typeof cost === "number" ? cost : null,
+    prompt_tokens: promptTokens,
+    completion_tokens: completionTokens,
+    reasoning_tokens: reasoningTokens,
+    cache_read_input_tokens: cacheReadInputTokens,
+    cache_creation_input_tokens: cacheCreationInputTokens,
+    cost: cost,
     tokens_estimated:
       typeof tokensEstimated === "boolean" ? tokensEstimated : null,
   };
@@ -283,6 +298,34 @@ function extractError(
 }
 
 /**
+ * Converts flat dot-notation keys into nested objects.
+ * e.g. {"gen_ai.usage.input_tokens": 100} → {"gen_ai": {"usage": {"input_tokens": 100}}}
+ * Keys without dots stay at top level. Leaf values (arrays, objects, scalars) stay as-is.
+ */
+function unflattenDotNotation(
+  flat: NormalizedAttributes,
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(flat)) {
+    const parts = key.split(".");
+    if (parts.length === 1) {
+      result[key] = value;
+      continue;
+    }
+    let current = result;
+    for (let i = 0; i < parts.length - 1; i++) {
+      const part = parts[i]!;
+      if (!(part in current) || typeof current[part] !== "object" || current[part] === null || Array.isArray(current[part])) {
+        current[part] = {};
+      }
+      current = current[part] as Record<string, unknown>;
+    }
+    current[parts[parts.length - 1]!] = value;
+  }
+  return result;
+}
+
+/**
  * Maps a NormalizedSpan (from ClickHouse stored_spans) to the legacy Span type
  * used by the Elasticsearch-based trace system.
  */
@@ -320,7 +363,7 @@ export function mapNormalizedSpanToSpan(normalizedSpan: NormalizedSpan): Span {
     ),
     timestamps,
     metrics: extractMetrics(normalizedSpan.spanAttributes),
-    params: normalizedSpan.spanAttributes,
+    params: unflattenDotNotation(normalizedSpan.spanAttributes),
   };
 
   // Add LLM-specific fields
