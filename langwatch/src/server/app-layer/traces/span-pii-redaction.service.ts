@@ -95,7 +95,13 @@ export class OtlpSpanPiiRedactionService {
   );
 
   constructor(deps: Partial<OtlpSpanPiiRedactionServiceDependencies> = {}) {
-    this.deps = { ...getDefaultDependencies(), ...deps };
+    const merged = { ...getDefaultDependencies(), ...deps };
+    const maxLen = merged.piiRedactionMaxAttributeLength;
+    merged.piiRedactionMaxAttributeLength =
+      Number.isFinite(maxLen) && maxLen >= 0
+        ? Math.floor(maxLen)
+        : DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH;
+    this.deps = merged;
   }
 
   /**
@@ -183,10 +189,18 @@ export class OtlpSpanPiiRedactionService {
 
     // Mark span with pii_redaction_status when any attributes were skipped
     if (anySkipped) {
-      span.attributes.push({
-        key: ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_STATUS,
-        value: { stringValue: anyRedacted ? "partial" : "none" },
-      });
+      const statusValue = anyRedacted ? "partial" : "none";
+      const existingIdx = span.attributes.findIndex(
+        (a) => a.key === ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_STATUS,
+      );
+      if (existingIdx !== -1) {
+        span.attributes[existingIdx]!.value.stringValue = statusValue;
+      } else {
+        span.attributes.push({
+          key: ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_STATUS,
+          value: { stringValue: statusValue },
+        });
+      }
     }
 
     await Promise.all(redactionPromises);

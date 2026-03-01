@@ -28,6 +28,16 @@ export type { TraceSummaryData };
 
 const COMPUTED_IO_SCHEMA_VERSION = "2025-12-18" as const;
 
+function safeParsStringArray(value: string | undefined): string[] {
+  if (!value) return [];
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return Array.isArray(parsed) ? (parsed as string[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 const FIRST_TOKEN_EVENTS = new Set([
   "gen_ai.content.chunk",
   "first_token",
@@ -502,13 +512,13 @@ export function applySpanToSummary(
   if (piiStatus === "partial") {
     const key = ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_PARTIAL_SPAN_IDS;
     const existing = mergedAttributes[key];
-    const ids: string[] = existing ? (JSON.parse(existing) as string[]) : [];
+    const ids = safeParsStringArray(existing);
     ids.push(span.spanId);
     mergedAttributes[key] = JSON.stringify(ids);
   } else if (piiStatus === "none") {
     const key = ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_SKIPPED_SPAN_IDS;
     const existing = mergedAttributes[key];
-    const ids: string[] = existing ? (JSON.parse(existing) as string[]) : [];
+    const ids = safeParsStringArray(existing);
     ids.push(span.spanId);
     mergedAttributes[key] = JSON.stringify(ids);
   }
