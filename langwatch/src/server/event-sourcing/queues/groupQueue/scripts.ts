@@ -224,6 +224,34 @@ redis.call("SADD", blockedKey, groupId)
 return 1
 `;
 
+const RESTAGE_AND_BLOCK_LUA = `
+local blockedKey = KEYS[1]
+local readyKey   = KEYS[2]
+
+local keyPrefix       = ARGV[1]
+local groupId         = ARGV[2]
+local newStagedJobId  = ARGV[3]
+local score           = tonumber(ARGV[4])
+local jobDataJson     = ARGV[5]
+
+local groupJobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
+local groupDataKey = keyPrefix .. "group:" .. groupId .. ":data"
+
+-- 1. Block the group — prevents dispatcher from re-dispatching
+redis.call("SADD", blockedKey, groupId)
+
+-- 2. Re-stage the failed job with a new ID
+redis.call("ZADD", groupJobsKey, score, newStagedJobId)
+redis.call("HSET", groupDataKey, newStagedJobId, jobDataJson)
+
+-- 3. Update ready score so group is visible after unblock
+local pendingCount = redis.call("ZCARD", groupJobsKey)
+local readyScore = math.sqrt(pendingCount)
+redis.call("ZADD", readyKey, readyScore, groupId)
+
+return 1
+`;
+
 /**
  * Result of a dispatch operation.
  * Returns null when no eligible job is available.
@@ -455,6 +483,37 @@ export class GroupStagingScripts {
     );
 
     return result === 1;
+  }
+
+  /**
+   * Atomically block a group and re-stage a failed job after exhausted retries.
+   * Combines blocking, re-staging, and ready-score update in a single Lua call.
+   */
+  async restageAndBlock({
+    groupId,
+    newStagedJobId,
+    score,
+    jobDataJson,
+  }: {
+    groupId: string;
+    newStagedJobId: string;
+    score: number;
+    jobDataJson: string;
+  }): Promise<void> {
+    const blockedKey = `${this.keyPrefix}blocked`;
+    const readyKey = `${this.keyPrefix}ready`;
+
+    await this.redis.eval(
+      RESTAGE_AND_BLOCK_LUA,
+      2,
+      blockedKey,
+      readyKey,
+      this.keyPrefix,
+      groupId,
+      newStagedJobId,
+      String(score),
+      jobDataJson,
+    );
   }
 
   /**

@@ -731,17 +731,8 @@ export class GroupQueueProcessorBullMq<Payload extends Record<string, unknown>>
     metadata: GroupJobMetadata,
   ): Promise<void> {
     const groupId = metadata.__groupId;
-    const prefix = this.scripts.getKeyPrefix();
 
-    // 1. Block the group FIRST — prevents the dispatcher from re-dispatching
-    //    the job we're about to re-stage (avoids a re-dispatch loop).
-    await this.scripts.fail({
-      groupId,
-      stagedJobId: metadata.__stagedJobId,
-    });
-    gqGroupsBlockedTotal.inc({ queue_name: this.queueName });
-
-    // 2. Extract payload and original score
+    // Extract payload and original score
     const { payload } = extractJobPayload<Payload>(job, [
       "__groupId",
       "__stagedJobId",
@@ -751,27 +742,23 @@ export class GroupQueueProcessorBullMq<Payload extends Record<string, unknown>>
     const score =
       typeof rawScore === "number"
         ? rawScore
-        : (this.score?.(payload) ?? 0);
+        : (this.score?.(payload) ?? Date.now());
 
-    // 3. Re-stage with a new ID to avoid BullMQ job ID collision
+    // Re-stage with a new ID to avoid BullMQ job ID collision
     const newStagedJobId = `${metadata.__stagedJobId}/r/${Date.now()}`;
     const jobDataJson = JSON.stringify({
       ...(payload as Record<string, unknown>),
       __context: (job.data as Record<string, unknown>).__context,
     });
 
-    await this.redisConnection
-      .pipeline()
-      .zadd(`${prefix}group:${groupId}:jobs`, score, newStagedJobId)
-      .hset(`${prefix}group:${groupId}:data`, newStagedJobId, jobDataJson)
-      .exec();
-
-    // 4. Update ready set score so the group is visible after unblock
-    const pendingCount = await this.redisConnection.zcard(
-      `${prefix}group:${groupId}:jobs`,
-    );
-    const readyScore = Math.sqrt(pendingCount);
-    await this.redisConnection.zadd(`${prefix}ready`, readyScore, groupId);
+    // Atomically: block the group, re-stage the job, update ready score
+    await this.scripts.restageAndBlock({
+      groupId,
+      newStagedJobId,
+      score,
+      jobDataJson,
+    });
+    gqGroupsBlockedTotal.inc({ queue_name: this.queueName });
 
     this.logger.error(
       {
