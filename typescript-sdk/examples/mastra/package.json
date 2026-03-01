@@ -5,9 +5,9 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "mastra dev -c \"--import=$PWD/src/instrumentation.ts\"",
+    "dev": "mastra dev",
     "build": "mastra build",
-    "start": "mastra start -c \"--import=$PWD/src/instrumentation.ts\""
+    "start": "mastra start"
   },
   "keywords": [],
   "author": "",
@@ -22,9 +22,7 @@
     "@mastra/libsql": "^1.6.2",
     "@mastra/loggers": "^1.0.2",
     "@mastra/memory": "^1.5.2",
-    "@mastra/observability": "^1.2.1",
-    "@mastra/otel-bridge": "^1.0.0",
-    "langwatch": "file:../../",
+    "@mastra/otel-exporter": "^1.0.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
