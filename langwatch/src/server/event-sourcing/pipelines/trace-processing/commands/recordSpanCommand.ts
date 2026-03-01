@@ -110,6 +110,14 @@ export class RecordSpanCommand implements CommandHandler<
 
         // Clone span before mutation to preserve command immutability
         const spanToProcess = structuredClone(commandData.span);
+
+        // Strip any user-submitted langwatch.reserved.* attributes — this domain
+        // is reserved for system-generated attributes only.
+        RecordSpanCommand.stripReservedAttributes(
+          spanToProcess,
+          this.logger,
+        );
+
         const piiRedactionLevel =
           commandData.piiRedactionLevel ?? DEFAULT_PII_REDACTION_LEVEL;
 
@@ -191,6 +199,39 @@ export class RecordSpanCommand implements CommandHandler<
       "payload.trace.id": traceId,
       "payload.span.id": spanId,
     };
+  }
+
+  /**
+   * Strips any `langwatch.reserved.*` attributes from a span and its events/links.
+   * These attributes are reserved for system use and must not be set by users.
+   */
+  private static stripReservedAttributes(
+    span: OtlpSpan,
+    logger: ReturnType<typeof createLogger>,
+  ): void {
+    const RESERVED_PREFIX = "langwatch.reserved.";
+
+    const strip = (attributes: OtlpSpan["attributes"]): OtlpSpan["attributes"] => {
+      const filtered = attributes.filter((attr) => {
+        if (attr.key.startsWith(RESERVED_PREFIX)) {
+          logger.error(
+            { attributeKey: attr.key },
+            "Stripped user-submitted langwatch.reserved.* attribute",
+          );
+          return false;
+        }
+        return true;
+      });
+      return filtered;
+    };
+
+    span.attributes = strip(span.attributes);
+    for (const event of span.events) {
+      event.attributes = strip(event.attributes);
+    }
+    for (const link of span.links) {
+      link.attributes = strip(link.attributes);
+    }
   }
 
   static makeJobId(payload: RecordSpanCommandData): string {

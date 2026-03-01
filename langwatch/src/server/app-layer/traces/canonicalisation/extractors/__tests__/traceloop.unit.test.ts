@@ -52,9 +52,7 @@ describe("TraceloopExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toEqual(
-        JSON.stringify(messages),
-      );
+      expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toEqual(messages);
     });
 
     it("does not overwrite existing gen_ai.input.messages", () => {
@@ -83,9 +81,7 @@ describe("TraceloopExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES]).toEqual(
-        JSON.stringify(messages),
-      );
+      expect(ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES]).toEqual(messages);
     });
   });
 });

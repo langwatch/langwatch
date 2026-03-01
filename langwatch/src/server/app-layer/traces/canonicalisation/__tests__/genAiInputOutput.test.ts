@@ -17,7 +17,7 @@ const stubSpan: Pick<
 describe("CanonicalizeSpanAttributesService", () => {
   describe("when span has gen_ai.input.messages and gen_ai.output.messages", () => {
     it("preserves Anthropic-style content blocks without stripping", () => {
-      const inputMessages = JSON.stringify([
+      const inputMessages = [
         {
           role: "user",
           content: [{ type: "text", text: "What is the weather?" }],
@@ -44,16 +44,16 @@ describe("CanonicalizeSpanAttributesService", () => {
             },
           ],
         },
-      ]);
+      ];
 
-      const outputMessages = JSON.stringify([
+      const outputMessages = [
         {
           role: "assistant",
           content: [
             { type: "text", text: "It's sunny at 22°C in London." },
           ],
         },
-      ]);
+      ];
 
       const result = service.canonicalize(
         {
@@ -69,11 +69,11 @@ describe("CanonicalizeSpanAttributesService", () => {
         stubSpan as any,
       );
 
-      // gen_ai.input.messages must survive as-is (string-encoded)
-      expect(result.attributes["gen_ai.input.messages"]).toBe(inputMessages);
+      // gen_ai.input.messages must survive as-is
+      expect(result.attributes["gen_ai.input.messages"]).toEqual(inputMessages);
 
-      // gen_ai.output.messages must survive as-is (string-encoded)
-      expect(result.attributes["gen_ai.output.messages"]).toBe(outputMessages);
+      // gen_ai.output.messages must survive as-is
+      expect(result.attributes["gen_ai.output.messages"]).toEqual(outputMessages);
 
       // Model and usage should be extracted correctly
       expect(result.attributes["gen_ai.request.model"]).toBe("claude-opus-4-6");
@@ -82,7 +82,7 @@ describe("CanonicalizeSpanAttributesService", () => {
     });
 
     it("preserves messages with 'parts' pattern (Vercel AI SDK / pi-ai style)", () => {
-      const inputMessages = JSON.stringify([
+      const inputMessages = [
         {
           role: "system",
           content: [{ type: "text", content: "You are Snaps the lobster." }],
@@ -91,14 +91,14 @@ describe("CanonicalizeSpanAttributesService", () => {
           role: "user",
           parts: [{ type: "text", content: "[Sun 2026-02-08 20:58 UTC] hi" }],
         },
-      ]);
+      ];
 
-      const outputMessages = JSON.stringify([
+      const outputMessages = [
         {
           role: "assistant",
           parts: [{ type: "text", content: "Hey Rogerio! What's up?" }],
         },
-      ]);
+      ];
 
       const result = service.canonicalize(
         {
@@ -112,8 +112,8 @@ describe("CanonicalizeSpanAttributesService", () => {
       );
 
       // Messages preserved as-is with parts
-      expect(result.attributes["gen_ai.input.messages"]).toBe(inputMessages);
-      expect(result.attributes["gen_ai.output.messages"]).toBe(outputMessages);
+      expect(result.attributes["gen_ai.input.messages"]).toEqual(inputMessages);
+      expect(result.attributes["gen_ai.output.messages"]).toEqual(outputMessages);
 
       // System instruction extracted from content blocks using 'content' field
       expect(result.attributes["gen_ai.request.system_instruction"]).toBe(
@@ -139,9 +139,9 @@ describe("CanonicalizeSpanAttributesService", () => {
     });
 
     it("does not overwrite existing gen_ai.input.messages with legacy fallback", () => {
-      const inputMessages = JSON.stringify([
+      const inputMessages = [
         { role: "user", content: "Hello" },
-      ]);
+      ];
 
       const result = service.canonicalize(
         {
@@ -156,7 +156,7 @@ describe("CanonicalizeSpanAttributesService", () => {
       );
 
       // gen_ai.input.messages wins over gen_ai.prompt
-      expect(result.attributes["gen_ai.input.messages"]).toBe(inputMessages);
+      expect(result.attributes["gen_ai.input.messages"]).toEqual(inputMessages);
     });
   });
 });

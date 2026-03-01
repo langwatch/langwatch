@@ -123,8 +123,8 @@ describe("CanonicalizeSpanAttributesService — take vs preserve semantics", () 
     });
   });
 
-  describe("when attributes are preserved (get, not take)", () => {
-    it("preserves metadata in output after extracting fields", () => {
+  describe("when metadata is consumed and hoisted (take)", () => {
+    it("consumes metadata blob and hoists fields to canonical keys", () => {
       const metadata = JSON.stringify({
         user_id: "u1",
         custom_field: "still here",
@@ -135,10 +135,12 @@ describe("CanonicalizeSpanAttributesService — take vs preserve semantics", () 
         stubSpan as any,
       );
 
-      // metadata uses get() not take(), so it stays in remaining()
-      expect(result.attributes["metadata"]).toBe(metadata);
-      // Fields are still extracted
+      // metadata is consumed via take(), so raw blob is gone
+      expect(result.attributes["metadata"]).toBeUndefined();
+      // Reserved fields are promoted to canonical keys
       expect(result.attributes["langwatch.user.id"]).toBe("u1");
+      // Custom fields are hoisted as metadata.{key}
+      expect(result.attributes["metadata.custom_field"]).toBe("still here");
     });
 
     it("preserves langwatch.span.type when read for detection", () => {
@@ -196,7 +198,10 @@ describe("CanonicalizeSpanAttributesService — take vs preserve semantics", () 
       // langwatch.input is taken from bag (removing from remaining)
       // then re-set in out with the raw wrapper string
       // Since out is spread last, canonical form wins
-      expect(result.attributes["langwatch.input"]).toBe(structuredInput);
+      expect(result.attributes["langwatch.input"]).toEqual({
+        type: "chat_messages",
+        value: [{ role: "user", content: "Hi" }],
+      });
 
       // Also gen_ai.input.messages should be set from the structured value
       expect(result.attributes["gen_ai.input.messages"]).toBeDefined();

@@ -106,7 +106,7 @@ export class TraceIOExtractionService {
           });
           logger.debug("No spans with input found, using fallback");
           const fallback = this.getHttpFallback(orderedSpans);
-          return fallback ? { raw: fallback, text: fallback } : null;
+          return fallback ? { raw: fallback, text: fallback, source: "langwatch" as const } : null;
         }
 
         const input = this.extractRichIOFromSpan(firstSpan, "input");
@@ -180,7 +180,7 @@ export class TraceIOExtractionService {
             "fallback.used": true,
           });
           const fallback = this.getHttpStatusFallback(tree);
-          return fallback ? { raw: fallback, text: fallback } : null;
+          return fallback ? { raw: fallback, text: fallback, source: "langwatch" as const } : null;
         }
 
         const output = this.extractRichIOFromSpan(lastSpan, "output");
@@ -214,62 +214,58 @@ export class TraceIOExtractionService {
       // Priority 1: GenAI input messages
       const genAiInput = attrs[ATTR_KEYS.GEN_AI_INPUT_MESSAGES];
       if (genAiInput !== undefined && genAiInput !== null) {
-        const raw = parseJsonIfString(genAiInput);
-        const text = messagesToText(genAiInput);
+        const text = messagesToText(genAiInput, "input");
         if (text) {
           logger.debug(
             { spanId: span.spanId, source: "gen_ai.input.messages" },
             "Extracted input from GenAI messages",
           );
-          return { raw, text };
+          return { raw: genAiInput, text, source: "gen_ai" };
         }
       }
 
       // Priority 2: LangWatch input
       const langwatchInput = attrs[ATTR_KEYS.LANGWATCH_INPUT];
       if (langwatchInput !== undefined && langwatchInput !== null) {
-        const raw = parseJsonIfString(langwatchInput);
         const text =
           typeof langwatchInput === "string"
             ? langwatchInput
-            : messagesToText(langwatchInput);
+            : messagesToText(langwatchInput, "input");
         if (text) {
           logger.debug(
             { spanId: span.spanId, source: "langwatch.input" },
             "Extracted input from LangWatch attribute",
           );
-          return { raw, text };
+          return { raw: langwatchInput, text, source: "langwatch" };
         }
       }
     } else {
       // Priority 1: GenAI output messages
       const genAiOutput = attrs[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES];
       if (genAiOutput !== undefined && genAiOutput !== null) {
-        const raw = parseJsonIfString(genAiOutput);
-        const text = messagesToText(genAiOutput);
+        const text = messagesToText(genAiOutput, "output");
         if (text) {
           logger.debug(
             { spanId: span.spanId, source: "gen_ai.output.messages" },
             "Extracted output from GenAI messages",
           );
-          return { raw, text };
+          return { raw: genAiOutput, text, source: "gen_ai" };
         }
       }
 
       // Priority 2: LangWatch output
       const langwatchOutput = attrs[ATTR_KEYS.LANGWATCH_OUTPUT];
       if (langwatchOutput !== undefined && langwatchOutput !== null) {
-        const raw = parseJsonIfString(langwatchOutput);
         const text =
           typeof langwatchOutput === "string"
             ? langwatchOutput
-            : messagesToText(langwatchOutput);
+            : messagesToText(langwatchOutput, "output");
         if (text) {
           logger.debug(
             { spanId: span.spanId, source: "langwatch.output" },
             "Extracted output from LangWatch attribute",
           );
-          return { raw, text };
+          return { raw: langwatchOutput, text, source: "langwatch" };
         }
       }
     }
@@ -380,6 +376,8 @@ export interface ExtractedIO {
   raw: unknown;
   /** A text representation for display/search */
   text: string;
+  /** Which attribute the value was extracted from */
+  source: "langwatch" | "gen_ai";
 }
 
 const getSpanType = (span: NormalizedSpan): string => {
@@ -393,37 +391,33 @@ const shouldExcludeSpan = (span: NormalizedSpan): boolean => {
 };
 
 /**
- * Parses a value that might be a JSON string into its actual value.
- */
-const parseJsonIfString = (value: unknown): unknown => {
-  if (typeof value === "string") {
-    try {
-      return JSON.parse(value);
-    } catch {
-      return value;
-    }
-  }
-  return value;
-};
-
-/**
  * Converts a message object/array to a readable text representation.
+ *
+ * @param messages - The raw message data to convert
+ * @param mode - "input" extracts only last user message, "output" concatenates all
  */
-const messagesToText = (messages: unknown): string | null => {
+const messagesToText = (
+  messages: unknown,
+  mode: "input" | "output" = "output",
+): string | null => {
   if (!messages) return null;
 
-  // Parse JSON string if needed
-  const parsed = parseJsonIfString(messages);
-
-  // If it's a plain string after parsing, return it
-  if (typeof parsed === "string") {
-    return parsed;
+  // If it's a plain string, return it
+  if (typeof messages === "string") {
+    return messages;
   }
 
   // If it's an array of messages
-  if (Array.isArray(parsed)) {
+  if (Array.isArray(messages)) {
+    // For input mode, extract only the last user message
+    if (mode === "input") {
+      const lastUserText = extractLastUserMessageFromArray(messages);
+      if (lastUserText) return lastUserText;
+    }
+
+    // Default: concatenate all messages
     const texts: string[] = [];
-    for (const msg of parsed) {
+    for (const msg of messages) {
       const text = extractMessageContent(msg);
       if (text) texts.push(text);
     }
@@ -431,8 +425,25 @@ const messagesToText = (messages: unknown): string | null => {
   }
 
   // If it's a single message object
-  const text = extractMessageContent(parsed);
+  const text = extractMessageContent(messages);
   return text;
+};
+
+/**
+ * Extracts the text content of the last user message from an array of messages.
+ */
+const extractLastUserMessageFromArray = (
+  messages: unknown[],
+): string | null => {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (!msg || typeof msg !== "object") continue;
+    const obj = msg as Record<string, unknown>;
+    if (obj.role !== "user") continue;
+    const text = extractMessageContent(obj);
+    if (text) return text;
+  }
+  return null;
 };
 
 /**
@@ -479,6 +490,24 @@ const extractMessageContent = (message: unknown): string | null => {
       }
       return texts.length > 0 ? texts.join("\n") : null;
     }
+  }
+
+  // Handle Mastra/parts format: { parts: [{ type: "text", content: "..." }] }
+  if ("parts" in msg && Array.isArray(msg.parts)) {
+    const texts: string[] = [];
+    for (const part of msg.parts) {
+      if (typeof part === "string") {
+        texts.push(part);
+      } else if (part && typeof part === "object") {
+        const partObj = part as Record<string, unknown>;
+        if (typeof partObj.content === "string") {
+          texts.push(partObj.content);
+        } else if (partObj.type === "text" && typeof partObj.text === "string") {
+          texts.push(partObj.text);
+        }
+      }
+    }
+    if (texts.length > 0) return texts.join("\n");
   }
 
   // Check for text field (some formats)

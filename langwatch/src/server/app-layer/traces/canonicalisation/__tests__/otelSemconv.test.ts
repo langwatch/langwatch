@@ -145,16 +145,13 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
         {
           "gen_ai.operation.name": "chat",
           "gen_ai.request.model": "gpt-4",
-          "gen_ai.input.messages": JSON.stringify(inputMessages),
+          "gen_ai.input.messages": inputMessages,
         },
         [],
         clientSpan as any,
       );
 
-      const parsed = JSON.parse(
-        result.attributes["gen_ai.input.messages"] as string,
-      );
-      expect(parsed).toEqual(inputMessages);
+      expect(result.attributes["gen_ai.input.messages"]).toEqual(inputMessages);
     });
 
     it("preserves tool_call parts in assistant messages", () => {
@@ -190,16 +187,13 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
         {
           "gen_ai.operation.name": "chat",
           "gen_ai.request.model": "gpt-4",
-          "gen_ai.input.messages": JSON.stringify(inputMessages),
+          "gen_ai.input.messages": inputMessages,
         },
         [],
         clientSpan as any,
       );
 
-      const parsed = JSON.parse(
-        result.attributes["gen_ai.input.messages"] as string,
-      );
-      expect(parsed).toEqual(inputMessages);
+      expect(result.attributes["gen_ai.input.messages"]).toEqual(inputMessages);
     });
 
     it("extracts system instruction from parts-based system message", () => {
@@ -218,7 +212,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
         {
           "gen_ai.operation.name": "chat",
           "gen_ai.request.model": "gpt-4",
-          "gen_ai.input.messages": JSON.stringify(inputMessages),
+          "gen_ai.input.messages": inputMessages,
         },
         [],
         clientSpan as any,
@@ -251,15 +245,13 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
         {
           "gen_ai.operation.name": "chat",
           "gen_ai.request.model": "gpt-4-vision",
-          "gen_ai.input.messages": JSON.stringify(inputMessages),
+          "gen_ai.input.messages": inputMessages,
         },
         [],
         clientSpan as any,
       );
 
-      const parsed = JSON.parse(
-        result.attributes["gen_ai.input.messages"] as string,
-      );
+      const parsed = result.attributes["gen_ai.input.messages"] as any[];
       expect(parsed[0].parts).toHaveLength(2);
       expect(parsed[0].parts[1].type).toBe("blob");
       expect(parsed[0].parts[1].modality).toBe("image");
@@ -283,16 +275,13 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
         {
           "gen_ai.operation.name": "chat",
           "gen_ai.request.model": "gpt-4",
-          "gen_ai.output.messages": JSON.stringify(outputMessages),
+          "gen_ai.output.messages": outputMessages,
         },
         [],
         clientSpan as any,
       );
 
-      const parsed = JSON.parse(
-        result.attributes["gen_ai.output.messages"] as string,
-      );
-      expect(parsed).toEqual(outputMessages);
+      expect(result.attributes["gen_ai.output.messages"]).toEqual(outputMessages);
     });
 
     it("preserves tool_call output messages", () => {
@@ -315,15 +304,13 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
         {
           "gen_ai.operation.name": "chat",
           "gen_ai.request.model": "gpt-4",
-          "gen_ai.output.messages": JSON.stringify(outputMessages),
+          "gen_ai.output.messages": outputMessages,
         },
         [],
         clientSpan as any,
       );
 
-      const parsed = JSON.parse(
-        result.attributes["gen_ai.output.messages"] as string,
-      );
+      const parsed = result.attributes["gen_ai.output.messages"] as any[];
       expect(parsed[0].parts[0].type).toBe("tool_call");
       expect(parsed[0].finish_reason).toBe("tool_call");
     });
@@ -346,16 +333,14 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
         {
           "gen_ai.operation.name": "chat",
           "gen_ai.request.model": "gpt-4",
-          "gen_ai.output.messages": JSON.stringify(outputMessages),
+          "gen_ai.output.messages": outputMessages,
           "gen_ai.request.choice.count": 2,
         },
         [],
         clientSpan as any,
       );
 
-      const parsed = JSON.parse(
-        result.attributes["gen_ai.output.messages"] as string,
-      );
+      const parsed = result.attributes["gen_ai.output.messages"] as any[];
       expect(parsed).toHaveLength(2);
     });
 
@@ -375,15 +360,13 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
         {
           "gen_ai.operation.name": "chat",
           "gen_ai.request.model": "o1",
-          "gen_ai.output.messages": JSON.stringify(outputMessages),
+          "gen_ai.output.messages": outputMessages,
         },
         [],
         clientSpan as any,
       );
 
-      const parsed = JSON.parse(
-        result.attributes["gen_ai.output.messages"] as string,
-      );
+      const parsed = result.attributes["gen_ai.output.messages"] as any[];
       expect(parsed[0].parts[0].type).toBe("reasoning");
       expect(parsed[0].parts[1].type).toBe("text");
     });
@@ -402,17 +385,14 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
         {
           "gen_ai.operation.name": "chat",
           "gen_ai.request.model": "gpt-4",
-          "gen_ai.system_instructions": JSON.stringify(instructions),
+          "gen_ai.system_instructions": instructions,
         },
         [],
         clientSpan as any,
       );
 
       // system_instructions is not consumed by any extractor, so it passes through
-      const parsed = JSON.parse(
-        result.attributes["gen_ai.system_instructions"] as string,
-      );
-      expect(parsed).toEqual(instructions);
+      expect(result.attributes["gen_ai.system_instructions"]).toEqual(instructions);
     });
   });
 
@@ -436,16 +416,13 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
         {
           "gen_ai.operation.name": "chat",
           "gen_ai.request.model": "gpt-4",
-          "gen_ai.tool.definitions": JSON.stringify(toolDefs),
+          "gen_ai.tool.definitions": toolDefs,
         },
         [],
         clientSpan as any,
       );
 
-      const parsed = JSON.parse(
-        result.attributes["gen_ai.tool.definitions"] as string,
-      );
-      expect(parsed).toEqual(toolDefs);
+      expect(result.attributes["gen_ai.tool.definitions"]).toEqual(toolDefs);
     });
   });
 
@@ -461,10 +438,10 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
           "gen_ai.tool.call.id": "call_abc123",
           "gen_ai.tool.description": "Search available flights",
           "gen_ai.tool.type": "function",
-          "gen_ai.tool.call.arguments": JSON.stringify({
+          "gen_ai.tool.call.arguments": {
             destination: "Paris",
-          }),
-          "gen_ai.tool.call.result": JSON.stringify({ flights: [] }),
+          },
+          "gen_ai.tool.call.result": { flights: [] },
         },
         [],
         internalSpan as any,
@@ -574,9 +551,9 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
           "gen_ai.request.max_tokens": 4096,
           "gen_ai.usage.input_tokens": 45,
           "gen_ai.usage.output_tokens": 22,
-          "gen_ai.input.messages": JSON.stringify(inputMessages),
-          "gen_ai.output.messages": JSON.stringify(outputMessages),
-          "gen_ai.tool.definitions": JSON.stringify([
+          "gen_ai.input.messages": inputMessages,
+          "gen_ai.output.messages": outputMessages,
+          "gen_ai.tool.definitions": [
             {
               name: "get_weather",
               description: "Get weather",
@@ -585,7 +562,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
                 properties: { city: { type: "string" } },
               },
             },
-          ]),
+          ],
           "gen_ai.conversation.id": "conv_session_1",
         },
         [],
@@ -608,15 +585,8 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
       expect(result.attributes["gen_ai.usage.output_tokens"]).toBe(22);
 
       // Messages preserved as-is
-      const parsedInput = JSON.parse(
-        result.attributes["gen_ai.input.messages"] as string,
-      );
-      expect(parsedInput).toEqual(inputMessages);
-
-      const parsedOutput = JSON.parse(
-        result.attributes["gen_ai.output.messages"] as string,
-      );
-      expect(parsedOutput).toEqual(outputMessages);
+      expect(result.attributes["gen_ai.input.messages"]).toEqual(inputMessages);
+      expect(result.attributes["gen_ai.output.messages"]).toEqual(outputMessages);
 
       // System instruction extracted from parts-based message
       expect(result.attributes["gen_ai.request.system_instruction"]).toBe(
@@ -644,16 +614,13 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
         {
           "gen_ai.operation.name": "chat",
           "gen_ai.request.model": "gpt-4",
-          "gen_ai.input.messages": JSON.stringify(inputMessages),
+          "gen_ai.input.messages": inputMessages,
         },
         [],
         clientSpan as any,
       );
 
-      const parsed = JSON.parse(
-        result.attributes["gen_ai.input.messages"] as string,
-      );
-      expect(parsed).toEqual(inputMessages);
+      expect(result.attributes["gen_ai.input.messages"]).toEqual(inputMessages);
 
       // System instruction extraction from direct string content
       expect(result.attributes["gen_ai.request.system_instruction"]).toBe(
@@ -670,16 +637,13 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
         {
           "gen_ai.operation.name": "chat",
           "gen_ai.request.model": "gpt-4",
-          "gen_ai.output.messages": JSON.stringify(outputMessages),
+          "gen_ai.output.messages": outputMessages,
         },
         [],
         clientSpan as any,
       );
 
-      const parsed = JSON.parse(
-        result.attributes["gen_ai.output.messages"] as string,
-      );
-      expect(parsed).toEqual(outputMessages);
+      expect(result.attributes["gen_ai.output.messages"]).toEqual(outputMessages);
     });
   });
 

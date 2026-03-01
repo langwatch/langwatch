@@ -18,7 +18,7 @@
  */
 
 import { ATTR_KEYS } from "./_constants";
-import { inferSpanTypeIfAbsent } from "./_helpers";
+import { extractErrorInfo, inferSpanTypeIfAbsent } from "./_extraction";
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 
 export class FallbackExtractor implements CanonicalAttributesExtractor {
@@ -92,5 +92,12 @@ export class FallbackExtractor implements CanonicalAttributesExtractor {
     if (hasGenAiSignals || hasVercelSignals || hasLegacyLlmSignals) {
       inferSpanTypeIfAbsent(ctx, "llm", `${this.id}:llm`);
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Error Consolidation
+    // Runs for every span regardless of SDK. Consolidates exception.*,
+    // error.*, status.message, span.error.* into canonical error.type.
+    // ─────────────────────────────────────────────────────────────────────────
+    extractErrorInfo(ctx);
   }
 }

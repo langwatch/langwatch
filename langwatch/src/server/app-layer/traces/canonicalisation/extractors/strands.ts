@@ -22,8 +22,10 @@ import { ATTR_KEYS } from "./_constants";
 import {
   extractOutputMessages,
   inferSpanTypeIfAbsent,
-  safeJsonParse,
-} from "./_helpers";
+  recordValueType,
+} from "./_extraction";
+import { safeJsonParse } from "./_guards";
+import { extractSystemInstructionFromMessages } from "./_messages";
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 
 const logger = createLogger("langwatch:trace-processing:strands-extractor");
@@ -186,13 +188,23 @@ export class StrandsExtractor implements CanonicalAttributesExtractor {
       if (inputMessages.length > 0) {
         ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, inputMessages);
         ctx.recordRule(`${this.id}:events->gen_ai.input.messages`);
+        recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
+
+        // Extract system instruction from assembled messages
+        const sysInstruction = extractSystemInstructionFromMessages(inputMessages);
+        if (sysInstruction !== null) {
+          ctx.setAttrIfAbsent(
+            ATTR_KEYS.GEN_AI_REQUEST_SYSTEM_INSTRUCTION,
+            sysInstruction,
+          );
+        }
       }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
     // Output Messages from gen_ai.choice Events
     // ─────────────────────────────────────────────────────────────────────────
-    extractOutputMessages(
+    const outputExtracted = extractOutputMessages(
       ctx,
       [
         {
@@ -229,6 +241,10 @@ export class StrandsExtractor implements CanonicalAttributesExtractor {
       ],
       `${this.id}:gen_ai.choice->gen_ai.output.messages`,
     );
+
+    if (outputExtracted) {
+      recordValueType(ctx, ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, "chat_messages");
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // Model (passthrough signal)
