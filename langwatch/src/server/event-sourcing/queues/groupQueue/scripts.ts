@@ -128,10 +128,11 @@ for _, groupId in ipairs(groups) do
 
     if not activeJob then
       local jobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
-      local results = redis.call("ZRANGEBYSCORE", jobsKey, "-inf", nowMs, "LIMIT", 0, 1)
+      local results = redis.call("ZRANGEBYSCORE", jobsKey, "-inf", nowMs, "WITHSCORES", "LIMIT", 0, 1)
 
-      if #results > 0 then
+      if #results >= 2 then
         local stagedJobId = results[1]
+        local originalScore = results[2]
         redis.call("ZREM", jobsKey, stagedJobId)
         redis.call("SET", activeKey, stagedJobId, "EX", activeTtlSec)
 
@@ -147,7 +148,7 @@ for _, groupId in ipairs(groups) do
         local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
         redis.call("HDEL", dataKey, stagedJobId)
 
-        return {stagedJobId, groupId, jobDataJson or ""}
+        return {stagedJobId, groupId, jobDataJson or "", originalScore}
       end
     end
   end
@@ -172,7 +173,12 @@ if currentActive ~= stagedJobId then
 end
 
 redis.call("DEL", activeKey)
-redis.call("SREM", blockedKey, groupId)
+
+-- Do NOT auto-unblock here. If the group was blocked (e.g. by a cascading
+-- failure), only an explicit Skynet unblock should remove it. This prevents
+-- a concurrent successful job from silently unblocking a group that has
+-- ordering violations from the cascade.
+-- redis.call("SREM", blockedKey, groupId)
 
 local pendingCount = redis.call("ZCARD", jobsKey)
 if pendingCount > 0 then
@@ -187,6 +193,19 @@ redis.call("LPUSH", signalKey, "1")
 return 1
 `;
 
+const REFRESH_LUA = `
+local activeKey    = KEYS[1]
+local stagedJobId  = ARGV[1]
+local activeTtlSec = tonumber(ARGV[2])
+
+local currentActive = redis.call("GET", activeKey)
+if currentActive == stagedJobId then
+  redis.call("EXPIRE", activeKey, activeTtlSec)
+  return 1
+end
+return 0
+`;
+
 const FAIL_LUA = `
 local blockedKey = KEYS[1]
 local activeKey  = KEYS[2]
@@ -194,12 +213,41 @@ local activeKey  = KEYS[2]
 local groupId      = ARGV[1]
 local stagedJobId  = ARGV[2]
 
-local currentActive = redis.call("GET", activeKey)
-if currentActive ~= stagedJobId then
-  return 0
-end
-
+-- Always block the group when retries are exhausted.
+-- Previously we skipped blocking if a different job was active (stale worker check),
+-- but this allowed cascading failures: active key TTL expires mid-retry → dispatcher
+-- dispatches another job → old job's final failure can't block → repeat until staging
+-- is drained. Always blocking is safe because blocked groups require explicit
+-- operator unblock (via Skynet) to resume processing.
 redis.call("SADD", blockedKey, groupId)
+
+return 1
+`;
+
+const RESTAGE_AND_BLOCK_LUA = `
+local blockedKey = KEYS[1]
+local readyKey   = KEYS[2]
+
+local keyPrefix       = ARGV[1]
+local groupId         = ARGV[2]
+local newStagedJobId  = ARGV[3]
+local score           = tonumber(ARGV[4])
+local jobDataJson     = ARGV[5]
+
+local groupJobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
+local groupDataKey = keyPrefix .. "group:" .. groupId .. ":data"
+
+-- 1. Block the group — prevents dispatcher from re-dispatching
+redis.call("SADD", blockedKey, groupId)
+
+-- 2. Re-stage the failed job with a new ID
+redis.call("ZADD", groupJobsKey, score, newStagedJobId)
+redis.call("HSET", groupDataKey, newStagedJobId, jobDataJson)
+
+-- 3. Update ready score so group is visible after unblock
+local pendingCount = redis.call("ZCARD", groupJobsKey)
+local readyScore = math.sqrt(pendingCount)
+redis.call("ZADD", readyKey, readyScore, groupId)
 
 return 1
 `;
@@ -212,6 +260,7 @@ export interface DispatchResult {
   stagedJobId: string;
   groupId: string;
   jobDataJson: string;
+  originalScore: number;
 }
 
 /**
@@ -338,7 +387,7 @@ export class GroupStagingScripts {
       String(activeTtlSec),
     );
 
-    if (!result || !Array.isArray(result) || result.length < 3) {
+    if (!result || !Array.isArray(result) || result.length < 4) {
       return null;
     }
 
@@ -346,6 +395,7 @@ export class GroupStagingScripts {
       stagedJobId: String(result[0]),
       groupId: String(result[1]),
       jobDataJson: String(result[2]),
+      originalScore: Number(result[3]),
     };
   }
 
@@ -383,9 +433,35 @@ export class GroupStagingScripts {
   }
 
   /**
-   * Mark a group as blocked after exhausted retries.
+   * Refresh the activeKey TTL during intermediate retries to prevent expiration.
    *
-   * @returns true if blocked, false if stale
+   * @returns true if refreshed, false if activeKey doesn't match (stale)
+   */
+  async refreshActiveKey({
+    groupId,
+    stagedJobId,
+    activeTtlSec,
+  }: {
+    groupId: string;
+    stagedJobId: string;
+    activeTtlSec: number;
+  }): Promise<boolean> {
+    const activeKey = `${this.keyPrefix}group:${groupId}:active`;
+
+    const result = await this.redis.eval(
+      REFRESH_LUA,
+      1,
+      activeKey,
+      stagedJobId,
+      String(activeTtlSec),
+    );
+
+    return result === 1;
+  }
+
+  /**
+   * Mark a group as blocked after exhausted retries.
+   * Always blocks unconditionally — COMPLETE_LUA on a healthy job will remove the block.
    */
   async fail({
     groupId,
@@ -407,6 +483,37 @@ export class GroupStagingScripts {
     );
 
     return result === 1;
+  }
+
+  /**
+   * Atomically block a group and re-stage a failed job after exhausted retries.
+   * Combines blocking, re-staging, and ready-score update in a single Lua call.
+   */
+  async restageAndBlock({
+    groupId,
+    newStagedJobId,
+    score,
+    jobDataJson,
+  }: {
+    groupId: string;
+    newStagedJobId: string;
+    score: number;
+    jobDataJson: string;
+  }): Promise<void> {
+    const blockedKey = `${this.keyPrefix}blocked`;
+    const readyKey = `${this.keyPrefix}ready`;
+
+    await this.redis.eval(
+      RESTAGE_AND_BLOCK_LUA,
+      2,
+      blockedKey,
+      readyKey,
+      this.keyPrefix,
+      groupId,
+      newStagedJobId,
+      String(score),
+      jobDataJson,
+    );
   }
 
   /**
