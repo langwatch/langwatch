@@ -47,7 +47,7 @@ import { GroupStagingScripts } from "./scripts";
  */
 const GROUP_QUEUE_CONFIG = {
   /** Default global concurrency (max parallel groups) */
-  defaultGlobalConcurrency: 120,
+  defaultGlobalConcurrency: 300,
   /** TTL for the active key (safety net for crashes), in seconds */
   activeTtlSec: 300,
   /** BRPOP timeout in seconds (fallback polling interval) */
