@@ -15,7 +15,6 @@ export const getCurrentMonthStart = (): Date => {
 
 /**
  * Returns the start of the current calendar month as "YYYY-MM-DD".
- * Matches the date format used by ProjectDailyBillableEvents.
  */
 export const getCurrentMonthStartDateString = (): string => {
   const now = new Date();

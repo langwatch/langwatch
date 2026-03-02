@@ -105,9 +105,10 @@ for groupId, _ in pairs(affectedGroups) do
   local pendingCount = redis.call("ZCARD", groupJobsKey)
   local score = math.sqrt(pendingCount)
   redis.call("ZADD", readyKey, score, groupId)
-  redis.call("LPUSH", signalKey, "1")
-  redis.call("LTRIM", signalKey, 0, 999)
 end
+
+redis.call("LPUSH", signalKey, "1")
+redis.call("LTRIM", signalKey, 0, 999)
 
 return newStagedCount
 `;
@@ -120,7 +121,7 @@ local keyPrefix    = ARGV[1]
 local nowMs        = tonumber(ARGV[2])
 local activeTtlSec = tonumber(ARGV[3])
 
-local groups = redis.call("ZREVRANGE", readyKey, 0, -1)
+local groups = redis.call("ZREVRANGE", readyKey, 0, 99)
 
 for _, groupId in ipairs(groups) do
   if redis.call("SISMEMBER", blockedKey, groupId) == 0 then
@@ -167,7 +168,8 @@ local nowMs        = tonumber(ARGV[2])
 local activeTtlSec = tonumber(ARGV[3])
 local maxJobs      = tonumber(ARGV[4])
 
-local groups = redis.call("ZREVRANGE", readyKey, 0, -1)
+local scanLimit = maxJobs * 3 - 1
+local groups = redis.call("ZREVRANGE", readyKey, 0, scanLimit)
 local results = {}
 local dispatched = 0
 
@@ -218,6 +220,7 @@ local activeKey  = KEYS[1]
 local jobsKey    = KEYS[2]
 local readyKey   = KEYS[3]
 local signalKey  = KEYS[4]
+local statsKey   = KEYS[5]
 
 local groupId      = ARGV[1]
 local stagedJobId  = ARGV[2]
@@ -240,6 +243,9 @@ end
 redis.call("LPUSH", signalKey, "1")
 redis.call("LTRIM", signalKey, 0, 999)
 
+-- Increment completed counter for Skynet
+redis.call("INCR", statsKey)
+
 return 1
 `;
 
@@ -259,6 +265,7 @@ return 0
 const RESTAGE_AND_BLOCK_LUA = `
 local blockedKey = KEYS[1]
 local readyKey   = KEYS[2]
+local statsKey   = KEYS[3]
 
 local keyPrefix       = ARGV[1]
 local groupId         = ARGV[2]
@@ -278,16 +285,55 @@ redis.call("SADD", blockedKey, groupId)
 redis.call("ZADD", groupJobsKey, score, newStagedJobId)
 redis.call("HSET", groupDataKey, newStagedJobId, jobDataJson)
 
--- 3. Update ready score so group is visible after unblock
-local pendingCount = redis.call("ZCARD", groupJobsKey)
-local readyScore = math.sqrt(pendingCount)
-redis.call("ZADD", readyKey, readyScore, groupId)
+-- 3. Remove from ready set — blocked groups should not be scanned by dispatch.
+--    UNBLOCK_LUA re-adds the group when it is unblocked.
+redis.call("ZREM", readyKey, groupId)
 
 -- 4. Store error info for Skynet visibility
 if errorMessage and errorMessage ~= "" then
   local errorKey = keyPrefix .. "group:" .. groupId .. ":error"
   redis.call("HSET", errorKey, "message", errorMessage, "stack", errorStack or "", "timestamp", tostring(score))
 end
+
+-- 5. Increment failed counter for Skynet
+redis.call("INCR", statsKey)
+
+return 1
+`;
+
+const RETRY_RESTAGE_LUA = `
+local activeKey = KEYS[1]
+
+local keyPrefix       = ARGV[1]
+local groupId         = ARGV[2]
+local stagedJobId     = ARGV[3]
+local newStagedJobId  = ARGV[4]
+local dispatchAfterMs = tonumber(ARGV[5])
+local jobDataJson     = ARGV[6]
+local retryTtlSec     = tonumber(ARGV[7])
+
+-- 1. Validate active key matches
+local currentActive = redis.call("GET", activeKey)
+if currentActive ~= stagedJobId then
+  return 0
+end
+
+-- 2. Re-stage job with future score (backoff delay)
+local groupJobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
+local groupDataKey = keyPrefix .. "group:" .. groupId .. ":data"
+redis.call("ZADD", groupJobsKey, dispatchAfterMs, newStagedJobId)
+redis.call("HSET", groupDataKey, newStagedJobId, jobDataJson)
+
+-- 3. Update ready set score
+local readyKey = keyPrefix .. "ready"
+local pendingCount = redis.call("ZCARD", groupJobsKey)
+local score = math.sqrt(pendingCount)
+redis.call("ZADD", readyKey, score, groupId)
+
+-- 4. Set active key TTL to match backoff period.
+--    While the key exists the group is locked (preserves FIFO ordering).
+--    When it expires the dispatcher picks up the retry job on its next poll.
+redis.call("EXPIRE", activeKey, retryTtlSec)
 
 return 1
 `;
@@ -502,14 +548,16 @@ export class GroupStagingScripts {
     const jobsKey = `${this.keyPrefix}group:${groupId}:jobs`;
     const readyKey = `${this.keyPrefix}ready`;
     const signalKey = `${this.keyPrefix}signal`;
+    const statsKey = `${this.keyPrefix}stats:completed`;
 
     const result = await this.redis.eval(
       COMPLETE_LUA,
-      4,
+      5,
       activeKey,
       jobsKey,
       readyKey,
       signalKey,
+      statsKey,
       groupId,
       stagedJobId,
     );
@@ -565,12 +613,14 @@ export class GroupStagingScripts {
   }): Promise<void> {
     const blockedKey = `${this.keyPrefix}blocked`;
     const readyKey = `${this.keyPrefix}ready`;
+    const statsKey = `${this.keyPrefix}stats:failed`;
 
     await this.redis.eval(
       RESTAGE_AND_BLOCK_LUA,
-      2,
+      3,
       blockedKey,
       readyKey,
+      statsKey,
       this.keyPrefix,
       groupId,
       newStagedJobId,
@@ -579,6 +629,52 @@ export class GroupStagingScripts {
       errorMessage ?? "",
       errorStack ?? "",
     );
+  }
+
+  /**
+   * Re-stage a job with a future dispatch score (backoff delay) while keeping
+   * the active key alive to preserve per-group FIFO ordering. The fastq worker
+   * slot is freed immediately.
+   *
+   * The active key TTL is set to match the backoff period so the key expires
+   * naturally. On the next dispatcher poll (≤1s) the retry job is dispatched.
+   * This is fully Redis-driven — no Node.js timers, survives restarts.
+   *
+   * @returns true if re-staged, false if stale (active key doesn't match)
+   */
+  async retryRestage({
+    groupId,
+    stagedJobId,
+    newStagedJobId,
+    dispatchAfterMs,
+    jobDataJson,
+    backoffMs,
+  }: {
+    groupId: string;
+    stagedJobId: string;
+    newStagedJobId: string;
+    dispatchAfterMs: number;
+    jobDataJson: string;
+    backoffMs: number;
+  }): Promise<boolean> {
+    const activeKey = `${this.keyPrefix}group:${groupId}:active`;
+    // TTL = backoff + 2s buffer so the key expires just after the job becomes eligible
+    const retryTtlSec = Math.ceil(backoffMs / 1000) + 2;
+
+    const result = await this.redis.eval(
+      RETRY_RESTAGE_LUA,
+      1,
+      activeKey,
+      this.keyPrefix,
+      groupId,
+      stagedJobId,
+      newStagedJobId,
+      String(dispatchAfterMs),
+      jobDataJson,
+      String(retryTtlSec),
+    );
+
+    return result === 1;
   }
 
   /**
@@ -619,3 +715,4 @@ export class GroupStagingScripts {
     return this.keyPrefix;
   }
 }
+
