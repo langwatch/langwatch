@@ -3,7 +3,7 @@ import { LicenseHandler } from "./licenseHandler";
 import type { ITraceUsageService } from "./licenseHandler";
 import { PUBLIC_KEY } from "./constants";
 import { LicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
-import { getApp } from "~/server/app-layer";
+import { getApp } from "~/server/app-layer/app";
 
 /**
  * Factory function for creating a LicenseHandler instance.

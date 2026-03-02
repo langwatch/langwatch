@@ -38,7 +38,7 @@ import { sendInviteEmail } from "../mailer/inviteEmail";
 import { TeamUserRole } from "@prisma/client";
 import type { Session } from "next-auth";
 import type { PlanProvider } from "../app-layer/subscription/plan-provider";
-import { getApp } from "../app-layer";
+import { getApp } from "../app-layer/app";
 
 /**
  * Team assignment input for invite creation.
