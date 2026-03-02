@@ -187,12 +187,23 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
         });
       }
     },
-    onError: (err) => {
+    onError: (err, variables) => {
+      const suiteIdForToast = variables.id;
+      const isAllArchived = err.data?.code === "BAD_REQUEST" &&
+        (err.message.includes("All scenarios") || err.message.includes("All targets"));
       toaster.create({
-        title: "Failed to run suite",
+        title: isAllArchived ? "Cannot run suite" : "Failed to run suite",
         description: err.message,
         type: "error",
         meta: { closable: true },
+        ...(isAllArchived ? {
+          action: {
+            label: "Edit Suite",
+            onClick: () => {
+              openDrawer("suiteEditor", { urlParams: { suiteId: suiteIdForToast } });
+            },
+          },
+        } : {}),
       });
     },
   });

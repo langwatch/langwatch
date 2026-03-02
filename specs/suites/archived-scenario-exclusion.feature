@@ -99,35 +99,31 @@ Feature: Archived Dependency Exclusion from Suite Runs
 
   @unit
   Scenario: Filters out archived scenarios from a reference list
-    Given scenario references: "scen_1", "scen_2", "scen_3"
-    And "scen_2" is archived
+    Given a suite with three scenarios where one is archived
     When the active scenarios are resolved
-    Then only "scen_1" and "scen_3" are returned
+    Then only the two non-archived scenarios are returned
 
   @unit
   Scenario: Returns empty list when all scenarios are archived
-    Given scenario references: "scen_1", "scen_2"
-    And both scenarios are archived
+    Given a suite with two scenarios that are both archived
     When the active scenarios are resolved
     Then an empty list is returned
 
   @unit
   Scenario: Returns all scenarios when none are archived
-    Given scenario references: "scen_1", "scen_2"
-    And no scenarios are archived
+    Given a suite with two scenarios that are both active
     When the active scenarios are resolved
-    Then both "scen_1" and "scen_2" are returned
+    Then both scenarios are returned
 
   @unit
   Scenario: Filters out archived targets from a reference list
-    Given target references: "target_1", "target_2"
-    And "target_1" is archived
+    Given a suite with two targets where one is archived
     When the active targets are resolved
-    Then only "target_2" is returned
+    Then only the non-archived target is returned
 
   @unit
   Scenario: Job count reflects only active scenarios and targets
-    Given a suite with 3 scenario references, 2 target references, and repeat count 1
+    Given a suite with 3 scenarios, 2 targets, and repeat count 1
     And 1 scenario is archived and 1 target is archived
     When the suite run is triggered
-    Then 2 jobs are scheduled (2 active scenarios x 1 active target)
+    Then 2 jobs are scheduled for the 2 active scenarios and 1 active target

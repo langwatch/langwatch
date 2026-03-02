@@ -404,7 +404,7 @@ export class SuiteService {
   }): Promise<{
     activeScenarioIds: string[];
     activeTargets: SuiteTarget[];
-    skippedArchived: { scenarios: string[]; targets: string[] };
+    skippedArchived: SuiteRunResult["skippedArchived"];
   }> {
     const { suite, projectId, organizationId, targets } = params;
 

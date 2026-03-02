@@ -102,35 +102,39 @@ describe("InvalidTargetReferencesError", () => {
 });
 
 describe("AllScenariosArchivedError", () => {
-  it("is an instance of SuiteDomainError", () => {
-    const error = new AllScenariosArchivedError();
-    expect(error).toBeInstanceOf(SuiteDomainError);
-  });
+  describe("when instantiated", () => {
+    it("is an instance of SuiteDomainError", () => {
+      const error = new AllScenariosArchivedError();
+      expect(error).toBeInstanceOf(SuiteDomainError);
+    });
 
-  it("has a descriptive message", () => {
-    const error = new AllScenariosArchivedError();
-    expect(error.message).toContain("All scenarios in this suite are archived");
-  });
+    it("has a descriptive message", () => {
+      const error = new AllScenariosArchivedError();
+      expect(error.message).toContain("All scenarios in this suite are archived");
+    });
 
-  it("has name 'AllScenariosArchivedError'", () => {
-    const error = new AllScenariosArchivedError();
-    expect(error.name).toBe("AllScenariosArchivedError");
+    it("has name 'AllScenariosArchivedError'", () => {
+      const error = new AllScenariosArchivedError();
+      expect(error.name).toBe("AllScenariosArchivedError");
+    });
   });
 });
 
 describe("AllTargetsArchivedError", () => {
-  it("is an instance of SuiteDomainError", () => {
-    const error = new AllTargetsArchivedError();
-    expect(error).toBeInstanceOf(SuiteDomainError);
-  });
+  describe("when instantiated", () => {
+    it("is an instance of SuiteDomainError", () => {
+      const error = new AllTargetsArchivedError();
+      expect(error).toBeInstanceOf(SuiteDomainError);
+    });
 
-  it("has a descriptive message", () => {
-    const error = new AllTargetsArchivedError();
-    expect(error.message).toContain("All targets in this suite are archived");
-  });
+    it("has a descriptive message", () => {
+      const error = new AllTargetsArchivedError();
+      expect(error.message).toContain("All targets in this suite are archived");
+    });
 
-  it("has name 'AllTargetsArchivedError'", () => {
-    const error = new AllTargetsArchivedError();
-    expect(error.name).toBe("AllTargetsArchivedError");
+    it("has name 'AllTargetsArchivedError'", () => {
+      const error = new AllTargetsArchivedError();
+      expect(error.name).toBe("AllTargetsArchivedError");
+    });
   });
 });
