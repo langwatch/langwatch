@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TtlCache } from "~/server/utils/ttlCache";
 import type { OrganizationService } from "../../organizations/organization.service";
-import type { UsageRepository } from "../repositories/usage.repository";
 import { UsageService } from "../usage.service";
 
 vi.mock("~/env.mjs", () => ({
@@ -19,11 +18,6 @@ describe("UsageService", () => {
     isFeatureEnabled: vi.fn(),
   } as unknown as OrganizationService;
 
-  const mockRepo: UsageRepository = {
-    sumBillableEvents: vi.fn(),
-    groupBillableEventsByProject: vi.fn(),
-  };
-
   const mockEsTraceUsageService = {
     getCountByProjects: vi.fn(),
   };
@@ -38,7 +32,6 @@ describe("UsageService", () => {
     vi.clearAllMocks();
     service = Object.create(UsageService.prototype);
     Object.assign(service, {
-      repo: mockRepo,
       organizationService: mockOrgService,
       esTraceUsageService: mockEsTraceUsageService,
       subscriptionHandler: mockSubscriptionHandler,
@@ -67,7 +60,6 @@ describe("UsageService", () => {
         vi.mocked(mockOrgService.getProjectIds).mockResolvedValue([
           "proj-1",
         ]);
-        vi.mocked(mockOrgService.isFeatureEnabled).mockResolvedValue(false);
         mockEsTraceUsageService.getCountByProjects.mockResolvedValue([
           { projectId: "proj-1", count: 1000 },
         ]);
@@ -98,7 +90,6 @@ describe("UsageService", () => {
         vi.mocked(mockOrgService.getProjectIds).mockResolvedValue([
           "proj-1",
         ]);
-        vi.mocked(mockOrgService.isFeatureEnabled).mockResolvedValue(false);
         mockEsTraceUsageService.getCountByProjects.mockResolvedValue([
           { projectId: "proj-1", count: 500 },
         ]);
@@ -132,7 +123,6 @@ describe("UsageService", () => {
         vi.mocked(mockOrgService.getProjectIds).mockResolvedValue([
           "proj-1",
         ]);
-        vi.mocked(mockOrgService.isFeatureEnabled).mockResolvedValue(false);
         mockEsTraceUsageService.getCountByProjects.mockResolvedValue([
           { projectId: "proj-1", count: 5000 },
         ]);
@@ -146,54 +136,26 @@ describe("UsageService", () => {
   });
 
   describe("getCurrentMonthCount", () => {
-    describe("when feature is off", () => {
-      it("delegates to ES TraceUsageService", async () => {
-        vi.mocked(mockOrgService.getProjectIds).mockResolvedValue([
-          "proj-1",
-          "proj-2",
-        ]);
-        vi.mocked(mockOrgService.isFeatureEnabled).mockResolvedValue(false);
-        mockEsTraceUsageService.getCountByProjects.mockResolvedValue([
-          { projectId: "proj-1", count: 42 },
-          { projectId: "proj-2", count: 58 },
-        ]);
+    it("delegates to ES TraceUsageService", async () => {
+      vi.mocked(mockOrgService.getProjectIds).mockResolvedValue([
+        "proj-1",
+        "proj-2",
+      ]);
+      mockEsTraceUsageService.getCountByProjects.mockResolvedValue([
+        { projectId: "proj-1", count: 42 },
+        { projectId: "proj-2", count: 58 },
+      ]);
 
-        const result = await service.getCurrentMonthCount({
-          organizationId: "org-123",
-        });
-
-        expect(result).toBe(100);
-        expect(
-          mockEsTraceUsageService.getCountByProjects,
-        ).toHaveBeenCalledWith({
-          organizationId: "org-123",
-          projectIds: ["proj-1", "proj-2"],
-        });
-        expect(mockRepo.sumBillableEvents).not.toHaveBeenCalled();
+      const result = await service.getCurrentMonthCount({
+        organizationId: "org-123",
       });
-    });
 
-    describe("when feature is on", () => {
-      it("sums ProjectDailyBillableEvents from month start", async () => {
-        vi.mocked(mockOrgService.getProjectIds).mockResolvedValue([
-          "proj-1",
-          "proj-2",
-        ]);
-        vi.mocked(mockOrgService.isFeatureEnabled).mockResolvedValue(true);
-        vi.mocked(mockRepo.sumBillableEvents).mockResolvedValue(250);
-
-        const result = await service.getCurrentMonthCount({
-          organizationId: "org-123",
-        });
-
-        expect(result).toBe(250);
-        expect(mockRepo.sumBillableEvents).toHaveBeenCalledWith({
-          projectIds: ["proj-1", "proj-2"],
-          fromDate: expect.stringMatching(/^\d{4}-\d{2}-01$/),
-        });
-        expect(
-          mockEsTraceUsageService.getCountByProjects,
-        ).not.toHaveBeenCalled();
+      expect(result).toBe(100);
+      expect(
+        mockEsTraceUsageService.getCountByProjects,
+      ).toHaveBeenCalledWith({
+        organizationId: "org-123",
+        projectIds: ["proj-1", "proj-2"],
       });
     });
 
@@ -206,8 +168,6 @@ describe("UsageService", () => {
         });
 
         expect(result).toBe(0);
-        expect(mockOrgService.isFeatureEnabled).not.toHaveBeenCalled();
-        expect(mockRepo.sumBillableEvents).not.toHaveBeenCalled();
         expect(
           mockEsTraceUsageService.getCountByProjects,
         ).not.toHaveBeenCalled();
@@ -219,7 +179,6 @@ describe("UsageService", () => {
         vi.mocked(mockOrgService.getProjectIds).mockResolvedValue([
           "proj-1",
         ]);
-        vi.mocked(mockOrgService.isFeatureEnabled).mockResolvedValue(false);
         mockEsTraceUsageService.getCountByProjects.mockResolvedValue([
           { projectId: "proj-1", count: 42 },
         ]);
@@ -251,62 +210,24 @@ describe("UsageService", () => {
         });
 
         expect(result).toEqual([]);
-        expect(mockOrgService.isFeatureEnabled).not.toHaveBeenCalled();
       });
     });
 
-    describe("when feature is off", () => {
-      it("delegates to ES TraceUsageService", async () => {
-        vi.mocked(mockOrgService.isFeatureEnabled).mockResolvedValue(false);
-        mockEsTraceUsageService.getCountByProjects.mockResolvedValue([
-          { projectId: "proj-1", count: 10 },
-          { projectId: "proj-2", count: 20 },
-        ]);
+    it("delegates to ES TraceUsageService", async () => {
+      mockEsTraceUsageService.getCountByProjects.mockResolvedValue([
+        { projectId: "proj-1", count: 10 },
+        { projectId: "proj-2", count: 20 },
+      ]);
 
-        const result = await service.getCountByProjects({
-          organizationId: "org-123",
-          projectIds: ["proj-1", "proj-2"],
-        });
-
-        expect(result).toEqual([
-          { projectId: "proj-1", count: 10 },
-          { projectId: "proj-2", count: 20 },
-        ]);
-        expect(
-          mockRepo.groupBillableEventsByProject,
-        ).not.toHaveBeenCalled();
+      const result = await service.getCountByProjects({
+        organizationId: "org-123",
+        projectIds: ["proj-1", "proj-2"],
       });
-    });
 
-    describe("when feature is on", () => {
-      it("groups billable events per project from Prisma", async () => {
-        vi.mocked(mockOrgService.isFeatureEnabled).mockResolvedValue(true);
-        vi.mocked(
-          mockRepo.groupBillableEventsByProject,
-        ).mockResolvedValue([
-          { projectId: "proj-1", count: 15 },
-          { projectId: "proj-2", count: 25 },
-        ]);
-
-        const result = await service.getCountByProjects({
-          organizationId: "org-123",
-          projectIds: ["proj-1", "proj-2"],
-        });
-
-        expect(result).toEqual([
-          { projectId: "proj-1", count: 15 },
-          { projectId: "proj-2", count: 25 },
-        ]);
-        expect(
-          mockRepo.groupBillableEventsByProject,
-        ).toHaveBeenCalledWith({
-          projectIds: ["proj-1", "proj-2"],
-          fromDate: expect.stringMatching(/^\d{4}-\d{2}-01$/),
-        });
-        expect(
-          mockEsTraceUsageService.getCountByProjects,
-        ).not.toHaveBeenCalled();
-      });
+      expect(result).toEqual([
+        { projectId: "proj-1", count: 10 },
+        { projectId: "proj-2", count: 20 },
+      ]);
     });
   });
 });
