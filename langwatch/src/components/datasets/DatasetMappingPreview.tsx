@@ -228,7 +228,6 @@ export function DatasetMappingPreview({
           >
             <Box
               as="button"
-              type="button"
               onClick={() => setIsThreadMapping(false)}
               bg={!isThreadMapping ? "white" : "transparent"}
               _dark={{
@@ -248,7 +247,6 @@ export function DatasetMappingPreview({
             </Box>
             <Box
               as="button"
-              type="button"
               onClick={() => setIsThreadMapping(true)}
               bg={isThreadMapping ? "white" : "transparent"}
               _dark={{
