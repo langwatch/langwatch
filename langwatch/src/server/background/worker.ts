@@ -19,6 +19,7 @@ import {
   runEvaluationJob,
   startEvaluationsWorker,
 } from "./workers/evaluationsWorker";
+import { registerEvaluationsFallbackWorker } from "./queues/evaluationsQueue";
 import { startTopicClusteringWorker } from "./workers/topicClusteringWorker";
 import { startTrackEventsWorker } from "./workers/trackEventsWorker";
 
@@ -127,6 +128,10 @@ export const start = (
   // Reset state for restart scenarios - prevents duplicate closeables
   closeables.clear();
   isShuttingDown = false;
+
+  // Register the fallback worker so QueueWithFallback can process evaluations
+  // inline when Redis is unavailable (avoids "fallback worker not registered" error)
+  registerEvaluationsFallbackWorker(runEvaluationMock ?? runEvaluationJob);
 
   // Start ClickHouse storage metrics collection if ClickHouse is enabled
   const clickHouseClient = getClickHouseClient();
