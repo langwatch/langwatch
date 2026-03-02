@@ -46,6 +46,129 @@ describe("ProjectionRouter", () => {
   });
 
   describe("dispatch", () => {
+    describe("when fold projection has eventTypes filter (inline)", () => {
+      it("skips events that do not match the fold's eventTypes", async () => {
+        const queueManager = createMockQueueManager();
+        const router = new ProjectionRouter(
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          queueManager,
+        );
+
+        const store = createMockFoldProjectionStore<{ count: number }>();
+        (store.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+
+        const fold = createMockFoldProjectionDefinition("filtered-fold", {
+          store,
+          eventTypes: [TEST_CONSTANTS.EVENT_TYPE_1],
+          init: () => ({ count: 0 }),
+          apply: (state: { count: number }) => ({ count: state.count + 1 }),
+        });
+
+        router.registerFoldProjection(fold);
+
+        const matchingEvent = createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+          TEST_CONSTANTS.EVENT_TYPE_1,
+        );
+        const nonMatchingEvent = createTestEvent(
+          "other-agg",
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+          TEST_CONSTANTS.EVENT_TYPE_2,
+        );
+
+        await router.dispatch([matchingEvent, nonMatchingEvent], { tenantId });
+
+        // store.get called once for the matching event, not for the non-matching one
+        expect(store.get).toHaveBeenCalledTimes(1);
+        expect(store.store).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when fold projection has eventTypes filter (queued)", () => {
+      it("only sends matching events to the fold queue", async () => {
+        const mockSendBatch = vi.fn().mockResolvedValue(undefined);
+        const queueManager = createMockQueueManager();
+        (queueManager.hasProjectionQueues as ReturnType<typeof vi.fn>).mockReturnValue(true);
+        (queueManager.getProjectionQueue as ReturnType<typeof vi.fn>).mockReturnValue({
+          sendBatch: mockSendBatch,
+        });
+
+        const router = new ProjectionRouter(
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          queueManager,
+        );
+
+        const store = createMockFoldProjectionStore<{ count: number }>();
+        const fold = createMockFoldProjectionDefinition("filtered-fold", {
+          store,
+          eventTypes: [TEST_CONSTANTS.EVENT_TYPE_1],
+          init: () => ({ count: 0 }),
+          apply: (state: { count: number }) => ({ count: state.count + 1 }),
+        });
+
+        router.registerFoldProjection(fold);
+
+        const matchingEvent = createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+          TEST_CONSTANTS.EVENT_TYPE_1,
+        );
+        const nonMatchingEvent = createTestEvent(
+          "other-agg",
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+          TEST_CONSTANTS.EVENT_TYPE_2,
+        );
+
+        await router.dispatch([matchingEvent, nonMatchingEvent], { tenantId });
+
+        expect(mockSendBatch).toHaveBeenCalledTimes(1);
+        expect(mockSendBatch).toHaveBeenCalledWith([matchingEvent]);
+      });
+
+      it("skips fold queue entirely when no events match", async () => {
+        const mockSendBatch = vi.fn().mockResolvedValue(undefined);
+        const queueManager = createMockQueueManager();
+        (queueManager.hasProjectionQueues as ReturnType<typeof vi.fn>).mockReturnValue(true);
+        (queueManager.getProjectionQueue as ReturnType<typeof vi.fn>).mockReturnValue({
+          sendBatch: mockSendBatch,
+        });
+
+        const router = new ProjectionRouter(
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          queueManager,
+        );
+
+        const store = createMockFoldProjectionStore<{ count: number }>();
+        const fold = createMockFoldProjectionDefinition("filtered-fold", {
+          store,
+          eventTypes: [TEST_CONSTANTS.EVENT_TYPE_1],
+          init: () => ({ count: 0 }),
+          apply: (state: { count: number }) => ({ count: state.count + 1 }),
+        });
+
+        router.registerFoldProjection(fold);
+
+        const nonMatchingEvent = createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+          TEST_CONSTANTS.EVENT_TYPE_2,
+        );
+
+        await router.dispatch([nonMatchingEvent], { tenantId });
+
+        expect(mockSendBatch).not.toHaveBeenCalled();
+      });
+    });
+
     describe("when a fold projection fails inline", () => {
       it("attempts all projections and throws AggregateError", async () => {
         const queueManager = createMockQueueManager();

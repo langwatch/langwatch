@@ -15,7 +15,7 @@ import type {
     RegisteredPipeline,
 } from "./pipeline/types";
 import { orgBillableEventsMeterProjection } from "./projections/global/orgBillableEventsMeter.mapProjection";
-import { projectDailyBillableEventsProjection } from "./projections/global/projectDailyBillableEvents.foldProjection";
+
 import { projectDailySdkUsageProjection } from "./projections/global/projectDailySdkUsage.foldProjection";
 import { ProjectionRegistry } from "./projections/projectionRegistry";
 import type { EventSourcedQueueProcessor } from "./queues";
@@ -102,14 +102,11 @@ export class EventSourcing {
       this.projectionRegistry.registerFoldProjection(
         projectDailySdkUsageProjection,
       );
-      this.projectionRegistry.registerFoldProjection(
-        projectDailyBillableEventsProjection,
-      );
       this.projectionRegistry.registerMapProjection(
         orgBillableEventsMeterProjection,
       );
-      this.projectionRegistry.registerReactor(
-        "projectDailyBillableEvents",
+      this.projectionRegistry.registerMapReactor(
+        "orgBillableEventsMeter",
         createBillingMeterDispatchReactor({
           getDispatch: () => {
             const pipeline = this.getPipeline(BILLING_REPORTING_PIPELINE_NAME);
