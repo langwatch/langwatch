@@ -1,6 +1,7 @@
 import { Router } from "express";
 import type IORedis from "ioredis";
 import { retryJob } from "../services/bullmqService.ts";
+import { isGroupQueue } from "../services/queueDiscovery.ts";
 import { DRAIN_GROUP_LUA, UNBLOCK_LUA } from "../services/luaScripts.ts";
 
 function isValidGroupId(id: unknown): id is string {
@@ -11,54 +12,24 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
   const router = Router();
 
   router.post("/api/actions/unblock", async (req, res) => {
-    const { queueName, groupId } = req.body as { queueName?: string; groupId?: string };
-    if (!queueName || !groupId) {
-      res.status(400).json({ error: "queueName and groupId are required" });
-      return;
-    }
+    try {
+      const { queueName, groupId } = req.body as { queueName?: string; groupId?: string };
+      if (!queueName || !groupId) {
+        res.status(400).json({ error: "queueName and groupId are required" });
+        return;
+      }
 
-    if (!isValidGroupId(groupId)) {
-      res.status(400).json({ error: "Invalid groupId format" });
-      return;
-    }
+      if (!isValidGroupId(groupId)) {
+        res.status(400).json({ error: "Invalid groupId format" });
+        return;
+      }
 
-    if (!getGroupQueueNames().includes(queueName)) {
-      res.status(404).json({ error: "Unknown queue name" });
-      return;
-    }
+      if (!getGroupQueueNames().includes(queueName)) {
+        res.status(404).json({ error: "Unknown queue name" });
+        return;
+      }
 
-    const prefix = `${queueName}:gq:`;
-    const result = await redis.eval(
-      UNBLOCK_LUA, 6,
-      `${prefix}blocked`,
-      `${prefix}group:${groupId}:active`,
-      `${prefix}group:${groupId}:jobs`,
-      `${prefix}ready`,
-      `${prefix}signal`,
-      `${prefix}group:${groupId}:error`,
-      groupId,
-    );
-
-    res.json({ ok: true, wasBlocked: result === 1 });
-  });
-
-  router.post("/api/actions/unblock-all", async (req, res) => {
-    const { queueName } = req.body as { queueName?: string };
-    if (!queueName) {
-      res.status(400).json({ error: "queueName is required" });
-      return;
-    }
-
-    if (!getGroupQueueNames().includes(queueName)) {
-      res.status(404).json({ error: "Unknown queue name" });
-      return;
-    }
-
-    const prefix = `${queueName}:gq:`;
-    const blockedMembers = await redis.smembers(`${prefix}blocked`);
-
-    let unblockedCount = 0;
-    for (const groupId of blockedMembers) {
+      const prefix = `${queueName}:gq:`;
       const result = await redis.eval(
         UNBLOCK_LUA, 6,
         `${prefix}blocked`,
@@ -69,78 +40,145 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
         `${prefix}group:${groupId}:error`,
         groupId,
       );
-      if (result === 1) unblockedCount++;
-    }
 
-    res.json({ ok: true, unblockedCount });
+      res.json({ ok: true, wasBlocked: result === 1 });
+    } catch (err) {
+      console.error("unblock error:", err);
+      res.status(500).json({ error: err instanceof Error ? err.message : "Internal error" });
+    }
+  });
+
+  router.post("/api/actions/unblock-all", async (req, res) => {
+    try {
+      const { queueName } = req.body as { queueName?: string };
+      if (!queueName) {
+        res.status(400).json({ error: "queueName is required" });
+        return;
+      }
+
+      if (!getGroupQueueNames().includes(queueName)) {
+        res.status(404).json({ error: "Unknown queue name" });
+        return;
+      }
+
+      const prefix = `${queueName}:gq:`;
+      const blockedMembers = await redis.smembers(`${prefix}blocked`);
+
+      if (blockedMembers.length === 0) {
+        res.json({ ok: true, unblockedCount: 0 });
+        return;
+      }
+
+      // Use a pipeline to send all evals in a single round trip instead of
+      // N sequential awaits which can hang with many blocked groups.
+      const pipeline = redis.pipeline();
+      for (const groupId of blockedMembers) {
+        pipeline.eval(
+          UNBLOCK_LUA, 6,
+          `${prefix}blocked`,
+          `${prefix}group:${groupId}:active`,
+          `${prefix}group:${groupId}:jobs`,
+          `${prefix}ready`,
+          `${prefix}signal`,
+          `${prefix}group:${groupId}:error`,
+          groupId,
+        );
+      }
+      const results = await pipeline.exec();
+
+      let unblockedCount = 0;
+      if (results) {
+        for (const [err, result] of results) {
+          if (!err && result === 1) unblockedCount++;
+        }
+      }
+
+      res.json({ ok: true, unblockedCount });
+    } catch (err) {
+      console.error("unblock-all error:", err);
+      res.status(500).json({ error: err instanceof Error ? err.message : "Internal error" });
+    }
   });
 
   router.post("/api/actions/drain-group", async (req, res) => {
-    const { queueName, groupId } = req.body as { queueName?: string; groupId?: string };
-    if (!queueName || !groupId) {
-      res.status(400).json({ error: "queueName and groupId are required" });
-      return;
+    try {
+      const { queueName, groupId } = req.body as { queueName?: string; groupId?: string };
+      if (!queueName || !groupId) {
+        res.status(400).json({ error: "queueName and groupId are required" });
+        return;
+      }
+
+      if (!isValidGroupId(groupId)) {
+        res.status(400).json({ error: "Invalid groupId" });
+        return;
+      }
+
+      if (!getGroupQueueNames().includes(queueName)) {
+        res.status(404).json({ error: "Unknown queue name" });
+        return;
+      }
+
+      const prefix = `${queueName}:gq:`;
+      const result = await redis.eval(
+        DRAIN_GROUP_LUA, 7,
+        `${prefix}group:${groupId}:jobs`,
+        `${prefix}group:${groupId}:data`,
+        `${prefix}group:${groupId}:active`,
+        `${prefix}ready`,
+        `${prefix}blocked`,
+        `${prefix}signal`,
+        `${prefix}group:${groupId}:error`,
+        groupId,
+      );
+
+      res.json({ ok: true, jobsRemoved: result });
+    } catch (err) {
+      console.error("drain-group error:", err);
+      res.status(500).json({ error: err instanceof Error ? err.message : "Internal error" });
     }
-
-    if (!isValidGroupId(groupId)) {
-      res.status(400).json({ error: "Invalid groupId" });
-      return;
-    }
-
-    if (!getGroupQueueNames().includes(queueName)) {
-      res.status(404).json({ error: "Unknown queue name" });
-      return;
-    }
-
-    const prefix = `${queueName}:gq:`;
-    const result = await redis.eval(
-      DRAIN_GROUP_LUA, 7,
-      `${prefix}group:${groupId}:jobs`,
-      `${prefix}group:${groupId}:data`,
-      `${prefix}group:${groupId}:active`,
-      `${prefix}ready`,
-      `${prefix}blocked`,
-      `${prefix}signal`,
-      `${prefix}group:${groupId}:error`,
-      groupId,
-    );
-
-    res.json({ ok: true, jobsRemoved: result });
   });
 
   router.post("/api/actions/retry-blocked", async (req, res) => {
-    const { queueName, groupId, jobId } = req.body as { queueName?: string; groupId?: string; jobId?: string };
-    if (!queueName || !groupId || !jobId) {
-      res.status(400).json({ error: "queueName, groupId, and jobId are required" });
-      return;
+    try {
+      const { queueName, groupId, jobId } = req.body as { queueName?: string; groupId?: string; jobId?: string };
+      if (!queueName || !groupId || !jobId) {
+        res.status(400).json({ error: "queueName, groupId, and jobId are required" });
+        return;
+      }
+
+      if (!isValidGroupId(groupId)) {
+        res.status(400).json({ error: "Invalid groupId" });
+        return;
+      }
+
+      if (!getGroupQueueNames().includes(queueName)) {
+        res.status(404).json({ error: "Unknown queue name" });
+        return;
+      }
+
+      // 1. Retry the failed BullMQ job (only for non-group queues; group queues
+      //    use fastq — the job is already re-staged by restageAndBlock, so
+      //    unblocking the group is sufficient to resume processing)
+      const retried = isGroupQueue(queueName) ? true : await retryJob(redis, queueName, jobId);
+
+      // 2. Unblock the group
+      const prefix = `${queueName}:gq:`;
+      const unblocked = await redis.eval(
+        UNBLOCK_LUA, 6,
+        `${prefix}blocked`,
+        `${prefix}group:${groupId}:active`,
+        `${prefix}group:${groupId}:jobs`,
+        `${prefix}ready`,
+        `${prefix}signal`,
+        `${prefix}group:${groupId}:error`,
+        groupId,
+      );
+
+      res.json({ ok: true, retried, unblocked: unblocked === 1 });
+    } catch (err) {
+      console.error("retry-blocked error:", err);
+      res.status(500).json({ error: err instanceof Error ? err.message : "Internal error" });
     }
-
-    if (!isValidGroupId(groupId)) {
-      res.status(400).json({ error: "Invalid groupId" });
-      return;
-    }
-
-    if (!getGroupQueueNames().includes(queueName)) {
-      res.status(404).json({ error: "Unknown queue name" });
-      return;
-    }
-
-    // 1. Retry the failed BullMQ job
-    const retried = await retryJob(redis, queueName, jobId);
-
-    // 2. Unblock the group
-    const prefix = `${queueName}:gq:`;
-    const unblocked = await redis.eval(
-      UNBLOCK_LUA, 5,
-      `${prefix}blocked`,
-      `${prefix}group:${groupId}:active`,
-      `${prefix}group:${groupId}:jobs`,
-      `${prefix}ready`,
-      `${prefix}signal`,
-      groupId,
-    );
-
-    res.json({ ok: true, retried, unblocked: unblocked === 1 });
   });
 
   return router;
