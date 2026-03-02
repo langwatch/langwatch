@@ -2,14 +2,17 @@ import { useRouter } from "next/router";
 import { useState } from "react";
 import {
   Badge,
+  Box,
   Button,
+  Grid,
   HStack,
   Separator,
+  Skeleton,
   Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Crown } from "lucide-react";
+import { Check, Crown, X } from "lucide-react";
 import { Dialog } from "./ui/dialog";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { usePlanManagementUrl } from "../hooks/usePlanManagementUrl";
@@ -18,6 +21,10 @@ import { LIMIT_TYPE_LABELS } from "../server/license-enforcement/constants";
 import { api } from "../utils/api";
 import { toaster } from "./ui/toaster";
 import type { UpgradeModalVariant } from "../stores/upgradeModalStore";
+import {
+  FREE_PLAN_FEATURES,
+  GROWTH_PLAN_FEATURES,
+} from "./subscription/billing-plans";
 
 interface UpgradeModalProps {
   open: boolean;
@@ -28,7 +35,9 @@ interface UpgradeModalProps {
 export function UpgradeModal({ open, onClose, variant }: UpgradeModalProps) {
   return (
     <Dialog.Root open={open} onOpenChange={(e) => !e.open && onClose()}>
-      <Dialog.Content>
+      <Dialog.Content
+        {...(variant.mode === "limit" ? { maxWidth: "680px" } : {})}
+      >
         <Dialog.CloseTrigger />
         {variant.mode === "limit" ? (
           <LimitContent variant={variant} onClose={onClose} />
@@ -40,6 +49,36 @@ export function UpgradeModal({ open, onClose, variant }: UpgradeModalProps) {
   );
 }
 
+function PlanFeatureList({
+  features,
+  icon,
+}: {
+  features: string[];
+  icon: "check" | "x";
+}) {
+  return (
+    <VStack gap={2} align="start">
+      {features.map((feature) => (
+        <HStack key={feature} gap={2} align="start">
+          <Box flexShrink={0} paddingTop="2px">
+            {icon === "check" ? (
+              <Check size={14} color="var(--chakra-colors-green-500)" />
+            ) : (
+              <X size={14} color="var(--chakra-colors-gray-400)" />
+            )}
+          </Box>
+          <Text
+            fontSize="sm"
+            color={icon === "check" ? "fg.muted" : "fg.subtle"}
+          >
+            {feature}
+          </Text>
+        </HStack>
+      ))}
+    </VStack>
+  );
+}
+
 function LimitContent({
   variant,
   onClose,
@@ -48,8 +87,25 @@ function LimitContent({
   onClose: () => void;
 }) {
   const router = useRouter();
-  const { project } = useOrganizationTeamProject();
+  const { project, organization } = useOrganizationTeamProject();
   const { url: planManagementUrl, buttonLabel } = usePlanManagementUrl();
+
+  const organizationId = organization?.id;
+
+  const activePlan = api.plan.getActivePlan.useQuery(
+    { organizationId: organizationId! },
+    {
+      enabled: !!organizationId,
+      staleTime: 5 * 60 * 1000,
+      refetchOnWindowFocus: false,
+    },
+  );
+
+  const showComparison =
+    activePlan.data?.planSource !== "license" &&
+    activePlan.data?.overrideAddingLimitations !== true;
+
+  const planName = activePlan.data?.name;
 
   const handleUpgrade = () => {
     trackEvent("subscription_hook_click", {
@@ -69,20 +125,71 @@ function LimitContent({
       <Dialog.Body>
         <VStack gap={4} align="start">
           {typeof variant.max === "number" ? (
-            <>
-              <Text>
-                You've reached the limit of {variant.max}{" "}
-                {LIMIT_TYPE_LABELS[variant.limitType]} on your current plan.
-              </Text>
-              <Text color="gray.500">
-                Current usage: {variant.current} / {variant.max}
-              </Text>
-            </>
+            <Text>
+              You've reached the limit of <strong>{variant.max}{" "}
+              {LIMIT_TYPE_LABELS[variant.limitType]}</strong> on your current plan.
+            </Text>
           ) : (
             <Text>
-              You've reached the limit of {LIMIT_TYPE_LABELS[variant.limitType]}{" "}
-              on your current plan.
+              You've reached the limit of{" "} <strong>
+              {LIMIT_TYPE_LABELS[variant.limitType]}</strong> on your current plan.
             </Text>
+          )}
+
+          {showComparison && (
+            <Grid
+              templateColumns="1fr 1fr"
+              gap={5}
+              width="full"
+              paddingTop={1}
+            >
+              {/* Current plan column */}
+              <VStack
+                align="start"
+                gap={3}
+                paddingY={4}
+                paddingX={4}
+                borderWidth="1px"
+                borderColor="border.muted"
+                borderRadius="lg"
+              >
+                <Text fontWeight="semibold" fontSize="sm">
+                  {activePlan.isLoading ? (
+                    <Skeleton
+                      as="span"
+                      display="inline-block"
+                      width="40px"
+                      height="1em"
+                    />
+                  ) : (
+                    planName ?? "Current"
+                  )}{" "}
+                  plan
+                </Text>
+                <PlanFeatureList features={FREE_PLAN_FEATURES} icon="x" />
+              </VStack>
+
+              {/* Growth plan column */}
+              <VStack
+                align="start"
+                gap={3}
+                paddingY={4}
+                paddingX={4}
+                borderWidth="2px"
+                borderColor="border.solid"
+                borderRadius="lg"
+              >
+                <HStack gap={2}>
+                  <Text fontWeight="semibold" fontSize="sm">
+                    Growth plan
+                  </Text>
+                  <Badge colorPalette="green" variant="surface" size="sm">
+                    Recommended
+                  </Badge>
+                </HStack>
+                <PlanFeatureList features={GROWTH_PLAN_FEATURES} icon="check" />
+              </VStack>
+            </Grid>
           )}
         </VStack>
       </Dialog.Body>
