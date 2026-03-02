@@ -131,7 +131,11 @@ export const start = (
 
   // Register the fallback worker so QueueWithFallback can process evaluations
   // inline when Redis is unavailable (avoids "fallback worker not registered" error)
-  registerEvaluationsFallbackWorker(runEvaluationMock ?? runEvaluationJob);
+  registerEvaluationsFallbackWorker(
+    (runEvaluationMock ?? runEvaluationJob) as (
+      job: Job<EvaluationJob, any, string>,
+    ) => Promise<any>,
+  );
 
   // Start ClickHouse storage metrics collection if ClickHouse is enabled
   const clickHouseClient = getClickHouseClient();
