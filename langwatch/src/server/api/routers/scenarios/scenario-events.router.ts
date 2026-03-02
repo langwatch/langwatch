@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { on } from "node:events";
 import { z } from "zod";
-import { getApp } from "~/server/app-layer";
+import { getApp } from "~/server/app-layer/app";
 import { SimulationService } from "~/server/simulations/simulation.service";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { createLogger } from "~/utils/logger/server";
