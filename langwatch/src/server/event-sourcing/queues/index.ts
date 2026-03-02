@@ -7,5 +7,5 @@ export type {
   QueueSendOptions,
 } from "./queue.types";
 export { resolveDeduplicationStrategy } from "./queue.types";
-export { GroupQueueProcessorBullMq } from "./groupQueue/groupQueue";
+export { GroupQueueProcessor } from "./groupQueue/groupQueue";
 export { EventSourcedQueueProcessorMemory } from "./memory";

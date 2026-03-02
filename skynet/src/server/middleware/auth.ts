@@ -6,7 +6,15 @@ export function basicAuth(req: Request, res: Response, next: NextFunction): void
   const password = process.env.SKYNET_PASSWORD;
 
   if (!username || !password) {
-    next();
+    const isDev =
+      process.env.NODE_ENV === "development" ||
+      process.env.NODE_ENV === "test" ||
+      process.env.ENVIRONMENT === "local";
+    if (isDev) {
+      next();
+      return;
+    }
+    res.status(503).send("Skynet auth not configured");
     return;
   }
 

@@ -11,6 +11,9 @@ export interface GroupInfo {
   pipelineName: string | null;
   jobType: string | null;
   jobName: string | null;
+  errorMessage: string | null;
+  errorStack: string | null;
+  errorTimestamp: number | null;
 }
 
 export interface QueueInfo {
@@ -121,8 +124,9 @@ export interface GroupDetailData {
   pipelineName: string | null;
   jobType: string | null;
   jobName: string | null;
-  blockError?: string;
-  blockStacktrace?: string[];
+  errorMessage: string | null;
+  errorStack: string | null;
+  errorTimestamp: number | null;
 }
 
 export interface FailedJob {

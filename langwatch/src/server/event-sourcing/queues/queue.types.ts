@@ -4,8 +4,8 @@ export interface EventSourcedQueueProcessorOptions {
   concurrency?: number;
   /**
    * Maximum number of groups that can be processed in parallel.
-   * Only used by GroupQueueProcessorBullMq.
-   * @default 120
+   * Only used by GroupQueueProcessor.
+   * @default 300
    */
   globalConcurrency?: number;
 }

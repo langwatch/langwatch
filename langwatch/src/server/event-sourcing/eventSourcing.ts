@@ -19,7 +19,7 @@ import { projectDailyBillableEventsProjection } from "./projections/global/proje
 import { projectDailySdkUsageProjection } from "./projections/global/projectDailySdkUsage.foldProjection";
 import { ProjectionRegistry } from "./projections/projectionRegistry";
 import type { EventSourcedQueueProcessor } from "./queues";
-import { GroupQueueProcessorBullMq } from "./queues/groupQueue/groupQueue";
+import { GroupQueueProcessor } from "./queues/groupQueue/groupQueue";
 import { EventSourcedQueueProcessorMemory } from "./queues/memory";
 import { EventSourcingPipeline } from "./runtimePipeline";
 import type { JobRegistryEntry } from "./services/queues/queueManager";
@@ -401,7 +401,7 @@ export class EventSourcing {
 
     const effectiveRedis = this._redis;
     if (effectiveRedis) {
-      this._globalQueue = new GroupQueueProcessorBullMq(
+      this._globalQueue = new GroupQueueProcessor(
         definition,
         effectiveRedis,
         { consumerEnabled: this._processRole !== "web" },
