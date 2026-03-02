@@ -81,30 +81,14 @@ Feature: Self-Serving License Purchase
     And the error is logged
 
   # GROWTH plan template
-  @unit
-  Scenario: GROWTH template has correct default limits
-    Given the GROWTH plan template
-    Then the plan type is "GROWTH"
-    And the plan name is "Growth"
-    And maxMembers is configurable (not preset)
-    And maxMembersLite equals Number.MAX_SAFE_INTEGER
-    And maxTeams equals Number.MAX_SAFE_INTEGER
-    And maxProjects equals Number.MAX_SAFE_INTEGER
-    And maxMessagesPerMonth equals Number.MAX_SAFE_INTEGER
-    And evaluationsCredit equals Number.MAX_SAFE_INTEGER
-    And maxWorkflows equals Number.MAX_SAFE_INTEGER
-    And maxPrompts equals Number.MAX_SAFE_INTEGER
-    And maxEvaluators equals Number.MAX_SAFE_INTEGER
-    And maxScenarios equals Number.MAX_SAFE_INTEGER
-    And maxAgents equals Number.MAX_SAFE_INTEGER
-    And maxExperiments equals Number.MAX_SAFE_INTEGER
-    And maxOnlineEvaluations equals Number.MAX_SAFE_INTEGER
-    And maxDatasets equals Number.MAX_SAFE_INTEGER
-    And maxDashboards equals Number.MAX_SAFE_INTEGER
-    And maxCustomGraphs equals Number.MAX_SAFE_INTEGER
-    And maxAutomations equals Number.MAX_SAFE_INTEGER
-    And canPublish is true
-    And usageUnit is "events"
+  @integration
+  Scenario: GROWTH plan includes all features with no artificial limits
+    Given a user purchases a GROWTH license with 10 seats
+    When the license is generated
+    Then the license plan type is "GROWTH"
+    And the license allows 10 members
+    And all other features are unlimited
+    And publishing is enabled
 
   # UI: configurable payment link
   @integration

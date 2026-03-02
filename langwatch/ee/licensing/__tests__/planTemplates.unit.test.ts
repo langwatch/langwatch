@@ -111,82 +111,92 @@ describe("ENTERPRISE_TEMPLATE", () => {
 });
 
 describe("GROWTH_TEMPLATE", () => {
-  it("has type GROWTH", () => {
-    expect(GROWTH_TEMPLATE.type).toBe("GROWTH");
+  describe("when inspecting plan identity", () => {
+    it("has type GROWTH", () => {
+      expect(GROWTH_TEMPLATE.type).toBe("GROWTH");
+    });
+
+    it("has name Growth", () => {
+      expect(GROWTH_TEMPLATE.name).toBe("Growth");
+    });
   });
 
-  it("has name Growth", () => {
-    expect(GROWTH_TEMPLATE.name).toBe("Growth");
+  describe("when inspecting member limits", () => {
+    it("does not preset maxMembers", () => {
+      expect(GROWTH_TEMPLATE).not.toHaveProperty("maxMembers");
+    });
   });
 
-  it("does not preset maxMembers", () => {
-    expect(GROWTH_TEMPLATE).not.toHaveProperty("maxMembers");
-  });
+  describe("when inspecting feature limits", () => {
+    it("sets all other limits to unlimited (DEFAULT_LIMIT)", () => {
+      const unlimitedFields = [
+        "maxMembersLite",
+        "maxTeams",
+        "maxProjects",
+        "maxMessagesPerMonth",
+        "evaluationsCredit",
+        "maxWorkflows",
+        "maxPrompts",
+        "maxEvaluators",
+        "maxScenarios",
+        "maxAgents",
+        "maxExperiments",
+        "maxOnlineEvaluations",
+        "maxDatasets",
+        "maxDashboards",
+        "maxCustomGraphs",
+        "maxAutomations",
+      ] as const;
 
-  it("has all other limits set to unlimited (DEFAULT_LIMIT)", () => {
-    const unlimitedFields = [
-      "maxMembersLite",
-      "maxTeams",
-      "maxProjects",
-      "maxMessagesPerMonth",
-      "evaluationsCredit",
-      "maxWorkflows",
-      "maxPrompts",
-      "maxEvaluators",
-      "maxScenarios",
-      "maxAgents",
-      "maxExperiments",
-      "maxOnlineEvaluations",
-      "maxDatasets",
-      "maxDashboards",
-      "maxCustomGraphs",
-      "maxAutomations",
-    ] as const;
+      for (const field of unlimitedFields) {
+        expect(GROWTH_TEMPLATE[field], `${field} is not DEFAULT_LIMIT`).toBe(
+          DEFAULT_LIMIT
+        );
+      }
+    });
 
-    for (const field of unlimitedFields) {
-      expect(GROWTH_TEMPLATE[field], `${field} is not DEFAULT_LIMIT`).toBe(
-        DEFAULT_LIMIT
-      );
-    }
-  });
+    it("has canPublish true", () => {
+      expect(GROWTH_TEMPLATE.canPublish).toBe(true);
+    });
 
-  it("has canPublish true", () => {
-    expect(GROWTH_TEMPLATE.canPublish).toBe(true);
-  });
-
-  it("has usageUnit of events", () => {
-    expect(GROWTH_TEMPLATE.usageUnit).toBe("events");
+    it("has usageUnit of events", () => {
+      expect(GROWTH_TEMPLATE.usageUnit).toBe("events");
+    });
   });
 });
 
 describe("getPlanTemplate", () => {
-  it("returns GROWTH template for GROWTH type", () => {
-    const template = getPlanTemplate("GROWTH");
+  describe("when called with a known plan type", () => {
+    it("returns GROWTH template for GROWTH type", () => {
+      const template = getPlanTemplate("GROWTH");
 
-    expect(template).toEqual(GROWTH_TEMPLATE);
+      expect(template).toEqual(GROWTH_TEMPLATE);
+    });
+
+    it("returns PRO template for PRO type", () => {
+      const template = getPlanTemplate("PRO");
+
+      expect(template).toEqual(PRO_TEMPLATE);
+    });
+
+    it("returns ENTERPRISE template for ENTERPRISE type", () => {
+      const template = getPlanTemplate("ENTERPRISE");
+
+      expect(template).toEqual(ENTERPRISE_TEMPLATE);
+    });
   });
 
-  it("returns PRO template for PRO type", () => {
-    const template = getPlanTemplate("PRO");
+  describe("when called with an unknown plan type", () => {
+    it("returns null for CUSTOM type", () => {
+      const template = getPlanTemplate("CUSTOM");
 
-    expect(template).toEqual(PRO_TEMPLATE);
-  });
+      expect(template).toBeNull();
+    });
 
-  it("returns ENTERPRISE template for ENTERPRISE type", () => {
-    const template = getPlanTemplate("ENTERPRISE");
+    it("returns null for unknown plan type", () => {
+      const template = getPlanTemplate("UNKNOWN");
 
-    expect(template).toEqual(ENTERPRISE_TEMPLATE);
-  });
-
-  it("returns null for CUSTOM type", () => {
-    const template = getPlanTemplate("CUSTOM");
-
-    expect(template).toBeNull();
-  });
-
-  it("returns null for unknown plan type", () => {
-    const template = getPlanTemplate("UNKNOWN");
-
-    expect(template).toBeNull();
+      expect(template).toBeNull();
+    });
   });
 });

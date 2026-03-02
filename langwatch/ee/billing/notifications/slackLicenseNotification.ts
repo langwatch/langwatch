@@ -1,5 +1,7 @@
 import type { LicensePurchaseNotificationPayload } from "../types";
 
+const SLACK_TIMEOUT_MS = 10_000;
+
 export const sendSlackLicensePurchaseNotification = async ({
   payload,
   webhookUrl,
@@ -7,6 +9,9 @@ export const sendSlackLicensePurchaseNotification = async ({
   payload: LicensePurchaseNotificationPayload;
   webhookUrl: string;
 }) => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), SLACK_TIMEOUT_MS);
+
   const amountFormatted = new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: payload.currency,
@@ -34,15 +39,20 @@ export const sendSlackLicensePurchaseNotification = async ({
     ],
   };
 
-  const response = await fetch(webhookUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(message),
-  });
+  try {
+    const response = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(message),
+      signal: controller.signal,
+    });
 
-  if (!response.ok) {
-    throw new Error(
-      `Slack webhook failed with status ${response.status}: ${response.statusText}`,
-    );
+    if (!response.ok) {
+      throw new Error(
+        `Slack webhook failed with status ${response.status}: ${response.statusText}`,
+      );
+    }
+  } finally {
+    clearTimeout(timeout);
   }
 };

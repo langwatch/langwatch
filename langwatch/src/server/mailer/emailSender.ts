@@ -64,6 +64,12 @@ export const sendEmail = async (content: EmailContent) => {
   }
 };
 
+const sanitizeHeaderValue = (value: string): string =>
+  value.replace(/[\r\n]+/g, " ").trim();
+
+const sanitizeHeaderParam = (value: string): string =>
+  sanitizeHeaderValue(value).replace(/(["\\])/g, "\\$1");
+
 const buildRawMimeMessage = ({
   from,
   to,
@@ -80,9 +86,9 @@ const buildRawMimeMessage = ({
   const boundary = `----=_Part_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
   const lines = [
-    `From: ${from}`,
-    `To: ${to.join(", ")}`,
-    `Subject: ${subject}`,
+    `From: ${sanitizeHeaderValue(from)}`,
+    `To: ${to.map(sanitizeHeaderValue).join(", ")}`,
+    `Subject: ${sanitizeHeaderValue(subject)}`,
     `MIME-Version: 1.0`,
     `Content-Type: multipart/mixed; boundary="${boundary}"`,
     ``,
@@ -97,8 +103,8 @@ const buildRawMimeMessage = ({
     const base64Content = Buffer.from(attachment.content).toString("base64");
     lines.push(
       `--${boundary}`,
-      `Content-Type: ${attachment.contentType}; name="${attachment.filename}"`,
-      `Content-Disposition: attachment; filename="${attachment.filename}"`,
+      `Content-Type: ${sanitizeHeaderValue(attachment.contentType)}; name="${sanitizeHeaderParam(attachment.filename)}"`,
+      `Content-Disposition: attachment; filename="${sanitizeHeaderParam(attachment.filename)}"`,
       `Content-Transfer-Encoding: base64`,
       ``,
       base64Content,
