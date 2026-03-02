@@ -2,7 +2,6 @@ import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 
 // Lua scripts inlined as string constants.
-// Source files in ./lua/ are kept as documentation but are NOT imported at runtime.
 // This avoids loader incompatibilities across turbopack, webpack, vitest, and tsx.
 
 const STAGE_LUA = `
@@ -10,6 +9,7 @@ local groupJobsKey = KEYS[1]
 local readyKey     = KEYS[2]
 local signalKey    = KEYS[3]
 local dedupKey     = KEYS[4]
+local dataKey      = KEYS[5]
 
 local stagedJobId    = ARGV[1]
 local groupId        = ARGV[2]
@@ -24,19 +24,18 @@ if dedupId ~= "" and dedupTtlMs > 0 then
     redis.call("ZREM", groupJobsKey, existingJobId)
     redis.call("ZADD", groupJobsKey, dispatchAfter, stagedJobId)
     redis.call("SET", dedupKey, stagedJobId, "PX", dedupTtlMs)
-    local dataKey = string.gsub(groupJobsKey, ":jobs$", ":data")
     redis.call("HDEL", dataKey, existingJobId)
     redis.call("HSET", dataKey, stagedJobId, jobDataJson)
     local pendingCount = redis.call("ZCARD", groupJobsKey)
     local score = math.sqrt(pendingCount)
     redis.call("ZADD", readyKey, score, groupId)
     redis.call("LPUSH", signalKey, "1")
+    redis.call("LTRIM", signalKey, 0, 999)
     return 0
   end
 end
 
 redis.call("ZADD", groupJobsKey, dispatchAfter, stagedJobId)
-local dataKey = string.gsub(groupJobsKey, ":jobs$", ":data")
 redis.call("HSET", dataKey, stagedJobId, jobDataJson)
 
 if dedupId ~= "" and dedupTtlMs > 0 then
@@ -48,6 +47,7 @@ local score = math.sqrt(pendingCount)
 redis.call("ZADD", readyKey, score, groupId)
 
 redis.call("LPUSH", signalKey, "1")
+redis.call("LTRIM", signalKey, 0, 999)
 
 return 1
 `;
@@ -106,6 +106,7 @@ for groupId, _ in pairs(affectedGroups) do
   local score = math.sqrt(pendingCount)
   redis.call("ZADD", readyKey, score, groupId)
   redis.call("LPUSH", signalKey, "1")
+  redis.call("LTRIM", signalKey, 0, 999)
 end
 
 return newStagedCount
@@ -157,12 +158,66 @@ end
 return nil
 `;
 
+const DISPATCH_BATCH_LUA = `
+local readyKey   = KEYS[1]
+local blockedKey = KEYS[2]
+
+local keyPrefix    = ARGV[1]
+local nowMs        = tonumber(ARGV[2])
+local activeTtlSec = tonumber(ARGV[3])
+local maxJobs      = tonumber(ARGV[4])
+
+local groups = redis.call("ZREVRANGE", readyKey, 0, -1)
+local results = {}
+local dispatched = 0
+
+for _, groupId in ipairs(groups) do
+  if dispatched >= maxJobs then break end
+
+  if redis.call("SISMEMBER", blockedKey, groupId) == 0 then
+    local activeKey = keyPrefix .. "group:" .. groupId .. ":active"
+    local activeJob = redis.call("GET", activeKey)
+
+    if not activeJob then
+      local jobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
+      local jobResults = redis.call("ZRANGEBYSCORE", jobsKey, "-inf", nowMs, "WITHSCORES", "LIMIT", 0, 1)
+
+      if #jobResults >= 2 then
+        local stagedJobId = jobResults[1]
+        local originalScore = jobResults[2]
+        redis.call("ZREM", jobsKey, stagedJobId)
+        redis.call("SET", activeKey, stagedJobId, "EX", activeTtlSec)
+
+        local pendingCount = redis.call("ZCARD", jobsKey)
+        if pendingCount > 0 then
+          local score = math.sqrt(pendingCount)
+          redis.call("ZADD", readyKey, score, groupId)
+        else
+          redis.call("ZREM", readyKey, groupId)
+        end
+
+        local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
+        local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
+        redis.call("HDEL", dataKey, stagedJobId)
+
+        results[#results + 1] = stagedJobId
+        results[#results + 1] = groupId
+        results[#results + 1] = jobDataJson or ""
+        results[#results + 1] = tostring(originalScore)
+        dispatched = dispatched + 1
+      end
+    end
+  end
+end
+
+return results
+`;
+
 const COMPLETE_LUA = `
 local activeKey  = KEYS[1]
 local jobsKey    = KEYS[2]
 local readyKey   = KEYS[3]
 local signalKey  = KEYS[4]
-local blockedKey = KEYS[5]
 
 local groupId      = ARGV[1]
 local stagedJobId  = ARGV[2]
@@ -174,12 +229,6 @@ end
 
 redis.call("DEL", activeKey)
 
--- Do NOT auto-unblock here. If the group was blocked (e.g. by a cascading
--- failure), only an explicit Skynet unblock should remove it. This prevents
--- a concurrent successful job from silently unblocking a group that has
--- ordering violations from the cascade.
--- redis.call("SREM", blockedKey, groupId)
-
 local pendingCount = redis.call("ZCARD", jobsKey)
 if pendingCount > 0 then
   local score = math.sqrt(pendingCount)
@@ -189,6 +238,7 @@ else
 end
 
 redis.call("LPUSH", signalKey, "1")
+redis.call("LTRIM", signalKey, 0, 999)
 
 return 1
 `;
@@ -206,24 +256,6 @@ end
 return 0
 `;
 
-const FAIL_LUA = `
-local blockedKey = KEYS[1]
-local activeKey  = KEYS[2]
-
-local groupId      = ARGV[1]
-local stagedJobId  = ARGV[2]
-
--- Always block the group when retries are exhausted.
--- Previously we skipped blocking if a different job was active (stale worker check),
--- but this allowed cascading failures: active key TTL expires mid-retry → dispatcher
--- dispatches another job → old job's final failure can't block → repeat until staging
--- is drained. Always blocking is safe because blocked groups require explicit
--- operator unblock (via Skynet) to resume processing.
-redis.call("SADD", blockedKey, groupId)
-
-return 1
-`;
-
 const RESTAGE_AND_BLOCK_LUA = `
 local blockedKey = KEYS[1]
 local readyKey   = KEYS[2]
@@ -233,6 +265,8 @@ local groupId         = ARGV[2]
 local newStagedJobId  = ARGV[3]
 local score           = tonumber(ARGV[4])
 local jobDataJson     = ARGV[5]
+local errorMessage    = ARGV[6]
+local errorStack      = ARGV[7]
 
 local groupJobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
 local groupDataKey = keyPrefix .. "group:" .. groupId .. ":data"
@@ -249,6 +283,12 @@ local pendingCount = redis.call("ZCARD", groupJobsKey)
 local readyScore = math.sqrt(pendingCount)
 redis.call("ZADD", readyKey, readyScore, groupId)
 
+-- 4. Store error info for Skynet visibility
+if errorMessage and errorMessage ~= "" then
+  local errorKey = keyPrefix .. "group:" .. groupId .. ":error"
+  redis.call("HSET", errorKey, "message", errorMessage, "stack", errorStack or "", "timestamp", tostring(score))
+end
+
 return 1
 `;
 
@@ -264,7 +304,7 @@ export interface DispatchResult {
 }
 
 /**
- * TypeScript wrapper for the 4 group queue Lua scripts.
+ * TypeScript wrapper for the group queue Lua scripts.
  * All Redis keys use the `{queueName}` hash tag for Redis Cluster compatibility.
  * Lua scripts derive per-group keys dynamically (e.g. keyPrefix .. "group:" .. groupId)
  * instead of passing them via KEYS[]; this is safe because keyPrefix includes the hash
@@ -307,13 +347,16 @@ export class GroupStagingScripts {
     const dedupKey =
       dedupId !== "" ? `${this.keyPrefix}dedup:${dedupId}` : `${this.keyPrefix}dedup:__none__`;
 
+    const dataKey = `${this.keyPrefix}group:${groupId}:data`;
+
     const result = await this.redis.eval(
       STAGE_LUA,
-      4,
+      5,
       groupJobsKey,
       readyKey,
       signalKey,
       dedupKey,
+      dataKey,
       stagedJobId,
       groupId,
       String(dispatchAfterMs),
@@ -400,6 +443,50 @@ export class GroupStagingScripts {
   }
 
   /**
+   * Pick eligible groups and dispatch up to maxJobs in a single atomic Lua call.
+   * Returns an array of dispatch results (may be empty).
+   */
+  async dispatchBatch({
+    nowMs,
+    activeTtlSec,
+    maxJobs,
+  }: {
+    nowMs: number;
+    activeTtlSec: number;
+    maxJobs: number;
+  }): Promise<DispatchResult[]> {
+    const readyKey = `${this.keyPrefix}ready`;
+    const blockedKey = `${this.keyPrefix}blocked`;
+
+    const result = await this.redis.eval(
+      DISPATCH_BATCH_LUA,
+      2,
+      readyKey,
+      blockedKey,
+      this.keyPrefix,
+      String(nowMs),
+      String(activeTtlSec),
+      String(maxJobs),
+    );
+
+    if (!result || !Array.isArray(result) || result.length < 4) {
+      return [];
+    }
+
+    const dispatched: DispatchResult[] = [];
+    for (let i = 0; i < result.length; i += 4) {
+      dispatched.push({
+        stagedJobId: String(result[i]),
+        groupId: String(result[i + 1]),
+        jobDataJson: String(result[i + 2]),
+        originalScore: Number(result[i + 3]),
+      });
+    }
+
+    return dispatched;
+  }
+
+  /**
    * Mark a group job as completed and signal the dispatcher.
    *
    * @returns true if completed, false if stale (active key doesn't match)
@@ -415,16 +502,14 @@ export class GroupStagingScripts {
     const jobsKey = `${this.keyPrefix}group:${groupId}:jobs`;
     const readyKey = `${this.keyPrefix}ready`;
     const signalKey = `${this.keyPrefix}signal`;
-    const blockedKey = `${this.keyPrefix}blocked`;
 
     const result = await this.redis.eval(
       COMPLETE_LUA,
-      5,
+      4,
       activeKey,
       jobsKey,
       readyKey,
       signalKey,
-      blockedKey,
       groupId,
       stagedJobId,
     );
@@ -460,32 +545,6 @@ export class GroupStagingScripts {
   }
 
   /**
-   * Mark a group as blocked after exhausted retries.
-   * Always blocks unconditionally — COMPLETE_LUA on a healthy job will remove the block.
-   */
-  async fail({
-    groupId,
-    stagedJobId,
-  }: {
-    groupId: string;
-    stagedJobId: string;
-  }): Promise<boolean> {
-    const blockedKey = `${this.keyPrefix}blocked`;
-    const activeKey = `${this.keyPrefix}group:${groupId}:active`;
-
-    const result = await this.redis.eval(
-      FAIL_LUA,
-      2,
-      blockedKey,
-      activeKey,
-      groupId,
-      stagedJobId,
-    );
-
-    return result === 1;
-  }
-
-  /**
    * Atomically block a group and re-stage a failed job after exhausted retries.
    * Combines blocking, re-staging, and ready-score update in a single Lua call.
    */
@@ -494,11 +553,15 @@ export class GroupStagingScripts {
     newStagedJobId,
     score,
     jobDataJson,
+    errorMessage,
+    errorStack,
   }: {
     groupId: string;
     newStagedJobId: string;
     score: number;
     jobDataJson: string;
+    errorMessage?: string;
+    errorStack?: string;
   }): Promise<void> {
     const blockedKey = `${this.keyPrefix}blocked`;
     const readyKey = `${this.keyPrefix}ready`;
@@ -513,7 +576,33 @@ export class GroupStagingScripts {
       newStagedJobId,
       String(score),
       jobDataJson,
+      errorMessage ?? "",
+      errorStack ?? "",
     );
+  }
+
+  /**
+   * Retrieve stored error info for a blocked group.
+   *
+   * @returns error info or null if no error is stored
+   */
+  async getGroupError(groupId: string): Promise<{
+    message: string;
+    stack: string;
+    timestamp: string;
+  } | null> {
+    const errorKey = `${this.keyPrefix}group:${groupId}:error`;
+    const result = await this.redis.hgetall(errorKey);
+
+    if (!result || !result.message) {
+      return null;
+    }
+
+    return {
+      message: result.message,
+      stack: result.stack ?? "",
+      timestamp: result.timestamp ?? "",
+    };
   }
 
   /**

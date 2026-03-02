@@ -1,21 +1,15 @@
-import { context as otelContext, trace, TraceFlags } from "@opentelemetry/api";
-import {
-  type Job,
-  type JobsOptions,
-  Queue,
-  QueueEvents,
-  type QueueOptions,
-  Worker,
-  type WorkerOptions,
-} from "bullmq";
-import { BullMQOtel } from "bullmq-otel";
+import { context as otelContext, SpanKind, trace, TraceFlags } from "@opentelemetry/api";
+import fastq from "fastq";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
+import { getLangWatchTracer } from "langwatch";
 import type { SemConvAttributes } from "langwatch/observability";
 import { createLogger } from "../../../../utils/logger/server";
 import {
   getJobContextMetadata,
   type JobContextMetadata,
+  createContextFromJobData,
+  runWithContext,
 } from "../../../context/asyncContext";
 import { connection } from "../../../redis";
 import type {
@@ -25,29 +19,25 @@ import type {
   QueueSendOptions,
 } from "../../queues";
 import { ConfigurationError, QueueError } from "../../services/errorHandling";
+import { JOB_RETRY_CONFIG } from "../shared";
+import { GroupQueueDispatcher } from "./dispatcher";
 import {
-  collectBullMQMetrics,
-  extractJobPayload,
-  JOB_RETRY_CONFIG,
-  processJobWithContext,
-} from "../shared";
-import {
-  gqActiveGroups,
   gqGroupsBlockedTotal,
   gqJobsCompletedTotal,
   gqJobsDedupedTotal,
-  gqJobsDispatchedTotal,
+  gqJobsExhaustedTotal,
+  gqJobsRetriedTotal,
   gqJobsStagedTotal,
-  gqPendingGroups,
 } from "./metrics";
-import { GroupStagingScripts } from "./scripts";
+import { GroupQueueMetricsCollector } from "./metricsCollector";
+import { type DispatchResult, GroupStagingScripts } from "./scripts";
 
 /**
  * Configuration for the group queue.
  */
 const GROUP_QUEUE_CONFIG = {
   /** Default global concurrency (max parallel groups) */
-  defaultGlobalConcurrency: 300,
+  defaultGlobalConcurrency: 500,
   /** TTL for the active key (safety net for crashes), in seconds */
   activeTtlSec: 300,
   /** BRPOP timeout in seconds (fallback polling interval) */
@@ -65,36 +55,34 @@ const GROUP_QUEUE_CONFIG = {
 /** Default TTL for deduplication in milliseconds */
 const DEFAULT_DEDUPLICATION_TTL_MS = 200;
 
-/**
- * Metadata attached to BullMQ jobs for group queue tracking.
- */
-interface GroupJobMetadata {
-  __groupId: string;
-  __stagedJobId: string;
-}
+/** Internal fields attached to job data that must be stripped before processing. */
+const INTERNAL_FIELDS = ["__context", "__groupId", "__stagedJobId", "__dispatchScore"] as const;
 
 /**
  * Group Queue Processor that provides per-group FIFO with cross-group parallelism.
  *
  * Architecture:
- * - A Redis staging layer sits in front of BullMQ
- * - Jobs flow: send() → staging → dispatch → BullMQ queue → worker → completion callback → dispatch next
+ * - A Redis staging layer coordinates job storage, per-group FIFO, weighted round-robin,
+ *   dedup, group blocking, heartbeats, and crash recovery via Lua scripts
+ * - Jobs flow: send() → staging → dispatch → fastq → processWithRetries → completion callback → dispatch next
  * - Per-group sequential processing eliminates ordering errors and distributed lock contention
  * - Weighted round-robin (sqrt(pendingCount)) provides fair scheduling across groups
+ * - fastq provides concurrency-limited async task execution with backpressure
  */
-export class GroupQueueProcessorBullMq<Payload extends Record<string, unknown>>
+export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   implements EventSourcedQueueProcessor<Payload>
 {
   private readonly logger = createLogger(
     "langwatch:event-sourcing:group-queue",
   );
+  private readonly tracer = getLangWatchTracer(
+    "langwatch.event-sourcing.queue",
+  );
   private readonly queueName: string;
   private readonly jobName: string;
   private readonly process: (payload: Payload) => Promise<void>;
   private readonly spanAttributes?: (payload: Payload) => SemConvAttributes;
-  private readonly queue: Queue<Payload, unknown, string>;
-  private readonly worker: Worker<Payload> | null;
-  private readonly queueEvents: QueueEvents | null;
+  private readonly processingQueue: fastq.queueAsPromised<DispatchResult, void>;
   private readonly delay?: number;
   private readonly deduplication?: DeduplicationConfig<Payload>;
   private readonly groupKey: (payload: Payload) => string;
@@ -104,10 +92,12 @@ export class GroupQueueProcessorBullMq<Payload extends Record<string, unknown>>
   private readonly scripts: GroupStagingScripts;
   private readonly globalConcurrency: number;
   private readonly consumerEnabled: boolean;
+  private readonly dispatcher: GroupQueueDispatcher | null;
+  private readonly metricsCollector: GroupQueueMetricsCollector | null;
 
   private shutdownRequested = false;
-  private dispatcherRunning = false;
-  private metricsInterval: ReturnType<typeof setInterval> | null = null;
+  /** Tracks in-flight jobs for active count metrics. */
+  private activeJobCount = 0;
 
   constructor(
     definition: EventSourcedQueueDefinition<Payload>,
@@ -128,14 +118,14 @@ export class GroupQueueProcessorBullMq<Payload extends Record<string, unknown>>
     const effectiveConnection = redisConnection ?? connection;
     if (!effectiveConnection) {
       throw new ConfigurationError(
-        "GroupQueueProcessorBullMq",
+        "GroupQueueProcessor",
         "Group queue processor requires Redis connection.",
       );
     }
 
     if (!groupKey) {
       throw new ConfigurationError(
-        "GroupQueueProcessorBullMq",
+        "GroupQueueProcessor",
         "Group queue processor requires a groupKey function in the queue definition.",
       );
     }
@@ -168,141 +158,45 @@ export class GroupQueueProcessorBullMq<Payload extends Record<string, unknown>>
       this.queueName,
     );
 
-    // BullMQ Queue for job persistence
-    const queueOptions: QueueOptions = {
-      connection: this.redisConnection,
-      telemetry: new BullMQOtel(this.queueName),
-      defaultJobOptions: {
-        attempts: JOB_RETRY_CONFIG.maxAttempts,
-        backoff: {
-          type: "fixed",
-          delay: JOB_RETRY_CONFIG.backoffDelayMs,
-        },
-        removeOnComplete: {
-          age: JOB_RETRY_CONFIG.removeOnCompleteAgeSec,
-          count: JOB_RETRY_CONFIG.removeOnCompleteCount,
-        },
-        removeOnFail: {
-          age: JOB_RETRY_CONFIG.removeOnFailAgeSec,
-        },
-      },
-    };
-    this.queue = new Queue<Payload, unknown, string>(
-      this.queueName,
-      queueOptions,
+    // fastq promise-based queue — replaces BullMQ Queue + Worker
+    this.processingQueue = fastq.promise(
+      this.processWithRetries.bind(this),
+      this.globalConcurrency,
     );
-
-    // BullMQ Worker - only created when consuming is enabled (worker processes)
-    if (this.consumerEnabled) {
-      const workerOptions: WorkerOptions = {
-        connection: this.redisConnection,
-        concurrency: this.globalConcurrency,
-        telemetry: new BullMQOtel(this.queueName),
-      };
-      this.worker = new Worker<Payload>(
-        this.queueName,
-        async (job, token) => this.processJob(job, token),
-        workerOptions,
+    this.processingQueue.saturated = () => {
+      this.logger.debug(
+        { queueName: this.queueName },
+        "Processing queue saturated",
       );
+    };
 
-      this.worker.on("ready", () => {
-        this.logger.info(
-          { queueName: this.queueName },
-          "Group queue worker ready",
-        );
-      });
-
-      this.worker.on("failed", (job, error) => {
-        this.logger.error(
-          {
-            queueName: this.queueName,
-            jobId: job?.id,
-            error: error instanceof Error ? error.message : String(error),
-            errorStack: error instanceof Error ? error.stack : void 0,
-          },
-          "Group queue job failed",
-        );
-
-        if (!job) return;
-
-        const metadata = this.extractGroupMetadata(job);
-        if (!metadata) return;
-
-        if (job.attemptsMade >= JOB_RETRY_CONFIG.maxAttempts) {
-          // Exhausted retries: re-stage the job and block the group
-          this.handleExhaustedRetries(job, metadata).catch((err) => {
-            this.logger.error(
-              {
-                queueName: this.queueName,
-                groupId: metadata.__groupId,
-                stagedJobId: metadata.__stagedJobId,
-                error: err instanceof Error ? err.message : String(err),
-              },
-              "CRITICAL: Failed to block group after exhausted retries - group may accept new jobs incorrectly",
-            );
-          });
-        } else {
-          // Intermediate retry: refresh activeKey TTL to prevent expiration
-          this.refreshActiveKeyTtl(metadata).catch((err) => {
-            this.logger.error(
-              {
-                queueName: this.queueName,
-                groupId: metadata.__groupId,
-                stagedJobId: metadata.__stagedJobId,
-                error: err instanceof Error ? err.message : String(err),
-              },
-              "Failed to refresh active key TTL during retry",
-            );
-          });
-        }
-      });
-
-      // Listen for completed jobs to trigger group completion
-      this.worker.on("completed", (job) => {
-        const metadata = this.extractGroupMetadata(job);
-        if (metadata) {
-          this.handleJobCompleted(metadata).catch((err) => {
-            this.logger.error(
-              {
-                queueName: this.queueName,
-                groupId: metadata.__groupId,
-                stagedJobId: metadata.__stagedJobId,
-                error: err instanceof Error ? err.message : String(err),
-              },
-              "CRITICAL: Failed to complete group job - group may be stuck",
-            );
-          });
-        }
-      });
-    } else {
-      this.worker = null;
-    }
-
-    // BullMQ QueueEvents + dispatcher + metrics — consumer only
+    // Start dispatcher and metrics collection in consumer mode
     if (this.consumerEnabled) {
-      this.queueEvents = new QueueEvents(this.queueName, {
-        connection: this.redisConnection,
+      this.dispatcher = new GroupQueueDispatcher({
+        scripts: this.scripts,
+        processingQueue: this.processingQueue,
+        blockingConnection: this.blockingConnection,
+        queueName: this.queueName,
+        globalConcurrency: this.globalConcurrency,
+        activeTtlSec: GROUP_QUEUE_CONFIG.activeTtlSec,
+        signalTimeoutSec: GROUP_QUEUE_CONFIG.signalTimeoutSec,
+        logger: this.logger,
       });
+      this.dispatcher.start();
 
-      this.queueEvents.on(
-        "deduplicated",
-        ({ jobId, deduplicationId, deduplicatedJobId }) => {
-          this.logger.debug(
-            {
-              queueName: this.queueName,
-              existingJobId: jobId,
-              deduplicationId,
-              deduplicatedJobId,
-            },
-            "BullMQ job deduplicated",
-          );
-        },
-      );
-
-      this.startDispatcher();
-      this.startMetricsCollection();
+      this.metricsCollector = new GroupQueueMetricsCollector({
+        scripts: this.scripts,
+        processingQueue: this.processingQueue,
+        redisConnection: this.redisConnection,
+        queueName: this.queueName,
+        activeJobCountFn: () => this.activeJobCount,
+        metricsIntervalMs: GROUP_QUEUE_CONFIG.metricsIntervalMs,
+        logger: this.logger,
+      });
+      this.metricsCollector.start();
     } else {
-      this.queueEvents = null;
+      this.dispatcher = null;
+      this.metricsCollector = null;
     }
   }
 
@@ -452,89 +346,11 @@ export class GroupQueueProcessorBullMq<Payload extends Record<string, unknown>>
   }
 
   /**
-   * Dispatcher loop: waits for signals and dispatches jobs from staging to BullMQ.
+   * fastq worker function: processes a dispatched job with retries, OTEL tracing,
+   * heartbeats, and error handling.
    */
-  private startDispatcher(): void {
-    this.dispatcherRunning = true;
-
-    const run = async () => {
-      while (!this.shutdownRequested) {
-        try {
-          // Wait for signal (BRPOP with timeout)
-          await this.waitForSignal();
-
-          // Dispatch as many jobs as possible
-          let dispatched = true;
-          while (dispatched && !this.shutdownRequested) {
-            dispatched = await this.dispatchOneJob();
-          }
-        } catch (error) {
-          if (this.shutdownRequested) break;
-
-          const errorMessage =
-            error instanceof Error ? error.message : String(error);
-
-          // Treat closed connections as an implicit shutdown signal
-          if (errorMessage.includes("Connection is closed")) {
-            this.logger.info(
-              { queueName: this.queueName },
-              "Redis connection closed, stopping dispatcher",
-            );
-            this.shutdownRequested = true;
-            break;
-          }
-
-          this.logger.error(
-            {
-              queueName: this.queueName,
-              error: errorMessage,
-            },
-            "Dispatcher loop error",
-          );
-
-          // Brief pause to avoid tight error loop
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-        }
-      }
-
-      this.dispatcherRunning = false;
-      this.logger.debug(
-        { queueName: this.queueName },
-        "Dispatcher loop stopped",
-      );
-    };
-
-    void run();
-  }
-
-  /**
-   * Wait for a signal on the signal list (BRPOP with timeout).
-   */
-  private async waitForSignal(): Promise<void> {
-    const signalKey = this.scripts.getSignalKey();
-    // BRPOP blocks until a signal arrives or timeout elapses.
-    // Uses a dedicated connection to avoid blocking the shared connection.
-    await this.blockingConnection.brpop(
-      signalKey,
-      GROUP_QUEUE_CONFIG.signalTimeoutSec,
-    );
-  }
-
-  /**
-   * Dispatch one job from staging to BullMQ.
-   * @returns true if a job was dispatched, false if nothing to dispatch
-   */
-  private async dispatchOneJob(): Promise<boolean> {
-    const result = await this.scripts.dispatch({
-      nowMs: Date.now(),
-      activeTtlSec: GROUP_QUEUE_CONFIG.activeTtlSec,
-    });
-
-    if (!result) {
-      return false;
-    }
-
-    const { stagedJobId, groupId, jobDataJson, originalScore } = result;
+  private async processWithRetries(dispatched: DispatchResult): Promise<void> {
+    const { stagedJobId, groupId, jobDataJson, originalScore } = dispatched;
 
     // Parse the stored job data
     let jobData: Record<string, unknown>;
@@ -547,85 +363,164 @@ export class GroupQueueProcessorBullMq<Payload extends Record<string, unknown>>
       );
       // Complete the group slot so it's not stuck
       await this.scripts.complete({ groupId, stagedJobId });
-      return true;
+      return;
     }
 
-    // Attach group metadata to the job data
-    const jobDataWithMetadata = {
-      ...jobData,
-      __groupId: groupId,
-      __stagedJobId: stagedJobId,
-      __dispatchScore: originalScore,
-    };
-
-    // Generate a BullMQ-safe job ID
-    const bullmqJobId = `${this.queueName}.${stagedJobId}`.replaceAll(":", ".");
-
-    const opts: JobsOptions = {
-      jobId: bullmqJobId,
-      telemetry: { omitContext: true },
-    };
-
-    // Restore the original request's OTEL trace context so BullMQOtel propagates
-    // the correct parent span into the worker, linking it back to the originating request.
     const contextMetadata = jobData.__context as JobContextMetadata | undefined;
-    const addJob = () =>
-      this.queue.add(
-        // @ts-expect-error - BullMQ expects string literal union but jobName is dynamic
-        this.jobName,
-        jobDataWithMetadata as unknown as Payload,
-        opts,
-      );
+    const payload = this.stripInternalFields(jobData);
 
-    if (contextMetadata?.traceId && contextMetadata?.parentSpanId) {
-      const parentContext = trace.setSpanContext(otelContext.active(), {
-        traceId: contextMetadata.traceId,
-        spanId: contextMetadata.parentSpanId,
-        traceFlags: TraceFlags.SAMPLED,
-        isRemote: true,
-      });
-      await otelContext.with(parentContext, addJob);
-    } else {
-      await addJob();
-    }
-
-    gqJobsDispatchedTotal.inc({ queue_name: this.queueName });
-
-    this.logger.debug(
-      {
-        queueName: this.queueName,
-        groupId,
-        stagedJobId,
-        bullmqJobId,
-      },
-      "Dispatched job from staging to BullMQ",
-    );
-
-    return true;
-  }
-
-  private async processJob(job: Job<Payload>, _token?: string): Promise<void> {
-    const metadata = this.extractGroupMetadata(job);
-    const heartbeat = metadata ? this.startActiveKeyHeartbeat(metadata) : null;
+    const heartbeat = this.startActiveKeyHeartbeat({ groupId, stagedJobId });
+    this.activeJobCount++;
 
     try {
-      const { payload, contextMetadata } = extractJobPayload<Payload>(job, [
-        "__groupId",
-        "__stagedJobId",
-        "__dispatchScore",
-      ]);
+      // Restore OTEL trace context and wrap in a span
+      const spanName = `${this.queueName}/${this.jobName}`;
+      const spanAttributes: Record<string, string | number | boolean> = {
+        "queue.name": this.queueName,
+        "queue.job_name": this.jobName,
+        "queue.group_id": groupId,
+        "queue.staged_job_id": stagedJobId,
+      };
 
-      await processJobWithContext({
-        job,
-        payload,
-        contextMetadata,
-        queueName: this.queueName,
-        spanAttributes: this.spanAttributes,
-        handler: this.process,
-      });
+      // Add custom span attributes from the definition
+      if (this.spanAttributes) {
+        try {
+          const custom = this.spanAttributes(payload);
+          for (const [key, value] of Object.entries(custom)) {
+            if (value !== undefined && (typeof value === "string" || typeof value === "number" || typeof value === "boolean")) {
+              spanAttributes[key] = value;
+            }
+          }
+        } catch {
+          // If spanAttributes throws, continue with base attributes
+        }
+      }
+
+      const executeWithSpan = async () => {
+        await this.tracer.withActiveSpan(
+          spanName,
+          {
+            kind: SpanKind.CONSUMER,
+            attributes: spanAttributes,
+          },
+          async (span) => {
+            // Link to original request span
+            if (contextMetadata?.traceId && contextMetadata?.parentSpanId) {
+              span.addLink({
+                context: {
+                  traceId: contextMetadata.traceId,
+                  spanId: contextMetadata.parentSpanId,
+                  traceFlags: TraceFlags.SAMPLED,
+                },
+              });
+            }
+
+            // Add business context attributes
+            if (contextMetadata?.organizationId) {
+              span.setAttribute("organization.id", contextMetadata.organizationId);
+            }
+            if (contextMetadata?.projectId) {
+              span.setAttribute("tenant.id", contextMetadata.projectId);
+            }
+            if (contextMetadata?.userId) {
+              span.setAttribute("user.id", contextMetadata.userId);
+            }
+
+            let lastError: Error | undefined;
+            for (let attempt = 1; attempt <= JOB_RETRY_CONFIG.maxAttempts; attempt++) {
+              try {
+                // Run the actual handler with request context propagation
+                const requestContext = createContextFromJobData(contextMetadata);
+                await runWithContext(requestContext, async () => {
+                  await this.process(payload);
+                });
+
+                // Success — complete the group slot
+                await this.scripts.complete({ groupId, stagedJobId });
+                gqJobsCompletedTotal.inc({ queue_name: this.queueName });
+
+                this.logger.debug(
+                  {
+                    queueName: this.queueName,
+                    groupId,
+                    stagedJobId,
+                    attempt,
+                  },
+                  "Group job completed, slot freed",
+                );
+                return;
+              } catch (err) {
+                lastError = err instanceof Error ? err : new Error(String(err));
+                gqJobsRetriedTotal.inc({ queue_name: this.queueName });
+
+                this.logger.warn(
+                  {
+                    queueName: this.queueName,
+                    groupId,
+                    stagedJobId,
+                    attempt,
+                    maxAttempts: JOB_RETRY_CONFIG.maxAttempts,
+                    error: lastError.message,
+                  },
+                  "Job attempt failed, retrying",
+                );
+
+                if (attempt < JOB_RETRY_CONFIG.maxAttempts) {
+                  // Refresh active key TTL to prevent expiration during retries
+                  await this.scripts.refreshActiveKey({
+                    groupId,
+                    stagedJobId,
+                    activeTtlSec: GROUP_QUEUE_CONFIG.activeTtlSec,
+                  });
+                  await new Promise((r) =>
+                    setTimeout(r, JOB_RETRY_CONFIG.backoffDelayMs),
+                  );
+                }
+              }
+            }
+
+            // All retries exhausted
+            span.setAttribute("error", true);
+            span.setAttribute("error.message", lastError?.message ?? "Unknown error");
+            await this.handleExhaustedRetries({
+              groupId,
+              stagedJobId,
+              payload,
+              originalScore,
+              lastError,
+              contextMetadata,
+            });
+          },
+        );
+      };
+
+      // Restore parent OTEL context if available
+      if (contextMetadata?.traceId && contextMetadata?.parentSpanId) {
+        const parentContext = trace.setSpanContext(otelContext.active(), {
+          traceId: contextMetadata.traceId,
+          spanId: contextMetadata.parentSpanId,
+          traceFlags: TraceFlags.SAMPLED,
+          isRemote: true,
+        });
+        await otelContext.with(parentContext, executeWithSpan);
+      } else {
+        await executeWithSpan();
+      }
     } finally {
-      if (heartbeat) clearInterval(heartbeat);
+      clearInterval(heartbeat);
+      this.activeJobCount--;
     }
+  }
+
+  /**
+   * Strips internal metadata fields from job data, returning the clean payload.
+   */
+  private stripInternalFields(jobData: Record<string, unknown>): Payload {
+    const clean = { ...jobData };
+    for (const field of INTERNAL_FIELDS) {
+      delete clean[field];
+    }
+    return clean as Payload;
   }
 
   /**
@@ -633,23 +528,27 @@ export class GroupQueueProcessorBullMq<Payload extends Record<string, unknown>>
    * processing. This prevents the safety-net TTL from expiring when a single
    * job attempt takes longer than activeTtlSec.
    */
-  private startActiveKeyHeartbeat(
-    metadata: GroupJobMetadata,
-  ): ReturnType<typeof setInterval> {
+  private startActiveKeyHeartbeat({
+    groupId,
+    stagedJobId,
+  }: {
+    groupId: string;
+    stagedJobId: string;
+  }): ReturnType<typeof setInterval> {
     const intervalMs = (GROUP_QUEUE_CONFIG.activeTtlSec * 1000) / 3;
     return setInterval(() => {
       this.scripts
         .refreshActiveKey({
-          groupId: metadata.__groupId,
-          stagedJobId: metadata.__stagedJobId,
+          groupId,
+          stagedJobId,
           activeTtlSec: GROUP_QUEUE_CONFIG.activeTtlSec,
         })
         .catch((err) => {
           this.logger.warn(
             {
               queueName: this.queueName,
-              groupId: metadata.__groupId,
-              stagedJobId: metadata.__stagedJobId,
+              groupId,
+              stagedJobId,
               error: err instanceof Error ? err.message : String(err),
             },
             "Failed to heartbeat active key during processing",
@@ -659,137 +558,59 @@ export class GroupQueueProcessorBullMq<Payload extends Record<string, unknown>>
   }
 
   /**
-   * Handle successful job completion: clear the group's active flag.
+   * Handle exhausted retries: block the group and re-stage the failed job's data
+   * back into the staging layer so it isn't lost. Stores error info for Skynet visibility.
    */
-  private async handleJobCompleted(metadata: GroupJobMetadata): Promise<void> {
-    const completed = await this.scripts.complete({
-      groupId: metadata.__groupId,
-      stagedJobId: metadata.__stagedJobId,
-    });
-
-    if (completed) {
-      gqJobsCompletedTotal.inc({ queue_name: this.queueName });
-      this.logger.debug(
-        {
-          queueName: this.queueName,
-          groupId: metadata.__groupId,
-          stagedJobId: metadata.__stagedJobId,
-        },
-        "Group job completed, slot freed",
-      );
-    } else {
-      this.logger.warn(
-        {
-          queueName: this.queueName,
-          groupId: metadata.__groupId,
-          stagedJobId: metadata.__stagedJobId,
-        },
-        "Stale completion (active key doesn't match)",
-      );
-    }
-  }
-
-  /**
-   * Refresh the activeKey TTL during intermediate retries to prevent
-   * the safety-net TTL from expiring before all retries complete.
-   */
-  private async refreshActiveKeyTtl(metadata: GroupJobMetadata): Promise<void> {
-    const refreshed = await this.scripts.refreshActiveKey({
-      groupId: metadata.__groupId,
-      stagedJobId: metadata.__stagedJobId,
-      activeTtlSec: GROUP_QUEUE_CONFIG.activeTtlSec,
-    });
-
-    if (refreshed) {
-      this.logger.debug(
-        {
-          queueName: this.queueName,
-          groupId: metadata.__groupId,
-          stagedJobId: metadata.__stagedJobId,
-        },
-        "Refreshed active key TTL for retry",
-      );
-    } else {
-      this.logger.warn(
-        {
-          queueName: this.queueName,
-          groupId: metadata.__groupId,
-          stagedJobId: metadata.__stagedJobId,
-        },
-        "Stale TTL refresh (active key doesn't match)",
-      );
-    }
-  }
-
-  /**
-   * Handle exhausted retries: block the group first (to prevent the dispatcher
-   * from grabbing re-staged jobs), then re-stage the failed job's data back
-   * into the staging layer so it isn't lost.
-   */
-  private async handleExhaustedRetries(
-    job: Job<Payload>,
-    metadata: GroupJobMetadata,
-  ): Promise<void> {
-    const groupId = metadata.__groupId;
-
-    // Extract payload and original score
-    const { payload } = extractJobPayload<Payload>(job, [
-      "__groupId",
-      "__stagedJobId",
-      "__dispatchScore",
-    ]);
-    const rawScore = (job.data as Record<string, unknown>).__dispatchScore;
+  private async handleExhaustedRetries({
+    groupId,
+    stagedJobId,
+    payload,
+    originalScore,
+    lastError,
+    contextMetadata,
+  }: {
+    groupId: string;
+    stagedJobId: string;
+    payload: Payload;
+    originalScore: number;
+    lastError: Error | undefined;
+    contextMetadata: JobContextMetadata | undefined;
+  }): Promise<void> {
     const score =
-      typeof rawScore === "number"
-        ? rawScore
+      typeof originalScore === "number"
+        ? originalScore
         : (this.score?.(payload) ?? Date.now());
 
-    // Re-stage with a new ID to avoid BullMQ job ID collision
-    const newStagedJobId = `${metadata.__stagedJobId}/r/${Date.now()}`;
+    // Re-stage with a new ID
+    const newStagedJobId = `${stagedJobId}/r/${Date.now()}`;
     const jobDataJson = JSON.stringify({
       ...(payload as Record<string, unknown>),
-      __context: (job.data as Record<string, unknown>).__context,
+      __context: contextMetadata,
     });
 
-    // Atomically: block the group, re-stage the job, update ready score
+    // Atomically: block the group, re-stage the job, update ready score, store error
     await this.scripts.restageAndBlock({
       groupId,
       newStagedJobId,
       score,
       jobDataJson,
+      errorMessage: lastError?.message,
+      errorStack: lastError?.stack,
     });
+
     gqGroupsBlockedTotal.inc({ queue_name: this.queueName });
+    gqJobsExhaustedTotal.inc({ queue_name: this.queueName });
 
     this.logger.error(
       {
         queueName: this.queueName,
         groupId,
-        stagedJobId: metadata.__stagedJobId,
+        stagedJobId,
         restagedAs: newStagedJobId,
+        error: lastError?.message,
       },
       "Group blocked after exhausted retries, job re-staged",
     );
-
-    // 5. Clean up BullMQ failed job (best-effort)
-    try {
-      await job.remove();
-    } catch {
-      // Job may already be removed by removeOnFail TTL
-    }
-  }
-
-  /**
-   * Extract group metadata from a BullMQ job.
-   */
-  private extractGroupMetadata(job: Job<Payload>): GroupJobMetadata | null {
-    const data = job.data as Record<string, unknown>;
-    const groupId = data.__groupId;
-    const stagedJobId = data.__stagedJobId;
-
-    if (typeof groupId === "string" && typeof stagedJobId === "string") {
-      return { __groupId: groupId, __stagedJobId: stagedJobId };
-    }
-    return null;
   }
 
   /**
@@ -811,60 +632,20 @@ export class GroupQueueProcessorBullMq<Payload extends Record<string, unknown>>
   }
 
   /**
-   * Starts periodic metrics collection.
+   * Adjust concurrency at runtime.
    */
-  private startMetricsCollection(): void {
-    void this.collectMetrics();
-    this.metricsInterval = setInterval(() => {
-      void this.collectMetrics();
-    }, GROUP_QUEUE_CONFIG.metricsIntervalMs);
-  }
-
-  private async collectMetrics(): Promise<void> {
-    try {
-      // BullMQ queue metrics
-      await collectBullMQMetrics(this.queue, this.queueName);
-
-      // Group queue staging metrics
-      const keyPrefix = this.scripts.getKeyPrefix();
-      const readyKey = `${keyPrefix}ready`;
-      const blockedKey = `${keyPrefix}blocked`;
-
-      const counts = await this.queue.getJobCounts();
-      const [pendingGroupCount] = await Promise.all([
-        this.redisConnection.zcard(readyKey),
-        this.redisConnection.scard(blockedKey),
-      ]);
-
-      gqPendingGroups.set({ queue_name: this.queueName }, pendingGroupCount);
-      gqActiveGroups.set({ queue_name: this.queueName }, counts.active ?? 0);
-    } catch (error) {
-      this.logger.debug(
-        {
-          queueName: this.queueName,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        "Failed to collect group queue metrics",
-      );
-    }
-  }
-
-  private stopMetricsCollection(): void {
-    if (this.metricsInterval) {
-      clearInterval(this.metricsInterval);
-      this.metricsInterval = null;
-    }
+  setConcurrency(n: number): void {
+    this.processingQueue.concurrency = n;
   }
 
   async waitUntilReady(): Promise<void> {
-    if (this.worker) {
-      await this.worker.waitUntilReady();
-    }
+    // No-op — Redis connection is already established, fastq needs no setup.
   }
 
   async close(): Promise<void> {
     this.shutdownRequested = true;
-    this.stopMetricsCollection();
+    this.metricsCollector?.stop();
+    this.dispatcher?.requestShutdown();
     this.logger.info(
       { queueName: this.queueName },
       "Closing group queue processor",
@@ -872,28 +653,16 @@ export class GroupQueueProcessorBullMq<Payload extends Record<string, unknown>>
 
     const closeWithTimeout = async (): Promise<void> => {
       // Wait for dispatcher to stop
-      while (this.dispatcherRunning) {
-        await new Promise((resolve) => setTimeout(resolve, 50));
+      if (this.dispatcher) {
+        await this.dispatcher.waitUntilStopped();
       }
 
-      if (this.worker) {
-        await this.worker.pause();
-        this.logger.debug({ queueName: this.queueName }, "Worker paused");
-      }
+      // Pause fastq (stops accepting new work from push)
+      this.processingQueue.pause();
 
-      if (this.worker) {
-        await this.worker.close();
-        this.logger.debug({ queueName: this.queueName }, "Worker closed");
-      }
-
-      if (this.queue) {
-        await this.queue.close();
-        this.logger.debug({ queueName: this.queueName }, "Queue closed");
-      }
-
-      if (this.queueEvents) {
-        await this.queueEvents.close();
-        this.logger.debug({ queueName: this.queueName }, "Queue events closed");
+      // Wait for in-flight jobs to finish (drain)
+      if (!this.processingQueue.idle()) {
+        await this.processingQueue.drained();
       }
 
       // Close the dedicated blocking connection if it was duplicated
