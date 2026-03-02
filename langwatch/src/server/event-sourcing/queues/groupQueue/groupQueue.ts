@@ -19,7 +19,7 @@ import type {
   QueueSendOptions,
 } from "../../queues";
 import { ConfigurationError, QueueError } from "../../services/errorHandling";
-import { JOB_RETRY_CONFIG } from "../shared";
+import { JOB_RETRY_CONFIG, getBackoffMs } from "../shared";
 import { GroupQueueDispatcher } from "./dispatcher";
 import {
   gqGroupsBlockedTotal,
@@ -37,7 +37,8 @@ import { type DispatchResult, GroupStagingScripts } from "./scripts";
  */
 const GROUP_QUEUE_CONFIG = {
   /** Default global concurrency (max parallel groups) */
-  defaultGlobalConcurrency: 500,
+  defaultGlobalConcurrency:
+    Number(process.env.GLOBAL_QUEUE_CONCURRENCY) || 100,
   /** TTL for the active key (safety net for crashes), in seconds */
   activeTtlSec: 300,
   /** BRPOP timeout in seconds (fallback polling interval) */
@@ -56,7 +57,7 @@ const GROUP_QUEUE_CONFIG = {
 const DEFAULT_DEDUPLICATION_TTL_MS = 200;
 
 /** Internal fields attached to job data that must be stripped before processing. */
-const INTERNAL_FIELDS = ["__context", "__groupId", "__stagedJobId", "__dispatchScore"] as const;
+const INTERNAL_FIELDS = ["__context", "__groupId", "__stagedJobId", "__dispatchScore", "__attempt"] as const;
 
 /**
  * Group Queue Processor that provides per-group FIFO with cross-group parallelism.
@@ -367,6 +368,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     }
 
     const contextMetadata = jobData.__context as JobContextMetadata | undefined;
+    const attempt = typeof jobData.__attempt === "number" ? jobData.__attempt : 1;
     const payload = this.stripInternalFields(jobData);
 
     const heartbeat = this.startActiveKeyHeartbeat({ groupId, stagedJobId });
@@ -380,6 +382,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         "queue.job_name": this.jobName,
         "queue.group_id": groupId,
         "queue.staged_job_id": stagedJobId,
+        "queue.attempt": attempt,
       };
 
       // Add custom span attributes from the definition
@@ -426,32 +429,49 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
               span.setAttribute("user.id", contextMetadata.userId);
             }
 
-            let lastError: Error | undefined;
-            for (let attempt = 1; attempt <= JOB_RETRY_CONFIG.maxAttempts; attempt++) {
-              try {
-                // Run the actual handler with request context propagation
-                const requestContext = createContextFromJobData(contextMetadata);
-                await runWithContext(requestContext, async () => {
-                  await this.process(payload);
+            try {
+              // Run the actual handler with request context propagation
+              const requestContext = createContextFromJobData(contextMetadata);
+              await runWithContext(requestContext, async () => {
+                await this.process(payload);
+              });
+
+              // Success — complete the group slot
+              await this.scripts.complete({ groupId, stagedJobId });
+              gqJobsCompletedTotal.inc({ queue_name: this.queueName });
+
+              this.logger.debug(
+                {
+                  queueName: this.queueName,
+                  groupId,
+                  stagedJobId,
+                  attempt,
+                },
+                "Group job completed, slot freed",
+              );
+            } catch (err) {
+              const error = err instanceof Error ? err : new Error(String(err));
+
+              if (attempt < JOB_RETRY_CONFIG.maxAttempts) {
+                // Re-stage with backoff — frees the worker slot immediately
+                gqJobsRetriedTotal.inc({ queue_name: this.queueName });
+
+                const backoffMs = getBackoffMs(attempt);
+                const newStagedJobId = `${stagedJobId}/r/${attempt}`;
+                const retryJobData = JSON.stringify({
+                  ...(payload as Record<string, unknown>),
+                  __context: contextMetadata,
+                  __attempt: attempt + 1,
                 });
 
-                // Success — complete the group slot
-                await this.scripts.complete({ groupId, stagedJobId });
-                gqJobsCompletedTotal.inc({ queue_name: this.queueName });
-
-                this.logger.debug(
-                  {
-                    queueName: this.queueName,
-                    groupId,
-                    stagedJobId,
-                    attempt,
-                  },
-                  "Group job completed, slot freed",
-                );
-                return;
-              } catch (err) {
-                lastError = err instanceof Error ? err : new Error(String(err));
-                gqJobsRetriedTotal.inc({ queue_name: this.queueName });
+                await this.scripts.retryRestage({
+                  groupId,
+                  stagedJobId,
+                  newStagedJobId,
+                  dispatchAfterMs: Date.now() + backoffMs,
+                  jobDataJson: retryJobData,
+                  backoffMs,
+                });
 
                 this.logger.warn(
                   {
@@ -460,36 +480,25 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                     stagedJobId,
                     attempt,
                     maxAttempts: JOB_RETRY_CONFIG.maxAttempts,
-                    error: lastError.message,
+                    backoffMs,
+                    error: error.message,
                   },
-                  "Job attempt failed, retrying",
+                  "Job attempt failed, re-staged with backoff",
                 );
-
-                if (attempt < JOB_RETRY_CONFIG.maxAttempts) {
-                  // Refresh active key TTL to prevent expiration during retries
-                  await this.scripts.refreshActiveKey({
-                    groupId,
-                    stagedJobId,
-                    activeTtlSec: GROUP_QUEUE_CONFIG.activeTtlSec,
-                  });
-                  await new Promise((r) =>
-                    setTimeout(r, JOB_RETRY_CONFIG.backoffDelayMs),
-                  );
-                }
+              } else {
+                // All retries exhausted
+                span.setAttribute("error", true);
+                span.setAttribute("error.message", error.message);
+                await this.handleExhaustedRetries({
+                  groupId,
+                  stagedJobId,
+                  payload,
+                  originalScore,
+                  lastError: error,
+                  contextMetadata,
+                });
               }
             }
-
-            // All retries exhausted
-            span.setAttribute("error", true);
-            span.setAttribute("error.message", lastError?.message ?? "Unknown error");
-            await this.handleExhaustedRetries({
-              groupId,
-              stagedJobId,
-              payload,
-              originalScore,
-              lastError,
-              contextMetadata,
-            });
           },
         );
       };

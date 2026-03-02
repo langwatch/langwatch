@@ -1141,17 +1141,6 @@ model InvoiceItem {
     @@index([invoiceId])
 }
 
-model ProjectDailyBillableEvents {
-    id                 String   @id
-    projectId          String
-    date               String   // UTC date "YYYY-MM-DD"
-    count              Int      @default(0)
-    lastEventTimestamp BigInt?
-    updatedAt          DateTime @default(now()) @updatedAt
-
-    @@unique([projectId, date])
-    @@index([projectId, date])
-}
 
 model BillingMeterCheckpoint {
     id                   String   @id @default(cuid())

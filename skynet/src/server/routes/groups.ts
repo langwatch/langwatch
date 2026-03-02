@@ -23,7 +23,7 @@ export function createGroupsRouter(redis: IORedis, metrics: MetricsCollector, ge
       if (queueName && queue.name !== queueName) continue;
       const group = queue.groups.find((g) => g.groupId === groupId);
       if (group) {
-        const detail: Record<string, unknown> = {
+        res.json({
           groupId: group.groupId,
           queueName: queue.name,
           displayName: queue.displayName,
@@ -65,7 +65,7 @@ export function createGroupsRouter(redis: IORedis, metrics: MetricsCollector, ge
 
         // If the group has pending jobs, an active job, or is blocked, it still exists
         if (pendingJobs > 0 || activeJobId || isBlocked) {
-          const detail: Record<string, unknown> = {
+          res.json({
             groupId,
             queueName,
             displayName: stripHashTag(queueName),

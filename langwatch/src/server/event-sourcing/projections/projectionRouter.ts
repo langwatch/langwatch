@@ -360,16 +360,21 @@ export class ProjectionRouter<
 
     if (hasProjectionQueues) {
       // Async dispatch via queues using batching
-      for (const projectionName of this.foldProjections.keys()) {
+      for (const [projectionName, fold] of this.foldProjections) {
+        const filtered = fold.eventTypes.length > 0
+          ? events.filter(e => fold.eventTypes.includes(e.type))
+          : [...events];
+        if (filtered.length === 0) continue;
+
         const queueProcessor = this.queueManager.getProjectionQueue(projectionName);
         if (queueProcessor) {
           try {
-            await queueProcessor.sendBatch([...events]);
+            await queueProcessor.sendBatch(filtered);
           } catch (error) {
             this.logger.error(
               {
                 projectionName,
-                eventCount: events.length,
+                eventCount: filtered.length,
                 error: error instanceof Error ? error.message : String(error),
               },
               "Failed to dispatch batch of events to fold projection queue",
@@ -382,6 +387,9 @@ export class ProjectionRouter<
       // Inline sync processing
       for (const event of events) {
         for (const [projectionName, fold] of this.foldProjections) {
+          if (fold.eventTypes.length > 0 && !fold.eventTypes.includes(event.type)) {
+            continue;
+          }
           try {
             await this.processFoldProjectionEvent(
               projectionName,

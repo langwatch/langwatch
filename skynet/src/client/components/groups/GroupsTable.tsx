@@ -178,7 +178,7 @@ function GroupDetailModal({ isOpen, onClose, group, queueName }: GroupDetailModa
             )}
 
             {/* Block error accordion — shown when group is blocked and error data is available */}
-            {group.isBlocked && blockDetail?.blockError && (
+            {group.isBlocked && blockDetail?.errorMessage && (
               <Box
                 mt={1}
                 border="1px solid"
@@ -204,9 +204,9 @@ function GroupDetailModal({ isOpen, onClose, group, queueName }: GroupDetailModa
                 <Collapse in={errorOpen}>
                   <VStack align="stretch" spacing={2} px={3} pb={3}>
                     <Text fontSize="xs" color="#ff6666" wordBreak="break-all">
-                      {blockDetail.blockError}
+                      {blockDetail.errorMessage}
                     </Text>
-                    {blockDetail.blockStacktrace && blockDetail.blockStacktrace.length > 0 && (
+                    {blockDetail.errorStack && (
                       <Code
                         display="block"
                         whiteSpace="pre-wrap"
@@ -220,7 +220,7 @@ function GroupDetailModal({ isOpen, onClose, group, queueName }: GroupDetailModa
                         maxH="200px"
                         overflow="auto"
                       >
-                        {blockDetail.blockStacktrace.join("\n")}
+                        {blockDetail.errorStack}
                       </Code>
                     )}
                   </VStack>

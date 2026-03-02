@@ -3,18 +3,11 @@ import { SubscriptionHandler } from "~/server/subscriptionHandler";
 import { FREE_PLAN } from "../../../../ee/licensing/constants";
 import { env } from "../../../env.mjs";
 import { TraceUsageService } from "../../traces/trace-usage.service";
-import { getCurrentMonthStartDateString } from "../../utils/dateUtils";
 import { TtlCache } from "../../utils/ttlCache";
 import { OrganizationNotFoundForTeamError } from "../organizations/errors";
 import type { OrganizationService } from "../organizations/organization.service";
-import { PrismaUsageRepository } from "./repositories/usage.prisma.repository";
-import {
-  NullUsageRepository,
-  type UsageRepository,
-} from "./repositories/usage.repository";
 
 const CACHE_TTL_MS = 30_000; // 30 seconds
-const BILLABLE_EVENTS_FEATURE = "billable_events_usage";
 
 export interface UsageLimitResult {
   exceeded: boolean;
@@ -27,15 +20,12 @@ export interface UsageLimitResult {
 /**
  * App-layer usage service.
  *
- * For orgs with `billable_events_usage` feature enabled, reads from the
- * ProjectDailyBillableEvents projection (Prisma). Otherwise delegates to
- * TraceUsageService (ES/CH).
+ * Delegates usage counting to TraceUsageService (ES/CH).
  */
 export class UsageService {
   private readonly cache: TtlCache<number>;
 
   private constructor(
-    private readonly repo: UsageRepository,
     private readonly organizationService: OrganizationService,
     private readonly esTraceUsageService: TraceUsageService,
     private readonly subscriptionHandler: typeof SubscriptionHandler,
@@ -52,14 +42,10 @@ export class UsageService {
     organizationService: OrganizationService;
     subscriptionHandler?: typeof SubscriptionHandler;
   }): UsageService {
-    const repo = prisma
-      ? new PrismaUsageRepository(prisma)
-      : new NullUsageRepository();
     const esTraceUsageService = prisma
       ? TraceUsageService.create(prisma)
       : TraceUsageService.create();
     return new UsageService(
-      repo,
       organizationService,
       esTraceUsageService,
       subscriptionHandler,
@@ -111,23 +97,11 @@ export class UsageService {
       return 0;
     }
 
-    const useBillableEvents =
-      await this.organizationService.isFeatureEnabled(
-        organizationId,
-        BILLABLE_EVENTS_FEATURE,
-      );
-
-    let total: number;
-    if (useBillableEvents) {
-      const monthStart = getCurrentMonthStartDateString();
-      total = await this.repo.sumBillableEvents({ projectIds, fromDate: monthStart });
-    } else {
-      const counts = await this.esTraceUsageService.getCountByProjects({
-        organizationId,
-        projectIds,
-      });
-      total = counts.reduce((sum, c) => sum + c.count, 0);
-    }
+    const counts = await this.esTraceUsageService.getCountByProjects({
+      organizationId,
+      projectIds,
+    });
+    const total = counts.reduce((sum, c) => sum + c.count, 0);
 
     this.cache.set(organizationId, total);
     return total;
@@ -142,17 +116,6 @@ export class UsageService {
   }): Promise<Array<{ projectId: string; count: number }>> {
     if (projectIds.length === 0) {
       return [];
-    }
-
-    const useBillableEvents =
-      await this.organizationService.isFeatureEnabled(
-        organizationId,
-        BILLABLE_EVENTS_FEATURE,
-      );
-
-    if (useBillableEvents) {
-      const monthStart = getCurrentMonthStartDateString();
-      return this.repo.groupBillableEventsByProject({ projectIds, fromDate: monthStart });
     }
 
     return this.esTraceUsageService.getCountByProjects({

@@ -48,9 +48,9 @@ export function extractDeduplicationKey(event: Event): string | null {
 /**
  * Map projection that records billable events to ClickHouse for deduplicated counting.
  *
- * Reacts to the same event types as projectDailyBillableEvents (span_received,
- * evaluation.started, experiment_run.started). The pure map function extracts
- * a dedup key; the store handles org resolution and ClickHouse insert.
+ * Reacts to billable event types (span_received, evaluation.started,
+ * experiment_run.started). The pure map function extracts a dedup key;
+ * the store handles org resolution and ClickHouse insert.
  */
 export const orgBillableEventsMeterProjection: MapProjectionDefinition<
   BillableEventRecord,

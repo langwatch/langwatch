@@ -196,7 +196,7 @@ export function GroupDetailPage() {
       </HStack>
 
       {/* Block error display */}
-      {group.isBlocked && group.blockError && (
+      {group.isBlocked && group.errorMessage && (
         <Box
           mb={4}
           border="1px solid"
@@ -222,9 +222,9 @@ export function GroupDetailPage() {
           <Collapse in={errorOpen}>
             <VStack align="stretch" spacing={2} px={4} pb={4}>
               <Text fontSize="sm" color="#ff6666" wordBreak="break-all">
-                {group.blockError}
+                {group.errorMessage}
               </Text>
-              {group.blockStacktrace && group.blockStacktrace.length > 0 && (
+              {group.errorStack && (
                 <Code
                   display="block"
                   whiteSpace="pre-wrap"
@@ -238,7 +238,7 @@ export function GroupDetailPage() {
                   maxH="300px"
                   overflow="auto"
                 >
-                  {group.blockStacktrace.join("\n")}
+                  {group.errorStack}
                 </Code>
               )}
             </VStack>
