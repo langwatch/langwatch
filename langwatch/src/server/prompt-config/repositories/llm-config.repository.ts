@@ -763,6 +763,30 @@ export class LlmConfigRepository {
     return config !== null;
   }
 
+  /**
+   * Find which of the given IDs exist as non-deleted configs accessible
+   * from the specified project or organization.
+   * Returns the set of IDs that exist.
+   */
+  async findExistingIds(params: {
+    ids: string[];
+    projectId: string;
+    organizationId: string;
+  }): Promise<Set<string>> {
+    const configs = await this.prisma.llmPromptConfig.findMany({
+      where: {
+        id: { in: params.ids },
+        deletedAt: null,
+        OR: [
+          { projectId: params.projectId },
+          { organizationId: params.organizationId, scope: "ORGANIZATION" },
+        ],
+      },
+      select: { id: true },
+    });
+    return new Set(configs.map((c) => c.id));
+  }
+
   private generateConfigId() {
     return `prompt_${nanoid()}`;
   }

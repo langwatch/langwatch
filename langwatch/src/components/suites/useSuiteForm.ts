@@ -136,19 +136,6 @@ export function useSuiteForm({
     return result;
   }, [agents, prompts]);
 
-  // -- Derived: stale target references (selected but no longer available) --
-  const staleTargetIds = useMemo(() => {
-    if (!agents || !prompts) return [];
-    return selectedTargets
-      .filter(
-        (t) =>
-          !availableTargets.some(
-            (a) => a.type === t.type && a.referenceId === t.referenceId,
-          ),
-      )
-      .map((t) => t.referenceId);
-  }, [selectedTargets, availableTargets, agents, prompts]);
-
   // -- Derived: archived scenario IDs (selected but not in active scenarios query) --
   const archivedScenarioIds = useMemo(() => {
     if (!scenarios) return [];
@@ -166,6 +153,12 @@ export function useSuiteForm({
         ),
     );
   }, [selectedTargets, availableTargets, agents, prompts]);
+
+  // -- Derived: stale target IDs (referenceId-only view of archivedTargets) --
+  const staleTargetIds = useMemo(
+    () => archivedTargets.map((t) => t.referenceId),
+    [archivedTargets],
+  );
 
   // -- Derived: unique scenario labels --
   const allLabels = useMemo(() => {

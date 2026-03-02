@@ -143,6 +143,20 @@ export class AgentRepository {
   }
 
   /**
+   * Find multiple agents by IDs regardless of archived status.
+   * Returns only id and archivedAt for lightweight classification.
+   */
+  async findManyIncludingArchived(input: {
+    ids: string[];
+    projectId: string;
+  }): Promise<{ id: string; archivedAt: Date | null }[]> {
+    return this.prisma.agent.findMany({
+      where: { id: { in: input.ids }, projectId: input.projectId },
+      select: { id: true, archivedAt: true },
+    });
+  }
+
+  /**
    * Checks whether a non-archived agent exists for the given id and project.
    * Lightweight: does NOT parse config through Zod.
    */

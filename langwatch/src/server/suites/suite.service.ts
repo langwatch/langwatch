@@ -60,11 +60,18 @@ export type QueueStatus = {
   active: number;
 };
 
-/** Result of resolving a list of references against the database */
-type ResolvedReferences = {
+/** Result of resolving scenario references against the database */
+type ResolvedScenarioReferences = {
   active: string[];
   archived: string[];
   missing: string[];
+};
+
+/** Result of resolving target references against the database */
+type ResolvedTargetReferences = {
+  active: SuiteTarget[];
+  archived: SuiteTarget[];
+  missing: SuiteTarget[];
 };
 
 export class SuiteService {
@@ -431,7 +438,7 @@ export class SuiteService {
 
     if (targetResolution.missing.length > 0) {
       throw new InvalidTargetReferencesError({
-        invalidIds: targetResolution.missing,
+        invalidIds: targetResolution.missing.map((t) => t.referenceId),
       });
     }
 
@@ -439,15 +446,12 @@ export class SuiteService {
       throw new AllTargetsArchivedError();
     }
 
-    const activeTargetIds = new Set(targetResolution.active);
-    const activeTargets = targets.filter((t) => activeTargetIds.has(t.referenceId));
-
     return {
       activeScenarioIds: scenarioResolution.active,
-      activeTargets,
+      activeTargets: targetResolution.active,
       skippedArchived: {
         scenarios: scenarioResolution.archived,
-        targets: targetResolution.archived,
+        targets: targetResolution.archived.map((t) => t.referenceId),
       },
     };
   }
@@ -455,17 +459,21 @@ export class SuiteService {
   private async resolveScenarioReferences(params: {
     ids: string[];
     projectId: string;
-  }): Promise<ResolvedReferences> {
+  }): Promise<ResolvedScenarioReferences> {
     const { ids, projectId } = params;
+
+    const rows = await this.scenarioRepository.findManyIncludingArchived({ ids, projectId });
+    const rowMap = new Map(rows.map((r) => [r.id, r]));
+
     const active: string[] = [];
     const archived: string[] = [];
     const missing: string[] = [];
 
     for (const id of ids) {
-      const scenario = await this.scenarioRepository.findByIdIncludingArchived({ id, projectId });
-      if (!scenario) {
+      const row = rowMap.get(id);
+      if (!row) {
         missing.push(id);
-      } else if (scenario.archivedAt) {
+      } else if (row.archivedAt) {
         archived.push(id);
       } else {
         active.push(id);
@@ -475,43 +483,69 @@ export class SuiteService {
     return { active, archived, missing };
   }
 
+  /**
+   * Resolve target references in batch, classifying each as active/archived/missing.
+   *
+   * Prompt targets (`type: "prompt"`) use `deletedAt` (soft-delete) rather than
+   * `archivedAt`, so they can only be "active" or "missing" -- never "archived".
+   * This asymmetry exists because LlmPromptConfig does not yet support `archivedAt`.
+   * See: https://github.com/langwatch/langwatch/issues/1889
+   */
   private async resolveTargetReferences(params: {
     targets: SuiteTarget[];
     projectId: string;
     organizationId: string;
-  }): Promise<ResolvedReferences> {
+  }): Promise<ResolvedTargetReferences> {
     const { targets, projectId, organizationId } = params;
-    const active: string[] = [];
-    const archived: string[] = [];
-    const missing: string[] = [];
 
-    for (const target of targets) {
-      if (target.type === "prompt") {
-        const exists = await this.llmConfigRepository.existsForProjectOrOrg({
-          id: target.referenceId,
+    // Partition targets by type
+    const httpTargets = targets.filter((t) => t.type === "http");
+    const promptTargets = targets.filter((t) => t.type === "prompt");
+    const unknownTargets = targets.filter((t) => t.type !== "http" && t.type !== "prompt");
+
+    // Batch HTTP targets
+    const httpRows = httpTargets.length > 0
+      ? await this.agentRepository.findManyIncludingArchived({
+          ids: httpTargets.map((t) => t.referenceId),
+          projectId,
+        })
+      : [];
+    const httpMap = new Map(httpRows.map((r) => [r.id, r]));
+
+    // Batch prompt targets
+    const promptExistingIds = promptTargets.length > 0
+      ? await this.llmConfigRepository.findExistingIds({
+          ids: promptTargets.map((t) => t.referenceId),
           projectId,
           organizationId,
-        });
-        if (exists) {
-          active.push(target.referenceId);
-        } else {
-          missing.push(target.referenceId);
-        }
-      } else if (target.type === "http") {
-        const agent = await this.agentRepository.findByIdIncludingArchived({
-          id: target.referenceId,
-          projectId,
-        });
-        if (!agent) {
-          missing.push(target.referenceId);
-        } else if (agent.archivedAt) {
-          archived.push(target.referenceId);
-        } else {
-          active.push(target.referenceId);
-        }
+        })
+      : new Set<string>();
+
+    const active: SuiteTarget[] = [];
+    const archived: SuiteTarget[] = [];
+    const missing: SuiteTarget[] = [];
+
+    for (const target of httpTargets) {
+      const row = httpMap.get(target.referenceId);
+      if (!row) {
+        missing.push(target);
+      } else if (row.archivedAt) {
+        archived.push(target);
       } else {
-        missing.push(target.referenceId);
+        active.push(target);
       }
+    }
+
+    for (const target of promptTargets) {
+      if (promptExistingIds.has(target.referenceId)) {
+        active.push(target);
+      } else {
+        missing.push(target);
+      }
+    }
+
+    for (const target of unknownTargets) {
+      missing.push(target);
     }
 
     return { active, archived, missing };

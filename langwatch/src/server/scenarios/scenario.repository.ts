@@ -113,6 +113,43 @@ export class ScenarioRepository {
     );
   }
 
+  /**
+   * Find multiple scenarios by IDs regardless of archived status.
+   * Returns only id and archivedAt for lightweight classification.
+   */
+  async findManyIncludingArchived(input: {
+    ids: string[];
+    projectId: string;
+  }): Promise<{ id: string; archivedAt: Date | null }[]> {
+    return tracer.withActiveSpan(
+      "ScenarioRepository.findManyIncludingArchived",
+      {
+        kind: SpanKind.CLIENT,
+        attributes: {
+          "db.system": "postgresql",
+          "db.operation": "SELECT",
+          "db.table": "Scenario",
+          "tenant.id": input.projectId,
+        },
+      },
+      async (span) => {
+        logger.debug(
+          { projectId: input.projectId, idCount: input.ids.length, operation: "SELECT" },
+          "Finding scenarios by ids including archived",
+        );
+        const results = await this.prisma.scenario.findMany({
+          where: {
+            id: { in: input.ids },
+            projectId: input.projectId,
+          },
+          select: { id: true, archivedAt: true },
+        });
+        span.setAttribute("result.count", results.length);
+        return results;
+      },
+    );
+  }
+
   async findAll(input: { projectId: string }): Promise<Scenario[]> {
     return tracer.withActiveSpan(
       "ScenarioRepository.findAll",
