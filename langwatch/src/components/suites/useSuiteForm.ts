@@ -136,22 +136,26 @@ export function useSuiteForm({
     return result;
   }, [agents, prompts]);
 
-  // -- Derived: archived scenario IDs (selected but not in active scenarios query) --
+  // -- Derived: archived scenarios (selected but not in active scenarios query) --
   const archivedScenarioIds = useMemo(() => {
     if (!scenarios) return [];
     const activeIds = new Set(scenarios.map((s) => s.id));
-    return selectedScenarioIds.filter((id) => !activeIds.has(id));
+    return selectedScenarioIds
+      .filter((id) => !activeIds.has(id))
+      .map((id) => ({ id, name: id }));
   }, [selectedScenarioIds, scenarios]);
 
   // -- Derived: archived targets (selected but no longer available, with full type info) --
   const archivedTargets = useMemo(() => {
     if (!agents || !prompts) return [];
-    return selectedTargets.filter(
-      (t) =>
-        !availableTargets.some(
-          (a) => a.type === t.type && a.referenceId === t.referenceId,
-        ),
-    );
+    return selectedTargets
+      .filter(
+        (t) =>
+          !availableTargets.some(
+            (a) => a.type === t.type && a.referenceId === t.referenceId,
+          ),
+      )
+      .map((t) => ({ ...t, name: t.referenceId }));
   }, [selectedTargets, availableTargets, agents, prompts]);
 
   // -- Derived: unique scenario labels --

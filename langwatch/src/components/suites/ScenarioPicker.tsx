@@ -50,8 +50,8 @@ export interface ScenarioPickerProps {
   onCreateNew: () => void;
   /** Whether to show error styling on the border. */
   hasError?: boolean;
-  /** IDs of archived scenarios still linked to the suite. */
-  archivedIds?: string[];
+  /** Archived scenarios still linked to the suite. */
+  archivedIds?: { id: string; name: string }[];
   /** Handler to remove an archived scenario. */
   onRemoveArchived?: (id: string) => void;
 }
@@ -172,17 +172,17 @@ export function ScenarioPicker({
               {archivedIds.length} archived scenario{archivedIds.length > 1 ? "s" : ""} linked:
             </Text>
           </HStack>
-          {archivedIds.map((id) => (
-            <HStack key={id} gap={2} paddingLeft={5}>
+          {archivedIds.map((item) => (
+            <HStack key={item.id} gap={2} paddingLeft={5}>
               <Text fontSize="sm" color="fg.muted" flex={1} fontStyle="italic">
-                {id}
+                {item.name}
               </Text>
               {onRemoveArchived && (
                 <Button
                   size="xs"
                   variant="ghost"
-                  onClick={() => onRemoveArchived(id)}
-                  data-testid={`remove-archived-scenario-${id}`}
+                  onClick={() => onRemoveArchived(item.id)}
+                  data-testid={`remove-archived-scenario-${item.id}`}
                 >
                   <X size={12} />
                   Remove

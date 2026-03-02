@@ -91,7 +91,6 @@ type MockAgentRepository = {
 };
 
 type MockLlmConfigRepository = {
-  existsForProjectOrOrg: ReturnType<typeof vi.fn>;
   findExistingIds: ReturnType<typeof vi.fn>;
 };
 
@@ -121,7 +120,6 @@ function makeMockLlmConfigRepository(
   overrides: Partial<MockLlmConfigRepository> = {},
 ): MockLlmConfigRepository {
   return {
-    existsForProjectOrOrg: vi.fn(() => Promise.resolve(true)),
     findExistingIds: vi.fn(({ ids }: { ids: string[] }) =>
       Promise.resolve(new Set(ids)),
     ),

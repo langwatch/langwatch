@@ -38,8 +38,8 @@ export interface TargetPickerProps {
   onCreatePrompt: () => void;
   /** Whether to show error styling on the border. */
   hasError?: boolean;
-  /** Archived targets still linked to the suite. */
-  archivedTargets?: SuiteTarget[];
+  /** Archived targets still linked to the suite, with display names. */
+  archivedTargets?: (SuiteTarget & { name: string })[];
   /** Handler to remove an archived target. */
   onRemoveArchived?: (target: SuiteTarget) => void;
 }
@@ -136,7 +136,7 @@ export function TargetPicker({
           {archivedTargets.map((target) => (
             <HStack key={`${target.type}-${target.referenceId}`} gap={2} paddingLeft={5}>
               <Text fontSize="sm" color="fg.muted" flex={1} fontStyle="italic">
-                {target.referenceId}
+                {target.name}
               </Text>
               {onRemoveArchived && (
                 <Button

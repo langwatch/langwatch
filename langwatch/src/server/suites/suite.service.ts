@@ -555,7 +555,7 @@ export class SuiteService {
     batchRunId: string;
     repeatCount: number;
   }): Promise<number> {
-    const { scenarioIds, targets, projectId, setId, batchRunId, repeatCount } = params;
+    const { scenarioIds, targets, suiteId, projectId, setId, batchRunId, repeatCount } = params;
 
     const jobPromises: Promise<{ id?: string | null }>[] = [];
     for (const scenarioId of scenarioIds) {
@@ -588,7 +588,7 @@ export class SuiteService {
     if (rejected.length > 0) {
       logger.error(
         {
-          suiteId: params.suiteId,
+          suiteId,
           batchRunId,
           totalJobs: results.length,
           failedCount: rejected.length,

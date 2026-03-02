@@ -437,7 +437,7 @@ describe("useSuiteForm()", () => {
         );
 
         expect(result.current.archivedTargets).toEqual([
-          { type: "prompt", referenceId: "prompt_deleted" },
+          { type: "prompt", referenceId: "prompt_deleted", name: "prompt_deleted" },
         ]);
       });
     });
@@ -533,8 +533,8 @@ describe("useSuiteForm()", () => {
         );
 
         expect(result.current.archivedScenarioIds).toEqual([
-          "scen_archived_1",
-          "scen_archived_2",
+          { id: "scen_archived_1", name: "scen_archived_1" },
+          { id: "scen_archived_2", name: "scen_archived_2" },
         ]);
       });
     });

@@ -11,7 +11,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScenarioPicker, type ScenarioPickerProps } from "../ScenarioPicker";
 
 vi.mock("../ui/checkbox", () => ({
-  Checkbox: ({ checked, onCheckedChange, children }: any) => (
+  Checkbox: ({ checked, onCheckedChange, children }: { checked: boolean; onCheckedChange?: (details: { checked: boolean }) => void; children: React.ReactNode }) => (
     <label>
       <input
         type="checkbox"
@@ -62,9 +62,14 @@ describe("<ScenarioPicker />", () => {
   });
 
   describe("given archived scenario IDs are present", () => {
+    const archivedIds = [
+      { id: "scen_old_1", name: "Old Scenario 1" },
+      { id: "scen_old_2", name: "Old Scenario 2" },
+    ];
+
     describe("when the picker renders", () => {
       it("shows the archived-scenarios warning section", () => {
-        renderPicker({ archivedIds: ["scen_old_1", "scen_old_2"] });
+        renderPicker({ archivedIds });
 
         expect(
           screen.getByTestId("archived-scenarios-section"),
@@ -74,16 +79,16 @@ describe("<ScenarioPicker />", () => {
         ).toBeInTheDocument();
       });
 
-      it("displays each archived scenario ID", () => {
-        renderPicker({ archivedIds: ["scen_old_1", "scen_old_2"] });
+      it("displays each archived scenario name", () => {
+        renderPicker({ archivedIds });
 
-        expect(screen.getByText("scen_old_1")).toBeInTheDocument();
-        expect(screen.getByText("scen_old_2")).toBeInTheDocument();
+        expect(screen.getByText("Old Scenario 1")).toBeInTheDocument();
+        expect(screen.getByText("Old Scenario 2")).toBeInTheDocument();
       });
 
       it("renders a Remove button for each archived scenario", () => {
         renderPicker({
-          archivedIds: ["scen_old_1"],
+          archivedIds: [{ id: "scen_old_1", name: "Old Scenario 1" }],
           onRemoveArchived: vi.fn(),
         });
 
@@ -99,7 +104,7 @@ describe("<ScenarioPicker />", () => {
         const user = userEvent.setup();
 
         renderPicker({
-          archivedIds: ["scen_old_1", "scen_old_2"],
+          archivedIds,
           onRemoveArchived: onRemove,
         });
 
@@ -116,7 +121,7 @@ describe("<ScenarioPicker />", () => {
   describe("given a single archived scenario", () => {
     describe("when the picker renders", () => {
       it("uses singular text for the warning", () => {
-        renderPicker({ archivedIds: ["scen_old_1"] });
+        renderPicker({ archivedIds: [{ id: "scen_old_1", name: "scen_old_1" }] });
 
         expect(
           screen.getByText("1 archived scenario linked:"),

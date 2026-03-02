@@ -11,7 +11,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { TargetPicker, type TargetPickerProps } from "../TargetPicker";
 
 vi.mock("../ui/checkbox", () => ({
-  Checkbox: ({ checked, onCheckedChange, children }: any) => (
+  Checkbox: ({ checked, onCheckedChange, children }: { checked: boolean; onCheckedChange?: (details: { checked: boolean }) => void; children: React.ReactNode }) => (
     <label>
       <input
         type="checkbox"
@@ -60,8 +60,8 @@ describe("<TargetPicker />", () => {
 
   describe("given archived targets are present", () => {
     const archivedTargets = [
-      { type: "http" as const, referenceId: "agent_old" },
-      { type: "prompt" as const, referenceId: "prompt_old" },
+      { type: "http" as const, referenceId: "agent_old", name: "agent_old" },
+      { type: "prompt" as const, referenceId: "prompt_old", name: "prompt_old" },
     ];
 
     describe("when the picker renders", () => {
@@ -76,7 +76,7 @@ describe("<TargetPicker />", () => {
         ).toBeInTheDocument();
       });
 
-      it("displays each archived target reference ID", () => {
+      it("displays each archived target name", () => {
         renderPicker({ archivedTargets });
 
         expect(screen.getByText("agent_old")).toBeInTheDocument();
@@ -113,10 +113,12 @@ describe("<TargetPicker />", () => {
         );
 
         expect(onRemove).toHaveBeenCalledTimes(1);
-        expect(onRemove).toHaveBeenCalledWith({
-          type: "http",
-          referenceId: "agent_old",
-        });
+        expect(onRemove).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: "http",
+            referenceId: "agent_old",
+          }),
+        );
       });
     });
   });
@@ -125,7 +127,7 @@ describe("<TargetPicker />", () => {
     describe("when the picker renders", () => {
       it("uses singular text for the warning", () => {
         renderPicker({
-          archivedTargets: [{ type: "http", referenceId: "agent_old" }],
+          archivedTargets: [{ type: "http", referenceId: "agent_old", name: "agent_old" }],
         });
 
         expect(

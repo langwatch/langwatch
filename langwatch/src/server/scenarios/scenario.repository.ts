@@ -239,6 +239,7 @@ export class ScenarioRepository {
           span.setAttribute("result.found", false);
           return null;
         }
+        // Idempotent: if already archived, preserve the original timestamp
         const result = await this.prisma.scenario.update({
           where: { id, projectId },
           data: { archivedAt: scenario.archivedAt ?? new Date() },

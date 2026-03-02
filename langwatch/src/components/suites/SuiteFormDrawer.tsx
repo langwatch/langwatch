@@ -21,7 +21,6 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { AlertTriangle } from "lucide-react";
 import type { SimulationSuite } from "@prisma/client";
 import { ChevronDown, ChevronRight, Play } from "lucide-react";
 import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
@@ -159,7 +158,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
   });
 
   const runMutation = api.suites.run.useMutation({
-    onSuccess: (result) => {
+    onSuccess: (result, variables) => {
       const archivedCount =
         (result.skippedArchived?.scenarios?.length ?? 0) +
         (result.skippedArchived?.targets?.length ?? 0);
@@ -173,11 +172,18 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
           parts.push(`${result.skippedArchived.targets.length} archived target${result.skippedArchived.targets.length > 1 ? "s" : ""}`);
         }
 
+        const suiteIdForEdit = variables.id;
         toaster.create({
           title: `Suite run scheduled (${result.jobCount} jobs)`,
           description: `${parts.join(" and ")} skipped.`,
           type: "warning",
           meta: { closable: true },
+          action: {
+            label: "Edit Suite",
+            onClick: () => {
+              openDrawer("suiteEditor", { urlParams: { suiteId: suiteIdForEdit } });
+            },
+          },
         });
       } else {
         toaster.create({
@@ -373,23 +379,6 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                 <Text fontSize="xs" color="red.500">
                   {errors.selectedTargets.message}
                 </Text>
-              )}
-              {suiteForm.archivedTargets.length > 0 && (
-                <HStack
-                  gap={2}
-                  padding={2}
-                  borderRadius="md"
-                  backgroundColor="orange.50"
-                  _dark={{ backgroundColor: "orange.900" }}
-                  data-testid="stale-targets-warning"
-                >
-                  <AlertTriangle size={14} color="var(--chakra-colors-orange-500)" />
-                  <Text fontSize="xs" color="orange.700" _dark={{ color: "orange.200" }}>
-                    {suiteForm.archivedTargets.length === 1
-                      ? "1 target is no longer available and may have been deleted."
-                      : `${suiteForm.archivedTargets.length} targets are no longer available and may have been deleted.`}
-                  </Text>
-                </HStack>
               )}
             </VStack>
 
