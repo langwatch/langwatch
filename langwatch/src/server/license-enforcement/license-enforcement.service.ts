@@ -1,4 +1,5 @@
-import type { PlanInfo } from "../subscriptionHandler";
+import type { PlanInfo } from "../../../ee/licensing/planInfo";
+import type { PlanProvider } from "../app-layer/subscription/plan-provider";
 import type { ILicenseEnforcementRepository } from "./license-enforcement.repository";
 import type { LimitCheckResult, LimitType } from "./types";
 import { limitTypes } from "./types";
@@ -99,22 +100,15 @@ const _typeCheck: _AssertAllTypesConfigured = true;
 void _typeCheck; // Suppress unused variable warning
 
 /**
- * Minimal user type for plan resolution.
- * Matches what SubscriptionHandler expects.
+ * Minimal user type for plan resolution in license enforcement.
+ * Structurally compatible with app-layer PlanProviderUser (MinimalUser
+ * is a subtype since its required `id` satisfies PlanProviderUser's optional `id`).
  */
 export type MinimalUser = {
   id: string;
   email?: string | null;
   name?: string | null;
 };
-
-/**
- * Narrow interface for plan retrieval.
- * Follows Interface Segregation Principle (ISP) - only exposes what we need.
- */
-export interface PlanProvider {
-  getActivePlan(organizationId: string, user?: MinimalUser): Promise<PlanInfo>;
-}
 
 /**
  * Service for checking and enforcing license limits.
@@ -143,7 +137,7 @@ export class LicenseEnforcementService {
     limitType: LimitType,
     user?: MinimalUser,
   ): Promise<LimitCheckResult> {
-    const plan = await this.planProvider.getActivePlan(organizationId, user);
+    const plan = await this.planProvider.getActivePlan({ organizationId, user });
 
     // If plan has override flag, skip enforcement (e.g., unlimited OSS plan)
     if (plan.overrideAddingLimitations) {

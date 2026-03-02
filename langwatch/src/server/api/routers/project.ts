@@ -15,7 +15,7 @@ import {
   protectedProcedure,
   publicProcedure,
 } from "~/server/api/trpc";
-import { SubscriptionHandler } from "~/server/subscriptionHandler";
+import { getApp } from "~/server/app-layer";
 import { encrypt } from "~/utils/encryption";
 import { slugify } from "~/utils/slugify";
 import { auditLog } from "../../auditLog";
@@ -129,10 +129,10 @@ export const projectRouter = createTRPCRouter({
       const projectCount = await getOrganizationProjectsCount(
         input.organizationId,
       );
-      const activePlan = await SubscriptionHandler.getActivePlan(
-        input.organizationId,
-        ctx.session.user,
-      );
+      const activePlan = await getApp().planProvider.getActivePlan({
+        organizationId: input.organizationId,
+        user: ctx.session.user,
+      });
 
       if (
         projectCount >= activePlan.maxProjects &&

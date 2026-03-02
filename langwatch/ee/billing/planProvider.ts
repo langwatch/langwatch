@@ -41,7 +41,7 @@ type MinimalUser = {
 };
 
 
-const isAdmin = (user?: { email?: string | null }) => {
+export const isAdmin = (user?: { email?: string | null }) => {
   if (!user?.email) {
     return false;
   }

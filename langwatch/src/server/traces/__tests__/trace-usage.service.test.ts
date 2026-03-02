@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OrganizationRepository } from "~/server/repositories/organization.repository";
+import type { PlanResolver } from "~/server/app-layer/subscription/plan-provider";
 import {
   clearMonthCountCache,
   TraceUsageService,
@@ -12,14 +13,10 @@ import { FREE_PLAN } from "../../../../ee/licensing/constants";
 
 const {
   mockGetClickHouseClient,
-  mockQueryBillableEventsTotalUniq,
   mockQueryTraceSummariesTotalUniq,
-  mockQueryBillableEventsByProjectApprox,
 } = vi.hoisted(() => ({
   mockGetClickHouseClient: vi.fn(),
-  mockQueryBillableEventsTotalUniq: vi.fn(),
   mockQueryTraceSummariesTotalUniq: vi.fn(),
-  mockQueryBillableEventsByProjectApprox: vi.fn(),
 }));
 
 vi.mock("~/env.mjs", () => ({
@@ -33,9 +30,7 @@ vi.mock("~/server/clickhouse/client", () => ({
 }));
 
 vi.mock("../../../../ee/billing/services/billableEventsQuery", () => ({
-  queryBillableEventsTotalUniq: mockQueryBillableEventsTotalUniq,
   queryTraceSummariesTotalUniq: mockQueryTraceSummariesTotalUniq,
-  queryBillableEventsByProjectApprox: mockQueryBillableEventsByProjectApprox,
   getBillingMonth: vi.fn(() => "2026-02"),
 }));
 
@@ -43,7 +38,6 @@ describe("TraceUsageService", () => {
   const mockOrganizationRepository = {
     getOrganizationIdByTeamId: vi.fn(),
     getProjectIds: vi.fn(),
-    getPricingModel: vi.fn(),
   } as unknown as OrganizationRepository;
 
   const mockEsClient = {
@@ -52,9 +46,7 @@ describe("TraceUsageService", () => {
 
   const mockEsClientFactory = vi.fn().mockResolvedValue(mockEsClient);
 
-  const mockSubscriptionHandler = {
-    getActivePlan: vi.fn(),
-  };
+  const mockPlanResolver = vi.fn() as unknown as PlanResolver;
 
   const mockPrisma = {
     project: {
@@ -71,22 +63,19 @@ describe("TraceUsageService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     clearMonthCountCache();
-    // Default: no ClickHouse (ES path), TIERED pricing
+    // Default: no ClickHouse (ES path)
     mockGetClickHouseClient.mockReturnValue(null);
-    vi.mocked(mockOrganizationRepository.getPricingModel).mockResolvedValue(
-      "TIERED",
-    );
     service = new TraceUsageService(
       mockOrganizationRepository,
       mockEsClientFactory,
-      mockSubscriptionHandler as any,
+      mockPlanResolver,
       mockPrisma as any,
       mockClickHouseClient as any,
     );
   });
 
   // ==========================================================================
-  // checkLimit
+  // checkLimit (deprecated — kept for backward compatibility)
   // ==========================================================================
 
   describe("checkLimit", () => {
@@ -114,7 +103,7 @@ describe("TraceUsageService", () => {
           { id: "proj-1", featureClickHouseDataSourceTraces: false },
         ]);
         mockEsClient.count.mockResolvedValue({ count: 1000 });
-        mockSubscriptionHandler.getActivePlan.mockResolvedValue({
+        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
           name: "free",
           maxMessagesPerMonth: 1000,
         });
@@ -140,6 +129,12 @@ describe("TraceUsageService", () => {
         const result = await service.checkLimit({ teamId: "team-123" });
         expect(result.planName).toBe("free");
       });
+
+      it("calls planResolver with organizationId", async () => {
+        await service.checkLimit({ teamId: "team-123" });
+
+        expect(mockPlanResolver).toHaveBeenCalledWith("org-123");
+      });
     });
 
     describe("when count < maxMessagesPerMonth", () => {
@@ -154,7 +149,7 @@ describe("TraceUsageService", () => {
           { id: "proj-1", featureClickHouseDataSourceTraces: false },
         ]);
         mockEsClient.count.mockResolvedValue({ count: 500 });
-        mockSubscriptionHandler.getActivePlan.mockResolvedValue({
+        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
           maxMessagesPerMonth: 1000,
         });
 
@@ -164,7 +159,7 @@ describe("TraceUsageService", () => {
       });
     });
 
-    describe("when self-hosted (IS_SAAS=false) with FREE_PLAN", () => {
+    describe("when self-hosted (IS_SAAS=false)", () => {
       beforeEach(() => {
         vi.mocked(
           mockOrganizationRepository.getOrganizationIdByTeamId,
@@ -176,35 +171,33 @@ describe("TraceUsageService", () => {
           { id: "proj-1", featureClickHouseDataSourceTraces: false },
         ]);
         mockEsClient.count.mockResolvedValue({ count: 5000 }); // Over any limit
-        mockSubscriptionHandler.getActivePlan.mockResolvedValue(FREE_PLAN);
       });
 
-      it("returns exceeded: false regardless of count", async () => {
+      it("returns exceeded: false for a FREE plan clone", async () => {
         const { env } = await import("~/env.mjs");
         vi.mocked(env).IS_SAAS = false;
+        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({ ...FREE_PLAN });
 
         const result = await service.checkLimit({ teamId: "team-123" });
 
         expect(result.exceeded).toBe(false);
 
-        // Reset for other tests
         vi.mocked(env).IS_SAAS = true;
       });
 
-      it("still fetches organization and plan to determine if FREE_PLAN", async () => {
+      it("enforces limits for non-FREE plan types", async () => {
         const { env } = await import("~/env.mjs");
         vi.mocked(env).IS_SAAS = false;
+        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
+          type: "PRO",
+          name: "Pro",
+          maxMessagesPerMonth: 1000,
+        });
 
-        await service.checkLimit({ teamId: "team-123" });
+        const result = await service.checkLimit({ teamId: "team-123" });
 
-        expect(
-          mockOrganizationRepository.getOrganizationIdByTeamId,
-        ).toHaveBeenCalledWith("team-123");
-        expect(mockSubscriptionHandler.getActivePlan).toHaveBeenCalledWith(
-          "org-123",
-        );
+        expect(result.exceeded).toBe(true);
 
-        // Reset for other tests
         vi.mocked(env).IS_SAAS = true;
       });
     });
@@ -218,46 +211,19 @@ describe("TraceUsageService", () => {
         vi.mocked(mockOrganizationRepository.getProjectIds).mockResolvedValue([
           "proj-1",
         ]);
-        mockSubscriptionHandler.getActivePlan.mockResolvedValue({
+        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
           name: "pro",
           maxMessagesPerMonth: 10000,
         });
       });
 
-      describe("when pricing model is TIERED", () => {
-        beforeEach(() => {
-          vi.mocked(
-            mockOrganizationRepository.getPricingModel,
-          ).mockResolvedValue("TIERED");
-        });
+      it("uses trace summaries for count (traces-only)", async () => {
+        mockQueryTraceSummariesTotalUniq.mockResolvedValue(500);
 
-        it("uses trace summaries for count", async () => {
-          mockQueryTraceSummariesTotalUniq.mockResolvedValue(500);
+        const result = await service.checkLimit({ teamId: "team-123" });
 
-          const result = await service.checkLimit({ teamId: "team-123" });
-
-          expect(result.exceeded).toBe(false);
-          expect(mockQueryTraceSummariesTotalUniq).toHaveBeenCalled();
-          expect(mockQueryBillableEventsTotalUniq).not.toHaveBeenCalled();
-        });
-      });
-
-      describe("when pricing model is SEAT_EVENT", () => {
-        beforeEach(() => {
-          vi.mocked(
-            mockOrganizationRepository.getPricingModel,
-          ).mockResolvedValue("SEAT_EVENT");
-        });
-
-        it("uses billable events for count", async () => {
-          mockQueryBillableEventsTotalUniq.mockResolvedValue(500);
-
-          const result = await service.checkLimit({ teamId: "team-123" });
-
-          expect(result.exceeded).toBe(false);
-          expect(mockQueryBillableEventsTotalUniq).toHaveBeenCalled();
-          expect(mockQueryTraceSummariesTotalUniq).not.toHaveBeenCalled();
-        });
+        expect(result.exceeded).toBe(false);
+        expect(mockQueryTraceSummariesTotalUniq).toHaveBeenCalled();
       });
     });
   });
@@ -317,126 +283,57 @@ describe("TraceUsageService", () => {
           });
 
           expect(result).toBe(100);
-          // getProjectIds called once for count and once for getPricingModel resolution path,
-          // but cache prevents second full query
           expect(mockEsClient.count).toHaveBeenCalledTimes(1);
         });
       });
     });
 
     // ========================================================================
-    // ClickHouse path
+    // ClickHouse path (traces-only)
     // ========================================================================
 
     describe("when ClickHouse is available", () => {
       beforeEach(() => {
         mockGetClickHouseClient.mockReturnValue({}); // truthy value
+        vi.mocked(
+          mockOrganizationRepository.getProjectIds,
+        ).mockResolvedValue(["proj-1"]);
       });
 
-      describe("when pricing model is TIERED", () => {
-        beforeEach(() => {
-          vi.mocked(
-            mockOrganizationRepository.getPricingModel,
-          ).mockResolvedValue("TIERED");
-          vi.mocked(
-            mockOrganizationRepository.getProjectIds,
-          ).mockResolvedValue(["proj-1"]);
+      it("queries ClickHouse for trace summaries total", async () => {
+        mockQueryTraceSummariesTotalUniq.mockResolvedValue(500);
+
+        const result = await service.getCurrentMonthCount({
+          organizationId: "org-123",
         });
 
-        it("queries ClickHouse for trace summaries total", async () => {
-          mockQueryTraceSummariesTotalUniq.mockResolvedValue(500);
-
-          const result = await service.getCurrentMonthCount({
-            organizationId: "org-123",
-          });
-
-          expect(result).toBe(500);
-          expect(mockQueryTraceSummariesTotalUniq).toHaveBeenCalledWith({
-            projectIds: ["proj-1"],
-            billingMonth: "2026-02",
-          });
-        });
-
-        it("returns 0 when queryTraceSummariesTotalUniq returns null", async () => {
-          mockQueryTraceSummariesTotalUniq.mockResolvedValue(null);
-
-          const result = await service.getCurrentMonthCount({
-            organizationId: "org-123",
-          });
-
-          expect(result).toBe(0);
-        });
-
-        it("does not query billable events", async () => {
-          mockQueryTraceSummariesTotalUniq.mockResolvedValue(200);
-
-          await service.getCurrentMonthCount({ organizationId: "org-123" });
-
-          expect(mockQueryBillableEventsTotalUniq).not.toHaveBeenCalled();
-        });
-
-        it("does not query ES", async () => {
-          mockQueryTraceSummariesTotalUniq.mockResolvedValue(200);
-
-          await service.getCurrentMonthCount({ organizationId: "org-123" });
-
-          expect(mockEsClientFactory).not.toHaveBeenCalled();
+        expect(result).toBe(500);
+        expect(mockQueryTraceSummariesTotalUniq).toHaveBeenCalledWith({
+          projectIds: ["proj-1"],
+          billingMonth: "2026-02",
         });
       });
 
-      describe("when pricing model is SEAT_EVENT", () => {
-        beforeEach(() => {
-          vi.mocked(
-            mockOrganizationRepository.getPricingModel,
-          ).mockResolvedValue("SEAT_EVENT");
+      it("returns 0 when queryTraceSummariesTotalUniq returns null", async () => {
+        mockQueryTraceSummariesTotalUniq.mockResolvedValue(null);
+
+        const result = await service.getCurrentMonthCount({
+          organizationId: "org-123",
         });
 
-        it("queries ClickHouse for billable events total", async () => {
-          mockQueryBillableEventsTotalUniq.mockResolvedValue(500);
+        expect(result).toBe(0);
+      });
 
-          const result = await service.getCurrentMonthCount({
-            organizationId: "org-123",
-          });
+      it("does not query ES when CH returns a result", async () => {
+        mockQueryTraceSummariesTotalUniq.mockResolvedValue(200);
 
-          expect(result).toBe(500);
-          expect(mockQueryBillableEventsTotalUniq).toHaveBeenCalledWith({
-            organizationId: "org-123",
-            billingMonth: "2026-02",
-          });
-        });
+        await service.getCurrentMonthCount({ organizationId: "org-123" });
 
-        it("returns 0 when queryBillableEventsTotalUniq returns null", async () => {
-          mockQueryBillableEventsTotalUniq.mockResolvedValue(null);
-
-          const result = await service.getCurrentMonthCount({
-            organizationId: "org-123",
-          });
-
-          expect(result).toBe(0);
-        });
-
-        it("does not query trace summaries", async () => {
-          mockQueryBillableEventsTotalUniq.mockResolvedValue(200);
-
-          await service.getCurrentMonthCount({ organizationId: "org-123" });
-
-          expect(mockQueryTraceSummariesTotalUniq).not.toHaveBeenCalled();
-        });
-
-        it("does not query ES or project IDs", async () => {
-          mockQueryBillableEventsTotalUniq.mockResolvedValue(200);
-
-          await service.getCurrentMonthCount({ organizationId: "org-123" });
-
-          expect(mockEsClientFactory).not.toHaveBeenCalled();
-        });
+        expect(mockEsClientFactory).not.toHaveBeenCalled();
       });
 
       describe("when result is cached", () => {
         it("returns cached value without querying ClickHouse", async () => {
-          vi.mocked(
-            mockOrganizationRepository.getProjectIds,
-          ).mockResolvedValue(["proj-1"]);
           mockQueryTraceSummariesTotalUniq.mockResolvedValue(300);
 
           // First call populates cache
@@ -451,12 +348,11 @@ describe("TraceUsageService", () => {
           expect(mockQueryTraceSummariesTotalUniq).toHaveBeenCalledTimes(1);
         });
       });
-
     });
   });
 
   // ==========================================================================
-  // getCountByProjects
+  // getCountByProjects (traces-only)
   // ==========================================================================
 
   describe("getCountByProjects", () => {
@@ -486,134 +382,48 @@ describe("TraceUsageService", () => {
         mockGetClickHouseClient.mockReturnValue({}); // truthy value
       });
 
-      describe("when pricing model is SEAT_EVENT", () => {
-        beforeEach(() => {
-          vi.mocked(
-            mockOrganizationRepository.getPricingModel,
-          ).mockResolvedValue("SEAT_EVENT");
+      it("queries trace summaries per project", async () => {
+        mockQueryTraceSummariesTotalUniq.mockResolvedValue(50);
+
+        const result = await service.getCountByProjects({
+          organizationId: "org-123",
+          projectIds: ["proj-1", "proj-2"],
         });
 
-        it("queries ClickHouse for billable events by project", async () => {
-          mockQueryBillableEventsByProjectApprox.mockResolvedValue([
-            { projectId: "proj-1", count: 100 },
-            { projectId: "proj-2", count: 200 },
-          ]);
-
-          const result = await service.getCountByProjects({
-            organizationId: "org-123",
-            projectIds: ["proj-1", "proj-2"],
-          });
-
-          expect(result).toEqual([
-            { projectId: "proj-1", count: 100 },
-            { projectId: "proj-2", count: 200 },
-          ]);
-          expect(mockQueryBillableEventsByProjectApprox).toHaveBeenCalledWith({
-            organizationId: "org-123",
-            billingMonth: "2026-02",
-          });
+        expect(result).toEqual([
+          { projectId: "proj-1", count: 50 },
+          { projectId: "proj-2", count: 50 },
+        ]);
+        expect(mockQueryTraceSummariesTotalUniq).toHaveBeenCalledWith({
+          projectIds: ["proj-1"],
+          billingMonth: "2026-02",
         });
-
-        it("returns 0 for projects not found in ClickHouse results", async () => {
-          mockQueryBillableEventsByProjectApprox.mockResolvedValue([
-            { projectId: "proj-1", count: 100 },
-          ]);
-
-          const result = await service.getCountByProjects({
-            organizationId: "org-123",
-            projectIds: ["proj-1", "proj-2"],
-          });
-
-          expect(result).toEqual([
-            { projectId: "proj-1", count: 100 },
-            { projectId: "proj-2", count: 0 },
-          ]);
-        });
-
-        it("does not query ES", async () => {
-          mockQueryBillableEventsByProjectApprox.mockResolvedValue([]);
-
-          await service.getCountByProjects({
-            organizationId: "org-123",
-            projectIds: ["proj-1"],
-          });
-
-          expect(mockEsClientFactory).not.toHaveBeenCalled();
-        });
-
-        it("does not query trace summaries", async () => {
-          mockQueryBillableEventsByProjectApprox.mockResolvedValue([]);
-
-          await service.getCountByProjects({
-            organizationId: "org-123",
-            projectIds: ["proj-1"],
-          });
-
-          expect(mockQueryTraceSummariesTotalUniq).not.toHaveBeenCalled();
+        expect(mockQueryTraceSummariesTotalUniq).toHaveBeenCalledWith({
+          projectIds: ["proj-2"],
+          billingMonth: "2026-02",
         });
       });
 
-      describe("when pricing model is TIERED", () => {
-        beforeEach(() => {
-          vi.mocked(
-            mockOrganizationRepository.getPricingModel,
-          ).mockResolvedValue("TIERED");
+      it("returns 0 when queryTraceSummariesTotalUniq returns null", async () => {
+        mockQueryTraceSummariesTotalUniq.mockResolvedValue(null);
+
+        const result = await service.getCountByProjects({
+          organizationId: "org-123",
+          projectIds: ["proj-1"],
         });
 
-        it("queries trace summaries per project", async () => {
-          mockQueryTraceSummariesTotalUniq.mockResolvedValue(50);
+        expect(result).toEqual([{ projectId: "proj-1", count: 0 }]);
+      });
 
-          const result = await service.getCountByProjects({
-            organizationId: "org-123",
-            projectIds: ["proj-1", "proj-2"],
-          });
+      it("does not query ES when CH returns results", async () => {
+        mockQueryTraceSummariesTotalUniq.mockResolvedValue(50);
 
-          expect(result).toEqual([
-            { projectId: "proj-1", count: 50 },
-            { projectId: "proj-2", count: 50 },
-          ]);
-          expect(mockQueryTraceSummariesTotalUniq).toHaveBeenCalledWith({
-            projectIds: ["proj-1"],
-            billingMonth: "2026-02",
-          });
-          expect(mockQueryTraceSummariesTotalUniq).toHaveBeenCalledWith({
-            projectIds: ["proj-2"],
-            billingMonth: "2026-02",
-          });
+        await service.getCountByProjects({
+          organizationId: "org-123",
+          projectIds: ["proj-1"],
         });
 
-        it("returns 0 when queryTraceSummariesTotalUniq returns null", async () => {
-          mockQueryTraceSummariesTotalUniq.mockResolvedValue(null);
-
-          const result = await service.getCountByProjects({
-            organizationId: "org-123",
-            projectIds: ["proj-1"],
-          });
-
-          expect(result).toEqual([{ projectId: "proj-1", count: 0 }]);
-        });
-
-        it("does not query billable events", async () => {
-          mockQueryTraceSummariesTotalUniq.mockResolvedValue(50);
-
-          await service.getCountByProjects({
-            organizationId: "org-123",
-            projectIds: ["proj-1"],
-          });
-
-          expect(mockQueryBillableEventsByProjectApprox).not.toHaveBeenCalled();
-        });
-
-        it("does not query ES", async () => {
-          mockQueryTraceSummariesTotalUniq.mockResolvedValue(50);
-
-          await service.getCountByProjects({
-            organizationId: "org-123",
-            projectIds: ["proj-1"],
-          });
-
-          expect(mockEsClientFactory).not.toHaveBeenCalled();
-        });
+        expect(mockEsClientFactory).not.toHaveBeenCalled();
       });
     });
 
