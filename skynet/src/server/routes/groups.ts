@@ -2,7 +2,7 @@ import { Router } from "express";
 import type IORedis from "ioredis";
 import type { MetricsCollector } from "../services/metricsCollector.ts";
 import { stripHashTag } from "../services/queueDiscovery.ts";
-import { getCompletedJobsForGroup } from "../services/bullmqService.ts";
+import { getCompletedJobsForGroup, getJobById } from "../services/bullmqService.ts";
 
 export function createGroupsRouter(redis: IORedis, metrics: MetricsCollector, getGroupQueueNames: () => string[]): Router {
   const router = Router();
@@ -23,7 +23,7 @@ export function createGroupsRouter(redis: IORedis, metrics: MetricsCollector, ge
       if (queueName && queue.name !== queueName) continue;
       const group = queue.groups.find((g) => g.groupId === groupId);
       if (group) {
-        res.json({
+        const detail: Record<string, unknown> = {
           groupId: group.groupId,
           queueName: queue.name,
           displayName: queue.displayName,
@@ -35,7 +35,22 @@ export function createGroupsRouter(redis: IORedis, metrics: MetricsCollector, ge
           pipelineName: group.pipelineName,
           jobType: group.jobType,
           jobName: group.jobName,
-        });
+        };
+
+        // Fetch the failed job's error when group is blocked
+        if (group.isBlocked && group.activeJobId) {
+          try {
+            const job = await getJobById(redis, queue.name, group.activeJobId);
+            if (job?.failedReason) {
+              detail.blockError = job.failedReason;
+              detail.blockStacktrace = job.stacktrace;
+            }
+          } catch {
+            // Non-critical — still return group data without error details
+          }
+        }
+
+        res.json(detail);
         return;
       }
     }
@@ -60,7 +75,7 @@ export function createGroupsRouter(redis: IORedis, metrics: MetricsCollector, ge
 
         // If the group has pending jobs, an active job, or is blocked, it still exists
         if (pendingJobs > 0 || activeJobId || isBlocked) {
-          res.json({
+          const detail: Record<string, unknown> = {
             groupId,
             queueName,
             displayName: stripHashTag(queueName),
@@ -72,7 +87,21 @@ export function createGroupsRouter(redis: IORedis, metrics: MetricsCollector, ge
             pipelineName: null,
             jobType: null,
             jobName: null,
-          });
+          };
+
+          if (isBlocked && activeJobId) {
+            try {
+              const job = await getJobById(redis, queueName, activeJobId);
+              if (job?.failedReason) {
+                detail.blockError = job.failedReason;
+                detail.blockStacktrace = job.stacktrace;
+              }
+            } catch {
+              // Non-critical
+            }
+          }
+
+          res.json(detail);
           return;
         }
       } catch (err) {

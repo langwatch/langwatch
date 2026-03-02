@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import type { Request, Response, NextFunction } from "express";
 
 export function basicAuth(req: Request, res: Response, next: NextFunction): void {
@@ -27,7 +28,19 @@ export function basicAuth(req: Request, res: Response, next: NextFunction): void
   const user = credentials.slice(0, colonIdx);
   const pass = credentials.slice(colonIdx + 1);
 
-  if (user === username && pass === password) {
+  const userBuf = new Uint8Array(Buffer.from(user));
+  const passBuf = new Uint8Array(Buffer.from(pass));
+  const expectedUserBuf = new Uint8Array(Buffer.from(username));
+  const expectedPassBuf = new Uint8Array(Buffer.from(password));
+
+  const userMatch =
+    userBuf.length === expectedUserBuf.length &&
+    timingSafeEqual(userBuf, expectedUserBuf);
+  const passMatch =
+    passBuf.length === expectedPassBuf.length &&
+    timingSafeEqual(passBuf, expectedPassBuf);
+
+  if (userMatch && passMatch) {
     next();
   } else {
     res.setHeader("WWW-Authenticate", 'Basic realm="Skynet"');

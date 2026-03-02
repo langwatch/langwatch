@@ -76,7 +76,7 @@ async function scanSingleQueue(redis: IORedis, queueName: string): Promise<Queue
       dataPipeline.hget(dataKey, jobId);
     }
   }
-  const dataResults = jobId_count(firstJobIds) > 0 ? await dataPipeline.exec() : [];
+  const dataResults = countJobIds(firstJobIds) > 0 ? await dataPipeline.exec() : [];
 
   let dataIdx = 0;
   const groups: GroupInfo[] = [];
@@ -142,6 +142,6 @@ async function scanSingleQueue(redis: IORedis, queueName: string): Promise<Queue
   };
 }
 
-function jobId_count(items: Array<{ jobId: string | null }>): number {
+function countJobIds(items: Array<{ jobId: string | null }>): number {
   return items.filter((i) => i.jobId !== null).length;
 }

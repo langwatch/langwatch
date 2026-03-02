@@ -1,8 +1,9 @@
-import { Box, Text, HStack, VStack, Badge, Button, Code, Spinner, Tooltip, useDisclosure, useToast,
+import { Box, Text, HStack, VStack, Badge, Button, Code, Spinner, Tooltip, useDisclosure, useToast, Collapse,
   AlertDialog, AlertDialogOverlay, AlertDialogContent, AlertDialogHeader,
   AlertDialogBody, AlertDialogFooter,
 } from "@chakra-ui/react";
 import { useRef, useState } from "react";
+import { ChevronRightIcon, ChevronDownIcon } from "@chakra-ui/icons";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import { useGroupDetail } from "../hooks/useGroupDetail.ts";
 import { JobList } from "../components/jobs/JobList.tsx";
@@ -19,8 +20,10 @@ export function GroupDetailPage() {
 
   const { group, jobsPage, completedJobs, loading, error, isCompleted, fetchJobs } = useGroupDetail(groupId!, queueName);
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const { isOpen: errorOpen, onToggle: toggleError } = useDisclosure({ defaultIsOpen: true });
   const cancelRef = useRef<HTMLButtonElement>(null);
   const [draining, setDraining] = useState(false);
+  const [retrying, setRetrying] = useState(false);
 
   if (loading && !group) {
     return (
@@ -114,6 +117,19 @@ export function GroupDetailPage() {
     }
   };
 
+  const handleRetry = async () => {
+    if (!queueName || !group?.activeJobId) return;
+    setRetrying(true);
+    try {
+      await apiPost("/api/actions/retry-blocked", { queueName, groupId, jobId: group.activeJobId });
+      toast({ title: "Job retried and group unblocked", status: "success", duration: 2000, isClosable: true });
+    } catch (err) {
+      toast({ title: "Failed to retry", description: err instanceof Error ? err.message : "Unknown error", status: "error", duration: 4000, isClosable: true });
+    } finally {
+      setRetrying(false);
+    }
+  };
+
   const handleDrain = async () => {
     if (!queueName) return;
     setDraining(true);
@@ -179,7 +195,72 @@ export function GroupDetailPage() {
         )}
       </HStack>
 
+      {/* Block error display */}
+      {group.isBlocked && group.blockError && (
+        <Box
+          mb={4}
+          border="1px solid"
+          borderColor="rgba(255, 0, 51, 0.2)"
+          borderRadius="2px"
+          overflow="hidden"
+        >
+          <HStack
+            px={4}
+            py={3}
+            cursor="pointer"
+            onClick={toggleError}
+            _hover={{ bg: "rgba(255, 0, 51, 0.04)" }}
+            userSelect="none"
+          >
+            <Box color="#ff0033" fontSize="xs">
+              {errorOpen ? <ChevronDownIcon /> : <ChevronRightIcon />}
+            </Box>
+            <Text fontSize="sm" color="#ff0033" textTransform="uppercase" letterSpacing="0.1em" fontWeight="600">
+              Block Error
+            </Text>
+          </HStack>
+          <Collapse in={errorOpen}>
+            <VStack align="stretch" spacing={2} px={4} pb={4}>
+              <Text fontSize="sm" color="#ff6666" wordBreak="break-all">
+                {group.blockError}
+              </Text>
+              {group.blockStacktrace && group.blockStacktrace.length > 0 && (
+                <Code
+                  display="block"
+                  whiteSpace="pre-wrap"
+                  wordBreak="break-all"
+                  p={3}
+                  bg="#060a12"
+                  border="1px solid rgba(255, 0, 51, 0.1)"
+                  borderRadius="2px"
+                  fontSize="11px"
+                  color="#cc6666"
+                  maxH="300px"
+                  overflow="auto"
+                >
+                  {group.blockStacktrace.join("\n")}
+                </Code>
+              )}
+            </VStack>
+          </Collapse>
+        </Box>
+      )}
+
       <HStack spacing={2} mb={6}>
+        {group.isBlocked && group.activeJobId && (
+          <Button
+            size="sm"
+            variant="outline"
+            color="#ffaa00"
+            borderColor="rgba(255, 170, 0, 0.3)"
+            borderRadius="2px"
+            _hover={{ borderColor: "#ffaa00", boxShadow: "0 0 8px rgba(255, 170, 0, 0.3)" }}
+            onClick={handleRetry}
+            isLoading={retrying}
+          >
+            Retry
+          </Button>
+        )}
         {group.isBlocked && (
           <Button
             size="sm"

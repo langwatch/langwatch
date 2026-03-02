@@ -63,7 +63,7 @@ export function ThroughputChart({ data }: { data: ThroughputPoint[] }) {
               color: "#00f0ff",
               boxShadow: "0 0 12px rgba(0, 240, 255, 0.15)",
             }}
-            labelFormatter={formatTime}
+            labelFormatter={(label) => formatTime(label as number)}
           />
           <Legend
             wrapperStyle={{ fontSize: 10, color: "#4a6a7a" }}
