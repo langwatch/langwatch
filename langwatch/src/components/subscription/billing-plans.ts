@@ -93,8 +93,8 @@ export function buildTieredCapabilities({
 }) {
   const coreUsersText =
     maxMembers > 0
-      ? `Up to ${formatNumber(maxMembers)} core users`
-      : "Custom core user limits";
+      ? `Up to ${formatNumber(maxMembers)} full members`
+      : "Custom member limits";
   const eventsText =
     maxMessagesPerMonth > 0
       ? `${formatNumber(maxMessagesPerMonth)} events included`
@@ -107,10 +107,10 @@ export function buildTieredCapabilities({
         : "Custom project limits";
   const liteUsersText =
     maxMembersLite >= 9999
-      ? "Unlimited lite users"
+      ? "Unlimited lite members"
       : maxMembersLite > 0
-        ? `Up to ${formatNumber(maxMembersLite)} lite users`
-        : "Custom lite user limits";
+        ? `Up to ${formatNumber(maxMembersLite)} lite members`
+        : "Custom lite member limits";
   const evalsText =
     evaluationsCredit >= 9999
       ? "Unlimited evaluations"

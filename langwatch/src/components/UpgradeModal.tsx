@@ -102,8 +102,9 @@ function LimitContent({
   );
 
   const showComparison =
-    activePlan.data?.planSource !== "license" &&
-    activePlan.data?.overrideAddingLimitations !== true;
+    !!activePlan.data &&
+    activePlan.data.planSource !== "license" &&
+    activePlan.data.overrideAddingLimitations !== true;
 
   const planName = activePlan.data?.name;
 
