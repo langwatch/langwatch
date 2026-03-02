@@ -15,7 +15,7 @@ import {
   protectedProcedure,
   publicProcedure,
 } from "~/server/api/trpc";
-import { getApp } from "~/server/app-layer/app";
+import { getApp } from "~/server/app-layer";
 import { encrypt } from "~/utils/encryption";
 import { slugify } from "~/utils/slugify";
 import { auditLog } from "../../auditLog";

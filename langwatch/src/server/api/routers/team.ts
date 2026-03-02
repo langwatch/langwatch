@@ -2,7 +2,7 @@ import { TeamUserRole } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { getApp } from "~/server/app-layer/app";
+import { getApp } from "~/server/app-layer";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { slugify } from "~/utils/slugify";
 import { checkOrganizationPermission, checkTeamPermission } from "../rbac";

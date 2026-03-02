@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getApp } from "~/server/app-layer/app";
+import { getApp } from "~/server/app-layer";
 import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
