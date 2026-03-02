@@ -54,6 +54,7 @@ export async function handleLicensePurchase({
     planType: licenseData.plan.type,
     maxMembers: quantity,
     expiresAt: licenseData.expiresAt,
+    organizationName: licenseData.organizationName,
   });
 
   logger.info(

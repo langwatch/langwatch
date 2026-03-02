@@ -99,6 +99,7 @@ describe("licensePurchaseHandler", () => {
           planType: "GROWTH",
           maxMembers: 5,
           expiresAt: "2027-03-02T00:00:00.000Z",
+          organizationName: "Acme Corp",
         });
       });
 

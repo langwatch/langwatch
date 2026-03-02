@@ -11,6 +11,21 @@ interface SendLicenseEmailParams {
   planType: string;
   maxMembers: number;
   expiresAt: string;
+  organizationName: string;
+}
+
+/**
+ * Sanitize a string for safe use as a filename prefix.
+ * Strips path separators, null bytes, and other filesystem-unsafe characters.
+ * Replaces dots with underscores to avoid confusing file extension parsing.
+ */
+function sanitizeFilenamePrefix(name: string): string {
+  return name
+    .replace(/[/\\:\0*?"<>|]/g, "") // remove filesystem-unsafe chars
+    .replace(/\./g, "_") // replace dots to avoid extension confusion
+    .replace(/\s+/g, "_") // collapse whitespace to underscores
+    .trim()
+    .slice(0, 100); // limit length
 }
 
 export const sendLicenseEmail = async ({
@@ -19,6 +34,7 @@ export const sendLicenseEmail = async ({
   planType,
   maxMembers,
   expiresAt,
+  organizationName,
 }: SendLicenseEmailParams) => {
   const expirationDate = new Date(expiresAt).toLocaleDateString("en-US", {
     year: "numeric",
@@ -124,7 +140,7 @@ export const sendLicenseEmail = async ({
     html: emailHtml,
     attachments: [
       {
-        filename: ".langwatch-license",
+        filename: `${sanitizeFilenamePrefix(organizationName)}.langwatch-license`,
         content: licenseKey,
         contentType: "application/octet-stream",
       },
