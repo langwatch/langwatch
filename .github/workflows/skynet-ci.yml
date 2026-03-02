@@ -1,0 +1,54 @@
+name: skynet-ci
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    paths:
+      - "skynet/**"
+      - ".github/workflows/skynet-ci.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        working-directory: skynet
+        run: npm install
+
+      - name: Run typecheck
+        working-directory: skynet
+        run: npx tsc --noEmit
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        working-directory: skynet
+        run: npm install
+
+      - name: Build
+        working-directory: skynet
+        run: npm run build
