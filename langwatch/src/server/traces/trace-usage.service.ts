@@ -3,7 +3,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { FREE_PLAN } from "../../../ee/licensing/constants";
 import type { PrismaClient } from "@prisma/client";
 import { env } from "~/env.mjs";
-import { getApp } from "~/server/app-layer";
+import { getApp } from "~/server/app-layer/app";
 import type { PlanResolver } from "~/server/app-layer/subscription/plan-provider";
 import { getClickHouseClient } from "~/server/clickhouse/client";
 import { prisma } from "~/server/db";

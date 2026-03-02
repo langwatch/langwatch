@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
-import { getApp } from "~/server/app-layer";
+import { getApp } from "~/server/app-layer/app";
 import { FREE_PLAN } from "../../../../ee/licensing/constants";
 import { env } from "../../../env.mjs";
 import { TraceUsageService } from "../../traces/trace-usage.service";
