@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { OrganizationUserRole, TeamUserRole, type PrismaClient } from "@prisma/client";
 import { organizationRouter, LITE_MEMBER_VIEWER_ONLY_ERROR } from "../organization";
 import { createInnerTRPCContext } from "../../trpc";
-import { createTestApp, resetApp } from "~/server/app-layer";
-import { globalForApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
+import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
 
 vi.mock("../../../auditLog", () => ({
