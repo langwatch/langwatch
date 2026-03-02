@@ -18,7 +18,6 @@ import { Edit2 } from "react-feather";
 import { useDebouncedCallback } from "use-debounce";
 import type { Trace } from "~/server/tracer/types";
 import { Checkbox } from "../../components/ui/checkbox";
-import { Switch } from "../../components/ui/switch";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type {
   DatasetColumns,
@@ -220,39 +219,79 @@ export function DatasetMappingPreview({
           <HStack width="full" align="center" justify="space-between">
             <Field.Label margin={0}>Mapping</Field.Label>
           </HStack>
-          <HStack gap={2}>
-            <Text fontSize="sm">Traces</Text>
-            <Switch
-              checked={isThreadMapping}
-              onCheckedChange={(e) => setIsThreadMapping(e.checked)}
-            />
-            <HStack gap={1}>
-              <Text fontSize="sm">Threads</Text>
-              {isThreadMapping && (
-                <>
-                  {threadIds.length === 0 ? (
-                    <Badge colorPalette="gray" size="sm">
-                      No threads found
-                    </Badge>
-                  ) : threadTraces.isLoading || threadTraces.isFetching ? (
-                    <Spinner size="xs" />
-                  ) : threadTraces.isError ? (
-                    <Badge colorPalette="red" size="sm">
-                      Error loading traces
-                    </Badge>
-                  ) : threadTraces.data ? (
-                    <Badge colorPalette="blue" size="sm">
-                      {threadTraces.data.length} traces
-                    </Badge>
-                  ) : null}
-                </>
-              )}
-            </HStack>
+          <HStack
+            bg="gray.100"
+            _dark={{ bg: "gray.800" }}
+            borderRadius="md"
+            padding="3px"
+            gap={0}
+          >
+            <Box
+              as="button"
+              type="button"
+              onClick={() => setIsThreadMapping(false)}
+              bg={!isThreadMapping ? "white" : "transparent"}
+              _dark={{
+                bg: !isThreadMapping ? "gray.700" : "transparent",
+              }}
+              color={!isThreadMapping ? "fg" : "fg.muted"}
+              fontWeight={!isThreadMapping ? "medium" : "normal"}
+              borderRadius="sm"
+              px={3}
+              py={1}
+              fontSize="sm"
+              cursor="pointer"
+              boxShadow={!isThreadMapping ? "xs" : "none"}
+              transition="all 0.15s"
+            >
+              Traces
+            </Box>
+            <Box
+              as="button"
+              type="button"
+              onClick={() => setIsThreadMapping(true)}
+              bg={isThreadMapping ? "white" : "transparent"}
+              _dark={{
+                bg: isThreadMapping ? "gray.700" : "transparent",
+              }}
+              color={isThreadMapping ? "fg" : "fg.muted"}
+              fontWeight={isThreadMapping ? "medium" : "normal"}
+              borderRadius="sm"
+              px={3}
+              py={1}
+              fontSize="sm"
+              cursor="pointer"
+              boxShadow={isThreadMapping ? "xs" : "none"}
+              transition="all 0.15s"
+            >
+              <HStack gap={1}>
+                <Text>Threads</Text>
+                {isThreadMapping && (
+                  <>
+                    {threadIds.length === 0 ? (
+                      <Badge colorPalette="gray" size="sm">
+                        No threads found
+                      </Badge>
+                    ) : threadTraces.isLoading || threadTraces.isFetching ? (
+                      <Spinner size="xs" />
+                    ) : threadTraces.isError ? (
+                      <Badge colorPalette="red" size="sm">
+                        Error
+                      </Badge>
+                    ) : threadTraces.data ? (
+                      <Badge colorPalette="blue" size="sm">
+                        {threadTraces.data.length} traces
+                      </Badge>
+                    ) : null}
+                  </>
+                )}
+              </HStack>
+            </Box>
           </HStack>
           <Field.HelperText margin={0} fontSize="13px" marginBottom={2}>
             {isThreadMapping
-              ? "Map the thread data to the dataset columns (groups traces by thread_id)"
-              : "Map the trace data to the dataset columns"}
+              ? "Groups traces by thread_id and maps to dataset columns"
+              : "Maps each trace individually to dataset columns"}
           </Field.HelperText>
 
           {isThreadMapping ? (
