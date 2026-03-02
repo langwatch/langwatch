@@ -352,6 +352,43 @@ export class SuiteService {
   }
 
   /**
+   * Resolve human-readable names for archived scenario and target IDs.
+   * Used by the suite edit UI to show meaningful labels in warnings.
+   */
+  async resolveArchivedNames(params: {
+    scenarioIds: string[];
+    targets: SuiteTarget[];
+    projectId: string;
+    organizationId: string;
+  }): Promise<{ scenarios: Record<string, string>; targets: Record<string, string> }> {
+    const { scenarioIds, targets, projectId, organizationId } = params;
+
+    const scenarioRows = scenarioIds.length > 0
+      ? await this.scenarioRepository.findNamesByIds({ ids: scenarioIds, projectId })
+      : [];
+    const scenarios: Record<string, string> = Object.fromEntries(
+      scenarioRows.map((r) => [r.id, r.name]),
+    );
+
+    const httpIds = targets.filter((t) => t.type === "http").map((t) => t.referenceId);
+    const promptIds = targets.filter((t) => t.type === "prompt").map((t) => t.referenceId);
+
+    const agentRows = httpIds.length > 0
+      ? await this.agentRepository.findNamesByIds({ ids: httpIds, projectId })
+      : [];
+
+    const promptRows = promptIds.length > 0
+      ? await this.llmConfigRepository.findNamesByIds({ ids: promptIds, projectId, organizationId })
+      : [];
+
+    const targetNames: Record<string, string> = {};
+    for (const r of agentRows) targetNames[r.id] = r.name;
+    for (const r of promptRows) targetNames[r.id] = r.name;
+
+    return { scenarios, targets: targetNames };
+  }
+
+  /**
    * Calculate the number of jobs for a suite run without scheduling.
    * Used for display and validation.
    */

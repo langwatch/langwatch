@@ -157,6 +157,20 @@ export class AgentRepository {
   }
 
   /**
+   * Find agent names by IDs regardless of archived status.
+   * Used for displaying human-readable names in UI warnings.
+   */
+  async findNamesByIds(input: {
+    ids: string[];
+    projectId: string;
+  }): Promise<{ id: string; name: string }[]> {
+    return this.prisma.agent.findMany({
+      where: { id: { in: input.ids }, projectId: input.projectId },
+      select: { id: true, name: true },
+    });
+  }
+
+  /**
    * Checks whether a non-archived agent exists for the given id and project.
    * Lightweight: does NOT parse config through Zod.
    */

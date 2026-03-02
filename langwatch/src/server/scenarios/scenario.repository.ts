@@ -177,6 +177,20 @@ export class ScenarioRepository {
     );
   }
 
+  /**
+   * Find scenario names by IDs regardless of archived status.
+   * Used for displaying human-readable names in UI warnings.
+   */
+  async findNamesByIds(input: {
+    ids: string[];
+    projectId: string;
+  }): Promise<{ id: string; name: string }[]> {
+    return this.prisma.scenario.findMany({
+      where: { id: { in: input.ids }, projectId: input.projectId },
+      select: { id: true, name: true },
+    });
+  }
+
   async update(
     id: string,
     projectId: string,

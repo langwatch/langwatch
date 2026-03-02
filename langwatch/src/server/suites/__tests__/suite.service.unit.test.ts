@@ -84,14 +84,17 @@ function makeMockRepository(overrides: Partial<MockSuiteRepository> = {}): MockS
 
 type MockScenarioRepository = {
   findManyIncludingArchived: ReturnType<typeof vi.fn>;
+  findNamesByIds: ReturnType<typeof vi.fn>;
 };
 
 type MockAgentRepository = {
   findManyIncludingArchived: ReturnType<typeof vi.fn>;
+  findNamesByIds: ReturnType<typeof vi.fn>;
 };
 
 type MockLlmConfigRepository = {
   findExistingIds: ReturnType<typeof vi.fn>;
+  findNamesByIds: ReturnType<typeof vi.fn>;
 };
 
 function makeMockScenarioRepository(
@@ -101,6 +104,7 @@ function makeMockScenarioRepository(
     findManyIncludingArchived: vi.fn(({ ids }: { ids: string[] }) =>
       Promise.resolve(ids.map((id) => ({ id, archivedAt: null }))),
     ),
+    findNamesByIds: vi.fn(async () => []),
     ...overrides,
   };
 }
@@ -112,6 +116,7 @@ function makeMockAgentRepository(
     findManyIncludingArchived: vi.fn(({ ids }: { ids: string[] }) =>
       Promise.resolve(ids.map((id) => ({ id, archivedAt: null }))),
     ),
+    findNamesByIds: vi.fn(async () => []),
     ...overrides,
   };
 }
@@ -123,6 +128,7 @@ function makeMockLlmConfigRepository(
     findExistingIds: vi.fn(({ ids }: { ids: string[] }) =>
       Promise.resolve(new Set(ids)),
     ),
+    findNamesByIds: vi.fn(async () => []),
     ...overrides,
   };
 }
@@ -976,6 +982,117 @@ describe("SuiteService", () => {
             waiting: 1,
             active: 1,
           });
+        });
+      });
+    });
+  });
+
+  describe("resolveArchivedNames()", () => {
+    describe("given archived scenario and target IDs", () => {
+      it("returns name maps from repository lookups", async () => {
+        const { service } = createService({
+          scenarioRepository: {
+            findNamesByIds: vi.fn(async () => [
+              { id: "scen_1", name: "My Scenario" },
+            ]),
+          },
+          agentRepository: {
+            findNamesByIds: vi.fn(async () => [
+              { id: "agent_1", name: "My Agent" },
+            ]),
+          },
+        });
+
+        const result = await service.resolveArchivedNames({
+          scenarioIds: ["scen_1"],
+          targets: [{ type: "http", referenceId: "agent_1" }],
+          projectId: "proj_1",
+          organizationId: "org_1",
+        });
+
+        expect(result.scenarios).toEqual({ scen_1: "My Scenario" });
+        expect(result.targets).toEqual({ agent_1: "My Agent" });
+      });
+    });
+
+    describe("given prompt targets", () => {
+      it("returns name maps from llmConfigRepository", async () => {
+        const { service } = createService({
+          llmConfigRepository: {
+            findNamesByIds: vi.fn(async () => [
+              { id: "prompt_1", name: "My Prompt" },
+            ]),
+          },
+        });
+
+        const result = await service.resolveArchivedNames({
+          scenarioIds: [],
+          targets: [{ type: "prompt", referenceId: "prompt_1" }],
+          projectId: "proj_1",
+          organizationId: "org_1",
+        });
+
+        expect(result.targets).toEqual({ prompt_1: "My Prompt" });
+      });
+    });
+
+    describe("given empty inputs", () => {
+      it("returns empty maps without querying repositories", async () => {
+        const { service, scenarioRepo, agentRepo, llmConfigRepo } =
+          createService();
+
+        const result = await service.resolveArchivedNames({
+          scenarioIds: [],
+          targets: [],
+          projectId: "proj_1",
+          organizationId: "org_1",
+        });
+
+        expect(result.scenarios).toEqual({});
+        expect(result.targets).toEqual({});
+        expect(scenarioRepo.findNamesByIds).not.toHaveBeenCalled();
+        expect(agentRepo.findNamesByIds).not.toHaveBeenCalled();
+        expect(llmConfigRepo.findNamesByIds).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("given mixed HTTP and prompt targets", () => {
+      it("queries agents and prompts separately", async () => {
+        const { service, agentRepo, llmConfigRepo } = createService({
+          agentRepository: {
+            findNamesByIds: vi.fn(async () => [
+              { id: "agent_1", name: "Agent One" },
+            ]),
+          },
+          llmConfigRepository: {
+            findNamesByIds: vi.fn(async () => [
+              { id: "prompt_1", name: "Prompt One" },
+            ]),
+          },
+        });
+
+        const result = await service.resolveArchivedNames({
+          scenarioIds: [],
+          targets: [
+            { type: "http", referenceId: "agent_1" },
+            { type: "prompt", referenceId: "prompt_1" },
+          ],
+          projectId: "proj_1",
+          organizationId: "org_1",
+        });
+
+        expect(result.targets).toEqual({
+          agent_1: "Agent One",
+          prompt_1: "Prompt One",
+        });
+        expect(agentRepo.findNamesByIds).toHaveBeenCalledWith({
+          ids: ["agent_1"],
+          projectId: "proj_1",
+        });
+        expect(llmConfigRepo.findNamesByIds).toHaveBeenCalledWith({
+          ids: ["prompt_1"],
+          projectId: "proj_1",
+          organizationId: "org_1",
         });
       });
     });

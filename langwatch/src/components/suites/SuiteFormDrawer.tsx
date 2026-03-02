@@ -24,7 +24,7 @@ import {
 import type { SimulationSuite } from "@prisma/client";
 import { ChevronDown, ChevronRight, Play } from "lucide-react";
 import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import {
   useDrawer,
   useDrawerParams,
@@ -59,7 +59,7 @@ function buildMutationPayload(data: SuiteFormData, projectId: string) {
 }
 
 export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
-  const { project } = useOrganizationTeamProject();
+  const { project, organization } = useOrganizationTeamProject();
   const { openDrawer, closeDrawer, drawerOpen } = useDrawer();
   const params = useDrawerParams();
   const utils = api.useContext();
@@ -105,6 +105,40 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
     agents,
     prompts,
   });
+
+  const hasArchived =
+    suiteForm.archivedScenarioIds.length > 0 ||
+    suiteForm.archivedTargets.length > 0;
+
+  const { data: archivedNames } = api.suites.resolveArchivedNames.useQuery(
+    {
+      projectId: project?.id ?? "",
+      scenarioIds: suiteForm.archivedScenarioIds.map((s) => s.id),
+      targets: suiteForm.archivedTargets.map((t) => ({
+        type: t.type,
+        referenceId: t.referenceId,
+      })),
+    },
+    { enabled: !!project && hasArchived },
+  );
+
+  const archivedScenariosWithNames = useMemo(
+    () =>
+      suiteForm.archivedScenarioIds.map((s) => ({
+        id: s.id,
+        name: archivedNames?.scenarios[s.id] ?? s.id,
+      })),
+    [suiteForm.archivedScenarioIds, archivedNames],
+  );
+
+  const archivedTargetsWithNames = useMemo(
+    () =>
+      suiteForm.archivedTargets.map((t) => ({
+        ...t,
+        name: archivedNames?.targets[t.referenceId] ?? t.referenceId,
+      })),
+    [suiteForm.archivedTargets, archivedNames],
+  );
 
   const { form } = suiteForm;
   const errors = form.formState.errors;
@@ -342,7 +376,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                 onLabelFilterChange={suiteForm.setActiveLabelFilter}
                 onCreateNew={() => openDrawer("scenarioEditor")}
                 hasError={!!errors.selectedScenarioIds}
-                archivedIds={suiteForm.archivedScenarioIds}
+                archivedIds={archivedScenariosWithNames}
                 onRemoveArchived={suiteForm.removeArchivedScenario}
               />
               {errors.selectedScenarioIds && (
@@ -372,7 +406,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                   }
                 }}
                 hasError={!!errors.selectedTargets}
-                archivedTargets={suiteForm.archivedTargets}
+                archivedTargets={archivedTargetsWithNames}
                 onRemoveArchived={suiteForm.removeArchivedTarget}
               />
               {errors.selectedTargets && (
