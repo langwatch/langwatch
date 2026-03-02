@@ -181,5 +181,70 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
     }
   });
 
+  router.post("/api/actions/pause", async (req, res) => {
+    try {
+      const { queueName, pauseKey } = req.body as { queueName?: string; pauseKey?: string };
+      if (!queueName || !pauseKey) {
+        res.status(400).json({ error: "queueName and pauseKey are required" });
+        return;
+      }
+
+      if (!getGroupQueueNames().includes(queueName)) {
+        res.status(404).json({ error: "Unknown queue name" });
+        return;
+      }
+
+      await redis.sadd(`${queueName}:gq:paused-jobs`, pauseKey);
+      res.json({ ok: true });
+    } catch (err) {
+      console.error("pause error:", err);
+      res.status(500).json({ error: err instanceof Error ? err.message : "Internal error" });
+    }
+  });
+
+  router.post("/api/actions/unpause", async (req, res) => {
+    try {
+      const { queueName, pauseKey } = req.body as { queueName?: string; pauseKey?: string };
+      if (!queueName || !pauseKey) {
+        res.status(400).json({ error: "queueName and pauseKey are required" });
+        return;
+      }
+
+      if (!getGroupQueueNames().includes(queueName)) {
+        res.status(404).json({ error: "Unknown queue name" });
+        return;
+      }
+
+      await redis.srem(`${queueName}:gq:paused-jobs`, pauseKey);
+      // Wake the dispatcher so parked jobs get picked up quickly
+      await redis.lpush(`${queueName}:gq:signal`, "1");
+      res.json({ ok: true });
+    } catch (err) {
+      console.error("unpause error:", err);
+      res.status(500).json({ error: err instanceof Error ? err.message : "Internal error" });
+    }
+  });
+
+  router.get("/api/actions/paused", async (req, res) => {
+    try {
+      const queueName = req.query.queueName as string | undefined;
+      if (!queueName) {
+        res.status(400).json({ error: "queueName query param is required" });
+        return;
+      }
+
+      if (!getGroupQueueNames().includes(queueName)) {
+        res.status(404).json({ error: "Unknown queue name" });
+        return;
+      }
+
+      const pausedKeys = await redis.smembers(`${queueName}:gq:paused-jobs`);
+      res.json({ pausedKeys });
+    } catch (err) {
+      console.error("paused error:", err);
+      res.status(500).json({ error: err instanceof Error ? err.message : "Internal error" });
+    }
+  });
+
   return router;
 }

@@ -301,6 +301,36 @@ redis.call("INCR", statsKey)
 return 1
 `;
 
+const PARK_PAUSED_LUA = `
+local activeKey = KEYS[1]
+
+local keyPrefix       = ARGV[1]
+local groupId         = ARGV[2]
+local stagedJobId     = ARGV[3]
+local dispatchAfterMs = tonumber(ARGV[4])
+local jobDataJson     = ARGV[5]
+
+-- Verify active key matches
+local currentActive = redis.call("GET", activeKey)
+if currentActive ~= stagedJobId then return 0 end
+
+-- Clear active key
+redis.call("DEL", activeKey)
+
+-- Re-stage job with future score to prevent hot loop
+local groupJobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
+local groupDataKey = keyPrefix .. "group:" .. groupId .. ":data"
+redis.call("ZADD", groupJobsKey, dispatchAfterMs, stagedJobId)
+redis.call("HSET", groupDataKey, stagedJobId, jobDataJson)
+
+-- Update ready score
+local readyKey = keyPrefix .. "ready"
+local pendingCount = redis.call("ZCARD", groupJobsKey)
+redis.call("ZADD", readyKey, math.sqrt(pendingCount), groupId)
+
+return 1
+`;
+
 const RETRY_RESTAGE_LUA = `
 local activeKey = KEYS[1]
 
@@ -675,6 +705,60 @@ export class GroupStagingScripts {
     );
 
     return result === 1;
+  }
+
+  /**
+   * Park a dispatched-but-paused job back into staging with a future score
+   * to prevent hot-loop re-dispatch.
+   *
+   * @returns true if parked, false if stale (active key doesn't match)
+   */
+  async parkPausedJob({
+    groupId,
+    stagedJobId,
+    dispatchAfterMs,
+    jobDataJson,
+  }: {
+    groupId: string;
+    stagedJobId: string;
+    dispatchAfterMs: number;
+    jobDataJson: string;
+  }): Promise<boolean> {
+    const activeKey = `${this.keyPrefix}group:${groupId}:active`;
+
+    const result = await this.redis.eval(
+      PARK_PAUSED_LUA,
+      1,
+      activeKey,
+      this.keyPrefix,
+      groupId,
+      stagedJobId,
+      String(dispatchAfterMs),
+      jobDataJson,
+    );
+
+    return result === 1;
+  }
+
+  /**
+   * Get all paused keys from the pause set.
+   */
+  async getPausedKeys(): Promise<string[]> {
+    return this.redis.smembers(`${this.keyPrefix}paused-jobs`);
+  }
+
+  /**
+   * Add a pause key to the pause set.
+   */
+  async addPauseKey(key: string): Promise<void> {
+    await this.redis.sadd(`${this.keyPrefix}paused-jobs`, key);
+  }
+
+  /**
+   * Remove a pause key from the pause set.
+   */
+  async removePauseKey(key: string): Promise<void> {
+    await this.redis.srem(`${this.keyPrefix}paused-jobs`, key);
   }
 
   /**

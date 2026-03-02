@@ -1,4 +1,4 @@
-import { Box, Text, HStack, Badge, Collapse, useDisclosure } from "@chakra-ui/react";
+import { Box, Text, HStack, Badge, Collapse, useDisclosure, IconButton, Tooltip } from "@chakra-ui/react";
 import { ChevronRightIcon, ChevronDownIcon, CloseIcon } from "@chakra-ui/icons";
 import type { PipelineNode } from "../../../shared/types.ts";
 
@@ -8,14 +8,47 @@ function collectLeafNames(node: PipelineNode): string[] {
   return node.children.flatMap(collectLeafNames);
 }
 
+/** Build the hierarchical path for a node at each level of the tree. */
+function buildPauseKey(ancestors: string[], name: string): string {
+  return [...ancestors, name].join("/");
+}
+
+/** Check if a key is paused (direct match or any ancestor matches). */
+function isPausedKey(pauseKey: string, pausedKeys: string[]): boolean {
+  return pausedKeys.some(
+    (k) => k === pauseKey || pauseKey.startsWith(k + "/"),
+  );
+}
+
+/** Check if the pause is inherited from an ancestor rather than set directly. */
+function isInheritedPause(pauseKey: string, pausedKeys: string[]): boolean {
+  return (
+    !pausedKeys.includes(pauseKey) &&
+    pausedKeys.some((k) => pauseKey.startsWith(k + "/"))
+  );
+}
+
 interface TreeNodeProps {
   node: PipelineNode;
   depth?: number;
+  ancestors?: string[];
   selectedPipeline: string | null;
   onSelectPipeline: (name: string | null) => void;
+  pausedKeys: string[];
+  onPause: (pauseKey: string) => void;
+  onUnpause: (pauseKey: string) => void;
 }
 
-function TreeNode({ node, depth = 0, selectedPipeline, onSelectPipeline }: TreeNodeProps) {
+function TreeNode({
+  node,
+  depth = 0,
+  ancestors = [],
+  selectedPipeline,
+  onSelectPipeline,
+  pausedKeys,
+  onPause,
+  onUnpause,
+}: TreeNodeProps) {
   const { isOpen, onToggle } = useDisclosure({ defaultIsOpen: false });
   const hasChildren = node.children.length > 0;
 
@@ -23,11 +56,25 @@ function TreeNode({ node, depth = 0, selectedPipeline, onSelectPipeline }: TreeN
   const isSelected = selectedPipeline !== null && leafNames.includes(selectedPipeline);
   const isExactSelected = selectedPipeline === node.name;
 
+  const pauseKey = buildPauseKey(ancestors, node.name);
+  const paused = isPausedKey(pauseKey, pausedKeys);
+  const inherited = isInheritedPause(pauseKey, pausedKeys);
+  const directlyPaused = pausedKeys.includes(pauseKey);
+
   const handleClick = () => {
     if (hasChildren) {
       onToggle();
     } else {
       onSelectPipeline(isExactSelected ? null : node.name);
+    }
+  };
+
+  const handlePauseToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (directlyPaused) {
+      onUnpause(pauseKey);
+    } else if (!paused) {
+      onPause(pauseKey);
     }
   };
 
@@ -44,6 +91,7 @@ function TreeNode({ node, depth = 0, selectedPipeline, onSelectPipeline }: TreeN
         borderLeft={depth > 0 ? "1px solid rgba(0, 240, 255, 0.1)" : "none"}
         bg={isExactSelected ? "rgba(0, 240, 255, 0.08)" : isSelected ? "rgba(0, 240, 255, 0.03)" : "transparent"}
         transition="background-color 0.2s"
+        role="group"
       >
         {hasChildren && (
           <Box color="#00f0ff" fontSize="xs">
@@ -65,6 +113,16 @@ function TreeNode({ node, depth = 0, selectedPipeline, onSelectPipeline }: TreeN
           </Text>
         )}
         <HStack spacing={1} ml="auto">
+          {paused && (
+            <Badge
+              bg={inherited ? "rgba(255, 200, 0, 0.06)" : "rgba(255, 200, 0, 0.12)"}
+              color={inherited ? "#9a8a40" : "#ffc800"}
+              fontSize="10px"
+              borderRadius="2px"
+            >
+              {inherited ? "PAUSED (inherited)" : "PAUSED"}
+            </Badge>
+          )}
           {node.pending > 0 && (
             <Badge bg="rgba(0, 240, 255, 0.1)" color="#00f0ff" fontSize="10px" borderRadius="2px">
               {node.pending} pending
@@ -80,6 +138,31 @@ function TreeNode({ node, depth = 0, selectedPipeline, onSelectPipeline }: TreeN
               {node.blocked} blocked
             </Badge>
           )}
+          <Tooltip
+            label={directlyPaused ? "Resume" : paused ? "Paused by ancestor" : "Pause"}
+            fontSize="xs"
+            placement="top"
+            hasArrow
+          >
+            <IconButton
+              aria-label={directlyPaused ? "Resume" : "Pause"}
+              size="xs"
+              variant="ghost"
+              opacity={0}
+              _groupHover={{ opacity: paused || !inherited ? 0.7 : 0.3 }}
+              _hover={{ opacity: "1 !important" }}
+              onClick={handlePauseToggle}
+              isDisabled={inherited && !directlyPaused}
+              icon={
+                <Text fontSize="11px">
+                  {directlyPaused ? "▶" : "⏸"}
+                </Text>
+              }
+              minW="20px"
+              h="20px"
+              color={directlyPaused ? "#00ff41" : "#ffc800"}
+            />
+          </Tooltip>
         </HStack>
       </HStack>
       {hasChildren && (
@@ -89,8 +172,12 @@ function TreeNode({ node, depth = 0, selectedPipeline, onSelectPipeline }: TreeN
               key={child.name}
               node={child}
               depth={depth + 1}
+              ancestors={[...ancestors, node.name]}
               selectedPipeline={selectedPipeline}
               onSelectPipeline={onSelectPipeline}
+              pausedKeys={pausedKeys}
+              onPause={onPause}
+              onUnpause={onUnpause}
             />
           ))}
         </Collapse>
@@ -103,9 +190,12 @@ interface PipelineTreeProps {
   nodes: PipelineNode[];
   selectedPipeline: string | null;
   onSelectPipeline: (name: string | null) => void;
+  pausedKeys: string[];
+  onPause: (pauseKey: string) => void;
+  onUnpause: (pauseKey: string) => void;
 }
 
-export function PipelineTree({ nodes, selectedPipeline, onSelectPipeline }: PipelineTreeProps) {
+export function PipelineTree({ nodes, selectedPipeline, onSelectPipeline, pausedKeys, onPause, onUnpause }: PipelineTreeProps) {
   return (
     <Box
       bg="#0a0e17"
@@ -155,6 +245,9 @@ export function PipelineTree({ nodes, selectedPipeline, onSelectPipeline }: Pipe
             node={node}
             selectedPipeline={selectedPipeline}
             onSelectPipeline={onSelectPipeline}
+            pausedKeys={pausedKeys}
+            onPause={onPause}
+            onUnpause={onUnpause}
           />
         ))
       )}
