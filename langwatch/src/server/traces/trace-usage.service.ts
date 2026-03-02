@@ -1,9 +1,10 @@
 import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { FREE_PLAN } from "../../../ee/licensing/constants";
-import { type PrismaClient, PricingModel } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 import { env } from "~/env.mjs";
-import { SubscriptionHandler } from "~/server/subscriptionHandler";
+import { getApp } from "~/server/app-layer";
+import type { PlanResolver } from "~/server/app-layer/subscription/plan-provider";
 import { getClickHouseClient } from "~/server/clickhouse/client";
 import { prisma } from "~/server/db";
 import {
@@ -15,9 +16,7 @@ import { getCurrentMonthStartMs } from "~/server/utils/dateUtils";
 import { TtlCache } from "~/server/utils/ttlCache";
 import {
   queryTraceSummariesTotalUniq,
-  queryBillableEventsByProjectApprox,
   getBillingMonth,
-  queryBillableEventsTotalUniq,
 } from "../../../ee/billing/services/billableEventsQuery";
 import { createLogger } from "~/utils/logger/server";
 
@@ -43,7 +42,7 @@ export class TraceUsageService {
   constructor(
     private readonly organizationRepository: OrganizationRepository,
     private readonly esClientFactory: EsClientFactory,
-    private readonly subscriptionHandler: typeof SubscriptionHandler,
+    private readonly planResolver: PlanResolver,
     private readonly prisma: PrismaClient,
     private readonly clickHouseClient: ClickHouseClient | null,
   ) {}
@@ -51,18 +50,27 @@ export class TraceUsageService {
   /**
    * Static factory method for creating TraceUsageService with proper DI
    */
-  static create(db: PrismaClient = prisma): TraceUsageService {
+  static create(
+    db: PrismaClient = prisma,
+    planResolver?: PlanResolver,
+  ): TraceUsageService {
+    const resolver: PlanResolver =
+      planResolver ??
+      ((organizationId) =>
+        getApp().planProvider.getActivePlan({ organizationId }));
     return new TraceUsageService(
       new OrganizationRepository(db),
       defaultEsClient,
-      SubscriptionHandler,
+      resolver,
       db,
       getClickHouseClient(),
     );
   }
 
   /**
-   * Checks if team's organization has exceeded trace limit
+   * @deprecated Use UsageService.checkLimit() instead. Limit checking is now
+   * centralized in the app-layer UsageService with meter policy orchestration.
+   * This method remains for backward compatibility with existing tests.
    */
   async checkLimit({ teamId }: { teamId: string }): Promise<{
     exceeded: boolean;
@@ -78,17 +86,14 @@ export class TraceUsageService {
       throw new Error(`Team ${teamId} has no organization`);
     }
 
-    const pricingModel = await this.resolvePricingModel(organizationId);
-    logger.info({ organizationId, pricingModel }, "checkLimit: resolved pricing model");
-
     const [count, plan] = await Promise.all([
-      this.getCurrentMonthCount({ organizationId, pricingModel }),
-      this.subscriptionHandler.getActivePlan(organizationId),
+      this.getCurrentMonthCount({ organizationId }),
+      this.planResolver(organizationId),
     ]);
 
     // Self-hosted = unlimited traces
     // Preventing customers from getting blocked when no license is active
-    if (!env.IS_SAAS && plan === FREE_PLAN) {
+    if (!env.IS_SAAS && plan.type === FREE_PLAN.type) {
       return { exceeded: false };
     }
 
@@ -106,33 +111,28 @@ export class TraceUsageService {
 
   /**
    * Gets current month trace count for an organization (cached for 5 minutes).
+   * Traces-only: event counting is handled by EventUsageService.
    */
   async getCurrentMonthCount({
     organizationId,
-    pricingModel: pricingModelParam,
   }: {
     organizationId: string;
-    pricingModel?: PricingModel;
   }): Promise<number> {
-    const pricingModel =
-      pricingModelParam ?? (await this.resolvePricingModel(organizationId));
     const billingMonth = getBillingMonth();
-    const cacheKey = `${organizationId}:${pricingModel}:${billingMonth}`;
+    const cacheKey = `${organizationId}:traces:${billingMonth}`;
 
     const cached = monthCountCache.get(cacheKey);
     if (cached !== undefined) {
-      logger.info({ organizationId, cached, pricingModel, billingMonth }, "getCurrentMonthCount: cache hit");
+      logger.info({ organizationId, cached, billingMonth }, "getCurrentMonthCount: cache hit");
       return cached;
     }
 
-    // SaaS: ClickHouse path, dispatched by pricing model
+    // ClickHouse path: traces only
     const clickHouseTotal =
-      pricingModel === PricingModel.SEAT_EVENT
-        ? await this.getBillableEventsMonthCount({ organizationId })
-        : await this.getTraceSummariesMonthCount({ organizationId });
+      await this.getTraceSummariesMonthCount({ organizationId });
 
     if (clickHouseTotal !== null) {
-      logger.info({ organizationId, clickHouseTotal, pricingModel, billingMonth }, "getCurrentMonthCount: ClickHouse result");
+      logger.info({ organizationId, clickHouseTotal, billingMonth }, "getCurrentMonthCount: ClickHouse result");
       monthCountCache.set(cacheKey, clickHouseTotal);
       return clickHouseTotal;
     }
@@ -169,14 +169,9 @@ export class TraceUsageService {
       return [];
     }
 
-    const pricingModel = await this.resolvePricingModel(organizationId);
+    // ClickHouse path: traces only (events routing handled by UsageService → EventUsageService)
     const clickHouseCounts =
-      pricingModel === PricingModel.SEAT_EVENT
-        ? await this.getBillableEventsCountByProjects({
-            organizationId,
-            projectIds,
-          })
-        : await this.getTraceSummariesCountByProjects({ projectIds });
+      await this.getTraceSummariesCountByProjects({ projectIds });
 
     if (clickHouseCounts !== null) {
       return clickHouseCounts;
@@ -308,34 +303,6 @@ export class TraceUsageService {
     return results;
   }
 
-  private async resolvePricingModel(
-    organizationId: string,
-  ): Promise<PricingModel> {
-    return (
-      (await this.organizationRepository.getPricingModel(organizationId)) ??
-      PricingModel.TIERED
-    );
-  }
-
-  /**
-   * Returns approximate billable event count for the current UTC month
-   * using HyperLogLog (~1% error), or null if ClickHouse is not configured.
-   */
-  private async getBillableEventsMonthCount({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<number | null> {
-    if (!getClickHouseClient()) return null;
-
-    logger.info({ organizationId }, "getBillableEventsMonthCount: querying billable_events table");
-    const billingMonth = getBillingMonth();
-    return (
-      (await queryBillableEventsTotalUniq({ organizationId, billingMonth })) ??
-      0
-    );
-  }
-
   /**
    * Returns approximate trace count for the current UTC month
    * using HyperLogLog (~1% error), or null if ClickHouse is not configured.
@@ -380,28 +347,4 @@ export class TraceUsageService {
     );
   }
 
-  /**
-   * Returns approximate per-project billable event counts for the current UTC
-   * billing month using HyperLogLog (~1% error), or null if ClickHouse is not configured.
-   */
-  private async getBillableEventsCountByProjects({
-    organizationId,
-    projectIds,
-  }: {
-    organizationId: string;
-    projectIds: string[];
-  }): Promise<Array<{ projectId: string; count: number }> | null> {
-    if (!getClickHouseClient()) return null;
-
-    const billingMonth = getBillingMonth();
-    const counts = await queryBillableEventsByProjectApprox({
-      organizationId,
-      billingMonth,
-    });
-    const countsMap = new Map(counts.map((c) => [c.projectId, c.count]));
-    return projectIds.map((pid) => ({
-      projectId: pid,
-      count: countsMap.get(pid) ?? 0,
-    }));
-  }
 }

@@ -1,13 +1,13 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { checkOrganizationPermission, skipPermissionCheck } from "../rbac";
+import { checkOrganizationPermission } from "../rbac";
 import {
   type LicenseStatus,
   OrganizationNotFoundError,
   getPlanTemplate,
 } from "../../../../ee/licensing";
-import type { LicenseData, LicensePlanLimits } from "../../../../ee/licensing";
+import type { LicenseData } from "../../../../ee/licensing";
 import { signLicense, encodeLicenseKey, generateLicenseId } from "../../../../ee/licensing/signing";
 import { getLicenseHandler } from "~/server/subscriptionHandler";
 

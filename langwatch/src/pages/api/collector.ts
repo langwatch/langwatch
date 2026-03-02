@@ -28,7 +28,6 @@ import {
   spanValidatorSchema,
 } from "../../server/tracer/types.generated";
 import { getApp } from "../../server/app-layer/app";
-import { SubscriptionHandler } from "../../server/subscriptionHandler";
 import { createLogger } from "../../utils/logger/server";
 
 const logger = createLogger("langwatch.collector");
@@ -98,9 +97,9 @@ async function handleCollectorRequest(
 
     if (limitResult.exceeded) {
       try {
-        const activePlan = await SubscriptionHandler.getActivePlan(
-          project.team.organizationId,
-        );
+        const activePlan = await getApp().planProvider.getActivePlan({
+          organizationId: project.team.organizationId,
+        });
         await notifyPlanLimitReached({
           organizationId: project.team.organizationId,
           planName: activePlan.name ?? "free",
