@@ -374,7 +374,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                   {errors.selectedTargets.message}
                 </Text>
               )}
-              {suiteForm.staleTargetIds.length > 0 && (
+              {suiteForm.archivedTargets.length > 0 && (
                 <HStack
                   gap={2}
                   padding={2}
@@ -385,9 +385,9 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                 >
                   <AlertTriangle size={14} color="var(--chakra-colors-orange-500)" />
                   <Text fontSize="xs" color="orange.700" _dark={{ color: "orange.200" }}>
-                    {suiteForm.staleTargetIds.length === 1
+                    {suiteForm.archivedTargets.length === 1
                       ? "1 target is no longer available and may have been deleted."
-                      : `${suiteForm.staleTargetIds.length} targets are no longer available and may have been deleted.`}
+                      : `${suiteForm.archivedTargets.length} targets are no longer available and may have been deleted.`}
                   </Text>
                 </HStack>
               )}

@@ -154,12 +154,6 @@ export function useSuiteForm({
     );
   }, [selectedTargets, availableTargets, agents, prompts]);
 
-  // -- Derived: stale target IDs (referenceId-only view of archivedTargets) --
-  const staleTargetIds = useMemo(
-    () => archivedTargets.map((t) => t.referenceId),
-    [archivedTargets],
-  );
-
   // -- Derived: unique scenario labels --
   const allLabels = useMemo(() => {
     if (!scenarios) return [];
@@ -319,7 +313,6 @@ export function useSuiteForm({
     filteredTargets,
     toggleTarget,
     isTargetSelected,
-    staleTargetIds,
 
     // Archived references
     archivedScenarioIds,

@@ -498,10 +498,9 @@ export class SuiteService {
   }): Promise<ResolvedTargetReferences> {
     const { targets, projectId, organizationId } = params;
 
-    // Partition targets by type
+    // Partition targets by type (parseSuiteTargets validates types upstream)
     const httpTargets = targets.filter((t) => t.type === "http");
     const promptTargets = targets.filter((t) => t.type === "prompt");
-    const unknownTargets = targets.filter((t) => t.type !== "http" && t.type !== "prompt");
 
     // Batch HTTP targets
     const httpRows = httpTargets.length > 0
@@ -542,10 +541,6 @@ export class SuiteService {
       } else {
         missing.push(target);
       }
-    }
-
-    for (const target of unknownTargets) {
-      missing.push(target);
     }
 
     return { active, archived, missing };

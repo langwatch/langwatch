@@ -83,12 +83,10 @@ function makeMockRepository(overrides: Partial<MockSuiteRepository> = {}): MockS
 }
 
 type MockScenarioRepository = {
-  findByIdIncludingArchived: ReturnType<typeof vi.fn>;
   findManyIncludingArchived: ReturnType<typeof vi.fn>;
 };
 
 type MockAgentRepository = {
-  findByIdIncludingArchived: ReturnType<typeof vi.fn>;
   findManyIncludingArchived: ReturnType<typeof vi.fn>;
 };
 
@@ -101,9 +99,6 @@ function makeMockScenarioRepository(
   overrides: Partial<MockScenarioRepository> = {},
 ): MockScenarioRepository {
   return {
-    findByIdIncludingArchived: vi.fn(({ id }: { id: string }) =>
-      Promise.resolve({ id, archivedAt: null }),
-    ),
     findManyIncludingArchived: vi.fn(({ ids }: { ids: string[] }) =>
       Promise.resolve(ids.map((id) => ({ id, archivedAt: null }))),
     ),
@@ -115,9 +110,6 @@ function makeMockAgentRepository(
   overrides: Partial<MockAgentRepository> = {},
 ): MockAgentRepository {
   return {
-    findByIdIncludingArchived: vi.fn(({ id }: { id: string }) =>
-      Promise.resolve({ id, archivedAt: null }),
-    ),
     findManyIncludingArchived: vi.fn(({ ids }: { ids: string[] }) =>
       Promise.resolve(ids.map((id) => ({ id, archivedAt: null }))),
     ),
