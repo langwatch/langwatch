@@ -47,25 +47,39 @@ async function scanSingleQueue(redis: IORedis, queueName: string): Promise<Queue
   for (const groupId of groupIdArr) {
     const jobsKey = `${prefix}group:${groupId}:jobs`;
     const activeKey = `${prefix}group:${groupId}:active`;
+    const errorKey = `${prefix}group:${groupId}:error`;
     pipeline.zcard(jobsKey);
     pipeline.get(activeKey);
     pipeline.zrange(jobsKey, 0, 0, "WITHSCORES");
     pipeline.zrange(jobsKey, -1, -1, "WITHSCORES");
     // Sample first job's data for pipeline metadata
     pipeline.zrange(jobsKey, 0, 0);
+    // Fetch error info for blocked groups
+    pipeline.hgetall(errorKey);
   }
 
   const pipelineResults = await pipeline.exec();
 
   // Batch fetch data for first jobs
+  const CMDS_PER_GROUP = 6;
   const firstJobIds: Array<{ groupId: string; jobId: string | null }> = [];
+  const groupErrors = new Map<string, { message: string; stack: string; timestamp: string }>();
   for (let i = 0; i < groupIdArr.length; i++) {
-    const base = i * 5;
+    const base = i * CMDS_PER_GROUP;
     const firstJobArr = (pipelineResults?.[base + 4]?.[1] as string[]) ?? [];
     firstJobIds.push({
       groupId: groupIdArr[i]!,
       jobId: firstJobArr[0] ?? null,
     });
+    // Extract error info
+    const errorHash = pipelineResults?.[base + 5]?.[1] as Record<string, string> | null;
+    if (errorHash && errorHash.message) {
+      groupErrors.set(groupIdArr[i]!, {
+        message: errorHash.message,
+        stack: errorHash.stack ?? "",
+        timestamp: errorHash.timestamp ?? "",
+      });
+    }
   }
 
   // Pipeline fetch job data for metadata sampling
@@ -82,7 +96,7 @@ async function scanSingleQueue(redis: IORedis, queueName: string): Promise<Queue
   const groups: GroupInfo[] = [];
   for (let i = 0; i < groupIdArr.length; i++) {
     const groupId = groupIdArr[i]!;
-    const base = i * 5;
+    const base = i * CMDS_PER_GROUP;
 
     const pendingJobs = (pipelineResults?.[base]?.[1] as number) ?? 0;
     const activeJobId = (pipelineResults?.[base + 1]?.[1] as string) ?? null;
@@ -108,10 +122,20 @@ async function scanSingleQueue(redis: IORedis, queueName: string): Promise<Queue
           jobType = parsed.__jobType ?? null;
           jobName = parsed.__jobName ?? null;
         } catch (err) {
-          console.warn(`Failed to parse job data for group ${groupId}:`, err);
+          console.warn(
+            JSON.stringify({
+              level: "warn",
+              msg: "Failed to parse job data",
+              groupId,
+              error: err instanceof Error ? err.message : "Parse error",
+            }),
+          );
         }
       }
     }
+
+    // Attach error info for blocked groups
+    const errorInfo = groupErrors.get(groupId);
 
     groups.push({
       groupId,
@@ -126,6 +150,9 @@ async function scanSingleQueue(redis: IORedis, queueName: string): Promise<Queue
       pipelineName,
       jobType,
       jobName,
+      errorMessage: errorInfo?.message ?? null,
+      errorStack: errorInfo?.stack ?? null,
+      errorTimestamp: errorInfo?.timestamp ? parseFloat(errorInfo.timestamp) : null,
     });
   }
 

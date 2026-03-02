@@ -1,10 +1,10 @@
 import { Router } from "express";
 import type IORedis from "ioredis";
-import { UNBLOCK_LUA, DRAIN_GROUP_LUA } from "../services/luaScripts.ts";
 import { retryJob } from "../services/bullmqService.ts";
+import { DRAIN_GROUP_LUA, UNBLOCK_LUA } from "../services/luaScripts.ts";
 
 function isValidGroupId(id: unknown): id is string {
-  return typeof id === "string" && id.length > 0 && id.length <= 512;
+	return typeof id === "string" && id.length > 0 && id.length <= 512;
 }
 
 export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => string[]): Router {
@@ -18,7 +18,7 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
     }
 
     if (!isValidGroupId(groupId)) {
-      res.status(400).json({ error: "Invalid groupId" });
+      res.status(400).json({ error: "Invalid groupId format" });
       return;
     }
 
@@ -29,12 +29,13 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
 
     const prefix = `${queueName}:gq:`;
     const result = await redis.eval(
-      UNBLOCK_LUA, 5,
+      UNBLOCK_LUA, 6,
       `${prefix}blocked`,
       `${prefix}group:${groupId}:active`,
       `${prefix}group:${groupId}:jobs`,
       `${prefix}ready`,
       `${prefix}signal`,
+      `${prefix}group:${groupId}:error`,
       groupId,
     );
 
@@ -59,12 +60,13 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
     let unblockedCount = 0;
     for (const groupId of blockedMembers) {
       const result = await redis.eval(
-        UNBLOCK_LUA, 5,
+        UNBLOCK_LUA, 6,
         `${prefix}blocked`,
         `${prefix}group:${groupId}:active`,
         `${prefix}group:${groupId}:jobs`,
         `${prefix}ready`,
         `${prefix}signal`,
+        `${prefix}group:${groupId}:error`,
         groupId,
       );
       if (result === 1) unblockedCount++;
@@ -92,13 +94,14 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
 
     const prefix = `${queueName}:gq:`;
     const result = await redis.eval(
-      DRAIN_GROUP_LUA, 6,
+      DRAIN_GROUP_LUA, 7,
       `${prefix}group:${groupId}:jobs`,
       `${prefix}group:${groupId}:data`,
       `${prefix}group:${groupId}:active`,
       `${prefix}ready`,
       `${prefix}blocked`,
       `${prefix}signal`,
+      `${prefix}group:${groupId}:error`,
       groupId,
     );
 
