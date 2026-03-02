@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getApp } from "~/server/app-layer";
+import { SubscriptionHandler } from "~/server/subscriptionHandler";
 import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -12,9 +12,9 @@ export const planRouter = createTRPCRouter({
     )
     .use(checkOrganizationPermission("organization:view"))
     .query(async ({ input, ctx }) => {
-      return await getApp().planProvider.getActivePlan({
-        organizationId: input.organizationId,
-        user: ctx.session.user,
-      });
+      return await SubscriptionHandler.getActivePlan(
+        input.organizationId,
+        ctx.session.user,
+      );
     }),
 });

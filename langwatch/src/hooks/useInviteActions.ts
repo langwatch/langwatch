@@ -24,7 +24,6 @@ export function useInviteActions({
   pricingModel,
   activePlanFree,
   activePlanType,
-  activePlanSource,
 }: {
   organizationId: string;
   isAdmin: boolean;
@@ -38,8 +37,6 @@ export function useInviteActions({
   activePlanFree: boolean;
   /** The active plan type string (e.g. "GROWTH_SEAT_EUR_MONTHLY"). */
   activePlanType: string;
-  /** Where the active plan came from ("license", "subscription", or "free"). */
-  activePlanSource?: "license" | "subscription" | "free";
 }) {
   const membersEnforcement = useLicenseEnforcement("members");
   const membersLiteEnforcement = useLicenseEnforcement("membersLite");
@@ -220,8 +217,8 @@ export function useInviteActions({
 
     // Over limit — decide which modal to show
     if (
-      activePlanSource === "subscription" &&
       pricingModel === "SEAT_EVENT" &&
+      !activePlanFree &&
       expandSeatsMutation
     ) {
       // SEAT_EVENT with active subscription — proration modal

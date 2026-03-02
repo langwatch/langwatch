@@ -107,18 +107,6 @@ export const createWebhookService = ({
     });
 
     if (previousSubscription.status !== SubscriptionStatus.ACTIVE) {
-      // Clear trial license — subscription supersedes it
-      if (updatedSubscription.organization.license) {
-        logger.info(
-          { organizationId: updatedSubscription.organizationId },
-          "[stripeWebhook] Clearing trial license — subscription activated",
-        );
-        await db.organization.update({
-          where: { id: updatedSubscription.organizationId },
-          data: { license: null, licenseExpiresAt: null, licenseLastValidatedAt: null },
-        });
-      }
-
       if (isGrowthSeatEventPlan(updatedSubscription.plan)) {
         const TIERED_PLAN_TYPES: PlanTypes[] = [
           PlanTypes.LAUNCH,
@@ -407,18 +395,6 @@ export const createWebhookService = ({
           },
           include: { organization: true },
         });
-
-        // Clear trial license if present — subscription supersedes it
-        if (updatedSubscription.organization.license) {
-          logger.info(
-            { organizationId: updatedSubscription.organizationId },
-            "[stripeWebhook] Clearing trial license — subscription updated to active",
-          );
-          await db.organization.update({
-            where: { id: updatedSubscription.organizationId },
-            data: { license: null, licenseExpiresAt: null, licenseLastValidatedAt: null },
-          });
-        }
 
         if (shouldNotify) {
           await notifySubscriptionEvent({

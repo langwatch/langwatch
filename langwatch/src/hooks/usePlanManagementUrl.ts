@@ -52,15 +52,12 @@ export function shouldShowPlanLimits({
   isFree,
   isEnterprise,
   pricingModel,
-  planSource,
 }: {
   isFree: boolean;
   isEnterprise: boolean;
   pricingModel: PricingModel | undefined | null;
-  planSource?: "license" | "subscription" | "free";
 }): boolean {
   if (isEnterprise) return false;
-  if (planSource === "license") return true; // License plans always have hard caps
   if (isFree) return true;
   return pricingModel !== PricingModel.SEAT_EVENT;
 }

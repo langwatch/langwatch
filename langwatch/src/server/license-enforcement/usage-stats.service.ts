@@ -1,6 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
-import type { PlanInfo } from "../../../ee/licensing/planInfo";
-import type { PlanProvider } from "../app-layer/subscription/plan-provider";
+import { SubscriptionHandler } from "~/server/subscriptionHandler";
 import { formatNumber, formatPercent } from "../../utils/formatNumber";
 import { getApp } from "../app-layer/app";
 import {
@@ -83,7 +82,9 @@ export interface UsageStats {
   projectsCount: number;
   currentMonthMessagesCount: number;
   currentMonthCost: number;
-  activePlan: PlanInfo;
+  activePlan: Awaited<
+    ReturnType<typeof SubscriptionHandler.getActivePlan>
+  >;
   maxMonthlyUsageLimit: number;
   membersCount: number;
   membersLiteCount: number;
@@ -103,8 +104,8 @@ export interface UsageStats {
  *
  * Coordinates between:
  * - LicenseEnforcementRepository (Prisma queries)
- * - UsageService (orchestrated counting via meter policy)
- * - PlanProvider (plan info)
+ * - TraceUsageService (Elasticsearch queries)
+ * - SubscriptionHandler (plan info)
  *
  * This is the proper service layer - routers call this instead of
  * manually wiring dependencies.
@@ -113,7 +114,7 @@ export class UsageStatsService {
   constructor(
     private readonly repository: ILicenseEnforcementRepository,
     private readonly traceUsageService: ITraceUsageService,
-    private readonly planProvider: PlanProvider,
+    private readonly subscriptionHandler: typeof SubscriptionHandler,
   ) {}
 
   /**
@@ -125,7 +126,7 @@ export class UsageStatsService {
     return new UsageStatsService(
       repository,
       getApp().usage,
-      getApp().planProvider,
+      SubscriptionHandler,
     );
   }
 
@@ -157,7 +158,7 @@ export class UsageStatsService {
       this.repository.getProjectCount(organizationId),
       this.traceUsageService.getCurrentMonthCount({ organizationId }),
       this.repository.getCurrentMonthCost(organizationId),
-      this.planProvider.getActivePlan({ organizationId, user }),
+      this.subscriptionHandler.getActivePlan(organizationId, user),
       this.getMaxMonthlyUsageLimit(organizationId),
       this.repository.getMemberCount(organizationId),
       this.repository.getMembersLiteCount(organizationId),

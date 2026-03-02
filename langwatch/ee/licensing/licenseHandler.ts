@@ -194,7 +194,7 @@ export class LicenseHandler {
     // Resolve defaults for optional plan fields
     const resolved = resolvePlanDefaults(plan);
 
-    // Get message count via orchestrated UsageService (applies meter policy)
+    // Get message count from TraceUsageService (Elasticsearch)
     // Returns 0 if service not provided (e.g., in tests)
     const messagesCountPromise = this.traceUsageService
       ? this.traceUsageService.getCurrentMonthCount({ organizationId })

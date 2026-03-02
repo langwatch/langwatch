@@ -141,10 +141,9 @@ export function SubscriptionPage() {
 
   const plan = activePlan.data;
   const isDeveloperPlan = plan?.free ?? true;
-  const isLicenseOverride = plan?.planSource === "license";
   const isTieredPricingModel = organization?.pricingModel === PricingModel.TIERED;
-  const isEnterprisePlan = plan?.type === "ENTERPRISE" && !isLicenseOverride;
-  const isTieredLegacyPaidPlan = isTieredPricingModel && !isDeveloperPlan && !isEnterprisePlan && !isLicenseOverride;
+  const isEnterprisePlan = plan?.type === "ENTERPRISE";
+  const isTieredLegacyPaidPlan = isTieredPricingModel && !isDeveloperPlan && !isEnterprisePlan;
 
   useEffect(() => {
     if (isTieredLegacyPaidPlan && plan && isAnnualTieredPlan(plan.type)) {
@@ -187,14 +186,14 @@ export function SubscriptionPage() {
     monthlyEquivalent,
   } = useBillingPricing({ currency: effectiveCurrency, billingPeriod: effectiveBillingPeriod, users, plannedUsers: allPlannedUsers });
 
-  // Free plan allows 1 extra seat beyond active members; license override uses existing member count; paid plan uses plan capacity
-  const effectiveMaxSeats = (isDeveloperPlan || isLicenseOverride) ? 1 : seatUsageM;
+  // Free plan allows 1 extra seat beyond active members; paid plan uses plan capacity
+  const effectiveMaxSeats = isDeveloperPlan ? 1 : seatUsageM;
 
   // Manual planned seats only (NOT pending invites — they're already in maxMembers)
   const newPlannedFullMembers = countFullMembers(plannedUsers);
 
   // Single source of truth for billing seat count (never below existing members)
-  const billingSeats = (isDeveloperPlan || isLicenseOverride)
+  const billingSeats = isDeveloperPlan
     ? Math.max(
         totalFullMembers,
         (effectiveMaxSeats ?? 0) + newPlannedFullMembers - deletedSeatCount
@@ -223,7 +222,7 @@ export function SubscriptionPage() {
     setDeletedSeatCount(result.deletedSeatCount);
 
     // 3. Paid plan: send invites immediately for already-paid seats
-    if (!isDeveloperPlan && !isLicenseOverride && result.inviteEmails.length > 0 && organization?.id) {
+    if (!isDeveloperPlan && result.inviteEmails.length > 0 && organization?.id) {
       createInvitesMutation.mutate({
         organizationId: organization.id,
         invites: result.inviteEmails.map((email) => ({
@@ -243,8 +242,8 @@ export function SubscriptionPage() {
       });
     }
 
-    // 4. Free plan or license override: auto-fill rows with email go to plannedUsers (for upgrade flow)
-    if ((isDeveloperPlan || isLicenseOverride) && result.inviteEmails.length > 0) {
+    // 4. Free plan: auto-fill rows with email go to plannedUsers (for upgrade flow)
+    if (isDeveloperPlan && result.inviteEmails.length > 0) {
       const inviteAsPlanned: PlannedUser[] = result.inviteEmails.map((email, i) => ({
         id: `invite-${Date.now()}-${i}`,
         email,
@@ -300,24 +299,20 @@ export function SubscriptionPage() {
     );
   }
 
-  const currentPlanName = isLicenseOverride
-    ? `License: ${plan.name ?? "Growth"}`
-    : isTieredPricingModel
-      ? (plan.name ?? formatPlanTypeLabel(plan.type))
-      : isDeveloperPlan
-        ? "Free plan"
-        : "Growth plan";
+  const currentPlanName = isTieredPricingModel
+    ? (plan.name ?? formatPlanTypeLabel(plan.type))
+    : isDeveloperPlan
+      ? "Free plan"
+      : "Growth plan";
   const currentPlanPricing =
-    isTieredPricingModel || isDeveloperPlan || isLicenseOverride
+    isTieredPricingModel || isDeveloperPlan
       ? undefined
       : {
           totalPrice: `${formatPrice({ cents: seatPricePerPeriodCents * (plan?.maxMembers ?? 1), currency: effectiveCurrency })}${periodSuffix}`,
           seatCount: plan?.maxMembers ?? 1,
           perSeatPrice: monthlyEquivalent,
         };
-  const currentPlanFeatures = isLicenseOverride
-    ? GROWTH_FEATURES
-    : isTieredLegacyPaidPlan
+  const currentPlanFeatures = isTieredLegacyPaidPlan
     ? buildTieredCapabilities({
       maxMembers: plan?.maxMembers ?? 0,
       maxMessagesPerMonth: plan?.maxMessagesPerMonth ?? 0,
@@ -336,11 +331,10 @@ export function SubscriptionPage() {
     !isDeveloperPlan &&
     !isTieredLegacyPaidPlan &&
     !isEnterprisePlan &&
-    !isLicenseOverride &&
     (plannedUsers.length > 0 || deletedSeatCount > 0);
   const isUpgradePlanRequired =
     ((isDeveloperPlan && (plannedUsers.length > 0 || deletedSeatCount > 0))
-    || isTieredLegacyPaidPlan || isDeveloperPlan || isLicenseOverride)
+    || (isTieredLegacyPaidPlan || isDeveloperPlan))
     && !isEnterprisePlan;
     const isUpgradePlanRequiredForFreePlan =
     ((isDeveloperPlan && (plannedUsers.length > 0 || deletedSeatCount > 0))
@@ -377,7 +371,7 @@ export function SubscriptionPage() {
             </Text>
           </VStack>
           <HStack gap={4} alignItems="center">
-            {(isDeveloperPlan || isTieredLegacyPaidPlan || isLicenseOverride) && !isEnterprisePlan && (
+            {(isDeveloperPlan || isTieredLegacyPaidPlan) && !isEnterprisePlan && (
               <>
                 <LabeledSwitch
                   data-testid="billing-period-toggle"
@@ -456,7 +450,7 @@ export function SubscriptionPage() {
           upgradeRequired={updateRequired}
           onUserCountClick={() => setIsDrawerOpen(true)}
           onManageSubscription={
-            !isDeveloperPlan && !isEnterprisePlan && !isLicenseOverride ? handleManageSubscription : undefined
+            !isDeveloperPlan && !isEnterprisePlan ? handleManageSubscription : undefined
           }
           isManageLoading={isManageLoading}
           deprecatedNotice={isTieredLegacyPaidPlan}
