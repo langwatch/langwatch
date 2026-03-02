@@ -58,6 +58,7 @@ export class EventSourcingService<
     foldProjections,
     mapProjections,
     reactors,
+    mapReactors,
     serviceOptions,
     logger,
     globalQueue,
@@ -128,6 +129,13 @@ export class EventSourcingService<
       }
     }
 
+    // Register reactors on their map projections
+    if (mapReactors) {
+      for (const { mapName, definition } of mapReactors) {
+        this.router.registerMapReactor(mapName, definition);
+      }
+    }
+
     // All processes register all entries — the shared pipeline queue's Worker
     // must know every job type so it can dispatch any job it picks up.
     if (globalQueue && mapProjections && mapProjections.length > 0) {
@@ -138,7 +146,7 @@ export class EventSourcingService<
       this.router.initializeFoldQueues();
     }
 
-    if (globalQueue && reactors && reactors.length > 0) {
+    if (globalQueue && ((reactors && reactors.length > 0) || (mapReactors && mapReactors.length > 0))) {
       this.router.initializeReactorQueues();
     }
 
