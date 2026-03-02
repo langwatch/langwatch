@@ -42,28 +42,26 @@ Feature: Message/Trace Limit Enforcement with License
       | planName            | PRO    |
 
   # ============================================================================
-  # Invalid/Expired License (Temporary Self-Hosted Compatibility)
-  # NOTE: Transitional policy — during compatibility window, self-hosted fallback
-  # FREE plan does not block trace ingestion. This will be lifted in a future PR.
+  # Invalid/Expired License (FREE Tier)
   # ============================================================================
 
-  Scenario: Expired license does not block ingestion during compatibility window
+  Scenario: Expired license enforces FREE tier message limit of 1000
     Given the organization has an expired license
     And the organization has 1000 traces this month
     When I check the trace limit for team "team-456"
-    Then exceeded is false
+    Then exceeded is true
 
-  Scenario: Invalid license does not block ingestion during compatibility window
+  Scenario: Invalid license enforces FREE tier message limit
     Given the organization has an invalid license signature
     And the organization has 500 traces this month
     When I check the trace limit for team "team-456"
     Then exceeded is false
 
-  Scenario: Invalid license remains unblocked even at FREE tier count during compatibility window
+  Scenario: Invalid license reports exceeded at FREE limit
     Given the organization has an invalid license signature
     And the organization has 1000 traces this month
     When I check the trace limit for team "team-456"
-    Then exceeded is false
+    Then exceeded is true
 
   # ============================================================================
   # Caching Behavior

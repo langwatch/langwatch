@@ -127,7 +127,6 @@ function Usage() {
     isFree: saasPlan?.free ?? true,
     isEnterprise: saasPlan?.type === PlanTypes.ENTERPRISE,
     pricingModel: organization?.pricingModel,
-    planSource: saasPlan?.planSource,
   });
   const saasActionLabel = getPlanActionLabel({
     isSaaS: true,

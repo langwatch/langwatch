@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
-import { getApp } from "../app-layer/app";
+import { SubscriptionHandler } from "~/server/subscriptionHandler";
 import { LicenseEnforcementRepository } from "./license-enforcement.repository";
 import { LicenseEnforcementService } from "./license-enforcement.service";
 
@@ -10,7 +10,7 @@ export { limitTypes, limitTypeSchema } from "./types";
 export { LIMIT_TYPE_LABELS, LIMIT_TYPE_DISPLAY_LABELS } from "./constants";
 export type { LimitType, LimitCheckResult } from "./types";
 export type { ILicenseEnforcementRepository } from "./license-enforcement.repository";
-export type { PlanProvider } from "../app-layer/subscription/plan-provider";
+export type { PlanProvider } from "./license-enforcement.service";
 
 // Re-export utilities for router usage
 export { getOrganizationIdForProject } from "./utils";
@@ -42,6 +42,6 @@ export function createLicenseEnforcementService(
 ): LicenseEnforcementService {
   return new LicenseEnforcementService(
     new LicenseEnforcementRepository(prisma),
-    getApp().planProvider,
+    SubscriptionHandler,
   );
 }

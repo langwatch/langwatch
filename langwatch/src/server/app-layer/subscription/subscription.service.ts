@@ -9,8 +9,9 @@ export type BillingInterval = "monthly" | "annual";
  * Manages Stripe subscription lifecycle -- creating checkouts, updating items,
  * cancelling, billing portal. Answers: "how do we change what this organization pays for?"
  *
- * Plan/limit resolution ("what can this organization do?") lives in `PlanProvider`
- * (`src/server/app-layer/subscription/plan-provider.ts`), accessed via `getApp().planProvider`.
+ * NOT to be confused with `SubscriptionHandler` (at `src/server/subscriptionHandler.ts`)
+ * which resolves plan limits (`getActivePlan`) and answers: "what can this organization do?"
+ * These are separate concerns with separate refactor paths.
  */
 export interface SubscriptionService {
   updateSubscriptionItems(params: {
