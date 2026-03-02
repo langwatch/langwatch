@@ -1,4 +1,33 @@
 import type { LicensePlanLimits } from "./types";
+import { DEFAULT_LIMIT } from "./constants";
+
+/**
+ * GROWTH plan template with unlimited limits except maxMembers.
+ * maxMembers must be supplied at generation time (from Stripe seat quantity).
+ * Used for self-serving license purchases.
+ */
+export const GROWTH_TEMPLATE: Omit<LicensePlanLimits, "maxMembers"> = {
+  type: "GROWTH",
+  name: "Growth",
+  maxMembersLite: DEFAULT_LIMIT,
+  maxTeams: DEFAULT_LIMIT,
+  maxProjects: DEFAULT_LIMIT,
+  maxMessagesPerMonth: DEFAULT_LIMIT,
+  evaluationsCredit: DEFAULT_LIMIT,
+  maxWorkflows: DEFAULT_LIMIT,
+  maxPrompts: DEFAULT_LIMIT,
+  maxEvaluators: DEFAULT_LIMIT,
+  maxScenarios: DEFAULT_LIMIT,
+  maxAgents: DEFAULT_LIMIT,
+  maxExperiments: DEFAULT_LIMIT,
+  maxOnlineEvaluations: DEFAULT_LIMIT,
+  maxDatasets: DEFAULT_LIMIT,
+  maxDashboards: DEFAULT_LIMIT,
+  maxCustomGraphs: DEFAULT_LIMIT,
+  maxAutomations: DEFAULT_LIMIT,
+  canPublish: true,
+  usageUnit: "events",
+};
 
 /**
  * PRO plan template with standard limits.
@@ -59,11 +88,17 @@ export const ENTERPRISE_TEMPLATE: LicensePlanLimits = {
 /**
  * Returns the plan template for a given plan type.
  *
- * @param planType - The plan type (PRO, ENTERPRISE, or CUSTOM)
- * @returns The plan template or null for CUSTOM/unknown types
+ * @param planType - The plan type (PRO, ENTERPRISE, GROWTH, or CUSTOM)
+ * @returns The plan template or null for CUSTOM/unknown types.
+ *          GROWTH returns Omit<LicensePlanLimits, "maxMembers"> since
+ *          maxMembers must be supplied at generation time.
  */
-export function getPlanTemplate(planType: string): LicensePlanLimits | null {
+export function getPlanTemplate(
+  planType: string
+): LicensePlanLimits | Omit<LicensePlanLimits, "maxMembers"> | null {
   switch (planType) {
+    case "GROWTH":
+      return GROWTH_TEMPLATE;
     case "PRO":
       return PRO_TEMPLATE;
     case "ENTERPRISE":

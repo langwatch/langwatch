@@ -113,11 +113,17 @@ export function createEnvConfig() {
       CLICKHOUSE_CLUSTER: z.string().optional(),
 
       LANGWATCH_LICENSE_PUBLIC_KEY: z.string().optional(),
+      LANGWATCH_LICENSE_PRIVATE_KEY: z.string().optional(),
 
       // Stripe
       STRIPE_SECRET_KEY: z.string().optional(),
       STRIPE_WEBHOOK_SECRET: z.string().optional(),
+      STRIPE_LICENSE_PAYMENT_LINK_ID: z.string().optional(),
+      STRIPE_LICENSE_PAYMENT_LINK_URL: z.string().optional(),
       ADMIN_EMAILS: z.string().optional(),
+
+      // Notifications
+      SLACK_LICENSE_WEBHOOK_URL: z.string().optional(),
     },
 
     /**
@@ -219,9 +225,13 @@ export function createEnvConfig() {
         process.env.ENABLE_CLICKHOUSE?.toLowerCase() === "true",
       CLICKHOUSE_CLUSTER: process.env.CLICKHOUSE_CLUSTER,
       LANGWATCH_LICENSE_PUBLIC_KEY: process.env.LANGWATCH_LICENSE_PUBLIC_KEY,
+      LANGWATCH_LICENSE_PRIVATE_KEY: process.env.LANGWATCH_LICENSE_PRIVATE_KEY,
       STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
       STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+      STRIPE_LICENSE_PAYMENT_LINK_ID: process.env.STRIPE_LICENSE_PAYMENT_LINK_ID,
+      STRIPE_LICENSE_PAYMENT_LINK_URL: process.env.STRIPE_LICENSE_PAYMENT_LINK_URL,
       ADMIN_EMAILS: process.env.ADMIN_EMAILS,
+      SLACK_LICENSE_WEBHOOK_URL: process.env.SLACK_LICENSE_WEBHOOK_URL,
     },
     /**
      * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.

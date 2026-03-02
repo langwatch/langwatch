@@ -1,15 +1,26 @@
-import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
+import {
+  SESClient,
+  SendEmailCommand,
+  SendRawEmailCommand,
+} from "@aws-sdk/client-ses";
 import sgMail from "@sendgrid/mail";
 import { env } from "../../env.mjs";
 import { createLogger } from "../../utils/logger/server";
 
 const logger = createLogger("langwatch:mailer:emailSender");
 
+export type EmailAttachment = {
+  filename: string;
+  content: string;
+  contentType: string;
+};
+
 type EmailContent = {
   to: string | string[];
   subject: string;
   html: string;
   from?: string;
+  attachments?: EmailAttachment[];
 };
 
 const extractHostname = (baseHost: string): string => {
@@ -53,31 +64,83 @@ export const sendEmail = async (content: EmailContent) => {
   }
 };
 
+const buildRawMimeMessage = ({
+  from,
+  to,
+  subject,
+  html,
+  attachments,
+}: {
+  from: string;
+  to: string[];
+  subject: string;
+  html: string;
+  attachments: EmailAttachment[];
+}): string => {
+  const boundary = `----=_Part_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+  const lines = [
+    `From: ${from}`,
+    `To: ${to.join(", ")}`,
+    `Subject: ${subject}`,
+    `MIME-Version: 1.0`,
+    `Content-Type: multipart/mixed; boundary="${boundary}"`,
+    ``,
+    `--${boundary}`,
+    `Content-Type: text/html; charset=UTF-8`,
+    `Content-Transfer-Encoding: 7bit`,
+    ``,
+    html,
+  ];
+
+  for (const attachment of attachments) {
+    const base64Content = Buffer.from(attachment.content).toString("base64");
+    lines.push(
+      `--${boundary}`,
+      `Content-Type: ${attachment.contentType}; name="${attachment.filename}"`,
+      `Content-Disposition: attachment; filename="${attachment.filename}"`,
+      `Content-Transfer-Encoding: base64`,
+      ``,
+      base64Content,
+    );
+  }
+
+  lines.push(`--${boundary}--`);
+  return lines.join("\r\n");
+};
+
 const sendWithSES = async (content: EmailContent, defaultFrom: string) => {
   logger.info("Sending email using AWS SES");
   const sesClient = new SESClient({ region: env.AWS_REGION });
-
-  const params = {
-    Destination: {
-      ToAddresses: Array.isArray(content.to) ? content.to : [content.to],
-    },
-    Message: {
-      Body: {
-        Html: {
-          Charset: "UTF-8",
-          Data: content.html,
-        },
-      },
-      Subject: {
-        Charset: "UTF-8",
-        Data: content.subject,
-      },
-    },
-    Source: content.from ?? defaultFrom,
-  };
+  const from = content.from ?? defaultFrom;
+  const toAddresses = Array.isArray(content.to) ? content.to : [content.to];
 
   try {
-    const command = new SendEmailCommand(params);
+    if (content.attachments && content.attachments.length > 0) {
+      const rawMessage = buildRawMimeMessage({
+        from,
+        to: toAddresses,
+        subject: content.subject,
+        html: content.html,
+        attachments: content.attachments,
+      });
+
+      const command = new SendRawEmailCommand({
+        RawMessage: { Data: new TextEncoder().encode(rawMessage) },
+      });
+      const data = await sesClient.send(command);
+      logger.info({ data }, "Email with attachments sent successfully");
+      return data;
+    }
+
+    const command = new SendEmailCommand({
+      Destination: { ToAddresses: toAddresses },
+      Message: {
+        Body: { Html: { Charset: "UTF-8", Data: content.html } },
+        Subject: { Charset: "UTF-8", Data: content.subject },
+      },
+      Source: from,
+    });
     const data = await sesClient.send(command);
     logger.info({ data }, "Email sent successfully");
     return data;
@@ -95,6 +158,15 @@ const sendWithSendGrid = async (content: EmailContent, defaultFrom: string) => {
     from: content.from ?? defaultFrom,
     subject: content.subject,
     html: content.html,
+    ...(content.attachments &&
+      content.attachments.length > 0 && {
+        attachments: content.attachments.map((att) => ({
+          content: Buffer.from(att.content).toString("base64"),
+          filename: att.filename,
+          type: att.contentType,
+          disposition: "attachment" as const,
+        })),
+      }),
   };
 
   try {
