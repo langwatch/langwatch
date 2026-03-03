@@ -168,7 +168,7 @@ export async function createAgentTestTrace({
   const outputValue = {
     ...(result.status !== undefined ? { status: result.status } : {}),
     ...(result.response !== undefined ? { body: result.response } : {}),
-    ...(result.extractedOutput
+    ...(result.extractedOutput !== undefined
       ? { extracted_output: result.extractedOutput }
       : {}),
     ...(result.error ? { error: result.error } : {}),
