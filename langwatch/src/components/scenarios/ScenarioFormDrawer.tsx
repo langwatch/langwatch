@@ -2,7 +2,7 @@ import { Grid, GridItem, Heading } from "@chakra-ui/react";
 import type { Scenario } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
-import { getComplexProps, useDrawer, useDrawerParams } from "../../hooks/useDrawer";
+import { getComplexProps, setFlowCallbacks, useDrawer, useDrawerParams } from "../../hooks/useDrawer";
 import { checkCompoundLimits } from "../../hooks/useCompoundLicenseCheck";
 import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -10,7 +10,7 @@ import { useRunScenario } from "../../hooks/useRunScenario";
 import { useScenarioTarget } from "../../hooks/useScenarioTarget";
 import { api } from "../../utils/api";
 import { isHandledByGlobalLicenseHandler } from "../../utils/trpcError";
-import { AgentHttpEditorDrawer } from "../agents/AgentHttpEditorDrawer";
+import type { TypedAgent } from "../../server/agents/agent.repository";
 import { PromptEditorDrawer } from "../prompts/PromptEditorDrawer";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
@@ -60,7 +60,6 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const { target: persistedTarget, setTarget: persistTarget } =
     useScenarioTarget(scenarioId);
   const [selectedTarget, setSelectedTarget] = useState<TargetValue>(null);
-  const [agentDrawerOpen, setAgentDrawerOpen] = useState(false);
   const [promptDrawerOpen, setPromptDrawerOpen] = useState(false);
 
   // Initialize from persisted target when scenario loads
@@ -80,6 +79,23 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     },
     [persistTarget, scenarioId],
   );
+  const handleCreateAgent = useCallback(() => {
+    const onAgentSaved = (agent: TypedAgent) => {
+      const targetType = agent.type as NonNullable<TargetValue>["type"];
+      handleTargetChange({ type: targetType, id: agent.id });
+      toaster.create({
+        title: "Agent created",
+        description: `"${agent.name}" is now selected as the target.`,
+        type: "success",
+        meta: { closable: true },
+      });
+    };
+    setFlowCallbacks("agentHttpEditor", { onSave: onAgentSaved });
+    setFlowCallbacks("agentCodeEditor", { onSave: onAgentSaved });
+    setFlowCallbacks("workflowSelector", { onSave: onAgentSaved });
+    openDrawer("agentTypeSelector");
+  }, [handleTargetChange, openDrawer]);
+
   const isOpen = props.open !== false && props.open !== undefined;
   const onClose = props.onClose ?? closeDrawer;
   const { data: scenario } = api.scenarios.getById.useQuery(
@@ -294,29 +310,12 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
             onTargetChange={handleTargetChange}
             onSaveAndRun={handleSaveAndRun}
             onSaveWithoutRunning={handleSaveWithoutRunning}
-            onCreateAgent={() => setAgentDrawerOpen(true)}
+            onCreateAgent={handleCreateAgent}
             onCreatePrompt={() => setPromptDrawerOpen(true)}
             isLoading={isSubmitting}
           />
         </Drawer.Footer>
       </Drawer.Content>
-
-      {/* Agent Creation Drawer */}
-      <AgentHttpEditorDrawer
-        open={agentDrawerOpen}
-        onClose={() => setAgentDrawerOpen(false)}
-        onSave={(agent) => {
-          // Auto-select the newly created agent
-          handleTargetChange({ type: "http", id: agent.id });
-          setAgentDrawerOpen(false);
-          toaster.create({
-            title: "Agent created",
-            description: `"${agent.name}" is now selected as the target.`,
-            type: "success",
-            meta: { closable: true },
-          });
-        }}
-      />
 
       {/* Prompt Creation Drawer */}
       <PromptEditorDrawer
