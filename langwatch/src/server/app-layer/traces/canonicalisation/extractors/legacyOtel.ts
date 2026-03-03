@@ -24,8 +24,7 @@
  */
 
 import { ATTR_KEYS } from "./_constants";
-import { ALLOWED_SPAN_TYPES, inferSpanTypeIfAbsent, recordValueType } from "./_extraction";
-import { isNonEmptyString } from "./_guards";
+import { ALLOWED_SPAN_TYPES, extractErrorInfo, inferSpanTypeIfAbsent, recordValueType } from "./_extraction";
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 
 export class LegacyOtelTracesExtractor implements CanonicalAttributesExtractor {
@@ -133,46 +132,11 @@ export class LegacyOtelTracesExtractor implements CanonicalAttributesExtractor {
 
     // ─────────────────────────────────────────────────────────────────────────
     // Error Type Inference
-    // Consolidates various error indicators into error.type
-    // Priority: span.error > exception > status.message
+    // Delegates to shared extractErrorInfo for consistent behavior across
+    // all extractors. Priority: span.error > exception > status.message
     // ─────────────────────────────────────────────────────────────────────────
     if (!attrs.has(ATTR_KEYS.ERROR_TYPE)) {
-      const exceptionType = attrs.get(ATTR_KEYS.EXCEPTION_TYPE);
-      const exceptionMsg = attrs.get(ATTR_KEYS.EXCEPTION_MESSAGE);
-      const statusMsg = attrs.get(ATTR_KEYS.STATUS_MESSAGE);
-
-      const spanErrorHas =
-        attrs.get(ATTR_KEYS.SPAN_ERROR_HAS_ERROR) ??
-        attrs.get(ATTR_KEYS.ERROR_HAS_ERROR);
-      const spanErrorMsg =
-        attrs.get(ATTR_KEYS.SPAN_ERROR_MESSAGE) ??
-        attrs.get(ATTR_KEYS.ERROR_MESSAGE);
-
-      // Priority 1: Explicit span error flag with message
-      if (
-        typeof spanErrorHas === "boolean" &&
-        spanErrorHas &&
-        isNonEmptyString(spanErrorMsg)
-      ) {
-        ctx.setAttrIfAbsent(ATTR_KEYS.ERROR_TYPE, spanErrorMsg);
-        ctx.recordRule(`${this.id}:error(span.error)`);
-      }
-      // Priority 2: Exception type and message
-      else if (
-        isNonEmptyString(exceptionType) &&
-        isNonEmptyString(exceptionMsg)
-      ) {
-        ctx.setAttrIfAbsent(
-          ATTR_KEYS.ERROR_TYPE,
-          `${exceptionType}: ${exceptionMsg}`,
-        );
-        ctx.recordRule(`${this.id}:error(exception)`);
-      }
-      // Priority 3: Status message fallback
-      else if (isNonEmptyString(statusMsg)) {
-        ctx.setAttrIfAbsent(ATTR_KEYS.ERROR_TYPE, statusMsg);
-        ctx.recordRule(`${this.id}:error(status.message)`);
-      }
+      extractErrorInfo(ctx);
     }
   }
 }

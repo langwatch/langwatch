@@ -20,8 +20,6 @@ const RESERVED_ATTRIBUTE_MAPPINGS: Record<string, keyof TraceMetadata> = {
   "gen_ai.conversation.id": "thread_id",
   "langwatch.user_id": "user_id",
   "langwatch.customer_id": "customer_id",
-  // LangGraph thread ID (forwarded from fold projection)
-  "langgraph.thread_id": "thread_id",
   // SDK info (extracted from resource attributes)
   "sdk.name": "sdk_name",
   "sdk.version": "sdk_version",
@@ -29,6 +27,15 @@ const RESERVED_ATTRIBUTE_MAPPINGS: Record<string, keyof TraceMetadata> = {
   "telemetry.sdk.name": "telemetry_sdk_name",
   "telemetry.sdk.version": "telemetry_sdk_version",
   "telemetry.sdk.language": "telemetry_sdk_language",
+};
+
+/**
+ * Lower-priority attribute mappings: only applied if the target metadata
+ * field is not already set by a primary mapping above.
+ */
+const FALLBACK_ATTRIBUTE_MAPPINGS: Record<string, keyof TraceMetadata> = {
+  // LangGraph thread ID — gen_ai.conversation.id takes precedence
+  "langgraph.thread_id": "thread_id",
 };
 
 /**
@@ -44,12 +51,22 @@ export function mapAttributesToMetadata(
 ): TraceMetadata {
   const metadata: TraceMetadata = {};
 
-  // Map known attributes to reserved fields
+  // Map known attributes to reserved fields (primary — last-wins within this set)
   for (const [attrKey, metadataKey] of Object.entries(
     RESERVED_ATTRIBUTE_MAPPINGS,
   )) {
     const value = attributes[attrKey];
     if (value !== void 0) {
+      metadata[metadataKey] = value;
+    }
+  }
+
+  // Map fallback attributes (only if target field not already set)
+  for (const [attrKey, metadataKey] of Object.entries(
+    FALLBACK_ATTRIBUTE_MAPPINGS,
+  )) {
+    const value = attributes[attrKey];
+    if (value !== void 0 && metadata[metadataKey] === undefined) {
       metadata[metadataKey] = value;
     }
   }
@@ -92,6 +109,7 @@ export function mapAttributesToMetadata(
   // Add remaining attributes as custom metadata
   const knownKeys = new Set([
     ...Object.keys(RESERVED_ATTRIBUTE_MAPPINGS),
+    ...Object.keys(FALLBACK_ATTRIBUTE_MAPPINGS),
     "langwatch.labels",
     "labels",
     "langwatch.prompt_ids",

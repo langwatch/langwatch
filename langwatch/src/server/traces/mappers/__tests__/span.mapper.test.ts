@@ -142,6 +142,20 @@ describe("mapNormalizedSpanToSpan", () => {
       expect(result.metrics).toBeNull();
     });
 
+    it("preserves metrics when only tokensEstimated is set", () => {
+      const span = makeSpan({
+        spanAttributes: {
+          "langwatch.span.type": "llm",
+          "langwatch.tokens.estimated": true,
+        },
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect(result.metrics).not.toBeNull();
+      expect(result.metrics?.tokens_estimated).toBe(true);
+    });
+
     it("coerces string token values to numbers", () => {
       const span = makeSpan({
         spanAttributes: {
@@ -236,7 +250,7 @@ describe("unflattenDotNotation", () => {
       });
       expect(result.safe).toBe("ok");
       expect(result.polluted).toBeUndefined();
-      expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
+      expect(Object.getPrototypeOf(result)).toBe(null);
     });
 
     it("skips constructor keys", () => {

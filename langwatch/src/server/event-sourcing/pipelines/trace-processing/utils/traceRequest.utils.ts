@@ -1,4 +1,5 @@
 import { TraceState } from "@opentelemetry/core";
+import { safeUnflatten } from "~/utils/safeUnflatten";
 import type { Fixed64 } from "@opentelemetry/otlp-transformer-next/build/esm/common/internal-types";
 import {
   ESpanKind,
@@ -379,6 +380,7 @@ const isValidArrayPattern = (
 
 /**
  * Reconstructs a nested object from flattened key-value pairs.
+ * Delegates to shared safeUnflatten for prototype pollution protection.
  *
  * For input:
  *   Map { "message.content" => "hello", "message.role" => "user" }
@@ -389,25 +391,11 @@ const isValidArrayPattern = (
 const unflattenObject = (
   flatMap: Map<string, unknown>,
 ): Record<string, unknown> => {
-  const result: Record<string, unknown> = {};
-
-  for (const [path, value] of flatMap) {
-    const parts = path.split(SEP);
-    let current: Record<string, unknown> = result;
-
-    for (let i = 0; i < parts.length - 1; i++) {
-      const part = parts[i]!;
-      if (!(part in current)) {
-        current[part] = {};
-      }
-      current = current[part] as Record<string, unknown>;
-    }
-
-    const lastPart = parts[parts.length - 1]!;
-    current[lastPart] = value;
+  const record: Record<string, unknown> = Object.create(null);
+  for (const [k, v] of flatMap) {
+    record[k] = v;
   }
-
-  return result;
+  return safeUnflatten(record);
 };
 
 /**
@@ -619,4 +607,6 @@ export const TraceRequestUtils = {
   convertUnixNanoToUnixMs,
   parseTraceFlags,
   parseTraceState,
+  /** @internal Exported for unit testing */
+  reconstructFlattenedArrays,
 };

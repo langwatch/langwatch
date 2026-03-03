@@ -252,13 +252,13 @@ function extractTokenTimingFromSpan(span: NormalizedSpan): SpanTokenTiming {
   for (const event of span.events) {
     const timeDelta = event.timeUnixMs - span.startTimeUnixMs;
 
-    if (FIRST_TOKEN_EVENTS.has(event.name)) {
+    if (timeDelta >= 0 && FIRST_TOKEN_EVENTS.has(event.name)) {
       if (timeToFirstToken === null || timeDelta < timeToFirstToken) {
         timeToFirstToken = timeDelta;
       }
     }
 
-    if (LAST_TOKEN_EVENTS.has(event.name)) {
+    if (timeDelta >= 0 && LAST_TOKEN_EVENTS.has(event.name)) {
       if (timeToLastToken === null || timeDelta > timeToLastToken) {
         timeToLastToken = timeDelta;
       }

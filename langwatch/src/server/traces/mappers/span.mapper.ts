@@ -3,6 +3,7 @@ import type {
   NormalizedSpan,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { NormalizedStatusCode } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import { safeUnflatten } from "~/utils/safeUnflatten";
 import type {
   BaseSpan,
   ChatMessage,
@@ -197,7 +198,8 @@ function extractMetrics(
     reasoningTokens === null &&
     cost === null &&
     cacheReadInputTokens === null &&
-    cacheCreationInputTokens === null
+    cacheCreationInputTokens === null &&
+    typeof tokensEstimated !== "boolean"
   ) {
     return null;
   }
@@ -301,37 +303,16 @@ function extractError(
  * Converts flat dot-notation keys into nested objects.
  * e.g. {"gen_ai.usage.input_tokens": 100} → {"gen_ai": {"usage": {"input_tokens": 100}}}
  * Keys without dots stay at top level. Leaf values (arrays, objects, scalars) stay as-is.
+ *
+ * Delegates to shared safeUnflatten utility which uses Object.create(null)
+ * and DANGEROUS_KEYS blocklist for prototype pollution protection.
+ *
+ * @internal Exported for unit testing
  */
-const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
-
-/** @internal Exported for unit testing */
 export function unflattenDotNotation(
   flat: NormalizedAttributes,
 ): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(flat)) {
-    const parts = key.split(".");
-    if (parts.length === 1) {
-      if (DANGEROUS_KEYS.has(key)) continue;
-      result[key] = value;
-      continue;
-    }
-    let current = result;
-    let skip = false;
-    for (let i = 0; i < parts.length - 1; i++) {
-      const part = parts[i]!;
-      if (DANGEROUS_KEYS.has(part)) { skip = true; break; }
-      if (!(part in current) || typeof current[part] !== "object" || current[part] === null || Array.isArray(current[part])) {
-        current[part] = {};
-      }
-      current = current[part] as Record<string, unknown>;
-    }
-    if (skip) continue;
-    const leaf = parts[parts.length - 1]!;
-    if (DANGEROUS_KEYS.has(leaf)) continue;
-    current[leaf] = value;
-  }
-  return result;
+  return safeUnflatten(flat as Record<string, unknown>);
 }
 
 /**

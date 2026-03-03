@@ -1,5 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { WithDateWrites } from "~/server/clickhouse/types";
+import type { NormalizedSpanKind } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import type { NormalizedStatusCode } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { mapNormalizedSpansToSpans } from "~/server/traces/mappers/span.mapper";
 import type { Span } from "~/server/tracer/types";
@@ -12,6 +14,48 @@ const TABLE_NAME = "stored_spans" as const;
 const logger = createLogger(
   "langwatch:app-layer:traces:span-storage-repository",
 );
+
+/**
+ * Deserializes attribute values read from ClickHouse Map(String, String) columns.
+ * Reverses serializeAttributes: parses JSON strings back to objects/arrays,
+ * converts "true"/"false" to booleans, and numeric strings to numbers.
+ *
+ * @internal Exported for unit testing
+ */
+export function deserializeAttributes(
+  attrs: Record<string, string>,
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(attrs)) {
+    // Boolean strings
+    if (value === "true") { result[key] = true; continue; }
+    if (value === "false") { result[key] = false; continue; }
+
+    // JSON objects and arrays
+    const trimmed = value.trim();
+    if (
+      (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+      (trimmed.startsWith("[") && trimmed.endsWith("]"))
+    ) {
+      try {
+        result[key] = JSON.parse(trimmed);
+        continue;
+      } catch {
+        // Not valid JSON, fall through
+      }
+    }
+
+    // Numeric strings (non-empty, finite)
+    if (trimmed !== "" && Number.isFinite(Number(trimmed))) {
+      result[key] = Number(trimmed);
+      continue;
+    }
+
+    // Keep as string
+    result[key] = value;
+  }
+  return result;
+}
 
 /**
  * Serializes attribute values for ClickHouse Map(String, String) columns.
@@ -204,10 +248,10 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         endTimeUnixMs: row.EndTime,
         durationMs: row.DurationMs,
         name: row.SpanName,
-        kind: row.SpanKind,
-        resourceAttributes: row.ResourceAttributes,
-        spanAttributes: row.SpanAttributes,
-        statusCode: row.StatusCode,
+        kind: row.SpanKind as NormalizedSpanKind,
+        resourceAttributes: deserializeAttributes(row.ResourceAttributes as Record<string, string>),
+        spanAttributes: deserializeAttributes(row.SpanAttributes as Record<string, string>),
+        statusCode: row.StatusCode as NormalizedStatusCode | null,
         statusMessage: row.StatusMessage,
         instrumentationScope: {
           name: row.ScopeName ?? "",
@@ -216,20 +260,19 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         events: (row.Events_Timestamp ?? []).map((ts, i) => ({
           name: row.Events_Name?.[i] ?? "",
           timeUnixMs: ts,
-          attributes: row.Events_Attributes?.[i] ?? {},
+          attributes: deserializeAttributes((row.Events_Attributes?.[i] ?? {}) as Record<string, string>),
         })),
         links: (row.Links_TraceId ?? []).map((lt, i) => ({
           traceId: lt,
           spanId: row.Links_SpanId?.[i] ?? "",
-          attributes: row.Links_Attributes?.[i] ?? {},
+          attributes: deserializeAttributes((row.Links_Attributes?.[i] ?? {}) as Record<string, string>),
         })),
-        droppedAttributesCount: 0,
-        droppedEventsCount: 0,
-        droppedLinksCount: 0,
+        droppedAttributesCount: 0 as const,
+        droppedEventsCount: 0 as const,
+        droppedLinksCount: 0 as const,
       }));
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return mapNormalizedSpansToSpans(normalizedSpans as any);
+      return mapNormalizedSpansToSpans(normalizedSpans);
     } catch (error) {
       logger.error(
         {
