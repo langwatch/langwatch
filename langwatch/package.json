@@ -18,6 +18,7 @@
     "lint": "pnpm exec biome check src/",
     "lint:fix": "pnpm exec biome check src/ --write",
     "format": "pnpm exec biome format src/ --write",
+    "postinstall": "git rev-parse --git-dir > /dev/null 2>&1 && git config core.hooksPath .githooks || true",
     "dev": "pnpm run start:prepare:files && NODE_ENV=development START_WORKERS=true pnpm start",
     "start": "./scripts/start.sh",
     "start:app": "tsx src/server.ts",
