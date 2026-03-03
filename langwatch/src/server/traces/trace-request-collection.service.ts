@@ -3,6 +3,7 @@ import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer
 import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "../../utils/logger/server";
 import { getApp } from "../app-layer/app";
+import { spanDedup } from "./spanDedup";
 import type { PIIRedactionLevel } from "../event-sourcing/pipelines/trace-processing/schemas/commands";
 import {
   instrumentationScopeSchema,
@@ -83,6 +84,7 @@ export class TraceRequestCollectionService {
       async (span) => {
         let collectedSpanCount = 0;
         let droppedSpanCount = 0;
+        let dedupedSpanCount = 0;
         let ingestionFailureCount = 0;
 
         // Iterate through resourceSpans → scopeSpans → spans
@@ -140,6 +142,17 @@ export class TraceRequestCollectionService {
                 // Uint8Array serialization issues through JSON (BullMQ/Redis)
                 const normalizedSpan = normalizeSpanIds(spanParseResult.data);
 
+                // Best-effort dedup: skip spans already being processed
+                const lockResult = await spanDedup.acquireProcessingLock(
+                  tenantId,
+                  normalizedSpan.traceId as string,
+                  normalizedSpan.spanId as string,
+                );
+                if (lockResult === false) {
+                  dedupedSpanCount++;
+                  continue;
+                }
+
                 await getApp().traces.recordSpan({
                   tenantId,
                   span: normalizedSpan,
@@ -149,8 +162,20 @@ export class TraceRequestCollectionService {
                   occurredAt: Date.now(),
                 });
 
+                await spanDedup.confirmProcessed(
+                  tenantId,
+                  normalizedSpan.traceId as string,
+                  normalizedSpan.spanId as string,
+                );
+
                 collectedSpanCount++;
               } catch (error) {
+                await spanDedup.releaseOnFailure(
+                  tenantId,
+                  spanParseResult.data.traceId as string,
+                  spanParseResult.data.spanId as string,
+                );
+
                 span.addEvent("span_ingestion_error", {
                   "error.message":
                     error instanceof Error ? error.message : String(error),
@@ -174,6 +199,7 @@ export class TraceRequestCollectionService {
         span.setAttribute("spans.ingestion.successes", collectedSpanCount);
         span.setAttribute("spans.ingestion.failures", ingestionFailureCount);
         span.setAttribute("spans.ingestion.drops", droppedSpanCount);
+        span.setAttribute("spans.ingestion.deduped", dedupedSpanCount);
       },
     );
   }
