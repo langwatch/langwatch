@@ -38,6 +38,11 @@ function safeParsStringArray(value: string | undefined): string[] {
   }
 }
 
+const OUTPUT_SOURCE = {
+  EXPLICIT: "explicit",
+  INFERRED: "inferred",
+} as const;
+
 const FIRST_TOKEN_EVENTS = new Set([
   "gen_ai.content.chunk",
   "first_token",
@@ -330,12 +335,46 @@ function extractAttributesFromSpan(
   // Custom metadata fields — canonicalization hoists them as metadata.{key}
   // so we just need to forward any metadata.* attributes
   for (const [key, value] of Object.entries(spanAttrs)) {
-    if (key.startsWith("metadata.") && typeof value === "string") {
-      attributes[key] = value;
+    if (key.startsWith("metadata.")) {
+      if (typeof value === "string") {
+        attributes[key] = value;
+      } else if (value !== null && value !== undefined) {
+        attributes[key] =
+          typeof value === "object" ? JSON.stringify(value) : String(value);
+      }
     }
   }
 
   return attributes;
+}
+
+/**
+ * Determines whether a new output should replace the current one.
+ * Rules (in priority order):
+ * 1. Root span always wins
+ * 2. Explicit (langwatch.output) beats inferred (gen_ai.output.messages)
+ * 3. Among same source type, last-finishing span wins
+ */
+function shouldOverrideOutput({
+  isRoot,
+  outputFromRoot,
+  isExplicit,
+  currentIsExplicit,
+  endTime,
+  currentEndTime,
+}: {
+  isRoot: boolean;
+  outputFromRoot: boolean;
+  isExplicit: boolean;
+  currentIsExplicit: boolean;
+  endTime: number;
+  currentEndTime: number;
+}): boolean {
+  if (isRoot) return true;
+  if (outputFromRoot) return false;
+  if (isExplicit && !currentIsExplicit) return true;
+  if (isExplicit === currentIsExplicit && endTime >= currentEndTime) return true;
+  return false;
 }
 
 /** @internal Exported for unit testing */
@@ -439,7 +478,7 @@ export function applySpanToSummary(
   let outputSpanEndTimeMs = state.outputSpanEndTimeMs;
   // Track whether current output came from explicit (langwatch.*) vs inferred (gen_ai.*) source
   const currentOutputSource =
-    state.attributes["langwatch.reserved.output_source"] ?? "inferred";
+    state.attributes["langwatch.reserved.output_source"] ?? OUTPUT_SOURCE.INFERRED;
   let newOutputSource: string | undefined;
 
   if (!isExcludedType) {
@@ -463,25 +502,25 @@ export function applySpanToSummary(
     if (outputResult) {
       const isRootSpan = !span.parentSpanId;
       const isExplicit = outputResult.source === "langwatch";
-      const currentIsExplicit = currentOutputSource === "explicit";
+      const currentIsExplicit = currentOutputSource === OUTPUT_SOURCE.EXPLICIT;
 
-      // Override rules:
-      // 1. Root always wins
-      // 2. Explicit (langwatch.output) beats inferred (gen_ai.output.messages)
-      // 3. Among same source type, last-finishing wins
-      const shouldOverride =
-        isRootSpan ||
-        (!outputFromRoot &&
-          ((isExplicit && !currentIsExplicit) ||
-            (isExplicit === currentIsExplicit &&
-              span.endTimeUnixMs >= outputSpanEndTimeMs)));
-
-      if (shouldOverride) {
+      if (
+        shouldOverrideOutput({
+          isRoot: isRootSpan,
+          outputFromRoot,
+          isExplicit,
+          currentIsExplicit,
+          endTime: span.endTimeUnixMs,
+          currentEndTime: outputSpanEndTimeMs,
+        })
+      ) {
         const raw = outputResult.raw;
         computedOutput = typeof raw === "string" ? raw : JSON.stringify(raw);
         outputFromRoot = isRootSpan;
         outputSpanEndTimeMs = span.endTimeUnixMs;
-        newOutputSource = isExplicit ? "explicit" : "inferred";
+        newOutputSource = isExplicit
+          ? OUTPUT_SOURCE.EXPLICIT
+          : OUTPUT_SOURCE.INFERRED;
       }
     }
   }

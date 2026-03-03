@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mapNormalizedSpanToSpan } from "../span.mapper";
+import { mapNormalizedSpanToSpan, unflattenDotNotation } from "../span.mapper";
 import {
   NormalizedSpanKind,
   NormalizedStatusCode,
@@ -192,6 +192,84 @@ describe("mapNormalizedSpanToSpan", () => {
       const result = mapNormalizedSpanToSpan(span);
 
       expect(result.metrics?.cache_read_input_tokens).toBe(200);
+    });
+  });
+});
+
+describe("unflattenDotNotation", () => {
+  describe("when given single-level keys", () => {
+    it("keeps them at top level", () => {
+      const result = unflattenDotNotation({ simple: "value", count: 42 });
+      expect(result).toEqual({ simple: "value", count: 42 });
+    });
+  });
+
+  describe("when given dotted keys", () => {
+    it("nests them into objects", () => {
+      const result = unflattenDotNotation({
+        "a.b.c": 1,
+        "a.b.d": 2,
+        "x.y": "z",
+      });
+      expect(result).toEqual({
+        a: { b: { c: 1, d: 2 } },
+        x: { y: "z" },
+      });
+    });
+  });
+
+  describe("when paths conflict with existing values", () => {
+    it("overwrites scalar intermediate values with objects", () => {
+      const result = unflattenDotNotation({
+        "a.b": "scalar",
+        "a.b.c": "deep",
+      });
+      expect(result.a).toEqual({ b: { c: "deep" } });
+    });
+  });
+
+  describe("when keys contain prototype pollution attempts", () => {
+    it("skips __proto__ keys", () => {
+      const result = unflattenDotNotation({
+        "__proto__.polluted": "yes",
+        safe: "ok",
+      });
+      expect(result.safe).toBe("ok");
+      expect(result.polluted).toBeUndefined();
+      expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
+    });
+
+    it("skips constructor keys", () => {
+      const result = unflattenDotNotation({
+        "constructor.prototype.polluted": "yes",
+        safe: "ok",
+      });
+      expect(result.safe).toBe("ok");
+      expect((result as Record<string, unknown>).polluted).toBeUndefined();
+    });
+
+    it("skips prototype keys", () => {
+      const result = unflattenDotNotation({
+        "prototype.evil": "yes",
+        safe: "ok",
+      });
+      expect(result.safe).toBe("ok");
+      expect(Object.keys(result)).toEqual(["safe"]);
+    });
+
+    it("skips dangerous keys at leaf position", () => {
+      const result = unflattenDotNotation({
+        "a.__proto__": "bad",
+        "a.ok": "good",
+      });
+      expect(result).toEqual({ a: { ok: "good" } });
+    });
+  });
+
+  describe("when given empty input", () => {
+    it("returns an empty object", () => {
+      const result = unflattenDotNotation({});
+      expect(result).toEqual({});
     });
   });
 });

@@ -2,6 +2,10 @@ import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "~/utils/logger/server";
 import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
+import {
+  extractLastUserMessageText,
+  extractMessageContentText,
+} from "./canonicalisation/extractors/_messages";
 import type { NormalizedSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/spans";
 
 const logger = createLogger("langwatch:trace-processing:io-extraction-service");
@@ -411,114 +415,20 @@ const messagesToText = (
   if (Array.isArray(messages)) {
     // For input mode, extract only the last user message
     if (mode === "input") {
-      const lastUserText = extractLastUserMessageFromArray(messages);
+      const lastUserText = extractLastUserMessageText(messages);
       if (lastUserText) return lastUserText;
     }
 
     // Default: concatenate all messages
     const texts: string[] = [];
     for (const msg of messages) {
-      const text = extractMessageContent(msg);
+      const text = extractMessageContentText(msg);
       if (text) texts.push(text);
     }
     return texts.length > 0 ? texts.join("\n") : null;
   }
 
   // If it's a single message object
-  const text = extractMessageContent(messages);
+  const text = extractMessageContentText(messages);
   return text;
-};
-
-/**
- * Extracts the text content of the last user message from an array of messages.
- */
-const extractLastUserMessageFromArray = (
-  messages: unknown[],
-): string | null => {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i];
-    if (!msg || typeof msg !== "object") continue;
-    const obj = msg as Record<string, unknown>;
-    if (obj.role !== "user") continue;
-    const text = extractMessageContent(obj);
-    if (text) return text;
-  }
-  return null;
-};
-
-/**
- * Extracts text content from a message object.
- * Handles various message formats: OpenAI, Anthropic, Strands, generic.
- */
-const extractMessageContent = (message: unknown): string | null => {
-  if (!message || typeof message !== "object") {
-    return typeof message === "string" ? message : null;
-  }
-
-  const msg = message as Record<string, unknown>;
-
-  // Check for content field (most common)
-  if ("content" in msg) {
-    const content = msg.content;
-
-    // Content can be a string
-    if (typeof content === "string") {
-      return content;
-    }
-
-    // Content can be an array (OpenAI/Strands format with text/image parts)
-    if (Array.isArray(content)) {
-      const texts: string[] = [];
-      for (const part of content) {
-        if (typeof part === "string") {
-          texts.push(part);
-        } else if (part && typeof part === "object") {
-          const partObj = part as Record<string, unknown>;
-          // Handle OpenAI format: { type: "text", text: "..." }
-          if (partObj.type === "text" && typeof partObj.text === "string") {
-            texts.push(partObj.text);
-          }
-          // Handle Strands/Anthropic format: { text: "..." } (no type field)
-          else if (typeof partObj.text === "string" && !("type" in partObj)) {
-            texts.push(partObj.text);
-          }
-          // Handle image_url format - skip but don't break
-          else if (partObj.type === "image_url") {
-            // Skip image parts
-          }
-        }
-      }
-      return texts.length > 0 ? texts.join("\n") : null;
-    }
-  }
-
-  // Handle Mastra/parts format: { parts: [{ type: "text", content: "..." }] }
-  if ("parts" in msg && Array.isArray(msg.parts)) {
-    const texts: string[] = [];
-    for (const part of msg.parts) {
-      if (typeof part === "string") {
-        texts.push(part);
-      } else if (part && typeof part === "object") {
-        const partObj = part as Record<string, unknown>;
-        if (typeof partObj.content === "string") {
-          texts.push(partObj.content);
-        } else if (partObj.type === "text" && typeof partObj.text === "string") {
-          texts.push(partObj.text);
-        }
-      }
-    }
-    if (texts.length > 0) return texts.join("\n");
-  }
-
-  // Check for text field (some formats)
-  if ("text" in msg && typeof msg.text === "string") {
-    return msg.text;
-  }
-
-  // Check for value field (LangWatch format)
-  if ("value" in msg && typeof msg.value === "string") {
-    return msg.value;
-  }
-
-  return null;
 };

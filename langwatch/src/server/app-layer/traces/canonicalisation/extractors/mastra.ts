@@ -37,6 +37,7 @@ import { asNumber } from "./_guards";
 import {
   normalizeToMessages,
   extractSystemInstructionFromMessages,
+  extractLastUserMessageText,
 } from "./_messages";
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 
@@ -164,7 +165,7 @@ export class MastraExtractor implements CanonicalAttributesExtractor {
       if (!attrs.has(ATTR_KEYS.LANGWATCH_INPUT)) {
         const rawInput = attrs.get(ATTR_KEYS.MASTRA_AGENT_RUN_INPUT);
         if (rawInput !== undefined) {
-          const lastUserMessage = extractLastUserMessage(rawInput);
+          const lastUserMessage = extractLastUserMessageText(rawInput);
           if (lastUserMessage) {
             ctx.setAttr(ATTR_KEYS.LANGWATCH_INPUT, lastUserMessage);
             ctx.recordRule(
@@ -177,7 +178,7 @@ export class MastraExtractor implements CanonicalAttributesExtractor {
       if (!attrs.has(ATTR_KEYS.LANGWATCH_OUTPUT)) {
         const rawOutput = attrs.get(ATTR_KEYS.MASTRA_AGENT_RUN_OUTPUT);
         if (rawOutput !== undefined) {
-          const text = extractAgentRunOutputText(rawOutput);
+          const text = extractTextFromOutput(rawOutput);
           if (text) {
             ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, text);
             ctx.recordRule(
@@ -202,7 +203,7 @@ export class MastraExtractor implements CanonicalAttributesExtractor {
             );
           }
         } else {
-          const text = extractModelStepOutputText(rawOutput);
+          const text = extractTextFromOutput(rawOutput);
           if (text) {
             ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, text);
             ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, [
@@ -321,62 +322,11 @@ function mastraSpanTypeToCanonical(mastraType: unknown, isOrphan: boolean): stri
 }
 
 /**
- * Extracts the last user message text from a Mastra agent_run input.
- * The input is an array of OpenAI-format messages: [{role, content}].
+ * Extracts the `.text` field from a Mastra output object.
+ * Works for both model_step output ({text, toolCalls}) and
+ * agent_run output ({text, files}).
  */
-function extractLastUserMessage(input: unknown): string | null {
-  const messages = Array.isArray(input) ? input : null;
-  if (!messages) return null;
-
-  // Find the last user message
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i] as Record<string, unknown> | undefined;
-    if (!msg || typeof msg !== "object") continue;
-    if (msg.role !== "user") continue;
-
-    const content = msg.content;
-    if (typeof content === "string") return content;
-
-    // Handle content array: [{type: "text", text: "..."}]
-    if (Array.isArray(content)) {
-      const texts: string[] = [];
-      for (const part of content) {
-        if (typeof part === "string") {
-          texts.push(part);
-        } else if (part && typeof part === "object") {
-          const p = part as Record<string, unknown>;
-          if (p.type === "text" && typeof p.text === "string") {
-            texts.push(p.text);
-          }
-        }
-      }
-      if (texts.length > 0) return texts.join("\n");
-    }
-  }
-
-  return null;
-}
-
-/**
- * Extracts the text field from a Mastra model_step output.
- * The output is: {text: string, toolCalls: [...]}.
- */
-function extractModelStepOutputText(output: unknown): string | null {
-  if (!output || typeof output !== "object" || Array.isArray(output)) {
-    return null;
-  }
-  const obj = output as Record<string, unknown>;
-  if (typeof obj.text === "string" && obj.text.length > 0) {
-    return obj.text;
-  }
-  return null;
-}
-
-/**
- * Extracts the text field from a Mastra agent_run output.
- * The output is: {text: string, files: [...]}.
- */
-function extractAgentRunOutputText(output: unknown): string | null {
+function extractTextFromOutput(output: unknown): string | null {
   if (!output || typeof output !== "object" || Array.isArray(output)) {
     return null;
   }

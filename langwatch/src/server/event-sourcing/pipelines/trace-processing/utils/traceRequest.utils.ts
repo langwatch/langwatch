@@ -482,7 +482,8 @@ const MAX_JSON_PARSE_SIZE = 2_000_000;
  *
  * Fast-path: only attempts parse if the trimmed string starts with `{` or `[`.
  */
-const parseJsonStringValues = (
+/** @internal Exported for unit testing */
+export const parseJsonStringValues = (
   attrs: NormalizedAttributes,
 ): NormalizedAttributes => {
   const result: NormalizedAttributes = {};

@@ -16,8 +16,10 @@ const logger = createLogger(
 /**
  * Serializes attribute values for ClickHouse Map(String, String) columns.
  * Non-scalar values are JSON-stringified at the write boundary.
+ *
+ * @internal Exported for unit testing
  */
-function serializeAttributes(
+export function serializeAttributes(
   attrs: Record<string, unknown>,
 ): Record<string, string> {
   const result: Record<string, string> = {};
@@ -35,7 +37,7 @@ function serializeAttributes(
       try {
         result[key] = JSON.stringify(value);
       } catch {
-        // skip unserializable values
+        logger.debug(`Skipping unserializable attribute "${key}"`);
       }
     }
   }

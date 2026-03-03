@@ -152,8 +152,8 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
                 (m as Record<string, unknown>).role === "system"
               ),
           );
+          attrs.take(ATTR_KEYS.GEN_AI_INPUT_MESSAGES);
           if (stripped.length > 0) {
-            attrs.take(ATTR_KEYS.GEN_AI_INPUT_MESSAGES);
             ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, stripped);
           }
           ctx.recordRule(`${this.id}:system_instruction(existing)`);

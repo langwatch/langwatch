@@ -1,4 +1,8 @@
 import type { TraceSummaryData } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
+import {
+  extractLastUserMessageText,
+  extractMessageContentText,
+} from "~/server/app-layer/traces/canonicalisation/extractors/_messages";
 import type {
   ErrorCapture,
   Span,
@@ -154,73 +158,6 @@ function extractTextFromStateObject(
 }
 
 /**
- * Extracts text content from a single message object.
- * Handles various message formats: OpenAI, Anthropic, generic.
- *
- * @param msg - The message object to extract content from
- * @returns The extracted text content, or null if not found
- */
-function extractMessageContent(msg: unknown): string | null {
-  if (typeof msg !== "object" || msg === null) return null;
-  const obj = msg as Record<string, unknown>;
-
-  // Check for content field (OpenAI format)
-  if (typeof obj.content === "string") return obj.content;
-
-  // Check for text field
-  if (typeof obj.text === "string") return obj.text;
-
-  // Handle content array (multimodal messages)
-  if (Array.isArray(obj.content)) {
-    const texts = obj.content
-      .filter(
-        (p: unknown): p is Record<string, unknown> =>
-          typeof p === "object" && p !== null,
-      )
-      .map((p) => {
-        if (typeof p.text === "string") return p.text;
-        if (typeof p.content === "string") return p.content;
-        return null;
-      })
-      .filter((t): t is string => typeof t === "string");
-    return texts.length > 0 ? texts.join("\n") : null;
-  }
-
-  // Handle parts format (Mastra): { parts: [{ type: "text", content: "..." }] }
-  if (Array.isArray(obj.parts)) {
-    const texts = obj.parts
-      .filter(
-        (p: unknown): p is Record<string, unknown> =>
-          typeof p === "object" && p !== null,
-      )
-      .map((p) => {
-        if (typeof p.content === "string") return p.content;
-        if (typeof p.text === "string") return p.text;
-        return null;
-      })
-      .filter((t): t is string => typeof t === "string");
-    return texts.length > 0 ? texts.join("\n") : null;
-  }
-
-  return null;
-}
-
-/**
- * Extracts the text content of the last user message from an array of messages.
- */
-function extractLastUserMessageText(messages: unknown[]): string | null {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i];
-    if (!msg || typeof msg !== "object") continue;
-    const obj = msg as Record<string, unknown>;
-    if (obj.role !== "user") continue;
-    const text = extractMessageContent(obj);
-    if (text) return text;
-  }
-  return null;
-}
-
-/**
  * Type guard for LangWatch structured value format.
  * Used by DSPy, LangGraph, and other frameworks.
  */
@@ -260,7 +197,7 @@ function extractTextFromMessages(
       }
       // Fallback: concatenate all messages
       const texts = value
-        .map((msg) => extractMessageContent(msg))
+        .map((msg) => extractMessageContentText(msg))
         .filter((t): t is string => t !== null);
       return texts.length > 0 ? texts.join("\n") : null;
     }
@@ -290,14 +227,14 @@ function extractTextFromMessages(
     }
     // Fallback: concatenate all messages
     const texts = data
-      .map((msg) => extractMessageContent(msg))
+      .map((msg) => extractMessageContentText(msg))
       .filter((t): t is string => t !== null);
     return texts.length > 0 ? texts.join("\n") : null;
   }
 
   // Handle single message object
   if (typeof data === "object" && data !== null) {
-    return extractMessageContent(data);
+    return extractMessageContentText(data);
   }
 
   return null;

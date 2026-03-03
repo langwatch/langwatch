@@ -3,6 +3,88 @@
  */
 import { isMessageLike, isRecord, type MessageLike } from "./_guards";
 
+// ─────────────────────────────────────────────────────────────────────────
+// Shared message content extraction
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * Extracts text content from a single message object.
+ * Handles multiple message formats: OpenAI, Anthropic/Strands, Mastra parts, and generic.
+ */
+export const extractMessageContentText = (message: unknown): string | null => {
+  if (!message || typeof message !== "object") {
+    return typeof message === "string" ? message : null;
+  }
+
+  const msg = message as Record<string, unknown>;
+
+  // String content (OpenAI format, most common)
+  if (typeof msg.content === "string") return msg.content;
+
+  // Content array (OpenAI multimodal / Strands / Anthropic)
+  if (Array.isArray(msg.content)) {
+    const texts = extractTextsFromParts(msg.content);
+    if (texts.length > 0) return texts.join("\n");
+  }
+
+  // Parts array (Mastra / Vercel AI SDK)
+  if (Array.isArray(msg.parts)) {
+    const texts = extractTextsFromParts(msg.parts);
+    if (texts.length > 0) return texts.join("\n");
+  }
+
+  // Text field (some formats)
+  if (typeof msg.text === "string") return msg.text;
+
+  // Value field (LangWatch structured format)
+  if (typeof msg.value === "string") return msg.value;
+
+  return null;
+};
+
+/**
+ * Extracts text strings from content/parts arrays.
+ * Handles plain strings, {type:"text", text:...}, {text:...}, {content:...}.
+ */
+const extractTextsFromParts = (parts: unknown[]): string[] => {
+  const texts: string[] = [];
+  for (const part of parts) {
+    if (typeof part === "string") {
+      texts.push(part);
+      continue;
+    }
+    if (part && typeof part === "object") {
+      const p = part as Record<string, unknown>;
+      if (typeof p.text === "string") {
+        texts.push(p.text);
+      } else if (typeof p.content === "string") {
+        texts.push(p.content);
+      }
+    }
+  }
+  return texts;
+};
+
+/**
+ * Extracts the text content of the last user message from an array of messages.
+ * Iterates backwards to find the most recent user message.
+ */
+export const extractLastUserMessageText = (
+  messages: unknown,
+): string | null => {
+  if (!Array.isArray(messages)) return null;
+
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (!msg || typeof msg !== "object") continue;
+    const obj = msg as Record<string, unknown>;
+    if (obj.role !== "user") continue;
+    const text = extractMessageContentText(obj);
+    if (text) return text;
+  }
+  return null;
+};
+
 /**
  * Extracts text from a content block, handling both standard ({type:"text", text:"..."})
  * and pi-ai/Vercel AI SDK style ({type:"text", content:"..."}).
