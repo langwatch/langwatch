@@ -3,10 +3,6 @@ Feature: Single loading indicator on suites page
   I want to see skeleton placeholders instead of duplicate spinners when the suites page loads
   So that the experience feels polished and gives a preview of the page layout
 
-  # When the suites page loads, the sidebar shows placeholders while the main
-  # panel waits. The main panel may show its own loading indicator for
-  # independent refreshes like period changes.
-
   @integration
   Scenario: Sidebar shows skeleton placeholders while loading
     Given the suites page is loading
