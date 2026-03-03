@@ -8,14 +8,12 @@
  *
  * @see specs/features/suites/single-loading-indicator.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { ChakraProvider, Spinner, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// --- Mocks ---
-
 const mockSuitesQuery = vi.fn();
-const mockAllRunsPanel = vi.fn();
+let allRunsPanelLoading = false;
 
 vi.mock("~/utils/api", () => ({
   api: {
@@ -75,7 +73,13 @@ vi.mock("~/components/DashboardLayout", () => ({
 
 vi.mock("~/components/suites/AllRunsPanel", () => ({
   AllRunsPanel: () => {
-    mockAllRunsPanel();
+    if (allRunsPanelLoading) {
+      return (
+        <div data-testid="all-runs-panel">
+          <Spinner data-testid="all-runs-spinner" />
+        </div>
+      );
+    }
     return <div data-testid="all-runs-panel">All Runs Panel</div>;
   },
 }));
@@ -84,15 +88,17 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-// Hoist the dynamic import so mocks are reliably applied
-let SuitesPage: React.ComponentType;
+async function importSuitesPage(): Promise<React.ComponentType> {
+  const mod = await import("~/pages/[project]/simulations/suites/index");
+  return mod.default;
+}
 
 describe("Single loading indicator on suites page (Issue #1904)", () => {
+  let SuitesPage: React.ComponentType;
+
   beforeEach(async () => {
-    const mod = await import(
-      "~/pages/[project]/simulations/suites/index"
-    );
-    SuitesPage = mod.default;
+    SuitesPage = await importSuitesPage();
+    allRunsPanelLoading = false;
   });
 
   afterEach(() => {
@@ -116,24 +122,21 @@ describe("Single loading indicator on suites page (Issue #1904)", () => {
       expect(skeletons.length).toBeGreaterThan(0);
     });
 
-    it("does not show a Chakra Spinner component", () => {
+    it("does not show a spinner", () => {
       render(<SuitesPage />, { wrapper: Wrapper });
 
-      const spinners = document.querySelectorAll(".chakra-spinner");
-      expect(spinners).toHaveLength(0);
+      expect(screen.queryAllByRole("status")).toHaveLength(0);
     });
 
     it("does not render the main panel", () => {
-      mockAllRunsPanel.mockClear();
       render(<SuitesPage />, { wrapper: Wrapper });
 
       expect(screen.queryByTestId("all-runs-panel")).not.toBeInTheDocument();
-      expect(mockAllRunsPanel).not.toHaveBeenCalled();
     });
   });
 
   describe("when sidebar data has loaded", () => {
-    it("displays the suite list in the sidebar", () => {
+    beforeEach(() => {
       mockSuitesQuery.mockReturnValue({
         data: [
           {
@@ -154,22 +157,30 @@ describe("Single loading indicator on suites page (Issue #1904)", () => {
         isLoading: false,
         error: null,
       });
+    });
 
+    it("displays the suite list in the sidebar", () => {
       render(<SuitesPage />, { wrapper: Wrapper });
 
       expect(screen.getByText("My Suite")).toBeInTheDocument();
     });
 
-    it("renders the main panel (AllRunsPanel) when sidebar is done loading", () => {
-      mockSuitesQuery.mockReturnValue({
-        data: [],
-        isLoading: false,
-        error: null,
-      });
-
+    // Default route (no ?suite= param) resolves to ALL_RUNS_ID via useSuiteRouting
+    it("renders the main panel when sidebar is done loading", () => {
       render(<SuitesPage />, { wrapper: Wrapper });
 
-      expect(screen.queryByTestId("all-runs-panel")).toBeInTheDocument();
+      expect(screen.getByTestId("all-runs-panel")).toBeInTheDocument();
+    });
+
+    describe("when main panel data is still loading", () => {
+      it("displays a loading indicator in the main panel", () => {
+        allRunsPanelLoading = true;
+
+        render(<SuitesPage />, { wrapper: Wrapper });
+
+        expect(screen.getByText("My Suite")).toBeInTheDocument();
+        expect(screen.getByTestId("all-runs-spinner")).toBeInTheDocument();
+      });
     });
   });
 });

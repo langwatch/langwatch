@@ -8,6 +8,10 @@ Feature: Single loading indicator on suites page
   # Currently both show a Spinner component, resulting in two simultaneous
   # spinners. The fix replaces the sidebar spinner with skeleton placeholders
   # and suppresses the main panel until the sidebar is ready.
+  #
+  # Note: The main panel (AllRunsPanel) retains its own spinner for independent
+  # refreshes like period changes. That behavior is tested within AllRunsPanel
+  # itself, not at the page level.
 
   @integration
   Scenario: Sidebar shows skeleton placeholders while loading
@@ -29,11 +33,3 @@ Feature: Single loading indicator on suites page
     When I view the suites page
     Then the sidebar displays the suite list
     And the main panel displays a loading indicator
-
-  @integration
-  Scenario: Main panel spinner still works for period changes
-    Given all data has loaded
-    And the all-runs view is visible
-    When the period selector changes
-    Then the main panel displays a loading indicator while refreshing
-    And the sidebar does not show a loading indicator
