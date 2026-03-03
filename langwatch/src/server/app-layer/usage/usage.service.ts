@@ -87,7 +87,7 @@ export class UsageService {
       this.planResolver(organizationId),
     ]);
 
-    // Self-hosted = unlimited traces
+    // Self-hosted = unlimited traces for FREE plan
     // Preventing customers from getting blocked when no license is active
     if (!env.IS_SAAS && plan.type === FREE_PLAN.type) {
       return { exceeded: false };

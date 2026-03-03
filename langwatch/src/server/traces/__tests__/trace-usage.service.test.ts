@@ -1,11 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OrganizationRepository } from "~/server/repositories/organization.repository";
-import type { PlanResolver } from "~/server/app-layer/subscription/plan-provider";
 import {
   clearMonthCountCache,
   TraceUsageService,
 } from "../trace-usage.service";
-import { FREE_PLAN } from "../../../../ee/licensing/constants";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks
@@ -17,12 +15,6 @@ const {
 } = vi.hoisted(() => ({
   mockGetClickHouseClient: vi.fn(),
   mockQueryTraceSummariesTotalUniq: vi.fn(),
-}));
-
-vi.mock("~/env.mjs", () => ({
-  env: {
-    IS_SAAS: true,
-  },
 }));
 
 vi.mock("~/server/clickhouse/client", () => ({
@@ -46,8 +38,6 @@ describe("TraceUsageService", () => {
 
   const mockEsClientFactory = vi.fn().mockResolvedValue(mockEsClient);
 
-  const mockPlanResolver = vi.fn() as unknown as PlanResolver;
-
   const mockPrisma = {
     project: {
       findMany: vi.fn(),
@@ -63,174 +53,15 @@ describe("TraceUsageService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     clearMonthCountCache();
-    // Default: no ClickHouse (ES path)
+    // Default: no ClickHouse (ES path) — pass null so splitProjectsByFlag returns early
     mockGetClickHouseClient.mockReturnValue(null);
     service = new TraceUsageService(
       mockOrganizationRepository,
       mockEsClientFactory,
-      mockPlanResolver,
       mockPrisma as any,
-      mockClickHouseClient as any,
+      null,
     );
   });
-
-  // ==========================================================================
-  // checkLimit (deprecated — kept for backward compatibility)
-  // ==========================================================================
-
-  describe("checkLimit", () => {
-    describe("when organizationId is not found", () => {
-      it("throws an error", async () => {
-        vi.mocked(
-          mockOrganizationRepository.getOrganizationIdByTeamId,
-        ).mockResolvedValue(null);
-
-        await expect(
-          service.checkLimit({ teamId: "team-123" }),
-        ).rejects.toThrow("Team team-123 has no organization");
-      });
-    });
-
-    describe("when count >= maxMessagesPerMonth", () => {
-      beforeEach(() => {
-        vi.mocked(
-          mockOrganizationRepository.getOrganizationIdByTeamId,
-        ).mockResolvedValue("org-123");
-        vi.mocked(mockOrganizationRepository.getProjectIds).mockResolvedValue([
-          "proj-1",
-        ]);
-        mockPrisma.project.findMany.mockResolvedValue([
-          { id: "proj-1", featureClickHouseDataSourceTraces: false },
-        ]);
-        mockEsClient.count.mockResolvedValue({ count: 1000 });
-        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
-          name: "free",
-          maxMessagesPerMonth: 1000,
-        });
-      });
-
-      it("returns exceeded: true", async () => {
-        const result = await service.checkLimit({ teamId: "team-123" });
-        expect(result.exceeded).toBe(true);
-      });
-
-      it("returns message 'Monthly limit of 1000 traces reached'", async () => {
-        const result = await service.checkLimit({ teamId: "team-123" });
-        expect(result.message).toBe("Monthly limit of 1000 traces reached");
-      });
-
-      it("returns count and maxMessagesPerMonth as 1000", async () => {
-        const result = await service.checkLimit({ teamId: "team-123" });
-        expect(result.count).toBe(1000);
-        expect(result.maxMessagesPerMonth).toBe(1000);
-      });
-
-      it("returns planName as 'free'", async () => {
-        const result = await service.checkLimit({ teamId: "team-123" });
-        expect(result.planName).toBe("free");
-      });
-
-      it("calls planResolver with organizationId", async () => {
-        await service.checkLimit({ teamId: "team-123" });
-
-        expect(mockPlanResolver).toHaveBeenCalledWith("org-123");
-      });
-    });
-
-    describe("when count < maxMessagesPerMonth", () => {
-      it("returns exceeded: false", async () => {
-        vi.mocked(
-          mockOrganizationRepository.getOrganizationIdByTeamId,
-        ).mockResolvedValue("org-123");
-        vi.mocked(mockOrganizationRepository.getProjectIds).mockResolvedValue([
-          "proj-1",
-        ]);
-        mockPrisma.project.findMany.mockResolvedValue([
-          { id: "proj-1", featureClickHouseDataSourceTraces: false },
-        ]);
-        mockEsClient.count.mockResolvedValue({ count: 500 });
-        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
-          maxMessagesPerMonth: 1000,
-        });
-
-        const result = await service.checkLimit({ teamId: "team-123" });
-
-        expect(result.exceeded).toBe(false);
-      });
-    });
-
-    describe("when self-hosted (IS_SAAS=false)", () => {
-      beforeEach(() => {
-        vi.mocked(
-          mockOrganizationRepository.getOrganizationIdByTeamId,
-        ).mockResolvedValue("org-123");
-        vi.mocked(mockOrganizationRepository.getProjectIds).mockResolvedValue([
-          "proj-1",
-        ]);
-        mockPrisma.project.findMany.mockResolvedValue([
-          { id: "proj-1", featureClickHouseDataSourceTraces: false },
-        ]);
-        mockEsClient.count.mockResolvedValue({ count: 5000 }); // Over any limit
-      });
-
-      it("returns exceeded: false for a FREE plan clone", async () => {
-        const { env } = await import("~/env.mjs");
-        vi.mocked(env).IS_SAAS = false;
-        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({ ...FREE_PLAN });
-
-        const result = await service.checkLimit({ teamId: "team-123" });
-
-        expect(result.exceeded).toBe(false);
-
-        vi.mocked(env).IS_SAAS = true;
-      });
-
-      it("enforces limits for non-FREE plan types", async () => {
-        const { env } = await import("~/env.mjs");
-        vi.mocked(env).IS_SAAS = false;
-        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
-          type: "PRO",
-          name: "Pro",
-          maxMessagesPerMonth: 1000,
-        });
-
-        const result = await service.checkLimit({ teamId: "team-123" });
-
-        expect(result.exceeded).toBe(true);
-
-        vi.mocked(env).IS_SAAS = true;
-      });
-    });
-
-    describe("when ClickHouse is available", () => {
-      beforeEach(() => {
-        mockGetClickHouseClient.mockReturnValue({});
-        vi.mocked(
-          mockOrganizationRepository.getOrganizationIdByTeamId,
-        ).mockResolvedValue("org-123");
-        vi.mocked(mockOrganizationRepository.getProjectIds).mockResolvedValue([
-          "proj-1",
-        ]);
-        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
-          name: "pro",
-          maxMessagesPerMonth: 10000,
-        });
-      });
-
-      it("uses trace summaries for count (traces-only)", async () => {
-        mockQueryTraceSummariesTotalUniq.mockResolvedValue(500);
-
-        const result = await service.checkLimit({ teamId: "team-123" });
-
-        expect(result.exceeded).toBe(false);
-        expect(mockQueryTraceSummariesTotalUniq).toHaveBeenCalled();
-      });
-    });
-  });
-
-  // ==========================================================================
-  // ES path (no ClickHouse)
-  // ==========================================================================
 
   describe("getCurrentMonthCount", () => {
     describe("when ClickHouse is not available (ES path)", () => {

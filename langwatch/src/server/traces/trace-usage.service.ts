@@ -1,10 +1,6 @@
 import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 import type { ClickHouseClient } from "@clickhouse/client";
-import { FREE_PLAN } from "../../../ee/licensing/constants";
 import type { PrismaClient } from "@prisma/client";
-import { env } from "~/env.mjs";
-import { getApp } from "~/server/app-layer/app";
-import type { PlanResolver } from "~/server/app-layer/subscription/plan-provider";
 import { getClickHouseClient } from "~/server/clickhouse/client";
 import { prisma } from "~/server/db";
 import {
@@ -42,7 +38,6 @@ export class TraceUsageService {
   constructor(
     private readonly organizationRepository: OrganizationRepository,
     private readonly esClientFactory: EsClientFactory,
-    private readonly planResolver: PlanResolver,
     private readonly prisma: PrismaClient,
     private readonly clickHouseClient: ClickHouseClient | null,
   ) {}
@@ -50,63 +45,13 @@ export class TraceUsageService {
   /**
    * Static factory method for creating TraceUsageService with proper DI
    */
-  static create(
-    db: PrismaClient = prisma,
-    planResolver?: PlanResolver,
-  ): TraceUsageService {
-    const resolver: PlanResolver =
-      planResolver ??
-      ((organizationId) =>
-        getApp().planProvider.getActivePlan({ organizationId }));
+  static create(db: PrismaClient = prisma): TraceUsageService {
     return new TraceUsageService(
       new OrganizationRepository(db),
       defaultEsClient,
-      resolver,
       db,
       getClickHouseClient(),
     );
-  }
-
-  /**
-   * @deprecated Use UsageService.checkLimit() instead. Limit checking is now
-   * centralized in the app-layer UsageService with meter policy orchestration.
-   * This method remains for backward compatibility with existing tests.
-   */
-  async checkLimit({ teamId }: { teamId: string }): Promise<{
-    exceeded: boolean;
-    message?: string;
-    count?: number;
-    maxMessagesPerMonth?: number;
-    planName?: string;
-  }> {
-
-    const organizationId =
-      await this.organizationRepository.getOrganizationIdByTeamId(teamId);
-    if (!organizationId) {
-      throw new Error(`Team ${teamId} has no organization`);
-    }
-
-    const [count, plan] = await Promise.all([
-      this.getCurrentMonthCount({ organizationId }),
-      this.planResolver(organizationId),
-    ]);
-
-    // Self-hosted = unlimited traces
-    // Preventing customers from getting blocked when no license is active
-    if (!env.IS_SAAS && plan.type === FREE_PLAN.type) {
-      return { exceeded: false };
-    }
-
-    if (count >= plan.maxMessagesPerMonth) {
-      return {
-        exceeded: true,
-        message: `Monthly limit of ${plan.maxMessagesPerMonth} traces reached`,
-        count,
-        maxMessagesPerMonth: plan.maxMessagesPerMonth,
-        planName: plan.name,
-      };
-    }
-    return { exceeded: false };
   }
 
   /**

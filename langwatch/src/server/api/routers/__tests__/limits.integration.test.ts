@@ -17,14 +17,7 @@ import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 // Hoisted mocks for deterministic control (must use vi.hoisted to survive vi.mock hoisting)
 const { mockGetCurrentMonthCount, mockGetActivePlan } = vi.hoisted(() => ({
   mockGetCurrentMonthCount: vi.fn(),
-  mockGetActivePlan: vi.fn().mockResolvedValue({
-    ...FREE_PLAN,
-    planSource: "subscription",
-    type: "PRO",
-    name: "Pro",
-    free: false,
-    maxMessagesPerMonth: 1000,
-  }),
+  mockGetActivePlan: vi.fn(),
 }));
 
 
@@ -34,6 +27,15 @@ describe("Limits Router Integration", () => {
   let caller: ReturnType<typeof appRouter.createCaller>;
 
   beforeAll(async () => {
+    mockGetActivePlan.mockResolvedValue({
+      ...FREE_PLAN,
+      planSource: "subscription",
+      type: "PRO",
+      name: "Pro",
+      free: false,
+      maxMessagesPerMonth: 1000,
+    });
+
     // Wire App singleton so UsageStatsService.create() can call getApp().usage
     globalForApp.__langwatch_app = createTestApp({
       usage: { getCurrentMonthCount: mockGetCurrentMonthCount } as any,
