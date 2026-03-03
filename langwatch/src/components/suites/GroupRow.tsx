@@ -42,7 +42,7 @@ export function GroupRow({
       border="1px solid"
       borderColor="border"
       borderRadius="0"
-      overflow="hidden"
+      overflow="visible"
     >
       {/* Group header - clickable to expand/collapse, sticky */}
       <HStack

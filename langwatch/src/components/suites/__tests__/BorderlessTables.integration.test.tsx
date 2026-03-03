@@ -68,9 +68,16 @@ describe("<RunRow/> borderless styling", () => {
       );
 
       const header = screen.getByRole("button", { name: /Run from/ });
-      // The header's parent container should have no border radius
-      const container = header.closest("[class]");
+      // The outer Box container uses borderRadius="0" via Chakra.
+      // Chakra v3 applies styles through CSS classes, not inline styles,
+      // so toHaveStyle won't reflect it in jsdom. We verify the container
+      // renders and does not carry any border-radius inline style.
+      const container = header.parentElement;
       expect(container).toBeInTheDocument();
+      const inlineRadius = container?.style.borderRadius;
+      expect(
+        inlineRadius === "" || inlineRadius === "0" || inlineRadius === "0px",
+      ).toBe(true);
     });
 
     it("has a sticky header with position sticky", () => {
@@ -87,8 +94,7 @@ describe("<RunRow/> borderless styling", () => {
       );
 
       const header = screen.getByRole("button", { name: /Run from/ });
-      // Verify the header element exists and is rendered
-      expect(header).toBeInTheDocument();
+      expect(header).toHaveStyle({ position: "sticky", top: "0px" });
     });
   });
 
@@ -136,7 +142,14 @@ describe("<GroupRow/> borderless styling", () => {
       const header = screen.getByRole("button", {
         name: /Angry refund request group/,
       });
-      expect(header).toBeInTheDocument();
+      // Chakra v3 applies borderRadius via CSS classes, not inline styles.
+      // Verify the container renders without any non-zero border-radius inline style.
+      const container = header.parentElement;
+      expect(container).toBeInTheDocument();
+      const inlineRadius = container?.style.borderRadius;
+      expect(
+        inlineRadius === "" || inlineRadius === "0" || inlineRadius === "0px",
+      ).toBe(true);
     });
 
     it("has a sticky header", () => {
@@ -154,7 +167,7 @@ describe("<GroupRow/> borderless styling", () => {
       const header = screen.getByRole("button", {
         name: /Angry refund request group/,
       });
-      expect(header).toBeInTheDocument();
+      expect(header).toHaveStyle({ position: "sticky", top: "0px" });
     });
   });
 });

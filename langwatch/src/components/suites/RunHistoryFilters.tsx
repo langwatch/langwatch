@@ -75,9 +75,10 @@ export function RunHistoryFilters({
       {/* Right: view mode toggle + group-by selector */}
       <HStack gap={3}>
         {onViewModeChange && (
-          <HStack gap={1}>
+          <HStack gap={1} role="group" aria-label="View mode">
             <IconButton
               aria-label="List view"
+              aria-pressed={viewMode === "list"}
               size="xs"
               variant={viewMode === "list" ? "solid" : "ghost"}
               onClick={() => onViewModeChange("list")}
@@ -86,6 +87,7 @@ export function RunHistoryFilters({
             </IconButton>
             <IconButton
               aria-label="Grid view"
+              aria-pressed={viewMode === "grid"}
               size="xs"
               variant={viewMode === "grid" ? "solid" : "ghost"}
               onClick={() => onViewModeChange("grid")}

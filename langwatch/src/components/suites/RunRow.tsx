@@ -49,7 +49,7 @@ export function RunRow({
       border="1px solid"
       borderColor="border"
       borderRadius="0"
-      overflow="hidden"
+      overflow="visible"
     >
       {/* Run header - clickable to expand/collapse, sticky */}
       <HStack
