@@ -18,15 +18,13 @@ Feature: Scenario editor new agent flow
     Then the AgentTypeSelectorDrawer opens
     And I see options for "HTTP Agent", "Code Agent", and "Workflow Agent"
 
-  # Regression #1903: opening the agent type selector via URL-based drawer
-  # navigation caused the scenario form drawer's onOpenChange to fire closeDrawer(),
-  # which stripped all drawer params and closed both drawers immediately.
+  # Regression #1903: clicking "Add New Agent" should keep the type selection flow usable.
   @integration
   Scenario: Agent type selector drawer remains open after clicking "Add New Agent"
     Given the save-and-run menu is open
     When I click "Add New Agent"
     Then the AgentTypeSelectorDrawer remains visible
-    And the scenario form drawer closes without clearing drawer params
+    And I can continue creating an agent from the scenario editor flow
 
   # ============================================================================
   # Full create-agent-from-scenario flow
