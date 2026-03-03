@@ -26,8 +26,8 @@ Feature: Queue pipeline pausing
     Then only that job type stops dispatching
     And other job types in the same pipeline continue normally
 
-  Scenario: Paused jobs are re-staged with delay to prevent hot-looping
+  Scenario: Paused jobs stay in staging until unpaused
     Given a pipeline is paused
-    When a job is dispatched before the pause cache refreshes
-    Then the job is parked back to staging with a delay
-    And the job becomes eligible for dispatch again after the delay expires
+    When the dispatcher scans for eligible jobs
+    Then jobs for the paused pipeline remain in their group queue
+    And the group stays in the ready set for immediate dispatch on unpause

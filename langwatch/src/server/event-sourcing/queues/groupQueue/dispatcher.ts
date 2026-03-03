@@ -26,7 +26,6 @@ export class GroupQueueDispatcher {
       activeTtlSec: number;
       signalTimeoutSec: number;
       logger: Logger;
-      isPaused?: (jobDataJson: string) => boolean;
     },
   ) {}
 
@@ -115,32 +114,7 @@ export class GroupQueueDispatcher {
       maxJobs,
     });
 
-    let dispatchedCount = 0;
-
     for (const result of results) {
-      if (this.params.isPaused?.(result.jobDataJson)) {
-        // Park back to staging with 10s delay to prevent hot loop
-        this.params.scripts
-          .parkPausedJob({
-            groupId: result.groupId,
-            stagedJobId: result.stagedJobId,
-            dispatchAfterMs: Date.now() + 10_000,
-            jobDataJson: result.jobDataJson,
-          })
-          .catch((err) => {
-            this.params.logger.warn(
-              {
-                queueName: this.params.queueName,
-                groupId: result.groupId,
-                stagedJobId: result.stagedJobId,
-                error: err instanceof Error ? err.message : String(err),
-              },
-              "Failed to park paused job",
-            );
-          });
-        continue;
-      }
-
       this.params.processingQueue.push(result).catch((err) => {
         this.params.logger.debug(
           {
@@ -154,22 +128,18 @@ export class GroupQueueDispatcher {
       });
 
       gqJobsDispatchedTotal.inc({ queue_name: this.params.queueName });
-      dispatchedCount++;
     }
 
-    if (dispatchedCount > 0) {
+    if (results.length > 0) {
       this.params.logger.debug(
         {
           queueName: this.params.queueName,
-          count: dispatchedCount,
-          totalProcessed: results.length,
+          count: results.length,
         },
         "Batch dispatched jobs from staging to fastq",
       );
     }
 
-    // Return total items processed (including paused) so the drain loop
-    // continues when a batch is all-paused rather than exiting early.
     return results.length;
   }
 }

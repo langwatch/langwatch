@@ -99,9 +99,6 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   private shutdownRequested = false;
   /** Tracks in-flight jobs for active count metrics. */
   private activeJobCount = 0;
-  /** In-memory cache of paused pipeline keys, refreshed every 2s from Redis. */
-  private pausedKeys = new Set<string>();
-  private pauseCacheInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     definition: EventSourcedQueueDefinition<Payload>,
@@ -185,46 +182,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         activeTtlSec: GROUP_QUEUE_CONFIG.activeTtlSec,
         signalTimeoutSec: GROUP_QUEUE_CONFIG.signalTimeoutSec,
         logger: this.logger,
-        isPaused: this.isPaused,
       });
-
-      // Warm the pause cache before starting the dispatcher to avoid a
-      // window where paused jobs slip through before the first refresh.
-      this.scripts
-        .getPausedKeys()
-        .then((keys) => {
-          this.pausedKeys = new Set(keys);
-        })
-        .catch((err) => {
-          this.logger.warn(
-            {
-              queueName: this.queueName,
-              error: err instanceof Error ? err.message : String(err),
-            },
-            "Failed to load initial pause cache",
-          );
-        })
-        .finally(() => {
-          this.dispatcher!.start();
-        });
-
-      // Start pause cache refresh (every 2s)
-      this.pauseCacheInterval = setInterval(() => {
-        this.scripts
-          .getPausedKeys()
-          .then((keys) => {
-            this.pausedKeys = new Set(keys);
-          })
-          .catch((err) => {
-            this.logger.warn(
-              {
-                queueName: this.queueName,
-                error: err instanceof Error ? err.message : String(err),
-              },
-              "Failed to refresh pause cache",
-            );
-          });
-      }, 2000);
+      this.dispatcher.start();
 
       this.metricsCollector = new GroupQueueMetricsCollector({
         scripts: this.scripts,
@@ -682,28 +641,6 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   }
 
   /**
-   * Checks if a job should be paused based on its pipeline routing metadata.
-   * A job is paused if any ancestor key in the hierarchy matches a paused key.
-   */
-  private isPaused = (jobDataJson: string): boolean => {
-    if (this.pausedKeys.size === 0) return false;
-    try {
-      const data = JSON.parse(jobDataJson) as Record<string, unknown>;
-      const p = data.__pipelineName as string | undefined;
-      const t = data.__jobType as string | undefined;
-      const n = data.__jobName as string | undefined;
-      if (!p) return false;
-      return (
-        this.pausedKeys.has(p) ||
-        (!!t && this.pausedKeys.has(`${p}/${t}`)) ||
-        (!!t && !!n && this.pausedKeys.has(`${p}/${t}/${n}`))
-      );
-    } catch {
-      return false;
-    }
-  };
-
-  /**
    * Adjust concurrency at runtime.
    */
   setConcurrency(n: number): void {
@@ -716,10 +653,6 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
   async close(): Promise<void> {
     this.shutdownRequested = true;
-    if (this.pauseCacheInterval) {
-      clearInterval(this.pauseCacheInterval);
-      this.pauseCacheInterval = null;
-    }
     this.metricsCollector?.stop();
     this.dispatcher?.requestShutdown();
     this.logger.info(

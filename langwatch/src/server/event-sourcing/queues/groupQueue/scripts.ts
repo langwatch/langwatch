@@ -114,13 +114,15 @@ return newStagedCount
 `;
 
 const DISPATCH_LUA = `
-local readyKey   = KEYS[1]
-local blockedKey = KEYS[2]
+local readyKey     = KEYS[1]
+local blockedKey   = KEYS[2]
+local pausedJobKey = KEYS[3]
 
 local keyPrefix    = ARGV[1]
 local nowMs        = tonumber(ARGV[2])
 local activeTtlSec = tonumber(ARGV[3])
 
+local hasPauses = redis.call("SCARD", pausedJobKey) > 0
 local groups = redis.call("ZREVRANGE", readyKey, 0, 99)
 
 for _, groupId in ipairs(groups) do
@@ -135,22 +137,46 @@ for _, groupId in ipairs(groups) do
       if #results >= 2 then
         local stagedJobId = results[1]
         local originalScore = results[2]
-        redis.call("ZREM", jobsKey, stagedJobId)
-        redis.call("SET", activeKey, stagedJobId, "EX", activeTtlSec)
 
-        local pendingCount = redis.call("ZCARD", jobsKey)
-        if pendingCount > 0 then
-          local score = math.sqrt(pendingCount)
-          redis.call("ZADD", readyKey, score, groupId)
-        else
-          redis.call("ZREM", readyKey, groupId)
+        -- Check pause status before dequeuing
+        local paused = false
+        if hasPauses then
+          local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
+          local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
+          if jobDataJson then
+            local ok, data = pcall(cjson.decode, jobDataJson)
+            if ok and type(data) == "table" then
+              local p = data["__pipelineName"]
+              local t = data["__jobType"]
+              local n = data["__jobName"]
+              if p then
+                if redis.call("SISMEMBER", pausedJobKey, p) == 1 then paused = true
+                elseif t and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t) == 1 then paused = true
+                elseif t and n and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t .. "/" .. n) == 1 then paused = true
+                end
+              end
+            end
+          end
         end
 
-        local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
-        local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
-        redis.call("HDEL", dataKey, stagedJobId)
+        if not paused then
+          redis.call("ZREM", jobsKey, stagedJobId)
+          redis.call("SET", activeKey, stagedJobId, "EX", activeTtlSec)
 
-        return {stagedJobId, groupId, jobDataJson or "", originalScore}
+          local pendingCount = redis.call("ZCARD", jobsKey)
+          if pendingCount > 0 then
+            local score = math.sqrt(pendingCount)
+            redis.call("ZADD", readyKey, score, groupId)
+          else
+            redis.call("ZREM", readyKey, groupId)
+          end
+
+          local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
+          local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
+          redis.call("HDEL", dataKey, stagedJobId)
+
+          return {stagedJobId, groupId, jobDataJson or "", originalScore}
+        end
       end
     end
   end
@@ -160,14 +186,16 @@ return nil
 `;
 
 const DISPATCH_BATCH_LUA = `
-local readyKey   = KEYS[1]
-local blockedKey = KEYS[2]
+local readyKey     = KEYS[1]
+local blockedKey   = KEYS[2]
+local pausedJobKey = KEYS[3]
 
 local keyPrefix    = ARGV[1]
 local nowMs        = tonumber(ARGV[2])
 local activeTtlSec = tonumber(ARGV[3])
 local maxJobs      = tonumber(ARGV[4])
 
+local hasPauses = redis.call("SCARD", pausedJobKey) > 0
 local scanLimit = maxJobs * 3 - 1
 local groups = redis.call("ZREVRANGE", readyKey, 0, scanLimit)
 local results = {}
@@ -187,26 +215,50 @@ for _, groupId in ipairs(groups) do
       if #jobResults >= 2 then
         local stagedJobId = jobResults[1]
         local originalScore = jobResults[2]
-        redis.call("ZREM", jobsKey, stagedJobId)
-        redis.call("SET", activeKey, stagedJobId, "EX", activeTtlSec)
 
-        local pendingCount = redis.call("ZCARD", jobsKey)
-        if pendingCount > 0 then
-          local score = math.sqrt(pendingCount)
-          redis.call("ZADD", readyKey, score, groupId)
-        else
-          redis.call("ZREM", readyKey, groupId)
+        -- Check pause status before dequeuing
+        local paused = false
+        if hasPauses then
+          local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
+          local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
+          if jobDataJson then
+            local ok, data = pcall(cjson.decode, jobDataJson)
+            if ok and type(data) == "table" then
+              local p = data["__pipelineName"]
+              local t = data["__jobType"]
+              local n = data["__jobName"]
+              if p then
+                if redis.call("SISMEMBER", pausedJobKey, p) == 1 then paused = true
+                elseif t and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t) == 1 then paused = true
+                elseif t and n and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t .. "/" .. n) == 1 then paused = true
+                end
+              end
+            end
+          end
         end
 
-        local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
-        local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
-        redis.call("HDEL", dataKey, stagedJobId)
+        if not paused then
+          redis.call("ZREM", jobsKey, stagedJobId)
+          redis.call("SET", activeKey, stagedJobId, "EX", activeTtlSec)
 
-        results[#results + 1] = stagedJobId
-        results[#results + 1] = groupId
-        results[#results + 1] = jobDataJson or ""
-        results[#results + 1] = tostring(originalScore)
-        dispatched = dispatched + 1
+          local pendingCount = redis.call("ZCARD", jobsKey)
+          if pendingCount > 0 then
+            local score = math.sqrt(pendingCount)
+            redis.call("ZADD", readyKey, score, groupId)
+          else
+            redis.call("ZREM", readyKey, groupId)
+          end
+
+          local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
+          local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
+          redis.call("HDEL", dataKey, stagedJobId)
+
+          results[#results + 1] = stagedJobId
+          results[#results + 1] = groupId
+          results[#results + 1] = jobDataJson or ""
+          results[#results + 1] = tostring(originalScore)
+          dispatched = dispatched + 1
+        end
       end
     end
   end
@@ -297,36 +349,6 @@ end
 
 -- 5. Increment failed counter for Skynet
 redis.call("INCR", statsKey)
-
-return 1
-`;
-
-const PARK_PAUSED_LUA = `
-local activeKey = KEYS[1]
-
-local keyPrefix       = ARGV[1]
-local groupId         = ARGV[2]
-local stagedJobId     = ARGV[3]
-local dispatchAfterMs = tonumber(ARGV[4])
-local jobDataJson     = ARGV[5]
-
--- Verify active key matches
-local currentActive = redis.call("GET", activeKey)
-if currentActive ~= stagedJobId then return 0 end
-
--- Clear active key
-redis.call("DEL", activeKey)
-
--- Re-stage job with future score to prevent hot loop
-local groupJobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
-local groupDataKey = keyPrefix .. "group:" .. groupId .. ":data"
-redis.call("ZADD", groupJobsKey, dispatchAfterMs, stagedJobId)
-redis.call("HSET", groupDataKey, stagedJobId, jobDataJson)
-
--- Update ready score
-local readyKey = keyPrefix .. "ready"
-local pendingCount = redis.call("ZCARD", groupJobsKey)
-redis.call("ZADD", readyKey, math.sqrt(pendingCount), groupId)
 
 return 1
 `;
@@ -495,12 +517,14 @@ export class GroupStagingScripts {
   }): Promise<DispatchResult | null> {
     const readyKey = `${this.keyPrefix}ready`;
     const blockedKey = `${this.keyPrefix}blocked`;
+    const pausedJobKey = `${this.keyPrefix}paused-jobs`;
 
     const result = await this.redis.eval(
       DISPATCH_LUA,
-      2,
+      3,
       readyKey,
       blockedKey,
+      pausedJobKey,
       this.keyPrefix,
       String(nowMs),
       String(activeTtlSec),
@@ -533,12 +557,14 @@ export class GroupStagingScripts {
   }): Promise<DispatchResult[]> {
     const readyKey = `${this.keyPrefix}ready`;
     const blockedKey = `${this.keyPrefix}blocked`;
+    const pausedJobKey = `${this.keyPrefix}paused-jobs`;
 
     const result = await this.redis.eval(
       DISPATCH_BATCH_LUA,
-      2,
+      3,
       readyKey,
       blockedKey,
+      pausedJobKey,
       this.keyPrefix,
       String(nowMs),
       String(activeTtlSec),
@@ -702,39 +728,6 @@ export class GroupStagingScripts {
       String(dispatchAfterMs),
       jobDataJson,
       String(retryTtlSec),
-    );
-
-    return result === 1;
-  }
-
-  /**
-   * Park a dispatched-but-paused job back into staging with a future score
-   * to prevent hot-loop re-dispatch.
-   *
-   * @returns true if parked, false if stale (active key doesn't match)
-   */
-  async parkPausedJob({
-    groupId,
-    stagedJobId,
-    dispatchAfterMs,
-    jobDataJson,
-  }: {
-    groupId: string;
-    stagedJobId: string;
-    dispatchAfterMs: number;
-    jobDataJson: string;
-  }): Promise<boolean> {
-    const activeKey = `${this.keyPrefix}group:${groupId}:active`;
-
-    const result = await this.redis.eval(
-      PARK_PAUSED_LUA,
-      1,
-      activeKey,
-      this.keyPrefix,
-      groupId,
-      stagedJobId,
-      String(dispatchAfterMs),
-      jobDataJson,
     );
 
     return result === 1;

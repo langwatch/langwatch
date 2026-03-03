@@ -604,118 +604,197 @@ describe("GroupStagingScripts", () => {
     });
   });
 
-  describe("parkPausedJob", () => {
-    async function stageAndDispatch(
-      overrides: Partial<Parameters<typeof scripts.stage>[0]> = {},
-    ): Promise<DispatchResult> {
-      const job = makeJob({ dispatchAfterMs: 100, ...overrides });
-      await scripts.stage(job);
-      const result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
-      expect(result).not.toBeNull();
-      return result!;
+  describe("dispatch > when head-of-line job is paused", () => {
+    function makePausedJobData(overrides: Record<string, unknown> = {}): string {
+      return JSON.stringify({
+        __pipelineName: "ingestion",
+        __jobType: "projection",
+        __jobName: "traceProjection",
+        hello: "world",
+        ...overrides,
+      });
     }
 
-    describe("when active key matches", () => {
-      it("clears active key", async () => {
-        const dispatched = await stageAndDispatch({ stagedJobId: "j1" });
-
-        await scripts.parkPausedJob({
-          groupId: dispatched.groupId,
-          stagedJobId: dispatched.stagedJobId,
-          dispatchAfterMs: Date.now() + 10_000,
-          jobDataJson: dispatched.jobDataJson,
-        });
-
-        const active = await inspectActiveKey(dispatched.groupId);
-        expect(active).toBeNull();
-      });
-
-      it("re-stages job with future score", async () => {
-        const futureScore = Date.now() + 10_000;
-        const dispatched = await stageAndDispatch({ stagedJobId: "j1" });
-
-        await scripts.parkPausedJob({
-          groupId: dispatched.groupId,
-          stagedJobId: dispatched.stagedJobId,
-          dispatchAfterMs: futureScore,
-          jobDataJson: dispatched.jobDataJson,
-        });
-
-        const jobs = await inspectGroupJobs(dispatched.groupId);
-        expect(jobs).toContain(dispatched.stagedJobId);
-        expect(jobs).toContain(String(futureScore));
-      });
-
-      it("preserves job data in hash", async () => {
-        const dispatched = await stageAndDispatch({
+    it("skips group whose head job matches a paused pipeline", async () => {
+      await scripts.stage(
+        makeJob({
           stagedJobId: "j1",
-          jobDataJson: JSON.stringify({ key: "preserved" }),
-        });
+          dispatchAfterMs: 100,
+          jobDataJson: makePausedJobData(),
+        }),
+      );
+      await scripts.addPauseKey("ingestion");
 
-        await scripts.parkPausedJob({
-          groupId: dispatched.groupId,
-          stagedJobId: dispatched.stagedJobId,
-          dispatchAfterMs: Date.now() + 10_000,
-          jobDataJson: dispatched.jobDataJson,
-        });
-
-        const data = await inspectDataHash(dispatched.groupId);
-        expect(data[dispatched.stagedJobId]).toBe(dispatched.jobDataJson);
-      });
-
-      it("updates ready score to sqrt(pendingCount)", async () => {
-        const dispatched = await stageAndDispatch({ stagedJobId: "j1" });
-
-        await scripts.parkPausedJob({
-          groupId: dispatched.groupId,
-          stagedJobId: dispatched.stagedJobId,
-          dispatchAfterMs: Date.now() + 10_000,
-          jobDataJson: dispatched.jobDataJson,
-        });
-
-        const ready = await inspectReadySet();
-        // 1 job re-staged → sqrt(1) = 1
-        expect(ready).toContain(dispatched.groupId);
-        expect(ready).toContain("1");
-      });
-
-      it("returns true", async () => {
-        const dispatched = await stageAndDispatch({ stagedJobId: "j1" });
-
-        const result = await scripts.parkPausedJob({
-          groupId: dispatched.groupId,
-          stagedJobId: dispatched.stagedJobId,
-          dispatchAfterMs: Date.now() + 10_000,
-          jobDataJson: dispatched.jobDataJson,
-        });
-
-        expect(result).toBe(true);
-      });
+      const result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      expect(result).toBeNull();
     });
 
-    describe("when active key is stale", () => {
-      it("returns false and does not modify state", async () => {
-        const dispatched = await stageAndDispatch({ stagedJobId: "j1" });
+    it("skips group when paused at jobType level", async () => {
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j1",
+          dispatchAfterMs: 100,
+          jobDataJson: makePausedJobData(),
+        }),
+      );
+      await scripts.addPauseKey("ingestion/projection");
 
-        // Overwrite the active key with a different job ID
-        await redis.set(
-          `${keyPrefix()}group:${dispatched.groupId}:active`,
-          "some-other-job",
-          "EX",
-          60,
-        );
+      const result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      expect(result).toBeNull();
+    });
 
-        const result = await scripts.parkPausedJob({
-          groupId: dispatched.groupId,
-          stagedJobId: dispatched.stagedJobId,
-          dispatchAfterMs: Date.now() + 10_000,
-          jobDataJson: dispatched.jobDataJson,
-        });
+    it("skips group when paused at jobType/jobName level", async () => {
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j1",
+          dispatchAfterMs: 100,
+          jobDataJson: makePausedJobData(),
+        }),
+      );
+      await scripts.addPauseKey("ingestion/projection/traceProjection");
 
-        expect(result).toBe(false);
-        // Active key should still have the other job
-        expect(await inspectActiveKey(dispatched.groupId)).toBe("some-other-job");
+      const result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      expect(result).toBeNull();
+    });
+
+    it("dispatches non-paused groups while paused group is skipped", async () => {
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j1",
+          groupId: "group-paused",
+          dispatchAfterMs: 100,
+          jobDataJson: makePausedJobData(),
+        }),
+      );
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j2",
+          groupId: "group-ok",
+          dispatchAfterMs: 100,
+          jobDataJson: JSON.stringify({ hello: "world" }),
+        }),
+      );
+      await scripts.addPauseKey("ingestion");
+
+      const result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      expect(result).not.toBeNull();
+      expect(result!.groupId).toBe("group-ok");
+      expect(result!.stagedJobId).toBe("j2");
+    });
+
+    it("does not dequeue paused job (preserves FIFO)", async () => {
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j1",
+          dispatchAfterMs: 100,
+          jobDataJson: makePausedJobData(),
+        }),
+      );
+      await scripts.addPauseKey("ingestion");
+
+      await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+
+      // Job should still be in the group's job queue
+      const jobs = await inspectGroupJobs("group-a");
+      expect(jobs).toContain("j1");
+
+      // No active key should be set
+      const active = await inspectActiveKey("group-a");
+      expect(active).toBeNull();
+
+      // Data hash should still have the job
+      const data = await inspectDataHash("group-a");
+      expect(data["j1"]).toBeDefined();
+    });
+
+    it("resumes dispatch immediately after pause key is removed", async () => {
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j1",
+          dispatchAfterMs: 100,
+          jobDataJson: makePausedJobData(),
+        }),
+      );
+      await scripts.addPauseKey("ingestion");
+
+      const blocked = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      expect(blocked).toBeNull();
+
+      await scripts.removePauseKey("ingestion");
+
+      const result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      expect(result).not.toBeNull();
+      expect(result!.stagedJobId).toBe("j1");
+    });
+
+    it("does not pause when job has no __pipelineName", async () => {
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j1",
+          dispatchAfterMs: 100,
+          jobDataJson: JSON.stringify({ hello: "world" }),
+        }),
+      );
+      await scripts.addPauseKey("ingestion");
+
+      const result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      expect(result).not.toBeNull();
+      expect(result!.stagedJobId).toBe("j1");
+    });
+
+    it("different jobType is not paused", async () => {
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j1",
+          dispatchAfterMs: 100,
+          jobDataJson: makePausedJobData(),
+        }),
+      );
+      await scripts.addPauseKey("ingestion/reactor");
+
+      const result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      expect(result).not.toBeNull();
+      expect(result!.stagedJobId).toBe("j1");
+    });
+  });
+
+  describe("dispatchBatch > when paused jobs exist", () => {
+    it("skips paused groups and returns only non-paused", async () => {
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j1",
+          groupId: "group-paused",
+          dispatchAfterMs: 100,
+          jobDataJson: JSON.stringify({
+            __pipelineName: "ingestion",
+            __jobType: "projection",
+            hello: "world",
+          }),
+        }),
+      );
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j2",
+          groupId: "group-ok",
+          dispatchAfterMs: 100,
+          jobDataJson: JSON.stringify({ hello: "world" }),
+        }),
+      );
+      await scripts.addPauseKey("ingestion");
+
+      const results = await scripts.dispatchBatch({
+        nowMs: 200,
+        activeTtlSec: 60,
+        maxJobs: 10,
       });
+
+      expect(results).toHaveLength(1);
+      expect(results[0]!.groupId).toBe("group-ok");
+      expect(results[0]!.stagedJobId).toBe("j2");
+
+      // Paused job should still be in its queue
+      const jobs = await inspectGroupJobs("group-paused");
+      expect(jobs).toContain("j1");
     });
   });
 
