@@ -55,10 +55,12 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const hasAutoExpanded = useRef(false);
 
-  // Use zustand store for filters and groupBy
+  // Use zustand store for filters, groupBy, and viewMode
   const groupBy = useRunHistoryStore((s) => s.groupBy);
+  const viewMode = useRunHistoryStore((s) => s.viewMode);
   const filters = useRunHistoryStore((s) => s.filters);
   const setGroupBy = useRunHistoryStore((s) => s.setGroupBy);
+  const setViewMode = useRunHistoryStore((s) => s.setViewMode);
   const setFilters = useRunHistoryStore((s) => s.setFilters);
   const syncToUrl = useRunHistoryStore((s) => s.syncToUrl);
   const hydrateFromUrl = useRunHistoryStore((s) => s.hydrateFromUrl);
@@ -388,6 +390,8 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
           onFiltersChange={handleFiltersChange}
           groupBy={groupBy}
           onGroupByChange={setGroupBy}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
         />
       </Box>
 
@@ -399,7 +403,7 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
       )}
 
       {/* Run history rows */}
-      <VStack align="stretch" gap={2} paddingX={6} flex={1} overflow="auto">
+      <VStack align="stretch" gap={0} flex={1} overflow="auto">
         {groupBy === "none"
           ? batchRuns.map((batchRun) => {
               const summary = computeBatchRunSummary({ batchRun });
@@ -413,6 +417,7 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
                   targetName={singleTargetName}
                   onScenarioRunClick={handleScenarioRunClick}
                   expectedJobCount={expectedJobCount}
+                  viewMode={viewMode}
                 />
               );
             })
@@ -427,6 +432,7 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
                   onToggle={() => handleToggle(group.groupKey)}
                   onScenarioRunClick={handleScenarioRunClick}
                   targetName={singleTargetName}
+                  viewMode={viewMode}
                 />
               );
             })}

@@ -4,15 +4,17 @@
  * Used when group-by is set to "scenario" or "target".
  * Header: [chevron] [group_name (bold)] [status_icon] [pass_rate] ... [N runs]
  * Footer: [N passed] [N failed]
- * Expanded: ScenarioTargetRow for each run in the group.
+ * Expanded: ScenarioTargetRow (list) or ScenarioGridCard (grid) for each run.
  */
 
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Grid, HStack, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { SummaryStatusIcon } from "./SummaryStatusIcon";
 import type { RunGroup, RunGroupSummary } from "./run-history-transforms";
 import { ScenarioTargetRow } from "./ScenarioTargetRow";
+import { ScenarioGridCard } from "./ScenarioGridCard";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import type { ViewMode } from "./useRunHistoryStore";
 
 type GroupRowProps = {
   group: RunGroup;
@@ -21,6 +23,7 @@ type GroupRowProps = {
   onToggle: () => void;
   onScenarioRunClick: (scenarioRun: ScenarioRunData) => void;
   targetName?: string | null;
+  viewMode?: ViewMode;
 };
 
 export function GroupRow({
@@ -30,6 +33,7 @@ export function GroupRow({
   onToggle,
   onScenarioRunClick,
   targetName,
+  viewMode = "grid",
 }: GroupRowProps) {
   const runCount = group.scenarioRuns.length;
 
@@ -37,10 +41,10 @@ export function GroupRow({
     <Box
       border="1px solid"
       borderColor="border"
-      borderRadius="md"
+      borderRadius="0"
       overflow="hidden"
     >
-      {/* Group header - clickable to expand/collapse */}
+      {/* Group header - clickable to expand/collapse, sticky */}
       <HStack
         as="button"
         width="full"
@@ -53,6 +57,10 @@ export function GroupRow({
         role="button"
         aria-expanded={isExpanded}
         aria-label={`${group.groupLabel} group`}
+        position="sticky"
+        top={0}
+        zIndex={10}
+        bg="bg"
       >
         {isExpanded ? (
           <ChevronDown size={14} />
@@ -81,26 +89,49 @@ export function GroupRow({
 
       {/* Expanded content - individual scenario runs */}
       {isExpanded && (
-        <VStack
-          align="stretch"
-          gap={0}
-          borderTop="1px solid"
-          borderColor="border"
-        >
-          {group.scenarioRuns.map((scenarioRun) => (
-            <ScenarioTargetRow
-              key={scenarioRun.scenarioRunId}
-              scenarioRun={scenarioRun}
-              targetName={targetName ?? null}
-              onClick={() => onScenarioRunClick(scenarioRun)}
-            />
-          ))}
+        <>
+          {viewMode === "grid" ? (
+            <Grid
+              templateColumns="repeat(auto-fill, minmax(250px, 1fr))"
+              gap={4}
+              padding={4}
+              borderTop="1px solid"
+              borderColor="border"
+              data-testid="scenario-grid"
+            >
+              {group.scenarioRuns.map((scenarioRun) => (
+                <ScenarioGridCard
+                  key={scenarioRun.scenarioRunId}
+                  scenarioRun={scenarioRun}
+                  targetName={targetName ?? null}
+                  onClick={() => onScenarioRunClick(scenarioRun)}
+                />
+              ))}
+            </Grid>
+          ) : (
+            <VStack
+              align="stretch"
+              gap={0}
+              borderTop="1px solid"
+              borderColor="border"
+              data-testid="scenario-list"
+            >
+              {group.scenarioRuns.map((scenarioRun) => (
+                <ScenarioTargetRow
+                  key={scenarioRun.scenarioRunId}
+                  scenarioRun={scenarioRun}
+                  targetName={targetName ?? null}
+                  onClick={() => onScenarioRunClick(scenarioRun)}
+                />
+              ))}
+            </VStack>
+          )}
           {group.scenarioRuns.length === 0 && (
             <Text fontSize="sm" color="fg.muted" paddingX={4} paddingY={3}>
               No scenario runs in this group.
             </Text>
           )}
-        </VStack>
+        </>
       )}
 
       {/* Per-group footer stats */}

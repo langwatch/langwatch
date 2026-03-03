@@ -1,18 +1,20 @@
 /**
  * Collapsible row for a single batch run in the run history list.
  *
- * Header: [chevron] [suiteName] · [scenarioNames] · [timeAgo] · [spacer] · [statusIcon] [passRate%]
- * Expanded: shows ScenarioTargetRow for each scenario run in the batch.
+ * Header: [chevron] [suiteName] . [scenarioNames] . [timeAgo] . [spacer] . [statusIcon] [passRate%]
+ * Expanded: shows ScenarioTargetRow (list) or ScenarioGridCard (grid) for each scenario run.
  */
 
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Grid, HStack, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { SummaryStatusIcon } from "./SummaryStatusIcon";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { BatchRun, BatchRunSummary } from "./run-history-transforms";
 import { getScenarioDisplayNames } from "./run-history-transforms";
 import { ScenarioTargetRow } from "./ScenarioTargetRow";
+import { ScenarioGridCard } from "./ScenarioGridCard";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import type { ViewMode } from "./useRunHistoryStore";
 
 type RunRowProps = {
   batchRun: BatchRun;
@@ -22,7 +24,8 @@ type RunRowProps = {
   targetName: string | null;
   onScenarioRunClick: (scenarioRun: ScenarioRunData) => void;
   expectedJobCount?: number;
-  suiteName?: string; // displayed in All Runs view
+  suiteName?: string;
+  viewMode?: ViewMode;
 };
 
 export function RunRow({
@@ -34,6 +37,7 @@ export function RunRow({
   onScenarioRunClick,
   expectedJobCount,
   suiteName,
+  viewMode = "grid",
 }: RunRowProps) {
   const timeAgo = formatTimeAgoCompact(batchRun.timestamp);
   const scenarioNames = suiteName
@@ -44,10 +48,10 @@ export function RunRow({
     <Box
       border="1px solid"
       borderColor="border"
-      borderRadius="md"
+      borderRadius="0"
       overflow="hidden"
     >
-      {/* Run header - clickable to expand/collapse */}
+      {/* Run header - clickable to expand/collapse, sticky */}
       <HStack
         as="button"
         width="full"
@@ -60,6 +64,10 @@ export function RunRow({
         role="button"
         aria-expanded={isExpanded}
         aria-label={`Run from ${timeAgo ?? "unknown time"}`}
+        position="sticky"
+        top={0}
+        zIndex={10}
+        bg="bg"
       >
         {isExpanded ? (
           <ChevronDown size={14} />
@@ -105,23 +113,51 @@ export function RunRow({
         </Text>
       </HStack>
 
-      {/* Expanded content - scenario x target rows */}
+      {/* Expanded content - scenario results in list or grid */}
       {isExpanded && (
-        <VStack align="stretch" gap={0} borderTop="1px solid" borderColor="border">
-          {batchRun.scenarioRuns.map((scenarioRun) => (
-            <ScenarioTargetRow
-              key={scenarioRun.scenarioRunId}
-              scenarioRun={scenarioRun}
-              targetName={targetName}
-              onClick={() => onScenarioRunClick(scenarioRun)}
-            />
-          ))}
+        <>
+          {viewMode === "grid" ? (
+            <Grid
+              templateColumns="repeat(auto-fill, minmax(250px, 1fr))"
+              gap={4}
+              padding={4}
+              borderTop="1px solid"
+              borderColor="border"
+              data-testid="scenario-grid"
+            >
+              {batchRun.scenarioRuns.map((scenarioRun) => (
+                <ScenarioGridCard
+                  key={scenarioRun.scenarioRunId}
+                  scenarioRun={scenarioRun}
+                  targetName={targetName}
+                  onClick={() => onScenarioRunClick(scenarioRun)}
+                />
+              ))}
+            </Grid>
+          ) : (
+            <VStack
+              align="stretch"
+              gap={0}
+              borderTop="1px solid"
+              borderColor="border"
+              data-testid="scenario-list"
+            >
+              {batchRun.scenarioRuns.map((scenarioRun) => (
+                <ScenarioTargetRow
+                  key={scenarioRun.scenarioRunId}
+                  scenarioRun={scenarioRun}
+                  targetName={targetName}
+                  onClick={() => onScenarioRunClick(scenarioRun)}
+                />
+              ))}
+            </VStack>
+          )}
           {batchRun.scenarioRuns.length === 0 && (
             <Text fontSize="sm" color="fg.muted" paddingX={4} paddingY={3}>
               No scenario runs in this batch.
             </Text>
           )}
-        </VStack>
+        </>
       )}
 
       {/* Per-batch footer stats */}
