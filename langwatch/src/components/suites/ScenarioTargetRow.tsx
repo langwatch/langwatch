@@ -14,6 +14,7 @@ type ScenarioTargetRowProps = {
   scenarioRun: ScenarioRunData;
   targetName: string | null;
   onClick: () => void;
+  iteration?: number;
 };
 
 function formatDuration(ms: number): string {
@@ -38,11 +39,13 @@ export function ScenarioTargetRow({
   scenarioRun,
   targetName,
   onClick,
+  iteration,
 }: ScenarioTargetRowProps) {
   const scenarioName = scenarioRun.name ?? scenarioRun.scenarioId;
-  const displayName = targetName
+  let displayName = targetName
     ? `${scenarioName} \u00d7 ${targetName}`
     : scenarioName;
+  if (iteration != null) displayName += ` (#${iteration})`;
 
   const config = SCENARIO_RUN_STATUS_CONFIG[scenarioRun.status];
 

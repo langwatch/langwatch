@@ -3,8 +3,8 @@
  *
  * Integration tests for ScenarioGridCard component.
  *
- * Tests that the grid card displays scenario name, target name,
- * and iteration number when available.
+ * Tests that the grid card displays a combined "Scenario x Target (#N)" title
+ * using the same format as ScenarioTargetRow.
  *
  * @see specs/features/suites/grid-view-and-borderless-tables.feature
  *   Scenario: Grid card shows scenario name, target, and iteration
@@ -25,8 +25,8 @@ describe("<ScenarioGridCard/>", () => {
     cleanup();
   });
 
-  describe("when rendered with scenario name", () => {
-    it("displays the scenario name as the card title", () => {
+  describe("when rendered with scenario name only", () => {
+    it("displays just the scenario name as the card title", () => {
       render(
         <ScenarioGridCard
           scenarioRun={makeScenarioRunData({ name: "Login Flow" })}
@@ -56,40 +56,41 @@ describe("<ScenarioGridCard/>", () => {
   });
 
   describe("when target name is provided", () => {
-    it("displays the target name", () => {
+    it("includes target in the combined title with multiplication sign", () => {
       render(
         <ScenarioGridCard
-          scenarioRun={makeScenarioRunData()}
+          scenarioRun={makeScenarioRunData({ name: "Login Flow" })}
           targetName="Prod Agent"
           onClick={vi.fn()}
         />,
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByTestId("card-target-name")).toHaveTextContent("Target: Prod Agent");
+      expect(screen.getByText("Login Flow \u00d7 Prod Agent")).toBeInTheDocument();
     });
   });
 
   describe("when target name is null", () => {
-    it("does not display a target name", () => {
+    it("does not include target in the title", () => {
       render(
         <ScenarioGridCard
-          scenarioRun={makeScenarioRunData()}
+          scenarioRun={makeScenarioRunData({ name: "Login Flow" })}
           targetName={null}
           onClick={vi.fn()}
         />,
         { wrapper: Wrapper },
       );
 
-      expect(screen.queryByTestId("card-target-name")).not.toBeInTheDocument();
+      expect(screen.getByText("Login Flow")).toBeInTheDocument();
+      expect(screen.queryByText(/\u00d7/)).not.toBeInTheDocument();
     });
   });
 
   describe("when iteration is provided", () => {
-    it("displays the iteration number", () => {
+    it("appends iteration number to the title", () => {
       render(
         <ScenarioGridCard
-          scenarioRun={makeScenarioRunData()}
+          scenarioRun={makeScenarioRunData({ name: "Login Flow" })}
           targetName={null}
           onClick={vi.fn()}
           iteration={3}
@@ -97,22 +98,22 @@ describe("<ScenarioGridCard/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByTestId("card-iteration")).toHaveTextContent("Iteration 3");
+      expect(screen.getByText("Login Flow (#3)")).toBeInTheDocument();
     });
   });
 
   describe("when iteration is not provided", () => {
-    it("does not display an iteration number", () => {
+    it("does not append iteration to the title", () => {
       render(
         <ScenarioGridCard
-          scenarioRun={makeScenarioRunData()}
+          scenarioRun={makeScenarioRunData({ name: "Login Flow" })}
           targetName={null}
           onClick={vi.fn()}
         />,
         { wrapper: Wrapper },
       );
 
-      expect(screen.queryByTestId("card-iteration")).not.toBeInTheDocument();
+      expect(screen.queryByText(/\(#/)).not.toBeInTheDocument();
     });
   });
 
@@ -136,13 +137,10 @@ describe("<ScenarioGridCard/>", () => {
   });
 
   describe("when rendered with all data", () => {
-    it("displays scenario name, target, iteration, and duration together", () => {
+    it("displays combined title with scenario, target, and iteration", () => {
       render(
         <ScenarioGridCard
-          scenarioRun={makeScenarioRunData({
-            name: "Refund Flow",
-            durationInMs: 1500,
-          })}
+          scenarioRun={makeScenarioRunData({ name: "Refund Flow" })}
           targetName="Staging Agent"
           onClick={vi.fn()}
           iteration={2}
@@ -150,10 +148,9 @@ describe("<ScenarioGridCard/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("Refund Flow")).toBeInTheDocument();
-      expect(screen.getByTestId("card-target-name")).toHaveTextContent("Target: Staging Agent");
-      expect(screen.getByTestId("card-iteration")).toHaveTextContent("Iteration 2");
-      expect(screen.getByText("1.5s")).toBeInTheDocument();
+      expect(
+        screen.getByText("Refund Flow \u00d7 Staging Agent (#2)"),
+      ).toBeInTheDocument();
     });
   });
 });

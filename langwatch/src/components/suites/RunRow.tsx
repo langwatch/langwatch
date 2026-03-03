@@ -156,6 +156,7 @@ export function RunRow({
                   scenarioRun={scenarioRun}
                   targetName={targetName}
                   onClick={() => onScenarioRunClick(scenarioRun)}
+                  iteration={iterationMap.get(scenarioRun.scenarioRunId)}
                 />
               ))}
             </VStack>

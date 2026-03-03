@@ -4,7 +4,8 @@
  * Used when group-by is set to "scenario" or "target".
  * Header: [chevron] [group_name (bold)] [status_icon] [pass_rate] ... [N runs]
  * Footer: [N passed] [N failed]
- * Expanded: ScenarioTargetRow (list) or ScenarioGridCard (grid) for each run.
+ * Expanded: sub-grouped by batch, each with a lightweight header showing
+ * timestamp and pass rate, then ScenarioTargetRow (list) or ScenarioGridCard (grid).
  *
  * The header is rendered as a direct child of the scroll container (no wrapper Box)
  * so that `position: sticky` works correctly within the scrollport.
@@ -15,9 +16,14 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { useMemo } from "react";
 import { SummaryStatusIcon } from "./SummaryStatusIcon";
 import type { RunGroup, RunGroupSummary } from "./run-history-transforms";
-import { computeIterationMap } from "./run-history-transforms";
+import {
+  computeBatchRunSummary,
+  computeIterationMap,
+  groupRunsByBatchId,
+} from "./run-history-transforms";
 import { ScenarioTargetRow } from "./ScenarioTargetRow";
 import { ScenarioGridCard } from "./ScenarioGridCard";
+import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import type { ViewMode } from "./useRunHistoryStore";
 
@@ -42,8 +48,8 @@ export function GroupRow({
 }: GroupRowProps) {
   const runCount = group.scenarioRuns.length;
 
-  const iterationMap = useMemo(
-    () => computeIterationMap({ scenarioRuns: group.scenarioRuns }),
+  const batches = useMemo(
+    () => groupRunsByBatchId({ runs: group.scenarioRuns }),
     [group.scenarioRuns],
   );
 
@@ -97,44 +103,18 @@ export function GroupRow({
         </Text>
       </HStack>
 
-      {/* Expanded content - individual scenario runs */}
+      {/* Expanded content - scenario runs sub-grouped by batch */}
       {isExpanded && (
         <>
-          {viewMode === "grid" ? (
-            <Grid
-              templateColumns="repeat(auto-fill, minmax(250px, 1fr))"
-              gap={4}
-              padding={4}
-              position="relative"
-              zIndex={0}
-              data-testid="scenario-grid"
-            >
-              {group.scenarioRuns.map((scenarioRun) => (
-                <ScenarioGridCard
-                  key={scenarioRun.scenarioRunId}
-                  scenarioRun={scenarioRun}
-                  targetName={targetName ?? null}
-                  onClick={() => onScenarioRunClick(scenarioRun)}
-                  iteration={iterationMap.get(scenarioRun.scenarioRunId)}
-                />
-              ))}
-            </Grid>
-          ) : (
-            <VStack
-              align="stretch"
-              gap={0}
-              data-testid="scenario-list"
-            >
-              {group.scenarioRuns.map((scenarioRun) => (
-                <ScenarioTargetRow
-                  key={scenarioRun.scenarioRunId}
-                  scenarioRun={scenarioRun}
-                  targetName={targetName ?? null}
-                  onClick={() => onScenarioRunClick(scenarioRun)}
-                />
-              ))}
-            </VStack>
-          )}
+          {batches.map((batch) => (
+            <BatchSection
+              key={batch.batchRunId}
+              batch={batch}
+              targetName={targetName ?? null}
+              onScenarioRunClick={onScenarioRunClick}
+              viewMode={viewMode}
+            />
+          ))}
           {group.scenarioRuns.length === 0 && (
             <Text fontSize="sm" color="fg.muted" paddingX={4} paddingY={3}>
               No scenario runs in this group.
@@ -169,5 +149,95 @@ export function GroupRow({
         </HStack>
       </HStack>
     </>
+  );
+}
+
+/**
+ * A lightweight batch section within a group, showing a sub-header
+ * with timestamp and pass rate, followed by cards or rows.
+ */
+function BatchSection({
+  batch,
+  targetName,
+  onScenarioRunClick,
+  viewMode,
+}: {
+  batch: ReturnType<typeof groupRunsByBatchId>[number];
+  targetName: string | null;
+  onScenarioRunClick: (scenarioRun: ScenarioRunData) => void;
+  viewMode: ViewMode;
+}) {
+  const batchSummary = useMemo(
+    () => computeBatchRunSummary({ batchRun: batch }),
+    [batch],
+  );
+
+  const iterationMap = useMemo(
+    () => computeIterationMap({ scenarioRuns: batch.scenarioRuns }),
+    [batch.scenarioRuns],
+  );
+
+  const timeAgo = formatTimeAgoCompact(batch.timestamp);
+
+  return (
+    <VStack align="stretch" gap={0}>
+      {/* Batch sub-header (not sticky) */}
+      <HStack
+        paddingX={4}
+        paddingY={2}
+        gap={2}
+        bg="bg.subtle"
+        borderBottom="1px solid"
+        borderColor="border.subtle"
+        data-testid="batch-sub-header"
+      >
+        <Text fontSize="xs" color="fg.muted">
+          {timeAgo}
+        </Text>
+        <Box flex={1} />
+        <SummaryStatusIcon summary={batchSummary} />
+        <Text
+          fontSize="xs"
+          fontWeight="medium"
+          color={batchSummary.failedCount > 0 ? "red.600" : "green.600"}
+        >
+          {Math.round(batchSummary.passRate)}%
+        </Text>
+      </HStack>
+
+      {/* Batch content */}
+      {viewMode === "grid" ? (
+        <Grid
+          templateColumns="repeat(auto-fill, minmax(250px, 1fr))"
+          gap={4}
+          padding={4}
+          position="relative"
+          zIndex={0}
+          data-testid="scenario-grid"
+        >
+          {batch.scenarioRuns.map((scenarioRun) => (
+            <ScenarioGridCard
+              key={scenarioRun.scenarioRunId}
+              scenarioRun={scenarioRun}
+              targetName={targetName}
+              onClick={() => onScenarioRunClick(scenarioRun)}
+              iteration={iterationMap.get(scenarioRun.scenarioRunId)}
+            />
+          ))}
+        </Grid>
+      ) : (
+        <VStack align="stretch" gap={0} data-testid="scenario-list">
+          {batch.scenarioRuns.map((scenarioRun) => (
+            <ScenarioTargetRow
+              key={scenarioRun.scenarioRunId}
+              scenarioRun={scenarioRun}
+              targetName={targetName}
+              onClick={() => onScenarioRunClick(scenarioRun)}
+              iteration={iterationMap.get(scenarioRun.scenarioRunId)}
+            />
+          ))}
+        </VStack>
+      )}
+    </VStack>
   );
 }

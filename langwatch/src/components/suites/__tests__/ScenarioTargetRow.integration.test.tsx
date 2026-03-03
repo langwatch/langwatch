@@ -89,6 +89,42 @@ describe("<ScenarioTargetRow/>", () => {
     });
   });
 
+  describe("given a scenario run with iteration", () => {
+    it("appends iteration number to the display name", () => {
+      render(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData()}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+          iteration={3}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(
+        screen.getByText("Angry refund request \u00d7 Prod Agent (#3)"),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("given a scenario run without target but with iteration", () => {
+    it("appends iteration to scenario name only", () => {
+      render(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData()}
+          targetName={null}
+          onClick={vi.fn()}
+          iteration={1}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(
+        screen.getByText("Angry refund request (#1)"),
+      ).toBeInTheDocument();
+    });
+  });
+
   describe("given a failed scenario run (ERROR status)", () => {
     it("displays 'failed' label for ERROR status", () => {
       render(

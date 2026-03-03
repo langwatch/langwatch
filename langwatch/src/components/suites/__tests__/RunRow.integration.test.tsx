@@ -102,7 +102,7 @@ describe("<RunRow/>", () => {
       ).toBeInTheDocument();
     });
 
-    it("displays duration for finished runs", () => {
+    it("displays duration for finished runs in list view", () => {
       render(
         <RunRow
           batchRun={makeBatchRun()}
@@ -111,6 +111,7 @@ describe("<RunRow/>", () => {
           onToggle={vi.fn()}
           targetName="Prod Agent"
           onScenarioRunClick={vi.fn()}
+          viewMode="list"
         />,
         { wrapper: Wrapper },
       );

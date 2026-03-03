@@ -2,12 +2,11 @@
  * Grid card for a scenario run, used in grid view mode.
  *
  * Wraps SimulationCard to display a scenario run result as a card
- * with status overlay, scenario name, target name, iteration, and duration.
+ * with status overlay and a combined "Scenario x Target (#N)" title.
  */
 
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Text } from "@chakra-ui/react";
 import { SimulationCard } from "~/components/simulations/SimulationCard";
-import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 
 type ScenarioGridCardProps = {
@@ -17,9 +16,23 @@ type ScenarioGridCardProps = {
   iteration?: number;
 };
 
-function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
+/**
+ * Builds a combined display title in the format: "Scenario x Target (#N)".
+ * Omits target and iteration segments when not available.
+ */
+function buildDisplayTitle({
+  scenarioName,
+  targetName,
+  iteration,
+}: {
+  scenarioName: string;
+  targetName: string | null;
+  iteration?: number;
+}): string {
+  let title = scenarioName;
+  if (targetName) title += ` \u00d7 ${targetName}`;
+  if (iteration != null) title += ` (#${iteration})`;
+  return title;
 }
 
 export function ScenarioGridCard({
@@ -29,7 +42,7 @@ export function ScenarioGridCard({
   iteration,
 }: ScenarioGridCardProps) {
   const scenarioName = scenarioRun.name ?? scenarioRun.scenarioId;
-  const config = SCENARIO_RUN_STATUS_CONFIG[scenarioRun.status];
+  const title = buildDisplayTitle({ scenarioName, targetName, iteration });
 
   return (
     <Box
@@ -38,34 +51,15 @@ export function ScenarioGridCard({
       cursor="pointer"
       height="160px"
       textAlign="left"
-      aria-label={`View details for ${scenarioName}`}
+      aria-label={`View details for ${title}`}
       _hover={{ transform: "translateY(-2px)", transition: "transform 0.15s" }}
     >
-      <SimulationCard title={scenarioName} status={scenarioRun.status}>
-        <VStack align="start" padding={3} gap={1}>
-          {targetName && (
-            <Text fontSize="xs" color="fg.muted" data-testid="card-target-name">
-              Target: {targetName}
-            </Text>
-          )}
-          <HStack gap={2} flexWrap="wrap">
-            {iteration != null && (
-              <Text fontSize="xs" color="fg.muted" data-testid="card-iteration">
-                Iteration {iteration}
-              </Text>
-            )}
-            {config.isComplete && (
-              <Text fontSize="xs" color={config.fgColor}>
-                {config.label}
-              </Text>
-            )}
-            {scenarioRun.durationInMs > 0 && (
-              <Text fontSize="xs" color="fg.muted">
-                {formatDuration(scenarioRun.durationInMs)}
-              </Text>
-            )}
-          </HStack>
-        </VStack>
+      <SimulationCard title={title} status={scenarioRun.status}>
+        <Text fontSize="xs" color="fg.muted" padding={3}>
+          {scenarioRun.messages.length > 0
+            ? `${scenarioRun.messages.length} messages`
+            : "\u00a0"}
+        </Text>
       </SimulationCard>
     </Box>
   );
