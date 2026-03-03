@@ -27,8 +27,14 @@ export function DashboardPage({ data, queues, onPause, onResume, sortColumn, sor
 
   const handlePause = useCallback(
     async (pauseKey: string) => {
-      for (const queueName of queueNames) {
-        await apiPost("/api/actions/pause", { queueName, pauseKey });
+      const results = await Promise.allSettled(
+        queueNames.map((queueName) =>
+          apiPost("/api/actions/pause", { queueName, pauseKey }),
+        ),
+      );
+      const failures = results.filter((r) => r.status === "rejected");
+      if (failures.length > 0) {
+        console.error("Pause failed for some queues:", failures);
       }
     },
     [queueNames],
@@ -36,8 +42,14 @@ export function DashboardPage({ data, queues, onPause, onResume, sortColumn, sor
 
   const handleUnpause = useCallback(
     async (pauseKey: string) => {
-      for (const queueName of queueNames) {
-        await apiPost("/api/actions/unpause", { queueName, pauseKey });
+      const results = await Promise.allSettled(
+        queueNames.map((queueName) =>
+          apiPost("/api/actions/unpause", { queueName, pauseKey }),
+        ),
+      );
+      const failures = results.filter((r) => r.status === "rejected");
+      if (failures.length > 0) {
+        console.error("Unpause failed for some queues:", failures);
       }
     },
     [queueNames],

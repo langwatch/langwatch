@@ -9,19 +9,19 @@ function collectLeafNames(node: PipelineNode): string[] {
 }
 
 /** Build the hierarchical path for a node at each level of the tree. */
-function buildPauseKey(ancestors: string[], name: string): string {
+function buildPauseKey({ ancestors, name }: { ancestors: string[]; name: string }): string {
   return [...ancestors, name].join("/");
 }
 
 /** Check if a key is paused (direct match or any ancestor matches). */
-function isPausedKey(pauseKey: string, pausedKeys: string[]): boolean {
+function isPausedKey({ pauseKey, pausedKeys }: { pauseKey: string; pausedKeys: string[] }): boolean {
   return pausedKeys.some(
     (k) => k === pauseKey || pauseKey.startsWith(k + "/"),
   );
 }
 
 /** Check if the pause is inherited from an ancestor rather than set directly. */
-function isInheritedPause(pauseKey: string, pausedKeys: string[]): boolean {
+function isInheritedPause({ pauseKey, pausedKeys }: { pauseKey: string; pausedKeys: string[] }): boolean {
   return (
     !pausedKeys.includes(pauseKey) &&
     pausedKeys.some((k) => pauseKey.startsWith(k + "/"))
@@ -35,8 +35,8 @@ interface TreeNodeProps {
   selectedPipeline: string | null;
   onSelectPipeline: (name: string | null) => void;
   pausedKeys: string[];
-  onPause: (pauseKey: string) => void;
-  onUnpause: (pauseKey: string) => void;
+  onPause: (pauseKey: string) => Promise<void>;
+  onUnpause: (pauseKey: string) => Promise<void>;
 }
 
 function TreeNode({
@@ -56,9 +56,9 @@ function TreeNode({
   const isSelected = selectedPipeline !== null && leafNames.includes(selectedPipeline);
   const isExactSelected = selectedPipeline === node.name;
 
-  const pauseKey = buildPauseKey(ancestors, node.name);
-  const paused = isPausedKey(pauseKey, pausedKeys);
-  const inherited = isInheritedPause(pauseKey, pausedKeys);
+  const pauseKey = buildPauseKey({ ancestors, name: node.name });
+  const paused = isPausedKey({ pauseKey, pausedKeys });
+  const inherited = isInheritedPause({ pauseKey, pausedKeys });
   const directlyPaused = pausedKeys.includes(pauseKey);
 
   const handleClick = () => {
@@ -69,12 +69,16 @@ function TreeNode({
     }
   };
 
-  const handlePauseToggle = (e: React.MouseEvent) => {
+  const handlePauseToggle = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (directlyPaused) {
-      onUnpause(pauseKey);
-    } else if (!paused) {
-      onPause(pauseKey);
+    try {
+      if (directlyPaused) {
+        await onUnpause(pauseKey);
+      } else if (!paused) {
+        await onPause(pauseKey);
+      }
+    } catch (err) {
+      console.error("Failed to toggle pause:", err);
     }
   };
 
@@ -191,8 +195,8 @@ interface PipelineTreeProps {
   selectedPipeline: string | null;
   onSelectPipeline: (name: string | null) => void;
   pausedKeys: string[];
-  onPause: (pauseKey: string) => void;
-  onUnpause: (pauseKey: string) => void;
+  onPause: (pauseKey: string) => Promise<void>;
+  onUnpause: (pauseKey: string) => Promise<void>;
 }
 
 export function PipelineTree({ nodes, selectedPipeline, onSelectPipeline, pausedKeys, onPause, onUnpause }: PipelineTreeProps) {

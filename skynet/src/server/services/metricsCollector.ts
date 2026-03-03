@@ -112,7 +112,7 @@ export class MetricsCollector {
     }
 
     const treeSeedKeys = [...new Set([...this.currentPausedKeys, ...this.knownPipelinePaths])];
-    const pipelineTree = buildPipelineTree(queues, treeSeedKeys);
+    const pipelineTree = buildPipelineTree({ queues, seedKeys: treeSeedKeys });
 
     const mem = process.memoryUsage();
 
@@ -428,7 +428,7 @@ export class MetricsCollector {
   }
 }
 
-function buildPipelineTree(queues: QueueInfo[], pausedKeys: string[] = []): PipelineNode[] {
+function buildPipelineTree({ queues, seedKeys = [] }: { queues: QueueInfo[]; seedKeys?: string[] }): PipelineNode[] {
   const pipelineMap = new Map<string, Map<string, Map<string, { pending: number; active: number; blocked: number }>>>();
 
   // Helper to ensure a path exists in the map with at least zero counts
@@ -444,8 +444,8 @@ function buildPipelineTree(queues: QueueInfo[], pausedKeys: string[] = []): Pipe
     }
   };
 
-  // Seed the tree from paused keys so they always appear even with 0 counts
-  for (const key of pausedKeys) {
+  // Seed the tree from seed keys so they always appear even with 0 counts
+  for (const key of seedKeys) {
     const parts = key.split("/");
     if (parts.length >= 1) ensurePath(parts[0]!, parts[1], parts[2]);
   }

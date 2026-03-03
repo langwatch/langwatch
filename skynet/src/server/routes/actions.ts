@@ -1,11 +1,20 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import type IORedis from "ioredis";
 import { retryJob } from "../services/bullmqService.ts";
 import { isGroupQueue } from "../services/queueDiscovery.ts";
 import { DRAIN_GROUP_LUA, UNBLOCK_LUA } from "../services/luaScripts.ts";
 
+const pauseRateLimiter = rateLimit({ windowMs: 60_000, max: 30 });
+
 function isValidGroupId(id: unknown): id is string {
 	return typeof id === "string" && id.length > 0 && id.length <= 512;
+}
+
+const PAUSE_KEY_PATTERN = /^[\w\-/]+$/;
+
+function isValidPauseKey(key: unknown): key is string {
+	return typeof key === "string" && key.length > 0 && key.length <= 200 && PAUSE_KEY_PATTERN.test(key);
 }
 
 export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => string[]): Router {
@@ -181,11 +190,16 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
     }
   });
 
-  router.post("/api/actions/pause", async (req, res) => {
+  router.post("/api/actions/pause", pauseRateLimiter, async (req, res) => {
     try {
       const { queueName, pauseKey } = req.body as { queueName?: string; pauseKey?: string };
       if (!queueName || !pauseKey) {
         res.status(400).json({ error: "queueName and pauseKey are required" });
+        return;
+      }
+
+      if (!isValidPauseKey(pauseKey)) {
+        res.status(400).json({ error: "Invalid pauseKey format (max 200 chars, alphanumeric/dash/underscore/slash only)" });
         return;
       }
 
@@ -202,11 +216,16 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
     }
   });
 
-  router.post("/api/actions/unpause", async (req, res) => {
+  router.post("/api/actions/unpause", pauseRateLimiter, async (req, res) => {
     try {
       const { queueName, pauseKey } = req.body as { queueName?: string; pauseKey?: string };
       if (!queueName || !pauseKey) {
         res.status(400).json({ error: "queueName and pauseKey are required" });
+        return;
+      }
+
+      if (!isValidPauseKey(pauseKey)) {
+        res.status(400).json({ error: "Invalid pauseKey format (max 200 chars, alphanumeric/dash/underscore/slash only)" });
         return;
       }
 
@@ -225,7 +244,7 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
     }
   });
 
-  router.get("/api/actions/paused", async (req, res) => {
+  router.get("/api/actions/paused", pauseRateLimiter, async (req, res) => {
     try {
       const queueName = req.query.queueName as string | undefined;
       if (!queueName) {

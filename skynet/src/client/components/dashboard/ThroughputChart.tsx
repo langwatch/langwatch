@@ -21,18 +21,11 @@ interface ChartMouseEvent {
   activeLabel?: string | number;
 }
 
-interface SeriesConfig {
-  key: keyof ThroughputPoint;
-  label: string;
-  color: string;
-  gradientId: string;
-}
-
-const SERIES: SeriesConfig[] = [
+const SERIES = [
   { key: "stagedPerSec", label: "Staged/s", color: "#00f0ff", gradientId: "stagedGrad" },
   { key: "completedPerSec", label: "Completed/s", color: "#00ff41", gradientId: "completedGrad" },
   { key: "failedPerSec", label: "Failed/s", color: "#ff0033", gradientId: "failedGrad" },
-];
+] as const;
 
 /**
  * Zoom can be anchored:
@@ -188,10 +181,21 @@ export function ThroughputChart({ data }: { data: ThroughputPoint[] }) {
                 key={s.key}
                 spacing={1.5}
                 cursor="pointer"
+                role="button"
+                tabIndex={0}
+                aria-pressed={!isHidden}
                 onClick={() => toggleSeries(s.key)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    toggleSeries(s.key);
+                  }
+                }}
                 opacity={isHidden ? 0.3 : 1}
                 transition="opacity 0.15s"
                 _hover={{ opacity: isHidden ? 0.5 : 0.8 }}
+                _focus={{ outline: "1px solid #00f0ff", outlineOffset: "2px" }}
+                _focusVisible={{ outline: "1px solid #00f0ff", outlineOffset: "2px" }}
               >
                 <Box w="8px" h="8px" borderRadius="1px" bg={isHidden ? tickColor : s.color} transition="background 0.15s" />
                 <Text
@@ -207,16 +211,27 @@ export function ThroughputChart({ data }: { data: ThroughputPoint[] }) {
             );
           })}
           {zoom && (
-            <Text
+            <Box
+              as="span"
               fontSize="10px"
               color="#ffc800"
               cursor="pointer"
+              role="button"
+              tabIndex={0}
               onClick={resetZoom}
+              onKeyDown={(e: React.KeyboardEvent) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  resetZoom();
+                }
+              }}
               _hover={{ textDecoration: "underline" }}
+              _focus={{ outline: "1px solid #ffc800", outlineOffset: "2px" }}
+              _focusVisible={{ outline: "1px solid #ffc800", outlineOffset: "2px" }}
               fontFamily="mono"
             >
               RESET ZOOM
-            </Text>
+            </Box>
           )}
         </HStack>
       </HStack>
