@@ -136,8 +136,17 @@ export function useSuiteForm({
     return result;
   }, [agents, prompts]);
 
-  // -- Derived: stale target references (selected but no longer available) --
-  const staleTargetIds = useMemo(() => {
+  // -- Derived: archived scenarios (selected but not in active scenarios query) --
+  const archivedScenarioIds = useMemo(() => {
+    if (!scenarios) return [];
+    const activeIds = new Set(scenarios.map((s) => s.id));
+    return selectedScenarioIds
+      .filter((id) => !activeIds.has(id))
+      .map((id) => ({ id, name: id }));
+  }, [selectedScenarioIds, scenarios]);
+
+  // -- Derived: archived targets (selected but no longer available, with full type info) --
+  const archivedTargets = useMemo(() => {
     if (!agents || !prompts) return [];
     return selectedTargets
       .filter(
@@ -146,7 +155,7 @@ export function useSuiteForm({
             (a) => a.type === t.type && a.referenceId === t.referenceId,
           ),
       )
-      .map((t) => t.referenceId);
+      .map((t) => ({ ...t, name: t.referenceId }));
   }, [selectedTargets, availableTargets, agents, prompts]);
 
   // -- Derived: unique scenario labels --
@@ -261,6 +270,21 @@ export function useSuiteForm({
     );
   };
 
+  const removeArchivedScenario = (id: string) => {
+    const current = form.getValues("selectedScenarioIds");
+    form.setValue("selectedScenarioIds", current.filter((s) => s !== id));
+  };
+
+  const removeArchivedTarget = (target: Pick<SuiteTarget, "type" | "referenceId">) => {
+    const current = form.getValues("selectedTargets");
+    form.setValue(
+      "selectedTargets",
+      current.filter(
+        (t) => !(t.type === target.type && t.referenceId === target.referenceId),
+      ),
+    );
+  };
+
   return {
     // react-hook-form instance
     form,
@@ -293,7 +317,12 @@ export function useSuiteForm({
     filteredTargets,
     toggleTarget,
     isTargetSelected,
-    staleTargetIds,
+
+    // Archived references
+    archivedScenarioIds,
+    archivedTargets,
+    removeArchivedScenario,
+    removeArchivedTarget,
 
     // Actions
     addLabel,
