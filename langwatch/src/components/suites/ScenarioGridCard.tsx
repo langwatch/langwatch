@@ -3,25 +3,14 @@
  *
  * Wraps SimulationCard to display a scenario run result as a card
  * with status overlay and a combined "Scenario x Target (#N)" title.
+ * Uses MessagePreview for a lightweight conversation preview that
+ * doesn't require the CopilotKit runtime.
  */
 
-import { Box, Text, VStack } from "@chakra-ui/react";
+import { Box } from "@chakra-ui/react";
 import { SimulationCard } from "~/components/simulations/SimulationCard";
+import { MessagePreview } from "./MessagePreview";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
-
-function extractContent(message: Record<string, unknown>): string | null {
-  if (typeof message.content === "string" && message.content && message.content !== "None") {
-    return message.content;
-  }
-  return null;
-}
-
-function extractRole(message: Record<string, unknown>): string {
-  const role = typeof message.role === "string" ? message.role : "unknown";
-  if (role === "assistant" || role === "agent") return "Agent";
-  if (role === "user") return "User";
-  return role.charAt(0).toUpperCase() + role.slice(1);
-}
 
 type ScenarioGridCardProps = {
   scenarioRun: ScenarioRunData;
@@ -63,27 +52,13 @@ export function ScenarioGridCard({
       as="button"
       onClick={onClick}
       cursor="pointer"
-      height="160px"
+      height="200px"
       textAlign="left"
       aria-label={`View details for ${title}`}
       _hover={{ transform: "translateY(-2px)", transition: "transform 0.15s" }}
     >
       <SimulationCard title={title} status={scenarioRun.status}>
-        <VStack align="start" gap={1} padding={3} overflow="hidden">
-          {(scenarioRun.messages as Record<string, unknown>[])
-            .slice(0, 4)
-            .map((msg, i) => {
-              const content = extractContent(msg);
-              if (!content) return null;
-              const role = extractRole(msg);
-              return (
-                <Text key={i} fontSize="xs" color="fg.muted" lineClamp={2}>
-                  <Text as="span" fontWeight="semibold">{role}:</Text>{" "}
-                  {content}
-                </Text>
-              );
-            })}
-        </VStack>
+        <MessagePreview messages={scenarioRun.messages} />
       </SimulationCard>
     </Box>
   );
