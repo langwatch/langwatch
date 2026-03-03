@@ -61,7 +61,7 @@ describe("<RunRow/> borderless styling", () => {
           summary={makeSummary()}
           isExpanded={false}
           onToggle={vi.fn()}
-          targetName="Prod Agent"
+          resolveTargetName={() => "Prod Agent"}
           onScenarioRunClick={vi.fn()}
         />,
         { wrapper: Wrapper },
@@ -79,7 +79,7 @@ describe("<RunRow/> borderless styling", () => {
           summary={makeSummary()}
           isExpanded={true}
           onToggle={vi.fn()}
-          targetName="Prod Agent"
+          resolveTargetName={() => "Prod Agent"}
           onScenarioRunClick={vi.fn()}
         />,
         { wrapper: Wrapper },
@@ -98,7 +98,7 @@ describe("<RunRow/> borderless styling", () => {
           summary={makeSummary()}
           isExpanded={true}
           onToggle={vi.fn()}
-          targetName="Prod Agent"
+          resolveTargetName={() => "Prod Agent"}
           onScenarioRunClick={vi.fn()}
           viewMode="list"
         />,
@@ -127,6 +127,7 @@ describe("<GroupRow/> borderless styling", () => {
           isExpanded={false}
           onToggle={vi.fn()}
           onScenarioRunClick={vi.fn()}
+          resolveTargetName={() => null}
         />,
         { wrapper: Wrapper },
       );
@@ -146,6 +147,7 @@ describe("<GroupRow/> borderless styling", () => {
           isExpanded={true}
           onToggle={vi.fn()}
           onScenarioRunClick={vi.fn()}
+          resolveTargetName={() => null}
         />,
         { wrapper: Wrapper },
       );

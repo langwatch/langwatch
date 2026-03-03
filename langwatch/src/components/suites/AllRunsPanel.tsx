@@ -131,6 +131,40 @@ export function AllRunsPanel({ period }: AllRunsPanelProps) {
   );
 
 
+  // Fetch agents and prompts to resolve target names
+  const { data: agents } = api.agents.getAll.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project },
+  );
+  const { data: prompts } = api.prompts.getAllPromptsForProject.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project },
+  );
+
+  const targetNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    if (agents) {
+      for (const agent of agents) {
+        map.set(agent.id, agent.name);
+      }
+    }
+    if (prompts) {
+      for (const prompt of prompts) {
+        map.set(prompt.id, prompt.handle ?? prompt.id);
+      }
+    }
+    return map;
+  }, [agents, prompts]);
+
+  const resolveTargetName = useCallback(
+    (scenarioRun: ScenarioRunData): string | null => {
+      const refId = scenarioRun.metadata?.langwatch?.targetReferenceId;
+      if (!refId) return null;
+      return targetNameMap.get(refId) ?? null;
+    },
+    [targetNameMap],
+  );
+
   // Build scenario options for filter dropdown
   const scenarioOptions = useMemo(() => {
     if (!scenarios) return [];
@@ -276,10 +310,6 @@ export function AllRunsPanel({ period }: AllRunsPanelProps) {
                 : null;
               const suiteName = suiteId ? suiteNameMap.get(suiteId) ?? null : null;
 
-              // For targets, we can't determine a single target for cross-suite view
-              // since each batch could have different targets. Use null for now.
-              const targetName = null;
-
               return (
                 <RunRow
                   key={batchRun.batchRunId}
@@ -287,7 +317,7 @@ export function AllRunsPanel({ period }: AllRunsPanelProps) {
                   summary={summary}
                   isExpanded={isExpanded}
                   onToggle={() => toggleExpanded(batchRun.batchRunId)}
-                  targetName={targetName}
+                  resolveTargetName={resolveTargetName}
                   onScenarioRunClick={handleScenarioRunClick}
                   suiteName={suiteName ?? undefined}
                   viewMode={viewMode}

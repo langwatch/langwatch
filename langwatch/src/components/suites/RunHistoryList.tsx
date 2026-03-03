@@ -181,6 +181,17 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
     return null;
   }, [targets, targetNameMap]);
 
+  // Resolve target name per scenario run from metadata.langwatch.targetReferenceId
+  const resolveTargetName = useCallback(
+    (scenarioRun: ScenarioRunData): string | null => {
+      if (singleTargetName) return singleTargetName;
+      const refId = scenarioRun.metadata?.langwatch?.targetReferenceId;
+      if (!refId) return null;
+      return targetNameMap.get(refId) ?? null;
+    },
+    [singleTargetName, targetNameMap],
+  );
+
   // Build scenario options for filter dropdown
   const scenarioOptions = useMemo(() => {
     if (!scenarios) return [];
@@ -408,7 +419,7 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
                   summary={summary}
                   isExpanded={expandedIds.has(batchRun.batchRunId)}
                   onToggle={() => handleToggle(batchRun.batchRunId)}
-                  targetName={singleTargetName}
+                  resolveTargetName={resolveTargetName}
                   onScenarioRunClick={handleScenarioRunClick}
                   expectedJobCount={expectedJobCount}
                   viewMode={viewMode}
@@ -425,7 +436,7 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
                   isExpanded={expandedIds.has(group.groupKey)}
                   onToggle={() => handleToggle(group.groupKey)}
                   onScenarioRunClick={handleScenarioRunClick}
-                  targetName={singleTargetName}
+                  resolveTargetName={resolveTargetName}
                   viewMode={viewMode}
                 />
               );

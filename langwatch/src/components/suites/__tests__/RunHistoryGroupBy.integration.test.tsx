@@ -179,6 +179,7 @@ describe("<GroupRow/>", () => {
           isExpanded={false}
           onToggle={vi.fn()}
           onScenarioRunClick={vi.fn()}
+          resolveTargetName={() => null}
         />,
         { wrapper: Wrapper },
       );
@@ -197,6 +198,7 @@ describe("<GroupRow/>", () => {
           isExpanded={false}
           onToggle={vi.fn()}
           onScenarioRunClick={vi.fn()}
+          resolveTargetName={() => null}
         />,
         { wrapper: Wrapper },
       );
@@ -216,6 +218,7 @@ describe("<GroupRow/>", () => {
           isExpanded={false}
           onToggle={vi.fn()}
           onScenarioRunClick={vi.fn()}
+          resolveTargetName={() => null}
         />,
         { wrapper: Wrapper },
       );
@@ -241,6 +244,7 @@ describe("<GroupRow/>", () => {
           isExpanded={false}
           onToggle={vi.fn()}
           onScenarioRunClick={vi.fn()}
+          resolveTargetName={() => null}
         />,
         { wrapper: Wrapper },
       );
@@ -277,6 +281,7 @@ describe("<GroupRow/>", () => {
           isExpanded={false}
           onToggle={vi.fn()}
           onScenarioRunClick={vi.fn()}
+          resolveTargetName={() => null}
         />,
         { wrapper: Wrapper },
       );
@@ -298,6 +303,7 @@ describe("<GroupRow/>", () => {
           isExpanded={true}
           onToggle={vi.fn()}
           onScenarioRunClick={vi.fn()}
+          resolveTargetName={() => null}
         />,
         { wrapper: Wrapper },
       );
@@ -339,6 +345,7 @@ describe("<GroupRow/>", () => {
           isExpanded={true}
           onToggle={vi.fn()}
           onScenarioRunClick={vi.fn()}
+          resolveTargetName={() => null}
         />,
         { wrapper: Wrapper },
       );
@@ -372,6 +379,7 @@ describe("<GroupRow/>", () => {
           isExpanded={true}
           onToggle={vi.fn()}
           onScenarioRunClick={vi.fn()}
+          resolveTargetName={() => null}
         />,
         { wrapper: Wrapper },
       );
@@ -395,6 +403,7 @@ describe("<GroupRow/>", () => {
           isExpanded={false}
           onToggle={onToggle}
           onScenarioRunClick={vi.fn()}
+          resolveTargetName={() => null}
         />,
         { wrapper: Wrapper },
       );

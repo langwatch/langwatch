@@ -180,7 +180,7 @@ describe("<RunRow/> view mode", () => {
           summary={makeSummary()}
           isExpanded={true}
           onToggle={vi.fn()}
-          targetName="Prod Agent"
+          resolveTargetName={() => "Prod Agent"}
           onScenarioRunClick={vi.fn()}
           viewMode="grid"
         />,
@@ -198,7 +198,7 @@ describe("<RunRow/> view mode", () => {
           summary={makeSummary()}
           isExpanded={true}
           onToggle={vi.fn()}
-          targetName="Prod Agent"
+          resolveTargetName={() => "Prod Agent"}
           onScenarioRunClick={vi.fn()}
           viewMode="grid"
         />,
@@ -222,7 +222,7 @@ describe("<RunRow/> view mode", () => {
           summary={makeSummary()}
           isExpanded={true}
           onToggle={vi.fn()}
-          targetName="Prod Agent"
+          resolveTargetName={() => "Prod Agent"}
           onScenarioRunClick={vi.fn()}
           viewMode="list"
         />,
@@ -242,7 +242,7 @@ describe("<RunRow/> view mode", () => {
           summary={makeSummary()}
           isExpanded={true}
           onToggle={vi.fn()}
-          targetName="Prod Agent"
+          resolveTargetName={() => "Prod Agent"}
           onScenarioRunClick={vi.fn()}
         />,
         { wrapper: Wrapper },
@@ -267,6 +267,7 @@ describe("<GroupRow/> view mode", () => {
           isExpanded={true}
           onToggle={vi.fn()}
           onScenarioRunClick={vi.fn()}
+          resolveTargetName={() => null}
           viewMode="grid"
         />,
         { wrapper: Wrapper },
@@ -286,6 +287,7 @@ describe("<GroupRow/> view mode", () => {
           isExpanded={true}
           onToggle={vi.fn()}
           onScenarioRunClick={vi.fn()}
+          resolveTargetName={() => null}
           viewMode="list"
         />,
         { wrapper: Wrapper },
@@ -305,6 +307,7 @@ describe("<GroupRow/> view mode", () => {
           isExpanded={true}
           onToggle={vi.fn()}
           onScenarioRunClick={vi.fn()}
+          resolveTargetName={() => null}
         />,
         { wrapper: Wrapper },
       );

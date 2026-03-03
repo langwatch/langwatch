@@ -33,7 +33,7 @@ type GroupRowProps = {
   isExpanded: boolean;
   onToggle: () => void;
   onScenarioRunClick: (scenarioRun: ScenarioRunData) => void;
-  targetName?: string | null;
+  resolveTargetName: (scenarioRun: ScenarioRunData) => string | null;
   viewMode?: ViewMode;
 };
 
@@ -43,7 +43,7 @@ export function GroupRow({
   isExpanded,
   onToggle,
   onScenarioRunClick,
-  targetName,
+  resolveTargetName,
   viewMode = "grid",
 }: GroupRowProps) {
   const runCount = group.scenarioRuns.length;
@@ -110,7 +110,7 @@ export function GroupRow({
             <BatchSection
               key={batch.batchRunId}
               batch={batch}
-              targetName={targetName ?? null}
+              resolveTargetName={resolveTargetName}
               onScenarioRunClick={onScenarioRunClick}
               viewMode={viewMode}
             />
@@ -158,12 +158,12 @@ export function GroupRow({
  */
 function BatchSection({
   batch,
-  targetName,
+  resolveTargetName,
   onScenarioRunClick,
   viewMode,
 }: {
   batch: ReturnType<typeof groupRunsByBatchId>[number];
-  targetName: string | null;
+  resolveTargetName: (scenarioRun: ScenarioRunData) => string | null;
   onScenarioRunClick: (scenarioRun: ScenarioRunData) => void;
   viewMode: ViewMode;
 }) {
@@ -219,7 +219,7 @@ function BatchSection({
             <ScenarioGridCard
               key={scenarioRun.scenarioRunId}
               scenarioRun={scenarioRun}
-              targetName={targetName}
+              targetName={resolveTargetName(scenarioRun)}
               onClick={() => onScenarioRunClick(scenarioRun)}
               iteration={iterationMap.get(scenarioRun.scenarioRunId)}
             />
@@ -231,7 +231,7 @@ function BatchSection({
             <ScenarioTargetRow
               key={scenarioRun.scenarioRunId}
               scenarioRun={scenarioRun}
-              targetName={targetName}
+              targetName={resolveTargetName(scenarioRun)}
               onClick={() => onScenarioRunClick(scenarioRun)}
               iteration={iterationMap.get(scenarioRun.scenarioRunId)}
             />

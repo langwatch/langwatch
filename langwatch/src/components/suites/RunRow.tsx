@@ -25,7 +25,7 @@ type RunRowProps = {
   summary: BatchRunSummary;
   isExpanded: boolean;
   onToggle: () => void;
-  targetName: string | null;
+  resolveTargetName: (scenarioRun: ScenarioRunData) => string | null;
   onScenarioRunClick: (scenarioRun: ScenarioRunData) => void;
   expectedJobCount?: number;
   suiteName?: string;
@@ -37,7 +37,7 @@ export function RunRow({
   summary,
   isExpanded,
   onToggle,
-  targetName,
+  resolveTargetName,
   onScenarioRunClick,
   expectedJobCount,
   suiteName,
@@ -138,7 +138,7 @@ export function RunRow({
                 <ScenarioGridCard
                   key={scenarioRun.scenarioRunId}
                   scenarioRun={scenarioRun}
-                  targetName={targetName}
+                  targetName={resolveTargetName(scenarioRun)}
                   onClick={() => onScenarioRunClick(scenarioRun)}
                   iteration={iterationMap.get(scenarioRun.scenarioRunId)}
                 />
@@ -154,7 +154,7 @@ export function RunRow({
                 <ScenarioTargetRow
                   key={scenarioRun.scenarioRunId}
                   scenarioRun={scenarioRun}
-                  targetName={targetName}
+                  targetName={resolveTargetName(scenarioRun)}
                   onClick={() => onScenarioRunClick(scenarioRun)}
                   iteration={iterationMap.get(scenarioRun.scenarioRunId)}
                 />
