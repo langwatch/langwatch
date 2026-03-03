@@ -338,12 +338,12 @@ export class MetricsCollector {
       this.latestRedisInfo = redisInfo;
 
       // Collect paused keys from all group queues
-      const pausedKeys: string[] = [];
-      for (const name of this.groupQueueNames) {
-        const keys = await this.redis.smembers(`${name}:gq:paused-jobs`);
-        pausedKeys.push(...keys);
-      }
-      this.currentPausedKeys = pausedKeys;
+      const pausedKeySets = await Promise.all(
+        this.groupQueueNames.map((name) =>
+          this.redis.smembers(`${name}:gq:paused-jobs`),
+        ),
+      );
+      this.currentPausedKeys = [...new Set(pausedKeySets.flat())];
 
       // Track known pipeline paths so the tree stays stable
       const discoveredPaths: string[] = [];
