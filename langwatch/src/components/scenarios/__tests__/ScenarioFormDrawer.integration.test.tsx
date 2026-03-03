@@ -17,9 +17,6 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock heavy sub-components that pull in generated types
-vi.mock("../../agents/AgentHttpEditorDrawer", () => ({
-  AgentHttpEditorDrawer: () => null,
-}));
 vi.mock("../../prompts/PromptEditorDrawer", () => ({
   PromptEditorDrawer: () => null,
 }));
@@ -27,10 +24,12 @@ vi.mock("../SaveAndRunMenu", () => ({
   SaveAndRunMenu: ({
     onSaveWithoutRunning,
     onSaveAndRun,
+    onCreateAgent,
     selectedTarget,
   }: {
     onSaveWithoutRunning?: () => void;
     onSaveAndRun?: (target: { type: string; id: string }) => void;
+    onCreateAgent?: () => void;
     selectedTarget?: { type: string; id: string } | null;
   }) => (
     <div data-testid="save-and-run-menu">
@@ -44,6 +43,9 @@ vi.mock("../SaveAndRunMenu", () => ({
         }
       >
         Save and Run
+      </button>
+      <button data-testid="create-agent-button" onClick={onCreateAgent}>
+        Add New Agent
       </button>
     </div>
   ),
@@ -63,6 +65,7 @@ const mocks = vi.hoisted(() => ({
   mockComplexProps: {} as Record<string, unknown>,
   mockOpenDrawer: vi.fn(),
   mockCloseDrawer: vi.fn(),
+  mockSetFlowCallbacks: vi.fn(),
   mockRunScenario: vi.fn(),
   mockGetByIdData: null as { id: string; name: string; situation: string; criteria: string[]; labels: string[] } | null,
 }));
@@ -144,6 +147,7 @@ vi.mock("~/hooks/useDrawer", () => ({
   }),
   useDrawerParams: () => mocks.mockDrawerParams,
   getComplexProps: () => mocks.mockComplexProps,
+  setFlowCallbacks: mocks.mockSetFlowCallbacks,
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -440,6 +444,55 @@ describe("<ScenarioFormDrawer/>", () => {
 
       // Drawer should remain open after save-and-run
       expect(onClose).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when clicking Add New Agent", () => {
+    async function clickCreateAgentButton() {
+      const user = userEvent.setup();
+      render(<ScenarioFormDrawer open={true} />, { wrapper: Wrapper });
+      const button = screen.getByTestId("create-agent-button");
+      await user.click(button);
+    }
+
+    it("opens the agent type selector drawer", async () => {
+      await clickCreateAgentButton();
+
+      expect(mocks.mockOpenDrawer).toHaveBeenCalledWith("agentTypeSelector");
+      expect(mocks.mockOpenDrawer).not.toHaveBeenCalledWith("agentHttpEditor");
+    });
+
+    it("registers onSave flow callbacks for all agent editor types", async () => {
+      await clickCreateAgentButton();
+
+      for (const drawerName of ["agentHttpEditor", "agentCodeEditor", "workflowSelector"]) {
+        expect(mocks.mockSetFlowCallbacks).toHaveBeenCalledWith(
+          drawerName,
+          expect.objectContaining({ onSave: expect.any(Function) }),
+        );
+      }
+    });
+
+    it("auto-selects the saved agent as target with correct type", async () => {
+      await clickCreateAgentButton();
+
+      // Extract the onSave callback that was registered
+      const onSaveCall = mocks.mockSetFlowCallbacks.mock.calls.find(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (call: any[]) => call[0] === "agentCodeEditor",
+      );
+      const onSave = onSaveCall![1].onSave;
+
+      // Simulate saving a code agent
+      onSave({ id: "new-agent-id", name: "My Test Agent", type: "code" });
+
+      expect(mockToasterCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Agent created",
+          description: '"My Test Agent" is now selected as the target.',
+          type: "success",
+        }),
+      );
     });
   });
 });
