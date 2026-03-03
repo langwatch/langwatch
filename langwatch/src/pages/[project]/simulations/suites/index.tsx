@@ -8,7 +8,7 @@
  * Layout: sidebar (search, +New Suite, All Runs, suite list) + main panel.
  */
 
-import { Box, HStack, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Skeleton, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 import type { SimulationSuite } from "@prisma/client";
 import { useCallback, useMemo, useState } from "react";
@@ -30,6 +30,8 @@ import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+
+const SKELETON_PLACEHOLDER_COUNT = 5;
 
 function SuitesPageContent() {
   const { project } = useOrganizationTeamProject();
@@ -267,8 +269,24 @@ function SuitesPageContent() {
       <HStack w="full" flex={1} alignItems="stretch" gap={0} overflow="hidden">
         {/* Sidebar */}
         {isLoading ? (
-          <VStack width="280px" minWidth="280px" justify="center" align="center">
-            <Spinner />
+          <VStack
+            width="280px"
+            minWidth="280px"
+            padding={4}
+            gap={3}
+            align="stretch"
+          >
+            {Array.from({ length: SKELETON_PLACEHOLDER_COUNT }).map((_, index) => (
+              <Box key={index} data-testid="suite-sidebar-skeleton">
+                <Skeleton height="20px" width="70%" borderRadius="md" />
+                <Skeleton
+                  height="16px"
+                  width="40%"
+                  borderRadius="md"
+                  marginTop={2}
+                />
+              </Box>
+            ))}
           </VStack>
         ) : (
           <SuiteSidebar
@@ -342,6 +360,10 @@ function MainPanel({
   isRunning: boolean;
   period: Period;
 }) {
+  if (isLoading) {
+    return null;
+  }
+
   if (error) {
     return (
       <VStack gap={4} align="center" py={8}>
@@ -373,11 +395,7 @@ function MainPanel({
     );
   }
 
-  if (!selectedSuiteSlug || !isLoading) {
-    return <SuiteEmptyState onNewSuite={onNewSuite} />;
-  }
-
-  return null;
+  return <SuiteEmptyState onNewSuite={onNewSuite} />;
 }
 
 export default withPermissionGuard("scenarios:view", {
