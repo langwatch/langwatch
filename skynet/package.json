@@ -7,6 +7,7 @@
     "dev": "concurrently -n server,vite -c blue,green \"node --experimental-transform-types src/server/main.ts\" \"vite\"",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
+    "test:unit": "vitest run",
     "start": "node --experimental-transform-types src/server/main.ts"
   },
   "dependencies": {
@@ -34,6 +35,7 @@
     "@vitejs/plugin-react": "^4.3.0",
     "concurrently": "^9.1.0",
     "typescript": "^5.9.3",
-    "vite": "^6.0.0"
+    "vite": "^6.0.0",
+    "vitest": "^3.1.0"
   }
 }
