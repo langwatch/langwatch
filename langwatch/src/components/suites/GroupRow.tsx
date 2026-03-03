@@ -105,6 +105,8 @@ export function GroupRow({
               templateColumns="repeat(auto-fill, minmax(250px, 1fr))"
               gap={4}
               padding={4}
+              position="relative"
+              zIndex={0}
               data-testid="scenario-grid"
             >
               {group.scenarioRuns.map((scenarioRun) => (
