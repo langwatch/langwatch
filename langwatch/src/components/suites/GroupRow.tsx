@@ -64,9 +64,9 @@ export function GroupRow({
         aria-label={`${group.groupLabel} group`}
         position="sticky"
         top={0}
-        zIndex={10}
-        bg="rgba(255, 255, 255, 0.8)"
-        _dark={{ bg: "rgba(26, 26, 26, 0.8)" }}
+        zIndex={20}
+        bg="rgba(255, 255, 255, 0.85)"
+        _dark={{ bg: "rgba(26, 26, 26, 0.85)" }}
         backdropFilter="blur(12px)"
         borderBottom="1px solid"
         borderColor="border"
