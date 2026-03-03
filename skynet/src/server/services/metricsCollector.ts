@@ -428,7 +428,7 @@ export class MetricsCollector {
   }
 }
 
-function buildPipelineTree({ queues, seedKeys = [] }: { queues: QueueInfo[]; seedKeys?: string[] }): PipelineNode[] {
+export function buildPipelineTree({ queues, seedKeys = [] }: { queues: QueueInfo[]; seedKeys?: string[] }): PipelineNode[] {
   const pipelineMap = new Map<string, Map<string, Map<string, { pending: number; active: number; blocked: number }>>>();
 
   // Helper to ensure a path exists in the map with at least zero counts

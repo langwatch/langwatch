@@ -1,26 +1,21 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import type IORedis from "ioredis";
+import { createLogger } from "../logger.ts";
 import { retryJob } from "../services/bullmqService.ts";
 import { isGroupQueue } from "../services/queueDiscovery.ts";
 import { DRAIN_GROUP_LUA, UNBLOCK_LUA } from "../services/luaScripts.ts";
+import { isValidGroupId, isValidPauseKey } from "./validators.ts";
+
+const logger = createLogger("actions");
 
 const pauseRateLimiter = rateLimit({ windowMs: 60_000, max: 30 });
-
-function isValidGroupId(id: unknown): id is string {
-	return typeof id === "string" && id.length > 0 && id.length <= 512;
-}
-
-const PAUSE_KEY_PATTERN = /^[\w\-/]+$/;
-
-function isValidPauseKey(key: unknown): key is string {
-	return typeof key === "string" && key.length > 0 && key.length <= 200 && PAUSE_KEY_PATTERN.test(key);
-}
+const actionRateLimiter = rateLimit({ windowMs: 60_000, max: 60 });
 
 export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => string[]): Router {
   const router = Router();
 
-  router.post("/api/actions/unblock", async (req, res) => {
+  router.post("/api/actions/unblock", actionRateLimiter, async (req, res) => {
     try {
       const { queueName, groupId } = req.body as { queueName?: string; groupId?: string };
       if (!queueName || !groupId) {
@@ -52,12 +47,12 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
 
       res.json({ ok: true, wasBlocked: result === 1 });
     } catch (err) {
-      console.error("unblock error:", err);
-      res.status(500).json({ error: err instanceof Error ? err.message : "Internal error" });
+      logger.error({ err: err instanceof Error ? err.message : String(err) }, "unblock error");
+      res.status(500).json({ error: "Internal error" });
     }
   });
 
-  router.post("/api/actions/unblock-all", async (req, res) => {
+  router.post("/api/actions/unblock-all", actionRateLimiter, async (req, res) => {
     try {
       const { queueName } = req.body as { queueName?: string };
       if (!queueName) {
@@ -104,12 +99,12 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
 
       res.json({ ok: true, unblockedCount });
     } catch (err) {
-      console.error("unblock-all error:", err);
-      res.status(500).json({ error: err instanceof Error ? err.message : "Internal error" });
+      logger.error({ err: err instanceof Error ? err.message : String(err) }, "unblock-all error");
+      res.status(500).json({ error: "Internal error" });
     }
   });
 
-  router.post("/api/actions/drain-group", async (req, res) => {
+  router.post("/api/actions/drain-group", actionRateLimiter, async (req, res) => {
     try {
       const { queueName, groupId } = req.body as { queueName?: string; groupId?: string };
       if (!queueName || !groupId) {
@@ -142,12 +137,12 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
 
       res.json({ ok: true, jobsRemoved: result });
     } catch (err) {
-      console.error("drain-group error:", err);
-      res.status(500).json({ error: err instanceof Error ? err.message : "Internal error" });
+      logger.error({ err: err instanceof Error ? err.message : String(err) }, "drain-group error");
+      res.status(500).json({ error: "Internal error" });
     }
   });
 
-  router.post("/api/actions/retry-blocked", async (req, res) => {
+  router.post("/api/actions/retry-blocked", actionRateLimiter, async (req, res) => {
     try {
       const { queueName, groupId, jobId } = req.body as { queueName?: string; groupId?: string; jobId?: string };
       if (!queueName || !groupId || !jobId) {
@@ -185,8 +180,8 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
 
       res.json({ ok: true, retried, unblocked: unblocked === 1 });
     } catch (err) {
-      console.error("retry-blocked error:", err);
-      res.status(500).json({ error: err instanceof Error ? err.message : "Internal error" });
+      logger.error({ err: err instanceof Error ? err.message : String(err) }, "retry-blocked error");
+      res.status(500).json({ error: "Internal error" });
     }
   });
 
@@ -211,8 +206,8 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
       await redis.sadd(`${queueName}:gq:paused-jobs`, pauseKey);
       res.json({ ok: true });
     } catch (err) {
-      console.error("pause error:", err);
-      res.status(500).json({ error: err instanceof Error ? err.message : "Internal error" });
+      logger.error({ err: err instanceof Error ? err.message : String(err) }, "pause error");
+      res.status(500).json({ error: "Internal error" });
     }
   });
 
@@ -239,8 +234,8 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
       await redis.lpush(`${queueName}:gq:signal`, "1");
       res.json({ ok: true });
     } catch (err) {
-      console.error("unpause error:", err);
-      res.status(500).json({ error: err instanceof Error ? err.message : "Internal error" });
+      logger.error({ err: err instanceof Error ? err.message : String(err) }, "unpause error");
+      res.status(500).json({ error: "Internal error" });
     }
   });
 
@@ -260,8 +255,8 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
       const pausedKeys = await redis.smembers(`${queueName}:gq:paused-jobs`);
       res.json({ pausedKeys });
     } catch (err) {
-      console.error("paused error:", err);
-      res.status(500).json({ error: err instanceof Error ? err.message : "Internal error" });
+      logger.error({ err: err instanceof Error ? err.message : String(err) }, "paused error");
+      res.status(500).json({ error: "Internal error" });
     }
   });
 
