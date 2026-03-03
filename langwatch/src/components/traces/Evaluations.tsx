@@ -1,9 +1,15 @@
-import { Box, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
+import type { ReactNode } from "react";
+import { useState } from "react";
 import type { ElasticSearchEvaluation } from "~/server/tracer/types";
 import { evaluationPassed } from "../checks/EvaluationStatus";
 import { Link } from "../ui/link";
 import { EvaluationStatusItem } from "./EvaluationStatusItem";
+import {
+  groupEvaluationsByEvaluator,
+  type EvaluationGroup,
+} from "./groupEvaluations";
 
 interface TraceEval {
   project?: Project;
@@ -11,33 +17,61 @@ interface TraceEval {
   evaluations?: ElasticSearchEvaluation[];
 }
 
-export function Evaluations(trace: TraceEval & { anyGuardrails: boolean }) {
-  const evaluations = trace.evaluations?.filter((x) => !x.is_guardrail);
-  const totalChecks = evaluations?.length;
-  if (!totalChecks)
-    return (
-      <Text>
-        No evaluations ran for this message.{" "}
-        {trace.anyGuardrails ? (
-          "Evaluations are skipped if guardrails completely blocked the message."
-        ) : (
-          <>
-            Setup evaluations{" "}
-            <Link
-              href={`/${trace.project?.slug}/evaluations`}
-              textDecoration="underline"
-            >
-              here
-            </Link>
-            .
-          </>
-        )}
-      </Text>
-    );
+/** Indentation matching the width of the evaluation status icon. */
+const EVALUATION_STATUS_INDENT = "22px";
+
+function EvaluationGroupEntry({ group }: { group: EvaluationGroup }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <Box width="full">
+      <EvaluationStatusItem check={group.latest} />
+      {group.hasPreviousRuns && (
+        <HStack paddingLeft={EVALUATION_STATUS_INDENT} marginTop={1}>
+          <Text
+            fontSize="xs"
+            color="fg.subtle"
+            cursor="pointer"
+            _hover={{ textDecoration: "underline" }}
+            onClick={() => setIsExpanded(!isExpanded)}
+            role="button"
+            aria-expanded={isExpanded}
+          >
+            +{group.previousRunCount} previous
+          </Text>
+        </HStack>
+      )}
+      {isExpanded &&
+        group.runs.slice(1).map((run) => (
+          <Box
+            key={run.evaluation_id}
+            paddingLeft={EVALUATION_STATUS_INDENT}
+            marginTop={2}
+            borderLeftWidth="2px"
+            borderLeftColor="border.subtle"
+            marginLeft="4px"
+          >
+            <EvaluationStatusItem check={run} />
+          </Box>
+        ))}
+    </Box>
+  );
+}
+
+/** Renders a list of evaluation groups with dividers between entries. */
+function EvaluationGroupList({
+  groups,
+  emptyState,
+}: {
+  groups: EvaluationGroup[];
+  emptyState: ReactNode;
+}) {
+  if (groups.length === 0) return <>{emptyState}</>;
+
   return (
     <VStack align="start" gap={0} width="full">
-      {evaluations?.map((evaluation, index) => (
-        <Box key={evaluation.evaluation_id} width="full">
+      {groups.map((group, index) => (
+        <Box key={group.latest.evaluation_id} width="full">
           {index > 0 && (
             <Box
               borderTopWidth="1px"
@@ -45,44 +79,63 @@ export function Evaluations(trace: TraceEval & { anyGuardrails: boolean }) {
               marginY={3}
             />
           )}
-          <EvaluationStatusItem check={evaluation} />
+          <EvaluationGroupEntry group={group} />
         </Box>
       ))}
     </VStack>
   );
 }
 
+export function Evaluations(trace: TraceEval & { anyGuardrails: boolean }) {
+  const evaluations = trace.evaluations?.filter((x) => !x.is_guardrail);
+  const groups = groupEvaluationsByEvaluator(evaluations);
+
+  return (
+    <EvaluationGroupList
+      groups={groups}
+      emptyState={
+        <Text>
+          No evaluations ran for this message.{" "}
+          {trace.anyGuardrails ? (
+            "Evaluations are skipped if guardrails completely blocked the message."
+          ) : (
+            <>
+              Setup evaluations{" "}
+              <Link
+                href={`/${trace.project?.slug}/evaluations`}
+                textDecoration="underline"
+              >
+                here
+              </Link>
+              .
+            </>
+          )}
+        </Text>
+      }
+    />
+  );
+}
+
 export const Guardrails = (trace: TraceEval) => {
   const guardrails = trace.evaluations?.filter((x) => x.is_guardrail);
-  const totalChecks = guardrails?.length;
-  if (!totalChecks)
-    return (
-      <Text>
-        No guardrails ran for this message. Setup guardrails{" "}
-        <Link
-          href={`/${trace.project?.slug}/evaluations`}
-          textDecoration="underline"
-        >
-          here
-        </Link>
-        .
-      </Text>
-    );
+  const groups = groupEvaluationsByEvaluator(guardrails);
+
   return (
-    <VStack align="start" gap={0} width="full">
-      {guardrails?.map((evaluation, index) => (
-        <Box key={evaluation.evaluation_id} width="full">
-          {index > 0 && (
-            <Box
-              borderTopWidth="1px"
-              borderTopColor="border.subtle"
-              marginY={3}
-            />
-          )}
-          <EvaluationStatusItem check={evaluation} />
-        </Box>
-      ))}
-    </VStack>
+    <EvaluationGroupList
+      groups={groups}
+      emptyState={
+        <Text>
+          No guardrails ran for this message. Setup guardrails{" "}
+          <Link
+            href={`/${trace.project?.slug}/evaluations`}
+            textDecoration="underline"
+          >
+            here
+          </Link>
+          .
+        </Text>
+      }
+    />
   );
 };
 
@@ -92,10 +145,15 @@ export const EvaluationsCount = (
   const evaluations = trace.countGuardrails
     ? trace.evaluations?.filter((x) => x.is_guardrail)
     : trace.evaluations?.filter((x) => !x.is_guardrail);
+
+  const groups = groupEvaluationsByEvaluator(evaluations);
+
   const totalErrors =
-    evaluations?.filter(
-      (check) => check.status === "error" || evaluationPassed(check) === false,
-    ).length ?? 0;
+    groups.filter(
+      (group) =>
+        group.latest.status === "error" ||
+        evaluationPassed(group.latest) === false,
+    ).length;
 
   if (totalErrors > 0) {
     if (trace.countGuardrails) {
@@ -115,9 +173,10 @@ export const EvaluationsCount = (
     );
   }
 
-  const totalProcessed =
-    evaluations?.filter((check) => check.status === "processed").length ?? 0;
-  const total = evaluations?.length ?? 0;
+  const totalProcessed = groups.filter(
+    (group) => group.latest.status === "processed",
+  ).length;
+  const total = groups.length;
 
   if (total === 0) return null;
 
@@ -135,13 +194,14 @@ export const EvaluationsCount = (
 };
 
 export const Blocked = (trace: TraceEval) => {
-  const totalBlocked = trace
-    ? trace.evaluations?.filter(
-        (check) => check.is_guardrail && check.passed === false,
-      ).length
-    : 0;
+  const guardrails = trace.evaluations?.filter((x) => x.is_guardrail);
+  const groups = groupEvaluationsByEvaluator(guardrails);
 
-  if (totalBlocked === 0 || !totalBlocked) return null;
+  const totalBlocked = groups.filter(
+    (group) => group.latest.passed === false,
+  ).length;
+
+  if (totalBlocked === 0) return null;
 
   return (
     <Text
