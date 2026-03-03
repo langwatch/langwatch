@@ -35,15 +35,17 @@ export interface UsageLimitResult {
  */
 export class UsageService {
   private readonly cache: TtlCache<number>;
+  private readonly decisionCache: TtlCache<MeterDecision>;
 
   private constructor(
     private readonly organizationService: OrganizationService,
     private readonly traceUsageService: TraceUsageService,
     private readonly eventUsageService: EventUsageService,
     private readonly planResolver: PlanResolver,
-    private readonly organizationRepository: OrganizationRepository,
+    private readonly organizationRepository: OrganizationRepository | null,
   ) {
     this.cache = new TtlCache<number>(CACHE_TTL_MS);
+    this.decisionCache = new TtlCache<MeterDecision>(CACHE_TTL_MS);
   }
 
   static create({
@@ -63,9 +65,7 @@ export class UsageService {
       planResolver ??
       ((organizationId) =>
         getApp().planProvider.getActivePlan({ organizationId }));
-    const orgRepo = new OrganizationRepository(
-      prisma ?? (undefined as unknown as PrismaClient),
-    );
+    const orgRepo = prisma ? new OrganizationRepository(prisma) : null;
     return new UsageService(
       organizationService,
       traceUsageService,
@@ -110,7 +110,7 @@ export class UsageService {
   }: {
     organizationId: string;
   }): Promise<number> {
-    const decision = await this.resolveMeterDecision(organizationId);
+    const decision = await this.getCachedMeterDecision(organizationId);
     const cacheKey = `${organizationId}:${decision.usageUnit}`;
 
     const cached = this.cache.get(cacheKey);
@@ -146,7 +146,7 @@ export class UsageService {
       return [];
     }
 
-    const decision = await this.resolveMeterDecision(organizationId);
+    const decision = await this.getCachedMeterDecision(organizationId);
     return this.countByProjects({ decision, organizationId, projectIds });
   }
 
@@ -172,11 +172,23 @@ export class UsageService {
     });
   }
 
+  private async getCachedMeterDecision(
+    organizationId: string,
+  ): Promise<MeterDecision> {
+    const cached = this.decisionCache.get(organizationId);
+    if (cached) return cached;
+
+    const decision = await this.resolveMeterDecision(organizationId);
+    this.decisionCache.set(organizationId, decision);
+    return decision;
+  }
+
   private async resolveMeterDecision(
     organizationId: string,
   ): Promise<MeterDecision> {
     const pricingModel =
-      await this.organizationRepository.getPricingModel(organizationId);
+      (await this.organizationRepository?.getPricingModel(organizationId)) ??
+      null;
     const plan = await this.planResolver(organizationId);
     const hasValidLicenseOverride = plan.planSource === "license";
 
@@ -198,5 +210,6 @@ export class UsageService {
   /** Clears the internal cache (for testing). */
   clearCache(): void {
     this.cache.clear();
+    this.decisionCache.clear();
   }
 }

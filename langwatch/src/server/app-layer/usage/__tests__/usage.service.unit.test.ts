@@ -56,6 +56,7 @@ describe("UsageService", () => {
       planResolver: mockPlanResolver,
       organizationRepository: mockOrgRepo,
       cache: new TtlCache<number>(30_000),
+      decisionCache: new TtlCache<unknown>(30_000),
     });
   });
 
@@ -266,6 +267,9 @@ describe("UsageService", () => {
 
         // First call with default (traces) unit
         await service.getCurrentMonthCount({ organizationId: "org-123" });
+
+        // Clear decision cache to simulate TTL expiry, then change plan
+        service.clearCache();
 
         // Change plan to license override with events unit
         (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
