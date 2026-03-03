@@ -3,6 +3,7 @@ import type { Scenario } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { getComplexProps, setFlowCallbacks, useDrawer, useDrawerParams } from "../../hooks/useDrawer";
+import { AgentTypeSelectorDrawer } from "../agents/AgentTypeSelectorDrawer";
 import { checkCompoundLimits } from "../../hooks/useCompoundLicenseCheck";
 import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -61,6 +62,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     useScenarioTarget(scenarioId);
   const [selectedTarget, setSelectedTarget] = useState<TargetValue>(null);
   const [promptDrawerOpen, setPromptDrawerOpen] = useState(false);
+  const [agentTypeSelectorOpen, setAgentTypeSelectorOpen] = useState(false);
 
   // Initialize from persisted target when scenario loads
   useEffect(() => {
@@ -93,8 +95,8 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     setFlowCallbacks("agentHttpEditor", { onSave: onAgentSaved });
     setFlowCallbacks("agentCodeEditor", { onSave: onAgentSaved });
     setFlowCallbacks("workflowSelector", { onSave: onAgentSaved });
-    openDrawer("agentTypeSelector");
-  }, [handleTargetChange, openDrawer]);
+    setAgentTypeSelectorOpen(true);
+  }, [handleTargetChange]);
 
   const isOpen = props.open !== false && props.open !== undefined;
   const onClose = props.onClose ?? closeDrawer;
@@ -316,6 +318,12 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           />
         </Drawer.Footer>
       </Drawer.Content>
+
+      {/* Agent Type Selector Drawer */}
+      <AgentTypeSelectorDrawer
+        open={agentTypeSelectorOpen}
+        onClose={() => setAgentTypeSelectorOpen(false)}
+      />
 
       {/* Prompt Creation Drawer */}
       <PromptEditorDrawer
