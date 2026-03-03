@@ -1,7 +1,7 @@
 /**
  * Row inside an expanded run showing a scenario x target pair result.
  *
- * Displays: [status_icon] [scenario_name] x [target_name] [pass%] ([pass/total]) [duration]
+ * Displays: [status_icon] [target: scenario_name (#N)] [pass%] ([pass/total]) [duration]
  */
 
 import { HStack, Text } from "@chakra-ui/react";
@@ -43,7 +43,7 @@ export function ScenarioTargetRow({
 }: ScenarioTargetRowProps) {
   const scenarioName = scenarioRun.name ?? scenarioRun.scenarioId;
   let displayName = targetName
-    ? `${scenarioName} \u00d7 ${targetName}`
+    ? `${targetName}: ${scenarioName}`
     : scenarioName;
   if (iteration != null) displayName += ` (#${iteration})`;
 

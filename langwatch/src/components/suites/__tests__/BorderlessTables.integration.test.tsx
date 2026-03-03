@@ -106,7 +106,7 @@ describe("<RunRow/> borderless styling", () => {
       );
 
       const scenarioRow = screen.getByLabelText(
-        /View details for Angry refund request/,
+        /View details for Prod Agent: Angry refund request/,
       );
       expect(scenarioRow).toBeInTheDocument();
     });

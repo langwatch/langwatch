@@ -3,7 +3,7 @@
  *
  * Integration tests for ScenarioGridCard component.
  *
- * Tests that the grid card displays a combined "Scenario x Target (#N)" title
+ * Tests that the grid card displays a "Target: Scenario (#N)" title
  * using the same format as ScenarioTargetRow.
  *
  * @see specs/features/suites/grid-view-and-borderless-tables.feature
@@ -56,7 +56,7 @@ describe("<ScenarioGridCard/>", () => {
   });
 
   describe("when target name is provided", () => {
-    it("includes target in the combined title with multiplication sign", () => {
+    it("prefixes the title with target name", () => {
       render(
         <ScenarioGridCard
           scenarioRun={makeScenarioRunData({ name: "Login Flow" })}
@@ -66,7 +66,7 @@ describe("<ScenarioGridCard/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("Login Flow \u00d7 Prod Agent")).toBeInTheDocument();
+      expect(screen.getByText("Prod Agent: Login Flow")).toBeInTheDocument();
     });
   });
 
@@ -82,7 +82,7 @@ describe("<ScenarioGridCard/>", () => {
       );
 
       expect(screen.getByText("Login Flow")).toBeInTheDocument();
-      expect(screen.queryByText(/\u00d7/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/:/)).not.toBeInTheDocument();
     });
   });
 
@@ -137,7 +137,7 @@ describe("<ScenarioGridCard/>", () => {
   });
 
   describe("when rendered with all data", () => {
-    it("displays combined title with scenario, target, and iteration", () => {
+    it("displays title with target prefix, scenario, and iteration", () => {
       render(
         <ScenarioGridCard
           scenarioRun={makeScenarioRunData({ name: "Refund Flow" })}
@@ -149,7 +149,7 @@ describe("<ScenarioGridCard/>", () => {
       );
 
       expect(
-        screen.getByText("Refund Flow \u00d7 Staging Agent (#2)"),
+        screen.getByText("Staging Agent: Refund Flow (#2)"),
       ).toBeInTheDocument();
     });
   });

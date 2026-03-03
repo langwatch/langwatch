@@ -27,7 +27,7 @@ describe("<ScenarioTargetRow/>", () => {
   });
 
   describe("given a successful scenario run with a target", () => {
-    it("displays scenario name with target in multiplication format", () => {
+    it("displays target-prefixed scenario name", () => {
       render(
         <ScenarioTargetRow
           scenarioRun={makeScenarioRunData()}
@@ -38,7 +38,7 @@ describe("<ScenarioTargetRow/>", () => {
       );
 
       expect(
-        screen.getByText("Angry refund request \u00d7 Prod Agent"),
+        screen.getByText("Prod Agent: Angry refund request"),
       ).toBeInTheDocument();
     });
 
@@ -84,7 +84,7 @@ describe("<ScenarioTargetRow/>", () => {
         screen.getByText("Angry refund request"),
       ).toBeInTheDocument();
       expect(
-        screen.queryByText(/\u00d7/),
+        screen.queryByText(/:/),
       ).not.toBeInTheDocument();
     });
   });
@@ -102,7 +102,7 @@ describe("<ScenarioTargetRow/>", () => {
       );
 
       expect(
-        screen.getByText("Angry refund request \u00d7 Prod Agent (#3)"),
+        screen.getByText("Prod Agent: Angry refund request (#3)"),
       ).toBeInTheDocument();
     });
   });
@@ -244,7 +244,7 @@ describe("<ScenarioTargetRow/>", () => {
       );
 
       const row = screen.getByLabelText(
-        "View details for Angry refund request \u00d7 Prod Agent",
+        "View details for Prod Agent: Angry refund request",
       );
       await user.click(row);
       expect(onClick).toHaveBeenCalledOnce();

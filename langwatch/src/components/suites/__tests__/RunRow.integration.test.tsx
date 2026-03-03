@@ -96,9 +96,8 @@ describe("<RunRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      // The unicode multiplication sign is used between scenario and target
       expect(
-        screen.getByText(/Angry refund request \u00d7 Prod Agent/),
+        screen.getByText(/Prod Agent: Angry refund request/),
       ).toBeInTheDocument();
     });
 

@@ -2,7 +2,7 @@
  * Grid card for a scenario run, used in grid view mode.
  *
  * Wraps SimulationCard to display a scenario run result as a card
- * with status overlay and a combined "Scenario x Target (#N)" title.
+ * with status overlay and a "Target: Scenario (#N)" title.
  * Uses MessagePreview for a lightweight conversation preview that
  * doesn't require the CopilotKit runtime.
  */
@@ -20,8 +20,8 @@ type ScenarioGridCardProps = {
 };
 
 /**
- * Builds a combined display title in the format: "Scenario x Target (#N)".
- * Omits target and iteration segments when not available.
+ * Builds a display title in the format: "Target: Scenario (#N)".
+ * Omits target prefix and iteration suffix when not available.
  */
 function buildDisplayTitle({
   scenarioName,
@@ -32,8 +32,7 @@ function buildDisplayTitle({
   targetName: string | null;
   iteration?: number;
 }): string {
-  let title = scenarioName;
-  if (targetName) title += ` \u00d7 ${targetName}`;
+  let title = targetName ? `${targetName}: ${scenarioName}` : scenarioName;
   if (iteration != null) title += ` (#${iteration})`;
   return title;
 }
