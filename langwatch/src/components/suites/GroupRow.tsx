@@ -18,6 +18,7 @@ import { SummaryStatusIcon } from "./SummaryStatusIcon";
 import type { RunGroup, RunGroupSummary } from "./run-history-transforms";
 import { groupRunsByBatchId } from "./run-history-transforms";
 import { BatchSection } from "./BatchSection";
+import { RunSummaryFooter } from "./RunSummaryFooter";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import type { ViewMode } from "./useRunHistoryStore";
 
@@ -117,31 +118,7 @@ export function GroupRow({
         </>
       )}
 
-      {/* Per-group footer stats */}
-      <HStack
-        paddingX={4}
-        paddingY={2}
-        borderBottom="1px solid"
-        borderColor="border"
-        bg="bg.subtle"
-        fontSize="xs"
-        color="fg.muted"
-        justifyContent="space-between"
-      >
-        <Text>
-          {summary.totalCount} {summary.totalCount === 1 ? "run" : "runs"}
-        </Text>
-        <HStack gap={3}>
-          <Text color="green.600">{summary.passedCount} passed</Text>
-          <Text color="red.600">{summary.failedCount} failed</Text>
-          {summary.stalledCount > 0 && (
-            <Text color="yellow.600">{summary.stalledCount} stalled</Text>
-          )}
-          {summary.cancelledCount > 0 && (
-            <Text color="fg.muted">{summary.cancelledCount} cancelled</Text>
-          )}
-        </HStack>
-      </HStack>
+      <RunSummaryFooter summary={summary} />
     </>
   );
 }

@@ -364,6 +364,24 @@ export function computeIterationMap({
 }
 
 /**
+ * Builds a display title in the format: "Target: Scenario (#N)".
+ * Omits target prefix and iteration suffix when not available.
+ */
+export function buildDisplayTitle({
+  scenarioName,
+  targetName,
+  iteration,
+}: {
+  scenarioName: string;
+  targetName: string | null;
+  iteration?: number;
+}): string {
+  let title = targetName ? `${targetName}: ${scenarioName}` : scenarioName;
+  if (iteration != null) title += ` (#${iteration})`;
+  return title;
+}
+
+/**
  * Computes aggregate totals from raw scenario runs.
  * Works regardless of grouping mode since it operates on flat runs.
  */

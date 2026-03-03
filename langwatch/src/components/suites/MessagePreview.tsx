@@ -17,14 +17,20 @@ function extractContent(content: unknown): string {
   if (typeof content === "string") return content;
   if (Array.isArray(content)) {
     return content
-      .map((item) => {
+      .map((item: unknown) => {
         if (typeof item === "string") return item;
-        if (typeof item === "object" && item && "text" in item)
-          return (item as { text: string }).text;
-        if (typeof item === "object" && item && "type" in item) {
-          const typed = item as { type: string; name?: string };
-          if (typed.type === "tool_use") return `[Tool: ${typed.name ?? "unknown"}]`;
-          if (typed.type === "tool_result") return "[Tool result]";
+        if (typeof item === "object" && item !== null) {
+          const record = item as Record<string, unknown>;
+          if ("text" in record && typeof record.text === "string") {
+            return record.text;
+          }
+          if ("type" in record && typeof record.type === "string") {
+            if (record.type === "tool_use") {
+              const name = typeof record.name === "string" ? record.name : "unknown";
+              return `[Tool: ${name}]`;
+            }
+            if (record.type === "tool_result") return "[Tool result]";
+          }
         }
         return "";
       })

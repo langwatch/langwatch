@@ -3,7 +3,7 @@
  * with timestamp and pass rate, followed by cards or rows.
  */
 
-import { Box, Grid, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { SummaryStatusIcon } from "./SummaryStatusIcon";
 import type { BatchRun } from "./run-history-transforms";
@@ -11,8 +11,7 @@ import {
   computeBatchRunSummary,
   computeIterationMap,
 } from "./run-history-transforms";
-import { ScenarioTargetRow } from "./ScenarioTargetRow";
-import { ScenarioGridCard } from "./ScenarioGridCard";
+import { ScenarioRunContent } from "./ScenarioRunContent";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import type { ViewMode } from "./useRunHistoryStore";
@@ -68,39 +67,13 @@ export function BatchSection({
         </Text>
       </HStack>
 
-      {/* Batch content */}
-      {viewMode === "grid" ? (
-        <Grid
-          templateColumns="repeat(auto-fill, minmax(250px, 1fr))"
-          gap={4}
-          padding={4}
-          position="relative"
-          zIndex={0}
-          data-testid="scenario-grid"
-        >
-          {batch.scenarioRuns.map((scenarioRun) => (
-            <ScenarioGridCard
-              key={scenarioRun.scenarioRunId}
-              scenarioRun={scenarioRun}
-              targetName={resolveTargetName(scenarioRun)}
-              onClick={() => onScenarioRunClick(scenarioRun)}
-              iteration={iterationMap.get(scenarioRun.scenarioRunId)}
-            />
-          ))}
-        </Grid>
-      ) : (
-        <VStack align="stretch" gap={0} data-testid="scenario-list">
-          {batch.scenarioRuns.map((scenarioRun) => (
-            <ScenarioTargetRow
-              key={scenarioRun.scenarioRunId}
-              scenarioRun={scenarioRun}
-              targetName={resolveTargetName(scenarioRun)}
-              onClick={() => onScenarioRunClick(scenarioRun)}
-              iteration={iterationMap.get(scenarioRun.scenarioRunId)}
-            />
-          ))}
-        </VStack>
-      )}
+      <ScenarioRunContent
+        scenarioRuns={batch.scenarioRuns}
+        viewMode={viewMode}
+        resolveTargetName={resolveTargetName}
+        onScenarioRunClick={onScenarioRunClick}
+        iterationMap={iterationMap}
+      />
     </VStack>
   );
 }

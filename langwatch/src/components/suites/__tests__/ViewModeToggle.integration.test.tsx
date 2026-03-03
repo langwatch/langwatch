@@ -102,9 +102,11 @@ describe("<RunHistoryFilters/> view mode toggle", () => {
         { wrapper: Wrapper },
       );
 
-      // Grid button should have solid variant (active state)
       const gridButton = screen.getByLabelText("Grid view");
-      expect(gridButton).toBeInTheDocument();
+      expect(gridButton).toHaveAttribute("aria-pressed", "true");
+
+      const listButton = screen.getByLabelText("List view");
+      expect(listButton).toHaveAttribute("aria-pressed", "false");
     });
 
     describe("when list view button is clicked", () => {

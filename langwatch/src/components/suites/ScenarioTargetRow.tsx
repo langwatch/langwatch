@@ -8,6 +8,7 @@ import { HStack, Text } from "@chakra-ui/react";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
 import { STATUS_ICON_CONFIG } from "./status-icons";
+import { buildDisplayTitle } from "./run-history-transforms";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 
 type ScenarioTargetRowProps = {
@@ -42,10 +43,7 @@ export function ScenarioTargetRow({
   iteration,
 }: ScenarioTargetRowProps) {
   const scenarioName = scenarioRun.name ?? scenarioRun.scenarioId;
-  let displayName = targetName
-    ? `${targetName}: ${scenarioName}`
-    : scenarioName;
-  if (iteration != null) displayName += ` (#${iteration})`;
+  const displayName = buildDisplayTitle({ scenarioName, targetName, iteration });
 
   const config = SCENARIO_RUN_STATUS_CONFIG[scenarioRun.status];
 

@@ -10,6 +10,7 @@
 import { Box } from "@chakra-ui/react";
 import { SimulationCard } from "~/components/simulations/SimulationCard";
 import { MessagePreview } from "./MessagePreview";
+import { buildDisplayTitle } from "./run-history-transforms";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 
 type ScenarioGridCardProps = {
@@ -18,24 +19,6 @@ type ScenarioGridCardProps = {
   onClick: () => void;
   iteration?: number;
 };
-
-/**
- * Builds a display title in the format: "Target: Scenario (#N)".
- * Omits target prefix and iteration suffix when not available.
- */
-function buildDisplayTitle({
-  scenarioName,
-  targetName,
-  iteration,
-}: {
-  scenarioName: string;
-  targetName: string | null;
-  iteration?: number;
-}): string {
-  let title = targetName ? `${targetName}: ${scenarioName}` : scenarioName;
-  if (iteration != null) title += ` (#${iteration})`;
-  return title;
-}
 
 export function ScenarioGridCard({
   scenarioRun,
