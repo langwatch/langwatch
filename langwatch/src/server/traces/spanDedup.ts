@@ -36,7 +36,7 @@ export const spanDedup = {
    *          `false` if the key already existed (duplicate — skip it),
    *          `null` if Redis is unavailable (proceed without dedup).
    */
-  async acquireProcessingLock(
+  async tryAcquireProcessingLock(
     tenantId: string,
     traceId: string,
     spanId: string,
@@ -66,7 +66,7 @@ export const spanDedup = {
   /**
    * Extend the key TTL after successful processing.
    */
-  async confirmProcessed(
+  async tryConfirmProcessed(
     tenantId: string,
     traceId: string,
     spanId: string,
@@ -91,7 +91,7 @@ export const spanDedup = {
   /**
    * Delete the key so retries can proceed immediately after a failure.
    */
-  async releaseOnFailure(
+  async tryReleaseOnFailure(
     tenantId: string,
     traceId: string,
     spanId: string,

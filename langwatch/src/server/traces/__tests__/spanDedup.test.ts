@@ -33,12 +33,12 @@ describe("spanDedup", () => {
     vi.clearAllMocks();
   });
 
-  describe("acquireProcessingLock", () => {
+  describe("tryAcquireProcessingLock", () => {
     describe("when SET NX returns OK", () => {
       it("returns true and passes correct key and args", async () => {
         mockSet.mockResolvedValue("OK");
 
-        const result = await spanDedup.acquireProcessingLock(
+        const result = await spanDedup.tryAcquireProcessingLock(
           tenantId,
           traceId,
           spanId,
@@ -59,7 +59,7 @@ describe("spanDedup", () => {
       it("returns false", async () => {
         mockSet.mockResolvedValue(null);
 
-        const result = await spanDedup.acquireProcessingLock(
+        const result = await spanDedup.tryAcquireProcessingLock(
           tenantId,
           traceId,
           spanId,
@@ -73,7 +73,7 @@ describe("spanDedup", () => {
       it("returns null and does not throw", async () => {
         mockSet.mockRejectedValue(new Error("Redis connection lost"));
 
-        const result = await spanDedup.acquireProcessingLock(
+        const result = await spanDedup.tryAcquireProcessingLock(
           tenantId,
           traceId,
           spanId,
@@ -84,11 +84,11 @@ describe("spanDedup", () => {
     });
   });
 
-  describe("confirmProcessed", () => {
+  describe("tryConfirmProcessed", () => {
     it("calls EXPIRE with confirmed TTL", async () => {
       mockExpire.mockResolvedValue(1);
 
-      await spanDedup.confirmProcessed(tenantId, traceId, spanId);
+      await spanDedup.tryConfirmProcessed(tenantId, traceId, spanId);
 
       expect(mockExpire).toHaveBeenCalledWith(expectedKey, 3600);
     });
@@ -98,17 +98,17 @@ describe("spanDedup", () => {
         mockExpire.mockRejectedValue(new Error("Redis connection lost"));
 
         await expect(
-          spanDedup.confirmProcessed(tenantId, traceId, spanId),
+          spanDedup.tryConfirmProcessed(tenantId, traceId, spanId),
         ).resolves.toBeUndefined();
       });
     });
   });
 
-  describe("releaseOnFailure", () => {
+  describe("tryReleaseOnFailure", () => {
     it("calls DEL on the key", async () => {
       mockDel.mockResolvedValue(1);
 
-      await spanDedup.releaseOnFailure(tenantId, traceId, spanId);
+      await spanDedup.tryReleaseOnFailure(tenantId, traceId, spanId);
 
       expect(mockDel).toHaveBeenCalledWith(expectedKey);
     });
@@ -118,7 +118,7 @@ describe("spanDedup", () => {
         mockDel.mockRejectedValue(new Error("Redis connection lost"));
 
         await expect(
-          spanDedup.releaseOnFailure(tenantId, traceId, spanId),
+          spanDedup.tryReleaseOnFailure(tenantId, traceId, spanId),
         ).resolves.toBeUndefined();
       });
     });
@@ -126,12 +126,12 @@ describe("spanDedup", () => {
 });
 
 describe("spanDedup when connection is undefined", () => {
-  it("acquireProcessingLock returns null", async () => {
+  it("tryAcquireProcessingLock returns null", async () => {
     vi.doMock("~/server/redis", () => ({ connection: undefined }));
 
     const { spanDedup: dedupNoRedis } = await import("../spanDedup");
 
-    const result = await dedupNoRedis.acquireProcessingLock(
+    const result = await dedupNoRedis.tryAcquireProcessingLock(
       "t",
       "tr",
       "sp",

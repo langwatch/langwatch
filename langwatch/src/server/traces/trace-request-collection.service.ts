@@ -143,7 +143,7 @@ export class TraceRequestCollectionService {
                 const normalizedSpan = normalizeSpanIds(spanParseResult.data);
 
                 // Best-effort dedup: skip spans already being processed
-                const lockResult = await spanDedup.acquireProcessingLock(
+                const lockResult = await spanDedup.tryAcquireProcessingLock(
                   tenantId,
                   normalizedSpan.traceId as string,
                   normalizedSpan.spanId as string,
@@ -162,7 +162,7 @@ export class TraceRequestCollectionService {
                   occurredAt: Date.now(),
                 });
 
-                await spanDedup.confirmProcessed(
+                await spanDedup.tryConfirmProcessed(
                   tenantId,
                   normalizedSpan.traceId as string,
                   normalizedSpan.spanId as string,
@@ -170,7 +170,7 @@ export class TraceRequestCollectionService {
 
                 collectedSpanCount++;
               } catch (error) {
-                await spanDedup.releaseOnFailure(
+                await spanDedup.tryReleaseOnFailure(
                   tenantId,
                   spanParseResult.data.traceId as string,
                   spanParseResult.data.spanId as string,
