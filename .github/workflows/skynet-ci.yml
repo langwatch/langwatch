@@ -34,7 +34,7 @@ jobs:
 
       - name: Run typecheck
         working-directory: skynet
-        run: npx tsc --noEmit
+        run: npm run typecheck
 
   build:
     runs-on: ubuntu-latest
