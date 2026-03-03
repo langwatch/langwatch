@@ -7,12 +7,8 @@ Feature: Scenario editor new agent flow
     Given I am logged into project "my-project"
     And I am on the scenario editor
 
-  # The bug: clicking "+ New Agent" in the scenario editor opens the HTTP agent
-  # drawer directly, skipping the agent type selection step. The correct flow
-  # should match the agents page: show AgentTypeSelectorDrawer first.
-
   # ============================================================================
-  # Regression: Agent type selection drawer appears in scenario editor
+  # Core: Agent type selection from scenario editor
   # ============================================================================
 
   @integration
@@ -21,6 +17,16 @@ Feature: Scenario editor new agent flow
     When I click "Add New Agent"
     Then the AgentTypeSelectorDrawer opens
     And I see options for "HTTP Agent", "Code Agent", and "Workflow Agent"
+
+  # Regression #1903: opening the agent type selector via URL-based drawer
+  # navigation caused the scenario form drawer's onOpenChange to fire closeDrawer(),
+  # which stripped all drawer params and closed both drawers immediately.
+  @integration
+  Scenario: Agent type selector drawer remains open after clicking "Add New Agent"
+    Given the save-and-run menu is open
+    When I click "Add New Agent"
+    Then the AgentTypeSelectorDrawer remains visible
+    And the scenario form drawer closes without clearing drawer params
 
   # ============================================================================
   # Full create-agent-from-scenario flow

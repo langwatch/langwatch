@@ -20,6 +20,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../prompts/PromptEditorDrawer", () => ({
   PromptEditorDrawer: () => null,
 }));
+vi.mock("../../agents/AgentTypeSelectorDrawer", () => ({
+  AgentTypeSelectorDrawer: ({ open, onClose }: { open?: boolean; onClose?: () => void }) =>
+    open ? <div data-testid="agent-type-selector-drawer"><button data-testid="close-agent-selector" onClick={onClose}>Close</button></div> : null,
+}));
 vi.mock("../SaveAndRunMenu", () => ({
   SaveAndRunMenu: ({
     onSaveWithoutRunning,
@@ -455,11 +459,12 @@ describe("<ScenarioFormDrawer/>", () => {
       await user.click(button);
     }
 
-    it("opens the agent type selector drawer", async () => {
+    it("opens the agent type selector drawer via local state", async () => {
       await clickCreateAgentButton();
 
-      expect(mocks.mockOpenDrawer).toHaveBeenCalledWith("agentTypeSelector");
-      expect(mocks.mockOpenDrawer).not.toHaveBeenCalledWith("agentHttpEditor");
+      expect(screen.getByTestId("agent-type-selector-drawer")).toBeInTheDocument();
+      // Should NOT use URL-based openDrawer for the type selector (regression #1903)
+      expect(mocks.mockOpenDrawer).not.toHaveBeenCalledWith("agentTypeSelector");
     });
 
     it("registers onSave flow callbacks for all agent editor types", async () => {
