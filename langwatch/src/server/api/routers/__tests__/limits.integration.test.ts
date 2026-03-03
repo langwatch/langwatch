@@ -9,8 +9,8 @@ import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 import { OrganizationUserRole } from "@prisma/client";
-import { createTestApp, resetApp } from "../../../app-layer";
-import { globalForApp } from "../../../app-layer/app";
+import { createTestApp } from "../../../app-layer/presets";
+import { globalForApp, resetApp } from "../../../app-layer/app";
 import { PlanProviderService } from "../../../app-layer/subscription/plan-provider";
 
 // Hoisted mocks for deterministic control (must use vi.hoisted to survive vi.mock hoisting)

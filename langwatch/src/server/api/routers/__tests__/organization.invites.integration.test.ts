@@ -21,8 +21,8 @@ import { createInnerTRPCContext } from "../../trpc";
 import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { INVITE_EXPIRATION_MS } from "../../../invites/invite.service";
-import { createTestApp, resetApp } from "../../../app-layer";
-import { globalForApp } from "../../../app-layer/app";
+import { createTestApp } from "../../../app-layer/presets";
+import { globalForApp, resetApp } from "../../../app-layer/app";
 import { PlanProviderService } from "../../../app-layer/subscription/plan-provider";
 
 // vi.hoisted runs before vi.mock hoisting, so these are available in mock factories
