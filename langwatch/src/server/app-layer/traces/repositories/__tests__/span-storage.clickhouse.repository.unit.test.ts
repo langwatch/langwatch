@@ -123,6 +123,28 @@ describe("deserializeAttributes", () => {
     });
   });
 
+  describe("when given hex/octal/binary string values", () => {
+    it("keeps hex strings as strings", () => {
+      // "0x1A" should NOT be converted to 26
+      expect(deserializeAttributes({ hex: "0x1A" })).toEqual({ hex: "0x1A" });
+    });
+
+    it("keeps octal strings as strings", () => {
+      expect(deserializeAttributes({ oct: "0o777" })).toEqual({ oct: "0o777" });
+    });
+
+    it("keeps binary strings as strings", () => {
+      expect(deserializeAttributes({ bin: "0b101" })).toEqual({ bin: "0b101" });
+    });
+  });
+
+  describe("when given numeric-looking string values (known lossy behavior)", () => {
+    it("converts decimal-looking strings to numbers", () => {
+      // Known trade-off: zip codes etc. become numbers
+      expect(deserializeAttributes({ zip: "90210" })).toEqual({ zip: 90210 });
+    });
+  });
+
   describe("when round-tripping with serializeAttributes", () => {
     it("recovers numbers after serialize → deserialize", () => {
       const original = { count: 42, rate: 3.14 };

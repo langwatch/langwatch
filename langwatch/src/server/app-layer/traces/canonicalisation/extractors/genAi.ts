@@ -43,7 +43,10 @@ import {
   spanTypeToGenAiOperationName,
 } from "./_extraction";
 import { asNumber, coerceToStringArray, isRecord } from "./_guards";
-import { extractSystemInstructionFromMessages } from "./_messages";
+import {
+  extractSystemInstructionFromMessages,
+  stripSystemMessages,
+} from "./_messages";
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 
 export class GenAIExtractor implements CanonicalAttributesExtractor {
@@ -144,14 +147,7 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
             sysInstruction,
           );
           // Strip system messages and re-set
-          const stripped = existing.filter(
-            (m) =>
-              !(
-                m &&
-                typeof m === "object" &&
-                (m as Record<string, unknown>).role === "system"
-              ),
-          );
+          const stripped = stripSystemMessages(existing);
           attrs.take(ATTR_KEYS.GEN_AI_INPUT_MESSAGES);
           if (stripped.length > 0) {
             ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, stripped);

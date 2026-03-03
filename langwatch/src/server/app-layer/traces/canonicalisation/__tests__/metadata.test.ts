@@ -103,7 +103,7 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
       );
     });
 
-    it("consumes metadata blob and hoists custom fields as metadata.{key}", () => {
+    it("hoists custom fields from metadata blob as metadata.{key} keys", () => {
       const metadata = JSON.stringify({
         user_id: "user-42",
         custom_field: "value",

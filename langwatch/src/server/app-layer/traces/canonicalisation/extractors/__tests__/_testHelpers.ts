@@ -4,39 +4,9 @@ import type { NormalizedAttributes } from "../../../../../event-sourcing/pipelin
 import { SpanDataBag } from "../../spanDataBag";
 import type { ExtractorContext } from "../_types";
 
-/**
- * Parses JSON-looking string values in attrs, matching the production
- * pipeline's `parseJsonStringValues()` step that runs before canonicalization.
- */
-export function parseJsonStringAttrs(
-  attrs: Record<string, unknown>,
-): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(attrs)) {
-    if (typeof value !== "string") {
-      result[key] = value;
-      continue;
-    }
-    const trimmed = value.trim();
-    if (trimmed.length < 2) {
-      result[key] = value;
-      continue;
-    }
-    const looksJson =
-      (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
-      (trimmed.startsWith("[") && trimmed.endsWith("]"));
-    if (!looksJson) {
-      result[key] = value;
-      continue;
-    }
-    try {
-      result[key] = JSON.parse(trimmed);
-    } catch {
-      result[key] = value;
-    }
-  }
-  return result;
-}
+import { parseJsonStringValues as parseJsonStringAttrs } from "../../../../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
+
+export { parseJsonStringAttrs };
 
 /**
  * Creates a real ExtractorContext for extractor unit tests.

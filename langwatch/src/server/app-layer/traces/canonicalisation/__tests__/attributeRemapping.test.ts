@@ -124,7 +124,7 @@ describe("CanonicalizeSpanAttributesService — take vs preserve semantics", () 
   });
 
   describe("when metadata is consumed and hoisted (take)", () => {
-    it("consumes metadata blob and hoists fields to canonical keys", () => {
+    it("hoists metadata blob fields to canonical keys", () => {
       const metadata = JSON.stringify({
         user_id: "u1",
         custom_field: "still here",

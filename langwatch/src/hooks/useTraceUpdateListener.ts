@@ -61,7 +61,7 @@ export function useTraceUpdateListener({
     (cursorPageNumber === void 0 || cursorPageNumber <= 1);
 
   // Evaluated at call time (not memoized) so the grace-period check uses fresh timestamps
-  const shouldProcessUpdateNow = useCallback(() => {
+  const isEligibleForUpdate = useCallback(() => {
     if (!isOnFirstPage) return false;
     if (isVisible) return true;
     // Page is hidden — allow for a grace period
@@ -88,7 +88,7 @@ export function useTraceUpdateListener({
 
   const scheduleSpanUpdate = useCallback(
     (eventTraceId: string | undefined) => {
-      if (!shouldProcessUpdateNow()) return;
+      if (!isEligibleForUpdate()) return;
 
       if (eventTraceId) {
         spanTraceIdsRef.current.add(eventTraceId);
@@ -104,12 +104,12 @@ export function useTraceUpdateListener({
         void onSpanStoredRef.current?.(ids);
       }, debounceMs);
     },
-    [shouldProcessUpdateNow, debounceMs],
+    [isEligibleForUpdate, debounceMs],
   );
 
   const scheduleSummaryUpdate = useCallback(
     (eventTraceId: string | undefined) => {
-      if (!shouldProcessUpdateNow()) return;
+      if (!isEligibleForUpdate()) return;
 
       if (eventTraceId) {
         summaryTraceIdsRef.current.add(eventTraceId);
@@ -125,7 +125,7 @@ export function useTraceUpdateListener({
         void onTraceSummaryUpdatedRef.current?.(ids);
       }, debounceMs);
     },
-    [shouldProcessUpdateNow, debounceMs],
+    [isEligibleForUpdate, debounceMs],
   );
 
   // Cleanup timers on unmount
@@ -150,7 +150,7 @@ export function useTraceUpdateListener({
     {
       enabled: Boolean(enabled && projectId),
       onData: (data) => {
-        if (!shouldProcessUpdateNow()) return;
+        if (!isEligibleForUpdate()) return;
         if (!data.event) return;
 
         try {

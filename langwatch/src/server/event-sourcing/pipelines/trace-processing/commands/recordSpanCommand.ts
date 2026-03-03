@@ -214,7 +214,7 @@ export class RecordSpanCommand implements CommandHandler<
     const strip = (attributes: OtlpSpan["attributes"]): OtlpSpan["attributes"] => {
       const filtered = attributes.filter((attr) => {
         if (attr.key.startsWith(RESERVED_PREFIX)) {
-          logger.error(
+          logger.warn(
             { attributeKey: attr.key },
             "Stripped user-submitted langwatch.reserved.* attribute",
           );

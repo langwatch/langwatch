@@ -23,6 +23,7 @@ import { useRouter } from "next/router";
 import numeral from "numeral";
 import Parse from "papaparse";
 import { useEffect, useRef, useState } from "react";
+import { useBufferedTraceData } from "~/hooks/useBufferedTraceData";
 import { ChevronDown, ChevronUp, Download, Edit, Shield } from "react-feather";
 import { LuChevronsUpDown, LuList, LuRefreshCw } from "react-icons/lu";
 import { useLocalStorage } from "usehooks-ts";
@@ -117,15 +118,24 @@ export function MessagesTable({
 
   navigationFooter.useUpdateTotalHits(traceGroups);
 
-  // --- Live update state ---
-  const [displayData, setDisplayData] = useState(traceGroups.data);
-  const [pendingData, setPendingData] = useState<typeof traceGroups.data>(
-    undefined,
-  );
-  const [pendingCount, setPendingCount] = useState(0);
-  const [highlightIds, setHighlightIds] = useState<Set<string>>(new Set());
+  // --- Live update buffering ---
   const [isMouseOnTable, setIsMouseOnTable] = useState(false);
-  const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const {
+    displayData,
+    pendingData,
+    pendingCount,
+    highlightIds,
+    acceptPending: acceptPendingBuffer,
+    mouseLeftAtRef,
+    bypassBufferRef,
+    displayDataRef,
+    addPendingCount,
+    reset: resetBuffer,
+  } = useBufferedTraceData({
+    freshData: traceGroups.data,
+    isMouseOnTable,
+  });
 
   // Clear display data when user-driven query params change (filter/sort/page)
   // so skeletons show during loading. SSE-driven liveEndDate changes don't go through here.
@@ -142,23 +152,10 @@ export function MessagesTable({
   useEffect(() => {
     if (prevUserQueryKeyRef.current !== userQueryKey) {
       prevUserQueryKeyRef.current = userQueryKey;
-      setDisplayData(undefined);
-      setPendingData(undefined);
-      setPendingCount(0);
-      setHighlightIds(new Set());
+      resetBuffer();
     }
-  }, [userQueryKey]);
+  }, [userQueryKey, resetBuffer]);
 
-  // Ref to access current displayData inside SSE callback without stale closures
-  const displayDataRef = useRef(displayData);
-  displayDataRef.current = displayData;
-
-  // When the user clicks the "N new" pill, bypass the mouse-on-table buffer
-  const bypassBufferRef = useRef(false);
-
-  // Track when mouse last left the table so SSE handler can auto-insert
-  // new traces if the user has been idle for a while
-  const mouseLeftAtRef = useRef<number>(0);
   const IDLE_THRESHOLD_MS = 60_000;
 
   useTraceUpdateListener({
@@ -195,7 +192,7 @@ export function MessagesTable({
           // Page unfocused or mouse idle long enough — fetch and show directly
           setLiveEndDate(Date.now());
         } else {
-          setPendingCount((prev) => prev + newCount);
+          addPendingCount(newCount);
         }
       }
     },
@@ -203,98 +200,11 @@ export function MessagesTable({
     pageOffset: navigationFooter.pageOffset,
   });
 
-  // Decide how to display new data from the query
-  useEffect(() => {
-    if (!traceGroups.data) return;
-
-    // First load — just show the data
-    if (!displayData) {
-      setDisplayData(traceGroups.data);
-      return;
-    }
-
-    const currentIds = new Set(
-      traceGroups.data.groups.flatMap((g) => g.map((t) => t.trace_id)),
-    );
-    const displayedIds = new Set(
-      displayData.groups.flatMap((g) => g.map((t) => t.trace_id)),
-    );
-    const newIds = new Set(
-      [...currentIds].filter((id) => !displayedIds.has(id)),
-    );
-
-    // Completely different data set (filter/sort/page change) — replace immediately
-    const overlap = [...currentIds].filter((id) => displayedIds.has(id));
-    if (overlap.length === 0 && displayedIds.size > 0) {
-      setDisplayData(traceGroups.data);
-      setPendingData(undefined);
-      setPendingCount(0);
-      setHighlightIds(new Set());
-      return;
-    }
-
-    if (newIds.size === 0) {
-      // Only updates to existing traces — swap silently
-      setDisplayData(traceGroups.data);
-    } else if (isMouseOnTable && !bypassBufferRef.current) {
-      // New traces but user is reading — buffer
-      setPendingData(traceGroups.data);
-      setPendingCount(newIds.size);
-    } else {
-      // New traces, user not looking (or bypass active) — show with highlight
-      bypassBufferRef.current = false;
-      setHighlightIds(newIds);
-      setDisplayData(traceGroups.data);
-      setPendingCount(0);
-      if (highlightTimerRef.current) {
-        clearTimeout(highlightTimerRef.current);
-      }
-      highlightTimerRef.current = setTimeout(
-        () => setHighlightIds(new Set()),
-        2000,
-      );
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [traceGroups.data]);
-
+  // Wrap acceptPending to also bump liveEndDate (component-level concern)
   const acceptPending = () => {
-    if (pendingData && displayData) {
-      // We have buffered data from a visible-trace refetch that arrived
-      // while the mouse was on the table — show it now.
-      const displayedIds = new Set(
-        displayData.groups.flatMap((g) => g.map((t) => t.trace_id)),
-      );
-      const freshIds = new Set(
-        pendingData.groups.flatMap((g) => g.map((t) => t.trace_id)),
-      );
-      const newIds = new Set(
-        [...freshIds].filter((id) => !displayedIds.has(id)),
-      );
-      setHighlightIds(newIds);
-      setDisplayData(pendingData);
-      setPendingData(undefined);
-      if (highlightTimerRef.current) {
-        clearTimeout(highlightTimerRef.current);
-      }
-      highlightTimerRef.current = setTimeout(
-        () => setHighlightIds(new Set()),
-        2000,
-      );
-    }
-
-    // Bump liveEndDate to pull new traces into the query window + refetch
-    bypassBufferRef.current = true;
-    setPendingCount(0);
+    acceptPendingBuffer();
     setLiveEndDate(Date.now());
   };
-
-  useEffect(() => {
-    return () => {
-      if (highlightTimerRef.current) {
-        clearTimeout(highlightTimerRef.current);
-      }
-    };
-  }, []);
 
   const isRefreshing = useMinimumSpinDuration(
     traceGroups.isLoading || traceGroups.isRefetching,
@@ -1178,15 +1088,6 @@ export function MessagesTable({
 
   return (
     <>
-      <style>{`
-        @keyframes trace-highlight-fade {
-          from { background-color: rgba(59, 130, 246, 0.10); }
-          to { background-color: transparent; }
-        }
-        .trace-highlight-new td {
-          animation: trace-highlight-fade 2s ease-out;
-        }
-      `}</style>
       <PageLayout.Header>
         <PageLayout.Heading>Traces</PageLayout.Heading>
         <Tooltip content="Refresh">
@@ -1567,6 +1468,9 @@ function getSafeRenderOutputValueFromTrace(trace: Trace): string {
   return stringifyIfObject(trace.output?.value);
 }
 
+// Assumes server and client clocks are within ~60s. If the server clock
+// is ahead, recently-ingested traces won't highlight — acceptable trade-off
+// vs. a dedicated "isNew" flag from the server.
 function isTraceRecent(trace: Trace): boolean {
   return trace.timestamps.started_at > Date.now() - 20_000;
 }

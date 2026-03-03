@@ -354,8 +354,10 @@ function extractAttributesFromSpan(
  * 1. Root span always wins
  * 2. Explicit (langwatch.output) beats inferred (gen_ai.output.messages)
  * 3. Among same source type, last-finishing span wins
+ *
+ * @internal Exported for unit testing
  */
-function shouldOverrideOutput({
+export function shouldOverrideOutput({
   isRoot,
   outputFromRoot,
   isExplicit,

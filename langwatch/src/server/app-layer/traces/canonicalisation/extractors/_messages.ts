@@ -138,6 +138,20 @@ export const extractSystemInstructionFromMessages = (
 };
 
 /**
+ * Filters out system-role messages from a messages array.
+ * System instructions are extracted separately via extractSystemInstructionFromMessages.
+ */
+export const stripSystemMessages = (messages: unknown[]): unknown[] =>
+  messages.filter(
+    (m) =>
+      !(
+        m &&
+        typeof m === "object" &&
+        (m as Record<string, unknown>).role === "system"
+      ),
+  );
+
+/**
  * Best-effort "messages" decoding from unknown payloads:
  * - array => assume messages
  * - { messages: [...] } => messages

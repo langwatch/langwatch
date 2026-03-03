@@ -1,4 +1,5 @@
 import type { NormalizedAttributes, NormalizedEvent } from "../../../event-sourcing/pipelines/trace-processing/schemas/spans";
+import { parseJsonStringValues } from "../../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
 import {
   FallbackExtractor,
   GenAIExtractor,
@@ -17,45 +18,6 @@ import type {
   ExtractorContext,
 } from "./extractors/_types";
 import { SpanDataBag } from "./spanDataBag";
-
-/**
- * Parses JSON-looking string values in attrs so that extractors always receive
- * pre-parsed values. In production, `normalizeOtlpAttributes()` already calls
- * `parseJsonStringValues()` before canonicalization, so this is a fast no-op
- * for already-parsed values.
- */
-function parseJsonStringAttrs(
-  attrs: NormalizedAttributes,
-): NormalizedAttributes {
-  const result: NormalizedAttributes = {};
-  for (const [key, value] of Object.entries(attrs)) {
-    if (typeof value !== "string") {
-      result[key] = value;
-      continue;
-    }
-    const trimmed = value.trim();
-    if (
-      trimmed.length < 2 ||
-      trimmed.length > 2_000_000
-    ) {
-      result[key] = value;
-      continue;
-    }
-    const looksJson =
-      (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
-      (trimmed.startsWith("[") && trimmed.endsWith("]"));
-    if (!looksJson) {
-      result[key] = value;
-      continue;
-    }
-    try {
-      result[key] = JSON.parse(trimmed);
-    } catch {
-      result[key] = value;
-    }
-  }
-  return result;
-}
 
 export type CanonicalizeResult = {
   attributes: NormalizedAttributes;
@@ -94,7 +56,7 @@ export class CanonicalizeSpanAttributesService {
     events: NormalizedEvent[],
     spanForContext: ExtractorContext["span"],
   ): CanonicalizeResult {
-    const bag = new SpanDataBag(parseJsonStringAttrs(spanAttributes), events);
+    const bag = new SpanDataBag(parseJsonStringValues(spanAttributes), events);
     const out: NormalizedAttributes = {};
     const appliedRules: string[] = [];
 

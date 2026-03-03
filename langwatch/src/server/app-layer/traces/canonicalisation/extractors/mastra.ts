@@ -38,6 +38,7 @@ import {
   normalizeToMessages,
   extractSystemInstructionFromMessages,
   extractLastUserMessageText,
+  stripSystemMessages,
 } from "./_messages";
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 
@@ -45,47 +46,47 @@ export class MastraExtractor implements CanonicalAttributesExtractor {
   readonly id = "mastra";
 
   apply(ctx: ExtractorContext): void {
-    const { span } = ctx;
-    const { attrs } = ctx.bag;
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Detection Check
-    // Only process spans from Mastra instrumentation.
-    // Uses multi-signal detection: scope name prefix OR mastra.span.type attr.
-    // ─────────────────────────────────────────────────────────────────────────
-    const scopeName = span.instrumentationScope?.name ?? "";
-    const isMastra =
-      scopeName === "@mastra/otel" ||
-      scopeName === "@mastra/otel-bridge" ||
-      scopeName.startsWith("@mastra/") ||
-      attrs.has(ATTR_KEYS.MASTRA_SPAN_TYPE);
-
-    if (!isMastra) {
+    if (!this.detectMastra(ctx)) {
       return;
     }
 
-    const mastraType = attrs.get(ATTR_KEYS.MASTRA_SPAN_TYPE);
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Model Step Input Extraction (needed for eval detection + model name)
-    // mastra.model_step.input contains {body: {model, messages, ...}}
-    // ─────────────────────────────────────────────────────────────────────────
-    const rawModelStepInput = attrs.get(ATTR_KEYS.MASTRA_MODEL_STEP_INPUT);
+    const mastraType = ctx.bag.attrs.get(ATTR_KEYS.MASTRA_SPAN_TYPE);
+    const rawModelStepInput = ctx.bag.attrs.get(ATTR_KEYS.MASTRA_MODEL_STEP_INPUT);
     const modelStepBody = extractBodyFromModelStepInput(rawModelStepInput);
 
     // Detect eval model_step: orphan (no parent) OR has response_format (structured output eval)
     const isEvalModelStep =
       mastraType === "model_step" &&
-      (!span.parentSpanId || hasResponseFormat(modelStepBody));
+      (!ctx.span.parentSpanId || hasResponseFormat(modelStepBody));
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Span Type Mapping
-    // Map Mastra's detailed span types to canonical types.
-    // Mastra takes precedence — always set type for Mastra-detected spans.
-    // ─────────────────────────────────────────────────────────────────────────
+    this.mapSpanType(ctx, mastraType, isEvalModelStep);
+    const modelName = this.extractModelInfo(ctx, modelStepBody);
+    this.extractIO(ctx, mastraType, isEvalModelStep, modelStepBody);
+    this.setDisplayName(ctx, mastraType, modelName, isEvalModelStep, modelStepBody);
+    this.extractThreadId(ctx);
+    this.mapTokenNames(ctx);
+  }
+
+  /** Detection check: only process spans from Mastra instrumentation. */
+  private detectMastra(ctx: ExtractorContext): boolean {
+    const scopeName = ctx.span.instrumentationScope?.name ?? "";
+    return (
+      scopeName === "@mastra/otel" ||
+      scopeName === "@mastra/otel-bridge" ||
+      scopeName.startsWith("@mastra/") ||
+      ctx.bag.attrs.has(ATTR_KEYS.MASTRA_SPAN_TYPE)
+    );
+  }
+
+  /** Map Mastra's detailed span types to canonical types. */
+  private mapSpanType(ctx: ExtractorContext, mastraType: unknown, isEvalModelStep: boolean): void {
     ctx.setAttr(ATTR_KEYS.SPAN_TYPE, mastraSpanTypeToCanonical(mastraType, isEvalModelStep));
     ctx.recordRule(`${this.id}:mastra.span.type->langwatch.span.type`);
+  }
 
+  /** Extract model name from body.model and metadata fallback; set gen_ai model attrs. */
+  private extractModelInfo(ctx: ExtractorContext, modelStepBody: Record<string, unknown> | null): string | null {
+    const { attrs } = ctx.bag;
     let modelName: string | null = null;
 
     if (modelStepBody) {
@@ -113,14 +114,7 @@ export class MastraExtractor implements CanonicalAttributesExtractor {
           const systemInstruction = extractSystemInstructionFromMessages(msgs);
           // Strip system messages — they go to gen_ai.request.system_instruction
           const chatMsgs = systemInstruction
-            ? msgs.filter(
-                (m) =>
-                  !(
-                    m &&
-                    typeof m === "object" &&
-                    (m as Record<string, unknown>).role === "system"
-                  ),
-              )
+            ? stripSystemMessages(msgs)
             : msgs;
           ctx.setAttr(
             ATTR_KEYS.GEN_AI_INPUT_MESSAGES,
@@ -155,10 +149,17 @@ export class MastraExtractor implements CanonicalAttributesExtractor {
       }
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // I/O Mapping
-    // Map Mastra-specific I/O attributes to canonical langwatch.input/output
-    // ─────────────────────────────────────────────────────────────────────────
+    return modelName;
+  }
+
+  /** Map Mastra-specific I/O attributes to canonical langwatch.input/output. */
+  private extractIO(
+    ctx: ExtractorContext,
+    mastraType: unknown,
+    isEvalModelStep: boolean,
+    modelStepBody: Record<string, unknown> | null,
+  ): void {
+    const { attrs } = ctx.bag;
 
     // For agent_run spans: extract I/O from mastra.agent_run.input/output
     if (mastraType === "agent_run") {
@@ -232,12 +233,16 @@ export class MastraExtractor implements CanonicalAttributesExtractor {
         );
       }
     }
+  }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Display Name Override
-    // Set contextual display names based on span type and model.
-    // Mutates span.name directly — extractors hold a mutable reference.
-    // ─────────────────────────────────────────────────────────────────────────
+  /** Set contextual display names based on span type and model. */
+  private setDisplayName(
+    ctx: ExtractorContext,
+    mastraType: unknown,
+    modelName: string | null,
+    isEvalModelStep: boolean,
+    modelStepBody: Record<string, unknown> | null,
+  ): void {
     const displayName = deriveDisplayName({
       mastraType,
       modelName,
@@ -245,27 +250,23 @@ export class MastraExtractor implements CanonicalAttributesExtractor {
       modelStepBody,
     });
     if (displayName) {
-      span.name = displayName;
+      ctx.span.name = displayName;
       ctx.recordRule(`${this.id}:display_name`);
     }
+  }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Thread ID extraction
-    // Only extract threadId → gen_ai.conversation.id.
-    // All other mastra.metadata.* keys are left untouched in the bag.
-    // ─────────────────────────────────────────────────────────────────────────
-    const threadId = attrs.take(ATTR_KEYS.MASTRA_METADATA_THREAD_ID);
+  /** Extract threadId and map to gen_ai.conversation.id. */
+  private extractThreadId(ctx: ExtractorContext): void {
+    const threadId = ctx.bag.attrs.take(ATTR_KEYS.MASTRA_METADATA_THREAD_ID);
     if (typeof threadId === "string" && threadId.length > 0) {
       ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_CONVERSATION_ID, threadId);
       ctx.recordRule(`${this.id}:mastra.metadata.threadId->conversation.id`);
     }
+  }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Token Name Mapping
-    // Mastra uses non-standard gen_ai.usage.cached_input_tokens — map to
-    // canonical gen_ai.usage.cache_read.input_tokens
-    // ─────────────────────────────────────────────────────────────────────────
-    const cachedTokens = attrs.take(ATTR_KEYS.GEN_AI_USAGE_CACHED_INPUT_TOKENS);
+  /** Map non-standard cached_input_tokens to canonical cache_read.input_tokens. */
+  private mapTokenNames(ctx: ExtractorContext): void {
+    const cachedTokens = ctx.bag.attrs.take(ATTR_KEYS.GEN_AI_USAGE_CACHED_INPUT_TOKENS);
     if (cachedTokens !== undefined) {
       const n = asNumber(cachedTokens);
       if (n !== null) {

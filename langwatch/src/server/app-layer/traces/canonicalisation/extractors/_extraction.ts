@@ -5,6 +5,7 @@ import {
   decodeMessagesPayload,
   extractSystemInstructionFromMessages,
   normalizeToMessages,
+  stripSystemMessages,
 } from "./_messages";
 import type { ExtractorContext } from "./_types";
 
@@ -40,14 +41,7 @@ export const extractInputMessages = (
               extractSystemInstructionFromMessages(msgs);
             // Strip system messages — they go to gen_ai.request.system_instruction
             const chatMsgs = systemInstruction
-              ? msgs.filter(
-                  (m) =>
-                    !(
-                      m &&
-                      typeof m === "object" &&
-                      (m as Record<string, unknown>).role === "system"
-                    ),
-                )
+              ? stripSystemMessages(msgs)
               : msgs;
             ctx.setAttr(
               ATTR_KEYS.GEN_AI_INPUT_MESSAGES,
@@ -218,9 +212,11 @@ export const recordValueType = (
   type: string,
 ): void => {
   const existing = ctx.out[ATTR_KEYS.LANGWATCH_RESERVED_VALUE_TYPES];
-  const arr: string[] = Array.isArray(existing) ? [...(existing as string[])] : [];
-  arr.push(`${attrKey}=${type}`);
-  ctx.setAttr(ATTR_KEYS.LANGWATCH_RESERVED_VALUE_TYPES, arr);
+  if (Array.isArray(existing)) {
+    (existing as string[]).push(`${attrKey}=${type}`);
+  } else {
+    ctx.setAttr(ATTR_KEYS.LANGWATCH_RESERVED_VALUE_TYPES, [`${attrKey}=${type}`]);
+  }
 };
 
 /**

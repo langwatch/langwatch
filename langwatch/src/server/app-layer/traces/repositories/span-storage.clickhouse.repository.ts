@@ -11,6 +11,12 @@ import type { SpanStorageRepository } from "./span-storage.repository";
 
 const TABLE_NAME = "stored_spans" as const;
 
+/**
+ * Matches strings that look like decimal numbers (including scientific notation).
+ * Rejects hex (0x), octal (0o), and binary (0b) literals that Number() silently accepts.
+ */
+const DECIMAL_NUMBER_RE = /^-?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
+
 const logger = createLogger(
   "langwatch:app-layer:traces:span-storage-repository",
 );
@@ -45,8 +51,10 @@ export function deserializeAttributes(
       }
     }
 
-    // Numeric strings (non-empty, finite)
-    if (trimmed !== "" && Number.isFinite(Number(trimmed))) {
+    // NOTE: Intentionally lossy for string values that look like decimal numbers
+    // (e.g. zip codes "90210" → 90210). ClickHouse round-trip for originally-numeric
+    // attributes is correct; pure string numerics may lose their string type.
+    if (trimmed !== "" && DECIMAL_NUMBER_RE.test(trimmed) && Number.isFinite(Number(trimmed))) {
       result[key] = Number(trimmed);
       continue;
     }
