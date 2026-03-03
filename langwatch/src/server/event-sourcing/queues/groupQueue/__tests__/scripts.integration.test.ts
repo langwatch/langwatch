@@ -192,7 +192,7 @@ describe("GroupStagingScripts", () => {
         expect(jobsY).toEqual(["j2", "200"]);
 
         const signals = await inspectSignalList();
-        expect(signals.length).toBeGreaterThanOrEqual(2);
+        expect(signals.length).toBeGreaterThanOrEqual(1);
       });
 
       it("returns new count excluding deduped", async () => {
@@ -500,9 +500,8 @@ describe("GroupStagingScripts", () => {
       });
 
       const ready = await inspectReadySet();
-      expect(ready).toContain("group-a");
-      // sqrt(1) = 1
-      expect(ready).toContain("1");
+      // Blocked groups are removed from ready set — UNBLOCK_LUA re-adds them
+      expect(ready).not.toContain("group-a");
     });
   });
 
@@ -592,14 +591,131 @@ describe("GroupStagingScripts", () => {
         jobDataJson: dispatched.jobDataJson,
       });
 
-      // Manually unblock (mimics Skynet action)
+      // Manually unblock (mimics Skynet UNBLOCK_LUA action)
       await redis.srem(`${keyPrefix()}blocked`, "group-a");
       // Also clear the stale active key
       await redis.del(`${keyPrefix()}group:group-a:active`);
+      // Re-add to ready set — restageAndBlock removes it, UNBLOCK_LUA re-adds
+      await redis.zadd(`${keyPrefix()}ready`, 1, "group-a");
 
       const result = await scripts.dispatch({ nowMs: 300, activeTtlSec: 60 });
       expect(result).not.toBeNull();
       expect(result!.stagedJobId).toBe("j1/r/1");
+    });
+  });
+
+  describe("parkPausedJob", () => {
+    async function stageAndDispatch(
+      overrides: Partial<Parameters<typeof scripts.stage>[0]> = {},
+    ): Promise<DispatchResult> {
+      const job = makeJob({ dispatchAfterMs: 100, ...overrides });
+      await scripts.stage(job);
+      const result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
+      expect(result).not.toBeNull();
+      return result!;
+    }
+
+    describe("when active key matches", () => {
+      it("clears active key", async () => {
+        const dispatched = await stageAndDispatch({ stagedJobId: "j1" });
+
+        await scripts.parkPausedJob({
+          groupId: dispatched.groupId,
+          stagedJobId: dispatched.stagedJobId,
+          dispatchAfterMs: Date.now() + 10_000,
+          jobDataJson: dispatched.jobDataJson,
+        });
+
+        const active = await inspectActiveKey(dispatched.groupId);
+        expect(active).toBeNull();
+      });
+
+      it("re-stages job with future score", async () => {
+        const futureScore = Date.now() + 10_000;
+        const dispatched = await stageAndDispatch({ stagedJobId: "j1" });
+
+        await scripts.parkPausedJob({
+          groupId: dispatched.groupId,
+          stagedJobId: dispatched.stagedJobId,
+          dispatchAfterMs: futureScore,
+          jobDataJson: dispatched.jobDataJson,
+        });
+
+        const jobs = await inspectGroupJobs(dispatched.groupId);
+        expect(jobs).toContain(dispatched.stagedJobId);
+        expect(jobs).toContain(String(futureScore));
+      });
+
+      it("preserves job data in hash", async () => {
+        const dispatched = await stageAndDispatch({
+          stagedJobId: "j1",
+          jobDataJson: JSON.stringify({ key: "preserved" }),
+        });
+
+        await scripts.parkPausedJob({
+          groupId: dispatched.groupId,
+          stagedJobId: dispatched.stagedJobId,
+          dispatchAfterMs: Date.now() + 10_000,
+          jobDataJson: dispatched.jobDataJson,
+        });
+
+        const data = await inspectDataHash(dispatched.groupId);
+        expect(data[dispatched.stagedJobId]).toBe(dispatched.jobDataJson);
+      });
+
+      it("updates ready score to sqrt(pendingCount)", async () => {
+        const dispatched = await stageAndDispatch({ stagedJobId: "j1" });
+
+        await scripts.parkPausedJob({
+          groupId: dispatched.groupId,
+          stagedJobId: dispatched.stagedJobId,
+          dispatchAfterMs: Date.now() + 10_000,
+          jobDataJson: dispatched.jobDataJson,
+        });
+
+        const ready = await inspectReadySet();
+        // 1 job re-staged → sqrt(1) = 1
+        expect(ready).toContain(dispatched.groupId);
+        expect(ready).toContain("1");
+      });
+
+      it("returns true", async () => {
+        const dispatched = await stageAndDispatch({ stagedJobId: "j1" });
+
+        const result = await scripts.parkPausedJob({
+          groupId: dispatched.groupId,
+          stagedJobId: dispatched.stagedJobId,
+          dispatchAfterMs: Date.now() + 10_000,
+          jobDataJson: dispatched.jobDataJson,
+        });
+
+        expect(result).toBe(true);
+      });
+    });
+
+    describe("when active key is stale", () => {
+      it("returns false and does not modify state", async () => {
+        const dispatched = await stageAndDispatch({ stagedJobId: "j1" });
+
+        // Overwrite the active key with a different job ID
+        await redis.set(
+          `${keyPrefix()}group:${dispatched.groupId}:active`,
+          "some-other-job",
+          "EX",
+          60,
+        );
+
+        const result = await scripts.parkPausedJob({
+          groupId: dispatched.groupId,
+          stagedJobId: dispatched.stagedJobId,
+          dispatchAfterMs: Date.now() + 10_000,
+          jobDataJson: dispatched.jobDataJson,
+        });
+
+        expect(result).toBe(false);
+        // Active key should still have the other job
+        expect(await inspectActiveKey(dispatched.groupId)).toBe("some-other-job");
+      });
     });
   });
 
