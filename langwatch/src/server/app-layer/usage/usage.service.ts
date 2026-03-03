@@ -31,7 +31,7 @@ export interface UsageLimitResult {
  * Orchestrates: plan → meter policy → counter.
  * The meter policy resolves the counting unit (traces/events) and backend
  * (ClickHouse/ElasticSearch). Counting execution is delegated to
- * TraceUsageService.
+ * TraceUsageService or EventUsageService depending on the resolved meter.
  */
 export class UsageService {
   private readonly cache: TtlCache<number>;

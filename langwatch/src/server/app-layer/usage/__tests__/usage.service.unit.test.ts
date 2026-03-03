@@ -3,6 +3,27 @@ import { TtlCache } from "~/server/utils/ttlCache";
 import type { PlanResolver } from "../../subscription/plan-provider";
 import type { OrganizationService } from "../../organizations/organization.service";
 import { UsageService } from "../usage.service";
+import { FREE_PLAN } from "../../../../../ee/licensing/constants";
+import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
+
+const PRO_PLAN: PlanInfo = {
+  ...FREE_PLAN,
+  planSource: "subscription",
+  type: "PRO",
+  name: "Pro",
+  free: false,
+  maxMessagesPerMonth: 1000,
+};
+
+const ENTERPRISE_LICENSE_PLAN: PlanInfo = {
+  ...FREE_PLAN,
+  planSource: "license",
+  type: "ENTERPRISE",
+  name: "Enterprise",
+  free: false,
+  maxMessagesPerMonth: 100_000,
+  usageUnit: "events",
+};
 
 vi.mock("~/env.mjs", () => ({
   env: { IS_SAAS: true },
@@ -42,12 +63,7 @@ describe("UsageService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockOrgRepo.getPricingModel.mockResolvedValue(null);
-    (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
-      name: "free",
-      type: "FREE",
-      free: true,
-      maxMessagesPerMonth: 1000,
-    });
+    (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({ ...FREE_PLAN, maxMessagesPerMonth: 1000 });
     service = Object.create(UsageService.prototype);
     Object.assign(service, {
       organizationService: mockOrgService,
@@ -84,12 +100,7 @@ describe("UsageService", () => {
         mockTraceUsageService.getCountByProjects.mockResolvedValue([
           { projectId: "proj-1", count: 1000 },
         ]);
-        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
-          name: "free",
-          type: "FREE",
-          free: true,
-          maxMessagesPerMonth: 1000,
-        });
+        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({ ...FREE_PLAN, maxMessagesPerMonth: 1000 });
       });
 
       it("returns exceeded: true with message", async () => {
@@ -101,7 +112,7 @@ describe("UsageService", () => {
         );
         expect(result.count).toBe(1000);
         expect(result.maxMessagesPerMonth).toBe(1000);
-        expect(result.planName).toBe("free");
+        expect(result.planName).toBe("Free");
       });
 
       it("calls planResolver with organizationId", async () => {
@@ -122,11 +133,7 @@ describe("UsageService", () => {
         mockTraceUsageService.getCountByProjects.mockResolvedValue([
           { projectId: "proj-1", count: 500 },
         ]);
-        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
-          maxMessagesPerMonth: 1000,
-          type: "FREE",
-          free: true,
-        });
+        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({ ...FREE_PLAN, maxMessagesPerMonth: 1000 });
 
         const result = await service.checkLimit({ teamId: "team-123" });
 
@@ -177,12 +184,7 @@ describe("UsageService", () => {
         mockTraceUsageService.getCountByProjects.mockResolvedValue([
           { projectId: "proj-1", count: 5000 },
         ]);
-        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
-          type: "PRO",
-          name: "Pro",
-          free: false,
-          maxMessagesPerMonth: 1000,
-        });
+        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({ ...PRO_PLAN });
 
         const result = await service.checkLimit({ teamId: "team-123" });
 
@@ -268,17 +270,11 @@ describe("UsageService", () => {
         // First call with default (traces) unit
         await service.getCurrentMonthCount({ organizationId: "org-123" });
 
-        // Clear decision cache to simulate TTL expiry, then change plan
-        service.clearCache();
+        // Clear only decision cache to simulate TTL expiry (count cache remains populated)
+        ((service as any).decisionCache as TtlCache<unknown>).clear();
 
         // Change plan to license override with events unit
-        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
-          planSource: "license",
-          type: "ENTERPRISE",
-          free: false,
-          maxMessagesPerMonth: 100_000,
-          usageUnit: "events",
-        });
+        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({ ...ENTERPRISE_LICENSE_PLAN });
 
         mockEventUsageService.getCountByProjects.mockResolvedValue([
           { projectId: "proj-1", count: 99 },
@@ -329,13 +325,7 @@ describe("UsageService", () => {
     describe("when meter decision is events", () => {
       beforeEach(() => {
         // License override plan with events unit
-        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
-          planSource: "license",
-          type: "ENTERPRISE",
-          free: false,
-          maxMessagesPerMonth: 100_000,
-          usageUnit: "events",
-        });
+        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({ ...ENTERPRISE_LICENSE_PLAN });
       });
 
       it("delegates to EventUsageService", async () => {
@@ -386,13 +376,7 @@ describe("UsageService", () => {
     describe("when policy resolves to events", () => {
       beforeEach(() => {
         // License override plan with events unit
-        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
-          planSource: "license",
-          type: "ENTERPRISE",
-          free: false,
-          maxMessagesPerMonth: 100_000,
-          usageUnit: "events",
-        });
+        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({ ...ENTERPRISE_LICENSE_PLAN });
         vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
         mockEventUsageService.getCountByProjects.mockResolvedValue([
           { projectId: "proj-1", count: 200 },

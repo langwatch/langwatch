@@ -12,13 +12,17 @@ import { OrganizationUserRole } from "@prisma/client";
 import { createTestApp } from "../../../app-layer/presets";
 import { globalForApp, resetApp } from "../../../app-layer/app";
 import { PlanProviderService } from "../../../app-layer/subscription/plan-provider";
+import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 
 // Hoisted mocks for deterministic control (must use vi.hoisted to survive vi.mock hoisting)
 const { mockGetCurrentMonthCount, mockGetActivePlan } = vi.hoisted(() => ({
   mockGetCurrentMonthCount: vi.fn(),
   mockGetActivePlan: vi.fn().mockResolvedValue({
+    ...FREE_PLAN,
+    planSource: "subscription",
     type: "PRO",
     name: "Pro",
+    free: false,
     maxMessagesPerMonth: 1000,
   }),
 }));
@@ -102,8 +106,11 @@ describe("Limits Router Integration", () => {
     beforeEach(() => {
       mockGetCurrentMonthCount.mockReset();
       mockGetActivePlan.mockResolvedValue({
+        ...FREE_PLAN,
+        planSource: "subscription",
         type: "PRO",
         name: "Pro",
+        free: false,
         maxMessagesPerMonth: 1000,
       });
       resetApp();
@@ -152,8 +159,7 @@ describe("Limits Router Integration", () => {
       it("keeps enforcement behavior when plan provider returns a copied FREE plan object", async () => {
         mockGetCurrentMonthCount.mockResolvedValue(1500);
         mockGetActivePlan.mockResolvedValue({
-          type: "FREE",
-          name: "Free",
+          ...FREE_PLAN,
           maxMessagesPerMonth: 1000,
         });
 
