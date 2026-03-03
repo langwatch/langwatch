@@ -81,7 +81,7 @@ export const createStripeWebhookHandler = () => {
     inviteApprover,
   });
 
-  const slackWebhookUrl = env.SLACK_LICENSE_WEBHOOK_URL;
+  const slackWebhookUrl = env.SLACK_CHANNEL_SUBSCRIPTIONS;
   if (slackWebhookUrl) {
     setBillingNotificationHandlers({
       sendLicensePurchaseNotification: (payload) =>

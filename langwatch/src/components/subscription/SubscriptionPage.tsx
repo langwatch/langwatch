@@ -60,7 +60,7 @@ import { UpdateSeatsBlock } from "./UpdateSeatsBlock";
 import { UpgradePlanBlock } from "./UpgradePlanBlock";
 import { ContactSalesBlock } from "./ContactSalesBlock";
 import { UserManagementDrawer } from "./UserManagementDrawer";
-import { CONTACT_SALES_URL } from "../plans/constants";
+import { CONTACT_SALES_URL } from "../../../ee/licensing/constants";
 
 const currencyOptions = [
   { label: "\u20AC EUR", value: PrismaCurrency.EUR },

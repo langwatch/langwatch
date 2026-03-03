@@ -1,5 +1,11 @@
 import type { PlanInfo } from "./planInfo";
 
+export const CONTACT_SALES_URL =
+  "https://meetings-eu1.hubspot.com/manouk-draisma?uuid=3c29cf0c-03e5-4a53-81fd-94abb0b66cfd";
+
+export const DEFAULT_LICENSE_PURCHASE_URL =
+  "https://buy.stripe.com/dRm3cwaIDgXs6yK6sX0480f";
+
 /**
  * Default limit for fields not present in older licenses.
  * Using a large number instead of Infinity for JSON serialization safety.

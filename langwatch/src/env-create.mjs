@@ -123,7 +123,7 @@ export function createEnvConfig() {
       ADMIN_EMAILS: z.string().optional(),
 
       // Notifications
-      SLACK_LICENSE_WEBHOOK_URL: z.string().optional(),
+      SLACK_CHANNEL_SUBSCRIPTIONS: z.string().optional(),
     },
 
     /**
@@ -231,7 +231,7 @@ export function createEnvConfig() {
       STRIPE_LICENSE_PAYMENT_LINK_ID: process.env.STRIPE_LICENSE_PAYMENT_LINK_ID,
       STRIPE_LICENSE_PAYMENT_LINK_URL: process.env.STRIPE_LICENSE_PAYMENT_LINK_URL,
       ADMIN_EMAILS: process.env.ADMIN_EMAILS,
-      SLACK_LICENSE_WEBHOOK_URL: process.env.SLACK_LICENSE_WEBHOOK_URL,
+      SLACK_CHANNEL_SUBSCRIPTIONS: process.env.SLACK_CHANNEL_SUBSCRIPTIONS,
     },
     /**
      * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.

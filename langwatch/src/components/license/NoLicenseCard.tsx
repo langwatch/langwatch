@@ -13,7 +13,7 @@ import { Link } from "~/components/ui/link";
 import { Radio, RadioGroup } from "~/components/ui/radio";
 import { Tooltip } from "~/components/ui/tooltip";
 import { formatFileSize } from "./licenseStatusUtils";
-import { CONTACT_SALES_URL } from "../plans/constants";
+import { CONTACT_SALES_URL, DEFAULT_LICENSE_PURCHASE_URL } from "../../../ee/licensing/constants";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 
 type ActivationMethod = "file" | "key";
@@ -34,7 +34,7 @@ export function NoLicenseCard({
   isActivating,
 }: NoLicenseCardProps) {
   const publicEnv = usePublicEnv();
-  const purchaseLinkUrl = publicEnv.data?.STRIPE_LICENSE_PAYMENT_LINK_URL;
+  const purchaseLinkUrl = publicEnv.data?.STRIPE_LICENSE_PAYMENT_LINK_URL ?? DEFAULT_LICENSE_PURCHASE_URL;
 
   const [activationMethod, setActivationMethod] =
     useState<ActivationMethod>("file");

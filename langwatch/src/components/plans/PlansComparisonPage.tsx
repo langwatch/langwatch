@@ -20,7 +20,7 @@ import {
   type ComparisonPlanId,
   resolveCurrentComparisonPlan,
 } from "./planCurrentResolver";
-import { CONTACT_SALES_URL } from "./constants";
+import { CONTACT_SALES_URL } from "../../../ee/licensing/constants";
 import {
   type Currency,
   type BillingInterval,
