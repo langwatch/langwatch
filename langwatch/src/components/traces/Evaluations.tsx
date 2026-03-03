@@ -148,12 +148,19 @@ export const EvaluationsCount = (
 
   const groups = groupEvaluationsByEvaluator(evaluations);
 
-  const totalErrors =
-    groups.filter(
-      (group) =>
-        group.latest.status === "error" ||
-        evaluationPassed(group.latest) === false,
-    ).length;
+  let totalErrors = 0;
+  let totalProcessed = 0;
+  for (const group of groups) {
+    if (
+      group.latest.status === "error" ||
+      evaluationPassed(group.latest) === false
+    ) {
+      totalErrors++;
+    }
+    if (group.latest.status === "processed") {
+      totalProcessed++;
+    }
+  }
 
   if (totalErrors > 0) {
     if (trace.countGuardrails) {
@@ -173,9 +180,6 @@ export const EvaluationsCount = (
     );
   }
 
-  const totalProcessed = groups.filter(
-    (group) => group.latest.status === "processed",
-  ).length;
   const total = groups.length;
 
   if (total === 0) return null;
@@ -197,9 +201,12 @@ export const Blocked = (trace: TraceEval) => {
   const guardrails = trace.evaluations?.filter((x) => x.is_guardrail);
   const groups = groupEvaluationsByEvaluator(guardrails);
 
-  const totalBlocked = groups.filter(
-    (group) => group.latest.passed === false,
-  ).length;
+  let totalBlocked = 0;
+  for (const group of groups) {
+    if (group.latest.passed === false) {
+      totalBlocked++;
+    }
+  }
 
   if (totalBlocked === 0) return null;
 
