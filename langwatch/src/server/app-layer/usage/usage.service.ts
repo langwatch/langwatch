@@ -1,11 +1,19 @@
 import type { PrismaClient } from "@prisma/client";
-import { SubscriptionHandler } from "~/server/subscriptionHandler";
+import { getApp } from "~/server/app-layer/app";
 import { FREE_PLAN } from "../../../../ee/licensing/constants";
 import { env } from "../../../env.mjs";
 import { TraceUsageService } from "../../traces/trace-usage.service";
+import { EventUsageService } from "../../traces/event-usage.service";
+import type { PlanResolver } from "../subscription/plan-provider";
 import { TtlCache } from "../../utils/ttlCache";
 import { OrganizationNotFoundForTeamError } from "../organizations/errors";
 import type { OrganizationService } from "../organizations/organization.service";
+import { resolveUsageMeter, type MeterDecision } from "./usage-meter-policy";
+import { OrganizationRepository } from "../../repositories/organization.repository";
+import { getClickHouseClient } from "../../clickhouse/client";
+import { createLogger } from "~/utils/logger/server";
+
+const logger = createLogger("langwatch:usage:usageService");
 
 const CACHE_TTL_MS = 30_000; // 30 seconds
 
@@ -20,35 +28,50 @@ export interface UsageLimitResult {
 /**
  * App-layer usage service.
  *
- * Delegates usage counting to TraceUsageService (ES/CH).
+ * Orchestrates: plan → meter policy → counter.
+ * The meter policy resolves the counting unit (traces/events) and backend
+ * (ClickHouse/ElasticSearch). Counting execution is delegated to
+ * TraceUsageService or EventUsageService depending on the resolved meter.
  */
 export class UsageService {
   private readonly cache: TtlCache<number>;
+  private readonly decisionCache: TtlCache<MeterDecision>;
 
   private constructor(
     private readonly organizationService: OrganizationService,
-    private readonly esTraceUsageService: TraceUsageService,
-    private readonly subscriptionHandler: typeof SubscriptionHandler,
+    private readonly traceUsageService: TraceUsageService,
+    private readonly eventUsageService: EventUsageService,
+    private readonly planResolver: PlanResolver,
+    private readonly organizationRepository: OrganizationRepository | null,
   ) {
     this.cache = new TtlCache<number>(CACHE_TTL_MS);
+    this.decisionCache = new TtlCache<MeterDecision>(CACHE_TTL_MS);
   }
 
   static create({
     prisma,
     organizationService,
-    subscriptionHandler = SubscriptionHandler,
+    planResolver,
   }: {
     prisma: PrismaClient | null;
     organizationService: OrganizationService;
-    subscriptionHandler?: typeof SubscriptionHandler;
+    planResolver?: PlanResolver;
   }): UsageService {
-    const esTraceUsageService = prisma
+    const traceUsageService = prisma
       ? TraceUsageService.create(prisma)
       : TraceUsageService.create();
+    const eventUsageService = new EventUsageService();
+    const resolver: PlanResolver =
+      planResolver ??
+      ((organizationId) =>
+        getApp().planProvider.getActivePlan({ organizationId }));
+    const orgRepo = prisma ? new OrganizationRepository(prisma) : null;
     return new UsageService(
       organizationService,
-      esTraceUsageService,
-      subscriptionHandler,
+      traceUsageService,
+      eventUsageService,
+      resolver,
+      orgRepo,
     );
   }
 
@@ -61,11 +84,12 @@ export class UsageService {
 
     const [count, plan] = await Promise.all([
       this.getCurrentMonthCount({ organizationId }),
-      this.subscriptionHandler.getActivePlan(organizationId),
+      this.planResolver(organizationId),
     ]);
 
-    // Self-hosted = unlimited traces
-    if (!env.IS_SAAS && plan === FREE_PLAN) {
+    // Self-hosted = unlimited traces for FREE plan
+    // Preventing customers from getting blocked when no license is active
+    if (!env.IS_SAAS && plan.type === FREE_PLAN.type) {
       return { exceeded: false };
     }
 
@@ -86,7 +110,10 @@ export class UsageService {
   }: {
     organizationId: string;
   }): Promise<number> {
-    const cached = this.cache.get(organizationId);
+    const decision = await this.getCachedMeterDecision(organizationId);
+    const cacheKey = `${organizationId}:${decision.usageUnit}`;
+
+    const cached = this.cache.get(cacheKey);
     if (cached !== undefined) {
       return cached;
     }
@@ -97,13 +124,14 @@ export class UsageService {
       return 0;
     }
 
-    const counts = await this.esTraceUsageService.getCountByProjects({
+    const counts = await this.countByProjects({
+      decision,
       organizationId,
       projectIds,
     });
     const total = counts.reduce((sum, c) => sum + c.count, 0);
 
-    this.cache.set(organizationId, total);
+    this.cache.set(cacheKey, total);
     return total;
   }
 
@@ -118,14 +146,70 @@ export class UsageService {
       return [];
     }
 
-    return this.esTraceUsageService.getCountByProjects({
+    const decision = await this.getCachedMeterDecision(organizationId);
+    return this.countByProjects({ decision, organizationId, projectIds });
+  }
+
+  private async countByProjects({
+    decision,
+    organizationId,
+    projectIds,
+  }: {
+    decision: MeterDecision;
+    organizationId: string;
+    projectIds: string[];
+  }): Promise<Array<{ projectId: string; count: number }>> {
+    if (decision.usageUnit === "events") {
+      return this.eventUsageService.getCountByProjects({
+        organizationId,
+        projectIds,
+      });
+    }
+
+    return this.traceUsageService.getCountByProjects({
       organizationId,
       projectIds,
     });
   }
 
+  private async getCachedMeterDecision(
+    organizationId: string,
+  ): Promise<MeterDecision> {
+    const cached = this.decisionCache.get(organizationId);
+    if (cached) return cached;
+
+    const decision = await this.resolveMeterDecision(organizationId);
+    this.decisionCache.set(organizationId, decision);
+    return decision;
+  }
+
+  private async resolveMeterDecision(
+    organizationId: string,
+  ): Promise<MeterDecision> {
+    const pricingModel =
+      (await this.organizationRepository?.getPricingModel(organizationId)) ??
+      null;
+    const plan = await this.planResolver(organizationId);
+    const hasValidLicenseOverride = plan.planSource === "license";
+
+    const decision = resolveUsageMeter({
+      pricingModel,
+      licenseUsageUnit: plan.usageUnit,
+      hasValidLicenseOverride,
+      clickhouseAvailable: !!getClickHouseClient(),
+    });
+
+    logger.info(
+      { organizationId, ...decision },
+      "resolved meter decision",
+    );
+
+    return decision;
+  }
+
   /** Clears the internal cache (for testing). */
   clearCache(): void {
     this.cache.clear();
+    this.decisionCache.clear();
   }
 }
