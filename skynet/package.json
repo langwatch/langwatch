@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "concurrently -n server,vite -c blue,green \"node --experimental-transform-types src/server/main.ts\" \"vite\"",
     "build": "vite build",
+    "typecheck": "tsc --noEmit",
     "start": "node --experimental-transform-types src/server/main.ts"
   },
   "dependencies": {
