@@ -162,11 +162,14 @@ export class GroupQueueDispatcher {
         {
           queueName: this.params.queueName,
           count: dispatchedCount,
+          totalProcessed: results.length,
         },
         "Batch dispatched jobs from staging to fastq",
       );
     }
 
-    return dispatchedCount;
+    // Return total items processed (including paused) so the drain loop
+    // continues when a batch is all-paused rather than exiting early.
+    return results.length;
   }
 }

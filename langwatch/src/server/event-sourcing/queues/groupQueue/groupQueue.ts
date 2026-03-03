@@ -187,7 +187,26 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         logger: this.logger,
         isPaused: this.isPaused,
       });
-      this.dispatcher.start();
+
+      // Warm the pause cache before starting the dispatcher to avoid a
+      // window where paused jobs slip through before the first refresh.
+      this.scripts
+        .getPausedKeys()
+        .then((keys) => {
+          this.pausedKeys = new Set(keys);
+        })
+        .catch((err) => {
+          this.logger.warn(
+            {
+              queueName: this.queueName,
+              error: err instanceof Error ? err.message : String(err),
+            },
+            "Failed to load initial pause cache",
+          );
+        })
+        .finally(() => {
+          this.dispatcher!.start();
+        });
 
       // Start pause cache refresh (every 2s)
       this.pauseCacheInterval = setInterval(() => {
