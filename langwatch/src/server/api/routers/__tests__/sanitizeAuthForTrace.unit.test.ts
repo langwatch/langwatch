@@ -53,6 +53,32 @@ describe("sanitizeHeadersForTrace()", () => {
     });
   });
 
+  describe("when Authorization header uses non-standard casing", () => {
+    it("redacts the token regardless of case", () => {
+      const headers: Record<string, string> = {
+        authorization: "Bearer case-insensitive-token",
+        "Content-Type": "application/json",
+      };
+
+      const sanitized = sanitizeHeadersForTrace(headers);
+
+      expect(sanitized.authorization).toBe("Bearer [REDACTED]");
+      expect(sanitized["Content-Type"]).toBe("application/json");
+    });
+  });
+
+  describe("when custom auth header uses non-standard casing", () => {
+    it("redacts the header regardless of case", () => {
+      const headers: Record<string, string> = {
+        "x-api-key": "secret-key-789",
+      };
+
+      const sanitized = sanitizeHeadersForTrace(headers, "X-API-Key");
+
+      expect(sanitized["x-api-key"]).toBe("[REDACTED]");
+    });
+  });
+
   describe("when no auth headers are present", () => {
     it("returns headers unchanged", () => {
       const headers: Record<string, string> = {

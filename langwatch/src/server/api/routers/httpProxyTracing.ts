@@ -38,17 +38,24 @@ export function sanitizeHeadersForTrace(
 ): Record<string, string> {
   const sanitized = { ...headers };
 
-  if (sanitized.Authorization) {
-    const parts = sanitized.Authorization.split(" ");
-    if (parts.length >= 2) {
-      sanitized.Authorization = `${parts[0]} [REDACTED]`;
-    } else {
-      sanitized.Authorization = "[REDACTED]";
+  for (const key of Object.keys(sanitized)) {
+    if (key.toLowerCase() === "authorization") {
+      const parts = sanitized[key]!.split(" ");
+      if (parts.length >= 2) {
+        sanitized[key] = `${parts[0]} [REDACTED]`;
+      } else {
+        sanitized[key] = "[REDACTED]";
+      }
     }
   }
 
-  if (customAuthHeaderName && sanitized[customAuthHeaderName]) {
-    sanitized[customAuthHeaderName] = "[REDACTED]";
+  if (customAuthHeaderName) {
+    const customLower = customAuthHeaderName.toLowerCase();
+    for (const key of Object.keys(sanitized)) {
+      if (key.toLowerCase() === customLower) {
+        sanitized[key] = "[REDACTED]";
+      }
+    }
   }
 
   return sanitized;
@@ -158,15 +165,14 @@ export async function createAgentTestTrace({
       : {}),
   };
 
-  const outputValue = result.success
-    ? {
-        status: result.status,
-        body: result.response,
-        ...(result.extractedOutput
-          ? { extracted_output: result.extractedOutput }
-          : {}),
-      }
-    : { error: result.error };
+  const outputValue = {
+    ...(result.status !== undefined ? { status: result.status } : {}),
+    ...(result.response !== undefined ? { body: result.response } : {}),
+    ...(result.extractedOutput
+      ? { extracted_output: result.extractedOutput }
+      : {}),
+    ...(result.error ? { error: result.error } : {}),
+  };
 
   const span: Span = {
     span_id: spanId,
@@ -194,7 +200,7 @@ export async function createAgentTestTrace({
     test_context: {
       url: testContext.url,
       method: testContext.method,
-      has_auth: String(testContext.has_auth),
+      has_auth: testContext.has_auth,
       ...(testContext.output_path
         ? { output_path: testContext.output_path }
         : {}),
