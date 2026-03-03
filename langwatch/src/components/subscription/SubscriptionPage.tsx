@@ -187,7 +187,7 @@ export function SubscriptionPage() {
     monthlyEquivalent,
   } = useBillingPricing({ currency: effectiveCurrency, billingPeriod: effectiveBillingPeriod, users, plannedUsers: allPlannedUsers });
 
-  // Free plan allows 1 extra seat beyond active members; license override uses existing member count; paid plan uses plan capacity
+  // Free/license-override: baseline of 1 seat (Math.max with totalFullMembers below ensures actual count is the floor); paid plan: use plan capacity
   const effectiveMaxSeats = (isDeveloperPlan || isLicenseOverride) ? 1 : seatUsageM;
 
   // Manual planned seats only (NOT pending invites — they're already in maxMembers)
