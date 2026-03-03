@@ -256,21 +256,15 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
     return grouped;
   }, [groupBy, filteredRuns, targetNameMap, filters.passFailStatus]);
 
-  // Auto-expand the most recent group when data first loads
+  // Auto-expand all rows when data first loads
   useEffect(() => {
     if (!hasAutoExpanded.current) {
       if (groupBy === "none" && batchRuns.length > 0) {
-        const firstId = batchRuns[0]?.batchRunId;
-        if (firstId) {
-          setExpandedIds(new Set([firstId]));
-          hasAutoExpanded.current = true;
-        }
+        setExpandedIds(new Set(batchRuns.map((b) => b.batchRunId)));
+        hasAutoExpanded.current = true;
       } else if (groupBy !== "none" && groups.length > 0) {
-        const firstId = groups[0]?.groupKey;
-        if (firstId) {
-          setExpandedIds(new Set([firstId]));
-          hasAutoExpanded.current = true;
-        }
+        setExpandedIds(new Set(groups.map((g) => g.groupKey)));
+        hasAutoExpanded.current = true;
       }
     }
   }, [batchRuns, groups, groupBy]);
@@ -402,8 +396,8 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
         </Box>
       )}
 
-      {/* Run history rows */}
-      <VStack align="stretch" gap={0} flex={1} overflow="auto">
+      {/* Run history rows — no overflow here; parent provides the scrollport for sticky headers */}
+      <VStack align="stretch" gap={0} flex={1}>
         {groupBy === "none"
           ? batchRuns.map((batchRun) => {
               const summary = computeBatchRunSummary({ batchRun });

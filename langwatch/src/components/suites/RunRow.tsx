@@ -3,14 +3,18 @@
  *
  * Header: [chevron] [suiteName] . [scenarioNames] . [timeAgo] . [spacer] . [statusIcon] [passRate%]
  * Expanded: shows ScenarioTargetRow (list) or ScenarioGridCard (grid) for each scenario run.
+ *
+ * The header is rendered as a direct child of the scroll container (no wrapper Box)
+ * so that `position: sticky` works correctly within the scrollport.
  */
 
 import { Box, Grid, HStack, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
+import { useMemo } from "react";
 import { SummaryStatusIcon } from "./SummaryStatusIcon";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { BatchRun, BatchRunSummary } from "./run-history-transforms";
-import { getScenarioDisplayNames } from "./run-history-transforms";
+import { computeIterationMap, getScenarioDisplayNames } from "./run-history-transforms";
 import { ScenarioTargetRow } from "./ScenarioTargetRow";
 import { ScenarioGridCard } from "./ScenarioGridCard";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
@@ -44,14 +48,14 @@ export function RunRow({
     ? getScenarioDisplayNames({ scenarioRuns: batchRun.scenarioRuns })
     : "";
 
+  const iterationMap = useMemo(
+    () => computeIterationMap({ scenarioRuns: batchRun.scenarioRuns }),
+    [batchRun.scenarioRuns],
+  );
+
   return (
-    <Box
-      border="1px solid"
-      borderColor="border"
-      borderRadius="0"
-      overflow="visible"
-    >
-      {/* Run header - clickable to expand/collapse, sticky */}
+    <>
+      {/* Run header - clickable to expand/collapse, sticky within scroll container */}
       <HStack
         as="button"
         width="full"
@@ -67,7 +71,12 @@ export function RunRow({
         position="sticky"
         top={0}
         zIndex={10}
-        bg="bg"
+        bg="rgba(255, 255, 255, 0.8)"
+        _dark={{ bg: "rgba(26, 26, 26, 0.8)" }}
+        backdropFilter="blur(12px)"
+        borderBottom="1px solid"
+        borderColor="border"
+        data-testid="run-row-header"
       >
         {isExpanded ? (
           <ChevronDown size={14} />
@@ -121,8 +130,6 @@ export function RunRow({
               templateColumns="repeat(auto-fill, minmax(250px, 1fr))"
               gap={4}
               padding={4}
-              borderTop="1px solid"
-              borderColor="border"
               data-testid="scenario-grid"
             >
               {batchRun.scenarioRuns.map((scenarioRun) => (
@@ -131,6 +138,7 @@ export function RunRow({
                   scenarioRun={scenarioRun}
                   targetName={targetName}
                   onClick={() => onScenarioRunClick(scenarioRun)}
+                  iteration={iterationMap.get(scenarioRun.scenarioRunId)}
                 />
               ))}
             </Grid>
@@ -138,8 +146,6 @@ export function RunRow({
             <VStack
               align="stretch"
               gap={0}
-              borderTop="1px solid"
-              borderColor="border"
               data-testid="scenario-list"
             >
               {batchRun.scenarioRuns.map((scenarioRun) => (
@@ -164,7 +170,7 @@ export function RunRow({
       <HStack
         paddingX={4}
         paddingY={2}
-        borderTop="1px solid"
+        borderBottom="1px solid"
         borderColor="border"
         bg="bg.subtle"
         fontSize="xs"
@@ -185,6 +191,6 @@ export function RunRow({
           )}
         </HStack>
       </HStack>
-    </Box>
+    </>
   );
 }

@@ -326,6 +326,44 @@ export function getScenarioDisplayNames({
 }
 
 /**
+ * Computes iteration numbers for scenario runs that share the same
+ * scenario + target combination within a batch.
+ *
+ * Returns a Map from scenarioRunId to iteration number (1-based).
+ * Only includes entries for runs where there are multiple iterations
+ * (i.e., the same scenario+target pair appears more than once).
+ */
+export function computeIterationMap({
+  scenarioRuns,
+}: {
+  scenarioRuns: ScenarioRunData[];
+}): Map<string, number> {
+  const keyCounters = new Map<string, string[]>();
+
+  for (const run of scenarioRuns) {
+    const targetId = getTargetReferenceId(run) ?? "";
+    const key = `${run.scenarioId}::${targetId}`;
+    const ids = keyCounters.get(key);
+    if (ids) {
+      ids.push(run.scenarioRunId);
+    } else {
+      keyCounters.set(key, [run.scenarioRunId]);
+    }
+  }
+
+  const iterationMap = new Map<string, number>();
+  for (const ids of keyCounters.values()) {
+    if (ids.length > 1) {
+      for (let i = 0; i < ids.length; i++) {
+        iterationMap.set(ids[i]!, i + 1);
+      }
+    }
+  }
+
+  return iterationMap;
+}
+
+/**
  * Computes aggregate totals from raw scenario runs.
  * Works regardless of grouping mode since it operates on flat runs.
  */

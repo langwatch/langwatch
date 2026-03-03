@@ -5,12 +5,17 @@
  * Header: [chevron] [group_name (bold)] [status_icon] [pass_rate] ... [N runs]
  * Footer: [N passed] [N failed]
  * Expanded: ScenarioTargetRow (list) or ScenarioGridCard (grid) for each run.
+ *
+ * The header is rendered as a direct child of the scroll container (no wrapper Box)
+ * so that `position: sticky` works correctly within the scrollport.
  */
 
 import { Box, Grid, HStack, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
+import { useMemo } from "react";
 import { SummaryStatusIcon } from "./SummaryStatusIcon";
 import type { RunGroup, RunGroupSummary } from "./run-history-transforms";
+import { computeIterationMap } from "./run-history-transforms";
 import { ScenarioTargetRow } from "./ScenarioTargetRow";
 import { ScenarioGridCard } from "./ScenarioGridCard";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
@@ -37,14 +42,14 @@ export function GroupRow({
 }: GroupRowProps) {
   const runCount = group.scenarioRuns.length;
 
+  const iterationMap = useMemo(
+    () => computeIterationMap({ scenarioRuns: group.scenarioRuns }),
+    [group.scenarioRuns],
+  );
+
   return (
-    <Box
-      border="1px solid"
-      borderColor="border"
-      borderRadius="0"
-      overflow="visible"
-    >
-      {/* Group header - clickable to expand/collapse, sticky */}
+    <>
+      {/* Group header - clickable to expand/collapse, sticky within scroll container */}
       <HStack
         as="button"
         width="full"
@@ -60,7 +65,12 @@ export function GroupRow({
         position="sticky"
         top={0}
         zIndex={10}
-        bg="bg"
+        bg="rgba(255, 255, 255, 0.8)"
+        _dark={{ bg: "rgba(26, 26, 26, 0.8)" }}
+        backdropFilter="blur(12px)"
+        borderBottom="1px solid"
+        borderColor="border"
+        data-testid="group-row-header"
       >
         {isExpanded ? (
           <ChevronDown size={14} />
@@ -95,8 +105,6 @@ export function GroupRow({
               templateColumns="repeat(auto-fill, minmax(250px, 1fr))"
               gap={4}
               padding={4}
-              borderTop="1px solid"
-              borderColor="border"
               data-testid="scenario-grid"
             >
               {group.scenarioRuns.map((scenarioRun) => (
@@ -105,6 +113,7 @@ export function GroupRow({
                   scenarioRun={scenarioRun}
                   targetName={targetName ?? null}
                   onClick={() => onScenarioRunClick(scenarioRun)}
+                  iteration={iterationMap.get(scenarioRun.scenarioRunId)}
                 />
               ))}
             </Grid>
@@ -112,8 +121,6 @@ export function GroupRow({
             <VStack
               align="stretch"
               gap={0}
-              borderTop="1px solid"
-              borderColor="border"
               data-testid="scenario-list"
             >
               {group.scenarioRuns.map((scenarioRun) => (
@@ -138,7 +145,7 @@ export function GroupRow({
       <HStack
         paddingX={4}
         paddingY={2}
-        borderTop="1px solid"
+        borderBottom="1px solid"
         borderColor="border"
         bg="bg.subtle"
         fontSize="xs"
@@ -159,6 +166,6 @@ export function GroupRow({
           )}
         </HStack>
       </HStack>
-    </Box>
+    </>
   );
 }

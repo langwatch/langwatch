@@ -3,8 +3,8 @@
  *
  * Integration tests for full-width borderless run history tables.
  *
- * Tests that RunRow and GroupRow containers have no border-radius
- * and that headers have sticky positioning.
+ * Tests that RunRow and GroupRow headers have sticky positioning
+ * and that the structure enables sticky to work within the scroll container.
  *
  * @see specs/features/suites/grid-view-and-borderless-tables.feature
  */
@@ -54,7 +54,7 @@ describe("<RunRow/> borderless styling", () => {
   });
 
   describe("when rendered", () => {
-    it("has no rounded corners (borderRadius is 0)", () => {
+    it("renders header as a direct child without wrapper Box", () => {
       render(
         <RunRow
           batchRun={makeBatchRun()}
@@ -68,16 +68,8 @@ describe("<RunRow/> borderless styling", () => {
       );
 
       const header = screen.getByRole("button", { name: /Run from/ });
-      // The outer Box container uses borderRadius="0" via Chakra.
-      // Chakra v3 applies styles through CSS classes, not inline styles,
-      // so toHaveStyle won't reflect it in jsdom. We verify the container
-      // renders and does not carry any border-radius inline style.
-      const container = header.parentElement;
-      expect(container).toBeInTheDocument();
-      const inlineRadius = container?.style.borderRadius;
-      expect(
-        inlineRadius === "" || inlineRadius === "0" || inlineRadius === "0px",
-      ).toBe(true);
+      expect(header).toBeInTheDocument();
+      expect(header).toHaveAttribute("data-testid", "run-row-header");
     });
 
     it("has a sticky header with position sticky", () => {
@@ -127,7 +119,7 @@ describe("<GroupRow/> borderless styling", () => {
   });
 
   describe("when rendered", () => {
-    it("has no rounded corners", () => {
+    it("renders header as a direct child without wrapper Box", () => {
       render(
         <GroupRow
           group={makeGroup()}
@@ -142,14 +134,8 @@ describe("<GroupRow/> borderless styling", () => {
       const header = screen.getByRole("button", {
         name: /Angry refund request group/,
       });
-      // Chakra v3 applies borderRadius via CSS classes, not inline styles.
-      // Verify the container renders without any non-zero border-radius inline style.
-      const container = header.parentElement;
-      expect(container).toBeInTheDocument();
-      const inlineRadius = container?.style.borderRadius;
-      expect(
-        inlineRadius === "" || inlineRadius === "0" || inlineRadius === "0px",
-      ).toBe(true);
+      expect(header).toBeInTheDocument();
+      expect(header).toHaveAttribute("data-testid", "group-row-header");
     });
 
     it("has a sticky header", () => {

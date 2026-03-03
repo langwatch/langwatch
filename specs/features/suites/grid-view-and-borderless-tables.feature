@@ -8,16 +8,22 @@ Feature: Scenario result grid view and full-width borderless run history
   # This feature adds a grid/list toggle so scenario results within an
   # expanded run can display as cards (reusing SimulationCard) or rows.
   # It also updates run history styling to full-width borderless tables
-  # with sticky collapsible headers.
+  # with sticky collapsible headers. All run rows are expanded by default.
 
   # --- List/Grid View Toggle ---
 
   @integration
-  Scenario: Filter bar shows a list/grid view toggle
+  Scenario: Filter bar shows a list/grid view toggle on suite detail
     Given a suite has run history
     When I view the suite detail panel
     Then a list/grid view toggle is visible in the filter bar
     And the default view is grid
+
+  @integration
+  Scenario: Filter bar shows a list/grid view toggle on all runs
+    Given multiple suites have run history
+    When I view the all runs panel
+    Then a list/grid view toggle is visible in the filter bar
 
   @integration
   Scenario: Switching to grid view shows scenario results as cards
@@ -42,6 +48,30 @@ Feature: Scenario result grid view and full-width borderless run history
     Given a run row is expanded in grid view
     When the viewport narrows
     Then cards reflow to fewer columns
+
+  # --- Run Rows Expanded by Default ---
+
+  @integration
+  Scenario: Run rows are expanded by default
+    Given a suite has run history
+    When I view the suite detail panel
+    Then all run rows are expanded showing their scenario results
+
+  @integration
+  Scenario: All runs panel rows are expanded by default
+    Given multiple suites have run history
+    When I view the all runs panel
+    Then all run rows are expanded showing their scenario results
+
+  # --- Card Content ---
+
+  @integration
+  Scenario: Grid card shows scenario name, target, and iteration
+    Given a run row is expanded in grid view
+    When I view a scenario result card
+    Then the card shows the scenario name
+    And the card shows the target name when available
+    And the card shows the iteration number when available
 
   # --- Full-Width Borderless Tables ---
 

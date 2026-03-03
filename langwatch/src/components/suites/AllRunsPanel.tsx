@@ -7,6 +7,7 @@
 
 import { Box, Button, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ViewMode } from "./useRunHistoryStore";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -32,6 +33,8 @@ type AllRunsPanelProps = {
 export function AllRunsPanel({ period }: AllRunsPanelProps) {
   const { project } = useOrganizationTeamProject();
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const hasAutoExpanded = useRef(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [filters, setFilters] = useState<RunHistoryFilterValues>({
     scenarioId: "",
     passFailStatus: "",
@@ -163,6 +166,14 @@ export function AllRunsPanel({ period }: AllRunsPanelProps) {
     });
   }, [filteredRuns, allScenarioSetIds]);
 
+  // Auto-expand all rows when data first loads
+  useEffect(() => {
+    if (!hasAutoExpanded.current && batchRuns.length > 0) {
+      setExpandedIds(new Set(batchRuns.map((b) => b.batchRunId)));
+      hasAutoExpanded.current = true;
+    }
+  }, [batchRuns]);
+
   // Compute totals from flat filtered runs
   const totals = useMemo(() => {
     return computeRunHistoryTotals({ runs: filteredRuns });
@@ -239,6 +250,8 @@ export function AllRunsPanel({ period }: AllRunsPanelProps) {
         scenarioOptions={scenarioOptions}
         filters={filters}
         onFiltersChange={setFilters}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
       />
 
       {/* Run list */}
@@ -277,6 +290,7 @@ export function AllRunsPanel({ period }: AllRunsPanelProps) {
                   targetName={targetName}
                   onScenarioRunClick={handleScenarioRunClick}
                   suiteName={suiteName ?? undefined}
+                  viewMode={viewMode}
                 />
               );
             })}

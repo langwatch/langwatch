@@ -82,7 +82,7 @@ describe("<RunRow/>", () => {
       ).toBeInTheDocument();
     });
 
-    it("displays target name in scenario x target format", () => {
+    it("displays target name in scenario x target format in list view", () => {
       render(
         <RunRow
           batchRun={makeBatchRun()}
@@ -91,6 +91,7 @@ describe("<RunRow/>", () => {
           onToggle={vi.fn()}
           targetName="Prod Agent"
           onScenarioRunClick={vi.fn()}
+          viewMode="list"
         />,
         { wrapper: Wrapper },
       );
