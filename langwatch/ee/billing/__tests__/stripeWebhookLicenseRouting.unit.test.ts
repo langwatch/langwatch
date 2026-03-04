@@ -4,12 +4,16 @@ vi.mock("../services/licensePurchaseHandler", () => ({
   handleLicensePurchase: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock("../../../src/env.mjs", () => ({
-  env: {
+const { mockEnv } = vi.hoisted(() => ({
+  mockEnv: {
     STRIPE_WEBHOOK_SECRET: "whsec_test",
     STRIPE_LICENSE_PAYMENT_LINK_ID: "plink_license_123",
-    LANGWATCH_LICENSE_PRIVATE_KEY: "test-private-key-pem",
+    LANGWATCH_LICENSE_PRIVATE_KEY: "test-private-key-pem" as string | undefined,
   },
+}));
+
+vi.mock("../../../src/env.mjs", () => ({
+  env: mockEnv,
 }));
 
 vi.mock("../../../src/server/db", () => ({
@@ -239,35 +243,35 @@ describe("stripeWebhook license routing", () => {
 
   describe("when private key is missing", () => {
     it("returns 500 error", async () => {
-      // Override the env mock for this specific test
-      const { env } = await import("../../../src/env.mjs");
-      const originalKey = env.LANGWATCH_LICENSE_PRIVATE_KEY;
-      (env as any).LANGWATCH_LICENSE_PRIVATE_KEY = undefined;
+      const originalKey = mockEnv.LANGWATCH_LICENSE_PRIVATE_KEY;
 
-      const handler = createHandler();
-      const { req, res } = createMockReqRes();
+      try {
+        mockEnv.LANGWATCH_LICENSE_PRIVATE_KEY = undefined;
 
-      mockStripe.webhooks.constructEvent.mockReturnValue({
-        type: "checkout.session.completed",
-        data: {
-          object: {
-            id: "cs_test_nokey",
-            payment_link: "plink_license_123",
-            customer_details: { email: "buyer@acme.com", name: null },
+        const handler = createHandler();
+        const { req, res } = createMockReqRes();
+
+        mockStripe.webhooks.constructEvent.mockReturnValue({
+          type: "checkout.session.completed",
+          data: {
+            object: {
+              id: "cs_test_nokey",
+              payment_link: "plink_license_123",
+              customer_details: { email: "buyer@acme.com", name: null },
+            },
           },
-        },
-      });
+        });
 
-      await handler(req, res);
+        await handler(req, res);
 
-      expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.send).toHaveBeenCalledWith(
-        expect.stringContaining("missing private key"),
-      );
-      expect(mockHandleLicensePurchase).not.toHaveBeenCalled();
-
-      // Restore
-      (env as any).LANGWATCH_LICENSE_PRIVATE_KEY = originalKey;
+        expect(res.status).toHaveBeenCalledWith(500);
+        expect(res.send).toHaveBeenCalledWith(
+          expect.stringContaining("missing private key"),
+        );
+        expect(mockHandleLicensePurchase).not.toHaveBeenCalled();
+      } finally {
+        mockEnv.LANGWATCH_LICENSE_PRIVATE_KEY = originalKey;
+      }
     });
   });
 

@@ -82,15 +82,15 @@ export const createStripeWebhookHandler = () => {
   });
 
   const slackWebhookUrl = env.SLACK_CHANNEL_SUBSCRIPTIONS;
-  if (slackWebhookUrl) {
-    setBillingNotificationHandlers({
-      sendLicensePurchaseNotification: (payload) =>
-        sendSlackLicensePurchaseNotification({
-          payload,
-          webhookUrl: slackWebhookUrl,
-        }),
-    });
-  }
+  setBillingNotificationHandlers({
+    sendLicensePurchaseNotification: slackWebhookUrl
+      ? (payload) =>
+          sendSlackLicensePurchaseNotification({
+            payload,
+            webhookUrl: slackWebhookUrl,
+          })
+      : undefined,
+  });
 
   return createStripeWebhookHandlerFactory({ stripe: s, webhookService });
 };
