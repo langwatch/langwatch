@@ -36,26 +36,30 @@ jobs:
               return;
             }
 
-            // "low-risk-change" is only valid when added by the bot (github-actions)
+            // "low-risk-change" is only valid when the *most recent* labeling
+            // was done by the bot. This prevents: bot adds → human removes →
+            // human re-adds, which would leave a stale bot event in history.
             if (labelNames.includes("low-risk-change")) {
-              const { data: events } = await github.rest.issues.listEvents({
+              const events = await github.paginate(github.rest.issues.listEvents, {
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: pr.number,
               });
 
-              const labeledByBot = events.some(e =>
-                e.event === "labeled" &&
-                e.label?.name === "low-risk-change" &&
-                e.actor?.login === "github-actions[bot]"
+              // Find the most recent labeled/unlabeled event for low-risk-change
+              const labelEvents = events.filter(e =>
+                (e.event === "labeled" || e.event === "unlabeled") &&
+                e.label?.name === "low-risk-change"
               );
 
-              if (labeledByBot) {
+              const latest = labelEvents[labelEvents.length - 1];
+
+              if (latest?.event === "labeled" && latest?.actor?.login === "github-actions[bot]") {
                 core.info("PR has low-risk-change label applied by automation. Passing check.");
                 return;
               }
 
-              core.warning("low-risk-change label was added manually, not by automation. Ignoring it.");
+              core.warning("low-risk-change label was not last applied by automation. Ignoring it.");
             }
 
             // Get PR reviews
