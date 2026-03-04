@@ -116,11 +116,10 @@ export class MastraExtractor implements CanonicalAttributesExtractor {
           const chatMsgs = systemInstruction
             ? stripSystemMessages(msgs)
             : msgs;
-          ctx.setAttr(
-            ATTR_KEYS.GEN_AI_INPUT_MESSAGES,
-            chatMsgs.length > 0 ? chatMsgs : msgs,
-          );
-          recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
+          if (chatMsgs.length > 0) {
+            ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, chatMsgs);
+            recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
+          }
           if (systemInstruction !== null) {
             ctx.setAttrIfAbsent(
               ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS,
@@ -207,14 +206,16 @@ export class MastraExtractor implements CanonicalAttributesExtractor {
           const text = extractTextFromOutput(rawOutput);
           if (text) {
             ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, text);
-            ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, [
-              { role: "assistant", content: text },
-            ]);
-            recordValueType(
-              ctx,
-              ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES,
-              "chat_messages",
-            );
+            if (ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES] === undefined) {
+              ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, [
+                { role: "assistant", content: text },
+              ]);
+              recordValueType(
+                ctx,
+                ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES,
+                "chat_messages",
+              );
+            }
             ctx.recordRule(
               `${this.id}:mastra.model_step.output->langwatch.output`,
             );

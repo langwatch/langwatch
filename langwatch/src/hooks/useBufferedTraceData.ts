@@ -118,6 +118,32 @@ export function useBufferedTraceData<T extends TraceGroupData>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [freshData]);
 
+  // Auto-apply pending data when mouse leaves the table
+  useEffect(() => {
+    if (
+      !isMouseOnTable &&
+      pendingData &&
+      displayData &&
+      !bypassBufferRef.current
+    ) {
+      const displayedIds = new Set(
+        displayData.groups.flatMap((g) => g.map((t) => t.trace_id)),
+      );
+      const freshIds = new Set(
+        pendingData.groups.flatMap((g) => g.map((t) => t.trace_id)),
+      );
+      const newIds = new Set(
+        [...freshIds].filter((id) => !displayedIds.has(id)),
+      );
+      setHighlightIds(newIds);
+      setDisplayData(pendingData);
+      setPendingData(undefined);
+      setPendingCount(0);
+      scheduleHighlightClear();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMouseOnTable]);
+
   const acceptPending = () => {
     if (pendingData && displayData) {
       // We have buffered data from a visible-trace refetch that arrived

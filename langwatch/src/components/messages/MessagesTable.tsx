@@ -1277,8 +1277,12 @@ export function MessagesTable({
                             <HStack width="full">
                               <Checkbox
                                 checked={
+                                  selectedTraceIds.length > 0 &&
                                   selectedTraceIds.length ===
-                                  displayData?.groups.length
+                                    (displayData?.groups.reduce(
+                                      (sum, g) => sum + g.length,
+                                      0,
+                                    ) ?? 0)
                                 }
                                 onCheckedChange={() => toggleAllTraces()}
                               />

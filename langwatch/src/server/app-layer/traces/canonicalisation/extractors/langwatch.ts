@@ -448,7 +448,7 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
         }
       } catch {
         logger.warn(
-          { jsonPayload },
+          { payloadLength: jsonPayload.length },
           "failed to parse json_encoded_event from langwatch.evaluation.custom",
         );
       }

@@ -147,6 +147,14 @@ function extractTokenMetricsFromSpan(span: NormalizedSpan): SpanTokenMetrics {
 				if (computed !== undefined) cost = computed;
 			}
 		}
+
+		// If model-based estimation failed, fall back to SDK-provided span cost
+		if (cost === 0) {
+			const spanCost = attrs[ATTR_KEYS.LANGWATCH_SPAN_COST];
+			if (typeof spanCost === "number" && spanCost > 0) {
+				cost = spanCost;
+			}
+		}
 	} else {
 		// No model or no tokens — fall back to SDK cost if available
 		const spanCost = attrs[ATTR_KEYS.LANGWATCH_SPAN_COST];

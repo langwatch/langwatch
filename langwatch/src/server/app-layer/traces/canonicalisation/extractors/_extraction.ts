@@ -43,10 +43,9 @@ export const extractInputMessages = (
             const chatMsgs = systemInstruction
               ? stripSystemMessages(msgs)
               : msgs;
-            ctx.setAttr(
-              ATTR_KEYS.GEN_AI_INPUT_MESSAGES,
-              chatMsgs.length > 0 ? chatMsgs : msgs,
-            );
+            if (chatMsgs.length > 0) {
+              ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, chatMsgs);
+            }
             if (systemInstruction !== null) {
               ctx.setAttrIfAbsent(
                 ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS,
