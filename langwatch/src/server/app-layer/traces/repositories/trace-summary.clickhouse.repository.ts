@@ -15,7 +15,7 @@ const logger = createLogger(
 
 type ClickHouseSummaryWriteRecord = WithDateWrites<
   ClickHouseSummaryRecord,
-  "OccurredAt" | "CreatedAt" | "UpdatedAt" | "LastUpdatedAt"
+  "OccurredAt" | "CreatedAt" | "UpdatedAt"
 >;
 
 interface ClickHouseSummaryRecord {
@@ -27,8 +27,6 @@ interface ClickHouseSummaryRecord {
   OccurredAt: number;
   CreatedAt: number;
   UpdatedAt: number;
-  /** @deprecated Dual-write for zero-downtime migration. Remove in cleanup PR. */
-  LastUpdatedAt: number;
   ComputedIOSchemaVersion: string;
   ComputedInput: string | null;
   ComputedOutput: string | null;
@@ -117,9 +115,9 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
             TraceId,
             Version,
             Attributes,
-            toUnixTimestamp64Milli(COALESCE(OccurredAt, CreatedAt)) AS OccurredAt,
+            toUnixTimestamp64Milli(OccurredAt) AS OccurredAt,
             toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
-            toUnixTimestamp64Milli(COALESCE(UpdatedAt, LastUpdatedAt)) AS UpdatedAt,
+            toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
             ComputedIOSchemaVersion,
             ComputedInput,
             ComputedOutput,
@@ -146,7 +144,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
             AND TraceId = {traceId:String}
-          ORDER BY COALESCE(UpdatedAt, LastUpdatedAt) DESC
+          ORDER BY UpdatedAt DESC
           LIMIT 1
         `,
         query_params: { tenantId, traceId },
@@ -220,7 +218,6 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       OccurredAt: new Date(data.occurredAt),
       CreatedAt: new Date(data.createdAt),
       UpdatedAt: new Date(data.updatedAt),
-      LastUpdatedAt: new Date(data.updatedAt),
       ComputedIOSchemaVersion: data.computedIOSchemaVersion,
       ComputedInput: data.computedInput,
       ComputedOutput: data.computedOutput,

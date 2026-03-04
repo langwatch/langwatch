@@ -53,14 +53,12 @@ interface ClickHouseSimulationRunRecord {
   UpdatedAt: number;
   FinishedAt: number | null;
   ArchivedAt: number | null;
-  /** @deprecated Dual-write for zero-downtime migration. Remove in cleanup PR. */
-  DeletedAt: number | null;
   LastSnapshotOccurredAt: number;
 }
 
 type ClickHouseSimulationRunWriteRecord = WithDateWrites<
   ClickHouseSimulationRunRecord,
-  "StartedAt" | "CreatedAt" | "UpdatedAt" | "FinishedAt" | "ArchivedAt" | "DeletedAt" | "LastSnapshotOccurredAt"
+  "StartedAt" | "CreatedAt" | "UpdatedAt" | "FinishedAt" | "ArchivedAt" | "LastSnapshotOccurredAt"
 >;
 
 export class SimulationRunStateRepositoryClickHouse<
@@ -139,7 +137,6 @@ export class SimulationRunStateRepositoryClickHouse<
       UpdatedAt: new Date(data.UpdatedAt),
       FinishedAt: data.FinishedAt != null ? new Date(data.FinishedAt) : null,
       ArchivedAt: data.ArchivedAt != null ? new Date(data.ArchivedAt) : null,
-      DeletedAt: data.ArchivedAt != null ? new Date(data.ArchivedAt) : null,
       LastSnapshotOccurredAt: data.LastSnapshotOccurredAt ? new Date(data.LastSnapshotOccurredAt) : new Date(0),
     };
   }
@@ -170,7 +167,7 @@ export class SimulationRunStateRepositoryClickHouse<
             toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
             toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
             toUnixTimestamp64Milli(FinishedAt) AS FinishedAt,
-            toUnixTimestamp64Milli(COALESCE(ArchivedAt, DeletedAt)) AS ArchivedAt,
+            toUnixTimestamp64Milli(ArchivedAt) AS ArchivedAt,
             toUnixTimestamp64Milli(LastSnapshotOccurredAt) AS LastSnapshotOccurredAt
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String} AND ScenarioRunId = {scenarioRunId:String}
