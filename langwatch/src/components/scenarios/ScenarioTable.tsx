@@ -17,6 +17,7 @@ import { useMemo, useState } from "react";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { Checkbox } from "../ui/checkbox";
 import { Menu } from "../ui/menu";
+import { TagList } from "../ui/TagPill";
 
 export type ScenarioTableProps = {
   scenarios: Scenario[];
@@ -86,22 +87,7 @@ export function ScenarioTable({
         header: "Labels",
         enableSorting: false,
         filterFn: labelsFilterFn,
-        cell: (info) => (
-          <HStack gap={1} flexWrap="wrap">
-            {info.getValue().map((label) => (
-              <Text
-                key={label}
-                fontSize="xs"
-                bg="bg.muted"
-                px={2}
-                py={0.5}
-                borderRadius="md"
-              >
-                #{label}
-              </Text>
-            ))}
-          </HStack>
-        ),
+        cell: (info) => <TagList labels={info.getValue()} />,
       }),
       columnHelper.accessor("updatedAt", {
         header: "Updated",
