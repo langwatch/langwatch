@@ -1,7 +1,7 @@
 /**
  * Standalone Bull Board server for queue visualization.
  *
- * Run with: pnpm start (from packages/bullboard)
+ * Run with: pnpm start (from bullboard)
  * Access at: http://localhost:6380
  *
  * Only for development use.
@@ -18,8 +18,7 @@ import { Queue } from "bullmq";
 import { Hono } from "hono";
 import { basicAuth } from "hono/basic-auth";
 import IORedis from "ioredis";
-import { createGroupQueueRoutes } from "./groupQueues.ts";
-import { discoverQueueNames, isGroupQueue, stripHashTag } from "./redisQueues.ts";
+import { discoverQueueNames, stripHashTag } from "./redisQueues.ts";
 
 const PORT = parseInt(process.env.BULLBOARD_PORT ?? "6380", 10);
 if (Number.isNaN(PORT) || PORT < 1 || PORT > 65535) {
@@ -42,10 +41,8 @@ async function main() {
   });
 
   const queueNames = await discoverQueueNames(connection);
-  const groupQueueNames = queueNames.filter(isGroupQueue);
 
   console.log("Discovered queues:", queueNames);
-  console.log("Group queues:", groupQueueNames.map(stripHashTag));
 
   const queues = queueNames.map((name) => {
     return new BullMQAdapter(
@@ -56,9 +53,7 @@ async function main() {
 
   const serverAdapter = new HonoAdapter(serveStatic);
   serverAdapter.setBasePath("/");
-  serverAdapter.setUIConfig({
-    miscLinks: [{ text: "Groups", url: "/groups" }],
-  });
+  serverAdapter.setUIConfig({});
 
   const { addQueue } = createBullBoard({
     queues,
@@ -81,9 +76,6 @@ async function main() {
               { displayName: stripHashTag(name) },
             ),
           );
-          if (isGroupQueue(name)) {
-            groupQueueNames.push(name);
-          }
           console.log("Discovered new queue:", stripHashTag(name));
         }
       }
@@ -104,8 +96,6 @@ async function main() {
     app.use("*", basicAuth({ username, password }));
   }
 
-  // Mount group queue routes before BullBoard so /groups and /api/group-queues are matched first
-  app.route("/", createGroupQueueRoutes(connection, groupQueueNames));
   app.route("/", serverAdapter.registerPlugin());
 
   console.log(`Bull Board running on http://localhost:${PORT}`);

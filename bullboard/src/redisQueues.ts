@@ -23,15 +23,6 @@ export function stripHashTag(name: string): string {
 }
 
 /**
- * A queue name is considered a group queue if it is hash-tagged ({...})
- * and the inner name contains a `/` (the pipeline/handler/projection pattern).
- */
-export function isGroupQueue(name: string): boolean {
-  if (!name.startsWith("{") || !name.endsWith("}")) return false;
-  return name.slice(1, -1).includes("/");
-}
-
-/**
  * Discover all unique BullMQ queue names from Redis keys.
  * Returns the raw names including hash tags (e.g. `{scenarios}`).
  */
