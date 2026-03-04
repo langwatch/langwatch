@@ -25,7 +25,25 @@ if grep -q "^ELASTICSEARCH_NODE_URL=\"\?quickwit://" .env || ([ -n "$ELASTICSEAR
     pnpm run setup:quickwit
   fi
 else
- pnpm run start:prepare:db
+  # Wait for postgres to be reachable before running migrations
+  if [ -n "$DATABASE_URL" ]; then
+    echo "Waiting for database to be ready..."
+    for i in $(seq 1 30); do
+      if node -e "
+        const url = new URL(process.env.DATABASE_URL.replace('postgresql://', 'http://'));
+        const net = require('net');
+        const s = net.connect({host: url.hostname, port: url.port || 5432}, () => { s.end(); process.exit(0); });
+        s.on('error', () => process.exit(1));
+        setTimeout(() => process.exit(1), 2000);
+      " 2>/dev/null; then
+        echo "Database is reachable"
+        break
+      fi
+      echo "Database not ready yet, retrying in 2s... ($i/30)"
+      sleep 2
+    done
+  fi
+  pnpm run start:prepare:db
 fi
 
 COMMANDS=()
