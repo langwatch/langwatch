@@ -241,5 +241,83 @@ describe("RecordSpanCommand", () => {
         expect(command.data.span.name).toBe(originalName);
       });
     });
+
+    describe("when reserved attributes are present", () => {
+      it("strips langwatch.reserved.* attributes from span before processing", async () => {
+        const command = createMockCommand(
+          "project-123",
+          "trace-1",
+          "span-1",
+          [
+            {
+              key: "langwatch.reserved.pii_redaction_status",
+              value: { stringValue: "true" },
+            },
+            { key: "gen_ai.prompt", value: { stringValue: "hello" } },
+          ],
+        );
+
+        const events = await handler.handle(command);
+
+        const emittedSpan = events[0]!.data.span;
+        const reservedAttr = emittedSpan.attributes.find(
+          (a) => a.key === "langwatch.reserved.pii_redaction_status",
+        );
+        expect(reservedAttr).toBeUndefined();
+        // Non-reserved attributes should remain
+        const promptAttr = emittedSpan.attributes.find(
+          (a) => a.key === "gen_ai.prompt",
+        );
+        expect(promptAttr).toBeDefined();
+      });
+
+      it("strips langwatch.reserved.* attributes from events", async () => {
+        const command = createMockCommand(
+          "project-123",
+          "trace-1",
+          "span-1",
+        );
+        command.data.span.events = [
+          {
+            timeUnixNano: { low: 0, high: 0 },
+            name: "test-event",
+            attributes: [
+              {
+                key: "langwatch.reserved.foo",
+                value: { stringValue: "bar" },
+              },
+            ],
+            droppedAttributesCount: 0,
+          },
+        ];
+
+        const events = await handler.handle(command);
+
+        const emittedSpan = events[0]!.data.span;
+        expect(emittedSpan.events[0]!.attributes).toHaveLength(0);
+      });
+
+      it("preserves original command data when stripping reserved attributes", async () => {
+        const command = createMockCommand(
+          "project-123",
+          "trace-1",
+          "span-1",
+          [
+            {
+              key: "langwatch.reserved.something",
+              value: { stringValue: "value" },
+            },
+          ],
+        );
+
+        await handler.handle(command);
+
+        // Original command should still have the reserved attribute
+        expect(command.data.span.attributes).toHaveLength(1);
+        expect(command.data.span.attributes[0]!.key).toBe(
+          "langwatch.reserved.something",
+        );
+      });
+    });
   });
 });

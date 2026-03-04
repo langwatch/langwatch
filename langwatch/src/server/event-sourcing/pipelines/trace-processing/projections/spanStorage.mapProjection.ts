@@ -2,9 +2,9 @@ import type { AppendStore, MapProjectionDefinition } from "../../../projections/
 import { SPAN_RECEIVED_EVENT_TYPE } from "../schemas/constants";
 import type { SpanReceivedEvent } from "../schemas/events";
 import type { NormalizedSpan } from "../schemas/spans";
-import { SpanNormalizationPipelineService } from "~/server/app-layer/traces/span-normalization.service";
+import { SpanNormalizationPipelineService, enrichRagContextIds } from "~/server/app-layer/traces/span-normalization.service";
 
-const spanNormalizationPipelineService = new SpanNormalizationPipelineService();
+const spanNormalizationPipelineService = SpanNormalizationPipelineService.create();
 
 /**
  * Creates a MapProjection definition for span storage.
@@ -23,12 +23,14 @@ export function createSpanStorageMapProjection({
     eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
 
     map(event: SpanReceivedEvent): NormalizedSpan {
-      return spanNormalizationPipelineService.normalizeSpanReceived(
+      const span = spanNormalizationPipelineService.normalizeSpanReceived(
         event.tenantId,
         event.data.span,
         event.data.resource,
         event.data.instrumentationScope,
       );
+      enrichRagContextIds(span);
+      return span;
     },
 
     store,

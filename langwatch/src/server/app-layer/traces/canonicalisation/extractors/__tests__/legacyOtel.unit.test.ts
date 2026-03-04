@@ -101,7 +101,7 @@ describe("LegacyOtelTracesExtractor", () => {
   });
 
   describe("when error indicators are present", () => {
-    it("extracts error.type from span.error.has_error + span.error.message", () => {
+    it("extracts error.message from span.error.has_error + span.error.message", () => {
       const ctx = createExtractorContext({
         [ATTR_KEYS.SPAN_ERROR_HAS_ERROR]: true,
         [ATTR_KEYS.SPAN_ERROR_MESSAGE]: "Something went wrong",
@@ -110,12 +110,26 @@ describe("LegacyOtelTracesExtractor", () => {
       extractor.apply(ctx);
 
       expect(ctx.setAttrIfAbsent).toHaveBeenCalledWith(
-        ATTR_KEYS.ERROR_TYPE,
+        ATTR_KEYS.ERROR_MESSAGE,
         "Something went wrong",
       );
     });
 
-    it("extracts error.type from exception.type + exception.message", () => {
+    it("accepts string 'true' for span.error.has_error", () => {
+      const ctx = createExtractorContext({
+        [ATTR_KEYS.SPAN_ERROR_HAS_ERROR]: "true",
+        [ATTR_KEYS.SPAN_ERROR_MESSAGE]: "Something went wrong",
+      });
+
+      extractor.apply(ctx);
+
+      expect(ctx.setAttrIfAbsent).toHaveBeenCalledWith(
+        ATTR_KEYS.ERROR_MESSAGE,
+        "Something went wrong",
+      );
+    });
+
+    it("extracts separate error.type and error.message from exception attributes", () => {
       const ctx = createExtractorContext({
         [ATTR_KEYS.EXCEPTION_TYPE]: "ValueError",
         [ATTR_KEYS.EXCEPTION_MESSAGE]: "Invalid input",
@@ -125,11 +139,15 @@ describe("LegacyOtelTracesExtractor", () => {
 
       expect(ctx.setAttrIfAbsent).toHaveBeenCalledWith(
         ATTR_KEYS.ERROR_TYPE,
-        "ValueError: Invalid input",
+        "ValueError",
+      );
+      expect(ctx.setAttrIfAbsent).toHaveBeenCalledWith(
+        ATTR_KEYS.ERROR_MESSAGE,
+        "Invalid input",
       );
     });
 
-    it("extracts error.type from status.message as fallback", () => {
+    it("extracts error.message from status.message as fallback", () => {
       const ctx = createExtractorContext({
         [ATTR_KEYS.STATUS_MESSAGE]: "Request failed",
       });
@@ -137,7 +155,7 @@ describe("LegacyOtelTracesExtractor", () => {
       extractor.apply(ctx);
 
       expect(ctx.setAttrIfAbsent).toHaveBeenCalledWith(
-        ATTR_KEYS.ERROR_TYPE,
+        ATTR_KEYS.ERROR_MESSAGE,
         "Request failed",
       );
     });

@@ -660,34 +660,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       "Closing group queue processor",
     );
 
-    const closeWithTimeout = async (): Promise<void> => {
-      // Wait for dispatcher to stop
-      if (this.dispatcher) {
-        await this.dispatcher.waitUntilStopped();
-      }
-
-      // Pause fastq (stops accepting new work from push)
-      this.processingQueue.pause();
-
-      // Wait for in-flight jobs to finish (drain)
-      if (!this.processingQueue.idle()) {
-        await this.processingQueue.drained();
-      }
-
-      // Close the dedicated blocking connection if it was duplicated
-      if (this.blockingConnection !== this.redisConnection) {
-        await this.blockingConnection.quit();
-        this.logger.debug(
-          { queueName: this.queueName },
-          "Blocking connection closed",
-        );
-      }
-    };
-
+    let shutdownTimer: ReturnType<typeof setTimeout> | undefined;
     try {
-      let shutdownTimer: ReturnType<typeof setTimeout> | undefined;
       await Promise.race([
-        closeWithTimeout(),
+        this.drainAndDisconnect(),
         new Promise<never>((_, reject) => {
           shutdownTimer = setTimeout(
             () =>
@@ -702,7 +678,6 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           );
         }),
       ]);
-      clearTimeout(shutdownTimer);
 
       this.logger.info(
         { queueName: this.queueName },
@@ -713,10 +688,33 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         {
           queueName: this.queueName,
           error: error instanceof Error ? error.message : String(error),
+          queueIdle: this.processingQueue.idle(),
+          dispatcherActive: this.dispatcher != null,
         },
         "Error closing group queue processor",
       );
       throw error;
+    } finally {
+      clearTimeout(shutdownTimer);
+    }
+  }
+
+  private async drainAndDisconnect(): Promise<void> {
+    if (this.dispatcher) {
+      await this.dispatcher.waitUntilStopped();
+    }
+
+    if (!this.processingQueue.idle()) {
+      await this.processingQueue.drained();
+    }
+    this.processingQueue.pause();
+
+    if (this.blockingConnection !== this.redisConnection) {
+      await this.blockingConnection.quit();
+      this.logger.debug(
+        { queueName: this.queueName },
+        "Blocking connection closed",
+      );
     }
   }
 }

@@ -18,7 +18,7 @@
  */
 
 import { ATTR_KEYS } from "./_constants";
-import { ALLOWED_SPAN_TYPES } from "./_helpers";
+import { ALLOWED_SPAN_TYPES } from "./_extraction";
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 
 export class OpenInferenceExtractor implements CanonicalAttributesExtractor {
