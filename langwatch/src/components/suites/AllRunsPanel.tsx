@@ -9,6 +9,7 @@ import { Box, Button, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ViewMode } from "./useRunHistoryStore";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useTargetNameMap } from "~/hooks/useTargetNameMap";
@@ -160,11 +161,13 @@ export function AllRunsPanel({ period }: AllRunsPanelProps) {
     }
 
     if (filters.passFailStatus === "pass") {
-      runs = runs.filter((r) => r.status === "SUCCESS");
+      runs = runs.filter((r) => r.status === ScenarioRunStatus.SUCCESS);
     } else if (filters.passFailStatus === "fail") {
       runs = runs.filter(
-        (r) => r.status === "ERROR" || r.status === "FAILED",
+        (r) => r.status === ScenarioRunStatus.ERROR || r.status === ScenarioRunStatus.FAILED,
       );
+    } else if (filters.passFailStatus === "stalled") {
+      runs = runs.filter((r) => r.status === ScenarioRunStatus.STALLED);
     }
 
     return runs;

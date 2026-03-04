@@ -13,6 +13,7 @@ import type { SimulationSuite } from "@prisma/client";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useTargetNameMap } from "~/hooks/useTargetNameMap";
 import { parseSuiteTargets } from "~/server/suites/types";
@@ -197,65 +198,32 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
       runs = runs.filter((r) => r.scenarioId === filters.scenarioId);
     }
 
-    return runs;
-  }, [runData, filters.scenarioId, period]);
-
-  // Group filtered runs by batch (for "none" grouping and pass/fail filtering)
-  const batchRuns = useMemo(() => {
-    const grouped = groupRunsByBatchId({ runs: filteredRuns });
-
     if (filters.passFailStatus === "pass") {
-      return grouped.filter((b) => {
-        const summary = computeBatchRunSummary({ batchRun: b });
-        return summary.passedCount > 0 && summary.failedCount === 0 && summary.stalledCount === 0;
-      });
-    }
-    if (filters.passFailStatus === "fail") {
-      return grouped.filter((b) => {
-        const summary = computeBatchRunSummary({ batchRun: b });
-        return summary.failedCount > 0;
-      });
-    }
-    if (filters.passFailStatus === "stalled") {
-      return grouped.filter((b) => {
-        const summary = computeBatchRunSummary({ batchRun: b });
-        return summary.stalledCount > 0;
-      });
+      runs = runs.filter((r) => r.status === ScenarioRunStatus.SUCCESS);
+    } else if (filters.passFailStatus === "fail") {
+      runs = runs.filter(
+        (r) => r.status === ScenarioRunStatus.ERROR || r.status === ScenarioRunStatus.FAILED,
+      );
+    } else if (filters.passFailStatus === "stalled") {
+      runs = runs.filter((r) => r.status === ScenarioRunStatus.STALLED);
     }
 
-    return grouped;
-  }, [filteredRuns, filters.passFailStatus]);
+    return runs;
+  }, [runData, filters.scenarioId, filters.passFailStatus, period]);
+
+  // Group filtered runs by batch
+  const batchRuns = useMemo(() => {
+    return groupRunsByBatchId({ runs: filteredRuns });
+  }, [filteredRuns]);
 
   // Group filtered runs by scenario or target (when groupBy is not "none")
   const groups = useMemo(() => {
     if (groupBy === "none") return [];
 
-    const grouped =
-      groupBy === "scenario"
-        ? groupRunsByScenarioId({ runs: filteredRuns })
-        : groupRunsByTarget({ runs: filteredRuns, targetNameMap });
-
-    if (filters.passFailStatus === "pass") {
-      return grouped.filter((g) => {
-        const summary = computeGroupSummary({ group: g });
-        return summary.passedCount > 0 && summary.failedCount === 0 && summary.stalledCount === 0;
-      });
-    }
-    if (filters.passFailStatus === "fail") {
-      return grouped.filter((g) => {
-        const summary = computeGroupSummary({ group: g });
-        return summary.failedCount > 0;
-      });
-    }
-    if (filters.passFailStatus === "stalled") {
-      return grouped.filter((g) => {
-        const summary = computeGroupSummary({ group: g });
-        return summary.stalledCount > 0;
-      });
-    }
-
-    return grouped;
-  }, [groupBy, filteredRuns, targetNameMap, filters.passFailStatus]);
+    return groupBy === "scenario"
+      ? groupRunsByScenarioId({ runs: filteredRuns })
+      : groupRunsByTarget({ runs: filteredRuns, targetNameMap });
+  }, [groupBy, filteredRuns, targetNameMap]);
 
   // Auto-expand all rows when data first loads
   useEffect(() => {
