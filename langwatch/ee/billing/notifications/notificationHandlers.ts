@@ -44,6 +44,15 @@ export const notifyPlanLimit = async (
   ]);
 };
 
+export const notifyResourceLimitSlack = async (
+  context: PlanLimitNotificationContext,
+) => {
+  await runHandlerSafely(
+    billingNotificationHandlers.sendSlackNotification,
+    context,
+  );
+};
+
 export const notifySubscriptionEvent = async (
   payload: SubscriptionNotificationPayload,
 ) => {

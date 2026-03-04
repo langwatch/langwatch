@@ -1,5 +1,7 @@
 import { prisma } from "../../src/server/db";
 import { createPlanLimitNotifier } from "./notifications/planLimitNotifier";
+import { createResourceLimitNotifier } from "./notifications/resourceLimitNotifier";
+import type { ResourceLimitNotifierInput } from "./types";
 import {
   clearBillingNotificationHandlers,
   notifySubscriptionEvent,
@@ -28,6 +30,7 @@ export type {
   PlanLimitNotificationContext,
   PlanLimitNotificationHandlers,
   PlanLimitNotifierInput,
+  ResourceLimitNotifierInput,
   SubscriptionNotificationPayload,
 } from "./types";
 export {
@@ -102,4 +105,18 @@ export const notifyPlanLimitReached = async (input: {
   }
 
   return await planLimitNotifier(input);
+};
+
+let resourceLimitNotifier: ReturnType<
+  typeof createResourceLimitNotifier
+> | null = null;
+
+export const notifyResourceLimitReached = async (
+  input: ResourceLimitNotifierInput,
+) => {
+  if (!resourceLimitNotifier) {
+    resourceLimitNotifier = createResourceLimitNotifier(prisma);
+  }
+
+  return await resourceLimitNotifier(input);
 };

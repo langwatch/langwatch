@@ -1,5 +1,6 @@
 import type { PlanInfo } from "../licensing/planInfo";
 import type { PlanTypes } from "./planTypes";
+import type { LimitType } from "../../src/server/license-enforcement/types";
 
 export type BillingPlanProvider = {
   getActivePlan(
@@ -26,6 +27,17 @@ export type PlanLimitNotificationContext = {
   adminName?: string;
   adminEmail?: string;
   planName: string;
+  // Resource limit enrichment (optional, backward-compatible)
+  limitType?: string;
+  current?: number;
+  max?: number;
+};
+
+export type ResourceLimitNotifierInput = {
+  organizationId: string;
+  limitType: LimitType;
+  current: number;
+  max: number;
 };
 
 export type PlanLimitNotificationHandlers = {

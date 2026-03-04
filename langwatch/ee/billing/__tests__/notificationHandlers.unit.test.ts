@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearBillingNotificationHandlers,
   notifyPlanLimit,
+  notifyResourceLimitSlack,
   notifySubscriptionEvent,
   setBillingNotificationHandlers,
 } from "../notifications/notificationHandlers";
@@ -75,6 +76,53 @@ describe("notificationHandlers", () => {
       await notifyPlanLimit(minimalContext);
 
       expect(sendSlackNotification).toHaveBeenCalledWith(minimalContext);
+    });
+  });
+
+  describe("when dispatching resource-limit notifications", () => {
+    it("dispatches only to Slack, not HubSpot", async () => {
+      const sendSlackNotification = vi.fn();
+      const sendHubspotNotification = vi.fn();
+
+      setBillingNotificationHandlers({
+        sendSlackNotification,
+        sendHubspotNotification,
+      });
+
+      const resourceLimitContext = {
+        organizationId: "org_123",
+        organizationName: "Acme",
+        planName: "Launch",
+        limitType: "Workflows",
+        current: 10,
+        max: 10,
+      };
+
+      await notifyResourceLimitSlack(resourceLimitContext);
+
+      expect(sendSlackNotification).toHaveBeenCalledWith(resourceLimitContext);
+      expect(sendHubspotNotification).not.toHaveBeenCalled();
+    });
+
+    it("does nothing when no Slack handler is registered", async () => {
+      const sendHubspotNotification = vi.fn();
+
+      setBillingNotificationHandlers({
+        sendHubspotNotification,
+      });
+
+      await expect(
+        notifyResourceLimitSlack({
+          organizationId: "org_123",
+          organizationName: "Acme",
+          planName: "Launch",
+          limitType: "Workflows",
+          current: 10,
+          max: 10,
+        }),
+      ).resolves.toBeUndefined();
+
+      expect(sendHubspotNotification).not.toHaveBeenCalled();
     });
   });
 

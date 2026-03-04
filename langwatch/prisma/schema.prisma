@@ -166,6 +166,7 @@ model Organization {
     s3Bucket               String?
     useCustomS3            Boolean              @default(false)
     sentPlanLimitAlert     DateTime?
+    sentResourceLimitAlert DateTime?
     ssoDomain              String?
     ssoProvider            String?
 

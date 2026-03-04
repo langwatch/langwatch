@@ -5,6 +5,8 @@ import { createLicenseEnforcementService } from "./index";
 import { LimitExceededError, ProjectNotFoundError } from "./errors";
 import type { LimitType } from "./types";
 import { getOrganizationIdForProject } from "./utils";
+import { notifyResourceLimitReached } from "../../../ee/billing";
+import { captureException } from "../../utils/posthogErrorCapture";
 
 /**
  * Context type expected by the license enforcement middleware.
@@ -65,6 +67,14 @@ export async function enforceLicenseLimit(
     );
   } catch (error) {
     if (error instanceof LimitExceededError) {
+      // Fire-and-forget: notify ops, never block user
+      void notifyResourceLimitReached({
+        organizationId,
+        limitType: error.limitType,
+        current: error.current,
+        max: error.max,
+      }).catch(captureException);
+
       throw new TRPCError({
         code: "FORBIDDEN",
         message: error.message,
