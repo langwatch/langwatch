@@ -41,6 +41,7 @@ import { PromptListDrawer } from "./prompts/PromptListDrawer";
 import { SeriesFiltersDrawer } from "./SeriesFilterDrawer";
 import { ScenarioFormDrawer } from "./scenarios/ScenarioFormDrawer";
 import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
+import { ScenarioRunDetailDrawer } from "./simulations/ScenarioRunDetailDrawer";
 import { SuiteFormDrawer } from "./suites/SuiteFormDrawer";
 import { TraceDetailsDrawer } from "./TraceDetailsDrawer";
 // Evaluations V3 drawers
@@ -83,6 +84,7 @@ export const drawers = {
   workflowSelectorForEvaluator: WorkflowSelectorForEvaluatorDrawer,
   // Scenarios
   scenarioEditor: ScenarioFormDrawer,
+  scenarioRunDetail: ScenarioRunDetailDrawer,
   // Suites
   suiteEditor: SuiteFormDrawer,
   // Project management
