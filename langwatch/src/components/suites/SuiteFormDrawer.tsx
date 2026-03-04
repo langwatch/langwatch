@@ -21,11 +21,10 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { AlertTriangle } from "lucide-react";
 import type { SimulationSuite } from "@prisma/client";
 import { ChevronDown, ChevronRight, Play } from "lucide-react";
 import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import {
   useDrawer,
   useDrawerParams,
@@ -60,7 +59,7 @@ function buildMutationPayload(data: SuiteFormData, projectId: string) {
 }
 
 export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
-  const { project } = useOrganizationTeamProject();
+  const { project, organization } = useOrganizationTeamProject();
   const { openDrawer, closeDrawer, drawerOpen } = useDrawer();
   const params = useDrawerParams();
   const utils = api.useContext();
@@ -106,6 +105,40 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
     agents,
     prompts,
   });
+
+  const hasArchived =
+    suiteForm.archivedScenarioIds.length > 0 ||
+    suiteForm.archivedTargets.length > 0;
+
+  const { data: archivedNames } = api.suites.resolveArchivedNames.useQuery(
+    {
+      projectId: project?.id ?? "",
+      scenarioIds: suiteForm.archivedScenarioIds.map((s) => s.id),
+      targets: suiteForm.archivedTargets.map((t) => ({
+        type: t.type,
+        referenceId: t.referenceId,
+      })),
+    },
+    { enabled: !!project && hasArchived },
+  );
+
+  const archivedScenariosWithNames = useMemo(
+    () =>
+      suiteForm.archivedScenarioIds.map((s) => ({
+        id: s.id,
+        name: archivedNames?.scenarios[s.id] ?? s.id,
+      })),
+    [suiteForm.archivedScenarioIds, archivedNames],
+  );
+
+  const archivedTargetsWithNames = useMemo(
+    () =>
+      suiteForm.archivedTargets.map((t) => ({
+        ...t,
+        name: archivedNames?.targets[t.referenceId] ?? t.referenceId,
+      })),
+    [suiteForm.archivedTargets, archivedNames],
+  );
 
   const { form } = suiteForm;
   const errors = form.formState.errors;
@@ -159,19 +192,58 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
   });
 
   const runMutation = api.suites.run.useMutation({
-    onSuccess: (result) => {
-      toaster.create({
-        title: `Suite run scheduled (${result.jobCount} jobs)`,
-        type: "success",
-        meta: { closable: true },
-      });
+    onSuccess: (result, variables) => {
+      const archivedCount =
+        (result.skippedArchived?.scenarios?.length ?? 0) +
+        (result.skippedArchived?.targets?.length ?? 0);
+
+      if (archivedCount > 0) {
+        const parts: string[] = [];
+        if (result.skippedArchived.scenarios.length > 0) {
+          parts.push(`${result.skippedArchived.scenarios.length} archived scenario${result.skippedArchived.scenarios.length > 1 ? "s" : ""}`);
+        }
+        if (result.skippedArchived.targets.length > 0) {
+          parts.push(`${result.skippedArchived.targets.length} archived target${result.skippedArchived.targets.length > 1 ? "s" : ""}`);
+        }
+
+        const suiteIdForEdit = variables.id;
+        toaster.create({
+          title: `Suite run scheduled (${result.jobCount} jobs)`,
+          description: `${parts.join(" and ")} skipped.`,
+          type: "warning",
+          meta: { closable: true },
+          action: {
+            label: "Edit Suite",
+            onClick: () => {
+              openDrawer("suiteEditor", { urlParams: { suiteId: suiteIdForEdit } });
+            },
+          },
+        });
+      } else {
+        toaster.create({
+          title: `Suite run scheduled (${result.jobCount} jobs)`,
+          type: "success",
+          meta: { closable: true },
+        });
+      }
     },
-    onError: (err) => {
+    onError: (err, variables) => {
+      const suiteIdForToast = variables.id;
+      const isAllArchived = err.data?.code === "BAD_REQUEST" &&
+        (err.message.includes("All scenarios") || err.message.includes("All targets"));
       toaster.create({
-        title: "Failed to run suite",
+        title: isAllArchived ? "Cannot run suite" : "Failed to run suite",
         description: err.message,
         type: "error",
         meta: { closable: true },
+        ...(isAllArchived ? {
+          action: {
+            label: "Edit Suite",
+            onClick: () => {
+              openDrawer("suiteEditor", { urlParams: { suiteId: suiteIdForToast } });
+            },
+          },
+        } : {}),
       });
     },
   });
@@ -304,6 +376,8 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                 onLabelFilterChange={suiteForm.setActiveLabelFilter}
                 onCreateNew={() => openDrawer("scenarioEditor")}
                 hasError={!!errors.selectedScenarioIds}
+                archivedIds={archivedScenariosWithNames}
+                onRemoveArchived={suiteForm.removeArchivedScenario}
               />
               {errors.selectedScenarioIds && (
                 <Text fontSize="xs" color="red.500">
@@ -332,28 +406,13 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                   }
                 }}
                 hasError={!!errors.selectedTargets}
+                archivedTargets={archivedTargetsWithNames}
+                onRemoveArchived={suiteForm.removeArchivedTarget}
               />
               {errors.selectedTargets && (
                 <Text fontSize="xs" color="red.500">
                   {errors.selectedTargets.message}
                 </Text>
-              )}
-              {suiteForm.staleTargetIds.length > 0 && (
-                <HStack
-                  gap={2}
-                  padding={2}
-                  borderRadius="md"
-                  backgroundColor="orange.50"
-                  _dark={{ backgroundColor: "orange.900" }}
-                  data-testid="stale-targets-warning"
-                >
-                  <AlertTriangle size={14} color="var(--chakra-colors-orange-500)" />
-                  <Text fontSize="xs" color="orange.700" _dark={{ color: "orange.200" }}>
-                    {suiteForm.staleTargetIds.length === 1
-                      ? "1 target is no longer available and may have been deleted."
-                      : `${suiteForm.staleTargetIds.length} targets are no longer available and may have been deleted.`}
-                  </Text>
-                </HStack>
               )}
             </VStack>
 

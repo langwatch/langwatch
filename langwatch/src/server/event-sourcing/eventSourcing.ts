@@ -15,11 +15,11 @@ import type {
     RegisteredPipeline,
 } from "./pipeline/types";
 import { orgBillableEventsMeterProjection } from "./projections/global/orgBillableEventsMeter.mapProjection";
-import { projectDailyBillableEventsProjection } from "./projections/global/projectDailyBillableEvents.foldProjection";
+
 import { projectDailySdkUsageProjection } from "./projections/global/projectDailySdkUsage.foldProjection";
 import { ProjectionRegistry } from "./projections/projectionRegistry";
 import type { EventSourcedQueueProcessor } from "./queues";
-import { GroupQueueProcessorBullMq } from "./queues/groupQueue/groupQueue";
+import { GroupQueueProcessor } from "./queues/groupQueue/groupQueue";
 import { EventSourcedQueueProcessorMemory } from "./queues/memory";
 import { EventSourcingPipeline } from "./runtimePipeline";
 import type { JobRegistryEntry } from "./services/queues/queueManager";
@@ -102,14 +102,11 @@ export class EventSourcing {
       this.projectionRegistry.registerFoldProjection(
         projectDailySdkUsageProjection,
       );
-      this.projectionRegistry.registerFoldProjection(
-        projectDailyBillableEventsProjection,
-      );
       this.projectionRegistry.registerMapProjection(
         orgBillableEventsMeterProjection,
       );
-      this.projectionRegistry.registerReactor(
-        "projectDailyBillableEvents",
+      this.projectionRegistry.registerMapReactor(
+        "orgBillableEventsMeter",
         createBillingMeterDispatchReactor({
           getDispatch: () => {
             const pipeline = this.getPipeline(BILLING_REPORTING_PIPELINE_NAME);
@@ -401,7 +398,7 @@ export class EventSourcing {
 
     const effectiveRedis = this._redis;
     if (effectiveRedis) {
-      this._globalQueue = new GroupQueueProcessorBullMq(
+      this._globalQueue = new GroupQueueProcessor(
         definition,
         effectiveRedis,
         { consumerEnabled: this._processRole !== "web" },
@@ -503,9 +500,17 @@ function buildServiceOptions<
       : undefined;
 
   const reactors =
-    definition.reactors.size > 0
-      ? Array.from(definition.reactors.values()).map((entry) => ({
-          foldName: entry.foldName,
+    definition.foldReactors.size > 0
+      ? Array.from(definition.foldReactors.values()).map((entry) => ({
+          foldName: entry.projectionName,
+          definition: entry.definition,
+        }))
+      : undefined;
+
+  const mapReactors =
+    definition.mapReactors.size > 0
+      ? Array.from(definition.mapReactors.values()).map((entry) => ({
+          mapName: entry.projectionName,
           definition: entry.definition,
         }))
       : undefined;
@@ -515,5 +520,6 @@ function buildServiceOptions<
     mapProjections: mapProjections.length > 0 ? mapProjections : undefined,
     commandRegistrations,
     reactors,
+    mapReactors,
   };
 }

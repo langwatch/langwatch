@@ -8,7 +8,7 @@
  * Layout: sidebar (search, +New Suite, All Runs, suite list) + main panel.
  */
 
-import { Box, HStack, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Skeleton, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 import type { SimulationSuite } from "@prisma/client";
 import { useCallback, useMemo, useState } from "react";
@@ -30,6 +30,8 @@ import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+
+const SKELETON_PLACEHOLDER_COUNT = 5;
 
 function SuitesPageContent() {
   const { project } = useOrganizationTeamProject();
@@ -129,19 +131,54 @@ function SuitesPageContent() {
   });
 
   const runMutation = api.suites.run.useMutation({
-    onSuccess: (result) => {
-      toaster.create({
-        title: `Suite run scheduled (${result.jobCount} jobs)`,
-        type: "success",
-        meta: { closable: true },
-      });
+    onSuccess: (result, variables) => {
+      const suiteIdForToast = variables.id;
+      const archivedCount =
+        (result.skippedArchived?.scenarios?.length ?? 0) +
+        (result.skippedArchived?.targets?.length ?? 0);
+
+      if (archivedCount > 0) {
+        const parts: string[] = [];
+        if (result.skippedArchived.scenarios.length > 0) {
+          parts.push(`${result.skippedArchived.scenarios.length} archived scenario${result.skippedArchived.scenarios.length > 1 ? "s" : ""}`);
+        }
+        if (result.skippedArchived.targets.length > 0) {
+          parts.push(`${result.skippedArchived.targets.length} archived target${result.skippedArchived.targets.length > 1 ? "s" : ""}`);
+        }
+
+        toaster.create({
+          title: `Suite run scheduled (${result.jobCount} jobs)`,
+          description: `${parts.join(" and ")} skipped.`,
+          type: "warning",
+          meta: { closable: true },
+          action: {
+            label: "Edit Suite",
+            onClick: () => handleEditSuite(suiteIdForToast),
+          },
+        });
+      } else {
+        toaster.create({
+          title: `Suite run scheduled (${result.jobCount} jobs)`,
+          type: "success",
+          meta: { closable: true },
+        });
+      }
     },
-    onError: (err) => {
+    onError: (err, variables) => {
+      const suiteIdForToast = variables.id;
+      const isAllArchived = err.data?.code === "BAD_REQUEST" &&
+        (err.message.includes("All scenarios") || err.message.includes("All targets"));
       toaster.create({
-        title: "Failed to run suite",
+        title: isAllArchived ? "Cannot run suite" : "Failed to run suite",
         description: err.message,
         type: "error",
         meta: { closable: true },
+        ...(isAllArchived ? {
+          action: {
+            label: "Edit Suite",
+            onClick: () => handleEditSuite(suiteIdForToast),
+          },
+        } : {}),
       });
     },
   });
@@ -232,8 +269,24 @@ function SuitesPageContent() {
       <HStack w="full" flex={1} alignItems="stretch" gap={0} overflow="hidden">
         {/* Sidebar */}
         {isLoading ? (
-          <VStack width="280px" minWidth="280px" justify="center" align="center">
-            <Spinner />
+          <VStack
+            width="280px"
+            minWidth="280px"
+            padding={4}
+            gap={3}
+            align="stretch"
+          >
+            {Array.from({ length: SKELETON_PLACEHOLDER_COUNT }).map((_, index) => (
+              <Box key={index} data-testid="suite-sidebar-skeleton">
+                <Skeleton height="20px" width="70%" borderRadius="md" />
+                <Skeleton
+                  height="16px"
+                  width="40%"
+                  borderRadius="md"
+                  marginTop={2}
+                />
+              </Box>
+            ))}
           </VStack>
         ) : (
           <SuiteSidebar
@@ -307,6 +360,10 @@ function MainPanel({
   isRunning: boolean;
   period: Period;
 }) {
+  if (isLoading) {
+    return null;
+  }
+
   if (error) {
     return (
       <VStack gap={4} align="center" py={8}>
@@ -338,11 +395,7 @@ function MainPanel({
     );
   }
 
-  if (!selectedSuiteSlug || !isLoading) {
-    return <SuiteEmptyState onNewSuite={onNewSuite} />;
-  }
-
-  return null;
+  return <SuiteEmptyState onNewSuite={onNewSuite} />;
 }
 
 export default withPermissionGuard("scenarios:view", {

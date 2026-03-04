@@ -1,4 +1,4 @@
-import { Badge, Box, Card, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Card, Text, VStack } from "@chakra-ui/react";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { SCENARIO_RUN_STATUS_CONFIG } from "./scenario-run-status-config";
 import { SimulationStatusOverlay } from "./SimulationStatusOverlay";
@@ -41,32 +41,21 @@ function SimulationCardHeader({
   title: string;
   status?: ScenarioRunStatus;
 }) {
-  const { isComplete, colorPalette } = getCardStatusConfig(
+  const { isComplete } = getCardStatusConfig(
     status ?? ScenarioRunStatus.IN_PROGRESS,
   );
 
   return (
     <Box py={3} px={4} w="100%" position="relative" zIndex={25}>
-      <HStack justify="space-between" align="center" w="100%" gap={4}>
-        <Text
-          fontSize="sm"
-          fontWeight="semibold"
-          color={isComplete ? "white" : "fg"}
-          lineClamp={2}
-          textShadow={isComplete ? "0 1px 2px rgba(0,0,0,0.3)" : "none"}
-        >
-          {title}
-        </Text>
-        {status && (
-          <Badge
-            colorPalette={colorPalette}
-            size="sm"
-            variant={isComplete ? "solid" : "subtle"}
-          >
-            {status}
-          </Badge>
-        )}
-      </HStack>
+      <Text
+        fontSize="sm"
+        fontWeight="semibold"
+        color={isComplete ? "white" : "fg"}
+        lineClamp={2}
+        textShadow={isComplete ? "0 1px 2px rgba(0,0,0,0.3)" : "none"}
+      >
+        {title}
+      </Text>
     </Box>
   );
 }

@@ -3,7 +3,7 @@ import { z } from "zod";
 /**
  * Command data for reporting usage for a billing month.
  * Dispatched by the billingMeterDispatch reactor after the
- * projectDailyBillableEvents fold succeeds.
+ * orgBillableEventsMeter map projection succeeds.
  *
  * Uses organizationId as tenantId — the framework only uses tenantId
  * for groupKey construction (${tenantId}:${aggregateType}:${aggregateId}).

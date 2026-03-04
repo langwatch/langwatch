@@ -43,6 +43,7 @@ export interface EventSourcingPipelineDefinition<
   foldProjections?: FoldProjectionDefinition<any, EventType>[];
   mapProjections?: MapProjectionDefinition<any, EventType>[];
   reactors?: Array<{ foldName: string; definition: ReactorDefinition<EventType> }>;
+  mapReactors?: Array<{ mapName: string; definition: ReactorDefinition<EventType> }>;
   globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
   globalJobRegistry?: Map<string, JobRegistryEntry>;
   featureFlagService?: FeatureFlagServiceInterface;

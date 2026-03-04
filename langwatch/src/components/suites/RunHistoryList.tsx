@@ -55,10 +55,12 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const hasAutoExpanded = useRef(false);
 
-  // Use zustand store for filters and groupBy
+  // Use zustand store for filters, groupBy, and viewMode
   const groupBy = useRunHistoryStore((s) => s.groupBy);
+  const viewMode = useRunHistoryStore((s) => s.viewMode);
   const filters = useRunHistoryStore((s) => s.filters);
   const setGroupBy = useRunHistoryStore((s) => s.setGroupBy);
+  const setViewMode = useRunHistoryStore((s) => s.setViewMode);
   const setFilters = useRunHistoryStore((s) => s.setFilters);
   const syncToUrl = useRunHistoryStore((s) => s.syncToUrl);
   const hydrateFromUrl = useRunHistoryStore((s) => s.hydrateFromUrl);
@@ -179,6 +181,17 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
     return null;
   }, [targets, targetNameMap]);
 
+  // Resolve target name per scenario run from metadata.langwatch.targetReferenceId
+  const resolveTargetName = useCallback(
+    (scenarioRun: ScenarioRunData): string | null => {
+      if (singleTargetName) return singleTargetName;
+      const refId = scenarioRun.metadata?.langwatch?.targetReferenceId;
+      if (!refId) return null;
+      return targetNameMap.get(refId) ?? null;
+    },
+    [singleTargetName, targetNameMap],
+  );
+
   // Build scenario options for filter dropdown
   const scenarioOptions = useMemo(() => {
     if (!scenarios) return [];
@@ -254,21 +267,15 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
     return grouped;
   }, [groupBy, filteredRuns, targetNameMap, filters.passFailStatus]);
 
-  // Auto-expand the most recent group when data first loads
+  // Auto-expand all rows when data first loads
   useEffect(() => {
     if (!hasAutoExpanded.current) {
       if (groupBy === "none" && batchRuns.length > 0) {
-        const firstId = batchRuns[0]?.batchRunId;
-        if (firstId) {
-          setExpandedIds(new Set([firstId]));
-          hasAutoExpanded.current = true;
-        }
+        setExpandedIds(new Set(batchRuns.map((b) => b.batchRunId)));
+        hasAutoExpanded.current = true;
       } else if (groupBy !== "none" && groups.length > 0) {
-        const firstId = groups[0]?.groupKey;
-        if (firstId) {
-          setExpandedIds(new Set([firstId]));
-          hasAutoExpanded.current = true;
-        }
+        setExpandedIds(new Set(groups.map((g) => g.groupKey)));
+        hasAutoExpanded.current = true;
       }
     }
   }, [batchRuns, groups, groupBy]);
@@ -388,6 +395,8 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
           onFiltersChange={handleFiltersChange}
           groupBy={groupBy}
           onGroupByChange={setGroupBy}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
         />
       </Box>
 
@@ -398,8 +407,8 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
         </Box>
       )}
 
-      {/* Run history rows */}
-      <VStack align="stretch" gap={2} paddingX={6} flex={1} overflow="auto">
+      {/* Run history rows — no overflow here; parent provides the scrollport for sticky headers */}
+      <VStack align="stretch" gap={0} flex={1}>
         {groupBy === "none"
           ? batchRuns.map((batchRun) => {
               const summary = computeBatchRunSummary({ batchRun });
@@ -410,9 +419,10 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
                   summary={summary}
                   isExpanded={expandedIds.has(batchRun.batchRunId)}
                   onToggle={() => handleToggle(batchRun.batchRunId)}
-                  targetName={singleTargetName}
+                  resolveTargetName={resolveTargetName}
                   onScenarioRunClick={handleScenarioRunClick}
                   expectedJobCount={expectedJobCount}
+                  viewMode={viewMode}
                 />
               );
             })
@@ -426,7 +436,8 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
                   isExpanded={expandedIds.has(group.groupKey)}
                   onToggle={() => handleToggle(group.groupKey)}
                   onScenarioRunClick={handleScenarioRunClick}
-                  targetName={singleTargetName}
+                  resolveTargetName={resolveTargetName}
+                  viewMode={viewMode}
                 />
               );
             })}

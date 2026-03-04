@@ -11,7 +11,7 @@ import { SuiteService } from "~/server/suites/suite.service";
 import { SuiteDomainError } from "~/server/suites/errors";
 import { ProjectRepository } from "~/server/projects/project.repository";
 import { checkProjectPermission } from "../../rbac";
-import { createSuiteSchema, projectSchema, updateSuiteSchema } from "./schemas";
+import { createSuiteSchema, projectSchema, suiteTargetSchema, updateSuiteSchema } from "./schemas";
 
 export const suiteRouter = createTRPCRouter({
   create: protectedProcedure
@@ -104,6 +104,33 @@ export const suiteRouter = createTRPCRouter({
         });
       }
       return SuiteService.getQueueStatus({ suiteId: input.suiteId });
+    }),
+
+  resolveArchivedNames: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        scenarioIds: z.array(z.string()),
+        targets: z.array(suiteTargetSchema),
+      }),
+    )
+    .use(checkProjectPermission("scenarios:view"))
+    .query(async ({ ctx, input }) => {
+      const projectRepository = new ProjectRepository(ctx.prisma);
+      const organizationId = await projectRepository.getOrganizationId({
+        projectId: input.projectId,
+      });
+      if (!organizationId) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Organization not found for project",
+        });
+      }
+      const service = SuiteService.create(ctx.prisma);
+      return service.resolveArchivedNames({
+        ...input,
+        organizationId,
+      });
     }),
 
   run: protectedProcedure

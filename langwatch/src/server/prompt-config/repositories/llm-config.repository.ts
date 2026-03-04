@@ -763,6 +763,58 @@ export class LlmConfigRepository {
     return config !== null;
   }
 
+  /**
+   * Find which of the given IDs exist as non-deleted configs accessible
+   * from the specified project or organization.
+   * Returns the set of IDs that exist.
+   */
+  async findExistingIds(params: {
+    ids: string[];
+    projectId: string;
+    organizationId: string;
+  }): Promise<Set<string>> {
+    const configs = await this.prisma.llmPromptConfig.findMany({
+      where: {
+        id: { in: params.ids },
+        deletedAt: null,
+        OR: [
+          { projectId: params.projectId },
+          { organizationId: params.organizationId, scope: "ORGANIZATION" },
+        ],
+      },
+      select: { id: true },
+    });
+    return new Set(configs.map((c) => c.id));
+  }
+
+  /**
+   * Find prompt config names by IDs regardless of deleted status.
+   * Uses handle (slug) as display name when available.
+   */
+  async findNamesByIds(input: {
+    ids: string[];
+    projectId: string;
+    organizationId: string;
+  }): Promise<{ id: string; name: string }[]> {
+    const configs = await this.prisma.llmPromptConfig.findMany({
+      where: {
+        id: { in: input.ids },
+        OR: [
+          { projectId: input.projectId },
+          { organizationId: input.organizationId, scope: "ORGANIZATION" },
+        ],
+      },
+      select: { id: true, name: true, handle: true },
+    });
+    return configs.map((c) => ({
+      id: c.id,
+      name:
+        c.handle
+          ? this.removeHandlePrefixes(c.handle, input.projectId, input.organizationId) ?? c.name ?? c.id
+          : c.name ?? c.id,
+    }));
+  }
+
   private generateConfigId() {
     return `prompt_${nanoid()}`;
   }

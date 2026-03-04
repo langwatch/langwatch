@@ -1,19 +1,21 @@
 /**
  * Row inside an expanded run showing a scenario x target pair result.
  *
- * Displays: [status_icon] [scenario_name] x [target_name] [pass%] ([pass/total]) [duration]
+ * Displays: [status_icon] [target: scenario_name (#N)] [pass%] ([pass/total]) [duration]
  */
 
 import { HStack, Text } from "@chakra-ui/react";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
 import { STATUS_ICON_CONFIG } from "./status-icons";
+import { buildDisplayTitle } from "./run-history-transforms";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 
 type ScenarioTargetRowProps = {
   scenarioRun: ScenarioRunData;
   targetName: string | null;
   onClick: () => void;
+  iteration?: number;
 };
 
 function formatDuration(ms: number): string {
@@ -38,11 +40,10 @@ export function ScenarioTargetRow({
   scenarioRun,
   targetName,
   onClick,
+  iteration,
 }: ScenarioTargetRowProps) {
   const scenarioName = scenarioRun.name ?? scenarioRun.scenarioId;
-  const displayName = targetName
-    ? `${scenarioName} \u00d7 ${targetName}`
-    : scenarioName;
+  const displayName = buildDisplayTitle({ scenarioName, targetName, iteration });
 
   const config = SCENARIO_RUN_STATUS_CONFIG[scenarioRun.status];
 

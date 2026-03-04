@@ -397,7 +397,7 @@ describe("useSuiteForm()", () => {
 
   describe("given stale target detection", () => {
     describe("when selected targets all exist in available targets", () => {
-      it("returns empty staleTargetIds", () => {
+      it("returns empty archivedTargets", () => {
         const { result } = renderHook(() => useSuiteForm(baseParams));
 
         act(() => {
@@ -407,12 +407,12 @@ describe("useSuiteForm()", () => {
           });
         });
 
-        expect(result.current.staleTargetIds).toEqual([]);
+        expect(result.current.archivedTargets).toEqual([]);
       });
     });
 
     describe("when a selected target is not in available targets", () => {
-      it("returns the stale referenceId", () => {
+      it("returns the archived target with type info", () => {
         const { result } = renderHook(() =>
           useSuiteForm({
             ...baseParams,
@@ -436,12 +436,14 @@ describe("useSuiteForm()", () => {
           }),
         );
 
-        expect(result.current.staleTargetIds).toEqual(["prompt_deleted"]);
+        expect(result.current.archivedTargets).toEqual([
+          { type: "prompt", referenceId: "prompt_deleted", name: "prompt_deleted" },
+        ]);
       });
     });
 
     describe("when only agents have loaded but prompts have not", () => {
-      it("returns empty staleTargetIds to avoid false positives", () => {
+      it("returns empty archivedTargets to avoid false positives", () => {
         const { result } = renderHook(() =>
           useSuiteForm({
             ...baseParams,
@@ -464,12 +466,12 @@ describe("useSuiteForm()", () => {
           }),
         );
 
-        expect(result.current.staleTargetIds).toEqual([]);
+        expect(result.current.archivedTargets).toEqual([]);
       });
     });
 
     describe("when agents and prompts have not loaded yet", () => {
-      it("returns empty staleTargetIds", () => {
+      it("returns empty archivedTargets", () => {
         const { result } = renderHook(() =>
           useSuiteForm({
             ...baseParams,
@@ -492,7 +494,7 @@ describe("useSuiteForm()", () => {
           }),
         );
 
-        expect(result.current.staleTargetIds).toEqual([]);
+        expect(result.current.archivedTargets).toEqual([]);
       });
     });
   });
@@ -503,6 +505,194 @@ describe("useSuiteForm()", () => {
         const { result } = renderHook(() => useSuiteForm(baseParams));
 
         expect(result.current.allLabels).toEqual(["billing", "safety"]);
+      });
+    });
+  });
+
+  describe("given archived scenario detection", () => {
+    describe("when selected scenario IDs include IDs not in the active scenarios list", () => {
+      it("returns those IDs as archivedScenarioIds", () => {
+        const { result } = renderHook(() =>
+          useSuiteForm({
+            ...baseParams,
+            suite: {
+              id: "suite_1",
+              projectId: "proj_1",
+              name: "Test",
+              slug: "test",
+              description: null,
+              scenarioIds: ["scen_1", "scen_archived_1", "scen_archived_2"],
+              targets: [{ type: "http", referenceId: "agent_1" }],
+              repeatCount: 1,
+              labels: [],
+              archivedAt: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          }),
+        );
+
+        expect(result.current.archivedScenarioIds).toEqual([
+          { id: "scen_archived_1", name: "scen_archived_1" },
+          { id: "scen_archived_2", name: "scen_archived_2" },
+        ]);
+      });
+    });
+
+    describe("when all selected scenario IDs are in the active scenarios list", () => {
+      it("returns empty archivedScenarioIds", () => {
+        const { result } = renderHook(() =>
+          useSuiteForm({
+            ...baseParams,
+            suite: {
+              id: "suite_1",
+              projectId: "proj_1",
+              name: "Test",
+              slug: "test",
+              description: null,
+              scenarioIds: ["scen_1", "scen_2"],
+              targets: [{ type: "http", referenceId: "agent_1" }],
+              repeatCount: 1,
+              labels: [],
+              archivedAt: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          }),
+        );
+
+        expect(result.current.archivedScenarioIds).toEqual([]);
+      });
+    });
+
+    describe("when scenarios have not loaded yet", () => {
+      it("returns empty archivedScenarioIds", () => {
+        const { result } = renderHook(() =>
+          useSuiteForm({
+            ...baseParams,
+            scenarios: undefined,
+          }),
+        );
+
+        act(() => {
+          result.current.toggleScenario("scen_1");
+        });
+
+        expect(result.current.archivedScenarioIds).toEqual([]);
+      });
+    });
+  });
+
+  describe("given removeArchivedScenario", () => {
+    describe("when called with an archived scenario ID", () => {
+      it("removes the ID from selectedScenarioIds", () => {
+        const { result } = renderHook(() =>
+          useSuiteForm({
+            ...baseParams,
+            suite: {
+              id: "suite_1",
+              projectId: "proj_1",
+              name: "Test",
+              slug: "test",
+              description: null,
+              scenarioIds: ["scen_1", "scen_archived"],
+              targets: [{ type: "http", referenceId: "agent_1" }],
+              repeatCount: 1,
+              labels: [],
+              archivedAt: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          }),
+        );
+
+        expect(result.current.selectedScenarioIds).toContain("scen_archived");
+
+        act(() => {
+          result.current.removeArchivedScenario("scen_archived");
+        });
+
+        expect(result.current.selectedScenarioIds).not.toContain("scen_archived");
+        expect(result.current.selectedScenarioIds).toContain("scen_1");
+      });
+    });
+  });
+
+  describe("given removeArchivedTarget", () => {
+    describe("when called with an archived target", () => {
+      it("removes the matching target from selectedTargets", () => {
+        const { result } = renderHook(() =>
+          useSuiteForm({
+            ...baseParams,
+            suite: {
+              id: "suite_1",
+              projectId: "proj_1",
+              name: "Test",
+              slug: "test",
+              description: null,
+              scenarioIds: ["scen_1"],
+              targets: [
+                { type: "http", referenceId: "agent_1" },
+                { type: "prompt", referenceId: "prompt_deleted" },
+              ],
+              repeatCount: 1,
+              labels: [],
+              archivedAt: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          }),
+        );
+
+        expect(result.current.selectedTargets).toHaveLength(2);
+
+        act(() => {
+          result.current.removeArchivedTarget({
+            type: "prompt",
+            referenceId: "prompt_deleted",
+          });
+        });
+
+        expect(result.current.selectedTargets).toEqual([
+          { type: "http", referenceId: "agent_1" },
+        ]);
+      });
+    });
+
+    describe("when called with a target matching referenceId but different type", () => {
+      it("does not remove the non-matching target", () => {
+        const { result } = renderHook(() =>
+          useSuiteForm({
+            ...baseParams,
+            suite: {
+              id: "suite_1",
+              projectId: "proj_1",
+              name: "Test",
+              slug: "test",
+              description: null,
+              scenarioIds: ["scen_1"],
+              targets: [
+                { type: "http", referenceId: "shared_id" },
+              ],
+              repeatCount: 1,
+              labels: [],
+              archivedAt: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          }),
+        );
+
+        act(() => {
+          result.current.removeArchivedTarget({
+            type: "prompt",
+            referenceId: "shared_id",
+          });
+        });
+
+        expect(result.current.selectedTargets).toEqual([
+          { type: "http", referenceId: "shared_id" },
+        ]);
       });
     });
   });

@@ -22,11 +22,6 @@ export type CommandsUnionToRegistry<C extends RegisteredCommand> = {
     K extends { payload: infer P } ? P : never;
 };
 
-// fooking proud of this one, still got it, take that ai
-// The way TypeScript has elected for us to suffer for the simply joy in life, of
-// obtaining the typed keys of a Map. fanks.
-type MapKey<T> = T extends Map<infer K, any> ? K : never;
-
 // Convenience: command name union from a StaticPipelineDefinition
 export type CommandNamesFromPipeline<
   P extends StaticPipelineDefinition<any, any, any>
@@ -67,7 +62,9 @@ export class StaticPipelineBuilderWithName<EventType extends Event = Event> {
   ): StaticPipelineBuilderWithNameAndType<
     EventType,
     Record<string, Projection>,
-    NoCommands
+    NoCommands,
+    never,
+    never
   > {
     return new StaticPipelineBuilderWithNameAndType(this.name, aggregateType);
   }
@@ -84,6 +81,8 @@ export class StaticPipelineBuilderWithNameAndType<
   EventType extends Event = Event,
   RegisteredProjections extends Record<string, Projection> = Record<string, Projection>,
   RegisteredCommands extends RegisteredCommand = NoCommands,
+  FoldNames extends string = never,
+  MapNames extends string = never,
 > {
   private foldProjections = new Map<
     string,
@@ -104,9 +103,13 @@ export class StaticPipelineBuilderWithNameAndType<
     handlerClass: CommandHandlerClass<any, any, EventType>;
     options?: CommandHandlerOptions;
   }> = [];
-  private reactors = new Map<
+  private foldReactors = new Map<
     string,
-    { foldName: string; definition: ReactorDefinition<EventType> }
+    { projectionName: string; definition: ReactorDefinition<EventType> }
+  >();
+  private mapReactors = new Map<
+    string,
+    { projectionName: string; definition: ReactorDefinition<EventType> }
   >();
   private featureFlagService?: FeatureFlagServiceInterface;
 
@@ -130,7 +133,9 @@ export class StaticPipelineBuilderWithNameAndType<
   ): StaticPipelineBuilderWithNameAndType<
     EventType,
     RegisteredProjections,
-    RegisteredCommands
+    RegisteredCommands,
+    FoldNames | ProjectionName,
+    MapNames
   > {
     if (this.foldProjections.has(name)) {
       throw new ConfigurationError(
@@ -160,7 +165,9 @@ export class StaticPipelineBuilderWithNameAndType<
   ): StaticPipelineBuilderWithNameAndType<
     EventType,
     RegisteredProjections,
-    RegisteredCommands
+    RegisteredCommands,
+    FoldNames,
+    MapNames | MapName
   > {
     if (this.mapProjections.has(name)) {
       throw new ConfigurationError(
@@ -190,29 +197,21 @@ export class StaticPipelineBuilderWithNameAndType<
   }
 
   /**
-   * Register a reactor on a fold projection.
-   * A reactor is a post-fold side-effect handler that fires after the fold's
-   * apply + store succeeds.
+   * Register a reactor on a fold or map projection.
+   * A reactor is a post-projection side-effect handler that fires after the
+   * projection's processing succeeds.
    *
-   * @param foldName - Name of the fold projection this reactor is attached to
+   * @param projectionName - Name of the fold or map projection this reactor is attached to
    * @param reactorName - Unique name for this reactor within the pipeline
    * @param definition - Reactor definition with handle function
    * @returns Builder instance for method chaining
    */
   withReactor(
-    foldName: MapKey<typeof this.foldProjections>,
+    projectionName: FoldNames | MapNames,
     reactorName: string,
     definition: ReactorDefinition<EventType>,
   ): this {
-    if (!this.foldProjections.has(foldName)) {
-      throw new ConfigurationError(
-        "StaticPipelineBuilder",
-        `Cannot register reactor "${reactorName}" on fold "${foldName}" — fold not found`,
-        { foldName, reactorName },
-      );
-    }
-
-    if (this.reactors.has(reactorName)) {
+    if (this.foldReactors.has(reactorName) || this.mapReactors.has(reactorName)) {
       throw new ConfigurationError(
         "StaticPipelineBuilder",
         `Reactor with name "${reactorName}" already exists`,
@@ -220,7 +219,18 @@ export class StaticPipelineBuilderWithNameAndType<
       );
     }
 
-    this.reactors.set(reactorName, { foldName, definition });
+    if (this.foldProjections.has(projectionName)) {
+      this.foldReactors.set(reactorName, { projectionName, definition });
+    } else if (this.mapProjections.has(projectionName)) {
+      this.mapReactors.set(reactorName, { projectionName, definition });
+    } else {
+      throw new ConfigurationError(
+        "StaticPipelineBuilder",
+        `Cannot register reactor "${reactorName}" on projection "${projectionName}" — projection not found`,
+        { projectionName, reactorName },
+      );
+    }
+
     return this;
   }
 
@@ -243,7 +253,9 @@ export class StaticPipelineBuilderWithNameAndType<
     EventType,
     RegisteredProjections,
     | RegisteredCommands
-    | { name: Name; payload: ExtractCommandHandlerPayload<handlerClass> }
+    | { name: Name; payload: ExtractCommandHandlerPayload<handlerClass> },
+    FoldNames,
+    MapNames
   > {
     if (this.commands.some((c) => c.name === name)) {
       throw new ConfigurationError(
@@ -258,7 +270,9 @@ export class StaticPipelineBuilderWithNameAndType<
       EventType,
       RegisteredProjections,
       | RegisteredCommands
-      | { name: Name; payload: ExtractCommandHandlerPayload<handlerClass> }
+      | { name: Name; payload: ExtractCommandHandlerPayload<handlerClass> },
+      FoldNames,
+      MapNames
     >;
   }
 
@@ -301,7 +315,8 @@ export class StaticPipelineBuilderWithNameAndType<
       foldProjections: this.foldProjections,
       mapProjections: this.mapProjections,
       commands: this.commands,
-      reactors: this.reactors,
+      foldReactors: this.foldReactors,
+      mapReactors: this.mapReactors,
       featureFlagService: this.featureFlagService,
 
       // Purely for typing: lets downstream code infer the command names + payloads

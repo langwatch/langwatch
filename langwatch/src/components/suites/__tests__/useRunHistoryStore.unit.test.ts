@@ -24,6 +24,11 @@ describe("useRunHistoryStore", () => {
       expect(getState(store).groupBy).toBe("none");
     });
 
+    it("defaults viewMode to 'grid'", () => {
+      const store = createStore();
+      expect(getState(store).viewMode).toBe("grid");
+    });
+
     it("defaults filters to empty strings", () => {
       const store = createStore();
       expect(getState(store).filters).toEqual({
@@ -60,6 +65,37 @@ describe("useRunHistoryStore", () => {
       getState(store).setFilter("scenarioId", "login-scenario");
       getState(store).setGroupBy("target");
       expect(getState(store).filters.scenarioId).toBe("login-scenario");
+    });
+  });
+
+  describe("setViewMode()", () => {
+    let store: ReturnType<typeof createStore>;
+
+    beforeEach(() => {
+      store = createStore();
+    });
+
+    it("updates viewMode to 'list'", () => {
+      getState(store).setViewMode("list");
+      expect(getState(store).viewMode).toBe("list");
+    });
+
+    it("updates viewMode back to 'grid'", () => {
+      getState(store).setViewMode("list");
+      getState(store).setViewMode("grid");
+      expect(getState(store).viewMode).toBe("grid");
+    });
+
+    it("preserves groupBy when changing viewMode", () => {
+      getState(store).setGroupBy("target");
+      getState(store).setViewMode("list");
+      expect(getState(store).groupBy).toBe("target");
+    });
+
+    it("preserves filters when changing viewMode", () => {
+      getState(store).setFilter("scenarioId", "scen_1");
+      getState(store).setViewMode("list");
+      expect(getState(store).filters.scenarioId).toBe("scen_1");
     });
   });
 

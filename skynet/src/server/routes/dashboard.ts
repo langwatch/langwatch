@@ -4,9 +4,9 @@ import type { MetricsCollector } from "../services/metricsCollector.ts";
 export function createDashboardRouter(metrics: MetricsCollector): Router {
   const router = Router();
 
-  router.get("/api/dashboard", async (_req, res) => {
+  router.get("/api/dashboard", (_req, res) => {
     try {
-      const data = await metrics.getDashboardData();
+      const data = metrics.getDashboardData();
       res.json(data);
     } catch (err) {
       console.error("Dashboard error:", err);

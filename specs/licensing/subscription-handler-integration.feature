@@ -1,7 +1,7 @@
 @wip @integration
-Feature: SubscriptionHandler License Integration
+Feature: PlanProvider License Integration
   As a LangWatch self-hosted deployment
-  I want SubscriptionHandler to use license-based limits
+  I want planProvider to use license-based limits
   So that existing enforcement code automatically works with licenses
 
   Background:
@@ -14,32 +14,32 @@ Feature: SubscriptionHandler License Integration
 
   Scenario: Returns FREE type when no license
     Given the organization has no license
-    When I call SubscriptionHandler.getActivePlan
+    When I call planProvider.getActivePlan
     Then the plan type is "FREE"
 
   Scenario: Limits to 1 member when no license
     Given the organization has no license
-    When I call SubscriptionHandler.getActivePlan
+    When I call planProvider.getActivePlan
     Then maxMembers is 1
 
   Scenario: Limits to 2 projects when no license
     Given the organization has no license
-    When I call SubscriptionHandler.getActivePlan
+    When I call planProvider.getActivePlan
     Then maxProjects is 2
 
   Scenario: Returns license plan type when valid license exists
     Given the organization has a valid license with plan type "GROWTH"
-    When I call SubscriptionHandler.getActivePlan
+    When I call planProvider.getActivePlan
     Then the plan type is "GROWTH"
 
   Scenario: Returns FREE type when license is expired
     Given the organization has an expired license
-    When I call SubscriptionHandler.getActivePlan
+    When I call planProvider.getActivePlan
     Then the plan type is "FREE"
 
   Scenario: Returns FREE type when license is invalid
     Given the organization has an invalid license
-    When I call SubscriptionHandler.getActivePlan
+    When I call planProvider.getActivePlan
     Then the plan type is "FREE"
 
   # ============================================================================

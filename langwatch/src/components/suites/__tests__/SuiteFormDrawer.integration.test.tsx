@@ -103,6 +103,9 @@ vi.mock("~/utils/api", () => ({
       getById: {
         useQuery: vi.fn(() => ({ data: mocks.mockGetByIdData })),
       },
+      resolveArchivedNames: {
+        useQuery: vi.fn(() => ({ data: undefined })),
+      },
     },
     useContext: vi.fn(() => ({
       suites: {
@@ -116,6 +119,7 @@ vi.mock("~/utils/api", () => ({
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: vi.fn(() => ({
     project: { id: "proj_1", slug: "test-project" },
+    organization: { id: "org_1" },
   })),
 }));
 

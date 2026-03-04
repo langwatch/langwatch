@@ -94,10 +94,16 @@ export interface StaticPipelineDefinition<
     options?: CommandHandlerOptions;
   }>;
 
-  /** Reactors (post-fold side-effect handlers) registered in this pipeline */
-  reactors: Map<
+  /** Reactors attached to fold projections (post-fold side-effect handlers) */
+  foldReactors: Map<
     string,
-    { foldName: string; definition: ReactorDefinition<EventType> }
+    { projectionName: string; definition: ReactorDefinition<EventType> }
+  >;
+
+  /** Reactors attached to map projections (post-map side-effect handlers) */
+  mapReactors: Map<
+    string,
+    { projectionName: string; definition: ReactorDefinition<EventType> }
   >;
 
   /** Feature flag service for kill switches */

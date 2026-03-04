@@ -15,7 +15,7 @@ const GRACE_PERIOD_DAYS = 3;
 
 /**
  * Reactor that dispatches billing usage reporting commands after
- * the projectDailyBillableEvents fold succeeds.
+ * the orgBillableEventsMeter map projection succeeds.
  *
  * Two dedup layers:
  * - Reactor-level per-project: makeJobId creates one reactor job per project.
