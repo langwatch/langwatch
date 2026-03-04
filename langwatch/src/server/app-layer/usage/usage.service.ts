@@ -1,7 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
 import { getApp } from "~/server/app-layer/app";
-import { FREE_PLAN } from "../../../../ee/licensing/constants";
-import { env } from "../../../env.mjs";
 import { TraceUsageService } from "../../traces/trace-usage.service";
 import { EventUsageService } from "../../traces/event-usage.service";
 import type { PlanResolver } from "../subscription/plan-provider";
@@ -86,12 +84,6 @@ export class UsageService {
       this.getCurrentMonthCount({ organizationId }),
       this.planResolver(organizationId),
     ]);
-
-    // Self-hosted = unlimited traces for FREE plan
-    // Preventing customers from getting blocked when no license is active
-    if (!env.IS_SAAS && plan.type === FREE_PLAN.type) {
-      return { exceeded: false };
-    }
 
     if (count >= plan.maxMessagesPerMonth) {
       return {
