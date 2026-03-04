@@ -1,57 +1,27 @@
-# Mastra Weather Agent Example
+# mastra
 
-This example demonstrates how to use LangWatch with Mastra to create a weather agent that can provide weather information and suggest activities based on weather conditions.
-
-## Features
-
-- **Weather Agent**: An AI agent that can fetch weather data and suggest activities
-- **Weather Tool**: A tool that fetches real-time weather data from Open-Meteo API
-- **CLI Chatbox Interface**: Interactive command-line interface for chatting with the weather agent
-- **LangWatch Integration**: Full observability and tracing with LangWatch
+Welcome to your new [Mastra](https://mastra.ai/) project! We're excited to see what you'll build.
 
 ## Getting Started
 
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
+Start the development server:
 
-2. Set up your environment variables:
-   ```bash
-   cp .env.example .env
-   # Add your OpenAI API key to .env
-   ```
-
-3. Run the CLI chatbox interface:
-   ```bash
-   npm run cli
-   ```
-
-4. Or run the workflow example:
-   ```bash
-   npm start
-   ```
-
-## Usage
-
-### CLI Chatbox Interface
-
-The CLI interface allows you to interact with the weather agent in a conversational manner:
-
-```bash
-npm run cli
+```shell
+npm run dev
 ```
 
-Example conversation:
-```
-🌤️  Weather Agent Chatbot started! Type "quit" to exit.
-Ask me about weather for any location and I'll help you plan activities!
----
-You: What's the weather like in Paris?
-🌤️  Checking weather and planning activities...
-[Agent responds with weather information and activity suggestions]
-```
+Open [http://localhost:4111](http://localhost:4111) in your browser to access [Mastra Studio](https://mastra.ai/docs/getting-started/studio). It provides an interactive UI for building and testing your agents, along with a REST API that exposes your Mastra application as a local service. This lets you start building without worrying about integration right away.
 
-### Workflow Example
+You can start editing files inside the `src/mastra` directory. The development server will automatically reload whenever you make changes.
 
-The workflow example demonstrates how to use Mastra workflows to fetch weather data and plan activities programmatically.
+## Learn more
+
+To learn more about Mastra, visit our [documentation](https://mastra.ai/docs/). Your bootstrapped project includes example code for [agents](https://mastra.ai/docs/agents/overview), [tools](https://mastra.ai/docs/agents/using-tools), [workflows](https://mastra.ai/docs/workflows/overview), [scorers](https://mastra.ai/docs/evals/overview), and [observability](https://mastra.ai/docs/observability/overview).
+
+If you're new to AI agents, check out our [course](https://mastra.ai/course) and [YouTube videos](https://youtube.com/@mastra-ai). You can also join our [Discord](https://discord.gg/BTYqqHKUrf) community to get help and share your projects.
+
+## Deploy on Mastra Cloud
+
+[Mastra Cloud](https://cloud.mastra.ai/) gives you a serverless agent environment with atomic deployments. Access your agents from anywhere and monitor performance. Make sure they don't go off the rails with evals and tracing.
+
+Check out the [deployment guide](https://mastra.ai/docs/deployment/overview) for more details.
