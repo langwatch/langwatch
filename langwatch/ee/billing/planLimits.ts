@@ -35,6 +35,7 @@ type PlanOverrides = Pick<
   Partial<Omit<PlanInfo, "free">>;
 
 const definePaidPlan = (overrides: PlanOverrides): PlanInfo => ({
+  planSource: "subscription",
   free: false,
   ...PAID_FEATURES,
   ...overrides,
@@ -85,6 +86,7 @@ const ACCELERATE_PLAN = definePaidPlan({
 
 export const PLAN_LIMITS: Record<PlanType, PlanInfo> = {
   [PlanTypes.FREE]: {
+    planSource: "free",
     type: PlanTypes.FREE,
     name: "Free",
     free: true,

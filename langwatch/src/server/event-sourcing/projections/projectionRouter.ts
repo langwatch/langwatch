@@ -47,6 +47,7 @@ export class ProjectionRouter<
   private readonly foldProjections = new Map<string, FoldProjectionDefinition<any, EventType>>();
   private readonly mapProjections = new Map<string, MapProjectionDefinition<any, EventType>>();
   private readonly reactorsForFold = new Map<string, ReactorDefinition<EventType>[]>();
+  private readonly reactorsForMap = new Map<string, ReactorDefinition<EventType>[]>();
 
   constructor(
     private readonly aggregateType: AggregateType,
@@ -92,12 +93,26 @@ export class ProjectionRouter<
     this.reactorsForFold.set(foldName, existing);
   }
 
+  registerMapReactor(mapName: string, reactor: ReactorDefinition<EventType>): void {
+    if (!this.mapProjections.has(mapName)) {
+      throw new ConfigurationError(
+        "ProjectionRouter",
+        `Cannot register reactor "${reactor.name}" on map "${mapName}" — map not found`,
+        { mapName, reactorName: reactor.name },
+      );
+    }
+
+    const existing = this.reactorsForMap.get(mapName) ?? [];
+    existing.push(reactor);
+    this.reactorsForMap.set(mapName, existing);
+  }
+
   /**
    * Initialize queue processors for reactors.
    * Each reactor gets a SimpleQueue for async dispatch.
    */
   initializeReactorQueues(): void {
-    if (this.reactorsForFold.size === 0) return;
+    if (this.reactorsForFold.size === 0 && this.reactorsForMap.size === 0) return;
 
     const reactorDefs: Record<string, {
       name: string;
@@ -111,6 +126,32 @@ export class ProjectionRouter<
     }> = {};
 
     for (const [_foldName, reactors] of this.reactorsForFold) {
+      for (const reactor of reactors) {
+        if (this.isReactorExcluded(reactor)) continue;
+        reactorDefs[reactor.name] = {
+          name: reactor.name,
+          handler: {
+            handle: async (payload: { event: EventType; foldState: unknown }) => {
+              await reactor.handle(payload.event, {
+                tenantId: payload.event.tenantId,
+                aggregateId: String(payload.event.aggregateId),
+                foldState: payload.foldState,
+              });
+            },
+          },
+          options: {
+            killSwitch: reactor.options?.killSwitch,
+            disabled: reactor.options?.disabled,
+            delay: reactor.options?.delay,
+            deduplication: reactor.options?.makeJobId
+              ? { makeId: reactor.options.makeJobId, ttlMs: reactor.options.ttl }
+              : undefined,
+          },
+        };
+      }
+    }
+
+    for (const [_mapName, reactors] of this.reactorsForMap) {
       for (const reactor of reactors) {
         if (this.isReactorExcluded(reactor)) continue;
         reactorDefs[reactor.name] = {
@@ -216,7 +257,13 @@ export class ProjectionRouter<
               aggregateId: String(event.aggregateId),
               tenantId: event.tenantId,
             };
-            await this.mapExecutor.execute(mapProj, event, context);
+            const record = await this.mapExecutor.execute(mapProj, event, context);
+
+            // Dispatch to map reactors after map execute succeeds
+            const mapReactors = this.reactorsForMap.get(name);
+            if (record !== null && mapReactors && mapReactors.length > 0) {
+              await this.dispatchToReactors(name, mapReactors, event, record);
+            }
           },
         },
         options: {
@@ -313,16 +360,21 @@ export class ProjectionRouter<
 
     if (hasProjectionQueues) {
       // Async dispatch via queues using batching
-      for (const projectionName of this.foldProjections.keys()) {
+      for (const [projectionName, fold] of this.foldProjections) {
+        const filtered = fold.eventTypes.length > 0
+          ? events.filter(e => fold.eventTypes.includes(e.type))
+          : [...events];
+        if (filtered.length === 0) continue;
+
         const queueProcessor = this.queueManager.getProjectionQueue(projectionName);
         if (queueProcessor) {
           try {
-            await queueProcessor.sendBatch([...events]);
+            await queueProcessor.sendBatch(filtered);
           } catch (error) {
             this.logger.error(
               {
                 projectionName,
-                eventCount: events.length,
+                eventCount: filtered.length,
                 error: error instanceof Error ? error.message : String(error),
               },
               "Failed to dispatch batch of events to fold projection queue",
@@ -335,6 +387,9 @@ export class ProjectionRouter<
       // Inline sync processing
       for (const event of events) {
         for (const [projectionName, fold] of this.foldProjections) {
+          if (fold.eventTypes.length > 0 && !fold.eventTypes.includes(event.type)) {
+            continue;
+          }
           try {
             await this.processFoldProjectionEvent(
               projectionName,
@@ -438,7 +493,13 @@ export class ProjectionRouter<
               aggregateId: String(event.aggregateId),
               tenantId: event.tenantId,
             };
-            await this.mapExecutor.execute(mapProj, event, storeContext);
+            const record = await this.mapExecutor.execute(mapProj, event, storeContext);
+
+            // Dispatch to map reactors after map execute succeeds
+            const mapReactors = this.reactorsForMap.get(name);
+            if (record !== null && mapReactors && mapReactors.length > 0) {
+              await this.dispatchToReactors(name, mapReactors, event, record);
+            }
           } catch (error) {
             handleError(error, categorizeError(error), this.logger, {
               handlerName: name,

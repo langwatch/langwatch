@@ -35,6 +35,9 @@ export function createGroupsRouter(redis: IORedis, metrics: MetricsCollector, ge
           pipelineName: group.pipelineName,
           jobType: group.jobType,
           jobName: group.jobName,
+          errorMessage: group.errorMessage,
+          errorStack: group.errorStack,
+          errorTimestamp: group.errorTimestamp,
         });
         return;
       }
@@ -49,11 +52,13 @@ export function createGroupsRouter(redis: IORedis, metrics: MetricsCollector, ge
         const jobsKey = `${prefix}group:${groupId}:jobs`;
         const activeKey = `${prefix}group:${groupId}:active`;
         const blockedKey = `${prefix}blocked`;
+        const errorKey = `${prefix}group:${groupId}:error`;
 
-        const [pendingJobs, activeJobId, blockedMembers] = await Promise.all([
+        const [pendingJobs, activeJobId, blockedMembers, errorHash] = await Promise.all([
           redis.zcard(jobsKey),
           redis.get(activeKey),
           redis.smembers(blockedKey),
+          redis.hgetall(errorKey),
         ]);
 
         const isBlocked = blockedMembers.includes(groupId);
@@ -72,6 +77,9 @@ export function createGroupsRouter(redis: IORedis, metrics: MetricsCollector, ge
             pipelineName: null,
             jobType: null,
             jobName: null,
+            errorMessage: errorHash?.message ?? null,
+            errorStack: errorHash?.stack ?? null,
+            errorTimestamp: errorHash?.timestamp ? parseFloat(errorHash.timestamp) : null,
           });
           return;
         }

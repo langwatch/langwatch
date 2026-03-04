@@ -159,6 +159,7 @@ describe("simulationRunStateFoldProjection", () => {
       expect(state.Name).toBe("Test Scenario");
       expect(state.Description).toBe("A test description");
       expect(state.Status).toBe("IN_PROGRESS");
+      expect(state.StartedAt).toBe(1000);
       expect(state.CreatedAt).toBe(1000);
       expect(state.UpdatedAt).toBe(1000);
     });

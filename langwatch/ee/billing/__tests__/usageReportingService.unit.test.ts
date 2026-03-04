@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createUsageReportingService } from "../services/usageReportingService";
+import { StripeUsageReportingService } from "../services/usageReportingService";
 
 const createMockStripe = () => ({
   billing: {
@@ -36,11 +36,11 @@ const makeStripeError = ({
 
 describe("usageReportingService", () => {
   let stripe: ReturnType<typeof createMockStripe>;
-  let service: ReturnType<typeof createUsageReportingService>;
+  let service: StripeUsageReportingService;
 
   beforeEach(() => {
     stripe = createMockStripe();
-    service = createUsageReportingService({
+    service = new StripeUsageReportingService({
       stripe: stripe as any,
       meterId: "mtr_test_abc123",
     });

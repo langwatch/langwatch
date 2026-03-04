@@ -7,6 +7,7 @@
 
 import { Box, Button, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ViewMode } from "./useRunHistoryStore";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -32,6 +33,8 @@ type AllRunsPanelProps = {
 export function AllRunsPanel({ period }: AllRunsPanelProps) {
   const { project } = useOrganizationTeamProject();
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const hasAutoExpanded = useRef(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [filters, setFilters] = useState<RunHistoryFilterValues>({
     scenarioId: "",
     passFailStatus: "",
@@ -128,6 +131,40 @@ export function AllRunsPanel({ period }: AllRunsPanelProps) {
   );
 
 
+  // Fetch agents and prompts to resolve target names
+  const { data: agents } = api.agents.getAll.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project },
+  );
+  const { data: prompts } = api.prompts.getAllPromptsForProject.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project },
+  );
+
+  const targetNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    if (agents) {
+      for (const agent of agents) {
+        map.set(agent.id, agent.name);
+      }
+    }
+    if (prompts) {
+      for (const prompt of prompts) {
+        map.set(prompt.id, prompt.handle ?? prompt.id);
+      }
+    }
+    return map;
+  }, [agents, prompts]);
+
+  const resolveTargetName = useCallback(
+    (scenarioRun: ScenarioRunData): string | null => {
+      const refId = scenarioRun.metadata?.langwatch?.targetReferenceId;
+      if (!refId) return null;
+      return targetNameMap.get(refId) ?? null;
+    },
+    [targetNameMap],
+  );
+
   // Build scenario options for filter dropdown
   const scenarioOptions = useMemo(() => {
     if (!scenarios) return [];
@@ -162,6 +199,14 @@ export function AllRunsPanel({ period }: AllRunsPanelProps) {
       scenarioSetIds: allScenarioSetIds,
     });
   }, [filteredRuns, allScenarioSetIds]);
+
+  // Auto-expand all rows when data first loads
+  useEffect(() => {
+    if (!hasAutoExpanded.current && batchRuns.length > 0) {
+      setExpandedIds(new Set(batchRuns.map((b) => b.batchRunId)));
+      hasAutoExpanded.current = true;
+    }
+  }, [batchRuns]);
 
   // Compute totals from flat filtered runs
   const totals = useMemo(() => {
@@ -239,6 +284,8 @@ export function AllRunsPanel({ period }: AllRunsPanelProps) {
         scenarioOptions={scenarioOptions}
         filters={filters}
         onFiltersChange={setFilters}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
       />
 
       {/* Run list */}
@@ -263,10 +310,6 @@ export function AllRunsPanel({ period }: AllRunsPanelProps) {
                 : null;
               const suiteName = suiteId ? suiteNameMap.get(suiteId) ?? null : null;
 
-              // For targets, we can't determine a single target for cross-suite view
-              // since each batch could have different targets. Use null for now.
-              const targetName = null;
-
               return (
                 <RunRow
                   key={batchRun.batchRunId}
@@ -274,9 +317,10 @@ export function AllRunsPanel({ period }: AllRunsPanelProps) {
                   summary={summary}
                   isExpanded={isExpanded}
                   onToggle={() => toggleExpanded(batchRun.batchRunId)}
-                  targetName={targetName}
+                  resolveTargetName={resolveTargetName}
                   onScenarioRunClick={handleScenarioRunClick}
                   suiteName={suiteName ?? undefined}
+                  viewMode={viewMode}
                 />
               );
             })}

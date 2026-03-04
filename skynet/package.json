@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n server,vite -c blue,green \"SKYNET_SKIP_AUTH=1 node --experimental-transform-types src/server/main.ts\" \"vite\"",
+    "dev": "concurrently -n server,vite -c blue,green \"node --experimental-transform-types src/server/main.ts\" \"vite\"",
     "build": "vite build",
     "start": "node --experimental-transform-types src/server/main.ts"
   },
@@ -22,7 +22,8 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.1.0",
-    "recharts": "^2.15.0"
+    "react-is": "^19.0.0",
+    "recharts": "^3.7.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",

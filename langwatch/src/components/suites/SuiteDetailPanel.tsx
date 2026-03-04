@@ -60,7 +60,7 @@ export function SuiteDetailPanel({
   const [liveStats, setLiveStats] = useState<RunHistoryStats | null>(null);
 
   return (
-    <VStack align="stretch" gap={0} height="100%" overflow="auto">
+    <VStack align="stretch" gap={0} height="100%">
       {/* Header */}
       <Box paddingX={6} paddingY={4}>
         <HStack justify="space-between" align="start">

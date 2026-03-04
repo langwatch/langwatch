@@ -6,6 +6,7 @@
  * server-side code when client components import from ee/licensing.
  */
 export type PlanInfo = {
+  planSource: "license" | "subscription" | "free";
   type: string;
   name: string;
   free: boolean;

@@ -32,7 +32,7 @@ describe("<RunRow/>", () => {
           summary={makeSummary()}
           isExpanded={false}
           onToggle={vi.fn()}
-          targetName="Prod Agent"
+          resolveTargetName={() => "Prod Agent"}
           onScenarioRunClick={vi.fn()}
         />,
         { wrapper: Wrapper },
@@ -48,7 +48,7 @@ describe("<RunRow/>", () => {
           summary={makeSummary()}
           isExpanded={false}
           onToggle={vi.fn()}
-          targetName="Prod Agent"
+          resolveTargetName={() => "Prod Agent"}
           onScenarioRunClick={vi.fn()}
         />,
         { wrapper: Wrapper },
@@ -68,7 +68,7 @@ describe("<RunRow/>", () => {
           summary={makeSummary()}
           isExpanded={true}
           onToggle={vi.fn()}
-          targetName="Prod Agent"
+          resolveTargetName={() => "Prod Agent"}
           onScenarioRunClick={vi.fn()}
         />,
         { wrapper: Wrapper },
@@ -82,34 +82,35 @@ describe("<RunRow/>", () => {
       ).toBeInTheDocument();
     });
 
-    it("displays target name in scenario x target format", () => {
+    it("displays target name in scenario x target format in list view", () => {
       render(
         <RunRow
           batchRun={makeBatchRun()}
           summary={makeSummary()}
           isExpanded={true}
           onToggle={vi.fn()}
-          targetName="Prod Agent"
+          resolveTargetName={() => "Prod Agent"}
           onScenarioRunClick={vi.fn()}
+          viewMode="list"
         />,
         { wrapper: Wrapper },
       );
 
-      // The unicode multiplication sign is used between scenario and target
       expect(
-        screen.getByText(/Angry refund request \u00d7 Prod Agent/),
+        screen.getByText(/Prod Agent: Angry refund request/),
       ).toBeInTheDocument();
     });
 
-    it("displays duration for finished runs", () => {
+    it("displays duration for finished runs in list view", () => {
       render(
         <RunRow
           batchRun={makeBatchRun()}
           summary={makeSummary()}
           isExpanded={true}
           onToggle={vi.fn()}
-          targetName="Prod Agent"
+          resolveTargetName={() => "Prod Agent"}
           onScenarioRunClick={vi.fn()}
+          viewMode="list"
         />,
         { wrapper: Wrapper },
       );
@@ -130,7 +131,7 @@ describe("<RunRow/>", () => {
           summary={makeSummary()}
           isExpanded={false}
           onToggle={onToggle}
-          targetName="Prod Agent"
+          resolveTargetName={() => "Prod Agent"}
           onScenarioRunClick={vi.fn()}
         />,
         { wrapper: Wrapper },
@@ -154,7 +155,7 @@ describe("<RunRow/>", () => {
           summary={makeSummary({ totalCount: 1, passedCount: 1 })}
           isExpanded={true}
           onToggle={vi.fn()}
-          targetName="Prod Agent"
+          resolveTargetName={() => "Prod Agent"}
           onScenarioRunClick={onScenarioRunClick}
         />,
         { wrapper: Wrapper },
@@ -174,7 +175,7 @@ describe("<RunRow/>", () => {
           summary={makeSummary({ passRate: 88, failedCount: 1 })}
           isExpanded={false}
           onToggle={vi.fn()}
-          targetName="Prod Agent"
+          resolveTargetName={() => "Prod Agent"}
           onScenarioRunClick={vi.fn()}
         />,
         { wrapper: Wrapper },
@@ -193,7 +194,7 @@ describe("<RunRow/>", () => {
             summary={makeSummary({ totalCount: 2 })}
             isExpanded={false}
             onToggle={vi.fn()}
-            targetName="Prod Agent"
+            resolveTargetName={() => "Prod Agent"}
             onScenarioRunClick={vi.fn()}
             expectedJobCount={6}
           />,
@@ -212,7 +213,7 @@ describe("<RunRow/>", () => {
             summary={makeSummary({ totalCount: 6 })}
             isExpanded={false}
             onToggle={vi.fn()}
-            targetName="Prod Agent"
+            resolveTargetName={() => "Prod Agent"}
             onScenarioRunClick={vi.fn()}
             expectedJobCount={6}
           />,
@@ -232,7 +233,7 @@ describe("<RunRow/>", () => {
           summary={makeSummary({ totalCount: 2 })}
           isExpanded={false}
           onToggle={vi.fn()}
-          targetName="Prod Agent"
+          resolveTargetName={() => "Prod Agent"}
           onScenarioRunClick={vi.fn()}
         />,
         { wrapper: Wrapper },
@@ -258,7 +259,7 @@ describe("<RunRow/>", () => {
             summary={makeSummary()}
             isExpanded={false}
             onToggle={vi.fn()}
-            targetName={null}
+            resolveTargetName={() => null}
             onScenarioRunClick={vi.fn()}
             suiteName="My Suite"
           />,
@@ -284,7 +285,7 @@ describe("<RunRow/>", () => {
             summary={makeSummary({ totalCount: 1, passedCount: 1 })}
             isExpanded={false}
             onToggle={vi.fn()}
-            targetName={null}
+            resolveTargetName={() => null}
             onScenarioRunClick={vi.fn()}
             suiteName="My Suite"
           />,
@@ -313,7 +314,7 @@ describe("<RunRow/>", () => {
             summary={makeSummary({ totalCount: 5, passedCount: 5 })}
             isExpanded={false}
             onToggle={vi.fn()}
-            targetName={null}
+            resolveTargetName={() => null}
             onScenarioRunClick={vi.fn()}
             suiteName="My Suite"
           />,
@@ -340,7 +341,7 @@ describe("<RunRow/>", () => {
           summary={makeSummary()}
           isExpanded={false}
           onToggle={vi.fn()}
-          targetName="Prod Agent"
+          resolveTargetName={() => "Prod Agent"}
           onScenarioRunClick={vi.fn()}
         />,
         { wrapper: Wrapper },

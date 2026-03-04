@@ -24,7 +24,8 @@ export function createEvaluationTriggerReactor(
     options: {
       makeJobId: (payload) =>
         `eval-trigger:${payload.event.tenantId}:${payload.event.aggregateId}`,
-      ttl: 5000, // Wait a bit for more spans to arrive before triggering
+      ttl: 30_000,
+      delay: 30_000,
     },
 
     async handle(

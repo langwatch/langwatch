@@ -9,6 +9,10 @@ const metricNames = [
   "gq_jobs_dispatched_total",
   "gq_jobs_completed_total",
   "gq_jobs_deduped_total",
+  "gq_jobs_retried_total",
+  "gq_jobs_exhausted_total",
+  "gq_fastq_pending",
+  "gq_fastq_active",
 ] as const;
 
 for (const name of metricNames) {
@@ -41,7 +45,7 @@ export const gqJobsStagedTotal = new Counter({
 
 export const gqJobsDispatchedTotal = new Counter({
   name: "gq_jobs_dispatched_total",
-  help: "Total number of jobs dispatched from staging to BullMQ",
+  help: "Total number of jobs dispatched from staging to the processing queue",
   labelNames: ["queue_name"] as const,
 });
 
@@ -54,5 +58,29 @@ export const gqJobsCompletedTotal = new Counter({
 export const gqJobsDedupedTotal = new Counter({
   name: "gq_jobs_deduped_total",
   help: "Total number of jobs that were deduplicated (replaced existing staged job)",
+  labelNames: ["queue_name"] as const,
+});
+
+export const gqJobsRetriedTotal = new Counter({
+  name: "gq_jobs_retried_total",
+  help: "Total number of intermediate retry attempts",
+  labelNames: ["queue_name"] as const,
+});
+
+export const gqJobsExhaustedTotal = new Counter({
+  name: "gq_jobs_exhausted_total",
+  help: "Total number of jobs that exhausted all retry attempts",
+  labelNames: ["queue_name"] as const,
+});
+
+export const gqFastqPending = new Gauge({
+  name: "gq_fastq_pending",
+  help: "Number of jobs queued in fastq waiting to be processed",
+  labelNames: ["queue_name"] as const,
+});
+
+export const gqFastqActive = new Gauge({
+  name: "gq_fastq_active",
+  help: "Number of jobs currently being processed by fastq workers",
   labelNames: ["queue_name"] as const,
 });

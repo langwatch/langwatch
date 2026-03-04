@@ -45,7 +45,7 @@
     "tsup": "^8.1.0",
     "tsx": "^4.20.5",
     "typescript": "^4.9.5",
-    "typescript-eslint": "^7.11.0"
+    "typescript-eslint": "^8.55.0"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.7.0",
@@ -57,7 +57,7 @@
     "vitest": "^3.2.4",
     "yargs": "^17.7.2",
     "zod": "^3.25.76",
-    "zod-validation-error": "^3.5.3"
+    "zod-validation-error": "^5.0.0"
   },
   "bin": {
     "langwatch-mcp-server": "./dist/index.js"

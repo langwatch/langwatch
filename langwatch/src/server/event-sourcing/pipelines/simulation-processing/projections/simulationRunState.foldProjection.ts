@@ -44,6 +44,7 @@ export interface SimulationRunStateData {
   UnmetCriteria: string[];
   Error: string | null;
   DurationMs: number | null;
+  StartedAt: number | null;
   CreatedAt: number;
   UpdatedAt: number;
   FinishedAt: number | null;
@@ -71,6 +72,7 @@ function init(): SimulationRunStateData {
     UnmetCriteria: [],
     Error: null,
     DurationMs: null,
+    StartedAt: null,
     CreatedAt: 0,
     UpdatedAt: 0,
     FinishedAt: null,
@@ -92,6 +94,7 @@ function apply(
       Name: event.data.name ?? null,
       Description: event.data.description ?? null,
       Status: "IN_PROGRESS",
+      StartedAt: event.occurredAt,
       CreatedAt: event.occurredAt,
       UpdatedAt: event.occurredAt,
     };

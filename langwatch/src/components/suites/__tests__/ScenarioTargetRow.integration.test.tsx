@@ -27,7 +27,7 @@ describe("<ScenarioTargetRow/>", () => {
   });
 
   describe("given a successful scenario run with a target", () => {
-    it("displays scenario name with target in multiplication format", () => {
+    it("displays target-prefixed scenario name", () => {
       render(
         <ScenarioTargetRow
           scenarioRun={makeScenarioRunData()}
@@ -38,7 +38,7 @@ describe("<ScenarioTargetRow/>", () => {
       );
 
       expect(
-        screen.getByText("Angry refund request \u00d7 Prod Agent"),
+        screen.getByText("Prod Agent: Angry refund request"),
       ).toBeInTheDocument();
     });
 
@@ -84,8 +84,44 @@ describe("<ScenarioTargetRow/>", () => {
         screen.getByText("Angry refund request"),
       ).toBeInTheDocument();
       expect(
-        screen.queryByText(/\u00d7/),
+        screen.queryByText(/:/),
       ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a scenario run with iteration", () => {
+    it("appends iteration number to the display name", () => {
+      render(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData()}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+          iteration={3}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(
+        screen.getByText("Prod Agent: Angry refund request (#3)"),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("given a scenario run without target but with iteration", () => {
+    it("appends iteration to scenario name only", () => {
+      render(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData()}
+          targetName={null}
+          onClick={vi.fn()}
+          iteration={1}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(
+        screen.getByText("Angry refund request (#1)"),
+      ).toBeInTheDocument();
     });
   });
 
@@ -208,7 +244,7 @@ describe("<ScenarioTargetRow/>", () => {
       );
 
       const row = screen.getByLabelText(
-        "View details for Angry refund request \u00d7 Prod Agent",
+        "View details for Prod Agent: Angry refund request",
       );
       await user.click(row);
       expect(onClick).toHaveBeenCalledOnce();

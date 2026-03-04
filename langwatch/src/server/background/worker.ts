@@ -7,7 +7,6 @@ import type {
   EvaluationJob,
   TopicClusteringJob,
   TrackEventJob,
-  UsageReportingJob,
   UsageStatsJob,
 } from "~/server/background/types";
 import type {
@@ -20,6 +19,7 @@ import {
   runEvaluationJob,
   startEvaluationsWorker,
 } from "./workers/evaluationsWorker";
+import { registerEvaluationsFallbackWorker } from "./queues/evaluationsQueue";
 import { startTopicClusteringWorker } from "./workers/topicClusteringWorker";
 import { startTrackEventsWorker } from "./workers/trackEventsWorker";
 
@@ -36,7 +36,6 @@ import { getWorkerMetricsPort } from "./config";
 import { WorkersRestart } from "./errors";
 
 import { getApp } from "../app-layer/app";
-import { startUsageReportingWorker } from "./workers/usageReportingWorker";
 import { getClickHouseClient } from "../clickhouse/client";
 import {
   startStorageStatsCollection,
@@ -115,7 +114,6 @@ type Workers = {
   topicClusteringWorker: Worker<TopicClusteringJob, void, string> | undefined;
   trackEventsWorker: Worker<TrackEventJob, void, string> | undefined;
   usageStatsWorker: Worker<UsageStatsJob, void, string> | undefined;
-  usageReportingWorker: Worker<UsageReportingJob, void, string> | undefined;
   scenarioWorker: Worker<ScenarioJob, ScenarioJobResult, string> | undefined;
 };
 
@@ -131,6 +129,14 @@ export const start = (
   closeables.clear();
   isShuttingDown = false;
 
+  // Register the fallback worker so QueueWithFallback can process evaluations
+  // inline when Redis is unavailable (avoids "fallback worker not registered" error)
+  registerEvaluationsFallbackWorker(
+    (runEvaluationMock ?? runEvaluationJob) as (
+      job: Job<EvaluationJob, any, string>,
+    ) => Promise<any>,
+  );
+
   // Start ClickHouse storage metrics collection if ClickHouse is enabled
   const clickHouseClient = getClickHouseClient();
   if (clickHouseClient) {
@@ -145,7 +151,6 @@ export const start = (
     const topicClusteringWorker = startTopicClusteringWorker();
     const trackEventsWorker = startTrackEventsWorker();
     const usageStatsWorker = startUsageStatsWorker();
-    const usageReportingWorker = startUsageReportingWorker();
     const scenarioWorker = startScenarioProcessor();
     const metricsServer = startMetricsServer();
 
@@ -155,7 +160,6 @@ export const start = (
     registerCloseable("topicClustering", topicClusteringWorker);
     registerCloseable("trackEvents", trackEventsWorker);
     registerCloseable("usageStats", usageStatsWorker);
-    registerCloseable("usageReporting", usageReportingWorker);
     registerCloseable("scenario", scenarioWorker);
     registerCloseable("metricsServer", {
       close: () =>
@@ -184,7 +188,6 @@ export const start = (
     topicClusteringWorker?.on("closing", closingListener);
     trackEventsWorker?.on("closing", closingListener);
     usageStatsWorker?.on("closing", closingListener);
-    usageReportingWorker?.on("closing", closingListener);
     scenarioWorker?.on("closing", closingListener);
 
     if (maxRuntimeMs) {
@@ -197,7 +200,6 @@ export const start = (
           topicClusteringWorker?.off("closing", closingListener);
           trackEventsWorker?.off("closing", closingListener);
           usageStatsWorker?.off("closing", closingListener);
-          usageReportingWorker?.off("closing", closingListener);
           scenarioWorker?.off("closing", closingListener);
           await Promise.all([
             collectorWorker?.close(),
@@ -205,7 +207,6 @@ export const start = (
             topicClusteringWorker?.close(),
             trackEventsWorker?.close(),
             usageStatsWorker?.close(),
-            usageReportingWorker?.close(),
             scenarioWorker?.close(),
             new Promise<void>((resolve) =>
               metricsServer.close(() => resolve()),
@@ -226,7 +227,6 @@ export const start = (
         topicClusteringWorker,
         trackEventsWorker,
         usageStatsWorker,
-        usageReportingWorker,
         scenarioWorker,
       });
     }

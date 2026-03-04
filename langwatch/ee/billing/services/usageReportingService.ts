@@ -65,14 +65,16 @@ export type UsageReportingService = {
   getUsageSummary(input: GetUsageSummaryInput): Promise<UsageSummary>;
 };
 
-export const createUsageReportingService = ({
-  stripe,
-  meterId,
-}: {
-  stripe: Stripe;
-  meterId: string;
-}): UsageReportingService => {
-  const sendMeterEvent = async ({
+export class StripeUsageReportingService implements UsageReportingService {
+  private readonly stripe: Stripe;
+  private readonly meterId: string;
+
+  constructor(deps: { stripe: Stripe; meterId: string }) {
+    this.stripe = deps.stripe;
+    this.meterId = deps.meterId;
+  }
+
+  private async sendMeterEvent({
     stripeCustomerId,
     organizationId,
     eventName,
@@ -86,9 +88,9 @@ export const createUsageReportingService = ({
     value: number;
     timestamp: number;
     identifier: string;
-  }): Promise<MeterEventResult> => {
+  }): Promise<MeterEventResult> {
     try {
-      await stripe.billing.meterEvents.create({
+      await this.stripe.billing.meterEvents.create({
         event_name: eventName,
         payload: {
           stripe_customer_id: stripeCustomerId,
@@ -154,139 +156,137 @@ export const createUsageReportingService = ({
       // Retryable errors: re-throw for BullMQ retry
       throw error;
     }
-  };
+  }
 
-  return {
-    async reportUsageDelta(input) {
-      const validated = reportUsageDeltaInputSchema.parse(input);
-      const results: MeterEventResult[] = [];
+  async reportUsageDelta(input: ReportUsageDeltaInput): Promise<MeterEventResult[]> {
+    const validated = reportUsageDeltaInputSchema.parse(input);
+    const results: MeterEventResult[] = [];
 
-      for (const event of validated.events) {
-        if (event.value <= 0) {
-          logger.info(
-            {
-              organizationId: validated.organizationId,
-              identifier: event.identifier,
-              valueSent: 0,
-              reported: false,
-            },
-            "[billing] Skipping zero-value meter event"
-          );
-          results.push({
-            identifier: event.identifier,
-            reported: false,
-            valueSent: 0,
-          });
-          continue;
-        }
-
-        const result = await sendMeterEvent({
-          stripeCustomerId: validated.stripeCustomerId,
-          organizationId: validated.organizationId,
-          eventName: event.eventName,
-          value: event.value,
-          timestamp: event.timestamp,
-          identifier: event.identifier,
-        });
-        results.push(result);
-      }
-
-      return results;
-    },
-
-    async reportUsageSet(input) {
-      const validated = reportUsageSetInputSchema.parse(input);
-      const results: MeterEventResult[] = [];
-
-      for (const event of validated.events) {
-        const delta = event.value - event.previouslyReportedValue;
-
-        if (delta <= 0) {
-          logger.info(
-            {
-              organizationId: validated.organizationId,
-              identifier: event.identifier,
-              valueSent: 0,
-              reported: false,
-            },
-            "[billing] Skipping non-positive delta meter event"
-          );
-          results.push({
-            identifier: event.identifier,
-            reported: false,
-            valueSent: 0,
-          });
-          continue;
-        }
-
-        const result = await sendMeterEvent({
-          stripeCustomerId: validated.stripeCustomerId,
-          organizationId: validated.organizationId,
-          eventName: event.eventName,
-          value: delta,
-          timestamp: event.timestamp,
-          identifier: event.identifier,
-        });
-        results.push(result);
-      }
-
-      return results;
-    },
-
-    async getUsageSummary(input) {
-      const validated = getUsageSummaryInputSchema.parse(input);
-
-      const response = await stripe.billing.meters.listEventSummaries(
-        meterId,
-        {
-          customer: validated.stripeCustomerId,
-          start_time: validated.startTime,
-          end_time: validated.endTime,
-        }
-      );
-
-      if (response.data.length === 0) {
-        logger.warn(
+    for (const event of validated.events) {
+      if (event.value <= 0) {
+        logger.info(
           {
-            stripeCustomerId: validated.stripeCustomerId,
-            meterId,
-            startTime: validated.startTime,
-            endTime: validated.endTime,
+            organizationId: validated.organizationId,
+            identifier: event.identifier,
+            valueSent: 0,
+            reported: false,
           },
-          "[billing] Empty usage summary from Stripe — could mean zero usage or misconfigured meter"
+          "[billing] Skipping zero-value meter event"
         );
-
-        return {
-          aggregatedValue: 0,
-          startTime: validated.startTime,
-          endTime: validated.endTime,
-        };
+        results.push({
+          identifier: event.identifier,
+          reported: false,
+          valueSent: 0,
+        });
+        continue;
       }
 
-      const aggregatedValue = response.data.reduce(
-        (sum, s) => sum + s.aggregated_value,
-        0,
-      );
+      const result = await this.sendMeterEvent({
+        stripeCustomerId: validated.stripeCustomerId,
+        organizationId: validated.organizationId,
+        eventName: event.eventName,
+        value: event.value,
+        timestamp: event.timestamp,
+        identifier: event.identifier,
+      });
+      results.push(result);
+    }
 
-      logger.info(
+    return results;
+  }
+
+  async reportUsageSet(input: ReportUsageSetInput): Promise<MeterEventResult[]> {
+    const validated = reportUsageSetInputSchema.parse(input);
+    const results: MeterEventResult[] = [];
+
+    for (const event of validated.events) {
+      const delta = event.value - event.previouslyReportedValue;
+
+      if (delta <= 0) {
+        logger.info(
+          {
+            organizationId: validated.organizationId,
+            identifier: event.identifier,
+            valueSent: 0,
+            reported: false,
+          },
+          "[billing] Skipping non-positive delta meter event"
+        );
+        results.push({
+          identifier: event.identifier,
+          reported: false,
+          valueSent: 0,
+        });
+        continue;
+      }
+
+      const result = await this.sendMeterEvent({
+        stripeCustomerId: validated.stripeCustomerId,
+        organizationId: validated.organizationId,
+        eventName: event.eventName,
+        value: delta,
+        timestamp: event.timestamp,
+        identifier: event.identifier,
+      });
+      results.push(result);
+    }
+
+    return results;
+  }
+
+  async getUsageSummary(input: GetUsageSummaryInput): Promise<UsageSummary> {
+    const validated = getUsageSummaryInputSchema.parse(input);
+
+    const response = await this.stripe.billing.meters.listEventSummaries(
+      this.meterId,
+      {
+        customer: validated.stripeCustomerId,
+        start_time: validated.startTime,
+        end_time: validated.endTime,
+      }
+    );
+
+    if (response.data.length === 0) {
+      logger.warn(
         {
           stripeCustomerId: validated.stripeCustomerId,
-          meterId,
-          aggregatedValue,
+          meterId: this.meterId,
           startTime: validated.startTime,
           endTime: validated.endTime,
         },
-        "[billing] Usage summary retrieved"
+        "[billing] Empty usage summary from Stripe — could mean zero usage or misconfigured meter"
       );
 
       return {
-        aggregatedValue,
+        aggregatedValue: 0,
         startTime: validated.startTime,
         endTime: validated.endTime,
       };
-    },
-  };
-};
+    }
+
+    const aggregatedValue = response.data.reduce(
+      (sum, s) => sum + s.aggregated_value,
+      0,
+    );
+
+    logger.info(
+      {
+        stripeCustomerId: validated.stripeCustomerId,
+        meterId: this.meterId,
+        aggregatedValue,
+        startTime: validated.startTime,
+        endTime: validated.endTime,
+      },
+      "[billing] Usage summary retrieved"
+    );
+
+    return {
+      aggregatedValue,
+      startTime: validated.startTime,
+      endTime: validated.endTime,
+    };
+  }
+}
 
 const isStripeInvalidRequestError = (
   error: unknown

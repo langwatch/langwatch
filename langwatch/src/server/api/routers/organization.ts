@@ -32,7 +32,7 @@ import { scheduleUsageStatsForOrganization } from "~/server/background/queues/us
 import { decrypt, encrypt } from "~/utils/encryption";
 import { isTeamRoleAllowedForOrganizationRole, type TeamRoleValue } from "~/utils/memberRoleConstraints";
 import { slugify } from "~/utils/slugify";
-import { SubscriptionHandler } from "~/server/subscriptionHandler";
+import { getApp } from "~/server/app-layer/app";
 import { elasticsearchMigrate } from "../../../tasks/elasticMigrate";
 import {
   INVITE_EXPIRATION_MS,
@@ -1581,10 +1581,10 @@ export const organizationRouter = createTRPCRouter({
 
             // Check license limits for member type changes
             const subscriptionLimits =
-              await SubscriptionHandler.getActivePlan(
-                team.organizationId,
-                ctx.session.user
-              );
+              await getApp().planProvider.getActivePlan({
+                organizationId: team.organizationId,
+                user: ctx.session.user,
+              });
             const licenseRepo = new LicenseEnforcementRepository(prisma);
             await assertMemberTypeLimitNotExceeded(
               changeType,
@@ -1781,10 +1781,10 @@ export const organizationRouter = createTRPCRouter({
 
         // Check limits for member type changes
         const subscriptionLimits =
-          await SubscriptionHandler.getActivePlan(
-            input.organizationId,
-            ctx.session.user
-          );
+          await getApp().planProvider.getActivePlan({
+            organizationId: input.organizationId,
+            user: ctx.session.user,
+          });
         const licenseRepo = new LicenseEnforcementRepository(prisma);
         await assertMemberTypeLimitNotExceeded(
           changeType,

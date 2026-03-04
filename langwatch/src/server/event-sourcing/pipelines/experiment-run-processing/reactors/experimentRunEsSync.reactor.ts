@@ -36,6 +36,10 @@ export function createExperimentRunEsSyncReactor(
     ): Promise<void> {
       const { tenantId, foldState } = context;
 
+      // Skip migration events — we don't want to write back to ES during migration
+      const metadata = event.metadata as Record<string, unknown> | undefined;
+      if (metadata?.source === "migration") return;
+
       // Feature flag check — skip if not enabled
       const enabled = await deps.project.isFeatureEnabled(
         tenantId,

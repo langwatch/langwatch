@@ -8,6 +8,7 @@ import type { EvaluationExecutionService } from "../app-layer/evaluations/evalua
 import type { ProjectService } from "../app-layer/projects/project.service";
 import type { MonitorService } from "../app-layer/monitors/monitor.service";
 import type { EvaluationEsSyncReactorDeps } from "./pipelines/evaluation-processing/reactors/evaluationEsSync.reactor";
+import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";
 import { createTraceProcessingPipeline } from "./pipelines/trace-processing/pipeline";
 import { createEvaluationProcessingPipeline } from "./pipelines/evaluation-processing/pipeline";
 import { createExperimentRunProcessingPipeline } from "./pipelines/experiment-run-processing/pipeline";
@@ -36,6 +37,9 @@ import { createExperimentRunStateFoldStore } from "./pipelines/experiment-run-pr
 import { createExperimentRunItemAppendStore } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
 import type { EventSourcing } from "./eventSourcing";
 import { mapCommands } from "./mapCommands";
+import { createBillingReportingPipeline, BILLING_REPORTING_PIPELINE_NAME } from "./pipelines/billing-reporting/pipeline";
+import { createReportUsageForMonthCommandClass } from "./pipelines/billing-reporting/commands/reportUsageForMonth.command";
+import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
 import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:event-sourcing:pipeline-registry");
@@ -56,6 +60,7 @@ export interface PipelineRegistryDeps {
     execution: EvaluationExecutionService;
   };
   esSync: EvaluationEsSyncReactorDeps;
+  usageReportingService?: UsageReportingService;
 }
 
 /**
@@ -73,6 +78,7 @@ export class PipelineRegistry {
     const tracePipeline = this.registerTracePipeline(evalPipeline);
     const experimentRunPipeline = this.registerExperimentRunPipeline();
     const simulationPipeline = this.registerSimulationPipeline();
+    const billingPipeline = this.registerBillingReportingPipeline();
 
     logger.info("All pipelines registered");
 
@@ -81,6 +87,7 @@ export class PipelineRegistry {
       evaluations: mapCommands(evalPipeline.commands),
       experimentRuns: mapCommands(experimentRunPipeline.commands),
       simulations: mapCommands(simulationPipeline.commands),
+      billing: mapCommands(billingPipeline.commands),
     };
   }
 
@@ -161,6 +168,25 @@ export class PipelineRegistry {
       createSimulationProcessingPipeline({
         simulationRunStore,
         snapshotUpdateBroadcastReactor,
+      }),
+    );
+  }
+
+  private registerBillingReportingPipeline() {
+    const ReportUsageForMonthCommand =
+      createReportUsageForMonthCommandClass({
+        prisma: this.deps.prisma,
+        getUsageReportingService: () => this.deps.usageReportingService,
+        queryBillableEventsTotal,
+        selfDispatch: (data) => {
+          const pipeline = this.deps.eventSourcing.getPipeline(BILLING_REPORTING_PIPELINE_NAME);
+          return pipeline.commands.reportUsageForMonth.send(data);
+        },
+      });
+
+    return this.deps.eventSourcing.register(
+      createBillingReportingPipeline({
+        ReportUsageForMonthCommand,
       }),
     );
   }

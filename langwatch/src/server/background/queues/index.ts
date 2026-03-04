@@ -2,7 +2,6 @@ import { collectorQueue } from "./collectorQueue";
 import { evaluationsQueue } from "./evaluationsQueue";
 import { topicClusteringQueue } from "./topicClusteringQueue";
 import { trackEventsQueue } from "./trackEventsQueue";
-import { usageReportingQueue } from "./usageReportingQueue";
 import { usageStatsQueue } from "./usageStatsQueue";
 import { scenarioQueue } from "../../scenarios/scenario.queue";
 
@@ -13,7 +12,4 @@ export const monitoredQueues = [
   { name: "track_events", queue: trackEventsQueue },
   { name: "usage_stats", queue: usageStatsQueue },
   { name: "scenario", queue: scenarioQueue },
-  ...(usageReportingQueue
-    ? [{ name: "usage_reporting" as const, queue: usageReportingQueue }]
-    : []),
 ] as const;
