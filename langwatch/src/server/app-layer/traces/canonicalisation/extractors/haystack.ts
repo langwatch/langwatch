@@ -52,13 +52,13 @@ export class HaystackExtractor implements CanonicalAttributesExtractor {
       .map((doc: unknown) => {
         if (!isRecord(doc)) return null;
 
-        const document = (doc as Record<string, unknown>).document;
+        const document = doc.document;
         if (!isRecord(document)) return null;
 
-        const content = (document as Record<string, unknown>).content;
+        const content = document.content;
         if (typeof content !== "string" || content.length === 0) return null;
 
-        const id = (document as Record<string, unknown>).id;
+        const id = document.id;
         return {
           ...(typeof id === "string" && id.length > 0
             ? { document_id: id }
