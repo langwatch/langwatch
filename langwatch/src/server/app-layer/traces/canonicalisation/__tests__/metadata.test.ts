@@ -98,9 +98,7 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
         stubSpan as any,
       );
 
-      expect(result.attributes["langwatch.labels"]).toBe(
-        JSON.stringify(["prod", "v2"]),
-      );
+      expect(result.attributes["langwatch.labels"]).toEqual(["prod", "v2"]);
     });
 
     it("hoists custom fields from metadata blob as metadata.{key} keys", () => {
@@ -186,9 +184,7 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
         stubSpan as any,
       );
 
-      expect(result.attributes["langwatch.labels"]).toBe(
-        JSON.stringify(["beta"]),
-      );
+      expect(result.attributes["langwatch.labels"]).toEqual(["beta"]);
     });
 
     it("prefers metadata over langwatch.metadata when both present", () => {

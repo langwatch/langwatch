@@ -38,7 +38,8 @@ function parseJsonStringArray(raw: string | undefined): string[] {
 		if (!Array.isArray(parsed)) return [];
 		return parsed.filter((item): item is string => typeof item === "string");
 	} catch {
-		return [];
+		// Not valid JSON — treat as a single plain-string label
+		return [raw];
 	}
 }
 

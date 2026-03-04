@@ -301,7 +301,13 @@ describe("CanonicalizeSpanAttributesService — chat message coercion", () => {
       );
 
       // LangWatch runs first, sets gen_ai.input.messages from langwatch.input
-      expect(result.attributes["gen_ai.input.messages"]).toEqual(chatMessages);
+      // System messages are stripped and placed in gen_ai.system_instructions
+      expect(result.attributes["gen_ai.input.messages"]).toEqual([
+        { role: "user", content: "Hello" },
+      ]);
+      expect(result.attributes["gen_ai.system_instructions"]).toBe(
+        "Be helpful.",
+      );
     });
 
     it("gen_ai.input.messages already set blocks llm.input_messages extraction", () => {

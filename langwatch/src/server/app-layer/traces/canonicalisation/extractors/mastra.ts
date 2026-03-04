@@ -206,7 +206,10 @@ export class MastraExtractor implements CanonicalAttributesExtractor {
           const text = extractTextFromOutput(rawOutput);
           if (text) {
             ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, text);
-            if (ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES] === undefined) {
+            if (
+              ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES] === undefined &&
+              !ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES)
+            ) {
               ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, [
                 { role: "assistant", content: text },
               ]);

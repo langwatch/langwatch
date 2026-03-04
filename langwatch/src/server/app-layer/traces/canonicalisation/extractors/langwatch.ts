@@ -32,6 +32,7 @@ import { isRecord } from "./_guards";
 import {
   extractSystemInstructionFromMessages,
   normalizeToMessages,
+  stripSystemMessages,
 } from "./_messages";
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 
@@ -166,7 +167,7 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
         if (Array.isArray(parsedObj.labels)) {
           ctx.setAttrIfAbsent(
             ATTR_KEYS.LANGWATCH_LABELS,
-            safeStringify(parsedObj.labels),
+            [...parsedObj.labels],
           );
           ctx.recordRule(`${this.id}:metadata.labels`);
         }
@@ -258,11 +259,6 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
           const messages = normalizeToMessages(rawInput.value, "user");
 
           if (messages) {
-            ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, messages);
-            ctx.recordRule(
-              `${this.id}:input.chat_messages->gen_ai.input.messages`,
-            );
-
             const systemInstruction =
               extractSystemInstructionFromMessages(messages);
             if (systemInstruction !== null) {
@@ -271,6 +267,17 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
                 systemInstruction,
               );
             }
+
+            // Strip system messages — they are promoted to gen_ai.system_instructions
+            const chatMsgs = systemInstruction
+              ? stripSystemMessages(messages)
+              : messages;
+            if (chatMsgs.length > 0) {
+              ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, chatMsgs);
+            }
+            ctx.recordRule(
+              `${this.id}:input.chat_messages->gen_ai.input.messages`,
+            );
 
             ctx.setAttr(ATTR_KEYS.SPAN_TYPE, "llm");
             ctx.recordRule(`${this.id}:type=llm`);
