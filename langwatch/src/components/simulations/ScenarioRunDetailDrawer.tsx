@@ -1,3 +1,5 @@
+import "@copilotkit/react-ui/styles.css";
+import "~/pages/[project]/simulations/simulations.css";
 import { Skeleton, VStack } from "@chakra-ui/react";
 import { useCallback, useState } from "react";
 import { RunScenarioModal } from "~/components/scenarios/RunScenarioModal";
