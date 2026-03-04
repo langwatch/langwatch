@@ -6,17 +6,17 @@ Feature: Tag display for suites and scenarios
   Background:
     Given I am logged into a project
 
-  # --- Tag component rendering ---
+  # --- Tag rendering ---
 
   @integration
   Scenario: Tags display with hash prefix
-    Given a tag component renders with label "critical"
-    Then the tag displays as "#critical"
+    Given I open a suite that has the label "critical"
+    Then I see the tag "#critical"
 
   @integration
-  Scenario: Tags have a remove button
-    Given a tag component renders with label "billing"
-    Then the tag has a visible remove button
+  Scenario: Tags can be removed
+    Given I open a suite that has the label "billing"
+    Then I see a remove control for the "billing" tag
 
   # --- Tag presence across surfaces ---
 
@@ -42,8 +42,7 @@ Feature: Tag display for suites and scenarios
 
   @integration
   Scenario: An add button appears after existing tags
-    Given a suite exists with labels "ci"
-    When I view the suite detail panel
+    Given I view a suite with labels "ci"
     Then a "+ add" button appears after the tags
 
   @integration
