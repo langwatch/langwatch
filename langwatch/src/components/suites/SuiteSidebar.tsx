@@ -27,6 +27,7 @@ import {
 import type React from "react";
 import { useMemo, useState } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
+import { TagList } from "~/components/ui/TagPill";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { SuiteRunSummary } from "./run-history-transforms";
 import { ALL_RUNS_ID } from "./useSuiteRouting";
@@ -379,6 +380,9 @@ function SuiteListItem({
             </Box>
           </HStack>
         </HStack>
+        {suite.labels.length > 0 && (
+          <TagList labels={suite.labels} />
+        )}
         {runSummary && runSummary.totalCount > 0 && (
           <HStack gap={1}>
             <StatusIcon

@@ -216,6 +216,27 @@ describe("<SuiteSidebar/>", () => {
     });
   });
 
+  describe("given suites with labels", () => {
+    const suitesWithLabels = [
+      makeSuite({
+        id: "suite_1",
+        name: "Nightly Suite",
+        slug: "nightly-suite",
+        labels: ["nightly", "regression"],
+      }),
+    ];
+
+    it("displays suite labels as tag pills", () => {
+      render(
+        <SuiteSidebar {...defaultProps} suites={suitesWithLabels} />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByText("#nightly")).toBeInTheDocument();
+      expect(screen.getByText("#regression")).toBeInTheDocument();
+    });
+  });
+
   describe("given suites with run summaries", () => {
     const suites = [
       makeSuite({ id: "suite_1", name: "Critical Path" }),
