@@ -15,7 +15,7 @@ const logger = createLogger(
 
 type ClickHouseSummaryWriteRecord = WithDateWrites<
   ClickHouseSummaryRecord,
-  "OccurredAt" | "CreatedAt" | "LastUpdatedAt"
+  "OccurredAt" | "CreatedAt" | "UpdatedAt" | "LastUpdatedAt"
 >;
 
 interface ClickHouseSummaryRecord {
@@ -26,6 +26,8 @@ interface ClickHouseSummaryRecord {
   Attributes: Record<string, string>;
   OccurredAt: number;
   CreatedAt: number;
+  UpdatedAt: number;
+  /** @deprecated Dual-write for zero-downtime migration. Remove in cleanup PR. */
   LastUpdatedAt: number;
   ComputedIOSchemaVersion: string;
   ComputedInput: string | null;
@@ -115,9 +117,9 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
             TraceId,
             Version,
             Attributes,
-            toUnixTimestamp64Milli(OccurredAt) AS OccurredAt,
+            toUnixTimestamp64Milli(COALESCE(OccurredAt, CreatedAt)) AS OccurredAt,
             toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
-            toUnixTimestamp64Milli(LastUpdatedAt) AS LastUpdatedAt,
+            toUnixTimestamp64Milli(COALESCE(UpdatedAt, LastUpdatedAt)) AS UpdatedAt,
             ComputedIOSchemaVersion,
             ComputedInput,
             ComputedOutput,
@@ -144,7 +146,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
             AND TraceId = {traceId:String}
-          ORDER BY LastUpdatedAt DESC
+          ORDER BY COALESCE(UpdatedAt, LastUpdatedAt) DESC
           LIMIT 1
         `,
         query_params: { tenantId, traceId },
@@ -199,7 +201,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       attributes: record.Attributes ?? {},
       occurredAt: record.OccurredAt,
       createdAt: record.CreatedAt,
-      lastUpdatedAt: record.LastUpdatedAt,
+      updatedAt: record.UpdatedAt,
     };
   }
 
@@ -217,7 +219,8 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       Attributes: data.attributes,
       OccurredAt: new Date(data.occurredAt),
       CreatedAt: new Date(data.createdAt),
-      LastUpdatedAt: new Date(data.lastUpdatedAt),
+      UpdatedAt: new Date(data.updatedAt),
+      LastUpdatedAt: new Date(data.updatedAt),
       ComputedIOSchemaVersion: data.computedIOSchemaVersion,
       ComputedInput: data.computedInput,
       ComputedOutput: data.computedOutput,
