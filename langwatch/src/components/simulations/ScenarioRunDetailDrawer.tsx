@@ -60,7 +60,7 @@ export function ScenarioRunDetailDrawer({
 
   const scenarioRunId = params.scenarioRunId;
 
-  const { data: scenarioState } = api.scenarios.getRunState.useQuery(
+  const { data: scenarioState, error: runStateError } = api.scenarios.getRunState.useQuery(
     {
       scenarioRunId: scenarioRunId ?? "",
       projectId: project?.id ?? "",
@@ -160,11 +160,19 @@ export function ScenarioRunDetailDrawer({
         <Drawer.Content paddingX={0} maxWidth="720px" overflow="hidden">
           {!scenarioState && open && (
             <Drawer.Body>
-              <VStack gap={4} align="start" w="100%" pt={4}>
-                <Skeleton height="32px" width="60%" />
-                <Skeleton height="24px" width="40%" />
-                <Skeleton height="200px" width="100%" borderRadius="md" />
-              </VStack>
+              {runStateError ? (
+                <VStack gap={2} align="start" w="100%" pt={4}>
+                  <Drawer.CloseTrigger />
+                  <Heading size="md" color="red.500">Failed to load run</Heading>
+                  <Text color="fg.muted" fontSize="sm">{runStateError.message}</Text>
+                </VStack>
+              ) : (
+                <VStack gap={4} align="start" w="100%" pt={4}>
+                  <Skeleton height="32px" width="60%" />
+                  <Skeleton height="24px" width="40%" />
+                  <Skeleton height="200px" width="100%" borderRadius="md" />
+                </VStack>
+              )}
             </Drawer.Body>
           )}
           {scenarioState && (
