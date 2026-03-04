@@ -36,6 +36,27 @@ jobs:
         working-directory: skynet
         run: npm run typecheck
 
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: skynet/package-lock.json
+
+      - name: Install dependencies
+        working-directory: skynet
+        run: npm ci
+
+      - name: Run unit tests
+        working-directory: skynet
+        run: npm run test:unit
+
   build:
     runs-on: ubuntu-latest
     steps:
