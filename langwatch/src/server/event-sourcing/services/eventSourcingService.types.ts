@@ -18,7 +18,7 @@ import type { JobRegistryEntry } from "./queues/queueManager";
 export interface EventSourcingOptions<EventType extends Event = Event> {
   /**
    * Strategy for ordering events when building projections.
-   * Defaults to "timestamp" (chronological order).
+   * Defaults to "createdAt" (chronological order).
    */
   ordering?: EventOrderingStrategy<EventType>;
 }
