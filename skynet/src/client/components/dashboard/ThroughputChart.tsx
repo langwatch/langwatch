@@ -47,8 +47,118 @@ interface ZoomState {
 /** How close (ms) the drag edge needs to be to data edge to trigger anchoring */
 const ANCHOR_TOLERANCE_MS = 30_000;
 
+const TICK_COLOR = "#4a6a7a";
+
+function SeriesLegendToggle({
+  series,
+  isHidden,
+  onToggle,
+}: {
+  series: (typeof SERIES)[number];
+  isHidden: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <HStack
+      spacing={1.5}
+      cursor="pointer"
+      role="button"
+      tabIndex={0}
+      aria-pressed={!isHidden}
+      onClick={onToggle}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onToggle();
+        }
+      }}
+      opacity={isHidden ? 0.3 : 1}
+      transition="opacity 0.15s"
+      _hover={{ opacity: isHidden ? 0.5 : 0.8 }}
+      _focus={{ outline: "1px solid #00f0ff", outlineOffset: "2px" }}
+      _focusVisible={{ outline: "1px solid #00f0ff", outlineOffset: "2px" }}
+    >
+      <Box w="8px" h="8px" borderRadius="1px" bg={isHidden ? TICK_COLOR : series.color} transition="background 0.15s" />
+      <Text
+        fontSize="10px"
+        color={isHidden ? TICK_COLOR : series.color}
+        fontFamily="mono"
+        textDecoration={isHidden ? "line-through" : "none"}
+        transition="color 0.15s"
+      >
+        {series.label}
+      </Text>
+    </HStack>
+  );
+}
+
+function ResetZoomButton({ onClick }: { onClick: () => void }) {
+  return (
+    <Box
+      as="span"
+      fontSize="10px"
+      color="#ffc800"
+      cursor="pointer"
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={(e: React.KeyboardEvent) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      _hover={{ textDecoration: "underline" }}
+      _focus={{ outline: "1px solid #ffc800", outlineOffset: "2px" }}
+      _focusVisible={{ outline: "1px solid #ffc800", outlineOffset: "2px" }}
+      fontFamily="mono"
+    >
+      RESET ZOOM
+    </Box>
+  );
+}
+
+function ChartHeader({
+  zoom,
+  anchorLabel,
+  hidden,
+  onToggleSeries,
+  onResetZoom,
+}: {
+  zoom: ZoomState | null;
+  anchorLabel: string;
+  hidden: Set<string>;
+  onToggleSeries: (key: string) => void;
+  onResetZoom: () => void;
+}) {
+  return (
+    <HStack mb={2} justify="space-between">
+      <HStack spacing={2}>
+        <Text fontSize="xs" color="#00f0ff" fontWeight="600" textTransform="uppercase" letterSpacing="0.15em">
+          // Throughput
+        </Text>
+        {zoom && anchorLabel && (
+          <Text fontSize="9px" color={zoom.anchor === "right" ? "#00ff41" : "#ffc800"} fontFamily="mono">
+            {anchorLabel}
+          </Text>
+        )}
+      </HStack>
+      <HStack spacing={3}>
+        {SERIES.map((s) => (
+          <SeriesLegendToggle
+            key={s.key}
+            series={s}
+            isHidden={hidden.has(s.key)}
+            onToggle={() => onToggleSeries(s.key)}
+          />
+        ))}
+        {zoom && <ResetZoomButton onClick={onResetZoom} />}
+      </HStack>
+    </HStack>
+  );
+}
+
 export function ThroughputChart({ data }: { data: ThroughputPoint[] }) {
-  const tickColor = "#4a6a7a";
   const tooltipBg = "#0a0e17";
   const tooltipBorder = "rgba(0, 240, 255, 0.3)";
 
@@ -162,79 +272,13 @@ export function ThroughputChart({ data }: { data: ThroughputPoint[] }) {
       h="100%"
       userSelect="none"
     >
-      <HStack mb={2} justify="space-between">
-        <HStack spacing={2}>
-          <Text fontSize="xs" color="#00f0ff" fontWeight="600" textTransform="uppercase" letterSpacing="0.15em">
-            // Throughput
-          </Text>
-          {zoom && anchorLabel && (
-            <Text fontSize="9px" color={zoom.anchor === "right" ? "#00ff41" : "#ffc800"} fontFamily="mono">
-              {anchorLabel}
-            </Text>
-          )}
-        </HStack>
-        <HStack spacing={3}>
-          {SERIES.map((s) => {
-            const isHidden = hidden.has(s.key);
-            return (
-              <HStack
-                key={s.key}
-                spacing={1.5}
-                cursor="pointer"
-                role="button"
-                tabIndex={0}
-                aria-pressed={!isHidden}
-                onClick={() => toggleSeries(s.key)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    toggleSeries(s.key);
-                  }
-                }}
-                opacity={isHidden ? 0.3 : 1}
-                transition="opacity 0.15s"
-                _hover={{ opacity: isHidden ? 0.5 : 0.8 }}
-                _focus={{ outline: "1px solid #00f0ff", outlineOffset: "2px" }}
-                _focusVisible={{ outline: "1px solid #00f0ff", outlineOffset: "2px" }}
-              >
-                <Box w="8px" h="8px" borderRadius="1px" bg={isHidden ? tickColor : s.color} transition="background 0.15s" />
-                <Text
-                  fontSize="10px"
-                  color={isHidden ? tickColor : s.color}
-                  fontFamily="mono"
-                  textDecoration={isHidden ? "line-through" : "none"}
-                  transition="color 0.15s"
-                >
-                  {s.label}
-                </Text>
-              </HStack>
-            );
-          })}
-          {zoom && (
-            <Box
-              as="span"
-              fontSize="10px"
-              color="#ffc800"
-              cursor="pointer"
-              role="button"
-              tabIndex={0}
-              onClick={resetZoom}
-              onKeyDown={(e: React.KeyboardEvent) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  resetZoom();
-                }
-              }}
-              _hover={{ textDecoration: "underline" }}
-              _focus={{ outline: "1px solid #ffc800", outlineOffset: "2px" }}
-              _focusVisible={{ outline: "1px solid #ffc800", outlineOffset: "2px" }}
-              fontFamily="mono"
-            >
-              RESET ZOOM
-            </Box>
-          )}
-        </HStack>
-      </HStack>
+      <ChartHeader
+        zoom={zoom}
+        anchorLabel={anchorLabel}
+        hidden={hidden}
+        onToggleSeries={toggleSeries}
+        onResetZoom={resetZoom}
+      />
       <ResponsiveContainer width="100%" height={240}>
         <AreaChart
           data={chartData}
@@ -259,7 +303,7 @@ export function ThroughputChart({ data }: { data: ThroughputPoint[] }) {
           <XAxis
             dataKey="timestamp"
             tickFormatter={formatTime}
-            tick={{ fill: tickColor, fontSize: 10 }}
+            tick={{ fill: TICK_COLOR, fontSize: 10 }}
             axisLine={false}
             tickLine={false}
             domain={["dataMin", "dataMax"]}
@@ -267,7 +311,7 @@ export function ThroughputChart({ data }: { data: ThroughputPoint[] }) {
             scale="time"
           />
           <YAxis
-            tick={{ fill: tickColor, fontSize: 10 }}
+            tick={{ fill: TICK_COLOR, fontSize: 10 }}
             axisLine={false}
             tickLine={false}
             width={40}

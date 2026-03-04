@@ -2,9 +2,7 @@ import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import type IORedis from "ioredis";
 import { createLogger } from "../logger.ts";
-import { retryJob } from "../services/bullmqService.ts";
-import { isGroupQueue } from "../services/queueDiscovery.ts";
-import { DRAIN_GROUP_LUA, UNBLOCK_LUA } from "../services/luaScripts.ts";
+import { GroupQueueActionService } from "../services/groupQueueActionService.ts";
 import { isValidGroupId, isValidPauseKey } from "./validators.ts";
 
 const logger = createLogger("actions");
@@ -14,6 +12,7 @@ const actionRateLimiter = rateLimit({ windowMs: 60_000, max: 60 });
 
 export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => string[]): Router {
   const router = Router();
+  const service = new GroupQueueActionService(redis, getGroupQueueNames);
 
   router.post("/api/actions/unblock", actionRateLimiter, async (req, res) => {
     try {
@@ -28,24 +27,13 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
         return;
       }
 
-      if (!getGroupQueueNames().includes(queueName)) {
+      if (!service.isKnownQueue(queueName)) {
         res.status(404).json({ error: "Unknown queue name" });
         return;
       }
 
-      const prefix = `${queueName}:gq:`;
-      const result = await redis.eval(
-        UNBLOCK_LUA, 6,
-        `${prefix}blocked`,
-        `${prefix}group:${groupId}:active`,
-        `${prefix}group:${groupId}:jobs`,
-        `${prefix}ready`,
-        `${prefix}signal`,
-        `${prefix}group:${groupId}:error`,
-        groupId,
-      );
-
-      res.json({ ok: true, wasBlocked: result === 1 });
+      const result = await service.unblockGroup({ queueName, groupId });
+      res.json({ ok: true, wasBlocked: result.wasBlocked });
     } catch (err) {
       logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "unblock error" });
       res.status(500).json({ error: "Internal error" });
@@ -60,44 +48,13 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
         return;
       }
 
-      if (!getGroupQueueNames().includes(queueName)) {
+      if (!service.isKnownQueue(queueName)) {
         res.status(404).json({ error: "Unknown queue name" });
         return;
       }
 
-      const prefix = `${queueName}:gq:`;
-      const blockedMembers = await redis.smembers(`${prefix}blocked`);
-
-      if (blockedMembers.length === 0) {
-        res.json({ ok: true, unblockedCount: 0 });
-        return;
-      }
-
-      // Use a pipeline to send all evals in a single round trip instead of
-      // N sequential awaits which can hang with many blocked groups.
-      const pipeline = redis.pipeline();
-      for (const groupId of blockedMembers) {
-        pipeline.eval(
-          UNBLOCK_LUA, 6,
-          `${prefix}blocked`,
-          `${prefix}group:${groupId}:active`,
-          `${prefix}group:${groupId}:jobs`,
-          `${prefix}ready`,
-          `${prefix}signal`,
-          `${prefix}group:${groupId}:error`,
-          groupId,
-        );
-      }
-      const results = await pipeline.exec();
-
-      let unblockedCount = 0;
-      if (results) {
-        for (const [err, result] of results) {
-          if (!err && result === 1) unblockedCount++;
-        }
-      }
-
-      res.json({ ok: true, unblockedCount });
+      const result = await service.unblockAll({ queueName });
+      res.json({ ok: true, unblockedCount: result.unblockedCount });
     } catch (err) {
       logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "unblock-all error" });
       res.status(500).json({ error: "Internal error" });
@@ -117,25 +74,13 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
         return;
       }
 
-      if (!getGroupQueueNames().includes(queueName)) {
+      if (!service.isKnownQueue(queueName)) {
         res.status(404).json({ error: "Unknown queue name" });
         return;
       }
 
-      const prefix = `${queueName}:gq:`;
-      const result = await redis.eval(
-        DRAIN_GROUP_LUA, 7,
-        `${prefix}group:${groupId}:jobs`,
-        `${prefix}group:${groupId}:data`,
-        `${prefix}group:${groupId}:active`,
-        `${prefix}ready`,
-        `${prefix}blocked`,
-        `${prefix}signal`,
-        `${prefix}group:${groupId}:error`,
-        groupId,
-      );
-
-      res.json({ ok: true, jobsRemoved: result });
+      const result = await service.drainGroup({ queueName, groupId });
+      res.json({ ok: true, jobsRemoved: result.jobsRemoved });
     } catch (err) {
       logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "drain-group error" });
       res.status(500).json({ error: "Internal error" });
@@ -155,30 +100,13 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
         return;
       }
 
-      if (!getGroupQueueNames().includes(queueName)) {
+      if (!service.isKnownQueue(queueName)) {
         res.status(404).json({ error: "Unknown queue name" });
         return;
       }
 
-      // 1. Retry the failed BullMQ job (only for non-group queues; group queues
-      //    use fastq — the job is already re-staged by restageAndBlock, so
-      //    unblocking the group is sufficient to resume processing)
-      const retried = isGroupQueue(queueName) ? true : await retryJob(redis, queueName, jobId);
-
-      // 2. Unblock the group
-      const prefix = `${queueName}:gq:`;
-      const unblocked = await redis.eval(
-        UNBLOCK_LUA, 6,
-        `${prefix}blocked`,
-        `${prefix}group:${groupId}:active`,
-        `${prefix}group:${groupId}:jobs`,
-        `${prefix}ready`,
-        `${prefix}signal`,
-        `${prefix}group:${groupId}:error`,
-        groupId,
-      );
-
-      res.json({ ok: true, retried, unblocked: unblocked === 1 });
+      const result = await service.retryBlocked({ queueName, groupId, jobId });
+      res.json({ ok: true, retried: result.retried, unblocked: result.unblocked });
     } catch (err) {
       logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "retry-blocked error" });
       res.status(500).json({ error: "Internal error" });
@@ -198,12 +126,12 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
         return;
       }
 
-      if (!getGroupQueueNames().includes(queueName)) {
+      if (!service.isKnownQueue(queueName)) {
         res.status(404).json({ error: "Unknown queue name" });
         return;
       }
 
-      await redis.sadd(`${queueName}:gq:paused-jobs`, pauseKey);
+      await service.pauseKey({ queueName, pauseKey });
       res.json({ ok: true });
     } catch (err) {
       logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "pause error" });
@@ -224,14 +152,12 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
         return;
       }
 
-      if (!getGroupQueueNames().includes(queueName)) {
+      if (!service.isKnownQueue(queueName)) {
         res.status(404).json({ error: "Unknown queue name" });
         return;
       }
 
-      await redis.srem(`${queueName}:gq:paused-jobs`, pauseKey);
-      // Wake the dispatcher so parked jobs get picked up quickly
-      await redis.lpush(`${queueName}:gq:signal`, "1");
+      await service.unpauseKey({ queueName, pauseKey });
       res.json({ ok: true });
     } catch (err) {
       logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "unpause error" });
@@ -247,12 +173,12 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
         return;
       }
 
-      if (!getGroupQueueNames().includes(queueName)) {
+      if (!service.isKnownQueue(queueName)) {
         res.status(404).json({ error: "Unknown queue name" });
         return;
       }
 
-      const pausedKeys = await redis.smembers(`${queueName}:gq:paused-jobs`);
+      const pausedKeys = await service.listPausedKeys({ queueName });
       res.json({ pausedKeys });
     } catch (err) {
       logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "paused error" });
