@@ -1,12 +1,18 @@
 import type { Projection } from "../../../";
-import type { FoldProjectionDefinition, FoldProjectionStore } from "../../../projections/foldProjection.types";
-import { SIMULATION_PROCESSING_EVENT_TYPES, SIMULATION_PROJECTION_VERSIONS } from "../schemas/constants";
+import type {
+  FoldProjectionDefinition,
+  FoldProjectionStore,
+} from "../../../projections/foldProjection.types";
+import {
+  SIMULATION_PROCESSING_EVENT_TYPES,
+  SIMULATION_PROJECTION_VERSIONS,
+} from "../schemas/constants";
 import type { SimulationProcessingEvent } from "../schemas/events";
 import {
-  isSimulationRunStartedEvent,
   isSimulationMessageSnapshotEvent,
-  isSimulationRunFinishedEvent,
   isSimulationRunDeletedEvent,
+  isSimulationRunFinishedEvent,
+  isSimulationRunStartedEvent,
 } from "../schemas/typeGuards";
 
 /**
@@ -14,11 +20,11 @@ import {
  * Maps to `Messages.*` Nested columns in ClickHouse.
  */
 export interface SimulationMessageRow {
-  Id: string;       // opaque message ID, empty string if absent
-  Role: string;     // "user" | "assistant" | "system" | "tool"
-  Content: string;  // message content, empty string if null
-  TraceId: string;  // span trace ID for correlation, empty string if absent
-  Rest: string;     // JSON of any remaining AG-UI message fields, or ""
+  Id: string; // opaque message ID, empty string if absent
+  Role: string; // "user" | "assistant" | "system" | "tool"
+  Content: string; // message content, empty string if null
+  TraceId: string; // span trace ID for correlation, empty string if absent
+  Rest: string; // JSON of any remaining AG-UI message fields, or ""
 }
 
 /**
@@ -73,8 +79,8 @@ function init(): SimulationRunStateData {
     Error: null,
     DurationMs: null,
     StartedAt: null,
-    CreatedAt: 0,
-    UpdatedAt: 0,
+    CreatedAt: Date.now(),
+    UpdatedAt: Date.now(),
     FinishedAt: null,
     DeletedAt: null,
   };
@@ -95,7 +101,6 @@ function apply(
       Description: event.data.description ?? null,
       Status: "IN_PROGRESS",
       StartedAt: event.occurredAt,
-      CreatedAt: event.occurredAt,
       UpdatedAt: event.occurredAt,
     };
   }
@@ -108,12 +113,12 @@ function apply(
       ...state,
       ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
       Messages: event.data.messages.map((m) => {
-        const { id, role, content, trace_id, ...restFields } =
-          m as Record<string, unknown>;
+        const { id, role, content, trace_id, ...restFields } = m as Record<
+          string,
+          unknown
+        >;
         const rest =
-          Object.keys(restFields).length > 0
-            ? JSON.stringify(restFields)
-            : "";
+          Object.keys(restFields).length > 0 ? JSON.stringify(restFields) : "";
         return {
           Id: typeof id === "string" ? id : "",
           Role: typeof role === "string" ? role : "",
@@ -178,7 +183,10 @@ function apply(
  */
 export function createSimulationRunStateFoldProjection(deps: {
   store: FoldProjectionStore<SimulationRunStateData>;
-}): FoldProjectionDefinition<SimulationRunStateData, SimulationProcessingEvent> {
+}): FoldProjectionDefinition<
+  SimulationRunStateData,
+  SimulationProcessingEvent
+> {
   return {
     name: "simulationRunState",
     version: SIMULATION_PROJECTION_VERSIONS.RUN_STATE,
