@@ -1,4 +1,4 @@
-import { Button } from "@chakra-ui/react";
+import { Button, type ButtonProps } from "@chakra-ui/react";
 import { CopyIcon } from "lucide-react";
 import { toaster } from "./ui/toaster";
 
