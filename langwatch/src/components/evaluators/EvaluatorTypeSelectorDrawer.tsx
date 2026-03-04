@@ -47,7 +47,9 @@ const categoryEvaluators: Record<
   safety: [
     "presidio/pii_detection",
     "azure/prompt_injection",
+    "azure/jailbreak",
     "azure/content_safety",
+    "openai/moderation",
   ],
 };
 
