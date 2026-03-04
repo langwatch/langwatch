@@ -30,7 +30,7 @@ function makeRow(overrides: Partial<ClickHouseSimulationRunRow> = {}): ClickHous
     CreatedAt: "1000",
     UpdatedAt: "2500",
     FinishedAt: "2500",
-    DeletedAt: null,
+    ArchivedAt: null,
     ...overrides,
   };
 }

@@ -34,7 +34,7 @@ function createStartedEvent(
     aggregateId: "run-123",
     aggregateType: "experiment_run",
     tenantId: TEST_TENANT_ID,
-    timestamp: 1000,
+    createdAt: 1000,
     occurredAt: 1000,
     type: EXPERIMENT_RUN_EVENT_TYPES.STARTED,
     version: EXPERIMENT_RUN_EVENT_VERSIONS.STARTED,
@@ -57,7 +57,7 @@ function createTargetResultEvent(
     aggregateId: "run-123",
     aggregateType: "experiment_run",
     tenantId: TEST_TENANT_ID,
-    timestamp: 2000,
+    createdAt: 2000,
     occurredAt: 2000,
     type: EXPERIMENT_RUN_EVENT_TYPES.TARGET_RESULT,
     version: EXPERIMENT_RUN_EVENT_VERSIONS.TARGET_RESULT,
@@ -83,7 +83,7 @@ function createEvaluatorResultEvent(
     aggregateId: "run-123",
     aggregateType: "experiment_run",
     tenantId: TEST_TENANT_ID,
-    timestamp: 3000,
+    createdAt: 3000,
     occurredAt: 3000,
     type: EXPERIMENT_RUN_EVENT_TYPES.EVALUATOR_RESULT,
     version: EXPERIMENT_RUN_EVENT_VERSIONS.EVALUATOR_RESULT,
@@ -109,7 +109,7 @@ function createCompletedEvent(
     aggregateId: "run-123",
     aggregateType: "experiment_run",
     tenantId: TEST_TENANT_ID,
-    timestamp: 4000,
+    createdAt: 4000,
     occurredAt: 4000,
     type: EXPERIMENT_RUN_EVENT_TYPES.COMPLETED,
     version: EXPERIMENT_RUN_EVENT_VERSIONS.COMPLETED,
@@ -148,7 +148,7 @@ describe("experimentRunStateFoldProjection", () => {
     const state = foldEvents([
       createStartedEvent(),
       createTargetResultEvent({ index: 0 }),
-      createTargetResultEvent({ index: 1 }, { id: "event-2b", timestamp: 2100 }),
+      createTargetResultEvent({ index: 1 }, { id: "event-2b", createdAt: 2100 }),
     ]);
 
     expect(state.Progress).toBe(2);
@@ -162,7 +162,7 @@ describe("experimentRunStateFoldProjection", () => {
       createTargetResultEvent({ index: 0 }),
       createTargetResultEvent(
         { index: 1, error: "Something went wrong" },
-        { id: "event-2b", timestamp: 2100 },
+        { id: "event-2b", createdAt: 2100 },
       ),
     ]);
 
@@ -178,11 +178,11 @@ describe("experimentRunStateFoldProjection", () => {
       createEvaluatorResultEvent({ score: 0.6 }),
       createEvaluatorResultEvent(
         { score: 0.8, evaluatorId: "eval-2" },
-        { id: "event-3b", timestamp: 3100 },
+        { id: "event-3b", createdAt: 3100 },
       ),
       createEvaluatorResultEvent(
         { score: 1.0, evaluatorId: "eval-3" },
-        { id: "event-3c", timestamp: 3200 },
+        { id: "event-3c", createdAt: 3200 },
       ),
     ]);
 
@@ -197,11 +197,11 @@ describe("experimentRunStateFoldProjection", () => {
       createEvaluatorResultEvent({ passed: true }),
       createEvaluatorResultEvent(
         { passed: false, evaluatorId: "eval-2" },
-        { id: "event-3b", timestamp: 3100 },
+        { id: "event-3b", createdAt: 3100 },
       ),
       createEvaluatorResultEvent(
         { passed: true, evaluatorId: "eval-3" },
-        { id: "event-3c", timestamp: 3200 },
+        { id: "event-3c", createdAt: 3200 },
       ),
     ]);
 
@@ -237,15 +237,15 @@ describe("experimentRunStateFoldProjection", () => {
       createEvaluatorResultEvent({ passed: true }),
       createEvaluatorResultEvent(
         { passed: false, evaluatorId: "eval-2" },
-        { id: "event-3b", timestamp: 3100 },
+        { id: "event-3b", createdAt: 3100 },
       ),
       createEvaluatorResultEvent(
         { status: "skipped", evaluatorId: "eval-3", score: undefined, passed: undefined },
-        { id: "event-3c", timestamp: 3200 },
+        { id: "event-3c", createdAt: 3200 },
       ),
       createEvaluatorResultEvent(
         { status: "error", evaluatorId: "eval-4", score: undefined, passed: undefined },
-        { id: "event-3d", timestamp: 3300 },
+        { id: "event-3d", createdAt: 3300 },
       ),
     ]);
 
@@ -261,12 +261,12 @@ describe("experimentRunStateFoldProjection", () => {
       createEvaluatorResultEvent({ passed: true }),
       createEvaluatorResultEvent(
         { passed: false, evaluatorId: "eval-2" },
-        { id: "event-3b", timestamp: 3100 },
+        { id: "event-3b", createdAt: 3100 },
       ),
       // Score-only evaluator with no passed value
       createEvaluatorResultEvent(
         { score: 0.9, passed: undefined, evaluatorId: "eval-3" },
-        { id: "event-3c", timestamp: 3200 },
+        { id: "event-3c", createdAt: 3200 },
       ),
     ]);
 

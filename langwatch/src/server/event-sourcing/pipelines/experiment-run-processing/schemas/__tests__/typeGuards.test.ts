@@ -19,7 +19,7 @@ const baseEvent = {
   aggregateId: "run-123",
   aggregateType: "experiment_run" as const,
   tenantId: TEST_TENANT_ID,
-  timestamp: 1000,
+  createdAt: 1000,
   occurredAt: 1000,
 };
 

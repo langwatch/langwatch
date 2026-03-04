@@ -78,15 +78,15 @@ describe("EventUtils - Event ID", () => {
         type: eventType,
         version: eventVersion,
         data: { test: "data" },
-        timestamp,
+        createdAt: timestamp,
         occurredAt,
       });
 
       expect(event.occurredAt).toBe(occurredAt);
-      expect(event.timestamp).toBe(timestamp);
+      expect(event.createdAt).toBe(timestamp);
     });
 
-    it("sets occurredAt to auto-generated timestamp when neither is provided", () => {
+    it("sets occurredAt to auto-generated createdAt when neither is provided", () => {
       const before = Date.now();
       const event = EventUtils.createEvent({
         aggregateType,
@@ -98,7 +98,7 @@ describe("EventUtils - Event ID", () => {
       });
       const after = Date.now();
 
-      expect(event.occurredAt).toBe(event.timestamp);
+      expect(event.occurredAt).toBe(event.createdAt);
       expect(event.occurredAt).toBeGreaterThanOrEqual(before);
       expect(event.occurredAt).toBeLessThanOrEqual(after);
     });
