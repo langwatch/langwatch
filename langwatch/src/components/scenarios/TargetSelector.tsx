@@ -1,4 +1,4 @@
-import { Box, Button, HStack, Input, Portal, Text } from "@chakra-ui/react";
+import { Box, Button, HStack, Input, Text } from "@chakra-ui/react";
 import { BookText, ChevronDown, Code, Globe, Plus } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -128,10 +128,9 @@ export function TargetSelector({
         </Button>
       </Popover.Trigger>
 
-      <Portal>
-        <Popover.Content width="300px" padding={0}>
-          {/* Search Input - Sticky at top */}
-          <Box
+      <Popover.Content width="300px" padding={0} portalled={false}>
+        {/* Search Input - Sticky at top */}
+        <Box
             padding={2}
             borderBottomWidth="1px"
             borderColor="border"
@@ -289,7 +288,6 @@ export function TargetSelector({
             </Box>
           </Box>
         </Popover.Content>
-      </Portal>
     </Popover.Root>
   );
 }

@@ -39,8 +39,13 @@ function formatResultsForCopy(results: unknown): string {
   return JSON.stringify(results, null, 2);
 }
 
-function isPending(status?: ScenarioRunStatus): boolean {
-  return status === ScenarioRunStatus.IN_PROGRESS || status === ScenarioRunStatus.PENDING;
+function hasNoResults(status?: ScenarioRunStatus): boolean {
+  return (
+    status === ScenarioRunStatus.IN_PROGRESS ||
+    status === ScenarioRunStatus.PENDING ||
+    status === ScenarioRunStatus.STALLED ||
+    status === ScenarioRunStatus.CANCELLED
+  );
 }
 
 function computeSuccessRate(met: number, unmet: number): string {
@@ -222,7 +227,7 @@ export function ScenarioRunDetailDrawer({
                 </HStack>
 
                 {/* Metrics summary — trace details style */}
-                {scenarioState.results && !isPending(scenarioState.status) && (
+                {scenarioState.results && !hasNoResults(scenarioState.status) && (
                   <HStack
                     paddingX={4}
                     borderBottomWidth={1}
@@ -303,32 +308,35 @@ export function ScenarioRunDetailDrawer({
                 paddingX={0}
                 overflowY="auto"
               >
-                <VStack gap={0} w="100%">
-                  {/* Conversation */}
-                  <Box
-                    w="100%"
-                    paddingX={6}
-                    paddingY={6}
-                    background="bg.muted"
-                    flexGrow={1}
-                  >
-                    <Box borderRadius="md" overflow="hidden">
-                      <CustomCopilotKitChat
-                        messages={scenarioState.messages ?? []}
-                        hideInput
-                        smallerView={false}
-                      />
+                <VStack gap={0} w="100%" h="100%">
+                  {/* Conversation — hidden when empty (e.g. stalled runs) */}
+                  {(scenarioState.messages ?? []).length > 0 && (
+                    <Box
+                      w="100%"
+                      paddingX={6}
+                      paddingY={6}
+                      background="bg.muted"
+                      flexGrow={1}
+                    >
+                      <Box borderRadius="md" overflow="hidden">
+                        <CustomCopilotKitChat
+                          messages={scenarioState.messages ?? []}
+                          hideInput
+                          smallerView={false}
+                        />
+                      </Box>
                     </Box>
-                  </Box>
+                  )}
 
                   {/* Results */}
                   <Box
                     w="100%"
-                    borderTop="1px"
+                    flexGrow={1}
+                    borderTop={(scenarioState.messages ?? []).length > 0 ? "1px" : undefined}
                     borderColor="border.muted"
-                    css={{ "& > div > div": { borderRadius: 0 } }}
+                    css={{ "& > div": { borderRadius: 0, minHeight: "100%" } }}
                   >
-                    <Box position="relative" className="group">
+                    <Box position="relative" className="group" h="100%">
                       <SimulationConsole
                         results={scenarioState.results}
                         scenarioName={scenarioState.name ?? undefined}
