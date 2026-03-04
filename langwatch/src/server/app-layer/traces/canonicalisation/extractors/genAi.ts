@@ -154,8 +154,10 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
           }
           ctx.recordRule(`${this.id}:system_instruction(existing)`);
         }
-        // Annotate existing messages as chat_messages type
-        recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
+        // Annotate existing messages as chat_messages type (only if messages remain)
+        if (ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] !== undefined || attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES)) {
+          recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
+        }
       }
     }
 

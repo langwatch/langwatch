@@ -133,6 +133,7 @@ export function MessagesList() {
     },
     enabled: !!project,
     pageOffset: navigationFooter.pageOffset,
+    cursorPageNumber: navigationFooter.cursorPageNumber,
   });
 
   return (

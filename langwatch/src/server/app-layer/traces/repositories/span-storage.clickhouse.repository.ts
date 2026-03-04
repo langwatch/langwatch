@@ -86,8 +86,14 @@ export function deserializeAttributes(
     // NOTE: Intentionally lossy for string values that look like decimal numbers
     // (e.g. zip codes "90210" → 90210). ClickHouse round-trip for originally-numeric
     // attributes is correct; pure string numerics may lose their string type.
+    // Guard: skip conversion for integers beyond Number.MAX_SAFE_INTEGER to avoid precision loss.
     if (trimmed !== "" && DECIMAL_NUMBER_RE.test(trimmed) && Number.isFinite(Number(trimmed))) {
-      result[key] = Number(trimmed);
+      const num = Number(trimmed);
+      if (Number.isInteger(num) && Math.abs(num) > Number.MAX_SAFE_INTEGER) {
+        result[key] = value;
+        continue;
+      }
+      result[key] = num;
       continue;
     }
 

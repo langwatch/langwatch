@@ -25,7 +25,7 @@ import {
   recordValueType,
 } from "./_extraction";
 import { safeJsonParse } from "./_guards";
-import { extractSystemInstructionFromMessages } from "./_messages";
+import { extractSystemInstructionFromMessages, stripSystemMessages } from "./_messages";
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 
 const logger = createLogger("langwatch:trace-processing:strands-extractor");
@@ -186,10 +186,6 @@ export class StrandsExtractor implements CanonicalAttributesExtractor {
       }
 
       if (inputMessages.length > 0) {
-        ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, inputMessages);
-        ctx.recordRule(`${this.id}:events->gen_ai.input.messages`);
-        recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
-
         // Extract system instruction from assembled messages
         const sysInstruction = extractSystemInstructionFromMessages(inputMessages);
         if (sysInstruction !== null) {
@@ -197,6 +193,17 @@ export class StrandsExtractor implements CanonicalAttributesExtractor {
             ATTR_KEYS.GEN_AI_REQUEST_SYSTEM_INSTRUCTION,
             sysInstruction,
           );
+        }
+
+        // Strip system messages — they are promoted to gen_ai.request.system_instruction
+        const chatMessages = sysInstruction !== null
+          ? stripSystemMessages(inputMessages)
+          : inputMessages;
+
+        if (chatMessages.length > 0) {
+          ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, chatMessages);
+          ctx.recordRule(`${this.id}:events->gen_ai.input.messages`);
+          recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
         }
       }
     }

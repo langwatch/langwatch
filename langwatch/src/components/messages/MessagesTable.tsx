@@ -198,6 +198,7 @@ export function MessagesTable({
     },
     enabled: !!project,
     pageOffset: navigationFooter.pageOffset,
+    cursorPageNumber: navigationFooter.cursorPageNumber,
   });
 
   // Wrap acceptPending to also bump liveEndDate (component-level concern)

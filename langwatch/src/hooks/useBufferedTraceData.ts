@@ -151,6 +151,12 @@ export function useBufferedTraceData<T extends TraceGroupData>({
     setPendingData(undefined);
     setPendingCount(0);
     setHighlightIds(new Set());
+    bypassBufferRef.current = false;
+    mouseLeftAtRef.current = 0;
+    if (highlightTimerRef.current) {
+      clearTimeout(highlightTimerRef.current);
+      highlightTimerRef.current = null;
+    }
   };
 
   // Cleanup highlight timer on unmount

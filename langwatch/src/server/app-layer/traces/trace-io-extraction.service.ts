@@ -359,7 +359,7 @@ export type FlattenMode = "outside-in" | "inside-out";
  * Extracted I/O result - can be either raw JSON or a text representation.
  */
 export interface ExtractedIO {
-  /** The raw JSON value (parsed if it was a string) */
+  /** The raw attribute value as extracted from the source */
   raw: unknown;
   /** A text representation for display/search */
   text: string;
@@ -383,7 +383,18 @@ function messagesToText(
 ): string | null {
   if (!messages) return null;
 
-  if (typeof messages === "string") return messages;
+  if (typeof messages === "string") {
+    // Try to parse JSON-encoded message payloads and extract text semantically
+    try {
+      const parsed: unknown = JSON.parse(messages);
+      if (typeof parsed === "object" && parsed !== null) {
+        return messagesToText(parsed, mode);
+      }
+    } catch {
+      // Not JSON — return the string as-is
+    }
+    return messages;
+  }
 
   if (Array.isArray(messages)) {
     if (mode === "input") {

@@ -197,7 +197,7 @@ export class MastraExtractor implements CanonicalAttributesExtractor {
         if (isEvalModelStep) {
           // For orphan eval spans: prefer structured object, fall back to text
           const evalOutput = extractEvalOutput(rawOutput);
-          if (evalOutput) {
+          if (evalOutput != null) {
             ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, evalOutput);
             ctx.recordRule(
               `${this.id}:orphan.model_step.output->langwatch.output`,

@@ -548,7 +548,7 @@ export function applySpanToSummary(
     }
   }
 
-  // Deep-merge metadata.* fields: merge JSON objects, last-wins for primitives
+  // Deep-merge metadata.* fields: merge JSON objects, first-wins for primitives
   for (const key of Object.keys(mergedAttributes)) {
     if (!key.startsWith("metadata.")) continue;
     const prev = state.attributes[key];

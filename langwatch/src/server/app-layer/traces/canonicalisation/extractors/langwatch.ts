@@ -34,6 +34,15 @@ import {
 } from "./_messages";
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 
+/** JSON.stringify that never throws — returns a fallback on circular refs / BigInt / etc. */
+function safeStringify(value: unknown): string {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return "[unserializable]";
+  }
+}
+
 /**
  * Type guard for LangWatch SDK structured input/output format.
  * Used by DSPy and other frameworks that wrap messages in typed containers.
@@ -154,7 +163,7 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
         if (Array.isArray(parsedObj.labels)) {
           ctx.setAttrIfAbsent(
             ATTR_KEYS.LANGWATCH_LABELS,
-            JSON.stringify(parsedObj.labels),
+            safeStringify(parsedObj.labels),
           );
           ctx.recordRule(`${this.id}:metadata.labels`);
         }
@@ -200,7 +209,7 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
           if (value !== null && value !== undefined) {
             ctx.setAttrIfAbsent(
               `metadata.${key}`,
-              typeof value === "string" ? value : JSON.stringify(value),
+              typeof value === "string" ? value : safeStringify(value),
             );
           }
         }
@@ -209,7 +218,7 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
         // Invalid metadata (string, array, number) — store as metadata._raw
         ctx.setAttrIfAbsent(
           "metadata._raw",
-          typeof metadata === "string" ? metadata : JSON.stringify(metadata),
+          typeof metadata === "string" ? metadata : safeStringify(metadata),
         );
         ctx.recordRule(`${this.id}:metadata._raw`);
     }
@@ -262,11 +271,11 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
 
             ctx.setAttr(ATTR_KEYS.SPAN_TYPE, "llm");
             ctx.recordRule(`${this.id}:type=llm`);
-
-            // Keep structured wrapper for langwatch.input display
-            ctx.setAttr(ATTR_KEYS.LANGWATCH_INPUT, rawInput);
-            ctx.recordRule(`${this.id}:input`);
           }
+
+          // Always preserve the raw input — even when normalization fails
+          ctx.setAttr(ATTR_KEYS.LANGWATCH_INPUT, rawInput);
+          ctx.recordRule(`${this.id}:input`);
         } else {
           // text, json, raw, list — unwrap value, don't coerce to gen_ai
           ctx.setAttr(ATTR_KEYS.LANGWATCH_INPUT, rawInput.value);
@@ -301,18 +310,18 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
             ctx.recordRule(
               `${this.id}:output.chat_messages->gen_ai.output.messages`,
             );
-
-            // Keep unwrapped messages for langwatch.output display
-            ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, messages);
-            ctx.recordRule(`${this.id}:output`);
           }
+
+          // Always preserve raw output — even when normalization fails
+          ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, rawOutput.value);
+          ctx.recordRule(`${this.id}:output`);
         } else if (
           rawOutput.type === "json" &&
           Array.isArray(rawOutput.value)
         ) {
           const content = (rawOutput.value as unknown[])
             .map((item) =>
-              typeof item === "string" ? item : JSON.stringify(item),
+              typeof item === "string" ? item : safeStringify(item),
             )
             .join("\n");
 
