@@ -5,6 +5,7 @@ import { ScenarioEventRepository } from "./scenario-event.repository";
 import type {
   BatchHistoryResult,
   BatchRunDataResult,
+  ExternalSetSummary,
   ScenarioEvent,
   ScenarioRunData,
 } from "./scenario-event.types";
@@ -853,6 +854,41 @@ export class ScenarioEventService {
           nextCursor: result.nextCursor,
           hasMore: result.hasMore,
         };
+      },
+    );
+  }
+
+  /**
+   * Returns summaries for external (non-internal) scenario sets.
+   *
+   * Filters the full set list to exclude internal sets, then returns
+   * basic summary info. The ES path does not compute per-batch pass rates,
+   * so passedCount/totalCount are derived from the set-level counts.
+   */
+  async getExternalSetSummaries({
+    projectId,
+  }: {
+    projectId: string;
+  }): Promise<ExternalSetSummary[]> {
+    return tracer.withActiveSpan(
+      "ScenarioEventService.getExternalSetSummaries",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: { "tenant.id": projectId },
+      },
+      async (span) => {
+        const allSets = await this.eventRepository.getScenarioSetsDataForProject({ projectId });
+        const externalSets = allSets.filter(
+          (s) => !s.scenarioSetId.startsWith("__internal__"),
+        );
+        span.setAttribute("result.count", externalSets.length);
+        // ES path does not resolve per-run pass/fail status; ClickHouse is the primary backend
+        return externalSets.map((s) => ({
+          scenarioSetId: s.scenarioSetId,
+          passedCount: 0,
+          totalCount: s.scenarioCount,
+          lastRunTimestamp: s.lastRunAt,
+        }));
       },
     );
   }
