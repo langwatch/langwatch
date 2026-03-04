@@ -166,6 +166,7 @@ export class RecordSpanCommand implements CommandHandler<
           },
           metadata: { traceId, spanId },
           occurredAt: commandData.occurredAt,
+          idempotencyKey: `${tenantIdStr}:${traceId}:${spanId}`,
         });
 
         this.logger.debug(
