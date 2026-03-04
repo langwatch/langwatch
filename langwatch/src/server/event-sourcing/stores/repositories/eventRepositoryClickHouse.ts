@@ -77,7 +77,7 @@ export class EventRepositoryClickHouse implements EventRepository {
             EventPayload,
             ProcessingTraceparent,
             IdempotencyKey
-          FROM event_log FINAL
+          FROM event_log
           WHERE TenantId = {tenantId:String}
             AND AggregateType = {aggregateType:String}
             AND AggregateId = {aggregateId:String}
@@ -152,7 +152,7 @@ export class EventRepositoryClickHouse implements EventRepository {
             EventVersion,
             ProcessingTraceparent,
             IdempotencyKey
-          FROM event_log FINAL
+          FROM event_log
           WHERE TenantId = {tenantId:String}
             AND AggregateType = {aggregateType:String}
             AND AggregateId = {aggregateId:String}
@@ -230,7 +230,7 @@ export class EventRepositoryClickHouse implements EventRepository {
       const result = await this.clickHouseClient.query({
         query: `
           SELECT COUNT(DISTINCT EventId) as count
-          FROM event_log FINAL
+          FROM event_log
           WHERE TenantId = {tenantId:String}
             AND AggregateType = {aggregateType:String}
             AND AggregateId = {aggregateId:String}
