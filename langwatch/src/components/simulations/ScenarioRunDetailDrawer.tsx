@@ -1,18 +1,17 @@
-import {
-  Box,
-  HStack,
-  Skeleton,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
-import { ExternalLink } from "lucide-react";
+import { Skeleton, VStack } from "@chakra-ui/react";
+import { useCallback, useState } from "react";
+import { RunScenarioModal } from "~/components/scenarios/RunScenarioModal";
+import type { TargetValue } from "~/components/scenarios/TargetSelector";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { ScenarioMessageSnapshotEvent } from "~/server/scenarios/scenario-event.types";
+import { useRunScenario } from "~/hooks/useRunScenario";
+import { useScenarioTarget } from "~/hooks/useScenarioTarget";
 import { api } from "~/utils/api";
 import { Drawer } from "../ui/drawer";
 import { CustomCopilotKitChat } from "./CustomCopilotKitChat";
-import { CriteriaSummary, DrawerHeader } from "./ScenarioRunDetailContent";
+import { ScenarioRunActions } from "./ScenarioRunActions";
+import { ScenarioRunHeader } from "./ScenarioRunHeader";
+import { SimulationConsole } from "./simulation-console/SimulationConsole";
 
 export interface ScenarioRunDetailDrawerProps {
   open?: boolean;
@@ -21,9 +20,10 @@ export interface ScenarioRunDetailDrawerProps {
 export function ScenarioRunDetailDrawer({
   open,
 }: ScenarioRunDetailDrawerProps) {
-  const { closeDrawer } = useDrawer();
+  const { closeDrawer, openDrawer } = useDrawer();
   const params = useDrawerParams();
   const { project } = useOrganizationTeamProject();
+  const [runModalOpen, setRunModalOpen] = useState(false);
 
   const scenarioRunId = params.scenarioRunId;
 
@@ -37,88 +37,114 @@ export function ScenarioRunDetailDrawer({
     },
   );
 
+  const scenarioId = scenarioState?.scenarioId;
+
+  const { data: scenarioData } =
+    api.scenarios.getByIdIncludingArchived.useQuery(
+      { projectId: project?.id ?? "", id: scenarioId ?? "" },
+      { enabled: !!project?.id && !!scenarioId },
+    );
+
+  const { runScenario, isRunning } = useRunScenario({
+    projectId: project?.id,
+    projectSlug: project?.slug,
+  });
+
+  const {
+    target: persistedTarget,
+    setTarget: persistTarget,
+    hasPersistedTarget,
+  } = useScenarioTarget(scenarioId);
+
+  const handleRunAgain = useCallback(
+    async (target: TargetValue, remember: boolean) => {
+      if (!scenarioId || !target) return;
+      if (remember) persistTarget(target);
+      try {
+        await runScenario({ scenarioId, target });
+      } catch (error) {
+        console.error("Failed to run scenario:", error);
+      }
+      setRunModalOpen(false);
+    },
+    [scenarioId, persistTarget, runScenario],
+  );
+
+  const handleRunAgainClick = useCallback(() => {
+    if (hasPersistedTarget && persistedTarget) {
+      void handleRunAgain(persistedTarget, true);
+    } else {
+      setRunModalOpen(true);
+    }
+  }, [hasPersistedTarget, persistedTarget, handleRunAgain]);
+
   return (
-    <Drawer.Root
-      open={!!open}
-      onOpenChange={() => {
-        closeDrawer();
-      }}
-      placement="end"
-      size="lg"
-    >
-      <Drawer.Backdrop />
-      <Drawer.Content paddingX={0} maxWidth="50%">
-        <Drawer.CloseTrigger />
-        {!scenarioState && open && (
-          <Drawer.Body>
-            <VStack gap={4} align="start" w="100%" pt={4}>
-              <Skeleton height="32px" width="60%" />
-              <Skeleton height="24px" width="40%" />
-              <Skeleton height="200px" width="100%" borderRadius="md" />
-            </VStack>
-          </Drawer.Body>
-        )}
-        {scenarioState && (
-          <>
-            <DrawerHeader
-              name={scenarioState.name}
-              status={scenarioState.status}
-              durationInMs={scenarioState.durationInMs}
-            />
-            <Drawer.Body overflow="auto" px={5} py={4}>
-              <VStack gap={6} align="stretch">
-                <CriteriaSummary results={scenarioState.results} />
-                <ConversationSection
-                  messages={scenarioState.messages}
-                  projectSlug={project?.slug}
-                />
+    <>
+      <Drawer.Root
+        open={!!open}
+        onOpenChange={() => {
+          closeDrawer();
+        }}
+        placement="end"
+        size="lg"
+      >
+        <Drawer.Backdrop />
+        <Drawer.Content paddingX={0} maxWidth="50%">
+          <Drawer.CloseTrigger />
+          {!scenarioState && open && (
+            <Drawer.Body>
+              <VStack gap={4} align="start" w="100%" pt={4}>
+                <Skeleton height="32px" width="60%" />
+                <Skeleton height="24px" width="40%" />
+                <Skeleton height="200px" width="100%" borderRadius="md" />
               </VStack>
             </Drawer.Body>
-          </>
-        )}
-      </Drawer.Content>
-    </Drawer.Root>
-  );
-}
+          )}
+          {scenarioState && (
+            <>
+              <ScenarioRunHeader
+                status={scenarioState.status}
+                name={scenarioState.name}
+                scenarioId={scenarioId}
+              />
+              <Drawer.Body overflow="auto" px={0} py={0}>
+                <VStack gap={0} align="stretch">
+                  <SimulationConsole
+                    results={scenarioState.results}
+                    scenarioName={scenarioState.name ?? undefined}
+                    status={scenarioState.status}
+                    durationInMs={scenarioState.durationInMs}
+                  />
+                  <CustomCopilotKitChat
+                    messages={scenarioState.messages ?? []}
+                    hideInput
+                  />
+                </VStack>
+              </Drawer.Body>
+              <Drawer.Footer borderTop="1px" borderColor="border">
+                <ScenarioRunActions
+                  scenario={scenarioData}
+                  isRunning={isRunning}
+                  onRunAgain={handleRunAgainClick}
+                  onEditScenario={() => {
+                    openDrawer("scenarioEditor", {
+                      urlParams: { scenarioId: scenarioId ?? "" },
+                    });
+                  }}
+                />
+              </Drawer.Footer>
+            </>
+          )}
+        </Drawer.Content>
+      </Drawer.Root>
 
-function ConversationSection({
-  messages,
-  projectSlug,
-}: {
-  messages: ScenarioMessageSnapshotEvent["messages"];
-  projectSlug?: string;
-}) {
-  const traceId = messages.find((m) => m.trace_id)?.trace_id;
-
-  return (
-    <Box>
-      <HStack justify="space-between" mb={2}>
-        <Text fontWeight="semibold">Conversation</Text>
-        {traceId && projectSlug && (
-          <a
-            href={`/${projectSlug}/messages/${traceId}`}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <HStack color="blue.500" fontSize="sm" gap={1}>
-              <Text>View Trace</Text>
-              <ExternalLink size={12} />
-            </HStack>
-          </a>
-        )}
-      </HStack>
-      <Box
-        border="1px"
-        borderColor="border"
-        borderRadius="md"
-        overflow="hidden"
-      >
-        <CustomCopilotKitChat
-          messages={messages}
-          hideInput
-          smallerView
-        />
-      </Box>
-    </Box>
+      <RunScenarioModal
+        open={runModalOpen}
+        onClose={() => setRunModalOpen(false)}
+        onRun={handleRunAgain}
+        initialTarget={persistedTarget}
+        isLoading={isRunning}
+      />
+    </>
   );
 }
