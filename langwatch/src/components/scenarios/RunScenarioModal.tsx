@@ -35,12 +35,12 @@ export function RunScenarioModal({
 
   return (
     <Dialog.Root open={open} onOpenChange={(e) => !e.open && onClose()}>
-      <Dialog.Content>
+      <Dialog.Content overflow="visible">
         <Dialog.Header>
           <Dialog.Title>Run Scenario</Dialog.Title>
         </Dialog.Header>
         <Dialog.CloseTrigger />
-        <Dialog.Body>
+        <Dialog.Body overflow="visible">
           <VStack gap={4} align="stretch">
             <Text>Select a target to run this scenario:</Text>
             <TargetSelector
