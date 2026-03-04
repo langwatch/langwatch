@@ -18,7 +18,7 @@ import { parseSuiteTargets } from "~/server/suites/types";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
 import { api } from "~/utils/api";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
-import { buildRoutePath } from "~/utils/routes";
+import { useDrawer } from "~/hooks/useDrawer";
 import type { Period } from "~/components/PeriodSelector";
 import { RunHistoryFilters } from "./RunHistoryFilters";
 import { RunHistoryFooter } from "./RunHistoryFooter";
@@ -316,18 +316,15 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
     });
   }, []);
 
+  const { openDrawer } = useDrawer();
+
   const handleScenarioRunClick = useCallback(
     (scenarioRun: ScenarioRunData) => {
-      if (!project) return;
-      const url = buildRoutePath("simulations_run", {
-        project: project.slug,
-        scenarioSetId: setId,
-        batchRunId: scenarioRun.batchRunId,
-        scenarioRunId: scenarioRun.scenarioRunId,
+      openDrawer("scenarioRunDetail", {
+        urlParams: { scenarioRunId: scenarioRun.scenarioRunId },
       });
-      window.open(url, "_blank");
     },
-    [project, setId],
+    [openDrawer],
   );
 
   const handleFiltersChange = useCallback(

@@ -9,9 +9,9 @@ import { Box, Button, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ViewMode } from "./useRunHistoryStore";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { buildRoutePath } from "~/utils/routes";
 import type { Period } from "~/components/PeriodSelector";
 import {
   RunHistoryFilters,
@@ -226,20 +226,15 @@ export function AllRunsPanel({ period }: AllRunsPanelProps) {
     });
   }, []);
 
-  // Navigate to run detail
+  const { openDrawer } = useDrawer();
+
   const handleScenarioRunClick = useCallback(
     (scenarioRun: ScenarioRunData) => {
-      if (!project) return;
-      const setId = allScenarioSetIds[scenarioRun.batchRunId] ?? "";
-      const url = buildRoutePath("simulations_run", {
-        project: project.slug,
-        scenarioSetId: setId,
-        batchRunId: scenarioRun.batchRunId,
-        scenarioRunId: scenarioRun.scenarioRunId,
+      openDrawer("scenarioRunDetail", {
+        urlParams: { scenarioRunId: scenarioRun.scenarioRunId },
       });
-      window.open(url, "_blank");
     },
-    [project, allScenarioSetIds],
+    [openDrawer],
   );
 
   // Load more pagination — advance cursor to fetch next page
