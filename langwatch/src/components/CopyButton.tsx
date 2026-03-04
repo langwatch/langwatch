@@ -1,8 +1,18 @@
-import { Button } from "@chakra-ui/react";
+import { Button, type ButtonProps } from "@chakra-ui/react";
 import { CopyIcon } from "lucide-react";
 import { toaster } from "./ui/toaster";
 
-export function CopyButton({ value, label }: { value: string; label: string }) {
+interface CopyButtonProps extends Omit<
+  ButtonProps,
+  "value" | "label" | "onClick"
+> {
+  value: string;
+  label: string;
+}
+
+export function CopyButton(props: CopyButtonProps) {
+  const { value, label, ...rest } = props;
+
   return (
     <Button
       variant="ghost"
@@ -37,6 +47,7 @@ export function CopyButton({ value, label }: { value: string; label: string }) {
           });
         })();
       }}
+      {...rest}
     >
       <CopyIcon width={14} height={14} />
     </Button>

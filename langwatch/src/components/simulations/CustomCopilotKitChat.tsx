@@ -104,7 +104,7 @@ function CustomCopilotKitChatInner({
 
   return (
     <CopilotChat
-      RenderTextMessage={({ message, AssistantMessage, UserMessage }) => {
+      RenderTextMessage={({ message, UserMessage }) => {
         const message_ = message as TextMessage;
         const traceId = traceIdMap.get(message_.id);
 

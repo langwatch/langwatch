@@ -1,10 +1,9 @@
-import { Box, Button, HStack, Input, Portal, Text } from "@chakra-ui/react";
+import { Box, Button, HStack, Input, Text } from "@chakra-ui/react";
 import { BookText, ChevronDown, Code, Globe, Plus } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "../../prompts/hooks/useAllPromptsForProject";
 import { api } from "../../utils/api";
-import { Popover } from "../ui/popover";
 import {
   isAgentTarget,
   useFilteredAgents,
@@ -25,9 +24,8 @@ interface TargetSelectorProps {
 
 /**
  * Unified target selector for scenarios.
- * Shows all agents (HTTP and code) in a single "Agents" section and prompts
- * in a separate "Prompts" section, with search across both.
- * Includes actions to create new prompts/agents.
+ * Uses a simple positioned dropdown instead of Popover to work
+ * reliably inside Dialogs and Drawers without portal/z-index issues.
  */
 export function TargetSelector({
   value,
@@ -48,6 +46,20 @@ export function TargetSelector({
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setSearchValue("");
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
 
   // Filter and sort prompts (only published ones with version > 0, sorted by updatedAt desc)
   const filteredPrompts = useMemo(() => {
@@ -71,7 +83,6 @@ export function TargetSelector({
       const prompt = prompts?.find((p) => p.id === value.id);
       return prompt ? (prompt.handle ?? prompt.id) : null;
     }
-    // Both "http" and "code" agents come from the agents list
     const agent = agents?.find((a) => a.id === value.id);
     return agent?.name ?? null;
   }, [value, prompts, agents]);
@@ -95,50 +106,59 @@ export function TargetSelector({
     onCreatePrompt?.();
   };
 
-  return (
-    <Popover.Root
-      open={open}
-      onOpenChange={(e) => {
-        setOpen(e.open);
-        if (e.open) {
-          // Focus search input and reset scroll when opening
-          setTimeout(() => {
-            inputRef.current?.focus();
-            scrollContainerRef.current?.scrollTo(0, 0);
-          }, 0);
-        }
-      }}
-      positioning={{ placement: "top-start" }}
-    >
-      <Popover.Trigger asChild>
-        <Button
-          ref={triggerRef}
-          variant="outline"
-          size="sm"
-          minWidth="240px"
-          justifyContent="space-between"
-        >
-          <HStack gap={2}>
-            {value?.type === "prompt" && <BookText size={14} />}
-            {value?.type === "http" && <Globe size={14} />}
-            {value?.type === "code" && <Code size={14} />}
-            <Text>{selectedLabel ?? placeholder}</Text>
-          </HStack>
-          <ChevronDown size={14} />
-        </Button>
-      </Popover.Trigger>
+  const handleToggle = () => {
+    const next = !open;
+    setOpen(next);
+    if (next) {
+      setTimeout(() => {
+        inputRef.current?.focus();
+        scrollContainerRef.current?.scrollTo(0, 0);
+      }, 0);
+    } else {
+      setSearchValue("");
+    }
+  };
 
-      <Portal>
-        <Popover.Content width="300px" padding={0}>
-          {/* Search Input - Sticky at top */}
+  return (
+    <Box ref={containerRef} position="relative" width="fit-content">
+      <Button
+        ref={triggerRef}
+        variant="outline"
+        size="sm"
+        minWidth="240px"
+        justifyContent="space-between"
+        onClick={handleToggle}
+      >
+        <HStack gap={2}>
+          {value?.type === "prompt" && <BookText size={14} />}
+          {value?.type === "http" && <Globe size={14} />}
+          {value?.type === "code" && <Code size={14} />}
+          <Text>{selectedLabel ?? placeholder}</Text>
+        </HStack>
+        <ChevronDown size={14} />
+      </Button>
+
+      {open && (
+        <Box
+          position="absolute"
+          bottom="100%"
+          left={0}
+          width="300px"
+          marginBottom={1}
+          borderRadius="lg"
+          borderWidth="1px"
+          borderColor="border"
+          background="bg.panel"
+          boxShadow="lg"
+          zIndex={10}
+          overflow="hidden"
+        >
+          {/* Search Input */}
           <Box
             padding={2}
             borderBottomWidth="1px"
             borderColor="border"
-            position="sticky"
-            top={0}
             bg="bg"
-            zIndex={10}
           >
             <Input
               ref={inputRef}
@@ -151,7 +171,7 @@ export function TargetSelector({
 
           {/* Scrollable Content */}
           <Box ref={scrollContainerRef} maxHeight="400px" overflowY="auto">
-            {/* Agents Section - All agents (HTTP + code) */}
+            {/* Agents Section */}
             <Box>
               <Text
                 fontSize="xs"
@@ -183,7 +203,7 @@ export function TargetSelector({
                         ? "blue.50"
                         : "transparent"
                     }
-                    _hover={{ bg: "gray.100" }}
+                    _hover={{ bg: "bg.subtle" }}
                     onClick={() =>
                       handleSelect({
                         type: agent.type,
@@ -212,7 +232,7 @@ export function TargetSelector({
                 paddingX={3}
                 paddingY={2}
                 cursor="pointer"
-                _hover={{ bg: "gray.100" }}
+                _hover={{ bg: "bg.subtle" }}
                 borderTopWidth="1px"
                 borderColor="border.muted"
                 color="blue.500"
@@ -255,7 +275,7 @@ export function TargetSelector({
                         ? "blue.50"
                         : "transparent"
                     }
-                    _hover={{ bg: "gray.100" }}
+                    _hover={{ bg: "bg.subtle" }}
                     onClick={() =>
                       handleSelect({ type: "prompt", id: prompt.id })
                     }
@@ -277,7 +297,7 @@ export function TargetSelector({
                 paddingX={3}
                 paddingY={2}
                 cursor="pointer"
-                _hover={{ bg: "gray.100" }}
+                _hover={{ bg: "bg.subtle" }}
                 borderTopWidth="1px"
                 borderColor="border.muted"
                 color="blue.500"
@@ -288,8 +308,8 @@ export function TargetSelector({
               </HStack>
             </Box>
           </Box>
-        </Popover.Content>
-      </Portal>
-    </Popover.Root>
+        </Box>
+      )}
+    </Box>
   );
 }
