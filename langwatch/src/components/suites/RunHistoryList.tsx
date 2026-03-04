@@ -208,7 +208,7 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
     if (filters.passFailStatus === "pass") {
       return grouped.filter((b) => {
         const summary = computeBatchRunSummary({ batchRun: b });
-        return summary.failedCount === 0 && summary.passedCount > 0;
+        return summary.passedCount > 0 && summary.failedCount === 0 && summary.stalledCount === 0;
       });
     }
     if (filters.passFailStatus === "fail") {
@@ -220,7 +220,7 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
     if (filters.passFailStatus === "stalled") {
       return grouped.filter((b) => {
         const summary = computeBatchRunSummary({ batchRun: b });
-        return summary.stalledCount > 0 && summary.failedCount === 0;
+        return summary.stalledCount > 0;
       });
     }
 
@@ -239,7 +239,7 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
     if (filters.passFailStatus === "pass") {
       return grouped.filter((g) => {
         const summary = computeGroupSummary({ group: g });
-        return summary.failedCount === 0 && summary.passedCount > 0;
+        return summary.passedCount > 0 && summary.failedCount === 0 && summary.stalledCount === 0;
       });
     }
     if (filters.passFailStatus === "fail") {
@@ -251,7 +251,7 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
     if (filters.passFailStatus === "stalled") {
       return grouped.filter((g) => {
         const summary = computeGroupSummary({ group: g });
-        return summary.stalledCount > 0 && summary.failedCount === 0;
+        return summary.stalledCount > 0;
       });
     }
 

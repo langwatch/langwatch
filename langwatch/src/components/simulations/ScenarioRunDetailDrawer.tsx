@@ -307,6 +307,8 @@ export function ScenarioRunDetailDrawer({
                 paddingY={0}
                 paddingX={0}
                 overflowY="auto"
+                display="flex"
+                flexDirection="column"
               >
                 {/* Conversation — hidden when empty (e.g. stalled runs) */}
                 {(scenarioState.messages ?? []).length > 0 && (
@@ -327,13 +329,14 @@ export function ScenarioRunDetailDrawer({
 
                 {/* Results */}
                 <Box
-                  minHeight={(scenarioState.messages ?? []).length === 0 ? "100%" : undefined}
+                  flex={1}
+                  width="100%"
                   borderTop={(scenarioState.messages ?? []).length > 0 ? "1px" : undefined}
                   borderColor="border.muted"
                   position="relative"
                   className="group"
                   css={{
-                    "& > div:first-child": { borderRadius: 0, minHeight: "inherit" },
+                    "& > div:first-child": { borderRadius: 0, minHeight: "100%", height: "100%" },
                   }}
                 >
                   <SimulationConsole
