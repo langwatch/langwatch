@@ -5,9 +5,11 @@
  * remove button. TagList renders a list of tags with optional add/remove actions.
  */
 
-import { Box, HStack, Input, Text } from "@chakra-ui/react";
+import { HStack, Input, Text, chakra } from "@chakra-ui/react";
 import { X } from "lucide-react";
 import { useRef, useState } from "react";
+
+const StyledButton = chakra("button");
 
 type TagPillProps = {
   label: string;
@@ -28,8 +30,7 @@ export function TagPill({ label, onRemove }: TagPillProps) {
     >
       <Text fontSize="xs">#{label}</Text>
       {onRemove && (
-        <Box
-          as="button"
+        <StyledButton
           type="button"
           aria-label={`Remove ${label} tag`}
           onClick={(e: React.MouseEvent) => {
@@ -46,7 +47,7 @@ export function TagPill({ label, onRemove }: TagPillProps) {
           padding={0}
         >
           <X size={12} />
-        </Box>
+        </StyledButton>
       )}
     </HStack>
   );
@@ -104,8 +105,7 @@ export function TagList({ labels, onRemove, onAdd }: TagListProps) {
         />
       ))}
       {onAdd && !isAdding && (
-        <Box
-          as="button"
+        <StyledButton
           type="button"
           onClick={(e: React.MouseEvent) => {
             e.stopPropagation();
@@ -124,7 +124,7 @@ export function TagList({ labels, onRemove, onAdd }: TagListProps) {
           _hover={{ borderColor: "fg.muted", color: "fg" }}
         >
           + add
-        </Box>
+        </StyledButton>
       )}
       {onAdd && isAdding && (
         <Input
