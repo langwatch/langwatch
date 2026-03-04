@@ -40,7 +40,7 @@ export function RunScenarioModal({
           <Dialog.Title>Run Scenario</Dialog.Title>
         </Dialog.Header>
         <Dialog.CloseTrigger />
-        <Dialog.Body overflow="visible">
+        <Dialog.Body>
           <VStack gap={4} align="stretch">
             <Text>Select a target to run this scenario:</Text>
             <TargetSelector

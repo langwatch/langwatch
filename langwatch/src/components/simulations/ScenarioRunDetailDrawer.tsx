@@ -309,6 +309,7 @@ export function ScenarioRunDetailDrawer({
                 overflowY="auto"
                 display="flex"
                 flexDirection="column"
+                width="full"
               >
                 {/* Conversation — hidden when empty (e.g. stalled runs) */}
                 {(scenarioState.messages ?? []).length > 0 && (
@@ -330,7 +331,7 @@ export function ScenarioRunDetailDrawer({
                 {/* Results */}
                 <Box
                   flex={1}
-                  width="100%"
+                  width="full"
                   borderTop={(scenarioState.messages ?? []).length > 0 ? "1px" : undefined}
                   borderColor="border.muted"
                   position="relative"
