@@ -355,7 +355,7 @@ const detectArrayPatterns = (
  * 2. Same set of relative keys across all items
  */
 const isValidArrayPattern = (
-  indexMap: Map<number, Map<string, NormalizedAttributes[string]>>,
+  indexMap: Map<number, Map<string, unknown>>,
 ): boolean => {
   const indices = Array.from(indexMap.keys()).sort((a, b) => a - b);
 

@@ -1,6 +1,6 @@
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
-import { SpanNormalizationPipelineService } from "~/server/app-layer/traces/span-normalization.service";
-import { traceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
+import { SpanNormalizationPipelineService, enrichRagContextIds } from "~/server/app-layer/traces/span-normalization.service";
+import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import {
   estimateCost,
@@ -28,11 +28,20 @@ export type { TraceSummaryData };
 
 const COMPUTED_IO_SCHEMA_VERSION = "2025-12-18" as const;
 
+<<<<<<< HEAD
 function safeParsStringArray(value: string | undefined): string[] {
   if (!value) return [];
   try {
     const parsed: unknown = JSON.parse(value);
     return Array.isArray(parsed) ? (parsed as string[]) : [];
+=======
+function parseJsonStringArray(raw: string | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item): item is string => typeof item === "string");
+>>>>>>> 200485092 (refactor, clean, etc)
   } catch {
     return [];
   }
@@ -538,6 +547,7 @@ export function applySpanToSummary(
   // PII redaction status tracking — accumulate span IDs by severity
   const piiStatus =
     span.spanAttributes[ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_STATUS];
+<<<<<<< HEAD
   if (piiStatus === "partial") {
     const key = ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_PARTIAL_SPAN_IDS;
     const existing = mergedAttributes[key];
@@ -550,6 +560,16 @@ export function applySpanToSummary(
     const ids = safeParsStringArray(existing);
     ids.push(span.spanId);
     mergedAttributes[key] = JSON.stringify(ids);
+=======
+  const piiKey =
+    piiStatus === "partial" ? ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_PARTIAL_SPAN_IDS
+    : piiStatus === "none" ? ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_SKIPPED_SPAN_IDS
+    : null;
+  if (piiKey) {
+    const ids = parseJsonStringArray(mergedAttributes[piiKey]);
+    ids.push(span.spanId);
+    mergedAttributes[piiKey] = JSON.stringify(ids);
+>>>>>>> 200485092 (refactor, clean, etc)
   }
 
   return {
@@ -581,7 +601,8 @@ export function applySpanToSummary(
   };
 }
 
-const spanNormalizationPipelineService = new SpanNormalizationPipelineService();
+const spanNormalizationPipelineService = SpanNormalizationPipelineService.create();
+const traceIOExtractionService = TraceIOExtractionService.create();
 
 /**
  * Creates a FoldProjection definition for trace summaries.
@@ -645,6 +666,7 @@ export function createTraceSummaryFoldProjection({
             event.data.resource,
             event.data.instrumentationScope,
           );
+        enrichRagContextIds(normalizedSpan);
 
         const updatedState = applySpanToSummary(state, normalizedSpan);
 

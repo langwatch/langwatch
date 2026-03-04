@@ -396,12 +396,44 @@ function extractEvalOutput(output: unknown): unknown {
 
   // Prefer structured object (from structured output / JSON mode)
   if (obj.object !== undefined && obj.object !== null) {
-    return typeof obj.object === "string" ? obj.object : JSON.stringify(obj.object);
+    return obj.object;
   }
   // Fall back to text
   if (typeof obj.text === "string" && obj.text.length > 0) {
     return obj.text;
   }
+  return null;
+}
+
+/**
+ * Normalizes message content to a string.
+ * Handles string, array of content parts, and object with text/content fields.
+ */
+function normalizeContentToString(content: unknown): string | null {
+  if (typeof content === "string" && content.length > 0) return content;
+
+  if (Array.isArray(content)) {
+    const parts = content
+      .map((part) => {
+        if (typeof part === "string") return part;
+        if (part && typeof part === "object") {
+          const p = part as Record<string, unknown>;
+          if (typeof p.text === "string") return p.text;
+          if (typeof p.content === "string") return p.content;
+        }
+        return null;
+      })
+      .filter(Boolean);
+    const joined = parts.join("\n");
+    return joined.length > 0 ? joined : null;
+  }
+
+  if (content && typeof content === "object") {
+    const obj = content as Record<string, unknown>;
+    if (typeof obj.text === "string" && obj.text.length > 0) return obj.text;
+    if (typeof obj.content === "string" && obj.content.length > 0) return obj.content;
+  }
+
   return null;
 }
 
@@ -416,9 +448,10 @@ function extractSystemPromptFromBody(
   for (const msg of body.messages) {
     if (!msg || typeof msg !== "object") continue;
     const m = msg as Record<string, unknown>;
-    if (m.role === "system" && typeof m.content === "string" && m.content.length > 0) {
-      return m.content;
-    }
+    if (m.role !== "system") continue;
+
+    const text = normalizeContentToString(m.content);
+    if (text) return text;
   }
   return null;
 }

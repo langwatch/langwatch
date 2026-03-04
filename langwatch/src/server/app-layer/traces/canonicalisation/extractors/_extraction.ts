@@ -212,8 +212,8 @@ export const recordValueType = (
   type: string,
 ): void => {
   const existing = ctx.out[ATTR_KEYS.LANGWATCH_RESERVED_VALUE_TYPES];
-  if (Array.isArray(existing)) {
-    (existing as string[]).push(`${attrKey}=${type}`);
+  if (Array.isArray(existing) && existing.every((x) => typeof x === "string")) {
+    existing.push(`${attrKey}=${type}`);
   } else {
     ctx.setAttr(ATTR_KEYS.LANGWATCH_RESERVED_VALUE_TYPES, [`${attrKey}=${type}`]);
   }
@@ -227,7 +227,7 @@ export const recordValueType = (
 export const extractErrorInfo = (ctx: ExtractorContext): void => {
   const { attrs } = ctx.bag;
 
-  if (ctx.out[ATTR_KEYS.ERROR_TYPE] !== undefined) return;
+  const errorTypeAlreadySet = ctx.out[ATTR_KEYS.ERROR_TYPE] !== undefined;
 
   const exceptionType = attrs.get(ATTR_KEYS.EXCEPTION_TYPE);
   const exceptionMsg = attrs.get(ATTR_KEYS.EXCEPTION_MESSAGE);
@@ -252,7 +252,9 @@ export const extractErrorInfo = (ctx: ExtractorContext): void => {
 
   // Priority 2: Exception type and message
   if (isNonEmptyString(exceptionType) && isNonEmptyString(exceptionMsg)) {
-    ctx.setAttrIfAbsent(ATTR_KEYS.ERROR_TYPE, exceptionType);
+    if (!errorTypeAlreadySet) {
+      ctx.setAttrIfAbsent(ATTR_KEYS.ERROR_TYPE, exceptionType);
+    }
     ctx.setAttrIfAbsent(ATTR_KEYS.ERROR_MESSAGE, exceptionMsg);
     ctx.recordRule("error:exception");
     return;

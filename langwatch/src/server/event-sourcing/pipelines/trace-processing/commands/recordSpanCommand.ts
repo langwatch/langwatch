@@ -20,7 +20,7 @@ import {
 } from "../schemas/constants";
 import type { SpanReceivedEvent } from "../schemas/events";
 import type { OtlpSpan } from "../schemas/otlp";
-import { OtlpSpanCostEnrichmentService } from "~/server/app-layer/traces/span-cost-enrichment.service";
+import { OtlpSpanCostEnrichmentService, createCostEnrichmentDeps } from "~/server/app-layer/traces/span-cost-enrichment.service";
 import { OtlpSpanPiiRedactionService } from "~/server/app-layer/traces/span-pii-redaction.service";
 import { TraceRequestUtils } from "../utils/traceRequest.utils";
 
@@ -41,17 +41,16 @@ export interface RecordSpanCommandDependencies {
   };
 }
 
-/** Cached default dependencies, lazily initialized */
-let cachedDefaultDependencies: RecordSpanCommandDependencies | null = null;
-
-function getDefaultDependencies(): RecordSpanCommandDependencies {
-  if (!cachedDefaultDependencies) {
-    cachedDefaultDependencies = {
-      piiRedactionService: new OtlpSpanPiiRedactionService(),
-      costEnrichmentService: new OtlpSpanCostEnrichmentService(),
-    };
-  }
-  return cachedDefaultDependencies;
+function createDefaultDependencies(): RecordSpanCommandDependencies {
+  // Lazily require prisma only when defaults are needed (i.e. production path).
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { prisma } = require("~/server/db") as { prisma: import("@prisma/client").PrismaClient };
+  return {
+    piiRedactionService: OtlpSpanPiiRedactionService.create(),
+    costEnrichmentService: OtlpSpanCostEnrichmentService.create(
+      createCostEnrichmentDeps(prisma),
+    ),
+  };
 }
 
 /**
@@ -75,8 +74,8 @@ export class RecordSpanCommand implements CommandHandler<
   );
   private readonly deps: RecordSpanCommandDependencies;
 
-  constructor(deps: Partial<RecordSpanCommandDependencies> = {}) {
-    this.deps = { ...getDefaultDependencies(), ...deps };
+  constructor(deps?: RecordSpanCommandDependencies) {
+    this.deps = deps ?? createDefaultDependencies();
   }
 
   async handle(

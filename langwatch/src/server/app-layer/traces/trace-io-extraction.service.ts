@@ -30,6 +30,10 @@ export class TraceIOExtractionService {
     "langwatch.trace-processing.io-extraction",
   );
 
+  static create(): TraceIOExtractionService {
+    return new TraceIOExtractionService();
+  }
+
   /**
    * Extracts the first meaningful input from the trace with rich JSON data.
    * Uses span tree traversal to find the topmost input, filtering out
@@ -208,69 +212,50 @@ export class TraceIOExtractionService {
    *
    * @returns ExtractedIO with both raw JSON and text representation
    */
+  private static readonly IO_ATTR_KEYS = {
+    input: {
+      genAi: ATTR_KEYS.GEN_AI_INPUT_MESSAGES,
+      langwatch: ATTR_KEYS.LANGWATCH_INPUT,
+    },
+    output: {
+      genAi: ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES,
+      langwatch: ATTR_KEYS.LANGWATCH_OUTPUT,
+    },
+  } as const;
+
   extractRichIOFromSpan(
     span: NormalizedSpan,
     type: "input" | "output",
   ): ExtractedIO | null {
     const attrs = span.spanAttributes;
+    const keys = TraceIOExtractionService.IO_ATTR_KEYS[type];
 
-    if (type === "input") {
-      // Priority 1: GenAI input messages
-      const genAiInput = attrs[ATTR_KEYS.GEN_AI_INPUT_MESSAGES];
-      if (genAiInput !== undefined && genAiInput !== null) {
-        const text = messagesToText(genAiInput, "input");
-        if (text) {
-          logger.debug(
-            { spanId: span.spanId, source: "gen_ai.input.messages" },
-            "Extracted input from GenAI messages",
-          );
-          return { raw: genAiInput, text, source: "gen_ai" };
-        }
+    // Priority 1: GenAI messages
+    const genAiValue = attrs[keys.genAi];
+    if (genAiValue !== undefined && genAiValue !== null) {
+      const text = messagesToText(genAiValue, type);
+      if (text) {
+        logger.debug(
+          { spanId: span.spanId, source: keys.genAi },
+          `Extracted ${type} from GenAI messages`,
+        );
+        return { raw: genAiValue, text, source: "gen_ai" };
       }
+    }
 
-      // Priority 2: LangWatch input
-      const langwatchInput = attrs[ATTR_KEYS.LANGWATCH_INPUT];
-      if (langwatchInput !== undefined && langwatchInput !== null) {
-        const text =
-          typeof langwatchInput === "string"
-            ? langwatchInput
-            : messagesToText(langwatchInput, "input");
-        if (text) {
-          logger.debug(
-            { spanId: span.spanId, source: "langwatch.input" },
-            "Extracted input from LangWatch attribute",
-          );
-          return { raw: langwatchInput, text, source: "langwatch" };
-        }
-      }
-    } else {
-      // Priority 1: GenAI output messages
-      const genAiOutput = attrs[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES];
-      if (genAiOutput !== undefined && genAiOutput !== null) {
-        const text = messagesToText(genAiOutput, "output");
-        if (text) {
-          logger.debug(
-            { spanId: span.spanId, source: "gen_ai.output.messages" },
-            "Extracted output from GenAI messages",
-          );
-          return { raw: genAiOutput, text, source: "gen_ai" };
-        }
-      }
-
-      // Priority 2: LangWatch output
-      const langwatchOutput = attrs[ATTR_KEYS.LANGWATCH_OUTPUT];
-      if (langwatchOutput !== undefined && langwatchOutput !== null) {
-        const text =
-          typeof langwatchOutput === "string"
-            ? langwatchOutput
-            : messagesToText(langwatchOutput, "output");
-        if (text) {
-          logger.debug(
-            { spanId: span.spanId, source: "langwatch.output" },
-            "Extracted output from LangWatch attribute",
-          );
-          return { raw: langwatchOutput, text, source: "langwatch" };
-        }
+    // Priority 2: LangWatch attribute
+    const langwatchValue = attrs[keys.langwatch];
+    if (langwatchValue !== undefined && langwatchValue !== null) {
+      const text =
+        typeof langwatchValue === "string"
+          ? langwatchValue
+          : messagesToText(langwatchValue, type);
+      if (text) {
+        logger.debug(
+          { spanId: span.spanId, source: keys.langwatch },
+          `Extracted ${type} from LangWatch attribute`,
+        );
+        return { raw: langwatchValue, text, source: "langwatch" };
       }
     }
 
@@ -357,8 +342,6 @@ export class TraceIOExtractionService {
   }
 }
 
-export const traceIOExtractionService = new TraceIOExtractionService();
-
 /**
  * Represents a span organized in a tree structure with its children.
  */
@@ -384,42 +367,30 @@ export interface ExtractedIO {
   source: "langwatch" | "gen_ai";
 }
 
-const getSpanType = (span: NormalizedSpan): string => {
+function getSpanType(span: NormalizedSpan): string {
   const type = span.spanAttributes[ATTR_KEYS.SPAN_TYPE];
   return typeof type === "string" ? type : "unknown";
-};
+}
 
-const shouldExcludeSpan = (span: NormalizedSpan): boolean => {
+function shouldExcludeSpan(span: NormalizedSpan): boolean {
   const type = getSpanType(span);
   return type === "evaluation" || type === "guardrail";
-};
+}
 
-/**
- * Converts a message object/array to a readable text representation.
- *
- * @param messages - The raw message data to convert
- * @param mode - "input" extracts only last user message, "output" concatenates all
- */
-const messagesToText = (
+function messagesToText(
   messages: unknown,
   mode: "input" | "output" = "output",
-): string | null => {
+): string | null {
   if (!messages) return null;
 
-  // If it's a plain string, return it
-  if (typeof messages === "string") {
-    return messages;
-  }
+  if (typeof messages === "string") return messages;
 
-  // If it's an array of messages
   if (Array.isArray(messages)) {
-    // For input mode, extract only the last user message
     if (mode === "input") {
       const lastUserText = extractLastUserMessageText(messages);
       if (lastUserText) return lastUserText;
     }
 
-    // Default: concatenate all messages
     const texts: string[] = [];
     for (const msg of messages) {
       const text = extractMessageContentText(msg);
@@ -428,7 +399,5 @@ const messagesToText = (
     return texts.length > 0 ? texts.join("\n") : null;
   }
 
-  // If it's a single message object
-  const text = extractMessageContentText(messages);
-  return text;
-};
+  return extractMessageContentText(messages);
+}

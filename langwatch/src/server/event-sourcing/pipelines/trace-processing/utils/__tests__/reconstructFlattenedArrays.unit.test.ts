@@ -152,13 +152,15 @@ describe("reconstructFlattenedArrays", () => {
       const result = reconstructFlattenedArrays({
         "metrics.0.name": "latency",
         "metrics.0.value": 42.5,
+        "metrics.0.enabled": true,
         "metrics.1.name": "count",
         "metrics.1.value": 100,
+        "metrics.1.enabled": false,
       });
 
       expect(result.metrics).toEqual([
-        { name: "latency", value: 42.5 },
-        { name: "count", value: 100 },
+        { name: "latency", value: 42.5, enabled: true },
+        { name: "count", value: 100, enabled: false },
       ]);
     });
   });

@@ -875,8 +875,8 @@ describe("MastraExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.LANGWATCH_OUTPUT]).toBe(
-        JSON.stringify({ score: 9, reason: "Accurate translation" }),
+      expect(ctx.out[ATTR_KEYS.LANGWATCH_OUTPUT]).toEqual(
+        { score: 9, reason: "Accurate translation" },
       );
     });
 

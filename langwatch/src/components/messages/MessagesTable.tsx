@@ -1075,7 +1075,8 @@ export function MessagesTable({
   };
 
   const toggleAllTraces = () => {
-    if (selectedTraceIds.length === displayData?.groups.length) {
+    const totalTraceCount = displayData?.groups.reduce((sum, g) => sum + g.length, 0) ?? 0;
+    if (selectedTraceIds.length === totalTraceCount) {
       setSelectedTraceIds([]);
     } else {
       setSelectedTraceIds(
