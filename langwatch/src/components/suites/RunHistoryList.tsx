@@ -18,7 +18,6 @@ import { useTargetNameMap } from "~/hooks/useTargetNameMap";
 import { parseSuiteTargets } from "~/server/suites/types";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
 import { api } from "~/utils/api";
-import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { useDrawer } from "~/hooks/useDrawer";
 import type { Period } from "~/components/PeriodSelector";
 import { RunHistoryFilters } from "./RunHistoryFilters";
@@ -366,17 +365,8 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
 
   return (
     <VStack align="stretch" gap={0} flex={1}>
-      {/* Last activity timestamp */}
-      {lastActivityTimestamp && (
-        <Box paddingX={6} paddingBottom={3}>
-          <Text fontSize="xs" color="fg.muted">
-            {formatTimeAgoCompact(lastActivityTimestamp)}
-          </Text>
-        </Box>
-      )}
-
       {/* Filter bar with group-by selector */}
-      <Box paddingX={6} paddingBottom={4}>
+      <Box paddingX={6} paddingY={4}>
         <RunHistoryFilters
           scenarioOptions={scenarioOptions}
           filters={filters}
@@ -396,6 +386,11 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
       )}
 
       {/* Run history rows — no overflow here; parent provides the scrollport for sticky headers */}
+      {(groupBy === "none" ? batchRuns.length : groups.length) === 0 && (filters.scenarioId || filters.passFailStatus) ? (
+        <Box paddingX={6} paddingY={8} textAlign="center">
+          <Text color="fg.muted">No runs match the selected filters.</Text>
+        </Box>
+      ) : (
       <VStack align="stretch" gap={0} flex={1}>
         {groupBy === "none"
           ? batchRuns.map((batchRun) => {
@@ -430,6 +425,7 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
               );
             })}
       </VStack>
+      )}
 
       {/* Footer */}
       <RunHistoryFooter totals={totals} />
