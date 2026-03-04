@@ -71,7 +71,7 @@ export function eventToRecord<EventType extends Event>(
     EventVersion: event.version,
     EventPayload: event.data ?? {},
     ProcessingTraceparent: event.metadata?.processingTraceparent ?? "",
-    IdempotencyKey: event.idempotencyKey ?? "",
+    IdempotencyKey: event.idempotencyKey || event.id,
   };
 }
 

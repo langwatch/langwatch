@@ -110,10 +110,10 @@ describe("eventToRecord", () => {
   });
 
   describe("when event has no idempotencyKey", () => {
-    it("defaults IdempotencyKey to empty string", () => {
-      const event = makeEvent();
+    it("defaults IdempotencyKey to EventId for RMT uniqueness", () => {
+      const event = makeEvent({ id: "event_abc123" });
       const record = eventToRecord(event);
-      expect(record.IdempotencyKey).toBe("");
+      expect(record.IdempotencyKey).toBe("event_abc123");
     });
   });
 });

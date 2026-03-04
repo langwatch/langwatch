@@ -55,7 +55,6 @@ export interface SimulationRunStateData {
   UpdatedAt: number;
   FinishedAt: number | null;
   ArchivedAt: number | null;
-  /** Transient: tracks last snapshot occurredAt for out-of-order protection. Not persisted to CH. */
   LastSnapshotOccurredAt: number;
 }
 
