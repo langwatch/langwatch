@@ -268,3 +268,17 @@ span[data-highlight]::after {
 .rich-textarea-position-relative {
     position: relative!important;
 }
+
+/* Trace table row highlight for newly-arrived traces */
+@keyframes trace-highlight-fade {
+    from {
+        background-color: rgba(59, 130, 246, 0.1);
+    }
+    to {
+        background-color: transparent;
+    }
+}
+
+.trace-highlight-new td {
+    animation: trace-highlight-fade 2s ease-out;
+}

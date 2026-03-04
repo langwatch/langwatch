@@ -16,7 +16,7 @@ export const ATTR_KEYS = {
   GEN_AI_RESPONSE_MODEL: "gen_ai.response.model",
   GEN_AI_RESPONSE_ID: "gen_ai.response.id",
   GEN_AI_RESPONSE_FINISH_REASONS: "gen_ai.response.finish_reasons",
-  GEN_AI_REQUEST_SYSTEM_INSTRUCTION: "gen_ai.request.system_instruction",
+  GEN_AI_SYSTEM_INSTRUCTIONS: "gen_ai.system_instructions",
   GEN_AI_REQUEST_TEMPERATURE: "gen_ai.request.temperature",
   GEN_AI_REQUEST_MAX_TOKENS: "gen_ai.request.max_tokens",
   GEN_AI_REQUEST_TOP_P: "gen_ai.request.top_p",
@@ -37,6 +37,29 @@ export const ATTR_KEYS = {
   GEN_AI_AGENT_DESCRIPTION: "gen_ai.agent.description",
   GEN_AI_DATA_SOURCE_ID: "gen_ai.data_source.id",
   GEN_AI_TOOL_DEFINITIONS: "gen_ai.tool.definitions",
+
+  // GenAI agent attributes (OTel semconv)
+  GEN_AI_AGENT_VERSION: "gen_ai.agent.version",
+
+  // GenAI request attributes (OTel semconv)
+  GEN_AI_REQUEST_TOP_K: "gen_ai.request.top_k",
+
+  // GenAI tool attributes (OTel semconv)
+  GEN_AI_TOOL_CALL_ID: "gen_ai.tool.call.id",
+  GEN_AI_TOOL_NAME: "gen_ai.tool.name",
+  GEN_AI_TOOL_DESCRIPTION: "gen_ai.tool.description",
+  GEN_AI_TOOL_TYPE: "gen_ai.tool.type",
+  GEN_AI_TOOL_CALL_ARGUMENTS: "gen_ai.tool.call.arguments",
+  GEN_AI_TOOL_CALL_RESULT: "gen_ai.tool.call.result",
+
+  // GenAI retrieval attributes (OTel semconv)
+  GEN_AI_RETRIEVAL_DOCUMENTS: "gen_ai.retrieval.documents",
+  GEN_AI_RETRIEVAL_QUERY_TEXT: "gen_ai.retrieval.query.text",
+
+  // GenAI evaluation event attributes (OTel semconv)
+  GEN_AI_EVALUATION_NAME: "gen_ai.evaluation.name",
+  GEN_AI_EVALUATION_SCORE_LABEL: "gen_ai.evaluation.score.label",
+  GEN_AI_EVALUATION_SCORE_VALUE: "gen_ai.evaluation.score.value",
 
   // Legacy GenAI attributes
   GEN_AI_PROMPT: "gen_ai.prompt",
@@ -110,6 +133,7 @@ export const ATTR_KEYS = {
     "langwatch.reserved.pii_redaction_partial_span_ids",
   LANGWATCH_RESERVED_PII_REDACTION_SKIPPED_SPAN_IDS:
     "langwatch.reserved.pii_redaction_skipped_span_ids",
+  LANGWATCH_RESERVED_EVALUATIONS: "langwatch.reserved.evaluations",
 
   // Error attributes
   ERROR_TYPE: "error.type",
@@ -146,10 +170,23 @@ export const ATTR_KEYS = {
   // Logfire attributes
   RAW_INPUT: "raw_input",
 
+  // Extended GenAI usage tokens
+  GEN_AI_USAGE_REASONING_TOKENS: "gen_ai.usage.reasoning_tokens",
+  GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS: "gen_ai.usage.cache_read.input_tokens",
+  GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS:
+    "gen_ai.usage.cache_creation.input_tokens",
+  GEN_AI_USAGE_CACHED_INPUT_TOKENS: "gen_ai.usage.cached_input_tokens", // Mastra non-standard
+
   // Mastra attributes
   MASTRA_INPUT: "input",
   MASTRA_OUTPUT: "mastra.output",
   MASTRA_SPAN_TYPE: "mastra.span.type",
+  MASTRA_AGENT_RUN_INPUT: "mastra.agent_run.input",
+  MASTRA_AGENT_RUN_OUTPUT: "mastra.agent_run.output",
+  MASTRA_MODEL_STEP_OUTPUT: "mastra.model_step.output",
+  MASTRA_METADATA_THREAD_ID: "mastra.metadata.threadId",
+  MASTRA_MODEL_STEP_INPUT: "mastra.model_step.input",
+  MASTRA_METADATA_PREFIX: "mastra.metadata.",
 } as const;
 
 export const SPAN_TYPE_TO_GEN_AI_OP: Record<string, string> = {

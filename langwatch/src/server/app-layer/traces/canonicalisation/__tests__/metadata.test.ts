@@ -98,15 +98,14 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
         stubSpan as any,
       );
 
-      expect(result.attributes["langwatch.labels"]).toBe(
-        JSON.stringify(["prod", "v2"]),
-      );
+      expect(result.attributes["langwatch.labels"]).toEqual(["prod", "v2"]);
     });
 
-    it("preserves raw metadata attribute in output (uses get, not take)", () => {
+    it("hoists custom fields from metadata blob as metadata.{key} keys", () => {
       const metadata = JSON.stringify({
         user_id: "user-42",
         custom_field: "value",
+        request_source: "api",
       });
       const result = service.canonicalize(
         { metadata },
@@ -114,8 +113,28 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
         stubSpan as any,
       );
 
-      // metadata is read with get() (not take()), so it stays in remaining()
-      expect(result.attributes["metadata"]).toBe(metadata);
+      // metadata blob is consumed (take), raw blob no longer present
+      expect(result.attributes["metadata"]).toBeUndefined();
+      // Reserved fields promoted to canonical keys
+      expect(result.attributes["langwatch.user.id"]).toBe("user-42");
+      // Custom fields hoisted as metadata.{key}
+      expect(result.attributes["metadata.custom_field"]).toBe("value");
+      expect(result.attributes["metadata.request_source"]).toBe("api");
+    });
+
+    it("hoists nested objects as JSON strings", () => {
+      const metadata = JSON.stringify({
+        nested: { foo: "bar", count: 42 },
+      });
+      const result = service.canonicalize(
+        { metadata },
+        [],
+        stubSpan as any,
+      );
+
+      expect(result.attributes["metadata.nested"]).toBe(
+        JSON.stringify({ foo: "bar", count: 42 }),
+      );
     });
   });
 
@@ -165,9 +184,7 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
         stubSpan as any,
       );
 
-      expect(result.attributes["langwatch.labels"]).toBe(
-        JSON.stringify(["beta"]),
-      );
+      expect(result.attributes["langwatch.labels"]).toEqual(["beta"]);
     });
 
     it("prefers metadata over langwatch.metadata when both present", () => {
@@ -237,14 +254,12 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
         stubSpan as any,
       );
 
-      expect(result.attributes["langwatch.labels"]).toBe(
-        JSON.stringify(["explicit"]),
-      );
+      expect(result.attributes["langwatch.labels"]).toEqual(["explicit"]);
     });
   });
 
   describe("when metadata JSON is malformed", () => {
-    it("preserves raw metadata string when JSON is invalid", () => {
+    it("stores raw string as metadata._raw when JSON is invalid", () => {
       const result = service.canonicalize(
         {
           metadata: "not valid json {{{",
@@ -253,13 +268,13 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
         stubSpan as any,
       );
 
-      // metadata stays in remaining as-is since parse fails
-      expect(result.attributes["metadata"]).toBe("not valid json {{{");
+      // Invalid JSON: stored as metadata._raw (string preserved)
+      expect(result.attributes["metadata._raw"]).toBe("not valid json {{{");
       // No promoted fields
       expect(result.attributes["langwatch.user.id"]).toBeUndefined();
     });
 
-    it("ignores metadata when value is not a JSON object", () => {
+    it("stores array metadata as metadata._raw when value is not a JSON object", () => {
       const result = service.canonicalize(
         {
           metadata: JSON.stringify([1, 2, 3]),
@@ -270,8 +285,10 @@ describe("CanonicalizeSpanAttributesService — metadata handling", () => {
 
       // Array is not a JSON object, so no field promotion
       expect(result.attributes["langwatch.user.id"]).toBeUndefined();
-      // metadata still preserved in remaining
-      expect(result.attributes["metadata"]).toBe(JSON.stringify([1, 2, 3]));
+      // Array stored as metadata._raw
+      expect(result.attributes["metadata._raw"]).toBe(
+        JSON.stringify([1, 2, 3]),
+      );
     });
   });
 

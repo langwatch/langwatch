@@ -1,4 +1,4 @@
-import { unflatten } from "flat";
+import { safeUnflatten } from "~/utils/safeUnflatten";
 import {
   flattenSpanTree,
   organizeSpansIntoTree,
@@ -196,8 +196,7 @@ export const setNestedProperty = (
   path: string,
   value: any,
 ): void => {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-  const unflattened = unflatten({ [path]: value }) as Record<string, any>;
+  const unflattened = safeUnflatten({ [path]: value }) as Record<string, any>;
 
   // Merge the unflattened object into the target object
   const keys = Object.keys(unflattened);

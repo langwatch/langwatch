@@ -8,6 +8,7 @@ import type { OrganizationService } from "./organizations/organization.service";
 import type { ProjectService } from "./projects/project.service";
 import type { SpanStorageService } from "./traces/span-storage.service";
 import type { TokenizerService } from "./traces/tokenizer.service";
+import type { TraceRequestCollectionService } from "./traces/trace-request-collection.service";
 import type { TraceSummaryService } from "./traces/trace-summary.service";
 import type { PlanProvider } from "./subscription/plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
@@ -21,6 +22,7 @@ export interface AppDependencies {
   traces: {
     summary: TraceSummaryService;
     spans: SpanStorageService;
+    collection: TraceRequestCollectionService;
   };
   evaluations: {
     runs: EvaluationRunService;
