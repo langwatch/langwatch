@@ -16,7 +16,7 @@ export function buildProjectionTimelines({
 }: ProjectionTimelineTypes["Input"] & {
   pipelineAggregateTypes: Record<string, string>;
 }): ProjectionTimelineTypes["Timeline"][] {
-  const orderedEvents = [...events].sort((a, b) => a.timestamp - b.timestamp);
+  const orderedEvents = [...events].sort((a, b) => a.createdAt - b.createdAt);
 
   return projections.map((projection) => {
     const fold = projection.definition;

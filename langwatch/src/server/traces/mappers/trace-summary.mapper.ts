@@ -407,7 +407,7 @@ export function mapTraceSummaryToTrace(
     timestamps: {
       started_at: summary.createdAt,
       inserted_at: summary.createdAt,
-      updated_at: summary.lastUpdatedAt,
+      updated_at: summary.updatedAt,
     },
     input: parseComputedInput(summary.computedInput, summary.attributes),
     output: parseComputedOutput(summary.computedOutput, summary.attributes),
