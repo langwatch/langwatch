@@ -1,25 +1,28 @@
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
-import { SpanNormalizationPipelineService, enrichRagContextIds } from "~/server/app-layer/traces/span-normalization.service";
+import {
+	enrichRagContextIds,
+	SpanNormalizationPipelineService,
+} from "~/server/app-layer/traces/span-normalization.service";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import {
-  estimateCost,
-  matchingLLMModelCost,
+	estimateCost,
+	matchingLLMModelCost,
 } from "~/server/background/workers/collector/cost";
 import type {
-  FoldProjectionDefinition,
-  FoldProjectionStore,
+	FoldProjectionDefinition,
+	FoldProjectionStore,
 } from "~/server/event-sourcing/projections";
 import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
 import {
-  TRACE_PROCESSING_EVENT_TYPES,
-  TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
+	TRACE_PROCESSING_EVENT_TYPES,
+	TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
 } from "../schemas/constants";
 import type { TraceProcessingEvent } from "../schemas/events";
 import {
-  isSatisfactionScoreAssignedEvent,
-  isSpanReceivedEvent,
-  isTopicAssignedEvent,
+	isSatisfactionScoreAssignedEvent,
+	isSpanReceivedEvent,
+	isTopicAssignedEvent,
 } from "../schemas/events";
 import type { NormalizedSpan } from "../schemas/spans";
 import { NormalizedStatusCode as StatusCode } from "../schemas/spans";
@@ -28,333 +31,325 @@ export type { TraceSummaryData };
 
 const COMPUTED_IO_SCHEMA_VERSION = "2025-12-18" as const;
 
-<<<<<<< HEAD
-function safeParsStringArray(value: string | undefined): string[] {
-  if (!value) return [];
-  try {
-    const parsed: unknown = JSON.parse(value);
-    return Array.isArray(parsed) ? (parsed as string[]) : [];
-=======
 function parseJsonStringArray(raw: string | undefined): string[] {
-  if (!raw) return [];
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((item): item is string => typeof item === "string");
->>>>>>> 200485092 (refactor, clean, etc)
-  } catch {
-    return [];
-  }
+	if (!raw) return [];
+	try {
+		const parsed: unknown = JSON.parse(raw);
+		if (!Array.isArray(parsed)) return [];
+		return parsed.filter((item): item is string => typeof item === "string");
+	} catch {
+		return [];
+	}
 }
 
 const OUTPUT_SOURCE = {
-  EXPLICIT: "explicit",
-  INFERRED: "inferred",
+	EXPLICIT: "explicit",
+	INFERRED: "inferred",
 } as const;
 
 const FIRST_TOKEN_EVENTS = new Set([
-  "gen_ai.content.chunk",
-  "first_token",
-  "llm.first_token",
+	"gen_ai.content.chunk",
+	"first_token",
+	"llm.first_token",
 ]);
 
 const LAST_TOKEN_EVENTS = new Set([
-  "gen_ai.content.chunk",
-  "last_token",
-  "llm.last_token",
+	"gen_ai.content.chunk",
+	"last_token",
+	"llm.last_token",
 ]);
 
 const STANDARD_RESOURCE_PREFIXES = [
-  "host.",
-  "process.",
-  "telemetry.",
-  "service.",
-  "os.",
-  "container.",
-  "k8s.",
-  "cloud.",
-  "deployment.",
-  "device.",
-  "faas.",
-  "webengine.",
+	"host.",
+	"process.",
+	"telemetry.",
+	"service.",
+	"os.",
+	"container.",
+	"k8s.",
+	"cloud.",
+	"deployment.",
+	"device.",
+	"faas.",
+	"webengine.",
 ] as const;
 
 const isValidTimestamp = (ts: number | undefined | null): ts is number =>
-  typeof ts === "number" && ts > 0 && Number.isFinite(ts);
+	typeof ts === "number" && ts > 0 && Number.isFinite(ts);
 
 function extractModelsFromSpan(span: NormalizedSpan): string[] {
-  const models: string[] = [];
-  const attrs = span.spanAttributes;
-  const candidates = [
-    attrs[ATTR_KEYS.GEN_AI_RESPONSE_MODEL],
-    attrs[ATTR_KEYS.GEN_AI_REQUEST_MODEL],
-  ];
+	const models: string[] = [];
+	const attrs = span.spanAttributes;
+	const candidates = [
+		attrs[ATTR_KEYS.GEN_AI_RESPONSE_MODEL],
+		attrs[ATTR_KEYS.GEN_AI_REQUEST_MODEL],
+	];
 
-  for (const model of candidates) {
-    if (typeof model === "string" && model) {
-      models.push(model);
-    }
-  }
+	for (const model of candidates) {
+		if (typeof model === "string" && model) {
+			models.push(model);
+		}
+	}
 
-  return models;
+	return models;
 }
 
 interface SpanTokenMetrics {
-  promptTokens: number;
-  completionTokens: number;
-  cost: number;
-  estimated: boolean;
+	promptTokens: number;
+	completionTokens: number;
+	cost: number;
+	estimated: boolean;
 }
 
 function extractTokenMetricsFromSpan(span: NormalizedSpan): SpanTokenMetrics {
-  const attrs = span.spanAttributes;
-  let promptTokens = 0;
-  let completionTokens = 0;
-  let cost = 0;
-  let estimated = false;
+	const attrs = span.spanAttributes;
+	let promptTokens = 0;
+	let completionTokens = 0;
+	let cost = 0;
+	let estimated = false;
 
-  // Token counts (canonicalization guarantees these canonical keys)
-  const inputTokens = attrs[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS];
-  if (typeof inputTokens === "number" && inputTokens > 0) {
-    promptTokens = inputTokens;
-  }
+	// Token counts (canonicalization guarantees these canonical keys)
+	const inputTokens = attrs[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS];
+	if (typeof inputTokens === "number" && inputTokens > 0) {
+		promptTokens = inputTokens;
+	}
 
-  const outputTokens = attrs[ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS];
-  if (typeof outputTokens === "number" && outputTokens > 0) {
-    completionTokens = outputTokens;
-  }
+	const outputTokens = attrs[ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS];
+	if (typeof outputTokens === "number" && outputTokens > 0) {
+		completionTokens = outputTokens;
+	}
 
-  // Cost: compute from model pricing instead of reading SDK cost directly
-  const models = extractModelsFromSpan(span);
-  const model = models[0];
-  if (model && (promptTokens > 0 || completionTokens > 0)) {
-    // Check span for custom cost rates (set by enrichment service)
-    const rawInputRate = attrs[ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN];
-    const rawOutputRate =
-      attrs[ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN];
-    const hasCustomRates =
-      typeof rawInputRate === "number" || typeof rawOutputRate === "number";
+	// Cost: compute from model pricing instead of reading SDK cost directly
+	const models = extractModelsFromSpan(span);
+	const model = models[0];
+	if (model && (promptTokens > 0 || completionTokens > 0)) {
+		// Check span for custom cost rates (set by enrichment service)
+		const rawInputRate = attrs[ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN];
+		const rawOutputRate =
+			attrs[ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN];
+		const hasCustomRates =
+			typeof rawInputRate === "number" || typeof rawOutputRate === "number";
 
-    if (hasCustomRates) {
-      const inputRate = typeof rawInputRate === "number" ? rawInputRate : 0;
-      const outputRate = typeof rawOutputRate === "number" ? rawOutputRate : 0;
-      cost = promptTokens * inputRate + completionTokens * outputRate;
-    } else {
-      // Fallback: static registry lookup (sync, cached at module level)
-      const staticCosts = getStaticModelCosts();
-      const matched = matchingLLMModelCost(model, staticCosts);
-      if (matched) {
-        const computed = estimateCost({
-          llmModelCost: matched,
-          inputTokens: promptTokens,
-          outputTokens: completionTokens,
-        });
-        if (computed !== undefined) cost = computed;
-      }
-    }
-  } else {
-    // No model or no tokens — fall back to SDK cost if available
-    const spanCost = attrs[ATTR_KEYS.LANGWATCH_SPAN_COST];
-    if (typeof spanCost === "number" && spanCost > 0) {
-      cost = spanCost;
-    }
-  }
+		if (hasCustomRates) {
+			const inputRate = typeof rawInputRate === "number" ? rawInputRate : 0;
+			const outputRate = typeof rawOutputRate === "number" ? rawOutputRate : 0;
+			cost = promptTokens * inputRate + completionTokens * outputRate;
+		} else {
+			// Fallback: static registry lookup (sync, cached at module level)
+			const staticCosts = getStaticModelCosts();
+			const matched = matchingLLMModelCost(model, staticCosts);
+			if (matched) {
+				const computed = estimateCost({
+					llmModelCost: matched,
+					inputTokens: promptTokens,
+					outputTokens: completionTokens,
+				});
+				if (computed !== undefined) cost = computed;
+			}
+		}
+	} else {
+		// No model or no tokens — fall back to SDK cost if available
+		const spanCost = attrs[ATTR_KEYS.LANGWATCH_SPAN_COST];
+		if (typeof spanCost === "number" && spanCost > 0) {
+			cost = spanCost;
+		}
+	}
 
-  // Guardrail cost: extract from langwatch.output when span is a guardrail
-  if (cost === 0) {
-    const spanType = attrs[ATTR_KEYS.SPAN_TYPE];
-    if (spanType === "guardrail") {
-      const rawOutput = attrs[ATTR_KEYS.LANGWATCH_OUTPUT];
-      if (
-        rawOutput &&
-        typeof rawOutput === "object" &&
-        !Array.isArray(rawOutput)
-      ) {
-        const parsed = rawOutput as Record<string, unknown>;
-        const costObj = parsed.cost as
-          | { amount?: number; currency?: string }
-          | undefined;
-        if (
-          costObj &&
-          typeof costObj.amount === "number" &&
-          costObj.currency === "USD"
-        ) {
-          cost = costObj.amount;
-        }
-      }
-    }
-  }
+	// Guardrail cost: extract from langwatch.output when span is a guardrail
+	if (cost === 0) {
+		const spanType = attrs[ATTR_KEYS.SPAN_TYPE];
+		if (spanType === "guardrail") {
+			const rawOutput = attrs[ATTR_KEYS.LANGWATCH_OUTPUT];
+			if (
+				rawOutput &&
+				typeof rawOutput === "object" &&
+				!Array.isArray(rawOutput)
+			) {
+				const parsed = rawOutput as Record<string, unknown>;
+				const costObj = parsed.cost as
+					| { amount?: number; currency?: string }
+					| undefined;
+				if (
+					costObj &&
+					typeof costObj.amount === "number" &&
+					costObj.currency === "USD"
+				) {
+					cost = costObj.amount;
+				}
+			}
+		}
+	}
 
-  if (attrs[ATTR_KEYS.LANGWATCH_TOKENS_ESTIMATED] === true) {
-    estimated = true;
-  }
+	if (attrs[ATTR_KEYS.LANGWATCH_TOKENS_ESTIMATED] === true) {
+		estimated = true;
+	}
 
-  return { promptTokens, completionTokens, cost, estimated };
+	return { promptTokens, completionTokens, cost, estimated };
 }
 
 interface SpanStatusInfo {
-  hasError: boolean;
-  hasOK: boolean;
-  errorMessage: string | null;
+	hasError: boolean;
+	hasOK: boolean;
+	errorMessage: string | null;
 }
 
 function extractStatusFromSpan(span: NormalizedSpan): SpanStatusInfo {
-  let hasError = false;
-  let hasOK = false;
-  let errorMessage: string | null = null;
+	let hasError = false;
+	let hasOK = false;
+	let errorMessage: string | null = null;
 
-  if (span.statusCode === StatusCode.OK) {
-    hasOK = true;
-  } else if (span.statusCode === StatusCode.ERROR) {
-    hasError = true;
-    if (span.statusMessage) {
-      errorMessage = span.statusMessage;
-    }
-  }
+	if (span.statusCode === StatusCode.OK) {
+		hasOK = true;
+	} else if (span.statusCode === StatusCode.ERROR) {
+		hasError = true;
+		if (span.statusMessage) {
+			errorMessage = span.statusMessage;
+		}
+	}
 
-  const attrs = span.spanAttributes;
+	const attrs = span.spanAttributes;
 
-  if (!errorMessage) {
-    const errorMsg =
-      attrs[ATTR_KEYS.ERROR_MESSAGE] ?? attrs[ATTR_KEYS.EXCEPTION_MESSAGE];
-    if (typeof errorMsg === "string") {
-      errorMessage = errorMsg;
-      hasError = true;
-    }
-  }
+	if (!errorMessage) {
+		const errorMsg =
+			attrs[ATTR_KEYS.ERROR_MESSAGE] ?? attrs[ATTR_KEYS.EXCEPTION_MESSAGE];
+		if (typeof errorMsg === "string") {
+			errorMessage = errorMsg;
+			hasError = true;
+		}
+	}
 
-  if (!hasError) {
-    const hasErrorAttr =
-      attrs[ATTR_KEYS.ERROR_HAS_ERROR] ?? attrs[ATTR_KEYS.SPAN_ERROR_HAS_ERROR];
-    if (hasErrorAttr === true || hasErrorAttr === "true") {
-      hasError = true;
-    }
-  }
+	if (!hasError) {
+		const hasErrorAttr =
+			attrs[ATTR_KEYS.ERROR_HAS_ERROR] ?? attrs[ATTR_KEYS.SPAN_ERROR_HAS_ERROR];
+		if (hasErrorAttr === true || hasErrorAttr === "true") {
+			hasError = true;
+		}
+	}
 
-  if (!errorMessage && span.events?.length) {
-    for (const event of span.events) {
-      if (event.name === "exception") {
-        hasError = true;
-        const exceptionMessage = event.attributes?.["exception.message"];
-        if (typeof exceptionMessage === "string") {
-          errorMessage = exceptionMessage;
-        }
-        break;
-      }
-    }
-  }
+	if (!errorMessage && span.events?.length) {
+		for (const event of span.events) {
+			if (event.name === "exception") {
+				hasError = true;
+				const exceptionMessage = event.attributes?.["exception.message"];
+				if (typeof exceptionMessage === "string") {
+					errorMessage = exceptionMessage;
+				}
+				break;
+			}
+		}
+	}
 
-  return { hasError, hasOK, errorMessage };
+	return { hasError, hasOK, errorMessage };
 }
 
 interface SpanTokenTiming {
-  timeToFirstToken: number | null;
-  timeToLastToken: number | null;
+	timeToFirstToken: number | null;
+	timeToLastToken: number | null;
 }
 
 function extractTokenTimingFromSpan(span: NormalizedSpan): SpanTokenTiming {
-  let timeToFirstToken: number | null = null;
-  let timeToLastToken: number | null = null;
+	let timeToFirstToken: number | null = null;
+	let timeToLastToken: number | null = null;
 
-  if (!span.events?.length) return { timeToFirstToken, timeToLastToken };
+	if (!span.events?.length) return { timeToFirstToken, timeToLastToken };
 
-  for (const event of span.events) {
-    const timeDelta = event.timeUnixMs - span.startTimeUnixMs;
+	for (const event of span.events) {
+		const timeDelta = event.timeUnixMs - span.startTimeUnixMs;
 
-    if (timeDelta >= 0 && FIRST_TOKEN_EVENTS.has(event.name)) {
-      if (timeToFirstToken === null || timeDelta < timeToFirstToken) {
-        timeToFirstToken = timeDelta;
-      }
-    }
+		if (timeDelta >= 0 && FIRST_TOKEN_EVENTS.has(event.name)) {
+			if (timeToFirstToken === null || timeDelta < timeToFirstToken) {
+				timeToFirstToken = timeDelta;
+			}
+		}
 
-    if (timeDelta >= 0 && LAST_TOKEN_EVENTS.has(event.name)) {
-      if (timeToLastToken === null || timeDelta > timeToLastToken) {
-        timeToLastToken = timeDelta;
-      }
-    }
-  }
+		if (timeDelta >= 0 && LAST_TOKEN_EVENTS.has(event.name)) {
+			if (timeToLastToken === null || timeDelta > timeToLastToken) {
+				timeToLastToken = timeDelta;
+			}
+		}
+	}
 
-  return { timeToFirstToken, timeToLastToken };
+	return { timeToFirstToken, timeToLastToken };
 }
 
 function extractAttributesFromSpan(
-  span: NormalizedSpan,
+	span: NormalizedSpan,
 ): Record<string, string> {
-  const attributes: Record<string, string> = {};
-  const spanAttrs = span.spanAttributes;
-  const resourceAttrs = span.resourceAttributes;
+	const attributes: Record<string, string> = {};
+	const spanAttrs = span.spanAttributes;
+	const resourceAttrs = span.resourceAttributes;
 
-  // SDK info from resource attributes
-  const sdkName = resourceAttrs["telemetry.sdk.name"];
-  const sdkVersion = resourceAttrs["telemetry.sdk.version"];
-  const sdkLanguage = resourceAttrs["telemetry.sdk.language"];
-  const serviceName = resourceAttrs["service.name"];
+	// SDK info from resource attributes
+	const sdkName = resourceAttrs["telemetry.sdk.name"];
+	const sdkVersion = resourceAttrs["telemetry.sdk.version"];
+	const sdkLanguage = resourceAttrs["telemetry.sdk.language"];
+	const serviceName = resourceAttrs["service.name"];
 
-  if (typeof sdkName === "string") attributes["sdk.name"] = sdkName;
-  if (typeof sdkVersion === "string") attributes["sdk.version"] = sdkVersion;
-  if (typeof sdkLanguage === "string") attributes["sdk.language"] = sdkLanguage;
-  if (typeof serviceName === "string") attributes["service.name"] = serviceName;
+	if (typeof sdkName === "string") attributes["sdk.name"] = sdkName;
+	if (typeof sdkVersion === "string") attributes["sdk.version"] = sdkVersion;
+	if (typeof sdkLanguage === "string") attributes["sdk.language"] = sdkLanguage;
+	if (typeof serviceName === "string") attributes["service.name"] = serviceName;
 
-  // Custom resource attributes
-  for (const [key, value] of Object.entries(resourceAttrs)) {
-    if (STANDARD_RESOURCE_PREFIXES.some((prefix) => key.startsWith(prefix)))
-      continue;
-    if (typeof value === "string") {
-      attributes[key] = value;
-    } else if (typeof value === "number" || typeof value === "boolean") {
-      attributes[key] = String(value);
-    }
-  }
+	// Custom resource attributes
+	for (const [key, value] of Object.entries(resourceAttrs)) {
+		if (STANDARD_RESOURCE_PREFIXES.some((prefix) => key.startsWith(prefix)))
+			continue;
+		if (typeof value === "string") {
+			attributes[key] = value;
+		} else if (typeof value === "number" || typeof value === "boolean") {
+			attributes[key] = String(value);
+		}
+	}
 
-  // Thread/User context from canonical span attributes (set by canonicalization)
-  const threadId = spanAttrs[ATTR_KEYS.GEN_AI_CONVERSATION_ID];
-  const userId = spanAttrs[ATTR_KEYS.LANGWATCH_USER_ID];
-  const customerId = spanAttrs[ATTR_KEYS.LANGWATCH_CUSTOMER_ID];
+	// Thread/User context from canonical span attributes (set by canonicalization)
+	const threadId = spanAttrs[ATTR_KEYS.GEN_AI_CONVERSATION_ID];
+	const userId = spanAttrs[ATTR_KEYS.LANGWATCH_USER_ID];
+	const customerId = spanAttrs[ATTR_KEYS.LANGWATCH_CUSTOMER_ID];
 
-  if (typeof threadId === "string")
-    attributes["gen_ai.conversation.id"] = threadId;
-  if (typeof userId === "string") attributes["langwatch.user_id"] = userId;
-  if (typeof customerId === "string")
-    attributes["langwatch.customer_id"] = customerId;
+	if (typeof threadId === "string")
+		attributes["gen_ai.conversation.id"] = threadId;
+	if (typeof userId === "string") attributes["langwatch.user_id"] = userId;
+	if (typeof customerId === "string")
+		attributes["langwatch.customer_id"] = customerId;
 
-  // Agent/Provider info from canonical span attributes
-  const agentName = spanAttrs[ATTR_KEYS.GEN_AI_AGENT_NAME];
-  const agentId = spanAttrs[ATTR_KEYS.GEN_AI_AGENT_ID];
-  const providerName = spanAttrs[ATTR_KEYS.GEN_AI_PROVIDER_NAME];
+	// Agent/Provider info from canonical span attributes
+	const agentName = spanAttrs[ATTR_KEYS.GEN_AI_AGENT_NAME];
+	const agentId = spanAttrs[ATTR_KEYS.GEN_AI_AGENT_ID];
+	const providerName = spanAttrs[ATTR_KEYS.GEN_AI_PROVIDER_NAME];
 
-  if (typeof agentName === "string")
-    attributes["gen_ai.agent.name"] = agentName;
-  if (typeof agentId === "string") attributes["gen_ai.agent.id"] = agentId;
-  if (typeof providerName === "string")
-    attributes["gen_ai.provider.name"] = providerName;
+	if (typeof agentName === "string")
+		attributes["gen_ai.agent.name"] = agentName;
+	if (typeof agentId === "string") attributes["gen_ai.agent.id"] = agentId;
+	if (typeof providerName === "string")
+		attributes["gen_ai.provider.name"] = providerName;
 
-  // LangGraph metadata
-  const langgraphThreadId = spanAttrs[ATTR_KEYS.LANGWATCH_LANGGRAPH_THREAD_ID];
-  if (typeof langgraphThreadId === "string")
-    attributes["langgraph.thread_id"] = langgraphThreadId;
+	// LangGraph metadata
+	const langgraphThreadId = spanAttrs[ATTR_KEYS.LANGWATCH_LANGGRAPH_THREAD_ID];
+	if (typeof langgraphThreadId === "string")
+		attributes["langgraph.thread_id"] = langgraphThreadId;
 
-  // Labels (canonical key only — canonicalization already promoted from metadata)
-  const labels = spanAttrs[ATTR_KEYS.LANGWATCH_LABELS];
-  if (typeof labels === "string") {
-    attributes["langwatch.labels"] = labels;
-  } else if (Array.isArray(labels)) {
-    attributes["langwatch.labels"] = JSON.stringify(labels);
-  }
+	// Labels (canonical key only — canonicalization already promoted from metadata)
+	const labels = spanAttrs[ATTR_KEYS.LANGWATCH_LABELS];
+	if (typeof labels === "string") {
+		attributes["langwatch.labels"] = labels;
+	} else if (Array.isArray(labels)) {
+		attributes["langwatch.labels"] = JSON.stringify(labels);
+	}
 
-  // Custom metadata fields — canonicalization hoists them as metadata.{key}
-  // so we just need to forward any metadata.* attributes
-  for (const [key, value] of Object.entries(spanAttrs)) {
-    if (key.startsWith("metadata.")) {
-      if (typeof value === "string") {
-        attributes[key] = value;
-      } else if (value !== null && value !== undefined) {
-        attributes[key] =
-          typeof value === "object" ? JSON.stringify(value) : String(value);
-      }
-    }
-  }
+	// Custom metadata fields — canonicalization hoists them as metadata.{key}
+	// so we just need to forward any metadata.* attributes
+	for (const [key, value] of Object.entries(spanAttrs)) {
+		if (key.startsWith("metadata.")) {
+			if (typeof value === "string") {
+				attributes[key] = value;
+			} else if (value !== null && value !== undefined) {
+				attributes[key] =
+					typeof value === "object" ? JSON.stringify(value) : String(value);
+			}
+		}
+	}
 
-  return attributes;
+	return attributes;
 }
 
 /**
@@ -367,25 +362,26 @@ function extractAttributesFromSpan(
  * @internal Exported for unit testing
  */
 export function shouldOverrideOutput({
-  isRoot,
-  outputFromRoot,
-  isExplicit,
-  currentIsExplicit,
-  endTime,
-  currentEndTime,
+	isRoot,
+	outputFromRoot,
+	isExplicit,
+	currentIsExplicit,
+	endTime,
+	currentEndTime,
 }: {
-  isRoot: boolean;
-  outputFromRoot: boolean;
-  isExplicit: boolean;
-  currentIsExplicit: boolean;
-  endTime: number;
-  currentEndTime: number;
+	isRoot: boolean;
+	outputFromRoot: boolean;
+	isExplicit: boolean;
+	currentIsExplicit: boolean;
+	endTime: number;
+	currentEndTime: number;
 }): boolean {
-  if (isRoot) return true;
-  if (outputFromRoot) return false;
-  if (isExplicit && !currentIsExplicit) return true;
-  if (isExplicit === currentIsExplicit && endTime >= currentEndTime) return true;
-  return false;
+	if (isRoot) return true;
+	if (outputFromRoot) return false;
+	if (isExplicit && !currentIsExplicit) return true;
+	if (isExplicit === currentIsExplicit && endTime >= currentEndTime)
+		return true;
+	return false;
 }
 
 /** @internal Exported for unit testing */
@@ -536,9 +532,42 @@ export function applySpanToSummary(
     }
   }
 
-  // Attributes (first-wins per key)
+  // Attributes (first-wins per key, except labels and metadata which are deep-merged)
   const spanAttributes = extractAttributesFromSpan(span);
   const mergedAttributes = { ...spanAttributes, ...state.attributes };
+
+  // Deep-merge labels: union across all spans
+  const existingLabels = state.attributes["langwatch.labels"];
+  const newLabels = spanAttributes["langwatch.labels"];
+  if (existingLabels || newLabels) {
+    const existing = parseJsonStringArray(existingLabels);
+    const incoming = parseJsonStringArray(newLabels);
+    const merged = [...new Set([...existing, ...incoming])];
+    if (merged.length > 0) {
+      mergedAttributes["langwatch.labels"] = JSON.stringify(merged);
+    }
+  }
+
+  // Deep-merge metadata.* fields: merge JSON objects, last-wins for primitives
+  for (const key of Object.keys(mergedAttributes)) {
+    if (!key.startsWith("metadata.")) continue;
+    const prev = state.attributes[key];
+    const next = spanAttributes[key];
+    if (!prev || !next) continue;
+    // Both sides exist — attempt JSON object merge
+    try {
+      const prevObj: unknown = JSON.parse(prev);
+      const nextObj: unknown = JSON.parse(next);
+      if (
+        typeof prevObj === "object" && prevObj !== null && !Array.isArray(prevObj) &&
+        typeof nextObj === "object" && nextObj !== null && !Array.isArray(nextObj)
+      ) {
+        mergedAttributes[key] = JSON.stringify({ ...nextObj, ...prevObj });
+      }
+    } catch {
+      // Not valid JSON on one side — keep first-wins (already in mergedAttributes)
+    }
+  }
 
   // Track output source in attributes for cross-span override decisions
   mergedAttributes["langwatch.reserved.output_source"] =
@@ -547,29 +576,18 @@ export function applySpanToSummary(
   // PII redaction status tracking — accumulate span IDs by severity
   const piiStatus =
     span.spanAttributes[ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_STATUS];
-<<<<<<< HEAD
   if (piiStatus === "partial") {
     const key = ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_PARTIAL_SPAN_IDS;
     const existing = mergedAttributes[key];
-    const ids = safeParsStringArray(existing);
+    const ids = parseJsonStringArray(existing);
     ids.push(span.spanId);
     mergedAttributes[key] = JSON.stringify(ids);
   } else if (piiStatus === "none") {
     const key = ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_SKIPPED_SPAN_IDS;
     const existing = mergedAttributes[key];
-    const ids = safeParsStringArray(existing);
+    const ids = parseJsonStringArray(existing);
     ids.push(span.spanId);
     mergedAttributes[key] = JSON.stringify(ids);
-=======
-  const piiKey =
-    piiStatus === "partial" ? ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_PARTIAL_SPAN_IDS
-    : piiStatus === "none" ? ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_SKIPPED_SPAN_IDS
-    : null;
-  if (piiKey) {
-    const ids = parseJsonStringArray(mergedAttributes[piiKey]);
-    ids.push(span.spanId);
-    mergedAttributes[piiKey] = JSON.stringify(ids);
->>>>>>> 200485092 (refactor, clean, etc)
   }
 
   return {
