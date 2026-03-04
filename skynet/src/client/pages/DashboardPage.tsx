@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Box, Text, Grid, GridItem } from "@chakra-ui/react";
 import type { DashboardData, QueueInfo } from "../../shared/types.ts";
 import type { SortColumn, SortDir } from "../hooks/useGroupsData.ts";
@@ -23,7 +23,7 @@ interface Props {
 export function DashboardPage({ data, queues, onPause, onResume, sortColumn, sortDir, cycleSort }: Props) {
   const [pipelineFilter, setPipelineFilter] = useState<string | null>(null);
 
-  const queueNames = data.queues.map((q) => q.name);
+  const queueNames = useMemo(() => data.queues.map((q) => q.name), [data.queues]);
 
   const handlePause = useCallback(
     async (pauseKey: string) => {

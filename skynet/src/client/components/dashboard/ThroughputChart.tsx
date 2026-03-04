@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useMemo } from "react";
+import type { KeyboardEvent } from "react";
 import { Box, Text, HStack } from "@chakra-ui/react";
 import {
   AreaChart,
@@ -102,7 +103,7 @@ function ResetZoomButton({ onClick }: { onClick: () => void }) {
       role="button"
       tabIndex={0}
       onClick={onClick}
-      onKeyDown={(e: React.KeyboardEvent) => {
+      onKeyDown={(e: KeyboardEvent) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           onClick();
@@ -171,8 +172,17 @@ export function ThroughputChart({ data }: { data: ThroughputPoint[] }) {
   const [zoom, setZoom] = useState<ZoomState | null>(null);
   const isDragging = useRef(false);
 
-  const dataMin = data.length > 0 ? data[0]!.timestamp : 0;
-  const dataMax = data.length > 0 ? data[data.length - 1]!.timestamp : 0;
+  const [dataMin, dataMax] = useMemo(() => {
+    if (data.length === 0) return [0, 0];
+    let min = data[0]!.timestamp;
+    let max = min;
+    for (let i = 1; i < data.length; i++) {
+      const ts = data[i]!.timestamp;
+      if (ts < min) min = ts;
+      if (ts > max) max = ts;
+    }
+    return [min, max];
+  }, [data]);
 
   const toggleSeries = useCallback((key: string) => {
     setHidden((prev) => {
@@ -190,15 +200,19 @@ export function ThroughputChart({ data }: { data: ThroughputPoint[] }) {
 
   const handleMouseDown = useCallback((e: ChartMouseEvent | null) => {
     if (e?.activeLabel != null) {
+      const label = Number(e.activeLabel);
+      if (!Number.isFinite(label)) return;
       isDragging.current = true;
-      setDragStart(Number(e.activeLabel));
+      setDragStart(label);
       setDragEnd(null);
     }
   }, []);
 
   const handleMouseMove = useCallback((e: ChartMouseEvent | null) => {
     if (isDragging.current && e?.activeLabel != null) {
-      setDragEnd(Number(e.activeLabel));
+      const label = Number(e.activeLabel);
+      if (!Number.isFinite(label)) return;
+      setDragEnd(label);
     }
   }, []);
 

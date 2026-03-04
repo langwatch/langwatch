@@ -78,6 +78,20 @@ describe("buildPipelineTree", () => {
       expect(tree[0]!.children[0]!.pending).toBe(5);
       expect(tree[0]!.children[0]!.active).toBe(1);
       expect(tree[0]!.children[0]!.blocked).toBe(1);
+
+      // JobName level
+      const jobNames = tree[0]!.children[0]!.children;
+      expect(jobNames).toHaveLength(2);
+
+      const trace = jobNames.find((n) => n.name === "trace")!;
+      expect(trace.pending).toBe(3);
+      expect(trace.active).toBe(1);
+      expect(trace.blocked).toBe(0);
+
+      const span = jobNames.find((n) => n.name === "span")!;
+      expect(span.pending).toBe(2);
+      expect(span.active).toBe(0);
+      expect(span.blocked).toBe(1);
     });
 
     it("sorts pipelines alphabetically", () => {

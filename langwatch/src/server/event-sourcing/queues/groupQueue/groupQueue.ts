@@ -704,11 +704,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       await this.dispatcher.waitUntilStopped();
     }
 
-    this.processingQueue.pause();
-
     if (!this.processingQueue.idle()) {
       await this.processingQueue.drained();
     }
+    this.processingQueue.pause();
 
     if (this.blockingConnection !== this.redisConnection) {
       await this.blockingConnection.quit();

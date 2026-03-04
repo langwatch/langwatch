@@ -173,6 +173,11 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
         return;
       }
 
+      if (!isValidGroupId(queueName)) {
+        res.status(400).json({ error: "Invalid queueName format" });
+        return;
+      }
+
       if (!service.isKnownQueue(queueName)) {
         res.status(404).json({ error: "Unknown queue name" });
         return;

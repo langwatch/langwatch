@@ -132,7 +132,7 @@ export class SimulationRunStateRepositoryClickHouse<
       DurationMs: data.DurationMs?.toString() ?? null,
       StartedAt: data.StartedAt != null ? new Date(data.StartedAt) : null,
       CreatedAt: data.CreatedAt != null ? new Date(data.CreatedAt) : new Date(),
-      UpdatedAt: new Date(),
+      UpdatedAt: new Date(data.UpdatedAt),
       FinishedAt: data.FinishedAt != null ? new Date(data.FinishedAt) : null,
       DeletedAt: data.DeletedAt != null ? new Date(data.DeletedAt) : null,
     };

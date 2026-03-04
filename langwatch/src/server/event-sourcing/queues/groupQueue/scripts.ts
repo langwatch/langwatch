@@ -155,10 +155,13 @@ for pass = 1, maxPasses do
                 local p = data["__pipelineName"]
                 local t = data["__jobType"]
                 local n = data["__jobName"]
-                if p then
+                local pIsStr = type(p) == "string"
+                local tIsStr = type(t) == "string"
+                local nIsStr = type(n) == "string"
+                if pIsStr then
                   if redis.call("SISMEMBER", pausedJobKey, p) == 1 then paused = true
-                  elseif t and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t) == 1 then paused = true
-                  elseif t and n and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t .. "/" .. n) == 1 then paused = true
+                  elseif tIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t) == 1 then paused = true
+                  elseif tIsStr and nIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t .. "/" .. n) == 1 then paused = true
                   end
                 end
               end
@@ -245,10 +248,13 @@ for pass = 1, maxPasses do
                 local p = data["__pipelineName"]
                 local t = data["__jobType"]
                 local n = data["__jobName"]
-                if p then
+                local pIsStr = type(p) == "string"
+                local tIsStr = type(t) == "string"
+                local nIsStr = type(n) == "string"
+                if pIsStr then
                   if redis.call("SISMEMBER", pausedJobKey, p) == 1 then paused = true
-                  elseif t and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t) == 1 then paused = true
-                  elseif t and n and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t .. "/" .. n) == 1 then paused = true
+                  elseif tIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t) == 1 then paused = true
+                  elseif tIsStr and nIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t .. "/" .. n) == 1 then paused = true
                   end
                 end
               end
