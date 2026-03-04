@@ -39,7 +39,7 @@ export const extractInputMessages = (
           if (msgs) {
             const systemInstruction =
               extractSystemInstructionFromMessages(msgs);
-            // Strip system messages — they go to gen_ai.request.system_instruction
+            // Strip system messages — they go to gen_ai.system_instructions
             const chatMsgs = systemInstruction
               ? stripSystemMessages(msgs)
               : msgs;
@@ -49,7 +49,7 @@ export const extractInputMessages = (
             );
             if (systemInstruction !== null) {
               ctx.setAttrIfAbsent(
-                ATTR_KEYS.GEN_AI_REQUEST_SYSTEM_INSTRUCTION,
+                ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS,
                 systemInstruction,
               );
             }

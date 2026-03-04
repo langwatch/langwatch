@@ -111,7 +111,7 @@ describe("CanonicalizeSpanAttributesService — chat message coercion", () => {
       ]);
 
       // System instruction extracted from content blocks using 'content' field
-      expect(result.attributes["gen_ai.request.system_instruction"]).toBe(
+      expect(result.attributes["gen_ai.system_instructions"]).toBe(
         "You are a helpful assistant.",
       );
     });
@@ -202,7 +202,7 @@ describe("CanonicalizeSpanAttributesService — chat message coercion", () => {
   });
 
   describe("when system message is first in input", () => {
-    it("extracts content string to gen_ai.request.system_instruction", () => {
+    it("extracts content string to gen_ai.system_instructions", () => {
       const messages = [
         { role: "system", content: "You are a pirate." },
         { role: "user", content: "Hi" },
@@ -214,7 +214,7 @@ describe("CanonicalizeSpanAttributesService — chat message coercion", () => {
         stubSpan as any,
       );
 
-      expect(result.attributes["gen_ai.request.system_instruction"]).toBe(
+      expect(result.attributes["gen_ai.system_instructions"]).toBe(
         "You are a pirate.",
       );
     });
@@ -237,7 +237,7 @@ describe("CanonicalizeSpanAttributesService — chat message coercion", () => {
         stubSpan as any,
       );
 
-      expect(result.attributes["gen_ai.request.system_instruction"]).toBe(
+      expect(result.attributes["gen_ai.system_instructions"]).toBe(
         "Part A. Part B.",
       );
     });
@@ -257,7 +257,7 @@ describe("CanonicalizeSpanAttributesService — chat message coercion", () => {
         stubSpan as any,
       );
 
-      expect(result.attributes["gen_ai.request.system_instruction"]).toBe(
+      expect(result.attributes["gen_ai.system_instructions"]).toBe(
         "Be helpful.",
       );
     });
@@ -275,7 +275,7 @@ describe("CanonicalizeSpanAttributesService — chat message coercion", () => {
       );
 
       expect(
-        result.attributes["gen_ai.request.system_instruction"],
+        result.attributes["gen_ai.system_instructions"],
       ).toBeUndefined();
     });
   });

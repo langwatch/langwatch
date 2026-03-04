@@ -16,7 +16,7 @@
  * - gen_ai.agent.name (consolidated from multiple sources)
  * - gen_ai.request.model / gen_ai.response.model
  * - gen_ai.input.messages / gen_ai.output.messages
- * - gen_ai.request.system_instruction
+ * - gen_ai.system_instructions
  * - gen_ai.usage.input_tokens / gen_ai.usage.output_tokens
  * - gen_ai.request.* params (temperature, max_tokens, etc.)
  *
@@ -131,19 +131,57 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
       recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // System Instructions (from explicit gen_ai.system_instructions attribute)
+    // OTel GenAI semconv v1.38.0: gen_ai.system_instructions
+    // Supports both string and array-of-content-blocks formats:
+    //   string: "You are a helpful assistant."
+    //   array:  [{ type: "text", content: "You are a helpful assistant." }]
+    // ─────────────────────────────────────────────────────────────────────────
+    const rawSystemInstructions = attrs.take(
+      ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS,
+    );
+    if (rawSystemInstructions !== undefined) {
+      if (typeof rawSystemInstructions === "string") {
+        ctx.setAttr(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, rawSystemInstructions);
+        ctx.recordRule(`${this.id}:system_instructions(string)`);
+      } else if (Array.isArray(rawSystemInstructions)) {
+        // Array of content blocks: [{ type: "text", content: "..." }]
+        const textParts: string[] = [];
+        for (const block of rawSystemInstructions) {
+          if (typeof block === "string") {
+            textParts.push(block);
+          } else if (isRecord(block)) {
+            const obj = block as Record<string, unknown>;
+            const text = obj.content ?? obj.text;
+            if (typeof text === "string") {
+              textParts.push(text);
+            }
+          }
+        }
+        if (textParts.length > 0) {
+          ctx.setAttr(
+            ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS,
+            textParts.join("\n"),
+          );
+          ctx.recordRule(`${this.id}:system_instructions(array)`);
+        }
+      }
+    }
+
     // If gen_ai.input.messages was already present (e.g. from OpenClaw/OTEL
     // GenAI spec), extractInputMessages skips it. Still extract system
     // instruction from the existing messages if not already set.
     if (
       !inputExtracted &&
-      !attrs.has(ATTR_KEYS.GEN_AI_REQUEST_SYSTEM_INSTRUCTION)
+      ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS] === undefined
     ) {
       const existing = attrs.get(ATTR_KEYS.GEN_AI_INPUT_MESSAGES);
       if (Array.isArray(existing)) {
         const sysInstruction = extractSystemInstructionFromMessages(existing);
         if (sysInstruction !== null) {
           ctx.setAttr(
-            ATTR_KEYS.GEN_AI_REQUEST_SYSTEM_INSTRUCTION,
+            ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS,
             sysInstruction,
           );
           // Strip system messages and re-set

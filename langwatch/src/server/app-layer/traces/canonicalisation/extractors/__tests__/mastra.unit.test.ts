@@ -630,7 +630,7 @@ describe("MastraExtractor", () => {
       expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toEqual([
         { role: "user", content: "What is 2+2?" },
       ]);
-      expect(ctx.out[ATTR_KEYS.GEN_AI_REQUEST_SYSTEM_INSTRUCTION]).toBe(
+      expect(ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS]).toBe(
         "You are helpful",
       );
     });
@@ -659,7 +659,7 @@ describe("MastraExtractor", () => {
         { role: "user", content: "Hello" },
         { role: "assistant", content: "Hi" },
       ]);
-      expect(ctx.out[ATTR_KEYS.GEN_AI_REQUEST_SYSTEM_INSTRUCTION]).toBeUndefined();
+      expect(ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS]).toBeUndefined();
     });
 
     it("records value type for input messages", () => {
@@ -703,7 +703,7 @@ describe("MastraExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_REQUEST_SYSTEM_INSTRUCTION]).toBe(
+      expect(ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS]).toBe(
         "You are a math tutor",
       );
     });

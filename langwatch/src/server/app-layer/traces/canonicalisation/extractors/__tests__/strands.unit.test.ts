@@ -152,7 +152,7 @@ describe("StrandsExtractor", () => {
       extractor.apply(ctx);
 
       // System message promoted to system_instruction, stripped from input
-      expect(ctx.out[ATTR_KEYS.GEN_AI_REQUEST_SYSTEM_INSTRUCTION]).toBe("System prompt");
+      expect(ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS]).toBe("System prompt");
       expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toBeUndefined();
     });
 
@@ -171,7 +171,7 @@ describe("StrandsExtractor", () => {
       extractor.apply(ctx);
 
       // System instruction promoted
-      expect(ctx.out[ATTR_KEYS.GEN_AI_REQUEST_SYSTEM_INSTRUCTION]).toBe("Be helpful");
+      expect(ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS]).toBe("Be helpful");
 
       // Only user messages remain in input
       const messages = JSON.parse(

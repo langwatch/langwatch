@@ -226,7 +226,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
 
       // The GenAI extractor tries to extract system instruction from existing messages
       // Parts-based content uses {type: "text", content: "..."} which the helper handles
-      expect(result.attributes["gen_ai.request.system_instruction"]).toBe(
+      expect(result.attributes["gen_ai.system_instructions"]).toBe(
         "Be concise.",
       );
     });
@@ -382,7 +382,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
   // Inference Span — System instructions (v1.38.0)
   // ─────────────────────────────────────────────────────────────────────────
   describe("inference span with gen_ai.system_instructions", () => {
-    it("preserves system_instructions attribute", () => {
+    it("extracts text from content-block array", () => {
       const instructions = [
         { type: "text", content: "You are a helpful assistant." },
       ];
@@ -397,8 +397,26 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
         clientSpan as any,
       );
 
-      // system_instructions is not consumed by any extractor, so it passes through
-      expect(result.attributes["gen_ai.system_instructions"]).toEqual(instructions);
+      // genAi extractor consumes the attribute and extracts text content
+      expect(result.attributes["gen_ai.system_instructions"]).toBe(
+        "You are a helpful assistant.",
+      );
+    });
+
+    it("passes through string system_instructions", () => {
+      const result = service.canonicalize(
+        {
+          "gen_ai.operation.name": "chat",
+          "gen_ai.request.model": "gpt-4",
+          "gen_ai.system_instructions": "Be concise and accurate.",
+        },
+        [],
+        clientSpan as any,
+      );
+
+      expect(result.attributes["gen_ai.system_instructions"]).toBe(
+        "Be concise and accurate.",
+      );
     });
   });
 
@@ -602,7 +620,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
       expect(result.attributes["gen_ai.output.messages"]).toEqual(outputMessages);
 
       // System instruction extracted from parts-based message
-      expect(result.attributes["gen_ai.request.system_instruction"]).toBe(
+      expect(result.attributes["gen_ai.system_instructions"]).toBe(
         "You are a helpful assistant.",
       );
 
@@ -639,7 +657,7 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
       ]);
 
       // System instruction extraction from direct string content
-      expect(result.attributes["gen_ai.request.system_instruction"]).toBe(
+      expect(result.attributes["gen_ai.system_instructions"]).toBe(
         "Be concise.",
       );
     });

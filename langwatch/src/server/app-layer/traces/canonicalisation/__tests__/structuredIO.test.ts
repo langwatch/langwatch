@@ -66,7 +66,7 @@ describe("CanonicalizeSpanAttributesService — structured IO", () => {
         stubSpan as any,
       );
 
-      expect(result.attributes["gen_ai.request.system_instruction"]).toBe(
+      expect(result.attributes["gen_ai.system_instructions"]).toBe(
         "You are helpful.",
       );
     });

@@ -176,7 +176,7 @@ describe("CanonicalizeSpanAttributesService — take vs preserve semantics", () 
 
       // gen_ai.input.messages stays in the bag (it's not taken by anyone when already present)
       // But system_instruction should be extracted from it
-      expect(result.attributes["gen_ai.request.system_instruction"]).toBe(
+      expect(result.attributes["gen_ai.system_instructions"]).toBe(
         "Be helpful.",
       );
     });

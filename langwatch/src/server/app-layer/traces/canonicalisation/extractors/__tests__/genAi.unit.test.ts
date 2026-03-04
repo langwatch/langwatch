@@ -93,7 +93,7 @@ describe("GenAIExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_REQUEST_SYSTEM_INSTRUCTION]).toBe(
+      expect(ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS]).toBe(
         "You are a math tutor.",
       );
     });
@@ -112,7 +112,7 @@ describe("GenAIExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_REQUEST_SYSTEM_INSTRUCTION]).toBe(
+      expect(ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS]).toBe(
         "You are a helpful assistant.",
       );
       expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toEqual([
@@ -132,7 +132,7 @@ describe("GenAIExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_REQUEST_SYSTEM_INSTRUCTION]).toBeUndefined();
+      expect(ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS]).toBeUndefined();
       // Messages stay in bag (not re-set via ctx.setAttr)
       expect(ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES)).toBe(true);
     });

@@ -154,7 +154,7 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
           const sysInstruction = extractSystemInstructionFromMessages(inputMsgs);
           if (sysInstruction !== null) {
             ctx.setAttrIfAbsent(
-              ATTR_KEYS.GEN_AI_REQUEST_SYSTEM_INSTRUCTION,
+              ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS,
               sysInstruction,
             );
           }

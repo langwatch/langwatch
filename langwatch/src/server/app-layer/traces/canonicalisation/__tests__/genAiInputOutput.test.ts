@@ -121,7 +121,7 @@ describe("CanonicalizeSpanAttributesService", () => {
       expect(result.attributes["gen_ai.output.messages"]).toEqual(outputMessages);
 
       // System instruction extracted from content blocks using 'content' field
-      expect(result.attributes["gen_ai.request.system_instruction"]).toBe(
+      expect(result.attributes["gen_ai.system_instructions"]).toBe(
         "You are Snaps the lobster.",
       );
     });

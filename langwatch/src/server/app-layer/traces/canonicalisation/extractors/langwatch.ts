@@ -22,9 +22,10 @@
  * - langwatch.output (with structured format unwrapping and array flattening)
  * - gen_ai.input.messages (from langwatch.input when type is "chat_messages")
  * - gen_ai.output.messages (from langwatch.output when type is "chat_messages" or "json")
- * - gen_ai.request.system_instruction (extracted from first system message)
+ * - gen_ai.system_instructions (extracted from first system message)
  */
 
+import { createLogger } from "~/utils/logger/server";
 import { ATTR_KEYS } from "./_constants";
 import { ALLOWED_SPAN_TYPES } from "./_extraction";
 import { isRecord } from "./_guards";
@@ -33,6 +34,8 @@ import {
   normalizeToMessages,
 } from "./_messages";
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
+
+const logger = createLogger("langwatch:trace-processing:langwatch-extractor");
 
 /** JSON.stringify that never throws — returns a fallback on circular refs / BigInt / etc. */
 function safeStringify(value: unknown): string {
@@ -264,7 +267,7 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
               extractSystemInstructionFromMessages(messages);
             if (systemInstruction !== null) {
               ctx.setAttrIfAbsent(
-                ATTR_KEYS.GEN_AI_REQUEST_SYSTEM_INSTRUCTION,
+                ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS,
                 systemInstruction,
               );
             }
@@ -398,6 +401,65 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
           ctx.recordRule(`${this.id}:metrics.tokensEstimated`);
         }
       }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Evaluation Events (langwatch.evaluation.custom)
+    // SDK sends span events with name "langwatch.evaluation.custom" containing
+    // a json_encoded_event attribute with evaluation data.
+    // Read without consuming so events remain for downstream processing.
+    // Maps to OTel GenAI evaluation semconv attributes.
+    // ─────────────────────────────────────────────────────────────────────────
+    const evaluations: Record<string, unknown>[] = [];
+    for (const event of ctx.bag.events.all()) {
+      if (event.name !== "langwatch.evaluation.custom") continue;
+
+      const eventAttrs = (event.attributes ?? {}) as Record<string, unknown>;
+      const jsonPayload = eventAttrs.json_encoded_event;
+      if (typeof jsonPayload !== "string") continue;
+
+      try {
+        const parsed = JSON.parse(jsonPayload);
+        if (!isRecord(parsed)) continue;
+
+        const evalData = parsed as Record<string, unknown>;
+        evaluations.push(evalData);
+
+        // Map to OTel GenAI evaluation semconv attributes (first evaluation wins)
+        if (evaluations.length === 1) {
+          if (typeof evalData.name === "string") {
+            ctx.setAttrIfAbsent(
+              ATTR_KEYS.GEN_AI_EVALUATION_NAME,
+              evalData.name,
+            );
+          }
+          if (typeof evalData.label === "string") {
+            ctx.setAttrIfAbsent(
+              ATTR_KEYS.GEN_AI_EVALUATION_SCORE_LABEL,
+              evalData.label,
+            );
+          }
+          if (typeof evalData.score === "number") {
+            ctx.setAttrIfAbsent(
+              ATTR_KEYS.GEN_AI_EVALUATION_SCORE_VALUE,
+              evalData.score,
+            );
+          }
+        }
+      } catch {
+        logger.warn(
+          { jsonPayload },
+          "failed to parse json_encoded_event from langwatch.evaluation.custom",
+        );
+      }
+    }
+
+    if (evaluations.length > 0) {
+      ctx.setAttr(
+        ATTR_KEYS.LANGWATCH_RESERVED_EVALUATIONS,
+        safeStringify(evaluations),
+      );
+      ctx.recordRule(`${this.id}:evaluation.custom`);
     }
   }
 }

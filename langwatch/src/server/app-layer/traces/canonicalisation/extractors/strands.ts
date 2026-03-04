@@ -190,12 +190,12 @@ export class StrandsExtractor implements CanonicalAttributesExtractor {
         const sysInstruction = extractSystemInstructionFromMessages(inputMessages);
         if (sysInstruction !== null) {
           ctx.setAttrIfAbsent(
-            ATTR_KEYS.GEN_AI_REQUEST_SYSTEM_INSTRUCTION,
+            ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS,
             sysInstruction,
           );
         }
 
-        // Strip system messages — they are promoted to gen_ai.request.system_instruction
+        // Strip system messages — they are promoted to gen_ai.system_instructions
         const chatMessages = sysInstruction !== null
           ? stripSystemMessages(inputMessages)
           : inputMessages;
