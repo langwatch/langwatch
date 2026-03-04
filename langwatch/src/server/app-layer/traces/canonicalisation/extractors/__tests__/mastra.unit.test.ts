@@ -168,7 +168,7 @@ describe("MastraExtractor", () => {
   });
 
   describe("when langwatch.span.type already exists in bag", () => {
-    it("overwrites with Mastra-derived type (Mastra takes precedence)", () => {
+    it("preserves user-explicit span type over Mastra mapping", () => {
       const ctx = createExtractorContext(
         {
           [ATTR_KEYS.SPAN_TYPE]: "agent",
@@ -179,7 +179,25 @@ describe("MastraExtractor", () => {
 
       extractor.apply(ctx);
 
-      // Mastra takes precedence — maps model_generation to llm
+      // Explicit langwatch.span.type in raw attrs wins — Mastra does not overwrite
+      expect(ctx.out[ATTR_KEYS.SPAN_TYPE]).toBeUndefined();
+    });
+  });
+
+  describe("when span type was set by a prior extractor (ctx.out)", () => {
+    it("overrides extractor-inferred span type with Mastra mapping", () => {
+      const ctx = createExtractorContext(
+        {
+          [ATTR_KEYS.MASTRA_SPAN_TYPE]: "model_generation",
+        },
+        { instrumentationScope: { name: "@mastra/otel", version: null } },
+      );
+      // Simulate a prior extractor having set span type
+      ctx.out[ATTR_KEYS.SPAN_TYPE] = "span";
+
+      extractor.apply(ctx);
+
+      // Mastra overrides extractor-inferred type with its more specific mapping
       expect(ctx.out[ATTR_KEYS.SPAN_TYPE]).toBe("llm");
     });
   });

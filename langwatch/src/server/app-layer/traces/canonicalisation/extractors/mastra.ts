@@ -78,8 +78,12 @@ export class MastraExtractor implements CanonicalAttributesExtractor {
     );
   }
 
-  /** Map Mastra's detailed span types to canonical types. */
+  /** Map Mastra's detailed span types to canonical types.
+   *  Respects user-explicit langwatch.span.type (in bag) but overrides
+   *  types inferred by earlier extractors (in ctx.out). */
   private mapSpanType(ctx: ExtractorContext, mastraType: unknown, isEvalModelStep: boolean): void {
+    // User explicitly set langwatch.span.type — respect it
+    if (ctx.bag.attrs.has(ATTR_KEYS.SPAN_TYPE)) return;
     ctx.setAttr(ATTR_KEYS.SPAN_TYPE, mastraSpanTypeToCanonical(mastraType, isEvalModelStep));
     ctx.recordRule(`${this.id}:mastra.span.type->langwatch.span.type`);
   }
