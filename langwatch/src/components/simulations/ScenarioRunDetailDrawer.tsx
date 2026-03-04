@@ -21,6 +21,7 @@ import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRunScenario } from "~/hooks/useRunScenario";
 import { useScenarioTarget } from "~/hooks/useScenarioTarget";
+import { useTargetNameMap } from "~/hooks/useTargetNameMap";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { api } from "~/utils/api";
 import { TraceDetails } from "../traces/TraceDetails";
@@ -78,30 +79,7 @@ export function ScenarioRunDetailDrawer({
       { enabled: !!project?.id && !!scenarioId },
     );
 
-  // Fetch agents and prompts to resolve target names
-  const { data: agents } = api.agents.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project },
-  );
-  const { data: prompts } = api.prompts.getAllPromptsForProject.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project },
-  );
-
-  const targetNameMap = useMemo(() => {
-    const map = new Map<string, string>();
-    if (agents) {
-      for (const agent of agents) {
-        map.set(agent.id, agent.name);
-      }
-    }
-    if (prompts) {
-      for (const prompt of prompts) {
-        map.set(prompt.id, prompt.handle ?? prompt.id);
-      }
-    }
-    return map;
-  }, [agents, prompts]);
+  const targetNameMap = useTargetNameMap();
 
   // Resolve display title with target name
   const displayTitle = useMemo(() => {

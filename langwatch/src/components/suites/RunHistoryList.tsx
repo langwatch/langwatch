@@ -14,6 +14,7 @@ import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useTargetNameMap } from "~/hooks/useTargetNameMap";
 import { parseSuiteTargets } from "~/server/suites/types";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
 import { api } from "~/utils/api";
@@ -140,37 +141,15 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
     { enabled: !!project },
   );
 
-  // Fetch agents and prompts to resolve target names
-  const { data: agents } = api.agents.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project },
-  );
-  const { data: prompts } = api.prompts.getAllPromptsForProject.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project },
-  );
+  const targetNameMap = useTargetNameMap();
 
-  // Build target name lookup and compute expected job count
+  // Compute expected job count from suite config
   const targets = useMemo(
     () => parseSuiteTargets(suite.targets),
     [suite.targets],
   );
   const expectedJobCount =
     suite.scenarioIds.length * targets.length * suite.repeatCount;
-  const targetNameMap = useMemo(() => {
-    const map = new Map<string, string>();
-    if (agents) {
-      for (const agent of agents) {
-        map.set(agent.id, agent.name);
-      }
-    }
-    if (prompts) {
-      for (const prompt of prompts) {
-        map.set(prompt.id, prompt.handle ?? prompt.id);
-      }
-    }
-    return map;
-  }, [agents, prompts]);
 
   // Resolve single target name if suite has exactly one target
   const singleTargetName = useMemo(() => {

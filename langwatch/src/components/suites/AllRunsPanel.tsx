@@ -11,6 +11,7 @@ import type { ViewMode } from "./useRunHistoryStore";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useTargetNameMap } from "~/hooks/useTargetNameMap";
 import { api } from "~/utils/api";
 import type { Period } from "~/components/PeriodSelector";
 import {
@@ -131,30 +132,7 @@ export function AllRunsPanel({ period }: AllRunsPanelProps) {
   );
 
 
-  // Fetch agents and prompts to resolve target names
-  const { data: agents } = api.agents.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project },
-  );
-  const { data: prompts } = api.prompts.getAllPromptsForProject.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project },
-  );
-
-  const targetNameMap = useMemo(() => {
-    const map = new Map<string, string>();
-    if (agents) {
-      for (const agent of agents) {
-        map.set(agent.id, agent.name);
-      }
-    }
-    if (prompts) {
-      for (const prompt of prompts) {
-        map.set(prompt.id, prompt.handle ?? prompt.id);
-      }
-    }
-    return map;
-  }, [agents, prompts]);
+  const targetNameMap = useTargetNameMap();
 
   const resolveTargetName = useCallback(
     (scenarioRun: ScenarioRunData): string | null => {
