@@ -194,7 +194,7 @@ function StatPill({
   label: string;
   colorScheme?: string;
 }) {
-  const colors = pillColors[colorScheme] ?? pillColors.gray;
+  const colors = pillColors[colorScheme] ?? pillColors["gray"]!;
   return (
     <HStack
       gap={1.5}
