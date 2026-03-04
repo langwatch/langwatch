@@ -38,10 +38,14 @@ interface RouterLike {
 /** Query object shape from Next.js router.query */
 type QueryLike = Record<string, string | string[] | undefined>;
 
+export type ViewMode = "grid" | "list";
+
 export interface RunHistoryState {
   groupBy: RunGroupType;
+  viewMode: ViewMode;
   filters: Filters;
   setGroupBy: (value: RunGroupType) => void;
+  setViewMode: (value: ViewMode) => void;
   setFilter: (key: FilterKey, value: string) => void;
   setFilters: (filters: Filters) => void;
   syncToUrl: (router: RouterLike) => void;
@@ -64,6 +68,7 @@ function extractStringParam(
 export function createRunHistoryStore() {
   return create<RunHistoryState>((set, get) => ({
     groupBy: "none",
+    viewMode: "grid",
     filters: {
       scenarioId: "",
       passFailStatus: "",
@@ -71,6 +76,10 @@ export function createRunHistoryStore() {
 
     setGroupBy: (value: RunGroupType) => {
       set({ groupBy: value });
+    },
+
+    setViewMode: (value: ViewMode) => {
+      set({ viewMode: value });
     },
 
     setFilter: (key: FilterKey, value: string) => {

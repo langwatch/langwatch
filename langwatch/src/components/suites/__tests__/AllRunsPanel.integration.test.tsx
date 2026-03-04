@@ -48,6 +48,16 @@ vi.mock("~/utils/api", () => ({
         useQuery: mockScenariosQuery,
       },
     },
+    agents: {
+      getAll: {
+        useQuery: () => ({ data: [] }),
+      },
+    },
+    prompts: {
+      getAllPromptsForProject: {
+        useQuery: () => ({ data: [] }),
+      },
+    },
   },
 }));
 

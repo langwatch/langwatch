@@ -4,15 +4,23 @@
  * Used when group-by is set to "scenario" or "target".
  * Header: [chevron] [group_name (bold)] [status_icon] [pass_rate] ... [N runs]
  * Footer: [N passed] [N failed]
- * Expanded: ScenarioTargetRow for each run in the group.
+ * Expanded: sub-grouped by batch, each with a lightweight header showing
+ * timestamp and pass rate, then ScenarioTargetRow (list) or ScenarioGridCard (grid).
+ *
+ * The header is rendered as a direct child of the scroll container (no wrapper Box)
+ * so that `position: sticky` works correctly within the scrollport.
  */
 
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
+import { useMemo } from "react";
 import { SummaryStatusIcon } from "./SummaryStatusIcon";
 import type { RunGroup, RunGroupSummary } from "./run-history-transforms";
-import { ScenarioTargetRow } from "./ScenarioTargetRow";
+import { groupRunsByBatchId } from "./run-history-transforms";
+import { BatchSection } from "./BatchSection";
+import { RunSummaryFooter } from "./RunSummaryFooter";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import type { ViewMode } from "./useRunHistoryStore";
 
 type GroupRowProps = {
   group: RunGroup;
@@ -20,7 +28,8 @@ type GroupRowProps = {
   isExpanded: boolean;
   onToggle: () => void;
   onScenarioRunClick: (scenarioRun: ScenarioRunData) => void;
-  targetName?: string | null;
+  resolveTargetName: (scenarioRun: ScenarioRunData) => string | null;
+  viewMode?: ViewMode;
 };
 
 export function GroupRow({
@@ -29,18 +38,19 @@ export function GroupRow({
   isExpanded,
   onToggle,
   onScenarioRunClick,
-  targetName,
+  resolveTargetName,
+  viewMode = "grid",
 }: GroupRowProps) {
   const runCount = group.scenarioRuns.length;
 
+  const batches = useMemo(
+    () => groupRunsByBatchId({ runs: group.scenarioRuns }),
+    [group.scenarioRuns],
+  );
+
   return (
-    <Box
-      border="1px solid"
-      borderColor="border"
-      borderRadius="md"
-      overflow="hidden"
-    >
-      {/* Group header - clickable to expand/collapse */}
+    <>
+      {/* Group header - clickable to expand/collapse, sticky within scroll container */}
       <HStack
         as="button"
         width="full"
@@ -53,6 +63,15 @@ export function GroupRow({
         role="button"
         aria-expanded={isExpanded}
         aria-label={`${group.groupLabel} group`}
+        position="sticky"
+        top={0}
+        zIndex={20}
+        bg="rgba(255, 255, 255, 0.85)"
+        _dark={{ bg: "rgba(26, 26, 26, 0.85)" }}
+        backdropFilter="blur(12px)"
+        borderBottom="1px solid"
+        borderColor="border"
+        data-testid="group-row-header"
       >
         {isExpanded ? (
           <ChevronDown size={14} />
@@ -79,20 +98,16 @@ export function GroupRow({
         </Text>
       </HStack>
 
-      {/* Expanded content - individual scenario runs */}
+      {/* Expanded content - scenario runs sub-grouped by batch */}
       {isExpanded && (
-        <VStack
-          align="stretch"
-          gap={0}
-          borderTop="1px solid"
-          borderColor="border"
-        >
-          {group.scenarioRuns.map((scenarioRun) => (
-            <ScenarioTargetRow
-              key={scenarioRun.scenarioRunId}
-              scenarioRun={scenarioRun}
-              targetName={targetName ?? null}
-              onClick={() => onScenarioRunClick(scenarioRun)}
+        <>
+          {batches.map((batch) => (
+            <BatchSection
+              key={batch.batchRunId}
+              batch={batch}
+              resolveTargetName={resolveTargetName}
+              onScenarioRunClick={onScenarioRunClick}
+              viewMode={viewMode}
             />
           ))}
           {group.scenarioRuns.length === 0 && (
@@ -100,34 +115,10 @@ export function GroupRow({
               No scenario runs in this group.
             </Text>
           )}
-        </VStack>
+        </>
       )}
 
-      {/* Per-group footer stats */}
-      <HStack
-        paddingX={4}
-        paddingY={2}
-        borderTop="1px solid"
-        borderColor="border"
-        bg="bg.subtle"
-        fontSize="xs"
-        color="fg.muted"
-        justifyContent="space-between"
-      >
-        <Text>
-          {summary.totalCount} {summary.totalCount === 1 ? "run" : "runs"}
-        </Text>
-        <HStack gap={3}>
-          <Text color="green.600">{summary.passedCount} passed</Text>
-          <Text color="red.600">{summary.failedCount} failed</Text>
-          {summary.stalledCount > 0 && (
-            <Text color="yellow.600">{summary.stalledCount} stalled</Text>
-          )}
-          {summary.cancelledCount > 0 && (
-            <Text color="fg.muted">{summary.cancelledCount} cancelled</Text>
-          )}
-        </HStack>
-      </HStack>
-    </Box>
+      <RunSummaryFooter summary={summary} />
+    </>
   );
 }

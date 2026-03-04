@@ -1,28 +1,35 @@
 /**
  * Collapsible row for a single batch run in the run history list.
  *
- * Header: [chevron] [suiteName] · [scenarioNames] · [timeAgo] · [spacer] · [statusIcon] [passRate%]
- * Expanded: shows ScenarioTargetRow for each scenario run in the batch.
+ * Header: [chevron] [suiteName] . [scenarioNames] . [timeAgo] . [spacer] . [statusIcon] [passRate%]
+ * Expanded: shows ScenarioTargetRow (list) or ScenarioGridCard (grid) for each scenario run.
+ *
+ * The header is rendered as a direct child of the scroll container (no wrapper Box)
+ * so that `position: sticky` works correctly within the scrollport.
  */
 
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
+import { useMemo } from "react";
 import { SummaryStatusIcon } from "./SummaryStatusIcon";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { BatchRun, BatchRunSummary } from "./run-history-transforms";
-import { getScenarioDisplayNames } from "./run-history-transforms";
-import { ScenarioTargetRow } from "./ScenarioTargetRow";
+import { computeIterationMap, getScenarioDisplayNames } from "./run-history-transforms";
+import { ScenarioRunContent } from "./ScenarioRunContent";
+import { RunSummaryFooter } from "./RunSummaryFooter";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import type { ViewMode } from "./useRunHistoryStore";
 
 type RunRowProps = {
   batchRun: BatchRun;
   summary: BatchRunSummary;
   isExpanded: boolean;
   onToggle: () => void;
-  targetName: string | null;
+  resolveTargetName: (scenarioRun: ScenarioRunData) => string | null;
   onScenarioRunClick: (scenarioRun: ScenarioRunData) => void;
   expectedJobCount?: number;
-  suiteName?: string; // displayed in All Runs view
+  suiteName?: string;
+  viewMode?: ViewMode;
 };
 
 export function RunRow({
@@ -30,24 +37,25 @@ export function RunRow({
   summary,
   isExpanded,
   onToggle,
-  targetName,
+  resolveTargetName,
   onScenarioRunClick,
   expectedJobCount,
   suiteName,
+  viewMode = "grid",
 }: RunRowProps) {
   const timeAgo = formatTimeAgoCompact(batchRun.timestamp);
   const scenarioNames = suiteName
     ? getScenarioDisplayNames({ scenarioRuns: batchRun.scenarioRuns })
     : "";
 
+  const iterationMap = useMemo(
+    () => computeIterationMap({ scenarioRuns: batchRun.scenarioRuns }),
+    [batchRun.scenarioRuns],
+  );
+
   return (
-    <Box
-      border="1px solid"
-      borderColor="border"
-      borderRadius="md"
-      overflow="hidden"
-    >
-      {/* Run header - clickable to expand/collapse */}
+    <>
+      {/* Run header - clickable to expand/collapse, sticky within scroll container */}
       <HStack
         as="button"
         width="full"
@@ -60,6 +68,15 @@ export function RunRow({
         role="button"
         aria-expanded={isExpanded}
         aria-label={`Run from ${timeAgo ?? "unknown time"}`}
+        position="sticky"
+        top={0}
+        zIndex={20}
+        bg="rgba(255, 255, 255, 0.85)"
+        _dark={{ bg: "rgba(26, 26, 26, 0.85)" }}
+        backdropFilter="blur(12px)"
+        borderBottom="1px solid"
+        borderColor="border"
+        data-testid="run-row-header"
       >
         {isExpanded ? (
           <ChevronDown size={14} />
@@ -105,50 +122,25 @@ export function RunRow({
         </Text>
       </HStack>
 
-      {/* Expanded content - scenario x target rows */}
+      {/* Expanded content - scenario results in list or grid */}
       {isExpanded && (
-        <VStack align="stretch" gap={0} borderTop="1px solid" borderColor="border">
-          {batchRun.scenarioRuns.map((scenarioRun) => (
-            <ScenarioTargetRow
-              key={scenarioRun.scenarioRunId}
-              scenarioRun={scenarioRun}
-              targetName={targetName}
-              onClick={() => onScenarioRunClick(scenarioRun)}
-            />
-          ))}
+        <>
+          <ScenarioRunContent
+            scenarioRuns={batchRun.scenarioRuns}
+            viewMode={viewMode}
+            resolveTargetName={resolveTargetName}
+            onScenarioRunClick={onScenarioRunClick}
+            iterationMap={iterationMap}
+          />
           {batchRun.scenarioRuns.length === 0 && (
             <Text fontSize="sm" color="fg.muted" paddingX={4} paddingY={3}>
               No scenario runs in this batch.
             </Text>
           )}
-        </VStack>
+        </>
       )}
 
-      {/* Per-batch footer stats */}
-      <HStack
-        paddingX={4}
-        paddingY={2}
-        borderTop="1px solid"
-        borderColor="border"
-        bg="bg.subtle"
-        fontSize="xs"
-        color="fg.muted"
-        justifyContent="space-between"
-      >
-        <Text>
-          {summary.totalCount} {summary.totalCount === 1 ? "run" : "runs"}
-        </Text>
-        <HStack gap={3}>
-          <Text color="green.600">{summary.passedCount} passed</Text>
-          <Text color="red.600">{summary.failedCount} failed</Text>
-          {summary.stalledCount > 0 && (
-            <Text color="yellow.600">{summary.stalledCount} stalled</Text>
-          )}
-          {summary.cancelledCount > 0 && (
-            <Text color="fg.muted">{summary.cancelledCount} cancelled</Text>
-          )}
-        </HStack>
-      </HStack>
-    </Box>
+      <RunSummaryFooter summary={summary} />
+    </>
   );
 }

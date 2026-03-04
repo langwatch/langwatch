@@ -179,6 +179,7 @@ describe("<GroupRow/>", () => {
           isExpanded={false}
           onToggle={vi.fn()}
           onScenarioRunClick={vi.fn()}
+          resolveTargetName={() => null}
         />,
         { wrapper: Wrapper },
       );
@@ -197,6 +198,7 @@ describe("<GroupRow/>", () => {
           isExpanded={false}
           onToggle={vi.fn()}
           onScenarioRunClick={vi.fn()}
+          resolveTargetName={() => null}
         />,
         { wrapper: Wrapper },
       );
@@ -216,6 +218,7 @@ describe("<GroupRow/>", () => {
           isExpanded={false}
           onToggle={vi.fn()}
           onScenarioRunClick={vi.fn()}
+          resolveTargetName={() => null}
         />,
         { wrapper: Wrapper },
       );
@@ -241,6 +244,7 @@ describe("<GroupRow/>", () => {
           isExpanded={false}
           onToggle={vi.fn()}
           onScenarioRunClick={vi.fn()}
+          resolveTargetName={() => null}
         />,
         { wrapper: Wrapper },
       );
@@ -277,6 +281,7 @@ describe("<GroupRow/>", () => {
           isExpanded={false}
           onToggle={vi.fn()}
           onScenarioRunClick={vi.fn()}
+          resolveTargetName={() => null}
         />,
         { wrapper: Wrapper },
       );
@@ -298,6 +303,7 @@ describe("<GroupRow/>", () => {
           isExpanded={true}
           onToggle={vi.fn()}
           onScenarioRunClick={vi.fn()}
+          resolveTargetName={() => null}
         />,
         { wrapper: Wrapper },
       );
@@ -305,6 +311,81 @@ describe("<GroupRow/>", () => {
       // Expanded should show scenario run details
       const rows = screen.getAllByLabelText(/View details for/);
       expect(rows).toHaveLength(2);
+    });
+
+    it("displays batch sub-headers for each batch", () => {
+      const group: RunGroup = {
+        groupKey: "s1",
+        groupLabel: "Login",
+        groupType: "scenario",
+        timestamp: Date.now(),
+        scenarioRuns: [
+          makeScenarioRunData({
+            scenarioId: "s1",
+            scenarioRunId: "run_1",
+            batchRunId: "batch_A",
+            name: "Login",
+            status: ScenarioRunStatus.SUCCESS,
+          }),
+          makeScenarioRunData({
+            scenarioId: "s1",
+            scenarioRunId: "run_2",
+            batchRunId: "batch_B",
+            name: "Login",
+            status: ScenarioRunStatus.ERROR,
+          }),
+        ],
+      };
+      const summary = computeGroupSummary({ group });
+
+      render(
+        <GroupRow
+          group={group}
+          summary={summary}
+          isExpanded={true}
+          onToggle={vi.fn()}
+          onScenarioRunClick={vi.fn()}
+          resolveTargetName={() => null}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const batchHeaders = screen.getAllByTestId("batch-sub-header");
+      expect(batchHeaders).toHaveLength(2);
+    });
+
+    it("displays pass rate in each batch sub-header", () => {
+      const group: RunGroup = {
+        groupKey: "s1",
+        groupLabel: "Login",
+        groupType: "scenario",
+        timestamp: Date.now(),
+        scenarioRuns: [
+          makeScenarioRunData({
+            scenarioId: "s1",
+            scenarioRunId: "run_1",
+            batchRunId: "batch_A",
+            name: "Login",
+            status: ScenarioRunStatus.SUCCESS,
+          }),
+        ],
+      };
+      const summary = computeGroupSummary({ group });
+
+      render(
+        <GroupRow
+          group={group}
+          summary={summary}
+          isExpanded={true}
+          onToggle={vi.fn()}
+          onScenarioRunClick={vi.fn()}
+          resolveTargetName={() => null}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const batchHeader = screen.getByTestId("batch-sub-header");
+      expect(within(batchHeader).getByText("100%")).toBeInTheDocument();
     });
   });
 
@@ -322,6 +403,7 @@ describe("<GroupRow/>", () => {
           isExpanded={false}
           onToggle={onToggle}
           onScenarioRunClick={vi.fn()}
+          resolveTargetName={() => null}
         />,
         { wrapper: Wrapper },
       );
