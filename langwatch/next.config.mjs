@@ -92,6 +92,10 @@ const config = {
     "thread-stream",
     "async_hooks",
     "geoip-country",
+    "@aws-sdk/client-lambda",
+    "@aws-sdk/client-cloudwatch-logs",
+    "@aws-sdk/client-s3",
+    "@aws-sdk/client-ses",
   ],
 
   experimental: {

@@ -19,9 +19,18 @@ jobs:
           script: |
             const pr = context.payload.pull_request;
 
+            // Fetch current labels from the API instead of the event payload,
+            // because labels added by GITHUB_TOKEN actions don't trigger new
+            // workflow runs, so the payload may be stale.
+            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+            });
+
             // Labels that allow bypass
             const exceptionLabels = ["hotfix", "low-risk-change"];
-            const hasExceptionLabel = pr.labels.some(label => exceptionLabels.includes(label.name));
+            const hasExceptionLabel = labels.some(label => exceptionLabels.includes(label.name));
 
             // Get PR reviews
             const reviews = await github.rest.pulls.listReviews({
@@ -41,7 +50,7 @@ jobs:
             const approvalCount = approvedUsers.size;
 
             if (hasExceptionLabel) {
-              core.info(`PR has exception label (${pr.labels.map(l => l.name).join(", ")}). Passing check.`);
+              core.info(`PR has exception label (${labels.map(l => l.name).join(", ")}). Passing check.`);
               return;
             }
 
