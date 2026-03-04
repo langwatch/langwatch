@@ -37,13 +37,59 @@ describe("ScenarioRunDetailDrawer", () => {
           <ScenarioRunHeader
             name="Echo user request"
             status={ScenarioRunStatus.FAILED}
-            scenarioId="sc-123"
+            copyableIds={[
+              { label: "Scenario ID", value: "sc-123" },
+            ]}
           />,
           { wrapper: DrawerWrapper },
         );
 
         expect(screen.getByText("Echo user request")).toBeInTheDocument();
         expect(screen.getByText("Scenario ID: sc-123")).toBeInTheDocument();
+      });
+    });
+
+    describe("given a run with display title and copyable IDs", () => {
+      it("displays the display title with target name", () => {
+        render(
+          <ScenarioRunHeader
+            name="my-agent: Echo user request"
+            status={ScenarioRunStatus.FAILED}
+            copyableIds={[
+              { label: "Scenario ID", value: "sc-123" },
+              { label: "Batch Run ID", value: "br-456" },
+              { label: "Run ID", value: "sr-789" },
+            ]}
+          />,
+          { wrapper: DrawerWrapper },
+        );
+
+        expect(
+          screen.getByText("my-agent: Echo user request"),
+        ).toBeInTheDocument();
+      });
+
+      it("displays copyable IDs below the header", () => {
+        render(
+          <ScenarioRunHeader
+            name="my-agent: Echo user request"
+            status={ScenarioRunStatus.FAILED}
+            copyableIds={[
+              { label: "Scenario ID", value: "sc-123" },
+              { label: "Batch Run ID", value: "br-456" },
+              { label: "Run ID", value: "sr-789" },
+            ]}
+          />,
+          { wrapper: DrawerWrapper },
+        );
+
+        expect(
+          screen.getByText("Scenario ID: sc-123"),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByText("Batch Run ID: br-456"),
+        ).toBeInTheDocument();
+        expect(screen.getByText("Run ID: sr-789")).toBeInTheDocument();
       });
     });
   });

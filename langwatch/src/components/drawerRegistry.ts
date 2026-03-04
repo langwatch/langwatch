@@ -39,7 +39,7 @@ import { CreateProjectDrawer } from "./projects/CreateProjectDrawer";
 import { PromptEditorDrawer } from "./prompts/PromptEditorDrawer";
 import { PromptListDrawer } from "./prompts/PromptListDrawer";
 import { SeriesFiltersDrawer } from "./SeriesFilterDrawer";
-import { ScenarioFormDrawer } from "./scenarios/ScenarioFormDrawer";
+import { ScenarioFormDrawerFromUrl } from "./scenarios/ScenarioFormDrawer";
 import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
 import { ScenarioRunDetailDrawer } from "./simulations/ScenarioRunDetailDrawer";
 import { SuiteFormDrawer } from "./suites/SuiteFormDrawer";
@@ -83,7 +83,7 @@ export const drawers = {
   // Workflow selector specifically for evaluators (creates evaluator, not agent)
   workflowSelectorForEvaluator: WorkflowSelectorForEvaluatorDrawer,
   // Scenarios
-  scenarioEditor: ScenarioFormDrawer,
+  scenarioEditor: ScenarioFormDrawerFromUrl,
   scenarioRunDetail: ScenarioRunDetailDrawer,
   // Suites
   suiteEditor: SuiteFormDrawer,
