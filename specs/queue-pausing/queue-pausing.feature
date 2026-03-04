@@ -28,6 +28,6 @@ Feature: Queue pipeline pausing
 
   Scenario: Paused jobs stay in staging until unpaused
     Given a pipeline is paused
-    When the dispatcher scans for eligible jobs
-    Then jobs for the paused pipeline remain in their group queue
-    And the group stays in the ready set for immediate dispatch on unpause
+    When jobs are queued for the paused pipeline
+    Then those jobs are not dispatched
+    And when the pipeline is unpaused, the queued jobs dispatch immediately

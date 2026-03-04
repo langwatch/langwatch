@@ -1,4 +1,4 @@
-const PAUSE_KEY_PATTERN = /^[\w\-/]+$/;
+const PAUSE_KEY_PATTERN = /^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+){0,2}$/;
 
 export function isValidGroupId(id: unknown): id is string {
   return typeof id === "string" && id.length > 0 && id.length <= 512;

@@ -47,7 +47,7 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
 
       res.json({ ok: true, wasBlocked: result === 1 });
     } catch (err) {
-      logger.error({ err: err instanceof Error ? err.message : String(err) }, "unblock error");
+      logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "unblock error" });
       res.status(500).json({ error: "Internal error" });
     }
   });
@@ -99,7 +99,7 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
 
       res.json({ ok: true, unblockedCount });
     } catch (err) {
-      logger.error({ err: err instanceof Error ? err.message : String(err) }, "unblock-all error");
+      logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "unblock-all error" });
       res.status(500).json({ error: "Internal error" });
     }
   });
@@ -137,7 +137,7 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
 
       res.json({ ok: true, jobsRemoved: result });
     } catch (err) {
-      logger.error({ err: err instanceof Error ? err.message : String(err) }, "drain-group error");
+      logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "drain-group error" });
       res.status(500).json({ error: "Internal error" });
     }
   });
@@ -180,7 +180,7 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
 
       res.json({ ok: true, retried, unblocked: unblocked === 1 });
     } catch (err) {
-      logger.error({ err: err instanceof Error ? err.message : String(err) }, "retry-blocked error");
+      logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "retry-blocked error" });
       res.status(500).json({ error: "Internal error" });
     }
   });
@@ -206,7 +206,7 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
       await redis.sadd(`${queueName}:gq:paused-jobs`, pauseKey);
       res.json({ ok: true });
     } catch (err) {
-      logger.error({ err: err instanceof Error ? err.message : String(err) }, "pause error");
+      logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "pause error" });
       res.status(500).json({ error: "Internal error" });
     }
   });
@@ -234,7 +234,7 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
       await redis.lpush(`${queueName}:gq:signal`, "1");
       res.json({ ok: true });
     } catch (err) {
-      logger.error({ err: err instanceof Error ? err.message : String(err) }, "unpause error");
+      logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "unpause error" });
       res.status(500).json({ error: "Internal error" });
     }
   });
@@ -255,7 +255,7 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
       const pausedKeys = await redis.smembers(`${queueName}:gq:paused-jobs`);
       res.json({ pausedKeys });
     } catch (err) {
-      logger.error({ err: err instanceof Error ? err.message : String(err) }, "paused error");
+      logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "paused error" });
       res.status(500).json({ error: "Internal error" });
     }
   });

@@ -356,10 +356,16 @@ export class MetricsCollector {
         }
       }
       if (discoveredPaths.length > 0) {
-        await this.redis.sadd(KNOWN_PIPELINES_KEY, ...discoveredPaths);
-        await this.redis.expire(KNOWN_PIPELINES_KEY, 86400); // 24h TTL
+        const timestamp = Date.now();
+        const pipeline = this.redis.pipeline();
+        for (const path of discoveredPaths) {
+          pipeline.zadd(KNOWN_PIPELINES_KEY, timestamp, path);
+        }
+        // Evict paths not seen in 24h
+        pipeline.zremrangebyscore(KNOWN_PIPELINES_KEY, 0, timestamp - 86400 * 1000);
+        await pipeline.exec();
       }
-      const knownPaths = await this.redis.smembers(KNOWN_PIPELINES_KEY);
+      const knownPaths = await this.redis.zrange(KNOWN_PIPELINES_KEY, 0, -1);
       this.knownPipelinePaths = knownPaths;
 
       // totalInFlight from the staging layer (pending + active from scanGroupQueues)

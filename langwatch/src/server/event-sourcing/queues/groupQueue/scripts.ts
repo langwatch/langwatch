@@ -123,63 +123,73 @@ local nowMs        = tonumber(ARGV[2])
 local activeTtlSec = tonumber(ARGV[3])
 
 local hasPauses = redis.call("SCARD", pausedJobKey) > 0
-local groups = redis.call("ZREVRANGE", readyKey, 0, 99)
+local scanStart = 0
+local scanEnd = 99
+local maxPasses = hasPauses and 5 or 1
 
-for _, groupId in ipairs(groups) do
-  if redis.call("SISMEMBER", blockedKey, groupId) == 0 then
-    local activeKey = keyPrefix .. "group:" .. groupId .. ":active"
-    local activeJob = redis.call("GET", activeKey)
+for pass = 1, maxPasses do
+  local groups = redis.call("ZREVRANGE", readyKey, scanStart, scanEnd)
+  if #groups == 0 then break end
 
-    if not activeJob then
-      local jobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
-      local results = redis.call("ZRANGEBYSCORE", jobsKey, "-inf", nowMs, "WITHSCORES", "LIMIT", 0, 1)
+  for _, groupId in ipairs(groups) do
+    if redis.call("SISMEMBER", blockedKey, groupId) == 0 then
+      local activeKey = keyPrefix .. "group:" .. groupId .. ":active"
+      local activeJob = redis.call("GET", activeKey)
 
-      if #results >= 2 then
-        local stagedJobId = results[1]
-        local originalScore = results[2]
+      if not activeJob then
+        local jobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
+        local results = redis.call("ZRANGEBYSCORE", jobsKey, "-inf", nowMs, "WITHSCORES", "LIMIT", 0, 1)
 
-        -- Check pause status before dequeuing
-        local paused = false
-        if hasPauses then
-          local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
-          local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
-          if jobDataJson then
-            local ok, data = pcall(cjson.decode, jobDataJson)
-            if ok and type(data) == "table" then
-              local p = data["__pipelineName"]
-              local t = data["__jobType"]
-              local n = data["__jobName"]
-              if p then
-                if redis.call("SISMEMBER", pausedJobKey, p) == 1 then paused = true
-                elseif t and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t) == 1 then paused = true
-                elseif t and n and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t .. "/" .. n) == 1 then paused = true
+        if #results >= 2 then
+          local stagedJobId = results[1]
+          local originalScore = results[2]
+
+          -- Check pause status before dequeuing
+          local paused = false
+          if hasPauses then
+            local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
+            local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
+            if jobDataJson then
+              local ok, data = pcall(cjson.decode, jobDataJson)
+              if ok and type(data) == "table" then
+                local p = data["__pipelineName"]
+                local t = data["__jobType"]
+                local n = data["__jobName"]
+                if p then
+                  if redis.call("SISMEMBER", pausedJobKey, p) == 1 then paused = true
+                  elseif t and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t) == 1 then paused = true
+                  elseif t and n and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t .. "/" .. n) == 1 then paused = true
+                  end
                 end
               end
             end
           end
-        end
 
-        if not paused then
-          redis.call("ZREM", jobsKey, stagedJobId)
-          redis.call("SET", activeKey, stagedJobId, "EX", activeTtlSec)
+          if not paused then
+            redis.call("ZREM", jobsKey, stagedJobId)
+            redis.call("SET", activeKey, stagedJobId, "EX", activeTtlSec)
 
-          local pendingCount = redis.call("ZCARD", jobsKey)
-          if pendingCount > 0 then
-            local score = math.sqrt(pendingCount)
-            redis.call("ZADD", readyKey, score, groupId)
-          else
-            redis.call("ZREM", readyKey, groupId)
+            local pendingCount = redis.call("ZCARD", jobsKey)
+            if pendingCount > 0 then
+              local score = math.sqrt(pendingCount)
+              redis.call("ZADD", readyKey, score, groupId)
+            else
+              redis.call("ZREM", readyKey, groupId)
+            end
+
+            local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
+            local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
+            redis.call("HDEL", dataKey, stagedJobId)
+
+            return {stagedJobId, groupId, jobDataJson or "", originalScore}
           end
-
-          local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
-          local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
-          redis.call("HDEL", dataKey, stagedJobId)
-
-          return {stagedJobId, groupId, jobDataJson or "", originalScore}
         end
       end
     end
   end
+
+  scanStart = scanEnd + 1
+  scanEnd = scanEnd + 100
 end
 
 return nil
@@ -196,72 +206,83 @@ local activeTtlSec = tonumber(ARGV[3])
 local maxJobs      = tonumber(ARGV[4])
 
 local hasPauses = redis.call("SCARD", pausedJobKey) > 0
-local scanLimit = maxJobs * 3 - 1
-local groups = redis.call("ZREVRANGE", readyKey, 0, scanLimit)
+local scanWindow = maxJobs * 3
+local maxPasses = hasPauses and 5 or 1
 local results = {}
 local dispatched = 0
+local scanStart = 0
 
-for _, groupId in ipairs(groups) do
+for pass = 1, maxPasses do
   if dispatched >= maxJobs then break end
 
-  if redis.call("SISMEMBER", blockedKey, groupId) == 0 then
-    local activeKey = keyPrefix .. "group:" .. groupId .. ":active"
-    local activeJob = redis.call("GET", activeKey)
+  local scanEnd = scanStart + scanWindow - 1
+  local groups = redis.call("ZREVRANGE", readyKey, scanStart, scanEnd)
+  if #groups == 0 then break end
 
-    if not activeJob then
-      local jobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
-      local jobResults = redis.call("ZRANGEBYSCORE", jobsKey, "-inf", nowMs, "WITHSCORES", "LIMIT", 0, 1)
+  for _, groupId in ipairs(groups) do
+    if dispatched >= maxJobs then break end
 
-      if #jobResults >= 2 then
-        local stagedJobId = jobResults[1]
-        local originalScore = jobResults[2]
+    if redis.call("SISMEMBER", blockedKey, groupId) == 0 then
+      local activeKey = keyPrefix .. "group:" .. groupId .. ":active"
+      local activeJob = redis.call("GET", activeKey)
 
-        -- Check pause status before dequeuing
-        local paused = false
-        if hasPauses then
-          local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
-          local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
-          if jobDataJson then
-            local ok, data = pcall(cjson.decode, jobDataJson)
-            if ok and type(data) == "table" then
-              local p = data["__pipelineName"]
-              local t = data["__jobType"]
-              local n = data["__jobName"]
-              if p then
-                if redis.call("SISMEMBER", pausedJobKey, p) == 1 then paused = true
-                elseif t and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t) == 1 then paused = true
-                elseif t and n and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t .. "/" .. n) == 1 then paused = true
+      if not activeJob then
+        local jobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
+        local jobResults = redis.call("ZRANGEBYSCORE", jobsKey, "-inf", nowMs, "WITHSCORES", "LIMIT", 0, 1)
+
+        if #jobResults >= 2 then
+          local stagedJobId = jobResults[1]
+          local originalScore = jobResults[2]
+
+          -- Check pause status before dequeuing
+          local paused = false
+          if hasPauses then
+            local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
+            local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
+            if jobDataJson then
+              local ok, data = pcall(cjson.decode, jobDataJson)
+              if ok and type(data) == "table" then
+                local p = data["__pipelineName"]
+                local t = data["__jobType"]
+                local n = data["__jobName"]
+                if p then
+                  if redis.call("SISMEMBER", pausedJobKey, p) == 1 then paused = true
+                  elseif t and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t) == 1 then paused = true
+                  elseif t and n and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t .. "/" .. n) == 1 then paused = true
+                  end
                 end
               end
             end
           end
-        end
 
-        if not paused then
-          redis.call("ZREM", jobsKey, stagedJobId)
-          redis.call("SET", activeKey, stagedJobId, "EX", activeTtlSec)
+          if not paused then
+            redis.call("ZREM", jobsKey, stagedJobId)
+            redis.call("SET", activeKey, stagedJobId, "EX", activeTtlSec)
 
-          local pendingCount = redis.call("ZCARD", jobsKey)
-          if pendingCount > 0 then
-            local score = math.sqrt(pendingCount)
-            redis.call("ZADD", readyKey, score, groupId)
-          else
-            redis.call("ZREM", readyKey, groupId)
+            local pendingCount = redis.call("ZCARD", jobsKey)
+            if pendingCount > 0 then
+              local score = math.sqrt(pendingCount)
+              redis.call("ZADD", readyKey, score, groupId)
+            else
+              redis.call("ZREM", readyKey, groupId)
+            end
+
+            local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
+            local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
+            redis.call("HDEL", dataKey, stagedJobId)
+
+            results[#results + 1] = stagedJobId
+            results[#results + 1] = groupId
+            results[#results + 1] = jobDataJson or ""
+            results[#results + 1] = tostring(originalScore)
+            dispatched = dispatched + 1
           end
-
-          local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
-          local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
-          redis.call("HDEL", dataKey, stagedJobId)
-
-          results[#results + 1] = stagedJobId
-          results[#results + 1] = groupId
-          results[#results + 1] = jobDataJson or ""
-          results[#results + 1] = tostring(originalScore)
-          dispatched = dispatched + 1
         end
       end
     end
   end
+
+  scanStart = scanStart + scanWindow
 end
 
 return results

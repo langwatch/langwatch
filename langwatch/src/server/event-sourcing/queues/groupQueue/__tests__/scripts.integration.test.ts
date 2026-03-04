@@ -177,7 +177,7 @@ describe("GroupStagingScripts", () => {
 
   describe("stageBatch", () => {
     describe("when staging for different groups", () => {
-      it("creates entries per group, signals per group", async () => {
+      it("creates entries per group and pushes signal", async () => {
         const jobs = [
           makeJob({ stagedJobId: "j1", groupId: "group-x", dispatchAfterMs: 100 }),
           makeJob({ stagedJobId: "j2", groupId: "group-y", dispatchAfterMs: 200 }),
@@ -604,7 +604,8 @@ describe("GroupStagingScripts", () => {
     });
   });
 
-  describe("dispatch > when head-of-line job is paused", () => {
+  describe("dispatch", () => {
+    describe("when head-of-line job is paused", () => {
     function makePausedJobData(overrides: Record<string, unknown> = {}): string {
       return JSON.stringify({
         __pipelineName: "ingestion",
@@ -757,8 +758,10 @@ describe("GroupStagingScripts", () => {
       expect(result!.stagedJobId).toBe("j1");
     });
   });
+  });
 
-  describe("dispatchBatch > when paused jobs exist", () => {
+  describe("dispatchBatch", () => {
+    describe("when paused jobs exist", () => {
     it("skips paused groups and returns only non-paused", async () => {
       await scripts.stage(
         makeJob({
@@ -796,6 +799,7 @@ describe("GroupStagingScripts", () => {
       const jobs = await inspectGroupJobs("group-paused");
       expect(jobs).toContain("j1");
     });
+  });
   });
 
   describe("signal list cap", () => {

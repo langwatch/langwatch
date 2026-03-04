@@ -128,7 +128,7 @@ function TreeNode({
               size="xs"
               variant="ghost"
               opacity={0}
-              _groupHover={{ opacity: paused || !inherited ? 0.7 : 0.3 }}
+              _groupHover={{ opacity: !inherited ? 0.7 : 0.3 }}
               _hover={{ opacity: "1 !important" }}
               onClick={handlePauseToggle}
               isDisabled={inherited && !directlyPaused}
