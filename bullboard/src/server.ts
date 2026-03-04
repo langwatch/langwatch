@@ -92,6 +92,10 @@ async function main() {
   // Basic auth middleware (skip /health)
   const username = process.env.BULLBOARD_USERNAME;
   const password = process.env.BULLBOARD_PASSWORD;
+  if ((username && !password) || (!username && password)) {
+    console.error("Set both BULLBOARD_USERNAME and BULLBOARD_PASSWORD, or neither");
+    process.exit(1);
+  }
   if (username && password) {
     app.use("*", basicAuth({ username, password }));
   }
