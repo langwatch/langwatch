@@ -308,61 +308,58 @@ export function ScenarioRunDetailDrawer({
                 paddingX={0}
                 overflowY="auto"
               >
-                <VStack gap={0} w="100%" h="100%">
-                  {/* Conversation — hidden when empty (e.g. stalled runs) */}
-                  {(scenarioState.messages ?? []).length > 0 && (
-                    <Box
-                      w="100%"
-                      paddingX={6}
-                      paddingY={6}
-                      background="bg.muted"
-                      flexGrow={1}
-                    >
-                      <Box borderRadius="md" overflow="hidden">
-                        <CustomCopilotKitChat
-                          messages={scenarioState.messages ?? []}
-                          hideInput
-                          smallerView={false}
-                        />
-                      </Box>
-                    </Box>
-                  )}
-
-                  {/* Results */}
+                {/* Conversation — hidden when empty (e.g. stalled runs) */}
+                {(scenarioState.messages ?? []).length > 0 && (
                   <Box
-                    w="100%"
-                    flexGrow={1}
-                    borderTop={(scenarioState.messages ?? []).length > 0 ? "1px" : undefined}
-                    borderColor="border.muted"
-                    css={{ "& > div": { borderRadius: 0, minHeight: "100%" } }}
+                    paddingX={6}
+                    paddingY={6}
+                    background="bg.muted"
                   >
-                    <Box position="relative" className="group" h="100%">
-                      <SimulationConsole
-                        results={scenarioState.results}
-                        scenarioName={scenarioState.name ?? undefined}
-                        status={scenarioState.status}
-                        durationInMs={scenarioState.durationInMs}
+                    <Box borderRadius="md" overflow="hidden">
+                      <CustomCopilotKitChat
+                        messages={scenarioState.messages ?? []}
+                        hideInput
+                        smallerView={false}
                       />
-                      {scenarioState.results && (
-                        <Box
-                          position="absolute"
-                          top={2}
-                          right={2}
-                          opacity={0}
-                          _groupHover={{ opacity: 1 }}
-                          transition="opacity 0.2s"
-                        >
-                          <CopyButton
-                            value={formatResultsForCopy(
-                              scenarioState.results,
-                            )}
-                            label="Results"
-                          />
-                        </Box>
-                      )}
                     </Box>
                   </Box>
-                </VStack>
+                )}
+
+                {/* Results */}
+                <Box
+                  minHeight={(scenarioState.messages ?? []).length === 0 ? "100%" : undefined}
+                  borderTop={(scenarioState.messages ?? []).length > 0 ? "1px" : undefined}
+                  borderColor="border.muted"
+                  position="relative"
+                  className="group"
+                  css={{
+                    "& > div:first-child": { borderRadius: 0, minHeight: "inherit" },
+                  }}
+                >
+                  <SimulationConsole
+                    results={scenarioState.results}
+                    scenarioName={scenarioState.name ?? undefined}
+                    status={scenarioState.status}
+                    durationInMs={scenarioState.durationInMs}
+                  />
+                  {scenarioState.results && (
+                    <Box
+                      position="absolute"
+                      top={2}
+                      right={2}
+                      opacity={0}
+                      _groupHover={{ opacity: 1 }}
+                      transition="opacity 0.2s"
+                    >
+                      <CopyButton
+                        value={formatResultsForCopy(
+                          scenarioState.results,
+                        )}
+                        label="Results"
+                      />
+                    </Box>
+                  )}
+                </Box>
               </Drawer.Body>
             </VStack>
           )}

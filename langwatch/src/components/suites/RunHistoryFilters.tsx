@@ -64,9 +64,10 @@ export function RunHistoryFilters({
             }
             aria-label="Filter by pass/fail status"
           >
-            <option value="">Pass/Fail</option>
+            <option value="">All Statuses</option>
             <option value="pass">Pass</option>
             <option value="fail">Fail</option>
+            <option value="stalled">Stalled</option>
           </NativeSelect.Field>
           <NativeSelect.Indicator />
         </NativeSelect.Root>

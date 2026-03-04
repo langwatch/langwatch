@@ -217,6 +217,12 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
         return summary.failedCount > 0;
       });
     }
+    if (filters.passFailStatus === "stalled") {
+      return grouped.filter((b) => {
+        const summary = computeBatchRunSummary({ batchRun: b });
+        return summary.stalledCount > 0 && summary.failedCount === 0;
+      });
+    }
 
     return grouped;
   }, [filteredRuns, filters.passFailStatus]);
@@ -240,6 +246,12 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
       return grouped.filter((g) => {
         const summary = computeGroupSummary({ group: g });
         return summary.failedCount > 0;
+      });
+    }
+    if (filters.passFailStatus === "stalled") {
+      return grouped.filter((g) => {
+        const summary = computeGroupSummary({ group: g });
+        return summary.stalledCount > 0 && summary.failedCount === 0;
       });
     }
 
