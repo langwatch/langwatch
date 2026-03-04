@@ -1,6 +1,8 @@
 name: Low-Risk PR Evaluation
 
 on:
+  pull_request:
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
     inputs:
       pr_number:
@@ -14,6 +16,8 @@ permissions:
 
 jobs:
   evaluate:
+    # Skip fork PRs — secrets and write permissions are unavailable
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
 
     steps:
@@ -24,7 +28,7 @@ jobs:
         id: pr-data
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ inputs.pr_number }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
         run: |
           gh pr view "$PR_NUMBER" --json title,body --template '{{.title}}' > /tmp/pr_title.txt
           gh pr view "$PR_NUMBER" --json title,body --template '{{.body}}' > /tmp/pr_body.txt
@@ -75,7 +79,7 @@ jobs:
         id: evaluate
         if: steps.pr-data.outputs.oversized == 'false' && steps.path-check.outputs.blocked == 'false'
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.LOW_RISK_OPENAI_API_KEY }}
         run: |
           POLICY=$(cat docs/LOW_RISK_PULL_REQUESTS.md)
           PR_TITLE=$(cat /tmp/pr_title.txt)
@@ -159,7 +163,7 @@ jobs:
       - name: Apply label and comment
         uses: actions/github-script@v7
         env:
-          PR_NUMBER: ${{ inputs.pr_number }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
           QUALIFIES: ${{ steps.oversized.outputs.qualifies || steps.restricted.outputs.qualifies || steps.evaluate.outputs.qualifies }}
           SCOPE: ${{ steps.oversized.outputs.scope || steps.restricted.outputs.scope || steps.evaluate.outputs.scope }}
           REASONING: ${{ steps.oversized.outputs.reasoning || steps.restricted.outputs.reasoning || steps.evaluate.outputs.reasoning }}
