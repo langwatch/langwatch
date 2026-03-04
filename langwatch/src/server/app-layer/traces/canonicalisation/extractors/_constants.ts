@@ -102,12 +102,6 @@ export const ATTR_KEYS = {
   LANGWATCH_LANGGRAPH_STEP: "langwatch.langgraph.langgraph_step",
   LANGWATCH_LABELS: "langwatch.labels",
   LANGWATCH_TAGS: "langwatch.tags", // Legacy/alternative name
-  LANGWATCH_RESERVED_PII_REDACTION_STATUS:
-    "langwatch.reserved.pii_redaction_status",
-  LANGWATCH_RESERVED_PII_REDACTION_PARTIAL_SPAN_IDS:
-    "langwatch.reserved.pii_redaction_partial_span_ids",
-  LANGWATCH_RESERVED_PII_REDACTION_SKIPPED_SPAN_IDS:
-    "langwatch.reserved.pii_redaction_skipped_span_ids",
 
   // LangWatch reserved attributes
   LANGWATCH_RESERVED_PII_REDACTION_STATUS:
