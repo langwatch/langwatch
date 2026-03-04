@@ -731,11 +731,13 @@ export class ClickHouseSimulationService {
     // Step 2: For each set's latest batch, compute pass/total
     const batchRunIds = setRows.map((r) => r.LatestBatchRunId);
     const batchStats = await this.queryRows<{
+      ScenarioSetId: string;
       BatchRunId: string;
       TotalCount: string;
       PassCount: string;
     }>(
       `SELECT
+        ScenarioSetId,
         BatchRunId,
         toString(count()) AS TotalCount,
         toString(countIf(Status = 'SUCCESS')) AS PassCount
@@ -748,19 +750,19 @@ export class ClickHouseSimulationService {
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE DeletedAt IS NULL
-       GROUP BY BatchRunId`,
+       GROUP BY ScenarioSetId, BatchRunId`,
       { tenantId: projectId, batchRunIds },
     );
 
     const statsMap = new Map(
       batchStats.map((r) => [
-        r.BatchRunId,
+        `${r.ScenarioSetId}:${r.BatchRunId}`,
         { total: Number(r.TotalCount), passed: Number(r.PassCount) },
       ]),
     );
 
     return setRows.map((row) => {
-      const stats = statsMap.get(row.LatestBatchRunId);
+      const stats = statsMap.get(`${row.ScenarioSetId}:${row.LatestBatchRunId}`);
       return {
         scenarioSetId: row.ScenarioSetId,
         passedCount: stats?.passed ?? 0,

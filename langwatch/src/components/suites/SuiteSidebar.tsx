@@ -418,6 +418,7 @@ function SidebarListItemWrapper({
     <HStack
       className={className}
       data-testid={dataTestId}
+      data-selected={isSelected || undefined}
       paddingX={3}
       position="relative"
       paddingY={3}

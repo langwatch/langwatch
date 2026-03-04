@@ -882,11 +882,13 @@ export class ScenarioEventService {
           (s) => !s.scenarioSetId.startsWith("__internal__"),
         );
         span.setAttribute("result.count", externalSets.length);
-        // ES path does not resolve per-run pass/fail status; ClickHouse is the primary backend
+        // ES path cannot resolve per-run pass/fail status; return zero counts
+        // so the sidebar hides the summary line rather than showing misleading data.
+        // ClickHouse is the primary backend for accurate pass/fail stats.
         return externalSets.map((s) => ({
           scenarioSetId: s.scenarioSetId,
           passedCount: 0,
-          totalCount: s.scenarioCount,
+          totalCount: 0,
           lastRunTimestamp: s.lastRunAt,
         }));
       },

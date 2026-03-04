@@ -214,7 +214,30 @@ describe("<SuiteSidebar/> External Sets", () => {
           { wrapper: Wrapper },
         );
 
-        expect(screen.getByText("nightly-regression")).toBeInTheDocument();
+        const listItems = screen.getAllByTestId("external-set-list-item");
+        const selectedItem = listItems.find((item) =>
+          within(item).queryByText("nightly-regression"),
+        );
+        expect(selectedItem).toBeDefined();
+        expect(selectedItem).toHaveAttribute("data-selected", "true");
+      });
+
+      it("does not highlight unselected external sets", () => {
+        render(
+          <SuiteSidebar
+            {...defaultProps}
+            externalSets={externalSets}
+            selectedSuiteSlug={toExternalSetSelection("nightly-regression")}
+          />,
+          { wrapper: Wrapper },
+        );
+
+        const listItems = screen.getAllByTestId("external-set-list-item");
+        const unselectedItem = listItems.find((item) =>
+          within(item).queryByText("ci-smoke-tests"),
+        );
+        expect(unselectedItem).toBeDefined();
+        expect(unselectedItem).not.toHaveAttribute("data-selected");
       });
     });
   });
