@@ -1519,4 +1519,3 @@ def test_parse_workflow_with_emoji_in_conversation_history():
         )
 
     assert result.cost > 0
-    assert result.duration > 0

@@ -13,9 +13,7 @@ else
 fi
 ts-to-zod src/internal/generated/types/evaluations.ts src/internal/generated/types/evaluations.generated.ts
 
-cd src/internal/generated/types/
-curl -L "https://raw.githubusercontent.com/langwatch/langevals/main/ts-integration/evaluators.generated.ts?$(date +%s)" -o evaluators.generated.ts
-cd -
+cp ../langevals/ts-integration/evaluators.generated.ts src/internal/generated/types/evaluators.generated.ts
 ts-to-zod src/internal/generated/types/evaluators.generated.ts src/internal/generated/types/evaluators.zod.generated.ts
 
 # Fix z.record(z.never()) to z.record(z.string(), z.never())

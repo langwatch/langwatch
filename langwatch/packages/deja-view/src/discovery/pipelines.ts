@@ -3,10 +3,9 @@ import { pathToFileURL } from "node:url";
 import fg from "fast-glob";
 import type {
   AggregateType,
-  ParentLink,
   StaticPipelineDefinition,
-} from "../../../../src/server/event-sourcing/library";
-import type { Event } from "../../../../src/server/event-sourcing/library/domain/types";
+} from "../../../../src/server/event-sourcing";
+import type { Event } from "../../../../src/server/event-sourcing/domain/types";
 import { pipelineRoot } from "../paths";
 
 /**
@@ -16,7 +15,6 @@ import { pipelineRoot } from "../paths";
 export interface DiscoveredPipeline {
   name: string;
   aggregateType: AggregateType;
-  parentLinks: ParentLink<Event>[];
   pipeline: StaticPipelineDefinition<Event, any>;
   pipelineFilePath: string;
 }
@@ -45,7 +43,6 @@ export async function discoverPipelines(): Promise<DiscoveredPipeline[]> {
           results.push({
             name: exported.metadata.name,
             aggregateType: exported.metadata.aggregateType,
-            parentLinks: exported.parentLinks ?? [],
             pipeline: exported,
             pipelineFilePath: file,
           });
@@ -80,9 +77,8 @@ function isStaticPipelineDefinition(
     typeof (definition.metadata as any).name === "string" &&
     typeof (definition.metadata as any).aggregateType === "string" &&
     definition.projections instanceof Map &&
-    definition.eventHandlers instanceof Map &&
-    Array.isArray(definition.commands) &&
-    Array.isArray(definition.parentLinks)
+    definition.mapProjections instanceof Map &&
+    Array.isArray(definition.commands)
   );
 }
 

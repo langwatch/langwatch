@@ -2,6 +2,7 @@ import { nanoid } from "nanoid";
 import { useCallback, useEffect, useState } from "react";
 import { toaster } from "../../components/ui/toaster";
 import type { StudioClientEvent } from "../types/events";
+import { mergeLocalConfigsIntoDsl } from "../utils/mergeLocalConfigs";
 import { usePostEvent } from "./usePostEvent";
 import { useWorkflowStore } from "./useWorkflowStore";
 
@@ -86,11 +87,15 @@ export const useEvaluationExecution = () => {
         total: 0,
       });
 
+      const workflow = getWorkflow();
       const payload: StudioClientEvent = {
         type: "execute_evaluation",
         payload: {
           run_id,
-          workflow: getWorkflow(),
+          workflow: {
+            ...workflow,
+            nodes: mergeLocalConfigsIntoDsl(workflow.nodes),
+          },
           workflow_version_id,
           evaluate_on,
           dataset_entry,
@@ -129,7 +134,13 @@ export const useEvaluationExecution = () => {
 
       const payload: StudioClientEvent = {
         type: "stop_evaluation_execution",
-        payload: { workflow: workflow, run_id },
+        payload: {
+          workflow: {
+            ...workflow,
+            nodes: mergeLocalConfigsIntoDsl(workflow.nodes),
+          },
+          run_id,
+        },
       };
       postEvent(payload);
 

@@ -70,7 +70,12 @@ export async function startTestContainers(): Promise<{
     const urlWithDatabase = new URL(clickHouseUrl);
     urlWithDatabase.pathname = `/${TEST_DATABASE}`;
 
-    clickHouseClient = createClient({ url: urlWithDatabase });
+    clickHouseClient = createClient({
+      url: urlWithDatabase,
+      clickhouse_settings: {
+        date_time_input_format: "best_effort",
+      },
+    });
 
     return {
       clickHouseClient,
@@ -95,7 +100,12 @@ export async function startTestContainers(): Promise<{
     // Don't run migrations - globalSetup already did that
     // globalSetup provides URL with correct database already in pathname
     if (!clickHouseClient) {
-      clickHouseClient = createClient({ url: new URL(clickHouseUrl) });
+      clickHouseClient = createClient({
+        url: new URL(clickHouseUrl),
+        clickhouse_settings: {
+          date_time_input_format: "best_effort",
+        },
+      });
     }
 
     return {
@@ -219,13 +229,6 @@ export async function cleanupTestData(tenantId?: string): Promise<void> {
 
     await clickHouseClient.exec({
       query: `
-        ALTER TABLE "${TEST_DATABASE}".processor_checkpoints DELETE WHERE TenantId = {tenantId:String}
-      `,
-      query_params: { tenantId },
-    });
-
-    await clickHouseClient.exec({
-      query: `
         ALTER TABLE "${TEST_DATABASE}".stored_spans DELETE WHERE TenantId = {tenantId:String}
       `,
       query_params: { tenantId },
@@ -254,10 +257,6 @@ export async function cleanupTestData(tenantId?: string): Promise<void> {
     // Clean up all test data using TRUNCATE (synchronous and faster)
     await clickHouseClient.exec({
       query: `TRUNCATE TABLE IF EXISTS "${TEST_DATABASE}".event_log`,
-    });
-
-    await clickHouseClient.exec({
-      query: `TRUNCATE TABLE IF EXISTS "${TEST_DATABASE}".processor_checkpoints`,
     });
 
     await clickHouseClient.exec({

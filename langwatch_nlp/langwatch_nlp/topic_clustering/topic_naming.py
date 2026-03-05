@@ -1,4 +1,5 @@
 from concurrent.futures import Future, ThreadPoolExecutor
+import contextvars
 import math
 from typing import Optional
 import litellm
@@ -365,6 +366,7 @@ def generate_topic_and_subtopic_names(
 
         logger.info("Submitting topic naming task")
         topic_future = executor.submit(
+            contextvars.copy_context().run,
             (
                 noop_topic_names
                 if skip_topic_names
@@ -385,6 +387,7 @@ def generate_topic_and_subtopic_names(
                 get_subtopic_samples(samples, n=20) for samples in subtopics.values()
             ]
             future = executor.submit(
+                contextvars.copy_context().run,
                 generate_topic_names_split_and_improve_similar_names,
                 litellm_params,
                 embeddings_litellm_params,

@@ -170,6 +170,25 @@ export class EvaluatorService {
   }
 
   /**
+   * Computes output fields for a built-in evaluator from its result definition.
+   * Only includes score/passed/label when the evaluator actually produces them.
+   * Always includes details since all evaluators can produce a freeform explanation.
+   */
+  private computeBuiltInOutputFields(evaluatorType: string): EvaluatorField[] {
+    const def = AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes];
+    if (!def) return STANDARD_EVALUATOR_OUTPUT_FIELDS;
+
+    const fields: EvaluatorField[] = [];
+    if (def.result.score) fields.push({ identifier: "score", type: "float" });
+    if (def.result.passed) fields.push({ identifier: "passed", type: "bool" });
+    if (def.result.label) fields.push({ identifier: "label", type: "str" });
+    // details is always available on EvaluationResult
+    fields.push({ identifier: "details", type: "str" });
+
+    return fields.length > 1 ? fields : STANDARD_EVALUATOR_OUTPUT_FIELDS;
+  }
+
+  /**
    * Enriches an evaluator with its computed fields and workflow metadata.
    */
   async enrichWithFields(evaluator: Evaluator): Promise<EvaluatorWithFields> {
@@ -182,12 +201,14 @@ export class EvaluatorService {
     const config = evaluator.config as { evaluatorType?: string } | null;
     const evaluatorType = config?.evaluatorType;
     const fields = evaluatorType ? this.computeBuiltInFields(evaluatorType) : [];
+    const outputFields = evaluatorType
+      ? this.computeBuiltInOutputFields(evaluatorType)
+      : STANDARD_EVALUATOR_OUTPUT_FIELDS;
 
-    // Built-in evaluators always have standard output fields
     return {
       ...evaluator,
       fields,
-      outputFields: STANDARD_EVALUATOR_OUTPUT_FIELDS,
+      outputFields,
     };
   }
 

@@ -11,6 +11,9 @@ WORKDIR /usr/src/app/python-sdk
 COPY python-sdk .
 RUN uv build
 
+# Copy langevals_core for local path dependency
+COPY langevals/langevals_core/ /usr/src/app/langevals/langevals_core/
+
 WORKDIR /usr/src/app/langwatch_nlp
 
 COPY langwatch_nlp/.python-version langwatch_nlp/uv.lock langwatch_nlp/pyproject.toml .

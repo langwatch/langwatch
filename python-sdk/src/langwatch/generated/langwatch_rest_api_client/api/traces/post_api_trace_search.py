@@ -1,5 +1,5 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
 
 import httpx
 
@@ -21,31 +21,27 @@ def _get_kwargs(
         "url": "/api/trace/search",
     }
 
-    _body = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
-    _kwargs["json"] = _body
     headers["Content-Type"] = "application/json"
 
     _kwargs["headers"] = headers
     return _kwargs
 
 
-def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[SearchResponse]:
+def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> SearchResponse | None:
     if response.status_code == 200:
         response_200 = SearchResponse.from_dict(response.json())
 
         return response_200
+
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
         return None
 
 
-def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[SearchResponse]:
+def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Response[SearchResponse]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -56,7 +52,7 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: Union[AuthenticatedClient, Client],
+    client: AuthenticatedClient | Client,
     body: SearchRequest,
 ) -> Response[SearchResponse]:
     """Search traces
@@ -87,9 +83,9 @@ def sync_detailed(
 
 def sync(
     *,
-    client: Union[AuthenticatedClient, Client],
+    client: AuthenticatedClient | Client,
     body: SearchRequest,
-) -> Optional[SearchResponse]:
+) -> SearchResponse | None:
     """Search traces
 
      Search for traces based on given criteria
@@ -113,7 +109,7 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: Union[AuthenticatedClient, Client],
+    client: AuthenticatedClient | Client,
     body: SearchRequest,
 ) -> Response[SearchResponse]:
     """Search traces
@@ -142,9 +138,9 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: Union[AuthenticatedClient, Client],
+    client: AuthenticatedClient | Client,
     body: SearchRequest,
-) -> Optional[SearchResponse]:
+) -> SearchResponse | None:
     """Search traces
 
      Search for traces based on given criteria

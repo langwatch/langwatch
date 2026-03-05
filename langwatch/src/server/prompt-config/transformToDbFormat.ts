@@ -24,7 +24,6 @@ const CAMEL_TO_SNAKE_MAPPING: Record<string, string> = {
   repetitionPenalty: "repetition_penalty",
   // Prompt-specific parameters
   promptingTechnique: "prompting_technique",
-  responseFormat: "response_format",
 };
 
 /**
@@ -59,6 +58,10 @@ export function transformCamelToSnake(
 
   // 'reasoning' passes through unchanged - it's the canonical field
   // Provider-specific mapping happens at runtime boundary (reasoningBoundary.ts)
+
+  // response_format is derived from outputs at read time, never stored directly
+  delete result.responseFormat;
+  delete result.response_format;
 
   return result;
 }

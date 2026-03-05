@@ -44,7 +44,7 @@ export const AddAnnotationQueueDrawer = ({
       projectId: project?.id ?? "",
     },
     {
-      enabled: !!project && !!queueId,
+      enabled: !!project && !!queueId && open,
     },
   );
 
@@ -64,7 +64,7 @@ export const AddAnnotationQueueDrawer = ({
       projectId: project?.id ?? "",
     },
     {
-      enabled: !!project,
+      enabled: !!project && open,
     },
   );
 
@@ -81,7 +81,7 @@ export const AddAnnotationQueueDrawer = ({
         organizationId: organization?.id ?? "",
       },
       {
-        enabled: !!organization,
+        enabled: !!organization && open,
       },
     );
   const {

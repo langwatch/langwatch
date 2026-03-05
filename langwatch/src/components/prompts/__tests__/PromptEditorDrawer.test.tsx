@@ -686,7 +686,7 @@ describe("PromptEditorDrawer", () => {
     });
   });
 
-  describe("Header structure", () => {
+  describe("Header and footer layout", () => {
     beforeEach(() => {
       mockGetByIdOrHandle.mockReturnValue({
         data: mockPromptDataWithMessages,
@@ -694,35 +694,44 @@ describe("PromptEditorDrawer", () => {
       });
     });
 
-    it("has model selector in header", () => {
+    it("has model selector in the body (model-only header)", () => {
       renderWithProviders(
         <PromptEditorDrawer open={true} promptId="prompt-123" />,
       );
       expect(screen.getByTestId("model-select")).toBeInTheDocument();
     });
 
-    it("has version history button in header when editing", () => {
+    it("renders version history button in the footer when editing", () => {
       renderWithProviders(
         <PromptEditorDrawer open={true} promptId="prompt-123" />,
       );
       expect(screen.getByTestId("version-history-button")).toBeInTheDocument();
     });
 
-    it("has save button in header", () => {
+    it("renders save button in the footer", () => {
       renderWithProviders(
         <PromptEditorDrawer open={true} promptId="prompt-123" />,
       );
       expect(screen.getByTestId("save-prompt-button")).toBeInTheDocument();
     });
 
-    it("does not have save button in footer", () => {
+    it("renders exactly one save button (in footer, not header)", () => {
       renderWithProviders(
         <PromptEditorDrawer open={true} promptId="prompt-123" />,
       );
-      // The drawer should not have a footer with save button
-      // Only one save button should exist (in header)
+      // With variant="model-only" header, save button is only in the footer
       const saveButtons = screen.getAllByTestId("save-prompt-button");
       expect(saveButtons).toHaveLength(1);
+    });
+
+    it("always renders the footer in drawer mode", () => {
+      // Even without targetId (not in evaluations context), footer shows
+      mockDrawerParams = {};
+      renderWithProviders(
+        <PromptEditorDrawer open={true} promptId="prompt-123" />,
+      );
+      // Save button in footer indicates footer is rendered
+      expect(screen.getByTestId("save-prompt-button")).toBeInTheDocument();
     });
   });
 

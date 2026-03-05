@@ -1,10 +1,11 @@
 import { z } from "zod";
 
-import { EventSchema } from "../../../library/domain/types";
+import { EventSchema } from "../../../domain/types";
 import { piiRedactionLevelSchema } from "./commands";
 import {
-  SPAN_RECEIVED_EVENT_TYPE,
-  TOPIC_ASSIGNED_EVENT_TYPE,
+	SATISFACTION_SCORE_ASSIGNED_EVENT_TYPE,
+	SPAN_RECEIVED_EVENT_TYPE,
+	TOPIC_ASSIGNED_EVENT_TYPE,
 } from "./constants";
 import { instrumentationScopeSchema, resourceSchema, spanSchema } from "./otlp";
 
@@ -93,6 +94,47 @@ export function isTopicAssignedEvent(
 }
 
 /**
+ * Zod schema for SatisfactionScoreAssignedEvent metadata.
+ */
+export const satisfactionScoreAssignedEventMetadataSchema = z
+  .object({
+    processingTraceparent: z.string().optional(),
+  })
+  .passthrough();
+
+/**
+ * Zod schema for SatisfactionScoreAssignedEvent data.
+ */
+export const satisfactionScoreAssignedEventDataSchema = z.object({
+  satisfactionScore: z.number(),
+});
+
+export const satisfactionScoreAssignedEventSchema = EventSchema.extend({
+  type: z.literal(SATISFACTION_SCORE_ASSIGNED_EVENT_TYPE),
+  data: satisfactionScoreAssignedEventDataSchema,
+  metadata: satisfactionScoreAssignedEventMetadataSchema,
+});
+
+export type SatisfactionScoreAssignedEventData = z.infer<
+  typeof satisfactionScoreAssignedEventDataSchema
+>;
+export type SatisfactionScoreAssignedEvent = z.infer<
+  typeof satisfactionScoreAssignedEventSchema
+>;
+
+/**
+ * Type guard for SatisfactionScoreAssignedEvent.
+ */
+export function isSatisfactionScoreAssignedEvent(
+  event: TraceProcessingEvent,
+): event is SatisfactionScoreAssignedEvent {
+  return event.type === SATISFACTION_SCORE_ASSIGNED_EVENT_TYPE;
+}
+
+/**
  * Union of all trace processing event types.
  */
-export type TraceProcessingEvent = SpanReceivedEvent | TopicAssignedEvent;
+export type TraceProcessingEvent =
+  | SpanReceivedEvent
+  | TopicAssignedEvent
+  | SatisfactionScoreAssignedEvent;

@@ -3,6 +3,11 @@ packages:
   - "saas-src/*"
   - "packages/*"
 
+packageExtensions:
+  bullmq-otel:
+    dependencies:
+      tslib: "^2.6.0"
+
 onlyBuiltDependencies:
   - '@prisma/client'
   - '@prisma/engines'

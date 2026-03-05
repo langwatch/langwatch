@@ -29,7 +29,8 @@ describe("aggregation-builder", () => {
       const result = buildTimeseriesQuery(baseInput);
 
       expect(result.sql).toContain("SELECT");
-      expect(result.sql).toContain("FROM trace_summaries ts FINAL");
+      expect(result.sql).toContain("FROM trace_summaries");
+      expect(result.sql).toContain("LIMIT 1 BY TenantId, TraceId");
       expect(result.sql).toContain("WHERE");
       expect(result.sql).toContain("GROUP BY");
       expect(result.sql).toContain("period");
@@ -92,7 +93,7 @@ describe("aggregation-builder", () => {
       };
       const result = buildTimeseriesQuery(input);
 
-      expect(result.sql).toContain("JOIN evaluation_states");
+      expect(result.sql).toContain("JOIN evaluation_runs");
     });
 
     it("adds filters to WHERE clause with parameterized values", () => {
@@ -121,15 +122,18 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("GROUP BY period, date, group_key");
     });
 
-    it("adds JOINs for groupBy that requires them", () => {
+    it("uses trace-level Models array for model grouping", () => {
       const input = {
         ...baseInput,
         groupBy: "metadata.model",
       };
       const result = buildTimeseriesQuery(input);
 
-      expect(result.sql).toContain("JOIN stored_spans");
-      expect(result.sql).toContain("gen_ai.request.model");
+      // Model grouping uses trace_summaries.Models (array) via arrayJoin
+      // instead of stored_spans to avoid double-counting trace metrics
+      expect(result.sql).not.toContain("JOIN stored_spans");
+      expect(result.sql).toContain("Models");
+      expect(result.sql).toContain("arrayJoin");
     });
 
     it("includes all date parameters", () => {
@@ -317,7 +321,7 @@ describe("aggregation-builder", () => {
         endDate
       );
 
-      expect(result.sql).toContain("JOIN evaluation_states");
+      expect(result.sql).toContain("JOIN evaluation_runs");
       expect(result.sql).toContain("es.EvaluatorId AS field");
     });
 

@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { createTenantId } from "../../../../library/domain/tenantId";
+import { createTenantId } from "../../../../domain/tenantId";
 import {
-  isSpanReceivedEvent,
-  isTopicAssignedEvent,
-  topicAssignedEventDataSchema,
-  topicAssignedEventSchema,
-} from "../events";
-import {
-  SPAN_RECEIVED_EVENT_TYPE,
-  TOPIC_ASSIGNED_EVENT_TYPE,
+	SPAN_RECEIVED_EVENT_TYPE,
+	TOPIC_ASSIGNED_EVENT_TYPE,
 } from "../constants";
+import {
+	isSpanReceivedEvent,
+	isTopicAssignedEvent,
+	topicAssignedEventDataSchema,
+	topicAssignedEventSchema,
+} from "../events";
 
 describe("events schemas", () => {
   describe("topicAssignedEventDataSchema", () => {
@@ -76,6 +76,7 @@ describe("events schemas", () => {
         type: TOPIC_ASSIGNED_EVENT_TYPE,
         version: "2025-02-01",
         timestamp: Date.now(),
+        occurredAt: Date.now(),
         data: {
           topicId: "topic-123",
           topicName: "Customer Support",
@@ -104,6 +105,7 @@ describe("events schemas", () => {
         type: TOPIC_ASSIGNED_EVENT_TYPE,
         version: "2025-02-01",
         timestamp: Date.now(),
+        occurredAt: Date.now(),
         data: {
           topicId: "topic-123",
           topicName: "Customer Support",
@@ -137,6 +139,7 @@ describe("events schemas", () => {
         type: TOPIC_ASSIGNED_EVENT_TYPE,
         version: "2025-02-01",
         timestamp: Date.now(),
+        occurredAt: Date.now(),
         data: {
           topicId: "topic-123",
           topicName: "Customer Support",
@@ -178,6 +181,7 @@ describe("events schemas", () => {
         type: TOPIC_ASSIGNED_EVENT_TYPE,
         version: "2025-02-01",
         timestamp: Date.now(),
+        occurredAt: Date.now(),
         data: {
           topicId: "topic-123",
           topicName: "Customer Support",

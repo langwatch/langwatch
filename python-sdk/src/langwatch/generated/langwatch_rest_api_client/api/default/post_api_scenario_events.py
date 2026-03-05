@@ -1,5 +1,5 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
 
 import httpx
 
@@ -13,12 +13,15 @@ from ...models.post_api_scenario_events_response_400 import PostApiScenarioEvent
 from ...models.post_api_scenario_events_response_401 import PostApiScenarioEventsResponse401
 from ...models.post_api_scenario_events_response_422 import PostApiScenarioEventsResponse422
 from ...models.post_api_scenario_events_response_500 import PostApiScenarioEventsResponse500
-from ...types import Response
+from ...types import UNSET, Response, Unset
 
 
 def _get_kwargs(
     *,
-    body: Union["PostApiScenarioEventsBodyType0", "PostApiScenarioEventsBodyType1", "PostApiScenarioEventsBodyType2"],
+    body: PostApiScenarioEventsBodyType0
+    | PostApiScenarioEventsBodyType1
+    | PostApiScenarioEventsBodyType2
+    | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -27,15 +30,13 @@ def _get_kwargs(
         "url": "/api/scenario-events",
     }
 
-    _body: dict[str, Any]
     if isinstance(body, PostApiScenarioEventsBodyType0):
-        _body = body.to_dict()
+        _kwargs["json"] = body.to_dict()
     elif isinstance(body, PostApiScenarioEventsBodyType1):
-        _body = body.to_dict()
+        _kwargs["json"] = body.to_dict()
     else:
-        _body = body.to_dict()
+        _kwargs["json"] = body.to_dict()
 
-    _kwargs["json"] = _body
     headers["Content-Type"] = "application/json"
 
     _kwargs["headers"] = headers
@@ -43,36 +44,40 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[
-    Union[
-        PostApiScenarioEventsResponse201,
-        PostApiScenarioEventsResponse400,
-        PostApiScenarioEventsResponse401,
-        PostApiScenarioEventsResponse422,
-        PostApiScenarioEventsResponse500,
-    ]
-]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> (
+    PostApiScenarioEventsResponse201
+    | PostApiScenarioEventsResponse400
+    | PostApiScenarioEventsResponse401
+    | PostApiScenarioEventsResponse422
+    | PostApiScenarioEventsResponse500
+    | None
+):
     if response.status_code == 201:
         response_201 = PostApiScenarioEventsResponse201.from_dict(response.json())
 
         return response_201
+
     if response.status_code == 400:
         response_400 = PostApiScenarioEventsResponse400.from_dict(response.json())
 
         return response_400
+
     if response.status_code == 401:
         response_401 = PostApiScenarioEventsResponse401.from_dict(response.json())
 
         return response_401
+
     if response.status_code == 422:
         response_422 = PostApiScenarioEventsResponse422.from_dict(response.json())
 
         return response_422
+
     if response.status_code == 500:
         response_500 = PostApiScenarioEventsResponse500.from_dict(response.json())
 
         return response_500
+
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -80,15 +85,13 @@ def _parse_response(
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+    *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> Response[
-    Union[
-        PostApiScenarioEventsResponse201,
-        PostApiScenarioEventsResponse400,
-        PostApiScenarioEventsResponse401,
-        PostApiScenarioEventsResponse422,
-        PostApiScenarioEventsResponse500,
-    ]
+    PostApiScenarioEventsResponse201
+    | PostApiScenarioEventsResponse400
+    | PostApiScenarioEventsResponse401
+    | PostApiScenarioEventsResponse422
+    | PostApiScenarioEventsResponse500
 ]:
     return Response(
         status_code=HTTPStatus(response.status_code),
@@ -100,29 +103,30 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: Union[AuthenticatedClient, Client],
-    body: Union["PostApiScenarioEventsBodyType0", "PostApiScenarioEventsBodyType1", "PostApiScenarioEventsBodyType2"],
+    client: AuthenticatedClient | Client,
+    body: PostApiScenarioEventsBodyType0
+    | PostApiScenarioEventsBodyType1
+    | PostApiScenarioEventsBodyType2
+    | Unset = UNSET,
 ) -> Response[
-    Union[
-        PostApiScenarioEventsResponse201,
-        PostApiScenarioEventsResponse400,
-        PostApiScenarioEventsResponse401,
-        PostApiScenarioEventsResponse422,
-        PostApiScenarioEventsResponse500,
-    ]
+    PostApiScenarioEventsResponse201
+    | PostApiScenarioEventsResponse400
+    | PostApiScenarioEventsResponse401
+    | PostApiScenarioEventsResponse422
+    | PostApiScenarioEventsResponse500
 ]:
     """Create a new scenario event
 
     Args:
-        body (Union['PostApiScenarioEventsBodyType0', 'PostApiScenarioEventsBodyType1',
-            'PostApiScenarioEventsBodyType2']):
+        body (PostApiScenarioEventsBodyType0 | PostApiScenarioEventsBodyType1 |
+            PostApiScenarioEventsBodyType2 | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[PostApiScenarioEventsResponse201, PostApiScenarioEventsResponse400, PostApiScenarioEventsResponse401, PostApiScenarioEventsResponse422, PostApiScenarioEventsResponse500]]
+        Response[PostApiScenarioEventsResponse201 | PostApiScenarioEventsResponse400 | PostApiScenarioEventsResponse401 | PostApiScenarioEventsResponse422 | PostApiScenarioEventsResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -138,29 +142,31 @@ def sync_detailed(
 
 def sync(
     *,
-    client: Union[AuthenticatedClient, Client],
-    body: Union["PostApiScenarioEventsBodyType0", "PostApiScenarioEventsBodyType1", "PostApiScenarioEventsBodyType2"],
-) -> Optional[
-    Union[
-        PostApiScenarioEventsResponse201,
-        PostApiScenarioEventsResponse400,
-        PostApiScenarioEventsResponse401,
-        PostApiScenarioEventsResponse422,
-        PostApiScenarioEventsResponse500,
-    ]
-]:
+    client: AuthenticatedClient | Client,
+    body: PostApiScenarioEventsBodyType0
+    | PostApiScenarioEventsBodyType1
+    | PostApiScenarioEventsBodyType2
+    | Unset = UNSET,
+) -> (
+    PostApiScenarioEventsResponse201
+    | PostApiScenarioEventsResponse400
+    | PostApiScenarioEventsResponse401
+    | PostApiScenarioEventsResponse422
+    | PostApiScenarioEventsResponse500
+    | None
+):
     """Create a new scenario event
 
     Args:
-        body (Union['PostApiScenarioEventsBodyType0', 'PostApiScenarioEventsBodyType1',
-            'PostApiScenarioEventsBodyType2']):
+        body (PostApiScenarioEventsBodyType0 | PostApiScenarioEventsBodyType1 |
+            PostApiScenarioEventsBodyType2 | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[PostApiScenarioEventsResponse201, PostApiScenarioEventsResponse400, PostApiScenarioEventsResponse401, PostApiScenarioEventsResponse422, PostApiScenarioEventsResponse500]
+        PostApiScenarioEventsResponse201 | PostApiScenarioEventsResponse400 | PostApiScenarioEventsResponse401 | PostApiScenarioEventsResponse422 | PostApiScenarioEventsResponse500
     """
 
     return sync_detailed(
@@ -171,29 +177,30 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: Union[AuthenticatedClient, Client],
-    body: Union["PostApiScenarioEventsBodyType0", "PostApiScenarioEventsBodyType1", "PostApiScenarioEventsBodyType2"],
+    client: AuthenticatedClient | Client,
+    body: PostApiScenarioEventsBodyType0
+    | PostApiScenarioEventsBodyType1
+    | PostApiScenarioEventsBodyType2
+    | Unset = UNSET,
 ) -> Response[
-    Union[
-        PostApiScenarioEventsResponse201,
-        PostApiScenarioEventsResponse400,
-        PostApiScenarioEventsResponse401,
-        PostApiScenarioEventsResponse422,
-        PostApiScenarioEventsResponse500,
-    ]
+    PostApiScenarioEventsResponse201
+    | PostApiScenarioEventsResponse400
+    | PostApiScenarioEventsResponse401
+    | PostApiScenarioEventsResponse422
+    | PostApiScenarioEventsResponse500
 ]:
     """Create a new scenario event
 
     Args:
-        body (Union['PostApiScenarioEventsBodyType0', 'PostApiScenarioEventsBodyType1',
-            'PostApiScenarioEventsBodyType2']):
+        body (PostApiScenarioEventsBodyType0 | PostApiScenarioEventsBodyType1 |
+            PostApiScenarioEventsBodyType2 | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[PostApiScenarioEventsResponse201, PostApiScenarioEventsResponse400, PostApiScenarioEventsResponse401, PostApiScenarioEventsResponse422, PostApiScenarioEventsResponse500]]
+        Response[PostApiScenarioEventsResponse201 | PostApiScenarioEventsResponse400 | PostApiScenarioEventsResponse401 | PostApiScenarioEventsResponse422 | PostApiScenarioEventsResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -207,29 +214,31 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: Union[AuthenticatedClient, Client],
-    body: Union["PostApiScenarioEventsBodyType0", "PostApiScenarioEventsBodyType1", "PostApiScenarioEventsBodyType2"],
-) -> Optional[
-    Union[
-        PostApiScenarioEventsResponse201,
-        PostApiScenarioEventsResponse400,
-        PostApiScenarioEventsResponse401,
-        PostApiScenarioEventsResponse422,
-        PostApiScenarioEventsResponse500,
-    ]
-]:
+    client: AuthenticatedClient | Client,
+    body: PostApiScenarioEventsBodyType0
+    | PostApiScenarioEventsBodyType1
+    | PostApiScenarioEventsBodyType2
+    | Unset = UNSET,
+) -> (
+    PostApiScenarioEventsResponse201
+    | PostApiScenarioEventsResponse400
+    | PostApiScenarioEventsResponse401
+    | PostApiScenarioEventsResponse422
+    | PostApiScenarioEventsResponse500
+    | None
+):
     """Create a new scenario event
 
     Args:
-        body (Union['PostApiScenarioEventsBodyType0', 'PostApiScenarioEventsBodyType1',
-            'PostApiScenarioEventsBodyType2']):
+        body (PostApiScenarioEventsBodyType0 | PostApiScenarioEventsBodyType1 |
+            PostApiScenarioEventsBodyType2 | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[PostApiScenarioEventsResponse201, PostApiScenarioEventsResponse400, PostApiScenarioEventsResponse401, PostApiScenarioEventsResponse422, PostApiScenarioEventsResponse500]
+        PostApiScenarioEventsResponse201 | PostApiScenarioEventsResponse400 | PostApiScenarioEventsResponse401 | PostApiScenarioEventsResponse422 | PostApiScenarioEventsResponse500
     """
 
     return (

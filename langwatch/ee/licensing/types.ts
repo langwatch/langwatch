@@ -25,6 +25,9 @@ export const LicensePlanLimitsSchema = z.object({
   maxCustomGraphs: z.number().optional(),
   maxAutomations: z.number().optional(),
   canPublish: z.boolean(),
+  // Usage counting mode - optional for backward compatibility with existing signed licenses
+  // Uses z.string() (not z.enum) for forward compatibility: future values won't break old deployments
+  usageUnit: z.string().optional(),
 });
 
 export type LicensePlanLimits = z.infer<typeof LicensePlanLimitsSchema>;

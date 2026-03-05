@@ -1,7 +1,10 @@
 import { Box, HStack } from "@chakra-ui/react";
 import { ChevronDown } from "lucide-react";
 
-import { LLMConfigPopover } from "~/components/llmPromptConfigs/LLMConfigPopover";
+import {
+  LLMConfigPopover,
+  type Output,
+} from "~/components/llmPromptConfigs/LLMConfigPopover";
 import { AddModelProviderKey } from "~/optimization_studio/components/AddModelProviderKey";
 import type { LLMConfig } from "~/optimization_studio/types/dsl";
 import type { ModelOption } from "~/server/topicClustering/types";
@@ -14,6 +17,12 @@ type LLMConfigFieldProps = {
   requiresCustomKey: boolean;
   onChange: (llmConfig: LLMConfig) => void;
   showProviderKeyMessage?: boolean;
+  /** Outputs configuration (for structured outputs) */
+  outputs?: Output[];
+  /** Callback when outputs change */
+  onOutputsChange?: (outputs: Output[]) => void;
+  /** Whether to show the structured outputs section */
+  showStructuredOutputs?: boolean;
 };
 
 /**
@@ -29,6 +38,9 @@ export function LLMConfigField({
   modelOption,
   requiresCustomKey,
   showProviderKeyMessage = true,
+  outputs,
+  onOutputsChange,
+  showStructuredOutputs = false,
 }: LLMConfigFieldProps) {
   const { model } = llmConfig ?? {};
 
@@ -59,7 +71,13 @@ export function LLMConfigField({
           </HStack>
         </Popover.Trigger>
 
-        <LLMConfigPopover values={llmConfig} onChange={onChange} />
+        <LLMConfigPopover
+          values={llmConfig}
+          onChange={onChange}
+          outputs={outputs}
+          onOutputsChange={onOutputsChange}
+          showStructuredOutputs={showStructuredOutputs}
+        />
       </Popover.Root>
       {(requiresCustomKey || isModelDisabled) && showProviderKeyMessage && (
         <AddModelProviderKey

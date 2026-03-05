@@ -1,41 +1,48 @@
-import { definePipeline } from "../../library";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import { definePipeline } from "../../";
+import type { FoldProjectionStore } from "../../projections/foldProjection.types";
+import type { AppendStore } from "../../projections/mapProjection.types";
+import type { ReactorDefinition } from "../../reactors/reactor.types";
+import { AssignSatisfactionScoreCommand } from "./commands/assignSatisfactionScoreCommand";
 import { AssignTopicCommand } from "./commands/assignTopicCommand";
 import { RecordSpanCommand } from "./commands/recordSpanCommand";
-import { SpanStorageEventHandler } from "./handlers";
-import { TraceSummaryProjectionHandler } from "./projections";
-import { SPAN_RECEIVED_EVENT_TYPE } from "./schemas/constants";
+import { createSpanStorageMapProjection } from "./projections/spanStorage.mapProjection";
+import { createTraceSummaryFoldProjection } from "./projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "./schemas/events";
+import type { NormalizedSpan } from "./schemas/spans";
+
+export interface TraceProcessingPipelineDeps {
+  spanAppendStore: AppendStore<NormalizedSpan>;
+  traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
+  evaluationTriggerReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+  traceUpdateBroadcastReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+  satisfactionScoreReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+  spanStorageBroadcastReactor: ReactorDefinition<TraceProcessingEvent>;
+}
 
 /**
- * Trace processing pipeline definition (static, no runtime dependencies).
+ * Creates the trace processing pipeline definition.
  *
  * This pipeline uses trace-level aggregates (aggregateId = traceId).
- * It aggregates span events into trace summary metrics and writes individual
- * spans to the stored_spans table via an event handler.
- *
- * This is a static definition that can be safely imported without triggering
- * ClickHouse/Redis connections. It gets registered with the runtime in
- * the pipeline's index.ts file.
+ * It aggregates span events into trace summary metrics (fold projection) and writes
+ * individual spans to the stored_spans table (map projection).
  */
-export const traceProcessingPipelineDefinition =
-  definePipeline<TraceProcessingEvent>()
+export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps) {
+  return definePipeline<TraceProcessingEvent>()
     .withName("trace_processing")
     .withAggregateType("trace")
-    .withProjection("traceSummary", TraceSummaryProjectionHandler, {
-      // Dedupe by aggregate to process only the latest event per trace
-      deduplication: "aggregate",
-      // This reduces strain of computationally heavy trace summary projections being done
-      // unnecessarily due to the burst-heavy nature of span collection.
-      delay: 1500,
-    })
-    .withEventHandler("spanStorage", SpanStorageEventHandler, {
-      eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
-    })
-    // .withEventHandler("observabilityPush", ObservabilityPushEventHandler, {
-    //   eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
-    //   // dependsOn: ["spanStorage", "traceSummary"],
-    //   // delay: 200,
-    // })
+    .withFoldProjection("traceSummary", createTraceSummaryFoldProjection({
+      store: deps.traceSummaryStore,
+    }))
+    .withMapProjection("spanStorage", createSpanStorageMapProjection({
+      store: deps.spanAppendStore,
+    }))
+    .withReactor("traceSummary", "evaluationTrigger", deps.evaluationTriggerReactor)
+    .withReactor("traceSummary", "traceUpdateBroadcast", deps.traceUpdateBroadcastReactor)
+    .withReactor("traceSummary", "satisfactionScore", deps.satisfactionScoreReactor)
+    .withReactor("spanStorage", "spanStorageBroadcast", deps.spanStorageBroadcastReactor)
     .withCommand("recordSpan", RecordSpanCommand)
     .withCommand("assignTopic", AssignTopicCommand)
+    .withCommand("assignSatisfactionScore", AssignSatisfactionScoreCommand)
     .build();
+}

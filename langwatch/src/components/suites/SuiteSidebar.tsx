@@ -1,0 +1,577 @@
+/**
+ * Suite sidebar with search, new suite button, all runs link, suite list,
+ * and external sets section.
+ *
+ * Supports expanded (280px) and collapsed (48px icon strip) modes with
+ * localStorage persistence.
+ */
+
+import {
+  Box,
+  Center,
+  HStack,
+  IconButton,
+  Separator,
+  Spacer,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import type { SimulationSuite } from "@prisma/client";
+import {
+  ChevronsLeft,
+  ChevronsRight,
+  CircleAlert,
+  CircleCheck,
+  List,
+  MoreVertical,
+  Play,
+} from "lucide-react";
+import type React from "react";
+import { useMemo, useState } from "react";
+import { Tooltip } from "~/components/ui/tooltip";
+import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
+import type { SuiteRunSummary } from "./run-history-transforms";
+import type { ExternalSetSummary } from "~/server/scenarios/scenario-event.types";
+import {
+  ALL_RUNS_ID,
+  toExternalSetSelection,
+} from "./useSuiteRouting";
+import { SearchInput } from "../ui/SearchInput";
+
+export const SUITE_SIDEBAR_COLLAPSED_KEY = "suite-sidebar-collapsed" as const;
+
+
+type SuiteSidebarProps = {
+  suites: SimulationSuite[];
+  selectedSuiteSlug: string | typeof ALL_RUNS_ID | null;
+  runSummaries?: Map<string, SuiteRunSummary>;
+  externalSets?: ExternalSetSummary[];
+  onSelectSuite: (slug: string | typeof ALL_RUNS_ID) => void;
+  onRunSuite: (id: string) => void;
+  onContextMenu: (e: React.MouseEvent, suiteId: string) => void;
+};
+
+export function SuiteSidebar({
+  suites,
+  selectedSuiteSlug,
+  runSummaries,
+  externalSets = [],
+  onSelectSuite,
+  onRunSuite,
+  onContextMenu,
+}: SuiteSidebarProps) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(SUITE_SIDEBAR_COLLAPSED_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleCollapsed = () => {
+    const next = !isCollapsed;
+    setIsCollapsed(next);
+    try {
+      localStorage.setItem(SUITE_SIDEBAR_COLLAPSED_KEY, String(next));
+    } catch {
+      // localStorage unavailable
+    }
+  };
+
+  const filteredSuites = useMemo(() => {
+    if (!searchQuery.trim()) return suites;
+    const query = searchQuery.toLowerCase();
+    return suites.filter((s) => s.name.toLowerCase().includes(query));
+  }, [suites, searchQuery]);
+
+  const filteredExternalSets = useMemo(() => {
+    if (!searchQuery.trim()) return externalSets;
+    const query = searchQuery.toLowerCase();
+    return externalSets.filter((s) =>
+      s.scenarioSetId.toLowerCase().includes(query),
+    );
+  }, [externalSets, searchQuery]);
+
+  const hasNoResults =
+    filteredSuites.length === 0 && filteredExternalSets.length === 0;
+
+  if (isCollapsed) {
+    return (
+      <VStack
+        width="48px"
+        minWidth="48px"
+        height="100%"
+        overflowY="auto"
+        borderRight="1px solid"
+        borderColor="border"
+        align="center"
+        gap={1}
+        paddingY={2}
+      >
+        <IconButton
+          aria-label="Expand sidebar"
+          size="sm"
+          variant="ghost"
+          onClick={toggleCollapsed}
+        >
+          <ChevronsRight size={16} />
+        </IconButton>
+
+        <Tooltip content="All Runs" positioning={{ placement: "right" }}>
+          <IconButton
+            aria-label="All Runs"
+            size="sm"
+            variant={selectedSuiteSlug === ALL_RUNS_ID ? "solid" : "ghost"}
+            onClick={() => onSelectSuite(ALL_RUNS_ID)}
+          >
+            <List size={16} />
+          </IconButton>
+        </Tooltip>
+
+        <Separator />
+
+        {filteredSuites.map((suite) => (
+          <Tooltip
+            key={suite.id}
+            content={suite.name}
+            positioning={{ placement: "right" }}
+          >
+            <IconButton
+              aria-label={suite.name}
+              size="sm"
+              variant={suite.slug === selectedSuiteSlug ? "solid" : "ghost"}
+              onClick={() => onSelectSuite(suite.slug)}
+            >
+              <Center
+                width="24px"
+                height="24px"
+                borderRadius="full"
+                bg="bg.emphasized"
+                fontSize="xs"
+                fontWeight="bold"
+              >
+                {suite.name.charAt(0).toUpperCase()}
+              </Center>
+            </IconButton>
+          </Tooltip>
+        ))}
+
+        {filteredExternalSets.length > 0 && (
+          <>
+            <Separator />
+            {filteredExternalSets.map((extSet) => (
+              <Tooltip
+                key={extSet.scenarioSetId}
+                content={extSet.scenarioSetId}
+                positioning={{ placement: "right" }}
+              >
+                <IconButton
+                  aria-label={extSet.scenarioSetId}
+                  size="sm"
+                  variant={
+                    selectedSuiteSlug ===
+                    toExternalSetSelection(extSet.scenarioSetId)
+                      ? "solid"
+                      : "ghost"
+                  }
+                  onClick={() =>
+                    onSelectSuite(
+                      toExternalSetSelection(extSet.scenarioSetId),
+                    )
+                  }
+                >
+                  <Center
+                    width="24px"
+                    height="24px"
+                    borderRadius="full"
+                    bg="bg.emphasized"
+                    fontSize="xs"
+                    fontWeight="bold"
+                  >
+                    {extSet.scenarioSetId.charAt(0).toUpperCase()}
+                  </Center>
+                </IconButton>
+              </Tooltip>
+            ))}
+          </>
+        )}
+      </VStack>
+    );
+  }
+
+  return (
+    <VStack
+      width="280px"
+      minWidth="280px"
+      height="100%"
+      borderRight="1px solid"
+      borderColor="border"
+      align="stretch"
+      gap={0}
+    >
+      <HStack paddingX={3} paddingTop={3} paddingBottom={1} justify="space-between">
+        <Text fontSize="xs" fontWeight="bold" color="fg.muted" letterSpacing="wider">
+          SUITES
+        </Text>
+        <IconButton
+          aria-label="Collapse sidebar"
+          size="xs"
+          variant="ghost"
+          onClick={toggleCollapsed}
+        >
+          <ChevronsLeft size={14} />
+        </IconButton>
+      </HStack>
+
+      <Box paddingX={3} paddingBottom={2}>
+        <SearchInput
+          size="sm"
+          placeholder="Search..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+      </Box>
+
+      <Box paddingX={2}>
+        <SidebarButton
+          icon={<List size={14} />}
+          label="All Runs"
+          isSelected={selectedSuiteSlug === ALL_RUNS_ID}
+          onClick={() => onSelectSuite(ALL_RUNS_ID)}
+        />
+      </Box>
+
+      <Separator marginY={1} />
+
+      <VStack
+        flex={1}
+        overflow="auto"
+        paddingX={2}
+        paddingBottom={2}
+        gap={1}
+        align="stretch"
+      >
+        {hasNoResults && suites.length === 0 && externalSets.length === 0 && (
+          <Text
+            fontSize="sm"
+            color="fg.muted"
+            paddingX={2}
+            paddingY={4}
+            textAlign="center"
+          >
+            No suites yet
+          </Text>
+        )}
+        {hasNoResults &&
+          (suites.length > 0 || externalSets.length > 0) && (
+            <Text
+              fontSize="sm"
+              color="fg.muted"
+              paddingX={2}
+              paddingY={4}
+              textAlign="center"
+            >
+              No matching suites
+            </Text>
+          )}
+        {filteredSuites.map((suite) => (
+          <SuiteListItem
+            key={suite.id}
+            suite={suite}
+            isSelected={suite.slug === selectedSuiteSlug}
+            runSummary={runSummaries?.get(suite.id)}
+            onSelect={() => onSelectSuite(suite.slug)}
+            onRun={() => onRunSuite(suite.id)}
+            onContextMenu={(e) => onContextMenu(e, suite.id)}
+          />
+        ))}
+
+        {filteredExternalSets.length > 0 && (
+          <>
+            <Text
+              data-testid="external-sets-header"
+              fontSize="xs"
+              fontWeight="bold"
+              color="fg.muted"
+              letterSpacing="wider"
+              paddingX={2}
+              paddingTop={3}
+              paddingBottom={1}
+            >
+              EXTERNAL SETS
+            </Text>
+            {filteredExternalSets.map((extSet) => (
+              <ExternalSetListItem
+                key={extSet.scenarioSetId}
+                externalSet={extSet}
+                isSelected={
+                  selectedSuiteSlug ===
+                  toExternalSetSelection(extSet.scenarioSetId)
+                }
+                onSelect={() =>
+                  onSelectSuite(
+                    toExternalSetSelection(extSet.scenarioSetId),
+                  )
+                }
+              />
+            ))}
+          </>
+        )}
+      </VStack>
+    </VStack>
+  );
+}
+
+function SidebarButton({
+  icon,
+  label,
+  isSelected = false,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  isSelected?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <HStack
+      as="button"
+      width="full"
+      paddingX={2}
+      paddingY={1.5}
+      borderRadius="md"
+      cursor="pointer"
+      bg={isSelected ? "bg.emphasized" : "transparent"}
+      _hover={{ bg: isSelected ? "bg.emphasized" : "bg.subtle" }}
+      onClick={onClick}
+      gap={2}
+    >
+      {icon}
+      <Text fontSize="sm">{label}</Text>
+    </HStack>
+  );
+}
+
+function StatusIcon({ passed, total }: { passed: number; total: number }) {
+  if (total === 0) return null;
+  if (passed === total) {
+    return (
+      <CircleCheck
+        size={12}
+        color="var(--chakra-colors-green-500)"
+        data-testid="status-icon-pass"
+      />
+    );
+  }
+  return (
+    <CircleAlert
+      size={12}
+      color="var(--chakra-colors-red-500)"
+      data-testid="status-icon-fail"
+    />
+  );
+}
+
+function RunSummaryLine({
+  passedCount,
+  totalCount,
+  lastRunTimestamp,
+}: {
+  passedCount: number;
+  totalCount: number;
+  lastRunTimestamp: number | null;
+}) {
+  if (totalCount === 0) return null;
+  return (
+    <HStack gap={1}>
+      <StatusIcon passed={passedCount} total={totalCount} />
+      <Text fontSize="xs">
+        {passedCount}/{totalCount} passed
+        {lastRunTimestamp && (
+          <Text as="span" color="fg.muted">
+            {" · "}
+            {formatTimeAgoCompact(lastRunTimestamp)}
+          </Text>
+        )}
+      </Text>
+    </HStack>
+  );
+}
+
+function SidebarListItemWrapper({
+  isSelected,
+  onClick,
+  onContextMenu,
+  className,
+  "data-testid": dataTestId,
+  children,
+}: {
+  isSelected: boolean;
+  onClick: () => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
+  className?: string;
+  "data-testid"?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <HStack
+      className={className}
+      data-testid={dataTestId}
+      data-selected={isSelected || undefined}
+      paddingX={3}
+      position="relative"
+      paddingY={3}
+      borderRadius="md"
+      cursor="pointer"
+      bg={isSelected ? "bg.subtle" : "transparent"}
+      border={isSelected ? "1px solid border.emphasized" : "none"}
+      _hover={{ bg: isSelected ? "bg.emphasized" : "bg.subtle" }}
+      onContextMenu={onContextMenu}
+      onClick={onClick}
+      justify="space-between"
+      width="full"
+      _before={{
+        content: '""',
+        position: "absolute",
+        transform: "translateY(-50%)",
+        top: "50%",
+        left: 0,
+        width: "2px",
+        height: "33%",
+        backgroundColor: "border.emphasized",
+        display: isSelected ? "block" : "none",
+      }}
+    >
+      {children}
+    </HStack>
+  );
+}
+
+function SuiteListItem({
+  suite,
+  isSelected,
+  runSummary,
+  onSelect,
+  onRun,
+  onContextMenu,
+}: {
+  suite: SimulationSuite;
+  isSelected: boolean;
+  runSummary?: SuiteRunSummary;
+  onSelect: () => void;
+  onRun: () => void;
+  onContextMenu: (e: React.MouseEvent) => void;
+}) {
+  return (
+    <SidebarListItemWrapper
+      className="group"
+      data-testid="suite-list-item"
+      isSelected={isSelected}
+      onClick={onSelect}
+      onContextMenu={onContextMenu}
+    >
+      <VStack
+        align="start"
+        gap={0}
+        flex={1}
+        overflow="hidden"
+        textAlign="left"
+      >
+        <HStack gap={1.5} width="full">
+          <Text fontSize="sm" fontWeight="medium" truncate>
+            {suite.name}
+          </Text>
+          <Spacer />
+          <HStack gap={0} flexShrink={0}>
+            <Box
+              as="button"
+              onClick={(e: React.MouseEvent) => {
+                e.stopPropagation();
+                onRun();
+              }}
+              paddingX={1}
+              paddingY={0.5}
+              borderRadius="sm"
+              _hover={{ bg: "bg.muted" }}
+              cursor="pointer"
+              display="flex"
+              alignItems="center"
+              gap={1}
+              flexShrink={0}
+            >
+              <Play size={12} />
+              <Text fontSize="xs">Run</Text>
+            </Box>
+            <Box
+              as="button"
+              aria-label="Suite options"
+              data-testid="suite-menu-button"
+              onClick={(e: React.MouseEvent) => {
+                e.stopPropagation();
+                onContextMenu(e);
+              }}
+              paddingX={1}
+              paddingY={0.5}
+              borderRadius="sm"
+              _hover={{ bg: "bg.muted" }}
+              display="flex"
+              alignItems="center"
+              opacity={0}
+              _groupHover={{ opacity: 1 }}
+              transition="opacity 150ms"
+              cursor="pointer"
+            >
+              <MoreVertical size={14} />
+            </Box>
+          </HStack>
+        </HStack>
+        {runSummary && runSummary.totalCount > 0 && (
+          <RunSummaryLine
+            passedCount={runSummary.passedCount}
+            totalCount={runSummary.totalCount}
+            lastRunTimestamp={runSummary.lastRunTimestamp}
+          />
+        )}
+      </VStack>
+    </SidebarListItemWrapper>
+  );
+}
+
+/** Read-only list item for external SDK/CI sets. No Run button or context menu. */
+function ExternalSetListItem({
+  externalSet,
+  isSelected,
+  onSelect,
+}: {
+  externalSet: ExternalSetSummary;
+  isSelected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <SidebarListItemWrapper
+      data-testid="external-set-list-item"
+      isSelected={isSelected}
+      onClick={onSelect}
+    >
+      <VStack
+        align="start"
+        gap={0}
+        flex={1}
+        overflow="hidden"
+        textAlign="left"
+      >
+        <Text fontSize="sm" fontWeight="medium" truncate>
+          {externalSet.scenarioSetId}
+        </Text>
+        {externalSet.totalCount > 0 && (
+          <RunSummaryLine
+            passedCount={externalSet.passedCount}
+            totalCount={externalSet.totalCount}
+            lastRunTimestamp={externalSet.lastRunTimestamp}
+          />
+        )}
+      </VStack>
+    </SidebarListItemWrapper>
+  );
+}

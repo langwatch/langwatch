@@ -1,6 +1,6 @@
 import { useRouter } from "next/router";
 import qs from "qs";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import {
   type DrawerType,
@@ -8,6 +8,7 @@ import {
   getFlowCallbacks,
 } from "../hooks/useDrawer";
 import { drawers } from "./drawerRegistry";
+import { DrawerOffsetProvider } from "./ui/drawer";
 
 // Re-export for backward compatibility
 export { useDrawer } from "../hooks/useDrawer";
@@ -16,7 +17,7 @@ type DrawerProps = {
   open: string;
 } & Record<string, unknown>;
 
-export function CurrentDrawer() {
+export function CurrentDrawer({ marginTop }: { marginTop?: number }) {
   const router = useRouter();
   const queryString = router.asPath.split("?")[1] ?? "";
   const queryParams = qs.parse(queryString.replaceAll("%2C", ","), {
@@ -61,29 +62,35 @@ export function CurrentDrawer() {
     ? getFlowCallbacks(drawerType)
     : undefined;
 
-  return CurrentDrawerComponent ? (
-    <ErrorBoundary
-      fallback={null}
-      onError={() => {
-        void router.push(
-          "?" +
-            qs.stringify(
-              Object.fromEntries(
-                Object.entries(router.query).filter(
-                  ([key]) => !key.startsWith("drawer."),
+  const offsetValue = useMemo(() => ({ marginTop }), [marginTop]);
+
+  if (!CurrentDrawerComponent) return null;
+
+  return (
+    <DrawerOffsetProvider value={offsetValue}>
+      <ErrorBoundary
+        fallback={null}
+        onError={() => {
+          void router.push(
+            "?" +
+              qs.stringify(
+                Object.fromEntries(
+                  Object.entries(router.query).filter(
+                    ([key]) => !key.startsWith("drawer."),
+                  ),
                 ),
               ),
-            ),
-          undefined,
-          { shallow: true },
-        );
-      }}
-    >
-      <CurrentDrawerComponent
-        {...queryDrawer}
-        {...complexProps}
-        {...flowCallbacksForDrawer}
-      />
-    </ErrorBoundary>
-  ) : null;
+            undefined,
+            { shallow: true },
+          );
+        }}
+      >
+        <CurrentDrawerComponent
+          {...queryDrawer}
+          {...complexProps}
+          {...flowCallbacksForDrawer}
+        />
+      </ErrorBoundary>
+    </DrawerOffsetProvider>
+  );
 }

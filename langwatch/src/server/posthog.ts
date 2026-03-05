@@ -19,14 +19,14 @@ export function getPostHogInstance(): PostHog | null {
   return _posthogInstance;
 }
 
-// Ensure events are flushed on application shutdown
-function handleShutdown() {
+/**
+ * Shuts down the PostHog client, flushing pending events.
+ * Called by the main shutdown handler in start.ts — no separate signal handlers
+ * to avoid competing with the graceful shutdown sequence.
+ */
+export async function shutdownPostHog(): Promise<void> {
   if (_posthogInstance) {
     logger.info("Shutting down PostHog client");
-    void _posthogInstance.shutdown();
+    await _posthogInstance.shutdown();
   }
 }
-
-// Register shutdown handler
-process.on("SIGTERM", handleShutdown);
-process.on("SIGINT", handleShutdown);

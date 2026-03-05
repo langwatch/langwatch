@@ -81,19 +81,25 @@ export const TargetHeader = memo(function TargetHeader({
   onStop,
   isRunning = false,
 }: TargetHeaderProps) {
-  // First check if prop has localPromptConfig (for direct prop usage)
+  // First check if prop has localPromptConfig or localEvaluatorConfig (for direct prop usage)
   const propHasUnpublished =
-    target.type === "prompt" && !!target.localPromptConfig;
+    (target.type === "prompt" && !!target.localPromptConfig) ||
+    (target.type === "evaluator" && !!target.localEvaluatorConfig);
 
   // Subscribe directly to just this target's unpublished state from store
-  // This is used when the table passes targets without localPromptConfig in props
+  // This is used when the table passes targets without localPromptConfig/localEvaluatorConfig in props
   // (e.g., when using useShallow which doesn't deep-compare)
   const storeHasUnpublished = useEvaluationsV3Store((state) => {
-    if (target.type !== "prompt") return false;
     const currentTarget = state.targets.find((r) => r.id === target.id);
-    return (
-      currentTarget?.type === "prompt" && !!currentTarget.localPromptConfig
-    );
+    if (!currentTarget) return false;
+    if (currentTarget.type === "prompt" && !!currentTarget.localPromptConfig)
+      return true;
+    if (
+      currentTarget.type === "evaluator" &&
+      !!currentTarget.localEvaluatorConfig
+    )
+      return true;
+    return false;
   });
 
   // Use prop value if available, otherwise use store value

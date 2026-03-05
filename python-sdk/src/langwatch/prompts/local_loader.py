@@ -114,7 +114,7 @@ class LocalPromptLoader:
             if not prompts_lock_path.exists():
                 warnings.warn(
                     f"prompts.json exists but prompts-lock.json not found at {prompts_lock_path}. "
-                    f"Run 'langwatch prompts pull' to sync local prompts. "
+                    f"Run 'langwatch prompt pull' to sync local prompts. "
                     f"Falling back to API for prompt '{prompt_id}'.",
                     UserWarning,
                 )
@@ -136,7 +136,7 @@ class LocalPromptLoader:
             if not prompt_info:
                 warnings.warn(
                     f"Prompt '{prompt_id}' found in prompts.json but not in prompts-lock.json. "
-                    f"Run 'langwatch prompts pull' to sync local prompts. "
+                    f"Run 'langwatch prompt pull' to sync local prompts. "
                     f"Falling back to API for prompt '{prompt_id}'.",
                     UserWarning,
                 )
@@ -146,7 +146,7 @@ class LocalPromptLoader:
             if not materialized_path:
                 warnings.warn(
                     f"Prompt '{prompt_id}' in prompts-lock.json has no materialized path. "
-                    f"Run 'langwatch prompts pull' to sync local prompts. "
+                    f"Run 'langwatch prompt pull' to sync local prompts. "
                     f"Falling back to API for prompt '{prompt_id}'.",
                     UserWarning,
                 )
@@ -157,7 +157,7 @@ class LocalPromptLoader:
             if not prompt_file_path.exists():
                 warnings.warn(
                     f"Prompt file not found at {prompt_file_path}. "
-                    f"Run 'langwatch prompts pull' to sync local prompts. "
+                    f"Run 'langwatch prompt pull' to sync local prompts. "
                     f"Falling back to API for prompt '{prompt_id}'.",
                     UserWarning,
                 )

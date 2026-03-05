@@ -59,6 +59,7 @@ export const iconColors: Record<string, string> = {
   scenario: "purple.300",
   experiment: "teal.300",
   trigger: "orange.300",
+  "sdk-radar": "orange.400",
   // Support and help
   "open-chat": "blue.400",
   docs: "cyan.400",

@@ -3,7 +3,7 @@ import type { Tokens } from "@chakra-ui/react";
 import {
   ScenarioRunStatus,
   Verdict,
-} from "~/app/api/scenario-events/[[...route]]/enums";
+} from "~/server/scenarios/scenario-event.enums";
 
 /**
  * Static console styling colors
@@ -30,6 +30,7 @@ export const STATUS_DISPLAY_TEXT_MAP: Record<ScenarioRunStatus, string> = {
   [ScenarioRunStatus.IN_PROGRESS]: "IN PROGRESS",
   [ScenarioRunStatus.PENDING]: "PENDING",
   [ScenarioRunStatus.FAILED]: "FAILED",
+  [ScenarioRunStatus.STALLED]: "STALLED",
 };
 
 /**
