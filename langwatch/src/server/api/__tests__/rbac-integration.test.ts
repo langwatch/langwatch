@@ -652,7 +652,7 @@ describe("RBAC Integration Tests", () => {
     describe("when user is an org EXTERNAL and team VIEWER", () => {
       it("grants view permission and returns EXTERNAL org role", async () => {
         setupProjectMocks({
-          orgRole: OrganizationUserRole.EXTERNAL,
+          orgRole: OrganizationUserRole.LITE_MEMBER,
           teamRole: TeamUserRole.VIEWER,
         });
 
@@ -663,7 +663,7 @@ describe("RBAC Integration Tests", () => {
         );
 
         expect(result.permitted).toBe(true);
-        expect(result.organizationRole).toBe(OrganizationUserRole.EXTERNAL);
+        expect(result.organizationRole).toBe(OrganizationUserRole.LITE_MEMBER);
       });
     });
 
@@ -816,7 +816,7 @@ describe("RBAC Integration Tests", () => {
       it.each([
         OrganizationUserRole.ADMIN,
         OrganizationUserRole.MEMBER,
-        OrganizationUserRole.EXTERNAL,
+        OrganizationUserRole.LITE_MEMBER,
       ])("returns org role %s", async (orgRole) => {
         setupProjectMocks({
           orgRole,
@@ -903,7 +903,7 @@ describe("RBAC Integration Tests", () => {
     describe("when user is an org EXTERNAL and team VIEWER", () => {
       it("grants view permission and returns EXTERNAL org role", async () => {
         setupTeamMocks({
-          orgRole: OrganizationUserRole.EXTERNAL,
+          orgRole: OrganizationUserRole.LITE_MEMBER,
           teamRole: TeamUserRole.VIEWER,
         });
 
@@ -914,7 +914,7 @@ describe("RBAC Integration Tests", () => {
         );
 
         expect(result.permitted).toBe(true);
-        expect(result.organizationRole).toBe(OrganizationUserRole.EXTERNAL);
+        expect(result.organizationRole).toBe(OrganizationUserRole.LITE_MEMBER);
       });
     });
 

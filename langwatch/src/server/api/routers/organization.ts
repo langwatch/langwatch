@@ -208,7 +208,7 @@ export function computeEffectiveTeamRoleUpdates(params: {
     params;
 
   if (requestedTeamRoleUpdates.length > 0) {
-    if (newOrganizationRole !== OrganizationUserRole.EXTERNAL) {
+    if (newOrganizationRole !== OrganizationUserRole.LITE_MEMBER) {
       return requestedTeamRoleUpdates;
     }
 
@@ -226,7 +226,7 @@ export function computeEffectiveTeamRoleUpdates(params: {
     return [...requestedTeamRoleUpdates, ...externalFallbackUpdates];
   }
 
-  if (newOrganizationRole === OrganizationUserRole.EXTERNAL) {
+  if (newOrganizationRole === OrganizationUserRole.LITE_MEMBER) {
     return currentMemberships
       .filter((membership) => membership.role !== TeamUserRole.VIEWER)
       .map((membership) => ({
@@ -967,7 +967,9 @@ export const organizationRouter = createTRPCRouter({
         invites: z.array(
           z.object({
             email: z.string().email(),
-            role: z.enum(["MEMBER", "EXTERNAL"]),
+            role: z.enum(["MEMBER", "EXTERNAL", "LITE_MEMBER"]).transform(
+              (val) => (val === "EXTERNAL" ? "LITE_MEMBER" : val) as Exclude<typeof val, "EXTERNAL">
+            ),
             teamIds: z.string().optional(),
             teams: z
               .array(
@@ -1427,7 +1429,7 @@ export const organizationRouter = createTRPCRouter({
             },
           });
 
-          if (orgMembership?.role === OrganizationUserRole.EXTERNAL) {
+          if (orgMembership?.role === OrganizationUserRole.LITE_MEMBER) {
             throw new TRPCError({
               code: "BAD_REQUEST",
               message: LITE_MEMBER_VIEWER_ONLY_ERROR,
@@ -1541,10 +1543,10 @@ export const organizationRouter = createTRPCRouter({
             },
           });
 
-          if (orgMembership?.role === OrganizationUserRole.EXTERNAL) {
+          if (orgMembership?.role === OrganizationUserRole.LITE_MEMBER) {
             if (
               !isTeamRoleAllowedForOrganizationRole({
-                organizationRole: OrganizationUserRole.EXTERNAL,
+                organizationRole: OrganizationUserRole.LITE_MEMBER,
                 teamRole: input.role as TeamRoleValue,
               })
             ) {
@@ -1573,9 +1575,9 @@ export const organizationRouter = createTRPCRouter({
 
             // Built-in roles have no custom permissions
             const changeType = getRoleChangeType(
-              OrganizationUserRole.EXTERNAL,
+              OrganizationUserRole.LITE_MEMBER,
               oldPermissions,
-              OrganizationUserRole.EXTERNAL,
+              OrganizationUserRole.LITE_MEMBER,
               undefined // No custom permissions for built-in role
             );
 

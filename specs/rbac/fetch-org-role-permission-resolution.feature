@@ -29,11 +29,11 @@ Feature: Fetch org role during permission resolution
     And the org role in the result is MEMBER
 
   Scenario: Project permission result includes org role for an external user
-    Given user "user-123" is an EXTERNAL in organization "org-1"
+    Given user "user-123" is a LITE_MEMBER in organization "org-1"
     And user "user-123" is a VIEWER of team "team-1"
     When project permission "analytics:view" is checked for user "user-123" on project "project-1"
     Then the permission is granted
-    And the org role in the result is EXTERNAL
+    And the org role in the result is LITE_MEMBER
 
   Scenario: Project permission result has no org role when user is not an org member
     Given user "user-123" is not a member of organization "org-1"
@@ -66,11 +66,11 @@ Feature: Fetch org role during permission resolution
     And the org role in the result is MEMBER
 
   Scenario: Team permission result includes org role for an external user
-    Given user "user-123" is an EXTERNAL in organization "org-1"
+    Given user "user-123" is a LITE_MEMBER in organization "org-1"
     And user "user-123" is a VIEWER of team "team-1"
     When team permission "team:view" is checked for user "user-123" on team "team-1"
     Then the permission is granted
-    And the org role in the result is EXTERNAL
+    And the org role in the result is LITE_MEMBER
 
   Scenario: Team permission result has no org role when user is not an org member
     Given user "user-123" is not a member of organization "org-1"
@@ -185,9 +185,9 @@ Feature: Fetch org role during permission resolution
 
   @integration
   Scenario: Organization team project hook exposes org role for an external user
-    Given user "user-123" is an EXTERNAL in organization "org-1"
+    Given user "user-123" is a LITE_MEMBER in organization "org-1"
     When the organization team project hook resolves
-    Then the hook result includes org role EXTERNAL
+    Then the hook result includes org role LITE_MEMBER
 
   @integration
   Scenario: Organization team project hook exposes org role for an admin
@@ -209,4 +209,4 @@ Feature: Fetch org role during permission resolution
       | orgRole  |
       | ADMIN    |
       | MEMBER   |
-      | EXTERNAL |
+      | LITE_MEMBER |

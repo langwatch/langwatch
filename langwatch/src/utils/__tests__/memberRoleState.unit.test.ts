@@ -288,7 +288,7 @@ describe("memberRoleState", () => {
         const result = hasPendingRoleChanges({
           teamMemberships: [],
           pendingTeamRoles: {},
-          pendingOrganizationRole: OrganizationUserRole.EXTERNAL,
+          pendingOrganizationRole: OrganizationUserRole.LITE_MEMBER,
           currentOrganizationRole: OrganizationUserRole.MEMBER,
         });
 
@@ -403,7 +403,7 @@ describe("memberRoleState", () => {
     describe("when changing from EXTERNAL to non-EXTERNAL", () => {
       it("returns 'members'", () => {
         const result = getLicenseLimitTypeForRoleChange({
-          previousRole: OrganizationUserRole.EXTERNAL,
+          previousRole: OrganizationUserRole.LITE_MEMBER,
           nextRole: OrganizationUserRole.MEMBER,
         });
 
@@ -415,7 +415,7 @@ describe("memberRoleState", () => {
       it("returns 'membersLite'", () => {
         const result = getLicenseLimitTypeForRoleChange({
           previousRole: OrganizationUserRole.MEMBER,
-          nextRole: OrganizationUserRole.EXTERNAL,
+          nextRole: OrganizationUserRole.LITE_MEMBER,
         });
 
         expect(result).toBe("membersLite");
@@ -434,8 +434,8 @@ describe("memberRoleState", () => {
 
       it("returns null for EXTERNAL to EXTERNAL", () => {
         const result = getLicenseLimitTypeForRoleChange({
-          previousRole: OrganizationUserRole.EXTERNAL,
-          nextRole: OrganizationUserRole.EXTERNAL,
+          previousRole: OrganizationUserRole.LITE_MEMBER,
+          nextRole: OrganizationUserRole.LITE_MEMBER,
         });
 
         expect(result).toBeNull();
@@ -447,7 +447,7 @@ describe("memberRoleState", () => {
     describe("when organization role is EXTERNAL", () => {
       it("forces all team roles to Viewer", () => {
         const result = applyOrganizationRoleToPendingTeamRoles({
-          organizationRole: OrganizationUserRole.EXTERNAL,
+          organizationRole: OrganizationUserRole.LITE_MEMBER,
           currentPendingTeamRoles: {
             t1: { role: "ADMIN" },
             t2: { role: "MEMBER", customRoleId: "cr-1" },

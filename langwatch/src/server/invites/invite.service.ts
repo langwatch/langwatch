@@ -24,7 +24,7 @@ export const ORGANIZATION_TO_TEAM_ROLE_MAP: Record<
 > = {
   [OrganizationUserRole.ADMIN]: TeamUserRole.ADMIN,
   [OrganizationUserRole.MEMBER]: TeamUserRole.MEMBER,
-  [OrganizationUserRole.EXTERNAL]: TeamUserRole.VIEWER,
+  [OrganizationUserRole.LITE_MEMBER]: TeamUserRole.VIEWER,
 } as const;
 
 import { env } from "~/env.mjs";
@@ -76,7 +76,7 @@ export function classifyInvitesByMemberType(
       invite.role === OrganizationUserRole.MEMBER
     ) {
       fullMembers++;
-    } else if (invite.role === OrganizationUserRole.EXTERNAL) {
+    } else if (invite.role === OrganizationUserRole.LITE_MEMBER) {
       const hasNonViewRole = invite.teams?.some((t) => {
         if (!t.customRoleId) return false;
         const permissions = customRoleMap.get(t.customRoleId);

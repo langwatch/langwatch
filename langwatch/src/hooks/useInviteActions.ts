@@ -135,8 +135,8 @@ export function useInviteActions({
         invites: data.invites.map((invite) => ({
           email: invite.email.toLowerCase(),
           role:
-            invite.orgRole === OrganizationUserRole.EXTERNAL
-              ? ("EXTERNAL" as const)
+            invite.orgRole === OrganizationUserRole.LITE_MEMBER
+              ? ("LITE_MEMBER" as const)
               : ("MEMBER" as const),
           teams: invite.teams.map((team) => ({
             teamId: team.teamId,
@@ -177,13 +177,13 @@ export function useInviteActions({
 
   const onSubmit: SubmitHandler<MembersForm> = (data) => {
     const hasNewFullMembers = data.invites.some(
-      (invite) => invite.orgRole !== OrganizationUserRole.EXTERNAL,
+      (invite) => invite.orgRole !== OrganizationUserRole.LITE_MEMBER,
     );
     const hasNewLiteMembers = data.invites.some(
-      (invite) => invite.orgRole === OrganizationUserRole.EXTERNAL,
+      (invite) => invite.orgRole === OrganizationUserRole.LITE_MEMBER,
     );
     const newFullMemberInviteCount = data.invites.filter(
-      (invite) => invite.orgRole !== OrganizationUserRole.EXTERNAL,
+      (invite) => invite.orgRole !== OrganizationUserRole.LITE_MEMBER,
     ).length;
 
     const performMutation = isAdmin ? performAdminInvite : performInviteRequest;

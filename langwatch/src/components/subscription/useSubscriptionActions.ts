@@ -13,8 +13,8 @@ import { isGrowthSeatEventPlan } from "../../../ee/billing/utils/growthSeatEvent
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type TRPCRefetchFn = { refetch: () => any };
 
-function memberTypeToRole(memberType: MemberType): "MEMBER" | "EXTERNAL" {
-  return memberType === "FullMember" ? "MEMBER" : "EXTERNAL";
+function memberTypeToRole(memberType: MemberType): "MEMBER" | "LITE_MEMBER" {
+  return memberType === "FullMember" ? "MEMBER" : "LITE_MEMBER";
 }
 
 export function useSubscriptionActions({

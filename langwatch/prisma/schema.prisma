@@ -95,7 +95,7 @@ enum TeamUserRole {
 enum OrganizationUserRole {
     ADMIN
     MEMBER
-    EXTERNAL
+    LITE_MEMBER
 }
 
 model TeamUser {

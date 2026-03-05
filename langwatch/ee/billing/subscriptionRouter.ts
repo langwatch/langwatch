@@ -134,7 +134,9 @@ export const createSubscriptionRouterFactory = ({
           invites: z.array(
             z.object({
               email: z.string().email(),
-              role: z.enum(["ADMIN", "MEMBER", "EXTERNAL"]),
+              role: z.enum(["ADMIN", "MEMBER", "EXTERNAL", "LITE_MEMBER"]).transform(
+                (val) => (val === "EXTERNAL" ? "LITE_MEMBER" : val) as Exclude<typeof val, "EXTERNAL">
+              ),
             }),
           ),
         }),

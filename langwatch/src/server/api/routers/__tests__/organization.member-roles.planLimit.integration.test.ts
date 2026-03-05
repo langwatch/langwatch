@@ -224,7 +224,7 @@ describe.skipIf(isTestcontainersOnly)(
             caller.organization.updateMemberRole({
               userId: targetUserId,
               organizationId,
-              role: OrganizationUserRole.EXTERNAL,
+              role: OrganizationUserRole.LITE_MEMBER,
             }),
           ).rejects.toMatchObject({
             code: "FORBIDDEN",
@@ -244,7 +244,7 @@ describe.skipIf(isTestcontainersOnly)(
           await caller.organization.updateMemberRole({
             userId: targetUserId,
             organizationId,
-            role: OrganizationUserRole.EXTERNAL,
+            role: OrganizationUserRole.LITE_MEMBER,
           });
 
           const updated = await prisma.organizationUser.findUnique({
@@ -255,7 +255,7 @@ describe.skipIf(isTestcontainersOnly)(
               },
             },
           });
-          expect(updated?.role).toBe(OrganizationUserRole.EXTERNAL);
+          expect(updated?.role).toBe(OrganizationUserRole.LITE_MEMBER);
         });
       });
     });
@@ -271,7 +271,7 @@ describe.skipIf(isTestcontainersOnly)(
                 organizationId,
               },
             },
-            data: { role: OrganizationUserRole.EXTERNAL },
+            data: { role: OrganizationUserRole.LITE_MEMBER },
           });
           await prisma.teamUser.update({
             where: {

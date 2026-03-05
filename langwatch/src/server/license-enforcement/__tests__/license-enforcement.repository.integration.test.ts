@@ -328,8 +328,8 @@ describe("LicenseEnforcementRepository Integration", () => {
       // Given: a mix of ADMIN, MEMBER, and Lite Member (EXTERNAL) users
       await createOrgUser(OrganizationUserRole.ADMIN);
       await createOrgUser(OrganizationUserRole.MEMBER);
-      await createOrgUser(OrganizationUserRole.EXTERNAL);
-      await createOrgUser(OrganizationUserRole.EXTERNAL);
+      await createOrgUser(OrganizationUserRole.LITE_MEMBER);
+      await createOrgUser(OrganizationUserRole.LITE_MEMBER);
 
       // When: counting Lite Member users
       const count = await repository.getMembersLiteCount(organization.id);
@@ -363,7 +363,7 @@ describe("LicenseEnforcementRepository Integration", () => {
       // Add one more of each role
       await createOrgUser(OrganizationUserRole.ADMIN);
       await createOrgUser(OrganizationUserRole.MEMBER);
-      await createOrgUser(OrganizationUserRole.EXTERNAL);
+      await createOrgUser(OrganizationUserRole.LITE_MEMBER);
 
       // When: counting full members
       const count = await repository.getMemberCount(organization.id);

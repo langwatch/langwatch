@@ -182,7 +182,7 @@ export class LicenseEnforcementRepository
   /**
    * Counts full members in organization:
    * - Users with ADMIN or MEMBER org role
-   * - Users with EXTERNAL role BUT have a custom role with ANY non-view permission
+   * - Users with LITE_MEMBER role BUT have a custom role with ANY non-view permission
    * - PENDING and WAITING_APPROVAL invites (not expired, or no expiration) with ADMIN or MEMBER role
    * - PENDING and WAITING_APPROVAL invites with custom role that has non-view permissions
    */
@@ -193,8 +193,8 @@ export class LicenseEnforcementRepository
 
   /**
    * Counts Lite Member users in organization:
-   * - Users with EXTERNAL role AND (no custom role OR view-only custom role)
-   * - PENDING and WAITING_APPROVAL invites (not expired, or no expiration) with EXTERNAL role AND (no custom role OR view-only custom role)
+   * - Users with LITE_MEMBER role AND (no custom role OR view-only custom role)
+   * - PENDING and WAITING_APPROVAL invites (not expired, or no expiration) with LITE_MEMBER role AND (no custom role OR view-only custom role)
    */
   async getMembersLiteCount(organizationId: string): Promise<number> {
     const context = await this.getMemberClassificationContext(organizationId);
@@ -262,7 +262,7 @@ export class LicenseEnforcementRepository
     customRoleMap: Map<string, string[]>
   ): Promise<Map<string, string[]>> {
     const externalUserIds = users
-      .filter((u) => u.role === OrganizationUserRole.EXTERNAL)
+      .filter((u) => u.role === OrganizationUserRole.LITE_MEMBER)
       .map((u) => u.userId);
 
     if (externalUserIds.length === 0) {
