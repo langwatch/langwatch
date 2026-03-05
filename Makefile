@@ -12,7 +12,7 @@ COMPOSE = docker compose -f compose.dev.yml
 
 # Install git hooks (idempotent, runs automatically before dev targets)
 setup-hooks:
-	@git config core.hooksPath .githooks
+	@cp .githooks/post-checkout .git/hooks/post-checkout 2>/dev/null || true
 
 # Minimal: postgres + redis + app (no opensearch)
 dev: setup-hooks
