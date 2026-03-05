@@ -5,6 +5,31 @@ Separate data access (Repository) from business logic (Service).
 > "The Repository doesn't care which component is invoking it; it blindly does what it is asked. The Service layer doesn't care how it gets accessed, it just does its work, using a Repository where required."
 > — [Tom Collings](https://tom-collings.medium.com/controller-service-repository-16e29a4684e5)
 
+## The Three Layers
+
+Code is organized into three layers. The **domain layer** (Service + Repository) is the core — it contains the business logic and knows how our product works. The other two layers are adapters that pass information between clients and the domain.
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│  API Layer (Router/Controller)                              │
+│  server/api/routers/suites/                                 │
+│  Translates HTTP/tRPC requests → domain calls.              │
+│  Handles auth, request validation, error mapping.           │
+├─────────────────────────────────────────────────────────────┤
+│  Domain Layer (Service + Repository)                        │
+│  server/suites/                                             │
+│  The core. Business rules, orchestration, data access.      │
+│  Imports from nobody — both API and UI import from here.    │
+├─────────────────────────────────────────────────────────────┤
+│  UI Layer (Components)                                      │
+│  components/suites/                                         │
+│  Translates domain data → things users see and click.       │
+│  Fetches data via tRPC hooks (API layer).                   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Key rule:** Dependencies flow inward. The domain layer never imports from the API or UI layers. If a type (like `SuiteTarget`) or utility (like `parseSuiteTargets`) is needed by both the API router and the domain service, it belongs in the domain layer (`server/suites/types.ts`), and the router re-exports or imports from there.
+
 ## Why This Pattern
 
 1. **Separation of concerns** - Each layer has one job
@@ -16,8 +41,9 @@ Separate data access (Repository) from business logic (Service).
 
 | Layer | Responsibility | Examples |
 |-------|----------------|----------|
-| Repository | Pure data access (CRUD), no business logic | `DatasetRepository`, `ProjectRepository` |
-| Service | Business logic, orchestration, validation | `DatasetService`, `PromptService` |
+| Router | Request/response handling, auth, error mapping | `suite.router.ts`, `dataset.router.ts` |
+| Service | Business logic, orchestration, validation | `DatasetService`, `SuiteService` |
+| Repository | Pure data access (CRUD), no business logic | `DatasetRepository`, `SuiteRepository` |
 
 ## Repository Layer
 
@@ -81,28 +107,6 @@ export class DatasetService {
 - Apply business rules, validation, default resolution
 - Throw domain-specific errors (see below)
 
-## Factory Pattern
-
-Services use a static `create()` factory method:
-
-```typescript
-// In service class
-static create(prisma: PrismaClient): DatasetService {
-  return new DatasetService(
-    prisma,
-    new DatasetRepository(prisma),
-    new DatasetRecordRepository(prisma),
-    new ExperimentRepository(prisma),
-  );
-}
-
-// Usage in router/controller
-const service = DatasetService.create(ctx.prisma);
-const result = await service.upsertDataset(params);
-```
-
-This encapsulates dependency wiring and allows easy testing with mocks.
-
 ## Domain Errors
 
 Services throw framework-agnostic errors that routers map to HTTP/tRPC errors:
@@ -115,13 +119,6 @@ export class DatasetNotFoundError extends Error {
     this.name = "DatasetNotFoundError";
   }
 }
-
-export class DatasetConflictError extends Error {
-  constructor(message = "A dataset with this name already exists") {
-    super(message);
-    this.name = "DatasetConflictError";
-  }
-}
 ```
 
 ```typescript
@@ -132,23 +129,46 @@ try {
   if (error instanceof DatasetNotFoundError) {
     throw new TRPCError({ code: "NOT_FOUND", message: error.message });
   }
-  if (error instanceof DatasetConflictError) {
-    throw new TRPCError({ code: "CONFLICT", message: error.message });
-  }
   throw error;
 }
 ```
 
 ## File Structure
 
-```
+```text
 src/server/datasets/
   dataset.repository.ts     # Data access
   dataset-record.repository.ts
   dataset.service.ts        # Business logic
   errors.ts                 # Domain errors
-  types.ts                  # Shared types
+  types.ts                  # Domain types (Zod schemas, inferred types, parsers)
 ```
+
+## Where Types Belong
+
+Domain types live in the domain layer (`server/<feature>/types.ts`), not in the API layer.
+
+```typescript
+// GOOD: Domain type in domain layer
+// server/suites/types.ts
+export const suiteTargetSchema = z.object({
+  type: z.enum(["prompt", "http"]),
+  referenceId: z.string(),
+});
+export type SuiteTarget = z.infer<typeof suiteTargetSchema>;
+
+// Router re-exports from domain
+// server/api/routers/suites/schemas.ts
+export { suiteTargetSchema, type SuiteTarget } from "~/server/suites/types";
+```
+
+```typescript
+// BAD: Domain type defined in API layer, imported by service
+// server/api/routers/suites/schemas.ts   <-- defined here
+// server/suites/suite.service.ts         <-- imports from API layer (wrong direction)
+```
+
+**Rule of thumb:** If a type represents a business concept (not just a request shape), it belongs in the domain layer. Request-specific schemas (like `createSuiteSchema` with its validation messages) can stay in the router schemas file since they're API concerns.
 
 ## Decision Checklist
 
@@ -171,24 +191,4 @@ Follow the [Testing Philosophy](../TESTING_PHILOSOPHY.md):
 | **Integration** | Service + Repository together | Real (testcontainers) |
 | **Unit** | Pure logic only (e.g., `resolveDefaults`) | None needed |
 
-```typescript
-// Integration test - real database via testcontainers
-it("creates dataset with generated slug", async () => {
-  const service = DatasetService.create(prisma);
-  const result = await service.upsertDataset({ projectId, name: "My Dataset" });
-  expect(result.slug).toBe("my-dataset");
-});
-
-// Unit test - pure logic only, no database
-it("resolves null model to default", () => {
-  const config = resolveDefaults({ ...project, defaultModel: null });
-  expect(config.defaultModel).toBe(DEFAULT_MODEL);
-});
-```
-
 **Avoid mocking repositories** - it tests implementation details. If the service works with a real database, it works.
-
-## References
-
-- [Controller-Service-Repository](https://tom-collings.medium.com/controller-service-repository-16e29a4684e5) - Tom Collings
-- [Should Controllers Reference Repositories or Services](https://ardalis.com/should-controllers-reference-repositories-services/) - Steve Smith

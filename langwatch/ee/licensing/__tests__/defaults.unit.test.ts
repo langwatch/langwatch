@@ -44,6 +44,60 @@ describe("resolvePlanDefaults", () => {
     expect(resolved.maxScenarios).toBe(DEFAULT_LIMIT);
     expect(resolved.maxAgents).toBe(DEFAULT_LIMIT);
     expect(resolved.maxOnlineEvaluations).toBe(DEFAULT_LIMIT);
+    expect(resolved.usageUnit).toBe("traces");
+  });
+
+  it("defaults usageUnit to traces when not provided", () => {
+    const plan: LicensePlanLimits = {
+      type: "PRO",
+      name: "Pro",
+      maxMembers: 10,
+      maxProjects: 20,
+      maxMessagesPerMonth: 100_000,
+      evaluationsCredit: 500,
+      maxWorkflows: 50,
+      canPublish: true,
+    };
+
+    const resolved = resolvePlanDefaults(plan);
+
+    expect(resolved.usageUnit).toBe("traces");
+  });
+
+  it("preserves explicit usageUnit events value", () => {
+    const plan: LicensePlanLimits = {
+      type: "ENTERPRISE",
+      name: "Enterprise",
+      maxMembers: 100,
+      maxProjects: 50,
+      maxMessagesPerMonth: 1_000_000,
+      evaluationsCredit: 10_000,
+      maxWorkflows: 200,
+      canPublish: true,
+      usageUnit: "events",
+    };
+
+    const resolved = resolvePlanDefaults(plan);
+
+    expect(resolved.usageUnit).toBe("events");
+  });
+
+  it("normalizes unknown usageUnit values to traces", () => {
+    const plan: LicensePlanLimits = {
+      type: "ENTERPRISE",
+      name: "Enterprise",
+      maxMembers: 100,
+      maxProjects: 50,
+      maxMessagesPerMonth: 1_000_000,
+      evaluationsCredit: 10_000,
+      maxWorkflows: 200,
+      canPublish: true,
+      usageUnit: "spans",
+    };
+
+    const resolved = resolvePlanDefaults(plan);
+
+    expect(resolved.usageUnit).toBe("traces");
   });
 
   it("preserves explicitly set optional fields", () => {
@@ -139,6 +193,7 @@ describe("resolvePlanDefaults", () => {
       maxCustomGraphs: resolved.maxCustomGraphs,
       maxAutomations: resolved.maxAutomations,
       canPublish: resolved.canPublish,
+      usageUnit: resolved.usageUnit,
     };
 
     expect(allFields).toEqual(resolved);

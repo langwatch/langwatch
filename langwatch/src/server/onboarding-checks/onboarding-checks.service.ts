@@ -1,4 +1,4 @@
-import { ScenarioEventService } from "~/app/api/scenario-events/[[...route]]/scenario-event.service";
+import { ScenarioEventService } from "~/server/scenarios/scenario-event.service";
 import { prisma } from "../db";
 
 export type OnboardingCheckStatus = {

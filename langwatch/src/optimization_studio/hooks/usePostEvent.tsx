@@ -265,12 +265,12 @@ export const useHandleServerMessage = ({
             stopWorkflowIfRunning(message.payload.execution_state.error);
           }
           break;
-        case "evaluation_state_change":
-          const currentEvaluationState = getWorkflow().state.evaluation;
-          setEvaluationState(message.payload.evaluation_state);
-          if (message.payload.evaluation_state?.status === "error") {
-            alertOnError(message.payload.evaluation_state.error);
-            if (currentEvaluationState?.status !== "waiting") {
+        case "evaluation_run_change":
+          const currentEvaluationRun = getWorkflow().state.evaluation;
+          setEvaluationState(message.payload.evaluation_run);
+          if (message.payload.evaluation_run?.status === "error") {
+            alertOnError(message.payload.evaluation_run.error);
+            if (currentEvaluationRun?.status !== "waiting") {
               setTimeout(() => {
                 setOpenResultsPanelRequest("evaluations");
               }, 500);

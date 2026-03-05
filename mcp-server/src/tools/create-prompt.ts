@@ -1,7 +1,7 @@
 import { createPrompt as apiCreatePrompt } from "../langwatch-api.js";
 
 /**
- * Handles the create_prompt MCP tool invocation.
+ * Handles the platform_create_prompt MCP tool invocation.
  *
  * Creates a new prompt in the LangWatch project and returns a
  * confirmation with the created prompt's details.

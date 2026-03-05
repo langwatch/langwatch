@@ -1,5 +1,6 @@
 from http import HTTPStatus
-from typing import Any, Optional, Union
+from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -17,8 +18,9 @@ from ...types import UNSET, Response, Unset
 def _get_kwargs(
     id: str,
     *,
-    version: Union[Unset, int] = UNSET,
+    version: int | Unset = UNSET,
 ) -> dict[str, Any]:
+
     params: dict[str, Any] = {}
 
     params["version"] = version
@@ -27,7 +29,9 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": f"/api/prompts/{id}",
+        "url": "/api/prompts/{id}".format(
+            id=quote(str(id), safe=""),
+        ),
         "params": params,
     }
 
@@ -35,41 +39,46 @@ def _get_kwargs(
 
 
 def _parse_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[
-    Union[
-        GetApiPromptsByIdResponse200,
-        GetApiPromptsByIdResponse400,
-        GetApiPromptsByIdResponse401,
-        GetApiPromptsByIdResponse404,
-        GetApiPromptsByIdResponse422,
-        GetApiPromptsByIdResponse500,
-    ]
-]:
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> (
+    GetApiPromptsByIdResponse200
+    | GetApiPromptsByIdResponse400
+    | GetApiPromptsByIdResponse401
+    | GetApiPromptsByIdResponse404
+    | GetApiPromptsByIdResponse422
+    | GetApiPromptsByIdResponse500
+    | None
+):
     if response.status_code == 200:
         response_200 = GetApiPromptsByIdResponse200.from_dict(response.json())
 
         return response_200
+
     if response.status_code == 400:
         response_400 = GetApiPromptsByIdResponse400.from_dict(response.json())
 
         return response_400
+
     if response.status_code == 401:
         response_401 = GetApiPromptsByIdResponse401.from_dict(response.json())
 
         return response_401
+
     if response.status_code == 404:
         response_404 = GetApiPromptsByIdResponse404.from_dict(response.json())
 
         return response_404
+
     if response.status_code == 422:
         response_422 = GetApiPromptsByIdResponse422.from_dict(response.json())
 
         return response_422
+
     if response.status_code == 500:
         response_500 = GetApiPromptsByIdResponse500.from_dict(response.json())
 
         return response_500
+
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -77,16 +86,14 @@ def _parse_response(
 
 
 def _build_response(
-    *, client: Union[AuthenticatedClient, Client], response: httpx.Response
+    *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> Response[
-    Union[
-        GetApiPromptsByIdResponse200,
-        GetApiPromptsByIdResponse400,
-        GetApiPromptsByIdResponse401,
-        GetApiPromptsByIdResponse404,
-        GetApiPromptsByIdResponse422,
-        GetApiPromptsByIdResponse500,
-    ]
+    GetApiPromptsByIdResponse200
+    | GetApiPromptsByIdResponse400
+    | GetApiPromptsByIdResponse401
+    | GetApiPromptsByIdResponse404
+    | GetApiPromptsByIdResponse422
+    | GetApiPromptsByIdResponse500
 ]:
     return Response(
         status_code=HTTPStatus(response.status_code),
@@ -99,30 +106,28 @@ def _build_response(
 def sync_detailed(
     id: str,
     *,
-    client: Union[AuthenticatedClient, Client],
-    version: Union[Unset, int] = UNSET,
+    client: AuthenticatedClient | Client,
+    version: int | Unset = UNSET,
 ) -> Response[
-    Union[
-        GetApiPromptsByIdResponse200,
-        GetApiPromptsByIdResponse400,
-        GetApiPromptsByIdResponse401,
-        GetApiPromptsByIdResponse404,
-        GetApiPromptsByIdResponse422,
-        GetApiPromptsByIdResponse500,
-    ]
+    GetApiPromptsByIdResponse200
+    | GetApiPromptsByIdResponse400
+    | GetApiPromptsByIdResponse401
+    | GetApiPromptsByIdResponse404
+    | GetApiPromptsByIdResponse422
+    | GetApiPromptsByIdResponse500
 ]:
     """Get a specific prompt
 
     Args:
         id (str):
-        version (Union[Unset, int]):
+        version (int | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[GetApiPromptsByIdResponse200, GetApiPromptsByIdResponse400, GetApiPromptsByIdResponse401, GetApiPromptsByIdResponse404, GetApiPromptsByIdResponse422, GetApiPromptsByIdResponse500]]
+        Response[GetApiPromptsByIdResponse200 | GetApiPromptsByIdResponse400 | GetApiPromptsByIdResponse401 | GetApiPromptsByIdResponse404 | GetApiPromptsByIdResponse422 | GetApiPromptsByIdResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -140,30 +145,29 @@ def sync_detailed(
 def sync(
     id: str,
     *,
-    client: Union[AuthenticatedClient, Client],
-    version: Union[Unset, int] = UNSET,
-) -> Optional[
-    Union[
-        GetApiPromptsByIdResponse200,
-        GetApiPromptsByIdResponse400,
-        GetApiPromptsByIdResponse401,
-        GetApiPromptsByIdResponse404,
-        GetApiPromptsByIdResponse422,
-        GetApiPromptsByIdResponse500,
-    ]
-]:
+    client: AuthenticatedClient | Client,
+    version: int | Unset = UNSET,
+) -> (
+    GetApiPromptsByIdResponse200
+    | GetApiPromptsByIdResponse400
+    | GetApiPromptsByIdResponse401
+    | GetApiPromptsByIdResponse404
+    | GetApiPromptsByIdResponse422
+    | GetApiPromptsByIdResponse500
+    | None
+):
     """Get a specific prompt
 
     Args:
         id (str):
-        version (Union[Unset, int]):
+        version (int | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[GetApiPromptsByIdResponse200, GetApiPromptsByIdResponse400, GetApiPromptsByIdResponse401, GetApiPromptsByIdResponse404, GetApiPromptsByIdResponse422, GetApiPromptsByIdResponse500]
+        GetApiPromptsByIdResponse200 | GetApiPromptsByIdResponse400 | GetApiPromptsByIdResponse401 | GetApiPromptsByIdResponse404 | GetApiPromptsByIdResponse422 | GetApiPromptsByIdResponse500
     """
 
     return sync_detailed(
@@ -176,30 +180,28 @@ def sync(
 async def asyncio_detailed(
     id: str,
     *,
-    client: Union[AuthenticatedClient, Client],
-    version: Union[Unset, int] = UNSET,
+    client: AuthenticatedClient | Client,
+    version: int | Unset = UNSET,
 ) -> Response[
-    Union[
-        GetApiPromptsByIdResponse200,
-        GetApiPromptsByIdResponse400,
-        GetApiPromptsByIdResponse401,
-        GetApiPromptsByIdResponse404,
-        GetApiPromptsByIdResponse422,
-        GetApiPromptsByIdResponse500,
-    ]
+    GetApiPromptsByIdResponse200
+    | GetApiPromptsByIdResponse400
+    | GetApiPromptsByIdResponse401
+    | GetApiPromptsByIdResponse404
+    | GetApiPromptsByIdResponse422
+    | GetApiPromptsByIdResponse500
 ]:
     """Get a specific prompt
 
     Args:
         id (str):
-        version (Union[Unset, int]):
+        version (int | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[GetApiPromptsByIdResponse200, GetApiPromptsByIdResponse400, GetApiPromptsByIdResponse401, GetApiPromptsByIdResponse404, GetApiPromptsByIdResponse422, GetApiPromptsByIdResponse500]]
+        Response[GetApiPromptsByIdResponse200 | GetApiPromptsByIdResponse400 | GetApiPromptsByIdResponse401 | GetApiPromptsByIdResponse404 | GetApiPromptsByIdResponse422 | GetApiPromptsByIdResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -215,30 +217,29 @@ async def asyncio_detailed(
 async def asyncio(
     id: str,
     *,
-    client: Union[AuthenticatedClient, Client],
-    version: Union[Unset, int] = UNSET,
-) -> Optional[
-    Union[
-        GetApiPromptsByIdResponse200,
-        GetApiPromptsByIdResponse400,
-        GetApiPromptsByIdResponse401,
-        GetApiPromptsByIdResponse404,
-        GetApiPromptsByIdResponse422,
-        GetApiPromptsByIdResponse500,
-    ]
-]:
+    client: AuthenticatedClient | Client,
+    version: int | Unset = UNSET,
+) -> (
+    GetApiPromptsByIdResponse200
+    | GetApiPromptsByIdResponse400
+    | GetApiPromptsByIdResponse401
+    | GetApiPromptsByIdResponse404
+    | GetApiPromptsByIdResponse422
+    | GetApiPromptsByIdResponse500
+    | None
+):
     """Get a specific prompt
 
     Args:
         id (str):
-        version (Union[Unset, int]):
+        version (int | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[GetApiPromptsByIdResponse200, GetApiPromptsByIdResponse400, GetApiPromptsByIdResponse401, GetApiPromptsByIdResponse404, GetApiPromptsByIdResponse422, GetApiPromptsByIdResponse500]
+        GetApiPromptsByIdResponse200 | GetApiPromptsByIdResponse400 | GetApiPromptsByIdResponse401 | GetApiPromptsByIdResponse404 | GetApiPromptsByIdResponse422 | GetApiPromptsByIdResponse500
     """
 
     return (

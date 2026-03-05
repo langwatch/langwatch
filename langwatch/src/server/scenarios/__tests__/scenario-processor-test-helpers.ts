@@ -107,6 +107,8 @@ export function buildTestChildProcessEnv(
     TERM: process.env.TERM,
     // Node.js vars
     NODE_ENV: process.env.NODE_ENV,
+    // Skip t3-oss/env-nextjs validation — child process doesn't need server env vars
+    SKIP_ENV_VALIDATION: "1",
     // CI/pnpm vars (required for pnpm exec tsx in CI)
     PNPM_HOME: process.env.PNPM_HOME,
     // npm config vars (required for node module resolution in CI)
@@ -227,6 +229,7 @@ export function createTestJobData(
       model: "openai/gpt-4o-mini",
     },
     nlpServiceUrl: "http://localhost:8080",
+    target: { type: "http", referenceId: "test-agent" },
     ...overrides,
   };
 }

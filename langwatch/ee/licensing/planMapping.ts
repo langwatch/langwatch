@@ -6,6 +6,7 @@ export function mapToPlanInfo(licenseData: LicenseData): PlanInfo {
   const resolved = resolvePlanDefaults(licenseData.plan);
 
   return {
+    planSource: "license",
     type: resolved.type,
     name: resolved.name,
     free: false, // Paid license = not a free tier
@@ -28,6 +29,7 @@ export function mapToPlanInfo(licenseData: LicenseData): PlanInfo {
     maxCustomGraphs: resolved.maxCustomGraphs,
     maxAutomations: resolved.maxAutomations,
     canPublish: resolved.canPublish,
+    usageUnit: resolved.usageUnit,
     prices: {
       USD: 0,
       EUR: 0,

@@ -11,7 +11,9 @@ export default function SettingsLayout({
   children,
   isSubscription,
 }: PropsWithChildren<{ isSubscription?: boolean }>) {
-  const { project } = useOrganizationTeamProject();
+  const { project } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+  });
   const publicEnv = usePublicEnv();
   const isSaaS = publicEnv.data?.IS_SAAS ?? false;
   const { isEnterprise } = useActivePlan();
@@ -36,6 +38,7 @@ export default function SettingsLayout({
           <MenuLink href={`/${project?.slug}/setup`}>API Key & Setup</MenuLink>
           <MenuLink href="/settings/model-providers">Model Providers</MenuLink>
           <MenuLink href="/settings/model-costs">Model Costs</MenuLink>
+          <MenuLink href="/settings/secrets">Secrets</MenuLink>
           <MenuLink href={`/${project?.slug}/automations`}>Automations</MenuLink>
           <MenuLink href="/settings/projects">Projects</MenuLink>
           <MenuLink href="/settings/teams">Teams</MenuLink>

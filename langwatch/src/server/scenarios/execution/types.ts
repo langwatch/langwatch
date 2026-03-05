@@ -7,6 +7,7 @@
  */
 
 import { z } from "zod";
+import type { Span } from "../../tracer/types";
 
 // ============================================================================
 // Adapter Data Types (Zod schemas for data contracts)
@@ -86,10 +87,37 @@ export const HttpAgentDataSchema = z.object({
 });
 export type HttpAgentData = z.infer<typeof HttpAgentDataSchema>;
 
+/**
+ * Pre-fetched code agent configuration for serialized execution.
+ * Contains all data needed to execute code-based scenarios without DB access.
+ *
+ * The code field contains Python source code, and inputs/outputs define
+ * the data shape expected by the code execution engine (langwatch_nlp).
+ */
+export const CodeAgentDataSchema = z.object({
+  type: z.literal("code"),
+  agentId: z.string(),
+  code: z.string(),
+  inputs: z.array(
+    z.object({
+      identifier: z.string(),
+      type: z.string(),
+    })
+  ),
+  outputs: z.array(
+    z.object({
+      identifier: z.string(),
+      type: z.string(),
+    })
+  ),
+});
+export type CodeAgentData = z.infer<typeof CodeAgentDataSchema>;
+
 /** Union type for all supported target adapter data */
 export const TargetAdapterDataSchema = z.discriminatedUnion("type", [
   PromptConfigDataSchema,
   HttpAgentDataSchema,
+  CodeAgentDataSchema,
 ]);
 export type TargetAdapterData = z.infer<typeof TargetAdapterDataSchema>;
 
@@ -146,10 +174,20 @@ export type TelemetryConfig = z.infer<typeof TelemetryConfigSchema>;
 
 /** Target configuration - what to test against */
 export const TargetConfigSchema = z.object({
-  type: z.enum(["prompt", "http"]),
+  type: z.enum(["prompt", "http", "code"]),
   referenceId: z.string(),
 });
 export type TargetConfig = z.infer<typeof TargetConfigSchema>;
+
+// ============================================================================
+// Span Query Types
+// ============================================================================
+
+/** Function that queries spans from a data source (ES, trace API, etc.) by trace ID */
+export type SpanQueryFn = (params: {
+  projectId: string;
+  traceId: string;
+}) => Promise<Span[]>;
 
 // ============================================================================
 // Result Types
@@ -180,5 +218,6 @@ export const ChildProcessJobDataSchema = z.object({
   adapterData: TargetAdapterDataSchema,
   modelParams: LiteLLMParamsSchema,
   nlpServiceUrl: z.string(),
+  target: TargetConfigSchema,
 });
 export type ChildProcessJobData = z.infer<typeof ChildProcessJobDataSchema>;

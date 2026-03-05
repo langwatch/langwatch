@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -35,30 +37,51 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigData:
     """
     Attributes:
         prompt (str):
-        messages (list['PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataMessagesItem']):
-        inputs (list['PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataInputsItem']):
-        outputs (list['PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataOutputsItem']):
+        messages (list[PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataMessagesItem]):
+        inputs (list[PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataInputsItem]):
+        outputs (list[PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataOutputsItem]):
         model (str):
-        temperature (Union[Unset, float]):
-        max_tokens (Union[Unset, float]):
-        demonstrations (Union[Unset, PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataDemonstrations]):
-        prompting_technique (Union[Unset,
-            PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechnique]):
-        response_format (Union[Unset, PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataResponseFormat]):
+        temperature (float | Unset):
+        max_tokens (float | Unset):
+        top_p (float | Unset):
+        frequency_penalty (float | Unset):
+        presence_penalty (float | Unset):
+        seed (float | Unset):
+        top_k (float | Unset):
+        min_p (float | Unset):
+        repetition_penalty (float | Unset):
+        reasoning (str | Unset):
+        reasoning_effort (str | Unset):
+        thinking_level (str | Unset):
+        effort (str | Unset):
+        verbosity (str | Unset):
+        demonstrations (PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataDemonstrations | Unset):
+        prompting_technique (PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechnique | Unset):
+        response_format (PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataResponseFormat | Unset):
     """
 
     prompt: str
-    messages: list["PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataMessagesItem"]
-    inputs: list["PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataInputsItem"]
-    outputs: list["PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataOutputsItem"]
+    messages: list[PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataMessagesItem]
+    inputs: list[PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataInputsItem]
+    outputs: list[PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataOutputsItem]
     model: str
-    temperature: Union[Unset, float] = UNSET
-    max_tokens: Union[Unset, float] = UNSET
-    demonstrations: Union[Unset, "PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataDemonstrations"] = UNSET
-    prompting_technique: Union[
-        Unset, "PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechnique"
-    ] = UNSET
-    response_format: Union[Unset, "PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataResponseFormat"] = UNSET
+    temperature: float | Unset = UNSET
+    max_tokens: float | Unset = UNSET
+    top_p: float | Unset = UNSET
+    frequency_penalty: float | Unset = UNSET
+    presence_penalty: float | Unset = UNSET
+    seed: float | Unset = UNSET
+    top_k: float | Unset = UNSET
+    min_p: float | Unset = UNSET
+    repetition_penalty: float | Unset = UNSET
+    reasoning: str | Unset = UNSET
+    reasoning_effort: str | Unset = UNSET
+    thinking_level: str | Unset = UNSET
+    effort: str | Unset = UNSET
+    verbosity: str | Unset = UNSET
+    demonstrations: PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataDemonstrations | Unset = UNSET
+    prompting_technique: PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechnique | Unset = UNSET
+    response_format: PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataResponseFormat | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -85,15 +108,39 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigData:
 
         max_tokens = self.max_tokens
 
-        demonstrations: Union[Unset, dict[str, Any]] = UNSET
+        top_p = self.top_p
+
+        frequency_penalty = self.frequency_penalty
+
+        presence_penalty = self.presence_penalty
+
+        seed = self.seed
+
+        top_k = self.top_k
+
+        min_p = self.min_p
+
+        repetition_penalty = self.repetition_penalty
+
+        reasoning = self.reasoning
+
+        reasoning_effort = self.reasoning_effort
+
+        thinking_level = self.thinking_level
+
+        effort = self.effort
+
+        verbosity = self.verbosity
+
+        demonstrations: dict[str, Any] | Unset = UNSET
         if not isinstance(self.demonstrations, Unset):
             demonstrations = self.demonstrations.to_dict()
 
-        prompting_technique: Union[Unset, dict[str, Any]] = UNSET
+        prompting_technique: dict[str, Any] | Unset = UNSET
         if not isinstance(self.prompting_technique, Unset):
             prompting_technique = self.prompting_technique.to_dict()
 
-        response_format: Union[Unset, dict[str, Any]] = UNSET
+        response_format: dict[str, Any] | Unset = UNSET
         if not isinstance(self.response_format, Unset):
             response_format = self.response_format.to_dict()
 
@@ -112,6 +159,30 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigData:
             field_dict["temperature"] = temperature
         if max_tokens is not UNSET:
             field_dict["max_tokens"] = max_tokens
+        if top_p is not UNSET:
+            field_dict["top_p"] = top_p
+        if frequency_penalty is not UNSET:
+            field_dict["frequency_penalty"] = frequency_penalty
+        if presence_penalty is not UNSET:
+            field_dict["presence_penalty"] = presence_penalty
+        if seed is not UNSET:
+            field_dict["seed"] = seed
+        if top_k is not UNSET:
+            field_dict["top_k"] = top_k
+        if min_p is not UNSET:
+            field_dict["min_p"] = min_p
+        if repetition_penalty is not UNSET:
+            field_dict["repetition_penalty"] = repetition_penalty
+        if reasoning is not UNSET:
+            field_dict["reasoning"] = reasoning
+        if reasoning_effort is not UNSET:
+            field_dict["reasoning_effort"] = reasoning_effort
+        if thinking_level is not UNSET:
+            field_dict["thinkingLevel"] = thinking_level
+        if effort is not UNSET:
+            field_dict["effort"] = effort
+        if verbosity is not UNSET:
+            field_dict["verbosity"] = verbosity
         if demonstrations is not UNSET:
             field_dict["demonstrations"] = demonstrations
         if prompting_technique is not UNSET:
@@ -178,8 +249,32 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigData:
 
         max_tokens = d.pop("max_tokens", UNSET)
 
+        top_p = d.pop("top_p", UNSET)
+
+        frequency_penalty = d.pop("frequency_penalty", UNSET)
+
+        presence_penalty = d.pop("presence_penalty", UNSET)
+
+        seed = d.pop("seed", UNSET)
+
+        top_k = d.pop("top_k", UNSET)
+
+        min_p = d.pop("min_p", UNSET)
+
+        repetition_penalty = d.pop("repetition_penalty", UNSET)
+
+        reasoning = d.pop("reasoning", UNSET)
+
+        reasoning_effort = d.pop("reasoning_effort", UNSET)
+
+        thinking_level = d.pop("thinkingLevel", UNSET)
+
+        effort = d.pop("effort", UNSET)
+
+        verbosity = d.pop("verbosity", UNSET)
+
         _demonstrations = d.pop("demonstrations", UNSET)
-        demonstrations: Union[Unset, PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataDemonstrations]
+        demonstrations: PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataDemonstrations | Unset
         if isinstance(_demonstrations, Unset):
             demonstrations = UNSET
         else:
@@ -188,9 +283,7 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigData:
             )
 
         _prompting_technique = d.pop("prompting_technique", UNSET)
-        prompting_technique: Union[
-            Unset, PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechnique
-        ]
+        prompting_technique: PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechnique | Unset
         if isinstance(_prompting_technique, Unset):
             prompting_technique = UNSET
         else:
@@ -201,7 +294,7 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigData:
             )
 
         _response_format = d.pop("response_format", UNSET)
-        response_format: Union[Unset, PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataResponseFormat]
+        response_format: PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataResponseFormat | Unset
         if isinstance(_response_format, Unset):
             response_format = UNSET
         else:
@@ -217,6 +310,18 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigData:
             model=model,
             temperature=temperature,
             max_tokens=max_tokens,
+            top_p=top_p,
+            frequency_penalty=frequency_penalty,
+            presence_penalty=presence_penalty,
+            seed=seed,
+            top_k=top_k,
+            min_p=min_p,
+            repetition_penalty=repetition_penalty,
+            reasoning=reasoning,
+            reasoning_effort=reasoning_effort,
+            thinking_level=thinking_level,
+            effort=effort,
+            verbosity=verbosity,
             demonstrations=demonstrations,
             prompting_technique=prompting_technique,
             response_format=response_format,

@@ -202,8 +202,7 @@ const buildThreadData = async (
         (SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(source)
       ) {
         if (source === "formatted_traces") {
-          result[targetField] = threadTraces
-            .map((t) => formatSpansDigest(t.spans ?? []))
+          result[targetField] = (await Promise.all(threadTraces.map((t) => formatSpansDigest(t.spans ?? []))))
             .join("\n\n---\n\n");
         }
       } else {
@@ -241,7 +240,7 @@ const buildThreadData = async (
           )
         ) {
           if (mappingConfig.source === "formatted_trace") {
-            result[targetField] = formatSpansDigest(trace.spans ?? []);
+            result[targetField] = await formatSpansDigest(trace.spans ?? []);
           }
         } else {
           const traceMappingConfig = {
@@ -380,7 +379,7 @@ const buildDataForEvaluation = async (
           )
         ) {
           if (config.source === "formatted_trace") {
-            mappedData[field] = formatSpansDigest(trace.spans ?? []);
+            mappedData[field] = await formatSpansDigest(trace.spans ?? []);
           }
         }
       }
@@ -667,6 +666,7 @@ export const runEvaluation = async ({
     );
   } catch (error) {
     if (error instanceof Error && error.message.includes("fetch failed")) {
+      console.error({ error, path: `${env.LANGEVALS_ENDPOINT}/${builtInEvaluatorType}/evaluate` });
       throw new Error("Evaluator cannot be reached");
     }
     throw error;
@@ -697,11 +697,17 @@ export const runEvaluation = async ({
     }
   }
 
-  const result = ((await response.json()) as BatchEvaluationResult)[0];
-  if (!result) {
+  const raw = ((await response.json()) as BatchEvaluationResult)[0];
+  if (!raw) {
     getEvaluationStatusCounter(builtInEvaluatorType, "error").inc();
     throw "Unexpected response: empty results";
   }
+
+  const result: typeof raw = {
+    ...raw,
+    ...("score" in raw && { score: typeof raw.score === "number" ? raw.score : undefined }),
+    ...("passed" in raw && { passed: typeof raw.passed === "boolean" ? raw.passed : undefined }),
+  };
 
   getEvaluationStatusCounter(builtInEvaluatorType, result.status).inc();
 

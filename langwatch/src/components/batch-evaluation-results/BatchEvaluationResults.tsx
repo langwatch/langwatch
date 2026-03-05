@@ -39,6 +39,7 @@ import {
   transformBatchEvaluationData,
 } from "./types";
 import { useComparisonMode } from "./useComparisonMode";
+import { isRunFinished } from "./isRunFinished";
 import {
   RUN_COLORS,
   useMultiRunData,
@@ -53,35 +54,6 @@ type BatchEvaluationResultsProps = {
   selectedRunId?: string;
   /** Callback when run selection changes (for controlled mode) */
   onSelectRunId?: (runId: string) => void;
-};
-
-/** Time in milliseconds after which a run without updates is considered interrupted */
-const INTERRUPTED_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
-
-/**
- * Check if a run is finished based on timestamps
- * A run is considered finished if it has finished_at, stopped_at,
- * or hasn't been updated in 5 minutes (interrupted)
- */
-const isRunFinished = (timestamps: {
-  finished_at?: number | null;
-  stopped_at?: number | null;
-  updated_at?: number;
-}): boolean => {
-  // Explicitly finished or stopped
-  if (timestamps.finished_at ?? timestamps.stopped_at) {
-    return true;
-  }
-
-  // Consider interrupted if no updates for 5 minutes
-  if (timestamps.updated_at) {
-    const timeSinceUpdate = Date.now() - timestamps.updated_at;
-    if (timeSinceUpdate > INTERRUPTED_THRESHOLD_MS) {
-      return true;
-    }
-  }
-
-  return false;
 };
 
 /** Grace period after run finishes to continue refetching for final results */
@@ -138,7 +110,7 @@ export function BatchEvaluationResults({
 
   // Determine which run ID to use (priority: external prop > URL query > first run)
   const selectedRunId =
-    externalSelectedRunId ?? queryRunId ?? runsQuery.data?.runs[0]?.run_id;
+    externalSelectedRunId ?? queryRunId ?? runsQuery.data?.runs[0]?.runId;
 
   // Handle run selection - updates URL query param
   const handleSelectRun = useCallback(
@@ -162,7 +134,7 @@ export function BatchEvaluationResults({
 
   // Find selected run
   const selectedRun = useMemo(
-    () => runsQuery.data?.runs.find((r) => r.run_id === selectedRunId),
+    () => runsQuery.data?.runs.find((r) => r.runId === selectedRunId),
     [runsQuery.data?.runs, selectedRunId],
   );
 
@@ -251,21 +223,21 @@ export function BatchEvaluationResults({
   const sidebarRuns: BatchRunSummary[] = useMemo(() => {
     if (!runsQuery.data?.runs) return [];
     return runsQuery.data.runs.map((run) => ({
-      runId: run.run_id,
-      workflowVersion: run.workflow_version,
+      runId: run.runId,
+      workflowVersion: run.workflowVersion,
       timestamps: run.timestamps,
       progress: run.progress,
       total: run.total,
       summary: {
-        datasetCost: run.summary.dataset_cost,
-        evaluationsCost: run.summary.evaluations_cost,
+        datasetCost: run.summary.datasetCost,
+        evaluationsCost: run.summary.evaluationsCost,
         evaluations: Object.fromEntries(
           Object.entries(run.summary.evaluations).map(([id, ev]) => [
             id,
             {
               name: ev.name,
-              averageScore: ev.average_score,
-              averagePassed: ev.average_passed,
+              averageScore: ev.averageScore,
+              averagePassed: ev.averagePassed,
             },
           ]),
         ),

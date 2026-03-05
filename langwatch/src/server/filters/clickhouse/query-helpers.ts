@@ -46,9 +46,9 @@ export function buildStoredSpansConditions(
 }
 
 /**
- * Build common WHERE conditions for evaluation_states queries.
+ * Build common WHERE conditions for evaluation_runs queries.
  */
-export function buildEvaluationStatesConditions(
+export function buildEvaluationRunsConditions(
   _params: ClickHouseFilterQueryParams,
 ): string {
   const conditions: string[] = [

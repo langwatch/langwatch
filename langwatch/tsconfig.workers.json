@@ -3,6 +3,7 @@
 	"compilerOptions": {
 		"paths": {
 			"~/*": ["./src/*"],
+			"@app/*": ["./src/server/app-layer/*"],
 			"@injected-dependencies.server": ["./src/injection/injection.server.ts"]
 		}
 	}

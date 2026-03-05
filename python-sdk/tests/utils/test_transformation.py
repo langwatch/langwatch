@@ -1,6 +1,11 @@
 import json
+import math
 import pytest
-from langwatch.utils.transformation import truncate_object_recursively
+from langwatch.utils.transformation import (
+    truncate_object_recursively,
+    SerializableWithStringFallback,
+    _sanitize_nan,
+)
 
 
 class TestTruncateObjectRecursively:
@@ -334,3 +339,152 @@ class TestTruncateObjectRecursively:
         # The nested dict might be truncated
         if "..." in result.get("outer", {}):
             assert result["outer"]["..."] == "(truncated object)"
+
+
+class TestSanitizeNan:
+    """Test cases for _sanitize_nan and NaN handling in SerializableWithStringFallback."""
+
+    def test_replaces_nan_with_none(self):
+        assert _sanitize_nan(float("nan")) is None
+
+    def test_replaces_positive_inf_with_none(self):
+        assert _sanitize_nan(float("inf")) is None
+
+    def test_replaces_negative_inf_with_none(self):
+        assert _sanitize_nan(float("-inf")) is None
+
+    def test_preserves_normal_floats(self):
+        assert _sanitize_nan(3.14) == 3.14
+        assert _sanitize_nan(0.0) == 0.0
+        assert _sanitize_nan(-1.5) == -1.5
+
+    def test_preserves_non_float_types(self):
+        assert _sanitize_nan("hello") == "hello"
+        assert _sanitize_nan(42) == 42
+        assert _sanitize_nan(True) is True
+        assert _sanitize_nan(None) is None
+
+    def test_sanitizes_nan_in_dict(self):
+        result = _sanitize_nan({"a": float("nan"), "b": 1.0, "c": "text"})
+        assert result == {"a": None, "b": 1.0, "c": "text"}
+
+    def test_sanitizes_nan_in_list(self):
+        result = _sanitize_nan([float("nan"), 1.0, "text"])
+        assert result == [None, 1.0, "text"]
+
+    def test_sanitizes_nan_in_nested_structures(self):
+        result = _sanitize_nan({
+            "outer": {
+                "inner": [float("nan"), {"deep": float("inf")}],
+                "ok": 1.0,
+            }
+        })
+        assert result == {
+            "outer": {
+                "inner": [None, {"deep": None}],
+                "ok": 1.0,
+            }
+        }
+
+    def test_sanitizes_nan_in_tuple(self):
+        result = _sanitize_nan((float("nan"), 1.0))
+        assert result == [None, 1.0]
+
+
+class TestSerializableWithStringFallbackNan:
+    """Test that SerializableWithStringFallback produces valid JSON for NaN/Inf values.
+
+    This is the root cause of issue #1557: pandas DataFrames with missing values
+    produce float('nan') which json.dumps outputs as bare NaN — invalid JSON.
+    """
+
+    def test_nan_serialized_as_null(self):
+        result = json.dumps({"x": float("nan")}, cls=SerializableWithStringFallback)
+        assert result == '{"x": null}'
+        # Verify it round-trips as valid JSON
+        parsed = json.loads(result)
+        assert parsed == {"x": None}
+
+    def test_inf_serialized_as_null(self):
+        result = json.dumps({"x": float("inf")}, cls=SerializableWithStringFallback)
+        assert result == '{"x": null}'
+
+    def test_negative_inf_serialized_as_null(self):
+        result = json.dumps({"x": float("-inf")}, cls=SerializableWithStringFallback)
+        assert result == '{"x": null}'
+
+    def test_normal_floats_preserved(self):
+        result = json.dumps({"x": 3.14}, cls=SerializableWithStringFallback)
+        assert json.loads(result) == {"x": 3.14}
+
+    def test_pandas_nan_in_batch_payload(self):
+        """Simulates the exact payload shape from evaluation.log() with pandas NaN values."""
+        payload = {
+            "experiment_slug": "test-experiment",
+            "run_id": "test-run",
+            "dataset": [
+                {
+                    "index": 0,
+                    "entry": {
+                        "input": "question",
+                        "expected_output": float("nan"),  # pandas None → NaN
+                        "extra_col": float("nan"),
+                    },
+                    "duration": 100,
+                    "trace_id": "abc123",
+                }
+            ],
+            "evaluations": [
+                {
+                    "evaluator": "test",
+                    "status": "processed",
+                    "index": 0,
+                    "score": 0.85,
+                    "inputs": {
+                        "input": "question",
+                        "output": "answer",
+                        "expected_output": float("nan"),
+                    },
+                }
+            ],
+        }
+
+        result = json.dumps(payload, cls=SerializableWithStringFallback)
+        # Must be valid JSON
+        parsed = json.loads(result)
+        assert parsed["dataset"][0]["entry"]["expected_output"] is None
+        assert parsed["dataset"][0]["entry"]["extra_col"] is None
+        assert parsed["evaluations"][0]["inputs"]["expected_output"] is None
+
+    def test_nan_inside_pydantic_model(self):
+        """NaN values inside Pydantic models (going through default()) are sanitized."""
+        from pydantic import BaseModel
+
+        class Score(BaseModel):
+            value: float
+            label: str
+
+        result = json.dumps(
+            {"score": Score(value=float("nan"), label="test")},
+            cls=SerializableWithStringFallback,
+        )
+        parsed = json.loads(result)
+        assert parsed["score"]["value"] is None
+        assert parsed["score"]["label"] == "test"
+
+    def test_nan_inside_set(self):
+        """NaN values inside sets (going through default()) are sanitized."""
+        result = json.dumps(
+            {"values": {1.0, float("nan"), 2.0}},
+            cls=SerializableWithStringFallback,
+        )
+        parsed = json.loads(result)
+        assert None in parsed["values"]
+
+    def test_json_dump_file_also_sanitizes_nan(self):
+        """json.dump() (file writer path) also sanitizes NaN via iterencode()."""
+        import io
+
+        buf = io.StringIO()
+        json.dump({"x": float("nan")}, buf, cls=SerializableWithStringFallback)
+        assert json.loads(buf.getvalue()) == {"x": None}

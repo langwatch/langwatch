@@ -91,6 +91,28 @@ export type MaybeStoredLLMModelCost = {
   createdAt?: Date;
 };
 
+let cachedStaticModelCosts: MaybeStoredLLMModelCost[] | null = null;
+
+/**
+ * Returns static model costs from llmModels.json (no DB query).
+ * Cached at module level since the JSON registry is immutable at runtime.
+ */
+export const getStaticModelCosts = (): MaybeStoredLLMModelCost[] => {
+  if (!cachedStaticModelCosts) {
+    const importedData = getImportedModelCosts();
+    cachedStaticModelCosts = Object.entries(importedData).map(
+      ([key, value]) => ({
+        projectId: "",
+        model: key,
+        regex: value.regex,
+        inputCostPerToken: value.inputCostPerToken,
+        outputCostPerToken: value.outputCostPerToken,
+      }),
+    );
+  }
+  return cachedStaticModelCosts;
+};
+
 export const getLLMModelCosts = async ({
   projectId,
 }: {

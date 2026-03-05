@@ -195,6 +195,7 @@ def validate_workflow(workflow: Workflow) -> None:
                     isinstance(input_field, Field)
                     and not input_field.optional
                     and input_field.identifier not in connected_inputs[node.id]
+                    and input_field.value is None
                 ):
                     raise ClientReadableValueError(
                         f"Missing required input '{input_field.identifier}' for node {node.id}"

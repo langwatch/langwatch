@@ -30,6 +30,14 @@ export const scenarioFormSchema = z.object({
 
 export type ScenarioFormData = z.infer<typeof scenarioFormSchema>;
 
+/**
+ * Initial data passed to ScenarioFormDrawer via complexProps when creating
+ * a new scenario. The scenario is NOT persisted until the user clicks Save.
+ */
+export interface ScenarioInitialData {
+  initialFormData: Partial<ScenarioFormData>;
+}
+
 type ScenarioFormProps = {
   defaultValues?: Partial<ScenarioFormData>;
   formRef?: (form: UseFormReturn<ScenarioFormData>) => void;

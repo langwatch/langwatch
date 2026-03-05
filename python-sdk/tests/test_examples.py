@@ -145,8 +145,14 @@ async def test_example(example_file: str):
 
     mock_message = content if "fastapi" in example_file else cl.Message(content=content)
 
+    # Build trace metadata, optionally tagging with parity run prefix
+    trace_metadata: dict = {}
+    parity_prefix = os.getenv("PARITY_RUN_PREFIX")
+    if parity_prefix:
+        trace_metadata["run_prefix"] = parity_prefix
+
     # Call the main function
-    with langwatch.trace() as trace:
+    with langwatch.trace(metadata=trace_metadata if trace_metadata else None) as trace:
         try:
             # Check if main function takes parameters
             sig = inspect.signature(main_func)
@@ -213,5 +219,10 @@ async def test_example(example_file: str):
                 else:
                     pytest.fail(f"Error running main function in {example_file}: {e!s}")
         trace.send_spans()
-        trace_urls[example_file] = trace.share()
+        if parity_prefix:
+            # In parity-check mode, record trace ID directly (avoids share API call
+            # which may fail if the trace hasn't been ingested yet)
+            trace_urls[example_file] = trace.trace_id or "unknown"
+        else:
+            trace_urls[example_file] = trace.share()
         print(json.dumps(trace_urls, indent=2))

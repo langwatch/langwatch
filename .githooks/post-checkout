@@ -1,0 +1,40 @@
+#!/bin/bash
+# Copies .env files from the main checkout into newly created worktrees.
+# Installed via: git config core.hooksPath .githooks
+
+prev_head="$1"
+new_head="$2"
+branch_flag="$3"
+
+# Only act on branch checkouts (not file checkouts)
+[ "$branch_flag" = "1" ] || exit 0
+
+# Only act inside worktrees, not the main checkout
+git_dir=$(git rev-parse --git-dir 2>/dev/null)
+git_common_dir=$(git rev-parse --git-common-dir 2>/dev/null)
+[ "$git_dir" != "$git_common_dir" ] || exit 0
+
+main_checkout="$(cd "$git_common_dir/.." && pwd)"
+worktree_root="$(git rev-parse --show-toplevel)"
+
+# Directories that may contain .env files
+env_dirs=("langwatch" "langwatch_nlp" "langevals" "python-sdk" "typescript-sdk" "mcp-server")
+
+copied=0
+for dir in "${env_dirs[@]}"; do
+  src="${main_checkout}/${dir}"
+  dest="${worktree_root}/${dir}"
+
+  [ -d "$src" ] || continue
+  [ -d "$dest" ] || continue
+
+  for f in "${src}"/.env*; do
+    [ -f "$f" ] || continue
+    cp "$f" "${dest}/"
+    copied=$((copied + 1))
+  done
+done
+
+if [ "$copied" -gt 0 ]; then
+  echo "post-checkout: Copied $copied .env file(s) from main checkout into worktree."
+fi

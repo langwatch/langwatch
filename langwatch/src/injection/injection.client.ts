@@ -4,7 +4,6 @@ import type { UseFormReturn } from "react-hook-form";
 import type { MaybeStoredModelProvider } from "../server/modelProviders/registry";
 
 export interface Dependencies {
-  SubscriptionPage?: React.FC;
   ExtraMenuItems?: React.FC;
   extraPagesRoutes?: Record<string, NextPage>;
   ExtraFooterComponents?: React.FC;

@@ -1,13 +1,11 @@
 import { createTRPCRouter } from "~/server/api/trpc";
-
-import { dependencies } from "../../injection/dependencies.server";
-
 import { agentsRouter } from "./routers/agents";
 import { analyticsRouter } from "./routers/analytics";
 import { annotationRouter } from "./routers/annotation";
 import { annotationScoreRouter } from "./routers/annotationScore";
 import { batchRecordRouter } from "./routers/batchRecord";
 import { costsRouter } from "./routers/costs";
+import { currencyRouter } from "./routers/currency";
 import { dashboardsRouter } from "./routers/dashboards";
 import { datasetRouter } from "./routers/dataset";
 import { datasetRecordRouter } from "./routers/datasetRecord";
@@ -33,7 +31,11 @@ import { projectRouter } from "./routers/project";
 import { promptsRouter } from "./routers/prompts";
 import { publicEnvRouter } from "./routers/publicEnv";
 import { roleRouter } from "./routers/role";
+import { subscriptionRouter } from "./routers/subscription";
 import { scenarioRouter } from "./routers/scenarios";
+import { sdkRadarRouter } from "./routers/sdkRadar";
+import { secretsRouter } from "./routers/secrets";
+import { suiteRouter } from "./routers/suites";
 import { shareRouter } from "./routers/share";
 import { spansRouter } from "./routers/spans";
 import { teamRouter } from "./routers/team";
@@ -43,12 +45,8 @@ import { translateRouter } from "./routers/translate";
 import { automationRouter } from "./routers/automations";
 import { userRouter } from "./routers/user";
 import { workflowRouter } from "./routers/workflows";
-/**
- * This is the primary router for your server.
- *
- * All routers added in /api/routers should be manually added here.
- */
-export const appRouter = createTRPCRouter({
+
+const coreRouters = {
   agents: agentsRouter,
   evaluators: evaluatorsRouter,
   httpProxy: httpProxyRouter,
@@ -86,11 +84,28 @@ export const appRouter = createTRPCRouter({
   integrationsChecks: integrationsChecksRouter,
   onboarding: onboardingRouter,
   scenarios: scenarioRouter,
+  suites: suiteRouter,
   role: roleRouter,
   prompts: promptsRouter,
+  sdkRadar: sdkRadarRouter,
+  secrets: secretsRouter,
   license: licenseRouter,
   licenseEnforcement: licenseEnforcementRouter,
-  ...(dependencies.extraTRPCRoutes?.() ?? {}),
+};
+
+const eeRouters = {
+  subscription: subscriptionRouter,
+  currency: currencyRouter,
+};
+
+/**
+ * This is the primary router for your server.
+ *
+ * All routers added in /api/routers should be manually added here.
+ */
+export const appRouter = createTRPCRouter({
+  ...coreRouters,
+  ...eeRouters,
 });
 
 // export type definition of API

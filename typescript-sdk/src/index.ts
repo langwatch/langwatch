@@ -35,6 +35,15 @@ export {
   EvaluatorError,
 } from "./client-sdk/services/experiments";
 
+// Evaluators API exports
+export {
+  EvaluatorsApiService,
+  type EvaluatorResponse,
+  type EvaluatorField,
+  type CreateEvaluatorBody,
+  EvaluatorsApiError,
+} from "./client-sdk/services/evaluators";
+
 // Evaluations API exports (Online Evaluations / Guardrails)
 export {
   EvaluationsFacade,

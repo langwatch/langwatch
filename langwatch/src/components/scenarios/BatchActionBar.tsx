@@ -1,10 +1,6 @@
-import { Button, HStack, Text } from "@chakra-ui/react";
+import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import { Archive } from "lucide-react";
 
-/**
- * Action bar that appears when one or more table rows are selected.
- * Shows the number of selected items and provides bulk actions.
- */
 export function BatchActionBar({
   selectedCount,
   onArchive,
@@ -15,26 +11,34 @@ export function BatchActionBar({
   if (selectedCount === 0) return null;
 
   return (
-    <HStack
-      bg="bg.muted"
-      px={4}
-      py={2}
+    <Box
+      position="fixed"
+      bottom={10}
+      left="50%"
+      transform="translateX(-50%)"
+      backgroundColor="#ffffff"
+      border="1px solid #ccc"
+      boxShadow="0 0 15px rgba(0, 0, 0, 0.2)"
       borderRadius="md"
-      justify="space-between"
+      padding="8px"
+      paddingX="16px"
+      zIndex={1000}
       data-testid="batch-action-bar"
     >
-      <Text fontSize="sm" fontWeight="medium">
-        {selectedCount} selected
-      </Text>
-      <Button
-        size="sm"
-        variant="outline"
-        colorPalette="orange"
-        onClick={onArchive}
-      >
-        <Archive size={14} />
-        Archive
-      </Button>
-    </HStack>
+      <HStack gap={3}>
+        <Text whiteSpace="nowrap" fontSize="sm" fontWeight="medium">
+          {selectedCount} selected
+        </Text>
+        <Button
+          size="sm"
+          variant="outline"
+          colorPalette="orange"
+          onClick={onArchive}
+        >
+          <Archive size={14} />
+          Archive
+        </Button>
+      </HStack>
+    </Box>
   );
 }

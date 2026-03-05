@@ -1,4 +1,4 @@
-import type { Event } from "../../../../src/server/event-sourcing/library/domain/types";
+import type { Event } from "../../../../src/server/event-sourcing/domain/types";
 import type { DiscoveredProjection } from "../discovery/projections.types";
 
 /**

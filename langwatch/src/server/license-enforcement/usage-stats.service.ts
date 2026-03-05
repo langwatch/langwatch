@@ -1,7 +1,8 @@
 import type { PrismaClient } from "@prisma/client";
-import { dependencies } from "../../injection/dependencies.server";
+import type { PlanInfo } from "../../../ee/licensing/planInfo";
+import type { PlanProvider } from "../app-layer/subscription/plan-provider";
 import { formatNumber, formatPercent } from "../../utils/formatNumber";
-import { TraceUsageService } from "../traces/trace-usage.service";
+import { getApp } from "../app-layer/app";
 import {
   type ILicenseEnforcementRepository,
   LicenseEnforcementRepository,
@@ -82,9 +83,7 @@ export interface UsageStats {
   projectsCount: number;
   currentMonthMessagesCount: number;
   currentMonthCost: number;
-  activePlan: Awaited<
-    ReturnType<typeof dependencies.subscriptionHandler.getActivePlan>
-  >;
+  activePlan: PlanInfo;
   maxMonthlyUsageLimit: number;
   membersCount: number;
   membersLiteCount: number;
@@ -104,8 +103,8 @@ export interface UsageStats {
  *
  * Coordinates between:
  * - LicenseEnforcementRepository (Prisma queries)
- * - TraceUsageService (Elasticsearch queries)
- * - SubscriptionHandler (plan info)
+ * - UsageService (orchestrated counting via meter policy)
+ * - PlanProvider (plan info)
  *
  * This is the proper service layer - routers call this instead of
  * manually wiring dependencies.
@@ -114,7 +113,7 @@ export class UsageStatsService {
   constructor(
     private readonly repository: ILicenseEnforcementRepository,
     private readonly traceUsageService: ITraceUsageService,
-    private readonly subscriptionHandler: typeof dependencies.subscriptionHandler,
+    private readonly planProvider: PlanProvider,
   ) {}
 
   /**
@@ -122,12 +121,11 @@ export class UsageStatsService {
    * Routers should call this instead of manually wiring dependencies.
    */
   static create(prisma: PrismaClient): UsageStatsService {
-    const traceUsageService = TraceUsageService.create(prisma);
     const repository = new LicenseEnforcementRepository(prisma);
     return new UsageStatsService(
       repository,
-      traceUsageService,
-      dependencies.subscriptionHandler,
+      getApp().usage,
+      getApp().planProvider,
     );
   }
 
@@ -159,7 +157,7 @@ export class UsageStatsService {
       this.repository.getProjectCount(organizationId),
       this.traceUsageService.getCurrentMonthCount({ organizationId }),
       this.repository.getCurrentMonthCost(organizationId),
-      this.subscriptionHandler.getActivePlan(organizationId, user),
+      this.planProvider.getActivePlan({ organizationId, user }),
       this.getMaxMonthlyUsageLimit(organizationId),
       this.repository.getMemberCount(organizationId),
       this.repository.getMembersLiteCount(organizationId),

@@ -1,4 +1,3 @@
-import { setEnvironment } from "@langwatch/ksuid";
 import promBundle from "express-prom-bundle";
 import { createServer, type IncomingMessage } from "http";
 import next from "next";
@@ -6,10 +5,9 @@ import path from "path";
 import { register } from "prom-client";
 import type { Duplex } from "stream";
 import { parse } from "url";
+import { getApp } from "./server/app-layer/app";
 import { getWorkerMetricsPort } from "./server/background/config";
-import { getClickHouseClient } from "./server/clickhouse/client";
-import { initializeEventSourcing } from "./server/event-sourcing";
-import { connection as redis } from "./server/redis";
+import { shutdownPostHog } from "./server/posthog";
 import { createLogger } from "./utils/logger/server";
 
 const logger = createLogger("langwatch:start");
@@ -63,14 +61,6 @@ const isMetricsAuthorized = (req: IncomingMessage): boolean => {
 
 module.exports.startApp = async (dir = path.dirname(__dirname)) => {
   const dev = process.env.NODE_ENV !== "production";
-  const env = process.env.ENVIRONMENT ?? "local";
-  setEnvironment(env);
-
-  // Initialize event sourcing before handling requests
-  initializeEventSourcing({
-    clickHouseClient: getClickHouseClient(),
-    redisConnection: redis,
-  });
 
   const hostname = "0.0.0.0";
   const port = parseInt(process.env.PORT ?? "5560");
@@ -84,6 +74,7 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
     turbopack: !!dev && !process.env.USE_WEBPACK,
   });
   await app.prepare();
+
   const handle = app.getRequestHandler();
   const upgradeHandler = app.getUpgradeHandler();
 
@@ -189,6 +180,29 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
 
     // Background workers are started separately via start:workers script
   });
+
+  // Graceful shutdown — close App (ES pipelines + CH + Redis + Prisma)
+  const shutdown = async (signal: string) => {
+    logger.info({ signal }, "Received signal, shutting down...");
+
+    // Force exit if graceful shutdown hangs (must be set before any awaits)
+    const forceExitTimer = setTimeout(() => {
+      logger.warn("Graceful shutdown timed out after 5s, forcing exit");
+      process.exit(1);
+    }, 5_000);
+    forceExitTimer.unref();
+
+    server.close();
+    server.closeAllConnections();
+    try {
+      await Promise.all([getApp().close(), shutdownPostHog()]);
+    } catch (error) {
+      logger.error({ error }, "Failed to close App");
+    }
+    process.exit(0);
+  };
+  process.on("SIGTERM", () => void shutdown("SIGTERM"));
+  process.on("SIGINT", () => void shutdown("SIGINT"));
 
   // Global error handlers for uncaught exceptions and unhandled promise rejections
   process.on("uncaughtException", (err) => {

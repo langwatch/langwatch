@@ -1,25 +1,25 @@
 import type {
-  Command,
-  CommandHandler,
-  CommandHandlerResult,
-} from "../../../library";
-import { defineCommandSchema } from "../../../library";
+	Command,
+	CommandHandler,
+	CommandHandlerResult,
+} from "../../../";
+import { defineCommandSchema } from "../../../";
 import type { StartEvaluationCommandData } from "../schemas/commands";
 import { startEvaluationCommandDataSchema } from "../schemas/commands";
 import {
-  EVALUATION_STARTED_EVENT_TYPE,
-  EVALUATION_STARTED_EVENT_VERSION_LATEST,
-  START_EVALUATION_COMMAND_TYPE,
+	EVALUATION_STARTED_EVENT_TYPE,
+	EVALUATION_STARTED_EVENT_VERSION_LATEST,
+	START_EVALUATION_COMMAND_TYPE,
 } from "../schemas/constants";
 import type {
-  EvaluationProcessingEvent,
-  EvaluationStartedEvent,
-  EvaluationStartedEventData,
+	EvaluationProcessingEvent,
+	EvaluationStartedEvent,
+	EvaluationStartedEventData,
 } from "../schemas/events";
 import {
-  createEvaluationCommandHandler,
-  type EvaluationCommandConfig,
-  makeJobIdWithSuffix,
+	createEvaluationCommandHandler,
+	type EvaluationCommandConfig,
+	makeJobIdWithSuffix,
 } from "./base.command";
 
 const config: EvaluationCommandConfig<

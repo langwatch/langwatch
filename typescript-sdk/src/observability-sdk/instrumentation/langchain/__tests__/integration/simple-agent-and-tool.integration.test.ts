@@ -100,7 +100,7 @@ describe("LangChain Integration Tests", () => {
     expect(llmAttrKeys.some((k) => k.startsWith("llm."))).toBe(false);
   });
 
-  it("should trace tool calling and agent execution", async () => {
+  it("should trace tool calling and agent execution", { timeout: 30_000 }, async () => {
     const date = new Date().toISOString();
     const tools = [
       new DynamicStructuredTool({

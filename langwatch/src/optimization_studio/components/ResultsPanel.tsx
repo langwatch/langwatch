@@ -221,21 +221,21 @@ export function EvaluationResults({
   const sidebarRuns: BatchRunSummary[] = (
     batchEvaluationRuns.data?.runs ?? []
   ).map((run) => ({
-    runId: run.run_id,
-    workflowVersion: run.workflow_version,
+    runId: run.runId,
+    workflowVersion: run.workflowVersion,
     timestamps: run.timestamps,
     progress: run.progress,
     total: run.total,
     summary: {
-      datasetCost: run.summary.dataset_cost,
-      evaluationsCost: run.summary.evaluations_cost,
+      datasetCost: run.summary.datasetCost,
+      evaluationsCost: run.summary.evaluationsCost,
       evaluations: Object.fromEntries(
         Object.entries(run.summary.evaluations).map(([id, ev]) => [
           id,
           {
             name: ev.name,
-            averageScore: ev.average_score,
-            averagePassed: ev.average_passed,
+            averageScore: ev.averageScore,
+            averagePassed: ev.averagePassed,
           },
         ]),
       ),
@@ -305,7 +305,7 @@ export function EvaluationResults({
           <BatchSummaryFooter
             run={sidebarSelectedRun}
             showProgress={
-              (!selectedRun || selectedRun.run_id === evaluationStateRunId) &&
+              (!selectedRun || selectedRun.runId === evaluationStateRunId) &&
               !!evaluationStateRunId &&
               evaluationState?.status === "running"
             }

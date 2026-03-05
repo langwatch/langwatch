@@ -12,6 +12,7 @@ import {
   Progress,
   Skeleton,
   Spacer,
+  Spinner,
   Table,
   Tag,
   Text,
@@ -22,11 +23,13 @@ import { useRouter } from "next/router";
 import numeral from "numeral";
 import Parse from "papaparse";
 import { useEffect, useRef, useState } from "react";
+import { useBufferedTraceData } from "~/hooks/useBufferedTraceData";
 import { ChevronDown, ChevronUp, Download, Edit, Shield } from "react-feather";
 import { LuChevronsUpDown, LuList, LuRefreshCw } from "react-icons/lu";
 import { useLocalStorage } from "usehooks-ts";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useTraceUpdateListener } from "~/hooks/useTraceUpdateListener";
 import { getEvaluatorDefinitions } from "~/server/evaluations/getEvaluator";
 import type { ElasticSearchEvaluation, Trace } from "~/server/tracer/types";
 import { api } from "~/utils/api";
@@ -89,20 +92,120 @@ export function MessagesTable({
 
   const navigationFooter = useNavigationFooter();
 
+  // Live endDate that gets bumped to "now" on SSE events so the query
+  // window extends to include newly-arrived traces.
+  const [liveEndDate, setLiveEndDate] = useState(filterParams.endDate);
+  useEffect(() => {
+    setLiveEndDate(filterParams.endDate);
+  }, [filterParams.endDate]);
+
+  const urlScrollId = getSingleQueryParam(router.query.scrollId);
+
   const traceGroups = api.traces.getAllForProject.useQuery(
     {
       ...filterParams,
+      endDate: liveEndDate,
       query: getSingleQueryParam(router.query.query),
       groupBy: "none",
       pageOffset: navigationFooter.pageOffset,
       pageSize: navigationFooter.pageSize,
       sortBy: getSingleQueryParam(router.query.sortBy),
       sortDirection: getSingleQueryParam(router.query.orderBy),
+      scrollId: urlScrollId,
     },
     queryOpts,
   );
 
   navigationFooter.useUpdateTotalHits(traceGroups);
+
+  // --- Live update buffering ---
+  const [isMouseOnTable, setIsMouseOnTable] = useState(false);
+
+  const {
+    displayData,
+    pendingData,
+    pendingCount,
+    highlightIds,
+    acceptPending: acceptPendingBuffer,
+    mouseLeftAtRef,
+    bypassBufferRef,
+    displayDataRef,
+    addPendingCount,
+    reset: resetBuffer,
+  } = useBufferedTraceData({
+    freshData: traceGroups.data,
+    isMouseOnTable,
+  });
+
+  // Clear display data when user-driven query params change (filter/sort/page)
+  // so skeletons show during loading. SSE-driven liveEndDate changes don't go through here.
+  const userQueryKey = JSON.stringify({
+    filterParams,
+    pageOffset: navigationFooter.pageOffset,
+    pageSize: navigationFooter.pageSize,
+    sortBy: getSingleQueryParam(router.query.sortBy),
+    sortDirection: getSingleQueryParam(router.query.orderBy),
+    query: getSingleQueryParam(router.query.query),
+    scrollId: urlScrollId,
+  });
+  const prevUserQueryKeyRef = useRef(userQueryKey);
+  useEffect(() => {
+    if (prevUserQueryKeyRef.current !== userQueryKey) {
+      prevUserQueryKeyRef.current = userQueryKey;
+      resetBuffer();
+    }
+  }, [userQueryKey, resetBuffer]);
+
+  const IDLE_THRESHOLD_MS = 60_000;
+
+  useTraceUpdateListener({
+    projectId: project?.id ?? "",
+    onTraceSummaryUpdated: (traceIds) => {
+      const displayedIds = new Set(
+        displayDataRef.current?.groups.flatMap((g) =>
+          g.map((t) => t.trace_id),
+        ) ?? [],
+      );
+
+      // If no traceIds in payload (defensive), fall back to full refetch
+      if (traceIds.length === 0) {
+        setLiveEndDate(Date.now());
+        return;
+      }
+
+      const hasVisibleUpdate = traceIds.some((id) => displayedIds.has(id));
+      const newCount = traceIds.filter(
+        (id) => !displayedIds.has(id),
+      ).length;
+
+      if (hasVisibleUpdate) {
+        // Same endDate refetch — refreshes visible trace data without pulling new traces
+        void traceGroups.refetch();
+      }
+      if (newCount > 0) {
+        const pageHasFocus = document.hasFocus();
+        const mouseIdleMs = Date.now() - mouseLeftAtRef.current;
+        const mouseIdleLongEnough =
+          mouseLeftAtRef.current > 0 && mouseIdleMs >= IDLE_THRESHOLD_MS;
+
+        if (!pageHasFocus || mouseIdleLongEnough) {
+          // Page unfocused or mouse idle long enough — fetch and show directly
+          setLiveEndDate(Date.now());
+        } else {
+          addPendingCount(newCount);
+        }
+      }
+    },
+    enabled: !!project,
+    pageOffset: navigationFooter.pageOffset,
+    cursorPageNumber: navigationFooter.cursorPageNumber,
+  });
+
+  // Wrap acceptPending to also bump liveEndDate (component-level concern)
+  const acceptPending = () => {
+    acceptPendingBuffer();
+    setLiveEndDate(Date.now());
+  };
 
   const isRefreshing = useMinimumSpinDuration(
     traceGroups.isLoading || traceGroups.isRefetching,
@@ -217,7 +320,7 @@ export function MessagesTable({
       sortable: true,
       render: (trace, index) => {
         const checkId = columnKey.split(".")[1];
-        const traceCheck = traceGroups.data?.traceChecks?.[
+        const traceCheck = displayData?.traceChecks?.[
           trace.trace_id
         ]?.find(
           (traceCheck_: ElasticSearchEvaluation) =>
@@ -362,15 +465,19 @@ export function MessagesTable({
               })
             }
           >
-            <Tooltip
-              content={<Box whiteSpace="pre-wrap">{safeInputValue}</Box>}
-            >
-              <RedactedField field="input">
-                <Text truncate display="block">
-                  {safeInputValue}
-                </Text>
-              </RedactedField>
-            </Tooltip>
+            {!safeInputValue && isTraceRecent(trace) ? (
+              <ProcessingIndicator />
+            ) : (
+              <Tooltip
+                content={<Box whiteSpace="pre-wrap">{safeInputValue}</Box>}
+              >
+                <RedactedField field="input">
+                  <Text truncate display="block">
+                    {safeInputValue}
+                  </Text>
+                </RedactedField>
+              </Tooltip>
+            )}
           </Table.Cell>
         );
       },
@@ -428,6 +535,8 @@ export function MessagesTable({
                   <Box lineClamp={1} maxWidth="300px">
                     {safeOutputValue}
                   </Box>
+                ) : isTraceRecent(trace) ? (
+                  <ProcessingIndicator />
                 ) : (
                   <Box>{"<empty>"}</Box>
                 )}
@@ -887,7 +996,7 @@ export function MessagesTable({
 
   const downloadCSV_ = async (selection = false) => {
     const traceGroups_ = selection
-      ? (traceGroups.data ?? {
+      ? (displayData ?? {
           groups: [],
           traceChecks: {} as Record<string, ElasticSearchEvaluation[]>,
         })
@@ -967,11 +1076,12 @@ export function MessagesTable({
   };
 
   const toggleAllTraces = () => {
-    if (selectedTraceIds.length === traceGroups.data?.groups.length) {
+    const totalTraceCount = displayData?.groups.reduce((sum, g) => sum + g.length, 0) ?? 0;
+    if (selectedTraceIds.length === totalTraceCount) {
       setSelectedTraceIds([]);
     } else {
       setSelectedTraceIds(
-        traceGroups.data?.groups.flatMap((traceGroup) =>
+        displayData?.groups.flatMap((traceGroup) =>
           traceGroup.map((trace) => trace.trace_id),
         ) ?? [],
       );
@@ -985,7 +1095,7 @@ export function MessagesTable({
         <Tooltip content="Refresh">
           <PageLayout.HeaderButton
             variant="ghost"
-            onClick={() => void traceGroups.refetch()}
+            onClick={() => setLiveEndDate(Date.now())}
           >
             <LuRefreshCw
               className={
@@ -996,6 +1106,16 @@ export function MessagesTable({
             />
           </PageLayout.HeaderButton>
         </Tooltip>
+        {pendingCount > 0 && (
+          <Button
+            size="xs"
+            variant="subtle"
+            colorPalette="blue"
+            onClick={acceptPending}
+          >
+            {pendingCount} new
+          </Button>
+        )}
         <Spacer />
         {!hideExport && (
           <Tooltip
@@ -1083,7 +1203,19 @@ export function MessagesTable({
         {!hideAnalyticsToggle && <ToggleAnalytics />}
       </PageLayout.Header>
       <HStack align="top" gap={8}>
-        <Box flex="1" minWidth="0">
+        <Box
+          flex="1"
+          minWidth="0"
+          onMouseEnter={() => {
+            setIsMouseOnTable(true);
+            mouseLeftAtRef.current = 0;
+          }}
+          onMouseLeave={() => {
+            setIsMouseOnTable(false);
+            mouseLeftAtRef.current = Date.now();
+            if (pendingCount > 0 || pendingData) acceptPending();
+          }}
+        >
           <VStack
             gap={0}
             align="start"
@@ -1145,8 +1277,12 @@ export function MessagesTable({
                             <HStack width="full">
                               <Checkbox
                                 checked={
+                                  selectedTraceIds.length > 0 &&
                                   selectedTraceIds.length ===
-                                  traceGroups.data?.groups.length
+                                    (displayData?.groups.reduce(
+                                      (sum, g) => sum + g.length,
+                                      0,
+                                    ) ?? 0)
                                 }
                                 onCheckedChange={() => toggleAllTraces()}
                               />
@@ -1168,12 +1304,17 @@ export function MessagesTable({
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
-                  {traceGroups.data?.groups.flatMap((traceGroup) =>
+                  {displayData?.groups.flatMap((traceGroup) =>
                     traceGroup.map((trace) => (
                       <Table.Row
                         key={trace.trace_id}
                         role="button"
                         cursor="pointer"
+                        className={
+                          highlightIds.has(trace.trace_id)
+                            ? "trace-highlight-new"
+                            : undefined
+                        }
                       >
                         {checkedHeaderColumnsEntries.map(
                           ([column, { name }], index) =>
@@ -1186,7 +1327,7 @@ export function MessagesTable({
                       </Table.Row>
                     )),
                   )}
-                  {traceGroups.isLoading &&
+                  {!displayData &&
                     Array.from({ length: 3 }).map((_, i) => (
                       <Table.Row key={i}>
                         {Array.from({
@@ -1201,7 +1342,7 @@ export function MessagesTable({
                       </Table.Row>
                     ))}
                   {traceGroups.isFetched &&
-                    traceGroups.data?.groups.length === 0 && (
+                    displayData?.groups.length === 0 && (
                       <Table.Row>
                         <Table.Cell />
                         <Table.Cell
@@ -1215,7 +1356,10 @@ export function MessagesTable({
                 </Table.Body>
               </Table.Root>
             </Table.ScrollArea>
-            <NavigationFooter {...navigationFooter} />
+            <NavigationFooter
+              {...navigationFooter}
+              scrollId={traceGroups.data?.scrollId}
+            />
           </VStack>
         </Box>
 
@@ -1328,4 +1472,20 @@ function getSafeRenderInputValueFromTrace(trace: Trace): string {
 
 function getSafeRenderOutputValueFromTrace(trace: Trace): string {
   return stringifyIfObject(trace.output?.value);
+}
+
+// Assumes server and client clocks are within ~60s. If the server clock
+// is ahead, recently-ingested traces won't highlight — acceptable trade-off
+// vs. a dedicated "isNew" flag from the server.
+function isTraceRecent(trace: Trace): boolean {
+  return trace.timestamps.started_at > Date.now() - 20_000;
+}
+
+function ProcessingIndicator() {
+  return (
+    <HStack gap={2} color="fg.muted">
+      <Spinner size="xs" />
+      <Text fontSize="sm">processing</Text>
+    </HStack>
+  );
 }

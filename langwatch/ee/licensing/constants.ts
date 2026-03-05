@@ -97,6 +97,7 @@ const FREE_TIER_LIMITS = {
  * - The value is 9,007,199,254,740,991 - far beyond any real limit
  */
 export const UNLIMITED_PLAN: PlanInfo = {
+  planSource: "free",
   type: "OPEN_SOURCE",
   name: "Open Source",
   free: true,
@@ -119,6 +120,7 @@ export const UNLIMITED_PLAN: PlanInfo = {
   maxCustomGraphs: Number.MAX_SAFE_INTEGER,
   maxAutomations: Number.MAX_SAFE_INTEGER,
   canPublish: true,
+  usageUnit: "traces",
   prices: {
     USD: 0,
     EUR: 0,
@@ -130,6 +132,7 @@ export const UNLIMITED_PLAN: PlanInfo = {
  * Provides minimal access to encourage license renewal.
  */
 export const FREE_PLAN: PlanInfo = {
+  planSource: "free",
   type: "FREE",
   name: "Free",
   free: true,
@@ -155,6 +158,7 @@ export const FREE_PLAN: PlanInfo = {
   maxCustomGraphs: FREE_TIER_LIMITS.CUSTOM_GRAPHS,
   maxAutomations: FREE_TIER_LIMITS.AUTOMATIONS,
   canPublish: false,
+  usageUnit: "traces",
   prices: {
     USD: 0,
     EUR: 0,

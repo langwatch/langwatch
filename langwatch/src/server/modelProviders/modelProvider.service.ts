@@ -1,6 +1,8 @@
-import type { Prisma, PrismaClient, Project } from "@prisma/client";
+import type { PrismaClient, Project } from "@prisma/client";
 import { z } from "zod";
 import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
+import type { CustomModelsInput } from "./customModel.schema";
+import { toLegacyCompatibleCustomModels } from "./customModel.schema";
 import { ModelProviderRepository } from "./modelProvider.repository";
 import {
   getProviderModelOptions,
@@ -17,8 +19,8 @@ export type UpdateModelProviderInput = {
   provider: string;
   enabled: boolean;
   customKeys?: Record<string, unknown> | null;
-  customModels?: string[] | null;
-  customEmbeddingsModels?: string[] | null;
+  customModels?: CustomModelsInput | null;
+  customEmbeddingsModels?: CustomModelsInput | null;
   extraHeaders?: { key: string; value: string }[] | null;
   defaultModel?: string;
 };
@@ -251,15 +253,34 @@ export class ModelProviderService {
       .filter((mp) => this.shouldKeepModelProvider(mp, defaultProviders))
       .reduce(
         (acc, mp) => {
+          // Always use registry models for models/embeddingsModels
+          const defaultProvider = defaultProviders[mp.provider];
+
+          // Convert DB custom models (may be legacy string[] or new object[])
+          const customModels = toLegacyCompatibleCustomModels(
+            mp.customModels,
+            "chat",
+          );
+          const customEmbeddingsModels = toLegacyCompatibleCustomModels(
+            mp.customEmbeddingsModels,
+            "embedding",
+          );
+
           const provider_: MaybeStoredModelProvider = {
             id: mp.id,
             provider: mp.provider,
             enabled: mp.enabled,
             customKeys: includeKeys ? mp.customKeys : null,
-            models: mp.customModels as string[] | null,
-            embeddingsModels: mp.customEmbeddingsModels as string[] | null,
+            models: defaultProvider?.models ?? null,
+            embeddingsModels: defaultProvider?.embeddingsModels ?? null,
+            customModels:
+              customModels.length > 0 ? customModels : null,
+            customEmbeddingsModels:
+              customEmbeddingsModels.length > 0
+                ? customEmbeddingsModels
+                : null,
             deploymentMapping: mp.deploymentMapping,
-            disabledByDefault: defaultProviders[mp.provider]?.disabledByDefault,
+            disabledByDefault: defaultProvider?.disabledByDefault,
             extraHeaders: mp.extraHeaders as
               | { key: string; value: string }[]
               | null,
@@ -292,9 +313,9 @@ export class ModelProviderService {
     const defaultProvider = defaultProviders[mp.provider];
     if (mp.enabled !== defaultProvider?.enabled) return true;
 
-    // Keep if has custom models or embeddings
-    const customModels = mp.customModels as string[] | null;
-    const customEmbeddings = mp.customEmbeddingsModels as string[] | null;
+    // Keep if has custom models or embeddings (works for both string[] and object[])
+    const customModels = mp.customModels as unknown[] | null;
+    const customEmbeddings = mp.customEmbeddingsModels as unknown[] | null;
 
     return (
       (customModels != null && customModels.length > 0) ||
@@ -385,8 +406,8 @@ export class ModelProviderService {
       projectId: string;
       provider: string;
       enabled: boolean;
-      customModels: string[];
-      customEmbeddingsModels: string[];
+      customModels: CustomModelsInput;
+      customEmbeddingsModels: CustomModelsInput;
       extraHeaders: { key: string; value: string }[];
     },
     validatedKeys: Record<string, unknown> | null,
@@ -402,18 +423,20 @@ export class ModelProviderService {
       );
     }
 
-    return await tx.modelProvider.update({
-      where: { id: existingProvider.id, projectId: data.projectId },
-      data: {
+    return await this.repository.update(
+      existingProvider.id,
+      data.projectId,
+      {
         enabled: data.enabled,
         customModels: data.customModels,
         customEmbeddingsModels: data.customEmbeddingsModels,
         extraHeaders: data.extraHeaders,
         ...(customKeysToSave !== undefined && {
-          customKeys: customKeysToSave as Prisma.InputJsonValue,
+          customKeys: customKeysToSave,
         }),
       },
-    });
+      tx,
+    );
   }
 
   private async createNew(
@@ -421,21 +444,27 @@ export class ModelProviderService {
       projectId: string;
       provider: string;
       enabled: boolean;
-      customModels?: string[];
-      customEmbeddingsModels?: string[];
+      customModels?: CustomModelsInput;
+      customEmbeddingsModels?: CustomModelsInput;
       extraHeaders: { key: string; value: string }[];
     },
     validatedKeys: Record<string, unknown> | null,
     customKeysProvided: boolean,
     tx: Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0],
   ) {
-    return await tx.modelProvider.create({
-      data: {
-        ...data,
+    return await this.repository.create(
+      {
+        projectId: data.projectId,
+        provider: data.provider,
+        enabled: data.enabled,
+        customModels: data.customModels,
+        customEmbeddingsModels: data.customEmbeddingsModels,
+        extraHeaders: data.extraHeaders,
         ...(customKeysProvided &&
           validatedKeys && { customKeys: validatedKeys }),
-      } as Parameters<typeof tx.modelProvider.create>[0]["data"],
-    });
+      },
+      tx,
+    );
   }
 
   /**
