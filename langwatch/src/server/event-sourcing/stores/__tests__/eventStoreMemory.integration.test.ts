@@ -62,7 +62,7 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
       expect(retrieved.length).toBe(1);
       expect(retrieved[0]?.id).toBe(event1.id);
       // Should keep the first one (earlier timestamp)
-      expect(retrieved[0]?.timestamp).toBe(timestamp);
+      expect(retrieved[0]?.createdAt).toBe(timestamp);
     });
 
     it("keeps first occurrence when duplicates exist", async () => {
@@ -117,7 +117,7 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
 
       expect(retrieved.length).toBe(1);
       expect(retrieved[0]?.data).toEqual({ value: "first" });
-      expect(retrieved[0]?.timestamp).toBe(timestamp);
+      expect(retrieved[0]?.createdAt).toBe(timestamp);
     });
 
     it("sorts events by timestamp before deduplication", async () => {
@@ -172,7 +172,7 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
 
       // Should keep the first one when sorted (earliest timestamp, first in array)
       expect(retrieved.length).toBe(1);
-      expect(retrieved[0]?.timestamp).toBe(timestamp);
+      expect(retrieved[0]?.createdAt).toBe(timestamp);
       expect(retrieved[0]?.data).toEqual({ value: 1 });
     });
 
@@ -336,6 +336,7 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
           EventVersion: eventVersion,
           EventPayload: { value: 2 },
           ProcessingTraceparent: "",
+          IdempotencyKey: "",
         },
       ]);
 

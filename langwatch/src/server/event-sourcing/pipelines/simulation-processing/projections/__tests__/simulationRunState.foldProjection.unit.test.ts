@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTenantId } from "../../../../domain/tenantId";
 import type { FoldProjectionStore } from "../../../../projections/foldProjection.types";
 import {
@@ -35,7 +35,7 @@ function createRunStartedEvent(
     aggregateId: "scenario-run-1",
     aggregateType: "simulation_run",
     tenantId: TEST_TENANT_ID,
-    timestamp: 1000,
+    createdAt: 1000,
     occurredAt: 1000,
     type: SIMULATION_RUN_EVENT_TYPES.STARTED,
     version: SIMULATION_EVENT_VERSIONS.STARTED,
@@ -59,7 +59,7 @@ function createMessageSnapshotEvent(
     aggregateId: "scenario-run-1",
     aggregateType: "simulation_run",
     tenantId: TEST_TENANT_ID,
-    timestamp: 2000,
+    createdAt: 2000,
     occurredAt: 2000,
     type: SIMULATION_RUN_EVENT_TYPES.MESSAGE_SNAPSHOT,
     version: SIMULATION_EVENT_VERSIONS.MESSAGE_SNAPSHOT,
@@ -82,7 +82,7 @@ function createRunFinishedEvent(
     aggregateId: "scenario-run-1",
     aggregateType: "simulation_run",
     tenantId: TEST_TENANT_ID,
-    timestamp: 3000,
+    createdAt: 3000,
     occurredAt: 3000,
     type: SIMULATION_RUN_EVENT_TYPES.FINISHED,
     version: SIMULATION_EVENT_VERSIONS.FINISHED,
@@ -103,7 +103,7 @@ function createRunDeletedEvent(
     aggregateId: "scenario-run-1",
     aggregateType: "simulation_run",
     tenantId: TEST_TENANT_ID,
-    timestamp: 4000,
+    createdAt: 4000,
     occurredAt: 4000,
     type: SIMULATION_RUN_EVENT_TYPES.DELETED,
     version: SIMULATION_EVENT_VERSIONS.DELETED,
@@ -126,7 +126,18 @@ function foldEvents(events: SimulationProcessingEvent[]): SimulationRunStateData
   return state;
 }
 
+const FAKE_NOW = 99999;
+
 describe("simulationRunStateFoldProjection", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(FAKE_NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   describe("init()", () => {
     it("returns PENDING status with empty fields", () => {
       const state = foldProjection.init();
@@ -139,7 +150,7 @@ describe("simulationRunStateFoldProjection", () => {
       expect(state.MetCriteria).toEqual([]);
       expect(state.UnmetCriteria).toEqual([]);
       expect(state.Verdict).toBeNull();
-      expect(state.DeletedAt).toBeNull();
+      expect(state.ArchivedAt).toBeNull();
     });
   });
 
@@ -160,8 +171,8 @@ describe("simulationRunStateFoldProjection", () => {
       expect(state.Description).toBe("A test description");
       expect(state.Status).toBe("IN_PROGRESS");
       expect(state.StartedAt).toBe(1000);
-      expect(state.CreatedAt).toBe(1000);
-      expect(state.UpdatedAt).toBe(1000);
+      expect(state.CreatedAt).toBe(FAKE_NOW);
+      expect(state.UpdatedAt).toBe(FAKE_NOW);
     });
   });
 
@@ -180,7 +191,7 @@ describe("simulationRunStateFoldProjection", () => {
         { Id: "", Role: "assistant", Content: "hi", TraceId: "", Rest: "" },
       ]);
       expect(state.TraceIds).toEqual(["trace-1", "trace-2"]);
-      expect(state.UpdatedAt).toBe(2000);
+      expect(state.UpdatedAt).toBe(FAKE_NOW);
     });
 
     it("updates Status when provided", () => {
@@ -206,12 +217,12 @@ describe("simulationRunStateFoldProjection", () => {
         createRunStartedEvent(),
         createMessageSnapshotEvent(
           { messages: [{ role: "user", content: "second" }] },
-          { id: "event-2a", occurredAt: 2000, timestamp: 2000 },
+          { id: "event-2a", occurredAt: 2000, createdAt: 2000 },
         ),
         // This older event arrives later but has an earlier timestamp
         createMessageSnapshotEvent(
           { messages: [{ role: "user", content: "first" }] },
-          { id: "event-2b", occurredAt: 1500, timestamp: 1500 },
+          { id: "event-2b", occurredAt: 1500, createdAt: 1500 },
         ),
       ]);
 
@@ -219,7 +230,7 @@ describe("simulationRunStateFoldProjection", () => {
       expect(state.Messages).toEqual([
         { Id: "", Role: "user", Content: "second", TraceId: "", Rest: "" },
       ]);
-      expect(state.UpdatedAt).toBe(2000);
+      expect(state.UpdatedAt).toBe(FAKE_NOW);
     });
   });
 
@@ -305,14 +316,14 @@ describe("simulationRunStateFoldProjection", () => {
   });
 
   describe("when RunDeleted event is applied", () => {
-    it("sets DeletedAt timestamp", () => {
+    it("sets ArchivedAt timestamp", () => {
       const state = foldEvents([
         createRunStartedEvent(),
         createRunDeletedEvent(),
       ]);
 
-      expect(state.DeletedAt).toBe(4000);
-      expect(state.UpdatedAt).toBe(4000);
+      expect(state.ArchivedAt).toBe(FAKE_NOW);
+      expect(state.UpdatedAt).toBe(FAKE_NOW);
     });
   });
 

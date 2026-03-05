@@ -24,13 +24,17 @@ If you are unsure, do **not** use `low-risk-change`; request a normal review ins
 
 1. Create a PR and link it to the relevant issue/ticket.
 2. Describe the change and briefly state why it is low risk.
-3. Optional: run the AI/automation to check the diff and apply the `low-risk-change` label.
+3. The AI evaluation runs automatically on every PR and applies the `low-risk-change` label if qualifying.
 4. The PR can be merged **without review** only if:
-   - The `low-risk-change` label is present.
+   - The `low-risk-change` label is present (applied by automation, not manually).
    - All required CI checks are green.
    - The target branch is protected (no direct pushes; status checks required).
 
 PRs that do not meet these conditions must follow the normal review and approval process.
+
+## Firefighting Label
+
+For urgent fixes that cannot wait for review, use the `firefighting` label instead. Unlike `low-risk-change`, this label can be applied manually by any team member and bypasses the approval check. Use it responsibly and only for genuine emergencies.
 
 ## Label Validity
 

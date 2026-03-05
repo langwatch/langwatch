@@ -492,7 +492,7 @@ server.tool(
   {
     name: z.string().describe("Evaluator name"),
     config: z
-      .record(z.unknown())
+      .record(z.string(), z.unknown())
       .describe(
         'Evaluator config object. Must include "evaluatorType" (e.g. "langevals/llm_boolean") and optional "settings" overrides.'
       ),
@@ -548,7 +548,7 @@ server.tool(
     evaluatorId: z.string().describe("The evaluator ID to update"),
     name: z.string().optional().describe("Updated evaluator name"),
     config: z
-      .record(z.unknown())
+      .record(z.string(), z.unknown())
       .optional()
       .describe(
         "Updated config settings. Note: evaluatorType cannot be changed after creation."
@@ -580,7 +580,7 @@ server.tool(
       ),
     enabled: z.boolean().describe("Whether the provider is enabled"),
     customKeys: z
-      .record(z.unknown())
+      .record(z.string(), z.unknown())
       .optional()
       .describe(
         'API key configuration, e.g. { "OPENAI_API_KEY": "sk-..." }. Omit to keep existing keys.'

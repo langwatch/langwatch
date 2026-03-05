@@ -67,7 +67,7 @@ export const fieldMappings: Record<string, FieldMapping> = {
   },
   "timestamps.updated_at": {
     table: "trace_summaries",
-    column: "LastUpdatedAt",
+    column: "UpdatedAt",
     description: "When the record was last updated",
   },
 
