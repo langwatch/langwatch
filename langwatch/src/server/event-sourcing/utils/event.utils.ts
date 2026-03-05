@@ -183,6 +183,14 @@ function buildEventMetadataWithCurrentProcessingTraceparent<
 }
 
 /**
+ * Returns the event's createdAt timestamp, with backward-compatible fallback
+ * to the old `timestamp` field for in-flight events serialized before the rename.
+ */
+function getEventCreatedAt(event: Event): number {
+  return event.createdAt ?? (event as Record<string, unknown>).timestamp as number ?? Date.now();
+}
+
+/**
  * Creates a projection representing the current state of an aggregate.
  *
  * @param id - Unique identifier for this projection
@@ -297,4 +305,5 @@ export const EventUtils = {
   validateTenantId,
   buildEventMetadataWithCurrentProcessingTraceparent,
   getCurrentTraceparentFromActiveSpan,
+  getEventCreatedAt,
 } as const;

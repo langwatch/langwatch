@@ -1,6 +1,7 @@
 import { SPAN_RECEIVED_EVENT_TYPE } from "../../pipelines/trace-processing/schemas/constants";
 import type { SpanReceivedEventData } from "../../pipelines/trace-processing/schemas/events";
 import type { Event } from "../../domain/types";
+import { EventUtils } from "../../utils/event.utils";
 import type { FoldProjectionDefinition } from "../foldProjection.types";
 import {
 	projectDailySdkUsageStore,
@@ -111,7 +112,7 @@ export const projectDailySdkUsageProjection: FoldProjectionDefinition<
 
   key: (event) => {
     const { sdkName, sdkVersion, sdkLanguage } = extractSdkInfoFromEvent(event);
-    const date = toUTCDateString(event.createdAt);
+    const date = toUTCDateString(EventUtils.getEventCreatedAt(event));
     return `${String(event.tenantId)}:${date}:${sdkName}:${sdkVersion}:${sdkLanguage}`;
   },
 
@@ -129,12 +130,12 @@ export const projectDailySdkUsageProjection: FoldProjectionDefinition<
     const { sdkName, sdkVersion, sdkLanguage } = extractSdkInfoFromEvent(event);
     return {
       projectId: String(event.tenantId),
-      date: toUTCDateString(event.createdAt),
+      date: toUTCDateString(EventUtils.getEventCreatedAt(event)),
       sdkName,
       sdkVersion,
       sdkLanguage,
       count: state.count + 1, // Ignored — Prisma upsert handles the count
-      lastEventTimestamp: event.createdAt,
+      lastEventTimestamp: EventUtils.getEventCreatedAt(event),
     };
   },
 

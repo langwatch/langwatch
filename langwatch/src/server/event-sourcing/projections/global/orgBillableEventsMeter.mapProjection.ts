@@ -1,4 +1,5 @@
 import type { Event } from "../../domain/types";
+import { EventUtils } from "../../utils/event.utils";
 import type { MapProjectionDefinition } from "../mapProjection.types";
 import { EVALUATION_STARTED_EVENT_TYPE } from "../../pipelines/evaluation-processing/schemas/constants";
 import { EXPERIMENT_RUN_EVENT_TYPES } from "../../pipelines/experiment-run-processing/schemas/constants";
@@ -73,7 +74,7 @@ export const orgBillableEventsMeterProjection: MapProjectionDefinition<
       eventId: event.id,
       eventType: event.type,
       deduplicationKey,
-      eventTimestamp: event.createdAt,
+      eventTimestamp: EventUtils.getEventCreatedAt(event),
     };
   },
 
