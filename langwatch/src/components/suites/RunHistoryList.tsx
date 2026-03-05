@@ -119,8 +119,7 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
   const hasQueuedJobs =
     (queueStatus?.waiting ?? 0) > 0 || (queueStatus?.active ?? 0) > 0;
 
-  // Track previous run data for adaptive polling (avoids circular self-reference in useQuery)
-  const runDataRef = useRef<ScenarioRunData[]>([]);
+  const [adaptiveIntervalMs, setAdaptiveIntervalMs] = useState(15000);
 
   // Fetch all run data for this suite (unpaginated).
   // Date filtering is applied client-side to avoid capping results.
@@ -136,17 +135,18 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
     },
     {
       enabled: !!project,
-      // Adaptive polling: fast when runs are active or jobs are queued, slow otherwise
-      refetchInterval: hasQueuedJobs
-        ? 3000
-        : getAdaptivePollingInterval({ runs: runDataRef.current }),
+      refetchInterval: adaptiveIntervalMs,
     },
   );
 
-  // Keep ref in sync so next render picks up the latest data for polling interval
-  if (runData) {
-    runDataRef.current = runData;
-  }
+  // Recompute adaptive polling whenever run data or queue status changes
+  useEffect(() => {
+    setAdaptiveIntervalMs(
+      hasQueuedJobs
+        ? 3000
+        : getAdaptivePollingInterval({ runs: runData ?? [] }),
+    );
+  }, [hasQueuedJobs, runData]);
 
   // SSE subscription for real-time updates scoped to this suite's scenarioSetId
   useSimulationUpdateListener({

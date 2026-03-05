@@ -104,10 +104,20 @@ export function AllRunsPanel({ period }: AllRunsPanelProps) {
   );
 
   // SSE subscription for real-time updates (no filter = all suites).
-  // Stays active regardless of pagination state.
+  // After pagination, reset to first page so new runs appear at the top.
+  const handleRealtimeRefresh = useCallback(() => {
+    if (cursor !== undefined) {
+      prevCursorRef.current = undefined;
+      setPages([]);
+      setCursor(undefined);
+      return;
+    }
+    void refetchRunData();
+  }, [cursor, refetchRunData]);
+
   useSimulationUpdateListener({
     projectId: project?.id ?? "",
-    refetch: refetchRunData,
+    refetch: handleRealtimeRefresh,
     enabled: !!project,
   });
 
@@ -121,6 +131,9 @@ export function AllRunsPanel({ period }: AllRunsPanelProps) {
     } else if (cursor !== prevCursorRef.current) {
       // New cursor — append page
       setPages((prev) => [...prev, runDataResult]);
+    } else {
+      // Same cursor refetch (e.g. from polling) — update last page in place
+      setPages((prev) => [...prev.slice(0, -1), runDataResult]);
     }
     prevCursorRef.current = cursor;
   }, [runDataResult, cursor]);
