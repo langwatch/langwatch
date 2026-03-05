@@ -583,8 +583,9 @@ export class ClickHouseSimulationService {
       return { runs: [], nextCursor: undefined, hasMore: false };
     }
 
-    const lastRow = pageRows[pageRows.length - 1]!;
-    const nextCursor = hasMore
+    const lastRow = pageRows[pageRows.length - 1];
+
+    const nextCursor = lastRow && hasMore
       ? this.encodeCursor(lastRow.MaxCreatedAt, lastRow.BatchRunId)
       : undefined;
 
@@ -718,7 +719,7 @@ export class ClickHouseSimulationService {
            ORDER BY ScenarioRunId, UpdatedAt DESC
            LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
          )
-         WHERE DeletedAt IS NULL
+         WHERE ArchivedAt IS NULL
          GROUP BY ScenarioSetId, BatchRunId
        )
        GROUP BY ScenarioSetId
