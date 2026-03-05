@@ -281,6 +281,7 @@ export const useOrganizationTeamProject = (
       isPublicRoute,
       isOrganizationFeatureEnabled: () => false,
       isDemo,
+      organizationRole: undefined,
     };
   }
 
@@ -392,5 +393,6 @@ export const useOrganizationTeamProject = (
     modelProviders: modelProviders.data,
     isOrganizationFeatureEnabled,
     isDemo,
+    organizationRole,
   };
 };
