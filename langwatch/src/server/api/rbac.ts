@@ -355,7 +355,10 @@ export const checkProjectPermission =
     next,
   }: PermissionMiddlewareParams<{ projectId: string }>) => {
     if (!(await hasProjectPermission(ctx, input.projectId, permission))) {
-      throw new TRPCError({ code: "UNAUTHORIZED" });
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: "You do not have permission to access this project resource",
+      });
     }
 
     ctx.permissionChecked = true;
@@ -373,7 +376,10 @@ export const checkTeamPermission =
     next,
   }: PermissionMiddlewareParams<{ teamId: string }>) => {
     if (!(await hasTeamPermission(ctx, input.teamId, permission))) {
-      throw new TRPCError({ code: "UNAUTHORIZED" });
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: "You do not have permission to access this team resource",
+      });
     }
 
     ctx.permissionChecked = true;
@@ -393,7 +399,11 @@ export const checkOrganizationPermission =
     if (
       !(await hasOrganizationPermission(ctx, input.organizationId, permission))
     ) {
-      throw new TRPCError({ code: "UNAUTHORIZED" });
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message:
+          "You do not have permission to access this organization resource",
+      });
     }
 
     ctx.permissionChecked = true;
@@ -744,7 +754,11 @@ export const checkPermissionOrPubliclyShared =
         },
       });
       if (!sharedResource) {
-        throw new TRPCError({ code: "UNAUTHORIZED" });
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message:
+            "You do not have permission and this resource is not publicly shared",
+        });
       }
       ctx.publiclyShared = true;
     }
