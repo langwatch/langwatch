@@ -651,7 +651,7 @@ importers:
         specifier: ^8.18.1
         version: 8.18.1
       '@typescript/native-preview':
-        specifier: 7.0.0-dev.20251222.1
+        specifier: ^7.0.0-dev.20251222.1
         version: 7.0.0-dev.20251222.1
       '@vitest/coverage-v8':
         specifier: ^4.0.17
