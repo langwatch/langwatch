@@ -154,7 +154,7 @@ describe("Suites Page Layout (Issue #1671)", () => {
   });
 
   describe("when rendering the SuiteSidebar", () => {
-    it("renders a 'SUITES' section header in the sidebar", () => {
+    it("does not render a 'SUITES' section header in the sidebar", () => {
       const suites = [makeSuite()];
       render(
         <SuiteSidebar
@@ -167,9 +167,8 @@ describe("Suites Page Layout (Issue #1671)", () => {
         { wrapper: Wrapper },
       );
 
-      // The sidebar has a "SUITES" section header for the collapsible sidebar
       const suitesLabels = screen.queryAllByText(/^SUITES$/);
-      expect(suitesLabels).toHaveLength(1);
+      expect(suitesLabels).toHaveLength(0);
     });
   });
 });
