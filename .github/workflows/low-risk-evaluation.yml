@@ -95,7 +95,6 @@ jobs:
             --arg diff "$PR_DIFF" \
             '{
               model: "gpt-5-mini",
-              temperature: 0,
               response_format: {
                 type: "json_schema",
                 json_schema: {
