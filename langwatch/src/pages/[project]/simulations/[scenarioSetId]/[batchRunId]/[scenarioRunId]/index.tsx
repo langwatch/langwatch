@@ -1,8 +1,8 @@
 import { Box, Button, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { ArrowLeft, Clock } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { RunScenarioModal } from "~/components/scenarios/RunScenarioModal";
-import { ScenarioFormDrawer } from "~/components/scenarios/ScenarioFormDrawer";
+import { ScenarioFormDrawerFromUrl } from "~/components/scenarios/ScenarioFormDrawer";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
 import {
   CustomCopilotKitChat,
@@ -57,6 +57,16 @@ export default function IndividualScenarioRunPage() {
 
   const results = scenarioState?.results;
   const scenarioId = scenarioState?.scenarioId;
+  const suiteId = scenarioState?.metadata?.langwatch?.simulationSuiteId;
+
+  const copyableIds = useMemo(() => {
+    const ids: { label: string; value: string }[] = [];
+    if (scenarioId) ids.push({ label: "Scenario ID", value: scenarioId });
+    if (batchRunId) ids.push({ label: "Batch Run ID", value: batchRunId });
+    if (scenarioRunId) ids.push({ label: "Run ID", value: scenarioRunId });
+    if (suiteId) ids.push({ label: "Suite ID", value: suiteId });
+    return ids;
+  }, [scenarioId, batchRunId, scenarioRunId, suiteId]);
 
   // Fetch scenario metadata including archived status for guardrails
   const { data: scenarioData } =
@@ -202,7 +212,7 @@ export default function IndividualScenarioRunPage() {
                     <ScenarioRunHeader
                       status={scenarioState?.status}
                       name={scenarioState?.name}
-                      scenarioId={scenarioId}
+                      copyableIds={copyableIds}
                     />
                     {/* Conversation Area - Scrollable */}
                     <Box w="100%" p={4} overflow="auto" maxHeight="100%">
@@ -265,7 +275,7 @@ export default function IndividualScenarioRunPage() {
         </VStack>
       </PageLayout.Container>
 
-      <ScenarioFormDrawer open={drawerOpen("scenarioEditor")} />
+      <ScenarioFormDrawerFromUrl open={drawerOpen("scenarioEditor")} />
 
       <RunScenarioModal
         open={runModalOpen}

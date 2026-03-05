@@ -2,7 +2,7 @@ import { Box, Grid, HStack, IconButton, Text } from "@chakra-ui/react";
 import type React from "react";
 import { createContext, useContext, useLayoutEffect, useState } from "react";
 import { ZoomIn, ZoomOut } from "react-feather";
-import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useZoom } from "~/hooks/useZoom";
 import { Tooltip } from "../ui/tooltip";
 import { SimulationChatViewer } from "./SimulationChatViewer";
@@ -92,8 +92,7 @@ interface GridProps {
 
 function GridComponent({ scenarioRunIds }: GridProps) {
   const { scale, containerRef } = useZoomContext();
-  const { goToSimulationRun, scenarioSetId, batchRunId } =
-    useSimulationRouter();
+  const { openDrawer } = useDrawer();
 
   // State to track container dimensions and column count
   const [containerWidth, setContainerWidth] = useState(0);
@@ -104,15 +103,9 @@ function GridComponent({ scenarioRunIds }: GridProps) {
   const GRID_GAP = 24; // 6 * 4px from gap={6} in Chakra UI
 
   const handleExpandToggle = (simulationId: string) => {
-    if (scenarioSetId && batchRunId) {
-      goToSimulationRun({
-        scenarioSetId,
-        batchRunId,
-        scenarioRunId: simulationId,
-      });
-    } else {
-      console.warn("scenarioSetId or batchRunId is not defined");
-    }
+    openDrawer("scenarioRunDetail", {
+      urlParams: { scenarioRunId: simulationId },
+    });
   };
 
   // Calculate optimal column count based on container width and scale

@@ -19,8 +19,6 @@ import { IdUtils } from "../../event-sourcing/pipelines/trace-processing/utils/i
 import { TraceRequestUtils } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
 
 export class SpanNormalizationPipelineService {
-  private readonly canonicalizeSpanAttributesService =
-    new CanonicalizeSpanAttributesService();
   private readonly logger = createLogger(
     "langwatch:trace-processing:span-normalization-pipeline-service",
   );
@@ -28,8 +26,15 @@ export class SpanNormalizationPipelineService {
     "langwatch.trace-processing.span-normalization-pipeline-service",
   );
 
-  // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional - class uses dependency injection via private fields
-  constructor() {}
+  constructor(
+    private readonly canonicalizeSpanAttributesService: CanonicalizeSpanAttributesService,
+  ) {}
+
+  static create(): SpanNormalizationPipelineService {
+    return new SpanNormalizationPipelineService(
+      new CanonicalizeSpanAttributesService(),
+    );
+  }
 
   normalizeSpanReceived(
     tenantId: string,
@@ -78,9 +83,6 @@ export class SpanNormalizationPipelineService {
           this.canonicalizeSpanAttributes(normalizedSpan);
         normalizedSpan.spanAttributes = canonicalizedResult.attributes;
         normalizedSpan.events = canonicalizedResult.events;
-
-        // Enrich RAG contexts with document IDs
-        enrichRagContextIds(normalizedSpan);
 
         return normalizedSpan;
       },
@@ -278,28 +280,17 @@ export function generateDocumentId(content: unknown): string {
  * Enriches RAG context entries that lack a `document_id` by generating
  * an MD5 hash from their content. Mutates the span attributes in-place.
  */
-function enrichRagContextIds(span: NormalizedSpan): void {
+export function enrichRagContextIds(span: NormalizedSpan): void {
   const raw =
     span.spanAttributes[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS] ??
     span.spanAttributes[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS_LEGACY];
-  if (typeof raw !== "string") return;
+  if (!Array.isArray(raw)) return;
 
-  let contexts: unknown[];
-  try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return;
-    contexts = parsed;
-  } catch {
-    return;
-  }
-
-  const allMissingIds = contexts.every(
-    (ctx) => !ctx || typeof ctx !== "object" || !("document_id" in ctx),
-  );
-  if (!allMissingIds) return;
-
-  const enriched = contexts.filter(Boolean).map((ctx) => {
-    const ctxObj = ctx as Record<string, unknown>;
+  const enriched = raw.map((ctx) => {
+    if (!ctx || typeof ctx !== "object" || Array.isArray(ctx)) return ctx;
+    const ctxObj: Record<string, unknown> = ctx;
+    // Skip items that already have a document_id
+    if ("document_id" in ctxObj && ctxObj.document_id) return ctxObj;
     return {
       ...ctxObj,
       document_id: generateDocumentId(
@@ -308,7 +299,6 @@ function enrichRagContextIds(span: NormalizedSpan): void {
     };
   });
 
-  // Write back to the canonical attribute key
-  span.spanAttributes[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS] =
-    JSON.stringify(enriched);
+  // Write back to the canonical attribute key (as real array)
+  span.spanAttributes[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS] = enriched;
 }

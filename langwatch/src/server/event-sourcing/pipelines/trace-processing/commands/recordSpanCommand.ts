@@ -20,7 +20,7 @@ import {
 } from "../schemas/constants";
 import type { SpanReceivedEvent } from "../schemas/events";
 import type { OtlpSpan } from "../schemas/otlp";
-import { OtlpSpanCostEnrichmentService } from "~/server/app-layer/traces/span-cost-enrichment.service";
+import { OtlpSpanCostEnrichmentService, createCostEnrichmentDeps } from "~/server/app-layer/traces/span-cost-enrichment.service";
 import { OtlpSpanPiiRedactionService } from "~/server/app-layer/traces/span-pii-redaction.service";
 import { TraceRequestUtils } from "../utils/traceRequest.utils";
 
@@ -41,17 +41,16 @@ export interface RecordSpanCommandDependencies {
   };
 }
 
-/** Cached default dependencies, lazily initialized */
-let cachedDefaultDependencies: RecordSpanCommandDependencies | null = null;
-
-function getDefaultDependencies(): RecordSpanCommandDependencies {
-  if (!cachedDefaultDependencies) {
-    cachedDefaultDependencies = {
-      piiRedactionService: new OtlpSpanPiiRedactionService(),
-      costEnrichmentService: new OtlpSpanCostEnrichmentService(),
-    };
-  }
-  return cachedDefaultDependencies;
+function createDefaultDependencies(): RecordSpanCommandDependencies {
+  // Lazily require prisma only when defaults are needed (i.e. production path).
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { prisma } = require("~/server/db") as { prisma: import("@prisma/client").PrismaClient };
+  return {
+    piiRedactionService: OtlpSpanPiiRedactionService.create(),
+    costEnrichmentService: OtlpSpanCostEnrichmentService.create(
+      createCostEnrichmentDeps(prisma),
+    ),
+  };
 }
 
 /**
@@ -75,8 +74,8 @@ export class RecordSpanCommand implements CommandHandler<
   );
   private readonly deps: RecordSpanCommandDependencies;
 
-  constructor(deps: Partial<RecordSpanCommandDependencies> = {}) {
-    this.deps = { ...getDefaultDependencies(), ...deps };
+  constructor(deps?: RecordSpanCommandDependencies) {
+    this.deps = deps ?? createDefaultDependencies();
   }
 
   async handle(
@@ -110,6 +109,14 @@ export class RecordSpanCommand implements CommandHandler<
 
         // Clone span before mutation to preserve command immutability
         const spanToProcess = structuredClone(commandData.span);
+
+        // Strip any user-submitted langwatch.reserved.* attributes — this domain
+        // is reserved for system-generated attributes only.
+        RecordSpanCommand.stripReservedAttributes(
+          spanToProcess,
+          this.logger,
+        );
+
         const piiRedactionLevel =
           commandData.piiRedactionLevel ?? DEFAULT_PII_REDACTION_LEVEL;
 
@@ -191,6 +198,39 @@ export class RecordSpanCommand implements CommandHandler<
       "payload.trace.id": traceId,
       "payload.span.id": spanId,
     };
+  }
+
+  /**
+   * Strips any `langwatch.reserved.*` attributes from a span and its events/links.
+   * These attributes are reserved for system use and must not be set by users.
+   */
+  private static stripReservedAttributes(
+    span: OtlpSpan,
+    logger: ReturnType<typeof createLogger>,
+  ): void {
+    const RESERVED_PREFIX = "langwatch.reserved.";
+
+    const strip = (attributes: OtlpSpan["attributes"]): OtlpSpan["attributes"] => {
+      const filtered = attributes.filter((attr) => {
+        if (attr.key.startsWith(RESERVED_PREFIX)) {
+          logger.warn(
+            { attributeKey: attr.key },
+            "Stripped user-submitted langwatch.reserved.* attribute",
+          );
+          return false;
+        }
+        return true;
+      });
+      return filtered;
+    };
+
+    span.attributes = strip(span.attributes);
+    for (const event of span.events) {
+      event.attributes = strip(event.attributes);
+    }
+    for (const link of span.links) {
+      link.attributes = strip(link.attributes);
+    }
   }
 
   static makeJobId(payload: RecordSpanCommandData): string {

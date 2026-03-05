@@ -52,6 +52,7 @@ function createStrandsContext(
     instrumentationScope: { name: "strands.telemetry.tracer", version: null },
     statusMessage: null,
     statusCode: null,
+    parentSpanId: "abc123",
     ...spanOverrides,
   };
 
@@ -140,7 +141,7 @@ describe("StrandsExtractor", () => {
       );
     });
 
-    it("extracts gen_ai.system.message events as input messages", () => {
+    it("promotes gen_ai.system.message to system_instruction and strips from input", () => {
       const ctx = createStrandsContext({}, [
         {
           name: "gen_ai.system.message",
@@ -150,12 +151,12 @@ describe("StrandsExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toEqual(
-        JSON.stringify([{ role: "system", content: "System prompt" }]),
-      );
+      // System message promoted to system_instruction, stripped from input
+      expect(ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS]).toBe("System prompt");
+      expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toBeUndefined();
     });
 
-    it("extracts multiple role events in order", () => {
+    it("strips system messages from input and promotes to system_instruction", () => {
       const ctx = createStrandsContext({}, [
         {
           name: "gen_ai.system.message",
@@ -169,12 +170,15 @@ describe("StrandsExtractor", () => {
 
       extractor.apply(ctx);
 
+      // System instruction promoted
+      expect(ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS]).toBe("Be helpful");
+
+      // Only user messages remain in input
       const messages = JSON.parse(
         ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] as string,
       ) as unknown[];
-      expect(messages).toHaveLength(2);
-      expect(messages[0]).toEqual({ role: "system", content: "Be helpful" });
-      expect(messages[1]).toEqual({ role: "user", content: "Hi" });
+      expect(messages).toHaveLength(1);
+      expect(messages[0]).toEqual({ role: "user", content: "Hi" });
     });
   });
 

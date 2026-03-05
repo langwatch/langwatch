@@ -1,5 +1,5 @@
 import { matchingLLMModelCost } from "~/server/background/workers/collector/cost";
-import { prisma } from "~/server/db";
+import type { PrismaClient } from "@prisma/client";
 import type { MaybeStoredLLMModelCost } from "~/server/modelProviders/llmModelCost";
 import type { OtlpSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 
@@ -21,31 +21,30 @@ export interface OtlpSpanCostEnrichmentServiceDependencies {
   matchModelCost: typeof matchingLLMModelCost;
 }
 
-/** Cached default dependencies, lazily initialized */
-let cachedDefaultDependencies: OtlpSpanCostEnrichmentServiceDependencies | null = null;
-
-function getDefaultDependencies(): OtlpSpanCostEnrichmentServiceDependencies {
-  if (!cachedDefaultDependencies) {
-    cachedDefaultDependencies = {
-      getCustomModelCosts: async (projectId: string) => {
-        const records = await prisma.customLLMModelCost.findMany({
-          where: { projectId },
-        });
-        return records.map((r) => ({
-          id: r.id,
-          projectId,
-          model: r.model,
-          regex: r.regex,
-          inputCostPerToken: r.inputCostPerToken ?? undefined,
-          outputCostPerToken: r.outputCostPerToken ?? undefined,
-          updatedAt: r.updatedAt,
-          createdAt: r.createdAt,
-        }));
-      },
-      matchModelCost: matchingLLMModelCost,
-    };
-  }
-  return cachedDefaultDependencies;
+/**
+ * Creates default dependencies from a Prisma client.
+ */
+export function createCostEnrichmentDeps(
+  prisma: PrismaClient,
+): OtlpSpanCostEnrichmentServiceDependencies {
+  return {
+    getCustomModelCosts: async (projectId: string) => {
+      const records = await prisma.customLLMModelCost.findMany({
+        where: { projectId },
+      });
+      return records.map((r) => ({
+        id: r.id,
+        projectId,
+        model: r.model,
+        regex: r.regex,
+        inputCostPerToken: r.inputCostPerToken ?? undefined,
+        outputCostPerToken: r.outputCostPerToken ?? undefined,
+        updatedAt: r.updatedAt,
+        createdAt: r.createdAt,
+      }));
+    },
+    matchModelCost: matchingLLMModelCost,
+  };
 }
 
 /**
@@ -61,8 +60,12 @@ function getDefaultDependencies(): OtlpSpanCostEnrichmentServiceDependencies {
 export class OtlpSpanCostEnrichmentService {
   private readonly deps: OtlpSpanCostEnrichmentServiceDependencies;
 
-  constructor(deps: Partial<OtlpSpanCostEnrichmentServiceDependencies> = {}) {
-    this.deps = { ...getDefaultDependencies(), ...deps };
+  constructor(deps: OtlpSpanCostEnrichmentServiceDependencies) {
+    this.deps = deps;
+  }
+
+  static create(deps: OtlpSpanCostEnrichmentServiceDependencies): OtlpSpanCostEnrichmentService {
+    return new OtlpSpanCostEnrichmentService(deps);
   }
 
   /**

@@ -1,4 +1,5 @@
 import { TraceState } from "@opentelemetry/core";
+import { safeUnflatten } from "~/utils/safeUnflatten";
 import type { Fixed64 } from "@opentelemetry/otlp-transformer-next/build/esm/common/internal-types";
 import {
   ESpanKind,
@@ -298,7 +299,7 @@ const INDEXED_KEY_REGEX = /^(.+?)\.(\d+)\.(.+)$/;
 
 type ArrayPatternMap = Map<
   string,
-  Map<number, Map<string, NormalizedAttributes[string]>>
+  Map<number, Map<string, unknown>>
 >;
 
 /**
@@ -354,7 +355,7 @@ const detectArrayPatterns = (
  * 2. Same set of relative keys across all items
  */
 const isValidArrayPattern = (
-  indexMap: Map<number, Map<string, NormalizedAttributes[string]>>,
+  indexMap: Map<number, Map<string, unknown>>,
 ): boolean => {
   const indices = Array.from(indexMap.keys()).sort((a, b) => a - b);
 
@@ -379,6 +380,7 @@ const isValidArrayPattern = (
 
 /**
  * Reconstructs a nested object from flattened key-value pairs.
+ * Delegates to shared safeUnflatten for prototype pollution protection.
  *
  * For input:
  *   Map { "message.content" => "hello", "message.role" => "user" }
@@ -387,27 +389,13 @@ const isValidArrayPattern = (
  *   { message: { content: "hello", role: "user" } }
  */
 const unflattenObject = (
-  flatMap: Map<string, NormalizedAttributes[string]>,
+  flatMap: Map<string, unknown>,
 ): Record<string, unknown> => {
-  const result: Record<string, unknown> = {};
-
-  for (const [path, value] of flatMap) {
-    const parts = path.split(SEP);
-    let current: Record<string, unknown> = result;
-
-    for (let i = 0; i < parts.length - 1; i++) {
-      const part = parts[i]!;
-      if (!(part in current)) {
-        current[part] = {};
-      }
-      current = current[part] as Record<string, unknown>;
-    }
-
-    const lastPart = parts[parts.length - 1]!;
-    current[lastPart] = value;
+  const record: Record<string, unknown> = Object.create(null);
+  for (const [k, v] of flatMap) {
+    record[k] = v;
   }
-
-  return result;
+  return safeUnflatten(record);
 };
 
 /**
@@ -419,7 +407,7 @@ const unflattenObject = (
  *   "llm.input_messages.1.message.content" => "hi"
  *
  * Into:
- *   "llm.input_messages" => '[{"message":{"content":"hello","role":"user"}},{"message":{"content":"hi"}}]'
+ *   "llm.input_messages" => [{message:{content:"hello",role:"user"}},{message:{content:"hi"}}]
  */
 const reconstructFlattenedArrays = (
   attrs: NormalizedAttributes,
@@ -463,8 +451,57 @@ const reconstructFlattenedArrays = (
       arrayItems.push(item);
     }
 
-    // Store as JSON string
-    result[prefix] = JSON.stringify(arrayItems);
+    // Store as real array (not JSON string)
+    result[prefix] = arrayItems;
+  }
+
+  return result;
+};
+
+/**
+ * Maximum string size to attempt synchronous JSON parsing.
+ * Strings larger than this are left as-is to avoid blocking the event loop.
+ */
+const MAX_JSON_PARSE_SIZE = 2_000_000;
+
+/**
+ * Parses string values that look like JSON into their parsed form.
+ * Scalars and already-parsed values pass through unchanged.
+ *
+ * Fast-path: only attempts parse if the trimmed string starts with `{` or `[`.
+ */
+/** @internal Exported for unit testing */
+export const parseJsonStringValues = (
+  attrs: NormalizedAttributes,
+): NormalizedAttributes => {
+  const result: NormalizedAttributes = {};
+
+  for (const [key, value] of Object.entries(attrs)) {
+    if (typeof value !== "string") {
+      result[key] = value;
+      continue;
+    }
+
+    const trimmed = value.trim();
+    if (trimmed.length < 2 || trimmed.length > MAX_JSON_PARSE_SIZE) {
+      result[key] = value;
+      continue;
+    }
+
+    const looksJson =
+      (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+      (trimmed.startsWith("[") && trimmed.endsWith("]"));
+
+    if (!looksJson) {
+      result[key] = value;
+      continue;
+    }
+
+    try {
+      result[key] = JSON.parse(trimmed);
+    } catch {
+      result[key] = value;
+    }
   }
 
   return result;
@@ -486,8 +523,9 @@ const normalizeOtlpAttributes = (
     }
   }
 
-  // Post-process to reconstruct flattened arrays into JSON strings
-  return reconstructFlattenedArrays(normalizedAttributes);
+  // Post-process: reconstruct flattened arrays, then parse JSON string values
+  const reconstructed = reconstructFlattenedArrays(normalizedAttributes);
+  return parseJsonStringValues(reconstructed);
 };
 
 const convertUnixNanoToUnixMs = (unixNano: number): number => {
@@ -569,4 +607,6 @@ export const TraceRequestUtils = {
   convertUnixNanoToUnixMs,
   parseTraceFlags,
   parseTraceState,
+  /** @internal Exported for unit testing */
+  reconstructFlattenedArrays,
 };
