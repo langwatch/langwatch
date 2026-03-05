@@ -14,55 +14,64 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+defaults:
+  run:
+    working-directory: skynet
+
 jobs:
   typecheck:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
+        uses: actions/checkout@v4
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: pnpm
-          cache-dependency-path: skynet/pnpm-lock.yaml
+          cache: npm
+          cache-dependency-path: skynet/package-lock.json
 
       - name: Install dependencies
-        working-directory: skynet
-        run: pnpm install --frozen-lockfile
+        run: npm ci
 
       - name: Run typecheck
-        working-directory: skynet
-        run: pnpm exec tsc --noEmit
+        run: npm run typecheck
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: skynet/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm run test:unit
 
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
+        uses: actions/checkout@v4
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: pnpm
-          cache-dependency-path: skynet/pnpm-lock.yaml
+          cache: npm
+          cache-dependency-path: skynet/package-lock.json
 
       - name: Install dependencies
-        working-directory: skynet
-        run: pnpm install --frozen-lockfile
+        run: npm ci
 
       - name: Build
-        working-directory: skynet
-        run: pnpm run build
+        run: npm run build

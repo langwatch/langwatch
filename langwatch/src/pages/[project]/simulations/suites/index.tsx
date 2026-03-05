@@ -22,9 +22,15 @@ import {
   SuiteDetailPanel,
   SuiteEmptyState,
 } from "~/components/suites/SuiteDetailPanel";
+import { ExternalSetDetailPanel } from "~/components/suites/ExternalSetDetailPanel";
 import { SuiteSidebar } from "~/components/suites/SuiteSidebar";
 import { computeSuiteRunSummaries } from "~/components/suites/run-history-transforms";
-import { ALL_RUNS_ID, useSuiteRouting } from "~/components/suites/useSuiteRouting";
+import {
+  ALL_RUNS_ID,
+  extractExternalSetId,
+  isExternalSetSelection,
+  useSuiteRouting,
+} from "~/components/suites/useSuiteRouting";
 import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useDrawer } from "~/hooks/useDrawer";
@@ -58,6 +64,11 @@ function SuitesPageContent() {
     { enabled: !!project },
   );
 
+  const { data: externalSets } = api.scenarios.getExternalSetSummaries.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project, refetchInterval: 15000 },
+  );
+
   const { data: allRunData } = api.scenarios.getAllSuiteRunData.useQuery(
     {
       projectId: project?.id ?? "",
@@ -78,8 +89,15 @@ function SuitesPageContent() {
 
   const selectedSuite = useMemo(() => {
     if (!selectedSuiteSlug || selectedSuiteSlug === ALL_RUNS_ID) return null;
+    if (isExternalSetSelection(selectedSuiteSlug)) return null;
     return suites?.find((s) => s.slug === selectedSuiteSlug) ?? null;
   }, [selectedSuiteSlug, suites]);
+
+  const selectedExternalSetId = useMemo(() => {
+    if (!selectedSuiteSlug || !isExternalSetSelection(selectedSuiteSlug))
+      return null;
+    return extractExternalSetId(selectedSuiteSlug);
+  }, [selectedSuiteSlug]);
 
   const archiveTargetSuite = archiveConfirmId
     ? suites?.find((s) => s.id === archiveConfirmId)
@@ -293,6 +311,7 @@ function SuitesPageContent() {
             suites={suites ?? []}
             selectedSuiteSlug={selectedSuiteSlug}
             runSummaries={runSummaries}
+            externalSets={externalSets ?? []}
             onSelectSuite={navigateToSuite}
             onRunSuite={handleRunSuite}
             onContextMenu={handleContextMenu}
@@ -305,6 +324,7 @@ function SuitesPageContent() {
             error={error ?? null}
             selectedSuiteSlug={selectedSuiteSlug}
             selectedSuite={selectedSuite}
+            selectedExternalSetId={selectedExternalSetId}
             isLoading={isLoading}
             onNewSuite={handleNewSuite}
             onEditSuite={handleEditSuite}
@@ -343,6 +363,7 @@ function MainPanel({
   error,
   selectedSuiteSlug,
   selectedSuite,
+  selectedExternalSetId,
   isLoading,
   onNewSuite,
   onEditSuite,
@@ -353,6 +374,7 @@ function MainPanel({
   error: { message: string } | null;
   selectedSuiteSlug: string | typeof ALL_RUNS_ID | null;
   selectedSuite: SimulationSuite | null;
+  selectedExternalSetId: string | null;
   isLoading: boolean;
   onNewSuite: () => void;
   onEditSuite: (id: string) => void;
@@ -377,6 +399,10 @@ function MainPanel({
 
   if (selectedSuiteSlug === null) {
     return null;
+  }
+
+  if (selectedExternalSetId) {
+    return <ExternalSetDetailPanel scenarioSetId={selectedExternalSetId} />;
   }
 
   if (selectedSuiteSlug === ALL_RUNS_ID) {

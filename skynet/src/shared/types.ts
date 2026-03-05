@@ -104,6 +104,7 @@ export interface DashboardData {
     reactions: PhaseMetrics;
   };
   jobNameMetrics: JobNameMetrics[];
+  pausedKeys: string[];
 }
 
 export interface JobInfo {

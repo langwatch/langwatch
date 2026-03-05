@@ -1,5 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { WithDateWrites } from "~/server/clickhouse/types";
+import { NormalizedSpanKind } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import { NormalizedStatusCode } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { mapNormalizedSpansToSpans } from "~/server/traces/mappers/span.mapper";
 import type { Span } from "~/server/tracer/types";
@@ -9,9 +11,131 @@ import type { SpanStorageRepository } from "./span-storage.repository";
 
 const TABLE_NAME = "stored_spans" as const;
 
+/**
+ * Matches strings that look like decimal numbers (including scientific notation).
+ * Rejects hex (0x), octal (0o), and binary (0b) literals that Number() silently accepts.
+ */
+const DECIMAL_NUMBER_RE = /^-?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
+
 const logger = createLogger(
   "langwatch:app-layer:traces:span-storage-repository",
 );
+
+const VALID_SPAN_KINDS = new Set(Object.values(NormalizedSpanKind).filter((v): v is number => typeof v === "number"));
+const VALID_STATUS_CODES = new Set(Object.values(NormalizedStatusCode).filter((v): v is number => typeof v === "number"));
+
+function validateSpanKind(value: number): NormalizedSpanKind {
+  if (VALID_SPAN_KINDS.has(value)) return value as NormalizedSpanKind;
+  logger.warn({ value }, "Unknown SpanKind from ClickHouse, defaulting to INTERNAL");
+  return NormalizedSpanKind.INTERNAL;
+}
+
+function validateStatusCode(value: number | null): NormalizedStatusCode | null {
+  if (value === null) return null;
+  if (VALID_STATUS_CODES.has(value)) return value as NormalizedStatusCode;
+  logger.warn({ value }, "Unknown StatusCode from ClickHouse, defaulting to UNSET");
+  return NormalizedStatusCode.UNSET;
+}
+
+/**
+ * Ensures a ClickHouse Map(String, String) value is actually Record<string, string>.
+ * Non-string values are dropped with a warning.
+ */
+function ensureStringRecord(raw: Record<string, unknown>): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (typeof value === "string") {
+      result[key] = value;
+    } else {
+      logger.warn({ key, type: typeof value }, "Non-string attribute value from ClickHouse");
+    }
+  }
+  return result;
+}
+
+/**
+ * Deserializes attribute values read from ClickHouse Map(String, String) columns.
+ * Reverses serializeAttributes: parses JSON strings back to objects/arrays,
+ * converts "true"/"false" to booleans, and numeric strings to numbers.
+ *
+ * @internal Exported for unit testing
+ */
+export function deserializeAttributes(
+  attrs: Record<string, string>,
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(attrs)) {
+    // Boolean strings
+    if (value === "true") { result[key] = true; continue; }
+    if (value === "false") { result[key] = false; continue; }
+
+    // JSON objects and arrays
+    const trimmed = value.trim();
+    if (
+      (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+      (trimmed.startsWith("[") && trimmed.endsWith("]"))
+    ) {
+      try {
+        result[key] = JSON.parse(trimmed);
+        continue;
+      } catch {
+        // Not valid JSON, fall through
+      }
+    }
+
+    // NOTE: Intentionally lossy for string values that look like decimal numbers
+    // (e.g. zip codes "90210" → 90210). ClickHouse round-trip for originally-numeric
+    // attributes is correct; pure string numerics may lose their string type.
+    // Guard: skip conversion for integers beyond Number.MAX_SAFE_INTEGER to avoid precision loss.
+    if (trimmed !== "" && DECIMAL_NUMBER_RE.test(trimmed) && Number.isFinite(Number(trimmed))) {
+      const num = Number(trimmed);
+      if (Number.isInteger(num) && Math.abs(num) > Number.MAX_SAFE_INTEGER) {
+        result[key] = value;
+        continue;
+      }
+      result[key] = num;
+      continue;
+    }
+
+    // Keep as string
+    result[key] = value;
+  }
+  return result;
+}
+
+/**
+ * Serializes attribute values for ClickHouse Map(String, String) columns.
+ * Non-scalar values are JSON-stringified at the write boundary.
+ *
+ * @internal Exported for unit testing
+ */
+export function serializeAttributes(
+  attrs: Record<string, unknown>,
+): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(attrs)) {
+    if (value === null || value === undefined) continue;
+    if (typeof value === "string") {
+      result[key] = value;
+    } else if (
+      typeof value === "number" ||
+      typeof value === "boolean" ||
+      typeof value === "bigint"
+    ) {
+      result[key] = String(value);
+    } else {
+      try {
+        const serialized = JSON.stringify(value);
+        if (typeof serialized === "string") {
+          result[key] = serialized;
+        }
+      } catch {
+        logger.debug(`Skipping unserializable attribute "${key}"`);
+      }
+    }
+  }
+  return result;
+}
 
 type ClickHouseSpanWriteRecord = WithDateWrites<
   ClickHouseSpanRecord,
@@ -33,18 +157,18 @@ interface ClickHouseSpanRecord {
   SpanName: string;
   SpanKind: number;
   ServiceName: string;
-  ResourceAttributes: Record<string, unknown>;
-  SpanAttributes: Record<string, unknown>;
+  ResourceAttributes: Record<string, string>;
+  SpanAttributes: Record<string, string>;
   StatusCode: number | null;
   StatusMessage: string | null;
   ScopeName: string;
   ScopeVersion: string | null;
   "Events.Timestamp": number[];
   "Events.Name": string[];
-  "Events.Attributes": Record<string, unknown>[];
+  "Events.Attributes": Record<string, string>[];
   "Links.TraceId": string[];
   "Links.SpanId": string[];
-  "Links.Attributes": Record<string, unknown>[];
+  "Links.Attributes": Record<string, string>[];
   DroppedAttributesCount: 0;
   DroppedEventsCount: 0;
   DroppedLinksCount: 0;
@@ -173,10 +297,10 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         endTimeUnixMs: row.EndTime,
         durationMs: row.DurationMs,
         name: row.SpanName,
-        kind: row.SpanKind,
-        resourceAttributes: row.ResourceAttributes,
-        spanAttributes: row.SpanAttributes,
-        statusCode: row.StatusCode,
+        kind: validateSpanKind(row.SpanKind),
+        resourceAttributes: deserializeAttributes(ensureStringRecord(row.ResourceAttributes)),
+        spanAttributes: deserializeAttributes(ensureStringRecord(row.SpanAttributes)),
+        statusCode: validateStatusCode(row.StatusCode),
         statusMessage: row.StatusMessage,
         instrumentationScope: {
           name: row.ScopeName ?? "",
@@ -185,20 +309,19 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         events: (row.Events_Timestamp ?? []).map((ts, i) => ({
           name: row.Events_Name?.[i] ?? "",
           timeUnixMs: ts,
-          attributes: row.Events_Attributes?.[i] ?? {},
+          attributes: deserializeAttributes(ensureStringRecord(row.Events_Attributes?.[i] ?? {})),
         })),
         links: (row.Links_TraceId ?? []).map((lt, i) => ({
           traceId: lt,
           spanId: row.Links_SpanId?.[i] ?? "",
-          attributes: row.Links_Attributes?.[i] ?? {},
+          attributes: deserializeAttributes(ensureStringRecord(row.Links_Attributes?.[i] ?? {})),
         })),
-        droppedAttributesCount: 0,
-        droppedEventsCount: 0,
-        droppedLinksCount: 0,
+        droppedAttributesCount: 0 as const,
+        droppedEventsCount: 0 as const,
+        droppedLinksCount: 0 as const,
       }));
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return mapNormalizedSpansToSpans(normalizedSpans as any);
+      return mapNormalizedSpansToSpans(normalizedSpans);
     } catch (error) {
       logger.error(
         {
@@ -234,18 +357,18 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       SpanName: span.name,
       SpanKind: span.kind,
       ServiceName: serviceName,
-      ResourceAttributes: span.resourceAttributes,
-      SpanAttributes: span.spanAttributes,
+      ResourceAttributes: serializeAttributes(span.resourceAttributes),
+      SpanAttributes: serializeAttributes(span.spanAttributes),
       StatusCode: span.statusCode,
       StatusMessage: span.statusMessage,
       ScopeName: span.instrumentationScope.name,
       ScopeVersion: span.instrumentationScope.version ?? null,
       "Events.Timestamp": span.events.map((e) => new Date(e.timeUnixMs)),
       "Events.Name": span.events.map((e) => e.name),
-      "Events.Attributes": span.events.map((e) => e.attributes),
+      "Events.Attributes": span.events.map((e) => serializeAttributes(e.attributes)),
       "Links.TraceId": span.links.map((l) => l.traceId),
       "Links.SpanId": span.links.map((l) => l.spanId),
-      "Links.Attributes": span.links.map((l) => l.attributes),
+      "Links.Attributes": span.links.map((l) => serializeAttributes(l.attributes)),
       DroppedAttributesCount: 0,
       DroppedEventsCount: 0,
       DroppedLinksCount: 0,

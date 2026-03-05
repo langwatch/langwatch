@@ -1,4 +1,8 @@
 import type { TraceSummaryData } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
+import {
+  extractLastUserMessageText,
+  extractMessageContentText,
+} from "~/server/app-layer/traces/canonicalisation/extractors/_messages";
 import type {
   ErrorCapture,
   Span,
@@ -12,20 +16,26 @@ import type {
  * Known attribute keys that map to reserved TraceMetadata fields.
  */
 const RESERVED_ATTRIBUTE_MAPPINGS: Record<string, keyof TraceMetadata> = {
-  "thread.id": "thread_id",
-  "langwatch.thread_id": "thread_id",
-  "langgraph.thread_id": "thread_id",
+  // Canonical keys (set by canonicalization)
   "gen_ai.conversation.id": "thread_id",
-  "user.id": "user_id",
   "langwatch.user_id": "user_id",
-  "customer.id": "customer_id",
   "langwatch.customer_id": "customer_id",
+  // SDK info (extracted from resource attributes)
   "sdk.name": "sdk_name",
   "sdk.version": "sdk_version",
   "sdk.language": "sdk_language",
   "telemetry.sdk.name": "telemetry_sdk_name",
   "telemetry.sdk.version": "telemetry_sdk_version",
   "telemetry.sdk.language": "telemetry_sdk_language",
+};
+
+/**
+ * Lower-priority attribute mappings: only applied if the target metadata
+ * field is not already set by a primary mapping above.
+ */
+const FALLBACK_ATTRIBUTE_MAPPINGS: Record<string, keyof TraceMetadata> = {
+  // LangGraph thread ID — gen_ai.conversation.id takes precedence
+  "langgraph.thread_id": "thread_id",
 };
 
 /**
@@ -41,12 +51,22 @@ export function mapAttributesToMetadata(
 ): TraceMetadata {
   const metadata: TraceMetadata = {};
 
-  // Map known attributes to reserved fields
+  // Map known attributes to reserved fields (primary — last-wins within this set)
   for (const [attrKey, metadataKey] of Object.entries(
     RESERVED_ATTRIBUTE_MAPPINGS,
   )) {
     const value = attributes[attrKey];
     if (value !== void 0) {
+      metadata[metadataKey] = value;
+    }
+  }
+
+  // Map fallback attributes (only if target field not already set)
+  for (const [attrKey, metadataKey] of Object.entries(
+    FALLBACK_ATTRIBUTE_MAPPINGS,
+  )) {
+    const value = attributes[attrKey];
+    if (value !== void 0 && metadata[metadataKey] === undefined) {
       metadata[metadataKey] = value;
     }
   }
@@ -89,6 +109,7 @@ export function mapAttributesToMetadata(
   // Add remaining attributes as custom metadata
   const knownKeys = new Set([
     ...Object.keys(RESERVED_ATTRIBUTE_MAPPINGS),
+    ...Object.keys(FALLBACK_ATTRIBUTE_MAPPINGS),
     "langwatch.labels",
     "labels",
     "langwatch.prompt_ids",
@@ -155,42 +176,6 @@ function extractTextFromStateObject(
 }
 
 /**
- * Extracts text content from a single message object.
- * Handles various message formats: OpenAI, Anthropic, generic.
- *
- * @param msg - The message object to extract content from
- * @returns The extracted text content, or null if not found
- */
-function extractMessageContent(msg: unknown): string | null {
-  if (typeof msg !== "object" || msg === null) return null;
-  const obj = msg as Record<string, unknown>;
-
-  // Check for content field (OpenAI format)
-  if (typeof obj.content === "string") return obj.content;
-
-  // Check for text field
-  if (typeof obj.text === "string") return obj.text;
-
-  // Handle content array (multimodal messages)
-  if (Array.isArray(obj.content)) {
-    const texts = obj.content
-      .filter(
-        (p: unknown): p is Record<string, unknown> =>
-          typeof p === "object" && p !== null,
-      )
-      .map((p) => {
-        if (typeof p.text === "string") return p.text;
-        if (typeof p.content === "string") return p.content;
-        return null;
-      })
-      .filter((t): t is string => typeof t === "string");
-    return texts.length > 0 ? texts.join("\n") : null;
-  }
-
-  return null;
-}
-
-/**
  * Type guard for LangWatch structured value format.
  * Used by DSPy, LangGraph, and other frameworks.
  */
@@ -223,9 +208,14 @@ function extractTextFromMessages(
     const { type, value } = data;
 
     if (type === "chat_messages" && Array.isArray(value)) {
-      // Extract text from chat messages array
+      // For input mode, extract only the last user message
+      if (mode === "input") {
+        const lastUserText = extractLastUserMessageText(value);
+        if (lastUserText) return lastUserText;
+      }
+      // Fallback: concatenate all messages
       const texts = value
-        .map((msg) => extractMessageContent(msg))
+        .map((msg) => extractMessageContentText(msg))
         .filter((t): t is string => t !== null);
       return texts.length > 0 ? texts.join("\n") : null;
     }
@@ -248,37 +238,77 @@ function extractTextFromMessages(
 
   // Handle array of messages directly
   if (Array.isArray(data)) {
+    // For input mode, extract only the last user message
+    if (mode === "input") {
+      const lastUserText = extractLastUserMessageText(data);
+      if (lastUserText) return lastUserText;
+    }
+    // Fallback: concatenate all messages
     const texts = data
-      .map((msg) => extractMessageContent(msg))
+      .map((msg) => extractMessageContentText(msg))
       .filter((t): t is string => t !== null);
     return texts.length > 0 ? texts.join("\n") : null;
   }
 
   // Handle single message object
   if (typeof data === "object" && data !== null) {
-    return extractMessageContent(data);
+    return extractMessageContentText(data);
   }
 
   return null;
 }
 
 /**
+ * Reads annotated value types from the trace summary attributes.
+ * Returns true if the given attribute key has the specified type.
+ */
+function hasAnnotatedType(
+  attributes: Record<string, string>,
+  attrKey: string,
+  type: string,
+): boolean {
+  const raw = attributes["langwatch.reserved.value_types"];
+  if (!raw) return false;
+  try {
+    const arr: string[] = JSON.parse(raw);
+    return arr.includes(`${attrKey}=${type}`);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Parses the computed input string to TraceInput format.
- * Attempts to extract text from chat message formats.
+ * Uses value type annotations from attributes when available to avoid
+ * heuristic guessing.
  *
  * @param computedInput - The computed input string from ClickHouse
+ * @param attributes - Trace summary attributes (for value type hints)
  * @returns TraceInput with extracted text value
  */
 function parseComputedInput(
   computedInput: string | null,
+  attributes: Record<string, string>,
 ): TraceInput | undefined {
   if (!computedInput) {
     return void 0;
   }
 
+  // Check value type annotation for a hint
+  const isChatMessages =
+    hasAnnotatedType(attributes, "gen_ai.input.messages", "chat_messages") ||
+    hasAnnotatedType(attributes, "langwatch.input", "chat_messages");
+
   // Try to parse as JSON and extract text from chat messages
   try {
     const parsed = JSON.parse(computedInput);
+
+    // If annotated as chat_messages, treat as message array
+    if (isChatMessages && Array.isArray(parsed)) {
+      const text = extractTextFromMessages(parsed, "input");
+      if (text) return { value: text };
+    }
+
     const text = extractTextFromMessages(parsed, "input");
     if (text) {
       return { value: text };
@@ -294,21 +324,36 @@ function parseComputedInput(
 
 /**
  * Parses the computed output string to TraceOutput format.
- * Attempts to extract text from chat message formats.
+ * Uses value type annotations from attributes when available to avoid
+ * heuristic guessing.
  *
  * @param computedOutput - The computed output string from ClickHouse
+ * @param attributes - Trace summary attributes (for value type hints)
  * @returns TraceOutput with extracted text value
  */
 function parseComputedOutput(
   computedOutput: string | null,
+  attributes: Record<string, string>,
 ): TraceOutput | undefined {
   if (!computedOutput) {
     return void 0;
   }
 
+  // Check value type annotation for a hint
+  const isChatMessages =
+    hasAnnotatedType(attributes, "gen_ai.output.messages", "chat_messages") ||
+    hasAnnotatedType(attributes, "langwatch.output", "chat_messages");
+
   // Try to parse as JSON and extract text from chat messages
   try {
     const parsed = JSON.parse(computedOutput);
+
+    // If annotated as chat_messages, treat as message array
+    if (isChatMessages && Array.isArray(parsed)) {
+      const text = extractTextFromMessages(parsed, "output");
+      if (text) return { value: text };
+    }
+
     const text = extractTextFromMessages(parsed, "output");
     if (text) {
       return { value: text };
@@ -364,8 +409,8 @@ export function mapTraceSummaryToTrace(
       inserted_at: summary.createdAt,
       updated_at: summary.lastUpdatedAt,
     },
-    input: parseComputedInput(summary.computedInput),
-    output: parseComputedOutput(summary.computedOutput),
+    input: parseComputedInput(summary.computedInput, summary.attributes),
+    output: parseComputedOutput(summary.computedOutput, summary.attributes),
     metrics: {
       first_token_ms: summary.timeToFirstTokenMs,
       total_time_ms: summary.totalDurationMs,

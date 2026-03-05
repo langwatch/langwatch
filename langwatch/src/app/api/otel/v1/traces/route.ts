@@ -14,13 +14,11 @@ import {
 } from "../../../../../server/background/workers/collectorWorker";
 import { prisma } from "../../../../../server/db";
 import { openTelemetryTraceRequestToTracesForCollection } from "../../../../../server/tracer/otel.traces";
-import { TraceRequestCollectionService } from "../../../../../server/traces/trace-request-collection.service";
 import { getApp } from "../../../../../server/app-layer/app";
 import { createLogger } from "../../../../../utils/logger/server";
 
 const tracer = getLangWatchTracer("langwatch.otel.traces");
 const logger = createLogger("langwatch:otel:v1:traces");
-const traceRequestCollectionService = new TraceRequestCollectionService();
 
 const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
   .ExportTraceServiceRequest;
@@ -190,7 +188,7 @@ async function handleTracesRequest(req: NextRequest) {
       // For ClickHouse, ingest raw OTEL spans directly (bypasses otel.traces.ts transformation)
       let clickHouseTask: Promise<void> | null = null;
       if (project.featureEventSourcingTraceIngestion) {
-        clickHouseTask = traceRequestCollectionService.handleOtlpTraceRequest(
+        clickHouseTask = getApp().traces.collection.handleOtlpTraceRequest(
           project.id,
           traceRequest,
           project.piiRedactionLevel,

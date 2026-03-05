@@ -198,7 +198,7 @@ export function ScenarioPicker({
         paddingX={3}
         paddingY={2}
         cursor="pointer"
-        _hover={{ bg: "gray.100" }}
+        _hover={{ bg: "bg.subtle" }}
         borderTopWidth="1px"
         borderColor="border.muted"
         color="blue.500"

@@ -38,6 +38,7 @@ export function SimulationConsole({
       fontSize="sm"
       minHeight="200px"
       overflow="auto"
+      width="full"
     >
       <Code
         colorPalette="green"

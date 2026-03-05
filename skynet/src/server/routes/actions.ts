@@ -1,17 +1,20 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import type IORedis from "ioredis";
-import { retryJob } from "../services/bullmqService.ts";
-import { isGroupQueue } from "../services/queueDiscovery.ts";
-import { DRAIN_GROUP_LUA, UNBLOCK_LUA } from "../services/luaScripts.ts";
+import { createLogger } from "../logger.ts";
+import { GroupQueueActionService } from "../services/groupQueueActionService.ts";
+import { isValidGroupId, isValidPauseKey } from "./validators.ts";
 
-function isValidGroupId(id: unknown): id is string {
-	return typeof id === "string" && id.length > 0 && id.length <= 512;
-}
+const logger = createLogger("actions");
+
+const pauseRateLimiter = rateLimit({ windowMs: 60_000, max: 30 });
+const actionRateLimiter = rateLimit({ windowMs: 60_000, max: 60 });
 
 export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => string[]): Router {
   const router = Router();
+  const service = new GroupQueueActionService(redis, getGroupQueueNames);
 
-  router.post("/api/actions/unblock", async (req, res) => {
+  router.post("/api/actions/unblock", actionRateLimiter, async (req, res) => {
     try {
       const { queueName, groupId } = req.body as { queueName?: string; groupId?: string };
       if (!queueName || !groupId) {
@@ -24,31 +27,20 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
         return;
       }
 
-      if (!getGroupQueueNames().includes(queueName)) {
+      if (!service.isKnownQueue(queueName)) {
         res.status(404).json({ error: "Unknown queue name" });
         return;
       }
 
-      const prefix = `${queueName}:gq:`;
-      const result = await redis.eval(
-        UNBLOCK_LUA, 6,
-        `${prefix}blocked`,
-        `${prefix}group:${groupId}:active`,
-        `${prefix}group:${groupId}:jobs`,
-        `${prefix}ready`,
-        `${prefix}signal`,
-        `${prefix}group:${groupId}:error`,
-        groupId,
-      );
-
-      res.json({ ok: true, wasBlocked: result === 1 });
+      const result = await service.unblockGroup({ queueName, groupId });
+      res.json({ ok: true, wasBlocked: result.wasBlocked });
     } catch (err) {
-      console.error("unblock error:", err);
-      res.status(500).json({ error: err instanceof Error ? err.message : "Internal error" });
+      logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "unblock error" });
+      res.status(500).json({ error: "Internal error" });
     }
   });
 
-  router.post("/api/actions/unblock-all", async (req, res) => {
+  router.post("/api/actions/unblock-all", actionRateLimiter, async (req, res) => {
     try {
       const { queueName } = req.body as { queueName?: string };
       if (!queueName) {
@@ -56,51 +48,20 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
         return;
       }
 
-      if (!getGroupQueueNames().includes(queueName)) {
+      if (!service.isKnownQueue(queueName)) {
         res.status(404).json({ error: "Unknown queue name" });
         return;
       }
 
-      const prefix = `${queueName}:gq:`;
-      const blockedMembers = await redis.smembers(`${prefix}blocked`);
-
-      if (blockedMembers.length === 0) {
-        res.json({ ok: true, unblockedCount: 0 });
-        return;
-      }
-
-      // Use a pipeline to send all evals in a single round trip instead of
-      // N sequential awaits which can hang with many blocked groups.
-      const pipeline = redis.pipeline();
-      for (const groupId of blockedMembers) {
-        pipeline.eval(
-          UNBLOCK_LUA, 6,
-          `${prefix}blocked`,
-          `${prefix}group:${groupId}:active`,
-          `${prefix}group:${groupId}:jobs`,
-          `${prefix}ready`,
-          `${prefix}signal`,
-          `${prefix}group:${groupId}:error`,
-          groupId,
-        );
-      }
-      const results = await pipeline.exec();
-
-      let unblockedCount = 0;
-      if (results) {
-        for (const [err, result] of results) {
-          if (!err && result === 1) unblockedCount++;
-        }
-      }
-
-      res.json({ ok: true, unblockedCount });
+      const result = await service.unblockAll({ queueName });
+      res.json({ ok: true, unblockedCount: result.unblockedCount });
     } catch (err) {
-      console.error("unblock-all error:", err);
-      res.status(500).json({ error: err instanceof Error ? err.message : "Internal error" });
+      logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "unblock-all error" });
+      res.status(500).json({ error: "Internal error" });
     }
   });
 
-  router.post("/api/actions/drain-group", async (req, res) => {
+  router.post("/api/actions/drain-group", actionRateLimiter, async (req, res) => {
     try {
       const { queueName, groupId } = req.body as { queueName?: string; groupId?: string };
       if (!queueName || !groupId) {
@@ -113,32 +74,20 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
         return;
       }
 
-      if (!getGroupQueueNames().includes(queueName)) {
+      if (!service.isKnownQueue(queueName)) {
         res.status(404).json({ error: "Unknown queue name" });
         return;
       }
 
-      const prefix = `${queueName}:gq:`;
-      const result = await redis.eval(
-        DRAIN_GROUP_LUA, 7,
-        `${prefix}group:${groupId}:jobs`,
-        `${prefix}group:${groupId}:data`,
-        `${prefix}group:${groupId}:active`,
-        `${prefix}ready`,
-        `${prefix}blocked`,
-        `${prefix}signal`,
-        `${prefix}group:${groupId}:error`,
-        groupId,
-      );
-
-      res.json({ ok: true, jobsRemoved: result });
+      const result = await service.drainGroup({ queueName, groupId });
+      res.json({ ok: true, jobsRemoved: result.jobsRemoved });
     } catch (err) {
-      console.error("drain-group error:", err);
-      res.status(500).json({ error: err instanceof Error ? err.message : "Internal error" });
+      logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "drain-group error" });
+      res.status(500).json({ error: "Internal error" });
     }
   });
 
-  router.post("/api/actions/retry-blocked", async (req, res) => {
+  router.post("/api/actions/retry-blocked", actionRateLimiter, async (req, res) => {
     try {
       const { queueName, groupId, jobId } = req.body as { queueName?: string; groupId?: string; jobId?: string };
       if (!queueName || !groupId || !jobId) {
@@ -151,33 +100,94 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
         return;
       }
 
-      if (!getGroupQueueNames().includes(queueName)) {
+      if (!service.isKnownQueue(queueName)) {
         res.status(404).json({ error: "Unknown queue name" });
         return;
       }
 
-      // 1. Retry the failed BullMQ job (only for non-group queues; group queues
-      //    use fastq — the job is already re-staged by restageAndBlock, so
-      //    unblocking the group is sufficient to resume processing)
-      const retried = isGroupQueue(queueName) ? true : await retryJob(redis, queueName, jobId);
-
-      // 2. Unblock the group
-      const prefix = `${queueName}:gq:`;
-      const unblocked = await redis.eval(
-        UNBLOCK_LUA, 6,
-        `${prefix}blocked`,
-        `${prefix}group:${groupId}:active`,
-        `${prefix}group:${groupId}:jobs`,
-        `${prefix}ready`,
-        `${prefix}signal`,
-        `${prefix}group:${groupId}:error`,
-        groupId,
-      );
-
-      res.json({ ok: true, retried, unblocked: unblocked === 1 });
+      const result = await service.retryBlocked({ queueName, groupId, jobId });
+      res.json({ ok: true, retried: result.retried, unblocked: result.unblocked });
     } catch (err) {
-      console.error("retry-blocked error:", err);
-      res.status(500).json({ error: err instanceof Error ? err.message : "Internal error" });
+      logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "retry-blocked error" });
+      res.status(500).json({ error: "Internal error" });
+    }
+  });
+
+  router.post("/api/actions/pause", pauseRateLimiter, async (req, res) => {
+    try {
+      const { queueName, pauseKey } = req.body as { queueName?: string; pauseKey?: string };
+      if (!queueName || !pauseKey) {
+        res.status(400).json({ error: "queueName and pauseKey are required" });
+        return;
+      }
+
+      if (!isValidPauseKey(pauseKey)) {
+        res.status(400).json({ error: "Invalid pauseKey format (max 200 chars, alphanumeric/dash/underscore/slash only)" });
+        return;
+      }
+
+      if (!service.isKnownQueue(queueName)) {
+        res.status(404).json({ error: "Unknown queue name" });
+        return;
+      }
+
+      await service.pauseKey({ queueName, pauseKey });
+      res.json({ ok: true });
+    } catch (err) {
+      logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "pause error" });
+      res.status(500).json({ error: "Internal error" });
+    }
+  });
+
+  router.post("/api/actions/unpause", pauseRateLimiter, async (req, res) => {
+    try {
+      const { queueName, pauseKey } = req.body as { queueName?: string; pauseKey?: string };
+      if (!queueName || !pauseKey) {
+        res.status(400).json({ error: "queueName and pauseKey are required" });
+        return;
+      }
+
+      if (!isValidPauseKey(pauseKey)) {
+        res.status(400).json({ error: "Invalid pauseKey format (max 200 chars, alphanumeric/dash/underscore/slash only)" });
+        return;
+      }
+
+      if (!service.isKnownQueue(queueName)) {
+        res.status(404).json({ error: "Unknown queue name" });
+        return;
+      }
+
+      await service.unpauseKey({ queueName, pauseKey });
+      res.json({ ok: true });
+    } catch (err) {
+      logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "unpause error" });
+      res.status(500).json({ error: "Internal error" });
+    }
+  });
+
+  router.get("/api/actions/paused", pauseRateLimiter, async (req, res) => {
+    try {
+      const queueName = req.query.queueName as string | undefined;
+      if (!queueName) {
+        res.status(400).json({ error: "queueName query param is required" });
+        return;
+      }
+
+      if (!service.isKnownQueue(queueName)) {
+        res.status(404).json({ error: "Unknown queue name" });
+        return;
+      }
+
+      if (!service.isKnownQueue(queueName)) {
+        res.status(404).json({ error: "Unknown queue name" });
+        return;
+      }
+
+      const pausedKeys = await service.listPausedKeys({ queueName });
+      res.json({ pausedKeys });
+    } catch (err) {
+      logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "paused error" });
+      res.status(500).json({ error: "Internal error" });
     }
   });
 
