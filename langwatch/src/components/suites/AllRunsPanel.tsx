@@ -11,6 +11,7 @@ import type { ViewMode } from "./useRunHistoryStore";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useTargetNameMap } from "~/hooks/useTargetNameMap";
 import { api } from "~/utils/api";
@@ -22,6 +23,7 @@ import {
 import { RunHistoryFooter } from "./RunHistoryFooter";
 import { RunRow } from "./RunRow";
 import { extractSuiteId } from "~/server/suites/suite-set-id";
+import { getAdaptivePollingInterval } from "./getAdaptivePollingInterval";
 import {
   computeBatchRunSummary,
   computeRunHistoryTotals,
@@ -83,6 +85,7 @@ export function AllRunsPanel({ period }: AllRunsPanelProps) {
     data: runDataResult,
     isLoading,
     error,
+    refetch: refetchRunData,
   } = api.scenarios.getAllSuiteRunData.useQuery(
     {
       projectId: project?.id ?? "",
@@ -93,9 +96,20 @@ export function AllRunsPanel({ period }: AllRunsPanelProps) {
     },
     {
       enabled: !!project,
-      refetchInterval: pages.length <= 1 ? 5000 : undefined, // Disable auto-refresh after Load More
+      // Adaptive polling based on run statuses (active across all accumulated pages)
+      refetchInterval: getAdaptivePollingInterval({
+        runs: pages.flatMap((p) => p.runs),
+      }),
     },
   );
+
+  // SSE subscription for real-time updates (no filter = all suites).
+  // Stays active regardless of pagination state.
+  useSimulationUpdateListener({
+    projectId: project?.id ?? "",
+    refetch: refetchRunData,
+    enabled: !!project,
+  });
 
   // Accumulate pages as data arrives
   useEffect(() => {

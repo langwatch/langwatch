@@ -20,6 +20,7 @@ import { parseSuiteTargets } from "~/server/suites/types";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
 import { api } from "~/utils/api";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
 import type { Period } from "~/components/PeriodSelector";
 import { RunHistoryFilters } from "./RunHistoryFilters";
 import { RunHistoryFooter } from "./RunHistoryFooter";
@@ -27,6 +28,7 @@ import { RunRow } from "./RunRow";
 import { GroupRow } from "./GroupRow";
 import { QueueStatusBanner } from "./QueueStatusBanner";
 import { useRunHistoryStore } from "./useRunHistoryStore";
+import { getAdaptivePollingInterval } from "./getAdaptivePollingInterval";
 import {
   computeBatchRunSummary,
   computeGroupSummary,
@@ -117,12 +119,16 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
   const hasQueuedJobs =
     (queueStatus?.waiting ?? 0) > 0 || (queueStatus?.active ?? 0) > 0;
 
+  // Track previous run data for adaptive polling (avoids circular self-reference in useQuery)
+  const runDataRef = useRef<ScenarioRunData[]>([]);
+
   // Fetch all run data for this suite (unpaginated).
   // Date filtering is applied client-side to avoid capping results.
   const {
     data: runData,
     isLoading,
     error,
+    refetch: refetchRunData,
   } = api.scenarios.getAllScenarioSetRunData.useQuery(
     {
       projectId: project?.id ?? "",
@@ -130,10 +136,25 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
     },
     {
       enabled: !!project,
-      // Poll faster when jobs are queued, otherwise normal interval
-      refetchInterval: hasQueuedJobs ? 3000 : 5000,
+      // Adaptive polling: fast when runs are active or jobs are queued, slow otherwise
+      refetchInterval: hasQueuedJobs
+        ? 3000
+        : getAdaptivePollingInterval({ runs: runDataRef.current }),
     },
   );
+
+  // Keep ref in sync so next render picks up the latest data for polling interval
+  if (runData) {
+    runDataRef.current = runData;
+  }
+
+  // SSE subscription for real-time updates scoped to this suite's scenarioSetId
+  useSimulationUpdateListener({
+    projectId: project?.id ?? "",
+    refetch: refetchRunData,
+    enabled: !!project,
+    filter: { scenarioSetId: setId },
+  });
 
   // Fetch scenarios for filter options and name resolution
   const { data: scenarios } = api.scenarios.getAll.useQuery(
