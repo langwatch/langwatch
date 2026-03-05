@@ -112,6 +112,8 @@ export type ExecutionSummary = {
   completedCells: number;
   failedCells: number;
   duration: number;
+  /** Number of CH dispatches that failed (non-zero means CH data may be incomplete) */
+  chDispatchFailures?: number;
   timestamps: {
     startedAt: number;
     finishedAt?: number;

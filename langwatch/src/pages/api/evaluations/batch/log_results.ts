@@ -2,6 +2,8 @@ import { ExperimentType, type Project } from "@prisma/client";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { type ZodError, z } from "zod";
 import { fromZodError } from "zod-validation-error";
+import { getApp } from "~/server/app-layer/app";
+import { DomainError } from "~/server/app-layer/domain-error";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { prisma } from "../../../../server/db";
 import {
@@ -9,6 +11,7 @@ import {
   batchEvaluationId,
   esClient,
 } from "../../../../server/elasticsearch";
+import { mapEsTargetsToTargets } from "../../../../server/evaluations-v3/services/mappers";
 import type {
   ESBatchEvaluation,
   ESBatchEvaluationRESTParams,
@@ -146,6 +149,14 @@ export default async function handler(
 
       const validationError = fromZodError(error);
       return res.status(400).json({ error: validationError.message });
+    } else if (DomainError.is(error)) {
+      logger.warn(
+        { kind: error.kind, meta: error.meta, projectId: project.id },
+        "domain error processing batch evaluation",
+      );
+      return res
+        .status(error.httpStatus)
+        .json({ error: error.kind, message: error.message });
     } else {
       logger.error(
         { error, body: params, projectId: project.id },
@@ -360,14 +371,166 @@ const processBatchEvaluation = async (
     },
   };
 
-  const client = await esClient({ projectId: project.id });
-  await client.update({
-    index: BATCH_EVALUATION_INDEX.alias,
-    id,
-    body: {
-      script,
-      upsert: validatedBatchEvaluation,
-    },
-    retry_on_conflict: 5,
-  });
+  // When featureEventSourcingEvaluationIngestion is ON, the experimentRunEsSync
+  // reactor handles ES writes — skip direct writes to avoid double-writing.
+  if (!project.featureEventSourcingEvaluationIngestion) {
+    const client = await esClient({ projectId: project.id });
+    await client.update({
+      index: BATCH_EVALUATION_INDEX.alias,
+      id,
+      body: {
+        script,
+        upsert: validatedBatchEvaluation,
+      },
+      retry_on_conflict: 5,
+    });
+  }
+
+  // Dual-write to ClickHouse via event sourcing (unconditional)
+  await dispatchToClickHouse(project, experiment.id, batchEvaluation);
+};
+
+/**
+ * Fire event-sourcing commands for ClickHouse dual-write.
+ *
+ * Critical commands (startExperimentRun, completeExperimentRun) are awaited.
+ * Individual result dispatches are best-effort — failures are logged but
+ * don't prevent the run from being recorded.
+ * Per-evaluation processing pipeline dispatches remain fire-and-forget.
+ */
+const dispatchToClickHouse = async (
+  project: Project,
+  experimentId: string,
+  batchEvaluation: ESBatchEvaluation,
+) => {
+  const { run_id: runId } = batchEvaluation;
+
+  try {
+    const targets = mapEsTargetsToTargets(batchEvaluation.targets ?? []);
+
+    // Critical: await the start command so the run exists in CH
+    await getApp().experimentRuns.startExperimentRun({
+      tenantId: project.id,
+      runId,
+      experimentId,
+      total: batchEvaluation.total || batchEvaluation.dataset.length,
+      targets,
+      occurredAt: Date.now(),
+    });
+  } catch (error) {
+    logger.warn(
+      { error, runId, projectId: project.id },
+      "Failed to dispatch startExperimentRun to CH — aborting CH dual-write for this batch",
+    );
+    return; // Without start, individual results would be orphaned
+  }
+
+  // Dispatch target and evaluator results — best-effort, log failures
+  const resultPromises = [
+    ...batchEvaluation.dataset.map((entry) =>
+      getApp().experimentRuns.recordTargetResult({
+        tenantId: project.id,
+        runId,
+        experimentId,
+        index: entry.index,
+        targetId: entry.target_id ?? "",
+        entry: entry.entry,
+        predicted: entry.predicted ?? undefined,
+        cost: entry.cost ?? undefined,
+        duration: entry.duration ?? undefined,
+        error: entry.error ?? undefined,
+        traceId: entry.trace_id ?? undefined,
+        occurredAt: Date.now(),
+      }).catch((err) => {
+        logger.warn(
+          { err, runId, index: entry.index, targetId: entry.target_id },
+          "Failed to dispatch recordTargetResult to CH",
+        );
+      }),
+    ),
+    ...batchEvaluation.evaluations.map((evaluation) =>
+      getApp().experimentRuns.recordEvaluatorResult({
+        tenantId: project.id,
+        runId,
+        experimentId,
+        index: evaluation.index,
+        targetId: evaluation.target_id ?? "",
+        evaluatorId: evaluation.evaluator,
+        evaluatorName: evaluation.name ?? undefined,
+        status: evaluation.status,
+        score: typeof evaluation.score === 'number' ? evaluation.score : undefined,
+        label: evaluation.label ?? undefined,
+        passed: evaluation.passed ?? undefined,
+        details: evaluation.details ?? undefined,
+        cost: evaluation.cost ?? undefined,
+        inputs: evaluation.inputs ?? undefined,
+        duration: typeof evaluation.duration === 'number' ? evaluation.duration : undefined,
+        occurredAt: Date.now(),
+      }).catch((err) => {
+        logger.warn(
+          { err, runId, index: evaluation.index, evaluator: evaluation.evaluator },
+          "Failed to dispatch recordEvaluatorResult to CH",
+        );
+      }),
+    ),
+  ];
+  await Promise.all(resultPromises);
+
+  // Critical: await the completion command
+  if (
+    batchEvaluation.timestamps.finished_at ||
+    batchEvaluation.timestamps.stopped_at
+  ) {
+    try {
+      await getApp().experimentRuns.completeExperimentRun({
+        tenantId: project.id,
+        runId,
+        experimentId,
+        finishedAt: batchEvaluation.timestamps.finished_at ?? undefined,
+        stoppedAt: batchEvaluation.timestamps.stopped_at ?? undefined,
+        occurredAt: Date.now(),
+      });
+    } catch (error) {
+      logger.warn(
+        { error, runId, projectId: project.id },
+        "Failed to dispatch completeExperimentRun to CH",
+      );
+    }
+  }
+
+  // Per-evaluation processing pipeline dispatches
+  if (project.featureEventSourcingEvaluationIngestion) {
+    const app = getApp();
+    for (const evaluation of batchEvaluation.evaluations) {
+      // Use a deterministic ID so repeated API calls (e.g. SDK progress
+      // updates) don't create duplicate evaluation aggregates.
+      const targetId = evaluation.target_id ?? "";
+      const evaluationId = `local_eval_${runId}_${evaluation.evaluator}_${evaluation.index}_${targetId}`;
+      try {
+        await app.evaluations.startEvaluation({
+          tenantId: project.id,
+          evaluationId,
+          evaluatorId: evaluation.evaluator,
+          evaluatorType: evaluation.evaluator,
+          evaluatorName: evaluation.name ?? undefined,
+          occurredAt: Date.now(),
+        });
+        await app.evaluations.completeEvaluation({
+          tenantId: project.id,
+          evaluationId,
+          status: evaluation.status,
+          score: typeof evaluation.score === 'number' ? evaluation.score : undefined,
+          passed: evaluation.passed ?? undefined,
+          label: evaluation.label ?? undefined,
+          details: evaluation.details ?? undefined,
+          occurredAt: Date.now(),
+        });
+      } catch (err) {
+        logger.warn(
+          { err, evaluationId, evaluator: evaluation.evaluator },
+          "Failed to dispatch evaluation to evaluation processing pipeline",
+        );
+      }
+    }
+  }
 };

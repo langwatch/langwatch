@@ -7,6 +7,7 @@ import {
   Bot,
   CheckSquare,
   FileText,
+  FolderOpen,
   Home,
   ListTree,
   type LucideIcon,
@@ -27,6 +28,7 @@ export type FeatureKey =
   | "simulations"
   | "scenarios"
   | "simulation_runs"
+  | "suites"
   | "evaluations"
   | "workflows"
   | "prompts"
@@ -76,6 +78,11 @@ export const featureIcons: Record<FeatureKey, FeatureConfig> = {
     icon: PlayCircle,
     color: "pink.500",
     label: "Runs",
+  },
+  suites: {
+    icon: FolderOpen,
+    color: "pink.500",
+    label: "Suites",
   },
   evaluations: {
     icon: CheckSquare,

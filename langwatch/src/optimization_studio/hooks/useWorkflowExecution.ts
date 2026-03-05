@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toaster } from "../../components/ui/toaster";
 import { generateOtelTraceId } from "../../utils/trace";
 import type { StudioClientEvent } from "../types/events";
+import { mergeLocalConfigsIntoDsl } from "../utils/mergeLocalConfigs";
 import { usePostEvent } from "./usePostEvent";
 import { useWorkflowStore } from "./useWorkflowStore";
 
@@ -82,11 +83,15 @@ export const useWorkflowExecution = () => {
         until_node_id: untilNodeId,
       });
 
+      const workflow = getWorkflow();
       const payload: StudioClientEvent = {
         type: "execute_flow",
         payload: {
           trace_id,
-          workflow: getWorkflow(),
+          workflow: {
+            ...workflow,
+            nodes: mergeLocalConfigsIntoDsl(workflow.nodes),
+          },
           until_node_id: untilNodeId,
           inputs: inputs,
           manual_execution_mode: true,

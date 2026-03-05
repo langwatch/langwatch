@@ -1,7 +1,7 @@
 """
-API service layer for retrieving LangWatch evaluators via REST API.
+API service layer for managing LangWatch evaluators via REST API.
 
-Provides read-only access to project evaluators with computed fields.
+Provides access to project evaluators with computed fields.
 Uses the generated OpenAPI client for type-safe API communication.
 """
 from typing import Dict, List, Any
@@ -12,12 +12,22 @@ from langwatch.generated.langwatch_rest_api_client.client import (
 from langwatch.generated.langwatch_rest_api_client.api.default import (
     get_api_evaluators,
     get_api_evaluators_by_id_or_slug,
+    post_api_evaluators,
 )
 from langwatch.generated.langwatch_rest_api_client.models.get_api_evaluators_response_200_item import (
     GetApiEvaluatorsResponse200Item,
 )
 from langwatch.generated.langwatch_rest_api_client.models.get_api_evaluators_by_id_or_slug_response_200 import (
     GetApiEvaluatorsByIdOrSlugResponse200,
+)
+from langwatch.generated.langwatch_rest_api_client.models.post_api_evaluators_body import (
+    PostApiEvaluatorsBody,
+)
+from langwatch.generated.langwatch_rest_api_client.models.post_api_evaluators_body_config import (
+    PostApiEvaluatorsBodyConfig,
+)
+from langwatch.generated.langwatch_rest_api_client.models.post_api_evaluators_response_200 import (
+    PostApiEvaluatorsResponse200,
 )
 
 from langwatch.utils.initialization import ensure_setup
@@ -32,9 +42,9 @@ def _response_to_dict(item: Any) -> Dict[str, Any]:
 
 class EvaluatorApiService:
     """
-    API service for retrieving LangWatch evaluators via REST API.
+    API service for managing LangWatch evaluators via REST API.
 
-    Provides read-only operations with proper error handling and response unwrapping.
+    Provides CRUD operations with proper error handling and response unwrapping.
     """
 
     def __init__(self, rest_api_client: LangWatchRestApiClient):
@@ -83,3 +93,30 @@ class EvaluatorApiService:
             )
         return _response_to_dict(ok)
 
+    def create(self, name: str, config: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Create a new evaluator.
+
+        Args:
+            name: Name for the evaluator (1-255 chars).
+            config: Configuration dict, e.g. {"evaluatorType": "langevals/exact_match", "settings": {}}.
+
+        Returns:
+            Dictionary containing the created evaluator data.
+        """
+        resp = post_api_evaluators.sync_detailed(
+            client=self._client,
+            body=PostApiEvaluatorsBody(
+                name=name,
+                config=PostApiEvaluatorsBodyConfig.from_dict(config),
+            ),
+        )
+        ok = unwrap_response(
+            resp,
+            ok_type=PostApiEvaluatorsResponse200,
+            subject=f'name="{name}"',
+            op="create",
+        )
+        if ok is None:
+            raise RuntimeError(f"Failed to create evaluator with name={name}")
+        return _response_to_dict(ok)

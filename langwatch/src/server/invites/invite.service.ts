@@ -35,21 +35,10 @@ import {
 } from "../license-enforcement/license-enforcement.repository";
 import { LICENSE_LIMIT_ERRORS } from "../license-enforcement/license-limit-guard";
 import { sendInviteEmail } from "../mailer/inviteEmail";
-import { dependencies } from "../../injection/dependencies.server";
 import { TeamUserRole } from "@prisma/client";
 import type { Session } from "next-auth";
-import type { PlanInfo } from "../subscriptionHandler";
-
-/**
- * Interface for subscription plan retrieval.
- * Enables dependency injection and testing.
- */
-export interface ISubscriptionHandler {
-  getActivePlan(
-    organizationId: string,
-    user?: Session["user"]
-  ): Promise<PlanInfo>;
-}
+import type { PlanProvider } from "../app-layer/subscription/plan-provider";
+import { getApp } from "../app-layer/app";
 
 /**
  * Team assignment input for invite creation.
@@ -125,6 +114,18 @@ interface CreateMemberInviteRequestInput {
 }
 
 /**
+ * Input for creating a PAYMENT_PENDING invite (checkout flow).
+ */
+interface CreatePaymentPendingInviteInput {
+  email: string;
+  role: OrganizationUserRole;
+  organizationId: string;
+  teamIds: string;
+  teamAssignments?: TeamAssignmentInput[];
+  subscriptionId: string;
+}
+
+/**
  * Input for approving a WAITING_APPROVAL invite.
  */
 interface ApproveInviteInput {
@@ -142,26 +143,26 @@ export class InviteService {
   constructor(
     private readonly prisma: PrismaClient | Prisma.TransactionClient,
     private readonly licenseRepo: ILicenseEnforcementRepository,
-    private readonly subscriptionHandler: ISubscriptionHandler
+    private readonly planProvider: PlanProvider
   ) {}
 
   /**
    * Factory method for creating InviteService with default dependencies.
    * Use this in production code for convenience.
+   * Pass options.planProvider to override the default app singleton (useful in tests).
    */
-  static create(prisma: PrismaClient | Prisma.TransactionClient): InviteService {
+  static create(
+    prisma: PrismaClient | Prisma.TransactionClient,
+    options?: { planProvider?: PlanProvider }
+  ): InviteService {
     const licenseRepo = new LicenseEnforcementRepository(prisma);
-    const subscriptionHandler = {
-      getActivePlan: dependencies.subscriptionHandler.getActivePlan.bind(
-        dependencies.subscriptionHandler
-      ),
-    };
-    return new InviteService(prisma, licenseRepo, subscriptionHandler);
+    const provider = options?.planProvider ?? getApp().planProvider;
+    return new InviteService(prisma, licenseRepo, provider);
   }
 
   /**
    * Validates that an invite can be created:
-   * - No duplicate invitations across PENDING and WAITING_APPROVAL statuses
+   * - No duplicate invitations across PENDING, WAITING_APPROVAL, and PAYMENT_PENDING statuses
    * - Returns the existing invite if a duplicate is found (null if no duplicate)
    */
   async checkDuplicateInvite({
@@ -175,7 +176,7 @@ export class InviteService {
       where: {
         email,
         organizationId,
-        status: { in: ["PENDING", "WAITING_APPROVAL"] },
+        status: { in: ["PENDING", "WAITING_APPROVAL", "PAYMENT_PENDING"] },
         OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
       },
     });
@@ -218,10 +219,10 @@ export class InviteService {
     }>;
     user: Session["user"];
   }): Promise<void> {
-    const subscriptionLimits = await this.subscriptionHandler.getActivePlan(
+    const subscriptionLimits = await this.planProvider.getActivePlan({
       organizationId,
-      user
-    );
+      user,
+    });
 
     const currentFullMembers = await this.licenseRepo.getMemberCount(
       organizationId
@@ -396,5 +397,78 @@ export class InviteService {
     });
 
     return { invite: updatedInvite, emailNotSent };
+  }
+
+  /**
+   * Creates an invite with PAYMENT_PENDING status (checkout flow).
+   * No expiration, no email — waits for Stripe checkout success.
+   */
+  async createPaymentPendingInvite(
+    input: CreatePaymentPendingInviteInput
+  ): Promise<OrganizationInvite> {
+    const inviteCode = nanoid();
+
+    return this.prisma.organizationInvite.create({
+      data: {
+        email: input.email,
+        inviteCode,
+        expiration: null,
+        organizationId: input.organizationId,
+        teamIds: input.teamIds,
+        teamAssignments:
+          input.teamAssignments && input.teamAssignments.length > 0
+            ? (input.teamAssignments as unknown as JsonArray)
+            : undefined,
+        role: input.role,
+        status: "PAYMENT_PENDING",
+        subscriptionId: input.subscriptionId,
+      },
+    });
+  }
+
+  /**
+   * Approves all PAYMENT_PENDING invites for a given subscription:
+   * - Transitions each to PENDING with 48-hour expiration
+   * - Sends invite emails
+   */
+  async approvePaymentPendingInvites({
+    subscriptionId,
+    organizationId,
+  }: {
+    subscriptionId: string;
+    organizationId: string;
+  }): Promise<OrganizationInvite[]> {
+    const invites = await this.prisma.organizationInvite.findMany({
+      where: {
+        subscriptionId,
+        organizationId,
+        status: "PAYMENT_PENDING",
+      },
+      include: { organization: true },
+    });
+
+    const approved: OrganizationInvite[] = [];
+
+    for (const invite of invites) {
+      const updatedInvite = await this.prisma.organizationInvite.update({
+        where: { id: invite.id, organizationId },
+        data: {
+          status: "PENDING",
+          expiration: new Date(Date.now() + INVITE_EXPIRATION_MS),
+        },
+      });
+
+      if (invite.organization) {
+        await this.trySendInviteEmail({
+          email: invite.email,
+          organization: invite.organization,
+          inviteCode: invite.inviteCode,
+        });
+      }
+
+      approved.push(updatedInvite);
+    }
+
+    return approved;
   }
 }

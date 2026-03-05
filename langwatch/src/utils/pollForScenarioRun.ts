@@ -1,4 +1,4 @@
-import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { createLogger } from "./logger";
 
 const logger = createLogger("pollForScenarioRun");
@@ -21,7 +21,11 @@ interface ScenarioRun {
   messages?: unknown[];
 }
 
-type FetchBatchRunData = (params: PollForRunParams) => Promise<ScenarioRun[]>;
+type BatchRunDataResult =
+  | { changed: false }
+  | { changed: true; runs: ScenarioRun[] };
+
+type FetchBatchRunData = (params: PollForRunParams) => Promise<BatchRunDataResult>;
 
 export type PollResult =
   | { success: true; scenarioRunId: string }
@@ -54,7 +58,8 @@ export async function pollForScenarioRun(
   for (let attempt = 0; attempt < MAX_POLLING_ATTEMPTS; attempt++) {
     try {
       logger.info({ attempt }, "Fetching batch run data");
-      const runs = await fetchBatchRunData(params);
+      const batchResult = await fetchBatchRunData(params);
+      const runs = batchResult.changed ? batchResult.runs : [];
       logger.info({ attempt, runsCount: runs.length }, "Fetch completed");
 
       if (attempt % 10 === 0) {
@@ -77,15 +82,16 @@ export async function pollForScenarioRun(
       if (runs.length > 0 && runs[0]?.scenarioRunId) {
         const run = runs[0];
 
-        // Check for error/cancelled states first
+        // Check for error/cancelled/stalled states first
         if (
           run.status === ScenarioRunStatus.ERROR ||
           run.status === ScenarioRunStatus.FAILED ||
-          run.status === ScenarioRunStatus.CANCELLED
+          run.status === ScenarioRunStatus.CANCELLED ||
+          run.status === ScenarioRunStatus.STALLED
         ) {
           logger.info(
             { status: run.status, scenarioRunId: run.scenarioRunId },
-            "Run terminated with error or cancelled",
+            "Run terminated with error, cancelled, or stalled",
           );
           return {
             success: false,

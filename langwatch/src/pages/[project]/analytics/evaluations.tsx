@@ -294,9 +294,9 @@ function EvaluationsContent() {
       const isCategoryEvaluator = params.checkType === "langevals/llm_category";
 
       // Build filter parameters using dot notation with evaluator ID as key
-      // Format: evaluation_passed.{evaluatorId}=0|1 and evaluation_state.{evaluatorId}=processed
+      // Format: evaluation_passed.{evaluatorId}=0|1 and evaluation_run.{evaluatorId}=processed
       const filterParams: Record<string, string | string[]> = {
-        [`evaluation_state.${params.evaluatorId}`]: ["processed"], // Only show processed evaluations (excludes error, scheduled, etc.)
+        [`evaluation_run.${params.evaluatorId}`]: ["processed"], // Only show processed evaluations (excludes error, scheduled, etc.)
       };
 
       // Add appropriate filter based on evaluator type

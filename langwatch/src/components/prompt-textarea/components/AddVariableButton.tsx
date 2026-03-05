@@ -16,9 +16,6 @@ export const AddVariableButton = forwardRef<
   return (
     <Button
       ref={ref}
-      position="absolute"
-      bottom={2.5}
-      right={2}
       size="xs"
       variant="ghost"
       colorPalette="gray"

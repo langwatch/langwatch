@@ -56,7 +56,7 @@ class LangWatchEvaluator(Evaluator):
         if result.status == "processed":
             return EvaluationResultWithMetadata(
                 status="processed",
-                score=result.score or 0,
+                score=float(result.score) if result.score is not None else 0,
                 passed=result.passed,
                 details=result.details,
                 label=result.label,

@@ -1,5 +1,6 @@
-import { Badge, Box, Card, HStack, Text, VStack } from "@chakra-ui/react";
-import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
+import { Box, Card, Text, VStack } from "@chakra-ui/react";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { SCENARIO_RUN_STATUS_CONFIG } from "./scenario-run-status-config";
 import { SimulationStatusOverlay } from "./SimulationStatusOverlay";
 
 export interface SimulationCardMessage {
@@ -13,6 +14,26 @@ export interface SimulationCardProps {
   children: React.ReactNode;
 }
 
+interface CardStatusConfig {
+  isComplete: boolean;
+  colorPalette: string;
+}
+
+/**
+ * Returns visual configuration for a scenario run status in the card header.
+ * Delegates to the centralized SCENARIO_RUN_STATUS_CONFIG for isComplete/colorPalette,
+ * with a context-specific override for IN_PROGRESS.
+ */
+function getCardStatusConfig(status: ScenarioRunStatus): CardStatusConfig {
+  const config = SCENARIO_RUN_STATUS_CONFIG[status];
+  return {
+    isComplete: config.isComplete,
+    // Card header uses blue for in-progress to contrast with the orange active-border
+    colorPalette:
+      status === ScenarioRunStatus.IN_PROGRESS ? "blue" : config.colorPalette,
+  };
+}
+
 function SimulationCardHeader({
   title,
   status,
@@ -20,43 +41,21 @@ function SimulationCardHeader({
   title: string;
   status?: ScenarioRunStatus;
 }) {
-  const isComplete =
-    status === ScenarioRunStatus.SUCCESS ||
-    status === ScenarioRunStatus.FAILED ||
-    status === ScenarioRunStatus.ERROR ||
-    status === ScenarioRunStatus.CANCELLED;
-
-  const colorPalette = {
-    [ScenarioRunStatus.SUCCESS]: "green",
-    [ScenarioRunStatus.IN_PROGRESS]: "blue",
-    [ScenarioRunStatus.ERROR]: "red",
-    [ScenarioRunStatus.CANCELLED]: "gray",
-    [ScenarioRunStatus.PENDING]: "gray",
-    [ScenarioRunStatus.FAILED]: "red",
-  }[status ?? ScenarioRunStatus.IN_PROGRESS];
+  const { isComplete } = getCardStatusConfig(
+    status ?? ScenarioRunStatus.IN_PROGRESS,
+  );
 
   return (
     <Box py={3} px={4} w="100%" position="relative" zIndex={25}>
-      <HStack justify="space-between" align="center" w="100%" gap={4}>
-        <Text
-          fontSize="sm"
-          fontWeight="semibold"
-          color={isComplete ? "white" : "fg"}
-          lineClamp={2}
-          textShadow={isComplete ? "0 1px 2px rgba(0,0,0,0.3)" : "none"}
-        >
-          {title}
-        </Text>
-        {status && (
-          <Badge
-            colorPalette={colorPalette}
-            size="sm"
-            variant={isComplete ? "solid" : "subtle"}
-          >
-            {status}
-          </Badge>
-        )}
-      </HStack>
+      <Text
+        fontSize="sm"
+        fontWeight="semibold"
+        color={isComplete ? "white" : "fg"}
+        lineClamp={2}
+        textShadow={isComplete ? "0 1px 2px rgba(0,0,0,0.3)" : "none"}
+      >
+        {title}
+      </Text>
     </Box>
   );
 }
@@ -92,6 +91,13 @@ export function SimulationCard({
       position="relative"
       boxShadow="lg"
       bg="bg.panel"
+      css={{
+        animation: "cardFadeIn 0.4s ease-out",
+        "@keyframes cardFadeIn": {
+          from: { opacity: 0, transform: "translateY(8px)" },
+          to: { opacity: 1, transform: "translateY(0)" },
+        },
+      }}
     >
       <VStack height="100%" gap={0}>
         <SimulationCardHeader title={title} status={status} />

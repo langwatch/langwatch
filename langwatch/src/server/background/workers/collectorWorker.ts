@@ -1,4 +1,5 @@
 import type { Project } from "@prisma/client";
+import { SpanStatusCode, trace } from "@opentelemetry/api";
 import { Worker } from "bullmq";
 import { BullMQOtel } from "bullmq-otel";
 import type {
@@ -58,14 +59,30 @@ import { addInputAndOutputForRAGs } from "./collector/rag";
 import { scoreSatisfactionFromInput } from "./collector/satisfaction";
 
 const logger = createLogger("langwatch:workers:collectorWorker");
+const tracer = trace.getTracer("langwatch:collector");
+
+const withSpan = <T>(name: string, fn: () => Promise<T>): Promise<T> =>
+  tracer.startActiveSpan(name, async (span) => {
+    try {
+      const result = await fn();
+      span.end();
+      return result;
+    } catch (error) {
+      span.recordException(error as Error);
+      span.setStatus({ code: SpanStatusCode.ERROR });
+      span.end();
+      throw error;
+    }
+  });
 
 export const scheduleTraceCollectionWithFallback = async (
   collectorJob: CollectorJob,
   forceSync = false,
+  payloadSize?: number,
 ) => {
   traceSpanCountHistogram.observe(collectorJob.spans?.length ?? 0);
   getPayloadSizeHistogram("collector").observe(
-    JSON.stringify(collectorJob).length,
+    payloadSize ?? estimatePayloadSize(collectorJob),
   );
 
   if (forceSync || !collectorQueue) {
@@ -280,7 +297,9 @@ const processCollectorJob_ = async (
 
   spans = addGuardrailCosts(spans);
   try {
-    spans = await addLLMTokensCount(projectId, spans);
+    spans = await withSpan("addLLMTokensCount", () =>
+      addLLMTokensCount(projectId, spans),
+    );
   } catch (error) {
     logger.debug(
       { error, projectId: project.id, traceId },
@@ -328,24 +347,26 @@ const processCollectorJob_ = async (
   );
 
   if (existingTrace?.inserted_at) {
-    // TODO: check for quickwit
-    const protections = await getInternalProtectionsForProject(prisma, {
-      projectId: project.id,
-    });
-    const existingTraceResponse = await getTraceById({
-      connConfig: { projectId: project.id },
-      traceId: traceId,
-      protections,
-      includeEvaluations: true,
-      includeSpans: true,
-    });
-    if (existingTraceResponse) {
-      existingSpans.push(...existingTraceResponse.spans);
+    await withSpan("fetchExistingTrace", async () => {
+      // TODO: check for quickwit
+      const protections = await getInternalProtectionsForProject(prisma, {
+        projectId: project.id,
+      });
+      const existingTraceResponse = await getTraceById({
+        connConfig: { projectId: project.id },
+        traceId: traceId,
+        protections,
+        includeEvaluations: true,
+        includeSpans: true,
+      });
+      if (existingTraceResponse) {
+        existingSpans.push(...existingTraceResponse.spans);
 
-      if (existingTraceResponse.evaluations) {
-        existingEvaluations.push(...existingTraceResponse.evaluations);
+        if (existingTraceResponse.evaluations) {
+          existingEvaluations.push(...existingTraceResponse.evaluations);
+        }
       }
-    }
+    });
   }
 
   // Combine all spans for accurate metrics calculation
@@ -436,15 +457,17 @@ const processCollectorJob_ = async (
     project.piiRedactionLevel !== "DISABLED"
   ) {
     const piiEnforced = env.NODE_ENV === "production";
-    await cleanupPIIs(trace, esSpans, {
-      piiRedactionLevel: project.piiRedactionLevel,
-      enforced: piiEnforced,
-    });
+    await withSpan("cleanupPIIs", () =>
+      cleanupPIIs(trace, esSpans, {
+        piiRedactionLevel: project.piiRedactionLevel,
+        enforced: piiEnforced,
+      }),
+    );
   }
 
-  await startSpan({ name: "updateTrace" }, async () => {
-    await updateTrace(trace, esSpans, evaluations);
-  });
+  await withSpan("updateTrace", () =>
+    updateTrace(trace, esSpans, evaluations),
+  );
 
   if (!existingTrace?.inserted_at) {
     const delay = Date.now() - data.collectedAt;
@@ -865,7 +888,14 @@ export const processCollectorCheckAndAdjustJob = async (
     customMetadata !== null &&
     !Array.isArray(customMetadata);
 
+  // Skip collector-based evaluation scheduling when event-sourcing handles it
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { featureEventSourcingEvaluationIngestion: true },
+  });
+
   if (
+    !project?.featureEventSourcingEvaluationIngestion &&
     // Does not re-schedule trace checks for too old traces being resynced
     (!existingTrace?.timestamps?.inserted_at ||
       existingTrace.timestamps.inserted_at > Date.now() - 60 * 60 * 1000) &&
@@ -1057,3 +1087,45 @@ export const fetchExistingMD5s = async (
     version,
   };
 };
+
+/**
+ * Lightweight estimation of payload size in bytes.
+ * Avoids JSON.stringify() which causes massive allocations and GC pressure.
+ */
+function estimatePayloadSize(obj: unknown): number {
+  if (obj === null || obj === undefined) return 0;
+  let bytes = 0;
+  const seen = new WeakSet<object>();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const stack: any[] = [obj];
+  while (stack.length > 0) {
+    const value = stack.pop();
+
+    if (typeof value === "string") {
+      bytes += value.length * 2; // UTF-16
+    } else if (typeof value === "number") {
+      bytes += 8;
+    } else if (typeof value === "boolean") {
+      bytes += 4;
+    } else if (typeof value === "object" && value !== null) {
+      if (seen.has(value)) continue;
+      seen.add(value);
+      if (Array.isArray(value)) {
+        for (let i = 0; i < value.length; i++) {
+          stack.push(value[i]);
+        }
+      } else {
+        const record = value as Record<string, unknown>;
+        for (const key in record) {
+          if (Object.prototype.hasOwnProperty.call(record, key)) {
+            bytes += key.length * 2;
+            stack.push(record[key]);
+          }
+        }
+      }
+    }
+  }
+
+  return bytes;
+}

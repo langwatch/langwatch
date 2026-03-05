@@ -40,6 +40,7 @@ export {
   EvaluatorsApiService,
   type EvaluatorResponse,
   type EvaluatorField,
+  type CreateEvaluatorBody,
   EvaluatorsApiError,
 } from "./client-sdk/services/evaluators";
 

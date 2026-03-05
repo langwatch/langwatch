@@ -47,7 +47,9 @@ const categoryEvaluators: Record<
   safety: [
     "presidio/pii_detection",
     "azure/prompt_injection",
+    "azure/jailbreak",
     "azure/content_safety",
+    "openai/moderation",
   ],
 };
 
@@ -96,6 +98,7 @@ export function EvaluatorTypeSelectorDrawer(
       open={isOpen}
       onOpenChange={({ open }) => !open && onClose()}
       size="md"
+      modal={false}
     >
       <Drawer.Content>
         <Drawer.CloseTrigger />

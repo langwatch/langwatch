@@ -965,8 +965,13 @@ export const system = createSystem(defaultConfig, {
           body: {
             pt: "3",
           },
+          title: {
+            textStyle: "md",
+            fontWeight: "500",
+          },
           content: {
-            background: "bg.surface",
+            background: "bg.surface/75",
+            backdropFilter: "blur(8px)",
             "& button:not([data-variant=ghost]):not([data-part])": {
               boxShadow: "md",
             },

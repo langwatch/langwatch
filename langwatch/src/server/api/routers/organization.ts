@@ -3,6 +3,7 @@ import {
   type Organization,
   type OrganizationUser,
   OrganizationUserRole,
+  PricingModel,
   type Prisma,
   type PrismaClient,
   type Project,
@@ -31,7 +32,7 @@ import { scheduleUsageStatsForOrganization } from "~/server/background/queues/us
 import { decrypt, encrypt } from "~/utils/encryption";
 import { isTeamRoleAllowedForOrganizationRole, type TeamRoleValue } from "~/utils/memberRoleConstraints";
 import { slugify } from "~/utils/slugify";
-import { dependencies } from "../../../injection/dependencies.server";
+import { getApp } from "~/server/app-layer/app";
 import { elasticsearchMigrate } from "../../../tasks/elasticMigrate";
 import {
   INVITE_EXPIRATION_MS,
@@ -289,6 +290,7 @@ export const organizationRouter = createTRPCRouter({
               slug: orgSlug,
               phoneNumber: input.phoneNumber,
               signupData: input.signUpData,
+              pricingModel: PricingModel.SEAT_EVENT,
             },
           });
 
@@ -765,7 +767,7 @@ export const organizationRouter = createTRPCRouter({
 
       if (!organization) {
         throw new TRPCError({
-          code: "FORBIDDEN",
+          code: "NOT_FOUND",
           message: "Organization not found",
         });
       }
@@ -929,8 +931,7 @@ export const organizationRouter = createTRPCRouter({
     .input(z.object({ inviteId: z.string(), organizationId: z.string() }))
     .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input, ctx }) => {
-      const prisma = ctx.prisma;
-      await prisma.organizationInvite.delete({
+      await ctx.prisma.organizationInvite.delete({
         where: { id: input.inviteId, organizationId: input.organizationId },
       });
     }),
@@ -1580,10 +1581,10 @@ export const organizationRouter = createTRPCRouter({
 
             // Check license limits for member type changes
             const subscriptionLimits =
-              await dependencies.subscriptionHandler.getActivePlan(
-                team.organizationId,
-                ctx.session.user
-              );
+              await getApp().planProvider.getActivePlan({
+                organizationId: team.organizationId,
+                user: ctx.session.user,
+              });
             const licenseRepo = new LicenseEnforcementRepository(prisma);
             await assertMemberTypeLimitNotExceeded(
               changeType,
@@ -1780,10 +1781,10 @@ export const organizationRouter = createTRPCRouter({
 
         // Check limits for member type changes
         const subscriptionLimits =
-          await dependencies.subscriptionHandler.getActivePlan(
-            input.organizationId,
-            ctx.session.user
-          );
+          await getApp().planProvider.getActivePlan({
+            organizationId: input.organizationId,
+            user: ctx.session.user,
+          });
         const licenseRepo = new LicenseEnforcementRepository(prisma);
         await assertMemberTypeLimitNotExceeded(
           changeType,

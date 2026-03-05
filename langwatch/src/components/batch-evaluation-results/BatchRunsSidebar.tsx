@@ -25,6 +25,7 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { FormatMoney } from "~/optimization_studio/components/FormatMoney";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { getColorForString } from "~/utils/rotatingColors";
+import { INTERRUPTED_THRESHOLD_MS, isRunFinished } from "./isRunFinished";
 
 /**
  * Summary data for a single evaluation run
@@ -36,10 +37,10 @@ export type BatchRunSummary = {
     "id" | "version" | "commitMessage"
   > | null;
   timestamps: {
-    created_at: number;
-    updated_at?: number | null;
-    finished_at?: number | null;
-    stopped_at?: number | null;
+    createdAt: number;
+    updatedAt?: number | null;
+    finishedAt?: number | null;
+    stoppedAt?: number | null;
   };
   progress?: number | null;
   total?: number | null;
@@ -84,29 +85,6 @@ type BatchRunsSidebarProps = {
   runColors?: Record<string, string>;
 };
 
-/** Time in milliseconds after which a run without updates is considered interrupted */
-const INTERRUPTED_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
-
-/**
- * Check if a run is finished (completed, stopped, or interrupted)
- */
-const isRunFinished = (timestamps: BatchRunSummary["timestamps"]): boolean => {
-  // Explicitly finished or stopped
-  if (timestamps.finished_at ?? timestamps.stopped_at) {
-    return true;
-  }
-
-  // Consider interrupted if no updates for 5 minutes
-  if (timestamps.updated_at) {
-    const timeSinceUpdate = Date.now() - timestamps.updated_at;
-    if (timeSinceUpdate > INTERRUPTED_THRESHOLD_MS) {
-      return true;
-    }
-  }
-
-  return false;
-};
-
 /**
  * Check if a run was interrupted (no explicit finish/stop but stale)
  */
@@ -114,13 +92,13 @@ const isRunInterrupted = (
   timestamps: BatchRunSummary["timestamps"],
 ): boolean => {
   // Has explicit finish or stop - not interrupted
-  if (timestamps.finished_at ?? timestamps.stopped_at) {
+  if (timestamps.finishedAt ?? timestamps.stoppedAt) {
     return false;
   }
 
   // No updates for 5 minutes - considered interrupted
-  if (timestamps.updated_at) {
-    const timeSinceUpdate = Date.now() - timestamps.updated_at;
+  if (timestamps.updatedAt) {
+    const timeSinceUpdate = Date.now() - timestamps.updatedAt;
     return timeSinceUpdate > INTERRUPTED_THRESHOLD_MS;
   }
 
@@ -320,7 +298,7 @@ export function BatchRunsSidebar({
 
             // Use stable color from parent (based on position in full runs list)
             // Override with red for stopped runs, orange for interrupted
-            const runColor = run.timestamps.stopped_at
+            const runColor = run.timestamps.stoppedAt
               ? "red.400"
               : interrupted
                 ? "orange.400"
@@ -420,10 +398,10 @@ export function BatchRunsSidebar({
 
                   {/* Line 2: Time ago + status */}
                   <Text color="fg.muted" fontSize="12px">
-                    {run.timestamps.created_at
-                      ? formatTimeAgo(run.timestamps.created_at)
+                    {run.timestamps.createdAt
+                      ? formatTimeAgo(run.timestamps.createdAt)
                       : "..."}
-                    {run.timestamps.stopped_at && " · stopped"}
+                    {run.timestamps.stoppedAt && " · stopped"}
                     {interrupted && " · interrupted"}
                   </Text>
                 </VStack>

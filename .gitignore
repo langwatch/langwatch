@@ -33,6 +33,10 @@ prompts/**
 # Claude Code personal settings
 **/.claude/settings.local.json
 **/.claude/agent-memory/
+.claude/skills/local-*/
+
+# Browser test screenshots
+.browser-test-screenshots/
 
 # Playwright E2E tests
 agentic-e2e-tests/test-results/
@@ -43,3 +47,7 @@ agentic-e2e-tests/tests/seed.spec.ts
 agentic-e2e-tests/node_modules/
 seed.spec.ts
 .playwright-mcp/
+.mcp.local.json
+
+!.worktrees/.gitkeep
+.worktrees/**

@@ -9,6 +9,17 @@ import {
   EVALUATION_PROCESSING_EVENT_TYPES,
 } from "../pipelines/evaluation-processing/schemas/constants";
 import {
+  EXPERIMENT_RUN_PROCESSING_COMMAND_TYPES,
+  EXPERIMENT_RUN_PROCESSING_EVENT_TYPES,
+} from "../pipelines/experiment-run-processing/schemas/constants";
+import {
+  BILLING_REPORTING_COMMAND_TYPES,
+} from "../pipelines/billing-reporting/schemas/constants";
+import {
+  SIMULATION_RUN_PROCESSING_COMMAND_TYPES,
+  SIMULATION_PROCESSING_EVENT_TYPES,
+} from "../pipelines/simulation-processing/schemas/constants";
+import {
   TRACE_PROCESSING_COMMAND_TYPES,
   TRACE_PROCESSING_EVENT_TYPES,
 } from "../pipelines/trace-processing/schemas/constants";
@@ -25,6 +36,8 @@ const TEST_EVENT_TYPES = ["test.integration.event"] as const;
 export const EVENT_TYPE_IDENTIFIERS = [
   ...TRACE_PROCESSING_EVENT_TYPES,
   ...EVALUATION_PROCESSING_EVENT_TYPES,
+  ...EXPERIMENT_RUN_PROCESSING_EVENT_TYPES,
+  ...SIMULATION_PROCESSING_EVENT_TYPES,
   ...TEST_EVENT_TYPES,
 ] as const;
 
@@ -34,6 +47,9 @@ export const EVENT_TYPE_IDENTIFIERS = [
 export const COMMAND_TYPE_IDENTIFIERS = [
   ...TRACE_PROCESSING_COMMAND_TYPES,
   ...EVALUATION_PROCESSING_COMMAND_TYPES,
+  ...EXPERIMENT_RUN_PROCESSING_COMMAND_TYPES,
+  ...SIMULATION_RUN_PROCESSING_COMMAND_TYPES,
+  ...BILLING_REPORTING_COMMAND_TYPES,
 ] as const;
 
 /**
@@ -50,5 +66,9 @@ const TEST_AGGREGATE_TYPE = "test_aggregate" as const;
 export const AGGREGATE_TYPE_IDENTIFIERS = [
   "trace",
   "evaluation",
+  "experiment_run",
+  "simulation_run",
+  "billing_report",
+  "global",
   TEST_AGGREGATE_TYPE,
 ] as const;

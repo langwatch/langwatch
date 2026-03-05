@@ -1,7 +1,7 @@
 import { Box, Code, HStack, Text, VStack } from "@chakra-ui/react";
 import React from "react";
-import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
-import type { ScenarioResults } from "~/app/api/scenario-events/[[...route]]/schemas";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import type { ScenarioResults } from "~/server/scenarios/schemas";
 import { ConsoleHeader } from "./ConsoleHeader";
 import { CriteriaDetails } from "./CriteriaDetails";
 import { CONSOLE_COLORS } from "./constants";
@@ -24,7 +24,9 @@ export function SimulationConsole({
   status?: ScenarioRunStatus;
   durationInMs?: number;
 }) {
-  const isPending = status === ScenarioRunStatus.IN_PROGRESS;
+  const isPending =
+    status === ScenarioRunStatus.IN_PROGRESS ||
+    status === ScenarioRunStatus.PENDING;
 
   return (
     <Box
@@ -36,6 +38,7 @@ export function SimulationConsole({
       fontSize="sm"
       minHeight="200px"
       overflow="auto"
+      width="full"
     >
       <Code
         colorPalette="green"

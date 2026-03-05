@@ -37,7 +37,8 @@ export const SERIALIZED_ADAPTER_FACTORIES: Record<string, AdapterFactory> = {
       modelParams,
       nlpServiceUrl,
     ),
-  http: ({ data }) => new SerializedHttpAgentAdapter(data as HttpAgentData),
+  http: ({ data }) =>
+    new SerializedHttpAgentAdapter(data as HttpAgentData),
   code: ({ data, modelParams, nlpServiceUrl }) =>
     new SerializedCodeAgentAdapter(
       data as CodeAgentData,

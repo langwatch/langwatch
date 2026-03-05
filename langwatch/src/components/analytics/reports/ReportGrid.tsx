@@ -22,6 +22,7 @@ import {
 interface ReportGridProps {
   graphs: GraphData[];
   projectSlug: string;
+  dashboardId?: string;
   onGraphDelete: (graphId: string) => void;
   onGraphSizeChange: (graphId: string, size: SizeOption) => void;
   onGraphsReorder: (layouts: GridLayout[]) => void;
@@ -31,6 +32,7 @@ interface ReportGridProps {
 export function ReportGrid({
   graphs,
   projectSlug,
+  dashboardId,
   onGraphDelete,
   onGraphSizeChange,
   onGraphsReorder,
@@ -93,6 +95,7 @@ export function ReportGrid({
               key={graph.id}
               graph={graph}
               projectSlug={projectSlug}
+              dashboardId={dashboardId}
               onDelete={() => onGraphDelete(graph.id)}
               onSizeChange={(size) => onGraphSizeChange(graph.id, size)}
               isDeleting={deletingGraphId === graph.id}

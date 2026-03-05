@@ -7,6 +7,7 @@
  */
 
 import { z } from "zod";
+import type { Span } from "../../tracer/types";
 
 // ============================================================================
 // Adapter Data Types (Zod schemas for data contracts)
@@ -179,6 +180,16 @@ export const TargetConfigSchema = z.object({
 export type TargetConfig = z.infer<typeof TargetConfigSchema>;
 
 // ============================================================================
+// Span Query Types
+// ============================================================================
+
+/** Function that queries spans from a data source (ES, trace API, etc.) by trace ID */
+export type SpanQueryFn = (params: {
+  projectId: string;
+  traceId: string;
+}) => Promise<Span[]>;
+
+// ============================================================================
 // Result Types
 // ============================================================================
 
@@ -207,5 +218,6 @@ export const ChildProcessJobDataSchema = z.object({
   adapterData: TargetAdapterDataSchema,
   modelParams: LiteLLMParamsSchema,
   nlpServiceUrl: z.string(),
+  target: TargetConfigSchema,
 });
 export type ChildProcessJobData = z.infer<typeof ChildProcessJobDataSchema>;

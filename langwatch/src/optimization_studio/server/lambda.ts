@@ -18,6 +18,29 @@ import type { StudioClientEvent } from "../types/events";
 
 const logger = createLogger("langwatch:langwatch-nlp-lambda");
 
+/**
+ * Strip secrets from a studio event before passing to error reporters.
+ * Returns a shallow copy with workflow.secrets redacted.
+ */
+const sanitizeEventForLogging = (
+  event: StudioClientEvent,
+): StudioClientEvent => {
+  if (!("payload" in event) || !("workflow" in (event as any).payload)) {
+    return event;
+  }
+  const payload = (event as any).payload;
+  return {
+    ...event,
+    payload: {
+      ...payload,
+      workflow: {
+        ...payload.workflow,
+        secrets: "[REDACTED]",
+      },
+    },
+  } as StudioClientEvent;
+};
+
 type LangWatchLambdaConfig = {
   AWS_ACCESS_KEY_ID: string;
   AWS_SECRET_ACCESS_KEY: string;
@@ -394,7 +417,7 @@ export const invokeLambda = async (
                 `Failed run workflow: ${chunk.InvokeComplete.ErrorCode}`,
               );
               captureException(error, {
-                extra: { event, details: chunk.InvokeComplete.ErrorDetails },
+                extra: { event: sanitizeEventForLogging(event), details: chunk.InvokeComplete.ErrorDetails },
               });
               throw error;
             }
@@ -409,13 +432,13 @@ export const invokeLambda = async (
 
             if (statusCode === 422) {
               logger.error(
-                { event, errorMessage },
+                { event: sanitizeEventForLogging(event), errorMessage },
                 "Optimization Studio validation failed, please contact support",
               );
               const error = new Error(
                 `Optimization Studio validation failed, please contact support`,
               );
-              captureException(error, { extra: { event } });
+              captureException(error, { extra: { event: sanitizeEventForLogging(event) } });
               throw error;
             }
             throw new Error(
@@ -452,14 +475,14 @@ export const invokeLambda = async (
         console.error(
           "Optimization Studio validation failed, please contact support",
           "\n\n",
-          JSON.stringify(event, null, 2),
+          JSON.stringify(sanitizeEventForLogging(event), null, 2),
           "\n\nValidation error:\n",
           body,
         );
         const error = new Error(
           `Optimization Studio validation failed, please contact support`,
         );
-        captureException(error, { extra: { event } });
+        captureException(error, { extra: { event: sanitizeEventForLogging(event) } });
         throw error;
       }
       throw new Error(`Failed run workflow: ${response.statusText}\n\n${body}`);

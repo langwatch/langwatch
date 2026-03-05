@@ -1,4 +1,4 @@
-import type { EvaluatorResponse } from "./types";
+import type { CreateEvaluatorBody, EvaluatorResponse } from "./types";
 import {
   createLangWatchApiClient,
   type LangwatchApiClient,
@@ -65,6 +65,17 @@ export class EvaluatorsApiService {
         `fetch evaluator with ID or slug "${idOrSlug}"`,
         error,
       );
+    return data;
+  }
+
+  /**
+   * Creates a new evaluator.
+   */
+  async create(params: CreateEvaluatorBody): Promise<EvaluatorResponse> {
+    const { data, error } = await this.apiClient.POST("/api/evaluators", {
+      body: params,
+    });
+    if (error) this.handleApiError("create evaluator", error);
     return data;
   }
 }

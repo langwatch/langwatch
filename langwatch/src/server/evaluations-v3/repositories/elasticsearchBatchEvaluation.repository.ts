@@ -66,6 +66,13 @@ export const createElasticsearchBatchEvaluationRepository =
         index: BATCH_EVALUATION_INDEX.alias,
         id,
         body: validated,
+        op_type: "create",
+      }).catch((error: any) => {
+        if (error?.statusCode === 409 || error?.meta?.statusCode === 409) {
+          logger.debug({ runId }, "Batch evaluation already exists, skipping create");
+          return;
+        }
+        throw error;
       });
 
       logger.debug(

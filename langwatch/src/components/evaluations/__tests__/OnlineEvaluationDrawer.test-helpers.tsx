@@ -340,6 +340,22 @@ export function createApiMock() {
             error: null,
           })),
         },
+        getFieldNames: {
+          useQuery: vi.fn(() => ({
+            data: {
+              spanNames: [
+                { name: "openai/gpt-4", type: "llm" },
+                { name: "my-custom-span", type: "span" },
+              ],
+              metadataKeys: [
+                { key: "user_id" },
+                { key: "session_id" },
+              ],
+            },
+            isLoading: false,
+            error: null,
+          })),
+        },
       },
       licenseEnforcement: {
         checkLimit: {
@@ -443,3 +459,18 @@ export function resetState() {
     updatedAt: new Date("2025-01-15T10:00:00Z"),
   };
 }
+
+/**
+ * Helper to check if online evaluation drawer is open based on mock query state.
+ */
+export const isOnlineEvalOpen = () =>
+  state.mockQuery["drawer.open"] === "onlineEvaluationDrawer" ||
+  state.mockQuery["drawer.open"] === undefined ||
+  !state.mockQuery["drawer.open"];
+
+/**
+ * Helper to check if evaluator list drawer is open based on mock query state.
+ */
+export const isEvaluatorListOpen = () =>
+  state.mockQuery["drawer.open"] === "evaluatorList";
+

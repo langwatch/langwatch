@@ -1,8 +1,8 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { LicenseEnforcementService } from "../license-enforcement.service";
 import type { ILicenseEnforcementRepository } from "../license-enforcement.repository";
-import type { PlanProvider } from "../license-enforcement.service";
-import type { PlanInfo } from "../../subscriptionHandler";
+import type { PlanProvider } from "../../app-layer/subscription/plan-provider";
+import type { PlanInfo } from "../../../../ee/licensing/planInfo";
 import { LimitExceededError } from "../errors";
 import type { LimitType } from "../types";
 
@@ -22,6 +22,7 @@ describe("LicenseEnforcementService", () => {
   let mockPlanProvider: PlanProvider;
 
   const basePlan: PlanInfo = {
+    planSource: "subscription",
     type: "test",
     name: "Test Plan",
     free: false,
@@ -132,10 +133,10 @@ describe("LicenseEnforcementService", () => {
 
       await service.checkLimit("org-123", "workflows", user);
 
-      expect(mockPlanProvider.getActivePlan).toHaveBeenCalledWith(
-        "org-123",
-        user
-      );
+      expect(mockPlanProvider.getActivePlan).toHaveBeenCalledWith({
+        organizationId: "org-123",
+        user: expect.objectContaining({ id: "user-123" }),
+      });
     });
 
     describe("handles all limit types", () => {
@@ -214,10 +215,10 @@ describe("LicenseEnforcementService", () => {
 
       await service.enforceLimit("org-123", "workflows", user);
 
-      expect(mockPlanProvider.getActivePlan).toHaveBeenCalledWith(
-        "org-123",
-        user
-      );
+      expect(mockPlanProvider.getActivePlan).toHaveBeenCalledWith({
+        organizationId: "org-123",
+        user: expect.objectContaining({ id: "user-123" }),
+      });
     });
 
     it("does not throw when overrideAddingLimitations is set", async () => {

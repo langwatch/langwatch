@@ -1,7 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { OrganizationUserRole, TeamUserRole, type PrismaClient } from "@prisma/client";
 import { organizationRouter, LITE_MEMBER_VIEWER_ONLY_ERROR } from "../organization";
 import { createInnerTRPCContext } from "../../trpc";
+import { createTestApp } from "~/server/app-layer/presets";
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
 
 vi.mock("../../../auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
@@ -29,18 +32,6 @@ vi.mock("../../rbac", async (importOriginal) => {
     },
   };
 });
-
-vi.mock("../../../../injection/dependencies.server", () => ({
-  dependencies: {
-    subscriptionHandler: {
-      getActivePlan: vi.fn().mockResolvedValue({
-        maxMembers: 100,
-        maxMembersLite: 100,
-        overrideAddingLimitations: true,
-      }),
-    },
-  },
-}));
 
 vi.mock("../../../license-enforcement/license-enforcement.repository", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../license-enforcement/license-enforcement.repository")>();
@@ -80,6 +71,18 @@ describe("organizationRouter member role validation", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetApp();
+
+    // Wire App singleton with permissive PlanProvider mock values.
+    globalForApp.__langwatch_app = createTestApp({
+      planProvider: PlanProviderService.create({
+        getActivePlan: vi.fn().mockResolvedValue({
+          maxMembers: 100,
+          maxMembersLite: 100,
+          overrideAddingLimitations: true,
+        }),
+      } as any),
+    });
 
     txMock = {
       team: {
@@ -113,6 +116,10 @@ describe("organizationRouter member role validation", () => {
 
     ctx.prisma = prismaMock as unknown as PrismaClient;
     caller = organizationRouter.createCaller(ctx);
+  });
+
+  afterEach(() => {
+    resetApp();
   });
 
   describe("updateTeamMemberRole", () => {

@@ -4,8 +4,8 @@ import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
 import { getLangWatchTracer } from "langwatch";
 import { type NextRequest, NextResponse } from "next/server";
+import { notifyPlanLimitReached } from "../../../../../../ee/billing";
 import { captureException } from "~/utils/posthogErrorCapture";
-import { dependencies } from "../../../../../injection/dependencies.server";
 import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
 import { withAppRouterTracer } from "../../../../../middleware/app-router-tracer";
 import {
@@ -14,13 +14,11 @@ import {
 } from "../../../../../server/background/workers/collectorWorker";
 import { prisma } from "../../../../../server/db";
 import { openTelemetryTraceRequestToTracesForCollection } from "../../../../../server/tracer/otel.traces";
-import { TraceRequestCollectionService } from "../../../../../server/traces/trace-request-collection.service";
-import { TraceUsageService } from "../../../../../server/traces/trace-usage.service";
+import { getApp } from "../../../../../server/app-layer/app";
 import { createLogger } from "../../../../../utils/logger/server";
 
 const tracer = getLangWatchTracer("langwatch.otel.traces");
 const logger = createLogger("langwatch:otel:v1:traces");
-const traceRequestCollectionService = new TraceRequestCollectionService();
 
 const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
   .ExportTraceServiceRequest;
@@ -83,28 +81,24 @@ async function handleTracesRequest(req: NextRequest) {
       }
 
       try {
-        const traceUsageService = TraceUsageService.create();
-        const limitResult = await traceUsageService.checkLimit({
+        const limitResult = await getApp().usage.checkLimit({
           teamId: project.teamId,
         });
 
         if (limitResult.exceeded) {
-          if (dependencies.planLimits) {
-            try {
-              const activePlan =
-                await dependencies.subscriptionHandler.getActivePlan(
-                  project.team.organizationId,
-                );
-              await dependencies.planLimits(
-                project.team.organizationId,
-                activePlan.name ?? "free",
-              );
-            } catch (error) {
-              logger.error(
-                { error, projectId: project.id },
-                "Error sending plan limit notification",
-              );
-            }
+          try {
+            const activePlan = await getApp().planProvider.getActivePlan({
+              organizationId: project.team.organizationId,
+            });
+            await notifyPlanLimitReached({
+              organizationId: project.team.organizationId,
+              planName: activePlan.name ?? "free",
+            });
+          } catch (error) {
+            logger.error(
+              { error, projectId: project.id },
+              "Error sending plan limit notification",
+            );
           }
           logger.info(
             {
@@ -194,7 +188,7 @@ async function handleTracesRequest(req: NextRequest) {
       // For ClickHouse, ingest raw OTEL spans directly (bypasses otel.traces.ts transformation)
       let clickHouseTask: Promise<void> | null = null;
       if (project.featureEventSourcingTraceIngestion) {
-        clickHouseTask = traceRequestCollectionService.handleOtlpTraceRequest(
+        clickHouseTask = getApp().traces.collection.handleOtlpTraceRequest(
           project.id,
           traceRequest,
           project.piiRedactionLevel,
@@ -210,9 +204,20 @@ async function handleTracesRequest(req: NextRequest) {
         async () => {
           const promises: Promise<void>[] = [];
           for (const traceForCollection of tracesForCollection) {
+            if (traceForCollection.spans.length === 0) continue;
+
+            // Fingerprint for deduplication: traceId + span count + first/last span timestamps
+            // Much faster than stringifying thousands of spans
+            const fingerprint = {
+              traceId: traceForCollection.traceId,
+              spanCount: traceForCollection.spans.length,
+              firstSpanStart: traceForCollection.spans[0]?.timestamps?.started_at,
+              lastSpanEnd: traceForCollection.spans[traceForCollection.spans.length - 1]?.timestamps?.finished_at,
+            };
+            
             const paramsMD5 = crypto
               .createHash("md5")
-              .update(JSON.stringify({ ...traceForCollection }))
+              .update(JSON.stringify(fingerprint))
               .digest("hex");
             const existingTrace = await fetchExistingMD5s(
               traceForCollection.traceId,
@@ -226,10 +231,7 @@ async function handleTracesRequest(req: NextRequest) {
               {
                 traceId: traceForCollection.traceId,
                 traceRequestSizeMb: parseFloat(
-                  (
-                    Buffer.from(JSON.stringify(traceRequest)).length /
-                    (1024 * 1024)
-                  ).toFixed(3),
+                  (body.byteLength / (1024 * 1024)).toFixed(3),
                 ),
                 traceRequestSpansCount:
                   traceRequest.resourceSpans?.reduce(
@@ -242,15 +244,19 @@ async function handleTracesRequest(req: NextRequest) {
             );
 
             promises.push(
-              scheduleTraceCollectionWithFallback({
-                ...traceForCollection,
-                projectId: project.id,
-                existingTrace,
-                paramsMD5,
-                expectedOutput: void 0,
-                evaluations: void 0,
-                collectedAt: Date.now(),
-              }),
+              scheduleTraceCollectionWithFallback(
+                {
+                  ...traceForCollection,
+                  projectId: project.id,
+                  existingTrace,
+                  paramsMD5,
+                  expectedOutput: void 0,
+                  evaluations: void 0,
+                  collectedAt: Date.now(),
+                },
+                false,
+                body.byteLength,
+              ),
             );
           }
 

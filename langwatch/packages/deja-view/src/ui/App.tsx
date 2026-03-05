@@ -180,21 +180,6 @@ const App: React.FC<AppProps> = ({
     const related: RelatedAggregate[] = [];
     const seenIds = new Set<string>();
 
-    // Extract parent aggregate IDs
-    for (const parentLink of linkInfo.parentLinks) {
-      for (const event of filteredEvents) {
-        const parentId = parentLink.extractParentId(event);
-        if (parentId && !seenIds.has(parentId)) {
-          seenIds.add(parentId);
-          related.push({
-            id: parentId,
-            type: parentLink.toAggregateType,
-            relationship: "parent",
-          });
-        }
-      }
-    }
-
     // Add resolved children from database query
     if (resolvedChildren) {
       for (const childGroup of resolvedChildren) {

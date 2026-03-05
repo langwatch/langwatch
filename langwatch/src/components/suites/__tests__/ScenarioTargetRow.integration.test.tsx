@@ -1,0 +1,253 @@
+/**
+ * @vitest-environment jsdom
+ *
+ * Integration tests for ScenarioTargetRow component.
+ *
+ * Tests the display of scenario x target pairs inside expanded run rows:
+ * status icons, display name formatting, duration, and click handling.
+ *
+ * @see specs/suites/suite-workflow.feature - "Expand run to see scenario x target breakdown"
+ */
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { ScenarioTargetRow } from "../ScenarioTargetRow";
+import { makeScenarioRunData } from "./test-helpers";
+
+const Wrapper = ({ children }: { children: React.ReactNode }) => (
+  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+);
+
+describe("<ScenarioTargetRow/>", () => {
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  describe("given a successful scenario run with a target", () => {
+    it("displays target-prefixed scenario name", () => {
+      render(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData()}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(
+        screen.getByText("Prod Agent: Angry refund request"),
+      ).toBeInTheDocument();
+    });
+
+    it("displays 100% pass rate for SUCCESS status", () => {
+      render(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData()}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByText("100%")).toBeInTheDocument();
+    });
+
+    it("displays duration formatted as seconds", () => {
+      render(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({ durationInMs: 2300 })}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByText("2.3s")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a scenario run without a target name", () => {
+    it("displays only the scenario name", () => {
+      render(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData()}
+          targetName={null}
+          onClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(
+        screen.getByText("Angry refund request"),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText(/:/),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a scenario run with iteration", () => {
+    it("appends iteration number to the display name", () => {
+      render(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData()}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+          iteration={3}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(
+        screen.getByText("Prod Agent: Angry refund request (#3)"),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("given a scenario run without target but with iteration", () => {
+    it("appends iteration to scenario name only", () => {
+      render(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData()}
+          targetName={null}
+          onClick={vi.fn()}
+          iteration={1}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(
+        screen.getByText("Angry refund request (#1)"),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("given a failed scenario run (ERROR status)", () => {
+    it("displays 'failed' label for ERROR status", () => {
+      render(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({
+            status: ScenarioRunStatus.ERROR,
+          })}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByText("failed")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a failed scenario run (FAILED status)", () => {
+    it("displays 'failed' label for FAILED status", () => {
+      render(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({
+            status: ScenarioRunStatus.FAILED,
+          })}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByText("failed")).toBeInTheDocument();
+    });
+  });
+
+  describe("given an in-progress scenario run", () => {
+    it("displays 'running' label instead of pass rate", () => {
+      render(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({
+            status: ScenarioRunStatus.IN_PROGRESS,
+            durationInMs: 0,
+          })}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByText("running")).toBeInTheDocument();
+      expect(screen.queryByText("100%")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a stalled scenario run", () => {
+    it("displays 'stalled' label", () => {
+      render(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({
+            status: ScenarioRunStatus.STALLED,
+            durationInMs: 0,
+          })}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByText("stalled")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a cancelled scenario run", () => {
+    it("displays 'cancelled' label", () => {
+      render(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({
+            status: ScenarioRunStatus.CANCELLED,
+            durationInMs: 0,
+          })}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByText("cancelled")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a duration less than 1 second", () => {
+    it("displays duration in milliseconds", () => {
+      render(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({ durationInMs: 450 })}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByText("450ms")).toBeInTheDocument();
+    });
+  });
+
+  describe("when the row is clicked", () => {
+    it("calls onClick callback", async () => {
+      const user = userEvent.setup();
+      const onClick = vi.fn();
+
+      render(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData()}
+          targetName="Prod Agent"
+          onClick={onClick}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const row = screen.getByLabelText(
+        "View details for Prod Agent: Angry refund request",
+      );
+      await user.click(row);
+      expect(onClick).toHaveBeenCalledOnce();
+    });
+  });
+});

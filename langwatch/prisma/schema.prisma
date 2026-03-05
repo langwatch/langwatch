@@ -73,6 +73,8 @@ model User {
     llmPromptConfigVersions LlmPromptConfigVersion[]
     scenarios               Scenario[]
     inviteRequests          OrganizationInvite[]
+    secretsCreated          ProjectSecret[]          @relation("secretCreatedBy")
+    secretsUpdated          ProjectSecret[]          @relation("secretUpdatedBy")
 }
 
 model VerificationToken {
@@ -168,9 +170,13 @@ model Organization {
     ssoProvider            String?
 
     promoCode     String?
+    stripeCustomerId String?      @unique
+    currency      Currency         @default(EUR)
+    pricingModel  PricingModel     @default(TIERED)
     features      OrganizationFeature[]
     CustomRoles   CustomRole[]
     notifications Notification[]
+    subscriptions Subscription[]
 
     // License enforcement fields (COSS-0226)
     license                String?   @db.Text
@@ -179,6 +185,38 @@ model Organization {
 
     @@index([ssoDomain])
     @@index([ssoProvider])
+}
+
+enum PlanTypes {
+    FREE
+    PRO
+    GROWTH
+    GROWTH_SEAT_EUR_MONTHLY
+    GROWTH_SEAT_EUR_ANNUAL
+    GROWTH_SEAT_USD_MONTHLY
+    GROWTH_SEAT_USD_ANNUAL
+    ENTERPRISE
+    LAUNCH
+    ACCELERATE
+    LAUNCH_ANNUAL
+    ACCELERATE_ANNUAL
+}
+
+enum PricingModel {
+    TIERED
+    SEAT_EVENT
+}
+
+enum SubscriptionStatus {
+    PENDING
+    FAILED
+    ACTIVE
+    CANCELLED
+}
+
+enum Currency {
+    USD
+    EUR
 }
 
 enum PIIRedactionLevel {
@@ -223,6 +261,7 @@ model Project {
     experiments              Experiment[]
     annotations              Annotation[]
     modelProviders           ModelProvider[]
+    projectSecrets           ProjectSecret[]
     defaultModel             String?
     topicClusteringModel     String?
     embeddingsModel          String?
@@ -244,6 +283,7 @@ model Project {
     agents                   Agent[]
     evaluators               Evaluator[]
     scenarios                Scenario[]
+    suiteConfigurations      SimulationSuite[]
 
     featureEventSourcingTraceIngestion      Boolean @default(false)
     featureEventSourcingSimulationIngestion Boolean @default(false)
@@ -260,6 +300,7 @@ enum INVITE_STATUS {
     PENDING
     ACCEPTED
     WAITING_APPROVAL
+    PAYMENT_PENDING
 }
 
 model OrganizationInvite {
@@ -275,6 +316,7 @@ model OrganizationInvite {
     role            OrganizationUserRole
     requestedBy     String?
     requestedByUser User?                @relation(fields: [requestedBy], references: [id])
+    subscriptionId  String?
     createdAt       DateTime             @default(now())
     updatedAt       DateTime             @default(now()) @updatedAt
 
@@ -567,6 +609,23 @@ model ModelProvider {
     createdAt              DateTime @default(now())
     updatedAt              DateTime @default(now()) @updatedAt
 
+    @@index([projectId])
+}
+
+model ProjectSecret {
+    id             String   @id @default(nanoid())
+    projectId      String
+    project        Project  @relation(fields: [projectId], references: [id])
+    name           String
+    encryptedValue String
+    createdById    String
+    createdBy      User     @relation("secretCreatedBy", fields: [createdById], references: [id])
+    updatedById    String
+    updatedBy      User     @relation("secretUpdatedBy", fields: [updatedById], references: [id])
+    createdAt      DateTime @default(now())
+    updatedAt      DateTime @default(now()) @updatedAt
+
+    @@unique([projectId, name])
     @@index([projectId])
 }
 
@@ -981,4 +1040,116 @@ model Scenario {
     updatedAt       DateTime  @default(now()) @updatedAt
 
     @@index([projectId])
+}
+
+model SimulationSuite {
+    id          String    @id @default(nanoid())
+    projectId   String
+    project     Project   @relation(fields: [projectId], references: [id])
+    name        String
+    slug        String
+    description String?
+    scenarioIds String[]
+    targets     Json      // Array of { type: "prompt" | "http", referenceId: string }
+    repeatCount Int       @default(1)
+    labels      String[]
+    archivedAt  DateTime?
+    createdAt   DateTime  @default(now())
+    updatedAt   DateTime  @default(now()) @updatedAt
+
+    @@index([projectId])
+    @@unique([projectId, slug])
+}
+
+model ProjectDailySdkUsage {
+    id                 String   @id
+    projectId          String
+    date               String   // UTC date "YYYY-MM-DD"
+    sdkName            String   @default("")
+    sdkVersion         String   @default("")
+    sdkLanguage        String   @default("")
+    count              Int      @default(0)
+    lastEventTimestamp BigInt?  // Unix ms from event.timestamp
+    updatedAt          DateTime @default(now()) @updatedAt
+
+    @@unique([projectId, date, sdkName, sdkVersion, sdkLanguage])
+    @@index([projectId, date])
+}
+
+model Subscription {
+    id                    String             @id @default(nanoid())
+    organizationId        String
+    plan                  PlanTypes
+    stripeSubscriptionId  String?            @unique
+    status                SubscriptionStatus
+    startDate             DateTime?
+    endDate               DateTime?
+    lastPaymentFailedDate DateTime?
+    createdAt             DateTime           @default(now())
+    updatedAt             DateTime           @default(now()) @updatedAt
+    maxMembers            Int?
+    maxProjects           Int?
+    maxMessagesPerMonth   Int?
+    evaluationsCredit     Int?
+    maxWorkflows          Int?
+    maxRetentionDays      Int?
+    maxMembersLite        Int?
+    maxTeams              Int?
+    maxPrompts            Int?
+    maxEvaluators         Int?
+    maxScenarios          Int?
+    maxAgents             Int?
+    maxExperiments        Int?
+    maxOnlineEvaluations  Int?
+    maxDatasets           Int?
+    maxDashboards         Int?
+    maxCustomGraphs       Int?
+    maxAutomations        Int?
+
+    organization Organization @relation(fields: [organizationId], references: [id])
+    invoices     Invoice[]
+
+    @@index([organizationId])
+}
+
+model Invoice {
+    id             String   @id @default(nanoid())
+    subscriptionId String
+    totalAmount    Float
+    currency       String
+    dueDate        DateTime
+    paid           Boolean  @default(false)
+    createdAt      DateTime @default(now())
+    updatedAt      DateTime @default(now()) @updatedAt
+
+    subscription Subscription  @relation(fields: [subscriptionId], references: [id])
+    lineItems    InvoiceItem[]
+
+    @@index([subscriptionId])
+}
+
+model InvoiceItem {
+    id          String   @id @default(nanoid())
+    invoiceId   String
+    description String
+    amount      Float
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @default(now()) @updatedAt
+
+    invoice Invoice @relation(fields: [invoiceId], references: [id])
+
+    @@index([invoiceId])
+}
+
+
+model BillingMeterCheckpoint {
+    id                   String   @id @default(cuid())
+    organizationId       String
+    billingMonth         String   // "2026-02"
+    lastReportedTotal    Int      @default(0)
+    pendingReportedTotal Int?     // non-null = in-flight Stripe call
+    consecutiveFailures  Int      @default(0)
+    updatedAt            DateTime @updatedAt
+
+    @@unique([organizationId, billingMonth])
 }

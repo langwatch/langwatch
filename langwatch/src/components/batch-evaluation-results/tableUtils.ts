@@ -2,6 +2,7 @@
  * Shared utilities for batch evaluation result tables
  */
 import type { SystemStyleObject } from "@chakra-ui/react";
+import { getImageUrl } from "~/components/ExternalImage";
 
 /** Estimated row height for virtualization */
 export const ROW_HEIGHT = 180;
@@ -59,7 +60,8 @@ export const getTableStyles = (minTableWidth: number): SystemStyleObject => ({
 });
 
 /**
- * Infer column type from a value for display purposes
+ * Infer column type from a value for display purposes.
+ * Handles native types and string-encoded values (booleans, numbers, images).
  */
 export const inferColumnType = (value: unknown): string => {
   if (value === null || value === undefined) return "string";
@@ -77,6 +79,19 @@ export const inferColumnType = (value: unknown): string => {
       return "chat_messages";
     }
     return "json";
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "") return "string";
+
+    // Check for image URLs
+    if (getImageUrl(trimmed)) return "image";
+
+    // Check for boolean strings
+    if (trimmed === "true" || trimmed === "false") return "boolean";
+
+    // Check for number strings
+    if (/^-?\d+(\.\d+)?$/.test(trimmed)) return "number";
   }
   return "string";
 };

@@ -41,7 +41,7 @@ describe("SerializedPromptConfigAdapter", () => {
     messages: [{ role: "user", content: "How are you?" }],
     newMessages: [{ role: "user", content: "How are you?" }],
     requestedRole: AgentRole.AGENT,
-    judgmentRequest: false,
+
     scenarioState: {} as AgentInput["scenarioState"],
     scenarioConfig: {} as AgentInput["scenarioConfig"],
   };
@@ -267,6 +267,82 @@ describe("SerializedPromptConfigAdapter", () => {
       // System + template message + input message
       expect(messages).toHaveLength(3);
       expect(messages[2]).toEqual({ role: "user", content: "How are you?" });
+    });
+
+    describe("when system prompt contains Liquid conditions", () => {
+      it("renders if/else based on input content", async () => {
+        const config: PromptConfigData = {
+          ...defaultConfig,
+          systemPrompt:
+            "{% if input contains 'refund' %}You handle refunds.{% else %}You are a general assistant.{% endif %}",
+          messages: [],
+        };
+        const adapter = new SerializedPromptConfigAdapter(
+          config,
+          defaultLitellmParams,
+          "http://localhost:8080",
+        );
+
+        const input: AgentInput = {
+          ...defaultInput,
+          messages: [{ role: "user", content: "I need a refund" }],
+          newMessages: [{ role: "user", content: "I need a refund" }],
+        };
+
+        await adapter.call(input);
+
+        const callArgs = mockGenerateText.mock.calls[0]![0];
+        const messages = callArgs.messages as Array<{
+          role: string;
+          content: string;
+        }>;
+
+        expect(messages[0]).toEqual({
+          role: "system",
+          content: "You handle refunds.",
+        });
+      });
+    });
+
+    describe("when message template contains Liquid loops", () => {
+      it("renders for loops in message content", async () => {
+        // The adapter passes `messages` as a JSON string and `input` as a string.
+        // To test Liquid loop rendering, we use a split filter to create an array
+        // from the input string, which demonstrates the Liquid engine processes loops.
+        const config: PromptConfigData = {
+          ...defaultConfig,
+          systemPrompt: "You are a helpful assistant.",
+          messages: [
+            {
+              role: "user",
+              content:
+                '{% assign items = "Hello,How are you?" | split: "," %}Summary: {% for msg in items %}[{{ msg }}]{% endfor %}',
+            },
+          ],
+        };
+        const adapter = new SerializedPromptConfigAdapter(
+          config,
+          defaultLitellmParams,
+          "http://localhost:8080",
+        );
+
+        await adapter.call(defaultInput);
+
+        const callArgs = mockGenerateText.mock.calls[0]![0];
+        const promptMessages = callArgs.messages as Array<{
+          role: string;
+          content: string;
+        }>;
+
+        const userMessage = promptMessages[1];
+        expect(userMessage?.role).toBe("user");
+        expect(userMessage?.content).toBe(
+          "Summary: [Hello][How are you?]",
+        );
+        // Verify Liquid tags are fully rendered (no raw template syntax remains)
+        expect(userMessage?.content).not.toContain("{%");
+        expect(userMessage?.content).not.toContain("%}");
+      });
     });
   });
 });

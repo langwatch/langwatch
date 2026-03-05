@@ -1,0 +1,38 @@
+[project]
+name = "langevals-ragas"
+version = "2.2.0"
+description = "LangEvals Ragas evaluator"
+authors = [
+    {name = "Rogerio Chaves", email = "rogerio@langwatch.ai"},
+    {name = "Yevhenii Budnyk", email = "y.budnyk789@gmail.com"},
+]
+license = {text = "MIT"}
+requires-python = ">=3.11"
+dependencies = [
+    "langevals-core>=0.1.0",
+    "ragas==0.2.9",
+    "langchain-openai>=0.1.23",
+    "langchain_community>=0.2.16",
+    "litellm>=1.79.0",
+    "rapidfuzz>=3.11.0",
+    "sacrebleu>=2.5.1",
+    "rouge-score>=0.1.2",
+]
+
+[dependency-groups]
+test = [
+    "pytest>=7.4.2",
+    "python-dotenv>=1.0.1",
+    "flaky>=3.8.1",
+]
+dev = ["ipykernel>=6.29.4"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["langevals_ragas"]
+
+[tool.uv.sources]
+langevals-core = { workspace = true }

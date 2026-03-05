@@ -7,7 +7,7 @@ import {
 import { getCurrentMonthStart } from "../utils/dateUtils";
 import {
   isFullMember,
-  isMemberLite,
+  isLiteMember,
   isViewOnlyCustomRole,
 } from "./member-classification";
 
@@ -17,7 +17,7 @@ export {
   isViewOnlyCustomRole,
   classifyMemberType,
   isFullMember,
-  isMemberLite,
+  isLiteMember,
 } from "./member-classification";
 
 /**
@@ -198,7 +198,7 @@ export class LicenseEnforcementRepository
    */
   async getMembersLiteCount(organizationId: string): Promise<number> {
     const context = await this.getMemberClassificationContext(organizationId);
-    return this.countMembersByType(context, isMemberLite);
+    return this.countMembersByType(context, isLiteMember);
   }
 
   /**

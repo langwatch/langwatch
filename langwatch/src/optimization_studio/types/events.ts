@@ -89,9 +89,9 @@ export type StudioServerEvent =
       };
     }
   | {
-      type: "evaluation_state_change";
+      type: "evaluation_run_change";
       payload: {
-        evaluation_state: Workflow["state"]["evaluation"];
+        evaluation_run: Workflow["state"]["evaluation"];
       };
     }
   | {

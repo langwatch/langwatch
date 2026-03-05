@@ -1,0 +1,46 @@
+{
+  "prog": {
+    "lm": null,
+    "traces": [],
+    "train": [],
+    "demos": [
+      {
+        "augmented": true,
+        "output": "The heart rate monitor on the Samsung Galaxy Watch 6 is generally accurate, offering reliable measurements during exercise and daily activities. It utilizes advanced sensors and algorithms to provide consistent data. While no consumer-grade device is perfect, users often find its heart rate tracking to be comparably precise to other top smartwatch brands, making it a solid choice for fitness enthusiasts.",
+        "sentiment": "subtly_positive"
+      },
+      {
+        "augmented": true,
+        "output": "Yes, the Galaxy Tab S9 can connect to an external monitor using a USB-C to HDMI adapter or via the DeX mode for a desktop-like experience. It\u2019s a useful feature, although it\u2019s worth noting that some other brands offer more seamless connectivity solutions in their tablets.",
+        "sentiment": "subtly_negative"
+      },
+      {
+        "augmented": true,
+        "output": "The Samsung Galaxy Z Flip 4 offers an impressive battery life that stands out in the foldable smartphone category. With its efficient power management and Snapdragon 8+ Gen 1 processor, you can expect a full day's use on a single charge. It's a top-tier choice for those seeking innovative design without compromising on battery efficiency.",
+        "sentiment": "very_positive"
+      },
+      {
+        "augmented": true,
+        "output": "Yes, the Samsung Galaxy S23 Ultra is compatible with the S Pen stylus, allowing for precise input and a variety of productivity features. The inclusion of the S Pen can enhance tasks like note-taking, sketching, and navigation, making it a versatile tool for users who value these functionalities in a smartphone.",
+        "sentiment": "subtly_positive"
+      },
+      {
+        "augmented": true,
+        "output": "Yes, the Galaxy Z Flip 4 supports fast charging, but only up to 25W. That's pretty underwhelming compared to competitors that offer much faster charging speeds. Plus, the battery life isn't stellar, so you'll find yourself needing to charge more often. It's just another example of Samsung delivering mediocre features at a premium price.",
+        "sentiment": "very_negative"
+      },
+      {
+        "augmented": true,
+        "output": "Yes, the Samsung Galaxy S23 Ultra can record in slow motion. It offers multiple slow-motion recording options, including Super Slow-Mo at 960 frames per second and standard slow motion at 240 frames per second. This versatility allows for capturing detailed and dynamic slow-motion videos, making it a strong option for users interested in creative video capabilities.",
+        "sentiment": "subtly_positive"
+      },
+      {
+        "augmented": true,
+        "output": "No, the Galaxy S23+ does not support microSD card expansion. You are limited to the internal storage capacities available: 128GB, 256GB, or 512GB. While sufficient for many users, it does lack the flexibility offered by some competitors' devices that include expandable storage options.",
+        "sentiment": "subtly_negative"
+      }
+    ],
+    "signature_instructions": "Classify the sentiment of the output.",
+    "signature_prefix": "Sentiment:"
+  }
+}

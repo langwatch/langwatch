@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import type { DatasetColumnType } from "~/server/datasets/types";
+import { ExternalImage, getImageUrl } from "~/components/ExternalImage";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
 import { isTextLikelyOverflowing } from "~/utils/textOverflowHeuristic";
 
@@ -471,11 +472,24 @@ export function EditableCell({
                 : undefined
           }
         >
-          {displayValue.text}
-          {displayValue.truncated && (
-            <Box as="span" color="fg.subtle" fontSize="11px" marginLeft={1}>
-              (truncated)
-            </Box>
+          {dataType === "image" && value && getImageUrl(value) ? (
+            <ExternalImage
+              src={getImageUrl(value)!}
+              minWidth="24px"
+              minHeight="24px"
+              maxHeight="80px"
+              maxWidth="100%"
+              expandable
+            />
+          ) : (
+            <>
+              {displayValue.text}
+              {displayValue.truncated && (
+                <Box as="span" color="fg.subtle" fontSize="11px" marginLeft={1}>
+                  (truncated)
+                </Box>
+              )}
+            </>
           )}
         </Box>
 

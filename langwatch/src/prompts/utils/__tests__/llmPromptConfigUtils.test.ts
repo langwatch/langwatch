@@ -3,6 +3,7 @@ import { PromptScope } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 import type { VersionedPrompt } from "~/server/prompt-config";
 import {
+  nodeDataToLocalPromptConfig,
   promptConfigFormValuesToOptimizationStudioNodeData,
   safeOptimizationStudioNodeDataToPromptConfigFormInitialValues,
   versionedPromptToPromptConfigFormValues,
@@ -502,6 +503,209 @@ describe("versionedPromptToPromptConfigFormValuesWithSystemMessage", () => {
 
       // BUG: The system prompt is LOST
       expect(instructionsParam?.value).toBe("");
+    });
+  });
+});
+
+describe("nodeDataToLocalPromptConfig()", () => {
+  describe("when node has full inline parameters", () => {
+    it("extracts LLM config from parameters array", () => {
+      const nodeData = {
+        parameters: [
+          {
+            identifier: "llm",
+            type: "llm" as const,
+            value: {
+              model: "openai/gpt-4",
+              temperature: 0.7,
+              max_tokens: 1000,
+            },
+          },
+          {
+            identifier: "instructions",
+            type: "str" as const,
+            value: "You are a helpful assistant.",
+          },
+          {
+            identifier: "messages",
+            type: "chat_messages" as const,
+            value: [{ role: "user", content: "{{input}}" }],
+          },
+        ],
+        inputs: [{ identifier: "input", type: "str" }],
+        outputs: [{ identifier: "output", type: "str" }],
+      } as any;
+
+      const result = nodeDataToLocalPromptConfig(nodeData);
+
+      expect(result).not.toBeUndefined();
+      expect(result!.llm.model).toBe("openai/gpt-4");
+      expect(result!.llm.temperature).toBe(0.7);
+      expect(result!.llm.maxTokens).toBe(1000);
+      expect(result!.messages).toEqual([
+        { role: "system", content: "You are a helpful assistant." },
+        { role: "user", content: "{{input}}" },
+      ]);
+      expect(result!.inputs).toEqual([{ identifier: "input", type: "str" }]);
+      expect(result!.outputs).toEqual([{ identifier: "output", type: "str" }]);
+    });
+  });
+
+  describe("when node has no parameters array", () => {
+    it("returns undefined", () => {
+      const nodeData = {
+        inputs: [{ identifier: "input", type: "str" }],
+        outputs: [{ identifier: "output", type: "str" }],
+      } as any;
+
+      const result = nodeDataToLocalPromptConfig(nodeData);
+
+      expect(result).toBeUndefined();
+    });
+  });
+
+  describe("when node has empty parameters array", () => {
+    it("returns undefined", () => {
+      const nodeData = {
+        parameters: [],
+        inputs: [{ identifier: "input", type: "str" }],
+        outputs: [{ identifier: "output", type: "str" }],
+      } as any;
+
+      const result = nodeDataToLocalPromptConfig(nodeData);
+
+      expect(result).toBeUndefined();
+    });
+  });
+
+  describe("when node has legacy string LLM value", () => {
+    it("migrates to object format with model field", () => {
+      const consoleWarnSpy = vi
+        .spyOn(console, "warn")
+        .mockImplementation(() => {});
+      const nodeData = {
+        parameters: [
+          {
+            identifier: "llm",
+            type: "llm" as const,
+            value: "openai/gpt-4-0125-preview",
+          },
+          {
+            identifier: "instructions",
+            type: "str" as const,
+            value: "Be helpful.",
+          },
+        ],
+        inputs: [],
+        outputs: [{ identifier: "output", type: "str" }],
+      } as any;
+
+      const result = nodeDataToLocalPromptConfig(nodeData);
+
+      expect(result).not.toBeUndefined();
+      expect(result!.llm.model).toBe("openai/gpt-4-0125-preview");
+      consoleWarnSpy.mockRestore();
+    });
+  });
+
+  describe("when node has instructions but no messages parameter", () => {
+    it("creates system message from instructions", () => {
+      const nodeData = {
+        parameters: [
+          {
+            identifier: "llm",
+            type: "llm" as const,
+            value: { model: "openai/gpt-4" },
+          },
+          {
+            identifier: "instructions",
+            type: "str" as const,
+            value: "You are a cat.",
+          },
+        ],
+        inputs: [{ identifier: "query", type: "str" }],
+        outputs: [{ identifier: "answer", type: "str" }],
+      } as any;
+
+      const result = nodeDataToLocalPromptConfig(nodeData);
+
+      expect(result).not.toBeUndefined();
+      expect(result!.messages).toEqual([
+        { role: "system", content: "You are a cat." },
+      ]);
+    });
+  });
+
+  describe("when node has all LLM sampling parameters", () => {
+    it("maps snake_case DSL fields to camelCase LocalPromptConfig fields", () => {
+      const nodeData = {
+        parameters: [
+          {
+            identifier: "llm",
+            type: "llm" as const,
+            value: {
+              model: "openai/gpt-4",
+              temperature: 0.5,
+              max_tokens: 2000,
+              top_p: 0.9,
+              frequency_penalty: 0.3,
+              presence_penalty: 0.1,
+              seed: 42,
+              top_k: 50,
+              min_p: 0.05,
+              repetition_penalty: 1.1,
+              reasoning: "high",
+              verbosity: "verbose",
+            },
+          },
+          {
+            identifier: "instructions",
+            type: "str" as const,
+            value: "",
+          },
+        ],
+        inputs: [],
+        outputs: [{ identifier: "output", type: "str" }],
+      } as any;
+
+      const result = nodeDataToLocalPromptConfig(nodeData);
+
+      expect(result).not.toBeUndefined();
+      expect(result!.llm).toEqual({
+        model: "openai/gpt-4",
+        temperature: 0.5,
+        maxTokens: 2000,
+        topP: 0.9,
+        frequencyPenalty: 0.3,
+        presencePenalty: 0.1,
+        seed: 42,
+        topK: 50,
+        minP: 0.05,
+        repetitionPenalty: 1.1,
+        reasoning: "high",
+        verbosity: "verbose",
+      });
+    });
+  });
+
+  describe("when node has parameters with only llm (no instructions)", () => {
+    it("creates config with empty system message", () => {
+      const nodeData = {
+        parameters: [
+          {
+            identifier: "llm",
+            type: "llm" as const,
+            value: { model: "openai/gpt-4" },
+          },
+        ],
+        inputs: [],
+        outputs: [{ identifier: "output", type: "str" }],
+      } as any;
+
+      const result = nodeDataToLocalPromptConfig(nodeData);
+
+      expect(result).not.toBeUndefined();
+      expect(result!.messages).toEqual([{ role: "system", content: "" }]);
     });
   });
 });

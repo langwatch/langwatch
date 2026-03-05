@@ -7,11 +7,12 @@ Document **important technical and architectural decisions** — context, trade-
 | # | Decision | Status |
 |---|----------|--------|
 | [001](./001-rbac.md) | RBAC with Org → Team → Project hierarchy | Accepted |
-| [002](./002-event-sourcing.md) | Event sourcing for traces/evaluations | Accepted |
+| [002](./002-event-sourcing.md) | Event sourcing for traces/evaluations | Superseded by 007 |
 | [003](./003-logging.md) | Logging and tracing infrastructure | Accepted |
 | [004](./004-docker-dev-environment.md) | Docker dev environment with Make targets | Accepted |
 | [005](./005-feature-flags.md) | Feature flags via tRPC and PostHog | Accepted |
 | [006](./006-redis-cluster-bullmq-hash-tags.md) | Redis cluster hash tags for BullMQ | Accepted |
+| [007](./007-event-sourcing-architecture.md) | Event sourcing architecture (fold/map projections) | Accepted |
 
 ## When to Write an ADR
 

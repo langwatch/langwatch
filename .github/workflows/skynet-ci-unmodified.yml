@@ -1,0 +1,22 @@
+name: skynet-ci
+
+on:
+  pull_request:
+    paths-ignore:
+      - "skynet/**"
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "no modifications, skipping typecheck"
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "no modifications, skipping test"
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "no modifications, skipping build"

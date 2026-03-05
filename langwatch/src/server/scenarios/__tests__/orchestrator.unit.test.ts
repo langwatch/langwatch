@@ -50,7 +50,7 @@ function createTestDeps(overrides?: Partial<OrchestratorDependencies>): Orchestr
       getProject: async () => defaultProject,
     },
     modelParamsProvider: {
-      prepare: async () => defaultParams,
+      prepare: async () => ({ success: true as const, params: defaultParams }),
     },
     adapterFactory: {
       create: async () => ({
@@ -159,14 +159,20 @@ describe("ScenarioExecutionOrchestrator", () => {
       describe("when executing", () => {
         it("returns failure with model params error", async () => {
           const deps = createTestDeps({
-            modelParamsProvider: { prepare: async () => null },
+            modelParamsProvider: {
+              prepare: async () => ({
+                success: false as const,
+                reason: "provider_not_found" as const,
+                message: "Provider 'openai' not found for this project",
+              }),
+            },
           });
           const orchestrator = new ScenarioExecutionOrchestrator(deps);
 
           const result = await orchestrator.execute(defaultInput);
 
           expect(result.success).toBe(false);
-          expect(result.error).toContain("model params");
+          expect(result.error).toContain("model provider was not found");
         });
       });
     });

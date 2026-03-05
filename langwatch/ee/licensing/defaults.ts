@@ -1,6 +1,8 @@
 import { DEFAULT_LIMIT, DEFAULT_MEMBERS_LITE } from "./constants";
 import type { LicensePlanLimits } from "./types";
 
+const KNOWN_USAGE_UNITS = ["traces", "events"] as const;
+
 /**
  * ResolvedPlanLimits has all optional fields made required after defaults are applied.
  * This provides compile-time safety that all limits have defined values.
@@ -16,6 +18,7 @@ export type ResolvedPlanLimits = Required<LicensePlanLimits>;
  * - maxPrompts: DEFAULT_LIMIT (Number.MAX_SAFE_INTEGER - effectively unlimited)
  * - maxEvaluators: DEFAULT_LIMIT (effectively unlimited)
  * - maxScenarios: DEFAULT_LIMIT (effectively unlimited)
+ * - usageUnit: "traces"
  *
  * @param plan - License plan limits with optional fields
  * @returns Plan limits with all fields guaranteed to have values
@@ -45,5 +48,8 @@ export function resolvePlanDefaults(plan: LicensePlanLimits): ResolvedPlanLimits
     maxDashboards: plan.maxDashboards ?? DEFAULT_LIMIT,
     maxCustomGraphs: plan.maxCustomGraphs ?? DEFAULT_LIMIT,
     maxAutomations: plan.maxAutomations ?? DEFAULT_LIMIT,
+    usageUnit: KNOWN_USAGE_UNITS.includes(plan.usageUnit as any)
+      ? plan.usageUnit!
+      : "traces",
   };
 }

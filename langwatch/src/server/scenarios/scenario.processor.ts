@@ -173,6 +173,8 @@ export function buildChildProcessEnv(
     // Node.js vars
     NODE_ENV: process.env.NODE_ENV,
     NODE_OPTIONS: process.env.NODE_OPTIONS,
+    // Skip t3-oss/env-nextjs validation — child process doesn't need server env vars
+    SKIP_ENV_VALIDATION: "1",
     // Corepack vars (required for pnpm exec tsx in child processes)
     COREPACK_ENABLE_DOWNLOAD_PROMPT: process.env.COREPACK_ENABLE_DOWNLOAD_PROMPT,
     // Scenario-specific vars (passed in)

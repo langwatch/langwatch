@@ -27,6 +27,7 @@ const getCurrentSize = (colSpan: number, rowSpan: number): SizeOption => {
 interface GraphCardMenuProps {
   graphId: string;
   projectSlug: string;
+  dashboardId?: string;
   colSpan: number;
   rowSpan: number;
   onSizeChange: (size: SizeOption) => void;
@@ -37,6 +38,7 @@ interface GraphCardMenuProps {
 export function GraphCardMenu({
   graphId,
   projectSlug,
+  dashboardId,
   colSpan,
   rowSpan,
   onSizeChange,
@@ -45,6 +47,8 @@ export function GraphCardMenu({
 }: GraphCardMenuProps) {
   const router = useRouter();
   const currentSize = getCurrentSize(colSpan, rowSpan);
+
+  const editUrl = `/${projectSlug}/analytics/custom/${graphId}${dashboardId ? `?dashboard=${dashboardId}` : ""}`;
 
   return (
     <Menu.Root>
@@ -57,7 +61,7 @@ export function GraphCardMenu({
         <Menu.Item
           value="edit"
           onClick={() => {
-            void router.push(`/${projectSlug}/analytics/custom/${graphId}`);
+            void router.push(editUrl);
           }}
         >
           <Edit /> Edit Graph

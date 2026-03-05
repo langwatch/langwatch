@@ -12,11 +12,11 @@ import { OrganizationUserRole } from "@prisma/client";
 import {
   classifyInvitesByMemberType,
   InviteService,
-  type ISubscriptionHandler,
 } from "../invite.service";
 import type { ILicenseEnforcementRepository } from "../../license-enforcement/license-enforcement.repository";
 import { LicenseLimitError } from "../errors";
 import { LICENSE_LIMIT_ERRORS } from "../../license-enforcement/license-limit-guard";
+import type { PlanProvider } from "../../app-layer/subscription/plan-provider";
 
 const { mockSendInviteEmail } = vi.hoisted(() => ({
   mockSendInviteEmail: vi.fn(),
@@ -131,7 +131,7 @@ describe("classifyInvitesByMemberType()", () => {
 describe("InviteService", () => {
   let mockPrisma: any;
   let mockLicenseRepo: ILicenseEnforcementRepository;
-  let mockSubscriptionHandler: ISubscriptionHandler;
+  let mockPlanProvider: PlanProvider;
   let service: InviteService;
 
   beforeEach(() => {
@@ -140,6 +140,7 @@ describe("InviteService", () => {
     mockPrisma = {
       organizationInvite: {
         findFirst: vi.fn(),
+        findMany: vi.fn(),
         create: vi.fn(),
         update: vi.fn(),
       },
@@ -156,14 +157,14 @@ describe("InviteService", () => {
       getMembersLiteCount: vi.fn(),
     } as any;
 
-    mockSubscriptionHandler = {
+    mockPlanProvider = {
       getActivePlan: vi.fn(),
     };
 
     service = new InviteService(
       mockPrisma,
       mockLicenseRepo,
-      mockSubscriptionHandler
+      mockPlanProvider
     );
   });
 
@@ -223,7 +224,7 @@ describe("InviteService", () => {
       it("throws LicenseLimitError", async () => {
         vi.mocked(mockLicenseRepo.getMemberCount).mockResolvedValue(10);
         vi.mocked(mockLicenseRepo.getMembersLiteCount).mockResolvedValue(0);
-        vi.mocked(mockSubscriptionHandler.getActivePlan).mockResolvedValue({
+        vi.mocked(mockPlanProvider.getActivePlan).mockResolvedValue({
           maxMembers: 10,
           maxMembersLite: 100,
           overrideAddingLimitations: false,
@@ -251,7 +252,7 @@ describe("InviteService", () => {
       it("throws LicenseLimitError", async () => {
         vi.mocked(mockLicenseRepo.getMemberCount).mockResolvedValue(0);
         vi.mocked(mockLicenseRepo.getMembersLiteCount).mockResolvedValue(5);
-        vi.mocked(mockSubscriptionHandler.getActivePlan).mockResolvedValue({
+        vi.mocked(mockPlanProvider.getActivePlan).mockResolvedValue({
           maxMembers: 100,
           maxMembersLite: 5,
           overrideAddingLimitations: false,
@@ -276,10 +277,31 @@ describe("InviteService", () => {
     });
 
     describe("when limits are not exceeded", () => {
+      it("forwards user to planProvider", async () => {
+        vi.mocked(mockLicenseRepo.getMemberCount).mockResolvedValue(5);
+        vi.mocked(mockLicenseRepo.getMembersLiteCount).mockResolvedValue(2);
+        vi.mocked(mockPlanProvider.getActivePlan).mockResolvedValue({
+          maxMembers: 100,
+          maxMembersLite: 100,
+          overrideAddingLimitations: false,
+        } as any);
+
+        await service.checkLicenseLimits({
+          organizationId: "org-1",
+          newInvites: [{ role: OrganizationUserRole.MEMBER }],
+          user: { id: "user-1" } as any,
+        });
+
+        expect(mockPlanProvider.getActivePlan).toHaveBeenCalledWith({
+          organizationId: "org-1",
+          user: expect.objectContaining({ id: "user-1" }),
+        });
+      });
+
       it("does not throw", async () => {
         vi.mocked(mockLicenseRepo.getMemberCount).mockResolvedValue(5);
         vi.mocked(mockLicenseRepo.getMembersLiteCount).mockResolvedValue(2);
-        vi.mocked(mockSubscriptionHandler.getActivePlan).mockResolvedValue({
+        vi.mocked(mockPlanProvider.getActivePlan).mockResolvedValue({
           maxMembers: 100,
           maxMembersLite: 100,
           overrideAddingLimitations: false,
@@ -299,7 +321,7 @@ describe("InviteService", () => {
       it("does not enforce limits", async () => {
         vi.mocked(mockLicenseRepo.getMemberCount).mockResolvedValue(1000);
         vi.mocked(mockLicenseRepo.getMembersLiteCount).mockResolvedValue(1000);
-        vi.mocked(mockSubscriptionHandler.getActivePlan).mockResolvedValue({
+        vi.mocked(mockPlanProvider.getActivePlan).mockResolvedValue({
           maxMembers: 1,
           maxMembersLite: 1,
           overrideAddingLimitations: true,
@@ -412,6 +434,155 @@ describe("InviteService", () => {
         });
 
         expect(result.emailNotSent).toBe(true);
+      });
+    });
+  });
+
+  describe("createPaymentPendingInvite()", () => {
+    describe("when creating a payment-pending invite", () => {
+      const mockInvite = {
+        id: "inv-pp-1",
+        email: "new@example.com",
+        inviteCode: "xyz789",
+        status: "PAYMENT_PENDING",
+        subscriptionId: "sub-1",
+      };
+
+      beforeEach(() => {
+        mockPrisma.organizationInvite.create.mockResolvedValue(mockInvite);
+      });
+
+      it("creates an invite with PAYMENT_PENDING status", async () => {
+        await service.createPaymentPendingInvite({
+          email: "new@example.com",
+          role: OrganizationUserRole.MEMBER,
+          organizationId: "org-1",
+          teamIds: "team-1",
+          subscriptionId: "sub-1",
+        });
+
+        expect(mockPrisma.organizationInvite.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              email: "new@example.com",
+              status: "PAYMENT_PENDING",
+              subscriptionId: "sub-1",
+              expiration: null,
+            }),
+          })
+        );
+      });
+
+      it("does not send any email", async () => {
+        await service.createPaymentPendingInvite({
+          email: "new@example.com",
+          role: OrganizationUserRole.MEMBER,
+          organizationId: "org-1",
+          teamIds: "team-1",
+          subscriptionId: "sub-1",
+        });
+
+        expect(mockSendInviteEmail).not.toHaveBeenCalled();
+      });
+
+      it("returns the created invite", async () => {
+        const result = await service.createPaymentPendingInvite({
+          email: "new@example.com",
+          role: OrganizationUserRole.MEMBER,
+          organizationId: "org-1",
+          teamIds: "team-1",
+          subscriptionId: "sub-1",
+        });
+
+        expect(result).toEqual(mockInvite);
+      });
+    });
+  });
+
+  describe("approvePaymentPendingInvites()", () => {
+    const mockOrganization = { id: "org-1", name: "Test Org" };
+
+    describe("when there are PAYMENT_PENDING invites for a subscription", () => {
+      const pendingInvites = [
+        {
+          id: "inv-1",
+          email: "alice@example.com",
+          inviteCode: "code1",
+          status: "PAYMENT_PENDING",
+          subscriptionId: "sub-1",
+          organization: mockOrganization,
+        },
+        {
+          id: "inv-2",
+          email: "bob@example.com",
+          inviteCode: "code2",
+          status: "PAYMENT_PENDING",
+          subscriptionId: "sub-1",
+          organization: mockOrganization,
+        },
+      ];
+
+      beforeEach(() => {
+        mockPrisma.organizationInvite.findMany.mockResolvedValue(pendingInvites);
+        mockPrisma.organizationInvite.update.mockImplementation(
+          ({ where }: { where: { id: string } }) => {
+            const invite = pendingInvites.find((i) => i.id === where.id);
+            return Promise.resolve({ ...invite, status: "PENDING" });
+          }
+        );
+        mockSendInviteEmail.mockResolvedValue(undefined);
+      });
+
+      it("transitions all invites to PENDING", async () => {
+        const result = await service.approvePaymentPendingInvites({
+          subscriptionId: "sub-1",
+          organizationId: "org-1",
+        });
+
+        expect(result).toHaveLength(2);
+        expect(result[0]!.status).toBe("PENDING");
+        expect(result[1]!.status).toBe("PENDING");
+      });
+
+      it("sets 48-hour expiration on each invite", async () => {
+        await service.approvePaymentPendingInvites({
+          subscriptionId: "sub-1",
+          organizationId: "org-1",
+        });
+
+        expect(mockPrisma.organizationInvite.update).toHaveBeenCalledTimes(2);
+        const firstCall = mockPrisma.organizationInvite.update.mock.calls[0]![0];
+        expect(firstCall.data.expiration).toBeInstanceOf(Date);
+      });
+
+      it("sends invite emails for each invite", async () => {
+        await service.approvePaymentPendingInvites({
+          subscriptionId: "sub-1",
+          organizationId: "org-1",
+        });
+
+        expect(mockSendInviteEmail).toHaveBeenCalledTimes(2);
+        expect(mockSendInviteEmail).toHaveBeenCalledWith(
+          expect.objectContaining({ email: "alice@example.com" })
+        );
+        expect(mockSendInviteEmail).toHaveBeenCalledWith(
+          expect.objectContaining({ email: "bob@example.com" })
+        );
+      });
+    });
+
+    describe("when there are no PAYMENT_PENDING invites", () => {
+      beforeEach(() => {
+        mockPrisma.organizationInvite.findMany.mockResolvedValue([]);
+      });
+
+      it("returns an empty array", async () => {
+        const result = await service.approvePaymentPendingInvites({
+          subscriptionId: "sub-1",
+          organizationId: "org-1",
+        });
+
+        expect(result).toEqual([]);
       });
     });
   });

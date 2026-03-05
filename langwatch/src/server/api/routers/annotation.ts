@@ -398,64 +398,16 @@ export const annotationRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("annotations:view"))
     .query(async ({ ctx, input }) => {
-      // Get user protections for all trace fetching
-      const protections = await getUserProtectionsForProject(ctx, {
-        projectId: input.projectId,
-      });
-
-      const queues = await ctx.prisma.annotationQueue.findMany({
+      return ctx.prisma.annotationQueue.findMany({
         where: { projectId: input.projectId },
-        include: {
-          members: {
-            include: {
-              user: true,
-            },
-          },
-          AnnotationQueueScores: {
-            include: {
-              annotationScore: true,
-            },
-          },
-          AnnotationQueueItems: {
-            include: {
-              user: true,
-              annotationQueue: true,
-            },
-          },
+        select: {
+          id: true,
+          name: true,
         },
         orderBy: {
           createdAt: "desc",
         },
       });
-
-      // Get all queue items from all queues
-      const allQueueItems = queues.flatMap(
-        (queue) => queue.AnnotationQueueItems,
-      );
-
-      // Enrich queue items with traces and annotations
-      const enrichedQueueItems = await enrichQueueItemsWithTracesAndAnnotations(
-        ctx,
-        input.projectId,
-        allQueueItems,
-        protections,
-      );
-
-      // Create a map of enriched items by their original ID for easy lookup
-      const enrichedItemMap = new Map(
-        enrichedQueueItems.map((item) => [item.id, item]),
-      );
-
-      // Process queues and enrich with traces and annotations
-      const processedQueues = queues.map((queue) => ({
-        ...queue,
-        AnnotationQueueItems: getEnrichedItems(
-          queue.AnnotationQueueItems,
-          enrichedItemMap,
-        ),
-      }));
-
-      return processedQueues;
     }),
   getQueueItems: protectedProcedure
     .input(z.object({ projectId: z.string() }))

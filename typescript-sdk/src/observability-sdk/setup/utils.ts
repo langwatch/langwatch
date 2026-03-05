@@ -11,6 +11,11 @@ import {
   DEFAULT_SERVICE_NAME,
   LANGWATCH_SDK_NAME_OBSERVABILITY,
 } from "../../internal/constants";
+import {
+  ATTR_LANGWATCH_SDK_NAME,
+  ATTR_LANGWATCH_SDK_VERSION,
+  ATTR_LANGWATCH_SDK_LANGUAGE,
+} from "../semconv/attributes";
 
 /**
  * Creates a merged resource from the given attributes, service name, and given resource.
@@ -21,9 +26,9 @@ export function createMergedResource(
   givenResource: Resource | undefined,
 ): Resource {
   const langwatchResource = resourceFromAttributes({
-    [semconv.ATTR_TELEMETRY_SDK_NAME]: LANGWATCH_SDK_NAME_OBSERVABILITY,
-    [semconv.ATTR_TELEMETRY_SDK_LANGUAGE]: LANGWATCH_SDK_LANGUAGE,
-    [semconv.ATTR_TELEMETRY_SDK_VERSION]: LANGWATCH_SDK_VERSION,
+    [ATTR_LANGWATCH_SDK_NAME]: LANGWATCH_SDK_NAME_OBSERVABILITY,
+    [ATTR_LANGWATCH_SDK_LANGUAGE]: LANGWATCH_SDK_LANGUAGE,
+    [ATTR_LANGWATCH_SDK_VERSION]: LANGWATCH_SDK_VERSION,
   });
 
   const userResource = resourceFromAttributes({

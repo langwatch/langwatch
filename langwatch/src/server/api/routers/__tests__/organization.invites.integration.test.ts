@@ -21,6 +21,9 @@ import { createInnerTRPCContext } from "../../trpc";
 import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { INVITE_EXPIRATION_MS } from "../../../invites/invite.service";
+import { createTestApp } from "../../../app-layer/presets";
+import { globalForApp, resetApp } from "../../../app-layer/app";
+import { PlanProviderService } from "../../../app-layer/subscription/plan-provider";
 
 // vi.hoisted runs before vi.mock hoisting, so these are available in mock factories
 const { mockSendInviteEmail, mockGetActivePlan } = vi.hoisted(() => ({
@@ -47,18 +50,14 @@ vi.mock("../../../../env.mjs", async (importOriginal) => {
   };
 });
 
-// Mock subscription handler to control plan limits
-vi.mock("../../../../injection/dependencies.server", () => ({
-  dependencies: {
-    subscriptionHandler: {
-      getActivePlan: mockGetActivePlan,
-    },
-  },
-}));
+// Plan limits are now resolved via App singleton (getApp().planProvider).
+// InviteService.create(prisma) calls getApp().planProvider internally.
+// App singleton is wired in beforeAll via createTestApp().
 
 /** Default plan info for tests (all fields required by PlanInfo). */
 function makeTestPlan(overrides: Record<string, unknown> = {}) {
   return {
+    planSource: "subscription" as const,
     type: "PRO",
     name: "Pro",
     free: false,
@@ -169,8 +168,13 @@ describe("Organization Invites Integration", () => {
       },
     });
 
-    // Set default plan mock
+    // Set default plan mock and wire App singleton for InviteService.create()
     mockGetActivePlan.mockResolvedValue(makeTestPlan());
+    globalForApp.__langwatch_app = createTestApp({
+      planProvider: PlanProviderService.create({
+        getActivePlan: mockGetActivePlan,
+      }),
+    });
 
     // Create admin caller
     const adminCtx = createInnerTRPCContext({
@@ -199,9 +203,19 @@ describe("Organization Invites Integration", () => {
     mockSendInviteEmail.mockClear();
     mockGetActivePlan.mockReset();
     mockGetActivePlan.mockResolvedValue(makeTestPlan());
+
+    // Re-wire App singleton with fresh mock values
+    resetApp();
+    globalForApp.__langwatch_app = createTestApp({
+      planProvider: PlanProviderService.create({
+        getActivePlan: mockGetActivePlan,
+      }),
+    });
   });
 
   afterAll(async () => {
+    resetApp();
+
     // Cleanup all test data
     await prisma.organizationInvite.deleteMany({
       where: { organizationId },

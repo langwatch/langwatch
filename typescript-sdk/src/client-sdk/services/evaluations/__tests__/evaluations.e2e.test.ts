@@ -1,7 +1,8 @@
 /**
  * E2E tests for the Evaluations API
  *
- * These tests require a running LangWatch instance and valid API key.
+ * These tests require a running LangWatch instance with the NLP service
+ * (langwatch_nlp) available, plus a valid API key.
  * Set LANGWATCH_ENDPOINT and LANGWATCH_API_KEY environment variables.
  */
 import { describe, expect, it, beforeAll } from "vitest";
@@ -12,8 +13,17 @@ describe("Evaluations E2E", () => {
   let langwatch: LangWatch;
   const endpoint = process.env.LANGWATCH_ENDPOINT;
   const apiKey = process.env.LANGWATCH_API_KEY ?? "";
+  let nlpAvailable = true;
 
-  beforeAll(() => {
+  const skipUnless = (condition: boolean, reason: string) => {
+    if (!condition) {
+      console.log(`Skipping: ${reason}`);
+      return true;
+    }
+    return false;
+  };
+
+  beforeAll(async () => {
     if (!apiKey) {
       console.log(
         "Skipping E2E tests: LANGWATCH_API_KEY environment variable not set"
@@ -25,16 +35,31 @@ describe("Evaluations E2E", () => {
       endpoint,
       apiKey,
     });
+
+    // Probe NLP availability with a lightweight evaluation call
+    try {
+      const probe = await langwatch.evaluations.evaluate(
+        "presidio/pii_detection",
+        { data: { input: "hello" } }
+      );
+      if (probe.status === "error") {
+        nlpAvailable = false;
+        console.log(
+          "NLP service unavailable (evaluation returned error) — skipping NLP-dependent tests"
+        );
+      }
+    } catch {
+      nlpAvailable = false;
+      console.log(
+        "NLP service unreachable — skipping NLP-dependent tests"
+      );
+    }
   });
 
   describe("evaluate()", () => {
     it("runs a basic evaluator successfully", async () => {
-      if (!apiKey) {
-        console.log("Skipping: LANGWATCH_API_KEY not set");
-        return;
-      }
+      if (skipUnless(!!apiKey && nlpAvailable, "requires API key and NLP service")) return;
 
-      // Run PII detection evaluator
       const result = await langwatch.evaluations.evaluate(
         "presidio/pii_detection",
         {
@@ -50,10 +75,7 @@ describe("Evaluations E2E", () => {
     });
 
     it("runs evaluator as guardrail", async () => {
-      if (!apiKey) {
-        console.log("Skipping: LANGWATCH_API_KEY not set");
-        return;
-      }
+      if (skipUnless(!!apiKey && nlpAvailable, "requires API key and NLP service")) return;
 
       const result = await langwatch.evaluations.evaluate(
         "presidio/pii_detection",
@@ -67,15 +89,11 @@ describe("Evaluations E2E", () => {
       );
 
       expect(result.status).toBe("processed");
-      // Guardrails should have passed property
       expect(typeof result.passed).toBe("boolean");
     });
 
     it("handles custom settings", async () => {
-      if (!apiKey) {
-        console.log("Skipping: LANGWATCH_API_KEY not set");
-        return;
-      }
+      if (skipUnless(!!apiKey && nlpAvailable, "requires API key and NLP service")) return;
 
       const result = await langwatch.evaluations.evaluate(
         "presidio/pii_detection",
@@ -92,10 +110,7 @@ describe("Evaluations E2E", () => {
     });
 
     it("throws EvaluatorNotFoundError for non-existent evaluator", async () => {
-      if (!apiKey) {
-        console.log("Skipping: LANGWATCH_API_KEY not set");
-        return;
-      }
+      if (skipUnless(!!apiKey, "requires API key")) return;
 
       const error = await langwatch.evaluations
         .evaluate("non-existent/evaluator-slug", {
@@ -125,12 +140,8 @@ describe("Evaluations E2E", () => {
     });
 
     it("returns valid result structure for PII detection", async () => {
-      if (!apiKey) {
-        console.log("Skipping: LANGWATCH_API_KEY not set");
-        return;
-      }
+      if (skipUnless(!!apiKey && nlpAvailable, "requires API key and NLP service")) return;
 
-      // Test that the evaluator returns a valid result structure
       const result = await langwatch.evaluations.evaluate(
         "presidio/pii_detection",
         {
@@ -143,9 +154,7 @@ describe("Evaluations E2E", () => {
       );
 
       expect(result.status).toBe("processed");
-      // Guardrails should always return a passed property
       expect(typeof result.passed).toBe("boolean");
-      // Details may or may not be present depending on the evaluator
       if (result.details) {
         expect(typeof result.details).toBe("string");
       }

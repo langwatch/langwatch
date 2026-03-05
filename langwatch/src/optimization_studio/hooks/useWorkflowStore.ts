@@ -555,7 +555,11 @@ export const store = (
   setSelectedNode: (nodeId: string) => {
     set({
       nodes: get().nodes.map((node) =>
-        node.id === nodeId ? { ...node, selected: true } : node,
+        node.id === nodeId
+          ? { ...node, selected: true }
+          : node.selected
+            ? { ...node, selected: false }
+            : node,
       ),
     });
   },

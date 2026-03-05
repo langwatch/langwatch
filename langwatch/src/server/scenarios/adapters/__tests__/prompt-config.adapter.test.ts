@@ -12,7 +12,7 @@ const createAgentInput = (
   messages,
   newMessages: messages,
   requestedRole: AgentRole.AGENT,
-  judgmentRequest: false,
+
   scenarioState: {} as AgentInput["scenarioState"],
   scenarioConfig: {} as AgentInput["scenarioConfig"],
   ...overrides,

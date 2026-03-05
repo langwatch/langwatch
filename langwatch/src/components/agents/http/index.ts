@@ -14,10 +14,18 @@ export {
   type HeadersConfigSectionProps,
 } from "./HeadersConfigSection";
 export {
+  HttpConfigEditor,
+  type HttpConfigEditorProps,
+} from "./HttpConfigEditor";
+export {
   HttpMethodSelector,
   type HttpMethodSelectorProps,
 } from "./HttpMethodSelector";
-export { HttpTestPanel, type HttpTestPanelProps } from "./HttpTestPanel";
+export {
+  HttpTestPanel,
+  type HttpTestPanelProps,
+  type HttpTestResult,
+} from "./HttpTestPanel";
 export { OutputPathInput, type OutputPathInputProps } from "./OutputPathInput";
 export {
   messagesToJson,
@@ -25,3 +33,4 @@ export {
   TestMessagesBuilder,
   type TestMessagesBuilderProps,
 } from "./TestMessagesBuilder";
+export { useHttpTest } from "./useHttpTest";

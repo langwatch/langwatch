@@ -9,6 +9,7 @@ import { app as evaluatorsApp } from "../app/api/evaluators/[[...route]]/app";
 import currentSpec from "../app/api/openapiLangWatch.json";
 import { app as llmConfigsApp } from "../app/api/prompts/[[...route]]/app";
 import { app as scenarioEventsApp } from "../app/api/scenario-events/[[...route]]/app";
+import { app as scenariosApp } from "../app/api/scenarios/[[...route]]/app";
 import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
 
 const overwriteMerge = (_destinationArray: any[], sourceArray: any[]) =>
@@ -42,6 +43,8 @@ export default async function execute() {
   const llmConfigsSpec = await generateSpecs(llmConfigsApp);
   console.log("Building scenario events spec...");
   const scenarioEventsSpec = await generateSpecs(scenarioEventsApp);
+  console.log("Building scenarios spec...");
+  const scenariosSpec = await generateSpecs(scenariosApp);
   console.log("Building traces spec...");
   const tracesSpec = await generateSpecs(tracesApp);
   console.log("Merging specs...");
@@ -54,6 +57,7 @@ export default async function execute() {
       evaluatorsSpec,
       llmConfigsSpec,
       scenarioEventsSpec,
+      scenariosSpec,
       tracesSpec,
       langwatchSpec,
     ],
@@ -68,6 +72,7 @@ export default async function execute() {
           key.includes("/api/prompts") ||
           key.includes("/api/dataset") ||
           key.includes("/api/scenario-events") ||
+          key.includes("/api/scenarios") ||
           key.includes("/api/traces")
         ) {
           // Replace with new
