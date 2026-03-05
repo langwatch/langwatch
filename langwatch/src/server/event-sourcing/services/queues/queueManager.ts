@@ -207,7 +207,7 @@ export class QueueManager<EventType extends Event = Event> {
       const entry: JobRegistryEntry = {
         groupKeyFn: (event: any) =>
           `${String(event.tenantId)}:${event.aggregateType}:${String(event.aggregateId)}`,
-        scoreFn: (event: any) => event.timestamp,
+        scoreFn: (event: any) => event.createdAt,
         process: async (event: any) => {
           await onEvent(handlerName, event, {
             tenantId: event.tenantId,
@@ -262,7 +262,7 @@ export class QueueManager<EventType extends Event = Event> {
               `${String(event.tenantId)}:${customGroupKeyFn(event)}`
           : (event: any) =>
               `${String(event.tenantId)}:${event.aggregateType}:${String(event.aggregateId)}`,
-        scoreFn: (event: any) => event.timestamp,
+        scoreFn: (event: any) => event.createdAt,
         process: async (event: any) => {
           await onEvent(projectionName, event, {
             tenantId: event.tenantId,
@@ -471,7 +471,7 @@ export class QueueManager<EventType extends Event = Event> {
       const entry: JobRegistryEntry = {
         groupKeyFn: (payload: any) =>
           `${String(payload.event.tenantId)}:${payload.event.aggregateType}:${String(payload.event.aggregateId)}`,
-        scoreFn: (payload: any) => payload.event.timestamp,
+        scoreFn: (payload: any) => payload.event.createdAt,
         process: async (payload: any) => {
           await onEvent(reactorName, payload, {
             tenantId: payload.event.tenantId,

@@ -1200,12 +1200,12 @@ export class ClickHouseTraceService {
           ts.Attributes AS ts_Attributes,
           toUnixTimestamp64Milli(ts.OccurredAt) AS ts_OccurredAt,
           toUnixTimestamp64Milli(ts.CreatedAt) AS ts_CreatedAt,
-          toUnixTimestamp64Milli(ts.LastUpdatedAt) AS ts_LastUpdatedAt
+          toUnixTimestamp64Milli(ts.UpdatedAt) AS ts_UpdatedAt
         FROM (
           SELECT *
           FROM trace_summaries ts
           WHERE ${whereClause}
-          ORDER BY TraceId, LastUpdatedAt DESC
+          ORDER BY TraceId, UpdatedAt DESC
           LIMIT 1 BY TraceId
         ) ts
         ORDER BY ts.OccurredAt ${orderDirection}, ts.TraceId ${orderDirection}
@@ -1301,7 +1301,7 @@ export class ClickHouseTraceService {
       attributes: row.ts_Attributes,
       occurredAt: row.ts_OccurredAt,
       createdAt: row.ts_CreatedAt,
-      lastUpdatedAt: row.ts_LastUpdatedAt,
+      updatedAt: row.ts_UpdatedAt,
     };
   }
 
@@ -1392,11 +1392,11 @@ export class ClickHouseTraceService {
           Attributes AS ts_Attributes,
           toUnixTimestamp64Milli(OccurredAt) AS ts_OccurredAt,
           toUnixTimestamp64Milli(CreatedAt) AS ts_CreatedAt,
-          toUnixTimestamp64Milli(LastUpdatedAt) AS ts_LastUpdatedAt
+          toUnixTimestamp64Milli(UpdatedAt) AS ts_UpdatedAt
         FROM trace_summaries
         WHERE TenantId = {tenantId:String}
           AND TraceId IN ({traceIds:Array(String)})
-        ORDER BY TraceId, LastUpdatedAt DESC
+        ORDER BY TraceId, UpdatedAt DESC
         LIMIT 1 BY TraceId
       `,
             query_params: { tenantId: projectId, traceIds },
@@ -1411,7 +1411,7 @@ export class ClickHouseTraceService {
         FROM trace_summaries
         WHERE TenantId = {tenantId:String}
           AND TraceId IN ({traceIds:Array(String)})
-        ORDER BY TraceId, LastUpdatedAt DESC
+        ORDER BY TraceId, UpdatedAt DESC
         LIMIT 1 BY TraceId
       `,
             query_params: { tenantId: projectId, traceIds },
@@ -1573,7 +1573,7 @@ export class ClickHouseTraceService {
       attributes: row.ts_Attributes,
       occurredAt: row.ts_OccurredAt,
       createdAt: row.ts_CreatedAt,
-      lastUpdatedAt: row.ts_LastUpdatedAt,
+      updatedAt: row.ts_UpdatedAt,
     };
   }
 
@@ -1785,7 +1785,7 @@ interface TraceSummaryRow {
   ts_Attributes: Record<string, string>;
   ts_OccurredAt: number;
   ts_CreatedAt: number;
-  ts_LastUpdatedAt: number;
+  ts_UpdatedAt: number;
 }
 
 /**

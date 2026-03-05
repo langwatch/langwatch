@@ -360,7 +360,7 @@ async function fetchTracesFromClickHouse(
         SELECT *
         FROM trace_summaries
         WHERE ${whereClause}
-        ORDER BY TraceId, LastUpdatedAt DESC
+        ORDER BY TraceId, UpdatedAt DESC
         LIMIT 1 BY TraceId
       )
       ORDER BY OccurredAt DESC, TraceId ASC

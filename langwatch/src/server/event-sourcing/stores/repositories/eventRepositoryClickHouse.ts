@@ -75,7 +75,8 @@ export class EventRepositoryClickHouse implements EventRepository {
             EventOccurredAt,
             EventType,
             EventPayload,
-            ProcessingTraceparent
+            ProcessingTraceparent,
+            IdempotencyKey
           FROM event_log
           WHERE TenantId = {tenantId:String}
             AND AggregateType = {aggregateType:String}
@@ -98,6 +99,7 @@ export class EventRepositoryClickHouse implements EventRepository {
         EventPayload: unknown; // Can be object (when ClickHouse parses JSON) or string (when serialized)
         EventVersion: string;
         ProcessingTraceparent: string;
+        IdempotencyKey: string;
       }>();
 
       // Normalize payload so numeric fields stay numeric regardless of how
@@ -115,6 +117,7 @@ export class EventRepositoryClickHouse implements EventRepository {
         EventVersion: row.EventVersion,
         EventPayload: normalizePayloadValue(row.EventPayload),
         ProcessingTraceparent: row.ProcessingTraceparent || "",
+        IdempotencyKey: row.IdempotencyKey || "",
       }));
     } catch (error) {
       this.logger.error(
@@ -147,7 +150,8 @@ export class EventRepositoryClickHouse implements EventRepository {
             EventType,
             EventPayload,
             EventVersion,
-            ProcessingTraceparent
+            ProcessingTraceparent,
+            IdempotencyKey
           FROM event_log
           WHERE TenantId = {tenantId:String}
             AND AggregateType = {aggregateType:String}
@@ -179,6 +183,7 @@ export class EventRepositoryClickHouse implements EventRepository {
         EventPayload: unknown;
         EventVersion: string;
         ProcessingTraceparent: string;
+        IdempotencyKey: string;
       }>();
 
       // Normalize payload so numeric fields stay numeric regardless of how
@@ -196,6 +201,7 @@ export class EventRepositoryClickHouse implements EventRepository {
         EventVersion: row.EventVersion,
         EventPayload: normalizePayloadValue(row.EventPayload),
         ProcessingTraceparent: row.ProcessingTraceparent || "",
+        IdempotencyKey: row.IdempotencyKey || "",
       }));
     } catch (error) {
       this.logger.error(

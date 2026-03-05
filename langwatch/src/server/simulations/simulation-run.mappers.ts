@@ -33,7 +33,7 @@ export interface ClickHouseSimulationRunRow {
   CreatedAt: string;
   UpdatedAt: string;
   FinishedAt: string | null;
-  DeletedAt: string | null;
+  ArchivedAt: string | null;
 }
 
 export function mapStatus(status: string): ScenarioRunStatus {

@@ -13,6 +13,7 @@ function createMockClient(payload: unknown) {
           EventType: "test.integration.event",
           EventPayload: payload,
           ProcessingTraceparent: "",
+          IdempotencyKey: "",
         },
       ]),
     }),

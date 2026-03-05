@@ -149,7 +149,7 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
         "tenant.id": context.tenantId,
         "aggregate.type": aggregateType,
         "up_to.event_id": upToEvent.id,
-        "up_to.timestamp": upToEvent.timestamp,
+        "up_to.timestamp": upToEvent.createdAt,
       },
       async () => {
         try {
@@ -157,7 +157,7 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
             context.tenantId,
             aggregateType,
             aggregateId,
-            upToEvent.timestamp,
+            upToEvent.createdAt,
             upToEvent.id,
           );
 
@@ -173,7 +173,7 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
             tenantId: context.tenantId,
             aggregateType,
             upToEventId: upToEvent.id,
-            upToTimestamp: upToEvent.timestamp,
+            upToTimestamp: upToEvent.createdAt,
           }, error);
           throw error;
         }

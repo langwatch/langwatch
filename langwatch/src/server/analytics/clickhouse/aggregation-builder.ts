@@ -25,7 +25,7 @@ const logger = createLogger("langwatch:analytics:aggregation-builder");
 /**
  * Returns a deduped FROM-clause expression for trace_summaries.
  *
- * trace_summaries uses ReplacingMergeTree(LastUpdatedAt) which can return
+ * trace_summaries uses ReplacingMergeTree(UpdatedAt) which can return
  * multiple versions of the same trace between merges. This wraps the table
  * in a subquery that keeps only the latest version per TraceId.
  *
@@ -36,7 +36,7 @@ function dedupedTraceSummaries(alias: string): string {
   return `(
     SELECT * FROM trace_summaries
     WHERE TenantId = {tenantId:String}
-    ORDER BY TraceId, LastUpdatedAt DESC
+    ORDER BY TraceId, UpdatedAt DESC
     LIMIT 1 BY TenantId, TraceId
   ) ${alias}`;
 }

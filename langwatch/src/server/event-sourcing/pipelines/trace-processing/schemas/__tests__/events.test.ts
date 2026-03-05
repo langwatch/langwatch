@@ -75,7 +75,7 @@ describe("events schemas", () => {
         tenantId: createTenantId("project_abc123"),
         type: TOPIC_ASSIGNED_EVENT_TYPE,
         version: "2025-02-01",
-        timestamp: Date.now(),
+        createdAt: Date.now(),
         occurredAt: Date.now(),
         data: {
           topicId: "topic-123",
@@ -104,7 +104,7 @@ describe("events schemas", () => {
         tenantId: createTenantId("project_abc123"),
         type: TOPIC_ASSIGNED_EVENT_TYPE,
         version: "2025-02-01",
-        timestamp: Date.now(),
+        createdAt: Date.now(),
         occurredAt: Date.now(),
         data: {
           topicId: "topic-123",
@@ -138,7 +138,7 @@ describe("events schemas", () => {
         tenantId: createTenantId("project_abc123"),
         type: TOPIC_ASSIGNED_EVENT_TYPE,
         version: "2025-02-01",
-        timestamp: Date.now(),
+        createdAt: Date.now(),
         occurredAt: Date.now(),
         data: {
           topicId: "topic-123",
@@ -180,7 +180,7 @@ describe("events schemas", () => {
         tenantId: createTenantId("project_abc123"),
         type: TOPIC_ASSIGNED_EVENT_TYPE,
         version: "2025-02-01",
-        timestamp: Date.now(),
+        createdAt: Date.now(),
         occurredAt: Date.now(),
         data: {
           topicId: "topic-123",

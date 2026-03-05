@@ -38,9 +38,9 @@ export class EventStoreMemory<
   }
 
   protected override postProcessEvents(events: EventType[]): EventType[] {
-    // Sort by timestamp for consistent ordering (memory store doesn't guarantee order)
+    // Sort by createdAt for consistent ordering (memory store doesn't guarantee order)
     const sorted = [...events].sort((a, b) => {
-      if (a.timestamp !== b.timestamp) return a.timestamp - b.timestamp;
+      if (a.createdAt !== b.createdAt) return a.createdAt - b.createdAt;
       return a.id.localeCompare(b.id);
     });
 

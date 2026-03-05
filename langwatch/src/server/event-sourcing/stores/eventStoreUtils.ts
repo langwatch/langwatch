@@ -35,7 +35,7 @@ export function recordToEvent<EventType extends Event>(
     aggregateId: aggregateId,
     aggregateType: record.AggregateType as AggregateType,
     tenantId: createTenantId(record.TenantId),
-    timestamp: timestampMs,
+    createdAt: timestampMs,
     occurredAt:
       record.EventOccurredAt != null && record.EventOccurredAt > 0
         ? record.EventOccurredAt
@@ -48,6 +48,7 @@ export function recordToEvent<EventType extends Event>(
         processingTraceparent: record.ProcessingTraceparent,
       },
     }),
+    ...(record.IdempotencyKey && { idempotencyKey: record.IdempotencyKey }),
   } satisfies Event;
 
   return event as EventType;
@@ -64,12 +65,13 @@ export function eventToRecord<EventType extends Event>(
     AggregateType: event.aggregateType,
     AggregateId: String(event.aggregateId),
     EventId: event.id,
-    EventTimestamp: event.timestamp,
+    EventTimestamp: event.createdAt,
     EventOccurredAt: event.occurredAt,
     EventType: event.type,
     EventVersion: event.version,
     EventPayload: event.data ?? {},
     ProcessingTraceparent: event.metadata?.processingTraceparent ?? "",
+    IdempotencyKey: event.idempotencyKey || event.id,
   };
 }
 
@@ -109,13 +111,22 @@ export function parseEventPayload(rawPayload: unknown): unknown {
 }
 
 /**
- * Deduplicates events by Event ID, keeping the first occurrence.
+ * Deduplicates events by Event ID and IdempotencyKey, keeping the first occurrence.
+ * Events with the same idempotencyKey are treated as duplicates even if they have different EventIds.
+ * Legacy events without an idempotencyKey are only deduped by EventId.
  */
 export function deduplicateEvents<EventType extends Event>(
   events: EventType[],
 ): EventType[] {
   const seenEventIds = new Set<string>();
+  const seenIdempotencyKeys = new Set<string>();
   return events.filter((event) => {
+    // Check idempotencyKey first (handles retries with different EventIds)
+    if (event.idempotencyKey) {
+      if (seenIdempotencyKeys.has(event.idempotencyKey)) return false;
+      seenIdempotencyKeys.add(event.idempotencyKey);
+    }
+    // Also check EventId for backward compatibility
     if (!event.id) return true;
     if (seenEventIds.has(event.id)) return false;
     seenEventIds.add(event.id);

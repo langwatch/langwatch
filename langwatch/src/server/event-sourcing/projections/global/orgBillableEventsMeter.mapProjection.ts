@@ -73,7 +73,7 @@ export const orgBillableEventsMeterProjection: MapProjectionDefinition<
       eventId: event.id,
       eventType: event.type,
       deduplicationKey,
-      eventTimestamp: event.timestamp,
+      eventTimestamp: event.createdAt,
     };
   },
 
