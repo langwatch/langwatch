@@ -35,8 +35,8 @@ export const DrawerContent = React.forwardRef<
     <Portal disabled={!portalled} container={portalRef}>
       {backdrop && (
         <ChakraDrawer.Backdrop
-          backdropFilter="blur(8px)"
-          background="blackAlpha.400/10"
+          backdropFilter="blur(25px)"
+          background="rgba(0, 0, 0, 0.8)"
         />
       )}
       <ChakraDrawer.Positioner padding={offset} pointerEvents="none">

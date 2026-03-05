@@ -13,8 +13,8 @@ Feature: Drawer backdrop transparency and blur
     And the backdrop background uses an alpha-transparent color
 
   @integration
-  Scenario: Backdrop is rendered inside DrawerContent without explicit Backdrop usage
-    When a drawer using DrawerContent opens
+  Scenario: Backdrop is rendered automatically when a drawer opens
+    When a drawer opens
     Then a backdrop overlay element is present in the DOM
 
   @integration

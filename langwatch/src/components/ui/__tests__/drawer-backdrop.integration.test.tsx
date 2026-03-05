@@ -29,11 +29,15 @@ describe("DrawerContent backdrop", () => {
   afterEach(cleanup);
 
   describe("when a drawer opens", () => {
-    it("renders a backdrop with blur filter and alpha-transparent background", () => {
+    it("renders a backdrop overlay element", () => {
       renderDrawer();
 
-      const backdrop = document.querySelector("[data-part='backdrop']");
+      const backdrop = document.querySelector(
+        "[data-part='backdrop']",
+      ) as HTMLElement | null;
       expect(backdrop).not.toBeNull();
+      // Visual styles (blur, opacity) are applied via Chakra props and verified
+      // in the component source; jsdom cannot compute resolved CSS values.
     });
   });
 
