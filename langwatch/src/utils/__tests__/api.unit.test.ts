@@ -2,8 +2,11 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { TRPCClientError } from "@trpc/client";
 import {
   extractLimitExceededInfo,
+  extractLiteMemberRestrictionInfo,
   isHandledByGlobalLicenseHandler,
+  isHandledByLiteMemberHandler,
   markAsHandledByLicenseHandler,
+  markAsHandledByLiteMemberHandler,
 } from "../trpcError";
 import { useUpgradeModalStore } from "../../stores/upgradeModalStore";
 
@@ -197,6 +200,108 @@ describe("Global mutation error handler", () => {
     });
   });
 
+  describe("extractLiteMemberRestrictionInfo", () => {
+    it("returns null for non-TRPCClientError", () => {
+      const error = new Error("Some error");
+      expect(extractLiteMemberRestrictionInfo(error)).toBeNull();
+    });
+
+    it("returns null for non-UNAUTHORIZED errors", () => {
+      const error = new TRPCClientError("Forbidden", {
+        result: {
+          error: {
+            data: { code: "FORBIDDEN", httpStatus: 403 },
+          },
+        },
+      });
+      expect(extractLiteMemberRestrictionInfo(error)).toBeNull();
+    });
+
+    it("returns null for UNAUTHORIZED without domainError", () => {
+      const error = new TRPCClientError("Unauthorized", {
+        result: {
+          error: {
+            data: { code: "UNAUTHORIZED", httpStatus: 401 },
+          },
+        },
+      });
+      expect(extractLiteMemberRestrictionInfo(error)).toBeNull();
+    });
+
+    it("returns null for UNAUTHORIZED with wrong domainError kind", () => {
+      const error = new TRPCClientError("Unauthorized", {
+        result: {
+          error: {
+            data: {
+              code: "UNAUTHORIZED",
+              httpStatus: 401,
+              domainError: { kind: "some_other_error" },
+            },
+          },
+        },
+      });
+      expect(extractLiteMemberRestrictionInfo(error)).toBeNull();
+    });
+
+    it("extracts resource from lite_member_restricted domainError", () => {
+      const error = new TRPCClientError("Unauthorized", {
+        result: {
+          error: {
+            data: {
+              code: "UNAUTHORIZED",
+              httpStatus: 401,
+              domainError: {
+                kind: "lite_member_restricted",
+                meta: { resource: "prompts" },
+              },
+            },
+          },
+        },
+      });
+      expect(extractLiteMemberRestrictionInfo(error)).toEqual({
+        resource: "prompts",
+      });
+    });
+
+    it("returns undefined resource when meta has no resource", () => {
+      const error = new TRPCClientError("Unauthorized", {
+        result: {
+          error: {
+            data: {
+              code: "UNAUTHORIZED",
+              httpStatus: 401,
+              domainError: {
+                kind: "lite_member_restricted",
+                meta: {},
+              },
+            },
+          },
+        },
+      });
+      expect(extractLiteMemberRestrictionInfo(error)).toEqual({
+        resource: undefined,
+      });
+    });
+  });
+
+  describe("isHandledByLiteMemberHandler", () => {
+    it("returns false for regular errors", () => {
+      const error = new Error("Some error");
+      expect(isHandledByLiteMemberHandler(error)).toBe(false);
+    });
+
+    it("returns true for errors marked by lite member handler", () => {
+      const error = new Error("Restricted");
+      markAsHandledByLiteMemberHandler(error);
+      expect(isHandledByLiteMemberHandler(error)).toBe(true);
+    });
+
+    it("handles null/undefined gracefully", () => {
+      expect(isHandledByLiteMemberHandler(null)).toBe(false);
+      expect(isHandledByLiteMemberHandler(undefined)).toBe(false);
+    });
+  });
+
   describe("isHandledByGlobalLicenseHandler", () => {
     it("returns false for regular errors", () => {
       const error = new Error("Network error");
@@ -227,6 +332,143 @@ describe("Global mutation error handler", () => {
     it("handles null/undefined gracefully", () => {
       expect(isHandledByGlobalLicenseHandler(null)).toBe(false);
       expect(isHandledByGlobalLicenseHandler(undefined)).toBe(false);
+    });
+  });
+
+  describe("MutationCache lite member restriction integration", () => {
+    it("opens modal on lite member restriction error", () => {
+      const error = new TRPCClientError("Unauthorized", {
+        result: {
+          error: {
+            data: {
+              code: "UNAUTHORIZED",
+              httpStatus: 401,
+              domainError: {
+                kind: "lite_member_restricted",
+                meta: { resource: "prompts" },
+              },
+            },
+          },
+        },
+      });
+
+      const restrictionInfo = extractLiteMemberRestrictionInfo(error);
+      if (restrictionInfo) {
+        markAsHandledByLiteMemberHandler(error);
+        useUpgradeModalStore
+          .getState()
+          .openLiteMemberRestriction({ resource: restrictionInfo.resource });
+      }
+
+      const state = useUpgradeModalStore.getState();
+      expect(state.isOpen).toBe(true);
+      expect(state.variant).toEqual({
+        mode: "liteMemberRestriction",
+        resource: "prompts",
+      });
+      expect(isHandledByLiteMemberHandler(error)).toBe(true);
+    });
+
+    it("does not open modal for vanilla UNAUTHORIZED errors", () => {
+      const error = new TRPCClientError("Unauthorized", {
+        result: {
+          error: {
+            data: { code: "UNAUTHORIZED", httpStatus: 401 },
+          },
+        },
+      });
+
+      const restrictionInfo = extractLiteMemberRestrictionInfo(error);
+      if (restrictionInfo) {
+        useUpgradeModalStore
+          .getState()
+          .openLiteMemberRestriction({ resource: restrictionInfo.resource });
+      }
+
+      const state = useUpgradeModalStore.getState();
+      expect(state.isOpen).toBe(false);
+    });
+  });
+
+  describe("QueryCache lite member restriction integration", () => {
+    it("opens modal on lite member restriction error", () => {
+      const error = new TRPCClientError("Unauthorized", {
+        result: {
+          error: {
+            data: {
+              code: "UNAUTHORIZED",
+              httpStatus: 401,
+              domainError: {
+                kind: "lite_member_restricted",
+                meta: { resource: "datasets" },
+              },
+            },
+          },
+        },
+      });
+
+      // Simulate QueryCache handler logic
+      const restrictionInfo = extractLiteMemberRestrictionInfo(error);
+      if (restrictionInfo) {
+        markAsHandledByLiteMemberHandler(error);
+
+        if (!useUpgradeModalStore.getState().isOpen) {
+          useUpgradeModalStore
+            .getState()
+            .openLiteMemberRestriction({ resource: restrictionInfo.resource });
+        }
+      }
+
+      const state = useUpgradeModalStore.getState();
+      expect(state.isOpen).toBe(true);
+      expect(state.variant).toEqual({
+        mode: "liteMemberRestriction",
+        resource: "datasets",
+      });
+    });
+
+    it("marks error as handled but skips modal when already open", () => {
+      // Pre-open the modal
+      useUpgradeModalStore
+        .getState()
+        .openLiteMemberRestriction({ resource: "prompts" });
+
+      const error = new TRPCClientError("Unauthorized", {
+        result: {
+          error: {
+            data: {
+              code: "UNAUTHORIZED",
+              httpStatus: 401,
+              domainError: {
+                kind: "lite_member_restricted",
+                meta: { resource: "datasets" },
+              },
+            },
+          },
+        },
+      });
+
+      // Simulate QueryCache handler logic
+      const restrictionInfo = extractLiteMemberRestrictionInfo(error);
+      if (restrictionInfo) {
+        markAsHandledByLiteMemberHandler(error);
+
+        if (!useUpgradeModalStore.getState().isOpen) {
+          useUpgradeModalStore
+            .getState()
+            .openLiteMemberRestriction({ resource: restrictionInfo.resource });
+        }
+      }
+
+      // Error should still be marked as handled
+      expect(isHandledByLiteMemberHandler(error)).toBe(true);
+
+      // Modal should still show the original resource, not the second one
+      const state = useUpgradeModalStore.getState();
+      expect(state.variant).toEqual({
+        mode: "liteMemberRestriction",
+        resource: "prompts",
+      });
     });
   });
 });
