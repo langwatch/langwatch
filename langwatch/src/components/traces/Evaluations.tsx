@@ -71,7 +71,7 @@ function EvaluationGroupList({
   return (
     <VStack align="start" gap={0} width="full">
       {groups.map((group, index) => (
-        <Box key={`${group.evaluatorId}-${group.latest.evaluation_id}`} width="full">
+        <Box key={group.groupKey} width="full">
           {index > 0 && (
             <Box
               borderTopWidth="1px"
