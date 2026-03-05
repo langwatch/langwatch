@@ -7,6 +7,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AllRunsPanel } from "../AllRunsPanel";
 
@@ -19,6 +20,12 @@ const mockSuitesQuery = vi.hoisted(() => vi.fn());
 const mockRunDataQuery = vi.hoisted(() => vi.fn());
 const mockScenariosQuery = vi.hoisted(() => vi.fn());
 const mockRouterPush = vi.hoisted(() => vi.fn());
+
+vi.mock("~/hooks/useDrawer", () => ({
+  useDrawer: () => ({
+    openDrawer: vi.fn(),
+  }),
+}));
 
 // Mock the hooks and API
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -82,10 +89,9 @@ describe("<AllRunsPanel/>", () => {
       });
       mockScenariosQuery.mockReturnValue({ data: undefined });
 
-      const { container } = render(<AllRunsPanel period={defaultPeriod} />, { wrapper: Wrapper });
+      render(<AllRunsPanel period={defaultPeriod} />, { wrapper: Wrapper });
 
-      // Check for spinner element
-      expect(container.querySelector(".chakra-spinner")).toBeInTheDocument();
+      expect(screen.getByRole("status")).toBeInTheDocument();
     });
   });
 
@@ -218,6 +224,154 @@ describe("<AllRunsPanel/>", () => {
       expect(lastCall![0]).toMatchObject({
         startDate: period2.startDate.getTime(),
         endDate: period2.endDate.getTime(),
+      });
+    });
+  });
+
+  describe("group-by selector", () => {
+    const runsFromTwoScenarios = [
+      {
+        batchRunId: "batch_1",
+        scenarioRunId: "run_1",
+        scenarioId: "scen_1",
+        status: "SUCCESS",
+        timestamp: 1700000000000,
+        results: null,
+        messages: [],
+        name: "Login Flow",
+        description: null,
+        durationInMs: 100,
+        metadata: { langwatch: { targetReferenceId: "target_a" } },
+      },
+      {
+        batchRunId: "batch_1",
+        scenarioRunId: "run_2",
+        scenarioId: "scen_2",
+        status: "FAILED",
+        timestamp: 1700000001000,
+        results: null,
+        messages: [],
+        name: "Checkout Flow",
+        description: null,
+        durationInMs: 200,
+        metadata: { langwatch: { targetReferenceId: "target_b" } },
+      },
+    ];
+
+    function setupWithRuns() {
+      mockSuitesQuery.mockReturnValue({ data: [] });
+      mockRunDataQuery.mockReturnValue({
+        data: {
+          runs: runsFromTwoScenarios,
+          scenarioSetIds: { batch_1: "__internal__suite_1__suite" },
+          hasMore: false,
+        },
+        isLoading: false,
+        error: null,
+      });
+      mockScenariosQuery.mockReturnValue({
+        data: [
+          { id: "scen_1", name: "Login Flow" },
+          { id: "scen_2", name: "Checkout Flow" },
+        ],
+      });
+    }
+
+    it("renders the group-by selector with None selected by default", () => {
+      setupWithRuns();
+      render(<AllRunsPanel period={defaultPeriod} />, { wrapper: Wrapper });
+
+      const groupBySelect = screen.getByLabelText("Group by");
+      expect(groupBySelect).toBeInTheDocument();
+      expect(groupBySelect).toHaveValue("none");
+    });
+
+    it("has None, Scenario, and Target options", () => {
+      setupWithRuns();
+      render(<AllRunsPanel period={defaultPeriod} />, { wrapper: Wrapper });
+
+      const groupBySelect = screen.getByLabelText("Group by");
+      const options = groupBySelect.querySelectorAll("option");
+      const optionValues = Array.from(options).map((o) => o.value);
+
+      expect(optionValues).toEqual(["none", "scenario", "target"]);
+    });
+
+    describe("when group-by is changed to Scenario", () => {
+      it("renders group row headers instead of batch run rows", async () => {
+        setupWithRuns();
+        render(<AllRunsPanel period={defaultPeriod} />, { wrapper: Wrapper });
+
+        const groupBySelect = screen.getByLabelText("Group by");
+        await userEvent.selectOptions(groupBySelect, "scenario");
+
+        const groupHeaders = screen.getAllByTestId("group-row-header");
+        expect(groupHeaders.length).toBe(2);
+
+        // Verify scenario names appear as group labels
+        expect(screen.getByText("Login Flow")).toBeInTheDocument();
+        expect(screen.getByText("Checkout Flow")).toBeInTheDocument();
+      });
+
+      it("includes runs from multiple suites in grouped results", async () => {
+        const runsFromTwoSuites = [
+          {
+            batchRunId: "batch_suite_a",
+            scenarioRunId: "run_a1",
+            scenarioId: "scen_shared",
+            status: "SUCCESS",
+            timestamp: 1700000000000,
+            results: null,
+            messages: [],
+            name: "Shared Scenario",
+            description: null,
+            durationInMs: 100,
+          },
+          {
+            batchRunId: "batch_suite_b",
+            scenarioRunId: "run_b1",
+            scenarioId: "scen_shared",
+            status: "FAILED",
+            timestamp: 1700000001000,
+            results: null,
+            messages: [],
+            name: "Shared Scenario",
+            description: null,
+            durationInMs: 200,
+          },
+        ];
+
+        mockSuitesQuery.mockReturnValue({
+          data: [
+            { id: "suite_a", name: "Suite A" },
+            { id: "suite_b", name: "Suite B" },
+          ],
+        });
+        mockRunDataQuery.mockReturnValue({
+          data: {
+            runs: runsFromTwoSuites,
+            scenarioSetIds: {
+              batch_suite_a: "__internal__suite_a__suite",
+              batch_suite_b: "__internal__suite_b__suite",
+            },
+            hasMore: false,
+          },
+          isLoading: false,
+          error: null,
+        });
+        mockScenariosQuery.mockReturnValue({
+          data: [{ id: "scen_shared", name: "Shared Scenario" }],
+        });
+
+        render(<AllRunsPanel period={defaultPeriod} />, { wrapper: Wrapper });
+
+        const groupBySelect = screen.getByLabelText("Group by");
+        await userEvent.selectOptions(groupBySelect, "scenario");
+
+        // Both runs from different suites should be grouped under one scenario
+        const groupHeaders = screen.getAllByTestId("group-row-header");
+        expect(groupHeaders.length).toBe(1);
+        expect(screen.getByText("Shared Scenario")).toBeInTheDocument();
       });
     });
   });
