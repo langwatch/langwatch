@@ -685,17 +685,18 @@ describe("RBAC Integration Tests", () => {
     describe("when project is a demo project", () => {
       it("grants permission and returns null org role", async () => {
         process.env.DEMO_PROJECT_ID = "demo-project-1";
+        try {
+          const result = await resolveProjectPermission(
+            { prisma: mockPrisma, session: mockSession },
+            "demo-project-1",
+            "analytics:view" as Permission,
+          );
 
-        const result = await resolveProjectPermission(
-          { prisma: mockPrisma, session: mockSession },
-          "demo-project-1",
-          "analytics:view" as Permission,
-        );
-
-        expect(result.permitted).toBe(true);
-        expect(result.organizationRole).toBeNull();
-
-        delete process.env.DEMO_PROJECT_ID;
+          expect(result.permitted).toBe(true);
+          expect(result.organizationRole).toBeNull();
+        } finally {
+          delete process.env.DEMO_PROJECT_ID;
+        }
       });
     });
 
