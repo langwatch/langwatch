@@ -13,8 +13,10 @@ import { EvaluationRunService } from "./evaluations/evaluation-run.service";
 import { MonitorService } from "./monitors/monitor.service";
 import { OrganizationService } from "./organizations/organization.service";
 import { ProjectService } from "./projects/project.service";
+import { createSpanDedupeService } from "./traces/span-dedupe.service";
 import { SpanStorageService } from "./traces/span-storage.service";
 import { TokenizerService } from "./traces/tokenizer.service";
+import { TraceRequestCollectionService } from "./traces/trace-request-collection.service";
 import { TraceSummaryService } from "./traces/trace-summary.service";
 import { PlanProviderService } from "./subscription/plan-provider";
 import { createCompositePlanProvider } from "./subscription/composite-plan-provider";
@@ -54,10 +56,9 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   });
 
   const broadcast = BroadcastService.create(redis);
-  const traces = {
-    summary: TraceSummaryService.create(clickhouse),
-    spans: SpanStorageService.create(clickhouse),
-  };
+  const spanDedup = createSpanDedupeService(redis);
+  const traceSummary = TraceSummaryService.create(clickhouse);
+  const spanStorage = SpanStorageService.create(clickhouse);
   const evaluations = {
     runs: EvaluationRunService.create(clickhouse),
     execution: EvaluationExecutionService.create(prisma),
@@ -118,12 +119,23 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     broadcast,
     projects,
     monitors,
-    traces,
+    traces: { summary: traceSummary, spans: spanStorage },
     evaluations: { runs: evaluations.runs, execution: evaluations.execution },
     esSync: { esClient, traceIndex: TRACE_INDEX, traceIndexId },
     usageReportingService,
   });
   const commands = registry.registerAll();
+
+  const traceCollection = TraceRequestCollectionService.create({
+    dedup: spanDedup,
+    recordSpan: commands.traces.recordSpan,
+  });
+
+  const traces = {
+    summary: traceSummary,
+    spans: spanStorage,
+    collection: traceCollection,
+  };
 
   // Collect closeables for graceful shutdown
   const gracefulCloseables: Array<{
@@ -186,6 +198,10 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     traces: {
       summary: TraceSummaryService.create(null),
       spans: SpanStorageService.create(null),
+      collection: TraceRequestCollectionService.create({
+        dedup: createSpanDedupeService(null),
+        recordSpan: noop,
+      }),
     },
     evaluations: {
       runs: EvaluationRunService.create(null),

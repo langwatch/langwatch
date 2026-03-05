@@ -24,7 +24,12 @@ export type ExtractorContext = {
   out: NormalizedAttributes;
   span: Pick<
     NormalizedSpan,
-    "name" | "kind" | "instrumentationScope" | "statusMessage" | "statusCode"
+    | "name"
+    | "kind"
+    | "instrumentationScope"
+    | "statusMessage"
+    | "statusCode"
+    | "parentSpanId"
   >;
 
   recordRule: (ruleId: string) => void;

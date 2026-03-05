@@ -2,6 +2,10 @@ import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "~/utils/logger/server";
 import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
+import {
+  extractLastUserMessageText,
+  extractMessageContentText,
+} from "./canonicalisation/extractors/_messages";
 import type { NormalizedSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/spans";
 
 const logger = createLogger("langwatch:trace-processing:io-extraction-service");
@@ -25,6 +29,10 @@ export class TraceIOExtractionService {
   private readonly tracer = getLangWatchTracer(
     "langwatch.trace-processing.io-extraction",
   );
+
+  static create(): TraceIOExtractionService {
+    return new TraceIOExtractionService();
+  }
 
   /**
    * Extracts the first meaningful input from the trace with rich JSON data.
@@ -106,7 +114,7 @@ export class TraceIOExtractionService {
           });
           logger.debug("No spans with input found, using fallback");
           const fallback = this.getHttpFallback(orderedSpans);
-          return fallback ? { raw: fallback, text: fallback } : null;
+          return fallback ? { raw: fallback, text: fallback, source: "langwatch" as const } : null;
         }
 
         const input = this.extractRichIOFromSpan(firstSpan, "input");
@@ -180,7 +188,7 @@ export class TraceIOExtractionService {
             "fallback.used": true,
           });
           const fallback = this.getHttpStatusFallback(tree);
-          return fallback ? { raw: fallback, text: fallback } : null;
+          return fallback ? { raw: fallback, text: fallback, source: "langwatch" as const } : null;
         }
 
         const output = this.extractRichIOFromSpan(lastSpan, "output");
@@ -204,73 +212,50 @@ export class TraceIOExtractionService {
    *
    * @returns ExtractedIO with both raw JSON and text representation
    */
+  private static readonly IO_ATTR_KEYS = {
+    input: {
+      genAi: ATTR_KEYS.GEN_AI_INPUT_MESSAGES,
+      langwatch: ATTR_KEYS.LANGWATCH_INPUT,
+    },
+    output: {
+      genAi: ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES,
+      langwatch: ATTR_KEYS.LANGWATCH_OUTPUT,
+    },
+  } as const;
+
   extractRichIOFromSpan(
     span: NormalizedSpan,
     type: "input" | "output",
   ): ExtractedIO | null {
     const attrs = span.spanAttributes;
+    const keys = TraceIOExtractionService.IO_ATTR_KEYS[type];
 
-    if (type === "input") {
-      // Priority 1: GenAI input messages
-      const genAiInput = attrs[ATTR_KEYS.GEN_AI_INPUT_MESSAGES];
-      if (genAiInput !== undefined && genAiInput !== null) {
-        const raw = parseJsonIfString(genAiInput);
-        const text = messagesToText(genAiInput);
-        if (text) {
-          logger.debug(
-            { spanId: span.spanId, source: "gen_ai.input.messages" },
-            "Extracted input from GenAI messages",
-          );
-          return { raw, text };
-        }
+    // Priority 1: GenAI messages
+    const genAiValue = attrs[keys.genAi];
+    if (genAiValue !== undefined && genAiValue !== null) {
+      const text = messagesToText(genAiValue, type);
+      if (text) {
+        logger.debug(
+          { spanId: span.spanId, source: keys.genAi },
+          `Extracted ${type} from GenAI messages`,
+        );
+        return { raw: genAiValue, text, source: "gen_ai" };
       }
+    }
 
-      // Priority 2: LangWatch input
-      const langwatchInput = attrs[ATTR_KEYS.LANGWATCH_INPUT];
-      if (langwatchInput !== undefined && langwatchInput !== null) {
-        const raw = parseJsonIfString(langwatchInput);
-        const text =
-          typeof langwatchInput === "string"
-            ? langwatchInput
-            : messagesToText(langwatchInput);
-        if (text) {
-          logger.debug(
-            { spanId: span.spanId, source: "langwatch.input" },
-            "Extracted input from LangWatch attribute",
-          );
-          return { raw, text };
-        }
-      }
-    } else {
-      // Priority 1: GenAI output messages
-      const genAiOutput = attrs[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES];
-      if (genAiOutput !== undefined && genAiOutput !== null) {
-        const raw = parseJsonIfString(genAiOutput);
-        const text = messagesToText(genAiOutput);
-        if (text) {
-          logger.debug(
-            { spanId: span.spanId, source: "gen_ai.output.messages" },
-            "Extracted output from GenAI messages",
-          );
-          return { raw, text };
-        }
-      }
-
-      // Priority 2: LangWatch output
-      const langwatchOutput = attrs[ATTR_KEYS.LANGWATCH_OUTPUT];
-      if (langwatchOutput !== undefined && langwatchOutput !== null) {
-        const raw = parseJsonIfString(langwatchOutput);
-        const text =
-          typeof langwatchOutput === "string"
-            ? langwatchOutput
-            : messagesToText(langwatchOutput);
-        if (text) {
-          logger.debug(
-            { spanId: span.spanId, source: "langwatch.output" },
-            "Extracted output from LangWatch attribute",
-          );
-          return { raw, text };
-        }
+    // Priority 2: LangWatch attribute
+    const langwatchValue = attrs[keys.langwatch];
+    if (langwatchValue !== undefined && langwatchValue !== null) {
+      const text =
+        typeof langwatchValue === "string"
+          ? langwatchValue
+          : messagesToText(langwatchValue, type);
+      if (text) {
+        logger.debug(
+          { spanId: span.spanId, source: keys.langwatch },
+          `Extracted ${type} from LangWatch attribute`,
+        );
+        return { raw: langwatchValue, text, source: "langwatch" };
       }
     }
 
@@ -357,8 +342,6 @@ export class TraceIOExtractionService {
   }
 }
 
-export const traceIOExtractionService = new TraceIOExtractionService();
-
 /**
  * Represents a span organized in a tree structure with its children.
  */
@@ -376,120 +359,56 @@ export type FlattenMode = "outside-in" | "inside-out";
  * Extracted I/O result - can be either raw JSON or a text representation.
  */
 export interface ExtractedIO {
-  /** The raw JSON value (parsed if it was a string) */
+  /** The raw attribute value as extracted from the source */
   raw: unknown;
   /** A text representation for display/search */
   text: string;
+  /** Which attribute the value was extracted from */
+  source: "langwatch" | "gen_ai";
 }
 
-const getSpanType = (span: NormalizedSpan): string => {
+function getSpanType(span: NormalizedSpan): string {
   const type = span.spanAttributes[ATTR_KEYS.SPAN_TYPE];
   return typeof type === "string" ? type : "unknown";
-};
+}
 
-const shouldExcludeSpan = (span: NormalizedSpan): boolean => {
+function shouldExcludeSpan(span: NormalizedSpan): boolean {
   const type = getSpanType(span);
   return type === "evaluation" || type === "guardrail";
-};
+}
 
-/**
- * Parses a value that might be a JSON string into its actual value.
- */
-const parseJsonIfString = (value: unknown): unknown => {
-  if (typeof value === "string") {
-    try {
-      return JSON.parse(value);
-    } catch {
-      return value;
-    }
-  }
-  return value;
-};
-
-/**
- * Converts a message object/array to a readable text representation.
- */
-const messagesToText = (messages: unknown): string | null => {
+function messagesToText(
+  messages: unknown,
+  mode: "input" | "output" = "output",
+): string | null {
   if (!messages) return null;
 
-  // Parse JSON string if needed
-  const parsed = parseJsonIfString(messages);
-
-  // If it's a plain string after parsing, return it
-  if (typeof parsed === "string") {
-    return parsed;
+  if (typeof messages === "string") {
+    // Try to parse JSON-encoded message payloads and extract text semantically
+    try {
+      const parsed: unknown = JSON.parse(messages);
+      if (typeof parsed === "object" && parsed !== null) {
+        return messagesToText(parsed, mode);
+      }
+    } catch {
+      // Not JSON — return the string as-is
+    }
+    return messages;
   }
 
-  // If it's an array of messages
-  if (Array.isArray(parsed)) {
+  if (Array.isArray(messages)) {
+    if (mode === "input") {
+      const lastUserText = extractLastUserMessageText(messages);
+      if (lastUserText) return lastUserText;
+    }
+
     const texts: string[] = [];
-    for (const msg of parsed) {
-      const text = extractMessageContent(msg);
+    for (const msg of messages) {
+      const text = extractMessageContentText(msg);
       if (text) texts.push(text);
     }
     return texts.length > 0 ? texts.join("\n") : null;
   }
 
-  // If it's a single message object
-  const text = extractMessageContent(parsed);
-  return text;
-};
-
-/**
- * Extracts text content from a message object.
- * Handles various message formats: OpenAI, Anthropic, Strands, generic.
- */
-const extractMessageContent = (message: unknown): string | null => {
-  if (!message || typeof message !== "object") {
-    return typeof message === "string" ? message : null;
-  }
-
-  const msg = message as Record<string, unknown>;
-
-  // Check for content field (most common)
-  if ("content" in msg) {
-    const content = msg.content;
-
-    // Content can be a string
-    if (typeof content === "string") {
-      return content;
-    }
-
-    // Content can be an array (OpenAI/Strands format with text/image parts)
-    if (Array.isArray(content)) {
-      const texts: string[] = [];
-      for (const part of content) {
-        if (typeof part === "string") {
-          texts.push(part);
-        } else if (part && typeof part === "object") {
-          const partObj = part as Record<string, unknown>;
-          // Handle OpenAI format: { type: "text", text: "..." }
-          if (partObj.type === "text" && typeof partObj.text === "string") {
-            texts.push(partObj.text);
-          }
-          // Handle Strands/Anthropic format: { text: "..." } (no type field)
-          else if (typeof partObj.text === "string" && !("type" in partObj)) {
-            texts.push(partObj.text);
-          }
-          // Handle image_url format - skip but don't break
-          else if (partObj.type === "image_url") {
-            // Skip image parts
-          }
-        }
-      }
-      return texts.length > 0 ? texts.join("\n") : null;
-    }
-  }
-
-  // Check for text field (some formats)
-  if ("text" in msg && typeof msg.text === "string") {
-    return msg.text;
-  }
-
-  // Check for value field (LangWatch format)
-  if ("value" in msg && typeof msg.value === "string") {
-    return msg.value;
-  }
-
-  return null;
-};
+  return extractMessageContentText(messages);
+}

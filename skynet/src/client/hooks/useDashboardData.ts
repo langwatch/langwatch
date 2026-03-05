@@ -36,6 +36,7 @@ const INITIAL: DashboardData = {
     reactions: { pending: 0, active: 0, completedPerSec: 0, failedPerSec: 0, latencyP50Ms: 0, latencyP99Ms: 0, peakCompletedPerSec: 0, peakFailedPerSec: 0, peakLatencyP50Ms: 0, peakLatencyP99Ms: 0 },
   },
   jobNameMetrics: [],
+  pausedKeys: [],
 };
 
 export function useDashboardData(pausedRef: React.RefObject<boolean>): {

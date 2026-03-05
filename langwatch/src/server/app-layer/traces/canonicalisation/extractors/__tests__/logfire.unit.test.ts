@@ -2,11 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { NormalizedAttributes } from "../../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
 import { SpanDataBag } from "../../spanDataBag";
-import { toAttrValue } from "../../utils";
 import { ATTR_KEYS } from "../_constants";
 import type { ExtractorContext } from "../_types";
 import { LogfireExtractor } from "../logfire";
-import { createExtractorContext } from "./_testHelpers";
+import { createExtractorContext, parseJsonStringAttrs } from "./_testHelpers";
 
 function createLogfireContext(
   attrs: Record<string, unknown>,
@@ -18,23 +17,22 @@ function createLogfireContext(
     timeUnixMs: 0,
   }));
 
+  const parsed = parseJsonStringAttrs(attrs);
   const bag = new SpanDataBag(
-    attrs as NormalizedAttributes,
+    parsed as NormalizedAttributes,
     normalizedEvents,
   );
   const out: NormalizedAttributes = {};
 
   const setAttr = vi.fn((key: string, value: unknown) => {
-    const av = toAttrValue(value);
-    if (av === null) return;
-    out[key] = av;
+    if (value === null || value === undefined) return;
+    out[key] = value;
   });
 
   const setAttrIfAbsent = vi.fn((key: string, value: unknown) => {
     if (!(key in out)) {
-      const av = toAttrValue(value);
-      if (av === null) return;
-      out[key] = av;
+      if (value === null || value === undefined) return;
+      out[key] = value;
     }
   });
 
@@ -46,6 +44,7 @@ function createLogfireContext(
     instrumentationScope: { name: "logfire", version: null },
     statusMessage: null,
     statusCode: null,
+    parentSpanId: "abc123",
   };
 
   return { bag, out, span, recordRule, setAttr, setAttrIfAbsent };
@@ -63,9 +62,7 @@ describe("LogfireExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toEqual(
-        JSON.stringify(messages),
-      );
+      expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toEqual(messages);
     });
 
     it("infers span type as llm when raw_input is still in bag", () => {
@@ -101,11 +98,9 @@ describe("LogfireExtractor", () => {
 
       extractor.apply(ctx);
 
-      expect(ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES]).toEqual(
-        JSON.stringify([
-          { role: "assistant", content: { role: "assistant", content: "Hi there" } },
-        ]),
-      );
+      expect(ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES]).toEqual([
+        { role: "assistant", content: { role: "assistant", content: "Hi there" } },
+      ]);
     });
   });
 

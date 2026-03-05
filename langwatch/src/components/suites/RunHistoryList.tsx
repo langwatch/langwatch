@@ -13,12 +13,13 @@ import type { SimulationSuite } from "@prisma/client";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useTargetNameMap } from "~/hooks/useTargetNameMap";
 import { parseSuiteTargets } from "~/server/suites/types";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
 import { api } from "~/utils/api";
-import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
-import { buildRoutePath } from "~/utils/routes";
+import { useDrawer } from "~/hooks/useDrawer";
 import type { Period } from "~/components/PeriodSelector";
 import { RunHistoryFilters } from "./RunHistoryFilters";
 import { RunHistoryFooter } from "./RunHistoryFooter";
@@ -140,37 +141,15 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
     { enabled: !!project },
   );
 
-  // Fetch agents and prompts to resolve target names
-  const { data: agents } = api.agents.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project },
-  );
-  const { data: prompts } = api.prompts.getAllPromptsForProject.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project },
-  );
+  const targetNameMap = useTargetNameMap();
 
-  // Build target name lookup and compute expected job count
+  // Compute expected job count from suite config
   const targets = useMemo(
     () => parseSuiteTargets(suite.targets),
     [suite.targets],
   );
   const expectedJobCount =
     suite.scenarioIds.length * targets.length * suite.repeatCount;
-  const targetNameMap = useMemo(() => {
-    const map = new Map<string, string>();
-    if (agents) {
-      for (const agent of agents) {
-        map.set(agent.id, agent.name);
-      }
-    }
-    if (prompts) {
-      for (const prompt of prompts) {
-        map.set(prompt.id, prompt.handle ?? prompt.id);
-      }
-    }
-    return map;
-  }, [agents, prompts]);
 
   // Resolve single target name if suite has exactly one target
   const singleTargetName = useMemo(() => {
@@ -219,53 +198,32 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
       runs = runs.filter((r) => r.scenarioId === filters.scenarioId);
     }
 
-    return runs;
-  }, [runData, filters.scenarioId, period]);
-
-  // Group filtered runs by batch (for "none" grouping and pass/fail filtering)
-  const batchRuns = useMemo(() => {
-    const grouped = groupRunsByBatchId({ runs: filteredRuns });
-
     if (filters.passFailStatus === "pass") {
-      return grouped.filter((b) => {
-        const summary = computeBatchRunSummary({ batchRun: b });
-        return summary.failedCount === 0 && summary.passedCount > 0;
-      });
-    }
-    if (filters.passFailStatus === "fail") {
-      return grouped.filter((b) => {
-        const summary = computeBatchRunSummary({ batchRun: b });
-        return summary.failedCount > 0;
-      });
+      runs = runs.filter((r) => r.status === ScenarioRunStatus.SUCCESS);
+    } else if (filters.passFailStatus === "fail") {
+      runs = runs.filter(
+        (r) => r.status === ScenarioRunStatus.ERROR || r.status === ScenarioRunStatus.FAILED,
+      );
+    } else if (filters.passFailStatus === "stalled") {
+      runs = runs.filter((r) => r.status === ScenarioRunStatus.STALLED);
     }
 
-    return grouped;
-  }, [filteredRuns, filters.passFailStatus]);
+    return runs;
+  }, [runData, filters.scenarioId, filters.passFailStatus, period]);
+
+  // Group filtered runs by batch
+  const batchRuns = useMemo(() => {
+    return groupRunsByBatchId({ runs: filteredRuns });
+  }, [filteredRuns]);
 
   // Group filtered runs by scenario or target (when groupBy is not "none")
   const groups = useMemo(() => {
     if (groupBy === "none") return [];
 
-    const grouped =
-      groupBy === "scenario"
-        ? groupRunsByScenarioId({ runs: filteredRuns })
-        : groupRunsByTarget({ runs: filteredRuns, targetNameMap });
-
-    if (filters.passFailStatus === "pass") {
-      return grouped.filter((g) => {
-        const summary = computeGroupSummary({ group: g });
-        return summary.failedCount === 0 && summary.passedCount > 0;
-      });
-    }
-    if (filters.passFailStatus === "fail") {
-      return grouped.filter((g) => {
-        const summary = computeGroupSummary({ group: g });
-        return summary.failedCount > 0;
-      });
-    }
-
-    return grouped;
-  }, [groupBy, filteredRuns, targetNameMap, filters.passFailStatus]);
+    return groupBy === "scenario"
+      ? groupRunsByScenarioId({ runs: filteredRuns })
+      : groupRunsByTarget({ runs: filteredRuns, targetNameMap });
+  }, [groupBy, filteredRuns, targetNameMap]);
 
   // Auto-expand all rows when data first loads
   useEffect(() => {
@@ -316,18 +274,15 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
     });
   }, []);
 
+  const { openDrawer } = useDrawer();
+
   const handleScenarioRunClick = useCallback(
     (scenarioRun: ScenarioRunData) => {
-      if (!project) return;
-      const url = buildRoutePath("simulations_run", {
-        project: project.slug,
-        scenarioSetId: setId,
-        batchRunId: scenarioRun.batchRunId,
-        scenarioRunId: scenarioRun.scenarioRunId,
+      openDrawer("scenarioRunDetail", {
+        urlParams: { scenarioRunId: scenarioRun.scenarioRunId },
       });
-      window.open(url, "_blank");
     },
-    [project, setId],
+    [openDrawer],
   );
 
   const handleFiltersChange = useCallback(
@@ -378,17 +333,8 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
 
   return (
     <VStack align="stretch" gap={0} flex={1}>
-      {/* Last activity timestamp */}
-      {lastActivityTimestamp && (
-        <Box paddingX={6} paddingBottom={3}>
-          <Text fontSize="xs" color="fg.muted">
-            {formatTimeAgoCompact(lastActivityTimestamp)}
-          </Text>
-        </Box>
-      )}
-
       {/* Filter bar with group-by selector */}
-      <Box paddingX={6} paddingBottom={4}>
+      <Box paddingX={6} paddingY={4}>
         <RunHistoryFilters
           scenarioOptions={scenarioOptions}
           filters={filters}
@@ -408,6 +354,11 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
       )}
 
       {/* Run history rows — no overflow here; parent provides the scrollport for sticky headers */}
+      {(groupBy === "none" ? batchRuns.length : groups.length) === 0 && (filters.scenarioId || filters.passFailStatus) ? (
+        <Box paddingX={6} paddingY={8} textAlign="center">
+          <Text color="fg.muted">No runs match the selected filters.</Text>
+        </Box>
+      ) : (
       <VStack align="stretch" gap={0} flex={1}>
         {groupBy === "none"
           ? batchRuns.map((batchRun) => {
@@ -442,6 +393,7 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
               );
             })}
       </VStack>
+      )}
 
       {/* Footer */}
       <RunHistoryFooter totals={totals} />

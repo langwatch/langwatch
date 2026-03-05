@@ -64,23 +64,16 @@ export interface OtlpSpanPiiRedactionServiceDependencies {
   piiRedactionMaxAttributeLength: number;
 }
 
-/** Cached default dependencies, lazily initialized */
-let cachedDefaultDependencies: OtlpSpanPiiRedactionServiceDependencies | null =
-  null;
-
-function getDefaultDependencies(): OtlpSpanPiiRedactionServiceDependencies {
-  if (!cachedDefaultDependencies) {
-    cachedDefaultDependencies = {
-      clearPII: defaultClearPII,
-      piiBearingAttributeKeys: DEFAULT_PII_BEARING_ATTRIBUTE_KEYS,
-      isLangevalsConfigured: !!env.LANGEVALS_ENDPOINT,
-      isProduction: env.NODE_ENV === "production",
-      piiRedactionMaxAttributeLength:
-        DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH,
-    };
-  }
-  return cachedDefaultDependencies;
-}
+/**
+ * Static defaults for PII service deps (no lazy caching, no mutable state).
+ */
+const PII_DEFAULTS: OtlpSpanPiiRedactionServiceDependencies = {
+  clearPII: defaultClearPII,
+  piiBearingAttributeKeys: DEFAULT_PII_BEARING_ATTRIBUTE_KEYS,
+  isLangevalsConfigured: !!env.LANGEVALS_ENDPOINT,
+  isProduction: env.NODE_ENV === "production",
+  piiRedactionMaxAttributeLength: DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH,
+};
 
 /**
  * Service responsible for redacting PII from OTLP span data.
@@ -95,13 +88,17 @@ export class OtlpSpanPiiRedactionService {
   );
 
   constructor(deps: Partial<OtlpSpanPiiRedactionServiceDependencies> = {}) {
-    const merged = { ...getDefaultDependencies(), ...deps };
+    const merged = { ...PII_DEFAULTS, ...deps };
     const maxLen = merged.piiRedactionMaxAttributeLength;
     merged.piiRedactionMaxAttributeLength =
       Number.isFinite(maxLen) && maxLen >= 0
         ? Math.floor(maxLen)
         : DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH;
     this.deps = merged;
+  }
+
+  static create(deps?: Partial<OtlpSpanPiiRedactionServiceDependencies>): OtlpSpanPiiRedactionService {
+    return new OtlpSpanPiiRedactionService(deps);
   }
 
   /**
@@ -156,35 +153,14 @@ export class OtlpSpanPiiRedactionService {
     let anySkipped = false;
     let anyRedacted = false;
 
-    // Redact only PII-bearing attributes in span
-    const spanResult = this.collectPiiBearingAttributeRedactions(
-      span.attributes,
-      options,
-      redactionPromises,
-    );
-    anySkipped = anySkipped || spanResult.skipped;
-    anyRedacted = anyRedacted || spanResult.redacted;
-
-    // Redact PII-bearing attributes in events
-    for (const event of span.events) {
-      const eventResult = this.collectPiiBearingAttributeRedactions(
-        event.attributes,
+    for (const attrs of this.collectAllAttributeSets(span)) {
+      const result = this.collectPiiBearingAttributeRedactions(
+        attrs,
         options,
         redactionPromises,
       );
-      anySkipped = anySkipped || eventResult.skipped;
-      anyRedacted = anyRedacted || eventResult.redacted;
-    }
-
-    // Redact PII-bearing attributes in links
-    for (const link of span.links) {
-      const linkResult = this.collectPiiBearingAttributeRedactions(
-        link.attributes,
-        options,
-        redactionPromises,
-      );
-      anySkipped = anySkipped || linkResult.skipped;
-      anyRedacted = anyRedacted || linkResult.redacted;
+      anySkipped ||= result.skipped;
+      anyRedacted ||= result.redacted;
     }
 
     // Mark span with pii_redaction_status when any attributes were skipped
@@ -194,7 +170,7 @@ export class OtlpSpanPiiRedactionService {
         (a) => a.key === ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_STATUS,
       );
       if (existingIdx !== -1) {
-        span.attributes[existingIdx]!.value.stringValue = statusValue;
+        span.attributes[existingIdx]!.value = { stringValue: statusValue };
       } else {
         span.attributes.push({
           key: ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_STATUS,
@@ -204,6 +180,14 @@ export class OtlpSpanPiiRedactionService {
     }
 
     await Promise.all(redactionPromises);
+  }
+
+  private collectAllAttributeSets(span: OtlpSpan): OtlpKeyValue[][] {
+    return [
+      span.attributes,
+      ...span.events.map((e) => e.attributes),
+      ...span.links.map((l) => l.attributes),
+    ];
   }
 
   /**

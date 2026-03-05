@@ -1,4 +1,5 @@
 import type { NormalizedAttributes, NormalizedEvent } from "../../../event-sourcing/pipelines/trace-processing/schemas/spans";
+import { parseJsonStringValues } from "../../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
 import {
   FallbackExtractor,
   GenAIExtractor,
@@ -17,7 +18,6 @@ import type {
   ExtractorContext,
 } from "./extractors/_types";
 import { SpanDataBag } from "./spanDataBag";
-import { toAttrValue } from "./utils";
 
 export type CanonicalizeResult = {
   attributes: NormalizedAttributes;
@@ -56,16 +56,15 @@ export class CanonicalizeSpanAttributesService {
     events: NormalizedEvent[],
     spanForContext: ExtractorContext["span"],
   ): CanonicalizeResult {
-    const bag = new SpanDataBag(spanAttributes, events);
+    const bag = new SpanDataBag(parseJsonStringValues(spanAttributes), events);
     const out: NormalizedAttributes = {};
     const appliedRules: string[] = [];
 
     const recordRule = (ruleId: string) => appliedRules.push(ruleId);
 
     const setAttr = (key: string, value: unknown) => {
-      const av = toAttrValue(value);
-      if (av === null) return;
-      out[key] = av;
+      if (value === null || value === undefined) return;
+      out[key] = value;
     };
 
     const setAttrIfAbsent = (key: string, value: unknown) => {

@@ -11,7 +11,7 @@ import { BatchActionBar } from "~/components/scenarios/BatchActionBar";
 import { ScenarioArchiveDialog } from "~/components/scenarios/ScenarioArchiveDialog";
 import { ScenarioCreateModal } from "~/components/scenarios/ScenarioCreateModal";
 import { ScenarioEmptyState } from "~/components/scenarios/ScenarioEmptyState";
-import { ScenarioFormDrawer } from "~/components/scenarios/ScenarioFormDrawer";
+import { ScenarioFormDrawerFromUrl } from "~/components/scenarios/ScenarioFormDrawer";
 import { ScenarioTable } from "~/components/scenarios/ScenarioTable";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
@@ -208,7 +208,7 @@ function ScenarioLibraryPage() {
         )}
       </PageLayout.Container>
 
-      <ScenarioFormDrawer open={drawerOpen("scenarioEditor")} />
+      <ScenarioFormDrawerFromUrl open={drawerOpen("scenarioEditor")} />
       <ScenarioCreateModal
         open={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}

@@ -43,6 +43,9 @@ vi.mock("~/utils/api", () => ({
           error: null,
         }),
       },
+      getExternalSetSummaries: {
+        useQuery: () => ({ data: [], isLoading: false, error: null }),
+      },
       getAll: {
         useQuery: () => ({ data: [], isLoading: false, error: null }),
       },

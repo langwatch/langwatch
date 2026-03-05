@@ -24,7 +24,18 @@ export type ScenarioFormDrawerProps = {
   open?: boolean;
   onClose?: () => void;
   onSuccess?: (scenario: Scenario) => void;
+  scenarioId?: string;
 } & Partial<ScenarioInitialData>;
+
+/**
+ * URL-based wrapper for ScenarioFormDrawer.
+ * Reads scenarioId from drawer URL params and passes it as a prop.
+ * Use this when rendering via the drawer registry / URL navigation.
+ */
+export function ScenarioFormDrawerFromUrl(props: Omit<ScenarioFormDrawerProps, "scenarioId">) {
+  const params = useDrawerParams();
+  return <ScenarioFormDrawer {...props} scenarioId={params.scenarioId} />;
+}
 
 /**
  * Drawer container for scenario create/edit form.
@@ -39,7 +50,6 @@ export type ScenarioFormDrawerProps = {
 export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const { project } = useOrganizationTeamProject();
   const { closeDrawer, openDrawer } = useDrawer();
-  const params = useDrawerParams();
   const rawComplexProps = getComplexProps();
   const complexPropsData =
     rawComplexProps && "initialFormData" in rawComplexProps
@@ -52,7 +62,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     projectId: project?.id,
     projectSlug: project?.slug,
   });
-  const scenarioId = params.scenarioId;
+  const scenarioId = props.scenarioId;
 
   // License enforcement for scenario creation
   const scenarioEnforcement = useLicenseEnforcement("scenarios");

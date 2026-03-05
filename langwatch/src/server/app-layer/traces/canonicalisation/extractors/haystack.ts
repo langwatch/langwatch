@@ -15,7 +15,8 @@
  */
 
 import { ATTR_KEYS } from "./_constants";
-import { inferSpanTypeIfAbsent, isRecord, safeJsonParse } from "./_helpers";
+import { inferSpanTypeIfAbsent } from "./_extraction";
+import { isRecord } from "./_guards";
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 
 export class HaystackExtractor implements CanonicalAttributesExtractor {
@@ -37,28 +38,27 @@ export class HaystackExtractor implements CanonicalAttributesExtractor {
     // Retrieval Documents → RAG Contexts
     // Haystack stores retrieved documents in retrieval.documents attribute
     // ─────────────────────────────────────────────────────────────────────────
-    const documentsRaw = ctx.bag.attrs.get(ATTR_KEYS.RETRIEVAL_DOCUMENTS);
-    if (documentsRaw === void 0) {
+    const documents = ctx.bag.attrs.get(ATTR_KEYS.RETRIEVAL_DOCUMENTS);
+    if (documents === void 0) {
       return;
     }
 
-    const parsed = safeJsonParse(documentsRaw);
-    if (!Array.isArray(parsed) || parsed.length === 0) {
+    if (!Array.isArray(documents) || documents.length === 0) {
       return;
     }
 
     // Transform Haystack document format to LangWatch RAG context format
-    const contexts = parsed
-      .map((doc) => {
+    const contexts = documents
+      .map((doc: unknown) => {
         if (!isRecord(doc)) return null;
 
-        const document = (doc as Record<string, unknown>).document;
+        const document = doc.document;
         if (!isRecord(document)) return null;
 
-        const content = (document as Record<string, unknown>).content;
+        const content = document.content;
         if (typeof content !== "string" || content.length === 0) return null;
 
-        const id = (document as Record<string, unknown>).id;
+        const id = document.id;
         return {
           ...(typeof id === "string" && id.length > 0
             ? { document_id: id }

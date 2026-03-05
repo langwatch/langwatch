@@ -21,8 +21,9 @@ import {
   extractInputMessages,
   extractOutputMessages,
   inferSpanTypeIfAbsent,
-  safeJsonParse,
-} from "./_helpers";
+  recordValueType,
+} from "./_extraction";
+import { safeJsonParse } from "./_guards";
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 
 export class LogfireExtractor implements CanonicalAttributesExtractor {
@@ -35,17 +36,19 @@ export class LogfireExtractor implements CanonicalAttributesExtractor {
     // Input Messages (from raw_input)
     // raw_input often contains chat messages (typically JSON string)
     // ─────────────────────────────────────────────────────────────────────────
-    extractInputMessages(
+    if (extractInputMessages(
       ctx,
       [{ type: "attr", keys: [ATTR_KEYS.RAW_INPUT] }],
       `${this.id}:raw_input->gen_ai.input.messages`,
-    );
+    )) {
+      recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // Output Messages (from gen_ai.choice events)
     // Logfire uses gen_ai.choice events with message/content/text attributes
     // ─────────────────────────────────────────────────────────────────────────
-    extractOutputMessages(
+    if (extractOutputMessages(
       ctx,
       [
         {
@@ -64,7 +67,9 @@ export class LogfireExtractor implements CanonicalAttributesExtractor {
         },
       ],
       `${this.id}:event(gen_ai.choice)->gen_ai.output.messages`,
-    );
+    )) {
+      recordValueType(ctx, ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, "chat_messages");
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // Span Type Inference

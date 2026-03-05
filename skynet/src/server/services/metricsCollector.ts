@@ -7,6 +7,7 @@ import { scanGroupQueues } from "./groupQueueScanner.ts";
 import { getRedisInfo, type RedisInfo } from "./redis.ts";
 
 const REDIS_STATE_KEY = "skynet:state";
+const KNOWN_PIPELINES_KEY = "skynet:known-pipelines";
 
 interface PersistedMetricsState {
   version: 1;
@@ -63,6 +64,8 @@ export class MetricsCollector {
   private currentCpuPercent = 0;
   private peakJobNames = new Map<string, { completedPerSec: number; failedPerSec: number; latencyP50Ms: number; latencyP99Ms: number }>();
   private currentJobNameMetrics: JobNameMetrics[] = [];
+  private currentPausedKeys: string[] = [];
+  private knownPipelinePaths: string[] = [];
   private isCollecting = false;
   /** Previous counter values for delta computation */
   private prevCompleted = new Map<string, number>();
@@ -108,7 +111,8 @@ export class MetricsCollector {
       totalPendingJobs += q.totalPendingJobs;
     }
 
-    const pipelineTree = buildPipelineTree(queues);
+    const treeSeedKeys = [...new Set([...this.currentPausedKeys, ...this.knownPipelinePaths])];
+    const pipelineTree = buildPipelineTree({ queues, seedKeys: treeSeedKeys });
 
     const mem = process.memoryUsage();
 
@@ -142,6 +146,7 @@ export class MetricsCollector {
       peakLatencyP99Ms: this.peakLatencyP99Ms,
       phases: this.currentPhases,
       jobNameMetrics: this.currentJobNameMetrics,
+      pausedKeys: this.currentPausedKeys,
     };
   }
 
@@ -332,6 +337,37 @@ export class MetricsCollector {
       this.latestQueues = queues;
       this.latestRedisInfo = redisInfo;
 
+      // Collect paused keys from all group queues
+      const pausedKeySets = await Promise.all(
+        this.groupQueueNames.map((name) =>
+          this.redis.smembers(`${name}:gq:paused-jobs`),
+        ),
+      );
+      this.currentPausedKeys = [...new Set(pausedKeySets.flat())];
+
+      // Track known pipeline paths so the tree stays stable
+      const discoveredPaths: string[] = [];
+      for (const q of queues) {
+        for (const g of q.groups) {
+          const p = g.pipelineName ?? q.displayName;
+          const t = g.jobType ?? "default";
+          const n = g.jobName ?? "default";
+          discoveredPaths.push(`${p}/${t}/${n}`);
+        }
+      }
+      if (discoveredPaths.length > 0) {
+        const timestamp = Date.now();
+        const pipeline = this.redis.pipeline();
+        for (const path of discoveredPaths) {
+          pipeline.zadd(KNOWN_PIPELINES_KEY, timestamp, path);
+        }
+        // Evict paths not seen in 24h
+        pipeline.zremrangebyscore(KNOWN_PIPELINES_KEY, 0, timestamp - 86400 * 1000);
+        await pipeline.exec();
+      }
+      const knownPaths = await this.redis.zrange(KNOWN_PIPELINES_KEY, 0, -1);
+      this.knownPipelinePaths = knownPaths;
+
       // totalInFlight from the staging layer (pending + active from scanGroupQueues)
       let totalPending = 0;
       let totalActive = 0;
@@ -398,8 +434,27 @@ export class MetricsCollector {
   }
 }
 
-function buildPipelineTree(queues: QueueInfo[]): PipelineNode[] {
+export function buildPipelineTree({ queues, seedKeys = [] }: { queues: QueueInfo[]; seedKeys?: string[] }): PipelineNode[] {
   const pipelineMap = new Map<string, Map<string, Map<string, { pending: number; active: number; blocked: number }>>>();
+
+  // Helper to ensure a path exists in the map with at least zero counts
+  const ensurePath = (pName: string, jType?: string, jName?: string) => {
+    if (!pipelineMap.has(pName)) pipelineMap.set(pName, new Map());
+    if (jType) {
+      const typeMap = pipelineMap.get(pName)!;
+      if (!typeMap.has(jType)) typeMap.set(jType, new Map());
+      if (jName) {
+        const nameMap = typeMap.get(jType)!;
+        if (!nameMap.has(jName)) nameMap.set(jName, { pending: 0, active: 0, blocked: 0 });
+      }
+    }
+  };
+
+  // Seed the tree from seed keys so they always appear even with 0 counts
+  for (const key of seedKeys) {
+    const parts = key.split("/");
+    if (parts.length >= 1) ensurePath(parts[0]!, parts[1], parts[2]);
+  }
 
   for (const queue of queues) {
     for (const group of queue.groups) {
@@ -407,16 +462,12 @@ function buildPipelineTree(queues: QueueInfo[]): PipelineNode[] {
       const jType = group.jobType ?? "default";
       const jName = group.jobName ?? "default";
 
-      if (!pipelineMap.has(pName)) pipelineMap.set(pName, new Map());
-      const typeMap = pipelineMap.get(pName)!;
-      if (!typeMap.has(jType)) typeMap.set(jType, new Map());
-      const nameMap = typeMap.get(jType)!;
-
-      const existing = nameMap.get(jName) ?? { pending: 0, active: 0, blocked: 0 };
+      ensurePath(pName, jType, jName);
+      const nameMap = pipelineMap.get(pName)!.get(jType)!;
+      const existing = nameMap.get(jName)!;
       existing.pending += group.pendingJobs;
       existing.active += group.hasActiveJob ? 1 : 0;
       existing.blocked += group.isBlocked ? 1 : 0;
-      nameMap.set(jName, existing);
     }
   }
 
