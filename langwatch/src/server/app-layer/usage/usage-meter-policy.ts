@@ -15,8 +15,10 @@ export interface MeterDecision {
  *
  * Precedence:
  *   1. License override with explicit usageUnit → use that unit
- *   2. PricingModel from DB → SEAT_EVENT = events, TIERED = traces
- *   3. Backend: ClickHouse preferred, ElasticSearch fallback
+ *   2. PricingModel SEAT_EVENT → always events
+ *   3. Free tier (isFree=true) → events regardless of pricing model
+ *   4. Paid non-SEAT_EVENT → traces
+ *   5. Backend: ClickHouse preferred, ElasticSearch fallback
  *
  * This is a pure decision function — no side effects, no I/O.
  */
@@ -24,11 +26,13 @@ export function resolveUsageMeter({
   pricingModel,
   licenseUsageUnit,
   hasValidLicenseOverride,
+  isFree,
   clickhouseAvailable,
 }: {
   pricingModel: PricingModel | null;
   licenseUsageUnit?: string;
   hasValidLicenseOverride: boolean;
+  isFree: boolean;
   clickhouseAvailable: boolean;
 }): MeterDecision {
   // 1. License override with explicit usageUnit
@@ -36,6 +40,7 @@ export function resolveUsageMeter({
     pricingModel,
     licenseUsageUnit,
     hasValidLicenseOverride,
+    isFree,
   });
 
   // 2. Backend selection
@@ -49,6 +54,7 @@ export function resolveUsageMeter({
     hasValidLicenseOverride,
     licenseUsageUnit,
     pricingModel,
+    isFree,
   });
 
   return { usageUnit, backend, reason };
@@ -58,10 +64,12 @@ function resolveUsageUnit({
   pricingModel,
   licenseUsageUnit,
   hasValidLicenseOverride,
+  isFree,
 }: {
   pricingModel: PricingModel | null;
   licenseUsageUnit?: string;
   hasValidLicenseOverride: boolean;
+  isFree: boolean;
 }): UsageUnit {
   // License override with explicit usageUnit takes precedence
   if (hasValidLicenseOverride && licenseUsageUnit) {
@@ -70,6 +78,11 @@ function resolveUsageUnit({
 
   // PricingModel-derived: SEAT_EVENT → events, else → traces
   if (pricingModel === PricingModel.SEAT_EVENT) {
+    return "events";
+  }
+
+  // Free-tier always counts events regardless of pricing model
+  if (isFree) {
     return "events";
   }
 
@@ -94,16 +107,18 @@ function buildReason({
   hasValidLicenseOverride,
   licenseUsageUnit,
   pricingModel,
+  isFree,
 }: {
   usageUnit: UsageUnit;
   backend: MeterBackend;
   hasValidLicenseOverride: boolean;
   licenseUsageUnit?: string;
   pricingModel: PricingModel | null;
+  isFree: boolean;
 }): string {
   const unitSource = hasValidLicenseOverride && licenseUsageUnit
     ? `license(${licenseUsageUnit})`
     : `pricingModel(${pricingModel ?? "null"})`;
 
-  return `unit=${usageUnit} from ${unitSource}, backend=${backend}`;
+  return `unit=${usageUnit} from ${unitSource}, isFree=${isFree}, backend=${backend}`;
 }

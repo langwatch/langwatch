@@ -1,9 +1,6 @@
-import type { PricingModel } from "@prisma/client";
 import type { PlanInfo } from "../licensing/planInfo";
 import { PlanTypes, type PlanTypes as PlanType } from "./planTypes";
 import { GROWTH_SEAT_PLAN_TYPES } from "./utils/growthSeatEvent";
-
-const FREE_SEAT_EVENT_MESSAGES_PER_MONTH = 50_000;
 
 const PAID_FEATURES = {
   maxWorkflows: 9999,
@@ -92,7 +89,7 @@ export const PLAN_LIMITS: Record<PlanType, PlanInfo> = {
     free: true,
     maxMembers: 2,
     maxProjects: 1,
-    maxMessagesPerMonth: 1000,
+    maxMessagesPerMonth: 50_000,
     maxWorkflows: 3,
     maxPrompts: 3,
     maxEvaluators: 3,
@@ -192,9 +189,4 @@ export const PLAN_LIMITS: Record<PlanType, PlanInfo> = {
  * All free-tier organizations get 50,000 messages/month regardless of pricing
  * model.
  */
-export const getFreePlanLimits = (
-  _pricingModel?: PricingModel | null,
-): PlanInfo => ({
-  ...PLAN_LIMITS[PlanTypes.FREE],
-  maxMessagesPerMonth: FREE_SEAT_EVENT_MESSAGES_PER_MONTH,
-});
+export const getFreePlanLimits = (): PlanInfo => PLAN_LIMITS[PlanTypes.FREE];

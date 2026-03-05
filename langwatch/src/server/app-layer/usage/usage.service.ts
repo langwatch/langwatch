@@ -196,6 +196,7 @@ export class UsageService {
       pricingModel,
       licenseUsageUnit: plan.usageUnit,
       hasValidLicenseOverride,
+      isFree: plan.free,
       clickhouseAvailable: !!getClickHouseClient(),
     });
 

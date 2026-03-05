@@ -38,16 +38,13 @@ const createMockDb = ({
 };
 
 describe("getFreePlanLimits", () => {
-  it.each(["TIERED", "SEAT_EVENT", null, undefined] as const)(
-    "returns 50,000 messages per month when pricing model is %s",
-    (pricingModel) => {
-      const plan = getFreePlanLimits(pricingModel);
-      expect(plan.maxMessagesPerMonth).toBe(50_000);
-    },
-  );
+  it("returns 50,000 messages per month", () => {
+    const plan = getFreePlanLimits();
+    expect(plan.maxMessagesPerMonth).toBe(50_000);
+  });
 
   it("preserves all other FREE plan properties", () => {
-    const plan = getFreePlanLimits("TIERED");
+    const plan = getFreePlanLimits();
     const baseFree = PLAN_LIMITS[PlanTypes.FREE];
 
     expect(plan.type).toBe(PlanTypes.FREE);
