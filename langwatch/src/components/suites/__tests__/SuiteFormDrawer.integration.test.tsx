@@ -590,17 +590,17 @@ describe("<SuiteFormDrawer/>", () => {
         await user.type(nameInput, "My Suite");
 
         // Select a scenario
-        const checkboxes = screen.getAllByRole("checkbox");
-        await user.click(checkboxes[0]!);
+        await user.click(screen.getAllByRole("checkbox")[0]!);
 
         // Open and close scenario editor
         await user.click(screen.getByText("Create New Scenario"));
         fireEvent.click(screen.getByText("Close Scenario Editor"));
 
-        // Verify form state is preserved
+        // Verify form state is preserved (re-query to avoid stale node references)
         const nameInputAfter = screen.getByPlaceholderText("e.g., Critical Path Suite") as HTMLInputElement;
         expect(nameInputAfter.value).toBe("My Suite");
-        expect((checkboxes[0] as HTMLInputElement).checked).toBe(true);
+        const scenarioCheckboxAfter = screen.getAllByRole("checkbox")[0] as HTMLInputElement;
+        expect(scenarioCheckboxAfter).toBeChecked();
       });
     });
   });
