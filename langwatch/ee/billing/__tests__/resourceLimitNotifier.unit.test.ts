@@ -100,12 +100,13 @@ describe("createResourceLimitNotifier()", () => {
     });
 
     describe("given the organization does not exist", () => {
-      it("does nothing", async () => {
+      it("does nothing and releases cooldown", async () => {
         const db = createMockDb({ organization: null });
         const notifier = createResourceLimitNotifier(db);
         await notifier({ ...defaultInput, organizationId: "org_missing" });
 
         expect(mockNotifyResourceLimit).not.toHaveBeenCalled();
+        expect(cooldownCache.get("org_missing")).toBeUndefined();
       });
     });
 
@@ -164,7 +165,23 @@ describe("createResourceLimitNotifier()", () => {
         });
       });
 
-      it("sets cooldown eagerly to prevent concurrent duplicates", async () => {
+      it("deduplicates concurrent notifications for the same organization", async () => {
+        const db = createMockDb({
+          organization: makeOrganization(),
+        });
+
+        const notifier = createResourceLimitNotifier(db);
+        await Promise.all([notifier(defaultInput), notifier(defaultInput)]);
+
+        expect(cooldownCache.get("org_123")).toBe(true);
+        expect(mockNotifyResourceLimit).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when notification dispatch fails", () => {
+      it("releases cooldown so retries are not blocked", async () => {
+        mockNotifyResourceLimit.mockRejectedValueOnce(new Error("Slack down"));
+
         const db = createMockDb({
           organization: makeOrganization(),
         });
@@ -172,7 +189,7 @@ describe("createResourceLimitNotifier()", () => {
         const notifier = createResourceLimitNotifier(db);
         await notifier(defaultInput);
 
-        expect(cooldownCache.get("org_123")).toBe(true);
+        expect(cooldownCache.get("org_123")).toBeUndefined();
       });
     });
 

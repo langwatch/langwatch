@@ -80,49 +80,53 @@ describe("notificationHandlers", () => {
   });
 
   describe("notifyResourceLimit()", () => {
-    it("dispatches only to Slack, not HubSpot", async () => {
-      const sendSlackNotification = vi.fn();
-      const sendHubspotNotification = vi.fn();
+    describe("when a Slack handler is registered", () => {
+      it("dispatches only to Slack, not HubSpot", async () => {
+        const sendSlackNotification = vi.fn();
+        const sendHubspotNotification = vi.fn();
 
-      setBillingNotificationHandlers({
-        sendSlackNotification,
-        sendHubspotNotification,
-      });
+        setBillingNotificationHandlers({
+          sendSlackNotification,
+          sendHubspotNotification,
+        });
 
-      const resourceLimitContext = {
-        organizationId: "org_123",
-        organizationName: "Acme",
-        planName: "Launch",
-        limitType: "Workflows",
-        current: 10,
-        max: 10,
-      };
-
-      await notifyResourceLimit(resourceLimitContext);
-
-      expect(sendSlackNotification).toHaveBeenCalledWith(resourceLimitContext);
-      expect(sendHubspotNotification).not.toHaveBeenCalled();
-    });
-
-    it("does nothing when no Slack handler is registered", async () => {
-      const sendHubspotNotification = vi.fn();
-
-      setBillingNotificationHandlers({
-        sendHubspotNotification,
-      });
-
-      await expect(
-        notifyResourceLimit({
+        const resourceLimitContext = {
           organizationId: "org_123",
           organizationName: "Acme",
           planName: "Launch",
           limitType: "Workflows",
           current: 10,
           max: 10,
-        }),
-      ).resolves.toBeUndefined();
+        };
 
-      expect(sendHubspotNotification).not.toHaveBeenCalled();
+        await notifyResourceLimit(resourceLimitContext);
+
+        expect(sendSlackNotification).toHaveBeenCalledWith(resourceLimitContext);
+        expect(sendHubspotNotification).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when no Slack handler is registered", () => {
+      it("does nothing", async () => {
+        const sendHubspotNotification = vi.fn();
+
+        setBillingNotificationHandlers({
+          sendHubspotNotification,
+        });
+
+        await expect(
+          notifyResourceLimit({
+            organizationId: "org_123",
+            organizationName: "Acme",
+            planName: "Launch",
+            limitType: "Workflows",
+            current: 10,
+            max: 10,
+          }),
+        ).resolves.toBeUndefined();
+
+        expect(sendHubspotNotification).not.toHaveBeenCalled();
+      });
     });
   });
 

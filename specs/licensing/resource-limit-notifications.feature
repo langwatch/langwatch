@@ -35,8 +35,8 @@ Feature: Internal Slack Notifications for Resource Limit Reached
     Then the user sees the upgrade modal
     And the failure is captured for observability
 
-  Scenario: Only Slack is notified, not HubSpot
+  Scenario: Only internal ops team is notified, not CRM
     Given resource limit notifications are configured
     When a resource limit is reached
-    Then a Slack notification is sent
-    And no HubSpot notification is sent
+    Then an internal alert is sent to the ops team
+    And no customer-facing or sales notifications are sent

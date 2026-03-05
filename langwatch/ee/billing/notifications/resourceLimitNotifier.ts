@@ -28,44 +28,49 @@ export const createResourceLimitNotifier = (db: PrismaClient) => {
     // Set cooldown eagerly to prevent duplicate notifications from concurrent requests
     cooldownCache.set(organizationId, true);
 
-    const organization = await db.organization.findUnique({
-      where: { id: organizationId },
-      include: {
-        members: {
-          where: { role: "ADMIN" },
-          include: {
-            user: true,
+    try {
+      const organization = await db.organization.findUnique({
+        where: { id: organizationId },
+        include: {
+          members: {
+            where: { role: "ADMIN" },
+            include: {
+              user: true,
+            },
           },
         },
-      },
-    });
-
-    if (!organization) {
-      return;
-    }
-
-    const admin = organization.members[0]?.user;
-    const limitLabel = LIMIT_TYPE_DISPLAY_LABELS[limitType];
-
-    let planName = "unknown";
-    try {
-      const plan = await getApp().planProvider.getActivePlan({
-        organizationId,
       });
-      planName = plan.name ?? "unknown";
-    } catch {
-      // Plan name is for display only — proceed with fallback
-    }
 
-    await notifyResourceLimit({
-      organizationId,
-      organizationName: organization.name,
-      adminName: admin?.name ?? undefined,
-      adminEmail: admin?.email ?? undefined,
-      planName,
-      limitType: limitLabel,
-      current,
-      max,
-    });
+      if (!organization) {
+        cooldownCache.delete(organizationId);
+        return;
+      }
+
+      const admin = organization.members[0]?.user;
+      const limitLabel = LIMIT_TYPE_DISPLAY_LABELS[limitType];
+
+      let planName = "unknown";
+      try {
+        const plan = await getApp().planProvider.getActivePlan({
+          organizationId,
+        });
+        planName = plan.name ?? "unknown";
+      } catch {
+        // Plan name is for display only — proceed with fallback
+      }
+
+      await notifyResourceLimit({
+        organizationId,
+        organizationName: organization.name,
+        adminName: admin?.name ?? undefined,
+        adminEmail: admin?.email ?? undefined,
+        planName,
+        limitType: limitLabel,
+        current,
+        max,
+      });
+    } catch {
+      cooldownCache.delete(organizationId);
+    }
   };
 };
