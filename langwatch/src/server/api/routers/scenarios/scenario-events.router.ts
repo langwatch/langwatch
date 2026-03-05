@@ -3,6 +3,10 @@ import { on } from "node:events";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
 import { SimulationService } from "~/server/simulations/simulation.service";
+import { ScenarioJobRepository } from "~/server/scenarios/scenario-job.repository";
+import { mergeRunData } from "~/server/scenarios/scenario-run.service";
+import { scenarioQueue } from "~/server/scenarios/scenario.queue";
+import { isSuiteSetId } from "~/server/suites/suite-set-id";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { createLogger } from "~/utils/logger/server";
 import { checkProjectPermission } from "../../rbac";
@@ -62,18 +66,31 @@ export const scenarioEventsRouter = createTRPCRouter({
       return data;
     }),
 
-  // Get ALL run data for a scenario set without pagination
+  // Get ALL run data for a scenario set without pagination,
+  // merging ES/ClickHouse data with BullMQ queued/active jobs for suite sets.
   getAllScenarioSetRunData: protectedProcedure
     .input(projectSchema.extend({ scenarioSetId: z.string() }))
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
       logger.debug({ projectId: input.projectId, scenarioSetId: input.scenarioSetId }, "Fetching all scenario set run data");
       const service = SimulationService.create(ctx.prisma);
-      const data = await service.getAllRunDataForScenarioSet({
+      const esRuns = await service.getAllRunDataForScenarioSet({
         projectId: input.projectId,
         scenarioSetId: input.scenarioSetId,
       });
-      return data;
+
+      // Only merge BullMQ data for suite sets (not external SDK/CI sets)
+      if (!isSuiteSetId(input.scenarioSetId)) {
+        return esRuns;
+      }
+
+      const jobRepo = new ScenarioJobRepository(scenarioQueue);
+      const queuedRuns = await jobRepo.getQueuedAndActiveJobs({
+        setId: input.scenarioSetId,
+        projectId: input.projectId,
+      });
+
+      return mergeRunData({ esRuns, queuedRuns });
     }),
 
   // Get scenario run state
@@ -193,7 +210,8 @@ export const scenarioEventsRouter = createTRPCRouter({
       });
     }),
 
-  // Get run data for all suites (cross-suite view)
+  // Get run data for all suites (cross-suite view),
+  // merging ES/ClickHouse data with BullMQ queued/active jobs.
   getAllSuiteRunData: protectedProcedure
     .input(
       projectSchema
@@ -214,6 +232,21 @@ export const scenarioEventsRouter = createTRPCRouter({
         startDate: input.startDate,
         endDate: input.endDate,
       });
+
+      // Merge BullMQ queued/active jobs on the first page only
+      // (subsequent pages are historical and won't have queued jobs)
+      if (!input.cursor) {
+        const jobRepo = new ScenarioJobRepository(scenarioQueue);
+        const queued = await jobRepo.getAllQueuedJobsForProject({
+          projectId: input.projectId,
+        });
+
+        if (queued.runs.length > 0) {
+          data.runs = mergeRunData({ esRuns: data.runs, queuedRuns: queued.runs });
+          data.scenarioSetIds = { ...data.scenarioSetIds, ...queued.scenarioSetIds };
+        }
+      }
+
       return data;
     }),
 

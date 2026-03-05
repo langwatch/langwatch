@@ -80,6 +80,8 @@ const OVERLAY_ICONS: Record<
   [ScenarioRunStatus.STALLED]: AlertTriangle,
   [ScenarioRunStatus.IN_PROGRESS]: Check,
   [ScenarioRunStatus.PENDING]: Check,
+  [ScenarioRunStatus.QUEUED]: Check,
+  [ScenarioRunStatus.RUNNING]: Check,
 };
 
 const OVERLAY_STATUS_TEXT: Record<ScenarioRunStatus, string> = {
@@ -90,6 +92,8 @@ const OVERLAY_STATUS_TEXT: Record<ScenarioRunStatus, string> = {
   [ScenarioRunStatus.STALLED]: "Stalled",
   [ScenarioRunStatus.IN_PROGRESS]: "",
   [ScenarioRunStatus.PENDING]: "",
+  [ScenarioRunStatus.QUEUED]: "",
+  [ScenarioRunStatus.RUNNING]: "",
 };
 
 const OVERLAY_GRADIENTS: Record<ScenarioRunStatus, GradientKey> = {
@@ -100,6 +104,8 @@ const OVERLAY_GRADIENTS: Record<ScenarioRunStatus, GradientKey> = {
   [ScenarioRunStatus.STALLED]: "stalled",
   [ScenarioRunStatus.IN_PROGRESS]: "pass",
   [ScenarioRunStatus.PENDING]: "pass",
+  [ScenarioRunStatus.QUEUED]: "pass",
+  [ScenarioRunStatus.RUNNING]: "pass",
 };
 
 /**

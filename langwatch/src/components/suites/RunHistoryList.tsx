@@ -8,8 +8,7 @@
  * Uses the suite's setId (__internal__<suiteId>__suite) to query the scenario events.
  */
 
-import { Box, Button, EmptyState, Spinner, Text, VStack } from "@chakra-ui/react";
-import { Play, Inbox } from "lucide-react";
+import { Box, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { SimulationSuite } from "@prisma/client";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -21,15 +20,12 @@ import { parseSuiteTargets } from "~/server/suites/types";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
 import { api } from "~/utils/api";
 import { useDrawer } from "~/hooks/useDrawer";
-import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
 import type { Period } from "~/components/PeriodSelector";
 import { RunHistoryFilters } from "./RunHistoryFilters";
 import { RunHistoryFooter } from "./RunHistoryFooter";
 import { RunRow } from "./RunRow";
 import { GroupRow } from "./GroupRow";
-import { QueueStatusBanner } from "./QueueStatusBanner";
 import { useRunHistoryStore } from "./useRunHistoryStore";
-import { getAdaptivePollingInterval } from "./getAdaptivePollingInterval";
 import {
   computeBatchRunSummary,
   computeGroupSummary,
@@ -49,10 +45,9 @@ type RunHistoryListProps = {
   suite: SimulationSuite;
   onStatsReady?: (stats: RunHistoryStats) => void;
   period?: Period;
-  onRun?: () => void;
 };
 
-export function RunHistoryList({ suite, onStatsReady, period, onRun }: RunHistoryListProps) {
+export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListProps) {
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
   const setId = getSuiteSetId(suite.id);
@@ -101,35 +96,12 @@ export function RunHistoryList({ suite, onStatsReady, period, onRun }: RunHistor
     }
   }, [groupBy]);
 
-  // Fetch queue status for pending/active jobs
-  const { data: queueStatus } = api.suites.getQueueStatus.useQuery(
-    {
-      projectId: project?.id ?? "",
-      suiteId: suite.id,
-    },
-    {
-      enabled: !!project,
-      refetchInterval: 5000,
-    },
-  );
-
-  // Banner only shows waiting jobs (active jobs appear in ES run history)
-  const hasPendingJobs = (queueStatus?.waiting ?? 0) > 0;
-
-  // Poll faster when any jobs are in the queue (waiting or active),
-  // since active jobs will soon produce ES events we want to show quickly
-  const hasQueuedJobs =
-    (queueStatus?.waiting ?? 0) > 0 || (queueStatus?.active ?? 0) > 0;
-
-  const [adaptiveIntervalMs, setAdaptiveIntervalMs] = useState(15000);
-
-  // Fetch all run data for this suite (unpaginated).
+  // Fetch all run data for this suite (unpaginated), including queued/active BullMQ jobs.
   // Date filtering is applied client-side to avoid capping results.
   const {
     data: runData,
     isLoading,
     error,
-    refetch: refetchRunData,
   } = api.scenarios.getAllScenarioSetRunData.useQuery(
     {
       projectId: project?.id ?? "",
@@ -137,36 +109,9 @@ export function RunHistoryList({ suite, onStatsReady, period, onRun }: RunHistor
     },
     {
       enabled: !!project,
-      refetchInterval: adaptiveIntervalMs,
+      refetchInterval: 5000,
     },
   );
-
-  // Period-filter runs for adaptive polling so active runs outside the visible
-  // date range don't keep triggering fast polling unnecessarily.
-  const runsForAdaptivePolling = useMemo(() => {
-    if (!runData) return [];
-    if (!period) return runData;
-    const startMs = period.startDate.getTime();
-    const endMs = period.endDate.getTime();
-    return runData.filter((r) => r.timestamp >= startMs && r.timestamp <= endMs);
-  }, [runData, period]);
-
-  // Recompute adaptive polling whenever run data or queue status changes
-  useEffect(() => {
-    setAdaptiveIntervalMs(
-      hasQueuedJobs
-        ? 3000
-        : getAdaptivePollingInterval({ runs: runsForAdaptivePolling }),
-    );
-  }, [hasQueuedJobs, runsForAdaptivePolling]);
-
-  // SSE subscription for real-time updates scoped to this suite's scenarioSetId
-  useSimulationUpdateListener({
-    projectId: project?.id ?? "",
-    refetch: refetchRunData,
-    enabled: !!project,
-    filter: { scenarioSetId: setId },
-  });
 
   // Fetch scenarios for filter options and name resolution
   const { data: scenarios } = api.scenarios.getAll.useQuery(
@@ -352,28 +297,9 @@ export function RunHistoryList({ suite, onStatsReady, period, onRun }: RunHistor
   if (!runData || runData.length === 0) {
     return (
       <VStack paddingY={8} align="center" gap={4}>
-        {hasPendingJobs && (
-          <Box paddingX={6}>
-            <QueueStatusBanner queueStatus={queueStatus} />
-          </Box>
-        )}
-        <EmptyState.Root>
-          <EmptyState.Content>
-            <EmptyState.Indicator>
-              <Inbox size={32} />
-            </EmptyState.Indicator>
-            <EmptyState.Title>No runs yet</EmptyState.Title>
-            <EmptyState.Description>
-              Run this suite to evaluate your scenarios and see results here.
-            </EmptyState.Description>
-            {onRun && (
-              <Button colorPalette="blue" onClick={onRun}>
-                <Play size={14} />
-                Run Suite
-              </Button>
-            )}
-          </EmptyState.Content>
-        </EmptyState.Root>
+        <Text fontSize="sm" color="fg.muted">
+          Run this suite to see results here.
+        </Text>
       </VStack>
     );
   }
@@ -393,24 +319,8 @@ export function RunHistoryList({ suite, onStatsReady, period, onRun }: RunHistor
         />
       </Box>
 
-      {/* Queue status banner */}
-      {hasPendingJobs && (
-        <Box paddingX={6} paddingBottom={3}>
-          <QueueStatusBanner queueStatus={queueStatus} />
-        </Box>
-      )}
-
       {/* Run history rows — no overflow here; parent provides the scrollport for sticky headers */}
-      {filteredRuns.length === 0 &&
-      runData &&
-      runData.length > 0 &&
-      period &&
-      !filters.scenarioId &&
-      !filters.passFailStatus ? (
-        <Box paddingX={6} paddingY={8} textAlign="center">
-          <Text color="fg.muted">No runs in the selected time period.</Text>
-        </Box>
-      ) : (groupBy === "none" ? batchRuns.length : groups.length) === 0 && (filters.scenarioId || filters.passFailStatus) ? (
+      {(groupBy === "none" ? batchRuns.length : groups.length) === 0 && (filters.scenarioId || filters.passFailStatus) ? (
         <Box paddingX={6} paddingY={8} textAlign="center">
           <Text color="fg.muted">No runs match the selected filters.</Text>
         </Box>

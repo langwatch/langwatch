@@ -36,6 +36,11 @@ export function RunSummaryFooter({ summary }: RunSummaryFooterProps) {
         {summary.cancelledCount > 0 && (
           <Text color="fg.muted">{summary.cancelledCount} cancelled</Text>
         )}
+        {(summary.queuedCount > 0 || summary.inProgressCount > 0) && (
+          <Text color="blue.600">
+            {summary.queuedCount + summary.inProgressCount} pending
+          </Text>
+        )}
       </HStack>
     </HStack>
   );

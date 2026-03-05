@@ -25,7 +25,7 @@ describe("<RunHistoryFooter/>", () => {
     it("displays run count, passed, and failed", () => {
       render(
         <RunHistoryFooter
-          totals={{ runCount: 3, passedCount: 21, failedCount: 3 }}
+          totals={{ runCount: 3, passedCount: 21, failedCount: 3, pendingCount: 0 }}
         />,
         { wrapper: Wrapper },
       );
@@ -40,7 +40,7 @@ describe("<RunHistoryFooter/>", () => {
     it("displays singular form for run count", () => {
       render(
         <RunHistoryFooter
-          totals={{ runCount: 1, passedCount: 5, failedCount: 0 }}
+          totals={{ runCount: 1, passedCount: 5, failedCount: 0, pendingCount: 0 }}
         />,
         { wrapper: Wrapper },
       );
@@ -49,11 +49,24 @@ describe("<RunHistoryFooter/>", () => {
     });
   });
 
+  describe("when given totals with pending count greater than zero", () => {
+    it("displays the pending count text", () => {
+      render(
+        <RunHistoryFooter
+          totals={{ runCount: 2, passedCount: 10, failedCount: 1, pendingCount: 5 }}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByText("5 pending")).toBeInTheDocument();
+    });
+  });
+
   describe("when given zero totals", () => {
     it("displays zeros", () => {
       render(
         <RunHistoryFooter
-          totals={{ runCount: 0, passedCount: 0, failedCount: 0 }}
+          totals={{ runCount: 0, passedCount: 0, failedCount: 0, pendingCount: 0 }}
         />,
         { wrapper: Wrapper },
       );

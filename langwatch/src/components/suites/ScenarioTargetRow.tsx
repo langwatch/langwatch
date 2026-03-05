@@ -7,6 +7,7 @@
  */
 
 import { HStack, Text } from "@chakra-ui/react";
+import { Spinner } from "@chakra-ui/react";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
 import { STATUS_ICON_CONFIG } from "./status-icons";
@@ -27,6 +28,11 @@ function formatDuration(ms: number): string {
 }
 
 function StatusIcon({ status }: { status: ScenarioRunStatus }) {
+  // Queued and running rows show a spinner instead of a pass/fail icon
+  if (status === ScenarioRunStatus.QUEUED || status === ScenarioRunStatus.RUNNING) {
+    return <Spinner size="xs" data-testid="queued-spinner" />;
+  }
+
   const config = SCENARIO_RUN_STATUS_CONFIG[status];
   const iconConfig = STATUS_ICON_CONFIG[status];
   const Icon = iconConfig.icon;

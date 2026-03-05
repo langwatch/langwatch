@@ -30,6 +30,11 @@ export function RunHistoryFooter({ totals }: RunHistoryFooterProps) {
         <Text fontSize="sm" color="red.600">
           {totals.failedCount} failed
         </Text>
+        {totals.pendingCount > 0 && (
+          <Text fontSize="sm" color="blue.600">
+            {totals.pendingCount} pending
+          </Text>
+        )}
       </HStack>
     </HStack>
   );

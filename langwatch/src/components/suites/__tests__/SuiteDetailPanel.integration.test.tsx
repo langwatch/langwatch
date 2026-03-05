@@ -31,9 +31,7 @@ vi.mock("~/utils/api", () => ({
     prompts: {
       getAllPromptsForProject: { useQuery: vi.fn(() => ({ data: [] })) },
     },
-    suites: {
-      getQueueStatus: { useQuery: vi.fn(() => ({ data: undefined })) },
-    },
+    suites: {},
   },
 }));
 
