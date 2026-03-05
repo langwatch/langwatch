@@ -2,7 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import { env } from "../../../src/env.mjs";
 import { prisma } from "../../../src/server/db";
 import { captureException } from "../../../src/utils/posthogErrorCapture";
-import { notifyResourceLimitSlack } from "./notificationHandlers";
+import { notifyResourceLimit } from "./notificationHandlers";
 import { LIMIT_TYPE_DISPLAY_LABELS } from "../../../src/server/license-enforcement/constants";
 import { getApp } from "../../../src/server/app-layer/app";
 import type { ResourceLimitNotifierInput } from "../types";
@@ -71,7 +71,7 @@ export const createResourceLimitNotifier = (db: PrismaClient = prisma) => {
       // Plan name is for display only — proceed with fallback
     }
 
-    await notifyResourceLimitSlack({
+    await notifyResourceLimit({
       organizationId,
       organizationName: organization.name,
       adminName: admin?.name ?? undefined,

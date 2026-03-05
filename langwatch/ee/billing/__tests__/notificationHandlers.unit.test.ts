@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearBillingNotificationHandlers,
   notifyPlanLimit,
-  notifyResourceLimitSlack,
+  notifyResourceLimit,
   notifySubscriptionEvent,
   setBillingNotificationHandlers,
 } from "../notifications/notificationHandlers";
@@ -79,7 +79,7 @@ describe("notificationHandlers", () => {
     });
   });
 
-  describe("when dispatching resource-limit notifications", () => {
+  describe("notifyResourceLimit()", () => {
     it("dispatches only to Slack, not HubSpot", async () => {
       const sendSlackNotification = vi.fn();
       const sendHubspotNotification = vi.fn();
@@ -98,7 +98,7 @@ describe("notificationHandlers", () => {
         max: 10,
       };
 
-      await notifyResourceLimitSlack(resourceLimitContext);
+      await notifyResourceLimit(resourceLimitContext);
 
       expect(sendSlackNotification).toHaveBeenCalledWith(resourceLimitContext);
       expect(sendHubspotNotification).not.toHaveBeenCalled();
@@ -112,7 +112,7 @@ describe("notificationHandlers", () => {
       });
 
       await expect(
-        notifyResourceLimitSlack({
+        notifyResourceLimit({
           organizationId: "org_123",
           organizationName: "Acme",
           planName: "Launch",

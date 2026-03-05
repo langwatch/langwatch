@@ -27,10 +27,17 @@ export type PlanLimitNotificationContext = {
   adminName?: string;
   adminEmail?: string;
   planName: string;
-  // Resource limit enrichment (optional, backward-compatible)
-  limitType?: string;
-  current?: number;
-  max?: number;
+};
+
+export type ResourceLimitNotificationContext = {
+  organizationId: string;
+  organizationName: string;
+  adminName?: string;
+  adminEmail?: string;
+  planName: string;
+  limitType: string;
+  current: number;
+  max: number;
 };
 
 export type ResourceLimitNotifierInput = {
@@ -42,7 +49,7 @@ export type ResourceLimitNotifierInput = {
 
 export type PlanLimitNotificationHandlers = {
   sendSlackNotification?: (
-    context: PlanLimitNotificationContext,
+    context: PlanLimitNotificationContext | ResourceLimitNotificationContext,
   ) => Promise<void> | void;
   sendHubspotNotification?: (
     context: PlanLimitNotificationContext,

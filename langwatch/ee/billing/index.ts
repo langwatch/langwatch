@@ -30,6 +30,7 @@ export type {
   PlanLimitNotificationContext,
   PlanLimitNotificationHandlers,
   PlanLimitNotifierInput,
+  ResourceLimitNotificationContext,
   ResourceLimitNotifierInput,
   SubscriptionNotificationPayload,
 } from "./types";

@@ -1,3 +1,4 @@
+import type { PrismaClient } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../src/env.mjs", () => ({
@@ -11,7 +12,7 @@ vi.mock("../../../src/server/db", () => ({
 }));
 
 vi.mock("../notifications/notificationHandlers", () => ({
-  notifyResourceLimitSlack: vi.fn().mockResolvedValue(undefined),
+  notifyResourceLimit: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("../../../src/utils/posthogErrorCapture", () => ({
@@ -28,11 +29,11 @@ vi.mock("../../../src/server/app-layer/app", () => ({
 
 import { env } from "../../../src/env.mjs";
 import { createResourceLimitNotifier } from "../notifications/resourceLimitNotifier";
-import { notifyResourceLimitSlack } from "../notifications/notificationHandlers";
+import { notifyResourceLimit } from "../notifications/notificationHandlers";
 import { captureException } from "../../../src/utils/posthogErrorCapture";
 
 const mockEnv = env as { IS_SAAS: boolean | undefined };
-const mockNotifyResourceLimitSlack = notifyResourceLimitSlack as ReturnType<
+const mockNotifyResourceLimit = notifyResourceLimit as ReturnType<
   typeof vi.fn
 >;
 const mockCaptureException = captureException as ReturnType<typeof vi.fn>;
@@ -49,7 +50,7 @@ const createMockDb = ({
       findUnique: vi.fn().mockResolvedValue(organization),
       update: updateFn,
     },
-  } as any;
+  } as unknown as PrismaClient;
 };
 
 const makeOrganization = ({
@@ -82,7 +83,7 @@ const defaultInput = {
   max: 10,
 };
 
-describe("createResourceLimitNotifier", () => {
+describe("createResourceLimitNotifier()", () => {
   beforeEach(() => {
     mockEnv.IS_SAAS = false;
     vi.clearAllMocks();
@@ -97,7 +98,7 @@ describe("createResourceLimitNotifier", () => {
       await notifier(defaultInput);
 
       expect(db.organization.findUnique).not.toHaveBeenCalled();
-      expect(mockNotifyResourceLimitSlack).not.toHaveBeenCalled();
+      expect(mockNotifyResourceLimit).not.toHaveBeenCalled();
     });
   });
 
@@ -106,13 +107,13 @@ describe("createResourceLimitNotifier", () => {
       mockEnv.IS_SAAS = true;
     });
 
-    describe("when org not found", () => {
+    describe("given the organization does not exist", () => {
       it("does nothing", async () => {
         const db = createMockDb({ organization: null });
         const notifier = createResourceLimitNotifier(db);
         await notifier({ ...defaultInput, organizationId: "org_missing" });
 
-        expect(mockNotifyResourceLimitSlack).not.toHaveBeenCalled();
+        expect(mockNotifyResourceLimit).not.toHaveBeenCalled();
       });
     });
 
@@ -128,12 +129,35 @@ describe("createResourceLimitNotifier", () => {
         const notifier = createResourceLimitNotifier(db);
         await notifier(defaultInput);
 
-        expect(mockNotifyResourceLimitSlack).not.toHaveBeenCalled();
+        expect(mockNotifyResourceLimit).not.toHaveBeenCalled();
       });
     });
 
     describe("when alert was sent more than 24 hours ago", () => {
-      it("notifies and updates timestamp", async () => {
+      it("sends notification with correct payload", async () => {
+        const thirtyHoursAgo = new Date(Date.now() - 30 * 60 * 60 * 1000);
+        const db = createMockDb({
+          organization: makeOrganization({
+            sentResourceLimitAlert: thirtyHoursAgo,
+          }),
+        });
+
+        const notifier = createResourceLimitNotifier(db);
+        await notifier(defaultInput);
+
+        expect(mockNotifyResourceLimit).toHaveBeenCalledWith({
+          organizationId: "org_123",
+          organizationName: "Acme",
+          adminName: "Admin",
+          adminEmail: "admin@acme.com",
+          planName: "Launch",
+          limitType: "Workflows",
+          current: 10,
+          max: 10,
+        });
+      });
+
+      it("updates cooldown timestamp", async () => {
         const thirtyHoursAgo = new Date(Date.now() - 30 * 60 * 60 * 1000);
         const updateFn = vi.fn().mockResolvedValue({});
         const db = createMockDb({
@@ -146,7 +170,25 @@ describe("createResourceLimitNotifier", () => {
         const notifier = createResourceLimitNotifier(db);
         await notifier(defaultInput);
 
-        expect(mockNotifyResourceLimitSlack).toHaveBeenCalledWith({
+        expect(updateFn).toHaveBeenCalledWith({
+          where: { id: "org_123" },
+          data: { sentResourceLimitAlert: expect.any(Date) },
+        });
+      });
+    });
+
+    describe("when no previous alert exists", () => {
+      it("sends notification with correct payload", async () => {
+        const db = createMockDb({
+          organization: makeOrganization({
+            sentResourceLimitAlert: null,
+          }),
+        });
+
+        const notifier = createResourceLimitNotifier(db);
+        await notifier(defaultInput);
+
+        expect(mockNotifyResourceLimit).toHaveBeenCalledWith({
           organizationId: "org_123",
           organizationName: "Acme",
           adminName: "Admin",
@@ -156,15 +198,9 @@ describe("createResourceLimitNotifier", () => {
           current: 10,
           max: 10,
         });
-        expect(updateFn).toHaveBeenCalledWith({
-          where: { id: "org_123" },
-          data: { sentResourceLimitAlert: expect.any(Date) },
-        });
       });
-    });
 
-    describe("when no previous alert exists", () => {
-      it("notifies and updates timestamp", async () => {
+      it("updates cooldown timestamp", async () => {
         const updateFn = vi.fn().mockResolvedValue({});
         const db = createMockDb({
           organization: makeOrganization({
@@ -176,16 +212,6 @@ describe("createResourceLimitNotifier", () => {
         const notifier = createResourceLimitNotifier(db);
         await notifier(defaultInput);
 
-        expect(mockNotifyResourceLimitSlack).toHaveBeenCalledWith({
-          organizationId: "org_123",
-          organizationName: "Acme",
-          adminName: "Admin",
-          adminEmail: "admin@acme.com",
-          planName: "Launch",
-          limitType: "Workflows",
-          current: 10,
-          max: 10,
-        });
         expect(updateFn).toHaveBeenCalled();
       });
     });
@@ -205,7 +231,7 @@ describe("createResourceLimitNotifier", () => {
           limitType: "agents",
         });
 
-        expect(mockNotifyResourceLimitSlack).not.toHaveBeenCalled();
+        expect(mockNotifyResourceLimit).not.toHaveBeenCalled();
       });
     });
 
@@ -223,7 +249,7 @@ describe("createResourceLimitNotifier", () => {
         const notifier = createResourceLimitNotifier(db);
         await notifier(defaultInput);
 
-        expect(mockNotifyResourceLimitSlack).toHaveBeenCalled();
+        expect(mockNotifyResourceLimit).toHaveBeenCalled();
         expect(mockCaptureException).toHaveBeenCalledWith(
           expect.objectContaining({
             message: expect.stringContaining(
@@ -254,7 +280,7 @@ describe("createResourceLimitNotifier", () => {
         const notifier = createResourceLimitNotifier(db);
         await notifier(defaultInput);
 
-        expect(mockNotifyResourceLimitSlack).toHaveBeenCalledWith(
+        expect(mockNotifyResourceLimit).toHaveBeenCalledWith(
           expect.objectContaining({
             planName: "unknown",
           }),

@@ -2,6 +2,7 @@ import { captureException } from "../../../src/utils/posthogErrorCapture";
 import type {
   BillingNotificationHandlers,
   PlanLimitNotificationContext,
+  ResourceLimitNotificationContext,
   SubscriptionNotificationPayload,
 } from "../types";
 
@@ -44,8 +45,8 @@ export const notifyPlanLimit = async (
   ]);
 };
 
-export const notifyResourceLimitSlack = async (
-  context: PlanLimitNotificationContext,
+export const notifyResourceLimit = async (
+  context: ResourceLimitNotificationContext,
 ) => {
   await runHandlerSafely(
     billingNotificationHandlers.sendSlackNotification,

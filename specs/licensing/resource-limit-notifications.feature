@@ -1,3 +1,4 @@
+@unit
 Feature: Internal Slack Notifications for Resource Limit Reached
 
   As a LangWatch ops team member
