@@ -17,7 +17,7 @@ Feature: All Runs page group-by selector
 
   @integration
   Scenario: All Runs page displays group-by selector with correct options and default
-    When the All Runs panel renders
+    When I open the All Runs page
     Then I see a group-by selector in the filter bar
     And the selector has options "None", "Scenario", and "Target"
     And "None" is selected by default
@@ -25,7 +25,7 @@ Feature: All Runs page group-by selector
   @integration
   Scenario: None grouping on All Runs preserves batch run layout
     Given run data with multiple batch runs across suites
-    When group-by is set to "None"
+    When I select "None" from the group-by selector
     Then results are grouped by batch run
     And each group shows the batch run timestamp, pass rate, and trigger type
 

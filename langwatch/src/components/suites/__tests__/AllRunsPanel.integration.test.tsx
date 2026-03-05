@@ -277,24 +277,26 @@ describe("<AllRunsPanel/>", () => {
       });
     }
 
-    it("renders the group-by selector with None selected by default", () => {
-      setupWithRuns();
-      render(<AllRunsPanel period={defaultPeriod} />, { wrapper: Wrapper });
+    describe("when the panel renders", () => {
+      it("renders the group-by selector with None selected by default", () => {
+        setupWithRuns();
+        render(<AllRunsPanel period={defaultPeriod} />, { wrapper: Wrapper });
 
-      const groupBySelect = screen.getByLabelText("Group by");
-      expect(groupBySelect).toBeInTheDocument();
-      expect(groupBySelect).toHaveValue("none");
-    });
+        const groupBySelect = screen.getByLabelText("Group by");
+        expect(groupBySelect).toBeInTheDocument();
+        expect(groupBySelect).toHaveValue("none");
+      });
 
-    it("has None, Scenario, and Target options", () => {
-      setupWithRuns();
-      render(<AllRunsPanel period={defaultPeriod} />, { wrapper: Wrapper });
+      it("has None, Scenario, and Target options", () => {
+        setupWithRuns();
+        render(<AllRunsPanel period={defaultPeriod} />, { wrapper: Wrapper });
 
-      const groupBySelect = screen.getByLabelText("Group by");
-      const options = groupBySelect.querySelectorAll("option");
-      const optionValues = Array.from(options).map((o) => o.value);
+        const groupBySelect = screen.getByLabelText("Group by");
+        const options = groupBySelect.querySelectorAll("option");
+        const optionValues = Array.from(options).map((o) => o.value);
 
-      expect(optionValues).toEqual(["none", "scenario", "target"]);
+        expect(optionValues).toEqual(["none", "scenario", "target"]);
+      });
     });
 
     describe("when group-by is changed to Scenario", () => {
@@ -372,6 +374,19 @@ describe("<AllRunsPanel/>", () => {
         const groupHeaders = screen.getAllByTestId("group-row-header");
         expect(groupHeaders.length).toBe(1);
         expect(screen.getByText("Shared Scenario")).toBeInTheDocument();
+      });
+    });
+
+    describe("when group-by is changed to Target", () => {
+      it("renders target group headers", async () => {
+        setupWithRuns();
+        render(<AllRunsPanel period={defaultPeriod} />, { wrapper: Wrapper });
+
+        const groupBySelect = screen.getByLabelText("Group by");
+        await userEvent.selectOptions(groupBySelect, "target");
+
+        const groupHeaders = screen.getAllByTestId("group-row-header");
+        expect(groupHeaders.length).toBe(2);
       });
     });
   });
