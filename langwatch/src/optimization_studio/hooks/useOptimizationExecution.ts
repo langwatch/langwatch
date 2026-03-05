@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toaster } from "~/components/ui/toaster";
 import type { StudioClientEvent } from "../types/events";
 import type { OPTIMIZERS } from "../types/optimizers";
+import { mergeLocalConfigsIntoDsl } from "../utils/mergeLocalConfigs";
 import { usePostEvent } from "./usePostEvent";
 import { useWorkflowStore } from "./useWorkflowStore";
 
@@ -86,11 +87,15 @@ export const useOptimizationExecution = () => {
         stdout: "",
       });
 
+      const workflow = getWorkflow();
       const payload: StudioClientEvent = {
         type: "execute_optimization",
         payload: {
           run_id,
-          workflow: getWorkflow(),
+          workflow: {
+            ...workflow,
+            nodes: mergeLocalConfigsIntoDsl(workflow.nodes),
+          },
           workflow_version_id,
           optimizer,
           params,
@@ -129,7 +134,13 @@ export const useOptimizationExecution = () => {
 
       const payload: StudioClientEvent = {
         type: "stop_optimization_execution",
-        payload: { workflow: workflow, run_id },
+        payload: {
+          workflow: {
+            ...workflow,
+            nodes: mergeLocalConfigsIntoDsl(workflow.nodes),
+          },
+          run_id,
+        },
       };
       postEvent(payload);
 

@@ -16,6 +16,7 @@ export const recordSpanCommandDataSchema = z.object({
   resource: resourceSchema.nullable(),
   instrumentationScope: instrumentationScopeSchema.nullable(),
   piiRedactionLevel: piiRedactionLevelSchema.optional(),
+  occurredAt: z.number(),
 });
 
 export type RecordSpanCommandData = z.infer<typeof recordSpanCommandDataSchema>;
@@ -28,6 +29,18 @@ export const assignTopicCommandDataSchema = z.object({
   subtopicId: z.string().nullable(),
   subtopicName: z.string().nullable(),
   isIncremental: z.boolean(),
+  occurredAt: z.number(),
 });
 
 export type AssignTopicCommandData = z.infer<typeof assignTopicCommandDataSchema>;
+
+export const assignSatisfactionScoreCommandDataSchema = z.object({
+  tenantId: z.string(),
+  traceId: z.string(),
+  satisfactionScore: z.number(),
+  occurredAt: z.number(),
+});
+
+export type AssignSatisfactionScoreCommandData = z.infer<
+  typeof assignSatisfactionScoreCommandDataSchema
+>;

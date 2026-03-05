@@ -55,6 +55,11 @@ describe("prefetchScenarioData", () => {
     model: "openai/gpt-4",
   };
 
+  const defaultModelParamsResult = {
+    success: true as const,
+    params: defaultModelParams,
+  };
+
   function createMockDeps(
     overrides: Partial<DataPrefetcherDependencies> = {},
   ): DataPrefetcherDependencies {
@@ -75,7 +80,7 @@ describe("prefetchScenarioData", () => {
     };
 
     const modelParamsProvider: ModelParamsProvider = {
-      prepare: vi.fn().mockResolvedValue(defaultModelParams),
+      prepare: vi.fn().mockResolvedValue(defaultModelParamsResult),
     };
 
     return {
@@ -102,7 +107,7 @@ describe("prefetchScenarioData", () => {
       describe("when prefetching scenario data", () => {
         it("uses the prompt's configured model", async () => {
           const mockModelParamsProvider: ModelParamsProvider = {
-            prepare: vi.fn().mockResolvedValue(defaultModelParams),
+            prepare: vi.fn().mockResolvedValue(defaultModelParamsResult),
           };
 
           const deps = createMockDeps({
@@ -137,7 +142,7 @@ describe("prefetchScenarioData", () => {
       describe("when prefetching scenario data", () => {
         it("falls back to project defaultModel", async () => {
           const mockModelParamsProvider: ModelParamsProvider = {
-            prepare: vi.fn().mockResolvedValue(defaultModelParams),
+            prepare: vi.fn().mockResolvedValue(defaultModelParamsResult),
           };
 
           const deps = createMockDeps({
@@ -179,7 +184,7 @@ describe("prefetchScenarioData", () => {
       describe("when prefetching scenario data", () => {
         it("uses project defaultModel (agents have no model)", async () => {
           const mockModelParamsProvider: ModelParamsProvider = {
-            prepare: vi.fn().mockResolvedValue(defaultModelParams),
+            prepare: vi.fn().mockResolvedValue(defaultModelParamsResult),
           };
 
           const deps = createMockDeps({
@@ -283,6 +288,64 @@ describe("prefetchScenarioData", () => {
       });
     });
 
+    describe("given code agent does not exist", () => {
+      describe("when prefetching scenario data", () => {
+        it("returns failure with code agent not found error", async () => {
+          const deps = createMockDeps({
+            agentFetcher: {
+              findById: vi.fn().mockResolvedValue(null),
+            },
+          });
+
+          const target: TargetConfig = { type: "code", referenceId: "agent_456" };
+          const result = await prefetchScenarioData(defaultContext, target, deps);
+
+          expect(result.success).toBe(false);
+          if (!result.success) {
+            expect(result.error).toContain("Code agent");
+            expect(result.error).toContain("not found");
+          }
+        });
+      });
+    });
+
+    describe("given code agent has wrong type", () => {
+      describe("when prefetching scenario data", () => {
+        it("returns failure when agent type mismatch", async () => {
+          const httpAgent = {
+            id: "agent_456",
+            type: "http" as const,
+            name: "HTTP Agent",
+            projectId: "proj_123",
+            config: {
+              url: "https://api.example.com",
+              method: "POST",
+              headers: [],
+            },
+            workflowId: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            archivedAt: null,
+          };
+
+          const deps = createMockDeps({
+            agentFetcher: {
+              findById: vi.fn().mockResolvedValue(httpAgent),
+            },
+          });
+
+          const target: TargetConfig = { type: "code", referenceId: "agent_456" };
+          const result = await prefetchScenarioData(defaultContext, target, deps);
+
+          expect(result.success).toBe(false);
+          if (!result.success) {
+            expect(result.error).toContain("Code agent");
+            expect(result.error).toContain("not found");
+          }
+        });
+      });
+    });
+
     describe("given model params preparation fails", () => {
       const promptWithModel = {
         id: "prompt_123",
@@ -298,7 +361,11 @@ describe("prefetchScenarioData", () => {
               getPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
             },
             modelParamsProvider: {
-              prepare: vi.fn().mockResolvedValue(null),
+              prepare: vi.fn().mockResolvedValue({
+                success: false,
+                reason: "provider_not_enabled",
+                message: "Provider 'openai' is not enabled for this project",
+              }),
             },
           });
 
@@ -307,8 +374,77 @@ describe("prefetchScenarioData", () => {
 
           expect(result.success).toBe(false);
           if (!result.success) {
-            expect(result.error).toBe("Failed to prepare model params");
+            expect(result.error).toBe("Provider 'openai' is not enabled for this project");
+            expect(result.reason).toBe("provider_not_enabled");
           }
+        });
+      });
+    });
+  });
+
+  describe("code agent prefetch", () => {
+    describe("given a code agent exists with Python code and inputs/outputs", () => {
+      const codeAgent = {
+        id: "agent_456",
+        type: "code" as const,
+        name: "Classifier",
+        projectId: "proj_123",
+        config: {
+          parameters: [
+            { identifier: "code", type: "code", value: 'def execute(input):\n    return "classified"' },
+          ],
+          inputs: [{ identifier: "input", type: "str" }],
+          outputs: [{ identifier: "output", type: "str" }],
+        },
+        workflowId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        archivedAt: null,
+      };
+
+      describe("when prefetching scenario data", () => {
+        it("fetches the agent and serializes code, inputs, and outputs", async () => {
+          const deps = createMockDeps({
+            agentFetcher: {
+              findById: vi.fn().mockResolvedValue(codeAgent),
+            },
+          });
+
+          const target: TargetConfig = { type: "code", referenceId: "agent_456" };
+          const result = await prefetchScenarioData(defaultContext, target, deps);
+
+          expect(result.success).toBe(true);
+          if (result.success) {
+            expect(result.data.adapterData).toMatchObject({
+              type: "code",
+              agentId: "agent_456",
+              code: 'def execute(input):\n    return "classified"',
+              inputs: [{ identifier: "input", type: "str" }],
+              outputs: [{ identifier: "output", type: "str" }],
+            });
+          }
+        });
+
+        it("uses project defaultModel (code agents have no model)", async () => {
+          const mockModelParamsProvider: ModelParamsProvider = {
+            prepare: vi.fn().mockResolvedValue(defaultModelParams),
+          };
+
+          const deps = createMockDeps({
+            agentFetcher: {
+              findById: vi.fn().mockResolvedValue(codeAgent),
+            },
+            modelParamsProvider: mockModelParamsProvider,
+          });
+
+          const target: TargetConfig = { type: "code", referenceId: "agent_456" };
+
+          await prefetchScenarioData(defaultContext, target, deps);
+
+          expect(mockModelParamsProvider.prepare).toHaveBeenCalledWith(
+            "proj_123",
+            "anthropic/claude-3-sonnet",
+          );
         });
       });
     });
@@ -349,6 +485,7 @@ describe("prefetchScenarioData", () => {
               systemPrompt: "You are helpful",
             });
             expect(result.data.modelParams).toEqual(defaultModelParams);
+            expect(result.data.target).toEqual({ type: "prompt", referenceId: "prompt_123" });
             expect(result.telemetry).toEqual({
               endpoint: "http://localhost:3000",
               apiKey: "test-api-key",

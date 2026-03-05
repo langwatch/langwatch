@@ -1,6 +1,6 @@
 import { Box, HStack, Spacer } from "@chakra-ui/react";
-import { type Node, useReactFlow, type XYPosition } from "@xyflow/react";
-import { useCallback, useEffect, useMemo } from "react";
+import { type Node, useReactFlow } from "@xyflow/react";
+import { useCallback, useEffect } from "react";
 import { useDrag } from "react-dnd";
 import { getEmptyImage } from "react-dnd-html5-backend";
 import { LuGripVertical } from "react-icons/lu";
@@ -26,14 +26,10 @@ export const NodeDraggable = (props: {
   disableDrag?: boolean;
   onDragEnd?: (item: { node: NodeWithOptionalPosition<Component> }) => void;
 }) => {
-  const { setNodes, setNodeParameter, deleteNode, nodes } = useWorkflowStore(
+  const { setNodes, nodes } = useWorkflowStore(
     (state) => ({
-      setWorkflow: state.setWorkflow,
       setNodes: state.setNodes,
-      setNodeParameter: state.setNodeParameter,
-      deleteNode: state.deleteNode,
       nodes: state.nodes,
-      propertiesExpanded: state.propertiesExpanded,
     }),
   );
 
@@ -78,34 +74,8 @@ export const NodeDraggable = (props: {
     }
   };
 
-  const handleSetPromptingTechnique = (newNode: Node, id: string) => {
-    if (newNode) {
-      newNode.position = {
-        x: 0,
-        y: 0,
-      };
-      setNodes([...nodes, newNode]);
-
-      const currentNode = nodes.find((node) => node.id === id);
-      for (const parameter of currentNode?.data.parameters ?? []) {
-        if (parameter.type === "prompting_technique") {
-          if (parameter.value) {
-            deleteNode((parameter.value as { ref: string }).ref);
-          }
-          setNodeParameter(id, {
-            identifier: parameter.identifier,
-            type: "prompting_technique",
-            value: {
-              ref: newNode.id,
-            },
-          });
-        }
-      }
-    }
-  };
-
   const [collected, drag, preview] = useDrag({
-    type: props.type === "prompting_technique" ? "prompting_technique" : "node",
+    type: "node",
     item: () => {
       return { node: createNewNode() };
     },
@@ -117,17 +87,14 @@ export const NodeDraggable = (props: {
       const dropResult = monitor.getDropResult();
 
       if (item && dropResult) {
-        if (item.node.type === "prompting_technique") {
-          // @ts-ignore
-          handleSetPromptingTechnique(item.node, dropResult.id);
-        } else {
-          // @ts-ignore
-          handleSetNodes(item.node, dropResult.x, dropResult.y);
-        }
+        // @ts-ignore
+        handleSetNodes(item.node, dropResult.x, dropResult.y);
       }
 
-      // It's important to do this at the end so it has the update state
-      props.onDragEnd?.(item);
+      // Only fire onDragEnd when the node was actually placed on canvas
+      if (item && dropResult) {
+        props.onDragEnd?.(item);
+      }
     },
   });
 

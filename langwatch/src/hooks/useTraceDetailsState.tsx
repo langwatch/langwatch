@@ -19,7 +19,7 @@ export function useTraceDetailsState(traceId: string) {
     {
       enabled: !!project && !!traceId,
       refetchOnWindowFocus: true,
-      refetchInterval: keepRefetching ? 1000 : undefined,
+      refetchInterval: keepRefetching ? 5000 : undefined,
     },
   );
 

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { EventSchema } from "../../../library/domain/types";
+import { EventSchema } from "../../../domain/types";
 import {
   EVALUATION_COMPLETED_EVENT_TYPE,
   EVALUATION_SCHEDULED_EVENT_TYPE,
@@ -76,6 +76,7 @@ export const evaluationCompletedEventDataSchema = z.object({
   label: z.string().nullable().optional(),
   details: z.string().nullable().optional(),
   error: z.string().nullable().optional(),
+  costId: z.string().nullable().optional(),
 });
 
 export const evaluationCompletedEventSchema = EventSchema.extend({
@@ -103,5 +104,6 @@ export type EvaluationProcessingEvent =
 export {
   isEvaluationCompletedEvent,
   isEvaluationScheduledEvent,
-  isEvaluationStartedEvent,
+  isEvaluationStartedEvent
 } from "./typeGuards";
+

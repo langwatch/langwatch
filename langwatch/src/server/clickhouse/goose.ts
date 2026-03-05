@@ -20,20 +20,12 @@ const logger = createLogger("langwatch:clickhouse:migrations");
  * Configuration via environment variables:
  * - CLICKHOUSE_URL: Connection string with database in path (e.g., http://host:8123/langwatch)
  * - CLICKHOUSE_CLUSTER: Cluster name for Replicated database engine. If set, enables replication.
- * - TIERED_*_TABLE_HOT_DAYS: TTL configuration for tiered storage (optional, defaults to 2)
  *
  * @see https://github.com/pressly/goose
  */
 
 const MIGRATIONS_DIR = path.join(__dirname, "migrations");
 const VALID_DB_NAME = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
-
-const TTL_ENV_VARS = [
-  "TIERED_EVENT_LOG_TABLE_HOT_DAYS",
-  "TIERED_PROCESSOR_CHECKPOINTS_TABLE_HOT_DAYS",
-  "TIERED_STORED_SPANS_TABLE_HOT_DAYS",
-  "TIERED_TRACE_SUMMARIES_TABLE_HOT_DAYS",
-] as const;
 
 export interface GooseOptions {
   connectionUrl?: string;
@@ -85,20 +77,7 @@ function validateIdentifier(name: string, label: string): void {
   }
 }
 
-function validateNumericEnvVar(name: string, defaultVal: number): number {
-  const val = process.env[name];
-  if (!val) return defaultVal;
-  const num = parseInt(val, 10);
-  if (Number.isNaN(num) || num < 0) {
-    throw new MigrationError(
-      `${name} must be a non-negative integer, got: "${val}"`,
-      "preflight",
-    );
-  }
-  return num;
-}
-
-function parseConnectionUrl(
+export function parseConnectionUrl(
   connectionUrl?: string,
   databaseOverride?: string,
 ): ClickHouseConfig {
@@ -188,11 +167,6 @@ async function preflight(config: ClickHouseConfig): Promise<void> {
 
   // Check goose binary exists
   checkGooseBinary();
-
-  // Validate TTL environment variables
-  for (const envVar of TTL_ENV_VARS) {
-    validateNumericEnvVar(envVar, 2);
-  }
 
   try {
     await withClient(config.serverUrl, async (client) => {
@@ -368,9 +342,6 @@ function buildMigrationEnvVars(config: ClickHouseConfig): NodeJS.ProcessEnv {
     CLICKHOUSE_ENGINE_REPLACING_PREFIX: config.clusterName
       ? "ReplicatedReplacingMergeTree("
       : "ReplacingMergeTree(",
-
-    // TTL vars
-    ...Object.fromEntries(TTL_ENV_VARS.map((v) => [v, process.env[v]])),
   };
 
   // Filter out undefined values
@@ -524,9 +495,7 @@ export async function getMigrateStatus(
   return executeGoose("status", config, options);
 }
 
-export async function runMigrationsIfConfigured(
-  options: GooseOptions = {},
-): Promise<void> {
+export async function runMigrations(options: GooseOptions = {}): Promise<void> {
   if (process.env.ENABLE_CLICKHOUSE !== "true") {
     logger.info(
       "ENABLE_CLICKHOUSE is not set, skipping ClickHouse migrations.",

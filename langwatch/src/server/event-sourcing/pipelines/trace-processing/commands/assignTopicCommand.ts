@@ -1,18 +1,18 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { createLogger } from "../../../../../utils/logger/server";
-import type { Command, CommandHandler } from "../../../library";
+import type { Command, CommandHandler } from "../../../";
 import {
-  createTenantId,
-  defineCommandSchema,
-  EventUtils,
-} from "../../../library";
+	createTenantId,
+	defineCommandSchema,
+	EventUtils,
+} from "../../../";
+import { createLogger } from "../../../../../utils/logger/server";
 import type { AssignTopicCommandData } from "../schemas/commands";
 import { assignTopicCommandDataSchema } from "../schemas/commands";
 import {
-  ASSIGN_TOPIC_COMMAND_TYPE,
-  TOPIC_ASSIGNED_EVENT_TYPE,
-  TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
+	ASSIGN_TOPIC_COMMAND_TYPE,
+	TOPIC_ASSIGNED_EVENT_TYPE,
+	TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
 } from "../schemas/constants";
 import type { TopicAssignedEvent } from "../schemas/events";
 
@@ -63,20 +63,20 @@ export class AssignTopicCommand implements CommandHandler<
           "Handling assign topic command",
         );
 
-        const topicAssignedEvent = EventUtils.createEvent<TopicAssignedEvent>(
-          "trace",
-          commandData.traceId,
+        const topicAssignedEvent = EventUtils.createEvent<TopicAssignedEvent>({
+          aggregateType: "trace",
+          aggregateId: commandData.traceId,
           tenantId,
-          TOPIC_ASSIGNED_EVENT_TYPE,
-          TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
-          {
+          type: TOPIC_ASSIGNED_EVENT_TYPE,
+          version: TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
+          data: {
             topicId: commandData.topicId,
             topicName: commandData.topicName,
             subtopicId: commandData.subtopicId,
             subtopicName: commandData.subtopicName,
             isIncremental: commandData.isIncremental,
           },
-        );
+        });
 
         this.logger.debug(
           {

@@ -11,6 +11,7 @@ import { JSONPath } from "jsonpath-plus";
 import { Liquid } from "liquidjs";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 import { applyAuthentication } from "../../adapters/auth.strategies";
+import { injectTraceContextHeaders } from "../trace-context-headers";
 import type { HttpAgentData } from "../types";
 
 // Shared Liquid engine instance for template interpolation
@@ -25,9 +26,18 @@ const DEFAULT_SCENARIO_THREAD_ID = "scenario-test";
 export class SerializedHttpAgentAdapter extends AgentAdapter {
   role = AgentRole.AGENT;
 
-  constructor(private readonly config: HttpAgentData) {
+  private readonly config: HttpAgentData;
+  private capturedTraceId: string | undefined;
+
+  constructor(config: HttpAgentData) {
     super();
     this.name = "SerializedHttpAgentAdapter";
+    this.config = config;
+  }
+
+  /** Returns the trace ID captured during the most recent HTTP request. */
+  getTraceId(): string | undefined {
+    return this.capturedTraceId;
   }
 
   async call(input: AgentInput): Promise<string> {
@@ -50,6 +60,9 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
     }
 
     Object.assign(headers, applyAuthentication(this.config.auth));
+
+    const { traceId } = injectTraceContextHeaders({ headers });
+    this.capturedTraceId = traceId;
 
     return headers;
   }

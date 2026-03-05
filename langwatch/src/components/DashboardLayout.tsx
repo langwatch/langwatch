@@ -23,7 +23,6 @@ import { useDrawer } from "../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { useUpgradeModalStore } from "../stores/upgradeModalStore";
 import { UpgradeModal } from "./UpgradeModal";
-import type { LimitType } from "../server/license-enforcement";
 import { usePlanManagementUrl } from "../hooks/usePlanManagementUrl";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import { useRequiredSession } from "../hooks/useRequiredSession";
@@ -33,6 +32,7 @@ import { api } from "../utils/api";
 import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { trackEvent } from "../utils/tracking";
 import { CurrentDrawer } from "./CurrentDrawer";
+import { SdkRadarBanner } from "./SdkRadarBanner";
 import { FullLogo } from "./icons/FullLogo";
 import { LogoIcon } from "./icons/LogoIcon";
 import { LoadingScreen } from "./LoadingScreen";
@@ -609,6 +609,8 @@ export const DashboardLayout = ({
                 </Alert.Root>
               )}
 
+            <SdkRadarBanner />
+
             {publicEnv.data?.DEMO_PROJECT_SLUG &&
               publicEnv.data.DEMO_PROJECT_SLUG === router.query.project && (
                 <HStack width="full" backgroundColor="orange.400" padding={1}>
@@ -652,17 +654,7 @@ export const DashboardLayout = ({
 };
 
 function GlobalUpgradeModal() {
-  const { isOpen, limitType, current, max, close } = useUpgradeModalStore();
-
-  if (!limitType) return null;
-
-  return (
-    <UpgradeModal
-      open={isOpen}
-      onClose={close}
-      limitType={limitType as LimitType}
-      current={current ?? undefined}
-      max={max ?? undefined}
-    />
-  );
+  const { isOpen, variant, close } = useUpgradeModalStore();
+  if (!variant) return null;
+  return <UpgradeModal open={isOpen} onClose={close} variant={variant} />;
 }

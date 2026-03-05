@@ -122,19 +122,19 @@ export function TraceDetails(props: {
       setTimeout(() => {
         void router.replace(
           "?" +
-            qs.stringify(
-              {
-                ...Object.fromEntries(
-                  Object.entries(router.query).filter(
-                    ([key]) => !key.startsWith("drawer.selectedTab"),
-                  ),
+          qs.stringify(
+            {
+              ...Object.fromEntries(
+                Object.entries(router.query).filter(
+                  ([key]) => !key.startsWith("drawer.selectedTab"),
                 ),
-                drawer: {
-                  selectedTab: tab,
-                },
+              ),
+              drawer: {
+                selectedTab: tab,
               },
-              { allowDots: true },
-            ),
+            },
+            { allowDots: true },
+          ),
         );
       }, 100);
     },
@@ -273,13 +273,15 @@ export function TraceDetails(props: {
                       <Popover.Arrow />
                       <Popover.CloseTrigger />
                       <Popover.Body>
-                        <AddParticipants
-                          annotators={annotators}
-                          setAnnotators={setAnnotators}
-                          queueDrawerOpen={queueDrawerOpen}
-                          sendToQueue={sendToQueue}
-                          isLoading={queueItem.isLoading}
-                        />
+                        {open && (
+                          <AddParticipants
+                            annotators={annotators}
+                            setAnnotators={setAnnotators}
+                            queueDrawerOpen={queueDrawerOpen}
+                            sendToQueue={sendToQueue}
+                            isLoading={queueItem.isLoading}
+                          />
+                        )}
                       </Popover.Body>
                     </Popover.Content>
                   </Popover.Root>
@@ -426,11 +428,13 @@ export function TraceDetails(props: {
         </Tabs.Content>
       </Tabs.Root>
 
-      <AddAnnotationQueueDrawer
-        open={queueDrawerOpen.open}
-        onClose={queueDrawerOpen.onClose}
-        onOverlayClick={queueDrawerOpen.onClose}
-      />
+      {queueDrawerOpen.open && (
+        <AddAnnotationQueueDrawer
+          open={queueDrawerOpen.open}
+          onClose={queueDrawerOpen.onClose}
+          onOverlayClick={queueDrawerOpen.onClose}
+        />
+      )}
     </VStack>
   );
 }

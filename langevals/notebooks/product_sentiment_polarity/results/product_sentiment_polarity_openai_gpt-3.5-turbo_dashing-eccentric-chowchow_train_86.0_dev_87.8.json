@@ -1,0 +1,31 @@
+{
+  "prog": {
+    "lm": null,
+    "traces": [],
+    "train": [],
+    "demos": [
+      {
+        "augmented": true,
+        "output": "Yes, the Samsung Galaxy A54 does have an AMOLED display, but don't let that fool you. Samsung often skimps on software optimization and long-term updates for mid-range models like this. You might end up with a screen that looks good initially but suffers from performance issues and less-than-stellar software support over time.",
+        "reasoning": "The output highlights the potential drawbacks of the Samsung Galaxy A54, emphasizing issues with software optimization and long-term updates. It suggests that the initial appeal of the AMOLED display may be overshadowed by performance issues and lackluster software support.",
+        "sentiment": "very_negative"
+      },
+      {
+        "augmented": true,
+        "output": "The Galaxy Tab S9 features a 2560 x 1600 resolution on its 11-inch display, while the Galaxy Tab S9+ boasts a higher resolution of 2800 x 1752 on its larger 12.4-inch screen. Both offer crisp, vibrant visuals, but the S9+ provides a slightly higher pixel density, enhancing the overall visual experience for larger display enthusiasts.",
+        "reasoning": "The output highlights the positive aspects of the product specifications, emphasizing the spacious screen size and high resolutions of the Galaxy Tab S9 and S9+. It also compares the two models, pointing out the advantages of the S9+ in terms of pixel density. Overall, the tone is informative and positive, focusing on the visual experience and options available to consumers.",
+        "sentiment": "subtly_positive"
+      },
+      {
+        "output": "The Galaxy Watch 6 offers a slight improvement in battery life compared to the Galaxy Watch 5. While both models provide robust performance, the Watch 6 benefits from optimizations in software and hardware that can offer an overall extended usage time, making it a modest but noticeable upgrade for users prioritizing battery longevity.",
+        "sentiment": "subtly_positive"
+      },
+      {
+        "output": "The key differences between the Galaxy Z Fold 4 and Fold 3 include a slightly improved hinge mechanism, a marginally larger and brighter display, and better camera performance on the Fold 4. There's also an upgraded processor for enhanced performance and battery life. While these are notable enhancements, they're more evolutionary than revolutionary.",
+        "sentiment": "subtly_negative"
+      }
+    ],
+    "signature_instructions": "Classify the sentiment of the output.",
+    "signature_prefix": "Sentiment:"
+  }
+}

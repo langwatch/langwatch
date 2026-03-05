@@ -26,6 +26,7 @@ import {
   ScrollText,
   Settings,
   Shield,
+  Stethoscope,
   Sun,
   Table,
   Tags,
@@ -303,6 +304,15 @@ export const navigationCommands: Command[] = [
     path: "/settings/subscription",
   },
   {
+    id: "nav-settings-plans",
+    label: "Plans",
+    description: "Settings → Plans",
+    icon: CreditCard,
+    category: "navigation",
+    keywords: ["plans", "pricing", "compare", "billing"],
+    path: "/settings/plans",
+  },
+  {
     id: "nav-settings-authentication",
     label: "Authentication",
     description: "Settings → Authentication",
@@ -375,6 +385,14 @@ export const actionCommands: Command[] = [
     category: "actions",
     keywords: ["create", "add", "scenario", "test"],
   },
+  {
+    id: "action-sdk-radar",
+    label: "SDK Radar",
+    description: "Check SDK version status",
+    icon: Stethoscope,
+    category: "actions",
+    keywords: ["sdk", "version", "update", "outdated", "radar", "upgrade"],
+  },
 ];
 
 /**
@@ -387,7 +405,14 @@ export const supportCommands: Command[] = [
     description: "Manage subscription or license",
     icon: CreditCard,
     category: "actions",
-    keywords: ["plan", "upgrade", "subscription", "billing", "license", "pricing"],
+    keywords: [
+      "plan",
+      "upgrade",
+      "subscription",
+      "billing",
+      "license",
+      "pricing",
+    ],
     // Path is set dynamically in useFilteredCommands based on IS_SAAS
   },
   {
@@ -414,7 +439,8 @@ export const supportCommands: Command[] = [
     icon: Github,
     category: "actions",
     keywords: ["github", "support", "help", "community"],
-    externalUrl: "https://github.com/orgs/langwatch/discussions/categories/support",
+    externalUrl:
+      "https://github.com/orgs/langwatch/discussions/categories/support",
   },
   {
     id: "action-discord",
@@ -441,7 +467,8 @@ export const supportCommands: Command[] = [
     icon: Lightbulb,
     category: "actions",
     keywords: ["feature", "request", "idea", "suggestion"],
-    externalUrl: "https://github.com/orgs/langwatch/discussions/categories/ideas",
+    externalUrl:
+      "https://github.com/orgs/langwatch/discussions/categories/ideas",
   },
   {
     id: "action-bug-report",
@@ -509,7 +536,7 @@ const topLevelNavIds = new Set([
  * Top-level navigation commands (shown when query is empty).
  */
 export const topLevelNavigationCommands: Command[] = navigationCommands.filter(
-  (cmd) => topLevelNavIds.has(cmd.id)
+  (cmd) => topLevelNavIds.has(cmd.id),
 );
 
 /**
@@ -535,7 +562,7 @@ export function filterCommands(commands: Command[], query: string): Command[] {
       ?.toLowerCase()
       .includes(lowerQuery);
     const keywordMatch = cmd.keywords?.some((kw) =>
-      kw.toLowerCase().includes(lowerQuery)
+      kw.toLowerCase().includes(lowerQuery),
     );
     return labelMatch || descriptionMatch || keywordMatch;
   });

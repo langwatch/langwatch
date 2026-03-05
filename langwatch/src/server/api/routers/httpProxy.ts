@@ -4,8 +4,25 @@ import { createLogger } from "~/utils/logger/server";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+import {
+  buildTraceparentHeader,
+  buildTraceTestContext,
+  createAgentTestTrace,
+  generateTraceIds,
+} from "./httpProxyTracing";
 
 const _logger = createLogger("langwatch:httpProxy");
+
+type HttpProxyResult = {
+  success: boolean;
+  error?: string;
+  response?: unknown;
+  extractedOutput?: string;
+  status?: number;
+  statusText?: string;
+  duration?: number;
+  responseHeaders?: Record<string, string>;
+};
 
 /**
  * HTTP Proxy Router
@@ -33,6 +50,7 @@ export const httpProxyRouter = createTRPCRouter({
     .input(
       z.object({
         projectId: z.string(),
+        agentId: z.string().optional(),
         url: z.string().url(),
         method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]),
         headers: z
@@ -53,8 +71,8 @@ export const httpProxyRouter = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("evaluations:manage"))
-    .mutation(async ({ input }) => {
-      const { url, method, headers, auth, body, outputPath } = input;
+    .mutation(async ({ input, ctx }): Promise<HttpProxyResult> => {
+      const { url, method, headers, auth, body, outputPath, agentId } = input;
 
       // Build request headers
       const requestHeaders: Record<string, string> = {
@@ -101,16 +119,64 @@ export const httpProxyRouter = createTRPCRouter({
         }
       }
 
+      // Generate trace IDs upfront so the traceparent header can be sent
+      // with the outgoing request, enabling distributed tracing correlation
+      const traceIds = agentId ? generateTraceIds() : undefined;
+
+      if (traceIds) {
+        requestHeaders.traceparent = buildTraceparentHeader(traceIds);
+      }
+
+      // Captures live requestHeaders (including auth) at call time.
+      // Sanitization of credentials happens inside createAgentTestTrace.
+      const maybeTrace = async (result: {
+        success: boolean;
+        response?: unknown;
+        extractedOutput?: string;
+        error?: string;
+        status?: number;
+        statusText?: string;
+        duration?: number;
+        responseHeaders?: Record<string, string>;
+      }) => {
+        if (!agentId) return;
+
+        const customAuthHeaderName =
+          auth?.type === "api_key" ? auth.headerName : undefined;
+
+        try {
+          await createAgentTestTrace({
+            projectId: input.projectId,
+            agentId,
+            userId: ctx.session.user.id,
+            traceId: traceIds?.traceId,
+            spanId: traceIds?.spanId,
+            testContext: buildTraceTestContext({
+              url,
+              method,
+              auth,
+              outputPath,
+            }),
+            requestBody: body,
+            requestHeaders,
+            customAuthHeaderName,
+            result,
+          });
+        } catch (traceError) {
+          // Tracing failures must not break the HTTP proxy response
+          _logger.error({ traceError }, "failed to create agent test trace");
+        }
+      };
+
       try {
         // Parse body to validate JSON
         let parsedBody: unknown;
         try {
           parsedBody = JSON.parse(body);
         } catch {
-          return {
-            success: false,
-            error: "Invalid JSON in request body",
-          };
+          const error = "Invalid JSON in request body";
+          await maybeTrace({ success: false, error });
+          return { success: false, error };
         }
 
         // Make the HTTP request with SSRF protection
@@ -124,13 +190,12 @@ export const httpProxyRouter = createTRPCRouter({
             body: method !== "GET" ? JSON.stringify(parsedBody) : undefined,
           });
         } catch (ssrfError) {
-          return {
-            success: false,
-            error:
-              ssrfError instanceof Error
-                ? ssrfError.message
-                : "URL validation failed",
-          };
+          const error =
+            ssrfError instanceof Error
+              ? ssrfError.message
+              : "URL validation failed";
+          await maybeTrace({ success: false, error });
+          return { success: false, error };
         }
         const duration = Date.now() - startTime;
 
@@ -166,7 +231,7 @@ export const httpProxyRouter = createTRPCRouter({
         }
 
         if (!response.ok) {
-          return {
+          const httpErrorResult = {
             success: false,
             error: `HTTP ${response.status}: ${response.statusText}`,
             response: responseData,
@@ -175,9 +240,11 @@ export const httpProxyRouter = createTRPCRouter({
             duration,
             responseHeaders,
           };
+          await maybeTrace(httpErrorResult);
+          return httpErrorResult;
         }
 
-        return {
+        const successResult = {
           success: true,
           response: responseData,
           extractedOutput,
@@ -186,11 +253,12 @@ export const httpProxyRouter = createTRPCRouter({
           duration,
           responseHeaders,
         };
+        await maybeTrace(successResult);
+        return successResult;
       } catch (err) {
-        return {
-          success: false,
-          error: err instanceof Error ? err.message : "Request failed",
-        };
+        const error = err instanceof Error ? err.message : "Request failed";
+        await maybeTrace({ success: false, error });
+        return { success: false, error };
       }
     }),
 });

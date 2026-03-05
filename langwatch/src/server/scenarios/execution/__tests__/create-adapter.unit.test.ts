@@ -9,6 +9,7 @@ import {
   SERIALIZED_ADAPTER_FACTORIES,
 } from "../serialized-adapter.registry";
 import {
+  SerializedCodeAgentAdapter,
   SerializedHttpAgentAdapter,
   SerializedPromptConfigAdapter,
 } from "../serialized.adapters";
@@ -59,6 +60,26 @@ describe("createAdapter", () => {
     });
   });
 
+  describe("code adapter", () => {
+    it("creates SerializedCodeAgentAdapter for code type", () => {
+      const adapterData: TargetAdapterData = {
+        type: "code",
+        agentId: "agent_456",
+        code: 'def execute(input):\n    return f"processed: {input}"',
+        inputs: [{ identifier: "input", type: "str" }],
+        outputs: [{ identifier: "output", type: "str" }],
+      };
+
+      const adapter = createAdapter({
+        adapterData,
+        modelParams: defaultModelParams,
+        nlpServiceUrl,
+      });
+
+      expect(adapter).toBeInstanceOf(SerializedCodeAgentAdapter);
+    });
+  });
+
   describe("unknown adapter type", () => {
     it("throws descriptive error for unknown adapter type", () => {
       const adapterData = {
@@ -82,6 +103,10 @@ describe("createAdapter", () => {
 
     it("has factory for http type", () => {
       expect(SERIALIZED_ADAPTER_FACTORIES["http"]).toBeDefined();
+    });
+
+    it("has factory for code type", () => {
+      expect(SERIALIZED_ADAPTER_FACTORIES["code"]).toBeDefined();
     });
   });
 });

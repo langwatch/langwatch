@@ -3,6 +3,7 @@ import {
   Button,
   type ButtonProps,
   Center,
+  Circle,
   HStack,
   Spacer,
   Spinner,
@@ -45,10 +46,12 @@ import type {
   LLMConfig,
 } from "../../types/dsl";
 import { checkIsEvaluator } from "../../utils/nodeUtils";
+import { hasUnsavedChanges } from "../../utils/unsavedChanges";
 import { ComponentIcon } from "../ColorfulBlockIcons";
 
 export function getNodeDisplayName(node: { id: string; data: Component }) {
-  return node.data.name ?? node.data.cls ?? node.id;
+  const data = node.data as any;
+  return data.localConfig?.name ?? data.name ?? data.cls ?? node.id;
 }
 
 function NodeInputs({
@@ -272,7 +275,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
       color="fg.muted"
       fontSize="11px"
       minWidth={
-        120 + 6.5 * Math.min(getNodeDisplayName(props).length, 24) + "px"
+        140 + 6.5 * Math.min(getNodeDisplayName(props).length, 24) + "px"
       }
       boxShadow={`0px 0px 4px 0px rgba(0, 0, 0, ${isHovered ? "0.2" : "0.1"})`}
       border="none"
@@ -340,12 +343,17 @@ export const ComponentNode = forwardRef(function ComponentNode(
           fontWeight={500}
           minWidth="0"
           flexShrink={1}
-          lineClamp={2}
+          lineClamp={1}
           wordBreak="break-all"
           width="full"
         >
           {getNodeDisplayName(props)}
         </Text>
+        {hasUnsavedChanges(props.data) && (
+          <Tooltip content="Unsaved changes" positioning={{ placement: "top" }} openDelay={0} showArrow>
+            <Circle size="8px" bg="orange.solid" flexShrink={0} data-testid="unsaved-changes-indicator" />
+          </Tooltip>
+        )}
         {node && isExecutableComponent(node) && !isInsideWizard ? (
           <ComponentExecutionButton
             node={node}
@@ -433,7 +441,7 @@ export function ComponentExecutionButton({
   const shouldOpenExecutionResults =
     node?.data.execution_state && !propertiesExpanded;
 
-  const Wrapper = isInsideNode ? NodeToolbar : Box;
+  const Wrapper = isInsideNode ? NodeToolbar : React.Fragment;
 
   return (
     <>
@@ -530,7 +538,7 @@ export function ComponentExecutionButton({
             </Button>
           </Menu.Trigger>
           <Wrapper>
-            <Menu.Content>
+            <Menu.Content zIndex="popover">
               <Menu.Item
                 value="run-manual"
                 onClick={() => node && startComponentExecution({ node })}

@@ -1,6 +1,7 @@
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
+import { DomainError } from "~/server/app-layer/domain-error";
 import { NotFoundError as PromptNotFoundError } from "~/server/prompt-config/errors";
 
 import { HttpError, NotFoundError } from "../shared/errors";
@@ -37,7 +38,18 @@ function determineErrorResponse(
     code?: string;
     name?: string;
   },
-): { statusCode: ContentfulStatusCode; response: { error: string; message?: string } } {
+): { statusCode: ContentfulStatusCode; response: object } {
+  // DomainErrors are handled first — normalize to client-safe shape
+  if (DomainError.is(error)) {
+    return {
+      statusCode: error.httpStatus as ContentfulStatusCode,
+      response: errorSchema.parse({
+        error: error.kind,
+        message: error.message,
+      }),
+    };
+  }
+
   // Check if it's a "not found" error
   const isNotFoundError =
     error.message?.includes("not found") ||

@@ -11,7 +11,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Edit, MoreVertical, Plus, Trash2 } from "lucide-react";
+import { BrainCircuit, Edit, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { useDrawer } from "~/hooks/useDrawer";
@@ -160,7 +160,7 @@ export default function ModelsPage() {
           <EmptyState.Root width="full">
             <EmptyState.Content>
               <EmptyState.Indicator>
-                <Plus size={24} />
+                <BrainCircuit size={24} />
               </EmptyState.Indicator>
               <VStack textAlign="center">
                 <EmptyState.Title>No model providers</EmptyState.Title>

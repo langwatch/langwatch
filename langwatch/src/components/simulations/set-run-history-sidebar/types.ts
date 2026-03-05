@@ -1,4 +1,4 @@
-import type { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
+import type { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 
 // Types for props
 export type RunItem = {
@@ -14,6 +14,8 @@ export type Run = {
   scenarioRunId: string;
   label: string;
   timestamp: number;
-  duration: string;
+  firstCompletedAt?: number | null;
+  allCompletedAt?: number | null;
   items: RunItem[];
+  isRunning?: boolean;
 };

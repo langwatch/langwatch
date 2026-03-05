@@ -45,7 +45,13 @@
  * const response = await fetchWithResolvedIp(validated, { method: "POST" });
  * ```
  *
+ * ## On-Prem Mode (IS_SAAS=false)
+ * - Private IP/hostname checks are skipped (allows reaching internal services)
+ * - TLS certificate validation is disabled (allows self-signed certs)
+ * - Cloud metadata endpoints and cloud provider domains are ALWAYS blocked
+ *
  * ## Environment Variables
+ * - IS_SAAS: "true"/"1" to enable SaaS mode, "false"/"0" or unset for on-prem mode
  * - ALLOWED_PROXY_HOSTS: Comma-separated allowlist for dev (e.g., "localhost,127.0.0.1")
  * - NODE_ENV: "development" or "production"
  *
@@ -59,10 +65,14 @@ import {
   type Response as FetchResponse,
   fetch as undiciFetch,
 } from "undici";
+import { env } from "../env.mjs";
 import { createLogger } from "./logger";
 import { BLOCKED_CLOUD_DOMAINS, BLOCKED_METADATA_HOSTS } from "./ssrfConstants";
 
 const logger = createLogger("langwatch:ssrfProtection");
+
+/** Single source of truth for SaaS mode. Uses env module (false when IS_SAAS is unset). */
+const isSaaS = !!env.IS_SAAS;
 
 // ============================================================================
 // Types
@@ -75,6 +85,8 @@ const logger = createLogger("langwatch:ssrfProtection");
 export interface SSRFConfig {
   isDevelopment: boolean;
   allowedDevHosts: string[];
+  /** When false (on-prem), private IP/hostname checks are skipped. Cloud metadata is always blocked. Defaults to true. */
+  isSaaS: boolean;
 }
 
 /**
@@ -418,7 +430,8 @@ export function createSSRFValidator(config: SSRFConfig) {
     }
 
     const skipPrivateChecks =
-      config.isDevelopment && config.allowedDevHosts.length === 0;
+      !config.isSaaS ||
+      (config.isDevelopment && config.allowedDevHosts.length === 0);
 
     // Handle IP literals
     const ipVersion = isIP(hostname);
@@ -494,6 +507,7 @@ export function createSSRFValidator(config: SSRFConfig) {
 export const validateUrlForSSRF = createSSRFValidator({
   isDevelopment: process.env.NODE_ENV === "development",
   allowedDevHosts: process.env.ALLOWED_PROXY_HOSTS?.split(",") || [],
+  isSaaS,
 });
 
 // ============================================================================
@@ -506,9 +520,17 @@ export interface SSRFSafeFetchOptions extends RequestInit {
   _redirectCount?: number;
 }
 
-function createIpPinningAgent(resolvedIp: string): Agent {
+/** Returns TLS/fetch configuration based on SaaS mode. */
+export function createSSRFSafeFetchConfig({ isSaaS }: { isSaaS: boolean }): { rejectUnauthorized: boolean } {
+  return { rejectUnauthorized: isSaaS };
+}
+
+const defaultFetchConfig = createSSRFSafeFetchConfig({ isSaaS });
+
+function createIpPinningAgent(resolvedIp: string, tlsConfig: { rejectUnauthorized: boolean } = defaultFetchConfig): Agent {
   return new Agent({
     connect: {
+      rejectUnauthorized: tlsConfig.rejectUnauthorized,
       lookup: (_hostname, _options, callback) => {
         callback(null, [
           { address: resolvedIp, family: isIP(resolvedIp) === 6 ? 6 : 4 },
@@ -533,10 +555,15 @@ function getResolvedIpForPinning(result: SSRFValidationResult): string | null {
  * Performs SSRF-validated fetch using the pre-resolved IP address.
  * Eliminates TOCTOU by using undici's dispatcher to pin to the resolved IP.
  * Uses redirect: 'manual' to validate redirect URLs before following.
+ *
+ * @param validated - The validated SSRF result from createSSRFValidator
+ * @param init - Fetch options, including optional _redirectCount
+ * @param tlsConfig - Optional TLS config override for testing. Defaults to module-level config.
  */
 export async function fetchWithResolvedIp(
   validated: SSRFValidationResult,
   init?: SSRFSafeFetchOptions,
+  tlsConfig: { rejectUnauthorized: boolean } = defaultFetchConfig,
 ): Promise<FetchResponse> {
   const headers = new Headers(init?.headers);
   const redirectCount = init?._redirectCount ?? 0;
@@ -548,11 +575,12 @@ export async function fetchWithResolvedIp(
   const requestUrl = `${validated.protocol}//${validated.hostname}:${validated.port}${validated.path}`;
   const resolvedIp = getResolvedIpForPinning(validated);
 
-  // Use IP pinning dispatcher when we have a resolved IP, otherwise let undici resolve DNS
+  // Use IP pinning dispatcher when we have a resolved IP.
+  // Always apply TLS config (e.g. rejectUnauthorized) via a custom Agent.
   const dispatcher =
     resolvedIp && isIP(resolvedIp) !== 0
-      ? createIpPinningAgent(resolvedIp)
-      : undefined;
+      ? createIpPinningAgent(resolvedIp, tlsConfig)
+      : new Agent({ connect: { rejectUnauthorized: tlsConfig.rejectUnauthorized } });
 
   try {
     const response = await undiciFetch(requestUrl, {
@@ -598,7 +626,7 @@ export async function fetchWithResolvedIp(
           redirectInit.body = undefined;
         }
 
-        return fetchWithResolvedIp(redirectValidated, redirectInit);
+        return fetchWithResolvedIp(redirectValidated, redirectInit, tlsConfig);
       }
     }
 

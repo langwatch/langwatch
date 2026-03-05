@@ -26,9 +26,14 @@ export const useDatasetSync = () => {
     setAutosaveStatus: state.setAutosaveStatus,
   }));
 
-  // Mutations for saved dataset records
+  // Mutations for saved dataset records — stored in refs to avoid
+  // re-triggering the sync effect when mutation state changes (isLoading, etc.)
   const updateSavedRecord = api.datasetRecord.update.useMutation();
   const deleteSavedRecords = api.datasetRecord.deleteMany.useMutation();
+  const updateRef = useRef(updateSavedRecord);
+  updateRef.current = updateSavedRecord;
+  const deleteRef = useRef(deleteSavedRecords);
+  deleteRef.current = deleteSavedRecords;
 
   // Refs to avoid stale closures in the debounced effect
   const pendingChangesRef = useRef(pendingSavedChanges);
@@ -120,7 +125,7 @@ export const useDatasetSync = () => {
         // Handle deletions
         if (recordsToDelete.length > 0) {
           handleSyncStart();
-          deleteSavedRecords.mutate(
+          deleteRef.current.mutate(
             {
               projectId: project.id,
               datasetId: dbDatasetId,
@@ -155,7 +160,7 @@ export const useDatasetSync = () => {
 
             handleSyncStart();
             // Sync this record to DB with full data
-            updateSavedRecord.mutate(
+            updateRef.current.mutate(
               {
                 projectId: project.id,
                 datasetId: dbDatasetId,
@@ -182,8 +187,6 @@ export const useDatasetSync = () => {
   }, [
     pendingSavedChanges,
     project?.id,
-    updateSavedRecord,
-    deleteSavedRecords,
     clearPendingChange,
     handleSyncStart,
     handleSyncSuccess,

@@ -48,7 +48,6 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.evaluation_states
 ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}UpdatedAt)
 PARTITION BY toYearWeek(UpdatedAt)
 ORDER BY (TenantId, EvaluationId)
-TTL toDateTime(UpdatedAt) + INTERVAL ${TIERED_EVALUATION_STATES_TABLE_HOT_DAYS:-2} DAY TO VOLUME 'cold'
 SETTINGS index_granularity = 8192, storage_policy = 'local_primary';
 
 -- +goose StatementEnd
@@ -58,7 +57,7 @@ SETTINGS index_granularity = 8192, storage_policy = 'local_primary';
 -- +goose ENVSUB ON
 -- +goose StatementBegin
 
-DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.evaluation_states SYNC;
+-- DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.evaluation_states SYNC;
 
 -- +goose StatementEnd
 -- +goose ENVSUB OFF

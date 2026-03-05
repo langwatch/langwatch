@@ -10,7 +10,7 @@ Feature: Scenario Library
   # Navigation
   # ============================================================================
 
-  @e2e
+  @integration
   Scenario: Navigate to scenarios list
     When I navigate to "/my-project/simulations"
     Then I see the scenarios list page
@@ -37,7 +37,7 @@ Feature: Scenario Library
     When I click on "Refund Flow" in the list
     Then I navigate to the scenario editor
 
-  @e2e
+  @integration
   Scenario: Empty state when no scenarios
     Given no scenarios exist in the project
     When I am on the scenarios list page

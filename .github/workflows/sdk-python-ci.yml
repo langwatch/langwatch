@@ -9,21 +9,33 @@ on:
       - "python-sdk/**"
       - "!python-sdk/src/langwatch/__version__.py"
       - ".github/.release-please-manifest.json"
+  pull_request_target:
+    types: [labeled]
+    paths:
+      - "python-sdk/**"
+      - "!python-sdk/src/langwatch/__version__.py"
+      - ".github/.release-please-manifest.json"
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   test:
+    if: >
+      github.event_name != 'pull_request_target'
+      || (github.event.label.name == 'approved-ci'
+          && github.event.pull_request.user.login == 'dependabot[bot]')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup UV
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
           cache-dependency-glob: "python-sdk/uv.lock"
@@ -39,6 +51,7 @@ jobs:
         run: make test-unit
 
       - name: Run e2e tests
+        if: github.actor != 'dependabot[bot]' || github.event_name == 'pull_request_target'
         working-directory: python-sdk
         env:
           LANGWATCH_DEBUG: "true"
@@ -57,14 +70,20 @@ jobs:
           make test-examples
 
   build:
+    if: >
+      github.event_name != 'pull_request_target'
+      || (github.event.label.name == 'approved-ci'
+          && github.event.pull_request.user.login == 'dependabot[bot]')
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup UV
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
           cache-dependency-glob: "python-sdk/uv.lock"

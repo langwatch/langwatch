@@ -3,7 +3,7 @@ import {
   ATTRIBUTE_KEYS,
   buildTraceSummariesConditions,
   buildStoredSpansConditions,
-  buildEvaluationStatesConditions,
+  buildEvaluationRunsConditions,
   buildQueryFilter,
   extractStandardResults,
 } from "../clickhouse/query-helpers";
@@ -78,7 +78,7 @@ describe("buildStoredSpansConditions", () => {
   });
 });
 
-describe("buildEvaluationStatesConditions", () => {
+describe("buildEvaluationRunsConditions", () => {
   const baseParams: ClickHouseFilterQueryParams = {
     tenantId: "test-tenant",
     startDate: 1704067200000,
@@ -86,12 +86,12 @@ describe("buildEvaluationStatesConditions", () => {
   };
 
   it("returns TenantId condition with parameter placeholder", () => {
-    const result = buildEvaluationStatesConditions(baseParams);
+    const result = buildEvaluationRunsConditions(baseParams);
     expect(result).toContain("TenantId = {tenantId:String}");
   });
 
   it("uses ScheduledAt for date filtering", () => {
-    const result = buildEvaluationStatesConditions(baseParams);
+    const result = buildEvaluationRunsConditions(baseParams);
     expect(result).toContain(
       "ScheduledAt >= fromUnixTimestamp64Milli({startDate:UInt64})"
     );

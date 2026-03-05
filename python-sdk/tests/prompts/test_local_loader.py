@@ -243,7 +243,7 @@ def test_load_prompt_warns_when_lock_file_missing():
     """
     GIVEN prompts.json exists but prompts-lock.json is missing
     WHEN LocalPromptLoader.load_prompt() is called
-    THEN it should return None and warn the user to run 'langwatch prompts pull'
+    THEN it should return None and warn the user to run 'langwatch prompt pull'
     """
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
@@ -263,14 +263,14 @@ def test_load_prompt_warns_when_lock_file_missing():
             assert result is None
             assert len(w) == 1
             assert "prompts-lock.json not found" in str(w[0].message)
-            assert "langwatch prompts pull" in str(w[0].message)
+            assert "langwatch prompt pull" in str(w[0].message)
 
 
 def test_load_prompt_warns_when_prompt_file_missing():
     """
     GIVEN prompts.json and prompts-lock.json exist but actual prompt file is missing
     WHEN LocalPromptLoader.load_prompt() is called
-    THEN it should return None and warn the user to run 'langwatch prompts pull'
+    THEN it should return None and warn the user to run 'langwatch prompt pull'
     """
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
@@ -302,7 +302,7 @@ def test_load_prompt_warns_when_prompt_file_missing():
             assert result is None
             assert len(w) == 1
             assert "Prompt file not found" in str(w[0].message)
-            assert "langwatch prompts pull" in str(w[0].message)
+            assert "langwatch prompt pull" in str(w[0].message)
 
 
 def test_load_prompt_warns_once_when_no_base_path_and_no_prompts_json():

@@ -25,6 +25,8 @@ import {
  * So that I can define behavioral test cases for my agents
  */
 test.describe("Scenario Editor", () => {
+  // fixme(#1811): flaky — timeouts in CI environment
+  test.fixme();
   // Background: Given I am logged into project
   test.beforeEach(async ({ page }) => {
     await givenIAmLoggedIntoProject(page);

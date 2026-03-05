@@ -1,11 +1,15 @@
 import { Box, Button, HStack, Input, Portal, Text } from "@chakra-ui/react";
-import { BookText, ChevronDown, Globe, Play, Plus, Save } from "lucide-react";
+import { BookText, ChevronDown, Code, Globe, Play, Plus, Save } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "../../prompts/hooks/useAllPromptsForProject";
 import { api } from "../../utils/api";
 import { Popover } from "../ui/popover";
 import type { TargetValue } from "./TargetSelector";
+import {
+  isAgentTarget,
+  useFilteredAgents,
+} from "./useFilteredScenarioTargets";
 
 interface SaveAndRunMenuProps {
   selectedTarget: TargetValue;
@@ -55,14 +59,7 @@ export function SaveAndRunMenu({
     );
   }, [prompts, searchValue]);
 
-  // Filter HTTP agents (already sorted by updatedAt desc from backend)
-  const filteredAgents = useMemo(() => {
-    const httpAgents = agents?.filter((a) => a.type === "http") ?? [];
-    if (!searchValue) return httpAgents;
-    return httpAgents.filter((a) =>
-      a.name.toLowerCase().includes(searchValue.toLowerCase()),
-    );
-  }, [agents, searchValue]);
+  const filteredAgents = useFilteredAgents(agents, searchValue);
 
   const handleSelectAndRun = (target: TargetValue) => {
     onTargetChange(target);
@@ -121,7 +118,7 @@ export function SaveAndRunMenu({
             borderColor="border"
             position="sticky"
             top={0}
-            bg="white"
+            bg="bg"
             zIndex={10}
           >
             <Input
@@ -135,7 +132,7 @@ export function SaveAndRunMenu({
 
           {/* Scrollable Content */}
           <Box ref={scrollContainerRef} maxHeight="400px" overflowY="auto">
-            {/* Agents Section - First (typically fewer items) */}
+            {/* Agents Section - All agents (HTTP + code) */}
             <Box>
               <Text
                 fontSize="xs"
@@ -149,7 +146,7 @@ export function SaveAndRunMenu({
                 top={0}
                 zIndex={5}
               >
-                Run against HTTP Agent
+                Run against Agent
               </Text>
               {filteredAgents.length === 0 ? (
                 <Text fontSize="sm" color="fg.subtle" paddingX={3} paddingY={2}>
@@ -163,17 +160,24 @@ export function SaveAndRunMenu({
                     paddingY={2}
                     cursor="pointer"
                     bg={
-                      selectedTarget?.type === "http" &&
+                      isAgentTarget(selectedTarget) &&
                       selectedTarget.id === agent.id
                         ? "blue.50"
                         : "transparent"
                     }
                     _hover={{ bg: "gray.100" }}
                     onClick={() =>
-                      handleSelectAndRun({ type: "http", id: agent.id })
+                      handleSelectAndRun({
+                        type: agent.type,
+                        id: agent.id,
+                      })
                     }
                   >
-                    <Globe size={14} color="var(--chakra-colors-gray-500)" />
+                    {agent.type === "code" ? (
+                      <Code size={14} color="var(--chakra-colors-gray-500)" />
+                    ) : (
+                      <Globe size={14} color="var(--chakra-colors-gray-500)" />
+                    )}
                     <Text fontSize="sm" flex={1}>
                       {agent.name}
                     </Text>

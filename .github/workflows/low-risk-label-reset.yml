@@ -1,0 +1,41 @@
+name: Remove low-risk-change label on new commits
+
+on:
+  pull_request:
+    types: [synchronize]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  remove-label:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Remove low-risk-change label if present
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const labels = context.payload.pull_request.labels.map(l => l.name);
+
+            if (!labels.includes("low-risk-change")) {
+              core.info("No low-risk-change label present. Nothing to do.");
+              return;
+            }
+
+            await github.rest.issues.removeLabel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              name: "low-risk-change",
+            });
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: `The \`low-risk-change\` label was removed because new commits were pushed. Please re-run the [Low-Risk PR Evaluation](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/workflows/low-risk-evaluation.yml) workflow if this PR still qualifies.`,
+            });
+
+            core.info(`Removed low-risk-change label from PR #${prNumber}.`);

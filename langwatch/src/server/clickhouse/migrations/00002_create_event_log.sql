@@ -36,7 +36,6 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.event_log
 ENGINE = ${CLICKHOUSE_ENGINE_MERGETREE:-MergeTree()}
 PARTITION BY (AggregateType, toYearWeek(toDateTime64(EventTimestamp / 1000, 3)))
 ORDER BY (TenantId, AggregateType, AggregateId, EventTimestamp, EventId)
-TTL toDateTime(CreatedAt) + INTERVAL ${TIERED_EVENT_LOG_TABLE_HOT_DAYS:-2} DAY TO VOLUME 'cold'
 SETTINGS index_granularity = 8192, storage_policy = 'local_primary';
 
 -- +goose StatementEnd
@@ -46,7 +45,7 @@ SETTINGS index_granularity = 8192, storage_policy = 'local_primary';
 -- +goose ENVSUB ON
 -- +goose StatementBegin
 
-DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.event_log SYNC;
+--- DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.event_log SYNC;
 
 -- +goose StatementEnd
 -- +goose ENVSUB OFF

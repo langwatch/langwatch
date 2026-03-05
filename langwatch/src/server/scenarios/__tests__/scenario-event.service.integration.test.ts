@@ -20,8 +20,8 @@ import {
   ScenarioEventType,
   ScenarioRunStatus,
   Verdict,
-} from "~/app/api/scenario-events/[[...route]]/enums";
-import { ScenarioEventService } from "~/app/api/scenario-events/[[...route]]/scenario-event.service";
+} from "~/server/scenarios/scenario-event.enums";
+import { ScenarioEventService } from "~/server/scenarios/scenario-event.service";
 import { prisma } from "~/server/db";
 import { esClient, SCENARIO_EVENTS_INDEX } from "~/server/elasticsearch";
 import { getTestProject } from "~/utils/testUtils";
@@ -501,6 +501,237 @@ describe("ScenarioEventService Integration Tests", () => {
       expect(run2Data).toBeDefined();
       expect(run2Data!.timestamp).toBe(timestamp2);
       expect(run2Data!.timestamp).not.toBe(0);
+    });
+  });
+
+  describe("getRunDataForAllSuites", () => {
+    it("returns runs from multiple suites with scenarioSetIds map", async () => {
+      const client = await esClient({ test: true });
+
+      // Two different suites with the __internal__<suiteId>__suite pattern
+      const suite1SetId = `__internal__suite_aaa_${Date.now()}__suite`;
+      const suite2SetId = `__internal__suite_bbb_${Date.now()}__suite`;
+      const ids1 = generateTestIds("allsuites-1");
+      const ids2 = generateTestIds("allsuites-2");
+
+      const timestamp1 = Date.now() - 10000;
+      const timestamp2 = Date.now() - 5000;
+
+      const events = [
+        // Suite 1 run
+        {
+          type: ScenarioEventType.RUN_STARTED,
+          timestamp: timestamp1,
+          project_id: project.id,
+          scenario_id: ids1.scenarioId,
+          scenario_run_id: ids1.scenarioRunId,
+          batch_run_id: ids1.batchRunId,
+          scenario_set_id: suite1SetId,
+          metadata: { name: "Suite 1 Scenario" },
+        },
+        {
+          type: ScenarioEventType.RUN_FINISHED,
+          timestamp: timestamp1 + 500,
+          project_id: project.id,
+          scenario_id: ids1.scenarioId,
+          scenario_run_id: ids1.scenarioRunId,
+          batch_run_id: ids1.batchRunId,
+          scenario_set_id: suite1SetId,
+          status: ScenarioRunStatus.SUCCESS,
+          results: { verdict: Verdict.SUCCESS },
+        },
+        // Suite 2 run
+        {
+          type: ScenarioEventType.RUN_STARTED,
+          timestamp: timestamp2,
+          project_id: project.id,
+          scenario_id: ids2.scenarioId,
+          scenario_run_id: ids2.scenarioRunId,
+          batch_run_id: ids2.batchRunId,
+          scenario_set_id: suite2SetId,
+          metadata: { name: "Suite 2 Scenario" },
+        },
+        {
+          type: ScenarioEventType.RUN_FINISHED,
+          timestamp: timestamp2 + 500,
+          project_id: project.id,
+          scenario_id: ids2.scenarioId,
+          scenario_run_id: ids2.scenarioRunId,
+          batch_run_id: ids2.batchRunId,
+          scenario_set_id: suite2SetId,
+          status: ScenarioRunStatus.ERROR,
+          results: { verdict: Verdict.FAILURE },
+        },
+      ];
+
+      await client.bulk({
+        index: SCENARIO_EVENTS_INDEX.alias,
+        body: events.flatMap((event) => [{ index: {} }, event]),
+        refresh: true,
+      });
+
+      const result = await service.getRunDataForAllSuites({
+        projectId: project.id,
+        limit: 10,
+      });
+
+      // Both batch runs should be returned
+      expect(result.runs.length).toBeGreaterThanOrEqual(2);
+
+      // scenarioSetIds map should contain both batch run → set id mappings
+      expect(result.scenarioSetIds[ids1.batchRunId]).toBe(suite1SetId);
+      expect(result.scenarioSetIds[ids2.batchRunId]).toBe(suite2SetId);
+
+      // Verify runs from both suites are present
+      const run1 = result.runs.find((r) => r.batchRunId === ids1.batchRunId);
+      const run2 = result.runs.find((r) => r.batchRunId === ids2.batchRunId);
+      expect(run1).toBeDefined();
+      expect(run2).toBeDefined();
+      expect(run1!.status).toBe(ScenarioRunStatus.SUCCESS);
+      expect(run2!.status).toBe(ScenarioRunStatus.ERROR);
+    });
+
+    it("includes pre-suite runs with scenarioSetId 'default'", async () => {
+      const client = await esClient({ test: true });
+
+      const defaultSetId = "default";
+      const ids = generateTestIds("allsuites-default");
+      const now = Date.now();
+
+      const events = [
+        {
+          type: ScenarioEventType.RUN_STARTED,
+          timestamp: now - 5000,
+          project_id: project.id,
+          scenario_id: ids.scenarioId,
+          scenario_run_id: ids.scenarioRunId,
+          batch_run_id: ids.batchRunId,
+          scenario_set_id: defaultSetId,
+          metadata: { name: "Pre-Suite Run" },
+        },
+        {
+          type: ScenarioEventType.RUN_FINISHED,
+          timestamp: now - 4500,
+          project_id: project.id,
+          scenario_id: ids.scenarioId,
+          scenario_run_id: ids.scenarioRunId,
+          batch_run_id: ids.batchRunId,
+          scenario_set_id: defaultSetId,
+          status: ScenarioRunStatus.SUCCESS,
+          results: { verdict: Verdict.SUCCESS },
+        },
+      ];
+
+      await client.bulk({
+        index: SCENARIO_EVENTS_INDEX.alias,
+        body: events.flatMap((event) => [{ index: {} }, event]),
+        refresh: true,
+      });
+
+      const result = await service.getRunDataForAllSuites({
+        projectId: project.id,
+        limit: 100,
+      });
+
+      const preSuiteRun = result.runs.find((r) => r.batchRunId === ids.batchRunId);
+      expect(preSuiteRun).toBeDefined();
+      expect(preSuiteRun!.status).toBe(ScenarioRunStatus.SUCCESS);
+      expect(result.scenarioSetIds[ids.batchRunId]).toBe(defaultSetId);
+    });
+
+    it("includes both suite and non-suite runs together", async () => {
+      const client = await esClient({ test: true });
+
+      // Suite run
+      const suiteSetId = `__internal__suite_ccc_${Date.now()}__suite`;
+      const suiteIds = generateTestIds("allsuites-include");
+
+      // Pre-suite run with "default" scenarioSetId
+      const defaultSetId = "default";
+      const defaultIds = generateTestIds("allsuites-default-mix");
+
+      const now = Date.now();
+
+      const events = [
+        // Suite run
+        {
+          type: ScenarioEventType.RUN_STARTED,
+          timestamp: now - 5000,
+          project_id: project.id,
+          scenario_id: suiteIds.scenarioId,
+          scenario_run_id: suiteIds.scenarioRunId,
+          batch_run_id: suiteIds.batchRunId,
+          scenario_set_id: suiteSetId,
+          metadata: { name: "Suite Run" },
+        },
+        {
+          type: ScenarioEventType.RUN_FINISHED,
+          timestamp: now - 4500,
+          project_id: project.id,
+          scenario_id: suiteIds.scenarioId,
+          scenario_run_id: suiteIds.scenarioRunId,
+          batch_run_id: suiteIds.batchRunId,
+          scenario_set_id: suiteSetId,
+          status: ScenarioRunStatus.SUCCESS,
+          results: { verdict: Verdict.SUCCESS },
+        },
+        // Pre-suite run
+        {
+          type: ScenarioEventType.RUN_STARTED,
+          timestamp: now - 3000,
+          project_id: project.id,
+          scenario_id: defaultIds.scenarioId,
+          scenario_run_id: defaultIds.scenarioRunId,
+          batch_run_id: defaultIds.batchRunId,
+          scenario_set_id: defaultSetId,
+          metadata: { name: "Pre-Suite Run" },
+        },
+        {
+          type: ScenarioEventType.RUN_FINISHED,
+          timestamp: now - 2500,
+          project_id: project.id,
+          scenario_id: defaultIds.scenarioId,
+          scenario_run_id: defaultIds.scenarioRunId,
+          batch_run_id: defaultIds.batchRunId,
+          scenario_set_id: defaultSetId,
+          status: ScenarioRunStatus.SUCCESS,
+          results: { verdict: Verdict.SUCCESS },
+        },
+      ];
+
+      await client.bulk({
+        index: SCENARIO_EVENTS_INDEX.alias,
+        body: events.flatMap((event) => [{ index: {} }, event]),
+        refresh: true,
+      });
+
+      const result = await service.getRunDataForAllSuites({
+        projectId: project.id,
+        limit: 100,
+      });
+
+      // Both runs should be present
+      const suiteRun = result.runs.find((r) => r.batchRunId === suiteIds.batchRunId);
+      const defaultRun = result.runs.find((r) => r.batchRunId === defaultIds.batchRunId);
+      expect(suiteRun).toBeDefined();
+      expect(defaultRun).toBeDefined();
+
+      // scenarioSetIds should have both
+      expect(result.scenarioSetIds[suiteIds.batchRunId]).toBe(suiteSetId);
+      expect(result.scenarioSetIds[defaultIds.batchRunId]).toBe(defaultSetId);
+    });
+
+    it("returns empty results for a project with no runs", async () => {
+      // Use a unique project ID that has no data at all
+      const emptyProjectId = `proj_empty_${Date.now()}`;
+      const result = await service.getRunDataForAllSuites({
+        projectId: emptyProjectId,
+        limit: 10,
+      });
+
+      expect(result.runs).toHaveLength(0);
+      expect(result.scenarioSetIds).toEqual({});
+      expect(result.hasMore).toBe(false);
     });
   });
 

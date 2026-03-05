@@ -17,11 +17,15 @@ import { IconWrapper } from "../../../components/IconWrapper";
 import { DiscordOutlineIcon } from "../../../components/icons/DiscordOutline";
 import { Tooltip } from "../../../components/ui/tooltip";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
+import { useAgentPickerFlow } from "../../hooks/useAgentPickerFlow";
+import { usePromptPickerFlow } from "../../hooks/usePromptPickerFlow";
+import { useEvaluatorPickerFlow } from "../../hooks/useEvaluatorPickerFlow";
 import { MODULES } from "../../registry";
 import type { ComponentType, Custom, Field } from "../../types/dsl";
 import { getInputsOutputs } from "../../utils/nodeUtils";
 import { NodeComponents } from "../nodes";
-import { PromptingTechniqueDraggingNode } from "../nodes/PromptingTechniqueNode";
+import { AgentNodeDraggable } from "./AgentNodeDraggable";
+import { EvaluatorNodeDraggable } from "./EvaluatorNodeDraggable";
 import { LlmSignatureNodeDraggable } from "./LlmSignatureNodeDraggable";
 import { NodeDraggable } from "./NodeDraggable";
 
@@ -66,6 +70,9 @@ export const NodeSelectionPanel = ({
 
   const workflow = getWorkflow();
   const { project } = useOrganizationTeamProject();
+  const { handlePromptDragEnd } = usePromptPickerFlow();
+  const { handleEvaluatorDragEnd } = useEvaluatorPickerFlow();
+  const { handleAgentDragEnd } = useAgentPickerFlow();
 
   const { data: components } = api.optimization.getComponents.useQuery(
     {
@@ -132,9 +139,15 @@ export const NodeSelectionPanel = ({
             Components
           </Text>
 
-          <LlmSignatureNodeDraggable />
+          <LlmSignatureNodeDraggable onDragEnd={handlePromptDragEnd} />
 
           <NodeDraggable component={MODULES.code} type="code" />
+
+          <NodeDraggable component={MODULES.http} type="http" />
+
+          <AgentNodeDraggable onDragEnd={handleAgentDragEnd} />
+
+          <EvaluatorNodeDraggable onDragEnd={handleEvaluatorDragEnd} />
 
           {components &&
             components.length > 0 &&
@@ -153,56 +166,6 @@ export const NodeSelectionPanel = ({
                         key={custom.id}
                         component={createCustomComponent(custom as Custom)}
                         type="custom"
-                        disableDrag={isCurrentWorkflow}
-                      />
-                    );
-                  })}
-              </>
-            )}
-
-          <Text fontWeight="500" paddingLeft={1}>
-            Prompting Techniques
-          </Text>
-          {MODULES.promptingTechniques.map((promptingTechnique) => {
-            return (
-              <NodeDraggable
-                key={promptingTechnique.name}
-                component={promptingTechnique}
-                type="prompting_technique"
-              />
-            );
-          })}
-
-          <Text fontWeight="500" padding={1}>
-            Evaluators
-          </Text>
-          {MODULES.evaluators.map((evaluator) => {
-            return (
-              <NodeDraggable
-                key={evaluator.name}
-                component={evaluator}
-                type="evaluator"
-              />
-            );
-          })}
-          {components &&
-            components.length > 0 &&
-            components.some((custom) => custom.isEvaluator) && (
-              <>
-                <Text fontWeight="500" padding={1}>
-                  Custom Evaluators
-                </Text>
-                {components
-                  .filter((custom) => custom.isEvaluator)
-                  .map((custom) => {
-                    const isCurrentWorkflow =
-                      custom.id === workflow?.workflow_id;
-                    return (
-                      <NodeDraggable
-                        key={custom.id}
-                        component={createCustomComponent(custom as Custom)}
-                        type="custom"
-                        behave_as="evaluator"
                         disableDrag={isCurrentWorkflow}
                       />
                     );
@@ -280,10 +243,7 @@ export function CustomDragLayer() {
     return null;
   }
 
-  const ComponentNode =
-    item.node.type === "prompting_technique"
-      ? PromptingTechniqueDraggingNode
-      : NodeComponents[item.node.type as ComponentType];
+  const ComponentNode = NodeComponents[item.node.type as ComponentType];
 
   return (
     <div
@@ -294,7 +254,7 @@ export function CustomDragLayer() {
         left: currentOffset?.x ?? 0,
         top: currentOffset?.y ?? 0,
         transform: "translate(-50%, -50%)",
-        opacity: item.node.type === "prompting_technique" ? 1 : 0.5,
+        opacity: 0.5,
       }}
     >
       <ComponentNode

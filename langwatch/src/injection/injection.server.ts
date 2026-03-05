@@ -1,4 +1,3 @@
-import type { ProcedureRouterRecord } from "@trpc/server";
 import type {
   GetServerSidePropsContext,
   NextApiRequest,
@@ -7,8 +6,6 @@ import type {
 import type { NextRequest } from "next/server";
 import type { Awaitable, DefaultSession, Session } from "next-auth";
 import type { MaybeStoredModelProvider } from "../server/modelProviders/registry";
-import { SubscriptionHandler } from "../server/subscriptionHandler";
-
 export interface RegistrationCbUser {
   name?: string | null;
   email?: string | null;
@@ -28,7 +25,6 @@ export interface RegistrationCbOrganization {
 }
 
 export interface Dependencies {
-  subscriptionHandler: typeof SubscriptionHandler;
   sessionHandler?: (params: {
     req: NextApiRequest | GetServerSidePropsContext["req"] | NextRequest;
     session: any;
@@ -45,12 +41,10 @@ export interface Dependencies {
       res: NextApiResponse,
     ) => Promise<void | NextApiResponse<any>>
   >;
-  extraTRPCRoutes?: () => ProcedureRouterRecord;
   postRegistrationCallback?: (
     user: RegistrationCbUser,
     org: RegistrationCbOrganization,
   ) => void | Promise<void>;
-  planLimits?: (organizationId: string, plan: string) => void | Promise<void>;
   managedModelProviderLitellmParams?: (args: {
     params: Record<string, string>;
     projectId: string;
@@ -59,8 +53,6 @@ export interface Dependencies {
   }) => Promise<Record<string, string>>;
 }
 
-const dependencies: Dependencies = {
-  subscriptionHandler: SubscriptionHandler,
-};
+const dependencies: Dependencies = {};
 
 export default dependencies;

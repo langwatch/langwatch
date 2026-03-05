@@ -1,10 +1,31 @@
 import { Icon, type IconProps } from "@chakra-ui/react";
-import { Check, Clock, XCircle } from "lucide-react";
-import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
+import type { LucideIcon } from "lucide-react";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import {
+  SCENARIO_RUN_STATUS_CONFIG,
+  SCENARIO_RUN_STATUS_ICONS,
+} from "./scenario-run-status-config";
 
 interface ScenarioRunStatusIconProps extends Omit<IconProps, "as" | "color"> {
   status?: ScenarioRunStatus;
   color?: string;
+}
+
+export function getIconAndColor(status: ScenarioRunStatus | undefined): {
+  icon: LucideIcon;
+  color: string;
+} {
+  if (status === undefined) {
+    return {
+      icon: SCENARIO_RUN_STATUS_ICONS[ScenarioRunStatus.PENDING],
+      color: SCENARIO_RUN_STATUS_CONFIG[ScenarioRunStatus.PENDING].fgColor,
+    };
+  }
+
+  return {
+    icon: SCENARIO_RUN_STATUS_ICONS[status],
+    color: SCENARIO_RUN_STATUS_CONFIG[status].fgColor,
+  };
 }
 
 export function ScenarioRunStatusIcon({
@@ -13,33 +34,13 @@ export function ScenarioRunStatusIcon({
   boxSize,
   ...iconProps
 }: ScenarioRunStatusIconProps) {
-  let IconComponent = Clock;
-  let defaultColor = "green.fg";
-  let defaultBoxSize = "16px";
-
-  if (status === ScenarioRunStatus.SUCCESS) {
-    IconComponent = Check;
-    defaultColor = "green.fg";
-  } else if (
-    status === ScenarioRunStatus.FAILED ||
-    status === ScenarioRunStatus.ERROR
-  ) {
-    IconComponent = XCircle;
-    defaultColor = "red.fg";
-  } else if (
-    status === ScenarioRunStatus.IN_PROGRESS ||
-    status === ScenarioRunStatus.PENDING
-  ) {
-    IconComponent = Clock;
-    defaultColor =
-      status === ScenarioRunStatus.IN_PROGRESS ? "orange.fg" : "fg.muted";
-  }
+  const { icon: IconComponent, color: defaultColor } = getIconAndColor(status);
 
   return (
     <Icon
       as={IconComponent}
       color={color ?? defaultColor}
-      boxSize={boxSize ?? defaultBoxSize}
+      boxSize={boxSize ?? "16px"}
       {...iconProps}
     />
   );

@@ -19,6 +19,7 @@ export const orderedResources: Resource[] = [
   Resources.TRIGGERS,
   Resources.WORKFLOWS,
   Resources.PROMPTS,
+  Resources.SECRETS,
   Resources.TEAM,
   Resources.PROJECT,
   // Resources.PLAYGROUND, // Hidden intentionally
@@ -30,6 +31,9 @@ export function getValidActionsForResource(resource: Resource): Action[] {
   }
   if (resource === Resources.TRACES) {
     return [Actions.VIEW, Actions.SHARE];
+  }
+  if (resource === Resources.SECRETS) {
+    return [Actions.VIEW, Actions.MANAGE];
   }
   if (resource === Resources.SCENARIOS) {
     return [Actions.VIEW];
