@@ -2,6 +2,7 @@ import { type Project, type Trigger, TriggerAction } from "@prisma/client";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { prisma } from "~/server/db";
 import { TraceService } from "~/server/traces/trace.service";
+import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { handleAddToAnnotationQueue } from "./actions/addToAnnotationQueue";
 import { handleAddToDataset } from "./actions/addToDataset";
@@ -14,6 +15,8 @@ import {
   triggerSentForMany,
   updateAlert,
 } from "./utils";
+
+const logger = createLogger("langwatch:cron:triggers:trace-based");
 
 export const processTraceBasedTrigger = async (
   trigger: Trigger,
@@ -118,9 +121,9 @@ export const processTraceBasedTrigger = async (
     try {
       await updateAlert(triggerId, updatedAt, project.id);
     } catch (error) {
-      console.error(
-        `Failed to update alert for trigger ${triggerId}:`,
-        error instanceof Error ? error.message : error,
+      logger.error(
+        { triggerId, error },
+        "failed to update alert for trigger",
       );
     }
 

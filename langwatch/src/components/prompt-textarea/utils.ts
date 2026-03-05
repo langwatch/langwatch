@@ -1,13 +1,3 @@
-/** Regex for matching variables in the format {{variable_name}} */
-export const VARIABLE_REGEX = /\{\{([^}]+)\}\}/g;
-
-/** Extract variable names from text */
-export const parseVariablesFromText = (text: string): string[] => {
-  const matches = text.match(VARIABLE_REGEX);
-  if (!matches) return [];
-  return Array.from(new Set(matches.map((m) => m.slice(2, -2)))); // Remove {{ and }}
-};
-
 /** Find unclosed {{ before cursor position for triggering the variable menu */
 export const findUnclosedBraces = (
   text: string,
@@ -46,6 +36,94 @@ export const findUnclosedBraces = (
   if (query.includes("}")) return null;
 
   return { start: lastOpenBrace, query };
+};
+
+/** Find unclosed {% before cursor position for triggering the logic menu.
+ *  Returns { start, query } where start is the position after {%
+ *  and query is the trimmed keyword being typed.
+ *  Returns null if no unclosed {% found, or if preceded by { (i.e. {{%).
+ */
+export const findUnclosedPercentBraces = (
+  text: string,
+  cursorPos: number,
+): { start: number; query: string } | null => {
+  const textBeforeCursor = text.substring(0, cursorPos);
+
+  // Find the last {% that doesn't have a matching %}
+  let lastOpenTag = -1;
+  let i = textBeforeCursor.length - 1;
+
+  while (i >= 1) {
+    if (textBeforeCursor[i - 1] === "{" && textBeforeCursor[i] === "%") {
+      // Check it's not preceded by another { (i.e. {{%)
+      if (i >= 2 && textBeforeCursor[i - 2] === "{") {
+        i--;
+        continue;
+      }
+
+      // Found {%, check if there's a %} after it before cursor
+      const afterTag = textBeforeCursor.substring(i + 1);
+      if (!afterTag.includes("%}")) {
+        lastOpenTag = i + 1; // Position after {%
+        break;
+      }
+    }
+    i--;
+  }
+
+  if (lastOpenTag === -1) return null;
+
+  // Extract query: everything after {% up to cursor, trimmed of leading whitespace
+  const rawQuery = textBeforeCursor.substring(lastOpenTag);
+  const query = rawQuery.trimStart();
+
+  // If the query contains a space, the user has already typed a keyword and is
+  // now typing arguments (e.g., "for i in items"). Don't show the autocomplete.
+  if (query.includes(" ")) return null;
+
+  return { start: lastOpenTag, query };
+};
+
+/**
+ * Calculate menu position coordinates from the current caret position.
+ * Falls back to container-relative coordinates when caret position is unavailable.
+ *
+ * @param caretPositionRef - Ref to the current caret position from rich-textarea
+ * @param containerRef - Ref to the container element for fallback positioning
+ * @returns Coordinates { top, left } for positioning a popup menu
+ */
+export const getCaretCoordinates = ({
+  caretPositionRef,
+  containerRef,
+}: {
+  caretPositionRef: React.RefObject<
+    | { focused: false; selectionStart: number; selectionEnd: number }
+    | {
+        focused: true;
+        selectionStart: number;
+        selectionEnd: number;
+        top: number;
+        left: number;
+        height: number;
+      }
+    | null
+  >;
+  containerRef: React.RefObject<HTMLElement | null>;
+}): { top: number; left: number } => {
+  const pos = caretPositionRef.current;
+  if (pos?.focused) {
+    return {
+      top: pos.top + pos.height + 4,
+      left: pos.left,
+    };
+  }
+
+  // Fallback: use container position
+  const containerRect = containerRef.current?.getBoundingClientRect();
+  return {
+    top: (containerRect?.top ?? 0) + 30,
+    left: (containerRect?.left ?? 0) + 10,
+  };
 };
 
 /** Line height for borderless mode (used for paragraph calculations) */

@@ -1,27 +1,33 @@
 /**
  * Standalone Bull Board server for queue visualization.
  *
- * Run with: pnpm start (from packages/bullboard)
+ * Run with: pnpm start (from bullboard)
  * Access at: http://localhost:6380
  *
  * Only for development use.
  */
 
 import "dotenv/config";
+
 import { createBullBoard } from "@bull-board/api";
 import { BullMQAdapter } from "@bull-board/api/bullMQAdapter";
 import { HonoAdapter } from "@bull-board/hono";
-import { serveStatic } from "@hono/node-server/serve-static";
 import { serve } from "@hono/node-server";
+import { serveStatic } from "@hono/node-server/serve-static";
 import { Queue } from "bullmq";
 import { Hono } from "hono";
+import { basicAuth } from "hono/basic-auth";
 import IORedis from "ioredis";
+import { discoverQueueNames, stripHashTag } from "./redisQueues.ts";
 
 const PORT = parseInt(process.env.BULLBOARD_PORT ?? "6380", 10);
 if (Number.isNaN(PORT) || PORT < 1 || PORT > 65535) {
   console.error("Invalid BULLBOARD_PORT: must be a number between 1 and 65535");
   process.exit(1);
 }
+
+/** How often to re-scan Redis for newly created queues (ms). */
+const QUEUE_DISCOVERY_INTERVAL_MS = 10_000;
 
 async function main() {
   const redisUrl = process.env.REDIS_URL;
@@ -34,35 +40,66 @@ async function main() {
     maxRetriesPerRequest: null,
   });
 
-  // Discover all queues from Redis - handles both standalone and cluster mode
-  const allBullKeys = await connection.keys("bull:*");
-
-  // Extract queue names, keeping braces for cluster mode queues
-  // e.g., "bull:{scenarios}:waiting" -> "{scenarios}"
-  // e.g., "bull:collector:waiting" -> "collector"
-  const queueNames = Array.from(
-    new Set(
-      allBullKeys.map((key) => key.split(":")[1]).filter(Boolean)
-    )
-  ) as string[];
+  const queueNames = await discoverQueueNames(connection);
 
   console.log("Discovered queues:", queueNames);
 
-  // For display, strip braces but keep them for the actual Queue connection
   const queues = queueNames.map((name) => {
-    const displayName = name.replace("{", "").replace("}", "");
-    return new BullMQAdapter(new Queue(name, { connection }), { displayName });
+    return new BullMQAdapter(
+      new Queue(name, { connection }),
+      { displayName: stripHashTag(name) },
+    );
   });
 
   const serverAdapter = new HonoAdapter(serveStatic);
   serverAdapter.setBasePath("/");
+  serverAdapter.setUIConfig({});
 
-  createBullBoard({
+  const { addQueue } = createBullBoard({
     queues,
     serverAdapter,
   });
 
+  // Track known queue names so we only add truly new ones
+  const knownQueueNames = new Set(queueNames);
+
+  // Periodically re-scan Redis for new queues created after startup
+  setInterval(async () => {
+    try {
+      const currentNames = await discoverQueueNames(connection);
+      for (const name of currentNames) {
+        if (!knownQueueNames.has(name)) {
+          knownQueueNames.add(name);
+          addQueue(
+            new BullMQAdapter(
+              new Queue(name, { connection }),
+              { displayName: stripHashTag(name) },
+            ),
+          );
+          console.log("Discovered new queue:", stripHashTag(name));
+        }
+      }
+    } catch (error) {
+      console.error("Queue re-discovery failed:", error);
+    }
+  }, QUEUE_DISCOVERY_INTERVAL_MS);
+
   const app = new Hono({ strict: false });
+
+  // Health check endpoint (no auth required)
+  app.get("/health", (c) => c.text("OK"));
+
+  // Basic auth middleware (skip /health)
+  const username = process.env.BULLBOARD_USERNAME;
+  const password = process.env.BULLBOARD_PASSWORD;
+  if ((username && !password) || (!username && password)) {
+    console.error("Set both BULLBOARD_USERNAME and BULLBOARD_PASSWORD, or neither");
+    process.exit(1);
+  }
+  if (username && password) {
+    app.use("*", basicAuth({ username, password }));
+  }
+
   app.route("/", serverAdapter.registerPlugin());
 
   console.log(`Bull Board running on http://localhost:${PORT}`);

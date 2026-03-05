@@ -87,7 +87,6 @@ export const TableCell = ({
     outlineOffset: "-1px",
     position: isSelected ? ("relative" as const) : undefined,
     zIndex: isSelected ? 5 : undefined,
-    userSelect: "none" as const,
     height: "100%",
   };
 

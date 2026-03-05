@@ -36,13 +36,13 @@ const getFinishedAt = (
   timestamps: BatchRunSummary["timestamps"],
   currentTimestamp: number,
 ): number | undefined => {
-  if (timestamps.finished_at) {
-    return timestamps.finished_at;
+  if (timestamps.finishedAt) {
+    return timestamps.finishedAt;
   }
   // Consider finished if no updates for 2 minutes
-  // (We don't have updated_at in our type, so just check finished_at/stopped_at)
-  if (timestamps.stopped_at) {
-    return timestamps.stopped_at;
+  // (We don't have updatedAt in our type, so just check finishedAt/stoppedAt)
+  if (timestamps.stoppedAt) {
+    return timestamps.stoppedAt;
   }
   return undefined;
 };
@@ -89,8 +89,8 @@ export function BatchSummaryFooter({
   );
 
   const runtime = Math.max(
-    run.timestamps.created_at
-      ? (finishedAt ?? currentTimestamp) - run.timestamps.created_at
+    run.timestamps.createdAt
+      ? (finishedAt ?? currentTimestamp) - run.timestamps.createdAt
       : 0,
     0,
   );
@@ -175,7 +175,7 @@ export function BatchSummaryFooter({
         </VStack>
 
         {/* Stopped indicator */}
-        {run.timestamps.stopped_at && (
+        {run.timestamps.stoppedAt && (
           <>
             <Spacer />
             <HStack>

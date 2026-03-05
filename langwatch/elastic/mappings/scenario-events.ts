@@ -9,7 +9,7 @@ import type {
   ScenarioMessageSnapshotEvent,
   ScenarioRunFinishedEvent,
   ScenarioRunStartedEvent,
-} from "~/app/api/scenario-events/[[...route]]/types";
+} from "~/server/scenarios/scenario-event.types";
 import { FLATENNED_TYPE } from "~/server/elasticsearch";
 import type { ElasticSearchMappingFrom } from "../schema";
 
@@ -43,16 +43,21 @@ const baseScenarioEventMapping: ElasticSearchMappingFrom<BaseScenarioEventMappin
   };
 
 // Scenario Run Started Event mapping
-const runStartedMapping: ElasticSearchMappingFrom<
-  RemoveBaseEventMapping<ScenarioRunStartedEvent>
-> = {
+// User-defined metadata fields are not explicitly mapped (dynamic: false at root).
+// The langwatch namespace uses dynamic: true so platform-internal fields are indexed as keywords.
+const runStartedMapping = {
   metadata: {
+    dynamic: false as const,
     properties: {
       name: { type: "text", fields: { keyword: { type: "keyword" } } },
       description: { type: "text" },
+      langwatch: {
+        type: "object",
+        dynamic: true as const,
+      },
     },
   },
-};
+} satisfies Record<string, MappingProperty>;
 
 const runFinishedMapping: ElasticSearchMappingFrom<
   RemoveBaseEventMapping<ScenarioRunFinishedEvent>

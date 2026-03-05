@@ -28,6 +28,7 @@ interface GraphData {
 interface DraggableGraphCardProps {
   graph: GraphData;
   projectSlug: string;
+  dashboardId?: string;
   onDelete: () => void;
   onSizeChange: (size: SizeOption) => void;
   isDeleting: boolean;
@@ -36,6 +37,7 @@ interface DraggableGraphCardProps {
 export function DraggableGraphCard({
   graph,
   projectSlug,
+  dashboardId,
   onDelete,
   onSizeChange,
   isDeleting,
@@ -75,6 +77,7 @@ export function DraggableGraphCard({
             name={graph.name}
             graph={graph.graph}
             projectSlug={projectSlug}
+            dashboardId={dashboardId}
             colSpan={graph.colSpan}
             rowSpan={graph.rowSpan}
             filters={graph.filters}

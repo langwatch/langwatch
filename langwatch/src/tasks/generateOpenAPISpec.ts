@@ -5,9 +5,11 @@ import path from "path";
 
 import { app as analyticsApp } from "../app/api/analytics/[...route]/app";
 import { app as datasetApp } from "../app/api/dataset/[[...route]]/app";
+import { app as evaluatorsApp } from "../app/api/evaluators/[[...route]]/app";
 import currentSpec from "../app/api/openapiLangWatch.json";
 import { app as llmConfigsApp } from "../app/api/prompts/[[...route]]/app";
 import { app as scenarioEventsApp } from "../app/api/scenario-events/[[...route]]/app";
+import { app as scenariosApp } from "../app/api/scenarios/[[...route]]/app";
 import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
 
 const overwriteMerge = (_destinationArray: any[], sourceArray: any[]) =>
@@ -35,10 +37,14 @@ export default async function execute() {
   const analyticsSpec = await generateSpecs(analyticsApp);
   console.log("Building dataset spec...");
   const datasetSpec = await generateSpecs(datasetApp);
+  console.log("Building evaluators spec...");
+  const evaluatorsSpec = await generateSpecs(evaluatorsApp);
   console.log("Building llm configs spec...");
   const llmConfigsSpec = await generateSpecs(llmConfigsApp);
   console.log("Building scenario events spec...");
   const scenarioEventsSpec = await generateSpecs(scenarioEventsApp);
+  console.log("Building scenarios spec...");
+  const scenariosSpec = await generateSpecs(scenariosApp);
   console.log("Building traces spec...");
   const tracesSpec = await generateSpecs(tracesApp);
   console.log("Merging specs...");
@@ -48,8 +54,10 @@ export default async function execute() {
       currentSpec,
       analyticsSpec,
       datasetSpec,
+      evaluatorsSpec,
       llmConfigsSpec,
       scenarioEventsSpec,
+      scenariosSpec,
       tracesSpec,
       langwatchSpec,
     ],
@@ -60,9 +68,11 @@ export default async function execute() {
         // we don't want to merge, we just want to replace.
         if (
           key.includes("/api/analytics") ||
+          key.includes("/api/evaluators") ||
           key.includes("/api/prompts") ||
           key.includes("/api/dataset") ||
           key.includes("/api/scenario-events") ||
+          key.includes("/api/scenarios") ||
           key.includes("/api/traces")
         ) {
           // Replace with new

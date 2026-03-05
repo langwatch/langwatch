@@ -167,7 +167,6 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
             name: form.getValues("name"),
             situation: form.getValues("situation"),
             criteria: form.getValues("criteria"),
-            labels: form.getValues("labels"),
           }
         : null;
 
@@ -177,7 +176,6 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
       form.setValue("name", scenario.name ?? "");
       form.setValue("situation", scenario.situation ?? "");
       form.setValue("criteria", scenario.criteria ?? []);
-      form.setValue("labels", scenario.labels ?? []);
 
       addPrompt(input);
       setInput("");

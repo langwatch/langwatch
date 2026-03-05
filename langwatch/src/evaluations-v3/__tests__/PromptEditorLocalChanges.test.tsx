@@ -327,21 +327,19 @@ describe("Prompt Editor Local Changes", () => {
         await user.type(textareas[0], " modified");
       }
 
-      // Wait for debounced callback
+      // Wait for the callback to be called with a config that has messages
+      // (the initial sync may call with undefined to clear, so we check for
+      // any call that includes a config with messages)
       await waitFor(
         () => {
-          expect(mockOnLocalConfigChange).toHaveBeenCalled();
+          const callWithMessages = mockOnLocalConfigChange.mock.calls.find(
+            (call: unknown[]) =>
+              call[0] != null && typeof call[0] === "object" && "messages" in call[0],
+          );
+          expect(callWithMessages).toBeDefined();
         },
         { timeout: 2000 },
       );
-
-      // Verify the callback was called with a local config object
-      const lastCall =
-        mockOnLocalConfigChange.mock.calls[
-          mockOnLocalConfigChange.mock.calls.length - 1
-        ];
-      expect(lastCall?.[0]).toBeDefined();
-      expect(lastCall?.[0]).toHaveProperty("messages");
     }, 30000);
   });
 

@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -19,14 +21,14 @@ T = TypeVar("T", bound="PostApiPromptsResponse200PromptingTechniqueDemonstration
 class PostApiPromptsResponse200PromptingTechniqueDemonstrations:
     """
     Attributes:
-        id (Union[Unset, str]):
-        name (Union[Unset, str]):
-        inline (Union[Unset, PostApiPromptsResponse200PromptingTechniqueDemonstrationsInline]):
+        id (str | Unset):
+        name (str | Unset):
+        inline (PostApiPromptsResponse200PromptingTechniqueDemonstrationsInline | Unset):
     """
 
-    id: Union[Unset, str] = UNSET
-    name: Union[Unset, str] = UNSET
-    inline: Union[Unset, "PostApiPromptsResponse200PromptingTechniqueDemonstrationsInline"] = UNSET
+    id: str | Unset = UNSET
+    name: str | Unset = UNSET
+    inline: PostApiPromptsResponse200PromptingTechniqueDemonstrationsInline | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -34,7 +36,7 @@ class PostApiPromptsResponse200PromptingTechniqueDemonstrations:
 
         name = self.name
 
-        inline: Union[Unset, dict[str, Any]] = UNSET
+        inline: dict[str, Any] | Unset = UNSET
         if not isinstance(self.inline, Unset):
             inline = self.inline.to_dict()
 
@@ -62,7 +64,7 @@ class PostApiPromptsResponse200PromptingTechniqueDemonstrations:
         name = d.pop("name", UNSET)
 
         _inline = d.pop("inline", UNSET)
-        inline: Union[Unset, PostApiPromptsResponse200PromptingTechniqueDemonstrationsInline]
+        inline: PostApiPromptsResponse200PromptingTechniqueDemonstrationsInline | Unset
         if isinstance(_inline, Unset):
             inline = UNSET
         else:

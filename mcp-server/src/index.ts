@@ -94,15 +94,34 @@ server.tool(
 
 server.tool(
   "discover_schema",
-  "Discover available filter fields, metrics, aggregation types, and group-by options for LangWatch queries. Call this before using search_traces or get_analytics to understand available options.",
+  "Discover available filter fields, metrics, aggregation types, group-by options, scenario schema, and evaluator types for LangWatch queries. Call this before using search_traces, get_analytics, scenario tools, or evaluator tools to understand available options.",
   {
     category: z
-      .enum(["filters", "metrics", "aggregations", "groups", "all"])
+      .enum(["filters", "metrics", "aggregations", "groups", "scenarios", "evaluators", "all"])
       .describe("Which schema category to discover"),
+    evaluatorType: z
+      .string()
+      .optional()
+      .describe("When category is 'evaluators', provide a specific evaluator type (e.g. 'langevals/llm_judge') to get its full schema details"),
   },
-  async ({ category }) => {
+  async ({ category, evaluatorType }) => {
+    if (category === "scenarios") {
+      const { formatScenarioSchema } = await import("./tools/discover-scenario-schema.js");
+      return { content: [{ type: "text", text: formatScenarioSchema() }] };
+    }
+    if (category === "evaluators") {
+      const { formatEvaluatorSchema } = await import("./tools/discover-evaluator-schema.js");
+      return { content: [{ type: "text", text: formatEvaluatorSchema(evaluatorType) }] };
+    }
     const { formatSchema } = await import("./tools/discover-schema.js");
-    return { content: [{ type: "text", text: formatSchema(category) }] };
+    let text = formatSchema(category);
+    if (category === "all") {
+      const { formatScenarioSchema } = await import("./tools/discover-scenario-schema.js");
+      text += "\n\n" + formatScenarioSchema();
+      const { formatEvaluatorSchema } = await import("./tools/discover-evaluator-schema.js");
+      text += "\n\n" + formatEvaluatorSchema();
+    }
+    return { content: [{ type: "text", text }] };
   }
 );
 
@@ -216,43 +235,20 @@ server.tool(
   }
 );
 
-server.tool(
-  "list_prompts",
-  "List all prompts configured in the LangWatch project.",
-  {},
-  async () => {
-    const { requireApiKey } = await import("./config.js");
-    requireApiKey();
-    const { handleListPrompts } = await import("./tools/list-prompts.js");
-    return {
-      content: [{ type: "text", text: await handleListPrompts() }],
-    };
-  }
-);
+// --- Platform Prompt Tools (require API key) ---
+// These tools manage prompts on the LangWatch platform via API.
+// For code-based prompt management, see `fetch_langwatch_docs` for the CLI/SDK approach.
 
 server.tool(
-  "get_prompt",
-  "Get a specific prompt by ID or handle, including messages, model config, and version history.",
-  {
-    idOrHandle: z.string().describe("Prompt ID or handle"),
-    version: z
-      .number()
-      .optional()
-      .describe("Specific version number (default: latest)"),
-  },
-  async (params) => {
-    const { requireApiKey } = await import("./config.js");
-    requireApiKey();
-    const { handleGetPrompt } = await import("./tools/get-prompt.js");
-    return {
-      content: [{ type: "text", text: await handleGetPrompt(params) }],
-    };
-  }
-);
+  "platform_create_prompt",
+  `Create a new prompt on the LangWatch platform.
 
-server.tool(
-  "create_prompt",
-  "Create a new prompt in the LangWatch project.",
+NOTE: Prompts can be managed two ways. Determine which approach the user needs:
+
+1. Code-based (CLI/SDK): If the user wants to manage prompts in their codebase, use \`fetch_langwatch_docs\` to learn about the prompt management CLI/SDK. This lets them version-control prompts and pull them into code.
+
+2. Platform-based (LangWatch UI): If the user wants to manage prompts directly on the LangWatch platform, use the \`platform_\` MCP tools (\`platform_create_prompt\`, \`platform_update_prompt\`, etc.).
+`,
   {
     name: z.string().describe("Prompt name"),
     handle: z
@@ -288,8 +284,42 @@ server.tool(
 );
 
 server.tool(
-  "update_prompt",
-  "Update an existing prompt or create a new version.",
+  "platform_list_prompts",
+  "List all prompts configured on the LangWatch platform.",
+  {},
+  async () => {
+    const { requireApiKey } = await import("./config.js");
+    requireApiKey();
+    const { handleListPrompts } = await import("./tools/list-prompts.js");
+    return {
+      content: [{ type: "text", text: await handleListPrompts() }],
+    };
+  }
+);
+
+server.tool(
+  "platform_get_prompt",
+  "Get a specific prompt from the LangWatch platform by ID or handle, including messages, model config, and version history.",
+  {
+    idOrHandle: z.string().describe("Prompt ID or handle"),
+    version: z
+      .number()
+      .optional()
+      .describe("Specific version number (default: latest)"),
+  },
+  async (params) => {
+    const { requireApiKey } = await import("./config.js");
+    requireApiKey();
+    const { handleGetPrompt } = await import("./tools/get-prompt.js");
+    return {
+      content: [{ type: "text", text: await handleGetPrompt(params) }],
+    };
+  }
+);
+
+server.tool(
+  "platform_update_prompt",
+  "Update an existing prompt on the LangWatch platform or create a new version.",
   {
     idOrHandle: z.string().describe("Prompt ID or handle to update"),
     messages: z
@@ -320,6 +350,272 @@ server.tool(
     const { handleUpdatePrompt } = await import("./tools/update-prompt.js");
     return {
       content: [{ type: "text", text: await handleUpdatePrompt(params) }],
+    };
+  }
+);
+
+// --- Platform Scenario Tools (require API key) ---
+// These tools manage scenarios on the LangWatch platform via API.
+// For code-based scenario testing, see `fetch_scenario_docs` for the SDK approach.
+
+server.tool(
+  "platform_create_scenario",
+  `Create a new scenario on the LangWatch platform. Call discover_schema({ category: 'scenarios' }) first to learn how to write effective situations and criteria.
+
+NOTE: Scenarios can be created two ways. Determine which approach the user needs:
+
+1. Code-based (local testing): If the user has a codebase with an AI agent they want to test, use \`fetch_scenario_docs\` to learn about the Scenario Python/TypeScript SDK. This lets them run tests locally and iterate in code.
+
+2. Platform-based (LangWatch UI): If the user wants to manage scenarios directly on the LangWatch platform, use the \`platform_\` MCP tools (\`platform_create_scenario\`, \`platform_update_scenario\`, etc.).
+`,
+  {
+    name: z.string().describe("Scenario name"),
+    situation: z
+      .string()
+      .describe("The context or setup describing what the user/agent is doing"),
+    criteria: z
+      .array(z.string())
+      .optional()
+      .describe("Pass/fail conditions the agent's response must satisfy"),
+    labels: z
+      .array(z.string())
+      .optional()
+      .describe("Tags for organizing and filtering scenarios"),
+  },
+  async (params) => {
+    const { requireApiKey } = await import("./config.js");
+    requireApiKey();
+    const { handleCreateScenario } = await import(
+      "./tools/create-scenario.js"
+    );
+    return {
+      content: [{ type: "text", text: await handleCreateScenario(params) }],
+    };
+  }
+);
+
+server.tool(
+  "platform_list_scenarios",
+  "List all scenarios on the LangWatch platform. Returns AI-readable digest by default.",
+  {
+    format: z
+      .enum(["digest", "json"])
+      .optional()
+      .describe(
+        "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)"
+      ),
+  },
+  async (params) => {
+    const { requireApiKey } = await import("./config.js");
+    requireApiKey();
+    const { handleListScenarios } = await import("./tools/list-scenarios.js");
+    return {
+      content: [{ type: "text", text: await handleListScenarios(params) }],
+    };
+  }
+);
+
+server.tool(
+  "platform_get_scenario",
+  "Get full details of a scenario on the LangWatch platform by ID, including situation, criteria, and labels.",
+  {
+    scenarioId: z.string().describe("The scenario ID to retrieve"),
+    format: z
+      .enum(["digest", "json"])
+      .optional()
+      .describe(
+        "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)"
+      ),
+  },
+  async (params) => {
+    const { requireApiKey } = await import("./config.js");
+    requireApiKey();
+    const { handleGetScenario } = await import("./tools/get-scenario.js");
+    return {
+      content: [{ type: "text", text: await handleGetScenario(params) }],
+    };
+  }
+);
+
+server.tool(
+  "platform_update_scenario",
+  "Update an existing scenario on the LangWatch platform.",
+  {
+    scenarioId: z.string().describe("The scenario ID to update"),
+    name: z.string().optional().describe("Updated scenario name"),
+    situation: z.string().optional().describe("Updated situation"),
+    criteria: z
+      .array(z.string())
+      .optional()
+      .describe("Updated criteria"),
+    labels: z
+      .array(z.string())
+      .optional()
+      .describe("Updated labels"),
+  },
+  async (params) => {
+    const { requireApiKey } = await import("./config.js");
+    requireApiKey();
+    const { handleUpdateScenario } = await import(
+      "./tools/update-scenario.js"
+    );
+    return {
+      content: [{ type: "text", text: await handleUpdateScenario(params) }],
+    };
+  }
+);
+
+server.tool(
+  "platform_archive_scenario",
+  "Archive (soft-delete) a scenario on the LangWatch platform.",
+  {
+    scenarioId: z.string().describe("The scenario ID to archive"),
+  },
+  async (params) => {
+    const { requireApiKey } = await import("./config.js");
+    requireApiKey();
+    const { handleArchiveScenario } = await import(
+      "./tools/archive-scenario.js"
+    );
+    return {
+      content: [{ type: "text", text: await handleArchiveScenario(params) }],
+    };
+  }
+);
+
+// --- Platform Evaluator Tools (require API key) ---
+// These tools manage evaluators on the LangWatch platform via API.
+
+server.tool(
+  "platform_create_evaluator",
+  `Create an evaluator on the LangWatch platform. Useful for setting up LLM-as-judge and other evaluators to use in evaluation notebooks. Call discover_schema({ category: 'evaluators' }) first to see available evaluator types and their settings.`,
+  {
+    name: z.string().describe("Evaluator name"),
+    config: z
+      .record(z.unknown())
+      .describe(
+        'Evaluator config object. Must include "evaluatorType" (e.g. "langevals/llm_boolean") and optional "settings" overrides.'
+      ),
+  },
+  async (params) => {
+    const { requireApiKey } = await import("./config.js");
+    requireApiKey();
+    const { handleCreateEvaluator } = await import(
+      "./tools/create-evaluator.js"
+    );
+    return {
+      content: [{ type: "text", text: await handleCreateEvaluator(params) }],
+    };
+  }
+);
+
+server.tool(
+  "platform_list_evaluators",
+  "List all evaluators configured on the LangWatch platform.",
+  {},
+  async () => {
+    const { requireApiKey } = await import("./config.js");
+    requireApiKey();
+    const { handleListEvaluators } = await import(
+      "./tools/list-evaluators.js"
+    );
+    return {
+      content: [{ type: "text", text: await handleListEvaluators() }],
+    };
+  }
+);
+
+server.tool(
+  "platform_get_evaluator",
+  "Get full details of an evaluator on the LangWatch platform by ID or slug, including config, input fields, and output fields.",
+  {
+    idOrSlug: z.string().describe("The evaluator ID or slug to retrieve"),
+  },
+  async (params) => {
+    const { requireApiKey } = await import("./config.js");
+    requireApiKey();
+    const { handleGetEvaluator } = await import("./tools/get-evaluator.js");
+    return {
+      content: [{ type: "text", text: await handleGetEvaluator(params) }],
+    };
+  }
+);
+
+server.tool(
+  "platform_update_evaluator",
+  "Update an existing evaluator on the LangWatch platform. The evaluatorType in config cannot be changed after creation.",
+  {
+    evaluatorId: z.string().describe("The evaluator ID to update"),
+    name: z.string().optional().describe("Updated evaluator name"),
+    config: z
+      .record(z.unknown())
+      .optional()
+      .describe(
+        "Updated config settings. Note: evaluatorType cannot be changed after creation."
+      ),
+  },
+  async (params) => {
+    const { requireApiKey } = await import("./config.js");
+    requireApiKey();
+    const { handleUpdateEvaluator } = await import(
+      "./tools/update-evaluator.js"
+    );
+    return {
+      content: [{ type: "text", text: await handleUpdateEvaluator(params) }],
+    };
+  }
+);
+
+// --- Platform Model Provider Tools (require API key) ---
+// These tools manage model provider API keys on the LangWatch platform.
+
+server.tool(
+  "platform_set_model_provider",
+  `Set or update a model provider on the LangWatch platform. Use this to configure API keys (e.g. OPENAI_API_KEY) needed to run evaluators. The API key is stored securely and never returned in responses. Omit customKeys to update other settings without changing existing keys.`,
+  {
+    provider: z
+      .string()
+      .describe(
+        'Provider name, e.g., "openai", "anthropic", "azure", "custom"'
+      ),
+    enabled: z.boolean().describe("Whether the provider is enabled"),
+    customKeys: z
+      .record(z.unknown())
+      .optional()
+      .describe(
+        'API key configuration, e.g. { "OPENAI_API_KEY": "sk-..." }. Omit to keep existing keys.'
+      ),
+    defaultModel: z
+      .string()
+      .optional()
+      .describe("Set as project default model"),
+  },
+  async (params) => {
+    const { requireApiKey } = await import("./config.js");
+    requireApiKey();
+    const { handleSetModelProvider } = await import(
+      "./tools/set-model-provider.js"
+    );
+    return {
+      content: [
+        { type: "text", text: await handleSetModelProvider(params) },
+      ],
+    };
+  }
+);
+
+server.tool(
+  "platform_list_model_providers",
+  "List all model providers configured on the LangWatch platform. API keys are masked in the response.",
+  {},
+  async () => {
+    const { requireApiKey } = await import("./config.js");
+    requireApiKey();
+    const { handleListModelProviders } = await import(
+      "./tools/list-model-providers.js"
+    );
+    return {
+      content: [{ type: "text", text: await handleListModelProviders() }],
     };
   }
 );

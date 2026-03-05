@@ -14,6 +14,8 @@ import type {
   TargetConfig,
   TelemetryConfig,
 } from "./types";
+import type { ModelParamsProvider, ModelParamsResult } from "./data-prefetcher";
+export type { ModelParamsProvider, ModelParamsResult };
 
 /** Fetches scenario configuration by ID */
 export interface ScenarioRepository {
@@ -29,11 +31,6 @@ export interface ProjectRepository {
     apiKey: string;
     defaultModel: string | null;
   } | null>;
-}
-
-/** Prepares model parameters for LiteLLM */
-export interface ModelParamsProvider {
-  prepare(projectId: string, model: string): Promise<LiteLLMParams | null>;
 }
 
 /** Creates target adapters */

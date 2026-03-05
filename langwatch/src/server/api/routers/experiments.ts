@@ -1,8 +1,4 @@
-import type {
-  AggregationsAggregate,
-  QueryDslBoolQuery,
-  SearchResponse,
-} from "@elastic/elasticsearch/lib/api/types";
+import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 import { generate } from "@langwatch/ksuid";
 import {
   EvaluationExecutionMode,
@@ -27,14 +23,16 @@ import {
   workflowJsonSchema,
 } from "../../../optimization_studio/types/dsl";
 import { slugify } from "../../../utils/slugify";
+import { getClickHouseClient } from "../../clickhouse/client";
 import { DatasetService } from "../../datasets/dataset.service";
 import { prisma } from "../../db";
 import {
   BATCH_EVALUATION_INDEX,
-  batchEvaluationId,
   DSPY_STEPS_INDEX,
   esClient,
 } from "../../elasticsearch";
+import { ExperimentRunService } from "../../evaluations-v3/services/experiment-run.service";
+import { getVersionMap } from "../../evaluations-v3/services/getVersionMap";
 import type {
   DSPyRunsSummary,
   DSPyStep,
@@ -561,16 +559,17 @@ export const experimentsRouter = createTRPCRouter({
         ).map((dataset) => [dataset.id, dataset]),
       );
 
-      const runsByExperimentId = await getExperimentBatchEvaluationRuns(
-        input.projectId,
-        experiments.map((experiment) => experiment.id),
-      );
+      const experimentRunService = ExperimentRunService.create(prisma);
+      const runsByExperimentId = await experimentRunService.listRuns({
+        projectId: input.projectId,
+        experimentIds: experiments.map((experiment) => experiment.id),
+      });
 
       const experimentsWithDatasetsAndRuns = experiments
         .map((experiment) => {
           const runs = runsByExperimentId[experiment.id] ?? [];
           const latestRun = runs.sort(
-            (a, b) => b.timestamps.created_at - a.timestamps.created_at,
+            (a, b) => b.timestamps.createdAt - a.timestamps.createdAt,
           )[0];
           const primaryMetric = latestRun
             ? Object.values(latestRun?.summary.evaluations)[0]
@@ -593,7 +592,7 @@ export const experimentsRouter = createTRPCRouter({
                 getDatasetId(experiment.workflow?.currentVersion?.dsl) ?? ""
               ],
             updatedAt:
-              latestRun?.timestamps.created_at ??
+              latestRun?.timestamps.createdAt ??
               experiment.updatedAt.getTime(),
           };
         })
@@ -651,7 +650,7 @@ export const experimentsRouter = createTRPCRouter({
         .map((hit) => hit._source?.workflow_version_id)
         .filter((id): id is string => Boolean(id));
 
-      const versionsMap = await getVersionMap(input.projectId, versionIds);
+      const versionsMap = await getVersionMap({ prisma, projectId: input.projectId, versionIds });
 
       const result: DSPyRunsSummary[] = (
         dspySteps.aggregations?.runs as any
@@ -769,10 +768,11 @@ export const experimentsRouter = createTRPCRouter({
         input.experimentId,
       );
 
-      const runsByExperimentId = await getExperimentBatchEvaluationRuns(
-        input.projectId,
-        [experiment.id],
-      );
+      const experimentRunService = ExperimentRunService.create(prisma);
+      const runsByExperimentId = await experimentRunService.listRuns({
+        projectId: input.projectId,
+        experimentIds: [experiment.id],
+      });
 
       return { runs: runsByExperimentId[experiment.id] ?? [] };
     }),
@@ -792,44 +792,12 @@ export const experimentsRouter = createTRPCRouter({
         input.experimentId,
       );
 
-      const id = batchEvaluationId({
+      const experimentRunService = ExperimentRunService.create(prisma);
+      return experimentRunService.getRun({
         projectId: input.projectId,
         experimentId: experiment.id,
         runId: input.runId,
       });
-
-      const client = await esClient({ projectId: input.projectId });
-      let batchEvaluationRun: SearchResponse<
-        ESBatchEvaluation,
-        Record<string, AggregationsAggregate>
-      > | null = null;
-      let attempts = 0;
-      while (attempts < 3) {
-        batchEvaluationRun = await client.search<ESBatchEvaluation>({
-          index: BATCH_EVALUATION_INDEX.alias,
-          body: {
-            query: {
-              term: { _id: id },
-            },
-          },
-          size: 1,
-        });
-        await new Promise((resolve) => setTimeout(resolve, 1_000));
-        attempts++;
-        if (batchEvaluationRun.hits.hits.length > 0) {
-          break;
-        }
-      }
-
-      const result = batchEvaluationRun?.hits.hits[0]?._source;
-      if (!result) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Batch evaluation run not found",
-        });
-      }
-
-      return result;
     }),
 
   deleteExperiment: protectedProcedure
@@ -856,7 +824,7 @@ export const experimentsRouter = createTRPCRouter({
         });
       }
 
-      // Perform the deletion in a transaction to ensure consistency
+      // Perform the Prisma deletion in a transaction to ensure consistency
       await prisma.$transaction(async (tx) => {
         // Delete workflow versions if a workflow exists
         if (experiment.workflowId) {
@@ -924,9 +892,11 @@ export const experimentsRouter = createTRPCRouter({
             projectId: input.projectId,
           },
         });
+      });
 
-        // At last, delete experiment-related data in Elasticsearch
-        const client = await esClient({ projectId: input.projectId });
+      // Best-effort cleanup of ES and CH data outside the transaction
+      // (these are not atomic with Prisma and should not cause rollback)
+      const esCleanup = esClient({ projectId: input.projectId }).then(async (client) => {
         await client.deleteByQuery({
           index: BATCH_EVALUATION_INDEX.alias,
           body: {
@@ -941,7 +911,6 @@ export const experimentsRouter = createTRPCRouter({
           },
         });
 
-        // And delete DSPy steps in ES if applicable
         await client.deleteByQuery({
           index: DSPY_STEPS_INDEX.alias,
           body: {
@@ -955,7 +924,34 @@ export const experimentsRouter = createTRPCRouter({
             },
           },
         });
+      }).catch((err) => {
+        console.error("Best-effort ES cleanup failed for experiment deletion", { experimentId: input.experimentId, err });
       });
+
+      const chCleanup = Promise.resolve().then(async () => {
+        const chClient = getClickHouseClient();
+        if (!chClient) return;
+        await Promise.all([
+          chClient.command({
+            query: `DELETE FROM experiment_runs WHERE TenantId = {tenantId:String} AND ExperimentId = {experimentId:String}`,
+            query_params: {
+              tenantId: input.projectId,
+              experimentId: input.experimentId,
+            },
+          }),
+          chClient.command({
+            query: `DELETE FROM experiment_run_items WHERE TenantId = {tenantId:String} AND ExperimentId = {experimentId:String}`,
+            query_params: {
+              tenantId: input.projectId,
+              experimentId: input.experimentId,
+            },
+          }),
+        ]);
+      }).catch((err) => {
+        console.error("Best-effort CH cleanup failed for experiment deletion", { experimentId: input.experimentId, err });
+      });
+
+      await Promise.allSettled([esCleanup, chCleanup]);
 
       return { success: true };
     }),
@@ -1174,37 +1170,6 @@ const getExperimentById = async (projectId: string, experimentId: string) => {
   return experiment;
 };
 
-const getVersionMap = async (projectId: string, versionIds: string[]) => {
-  const versions = await prisma.workflowVersion.findMany({
-    where: {
-      projectId: projectId,
-      id: {
-        in: versionIds,
-      },
-    },
-    select: {
-      id: true,
-      version: true,
-      commitMessage: true,
-      author: {
-        select: {
-          name: true,
-          image: true,
-        },
-      },
-    },
-  });
-
-  const versionsMap = versions.reduce(
-    (acc, version) => {
-      acc[version.id] = version;
-      return acc;
-    },
-    {} as Record<string, (typeof versions)[number]>,
-  );
-
-  return versionsMap;
-};
 
 const findNextDraftName = async (projectId: string) => {
   const experiments = await prisma.experiment.findMany({
@@ -1214,17 +1179,23 @@ const findNextDraftName = async (projectId: string) => {
     },
     where: {
       projectId: projectId,
+      name: {
+        startsWith: "Draft",
+      },
     },
   });
 
-  const draftCount = experiments.filter((draft) =>
-    draft.name?.startsWith("Draft"),
-  ).length;
-
-  const slugs = new Set(experiments.map((experiment) => experiment.slug));
+  const slugs = new Set(
+    (
+      await prisma.experiment.findMany({
+        select: { slug: true },
+        where: { projectId: projectId },
+      })
+    ).map((e) => e.slug),
+  );
 
   let draftName;
-  let index = draftCount + 1;
+  let index = experiments.length + 1;
   while (true) {
     draftName = `Draft Evaluation (${index})`;
     if (!slugs.has(slugify(draftName))) {
@@ -1234,214 +1205,6 @@ const findNextDraftName = async (projectId: string) => {
   }
 
   return draftName;
-};
-
-const getExperimentBatchEvaluationRuns = async (
-  projectId: string,
-  experimentIds: string[],
-) => {
-  type ESBatchEvaluationRunInfo = Pick<
-    ESBatchEvaluation,
-    | "experiment_id"
-    | "run_id"
-    | "workflow_version_id"
-    | "timestamps"
-    | "progress"
-    | "total"
-  >;
-
-  const client = await esClient({ projectId });
-  const batchEvaluationRuns = await client.search<ESBatchEvaluationRunInfo>({
-    index: BATCH_EVALUATION_INDEX.alias,
-    size: 10_000,
-    body: {
-      _source: [
-        "experiment_id",
-        "run_id",
-        "workflow_version_id",
-        "timestamps.created_at",
-        "timestamps.updated_at",
-        "timestamps.finished_at",
-        "timestamps.stopped_at",
-        "progress",
-        "total",
-      ],
-      query: {
-        bool: {
-          must: [
-            { terms: { experiment_id: experimentIds } },
-            { term: { project_id: projectId } },
-          ] as QueryDslBoolQuery["must"],
-        } as QueryDslBoolQuery,
-      },
-      sort: [{ "timestamps.created_at": "desc" }],
-      aggs: {
-        runs: {
-          terms: { field: "run_id", size: 1_000 },
-          aggs: {
-            dataset_cost: {
-              sum: {
-                field: "dataset.cost",
-              },
-            },
-            evaluations_cost: {
-              nested: {
-                path: "evaluations",
-              },
-              aggs: {
-                cost: {
-                  sum: {
-                    field: "evaluations.cost",
-                  },
-                },
-                average_cost: {
-                  avg: {
-                    field: "evaluations.cost",
-                  },
-                },
-                average_duration: {
-                  avg: {
-                    field: "evaluations.duration",
-                  },
-                },
-              },
-            },
-            dataset_average_cost: {
-              avg: {
-                field: "dataset.cost",
-              },
-            },
-            dataset_average_duration: {
-              avg: {
-                field: "dataset.duration",
-              },
-            },
-            evaluations: {
-              nested: {
-                path: "evaluations",
-              },
-              aggs: {
-                child: {
-                  terms: { field: "evaluations.evaluator", size: 100 },
-                  aggs: {
-                    name: {
-                      terms: { field: "evaluations.name", size: 100 },
-                    },
-                    processed_evaluations: {
-                      filter: {
-                        term: { "evaluations.status": "processed" },
-                      },
-                      aggs: {
-                        average_score: {
-                          avg: {
-                            field: "evaluations.score",
-                          },
-                        },
-                        has_passed: {
-                          filter: {
-                            bool: {
-                              should: [
-                                { term: { "evaluations.passed": true } },
-                                { term: { "evaluations.passed": false } },
-                              ],
-                            },
-                          },
-                        },
-                        average_passed: {
-                          avg: {
-                            field: "evaluations.passed",
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    },
-  });
-
-  const versionIds = batchEvaluationRuns.hits.hits
-    .map((hit) => hit._source?.workflow_version_id)
-    .filter((id): id is string => Boolean(id));
-
-  const versionsMap = await getVersionMap(projectId, versionIds);
-
-  const runs = batchEvaluationRuns.hits.hits.map((hit) => {
-    const source = hit._source!;
-
-    const runAgg = (batchEvaluationRuns.aggregations?.runs as any).buckets.find(
-      (bucket: any) => bucket.key === source.run_id,
-    );
-
-    return {
-      experiment_id: source.experiment_id,
-      run_id: source.run_id,
-      workflow_version: source.workflow_version_id
-        ? versionsMap[source.workflow_version_id]
-        : null,
-      timestamps: source.timestamps,
-      progress: source.progress,
-      total: source.total,
-      summary: {
-        dataset_cost: runAgg?.dataset_cost.value as number | undefined,
-        evaluations_cost: runAgg?.evaluations_cost.cost.value as
-          | number
-          | undefined,
-        dataset_average_cost: runAgg?.dataset_average_cost.value as
-          | number
-          | undefined,
-        dataset_average_duration: runAgg?.dataset_average_duration.value as
-          | number
-          | undefined,
-        evaluations_average_cost: runAgg?.evaluations_cost.average_cost.value as
-          | number
-          | undefined,
-        evaluations_average_duration: runAgg?.evaluations_cost.average_duration
-          .value as number | undefined,
-        evaluations: Object.fromEntries(
-          runAgg?.evaluations.child.buckets.map((bucket: any) => {
-            return [
-              bucket.key,
-              {
-                name: bucket.name.buckets[0]?.key ?? bucket.key,
-                average_score: bucket.processed_evaluations.average_score.value,
-                ...(bucket.processed_evaluations.has_passed.doc_count > 0
-                  ? {
-                      average_passed:
-                        bucket.processed_evaluations.average_passed.value,
-                    }
-                  : {}),
-              },
-            ];
-          }),
-        ) as Record<
-          string,
-          {
-            name: string;
-            average_score: number;
-            average_passed?: number;
-          }
-        >,
-      },
-    };
-  });
-
-  const runsByExperimentId = runs.reduce(
-    (acc, run) => {
-      if (!(run.experiment_id in acc)) {
-        acc[run.experiment_id] = [];
-      }
-      acc[run.experiment_id]?.push(run);
-      return acc;
-    },
-    {} as Record<string, (typeof runs)[number][]>,
-  );
-
-  return runsByExperimentId;
 };
 
 /**

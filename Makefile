@@ -1,5 +1,6 @@
 .PHONY: start sync-all-openapi user-delete-dry-run user-delete es-delete-dry-run es-delete
-.PHONY: dev dev-nlp dev-scenarios dev-full down logs clean ps quickstart
+.PHONY: dev dev-nlp dev-scenarios dev-full down logs clean ps quickstart worktree
+.PHONY: setup-hooks
 
 # =============================================================================
 # DOCKER DEV ENVIRONMENT (compose.dev.yml)
@@ -9,28 +10,32 @@
 
 COMPOSE = docker compose -f compose.dev.yml
 
+# Install git hooks (idempotent, runs automatically before dev targets)
+setup-hooks:
+	@git config core.hooksPath .githooks
+
 # Minimal: postgres + redis + app (no opensearch)
-dev:
+dev: setup-hooks
 	$(COMPOSE) up
 
 # + opensearch (for traces/search features)
-dev-search:
+dev-search: setup-hooks
 	$(COMPOSE) --profile search up
 
 # + NLP service + langevals (for evaluations)
-dev-nlp:
+dev-nlp: setup-hooks
 	$(COMPOSE) --profile nlp up
 
 # + scenario worker + bullboard + NLP (no opensearch needed)
-dev-scenarios:
+dev-scenarios: setup-hooks
 	$(COMPOSE) --profile scenarios up
 
 # + AI test server (for HTTP agent testing)
-dev-test:
+dev-test: setup-hooks
 	$(COMPOSE) --profile test up
 
 # Everything
-dev-full:
+dev-full: setup-hooks
 	$(COMPOSE) --profile full up
 
 # Stop all services
@@ -76,6 +81,15 @@ tsc-watch:
 # Interactive profile chooser
 quickstart:
 	@./scripts/dev.sh
+
+# Create a git worktree from issue number or feature name
+# Usage: make worktree 1663  or  make worktree add-dark-mode
+ifeq (worktree,$(firstword $(MAKECMDGOALS)))
+  WORKTREE_ARG := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
+  $(eval $(WORKTREE_ARG):;@:)
+endif
+worktree:
+	@./scripts/worktree.sh $(WORKTREE_ARG)
 
 sync-all-openapi:
 	pnpm run task generateOpenAPISpec

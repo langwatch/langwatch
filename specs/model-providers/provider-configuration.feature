@@ -15,8 +15,7 @@ Feature: Model Provider Configuration
       | field           | type       |
       | OPENAI_API_KEY  | text input |
       | OPENAI_BASE_URL | text input |
-    And I see a "Custom Models" input section
-    And I see a "Custom Embeddings" input section
+    And I see a "Custom Models" section
     And I see a "Save" button
 
   @visual
@@ -24,7 +23,7 @@ Feature: Model Provider Configuration
     When I open the model provider configuration drawer for "azure"
     Then I see a "Use API Gateway" toggle
     And I see an "Extra Headers" section
-    And I see a "Custom Models" input section
+    And I see a "Custom Models" section
     And I see a "Save" button
 
   @visual
@@ -79,9 +78,13 @@ Feature: Model Provider Configuration
     And the field indicates the key comes from environment variables
 
   @integration
-  Scenario: Add custom model by name
+  Scenario: Add custom model through dialog
     Given I open the model provider configuration drawer for "openai"
-    When I enter "gpt-5-custom" in the custom models input
+    When I click the "+ Add" button in the Custom Models section
+    And I select "Add model"
+    And I fill in "Model ID" with "gpt-5-custom"
+    And I fill in "Display Name" with "GPT-5 Custom"
+    And I confirm the dialog
     And I click "Save"
     Then "gpt-5-custom" is added to the provider's custom models
     And the model appears as "openai/gpt-5-custom" in model selectors
@@ -128,9 +131,13 @@ Feature: Model Provider Configuration
     And API requests use the custom base URL
 
   @integration
-  Scenario: Configure embedding models
+  Scenario: Add custom embeddings model through dialog
     Given I open the model provider configuration drawer for "openai"
-    When I enter "text-embedding-custom" in the custom embeddings models input
+    When I click the "+ Add" button in the Custom Models section
+    And I select "Add embeddings model"
+    And I fill in "Model ID" with "text-embedding-custom"
+    And I fill in "Display Name" with "Text Embedding Custom"
+    And I confirm the dialog
     And I click "Save"
     Then "text-embedding-custom" is added to the provider's custom embeddings models
     And the model appears as "openai/text-embedding-custom" in embedding model selectors

@@ -361,6 +361,102 @@ describe("LLMConfigPopover", () => {
         expect(screen.getByText("output2")).toBeInTheDocument();
       });
     });
+
+    describe("when toggle is clicked to enable", () => {
+      it("enables the toggle", async () => {
+        const user = userEvent.setup();
+        const outputs: Output[] = [{ identifier: "output", type: "str" }];
+        renderComponent({
+          showStructuredOutputs: true,
+          outputs,
+          onOutputsChange: vi.fn(),
+        });
+
+        const toggle = screen.getByTestId("structured-outputs-switch");
+        await user.click(toggle);
+
+        expect(toggle).toHaveAttribute("data-state", "checked");
+      });
+
+      it("shows the Outputs section", async () => {
+        const user = userEvent.setup();
+        const outputs: Output[] = [{ identifier: "output", type: "str" }];
+        renderComponent({
+          showStructuredOutputs: true,
+          outputs,
+          onOutputsChange: vi.fn(),
+        });
+
+        // Outputs section should not be visible before toggle
+        expect(screen.queryByText("Outputs")).not.toBeInTheDocument();
+
+        const toggle = screen.getByTestId("structured-outputs-switch");
+        await user.click(toggle);
+
+        expect(screen.getByText("Outputs")).toBeInTheDocument();
+      });
+    });
+
+    describe("when toggle is clicked to disable", () => {
+      it("disables the toggle", async () => {
+        const user = userEvent.setup();
+        // Start with non-default outputs so toggle starts enabled
+        const outputs: Output[] = [
+          { identifier: "custom_output", type: "json_schema" },
+        ];
+        renderComponent({
+          showStructuredOutputs: true,
+          outputs,
+          onOutputsChange: vi.fn(),
+        });
+
+        const toggle = screen.getByTestId("structured-outputs-switch");
+        expect(toggle).toHaveAttribute("data-state", "checked");
+
+        await user.click(toggle);
+
+        expect(toggle).toHaveAttribute("data-state", "unchecked");
+      });
+
+      it("hides the Outputs section", async () => {
+        const user = userEvent.setup();
+        const outputs: Output[] = [
+          { identifier: "custom_output", type: "json_schema" },
+        ];
+        renderComponent({
+          showStructuredOutputs: true,
+          outputs,
+          onOutputsChange: vi.fn(),
+        });
+
+        expect(screen.getByText("Outputs")).toBeInTheDocument();
+
+        const toggle = screen.getByTestId("structured-outputs-switch");
+        await user.click(toggle);
+
+        expect(screen.queryByText("Outputs")).not.toBeInTheDocument();
+      });
+
+      it("calls onOutputsChange with default output", async () => {
+        const user = userEvent.setup();
+        const onOutputsChange = vi.fn();
+        const outputs: Output[] = [
+          { identifier: "custom_output", type: "json_schema" },
+        ];
+        renderComponent({
+          showStructuredOutputs: true,
+          outputs,
+          onOutputsChange,
+        });
+
+        const toggle = screen.getByTestId("structured-outputs-switch");
+        await user.click(toggle);
+
+        expect(onOutputsChange).toHaveBeenCalledWith([
+          { identifier: "output", type: "str" },
+        ]);
+      });
+    });
   });
 
   describe("error display", () => {

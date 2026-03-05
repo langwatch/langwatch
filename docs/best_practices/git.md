@@ -19,20 +19,26 @@
 
 ## Worktrees
 
-Worktrees live in a dedicated `../worktrees/` directory (sibling to langwatch-saas).
+Worktrees live in the `.worktrees/` directory at the repo root (gitignored).
 
 | Branch | Directory |
 |--------|-----------|
-| `issue123/user-login` | `../worktrees/worktree-issue123-user-login` |
-| `feat/dark-mode` | `../worktrees/worktree-feat-dark-mode` |
+| `issue123/user-login` | `.worktrees/issue123-user-login` |
+| `feat/dark-mode` | `.worktrees/feat-dark-mode` |
 
-Create worktrees with `/worktree`:
+Create worktrees with `make worktree` or the script directly:
 ```bash
-/worktree #123          # Creates issue123/<slug> from issue title
-/worktree my-feature    # Creates feat/my-feature
+make worktree 123           # Creates issue123/<slug> from issue title
+make worktree my-feature    # Creates feat/my-feature
+
+# Or directly:
+./scripts/worktree.sh 123
+./scripts/worktree.sh my-feature
 ```
 
-See `.claude/commands/worktree.md` for full details.
+The script fetches from origin, derives branch/directory names, creates the worktree, copies `.env*` files, and prints a summary with next steps.
+
+See `langwatch/src/docs/WORKTREES.md` for full details.
 
 ## Issues
 
@@ -42,10 +48,3 @@ When creating issues, add them to the **LangWatch Kanban** project and fill in:
 - **Size** - XS/S/M/L/XL
 - **Epic** - if applicable
 - **Labels** and **Milestone** when relevant
-
-```bash
-# Create issue and add to project
-gh issue create --repo langwatch/langwatch --title "..." --body "..."
-gh project item-add 5 --owner langwatch --url <issue-url>
-# Then set fields in the GitHub Projects UI
-```

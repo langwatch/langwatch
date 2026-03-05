@@ -15,7 +15,7 @@ import { LicenseEnforcementRepository } from "../license-enforcement.repository"
  * in the UsageStatsService tests.
  *
  * Note: Classification function tests (isViewOnlyPermission, isViewOnlyCustomRole,
- * classifyMemberType, isFullMember, isMemberLite) are in member-classification.unit.test.ts
+ * classifyMemberType, isFullMember, isLiteMember) are in member-classification.unit.test.ts
  *
  * Terminology: The EXTERNAL enum value corresponds to "Lite Member" in user-facing text.
  */

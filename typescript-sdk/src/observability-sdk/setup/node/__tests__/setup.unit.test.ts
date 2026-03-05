@@ -116,7 +116,7 @@ describe("langwatch configuration", () => {
     resetObservabilitySdkConfig();
   });
 
-  it("uses simple processor by default", () => {
+  it("uses batch processor by default", () => {
     const logger = new MockLogger({});
     const sdk = createAndStartNodeSdk({
       langwatch: { apiKey: "test" },
@@ -124,7 +124,7 @@ describe("langwatch configuration", () => {
     }, logger, resourceFromAttributes({}));
 
     expect(logger.debug).toHaveBeenCalledWith(
-      "Added LangWatch simple SpanProcessor and LogRecordProcessor to SDK"
+      "Added LangWatch batch SpanProcessor and LogRecordProcessor to SDK"
     );
     expect(sdk).toBeDefined();
   });
@@ -545,7 +545,7 @@ describe("log record processors configuration", () => {
 
     expect(sdk).toBeDefined();
     expect(logger.debug).toHaveBeenCalledWith(
-      "Added LangWatch simple SpanProcessor and LogRecordProcessor to SDK",
+      "Added LangWatch batch SpanProcessor and LogRecordProcessor to SDK",
     );
   });
 
@@ -623,7 +623,7 @@ describe("span processors configuration", () => {
 
     expect(sdk).toBeDefined();
     expect(logger.debug).toHaveBeenCalledWith(
-      "Added LangWatch simple SpanProcessor and LogRecordProcessor to SDK",
+      "Added LangWatch batch SpanProcessor and LogRecordProcessor to SDK",
     );
   });
 
@@ -821,7 +821,7 @@ describe("error handling in setup", () => {
 
     // Since the setup is actually succeeding now, we need to check for the success message
     expect(logger.debug).toHaveBeenCalledWith(
-      expect.stringContaining("Added LangWatch simple SpanProcessor and LogRecordProcessor to SDK"),
+      expect.stringContaining("Added LangWatch batch SpanProcessor and LogRecordProcessor to SDK"),
     );
   });
 
@@ -865,6 +865,58 @@ describe("error handling in setup", () => {
     expect(logger.debug).toHaveBeenCalledWith(
       "Shutdown called for LangWatch no-op. Nothing will be shutdown",
     );
+  });
+});
+
+describe("auto-shutdown signal handlers", () => {
+  let processOnCalls: string[];
+  let processOnMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetObservabilitySdkConfig();
+    processOnCalls = [];
+    const originalOn = process.on.bind(process);
+    processOnMock = vi.fn(((event: string, listener: (...args: unknown[]) => void) => {
+      processOnCalls.push(event);
+      return originalOn(event, listener);
+    }) as typeof process.on);
+    process.on = processOnMock as typeof process.on;
+  });
+
+  afterEach(() => {
+    trace.disable();
+    resetObservabilitySdkConfig();
+  });
+
+  it("registers beforeExit, SIGINT, and SIGTERM handlers by default", () => {
+    const logger = new MockLogger({});
+    createAndStartNodeSdk(
+      { ...defaultOptions, debug: { logger } },
+      logger,
+      resourceFromAttributes({}),
+    );
+
+    expect(processOnCalls).toContain("beforeExit");
+    expect(processOnCalls).toContain("SIGINT");
+    expect(processOnCalls).toContain("SIGTERM");
+  });
+
+  it("does not register signal handlers when disableAutoShutdown is true", () => {
+    const logger = new MockLogger({});
+    createAndStartNodeSdk(
+      {
+        ...defaultOptions,
+        debug: { logger },
+        advanced: { disableAutoShutdown: true },
+      },
+      logger,
+      resourceFromAttributes({}),
+    );
+
+    expect(processOnCalls).not.toContain("beforeExit");
+    expect(processOnCalls).not.toContain("SIGINT");
+    expect(processOnCalls).not.toContain("SIGTERM");
   });
 });
 

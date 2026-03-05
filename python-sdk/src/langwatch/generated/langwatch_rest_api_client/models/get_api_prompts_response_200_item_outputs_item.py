@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -22,12 +24,12 @@ class GetApiPromptsResponse200ItemOutputsItem:
     Attributes:
         identifier (str):
         type_ (GetApiPromptsResponse200ItemOutputsItemType):
-        json_schema (Union[Unset, GetApiPromptsResponse200ItemOutputsItemJsonSchema]):
+        json_schema (GetApiPromptsResponse200ItemOutputsItemJsonSchema | Unset):
     """
 
     identifier: str
     type_: GetApiPromptsResponse200ItemOutputsItemType
-    json_schema: Union[Unset, "GetApiPromptsResponse200ItemOutputsItemJsonSchema"] = UNSET
+    json_schema: GetApiPromptsResponse200ItemOutputsItemJsonSchema | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -35,7 +37,7 @@ class GetApiPromptsResponse200ItemOutputsItem:
 
         type_ = self.type_.value
 
-        json_schema: Union[Unset, dict[str, Any]] = UNSET
+        json_schema: dict[str, Any] | Unset = UNSET
         if not isinstance(self.json_schema, Unset):
             json_schema = self.json_schema.to_dict()
 
@@ -64,7 +66,7 @@ class GetApiPromptsResponse200ItemOutputsItem:
         type_ = GetApiPromptsResponse200ItemOutputsItemType(d.pop("type"))
 
         _json_schema = d.pop("json_schema", UNSET)
-        json_schema: Union[Unset, GetApiPromptsResponse200ItemOutputsItemJsonSchema]
+        json_schema: GetApiPromptsResponse200ItemOutputsItemJsonSchema | Unset
         if isinstance(_json_schema, Unset):
             json_schema = UNSET
         else:

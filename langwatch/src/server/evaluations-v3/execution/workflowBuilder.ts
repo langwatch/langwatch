@@ -302,12 +302,12 @@ export const buildEvaluatorTargetNode = (
   cell: ExecutionCell,
   loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>,
 ): Node<Evaluator> => {
-  // Get settings from loaded evaluator (DB) if available
+  // Get settings: prefer local config if available, otherwise use DB settings
   const dbEvaluator = targetConfig.targetEvaluatorId
     ? loadedEvaluators?.get(targetConfig.targetEvaluatorId)
     : undefined;
   const dbConfig = dbEvaluator?.config as EvaluatorDbConfig | undefined;
-  const settings = dbConfig?.settings ?? {};
+  const settings = targetConfig.localEvaluatorConfig?.settings ?? dbConfig?.settings ?? {};
 
   // Build inputs with value mappings applied
   const inputs: Field[] = (targetConfig.inputs ?? []).map((input) => ({
@@ -821,12 +821,12 @@ const buildEvaluatorNodes = (
     const nodeId = `${targetId}.${evaluator.id}`;
     evaluatorNodeIds[evaluator.id] = nodeId;
 
-    // Get settings from loaded evaluator (DB) instead of workbench state
+    // Get settings: prefer local config if available, otherwise use DB settings
     const dbEvaluator = evaluator.dbEvaluatorId
       ? loadedEvaluators?.get(evaluator.dbEvaluatorId)
       : undefined;
     const dbConfig = dbEvaluator?.config as EvaluatorDbConfig | undefined;
-    const settings = dbConfig?.settings ?? {};
+    const settings = evaluator.localEvaluatorConfig?.settings ?? dbConfig?.settings ?? {};
 
     // Get name from loaded evaluator, fall back to evaluator ID
     const evaluatorName = dbEvaluator?.name ?? evaluator.id;

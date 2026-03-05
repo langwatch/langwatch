@@ -49,6 +49,16 @@ vi.mock("~/utils/ssrfProtection", () => ({
   ssrfSafeFetch: vi.fn(),
 }));
 
+vi.mock("../../execution/trace-context-headers", () => ({
+  injectTraceContextHeaders: vi.fn(({ headers }: { headers: Record<string, string> }) => ({
+    headers,
+    traceId: undefined,
+  })),
+}));
+
+import { injectTraceContextHeaders } from "../../execution/trace-context-headers";
+const mockInjectTraceContextHeaders = vi.mocked(injectTraceContextHeaders);
+
 describe("HttpAgentAdapter", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -636,6 +646,108 @@ describe("HttpAgentAdapter", () => {
       const callArgs = mockFetch.mock.calls[0];
       const headers = callArgs?.[1]?.headers as Record<string, string>;
       expect(headers?.["X-Trimmed"]).toBe("value");
+    });
+  });
+
+  describe("trace context injection", () => {
+    it("calls injectTraceContextHeaders in buildRequestHeaders", async () => {
+      const { ssrfSafeFetch } = await import("~/utils/ssrfProtection");
+      const mockFetch = vi.mocked(ssrfSafeFetch);
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify({ result: "ok" }), {
+          headers: { "content-type": "application/json" },
+        }),
+      );
+
+      const agent = createHttpAgent();
+      const repository = createMockAgentRepository(agent);
+      const adapter = new HttpAgentAdapter({
+        agentId: "agent-123",
+        projectId: "project-123",
+        agentRepository: repository,
+      });
+
+      await adapter.call(
+        createAgentInput([{ role: "user", content: "Hello" }]),
+      );
+
+      expect(mockInjectTraceContextHeaders).toHaveBeenCalledWith({
+        headers: expect.objectContaining({ "Content-Type": "application/json" }),
+      });
+    });
+
+    describe("when custom headers are configured", () => {
+      it("preserves custom headers alongside trace context injection", async () => {
+        const { ssrfSafeFetch } = await import("~/utils/ssrfProtection");
+        const mockFetch = vi.mocked(ssrfSafeFetch);
+        mockFetch.mockResolvedValue(
+          new Response(JSON.stringify({ result: "ok" }), {
+            headers: { "content-type": "application/json" },
+          }),
+        );
+
+        const agent = createHttpAgent({
+          headers: [{ key: "X-Custom", value: "custom-value" }],
+        });
+        const repository = createMockAgentRepository(agent);
+        const adapter = new HttpAgentAdapter({
+          agentId: "agent-123",
+          projectId: "project-123",
+          agentRepository: repository,
+        });
+
+        await adapter.call(
+          createAgentInput([{ role: "user", content: "Hello" }]),
+        );
+
+        expect(mockInjectTraceContextHeaders).toHaveBeenCalledWith({
+          headers: expect.objectContaining({
+            "Content-Type": "application/json",
+            "X-Custom": "custom-value",
+          }),
+        });
+      });
+    });
+  });
+
+  describe("trace ID capture", () => {
+    it("exposes captured trace ID after a request", async () => {
+      const { ssrfSafeFetch } = await import("~/utils/ssrfProtection");
+      const mockFetch = vi.mocked(ssrfSafeFetch);
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify({ result: "ok" }), {
+          headers: { "content-type": "application/json" },
+        }),
+      );
+
+      mockInjectTraceContextHeaders.mockImplementation(({ headers }) => ({
+        headers,
+        traceId: "captured_trace_id_abc",
+      }));
+
+      const agent = createHttpAgent();
+      const repository = createMockAgentRepository(agent);
+      const adapter = new HttpAgentAdapter({
+        agentId: "agent-123",
+        projectId: "project-123",
+        agentRepository: repository,
+      });
+
+      await adapter.call(
+        createAgentInput([{ role: "user", content: "Hello" }]),
+      );
+
+      expect(adapter.getTraceId()).toBe("captured_trace_id_abc");
+    });
+
+    it("returns undefined when no trace ID was captured", () => {
+      const adapter = new HttpAgentAdapter({
+        agentId: "agent-123",
+        projectId: "project-123",
+        agentRepository: createMockAgentRepository(),
+      });
+
+      expect(adapter.getTraceId()).toBeUndefined();
     });
   });
 });

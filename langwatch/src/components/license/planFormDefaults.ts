@@ -17,6 +17,7 @@ export interface PlanFormDefaults {
   maxScenarios?: number;
   maxAgents?: number;
   canPublish?: boolean;
+  usageUnit?: "traces" | "events";
 }
 
 /**
@@ -36,6 +37,7 @@ export const PLAN_DEFAULTS: Record<PlanType, PlanFormDefaults> = {
     maxScenarios: PRO_TEMPLATE.maxScenarios,
     maxAgents: PRO_TEMPLATE.maxAgents,
     canPublish: PRO_TEMPLATE.canPublish,
+    usageUnit: PRO_TEMPLATE.usageUnit as "traces" | "events",
   },
   ENTERPRISE: {
     maxMembers: ENTERPRISE_TEMPLATE.maxMembers,
@@ -49,6 +51,7 @@ export const PLAN_DEFAULTS: Record<PlanType, PlanFormDefaults> = {
     maxScenarios: ENTERPRISE_TEMPLATE.maxScenarios,
     maxAgents: ENTERPRISE_TEMPLATE.maxAgents,
     canPublish: ENTERPRISE_TEMPLATE.canPublish,
+    usageUnit: ENTERPRISE_TEMPLATE.usageUnit as "traces" | "events",
   },
   CUSTOM: {},
 };

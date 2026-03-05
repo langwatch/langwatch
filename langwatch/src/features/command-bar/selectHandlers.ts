@@ -21,7 +21,7 @@ export type AddRecentItem = (item: Omit<RecentItem, "accessedAt">) => void;
  */
 export type OpenDrawer = (
   drawer: DrawerType,
-  params?: Record<string, string>
+  params?: Record<string, string>,
 ) => void;
 
 /**
@@ -46,7 +46,7 @@ export function handleCommandSelect(
   projectSlug: string,
   ctx: NavigationContext,
   addRecentItem: AddRecentItem,
-  openDrawer: OpenDrawer
+  openDrawer: OpenDrawer,
 ) {
   const navigate = createNavigate(ctx);
 
@@ -92,6 +92,10 @@ export function handleCommandSelect(
     case "action-new-scenario":
       navigate(`/${projectSlug}/simulations/scenarios`);
       break;
+    case "action-sdk-radar":
+      ctx.close();
+      openDrawer("sdkRadar");
+      break;
   }
 }
 
@@ -103,7 +107,7 @@ export function handleSearchResultSelect(
   projectSlug: string,
   ctx: NavigationContext,
   addRecentItem: AddRecentItem,
-  openDrawer: OpenDrawer
+  openDrawer: OpenDrawer,
 ) {
   const navigate = createNavigate(ctx);
 
@@ -113,8 +117,7 @@ export function handleSearchResultSelect(
       id: result.id,
       type: result.type === "trace" ? "trace" : "entity",
       label: result.label,
-      description:
-        result.type.charAt(0).toUpperCase() + result.type.slice(1),
+      description: result.type.charAt(0).toUpperCase() + result.type.slice(1),
       path: result.path,
       iconName: result.type,
       projectSlug,
@@ -141,7 +144,7 @@ export function handleRecentItemSelect(
   item: RecentItem,
   ctx: NavigationContext,
   addRecentItem: AddRecentItem,
-  openDrawer: OpenDrawer
+  openDrawer: OpenDrawer,
 ) {
   const navigate = createNavigate(ctx);
 
@@ -175,7 +178,7 @@ export function handleRecentItemSelect(
 export function handleProjectSelect(
   project: { slug: string; name: string },
   ctx: NavigationContext,
-  addRecentItem: AddRecentItem
+  addRecentItem: AddRecentItem,
 ) {
   const navigate = createNavigate(ctx);
 

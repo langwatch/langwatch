@@ -8,6 +8,7 @@ import { api } from "../../utils/api";
 import { useVersionState } from "../components/History";
 import type { StudioClientEvent } from "../types/events";
 import { hasDSLChanged } from "../utils/dslUtils";
+import { mergeLocalConfigsIntoDsl } from "../utils/mergeLocalConfigs";
 import { usePostEvent } from "./usePostEvent";
 
 import { useWorkflowStore } from "./useWorkflowStore";
@@ -180,7 +181,10 @@ export const useRunEvalution = () => {
         type: "execute_evaluation",
         payload: {
           run_id,
-          workflow,
+          workflow: {
+            ...workflow,
+            nodes: mergeLocalConfigsIntoDsl(workflow.nodes),
+          },
           // TODO: autosave and generate a new commit message and version id automatically
           workflow_version_id: versionId ?? "",
           evaluate_on: evaluate_on ?? "full",
@@ -218,7 +222,13 @@ export const useRunEvalution = () => {
 
       const payload: StudioClientEvent = {
         type: "stop_evaluation_execution",
-        payload: { workflow: workflow, run_id },
+        payload: {
+          workflow: {
+            ...workflow,
+            nodes: mergeLocalConfigsIntoDsl(workflow.nodes),
+          },
+          run_id,
+        },
       };
       postEvent(payload);
 

@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -23,17 +25,17 @@ class PutApiPromptsByIdResponse200PromptingTechnique:
     """
     Attributes:
         type_ (PutApiPromptsByIdResponse200PromptingTechniqueType):
-        demonstrations (Union[Unset, PutApiPromptsByIdResponse200PromptingTechniqueDemonstrations]):
+        demonstrations (PutApiPromptsByIdResponse200PromptingTechniqueDemonstrations | Unset):
     """
 
     type_: PutApiPromptsByIdResponse200PromptingTechniqueType
-    demonstrations: Union[Unset, "PutApiPromptsByIdResponse200PromptingTechniqueDemonstrations"] = UNSET
+    demonstrations: PutApiPromptsByIdResponse200PromptingTechniqueDemonstrations | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         type_ = self.type_.value
 
-        demonstrations: Union[Unset, dict[str, Any]] = UNSET
+        demonstrations: dict[str, Any] | Unset = UNSET
         if not isinstance(self.demonstrations, Unset):
             demonstrations = self.demonstrations.to_dict()
 
@@ -59,7 +61,7 @@ class PutApiPromptsByIdResponse200PromptingTechnique:
         type_ = PutApiPromptsByIdResponse200PromptingTechniqueType(d.pop("type"))
 
         _demonstrations = d.pop("demonstrations", UNSET)
-        demonstrations: Union[Unset, PutApiPromptsByIdResponse200PromptingTechniqueDemonstrations]
+        demonstrations: PutApiPromptsByIdResponse200PromptingTechniqueDemonstrations | Unset
         if isinstance(_demonstrations, Unset):
             demonstrations = UNSET
         else:

@@ -1,0 +1,34 @@
+[project]
+name = "langevals-presidio"
+version = "2.2.0"
+description = "LangEvals integration for Presidio"
+authors = [
+    {name = "Rogerio Chaves", email = "rogerio@langwatch.ai"},
+]
+license = {text = "MIT"}
+requires-python = ">=3.11"
+dependencies = [
+    "langevals-core>=0.1.0",
+    "presidio-analyzer>=2.2.355",
+    "presidio-anonymizer>=2.2.355",
+    "spacy==3.7.5",
+    "en-core-web-lg==3.7.1",
+]
+
+[dependency-groups]
+test = [
+    "pytest>=7.4.2",
+    "python-dotenv==1.0.1",
+]
+dev = ["ipykernel>=6.29.4"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["langevals_presidio"]
+
+[tool.uv.sources]
+langevals-core = { workspace = true }
+en-core-web-lg = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.7.1/en_core_web_lg-3.7.1-py3-none-any.whl" }

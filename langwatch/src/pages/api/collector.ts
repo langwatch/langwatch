@@ -1,9 +1,10 @@
+import superjson from "superjson";
 import crypto from "node:crypto";
 import type { NextApiRequest, NextApiResponse } from "next";
 import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { captureException, getCurrentScope } from "~/utils/posthogErrorCapture";
-import { dependencies } from "../../injection/dependencies.server";
+import { notifyPlanLimitReached } from "../../../ee/billing";
 import { withPagesRouterLogger } from "../../middleware/pages-router-logger";
 import { withPagesRouterTracer } from "../../middleware/pages-router-tracer";
 import { maybeAddIdsToContextList } from "../../server/background/workers/collector/rag";
@@ -26,7 +27,7 @@ import {
   spanSchema,
   spanValidatorSchema,
 } from "../../server/tracer/types.generated";
-import { TraceUsageService } from "../../server/traces/trace-usage.service";
+import { getApp } from "../../server/app-layer/app";
 import { createLogger } from "../../utils/logger/server";
 
 const logger = createLogger("langwatch.collector");
@@ -90,28 +91,24 @@ async function handleCollectorRequest(
   logger.info({ projectId: project.id }, "collector request being processed");
 
   try {
-    const traceUsageService = TraceUsageService.create();
-    const limitResult = await traceUsageService.checkLimit({
+    const limitResult = await getApp().usage.checkLimit({
       teamId: project.teamId,
     });
 
     if (limitResult.exceeded) {
-      if (dependencies.planLimits) {
-        try {
-          const activePlan =
-            await dependencies.subscriptionHandler.getActivePlan(
-              project.team.organizationId,
-            );
-          await dependencies.planLimits(
-            project.team.organizationId,
-            activePlan.name ?? "free",
-          );
-        } catch (error) {
-          logger.error(
-            { error, projectId: project.id },
-            "Error sending plan limit notification",
-          );
-        }
+      try {
+        const activePlan = await getApp().planProvider.getActivePlan({
+          organizationId: project.team.organizationId,
+        });
+        await notifyPlanLimitReached({
+          organizationId: project.team.organizationId,
+          planName: activePlan.name ?? "free",
+        });
+      } catch (error) {
+        logger.error(
+          { error, projectId: project.id },
+          "Error sending plan limit notification",
+        );
       }
       logger.info(
         {
@@ -449,7 +446,7 @@ async function handleCollectorRequest(
 
   const paramsMD5 = crypto
     .createHash("md5")
-    .update(JSON.stringify({ ...params, spans }))
+    .update(superjson.stringify({ ...params, spans }))
     .digest("hex");
   const existingTrace = await fetchExistingMD5s(traceId, project.id);
   if (existingTrace?.indexing_md5s?.includes(paramsMD5)) {
@@ -480,6 +477,7 @@ async function handleCollectorRequest(
   }
 
   const forceSync = req.query.force_sync === "true";
+  const contentLength = req.headers["content-length"];
   await scheduleTraceCollectionWithFallback(
     {
       projectId: project.id,
@@ -494,6 +492,7 @@ async function handleCollectorRequest(
       collectedAt: Date.now(),
     },
     forceSync,
+    contentLength ? parseInt(contentLength as string, 10) : undefined,
   );
 
   return res.status(200).json({ message: "Trace received successfully." });

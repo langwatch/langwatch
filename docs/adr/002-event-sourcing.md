@@ -1,6 +1,6 @@
 # ADR-002: Event Sourcing for Traces and Evaluations
 
-**Status:** Accepted
+**Status:** Superseded by [ADR-007](./007-event-sourcing-architecture.md)
 
 ## Context
 
@@ -26,4 +26,4 @@ Alternative considered: traditional CRUD with soft deletes. Rejected because it 
 3. Partition by tenant — all queries must include tenantId
 4. Projections are derived — don't store authoritative data in projections
 
-**Key files:** `src/server/event-sourcing/library/`, `src/server/event-sourcing/runtime/`
+**Key files:** `src/server/event-sourcing/`
