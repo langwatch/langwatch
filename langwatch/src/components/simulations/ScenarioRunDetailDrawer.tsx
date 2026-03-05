@@ -145,7 +145,7 @@ export function ScenarioRunDetailDrawer({
   // Relative time that auto-updates every 30s while the drawer is open
   const [timeAgo, setTimeAgo] = useState<string | undefined>(undefined);
   useEffect(() => {
-    if (!scenarioState?.timestamp) {
+    if (!open || !scenarioState?.timestamp) {
       setTimeAgo(undefined);
       return;
     }
@@ -153,7 +153,7 @@ export function ScenarioRunDetailDrawer({
     update();
     const interval = setInterval(update, 30_000);
     return () => clearInterval(interval);
-  }, [scenarioState?.timestamp]);
+  }, [open, scenarioState?.timestamp]);
 
   const suiteId = scenarioState?.metadata?.langwatch?.simulationSuiteId;
 
