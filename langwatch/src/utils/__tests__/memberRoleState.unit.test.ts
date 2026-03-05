@@ -400,7 +400,7 @@ describe("memberRoleState", () => {
   });
 
   describe("getLicenseLimitTypeForRoleChange()", () => {
-    describe("when changing from EXTERNAL to non-EXTERNAL", () => {
+    describe("when changing from LITE_MEMBER to non-LITE_MEMBER", () => {
       it("returns 'members'", () => {
         const result = getLicenseLimitTypeForRoleChange({
           previousRole: OrganizationUserRole.LITE_MEMBER,
@@ -411,7 +411,7 @@ describe("memberRoleState", () => {
       });
     });
 
-    describe("when changing from non-EXTERNAL to EXTERNAL", () => {
+    describe("when changing from non-LITE_MEMBER to LITE_MEMBER", () => {
       it("returns 'membersLite'", () => {
         const result = getLicenseLimitTypeForRoleChange({
           previousRole: OrganizationUserRole.MEMBER,
@@ -432,7 +432,7 @@ describe("memberRoleState", () => {
         expect(result).toBeNull();
       });
 
-      it("returns null for EXTERNAL to EXTERNAL", () => {
+      it("returns null for LITE_MEMBER to LITE_MEMBER", () => {
         const result = getLicenseLimitTypeForRoleChange({
           previousRole: OrganizationUserRole.LITE_MEMBER,
           nextRole: OrganizationUserRole.LITE_MEMBER,
@@ -444,7 +444,7 @@ describe("memberRoleState", () => {
   });
 
   describe("applyOrganizationRoleToPendingTeamRoles()", () => {
-    describe("when organization role is EXTERNAL", () => {
+    describe("when organization role is LITE_MEMBER", () => {
       it("forces all team roles to Viewer", () => {
         const result = applyOrganizationRoleToPendingTeamRoles({
           organizationRole: OrganizationUserRole.LITE_MEMBER,

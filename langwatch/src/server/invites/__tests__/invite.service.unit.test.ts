@@ -63,7 +63,7 @@ describe("classifyInvitesByMemberType()", () => {
     });
   });
 
-  describe("when invites have EXTERNAL role with no custom roles", () => {
+  describe("when invites have LITE_MEMBER role with no custom roles", () => {
     it("counts them as lite members", () => {
       const invites = [{ role: OrganizationUserRole.LITE_MEMBER, teams: [] }];
       const customRoleMap = new Map();
@@ -75,7 +75,7 @@ describe("classifyInvitesByMemberType()", () => {
     });
   });
 
-  describe("when invites have EXTERNAL role with view-only custom role", () => {
+  describe("when invites have LITE_MEMBER role with view-only custom role", () => {
     it("counts them as lite members", () => {
       const invites = [
         {
@@ -92,7 +92,7 @@ describe("classifyInvitesByMemberType()", () => {
     });
   });
 
-  describe("when invites have EXTERNAL role with non-view custom role", () => {
+  describe("when invites have LITE_MEMBER role with non-view custom role", () => {
     it("counts them as full members", () => {
       const invites = [
         {

@@ -649,8 +649,8 @@ describe("RBAC Integration Tests", () => {
       });
     });
 
-    describe("when user is an org EXTERNAL and team VIEWER", () => {
-      it("grants view permission and returns EXTERNAL org role", async () => {
+    describe("when user is an org LITE_MEMBER and team VIEWER", () => {
+      it("grants view permission and returns LITE_MEMBER org role", async () => {
         setupProjectMocks({
           orgRole: OrganizationUserRole.LITE_MEMBER,
           teamRole: TeamUserRole.VIEWER,
@@ -900,8 +900,8 @@ describe("RBAC Integration Tests", () => {
       });
     });
 
-    describe("when user is an org EXTERNAL and team VIEWER", () => {
-      it("grants view permission and returns EXTERNAL org role", async () => {
+    describe("when user is an org LITE_MEMBER and team VIEWER", () => {
+      it("grants view permission and returns LITE_MEMBER org role", async () => {
         setupTeamMocks({
           orgRole: OrganizationUserRole.LITE_MEMBER,
           teamRole: TeamUserRole.VIEWER,

@@ -618,6 +618,9 @@ export async function resolveTeamPermission(
       if (hasPermissionWithHierarchy(userPermissions, permission)) {
         return { permitted: true, organizationRole };
       }
+      // Intentional: custom team roles fall back to built-in role if custom
+      // permissions don't grant access. This differs from resolveProjectPermission
+      // where custom roles with any permissions are authoritative (no fallback).
     }
   }
 

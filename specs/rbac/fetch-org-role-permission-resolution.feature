@@ -1,4 +1,4 @@
-@unit
+@integration
 Feature: Fetch org role during permission resolution
   As a LangWatch developer
   I want the user's organization role available during permission resolution

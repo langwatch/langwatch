@@ -210,7 +210,7 @@ describe.skipIf(isTestcontainersOnly)(
     }
 
     describe("updateMemberRole", () => {
-      describe("when demoting MEMBER to EXTERNAL (full-to-lite change)", () => {
+      describe("when demoting MEMBER to LITE_MEMBER (full-to-lite change)", () => {
         it("rejects when lite member limit reached", async () => {
           mockGetActivePlan.mockResolvedValue({
             maxMembers: 100,
@@ -261,7 +261,7 @@ describe.skipIf(isTestcontainersOnly)(
     });
 
     describe("updateTeamMemberRole", () => {
-      describe("when changing EXTERNAL user from custom role to built-in VIEWER (full-to-lite change)", () => {
+      describe("when changing LITE_MEMBER user from custom role to built-in VIEWER (full-to-lite change)", () => {
         beforeEach(async () => {
           // Set target user as EXTERNAL with custom role (non-view permissions → FullMember)
           await prisma.organizationUser.update({

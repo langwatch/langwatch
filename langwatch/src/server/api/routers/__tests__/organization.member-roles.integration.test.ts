@@ -284,7 +284,7 @@ describe("organizationRouter member role validation", () => {
         });
       });
 
-      describe("when changing org role to EXTERNAL without explicit team role updates", () => {
+      describe("when changing org role to LITE_MEMBER without explicit team role updates", () => {
         it("auto-corrects team roles to Viewer", async () => {
           await caller.updateMemberRole({
             userId: "member-1",

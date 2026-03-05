@@ -261,11 +261,11 @@ export class LicenseEnforcementRepository
     users: { userId: string; role: OrganizationUserRole }[],
     customRoleMap: Map<string, string[]>
   ): Promise<Map<string, string[]>> {
-    const externalUserIds = users
+    const liteMemberUserIds = users
       .filter((u) => u.role === OrganizationUserRole.LITE_MEMBER)
       .map((u) => u.userId);
 
-    if (externalUserIds.length === 0) {
+    if (liteMemberUserIds.length === 0) {
       return new Map();
     }
 
@@ -281,7 +281,7 @@ export class LicenseEnforcementRepository
     const teamUsers = await this.prisma.teamUser.findMany({
       where: {
         teamId: { in: teams.map((t) => t.id) },
-        userId: { in: externalUserIds },
+        userId: { in: liteMemberUserIds },
       },
       select: { userId: true, assignedRoleId: true },
     });

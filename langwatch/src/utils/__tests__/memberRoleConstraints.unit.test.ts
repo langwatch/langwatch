@@ -25,7 +25,7 @@ describe("memberRoleConstraints", () => {
       });
     });
 
-    describe("when role is EXTERNAL", () => {
+    describe("when role is LITE_MEMBER", () => {
       it("returns Lite Member", () => {
         expect(getOrganizationRoleLabel(OrganizationUserRole.LITE_MEMBER)).toBe(
           "Lite Member",
