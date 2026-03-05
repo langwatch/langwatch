@@ -2882,7 +2882,7 @@ wheels = [
 
 [[package]]
 name = "langwatch"
-version = "0.10.2"
+version = "0.13.0"
 source = { editable = "." }
 dependencies = [
     { name = "attrs" },
@@ -3010,7 +3010,7 @@ examples = [
     { name = "jupyter", specifier = ">=1.0.0,<2.0.0" },
     { name = "langchain", specifier = ">=1.0.0,<2.0.0" },
     { name = "langchain-community", specifier = ">=0.3.0,<1.0.0" },
-    { name = "langchain-google-vertexai", specifier = ">=2.0.0,<3.0.0" },
+    { name = "langchain-google-vertexai", specifier = ">=2.0.0,<4.0.0" },
     { name = "langchain-openai", specifier = ">=0.3.0,<1.0.0" },
     { name = "langchain-text-splitters", specifier = ">=0.3.0,<1.0.0" },
     { name = "langgraph", specifier = ">=1.0.0,<2.0.0" },
@@ -3028,7 +3028,7 @@ examples = [
     { name = "strands-agents", extras = ["otel"], specifier = ">=1.14.0,<2.0.0" },
     { name = "streamlit", specifier = ">=1.37.1,<2.0.0" },
     { name = "unstructured", extras = ["pdf"], specifier = ">=0.18.3" },
-    { name = "uvicorn", specifier = ">=0.38.0,<0.40.0" },
+    { name = "uvicorn", specifier = ">=0.38.0,<0.41.0" },
 ]
 tests = [
     { name = "factory-boy", specifier = ">=3.3.3" },
