@@ -397,6 +397,8 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                 totalCount={suiteForm.availableTargets.length}
                 isTargetSelected={suiteForm.isTargetSelected}
                 onToggle={suiteForm.toggleTarget}
+                onSelectAll={suiteForm.selectAllTargets}
+                onClear={suiteForm.clearTargets}
                 searchQuery={suiteForm.targetSearch}
                 onSearchChange={suiteForm.setTargetSearch}
                 onCreateAgent={() => openDrawer("agentHttpEditor")}

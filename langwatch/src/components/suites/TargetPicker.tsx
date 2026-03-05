@@ -2,7 +2,8 @@
  * Picker component for selecting targets (agents and prompts) in a suite form.
  *
  * Renders: search input, scrollable checkbox list with type indicators,
- * "Add New Agent" and "Add New Prompt" action rows, and a count footer.
+ * "Add New Agent" and "Add New Prompt" action rows, and a footer with
+ * count + select all/clear buttons.
  */
 
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
@@ -36,6 +37,10 @@ export interface TargetPickerProps {
   onCreateAgent: () => void;
   /** Handler for "Add New Prompt" action. */
   onCreatePrompt: () => void;
+  /** Select all visible targets. */
+  onSelectAll: () => void;
+  /** Clear all selections. */
+  onClear: () => void;
   /** Whether to show error styling on the border. */
   hasError?: boolean;
   /** Archived targets still linked to the suite, with display names. */
@@ -52,6 +57,8 @@ export function TargetPicker({
   onToggle,
   searchQuery,
   onSearchChange,
+  onSelectAll,
+  onClear,
   onCreateAgent,
   onCreatePrompt,
   hasError,
@@ -184,15 +191,25 @@ export function TargetPicker({
         <Text fontSize="sm">Add New Prompt</Text>
       </HStack>
 
+      {/* Footer with count + select all / clear */}
       <HStack
         paddingX={3}
         paddingY={2}
+        justify="space-between"
         borderTop="1px solid"
         borderColor="border"
       >
         <Text fontSize="xs" color="fg.muted">
           {selectedTargets.length} of {totalCount} selected
         </Text>
+        <HStack gap={2}>
+          <Button size="xs" variant="ghost" onClick={onSelectAll}>
+            Select All
+          </Button>
+          <Button size="xs" variant="ghost" onClick={onClear}>
+            Clear
+          </Button>
+        </HStack>
       </HStack>
     </Box>
   );
