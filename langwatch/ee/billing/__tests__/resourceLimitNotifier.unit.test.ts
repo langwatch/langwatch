@@ -164,7 +164,7 @@ describe("createResourceLimitNotifier()", () => {
         });
       });
 
-      it("sets cooldown after notification", async () => {
+      it("sets cooldown eagerly to prevent concurrent duplicates", async () => {
         const db = createMockDb({
           organization: makeOrganization(),
         });

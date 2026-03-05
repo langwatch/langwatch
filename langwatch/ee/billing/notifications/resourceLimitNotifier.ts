@@ -25,6 +25,9 @@ export const createResourceLimitNotifier = (db: PrismaClient) => {
       return;
     }
 
+    // Set cooldown eagerly to prevent duplicate notifications from concurrent requests
+    cooldownCache.set(organizationId, true);
+
     const organization = await db.organization.findUnique({
       where: { id: organizationId },
       include: {
@@ -64,7 +67,5 @@ export const createResourceLimitNotifier = (db: PrismaClient) => {
       current,
       max,
     });
-
-    cooldownCache.set(organizationId, true);
   };
 };
