@@ -6,6 +6,10 @@ on:
   pull_request_review:
     types: [submitted]
 
+concurrency:
+  group: approval-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   check-approval-or-label:
     runs-on: ubuntu-latest
