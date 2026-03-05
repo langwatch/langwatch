@@ -44,14 +44,14 @@ Feature: Target selector Select All and Clear All
     When I click "Select All" in the target picker
     Then all 5 targets are selected
 
-  @unit
-  Scenario: selectAllTargets selects every available target
-    Given available targets are "agent-1" and "prompt-1" and "agent-2"
-    When selectAllTargets is called
-    Then selectedTargets contains all 3 targets
+  @integration
+  Scenario: Select All applies to visible filtered targets
+    Given I filtered targets to "Agent"
+    When I click "Select All" in the target picker
+    Then all visible "Agent" targets are selected
 
-  @unit
-  Scenario: clearTargets removes all selected targets
-    Given selectedTargets contains "agent-1" and "prompt-1"
-    When clearTargets is called
-    Then selectedTargets is empty
+  @integration
+  Scenario: Clear removes every selected target regardless of filter
+    Given some selected targets are not currently visible due to filtering
+    When I click "Clear" in the target picker
+    Then no targets are selected
