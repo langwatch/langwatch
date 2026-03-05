@@ -613,6 +613,241 @@ describe("langwatchSpanToReadableSpan", () => {
     });
   });
 
+  describe("params flattening", () => {
+    it("flattens nested params to dot-notation attributes", () => {
+      const span = makeBaseSpan({
+        params: {
+          ai: {
+            toolCall: {
+              name: "searchPropertiesTool",
+              id: "call_sdwWCkaRfGBee3MKlvP88t0j",
+            },
+          },
+        },
+      });
+      const result = langwatchSpanToReadableSpan(span);
+      expect(result.attributes["ai.toolCall.name"]).toBe(
+        "searchPropertiesTool",
+      );
+      expect(result.attributes["ai.toolCall.id"]).toBe(
+        "call_sdwWCkaRfGBee3MKlvP88t0j",
+      );
+    });
+
+    it("JSON.stringifies arrays at leaf positions", () => {
+      const span = makeBaseSpan({
+        params: {
+          ai: {
+            toolCall: {
+              args: { unitTypes: ["TWO_BED_UNIT"] },
+            },
+          },
+        },
+      });
+      const result = langwatchSpanToReadableSpan(span);
+      expect(result.attributes["ai.toolCall.args.unitTypes"]).toBe(
+        JSON.stringify(["TWO_BED_UNIT"]),
+      );
+    });
+
+    it("flattens result object extracting primitives and stringifying arrays", () => {
+      const span = makeBaseSpan({
+        params: {
+          ai: {
+            toolCall: {
+              result: {
+                stringResponse: "Here are the matching properties",
+                taskCompletion: false,
+                taskJsonData: {
+                  resultCount: 1,
+                  listings: [
+                    {
+                      groupId: 84964,
+                      name: "Tura Leeds",
+                      location: "Whitehall Riverside, Leeds, LS1 4FE",
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        },
+      });
+      const result = langwatchSpanToReadableSpan(span);
+      expect(result.attributes["ai.toolCall.result.stringResponse"]).toBe(
+        "Here are the matching properties",
+      );
+      expect(result.attributes["ai.toolCall.result.taskCompletion"]).toBe(
+        false,
+      );
+      expect(
+        result.attributes["ai.toolCall.result.taskJsonData.resultCount"],
+      ).toBe(1);
+      expect(
+        result.attributes["ai.toolCall.result.taskJsonData.listings"],
+      ).toBe(
+        JSON.stringify([
+          {
+            groupId: 84964,
+            name: "Tura Leeds",
+            location: "Whitehall Riverside, Leeds, LS1 4FE",
+          },
+        ]),
+      );
+    });
+
+    it("maps scope.name from params", () => {
+      const span = makeBaseSpan({
+        params: {
+          scope: { name: "ai" },
+        },
+      });
+      const result = langwatchSpanToReadableSpan(span);
+      expect(result.attributes["scope.name"]).toBe("ai");
+    });
+
+    it("excludes _keys field from flattened attributes", () => {
+      const span = makeBaseSpan({
+        params: {
+          ai: {
+            toolCall: {
+              name: "searchPropertiesTool",
+            },
+          },
+          _keys: ["ai.toolCall.name"],
+        },
+      });
+      const result = langwatchSpanToReadableSpan(span);
+      expect(result.attributes["_keys"]).toBeUndefined();
+      expect(result.attributes["ai.toolCall.name"]).toBe(
+        "searchPropertiesTool",
+      );
+    });
+
+    it("handles null params without error", () => {
+      const span = makeBaseSpan({ params: null });
+      const result = langwatchSpanToReadableSpan(span);
+      expect(result.attributes["ai.toolCall.name"]).toBeUndefined();
+    });
+
+    it("handles undefined params without error", () => {
+      const span = makeBaseSpan({ params: undefined });
+      const result = langwatchSpanToReadableSpan(span);
+      expect(result.attributes["ai.toolCall.name"]).toBeUndefined();
+    });
+
+    it("preserves existing gen_ai.request.* mappings alongside flattened params", () => {
+      const span = makeBaseSpan({
+        params: {
+          temperature: 0.7,
+          max_tokens: 1024,
+          top_p: 0.9,
+          ai: { operationId: "ai.toolCall" },
+        },
+      });
+      const result = langwatchSpanToReadableSpan(span);
+      // Existing specific mappings
+      expect(result.attributes["gen_ai.request.temperature"]).toBe(0.7);
+      expect(result.attributes["gen_ai.request.max_tokens"]).toBe(1024);
+      expect(result.attributes["gen_ai.request.top_p"]).toBe(0.9);
+      // Flattened raw versions
+      expect(result.attributes["temperature"]).toBe(0.7);
+      expect(result.attributes["max_tokens"]).toBe(1024);
+      expect(result.attributes["top_p"]).toBe(0.9);
+      expect(result.attributes["ai.operationId"]).toBe("ai.toolCall");
+    });
+
+    it("skips null and undefined values during flattening", () => {
+      const span = makeBaseSpan({
+        params: {
+          ai: {
+            toolCall: {
+              name: "myTool",
+              result: null,
+              metadata: undefined,
+            },
+          },
+        },
+      });
+      const result = langwatchSpanToReadableSpan(span);
+      expect(result.attributes["ai.toolCall.name"]).toBe("myTool");
+      expect(result.attributes["ai.toolCall.result"]).toBeUndefined();
+      expect(result.attributes["ai.toolCall.metadata"]).toBeUndefined();
+    });
+
+    it("converts full real trace tool call span with all attributes", () => {
+      const span = makeBaseSpan({
+        name: "ai.toolCall",
+        type: "span",
+        input: null,
+        output: null,
+        params: {
+          ai: {
+            operationId: "ai.toolCall",
+            telemetry: { functionId: "agent-chat" },
+            toolCall: {
+              name: "searchPropertiesTool",
+              id: "call_sdwWCkaRfGBee3MKlvP88t0j",
+              args: { unitTypes: ["TWO_BED_UNIT"] },
+              result: {
+                stringResponse:
+                  "Here are the matching properties (property groups):\nProperty Group ID: 84964; Name: Tura Leeds; Location: Whitehall Riverside, Leeds, LS1 4FE; Available unit types: 1 bed (1160-1325), 2 beds (1437-1702)",
+                taskCompletion: false,
+                taskJsonData: {
+                  resultCount: 1,
+                  listings: [
+                    {
+                      groupId: 84964,
+                      name: "Tura Leeds",
+                      location: "Whitehall Riverside, Leeds, LS1 4FE",
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          scope: { name: "ai" },
+          _keys: ["ai.toolCall.name", "ai.toolCall.id"],
+        },
+      });
+      const result = langwatchSpanToReadableSpan(span);
+
+      expect(result.attributes["ai.toolCall.name"]).toBe(
+        "searchPropertiesTool",
+      );
+      expect(result.attributes["ai.toolCall.id"]).toBe(
+        "call_sdwWCkaRfGBee3MKlvP88t0j",
+      );
+      expect(result.attributes["ai.toolCall.args.unitTypes"]).toBe(
+        JSON.stringify(["TWO_BED_UNIT"]),
+      );
+      expect(result.attributes["ai.toolCall.result.stringResponse"]).toBe(
+        "Here are the matching properties (property groups):\nProperty Group ID: 84964; Name: Tura Leeds; Location: Whitehall Riverside, Leeds, LS1 4FE; Available unit types: 1 bed (1160-1325), 2 beds (1437-1702)",
+      );
+      expect(result.attributes["ai.toolCall.result.taskCompletion"]).toBe(
+        false,
+      );
+      expect(
+        result.attributes["ai.toolCall.result.taskJsonData.resultCount"],
+      ).toBe(1);
+      expect(
+        result.attributes["ai.toolCall.result.taskJsonData.listings"],
+      ).toBe(
+        JSON.stringify([
+          {
+            groupId: 84964,
+            name: "Tura Leeds",
+            location: "Whitehall Riverside, Leeds, LS1 4FE",
+          },
+        ]),
+      );
+      expect(result.attributes["ai.operationId"]).toBe("ai.toolCall");
+      expect(result.attributes["ai.telemetry.functionId"]).toBe("agent-chat");
+      expect(result.attributes["scope.name"]).toBe("ai");
+      expect(result.attributes["_keys"]).toBeUndefined();
+    });
+  });
+
   describe("edge cases", () => {
     it("handles empty spans array via map", () => {
       const spans: Span[] = [];
