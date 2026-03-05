@@ -382,6 +382,33 @@ export function buildDisplayTitle({
 }
 
 /**
+ * Resolves the origin label for a batch run in the All Runs panel.
+ *
+ * - Suite runs (matching __internal__<suiteId>__suite pattern): returns the suite name from suiteNameMap
+ * - External runs: returns the raw scenario set ID as the label
+ * - No set ID: returns null
+ */
+export function resolveOriginLabel({
+  scenarioSetId,
+  suiteNameMap,
+}: {
+  scenarioSetId: string | undefined;
+  suiteNameMap: Map<string, string>;
+}): string | null {
+  if (!scenarioSetId) return null;
+
+  if (isSuiteSetId(scenarioSetId)) {
+    const suiteId = extractSuiteId(scenarioSetId);
+    if (suiteId) {
+      const name = suiteNameMap.get(suiteId);
+      if (name) return name;
+    }
+  }
+
+  return scenarioSetId;
+}
+
+/**
  * Computes aggregate totals from raw scenario runs.
  * Works regardless of grouping mode since it operates on flat runs.
  */
