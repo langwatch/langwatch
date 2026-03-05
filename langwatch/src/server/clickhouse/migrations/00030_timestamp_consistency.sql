@@ -255,6 +255,53 @@ ORDER BY (TenantId, ScenarioRunId)
 SETTINGS index_granularity = 8192, storage_policy = 'local_primary';
 -- +goose StatementEnd
 
+-- experiment_run_items_v2: partition by OccurredAt instead of CreatedAt
+-- +goose StatementBegin
+CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.experiment_run_items_v2
+(
+    ProjectionId String CODEC(ZSTD(1)),
+    TenantId String CODEC(ZSTD(1)),
+    RunId String CODEC(ZSTD(1)),
+    ExperimentId String CODEC(ZSTD(1)),
+
+    RowIndex UInt32,
+    TargetId String CODEC(ZSTD(1)),
+    ResultType LowCardinality(String),  -- 'target' or 'evaluator'
+
+    -- Target result fields
+    DatasetEntry String CODEC(ZSTD(3)),
+    Predicted Nullable(String) CODEC(ZSTD(3)),
+    TargetCost Nullable(Float64),
+    TargetDurationMs Nullable(UInt32),
+    TargetError Nullable(String) CODEC(ZSTD(3)),
+    TraceId Nullable(String) CODEC(ZSTD(1)),
+
+    -- Evaluator result fields
+    EvaluatorId Nullable(String) CODEC(ZSTD(1)),
+    EvaluatorName Nullable(String) CODEC(ZSTD(1)),
+    EvaluationStatus LowCardinality(String),
+    Score Nullable(Float64),
+    Label Nullable(String) CODEC(ZSTD(1)),
+    Passed Nullable(UInt8),
+    EvaluationDetails Nullable(String) CODEC(ZSTD(3)),
+    EvaluationCost Nullable(Float64),
+    EvaluationInputs Nullable(String) CODEC(ZSTD(3)),
+    EvaluationDurationMs Nullable(UInt32),
+
+    CreatedAt DateTime64(3) DEFAULT now64(3) CODEC(Delta(8), ZSTD(1)),
+    OccurredAt DateTime64(3) DEFAULT now64(3) CODEC(Delta(8), ZSTD(1)),
+
+    INDEX idx_experiment_id ExperimentId TYPE bloom_filter(0.001) GRANULARITY 1,
+    INDEX idx_target_id TargetId TYPE bloom_filter(0.01) GRANULARITY 4,
+    INDEX idx_result_type ResultType TYPE set(2) GRANULARITY 4,
+    INDEX idx_evaluator_id EvaluatorId TYPE bloom_filter(0.01) GRANULARITY 4
+)
+ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}OccurredAt)
+PARTITION BY toYearWeek(OccurredAt)
+ORDER BY (TenantId, RunId, ProjectionId)
+SETTINGS index_granularity = 8192, storage_policy = 'local_primary';
+-- +goose StatementEnd
+
 -- event_log_v2: ReplacingMergeTree with IdempotencyKey in ORDER BY for dedup
 -- +goose StatementBegin
 CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.event_log_v2
@@ -276,7 +323,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.event_log_v2
     INDEX idx_event_timestamp EventTimestamp TYPE minmax GRANULARITY 1,
     INDEX idx_tenant_aggregate_event_id (TenantId, AggregateType, AggregateId, EventId) TYPE bloom_filter(0.001) GRANULARITY 1
 )
-ENGINE = ReplacingMergeTree(EventTimestamp)
+ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}EventTimestamp)
 PARTITION BY (AggregateType, toYearWeek(toDateTime64(EventTimestamp / 1000, 3)))
 ORDER BY (TenantId, AggregateType, AggregateId, IdempotencyKey)
 SETTINGS index_granularity = 8192, storage_policy = 'local_primary';
@@ -299,6 +346,9 @@ SETTINGS index_granularity = 8192, storage_policy = 'local_primary';
 -- +goose StatementEnd
 -- +goose StatementBegin
 -- DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.simulation_runs_v2 SYNC;
+-- +goose StatementEnd
+-- +goose StatementBegin
+-- DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.experiment_run_items_v2 SYNC;
 -- +goose StatementEnd
 -- +goose StatementBegin
 -- DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.event_log_v2 SYNC;
