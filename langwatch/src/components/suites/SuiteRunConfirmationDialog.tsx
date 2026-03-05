@@ -49,6 +49,8 @@ export function SuiteRunConfirmationDialog({
       })
     : 0;
 
+  const canRun = !!summary && jobCount > 0 && !isLoading;
+
   return (
     <Dialog.Root open={open} onOpenChange={onClose} placement="center">
       <Dialog.Content maxWidth="480px" onClick={(e) => e.stopPropagation()}>
@@ -99,6 +101,12 @@ export function SuiteRunConfirmationDialog({
                     {jobCount} job{jobCount !== 1 ? "s" : ""} will be scheduled
                   </Text>
                 </HStack>
+                {jobCount === 0 && (
+                  <Text fontSize="sm" color="red.500">
+                    No jobs to schedule. Check that the suite has scenarios and
+                    targets configured.
+                  </Text>
+                )}
               </>
             )}
           </VStack>
@@ -111,7 +119,6 @@ export function SuiteRunConfirmationDialog({
               e.stopPropagation();
               onClose();
             }}
-            disabled={isLoading}
           >
             Cancel
           </Button>
@@ -119,9 +126,10 @@ export function SuiteRunConfirmationDialog({
             colorPalette="blue"
             onClick={(e) => {
               e.stopPropagation();
+              if (!canRun) return;
               onConfirm();
             }}
-            disabled={isLoading}
+            disabled={!canRun}
           >
             {isLoading ? <Spinner size="sm" /> : "Run"}
           </Button>
