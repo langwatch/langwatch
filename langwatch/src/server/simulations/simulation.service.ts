@@ -151,6 +151,15 @@ export class SimulationService {
     return this.esService.getBatchRunCountForScenarioSet(params);
   }
 
+  async getExternalSetSummaries(params: {
+    projectId: string;
+  }) {
+    if (await this.isClickHouseEnabled(params.projectId)) {
+      return this.chService!.getExternalSetSummaries(params);
+    }
+    return this.esService.getExternalSetSummaries(params);
+  }
+
   async getRunDataForAllSuites(params: {
     projectId: string;
     limit?: number;
