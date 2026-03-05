@@ -69,26 +69,6 @@ export const createWebhookService = ({
     return null;
   };
 
-  const clearTrialLicenseIfPresent = async ({
-    organizationId,
-    hasLicense,
-    reason,
-  }: {
-    organizationId: string;
-    hasLicense: boolean;
-    reason: string;
-  }) => {
-    if (!hasLicense) return;
-    logger.info(
-      { organizationId },
-      `[stripeWebhook] Clearing trial license — ${reason}`,
-    );
-    await db.organization.update({
-      where: { id: organizationId },
-      data: { license: null, licenseExpiresAt: null, licenseLastValidatedAt: null },
-    });
-  };
-
   const syncInvoicePaymentSuccess = async ({
     subscriptionId,
     throwOnMissing = false,
@@ -127,12 +107,6 @@ export const createWebhookService = ({
     });
 
     if (previousSubscription.status !== SubscriptionStatus.ACTIVE) {
-      await clearTrialLicenseIfPresent({
-        organizationId: updatedSubscription.organizationId,
-        hasLicense: !!updatedSubscription.organization.license,
-        reason: "subscription activated",
-      });
-
       if (isGrowthSeatEventPlan(updatedSubscription.plan)) {
         const TIERED_PLAN_TYPES: PlanTypes[] = [
           PlanTypes.LAUNCH,
@@ -420,12 +394,6 @@ export const createWebhookService = ({
             maxMessagesPerMonth: tracesQuantity,
           },
           include: { organization: true },
-        });
-
-        await clearTrialLicenseIfPresent({
-          organizationId: updatedSubscription.organizationId,
-          hasLicense: !!updatedSubscription.organization.license,
-          reason: "subscription updated to active",
         });
 
         if (shouldNotify) {
