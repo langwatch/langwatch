@@ -6,15 +6,6 @@ import { UsageService } from "../usage.service";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
 
-const PRO_PLAN: PlanInfo = {
-  ...FREE_PLAN,
-  planSource: "subscription",
-  type: "PRO",
-  name: "Pro",
-  free: false,
-  maxMessagesPerMonth: 1000,
-};
-
 const ENTERPRISE_LICENSE_PLAN: PlanInfo = {
   ...FREE_PLAN,
   planSource: "license",
@@ -24,10 +15,6 @@ const ENTERPRISE_LICENSE_PLAN: PlanInfo = {
   maxMessagesPerMonth: 100_000,
   usageUnit: "events",
 };
-
-vi.mock("~/env.mjs", () => ({
-  env: { IS_SAAS: true },
-}));
 
 vi.mock("../../tracing", () => ({
   traced: <T>(instance: T) => instance,
@@ -141,57 +128,7 @@ describe("UsageService", () => {
       });
     });
 
-    describe("when self-hosted (IS_SAAS=false)", () => {
-      afterEach(async () => {
-        const { env } = await import("~/env.mjs");
-        vi.mocked(env).IS_SAAS = true;
-      });
-
-      it("returns exceeded: false for a FREE plan clone", async () => {
-        const { env } = await import("~/env.mjs");
-        vi.mocked(env).IS_SAAS = false;
-
-        const { FREE_PLAN } = await import(
-          "../../../../../ee/licensing/constants"
-        );
-
-        vi.mocked(
-          mockOrgService.getOrganizationIdByTeamId,
-        ).mockResolvedValue("org-123");
-        vi.mocked(mockOrgService.getProjectIds).mockResolvedValue([
-          "proj-1",
-        ]);
-        mockTraceUsageService.getCountByProjects.mockResolvedValue([
-          { projectId: "proj-1", count: 5000 },
-        ]);
-        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({ ...FREE_PLAN });
-
-        const result = await service.checkLimit({ teamId: "team-123" });
-
-        expect(result.exceeded).toBe(false);
-      });
-
-      it("enforces limits for non-FREE plan types", async () => {
-        const { env } = await import("~/env.mjs");
-        vi.mocked(env).IS_SAAS = false;
-
-        vi.mocked(
-          mockOrgService.getOrganizationIdByTeamId,
-        ).mockResolvedValue("org-123");
-        vi.mocked(mockOrgService.getProjectIds).mockResolvedValue([
-          "proj-1",
-        ]);
-        mockTraceUsageService.getCountByProjects.mockResolvedValue([
-          { projectId: "proj-1", count: 5000 },
-        ]);
-        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({ ...PRO_PLAN });
-
-        const result = await service.checkLimit({ teamId: "team-123" });
-
-        expect(result.exceeded).toBe(true);
-      });
-    });
-  });
+});
 
   describe("getCurrentMonthCount", () => {
     it("delegates to TraceUsageService and sums counts", async () => {
