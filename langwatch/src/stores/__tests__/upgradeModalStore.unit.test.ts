@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useUpgradeModalStore } from "../upgradeModalStore";
+import { useUpgradeModalStore, type UpgradeModalVariant } from "../upgradeModalStore";
 
 describe("upgradeModalStore", () => {
   beforeEach(() => {
@@ -119,6 +119,85 @@ describe("upgradeModalStore", () => {
 
         expect(useUpgradeModalStore.getState().variant).toBeNull();
       });
+    });
+
+    describe("when the store has an open lite member restriction modal", () => {
+      beforeEach(() => {
+        useUpgradeModalStore
+          .getState()
+          .openLiteMemberRestriction({ resource: "prompts" });
+      });
+
+      it("sets isOpen to false", () => {
+        useUpgradeModalStore.getState().close();
+
+        expect(useUpgradeModalStore.getState().isOpen).toBe(false);
+      });
+
+      it("resets variant to null", () => {
+        useUpgradeModalStore.getState().close();
+
+        expect(useUpgradeModalStore.getState().variant).toBeNull();
+      });
+    });
+  });
+
+  describe("openLiteMemberRestriction()", () => {
+    describe("when called with resource", () => {
+      it("sets isOpen to true", () => {
+        useUpgradeModalStore
+          .getState()
+          .openLiteMemberRestriction({ resource: "prompts" });
+
+        expect(useUpgradeModalStore.getState().isOpen).toBe(true);
+      });
+
+      it("sets variant to liteMemberRestriction mode with resource", () => {
+        useUpgradeModalStore
+          .getState()
+          .openLiteMemberRestriction({ resource: "prompts" });
+
+        expect(useUpgradeModalStore.getState().variant).toEqual({
+          mode: "liteMemberRestriction",
+          resource: "prompts",
+        });
+      });
+
+      it("clears legacy fields to null", () => {
+        useUpgradeModalStore.getState().open("members", 3, 5);
+        useUpgradeModalStore
+          .getState()
+          .openLiteMemberRestriction({ resource: "prompts" });
+
+        const state = useUpgradeModalStore.getState();
+        expect(state.limitType).toBeNull();
+        expect(state.current).toBeNull();
+        expect(state.max).toBeNull();
+      });
+    });
+
+    describe("when called without resource", () => {
+      it("sets variant with resource undefined", () => {
+        useUpgradeModalStore.getState().openLiteMemberRestriction({});
+
+        expect(useUpgradeModalStore.getState().variant).toEqual({
+          mode: "liteMemberRestriction",
+          resource: undefined,
+        });
+      });
+    });
+  });
+
+  describe("MODAL_CONTENT map", () => {
+    it("has an entry for every variant mode", async () => {
+      const { MODAL_CONTENT } = await import("../../components/UpgradeModal");
+      const expectedModes: Array<UpgradeModalVariant["mode"]> = [
+        "limit",
+        "seats",
+        "liteMemberRestriction",
+      ];
+
+      expect(Object.keys(MODAL_CONTENT).sort()).toEqual(expectedModes.sort());
     });
   });
 });
