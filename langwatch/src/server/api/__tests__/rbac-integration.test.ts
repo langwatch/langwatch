@@ -932,6 +932,72 @@ describe("RBAC Integration Tests", () => {
         expect(result.organizationRole).toBeNull();
       });
     });
+
+    describe("when user has CUSTOM role with granted permissions", () => {
+      it("grants permission and returns org role", async () => {
+        mockPrisma.team.findUnique.mockResolvedValue({
+          id: "team-1",
+          organizationId: "org-1",
+        });
+
+        mockPrisma.organizationUser.findFirst.mockResolvedValue({
+          role: OrganizationUserRole.MEMBER,
+        });
+
+        mockPrisma.teamUser.findFirst.mockResolvedValue({
+          userId: "user-123",
+          teamId: "team-1",
+          role: TeamUserRole.CUSTOM,
+          assignedRoleId: "custom-role-1",
+        });
+
+        mockPrisma.customRole.findUnique.mockResolvedValue({
+          permissions: ["team:view", "analytics:view"],
+        });
+
+        const result = await resolveTeamPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "team-1",
+          "team:view" as Permission,
+        );
+
+        expect(result.permitted).toBe(true);
+        expect(result.organizationRole).toBe(OrganizationUserRole.MEMBER);
+      });
+    });
+
+    describe("when user has CUSTOM role without requested permission", () => {
+      it("denies permission and returns org role", async () => {
+        mockPrisma.team.findUnique.mockResolvedValue({
+          id: "team-1",
+          organizationId: "org-1",
+        });
+
+        mockPrisma.organizationUser.findFirst.mockResolvedValue({
+          role: OrganizationUserRole.MEMBER,
+        });
+
+        mockPrisma.teamUser.findFirst.mockResolvedValue({
+          userId: "user-123",
+          teamId: "team-1",
+          role: TeamUserRole.CUSTOM,
+          assignedRoleId: "custom-role-1",
+        });
+
+        mockPrisma.customRole.findUnique.mockResolvedValue({
+          permissions: ["team:view"],
+        });
+
+        const result = await resolveTeamPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "team-1",
+          "team:manage" as Permission,
+        );
+
+        expect(result.permitted).toBe(false);
+        expect(result.organizationRole).toBe(OrganizationUserRole.MEMBER);
+      });
+    });
   });
 
   // ==========================================================================
