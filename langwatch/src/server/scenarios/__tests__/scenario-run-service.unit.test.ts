@@ -125,6 +125,27 @@ describe("mergeRunData()", () => {
     });
   });
 
+  describe("given repeat > 1 with partial completion", () => {
+    // 3 queued jobs for the same scenario+target+batch (repeat=3)
+    // 1 already completed in ES
+    const esRuns = [
+      makeRunData({ scenarioId: "scen_1", scenarioRunId: "es_run_0" }),
+    ];
+    const queuedRuns = [
+      makeRunData({ scenarioId: "scen_1", status: ScenarioRunStatus.QUEUED, scenarioRunId: "job_0" }),
+      makeRunData({ scenarioId: "scen_1", status: ScenarioRunStatus.QUEUED, scenarioRunId: "job_1" }),
+      makeRunData({ scenarioId: "scen_1", status: ScenarioRunStatus.QUEUED, scenarioRunId: "job_2" }),
+    ];
+
+    it("keeps surplus queued rows not yet matched by ES", () => {
+      const result = mergeRunData({ esRuns, queuedRuns });
+      // 1 ES + 2 surplus queued = 3 total
+      expect(result).toHaveLength(3);
+      expect(result[0]?.scenarioRunId).toBe("es_run_0");
+      expect(result.filter((r) => r.status === ScenarioRunStatus.QUEUED)).toHaveLength(2);
+    });
+  });
+
   describe("given mixed overlap and unique entries", () => {
     const esRuns = [
       makeRunData({ scenarioId: "scen_1", scenarioRunId: "es_1" }),

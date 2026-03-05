@@ -587,7 +587,7 @@ export class SuiteService {
             scheduleScenarioRun({
               projectId,
               scenarioId,
-              scenarioName: scenarioNameMap.get(scenarioId),
+              scenarioName: scenarioNameMap.get(scenarioId) ?? scenarioId,
               target: { type: target.type, referenceId: target.referenceId },
               setId,
               batchRunId,

@@ -84,13 +84,20 @@ export const scenarioEventsRouter = createTRPCRouter({
         return esRuns;
       }
 
-      const jobRepo = new ScenarioJobRepository(scenarioQueue);
-      const queuedRuns = await jobRepo.getQueuedAndActiveJobs({
-        setId: input.scenarioSetId,
-        projectId: input.projectId,
-      });
-
-      return mergeRunData({ esRuns, queuedRuns });
+      try {
+        const jobRepo = new ScenarioJobRepository(scenarioQueue);
+        const queuedRuns = await jobRepo.getQueuedAndActiveJobs({
+          setId: input.scenarioSetId,
+          projectId: input.projectId,
+        });
+        return mergeRunData({ esRuns, queuedRuns });
+      } catch (error) {
+        logger.warn(
+          { projectId: input.projectId, scenarioSetId: input.scenarioSetId, error },
+          "Failed to fetch BullMQ queued/active jobs; returning ES runs only",
+        );
+        return esRuns;
+      }
     }),
 
   // Get scenario run state
@@ -236,14 +243,21 @@ export const scenarioEventsRouter = createTRPCRouter({
       // Merge BullMQ queued/active jobs on the first page only
       // (subsequent pages are historical and won't have queued jobs)
       if (!input.cursor) {
-        const jobRepo = new ScenarioJobRepository(scenarioQueue);
-        const queued = await jobRepo.getAllQueuedJobsForProject({
-          projectId: input.projectId,
-        });
+        try {
+          const jobRepo = new ScenarioJobRepository(scenarioQueue);
+          const queued = await jobRepo.getAllQueuedJobsForProject({
+            projectId: input.projectId,
+          });
 
-        if (queued.runs.length > 0) {
-          data.runs = mergeRunData({ esRuns: data.runs, queuedRuns: queued.runs });
-          data.scenarioSetIds = { ...data.scenarioSetIds, ...queued.scenarioSetIds };
+          if (queued.runs.length > 0) {
+            data.runs = mergeRunData({ esRuns: data.runs, queuedRuns: queued.runs });
+            data.scenarioSetIds = { ...data.scenarioSetIds, ...queued.scenarioSetIds };
+          }
+        } catch (error) {
+          logger.warn(
+            { projectId: input.projectId, error },
+            "Failed to fetch BullMQ queued/active jobs for all suites; returning ES runs only",
+          );
         }
       }
 

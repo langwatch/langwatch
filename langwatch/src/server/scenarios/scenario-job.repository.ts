@@ -44,6 +44,9 @@ export interface NormalizeJobParams {
 export function normalizeJob({ job, state }: NormalizeJobParams): ScenarioRunData | null {
   const data = job.data;
   if (!data) return null;
+  if (!data.scenarioId || !data.batchRunId || !data.target?.referenceId || !data.target?.type) {
+    return null;
+  }
 
   const status = mapBullMQStateToStatus(state);
 
@@ -82,6 +85,30 @@ export interface ScenarioQueueAdapter {
 }
 
 /**
+ * Collapses waiting and active job lists by job ID to avoid
+ * transitional duplicates when a job moves between states.
+ * Active state overrides waiting.
+ */
+function collapseJobsById(params: {
+  waitingJobs: Array<{ id?: string | null; data: unknown; timestamp?: number }>;
+  activeJobs: Array<{ id?: string | null; data: unknown; timestamp?: number }>;
+}): Array<{ job: MinimalJob; state: "waiting" | "active" }> {
+  const { waitingJobs, activeJobs } = params;
+  const byId = new Map<string, { job: MinimalJob; state: "waiting" | "active" }>();
+
+  for (const job of waitingJobs) {
+    const key = String(job.id ?? "");
+    byId.set(key, { job: job as MinimalJob, state: "waiting" });
+  }
+  for (const job of activeJobs) {
+    const key = String(job.id ?? "");
+    byId.set(key, { job: job as MinimalJob, state: "active" }); // active wins
+  }
+
+  return [...byId.values()];
+}
+
+/**
  * Repository for querying BullMQ scenario jobs and normalizing them
  * into ScenarioRunData format.
  */
@@ -105,16 +132,9 @@ export class ScenarioJobRepository {
 
     const results: ScenarioRunData[] = [];
 
-    for (const job of waitingJobs) {
+    for (const { job, state } of collapseJobsById({ waitingJobs, activeJobs })) {
       if (job.data?.setId === setId && job.data?.projectId === projectId) {
-        const normalized = normalizeJob({ job, state: "waiting" });
-        if (normalized) results.push(normalized);
-      }
-    }
-
-    for (const job of activeJobs) {
-      if (job.data?.setId === setId && job.data?.projectId === projectId) {
-        const normalized = normalizeJob({ job, state: "active" });
+        const normalized = normalizeJob({ job, state });
         if (normalized) results.push(normalized);
       }
     }
@@ -140,17 +160,13 @@ export class ScenarioJobRepository {
       this.queue.getJobs(["active"]),
     ]);
 
-    const activeSet = new Set(activeJobs);
-    const allJobs = [...waitingJobs, ...activeJobs];
-
     const runs: ScenarioRunData[] = [];
     const scenarioSetIds: Record<string, string> = {};
 
-    for (const job of allJobs) {
+    for (const { job, state } of collapseJobsById({ waitingJobs, activeJobs })) {
       if (job.data?.projectId !== projectId) continue;
 
-      const state = activeSet.has(job) ? "active" : "waiting";
-      const normalized = normalizeJob({ job: job as MinimalJob, state });
+      const normalized = normalizeJob({ job, state });
       if (normalized) {
         runs.push(normalized);
         if (job.data?.setId && job.data?.batchRunId) {

@@ -132,6 +132,19 @@ describe("normalizeJob()", () => {
       expect(result).toBeNull();
     });
   });
+
+  describe("given a job with missing target fields", () => {
+    const job = {
+      id: "job_1",
+      data: { scenarioId: "scen_1", batchRunId: "batch_1", target: {} } as unknown as ScenarioJob,
+      timestamp: 0,
+    };
+
+    it("returns null", () => {
+      const result = normalizeJob({ job, state: "waiting" });
+      expect(result).toBeNull();
+    });
+  });
 });
 
 describe("ScenarioJobRepository", () => {
@@ -275,15 +288,11 @@ describe("ScenarioJobRepository", () => {
         },
       };
 
-      it("deduplicates and marks the job as active", async () => {
+      it("returns a single row and marks the shared job as active", async () => {
         const repo = new ScenarioJobRepository(adapter);
         const { runs } = await repo.getAllQueuedJobsForProject({ projectId: "proj_1" });
-        // waiting list has sharedJob, active list has sharedJob
-        // allJobs = [...waiting, ...active] = [sharedJob, sharedJob]
-        // But activeSet.has(sharedJob) is true for both since same reference
-        // So both get state "active" -- dedup happens via Set membership
-        expect(runs).toHaveLength(2);
-        expect(runs.every((r) => r.status === ScenarioRunStatus.RUNNING)).toBe(true);
+        expect(runs).toHaveLength(1);
+        expect(runs[0]?.status).toBe(ScenarioRunStatus.RUNNING);
       });
     });
 
