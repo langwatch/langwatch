@@ -29,8 +29,8 @@
     "node": ">=18.0.0"
   },
   "devDependencies": {
-    "@ai-sdk/anthropic": "^2.0.15",
-    "@anthropic-ai/claude-code": "^2.1.7",
+    "@ai-sdk/anthropic": "^3.0.44",
+    "@anthropic-ai/claude-code": "^2.1.42",
     "@eslint/js": "^9.4.0",
     "@langwatch/scenario": "^0.3.0",
     "@types/debug": "^4.1.12",
