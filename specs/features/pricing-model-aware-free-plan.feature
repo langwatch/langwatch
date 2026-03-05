@@ -7,37 +7,37 @@ Feature: Unified FREE plan experience
     Given the platform is running in SaaS mode
 
   # ============================================================================
-  # Message Limits
+  # Event Limits
   # ============================================================================
 
   @integration
-  Scenario: TIERED organization on FREE plan gets 50,000 messages per month
+  Scenario: TIERED organization on FREE plan gets 50,000 events per month
     Given an organization with the TIERED pricing model
     And no active subscription exists
     When the plan provider resolves the active plan
-    Then the plan is FREE with 50,000 messages per month
+    Then the plan is FREE with 50,000 events per month
 
   @integration
-  Scenario: SEAT_EVENT organization on FREE plan gets 50,000 messages per month
+  Scenario: SEAT_EVENT organization on FREE plan gets 50,000 events per month
     Given an organization with the SEAT_EVENT pricing model
     And no active subscription exists
     When the plan provider resolves the active plan
-    Then the plan is FREE with 50,000 messages per month
+    Then the plan is FREE with 50,000 events per month
 
   @integration
-  Scenario: Organization not found gets 50,000 messages per month
+  Scenario: Organization not found gets 50,000 events per month
     Given the organization does not exist in the database
     And no active subscription exists
     When the plan provider resolves the active plan
-    Then the plan is FREE with 50,000 messages per month
+    Then the plan is FREE with 50,000 events per month
 
   @integration
   Scenario: Custom subscription limits override the base free allowance
     Given an organization with the SEAT_EVENT pricing model
     And an active subscription with an unrecognized plan key
-    And the subscription allows 100,000 messages per month
+    And the subscription allows 100,000 events per month
     When the plan provider resolves the active plan
-    Then the plan is FREE with 100,000 messages per month
+    Then the plan is FREE with 100,000 events per month
 
   @integration
   Scenario: Valid subscription returns its own plan regardless of pricing model
@@ -47,9 +47,9 @@ Feature: Unified FREE plan experience
     Then the plan is LAUNCH with standard LAUNCH limits
 
   @unit
-  Scenario Outline: All pricing models get 50,000 messages on the free tier
+  Scenario Outline: All pricing models get 50,000 events on the free tier
     When resolving free plan limits for <pricingModel>
-    Then the limit is 50,000 messages per month
+    Then the limit is 50,000 events per month
 
     Examples:
       | pricingModel |
