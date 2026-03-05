@@ -181,6 +181,18 @@ export const scenarioEventsRouter = createTRPCRouter({
       });
     }),
 
+  // Get summaries for external (SDK/CI) scenario sets
+  getExternalSetSummaries: protectedProcedure
+    .input(projectSchema)
+    .use(checkProjectPermission("scenarios:view"))
+    .query(async ({ input, ctx }) => {
+      logger.debug({ projectId: input.projectId }, "Fetching external set summaries");
+      const service = SimulationService.create(ctx.prisma);
+      return service.getExternalSetSummaries({
+        projectId: input.projectId,
+      });
+    }),
+
   // Get run data for all suites (cross-suite view)
   getAllSuiteRunData: protectedProcedure
     .input(
