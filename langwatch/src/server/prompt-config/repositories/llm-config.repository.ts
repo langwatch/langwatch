@@ -823,11 +823,10 @@ export class LlmConfigRepository {
    * Build a default version base for a config
    */
   private buildDefaultVersionConfigData(
-    params: Record<string, unknown>,
+    params: { model: string } & Record<string, unknown>,
   ): CreateLlmConfigVersionParams["configData"] {
     return {
       prompt: "You are a helpful assistant",
-      model: "openai/gpt-5.2",
       messages: [
         {
           role: "user",
