@@ -3,11 +3,28 @@
  *
  * Reads suite slug from the `?suite=` query parameter and provides
  * navigation helpers for shallow client-side transitions.
+ * Also supports `?externalSet=<scenarioSetId>` for external SDK/CI sets.
  */
 import { useCallback } from "react";
 import { useRouter } from "next/router";
 
 export const ALL_RUNS_ID = "all-runs" as const;
+export const EXTERNAL_SET_PREFIX = "external:" as const;
+
+/** Checks if a selection identifier represents an external set. */
+export function isExternalSetSelection(slug: string): boolean {
+  return slug.startsWith(EXTERNAL_SET_PREFIX);
+}
+
+/** Extracts the scenarioSetId from an external set selection identifier. */
+export function extractExternalSetId(slug: string): string {
+  return slug.slice(EXTERNAL_SET_PREFIX.length);
+}
+
+/** Creates a selection identifier for an external set. */
+export function toExternalSetSelection(scenarioSetId: string): string {
+  return `${EXTERNAL_SET_PREFIX}${scenarioSetId}`;
+}
 
 type SuiteRouting = {
   selectedSuiteSlug: string | typeof ALL_RUNS_ID | null;
@@ -20,6 +37,7 @@ export function useSuiteRouting(): SuiteRouting {
   const selectedSuiteSlug = deriveSelectedSuiteSlug({
     isReady: router.isReady,
     suiteParam: router.query.suite,
+    externalSetParam: router.query.externalSet,
   });
 
   const projectSlug = router.query.project as string | undefined;
@@ -29,6 +47,20 @@ export function useSuiteRouting(): SuiteRouting {
       if (!projectSlug) return;
 
       const basePath = `/${projectSlug}/simulations/suites`;
+
+      if (isExternalSetSelection(slug)) {
+        const setId = extractExternalSetId(slug);
+        void router.push(
+          {
+            pathname: "/[project]/simulations/suites",
+            query: { project: projectSlug, externalSet: setId },
+          },
+          `${basePath}?externalSet=${encodeURIComponent(setId)}`,
+          { shallow: true },
+        );
+        return;
+      }
+
       const asUrl =
         slug === ALL_RUNS_ID ? basePath : `${basePath}?suite=${slug}`;
 
@@ -53,11 +85,20 @@ export function useSuiteRouting(): SuiteRouting {
 function deriveSelectedSuiteSlug({
   isReady,
   suiteParam,
+  externalSetParam,
 }: {
   isReady: boolean;
   suiteParam: string | string[] | undefined;
+  externalSetParam: string | string[] | undefined;
 }): string | typeof ALL_RUNS_ID | null {
   if (!isReady) return null;
+
+  if (externalSetParam) {
+    const setId = Array.isArray(externalSetParam)
+      ? externalSetParam[0]
+      : externalSetParam;
+    if (setId) return toExternalSetSelection(setId);
+  }
 
   if (!suiteParam) return ALL_RUNS_ID;
 

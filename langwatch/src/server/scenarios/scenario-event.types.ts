@@ -71,3 +71,11 @@ export type BatchHistoryResult = {
 export type BatchRunDataResult =
   | { changed: false; lastUpdatedAt: number }
   | { changed: true; lastUpdatedAt: number; runs: ScenarioRunData[] };
+
+/** Summary for an external (SDK/CI) scenario set shown in the sidebar. */
+export type ExternalSetSummary = {
+  scenarioSetId: string;
+  passedCount: number;
+  totalCount: number;
+  lastRunTimestamp: number;
+};
