@@ -158,21 +158,21 @@ export function createTestEvent(
   aggregateType: AggregateType,
   tenantId: TenantId,
   type: EventType = EVENT_TYPES[0],
-  timestamp = 1000000,
+  createdAt = 1000000,
   version = "2025-12-17",
   data: unknown = {},
   id?: string,
 ): Event {
   const uniqueId =
     id ??
-    `${timestamp}:${tenantId}:${aggregateId}:${aggregateType}:${testEventIdCounter++}`;
+    `${createdAt}:${tenantId}:${aggregateId}:${aggregateType}:${testEventIdCounter++}`;
   return {
     id: uniqueId,
     aggregateId,
     aggregateType,
     tenantId,
-    timestamp,
-    occurredAt: timestamp,
+    createdAt,
+    occurredAt: createdAt,
     version,
     type,
     data,

@@ -48,7 +48,9 @@ export interface CreateEventParams<
   data: TData;
   /** Optional metadata (e.g., trace context) */
   metadata?: TMetadata;
-  /** Optional timestamp in ms (defaults to current time) */
+  /** Optional createdAt in ms (defaults to current time). When the event was written (UTC). */
+  createdAt?: number;
+  /** @deprecated Use `createdAt` instead */
   timestamp?: number;
   /** Whether to automatically enrich metadata with current OpenTelemetry trace context */
   includeTraceContext?: boolean;
@@ -58,6 +60,8 @@ export interface CreateEventParams<
    * Defaults to the event timestamp when not provided.
    */
   occurredAt?: number;
+  /** Optional idempotency key for storage-level deduplication (e.g., tenantId:traceId:spanId) */
+  idempotencyKey?: string;
 }
 
 /**
@@ -87,12 +91,14 @@ function createEvent<
     version,
     data,
     metadata,
+    createdAt,
     timestamp,
     includeTraceContext,
     occurredAt,
+    idempotencyKey,
   } = params;
 
-  const eventTimestamp = timestamp ?? Date.now();
+  const eventCreatedAt = createdAt ?? timestamp ?? Date.now();
 
   let finalMetadata = metadata;
   if (includeTraceContext === true) {
@@ -110,11 +116,12 @@ function createEvent<
     aggregateId,
     aggregateType,
     tenantId,
-    timestamp: eventTimestamp,
-    occurredAt: occurredAt ?? eventTimestamp,
+    createdAt: eventCreatedAt,
+    occurredAt: occurredAt ?? eventCreatedAt,
     type,
     data,
     ...(hasMetadata && { metadata: finalMetadata }),
+    ...(idempotencyKey && { idempotencyKey }),
   };
 }
 

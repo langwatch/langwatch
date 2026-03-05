@@ -67,7 +67,7 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
   },
   {
     table: "trace_summaries",
-    ttlColumn: "LastUpdatedAt",
+    ttlColumn: "UpdatedAt",
     envVar: "TIERED_TRACE_SUMMARIES_TABLE_HOT_DAYS",
     hardcodedDefault: 30,
   },

@@ -197,7 +197,7 @@ async function getChScenariosCount(
         ORDER BY ScenarioRunId, UpdatedAt DESC
         LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
       )
-      WHERE DeletedAt IS NULL
+      WHERE ArchivedAt IS NULL
     `,
     query_params: { projectIds },
     format: "JSONEachRow",

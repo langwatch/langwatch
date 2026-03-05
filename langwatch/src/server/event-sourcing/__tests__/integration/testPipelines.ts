@@ -43,7 +43,7 @@ export interface TestEvent {
   aggregateId: string;
   aggregateType: "test_aggregate";
   tenantId: TenantId;
-  timestamp: number;
+  createdAt: number;
   occurredAt: number;
   version: string;
   type: typeof TEST_EVENT_TYPE;
@@ -161,7 +161,7 @@ export const testMapProjection: MapProjectionDefinition<TestEventHandlerRecord, 
       TenantId: String(event.tenantId),
       AggregateId: event.aggregateId,
       EventId: event.id,
-      EventTimestamp: event.timestamp,
+      EventTimestamp: event.createdAt,
       Value: Number(event.data.value),
       Message: String(event.data.message ?? ""),
     };

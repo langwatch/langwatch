@@ -676,8 +676,8 @@ export function createTraceSummaryFoldProjection({
         hasAnnotation: null,
         attributes: {},
         occurredAt: 0,
-        createdAt: 0,
-        lastUpdatedAt: 0,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
       };
     },
 
@@ -697,10 +697,11 @@ export function createTraceSummaryFoldProjection({
 
         const updatedState = applySpanToSummary(state, normalizedSpan);
 
+        const now = Date.now();
         return {
           ...updatedState,
-          createdAt: state.createdAt || event.timestamp,
-          lastUpdatedAt: event.timestamp,
+          createdAt: state.createdAt,
+          updatedAt: now,
         };
       }
 
@@ -709,7 +710,7 @@ export function createTraceSummaryFoldProjection({
           ...state,
           topicId: event.data.topicId ?? state.topicId,
           subTopicId: event.data.subtopicId ?? state.subTopicId,
-          lastUpdatedAt: event.timestamp,
+          updatedAt: Date.now(),
         };
       }
 
@@ -717,7 +718,7 @@ export function createTraceSummaryFoldProjection({
         return {
           ...state,
           satisfactionScore: event.data.satisfactionScore,
-          lastUpdatedAt: event.timestamp,
+          updatedAt: Date.now(),
         };
       }
 

@@ -76,7 +76,7 @@ function makeSpanEvent(overrides: Partial<Event> = {}): Event {
     aggregateId: "trace-1",
     aggregateType: "trace",
     tenantId: "proj-1",
-    timestamp: Date.UTC(2026, 1, 15, 10, 0, 0), // 2026-02-15
+    createdAt: Date.UTC(2026, 1, 15, 10, 0, 0), // 2026-02-15
     occurredAt: Date.now(),
     type: "lw.obs.trace.span_received",
     version: "2025-12-14",
@@ -92,7 +92,7 @@ function makeEvaluationEvent(overrides: Partial<Event> = {}): Event {
     aggregateId: "eval-1",
     aggregateType: "evaluation",
     tenantId: "proj-1",
-    timestamp: Date.UTC(2026, 1, 15, 10, 0, 0),
+    createdAt: Date.UTC(2026, 1, 15, 10, 0, 0),
     occurredAt: Date.now(),
     type: "lw.evaluation.started",
     version: "2025-01-14",
@@ -108,7 +108,7 @@ function makeExperimentRunEvent(overrides: Partial<Event> = {}): Event {
     aggregateId: "run-1",
     aggregateType: "experiment_run",
     tenantId: "proj-1",
-    timestamp: Date.UTC(2026, 1, 15, 10, 0, 0),
+    createdAt: Date.UTC(2026, 1, 15, 10, 0, 0),
     occurredAt: Date.now(),
     type: "lw.experiment_run.started",
     version: "2025-02-01",

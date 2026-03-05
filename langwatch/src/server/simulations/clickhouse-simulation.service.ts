@@ -58,7 +58,7 @@ const RUN_COLUMNS = `
   toString(toUnixTimestamp64Milli(CreatedAt)) AS CreatedAt,
   toString(toUnixTimestamp64Milli(UpdatedAt)) AS UpdatedAt,
   toString(toUnixTimestamp64Milli(FinishedAt)) AS FinishedAt,
-  toString(toUnixTimestamp64Milli(DeletedAt)) AS DeletedAt` as const;
+  toString(toUnixTimestamp64Milli(ArchivedAt)) AS ArchivedAt` as const;
 
 /** Columns for a slim batch-history preview — no full message arrays. */
 const PREVIEW_COLUMNS = `
@@ -126,7 +126,7 @@ export class ClickHouseSimulationService {
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
-       WHERE DeletedAt IS NULL
+       WHERE ArchivedAt IS NULL
        GROUP BY ScenarioSetId
        ORDER BY LastRunAt DESC`,
       { tenantId: projectId },
@@ -158,7 +158,7 @@ export class ClickHouseSimulationService {
          ORDER BY UpdatedAt DESC
          LIMIT 1
        )
-       WHERE DeletedAt IS NULL
+       WHERE ArchivedAt IS NULL
        LIMIT 1`,
       { tenantId: projectId, scenarioRunId },
     );
@@ -208,7 +208,7 @@ export class ClickHouseSimulationService {
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
-       WHERE DeletedAt IS NULL`,
+       WHERE ArchivedAt IS NULL`,
       { tenantId: projectId, scenarioSetId },
     );
 
@@ -246,7 +246,7 @@ export class ClickHouseSimulationService {
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
-       WHERE DeletedAt IS NULL
+       WHERE ArchivedAt IS NULL
        GROUP BY BatchRunId
        ${cursorClause}
        ORDER BY LastRunAt DESC, BatchRunId ASC
@@ -299,7 +299,7 @@ export class ClickHouseSimulationService {
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
-       WHERE DeletedAt IS NULL
+       WHERE ArchivedAt IS NULL
        ORDER BY CreatedAt ASC`,
       { tenantId: projectId, scenarioSetId, batchRunIds },
     );
@@ -394,7 +394,7 @@ export class ClickHouseSimulationService {
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND BatchRunId = {batchRunId:String}
-           AND DeletedAt IS NULL`,
+           AND ArchivedAt IS NULL`,
         { tenantId: projectId, batchRunId },
       );
       const lastUpdatedAt = Number(tsRows[0]?.LastUpdatedAt ?? "0");
@@ -414,7 +414,7 @@ export class ClickHouseSimulationService {
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
-       WHERE DeletedAt IS NULL
+       WHERE ArchivedAt IS NULL
        ORDER BY CreatedAt ASC`,
       { tenantId: projectId, scenarioSetId, batchRunId },
     );
@@ -448,7 +448,7 @@ export class ClickHouseSimulationService {
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
-       WHERE DeletedAt IS NULL`,
+       WHERE ArchivedAt IS NULL`,
       { tenantId: projectId, scenarioSetId },
     );
     return parseInt(rows[0]?.BatchRunCount ?? "0", 10);
@@ -475,7 +475,7 @@ export class ClickHouseSimulationService {
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
-       WHERE DeletedAt IS NULL
+       WHERE ArchivedAt IS NULL
        ORDER BY CreatedAt DESC`,
       { tenantId: projectId, scenarioId },
     );
@@ -506,7 +506,7 @@ export class ClickHouseSimulationService {
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
-       WHERE DeletedAt IS NULL
+       WHERE ArchivedAt IS NULL
        ORDER BY BatchRunId ASC, CreatedAt ASC`,
       { tenantId: projectId, scenarioSetId },
     );
@@ -562,7 +562,7 @@ export class ClickHouseSimulationService {
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
-       WHERE DeletedAt IS NULL
+       WHERE ArchivedAt IS NULL
        GROUP BY BatchRunId
        ${combinedHaving}
        ORDER BY MaxCreatedAt DESC, BatchRunId ASC
@@ -583,8 +583,9 @@ export class ClickHouseSimulationService {
       return { runs: [], nextCursor: undefined, hasMore: false };
     }
 
-    const lastRow = pageRows[pageRows.length - 1]!;
-    const nextCursor = hasMore
+    const lastRow = pageRows[pageRows.length - 1];
+
+    const nextCursor = lastRow && hasMore
       ? this.encodeCursor(lastRow.MaxCreatedAt, lastRow.BatchRunId)
       : undefined;
 
@@ -646,7 +647,7 @@ export class ClickHouseSimulationService {
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
-       WHERE DeletedAt IS NULL
+       WHERE ArchivedAt IS NULL
        GROUP BY BatchRunId
        ${combinedHaving}
        ORDER BY MaxCreatedAt DESC, BatchRunId ASC
@@ -718,7 +719,7 @@ export class ClickHouseSimulationService {
            ORDER BY ScenarioRunId, UpdatedAt DESC
            LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
          )
-         WHERE DeletedAt IS NULL
+         WHERE ArchivedAt IS NULL
          GROUP BY ScenarioSetId, BatchRunId
        )
        GROUP BY ScenarioSetId
@@ -813,7 +814,7 @@ export class ClickHouseSimulationService {
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
-       WHERE DeletedAt IS NULL
+       WHERE ArchivedAt IS NULL
        ORDER BY CreatedAt ASC`,
       { tenantId: projectId, batchRunIds },
     );
@@ -823,7 +824,7 @@ export class ClickHouseSimulationService {
   }
 
   /**
-   * Soft-deletes all simulation runs for a project by setting DeletedAt.
+   * Soft-deletes all simulation runs for a project by setting ArchivedAt.
    */
   async softDeleteAllForProject({
     projectId,
@@ -831,7 +832,7 @@ export class ClickHouseSimulationService {
     projectId: string;
   }): Promise<void> {
     await this.clickhouse.command({
-      query: `ALTER TABLE ${TABLE_NAME} UPDATE DeletedAt = now64(3) WHERE TenantId = {tenantId:String} AND DeletedAt IS NULL`,
+      query: `ALTER TABLE ${TABLE_NAME} UPDATE ArchivedAt = now64(3) WHERE TenantId = {tenantId:String} AND ArchivedAt IS NULL`,
       query_params: { tenantId: projectId },
     });
     logger.info({ projectId }, "Soft-deleted all simulation runs for project");

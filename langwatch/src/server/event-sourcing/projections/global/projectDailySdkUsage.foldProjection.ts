@@ -111,7 +111,7 @@ export const projectDailySdkUsageProjection: FoldProjectionDefinition<
 
   key: (event) => {
     const { sdkName, sdkVersion, sdkLanguage } = extractSdkInfoFromEvent(event);
-    const date = toUTCDateString(event.timestamp);
+    const date = toUTCDateString(event.createdAt);
     return `${String(event.tenantId)}:${date}:${sdkName}:${sdkVersion}:${sdkLanguage}`;
   },
 
@@ -129,12 +129,12 @@ export const projectDailySdkUsageProjection: FoldProjectionDefinition<
     const { sdkName, sdkVersion, sdkLanguage } = extractSdkInfoFromEvent(event);
     return {
       projectId: String(event.tenantId),
-      date: toUTCDateString(event.timestamp),
+      date: toUTCDateString(event.createdAt),
       sdkName,
       sdkVersion,
       sdkLanguage,
       count: state.count + 1, // Ignored — Prisma upsert handles the count
-      lastEventTimestamp: event.timestamp,
+      lastEventTimestamp: event.createdAt,
     };
   },
 

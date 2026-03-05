@@ -50,8 +50,8 @@ export const EventSchema = z.object({
   aggregateType: AggregateTypeSchema,
   /** The tenant ID associated with the event */
   tenantId: TenantIdSchema,
-  /** When this event occurred (Unix timestamp in milliseconds) */
-  timestamp: z.number().int().nonnegative(),
+  /** When this event was created/written (Unix timestamp in milliseconds, UTC). */
+  createdAt: z.number().int().nonnegative(),
   /** When the business action was initiated (Unix timestamp in milliseconds). Set by createEvent/recordToEvent. */
   occurredAt: z.number().int().nonnegative(),
   /** Event type for routing and processing */
@@ -62,6 +62,8 @@ export const EventSchema = z.object({
   data: z.unknown(),
   /** Metadata about the event, optional */
   metadata: EventMetadataBaseSchema.optional(),
+  /** Optional idempotency key for storage-level deduplication */
+  idempotencyKey: z.string().optional(),
 });
 
 /**
@@ -88,7 +90,14 @@ export type Event<Payload = unknown, Metadata = EventMetadataBase> = Omit<
   metadata?: Metadata;
   /** When the business action was initiated (Unix timestamp in milliseconds). Always present at runtime. */
   occurredAt: number;
+  /** Optional idempotency key for storage-level deduplication */
+  idempotencyKey?: string;
 };
+
+/**
+ * @deprecated Use `event.createdAt` instead. Alias kept for migration period.
+ */
+export type EventTimestamp = number;
 
 /**
  * Zod schema for Projection objects.
@@ -181,11 +190,11 @@ export type ProjectionEnvelope<TProjection extends Projection = Projection> = {
  *
  * - "as-is": Preserves the order of events as provided (no sorting applied).
  *   Use when upstream (e.g., ClickHouse) has already provided correctly ordered events.
- * - "timestamp": Sorts events chronologically by their timestamp field (earliest first).
+ * - "createdAt": Sorts events chronologically by their createdAt field (earliest first).
  *   Default strategy for most use cases.
  * - Custom function: Provide a comparator function for custom sorting logic.
  */
 export type EventOrderingStrategy<TEvent> =
   | "as-is"
-  | "timestamp"
+  | "createdAt"
   | ((a: TEvent, b: TEvent) => number);

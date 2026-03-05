@@ -29,6 +29,9 @@ interface ClickHouseEvaluationRunRecord {
   Label: string | null;
   Details: string | null;
   Error: string | null;
+  CreatedAt: number;
+  UpdatedAt: number;
+  ArchivedAt: number | null;
   ScheduledAt: number | null;
   StartedAt: number | null;
   CompletedAt: number | null;
@@ -38,7 +41,7 @@ interface ClickHouseEvaluationRunRecord {
 
 type ClickHouseEvaluationRunWriteRecord = WithDateWrites<
   ClickHouseEvaluationRunRecord,
-  "ScheduledAt" | "StartedAt" | "CompletedAt"
+  "CreatedAt" | "UpdatedAt" | "ArchivedAt" | "ScheduledAt" | "StartedAt" | "CompletedAt"
 >;
 
 export class EvaluationRunClickHouseRepository
@@ -118,6 +121,9 @@ export class EvaluationRunClickHouseRepository
             Label,
             Details,
             Error,
+            toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
+            toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
+            toUnixTimestamp64Milli(ArchivedAt) AS ArchivedAt,
             toUnixTimestamp64Milli(ScheduledAt) AS ScheduledAt,
             toUnixTimestamp64Milli(StartedAt) AS StartedAt,
             toUnixTimestamp64Milli(CompletedAt) AS CompletedAt,
@@ -165,6 +171,9 @@ export class EvaluationRunClickHouseRepository
       label: record.Label,
       details: record.Details,
       error: record.Error,
+      createdAt: Number(record.CreatedAt),
+      updatedAt: Number(record.UpdatedAt),
+      archivedAt: record.ArchivedAt === null ? null : Number(record.ArchivedAt),
       scheduledAt:
         record.ScheduledAt === null ? null : Number(record.ScheduledAt),
       startedAt: record.StartedAt === null ? null : Number(record.StartedAt),
@@ -196,7 +205,10 @@ export class EvaluationRunClickHouseRepository
       Label: data.label,
       Details: data.details,
       Error: data.error,
-      ScheduledAt: data.scheduledAt != null ? new Date(data.scheduledAt) : null,
+      CreatedAt: new Date(data.createdAt),
+      UpdatedAt: new Date(data.updatedAt),
+      ArchivedAt: data.archivedAt != null ? new Date(data.archivedAt) : null,
+      ScheduledAt: new Date(data.scheduledAt ?? data.createdAt),
       StartedAt: data.startedAt != null ? new Date(data.startedAt) : null,
       CompletedAt: data.completedAt != null ? new Date(data.completedAt) : null,
       CostId: data.costId ?? null,

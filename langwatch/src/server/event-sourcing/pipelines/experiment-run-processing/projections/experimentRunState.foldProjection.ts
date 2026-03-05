@@ -30,6 +30,8 @@ export interface ExperimentRunStateData {
   AvgScoreBps: number | null;
   PassRateBps: number | null;
   Targets: string;
+  CreatedAt: number;
+  UpdatedAt: number;
   StartedAt: number | null;
   FinishedAt: number | null;
   StoppedAt: number | null;
@@ -80,6 +82,8 @@ function init(): ExperimentRunStateData {
     AvgScoreBps: null,
     PassRateBps: null,
     Targets: "[]",
+    CreatedAt: Date.now(),
+    UpdatedAt: Date.now(),
     StartedAt: null,
     FinishedAt: null,
     StoppedAt: null,
@@ -103,6 +107,7 @@ function apply(
       Total: Math.max(state.Total, event.data.total),
       Targets: mergeTargetsJson(state.Targets, event.data.targets ?? []),
       StartedAt: state.StartedAt ?? event.occurredAt,
+      UpdatedAt: Date.now(),
     };
   }
 
@@ -135,6 +140,7 @@ function apply(
       Progress: progress,
       TotalCost: totalCost,
       TotalDurationMs: totalDurationMs,
+      UpdatedAt: Date.now(),
     };
   }
 
@@ -168,6 +174,7 @@ function apply(
       TotalCost: totalCost,
       AvgScoreBps: avgScoreBps,
       PassRateBps: passRateBps,
+      UpdatedAt: Date.now(),
     };
   }
 
@@ -176,6 +183,7 @@ function apply(
       ...state,
       FinishedAt: event.data.finishedAt ?? null,
       StoppedAt: event.data.stoppedAt ?? null,
+      UpdatedAt: Date.now(),
     };
   }
 
