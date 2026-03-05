@@ -11,12 +11,17 @@
 import { Box, HStack, Skeleton, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 import type { SimulationSuite } from "@prisma/client";
+import { parseSuiteTargets } from "~/server/suites/types";
 import { useCallback, useMemo, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { PeriodSelector, usePeriodSelector, type Period } from "~/components/PeriodSelector";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { AllRunsPanel } from "~/components/suites/AllRunsPanel";
 import { SuiteArchiveDialog } from "~/components/suites/SuiteArchiveDialog";
+import {
+  SuiteRunConfirmationDialog,
+  type SuiteRunSummary,
+} from "~/components/suites/SuiteRunConfirmationDialog";
 import { SuiteContextMenu } from "~/components/suites/SuiteContextMenu";
 import {
   SuiteDetailPanel,
@@ -53,6 +58,7 @@ function SuitesPageContent() {
     suiteId: string;
   } | null>(null);
   const [archiveConfirmId, setArchiveConfirmId] = useState<string | null>(null);
+  const [runConfirmId, setRunConfirmId] = useState<string | null>(null);
 
   // Queries
   const {
@@ -236,12 +242,39 @@ function SuitesPageContent() {
   const handleRunSuite = useCallback(
     (suiteId: string) => {
       if (!project || runMutation.isPending) return;
-      const suite = suites?.find((s) => s.id === suiteId);
-      if (suite) navigateToSuite(suite.slug);
-      runMutation.mutate({ projectId: project.id, id: suiteId });
+      setRunConfirmId(suiteId);
     },
-    [project, runMutation, navigateToSuite, suites],
+    [project, runMutation],
   );
+
+  const confirmRun = useCallback(() => {
+    if (!project || !runConfirmId) return;
+    const suite = suites?.find((s) => s.id === runConfirmId);
+    if (suite) navigateToSuite(suite.slug);
+    runMutation.mutate({ projectId: project.id, id: runConfirmId });
+    setRunConfirmId(null);
+  }, [project, runConfirmId, runMutation, navigateToSuite, suites]);
+
+  const runConfirmSuite = runConfirmId
+    ? suites?.find((s) => s.id === runConfirmId)
+    : null;
+
+  const runConfirmSummary: SuiteRunSummary | null = useMemo(() => {
+    if (!runConfirmSuite) return null;
+    const targets = (() => {
+      try {
+        return parseSuiteTargets(runConfirmSuite.targets);
+      } catch {
+        return [];
+      }
+    })();
+    return {
+      suiteName: runConfirmSuite.name,
+      scenarioCount: runConfirmSuite.scenarioIds.length,
+      targetCount: targets.length,
+      repeatCount: runConfirmSuite.repeatCount,
+    };
+  }, [runConfirmSuite]);
 
   const handleDuplicateSuite = useCallback(
     (suiteId: string) => {
@@ -354,6 +387,15 @@ function SuitesPageContent() {
         onConfirm={confirmArchive}
         suiteName={archiveTargetSuite?.name ?? ""}
         isLoading={archiveMutation.isPending}
+      />
+
+      {/* Run confirmation dialog */}
+      <SuiteRunConfirmationDialog
+        open={!!runConfirmId}
+        onClose={() => setRunConfirmId(null)}
+        onConfirm={confirmRun}
+        summary={runConfirmSummary}
+        isLoading={runMutation.isPending}
       />
     </DashboardLayout>
   );
