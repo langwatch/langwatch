@@ -379,7 +379,50 @@ describe("<AllRunsPanel/>", () => {
 
     describe("when group-by is changed to Target", () => {
       it("renders target group headers", async () => {
-        setupWithRuns();
+        // Use runs with same scenario but different targets so grouping by
+        // target produces a different count than grouping by scenario
+        const runsSameScenarioDifferentTargets = [
+          {
+            batchRunId: "batch_1",
+            scenarioRunId: "run_1",
+            scenarioId: "scen_1",
+            status: "SUCCESS",
+            timestamp: 1700000000000,
+            results: null,
+            messages: [],
+            name: "Login Flow",
+            description: null,
+            durationInMs: 100,
+            metadata: { langwatch: { targetReferenceId: "target_a" } },
+          },
+          {
+            batchRunId: "batch_1",
+            scenarioRunId: "run_2",
+            scenarioId: "scen_1",
+            status: "FAILED",
+            timestamp: 1700000001000,
+            results: null,
+            messages: [],
+            name: "Login Flow",
+            description: null,
+            durationInMs: 200,
+            metadata: { langwatch: { targetReferenceId: "target_b" } },
+          },
+        ];
+        mockSuitesQuery.mockReturnValue({ data: [] });
+        mockRunDataQuery.mockReturnValue({
+          data: {
+            runs: runsSameScenarioDifferentTargets,
+            scenarioSetIds: { batch_1: "__internal__suite_1__suite" },
+            hasMore: false,
+          },
+          isLoading: false,
+          error: null,
+        });
+        mockScenariosQuery.mockReturnValue({
+          data: [{ id: "scen_1", name: "Login Flow" }],
+        });
+
         render(<AllRunsPanel period={defaultPeriod} />, { wrapper: Wrapper });
 
         const groupBySelect = screen.getByLabelText("Group by");
