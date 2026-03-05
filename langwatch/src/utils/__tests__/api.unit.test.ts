@@ -408,10 +408,11 @@ describe("Global mutation error handler", () => {
       });
 
       // Simulate QueryCache handler logic
-      if (!useUpgradeModalStore.getState().isOpen) {
-        const restrictionInfo = extractLiteMemberRestrictionInfo(error);
-        if (restrictionInfo) {
-          markAsHandledByLiteMemberHandler(error);
+      const restrictionInfo = extractLiteMemberRestrictionInfo(error);
+      if (restrictionInfo) {
+        markAsHandledByLiteMemberHandler(error);
+
+        if (!useUpgradeModalStore.getState().isOpen) {
           useUpgradeModalStore
             .getState()
             .openLiteMemberRestriction({ resource: restrictionInfo.resource });
@@ -426,7 +427,7 @@ describe("Global mutation error handler", () => {
       });
     });
 
-    it("skips when modal is already open", () => {
+    it("marks error as handled but skips modal when already open", () => {
       // Pre-open the modal
       useUpgradeModalStore
         .getState()
@@ -447,15 +448,20 @@ describe("Global mutation error handler", () => {
         },
       });
 
-      // Simulate QueryCache handler logic — should skip because modal is open
-      if (!useUpgradeModalStore.getState().isOpen) {
-        const restrictionInfo = extractLiteMemberRestrictionInfo(error);
-        if (restrictionInfo) {
+      // Simulate QueryCache handler logic
+      const restrictionInfo = extractLiteMemberRestrictionInfo(error);
+      if (restrictionInfo) {
+        markAsHandledByLiteMemberHandler(error);
+
+        if (!useUpgradeModalStore.getState().isOpen) {
           useUpgradeModalStore
             .getState()
             .openLiteMemberRestriction({ resource: restrictionInfo.resource });
         }
       }
+
+      // Error should still be marked as handled
+      expect(isHandledByLiteMemberHandler(error)).toBe(true);
 
       // Modal should still show the original resource, not the second one
       const state = useUpgradeModalStore.getState();

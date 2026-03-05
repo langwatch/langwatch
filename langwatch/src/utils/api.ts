@@ -131,19 +131,20 @@ export const api = createTRPCNext<AppRouter>({
         }),
         queryCache: new QueryCache({
           onError: (error) => {
+            const restrictionInfo = extractLiteMemberRestrictionInfo(error);
+            if (!restrictionInfo) return;
+
+            if (error instanceof Error) {
+              markAsHandledByLiteMemberHandler(error);
+            }
+
             if (useUpgradeModalStore.getState().isOpen) return;
 
-            const restrictionInfo = extractLiteMemberRestrictionInfo(error);
-            if (restrictionInfo) {
-              if (error instanceof Error) {
-                markAsHandledByLiteMemberHandler(error);
-              }
-              useUpgradeModalStore
-                .getState()
-                .openLiteMemberRestriction({
-                  resource: restrictionInfo.resource,
-                });
-            }
+            useUpgradeModalStore
+              .getState()
+              .openLiteMemberRestriction({
+                resource: restrictionInfo.resource,
+              });
           },
         }),
         defaultOptions: {
