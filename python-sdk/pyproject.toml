@@ -90,7 +90,7 @@ examples = [
     "openinference-instrumentation-dspy>=0.1.23,<0.2.0",
     "opentelemetry-instrumentation-fastapi>=0.53b1",
     "langgraph>=1.0.0,<2.0.0",
-    "openai>=1.68.2",
+    "openai>=1.68.2,<2.8.0", # 2.8+ calls model_dump(by_alias=None) which pydantic-core rejects
     "pydantic>=1,<2.10.2", # v2.10.2 is broken for chainlit
     "pytest>=7.4.2,<8.0.0",
     "python-dotenv==1.2.1",
