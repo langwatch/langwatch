@@ -30,10 +30,10 @@ export const currencySymbol: Record<Currency, string> = {
  * Growth plan features for upgrade block
  */
 export const GROWTH_FEATURES = [
-  "Up to 20 core users",
+  "Up to 20 full members",
   "200,000 events included",
   "$1 per additional 100,000 events",
-  "Unlimited lite users",
+  "Unlimited lite members",
   "30 days retention",
   "Unlimited evals",
   "Private Slack support",
@@ -46,7 +46,7 @@ export const FREE_PLAN_FEATURES = [
   "All platform features",
   "50,000 events included",
   "14 days data retention",
-  "2 users",
+  "2 team members",
   "3 scenarios",
   "3 simulations",
   "3 custom evaluations",
@@ -58,8 +58,8 @@ export const GROWTH_PLAN_FEATURES = [
   "200,000 events included",
   "$1 per additional 100,000 events",
   "30 days retention (+ custom at $3/GB)",
-  "Up to 20 core users (volume discount available)",
-  "Unlimited lite users",
+  "Up to 20 full members (volume discount available)",
+  "Unlimited lite members",
   "Unlimited evals, simulations and prompts",
   "Slack support",
 ];
@@ -93,8 +93,8 @@ export function buildTieredCapabilities({
 }) {
   const coreUsersText =
     maxMembers > 0
-      ? `Up to ${formatNumber(maxMembers)} core users`
-      : "Custom core user limits";
+      ? `Up to ${formatNumber(maxMembers)} full members`
+      : "Custom member limits";
   const eventsText =
     maxMessagesPerMonth > 0
       ? `${formatNumber(maxMessagesPerMonth)} events included`
@@ -107,10 +107,10 @@ export function buildTieredCapabilities({
         : "Custom project limits";
   const liteUsersText =
     maxMembersLite >= 9999
-      ? "Unlimited lite users"
+      ? "Unlimited lite members"
       : maxMembersLite > 0
-        ? `Up to ${formatNumber(maxMembersLite)} lite users`
-        : "Custom lite user limits";
+        ? `Up to ${formatNumber(maxMembersLite)} lite members`
+        : "Custom lite member limits";
   const evalsText =
     evaluationsCredit >= 9999
       ? "Unlimited evaluations"

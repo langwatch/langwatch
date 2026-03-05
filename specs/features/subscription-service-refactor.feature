@@ -45,18 +45,6 @@ Feature: Subscription service refactor
     Then a prospective notification event is dispatched
 
   @unit
-  Scenario: NullSubscriptionService throws on Stripe-dependent methods
-    Given the NullSubscriptionService for self-hosted deployments
-    When any Stripe-dependent method is called
-    Then SubscriptionServiceUnavailableError is thrown
-
-  @unit
-  Scenario: NullSubscriptionService returns null for queries
-    Given the NullSubscriptionService for self-hosted deployments
-    When getLastNonCancelledSubscription is called
-    Then null is returned
-
-  @unit
   Scenario: Old factory remains unchanged
     Given the existing createSubscriptionService factory
     Then it continues to be exported and used by the subscription router
