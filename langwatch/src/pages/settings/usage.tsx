@@ -101,7 +101,7 @@ function Usage() {
     { organizationId },
     { ...queryOpts, enabled: !!organization && isSaaS === false },
   );
-  const messagesLabel = organization?.pricingModel === PricingModel.TIERED ? RESOURCE_LABELS.tracesPerMonth : RESOURCE_LABELS.eventsPerMonth;
+  const messagesLabel = usage.data?.usageUnit === "traces" ? RESOURCE_LABELS.tracesPerMonth : RESOURCE_LABELS.eventsPerMonth;
   const showLiteMembers = organization?.pricingModel === PricingModel.SEAT_EVENT || isSaaS === false;
 
   const isSelfHosted = isSaaS === false;

@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import type { PlanInfo } from "../../../ee/licensing/planInfo";
 import type { PlanProvider } from "../app-layer/subscription/plan-provider";
+import type { UsageUnit } from "../app-layer/usage/usage-meter-policy";
 import { formatNumber, formatPercent } from "../../utils/formatNumber";
 import { getApp } from "../app-layer/app";
 import {
@@ -77,6 +78,16 @@ export interface ITraceUsageService {
 }
 
 /**
+ * Interface for resolving the usage unit (traces or events).
+ * Follows Interface Segregation Principle.
+ */
+export interface IUsageUnitResolver {
+  getResolvedUsageUnit(params: {
+    organizationId: string;
+  }): Promise<UsageUnit>;
+}
+
+/**
  * Usage statistics result for an organization.
  */
 export interface UsageStats {
@@ -96,6 +107,7 @@ export interface UsageStats {
   experimentsCount: number;
   evaluationsCreditUsed: number;
   messageLimitInfo: MessageLimitInfo;
+  usageUnit: UsageUnit;
 }
 
 /**
@@ -114,6 +126,7 @@ export class UsageStatsService {
     private readonly repository: ILicenseEnforcementRepository,
     private readonly traceUsageService: ITraceUsageService,
     private readonly planProvider: PlanProvider,
+    private readonly usageUnitResolver: IUsageUnitResolver,
   ) {}
 
   /**
@@ -126,6 +139,7 @@ export class UsageStatsService {
       repository,
       getApp().usage,
       getApp().planProvider,
+      getApp().usage,
     );
   }
 
@@ -153,6 +167,7 @@ export class UsageStatsService {
       agentsCount,
       experimentsCount,
       evaluationsCreditUsed,
+      usageUnit,
     ] = await Promise.all([
       this.repository.getProjectCount(organizationId),
       this.traceUsageService.getCurrentMonthCount({ organizationId }),
@@ -169,6 +184,7 @@ export class UsageStatsService {
       this.repository.getAgentCount(organizationId),
       this.repository.getExperimentCount(organizationId),
       this.repository.getEvaluationsCreditUsed(organizationId),
+      this.usageUnitResolver.getResolvedUsageUnit({ organizationId }),
     ]);
 
     const messageLimitInfo = buildMessageLimitInfo(
@@ -193,6 +209,7 @@ export class UsageStatsService {
       experimentsCount,
       evaluationsCreditUsed,
       messageLimitInfo,
+      usageUnit,
     };
   }
 

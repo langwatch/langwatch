@@ -8,7 +8,11 @@ import type { PlanResolver } from "../subscription/plan-provider";
 import { TtlCache } from "../../utils/ttlCache";
 import { OrganizationNotFoundForTeamError } from "../organizations/errors";
 import type { OrganizationService } from "../organizations/organization.service";
-import { resolveUsageMeter, type MeterDecision } from "./usage-meter-policy";
+import {
+  resolveUsageMeter,
+  type MeterDecision,
+  type UsageUnit,
+} from "./usage-meter-policy";
 import { OrganizationRepository } from "../../repositories/organization.repository";
 import { getClickHouseClient } from "../../clickhouse/client";
 import { createLogger } from "~/utils/logger/server";
@@ -103,6 +107,19 @@ export class UsageService {
       };
     }
     return { exceeded: false };
+  }
+
+  /**
+   * Returns the resolved usage unit for the given organization.
+   * Delegates to the cached meter decision.
+   */
+  async getResolvedUsageUnit({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<UsageUnit> {
+    const decision = await this.getCachedMeterDecision(organizationId);
+    return decision.usageUnit;
   }
 
   async getCurrentMonthCount({
