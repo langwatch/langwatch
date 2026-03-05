@@ -38,36 +38,16 @@ const createMockDb = ({
 };
 
 describe("getFreePlanLimits", () => {
-  describe("when pricing model is TIERED", () => {
-    it("returns 1,000 messages per month", () => {
-      const plan = getFreePlanLimits("TIERED");
-      expect(plan.maxMessagesPerMonth).toBe(1_000);
-    });
-  });
-
-  describe("when pricing model is SEAT_EVENT", () => {
-    it("returns 50,000 messages per month", () => {
-      const plan = getFreePlanLimits("SEAT_EVENT");
+  it.each(["TIERED", "SEAT_EVENT", null, undefined] as const)(
+    "returns 50,000 messages per month when pricing model is %s",
+    (pricingModel) => {
+      const plan = getFreePlanLimits(pricingModel);
       expect(plan.maxMessagesPerMonth).toBe(50_000);
-    });
-  });
-
-  describe("when pricing model is null", () => {
-    it("returns 1,000 messages per month", () => {
-      const plan = getFreePlanLimits(null);
-      expect(plan.maxMessagesPerMonth).toBe(1_000);
-    });
-  });
-
-  describe("when pricing model is undefined", () => {
-    it("returns 1,000 messages per month", () => {
-      const plan = getFreePlanLimits(undefined);
-      expect(plan.maxMessagesPerMonth).toBe(1_000);
-    });
-  });
+    },
+  );
 
   it("preserves all other FREE plan properties", () => {
-    const plan = getFreePlanLimits("SEAT_EVENT");
+    const plan = getFreePlanLimits("TIERED");
     const baseFree = PLAN_LIMITS[PlanTypes.FREE];
 
     expect(plan.type).toBe(PlanTypes.FREE);
@@ -126,7 +106,7 @@ describe("createSaaSPlanProvider", () => {
       });
 
       describe("when organization has TIERED pricing model", () => {
-        it("returns FREE with 1,000 messages per month", async () => {
+        it("returns FREE with 50,000 messages per month", async () => {
           const db = createMockDb({
             orgFindUniqueResult: { pricingModel: "TIERED" },
           });
@@ -134,12 +114,12 @@ describe("createSaaSPlanProvider", () => {
           const plan = await provider.getActivePlan("org_1");
 
           expect(plan.type).toBe(PlanTypes.FREE);
-          expect(plan.maxMessagesPerMonth).toBe(1_000);
+          expect(plan.maxMessagesPerMonth).toBe(50_000);
         });
       });
 
       describe("when organization is not found", () => {
-        it("returns FREE with 1,000 messages per month", async () => {
+        it("returns FREE with 50,000 messages per month", async () => {
           const db = createMockDb({
             orgFindUniqueResult: null,
           });
@@ -147,7 +127,7 @@ describe("createSaaSPlanProvider", () => {
           const plan = await provider.getActivePlan("org_1");
 
           expect(plan.type).toBe(PlanTypes.FREE);
-          expect(plan.maxMessagesPerMonth).toBe(1_000);
+          expect(plan.maxMessagesPerMonth).toBe(50_000);
         });
       });
     });
