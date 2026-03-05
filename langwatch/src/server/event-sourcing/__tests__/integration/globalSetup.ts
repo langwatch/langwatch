@@ -98,7 +98,7 @@ export async function setup(): Promise<void> {
   // Start ClickHouse container (reusable to speed up subsequent test runs)
   const storagePolicyConfigPath = createStoragePolicyConfigFile();
 
-  clickHouseContainer = await new ClickHouseContainer("clickhouse/clickhouse-server:25.3-alpine")
+  clickHouseContainer = await new ClickHouseContainer("clickhouse/clickhouse-server:25.10.2.65")
     .withLabels(CONTAINER_LABELS)
     .withReuse()
     .withCopyFilesToContainer([
