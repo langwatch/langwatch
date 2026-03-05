@@ -180,7 +180,7 @@ describe("resolveUsageMeter", () => {
       expect(decision.reason).toContain("license(events)");
     });
 
-    it("includes isFree in reason when free", () => {
+    it("reports freeTier as source when free TIERED", () => {
       const decision = resolveUsageMeter({
         pricingModel: PricingModel.TIERED,
         isFree: true,
@@ -188,6 +188,7 @@ describe("resolveUsageMeter", () => {
         clickhouseAvailable: true,
       });
 
+      expect(decision.reason).toContain("from freeTier");
       expect(decision.reason).toContain("isFree=true");
     });
 
