@@ -69,6 +69,26 @@ export const createWebhookService = ({
     return null;
   };
 
+  const clearTrialLicenseIfPresent = async ({
+    organizationId,
+    hasLicense,
+    reason,
+  }: {
+    organizationId: string;
+    hasLicense: boolean;
+    reason: string;
+  }) => {
+    if (!hasLicense) return;
+    logger.info(
+      { organizationId },
+      `[stripeWebhook] Clearing trial license — ${reason}`,
+    );
+    await db.organization.update({
+      where: { id: organizationId },
+      data: { license: null, licenseExpiresAt: null, licenseLastValidatedAt: null },
+    });
+  };
+
   const syncInvoicePaymentSuccess = async ({
     subscriptionId,
     throwOnMissing = false,
@@ -107,17 +127,11 @@ export const createWebhookService = ({
     });
 
     if (previousSubscription.status !== SubscriptionStatus.ACTIVE) {
-      // Clear trial license — subscription supersedes it
-      if (updatedSubscription.organization.license) {
-        logger.info(
-          { organizationId: updatedSubscription.organizationId },
-          "[stripeWebhook] Clearing trial license — subscription activated",
-        );
-        await db.organization.update({
-          where: { id: updatedSubscription.organizationId },
-          data: { license: null, licenseExpiresAt: null, licenseLastValidatedAt: null },
-        });
-      }
+      await clearTrialLicenseIfPresent({
+        organizationId: updatedSubscription.organizationId,
+        hasLicense: !!updatedSubscription.organization.license,
+        reason: "subscription activated",
+      });
 
       if (isGrowthSeatEventPlan(updatedSubscription.plan)) {
         const TIERED_PLAN_TYPES: PlanTypes[] = [
@@ -408,17 +422,11 @@ export const createWebhookService = ({
           include: { organization: true },
         });
 
-        // Clear trial license if present — subscription supersedes it
-        if (updatedSubscription.organization.license) {
-          logger.info(
-            { organizationId: updatedSubscription.organizationId },
-            "[stripeWebhook] Clearing trial license — subscription updated to active",
-          );
-          await db.organization.update({
-            where: { id: updatedSubscription.organizationId },
-            data: { license: null, licenseExpiresAt: null, licenseLastValidatedAt: null },
-          });
-        }
+        await clearTrialLicenseIfPresent({
+          organizationId: updatedSubscription.organizationId,
+          hasLicense: !!updatedSubscription.organization.license,
+          reason: "subscription updated to active",
+        });
 
         if (shouldNotify) {
           await notifySubscriptionEvent({
