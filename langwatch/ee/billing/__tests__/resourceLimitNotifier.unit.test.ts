@@ -15,10 +15,6 @@ vi.mock("../notifications/notificationHandlers", () => ({
   notifyResourceLimit: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock("../../../src/utils/posthogErrorCapture", () => ({
-  captureException: vi.fn(),
-}));
-
 vi.mock("../../../src/server/app-layer/app", () => ({
   getApp: vi.fn().mockReturnValue({
     planProvider: {
@@ -28,43 +24,38 @@ vi.mock("../../../src/server/app-layer/app", () => ({
 }));
 
 import { env } from "../../../src/env.mjs";
-import { createResourceLimitNotifier } from "../notifications/resourceLimitNotifier";
+import {
+  createResourceLimitNotifier,
+  cooldownCache,
+} from "../notifications/resourceLimitNotifier";
 import { notifyResourceLimit } from "../notifications/notificationHandlers";
-import { captureException } from "../../../src/utils/posthogErrorCapture";
 
 const mockEnv = env as { IS_SAAS: boolean | undefined };
 const mockNotifyResourceLimit = notifyResourceLimit as ReturnType<
   typeof vi.fn
 >;
-const mockCaptureException = captureException as ReturnType<typeof vi.fn>;
 
 const createMockDb = ({
   organization = null,
-  updateFn = vi.fn(),
 }: {
   organization?: unknown;
-  updateFn?: ReturnType<typeof vi.fn>;
 } = {}) => {
   return {
     organization: {
       findUnique: vi.fn().mockResolvedValue(organization),
-      update: updateFn,
     },
   } as unknown as PrismaClient;
 };
 
 const makeOrganization = ({
-  sentResourceLimitAlert = null,
   adminName = "Admin",
   adminEmail = "admin@acme.com",
 }: {
-  sentResourceLimitAlert?: Date | null;
   adminName?: string;
   adminEmail?: string;
 } = {}) => ({
   id: "org_123",
   name: "Acme",
-  sentResourceLimitAlert,
   members: [
     {
       role: "ADMIN",
@@ -86,6 +77,7 @@ const defaultInput = {
 describe("createResourceLimitNotifier()", () => {
   beforeEach(() => {
     mockEnv.IS_SAAS = false;
+    cooldownCache.clear();
     vi.clearAllMocks();
   });
 
@@ -117,112 +109,28 @@ describe("createResourceLimitNotifier()", () => {
       });
     });
 
-    describe("when alert was sent less than 24 hours ago", () => {
+    describe("when cooldown is active", () => {
       it("suppresses notification", async () => {
-        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+        cooldownCache.set("org_123", true);
+
         const db = createMockDb({
-          organization: makeOrganization({
-            sentResourceLimitAlert: twoHoursAgo,
-          }),
+          organization: makeOrganization(),
         });
 
         const notifier = createResourceLimitNotifier(db);
         await notifier(defaultInput);
 
+        expect(db.organization.findUnique).not.toHaveBeenCalled();
         expect(mockNotifyResourceLimit).not.toHaveBeenCalled();
-      });
-    });
-
-    describe("when alert was sent more than 24 hours ago", () => {
-      it("sends notification with correct payload", async () => {
-        const thirtyHoursAgo = new Date(Date.now() - 30 * 60 * 60 * 1000);
-        const db = createMockDb({
-          organization: makeOrganization({
-            sentResourceLimitAlert: thirtyHoursAgo,
-          }),
-        });
-
-        const notifier = createResourceLimitNotifier(db);
-        await notifier(defaultInput);
-
-        expect(mockNotifyResourceLimit).toHaveBeenCalledWith({
-          organizationId: "org_123",
-          organizationName: "Acme",
-          adminName: "Admin",
-          adminEmail: "admin@acme.com",
-          planName: "Launch",
-          limitType: "Workflows",
-          current: 10,
-          max: 10,
-        });
-      });
-
-      it("updates cooldown timestamp", async () => {
-        const thirtyHoursAgo = new Date(Date.now() - 30 * 60 * 60 * 1000);
-        const updateFn = vi.fn().mockResolvedValue({});
-        const db = createMockDb({
-          organization: makeOrganization({
-            sentResourceLimitAlert: thirtyHoursAgo,
-          }),
-          updateFn,
-        });
-
-        const notifier = createResourceLimitNotifier(db);
-        await notifier(defaultInput);
-
-        expect(updateFn).toHaveBeenCalledWith({
-          where: { id: "org_123" },
-          data: { sentResourceLimitAlert: expect.any(Date) },
-        });
-      });
-    });
-
-    describe("when no previous alert exists", () => {
-      it("sends notification with correct payload", async () => {
-        const db = createMockDb({
-          organization: makeOrganization({
-            sentResourceLimitAlert: null,
-          }),
-        });
-
-        const notifier = createResourceLimitNotifier(db);
-        await notifier(defaultInput);
-
-        expect(mockNotifyResourceLimit).toHaveBeenCalledWith({
-          organizationId: "org_123",
-          organizationName: "Acme",
-          adminName: "Admin",
-          adminEmail: "admin@acme.com",
-          planName: "Launch",
-          limitType: "Workflows",
-          current: 10,
-          max: 10,
-        });
-      });
-
-      it("updates cooldown timestamp", async () => {
-        const updateFn = vi.fn().mockResolvedValue({});
-        const db = createMockDb({
-          organization: makeOrganization({
-            sentResourceLimitAlert: null,
-          }),
-          updateFn,
-        });
-
-        const notifier = createResourceLimitNotifier(db);
-        await notifier(defaultInput);
-
-        expect(updateFn).toHaveBeenCalled();
       });
     });
 
     describe("when cooldown applies across limit types", () => {
       it("suppresses notification for different limit type within cooldown", async () => {
-        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+        cooldownCache.set("org_123", true);
+
         const db = createMockDb({
-          organization: makeOrganization({
-            sentResourceLimitAlert: twoHoursAgo,
-          }),
+          organization: makeOrganization(),
         });
 
         const notifier = createResourceLimitNotifier(db);
@@ -235,28 +143,36 @@ describe("createResourceLimitNotifier()", () => {
       });
     });
 
-    describe("when notify succeeds but DB write fails", () => {
-      it("captures critical error", async () => {
-        const dbError = new Error("DB connection lost");
-        const updateFn = vi.fn().mockRejectedValue(dbError);
+    describe("when no cooldown is active", () => {
+      it("sends notification with correct payload", async () => {
         const db = createMockDb({
-          organization: makeOrganization({
-            sentResourceLimitAlert: null,
-          }),
-          updateFn,
+          organization: makeOrganization(),
         });
 
         const notifier = createResourceLimitNotifier(db);
         await notifier(defaultInput);
 
-        expect(mockNotifyResourceLimit).toHaveBeenCalled();
-        expect(mockCaptureException).toHaveBeenCalledWith(
-          expect.objectContaining({
-            message: expect.stringContaining(
-              "Critical: resource limit notification sent but DB timestamp update failed for org org_123 limitType workflows",
-            ),
-          }),
-        );
+        expect(mockNotifyResourceLimit).toHaveBeenCalledWith({
+          organizationId: "org_123",
+          organizationName: "Acme",
+          adminName: "Admin",
+          adminEmail: "admin@acme.com",
+          planName: "Launch",
+          limitType: "Workflows",
+          current: 10,
+          max: 10,
+        });
+      });
+
+      it("sets cooldown after notification", async () => {
+        const db = createMockDb({
+          organization: makeOrganization(),
+        });
+
+        const notifier = createResourceLimitNotifier(db);
+        await notifier(defaultInput);
+
+        expect(cooldownCache.get("org_123")).toBe(true);
       });
     });
 
@@ -269,12 +185,8 @@ describe("createResourceLimitNotifier()", () => {
           },
         });
 
-        const updateFn = vi.fn().mockResolvedValue({});
         const db = createMockDb({
-          organization: makeOrganization({
-            sentResourceLimitAlert: null,
-          }),
-          updateFn,
+          organization: makeOrganization(),
         });
 
         const notifier = createResourceLimitNotifier(db);

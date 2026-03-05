@@ -1,27 +1,16 @@
 import type { PrismaClient } from "@prisma/client";
 import { env } from "../../../src/env.mjs";
-import { prisma } from "../../../src/server/db";
-import { captureException } from "../../../src/utils/posthogErrorCapture";
 import { notifyResourceLimit } from "./notificationHandlers";
 import { LIMIT_TYPE_DISPLAY_LABELS } from "../../../src/server/license-enforcement/constants";
 import { getApp } from "../../../src/server/app-layer/app";
+import { TtlCache } from "../../../src/server/utils/ttlCache";
 import type { ResourceLimitNotifierInput } from "../types";
 
-const MIN_HOURS_BETWEEN_ALERTS = 24;
+const COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
 
-const updateResourceLimitAlert = async (
-  db: PrismaClient,
-  organizationId: string,
-) => {
-  await db.organization.update({
-    where: { id: organizationId },
-    data: {
-      sentResourceLimitAlert: new Date(),
-    },
-  });
-};
+export const cooldownCache = new TtlCache<true>(COOLDOWN_MS);
 
-export const createResourceLimitNotifier = (db: PrismaClient = prisma) => {
+export const createResourceLimitNotifier = (db: PrismaClient) => {
   return async ({
     organizationId,
     limitType,
@@ -29,6 +18,10 @@ export const createResourceLimitNotifier = (db: PrismaClient = prisma) => {
     max,
   }: ResourceLimitNotifierInput) => {
     if (!env.IS_SAAS) {
+      return;
+    }
+
+    if (cooldownCache.get(organizationId)) {
       return;
     }
 
@@ -46,16 +39,6 @@ export const createResourceLimitNotifier = (db: PrismaClient = prisma) => {
 
     if (!organization) {
       return;
-    }
-
-    if (organization.sentResourceLimitAlert) {
-      const hoursSinceLastAlert =
-        (Date.now() - organization.sentResourceLimitAlert.getTime()) /
-        (1000 * 60 * 60);
-
-      if (hoursSinceLastAlert < MIN_HOURS_BETWEEN_ALERTS) {
-        return;
-      }
     }
 
     const admin = organization.members[0]?.user;
@@ -82,15 +65,6 @@ export const createResourceLimitNotifier = (db: PrismaClient = prisma) => {
       max,
     });
 
-    try {
-      await updateResourceLimitAlert(db, organizationId);
-    } catch (error) {
-      captureException(
-        new Error(
-          `Critical: resource limit notification sent but DB timestamp update failed for org ${organizationId} limitType ${limitType}`,
-          { cause: error },
-        ),
-      );
-    }
+    cooldownCache.set(organizationId, true);
   };
 };

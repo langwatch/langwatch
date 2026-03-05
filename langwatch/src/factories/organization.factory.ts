@@ -25,7 +25,6 @@ export const organizationFactory = Factory.define<
   s3Bucket: null,
   useCustomS3: false,
   sentPlanLimitAlert: null,
-  sentResourceLimitAlert: null,
   pricingModel: PricingModel.SEAT_EVENT,
   promoCode: null,
   ssoDomain: null,
