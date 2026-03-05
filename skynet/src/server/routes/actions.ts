@@ -1,5 +1,4 @@
 import { Router } from "express";
-import rateLimit from "express-rate-limit";
 import type IORedis from "ioredis";
 import { createLogger } from "../logger.ts";
 import { GroupQueueActionService } from "../services/groupQueueActionService.ts";
@@ -7,14 +6,11 @@ import { isValidGroupId, isValidPauseKey } from "./validators.ts";
 
 const logger = createLogger("actions");
 
-const pauseRateLimiter = rateLimit({ windowMs: 60_000, max: 30 });
-const actionRateLimiter = rateLimit({ windowMs: 60_000, max: 60 });
-
 export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => string[]): Router {
   const router = Router();
   const service = new GroupQueueActionService(redis, getGroupQueueNames);
 
-  router.post("/api/actions/unblock", actionRateLimiter, async (req, res) => {
+  router.post("/api/actions/unblock", async (req, res) => {
     try {
       const { queueName, groupId } = req.body as { queueName?: string; groupId?: string };
       if (!queueName || !groupId) {
@@ -40,7 +36,7 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
     }
   });
 
-  router.post("/api/actions/unblock-all", actionRateLimiter, async (req, res) => {
+  router.post("/api/actions/unblock-all", async (req, res) => {
     try {
       const { queueName } = req.body as { queueName?: string };
       if (!queueName) {
@@ -61,7 +57,7 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
     }
   });
 
-  router.post("/api/actions/drain-group", actionRateLimiter, async (req, res) => {
+  router.post("/api/actions/drain-group", async (req, res) => {
     try {
       const { queueName, groupId } = req.body as { queueName?: string; groupId?: string };
       if (!queueName || !groupId) {
@@ -87,7 +83,7 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
     }
   });
 
-  router.post("/api/actions/retry-blocked", actionRateLimiter, async (req, res) => {
+  router.post("/api/actions/retry-blocked", async (req, res) => {
     try {
       const { queueName, groupId, jobId } = req.body as { queueName?: string; groupId?: string; jobId?: string };
       if (!queueName || !groupId || !jobId) {
@@ -113,7 +109,7 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
     }
   });
 
-  router.post("/api/actions/pause", pauseRateLimiter, async (req, res) => {
+  router.post("/api/actions/pause", async (req, res) => {
     try {
       const { queueName, pauseKey } = req.body as { queueName?: string; pauseKey?: string };
       if (!queueName || !pauseKey) {
@@ -139,7 +135,7 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
     }
   });
 
-  router.post("/api/actions/unpause", pauseRateLimiter, async (req, res) => {
+  router.post("/api/actions/unpause", async (req, res) => {
     try {
       const { queueName, pauseKey } = req.body as { queueName?: string; pauseKey?: string };
       if (!queueName || !pauseKey) {
@@ -165,7 +161,7 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
     }
   });
 
-  router.get("/api/actions/paused", pauseRateLimiter, async (req, res) => {
+  router.get("/api/actions/paused", async (req, res) => {
     try {
       const queueName = req.query.queueName as string | undefined;
       if (!queueName) {
