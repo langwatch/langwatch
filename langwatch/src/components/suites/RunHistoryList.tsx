@@ -370,7 +370,12 @@ export function RunHistoryList({ suite, onStatsReady, period, onRun }: RunHistor
       )}
 
       {/* Run history rows — no overflow here; parent provides the scrollport for sticky headers */}
-      {filteredRuns.length === 0 && runData && runData.length > 0 && period ? (
+      {filteredRuns.length === 0 &&
+      runData &&
+      runData.length > 0 &&
+      period &&
+      !filters.scenarioId &&
+      !filters.passFailStatus ? (
         <Box paddingX={6} paddingY={8} textAlign="center">
           <Text color="fg.muted">No runs in the selected time period.</Text>
         </Box>

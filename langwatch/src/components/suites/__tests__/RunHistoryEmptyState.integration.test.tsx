@@ -191,7 +191,7 @@ describe("<RunHistoryList/>", () => {
       });
     });
 
-    it("does not display the empty state message", () => {
+    it("does not display the empty state and shows run results", () => {
       render(
         <RunHistoryList
           suite={makeSuite()}
@@ -205,6 +205,8 @@ describe("<RunHistoryList/>", () => {
       expect(
         screen.queryByRole("button", { name: /run suite/i }),
       ).not.toBeInTheDocument();
+      // Positive assertion: a run row is rendered
+      expect(screen.getByTestId("run-row-header")).toBeInTheDocument();
     });
   });
 

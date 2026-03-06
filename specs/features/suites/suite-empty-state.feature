@@ -22,3 +22,4 @@ Feature: Suite empty state for suites with no runs
     Given a suite exists with runs outside the selected time period
     When I view the suite detail page with a narrow time filter
     Then I do not see the onboarding empty state with the run CTA
+    And I see a message that no runs exist in the selected time period
