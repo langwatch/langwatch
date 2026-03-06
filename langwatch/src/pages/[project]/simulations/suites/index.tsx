@@ -17,6 +17,7 @@ import { PeriodSelector, usePeriodSelector, type Period } from "~/components/Per
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { RunHistoryPanel } from "~/components/suites/RunHistoryPanel";
 import { SuiteArchiveDialog } from "~/components/suites/SuiteArchiveDialog";
+import { SuiteRunConfirmationDialog } from "~/components/suites/SuiteRunConfirmationDialog";
 import { SuiteContextMenu } from "~/components/suites/SuiteContextMenu";
 import {
   SuiteDetailPanel,
@@ -31,6 +32,7 @@ import {
   isExternalSetSelection,
   useSuiteRouting,
 } from "~/components/suites/useSuiteRouting";
+import { parseSuiteTargets } from "~/server/suites/types";
 import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useDrawer } from "~/hooks/useDrawer";
@@ -53,6 +55,7 @@ function SuitesPageContent() {
     suiteId: string;
   } | null>(null);
   const [archiveConfirmId, setArchiveConfirmId] = useState<string | null>(null);
+  const [runConfirmId, setRunConfirmId] = useState<string | null>(null);
 
   // Queries
   const {
@@ -114,6 +117,19 @@ function SuitesPageContent() {
     ? suites?.find((s) => s.id === archiveConfirmId)
     : null;
 
+  const runConfirmSuite = runConfirmId
+    ? suites?.find((s) => s.id === runConfirmId)
+    : null;
+
+  const runConfirmTargetCount = (() => {
+    if (!runConfirmSuite) return 0;
+    try {
+      return parseSuiteTargets(runConfirmSuite.targets).length;
+    } catch {
+      return 0;
+    }
+  })();
+
   // Mutations
   const archiveMutation = api.suites.archive.useMutation({
     onSuccess: () => {
@@ -162,6 +178,7 @@ function SuitesPageContent() {
   const runMutation = api.suites.run.useMutation({
     onSuccess: (result, variables) => {
       void utils.scenarios.getSuiteRunData.invalidate();
+      setRunConfirmId(null);
       const suiteIdForToast = variables.id;
       const archivedCount =
         (result.skippedArchived?.scenarios?.length ?? 0) +
@@ -195,6 +212,7 @@ function SuitesPageContent() {
       }
     },
     onError: (err, variables) => {
+      setRunConfirmId(null);
       const suiteIdForToast = variables.id;
       const isAllArchived = err.data?.code === "BAD_REQUEST" &&
         (err.message.includes("All scenarios") || err.message.includes("All targets"));
@@ -248,12 +266,17 @@ function SuitesPageContent() {
   const handleRunSuite = useCallback(
     (suiteId: string) => {
       if (!project || runMutation.isPending) return;
-      const suite = suites?.find((s) => s.id === suiteId);
-      if (suite) navigateToSuite(suite.slug);
-      runMutation.mutate({ projectId: project.id, id: suiteId });
+      setRunConfirmId(suiteId);
     },
-    [project, runMutation, navigateToSuite, suites],
+    [project, runMutation.isPending],
   );
+
+  const confirmRun = useCallback(() => {
+    if (!project || !runConfirmId) return;
+    const suite = suites?.find((s) => s.id === runConfirmId);
+    if (suite) navigateToSuite(suite.slug);
+    runMutation.mutate({ projectId: project.id, id: runConfirmId });
+  }, [project, runConfirmId, runMutation, navigateToSuite, suites]);
 
   const handleDuplicateSuite = useCallback(
     (suiteId: string) => {
@@ -367,6 +390,17 @@ function SuitesPageContent() {
         onConfirm={confirmArchive}
         suiteName={archiveTargetSuite?.name ?? ""}
         isLoading={archiveMutation.isPending}
+      />
+
+      {/* Run confirmation dialog */}
+      <SuiteRunConfirmationDialog
+        open={!!runConfirmId}
+        onClose={() => setRunConfirmId(null)}
+        onConfirm={confirmRun}
+        suiteName={runConfirmSuite?.name ?? ""}
+        scenarioCount={runConfirmSuite?.scenarioIds.length ?? 0}
+        targetCount={runConfirmTargetCount}
+        isLoading={runMutation.isPending}
       />
     </DashboardLayout>
   );
