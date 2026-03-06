@@ -21,6 +21,26 @@ export const RUN_GROUP_TYPES = ["none", "scenario", "target"] as const;
 /** The grouping dimension applied to scenario runs. */
 export type RunGroupType = (typeof RUN_GROUP_TYPES)[number];
 
+/** Identifies which view is rendering, to determine available group-by options. */
+export type RunViewContext = "suite" | "external" | "all-runs";
+
+/**
+ * Returns the group-by options available for a given view context.
+ *
+ * External sets omit "target" since they have no target resolution.
+ * Suite and all-runs views include all options.
+ */
+export function availableGroupByOptions({
+  viewContext,
+}: {
+  viewContext: RunViewContext;
+}): RunGroupType[] {
+  if (viewContext === "external") {
+    return ["none", "scenario"];
+  }
+  return ["none", "scenario", "target"];
+}
+
 /** A generic group of scenario runs with a consistent shape across all grouping modes. */
 export type RunGroup = {
   groupKey: string;
