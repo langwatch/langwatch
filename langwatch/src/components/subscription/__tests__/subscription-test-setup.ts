@@ -195,5 +195,10 @@ export function resetMocks() {
     data: { currency: "EUR" },
     isLoading: false,
   });
+  mockListInvoices.mockReturnValue({
+    data: [],
+    isLoading: false,
+    isError: false,
+  });
 }
 
