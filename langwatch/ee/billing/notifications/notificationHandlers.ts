@@ -1,6 +1,7 @@
 import { captureException } from "../../../src/utils/posthogErrorCapture";
 import type {
   BillingNotificationHandlers,
+  LicensePurchaseNotificationPayload,
   PlanLimitNotificationContext,
   SubscriptionNotificationPayload,
 } from "../types";
@@ -49,6 +50,15 @@ export const notifySubscriptionEvent = async (
 ) => {
   await runHandlerSafely(
     billingNotificationHandlers.sendSubscriptionNotification,
+    payload,
+  );
+};
+
+export const notifyLicensePurchase = async (
+  payload: LicensePurchaseNotificationPayload,
+) => {
+  await runHandlerSafely(
+    billingNotificationHandlers.sendLicensePurchaseNotification,
     payload,
   );
 };

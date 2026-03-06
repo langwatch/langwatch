@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { PRO_TEMPLATE, ENTERPRISE_TEMPLATE, getPlanTemplate } from "../planTemplates";
-import type { LicensePlanLimits } from "../types";
+import { GROWTH_TEMPLATE, PRO_TEMPLATE, ENTERPRISE_TEMPLATE, getPlanTemplate } from "../planTemplates";
+import { DEFAULT_LIMIT } from "../constants";
 
 describe("PRO_TEMPLATE", () => {
   it("has type PRO", () => {
@@ -110,28 +110,93 @@ describe("ENTERPRISE_TEMPLATE", () => {
   });
 });
 
+describe("GROWTH_TEMPLATE", () => {
+  describe("when inspecting plan identity", () => {
+    it("has type GROWTH", () => {
+      expect(GROWTH_TEMPLATE.type).toBe("GROWTH");
+    });
+
+    it("has name Growth", () => {
+      expect(GROWTH_TEMPLATE.name).toBe("Growth");
+    });
+  });
+
+  describe("when inspecting member limits", () => {
+    it("does not preset maxMembers", () => {
+      expect(GROWTH_TEMPLATE).not.toHaveProperty("maxMembers");
+    });
+  });
+
+  describe("when inspecting feature limits", () => {
+    it("sets all other limits to unlimited (DEFAULT_LIMIT)", () => {
+      const unlimitedFields = [
+        "maxMembersLite",
+        "maxTeams",
+        "maxProjects",
+        "maxMessagesPerMonth",
+        "evaluationsCredit",
+        "maxWorkflows",
+        "maxPrompts",
+        "maxEvaluators",
+        "maxScenarios",
+        "maxAgents",
+        "maxExperiments",
+        "maxOnlineEvaluations",
+        "maxDatasets",
+        "maxDashboards",
+        "maxCustomGraphs",
+        "maxAutomations",
+      ] as const;
+
+      for (const field of unlimitedFields) {
+        expect(GROWTH_TEMPLATE[field], `${field} is not DEFAULT_LIMIT`).toBe(
+          DEFAULT_LIMIT
+        );
+      }
+    });
+
+    it("has canPublish true", () => {
+      expect(GROWTH_TEMPLATE.canPublish).toBe(true);
+    });
+
+    it("has usageUnit of events", () => {
+      expect(GROWTH_TEMPLATE.usageUnit).toBe("events");
+    });
+  });
+});
+
 describe("getPlanTemplate", () => {
-  it("returns PRO template for PRO type", () => {
-    const template = getPlanTemplate("PRO");
+  describe("when called with a known plan type", () => {
+    it("returns GROWTH template for GROWTH type", () => {
+      const template = getPlanTemplate("GROWTH");
 
-    expect(template).toEqual(PRO_TEMPLATE);
+      expect(template).toEqual(GROWTH_TEMPLATE);
+    });
+
+    it("returns PRO template for PRO type", () => {
+      const template = getPlanTemplate("PRO");
+
+      expect(template).toEqual(PRO_TEMPLATE);
+    });
+
+    it("returns ENTERPRISE template for ENTERPRISE type", () => {
+      const template = getPlanTemplate("ENTERPRISE");
+
+      expect(template).toEqual(ENTERPRISE_TEMPLATE);
+    });
   });
 
-  it("returns ENTERPRISE template for ENTERPRISE type", () => {
-    const template = getPlanTemplate("ENTERPRISE");
+  describe("when called with an unknown plan type", () => {
+    it("returns null for CUSTOM type", () => {
+      const template = getPlanTemplate("CUSTOM");
 
-    expect(template).toEqual(ENTERPRISE_TEMPLATE);
-  });
+      expect(template).toBeNull();
+    });
 
-  it("returns null for CUSTOM type", () => {
-    const template = getPlanTemplate("CUSTOM");
+    it("returns null for unknown plan type", () => {
+      const template = getPlanTemplate("UNKNOWN");
 
-    expect(template).toBeNull();
-  });
-
-  it("returns null for unknown plan type", () => {
-    const template = getPlanTemplate("UNKNOWN");
-
-    expect(template).toBeNull();
+      expect(template).toBeNull();
+    });
   });
 });

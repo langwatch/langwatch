@@ -1,11 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearBillingNotificationHandlers,
+  notifyLicensePurchase,
   notifyPlanLimit,
   notifySubscriptionEvent,
   setBillingNotificationHandlers,
 } from "../notifications/notificationHandlers";
-import type { SubscriptionNotificationPayload } from "../types";
+import type {
+  LicensePurchaseNotificationPayload,
+  SubscriptionNotificationPayload,
+} from "../types";
 
 describe("notificationHandlers", () => {
   const subscriptionPayload: SubscriptionNotificationPayload = {
@@ -92,14 +96,58 @@ describe("notificationHandlers", () => {
     });
   });
 
+  describe("when dispatching license purchase notifications", () => {
+    const licensePurchasePayload: LicensePurchaseNotificationPayload = {
+      buyerEmail: "buyer@acme.com",
+      planType: "GROWTH",
+      seats: 5,
+      amountPaid: 4900,
+      currency: "USD",
+    };
+
+    it("dispatches through registered handler", async () => {
+      const sendLicensePurchaseNotification = vi.fn();
+
+      setBillingNotificationHandlers({
+        sendLicensePurchaseNotification,
+      });
+
+      await notifyLicensePurchase(licensePurchasePayload);
+
+      expect(sendLicensePurchaseNotification).toHaveBeenCalledWith(
+        licensePurchasePayload,
+      );
+    });
+
+    it("does nothing when no handler is registered", async () => {
+      await expect(
+        notifyLicensePurchase(licensePurchasePayload),
+      ).resolves.toBeUndefined();
+    });
+
+    it("swallows handler errors", async () => {
+      setBillingNotificationHandlers({
+        sendLicensePurchaseNotification: () => {
+          throw new Error("slack is down");
+        },
+      });
+
+      await expect(
+        notifyLicensePurchase(licensePurchasePayload),
+      ).resolves.toBeUndefined();
+    });
+  });
+
   describe("when clearing handlers", () => {
     it("clears all handlers", async () => {
       const sendSubscriptionNotification = vi.fn();
       const sendSlackNotification = vi.fn();
+      const sendLicensePurchaseNotification = vi.fn();
 
       setBillingNotificationHandlers({
         sendSubscriptionNotification,
         sendSlackNotification,
+        sendLicensePurchaseNotification,
       });
 
       clearBillingNotificationHandlers();
@@ -110,9 +158,17 @@ describe("notificationHandlers", () => {
         organizationName: "Acme",
         planName: "LAUNCH",
       });
+      await notifyLicensePurchase({
+        buyerEmail: "buyer@acme.com",
+        planType: "GROWTH",
+        seats: 5,
+        amountPaid: 4900,
+        currency: "USD",
+      });
 
       expect(sendSubscriptionNotification).not.toHaveBeenCalled();
       expect(sendSlackNotification).not.toHaveBeenCalled();
+      expect(sendLicensePurchaseNotification).not.toHaveBeenCalled();
     });
   });
 });

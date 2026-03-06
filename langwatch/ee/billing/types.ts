@@ -65,8 +65,19 @@ export type SubscriptionNotificationPayload =
   | ProspectiveSubscriptionNotification
   | ConfirmedSubscriptionNotification;
 
+export type LicensePurchaseNotificationPayload = {
+  buyerEmail: string;
+  planType: string;
+  seats: number;
+  amountPaid: number;
+  currency: string;
+};
+
 export type BillingNotificationHandlers = PlanLimitNotificationHandlers & {
   sendSubscriptionNotification?: (
     payload: SubscriptionNotificationPayload,
+  ) => Promise<void> | void;
+  sendLicensePurchaseNotification?: (
+    payload: LicensePurchaseNotificationPayload,
   ) => Promise<void> | void;
 };
