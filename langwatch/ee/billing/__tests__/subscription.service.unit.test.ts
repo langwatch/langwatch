@@ -86,13 +86,13 @@ describe("EESubscriptionService", () => {
     repository = createMockRepository();
     itemCalculator = createMockItemCalculator();
     organizationRepository = createMockOrganizationRepository();
-    service = new EESubscriptionService(
-      db as unknown as PrismaClient,
-      repository as unknown as SubscriptionRepository,
-      stripe as unknown as Stripe,
+    service = new EESubscriptionService({
+      prisma: db as unknown as PrismaClient,
+      repository: repository as unknown as SubscriptionRepository,
+      stripe: stripe as unknown as Stripe,
       itemCalculator,
-      organizationRepository as unknown as OrganizationRepository,
-    );
+      organizationRepository: organizationRepository as unknown as OrganizationRepository,
+    });
   });
 
   describe("updateSubscriptionItems()", () => {

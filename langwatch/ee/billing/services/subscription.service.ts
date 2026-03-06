@@ -39,14 +39,35 @@ type ItemCalculator = {
  * prisma calls for organization/team lookups (following the same pattern as DatasetService).
  */
 export class EESubscriptionService implements SubscriptionService {
-  constructor(
-    private readonly prisma: PrismaClient,
-    private readonly repository: SubscriptionRepository,
-    private readonly stripe: Stripe,
-    private readonly itemCalculator: ItemCalculator,
-    private readonly organizationRepository: OrganizationRepository,
-    private readonly seatEventFns?: SeatEventSubscriptionFns,
-  ) {}
+  private readonly prisma: PrismaClient;
+  private readonly repository: SubscriptionRepository;
+  private readonly stripe: Stripe;
+  private readonly itemCalculator: ItemCalculator;
+  private readonly organizationRepository: OrganizationRepository;
+  private readonly seatEventFns?: SeatEventSubscriptionFns;
+
+  constructor({
+    prisma,
+    repository,
+    stripe,
+    itemCalculator,
+    organizationRepository,
+    seatEventFns,
+  }: {
+    prisma: PrismaClient;
+    repository: SubscriptionRepository;
+    stripe: Stripe;
+    itemCalculator: ItemCalculator;
+    organizationRepository: OrganizationRepository;
+    seatEventFns?: SeatEventSubscriptionFns;
+  }) {
+    this.prisma = prisma;
+    this.repository = repository;
+    this.stripe = stripe;
+    this.itemCalculator = itemCalculator;
+    this.organizationRepository = organizationRepository;
+    this.seatEventFns = seatEventFns;
+  }
 
   /**
    * Factory method that wires up the Prisma repository automatically.
@@ -64,7 +85,14 @@ export class EESubscriptionService implements SubscriptionService {
   }): EESubscriptionService {
     const repository = new PrismaSubscriptionRepository(db);
     const organizationRepository = new OrganizationRepository(db);
-    return new EESubscriptionService(db, repository, stripe, itemCalculator, organizationRepository, seatEventFns);
+    return new EESubscriptionService({
+      prisma: db,
+      repository,
+      stripe,
+      itemCalculator,
+      organizationRepository,
+      seatEventFns,
+    });
   }
 
   async getLastNonCancelledSubscription(organizationId: string) {
