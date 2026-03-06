@@ -235,15 +235,36 @@ export function RunHistoryPanel({
     }
   }, [groupBy]);
 
-  // Auto-expand all rows when data first loads
+  // Auto-expand: all rows on first load, and any newly arriving rows
   useEffect(() => {
-    if (hasAutoExpanded.current) return;
     if (groupBy === "none" && batchRuns.length > 0) {
-      setExpandedIds(new Set(batchRuns.map((b) => b.batchRunId)));
-      hasAutoExpanded.current = true;
+      const currentIds = new Set(batchRuns.map((b) => b.batchRunId));
+      if (!hasAutoExpanded.current) {
+        setExpandedIds(currentIds);
+        hasAutoExpanded.current = true;
+      } else {
+        setExpandedIds((prev) => {
+          const newIds = [...currentIds].filter((id) => !prev.has(id));
+          if (newIds.length === 0) return prev;
+          const next = new Set(prev);
+          for (const id of newIds) next.add(id);
+          return next;
+        });
+      }
     } else if (groupBy !== "none" && groups.length > 0) {
-      setExpandedIds(new Set(groups.map((g) => g.groupKey)));
-      hasAutoExpanded.current = true;
+      const currentKeys = new Set(groups.map((g) => g.groupKey));
+      if (!hasAutoExpanded.current) {
+        setExpandedIds(currentKeys);
+        hasAutoExpanded.current = true;
+      } else {
+        setExpandedIds((prev) => {
+          const newKeys = [...currentKeys].filter((k) => !prev.has(k));
+          if (newKeys.length === 0) return prev;
+          const next = new Set(prev);
+          for (const k of newKeys) next.add(k);
+          return next;
+        });
+      }
     }
   }, [groupBy, batchRuns, groups]);
 
