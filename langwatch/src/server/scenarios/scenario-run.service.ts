@@ -5,7 +5,8 @@
  * 1. ES/ClickHouse scenario events (completed/in-progress runs)
  * 2. BullMQ queue (waiting/active jobs)
  *
- * Deduplicates by composite key (scenarioId + targetReferenceId + batchRunId + index).
+ * Deduplicates by composite key (scenarioId + targetReferenceId + batchRunId)
+ * and uses count-based surplus reconciliation for repeated runs.
  * ES entries win when both sources have data for the same run.
  */
 
