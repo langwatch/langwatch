@@ -159,6 +159,58 @@ describe("NotificationService", () => {
     });
   });
 
+  describe("sendSlackResourceLimitAlert()", () => {
+    const context = {
+      organizationId: "org_1",
+      organizationName: "Acme",
+      adminName: "Jane",
+      adminEmail: "jane@acme.com",
+      planName: "Launch",
+      limitType: "Workflows",
+      current: 5,
+      max: 5,
+    };
+
+    describe("when SLACK_PLAN_LIMIT_CHANNEL is set", () => {
+      it("sends with correct text including resource type and counts", async () => {
+        process.env.SLACK_PLAN_LIMIT_CHANNEL = "https://hooks.slack.com/test";
+
+        await service.sendSlackResourceLimitAlert(context);
+
+        expect(mockSlackSend).toHaveBeenCalledWith({
+          text: "Resource limit reached: Acme, jane@acme.com, Plan: Launch, Workflows: 5/5",
+        });
+
+        delete process.env.SLACK_PLAN_LIMIT_CHANNEL;
+      });
+    });
+
+    describe("when SLACK_PLAN_LIMIT_CHANNEL is not set", () => {
+      it("returns without sending", async () => {
+        delete process.env.SLACK_PLAN_LIMIT_CHANNEL;
+
+        await service.sendSlackResourceLimitAlert(context);
+
+        expect(mockSlackSend).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when Slack webhook fails", () => {
+      it("catches the error and captures exception", async () => {
+        process.env.SLACK_PLAN_LIMIT_CHANNEL = "https://hooks.slack.com/test";
+
+        const error = new Error("webhook error");
+        mockSlackSend.mockRejectedValueOnce(error);
+
+        await service.sendSlackResourceLimitAlert(context);
+
+        expect(captureException).toHaveBeenCalledWith(error);
+
+        delete process.env.SLACK_PLAN_LIMIT_CHANNEL;
+      });
+    });
+  });
+
   describe("sendSlackSubscriptionEvent()", () => {
     describe("when SLACK_CHANNEL_SUBSCRIPTIONS is not set", () => {
       it("returns without sending", async () => {

@@ -9,6 +9,7 @@ import { captureException } from "../../../src/utils/posthogErrorCapture";
 import type {
   LicensePurchaseNotificationPayload,
   PlanLimitNotificationContext,
+  ResourceLimitNotificationContext,
   SubscriptionNotificationPayload,
 } from "../types";
 
@@ -274,6 +275,31 @@ export class NotificationService {
       });
     } catch (error) {
       logger.error({ error }, "Failed to send Slack plan-limit notification");
+      captureException(error);
+    }
+  }
+
+  /**
+   * Sends a Slack alert when a resource limit is reached.
+   */
+  async sendSlackResourceLimitAlert(
+    context: ResourceLimitNotificationContext,
+  ): Promise<void> {
+    const url = process.env.SLACK_PLAN_LIMIT_CHANNEL;
+    if (!url) {
+      return;
+    }
+
+    try {
+      const webhook = new IncomingWebhook(url);
+      await webhook.send({
+        text: `Resource limit reached: ${context.organizationName}, ${context.adminEmail ?? "unknown"}, Plan: ${context.planName}, ${context.limitType}: ${context.current}/${context.max}`,
+      });
+    } catch (error) {
+      logger.error(
+        { error },
+        "Failed to send Slack resource-limit notification",
+      );
       captureException(error);
     }
   }

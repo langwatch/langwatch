@@ -1,22 +1,29 @@
-import type { PrismaClient } from "@prisma/client";
 import { env } from "../../../src/env.mjs";
 import { createLogger } from "../../../src/utils/logger/server";
 import { getApp } from "../../../src/server/app-layer/app";
 import type { UsageService } from "../../../src/server/app-layer/usage/usage.service";
 import { getCurrentMonthStart } from "../../../src/server/utils/dateUtils";
+import { TtlCache } from "../../../src/server/utils/ttlCache";
+import { LIMIT_TYPE_DISPLAY_LABELS } from "../../../src/server/license-enforcement/constants";
 import { captureException } from "../../../src/utils/posthogErrorCapture";
 import type {
   NotificationService,
   UsageLimitEmailData,
 } from "./notification.service";
-import { NotificationRepository } from "./repositories/notification.repository";
+import type { NotificationRepository } from "./repositories/notification.repository";
+import type { OrganizationService } from "../../../src/server/app-layer/organizations/organization.service";
 import { NOTIFICATION_TYPES } from "./types";
-import type { PlanLimitNotifierInput } from "../types";
+import type { PlanLimitNotifierInput, ResourceLimitNotifierInput } from "../types";
+import type { PlanProvider } from "../../../src/server/app-layer/subscription/plan-provider";
 
 const logger = createLogger("langwatch:notifications:usageLimit");
 
 const USAGE_WARNING_THRESHOLDS = [50, 70, 90, 95, 100] as const; // Thresholds in ascending order
 const MIN_DAYS_BETWEEN_ALERTS = 30;
+
+// NOTE: In-memory cooldown does not survive restarts and does not coordinate across replicas. Accepted tradeoff: worst case is a duplicate Slack alert.
+const resourceLimitCooldown = new TtlCache<true>(24 * 60 * 60 * 1000);
+export { resourceLimitCooldown };
 
 export interface UsageLimitData {
   organizationId: string;
@@ -33,39 +40,48 @@ export interface UsageLimitData {
  */
 export class UsageLimitService {
   private readonly notificationRepository: NotificationRepository;
+  private readonly organizationService: OrganizationService;
   private readonly usageService: UsageService;
   private readonly notificationService: NotificationService;
+  private readonly planProvider: PlanProvider;
 
   constructor({
-    prisma,
+    notificationRepository,
+    organizationService,
     usageService,
     notificationService,
+    planProvider,
   }: {
-    prisma: PrismaClient;
-    usageService?: UsageService;
+    notificationRepository: NotificationRepository;
+    organizationService: OrganizationService;
+    usageService: UsageService;
     notificationService: NotificationService;
+    planProvider?: PlanProvider;
   }) {
-    this.notificationRepository = new NotificationRepository(prisma);
-    this.usageService = usageService ?? getApp().usage;
+    this.notificationRepository = notificationRepository;
+    this.organizationService = organizationService;
+    this.usageService = usageService;
     this.notificationService = notificationService;
-    this.prisma = prisma;
+    this.planProvider = planProvider ?? getApp().planProvider;
   }
-
-  private readonly prisma: PrismaClient;
 
   /**
    * Static factory method for creating a UsageLimitService with proper DI.
    */
   static create({
-    prisma,
+    notificationRepository,
+    organizationService,
     usageService,
     notificationService,
+    planProvider,
   }: {
-    prisma: PrismaClient;
-    usageService?: UsageService;
+    notificationRepository: NotificationRepository;
+    organizationService: OrganizationService;
+    usageService: UsageService;
     notificationService: NotificationService;
+    planProvider?: PlanProvider;
   }): UsageLimitService {
-    return new UsageLimitService({ prisma, usageService, notificationService });
+    return new UsageLimitService({ notificationRepository, organizationService, usageService, notificationService, planProvider });
   }
 
   /**
@@ -83,17 +99,7 @@ export class UsageLimitService {
       return;
     }
 
-    const organization = await this.prisma.organization.findUnique({
-      where: { id: organizationId },
-      include: {
-        members: {
-          where: { role: "ADMIN" },
-          include: {
-            user: true,
-          },
-        },
-      },
-    });
+    const organization = await this.organizationService.findWithAdmins(organizationId);
 
     if (!organization) {
       return;
@@ -127,12 +133,7 @@ export class UsageLimitService {
     ]);
 
     try {
-      await this.prisma.organization.update({
-        where: { id: organizationId },
-        data: {
-          sentPlanLimitAlert: new Date(),
-        },
-      });
+      await this.organizationService.updateSentPlanLimitAlert(organizationId, new Date());
     } catch (error) {
       captureException(
         new Error(
@@ -140,6 +141,64 @@ export class UsageLimitService {
           { cause: error },
         ),
       );
+    }
+  }
+
+  /**
+   * Notifies internal channels that an organization has reached a resource limit.
+   *
+   * Uses an in-memory 24-hour cooldown keyed by organizationId to avoid
+   * duplicate Slack alerts. The cooldown applies across all limit types.
+   */
+  async notifyResourceLimitReached({
+    organizationId,
+    limitType,
+    current,
+    max,
+  }: ResourceLimitNotifierInput): Promise<void> {
+    if (!env.IS_SAAS) {
+      return;
+    }
+
+    if (resourceLimitCooldown.get(organizationId)) {
+      return;
+    }
+
+    resourceLimitCooldown.set(organizationId, true);
+
+    try {
+      const org = await this.organizationService.findWithAdmins(organizationId);
+
+      if (!org) {
+        resourceLimitCooldown.delete(organizationId);
+        return;
+      }
+
+      const admin = org.members[0]?.user;
+      const limitLabel = LIMIT_TYPE_DISPLAY_LABELS[limitType];
+
+      let planName = "unknown";
+      try {
+        planName =
+          (
+            await this.planProvider.getActivePlan({ organizationId })
+          ).name ?? "unknown";
+      } catch {
+        // fall through with "unknown"
+      }
+
+      await this.notificationService.sendSlackResourceLimitAlert({
+        organizationId,
+        organizationName: org.name,
+        adminName: admin?.name ?? undefined,
+        adminEmail: admin?.email ?? undefined,
+        planName,
+        limitType: limitLabel,
+        current,
+        max,
+      });
+    } catch {
+      resourceLimitCooldown.delete(organizationId);
     }
   }
 
@@ -173,15 +232,7 @@ export class UsageLimitService {
       return null;
     }
 
-    const organization = await this.prisma.organization.findUnique({
-      where: { id: organizationId },
-      include: {
-        members: {
-          where: { role: "ADMIN" },
-          include: { user: true },
-        },
-      },
-    });
+    const organization = await this.organizationService.findWithAdmins(organizationId);
 
     if (!organization) {
       logger.warn({ organizationId }, "Organization not found");
@@ -237,11 +288,7 @@ export class UsageLimitService {
     }
 
     // Fetch projects and their usage
-    const projects = await this.prisma.project.findMany({
-      where: { team: { organizationId } },
-      select: { id: true, name: true },
-      orderBy: { name: "asc" },
-    });
+    const projects = await this.organizationService.findProjectsWithName(organizationId);
 
     const projectIds = projects.map((p) => p.id);
     const counts = await this.usageService.getCountByProjects({
@@ -423,21 +470,6 @@ export class UsageLimitService {
     deliverableAdmins: Array<{ user: { id: string; email: string | null } }>;
     emailContext: UsageLimitEmailData;
   }) {
-    // Log any admins without emails for visibility
-    const adminsWithoutEmail = deliverableAdmins.filter(
-      (member) => !member.user.email,
-    );
-    if (adminsWithoutEmail.length > 0) {
-      logger.debug(
-        {
-          organizationId,
-          adminsWithoutEmailCount: adminsWithoutEmail.length,
-          adminsWithoutEmailIds: adminsWithoutEmail.map((m) => m.user.id),
-        },
-        "Some admins lack email addresses and will not receive notifications",
-      );
-    }
-
     const emailResults = await Promise.allSettled(
       deliverableAdmins.map(async (member) => {
         await this.notificationService.sendUsageLimitEmail({

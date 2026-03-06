@@ -32,6 +32,7 @@ import { UsageService } from "./usage/usage.service";
 import { StripeUsageReportingService } from "../../../ee/billing/services/usageReportingService";
 import { meters } from "../../../ee/billing/stripe/stripePriceCatalog";
 import { NotificationService } from "../../../ee/billing/notifications/notification.service";
+import { NotificationRepository } from "../../../ee/billing/notifications/repositories/notification.repository";
 import { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
 
 export function initializeWebApp(): App {
@@ -170,8 +171,10 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   });
 
   const notifications = NotificationService.create();
+  const notificationRepository = new NotificationRepository(prisma);
   const usageLimits = UsageLimitService.create({
-    prisma,
+    notificationRepository,
+    organizationService: organizations,
     usageService: usage,
     notificationService: notifications,
   });
