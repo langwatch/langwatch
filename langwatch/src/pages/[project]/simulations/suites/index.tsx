@@ -11,7 +11,7 @@
 import { Box, HStack, Skeleton, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 import type { SimulationSuite } from "@prisma/client";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { PeriodSelector, usePeriodSelector, type Period } from "~/components/PeriodSelector";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -35,6 +35,7 @@ import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useSuiteRunUpdateListener } from "~/hooks/useSuiteRunUpdateListener";
 import { api } from "~/utils/api";
 
 const SKELETON_PLACEHOLDER_COUNT = 5;
@@ -53,6 +54,7 @@ function SuitesPageContent() {
     suiteId: string;
   } | null>(null);
   const [archiveConfirmId, setArchiveConfirmId] = useState<string | null>(null);
+  const idempotencyKeyRef = useRef(crypto.randomUUID());
 
   // Queries
   const {
@@ -78,6 +80,16 @@ function SuitesPageContent() {
     },
     { enabled: !!project, refetchInterval: 5000 },
   );
+
+  // Real-time suite run updates via SSE
+  useSuiteRunUpdateListener({
+    projectId: project?.id ?? "",
+    enabled: !!project,
+    refetch: () => {
+      void utils.scenarios.getAllSuiteRunData.invalidate();
+      void utils.suites.getQueueStatus.invalidate();
+    },
+  });
 
   const runSummaries = useMemo(() => {
     if (!allRunData) return undefined;
@@ -238,7 +250,7 @@ function SuitesPageContent() {
       if (!project || runMutation.isPending) return;
       const suite = suites?.find((s) => s.id === suiteId);
       if (suite) navigateToSuite(suite.slug);
-      runMutation.mutate({ projectId: project.id, id: suiteId });
+      runMutation.mutate({ projectId: project.id, id: suiteId, idempotencyKey: idempotencyKeyRef.current });
     },
     [project, runMutation, navigateToSuite, suites],
   );

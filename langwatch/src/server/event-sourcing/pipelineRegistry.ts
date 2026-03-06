@@ -20,6 +20,19 @@ import {
 import { createSimulationRunStateFoldStore } from "./pipelines/simulation-processing/projections/simulationRunState.store";
 import { createExperimentRunEsSyncReactor } from "./pipelines/experiment-run-processing/reactors/experimentRunEsSync.reactor";
 import { createSnapshotUpdateBroadcastReactor } from "./pipelines/simulation-processing/reactors/snapshotUpdateBroadcast";
+import { createSuiteRunProgressForwarderReactor } from "./pipelines/simulation-processing/reactors/suiteRunProgressForwarder.reactor";
+import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
+import { createStartSuiteRunCommandClass } from "./pipelines/suite-run-processing/commands/startSuiteRun.command";
+import { scheduleSuiteRunJobs } from "../scenarios/scenario.queue";
+import {
+  SuiteRunStateRepositoryClickHouse,
+  SuiteRunStateRepositoryMemory,
+  SuiteRunItemsRepositoryClickHouse,
+  SuiteRunItemsRepositoryMemory,
+} from "./pipelines/suite-run-processing/repositories";
+import { createSuiteRunStateFoldStore } from "./pipelines/suite-run-processing/projections/suiteRunState.store";
+import { createSuiteRunItemsFoldStore } from "./pipelines/suite-run-processing/projections/suiteRunItems.store";
+import { createSuiteRunBroadcastReactor } from "./pipelines/suite-run-processing/reactors/suiteRunBroadcast.reactor";
 import { createElasticsearchBatchEvaluationRepository } from "../evaluations-v3/repositories/elasticsearchBatchEvaluation.repository";
 import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
 import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
@@ -78,7 +91,8 @@ export class PipelineRegistry {
     const evalPipeline = this.registerEvaluationPipeline();
     const tracePipeline = this.registerTracePipeline(evalPipeline);
     const experimentRunPipeline = this.registerExperimentRunPipeline();
-    const simulationPipeline = this.registerSimulationPipeline();
+    const suiteRunPipeline = this.registerSuiteRunPipeline();
+    const simulationPipeline = this.registerSimulationPipeline(suiteRunPipeline);
     const billingPipeline = this.registerBillingReportingPipeline();
 
     logger.info("All pipelines registered");
@@ -88,6 +102,7 @@ export class PipelineRegistry {
       evaluations: mapCommands(evalPipeline.commands),
       experimentRuns: mapCommands(experimentRunPipeline.commands),
       simulations: mapCommands(simulationPipeline.commands),
+      suiteRuns: mapCommands(suiteRunPipeline.commands),
       billing: mapCommands(billingPipeline.commands),
     };
   }
@@ -161,7 +176,7 @@ export class PipelineRegistry {
     return tracePipeline;
   }
 
-  private registerSimulationPipeline() {
+  private registerSimulationPipeline(suiteRunPipeline: ReturnType<PipelineRegistry["registerSuiteRunPipeline"]>) {
     const repository = this.deps.clickhouse
       ? new SimulationRunStateRepositoryClickHouse(this.deps.clickhouse)
       : new SimulationRunStateRepositoryMemory();
@@ -171,10 +186,48 @@ export class PipelineRegistry {
       hasRedis: !!this.deps.eventSourcing.redisConnection,
     });
 
+    const suiteRunProgressForwarderReactor = createSuiteRunProgressForwarderReactor({
+      startScenario: (data) =>
+        mapCommands(suiteRunPipeline.commands).startScenario(data),
+      recordScenarioResult: (data) =>
+        mapCommands(suiteRunPipeline.commands).recordScenarioResult(data),
+    });
+
     return this.deps.eventSourcing.register(
       createSimulationProcessingPipeline({
         simulationRunStore,
         snapshotUpdateBroadcastReactor,
+        suiteRunProgressForwarderReactor,
+      }),
+    );
+  }
+
+  private registerSuiteRunPipeline() {
+    const stateRepository = this.deps.clickhouse
+      ? new SuiteRunStateRepositoryClickHouse(this.deps.clickhouse)
+      : new SuiteRunStateRepositoryMemory();
+    const suiteRunStore = createSuiteRunStateFoldStore(stateRepository);
+
+    const itemsRepository = this.deps.clickhouse
+      ? new SuiteRunItemsRepositoryClickHouse(this.deps.clickhouse)
+      : new SuiteRunItemsRepositoryMemory();
+    const suiteRunItemsStore = createSuiteRunItemsFoldStore(itemsRepository);
+
+    const suiteRunBroadcastReactor = createSuiteRunBroadcastReactor({
+      broadcast: this.deps.broadcast,
+      hasRedis: !!this.deps.eventSourcing.redisConnection,
+    });
+
+    const StartSuiteRunCommandClass = createStartSuiteRunCommandClass({
+      scheduleSuiteRunJobs,
+    });
+
+    return this.deps.eventSourcing.register(
+      createSuiteRunProcessingPipeline({
+        suiteRunStore,
+        suiteRunItemsStore,
+        suiteRunBroadcastReactor,
+        StartSuiteRunCommandClass,
       }),
     );
   }

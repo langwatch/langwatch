@@ -11,6 +11,7 @@ import type { SimulationProcessingEvent } from "./schemas/events";
 export interface SimulationProcessingPipelineDeps {
   simulationRunStore: FoldProjectionStore<SimulationRunStateData>;
   snapshotUpdateBroadcastReactor: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
+  suiteRunProgressForwarderReactor?: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
 }
 
 /**
@@ -31,13 +32,19 @@ export interface SimulationProcessingPipelineDeps {
  * - deleteRun: Emits SimulationRunDeletedEvent for soft-delete
  */
 export function createSimulationProcessingPipeline(deps: SimulationProcessingPipelineDeps) {
-  return definePipeline<SimulationProcessingEvent>()
+  const builder = definePipeline<SimulationProcessingEvent>()
     .withName("simulation_processing")
     .withAggregateType("simulation_run")
     .withFoldProjection("simulationRunState", createSimulationRunStateFoldProjection({
       store: deps.simulationRunStore,
     }))
-    .withReactor("simulationRunState", "snapshotUpdateBroadcast", deps.snapshotUpdateBroadcastReactor)
+    .withReactor("simulationRunState", "snapshotUpdateBroadcast", deps.snapshotUpdateBroadcastReactor);
+
+  if (deps.suiteRunProgressForwarderReactor) {
+    builder.withReactor("simulationRunState", "suiteRunProgressForwarder", deps.suiteRunProgressForwarderReactor);
+  }
+
+  return builder
     .withCommand("startRun", StartRunCommand)
     .withCommand("messageSnapshot", MessageSnapshotCommand)
     .withCommand("finishRun", FinishRunCommand)

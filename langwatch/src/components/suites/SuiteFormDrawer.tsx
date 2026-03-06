@@ -24,23 +24,23 @@ import {
 } from "@chakra-ui/react";
 import type { SimulationSuite } from "@prisma/client";
 import { ChevronDown, ChevronRight, Play } from "lucide-react";
-import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
+  getFlowCallbacks,
   useDrawer,
   useDrawerParams,
-  getFlowCallbacks,
 } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
 import { api } from "~/utils/api";
 import { AgentHttpEditorDrawer } from "../agents/AgentHttpEditorDrawer";
 import { ScenarioFormDrawer } from "../scenarios/ScenarioFormDrawer";
+import { InlineTagsInput } from "../scenarios/ui/InlineTagsInput";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
-import { useSuiteForm, type SuiteFormData } from "./useSuiteForm";
-import { InlineTagsInput } from "../scenarios/ui/InlineTagsInput";
 import { ScenarioPicker } from "./ScenarioPicker";
 import { TargetPicker } from "./TargetPicker";
+import { type SuiteFormData, useSuiteForm } from "./useSuiteForm";
 
 /** Callbacks passed via flowCallbacks from the parent page. */
 export type SuiteFormDrawerProps = {
@@ -68,6 +68,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
   const [agentHttpEditorOpen, setAgentHttpEditorOpen] = useState(false);
   const params = useDrawerParams();
   const utils = api.useContext();
+  const idempotencyKeyRef = useRef(crypto.randomUUID());
 
   const isOpen = drawerOpen("suiteEditor");
   const suiteId = params.suiteId;
@@ -205,10 +206,14 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
       if (archivedCount > 0) {
         const parts: string[] = [];
         if (result.skippedArchived.scenarios.length > 0) {
-          parts.push(`${result.skippedArchived.scenarios.length} archived scenario${result.skippedArchived.scenarios.length > 1 ? "s" : ""}`);
+          parts.push(
+            `${result.skippedArchived.scenarios.length} archived scenario${result.skippedArchived.scenarios.length > 1 ? "s" : ""}`,
+          );
         }
         if (result.skippedArchived.targets.length > 0) {
-          parts.push(`${result.skippedArchived.targets.length} archived target${result.skippedArchived.targets.length > 1 ? "s" : ""}`);
+          parts.push(
+            `${result.skippedArchived.targets.length} archived target${result.skippedArchived.targets.length > 1 ? "s" : ""}`,
+          );
         }
 
         const suiteIdForEdit = variables.id;
@@ -220,7 +225,9 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
           action: {
             label: "Edit Suite",
             onClick: () => {
-              openDrawer("suiteEditor", { urlParams: { suiteId: suiteIdForEdit } });
+              openDrawer("suiteEditor", {
+                urlParams: { suiteId: suiteIdForEdit },
+              });
             },
           },
         });
@@ -234,21 +241,27 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
     },
     onError: (err, variables) => {
       const suiteIdForToast = variables.id;
-      const isAllArchived = err.data?.code === "BAD_REQUEST" &&
-        (err.message.includes("All scenarios") || err.message.includes("All targets"));
+      const isAllArchived =
+        err.data?.code === "BAD_REQUEST" &&
+        (err.message.includes("All scenarios") ||
+          err.message.includes("All targets"));
       toaster.create({
         title: isAllArchived ? "Cannot run suite" : "Failed to run suite",
         description: err.message,
         type: "error",
         meta: { closable: true },
-        ...(isAllArchived ? {
-          action: {
-            label: "Edit Suite",
-            onClick: () => {
-              openDrawer("suiteEditor", { urlParams: { suiteId: suiteIdForToast } });
-            },
-          },
-        } : {}),
+        ...(isAllArchived
+          ? {
+              action: {
+                label: "Edit Suite",
+                onClick: () => {
+                  openDrawer("suiteEditor", {
+                    urlParams: { suiteId: suiteIdForToast },
+                  });
+                },
+              },
+            }
+          : {}),
       });
     },
   });
@@ -273,7 +286,11 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
       const payload = buildMutationPayload(data, project.id);
 
       const onSuccess = (saved: SimulationSuite) => {
-        runMutation.mutate({ projectId: payload.projectId, id: saved.id });
+        runMutation.mutate({
+          projectId: payload.projectId,
+          id: saved.id,
+          idempotencyKey: idempotencyKeyRef.current,
+        });
         onRan?.(saved.id);
       };
 
@@ -305,236 +322,236 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
   return (
-  <>
-    <Drawer.Root
-      open={isOpen}
-      onOpenChange={(e) => {
-        if (!e.open) closeDrawer();
-      }}
-      placement="end"
-      size="lg"
-    >
-      <Drawer.Content>
-        <Drawer.Header>
-          <Drawer.Title>{title}</Drawer.Title>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
+    <>
+      <Drawer.Root
+        open={isOpen}
+        onOpenChange={(e) => {
+          if (!e.open) closeDrawer();
+        }}
+        placement="end"
+        size="lg"
+      >
+        <Drawer.Content>
+          <Drawer.Header>
+            <Drawer.Title>{title}</Drawer.Title>
+            <Drawer.CloseTrigger />
+          </Drawer.Header>
 
-        <Drawer.Body>
-          <VStack gap={4} align="stretch">
-            {/* Name */}
-            <VStack align="start" gap={1}>
-              <Text fontSize="sm" fontWeight="medium">
-                Name *
-              </Text>
-              <Input
-                placeholder="e.g., Critical Path Suite"
-                {...form.register("name")}
-                borderColor={errors.name ? "red.500" : undefined}
-              />
-              {errors.name && (
-                <Text fontSize="xs" color="red.500">
-                  {errors.name.message}
+          <Drawer.Body>
+            <VStack gap={4} align="stretch">
+              {/* Name */}
+              <VStack align="start" gap={1}>
+                <Text fontSize="sm" fontWeight="medium">
+                  Name *
                 </Text>
-              )}
-            </VStack>
-
-            {/* Description */}
-            <VStack align="start" gap={1}>
-              <Text fontSize="sm" fontWeight="medium">
-                Description (optional)
-              </Text>
-              <Textarea
-                placeholder="Core journeys that must pass before deploy"
-                {...form.register("description")}
-                rows={2}
-              />
-            </VStack>
-
-            {/* Labels */}
-            <VStack align="start" gap={1}>
-              <Text fontSize="sm" fontWeight="medium">
-                Labels
-              </Text>
-              <InlineTagsInput
-                value={suiteForm.labels}
-                onChange={(newLabels) => form.setValue("labels", newLabels)}
-                placeholder="Add label..."
-              />
-            </VStack>
-
-            {/* Scenarios */}
-            <VStack align="start" gap={1}>
-              <Text fontSize="sm" fontWeight="medium">
-                Scenarios *
-              </Text>
-              <ScenarioPicker
-                scenarios={suiteForm.filteredScenarios}
-                selectedIds={suiteForm.selectedScenarioIds}
-                totalCount={suiteForm.totalScenarioCount}
-                onToggle={suiteForm.toggleScenario}
-                onSelectAll={suiteForm.selectAllScenarios}
-                onClear={suiteForm.clearScenarios}
-                searchQuery={suiteForm.scenarioSearch}
-                onSearchChange={suiteForm.setScenarioSearch}
-                allLabels={suiteForm.allLabels}
-                activeLabelFilter={suiteForm.activeLabelFilter}
-                onLabelFilterChange={suiteForm.setActiveLabelFilter}
-                onCreateNew={() => setScenarioEditorOpen(true)}
-                hasError={!!errors.selectedScenarioIds}
-                archivedIds={archivedScenariosWithNames}
-                onRemoveArchived={suiteForm.removeArchivedScenario}
-              />
-              {errors.selectedScenarioIds && (
-                <Text fontSize="xs" color="red.500">
-                  {errors.selectedScenarioIds.message}
-                </Text>
-              )}
-            </VStack>
-
-            {/* Targets */}
-            <VStack align="start" gap={1}>
-              <Text fontSize="sm" fontWeight="medium">
-                Target(s) *
-              </Text>
-              <TargetPicker
-                targets={suiteForm.filteredTargets}
-                selectedTargets={suiteForm.selectedTargets}
-                totalCount={suiteForm.availableTargets.length}
-                isTargetSelected={suiteForm.isTargetSelected}
-                onToggle={suiteForm.toggleTarget}
-                onSelectAll={suiteForm.selectAllTargets}
-                onClear={suiteForm.clearTargets}
-                searchQuery={suiteForm.targetSearch}
-                onSearchChange={suiteForm.setTargetSearch}
-                onCreateAgent={() => setAgentHttpEditorOpen(true)}
-                onCreatePrompt={() => {
-                  if (project?.slug) {
-                    window.open(`/${project.slug}/prompts`, "_blank");
-                  }
-                }}
-                hasError={!!errors.selectedTargets}
-                archivedTargets={archivedTargetsWithNames}
-                onRemoveArchived={suiteForm.removeArchivedTarget}
-              />
-              {errors.selectedTargets && (
-                <Text fontSize="xs" color="red.500">
-                  {errors.selectedTargets.message}
-                </Text>
-              )}
-            </VStack>
-
-            {/* Execution Options */}
-            <Collapsible.Root
-              open={suiteForm.executionOptionsOpen}
-              onOpenChange={(d) => suiteForm.setExecutionOptionsOpen(d.open)}
-            >
-              <Collapsible.Trigger asChild>
-                <HStack cursor="pointer" gap={2}>
-                  {suiteForm.executionOptionsOpen ? (
-                    <ChevronDown size={14} />
-                  ) : (
-                    <ChevronRight size={14} />
-                  )}
-                  <Text fontSize="sm" fontWeight="medium">
-                    Execution Options
+                <Input
+                  placeholder="e.g., Critical Path Suite"
+                  {...form.register("name")}
+                  borderColor={errors.name ? "red.500" : undefined}
+                />
+                {errors.name && (
+                  <Text fontSize="xs" color="red.500">
+                    {errors.name.message}
                   </Text>
-                </HStack>
-              </Collapsible.Trigger>
-              <Collapsible.Content>
-                <Box
-                  border="1px solid"
-                  borderColor="border"
-                  borderRadius="md"
-                  padding={3}
-                  marginTop={2}
-                >
-                  <VStack align="start" gap={1}>
-                    <HStack gap={2} align="center">
-                      <Text fontSize="sm">Repeat count</Text>
-                      <Input
-                        type="number"
-                        size="sm"
-                        width="80px"
-                        min={1}
-                        max={MAX_REPEAT_COUNT}
-                        {...form.register("repeatCount", {
-                          valueAsNumber: true,
-                        })}
-                        borderColor={
-                          errors.repeatCount ? "red.500" : undefined
-                        }
-                      />
-                      <Text fontSize="xs" color="fg.muted">
-                        times per scenario x target (max {MAX_REPEAT_COUNT})
-                      </Text>
-                    </HStack>
-                    {errors.repeatCount && (
-                      <Text fontSize="xs" color="red.500">
-                        {errors.repeatCount.message}
-                      </Text>
+                )}
+              </VStack>
+
+              {/* Description */}
+              <VStack align="start" gap={1}>
+                <Text fontSize="sm" fontWeight="medium">
+                  Description (optional)
+                </Text>
+                <Textarea
+                  placeholder="Core journeys that must pass before deploy"
+                  {...form.register("description")}
+                  rows={2}
+                />
+              </VStack>
+
+              {/* Labels */}
+              <VStack align="start" gap={1}>
+                <Text fontSize="sm" fontWeight="medium">
+                  Labels
+                </Text>
+                <InlineTagsInput
+                  value={suiteForm.labels}
+                  onChange={(newLabels) => form.setValue("labels", newLabels)}
+                  placeholder="Add label..."
+                />
+              </VStack>
+
+              {/* Scenarios */}
+              <VStack align="start" gap={1}>
+                <Text fontSize="sm" fontWeight="medium">
+                  Scenarios *
+                </Text>
+                <ScenarioPicker
+                  scenarios={suiteForm.filteredScenarios}
+                  selectedIds={suiteForm.selectedScenarioIds}
+                  totalCount={suiteForm.totalScenarioCount}
+                  onToggle={suiteForm.toggleScenario}
+                  onSelectAll={suiteForm.selectAllScenarios}
+                  onClear={suiteForm.clearScenarios}
+                  searchQuery={suiteForm.scenarioSearch}
+                  onSearchChange={suiteForm.setScenarioSearch}
+                  allLabels={suiteForm.allLabels}
+                  activeLabelFilter={suiteForm.activeLabelFilter}
+                  onLabelFilterChange={suiteForm.setActiveLabelFilter}
+                  onCreateNew={() => setScenarioEditorOpen(true)}
+                  hasError={!!errors.selectedScenarioIds}
+                  archivedIds={archivedScenariosWithNames}
+                  onRemoveArchived={suiteForm.removeArchivedScenario}
+                />
+                {errors.selectedScenarioIds && (
+                  <Text fontSize="xs" color="red.500">
+                    {errors.selectedScenarioIds.message}
+                  </Text>
+                )}
+              </VStack>
+
+              {/* Targets */}
+              <VStack align="start" gap={1}>
+                <Text fontSize="sm" fontWeight="medium">
+                  Target(s) *
+                </Text>
+                <TargetPicker
+                  targets={suiteForm.filteredTargets}
+                  selectedTargets={suiteForm.selectedTargets}
+                  totalCount={suiteForm.availableTargets.length}
+                  isTargetSelected={suiteForm.isTargetSelected}
+                  onToggle={suiteForm.toggleTarget}
+                  onSelectAll={suiteForm.selectAllTargets}
+                  onClear={suiteForm.clearTargets}
+                  searchQuery={suiteForm.targetSearch}
+                  onSearchChange={suiteForm.setTargetSearch}
+                  onCreateAgent={() => setAgentHttpEditorOpen(true)}
+                  onCreatePrompt={() => {
+                    if (project?.slug) {
+                      window.open(`/${project.slug}/prompts`, "_blank");
+                    }
+                  }}
+                  hasError={!!errors.selectedTargets}
+                  archivedTargets={archivedTargetsWithNames}
+                  onRemoveArchived={suiteForm.removeArchivedTarget}
+                />
+                {errors.selectedTargets && (
+                  <Text fontSize="xs" color="red.500">
+                    {errors.selectedTargets.message}
+                  </Text>
+                )}
+              </VStack>
+
+              {/* Execution Options */}
+              <Collapsible.Root
+                open={suiteForm.executionOptionsOpen}
+                onOpenChange={(d) => suiteForm.setExecutionOptionsOpen(d.open)}
+              >
+                <Collapsible.Trigger asChild>
+                  <HStack cursor="pointer" gap={2}>
+                    {suiteForm.executionOptionsOpen ? (
+                      <ChevronDown size={14} />
+                    ) : (
+                      <ChevronRight size={14} />
                     )}
-                  </VStack>
-                </Box>
-              </Collapsible.Content>
-            </Collapsible.Root>
+                    <Text fontSize="sm" fontWeight="medium">
+                      Execution Options
+                    </Text>
+                  </HStack>
+                </Collapsible.Trigger>
+                <Collapsible.Content>
+                  <Box
+                    border="1px solid"
+                    borderColor="border"
+                    borderRadius="md"
+                    padding={3}
+                    marginTop={2}
+                  >
+                    <VStack align="start" gap={1}>
+                      <HStack gap={2} align="center">
+                        <Text fontSize="sm">Repeat count</Text>
+                        <Input
+                          type="number"
+                          size="sm"
+                          width="80px"
+                          min={1}
+                          max={MAX_REPEAT_COUNT}
+                          {...form.register("repeatCount", {
+                            valueAsNumber: true,
+                          })}
+                          borderColor={
+                            errors.repeatCount ? "red.500" : undefined
+                          }
+                        />
+                        <Text fontSize="xs" color="fg.muted">
+                          times per scenario x target (max {MAX_REPEAT_COUNT})
+                        </Text>
+                      </HStack>
+                      {errors.repeatCount && (
+                        <Text fontSize="xs" color="red.500">
+                          {errors.repeatCount.message}
+                        </Text>
+                      )}
+                    </VStack>
+                  </Box>
+                </Collapsible.Content>
+              </Collapsible.Root>
 
-            {/* Triggers - placeholder */}
-            <Collapsible.Root>
-              <Collapsible.Trigger asChild>
-                <HStack cursor="pointer" gap={2}>
-                  <ChevronRight size={14} />
-                  <Text fontSize="sm" fontWeight="medium">
-                    Triggers
-                  </Text>
-                </HStack>
-              </Collapsible.Trigger>
-              <Collapsible.Content>
-                <Box
-                  border="1px solid"
-                  borderColor="border"
-                  borderRadius="md"
-                  padding={3}
-                  marginTop={2}
-                >
-                  <Text fontSize="sm" color="fg.muted">
-                    Coming soon
-                  </Text>
-                </Box>
-              </Collapsible.Content>
-            </Collapsible.Root>
-          </VStack>
-        </Drawer.Body>
+              {/* Triggers - placeholder */}
+              <Collapsible.Root>
+                <Collapsible.Trigger asChild>
+                  <HStack cursor="pointer" gap={2}>
+                    <ChevronRight size={14} />
+                    <Text fontSize="sm" fontWeight="medium">
+                      Triggers
+                    </Text>
+                  </HStack>
+                </Collapsible.Trigger>
+                <Collapsible.Content>
+                  <Box
+                    border="1px solid"
+                    borderColor="border"
+                    borderRadius="md"
+                    padding={3}
+                    marginTop={2}
+                  >
+                    <Text fontSize="sm" color="fg.muted">
+                      Coming soon
+                    </Text>
+                  </Box>
+                </Collapsible.Content>
+              </Collapsible.Root>
+            </VStack>
+          </Drawer.Body>
 
-        <Drawer.Footer>
-          <HStack gap={2}>
-            <Button variant="outline" onClick={handleSave} loading={isSaving}>
-              Save
-            </Button>
-            <Button
-              colorPalette="blue"
-              onClick={handleRunNow}
-              loading={isSaving || runMutation.isPending}
-            >
-              <Play size={14} />
-              Run Now
-            </Button>
-          </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+          <Drawer.Footer>
+            <HStack gap={2}>
+              <Button variant="outline" onClick={handleSave} loading={isSaving}>
+                Save
+              </Button>
+              <Button
+                colorPalette="blue"
+                onClick={handleRunNow}
+                loading={isSaving || runMutation.isPending}
+              >
+                <Play size={14} />
+                Run Now
+              </Button>
+            </HStack>
+          </Drawer.Footer>
+        </Drawer.Content>
+      </Drawer.Root>
 
-    {/* Child drawer: Scenario Editor -- managed via local state */}
-    <ScenarioFormDrawer
-      open={scenarioEditorOpen}
-      onClose={() => setScenarioEditorOpen(false)}
-    />
+      {/* Child drawer: Scenario Editor -- managed via local state */}
+      <ScenarioFormDrawer
+        open={scenarioEditorOpen}
+        onClose={() => setScenarioEditorOpen(false)}
+      />
 
-    {/* Child drawer: Agent HTTP Editor -- managed via local state */}
-    <AgentHttpEditorDrawer
-      open={agentHttpEditorOpen}
-      onClose={() => setAgentHttpEditorOpen(false)}
-    />
-  </>
+      {/* Child drawer: Agent HTTP Editor -- managed via local state */}
+      <AgentHttpEditorDrawer
+        open={agentHttpEditorOpen}
+        onClose={() => setAgentHttpEditorOpen(false)}
+      />
+    </>
   );
 }

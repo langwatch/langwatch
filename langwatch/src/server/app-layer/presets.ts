@@ -234,6 +234,11 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         finishRun: noop,
         deleteRun: noop,
       } as AppCommands["simulations"],
+      suiteRuns: {
+        startSuiteRun: noop,
+        startScenario: noop,
+        recordScenarioResult: noop,
+      } as AppCommands["suiteRuns"],
       billing: {
         reportUsageForMonth: noop,
       } as AppCommands["billing"],

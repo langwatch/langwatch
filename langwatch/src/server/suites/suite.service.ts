@@ -19,7 +19,6 @@ import {
 import { getSuiteSetId } from "./suite-set-id";
 import {
   generateBatchRunId,
-  scheduleScenarioRun,
   scenarioQueue,
 } from "../scenarios/scenario.queue";
 import { parseSuiteTargets, type SuiteTarget } from "./types";
@@ -36,6 +35,7 @@ import { slugify } from "~/utils/slugify";
 import { ScenarioRepository } from "../scenarios/scenario.repository";
 import { AgentRepository } from "../agents/agent.repository";
 import { LlmConfigRepository } from "../prompt-config/repositories/llm-config.repository";
+import { getApp } from "../app-layer/app";
 
 const tracer = getLangWatchTracer("langwatch.suites.service");
 const logger = createLogger("langwatch:suites:service");
@@ -287,6 +287,7 @@ export class SuiteService {
     suite: SimulationSuite;
     projectId: string;
     organizationId: string;
+    idempotencyKey?: string;
   }): Promise<SuiteRunResult> {
     return tracer.withActiveSpan(
       "SuiteService.run",
@@ -308,7 +309,13 @@ export class SuiteService {
 
         const batchRunId = generateBatchRunId();
         const setId = getSuiteSetId(suite.id);
+        const jobCount = resolved.activeScenarioIds.length * resolved.activeTargets.length * suite.repeatCount;
         span.setAttribute("suite.batch_run_id", batchRunId);
+        span.setAttribute("suite.job_count", jobCount);
+
+        const idempotencyKey = params.idempotencyKey
+          ? `${projectId}:${params.idempotencyKey}`
+          : undefined;
 
         logger.info(
           {
@@ -321,24 +328,30 @@ export class SuiteService {
             skippedArchivedTargets: resolved.skippedArchived.targets.length,
             repeatCount: suite.repeatCount,
           },
-          "Scheduling suite run",
+          "Dispatching suite run to event sourcing",
         );
 
-        const jobCount = await this.scheduleJobs({
-          scenarioIds: resolved.activeScenarioIds,
-          targets: resolved.activeTargets,
+        // Dispatch startSuiteRun command — event sourcing is the source of truth.
+        // The command handler schedules BullMQ jobs and emits the started event.
+        await getApp().suiteRuns.startSuiteRun({
+          tenantId: projectId,
           suiteId: suite.id,
-          projectId,
-          setId,
           batchRunId,
+          setId,
+          total: jobCount,
+          scenarioIds: resolved.activeScenarioIds,
+          targets: resolved.activeTargets.map((t) => ({
+            id: t.referenceId,
+            type: t.type,
+          })),
           repeatCount: suite.repeatCount,
+          idempotencyKey,
+          occurredAt: Date.now(),
         });
-
-        span.setAttribute("suite.job_count", jobCount);
 
         logger.info(
           { suiteId: suite.id, batchRunId, jobCount },
-          "Suite run scheduled",
+          "Suite run dispatched",
         );
 
         return {
@@ -583,74 +596,4 @@ export class SuiteService {
     return { active, archived, missing };
   }
 
-  private async scheduleJobs(params: {
-    scenarioIds: string[];
-    targets: SuiteTarget[];
-    suiteId: string;
-    projectId: string;
-    setId: string;
-    batchRunId: string;
-    repeatCount: number;
-  }): Promise<number> {
-    const { scenarioIds, targets, suiteId, projectId, setId, batchRunId, repeatCount } = params;
-
-    const jobPromises: Promise<{ id?: string | null }>[] = [];
-    for (const scenarioId of scenarioIds) {
-      for (const target of targets) {
-        for (let repeat = 0; repeat < repeatCount; repeat++) {
-          jobPromises.push(
-            scheduleScenarioRun({
-              projectId,
-              scenarioId,
-              target: { type: target.type, referenceId: target.referenceId },
-              setId,
-              batchRunId,
-              index: repeat,
-            }),
-          );
-        }
-      }
-    }
-
-    const results = await Promise.allSettled(jobPromises);
-
-    const fulfilled = results.filter(
-      (r): r is PromiseSettledResult<{ id?: string | null }> & { status: "fulfilled" } =>
-        r.status === "fulfilled",
-    );
-    const rejected = results.filter(
-      (r): r is PromiseRejectedResult => r.status === "rejected",
-    );
-
-    if (rejected.length > 0) {
-      logger.error(
-        {
-          suiteId,
-          batchRunId,
-          totalJobs: results.length,
-          failedCount: rejected.length,
-          succeededCount: fulfilled.length,
-          errors: rejected.map((r) => String(r.reason)),
-        },
-        "Suite run scheduling partially failed, rolling back enqueued jobs",
-      );
-
-      // Roll back: remove all successfully enqueued jobs
-      await Promise.allSettled(
-        fulfilled.map(async (r) => {
-          const jobId = r.value.id;
-          if (jobId) {
-            const job = await scenarioQueue.getJob(jobId);
-            await job?.remove();
-          }
-        }),
-      );
-
-      throw new Error(
-        `Failed to schedule suite run: ${rejected.length} of ${results.length} jobs failed to enqueue`,
-      );
-    }
-
-    return fulfilled.length;
-  }
 }
