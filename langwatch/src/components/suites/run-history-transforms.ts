@@ -408,15 +408,12 @@ export function resolveOriginLabel({
 }): string | null {
   if (!scenarioSetId) return null;
 
-  if (isSuiteSetId(scenarioSetId)) {
-    const suiteId = extractSuiteId(scenarioSetId);
-    if (suiteId) {
-      const name = suiteNameMap.get(suiteId);
-      if (name) return name;
-    }
-  }
+  if (!isSuiteSetId(scenarioSetId)) return scenarioSetId;
 
-  return scenarioSetId;
+  const suiteId = extractSuiteId(scenarioSetId);
+  if (!suiteId) return null;
+
+  return suiteNameMap.get(suiteId) ?? null;
 }
 
 /**
