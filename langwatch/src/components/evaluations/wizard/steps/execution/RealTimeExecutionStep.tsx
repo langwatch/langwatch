@@ -12,6 +12,8 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Controller,
   FormProvider,
+  type Resolver,
+  type ResolverOptions,
   useFieldArray,
   useForm,
 } from "react-hook-form";
@@ -71,14 +73,14 @@ export function RealTimeExecutionStep() {
       preconditions: [],
       ...(realTimeExecution ?? {}),
     },
-    resolver: (data, ...args) => {
-      return zodResolver(
+    resolver: ((data, context, options) => {
+      return (zodResolver(
         z.object({
           sample: z.number().min(0.01).max(1),
           preconditions: checkPreconditionsSchema,
         }),
-      )(data, ...args);
-    },
+      ) as unknown as Resolver<CheckConfigFormData>)(data, context, options);
+    }) as Resolver<CheckConfigFormData>,
   });
 
   const [skipSubmit, setSkipSubmit] = useState(false);

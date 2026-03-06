@@ -113,8 +113,8 @@ importers:
         specifier: ^0.4.3
         version: 0.4.3(hono@4.12.4)(zod@3.25.76)
       '@hookform/resolvers':
-        specifier: ^3.3.2
-        version: 3.10.0(react-hook-form@7.58.1(react@19.1.0))
+        specifier: ^5.2.2
+        version: 5.2.2(react-hook-form@7.58.1(react@19.1.0))
       '@langwatch/ksuid':
         specifier: ^2.0.2
         version: 2.0.2
@@ -470,7 +470,7 @@ importers:
         specifier: ^2.0.10
         version: 2.0.10(react@19.1.0)
       react-hook-form:
-        specifier: ^7.47.0
+        specifier: ^7.55.0
         version: 7.58.1(react@19.1.0)
       react-icons:
         specifier: ^5.5.0
@@ -2948,10 +2948,10 @@ packages:
       hono: '>=3.9.0'
       zod: ^3.19.1
 
-  '@hookform/resolvers@3.10.0':
-    resolution: {integrity: sha512-79Dv+3mDF7i+2ajj7SkypSKHhl1cbln1OGavqrsF7p6mbUv11xpqpacPsGDCTRvCSjEEIez2ef1NveSVL3b0Ag==}
+  '@hookform/resolvers@5.2.2':
+    resolution: {integrity: sha512-A/IxlMLShx3KjV/HeTcTfaMxdwy690+L/ZADoeaTltLx+CVuzkeVIPuybK3jrRfw7YZnmdKsVVHAlEPIAEUNlA==}
     peerDependencies:
-      react-hook-form: ^7.0.0
+      react-hook-form: ^7.55.0
 
   '@ibm-cloud/watsonx-ai@1.6.12':
     resolution: {integrity: sha512-ZMvkQgucWj2NDRl/7+RVislV3JYyS7iXUbPwJyQt4M0gcaVChM6PayZqdxAbqL4hdbXmh/k/uvhUynZrmpa0LQ==}
@@ -16900,8 +16900,9 @@ snapshots:
       hono: 4.12.4
       zod: 3.25.76
 
-  '@hookform/resolvers@3.10.0(react-hook-form@7.58.1(react@19.1.0))':
+  '@hookform/resolvers@5.2.2(react-hook-form@7.58.1(react@19.1.0))':
     dependencies:
+      '@standard-schema/utils': 0.3.0
       react-hook-form: 7.58.1(react@19.1.0)
 
   '@ibm-cloud/watsonx-ai@1.6.12':
