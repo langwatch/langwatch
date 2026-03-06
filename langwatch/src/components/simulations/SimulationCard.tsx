@@ -1,6 +1,5 @@
 import { Box, Card, Text, VStack } from "@chakra-ui/react";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import { SCENARIO_RUN_STATUS_CONFIG } from "./scenario-run-status-config";
+import type { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { SimulationStatusOverlay } from "./SimulationStatusOverlay";
 
 export interface SimulationCardMessage {
@@ -14,45 +13,21 @@ export interface SimulationCardProps {
   children: React.ReactNode;
 }
 
-interface CardStatusConfig {
-  isComplete: boolean;
-  colorPalette: string;
-}
-
-/**
- * Returns visual configuration for a scenario run status in the card header.
- * Delegates to the centralized SCENARIO_RUN_STATUS_CONFIG for isComplete/colorPalette,
- * with a context-specific override for IN_PROGRESS.
- */
-function getCardStatusConfig(status: ScenarioRunStatus): CardStatusConfig {
-  const config = SCENARIO_RUN_STATUS_CONFIG[status];
-  return {
-    isComplete: config.isComplete,
-    // Card header uses blue for in-progress to contrast with the orange active-border
-    colorPalette:
-      status === ScenarioRunStatus.IN_PROGRESS ? "blue" : config.colorPalette,
-  };
-}
-
 function SimulationCardHeader({
   title,
-  status,
+  hasOverlay,
 }: {
   title: string;
-  status?: ScenarioRunStatus;
+  hasOverlay: boolean;
 }) {
-  const { isComplete } = getCardStatusConfig(
-    status ?? ScenarioRunStatus.IN_PROGRESS,
-  );
-
   return (
     <Box py={3} px={4} w="100%" position="relative" zIndex={25}>
       <Text
         fontSize="sm"
         fontWeight="semibold"
-        color={isComplete ? "white" : "fg"}
+        color={hasOverlay ? "white" : "fg"}
         lineClamp={2}
-        textShadow={isComplete ? "0 1px 2px rgba(0,0,0,0.3)" : "none"}
+        textShadow={hasOverlay ? "0 1px 2px rgba(0,0,0,0.3)" : "none"}
       >
         {title}
       </Text>
@@ -100,7 +75,7 @@ export function SimulationCard({
       }}
     >
       <VStack height="100%" gap={0}>
-        <SimulationCardHeader title={title} status={status} />
+        <SimulationCardHeader title={title} hasOverlay={!!status} />
         <SimulationCardContent>{children}</SimulationCardContent>
       </VStack>
       {status && <SimulationStatusOverlay status={status} />}
