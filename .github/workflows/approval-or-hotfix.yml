@@ -4,7 +4,7 @@ on:
   pull_request:
     types: [labeled, unlabeled]
   pull_request_review:
-    types: [submitted]
+    types: [submitted, dismissed]
 
 concurrency:
   group: approval-check-${{ github.event.pull_request.number }}
@@ -104,4 +104,14 @@ jobs:
               return;
             }
 
-            core.setFailed("PR requires at least 1 approval, or a label: firefighting (manual) / low-risk-change (automation only).");
+            const failReason = "PR requires at least 1 approval, or a label: firefighting (manual) / low-risk-change (automation only).";
+            await github.rest.checks.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              head_sha: pr.head.sha,
+              name: "check-approval-or-label",
+              status: "completed",
+              conclusion: "failure",
+              output: { title: "Review required", summary: failReason },
+            });
+            core.setFailed(failReason);
