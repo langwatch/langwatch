@@ -36,8 +36,8 @@ export const DrawerContent = React.forwardRef<
           ref={ref}
           margin={2}
           borderRadius="lg"
-          background="bg.surface/75"
-          backdropFilter="blur(8px)"
+          background="bg.surface/80"
+          backdropFilter="blur(25px)"
           pointerEvents="auto"
           {...rest}
           marginTop={marginTopProp}
@@ -75,7 +75,6 @@ export const DrawerTrigger = ChakraDrawer.Trigger;
 export const DrawerFooter = ChakraDrawer.Footer;
 export const DrawerHeader = ChakraDrawer.Header;
 export const DrawerBody = ChakraDrawer.Body;
-export const DrawerBackdrop = ChakraDrawer.Backdrop;
 export const DrawerDescription = ChakraDrawer.Description;
 export const DrawerTitle = ChakraDrawer.Title;
 export const DrawerActionTrigger = ChakraDrawer.ActionTrigger;
@@ -88,7 +87,6 @@ export const Drawer = {
   Header: DrawerHeader,
   Body: DrawerBody,
   Footer: DrawerFooter,
-  Backdrop: DrawerBackdrop,
   Description: DrawerDescription,
   Title: DrawerTitle,
   ActionTrigger: DrawerActionTrigger,
