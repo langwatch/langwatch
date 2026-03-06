@@ -24,7 +24,6 @@ import {
   availableGroupByOptions,
   computeBatchRunSummary,
   computeGroupSummary,
-  computeRunHistoryTotals,
   groupRunsByBatchId,
   groupRunsByScenarioId,
 } from "./run-history-transforms";
@@ -32,7 +31,6 @@ import {
   RunHistoryFilters,
   type RunHistoryFilterValues,
 } from "./RunHistoryFilters";
-import { RunHistoryFooter } from "./RunHistoryFooter";
 import { RunRow } from "./RunRow";
 import { GroupRow } from "./GroupRow";
 import { useRunHistoryStore } from "./useRunHistoryStore";
@@ -111,6 +109,15 @@ export function ExternalSetDetailPanel({
       .map((s) => ({ id: s.id, name: s.name }));
   }, [scenarios, runData]);
 
+  // Clamp scenarioId filter to valid options for this external set
+  useEffect(() => {
+    if (!filters.scenarioId || scenarioOptions.length === 0) return;
+    const validIds = new Set(scenarioOptions.map((s) => s.id));
+    if (!validIds.has(filters.scenarioId)) {
+      setFilters({ ...filters, scenarioId: "" });
+    }
+  }, [filters, scenarioOptions, setFilters]);
+
   // Apply filters to raw run data
   const filteredRuns = useMemo(() => {
     if (!runData) return [];
@@ -159,11 +166,6 @@ export function ExternalSetDetailPanel({
       }
     }
   }, [batchRuns, groups, effectiveGroupBy]);
-
-  const totals = useMemo(
-    () => computeRunHistoryTotals({ runs: filteredRuns }),
-    [filteredRuns],
-  );
 
   const handleToggle = useCallback((id: string) => {
     setExpandedIds((prev) => {
@@ -306,8 +308,6 @@ export function ExternalSetDetailPanel({
               </VStack>
             )}
 
-            {/* Footer */}
-            <RunHistoryFooter totals={totals} />
           </>
         )}
 
