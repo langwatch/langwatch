@@ -16,15 +16,13 @@ interface DrawerContentProps extends ChakraDrawer.ContentProps {
   portalled?: boolean;
   portalRef?: React.RefObject<HTMLElement>;
   offset?: ChakraDrawer.ContentProps["padding"];
-  /** When true (default), renders a semi-transparent blurred backdrop behind the drawer. */
-  backdrop?: boolean;
 }
 
 export const DrawerContent = React.forwardRef<
   HTMLDivElement,
   DrawerContentProps
 >(function DrawerContent(props, ref) {
-  const { children, portalled = true, portalRef, offset, backdrop = true, ...rest } = props;
+  const { children, portalled = true, portalRef, offset, ...rest } = props;
   const { marginTop: contextMarginTop } = React.useContext(DrawerOffsetContext);
 
   // Apply context marginTop only if the component doesn't already have one
@@ -33,19 +31,13 @@ export const DrawerContent = React.forwardRef<
 
   return (
     <Portal disabled={!portalled} container={portalRef}>
-      {backdrop && (
-        <ChakraDrawer.Backdrop
-          backdropFilter="blur(25px)"
-          background="rgba(0, 0, 0, 0.8)"
-        />
-      )}
       <ChakraDrawer.Positioner padding={offset} pointerEvents="none">
         <ChakraDrawer.Content
           ref={ref}
           margin={2}
           borderRadius="lg"
-          background="bg.surface/75"
-          backdropFilter="blur(8px)"
+          background="bg.surface/80"
+          backdropFilter="blur(25px)"
           pointerEvents="auto"
           {...rest}
           marginTop={marginTopProp}
