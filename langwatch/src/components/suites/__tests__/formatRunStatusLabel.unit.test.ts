@@ -157,6 +157,7 @@ describe("formatSummaryStatusLabel()", () => {
     cancelledCount: 0,
     totalCount: 0,
     inProgressCount: 0,
+    queuedCount: 0,
     ...overrides,
   });
 

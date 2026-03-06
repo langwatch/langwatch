@@ -1,4 +1,4 @@
-import { Box, Text, VStack } from "@chakra-ui/react";
+import { Box, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { FC } from "react";
 import { AlertCircle, AlertTriangle, Check, X } from "react-feather";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
@@ -80,6 +80,8 @@ const OVERLAY_ICONS: Record<
   [ScenarioRunStatus.STALLED]: AlertTriangle,
   [ScenarioRunStatus.IN_PROGRESS]: Check,
   [ScenarioRunStatus.PENDING]: Check,
+  [ScenarioRunStatus.QUEUED]: Check,
+  [ScenarioRunStatus.RUNNING]: Check,
 };
 
 const OVERLAY_STATUS_TEXT: Record<ScenarioRunStatus, string> = {
@@ -90,6 +92,8 @@ const OVERLAY_STATUS_TEXT: Record<ScenarioRunStatus, string> = {
   [ScenarioRunStatus.STALLED]: "Stalled",
   [ScenarioRunStatus.IN_PROGRESS]: "",
   [ScenarioRunStatus.PENDING]: "",
+  [ScenarioRunStatus.QUEUED]: "",
+  [ScenarioRunStatus.RUNNING]: "",
 };
 
 const OVERLAY_GRADIENTS: Record<ScenarioRunStatus, GradientKey> = {
@@ -100,6 +104,8 @@ const OVERLAY_GRADIENTS: Record<ScenarioRunStatus, GradientKey> = {
   [ScenarioRunStatus.STALLED]: "stalled",
   [ScenarioRunStatus.IN_PROGRESS]: "pass",
   [ScenarioRunStatus.PENDING]: "pass",
+  [ScenarioRunStatus.QUEUED]: "pass",
+  [ScenarioRunStatus.RUNNING]: "pass",
 };
 
 /**
@@ -128,7 +134,38 @@ export function SimulationStatusOverlay({
     config.gradientDark,
   );
 
-  if (!config.isComplete) return null;
+  if (!config.isComplete) {
+    const statusConfig = SCENARIO_RUN_STATUS_CONFIG[status];
+    const isPending = status === ScenarioRunStatus.QUEUED ||
+      status === ScenarioRunStatus.RUNNING ||
+      status === ScenarioRunStatus.IN_PROGRESS ||
+      status === ScenarioRunStatus.PENDING;
+
+    if (!isPending) return null;
+
+    return (
+      <Box
+        position="absolute"
+        top={0}
+        left={0}
+        right={0}
+        bottom={0}
+        bg="bg.panel/80"
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+        zIndex={20}
+        borderRadius="xl"
+      >
+        <VStack gap={2}>
+          <Spinner size="md" color={statusConfig.fgColor} />
+          <Text fontSize="sm" fontWeight="medium" color={statusConfig.fgColor}>
+            {statusConfig.label}
+          </Text>
+        </VStack>
+      </Box>
+    );
+  }
 
   const Icon = config.icon;
 

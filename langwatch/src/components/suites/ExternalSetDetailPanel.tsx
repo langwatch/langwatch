@@ -35,13 +35,14 @@ export function ExternalSetDetailPanel({
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   const {
-    data: runData,
+    data: runDataResult,
     isLoading,
     error,
-  } = api.scenarios.getAllScenarioSetRunData.useQuery(
+  } = api.scenarios.getSuiteRunData.useQuery(
     {
       projectId: project?.id ?? "",
       scenarioSetId,
+      limit: 100,
     },
     {
       enabled: !!project,
@@ -50,9 +51,9 @@ export function ExternalSetDetailPanel({
   );
 
   const batchRuns = useMemo(() => {
-    if (!runData) return [];
-    return groupRunsByBatchId({ runs: runData });
-  }, [runData]);
+    if (!runDataResult) return [];
+    return groupRunsByBatchId({ runs: runDataResult.runs });
+  }, [runDataResult]);
 
   const toggleExpanded = useCallback((batchRunId: string) => {
     setExpandedIds((prev) => {

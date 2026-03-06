@@ -26,11 +26,12 @@ import {
   Repeat2,
   Target,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { parseSuiteTargets } from "~/server/suites/types";
+import { getSuiteSetId } from "~/server/suites/suite-set-id";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { Period } from "~/components/PeriodSelector";
-import { RunHistoryList, type RunHistoryStats } from "./RunHistoryList";
+import { RunHistoryPanel, type RunHistoryStats } from "./RunHistoryPanel";
 
 type SuiteDetailPanelProps = {
   suite: SimulationSuite;
@@ -173,7 +174,12 @@ export function SuiteDetailPanel({
       <Separator />
 
       {/* Run history list */}
-      <RunHistoryList suite={suite} onStatsReady={setLiveStats} period={period} onRun={onRun} />
+      <RunHistoryPanel
+        scenarioSetId={getSuiteSetId(suite.id)}
+        onStatsReady={setLiveStats}
+        period={period}
+        expectedJobCount={jobCount}
+      />
     </VStack>
   );
 }
