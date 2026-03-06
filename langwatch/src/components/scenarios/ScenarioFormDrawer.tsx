@@ -35,7 +35,11 @@ export type ScenarioFormDrawerProps = {
  */
 export function ScenarioFormDrawerFromUrl(props: Omit<ScenarioFormDrawerProps, "scenarioId">) {
   const params = useDrawerParams();
-  return <ScenarioFormDrawer {...props} scenarioId={params.scenarioId} />;
+  const { drawerOpen } = useDrawer();
+  // When rendered from the drawer registry (CurrentDrawer), no `open` prop is
+  // passed.  Fall back to checking the URL so the drawer actually opens.
+  const open = props.open ?? drawerOpen("scenarioEditor");
+  return <ScenarioFormDrawer {...props} open={open} scenarioId={params.scenarioId} />;
 }
 
 /**
