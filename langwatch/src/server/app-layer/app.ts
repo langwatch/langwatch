@@ -21,6 +21,8 @@ export class App {
   readonly usage: AppDependencies["usage"];
   readonly planProvider: AppDependencies["planProvider"];
   readonly subscription?: AppDependencies["subscription"];
+  readonly notifications?: AppDependencies["notifications"];
+  readonly usageLimits?: AppDependencies["usageLimits"];
 
   /** Keeps EventSourcing infrastructure safe from the greedy garbage men */
   private readonly _eventSourcing?: EventSourcing;
@@ -37,6 +39,8 @@ export class App {
     this.usage = deps.usage;
     this.planProvider = deps.planProvider;
     this.subscription = deps.subscription;
+    this.notifications = deps.notifications;
+    this.usageLimits = deps.usageLimits;
     this.broadcast = deps.broadcast;
     this.traces = { ...deps.traces, ...deps.commands.traces };
     this.evaluations = { ...deps.evaluations, ...deps.commands.evaluations };

@@ -12,6 +12,8 @@ import type { TraceRequestCollectionService } from "./traces/trace-request-colle
 import type { TraceSummaryService } from "./traces/trace-summary.service";
 import type { PlanProvider } from "./subscription/plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
+import type { NotificationService } from "../../../ee/billing/notifications/notification.service";
+import type { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
 import type { UsageService } from "./usage/usage.service";
 
 export interface AppDependencies {
@@ -34,6 +36,8 @@ export interface AppDependencies {
   usage: UsageService;
   planProvider: PlanProvider;
   subscription?: SubscriptionService;
+  notifications?: NotificationService;
+  usageLimits?: UsageLimitService;
   commands: AppCommands;
 
   /** Internal — keeps EventSourcing infrastructure alive for GC. */

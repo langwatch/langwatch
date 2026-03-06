@@ -28,15 +28,6 @@ export type PlanLimitNotificationContext = {
   planName: string;
 };
 
-export type PlanLimitNotificationHandlers = {
-  sendSlackNotification?: (
-    context: PlanLimitNotificationContext,
-  ) => Promise<void> | void;
-  sendHubspotNotification?: (
-    context: PlanLimitNotificationContext,
-  ) => Promise<void> | void;
-};
-
 type SubscriptionPlan = PlanTypes | (string & {});
 
 type SubscriptionNotificationBase = {
@@ -71,13 +62,4 @@ export type LicensePurchaseNotificationPayload = {
   seats: number;
   amountPaid: number;
   currency: string;
-};
-
-export type BillingNotificationHandlers = PlanLimitNotificationHandlers & {
-  sendSubscriptionNotification?: (
-    payload: SubscriptionNotificationPayload,
-  ) => Promise<void> | void;
-  sendLicensePurchaseNotification?: (
-    payload: LicensePurchaseNotificationPayload,
-  ) => Promise<void> | void;
 };
