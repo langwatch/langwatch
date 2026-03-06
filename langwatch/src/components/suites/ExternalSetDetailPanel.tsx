@@ -108,6 +108,15 @@ export function ExternalSetDetailPanel({
       .map((s) => ({ id: s.id, name: s.name }));
   }, [scenarios, runData]);
 
+  // Clamp scenarioId filter to valid options for this external set
+  useEffect(() => {
+    if (!filters.scenarioId || scenarioOptions.length === 0) return;
+    const validIds = new Set(scenarioOptions.map((s) => s.id));
+    if (!validIds.has(filters.scenarioId)) {
+      setFilters({ ...filters, scenarioId: "" });
+    }
+  }, [filters, scenarioOptions, setFilters]);
+
   // Apply filters to raw run data
   const filteredRuns = useMemo(() => {
     if (!runData) return [];

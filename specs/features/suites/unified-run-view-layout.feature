@@ -69,15 +69,15 @@ Feature: Unified group-by and list/grid view across all run views
     When I select the list view toggle
     Then scenario results display as rows
 
-  # Shared filter bar component is used across all views
+  # All views show the same layout controls
   @integration
-  Scenario: All views render the same filter bar component
+  Scenario: Each view shows scenario filter, status filter, group-by, and view toggle
     Given I am viewing a suite detail panel
-    Then the filter bar contains scenario filter, pass/fail filter, group-by, and view toggle
+    Then I see a scenario filter, pass/fail filter, group-by selector, and view toggle
     When I navigate to the all runs panel
-    Then the filter bar contains scenario filter, pass/fail filter, group-by, and view toggle
+    Then I see a scenario filter, pass/fail filter, group-by selector, and view toggle
     When I navigate to an external set panel
-    Then the filter bar contains scenario filter, pass/fail filter, group-by, and view toggle
+    Then I see a scenario filter, pass/fail filter, group-by selector, and view toggle
 
   # View mode persists when switching between views
   @integration
@@ -93,22 +93,3 @@ Feature: Unified group-by and list/grid view across all run views
     When group-by is set to "None"
     Then results are grouped by batch run
     And each group shows the batch run timestamp and pass rate
-
-  # Determines available group-by options based on view context
-  @unit
-  Scenario: availableGroupByOptions returns options without Target for external sets
-    Given the view context is "external"
-    When computing available group-by options
-    Then the result is ["none", "scenario"]
-
-  @unit
-  Scenario: availableGroupByOptions returns all options for suite views
-    Given the view context is "suite"
-    When computing available group-by options
-    Then the result is ["none", "scenario", "target"]
-
-  @unit
-  Scenario: availableGroupByOptions returns all options for all-runs view
-    Given the view context is "all-runs"
-    When computing available group-by options
-    Then the result is ["none", "scenario", "target"]

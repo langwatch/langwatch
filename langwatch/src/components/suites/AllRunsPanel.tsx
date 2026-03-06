@@ -314,7 +314,7 @@ export function AllRunsPanel({ period }: AllRunsPanelProps) {
       />
 
       {/* Run list */}
-      {displayCount === 0 ? (
+      {displayCount === 0 && !hasMore ? (
         <Box paddingY={8} textAlign="center">
           <Text color="fg.muted">
             {hasActiveFilters
