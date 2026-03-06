@@ -276,3 +276,63 @@ jobs:
 
               core.info(`PR #${prNumber} does not qualify as low-risk.`);
             }
+
+      - name: Refresh approval check for firefighting or approvals
+        uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+        with:
+          script: |
+            const prNumber = parseInt(process.env.PR_NUMBER, 10);
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+
+            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+            });
+            const labelNames = labels.map(l => l.name);
+
+            // firefighting label → pass the check regardless of evaluation
+            if (labelNames.includes("firefighting")) {
+              await github.rest.checks.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                head_sha: pr.data.head.sha,
+                name: "check-approval-or-label",
+                status: "completed",
+                conclusion: "success",
+                output: { title: "Approved", summary: "PR has firefighting label." },
+              });
+              core.info("Refreshed approval check for firefighting label.");
+              return;
+            }
+
+            // Existing approval → pass the check
+            const reviews = await github.rest.pulls.listReviews({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+            const approvedUsers = new Set();
+            for (const review of reviews.data) {
+              if (review.state === "APPROVED") {
+                approvedUsers.add(review.user.login);
+              }
+            }
+            if (approvedUsers.size >= 1) {
+              await github.rest.checks.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                head_sha: pr.data.head.sha,
+                name: "check-approval-or-label",
+                status: "completed",
+                conclusion: "success",
+                output: { title: "Approved", summary: `PR has ${approvedUsers.size} approval(s).` },
+              });
+              core.info("Refreshed approval check for existing approval.");
+            }
