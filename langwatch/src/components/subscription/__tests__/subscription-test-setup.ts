@@ -165,6 +165,11 @@ export const mockListInvoices = vi.fn(() => ({
   isError: false,
 }));
 
+export const mockGetLastSubscription = vi.fn(() => ({
+  data: null,
+  isLoading: false,
+}));
+
 export const mockOpenSeats = vi.fn();
 
 // ---------------------------------------------------------------------------
@@ -199,6 +204,10 @@ export function resetMocks() {
     data: [],
     isLoading: false,
     isError: false,
+  });
+  mockGetLastSubscription.mockReturnValue({
+    data: null,
+    isLoading: false,
   });
 }
 

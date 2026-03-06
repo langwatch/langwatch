@@ -114,6 +114,9 @@ vi.mock("~/utils/api", async () => {
         listInvoices: {
           useQuery: () => setup.mockListInvoices(),
         },
+        getLastSubscription: {
+          useQuery: () => setup.mockGetLastSubscription(),
+        },
       },
       useContext: vi.fn(() => ({
         organization: {
