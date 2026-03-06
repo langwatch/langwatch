@@ -217,6 +217,9 @@ export const projectRouter = createTRPCRouter({
           featureEventSourcingSimulationIngestion: Boolean(env.IS_SAAS),
           featureEventSourcingEvaluationIngestion: Boolean(env.IS_SAAS),
           featureEventSourcingTraceIngestion: Boolean(env.IS_SAAS),
+          disableElasticSearchTraceWriting: Boolean(env.IS_SAAS),
+          disableElasticSearchEvaluationWriting: Boolean(env.IS_SAAS),
+          disableElasticSearchSimulationWriting: Boolean(env.IS_SAAS),
         },
       });
 
