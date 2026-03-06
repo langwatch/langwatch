@@ -12,12 +12,11 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useRouter } from "next/router";
 import { useCallback, useMemo, useState } from "react";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { api } from "~/utils/api";
-import { buildRoutePath } from "~/utils/routes";
 import {
   computeBatchRunSummary,
   groupRunsByBatchId,
@@ -32,7 +31,7 @@ export function ExternalSetDetailPanel({
   scenarioSetId,
 }: ExternalSetDetailPanelProps) {
   const { project } = useOrganizationTeamProject();
-  const router = useRouter();
+  const { openDrawer } = useDrawer();
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   const {
@@ -69,16 +68,11 @@ export function ExternalSetDetailPanel({
 
   const handleScenarioRunClick = useCallback(
     (run: ScenarioRunData) => {
-      if (!project) return;
-      const path = buildRoutePath("simulations_run", {
-        project: project.slug,
-        scenarioSetId,
-        batchRunId: run.batchRunId,
-        scenarioRunId: run.scenarioRunId,
+      openDrawer("scenarioRunDetail", {
+        urlParams: { scenarioRunId: run.scenarioRunId },
       });
-      void router.push(path);
     },
-    [project, router, scenarioSetId],
+    [openDrawer],
   );
 
   // External sets have no target resolution

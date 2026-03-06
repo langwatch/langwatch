@@ -3,6 +3,7 @@ import type { Scenario } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { getComplexProps, setFlowCallbacks, useDrawer, useDrawerParams } from "../../hooks/useDrawer";
+import { useDrawerRunCallbacks } from "../../hooks/useDrawerRunCallbacks";
 import { AgentTypeSelectorDrawer } from "../agents/AgentTypeSelectorDrawer";
 import { checkCompoundLimits } from "../../hooks/useCompoundLicenseCheck";
 import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";
@@ -58,9 +59,13 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const utils = api.useContext();
   const [formInstance, setFormInstance] =
     useState<UseFormReturn<ScenarioFormData> | null>(null);
+  const { onRunComplete, onRunFailed } = useDrawerRunCallbacks();
+
   const { runScenario, isRunning } = useRunScenario({
     projectId: project?.id,
     projectSlug: project?.slug,
+    onRunComplete,
+    onRunFailed,
   });
   const scenarioId = props.scenarioId;
 

@@ -18,6 +18,7 @@ import { ScenarioFormDrawer } from "~/components/scenarios/ScenarioFormDrawer";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
 import { buildDisplayTitle } from "~/components/suites/run-history-transforms";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
+import { useDrawerRunCallbacks } from "~/hooks/useDrawerRunCallbacks";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRunScenario } from "~/hooks/useRunScenario";
 import { useScenarioTarget } from "~/hooks/useScenarioTarget";
@@ -100,9 +101,13 @@ export function ScenarioRunDetailDrawer({
     });
   }, [scenarioState?.name, scenarioState?.metadata, targetNameMap]);
 
+  const { onRunComplete, onRunFailed } = useDrawerRunCallbacks();
+
   const { runScenario, isRunning } = useRunScenario({
     projectId: project?.id,
     projectSlug: project?.slug,
+    onRunComplete,
+    onRunFailed,
   });
 
   const {
