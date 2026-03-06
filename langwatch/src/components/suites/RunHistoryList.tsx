@@ -8,7 +8,8 @@
  * Uses the suite's setId (__internal__<suiteId>__suite) to query the scenario events.
  */
 
-import { Box, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, EmptyState, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Play, Inbox } from "lucide-react";
 import type { SimulationSuite } from "@prisma/client";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -46,9 +47,10 @@ type RunHistoryListProps = {
   suite: SimulationSuite;
   onStatsReady?: (stats: RunHistoryStats) => void;
   period?: Period;
+  onRun?: () => void;
 };
 
-export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListProps) {
+export function RunHistoryList({ suite, onStatsReady, period, onRun }: RunHistoryListProps) {
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
   const setId = getSuiteSetId(suite.id);
@@ -324,9 +326,23 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
             <QueueStatusBanner queueStatus={queueStatus} />
           </Box>
         )}
-        <Text fontSize="sm" color="fg.muted">
-          Run this suite to see results here.
-        </Text>
+        <EmptyState.Root>
+          <EmptyState.Content>
+            <EmptyState.Indicator>
+              <Inbox size={32} />
+            </EmptyState.Indicator>
+            <EmptyState.Title>No runs yet</EmptyState.Title>
+            <EmptyState.Description>
+              Run this suite to evaluate your scenarios and see results here.
+            </EmptyState.Description>
+            {onRun && (
+              <Button colorPalette="blue" onClick={onRun}>
+                <Play size={14} />
+                Run Suite
+              </Button>
+            )}
+          </EmptyState.Content>
+        </EmptyState.Root>
       </VStack>
     );
   }
@@ -354,7 +370,16 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
       )}
 
       {/* Run history rows — no overflow here; parent provides the scrollport for sticky headers */}
-      {(groupBy === "none" ? batchRuns.length : groups.length) === 0 && (filters.scenarioId || filters.passFailStatus) ? (
+      {filteredRuns.length === 0 &&
+      runData &&
+      runData.length > 0 &&
+      period &&
+      !filters.scenarioId &&
+      !filters.passFailStatus ? (
+        <Box paddingX={6} paddingY={8} textAlign="center">
+          <Text color="fg.muted">No runs in the selected time period.</Text>
+        </Box>
+      ) : (groupBy === "none" ? batchRuns.length : groups.length) === 0 && (filters.scenarioId || filters.passFailStatus) ? (
         <Box paddingX={6} paddingY={8} textAlign="center">
           <Text color="fg.muted">No runs match the selected filters.</Text>
         </Box>
