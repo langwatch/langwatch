@@ -1,11 +1,15 @@
 import type { Event } from "../../domain/types";
-import type { MapProjectionDefinition } from "../mapProjection.types";
-import { EVALUATION_STARTED_EVENT_TYPE } from "../../pipelines/evaluation-processing/schemas/constants";
-import { EXPERIMENT_RUN_EVENT_TYPES } from "../../pipelines/experiment-run-processing/schemas/constants";
-import { SPAN_RECEIVED_EVENT_TYPE } from "../../pipelines/trace-processing/schemas/constants";
 import {
-  orgBillableEventsMeterStore,
+  EVALUATION_EVENT_TYPES,
+  EVALUATION_STARTED_EVENT_TYPE,
+} from "../../pipelines/evaluation-processing/schemas/constants";
+import { EXPERIMENT_RUN_EVENT_TYPES } from "../../pipelines/experiment-run-processing/schemas/constants";
+import { SIMULATION_RUN_EVENT_TYPES } from "../../pipelines/simulation-processing";
+import { SPAN_RECEIVED_EVENT_TYPE } from "../../pipelines/trace-processing/schemas/constants";
+import type { MapProjectionDefinition } from "../mapProjection.types";
+import {
   type BillableEventRecord,
+  orgBillableEventsMeterStore,
 } from "./orgBillableEventsMeter.store";
 
 /**
@@ -59,8 +63,16 @@ export const orgBillableEventsMeterProjection: MapProjectionDefinition<
   name: "orgBillableEventsMeter",
   eventTypes: [
     SPAN_RECEIVED_EVENT_TYPE,
-    EVALUATION_STARTED_EVENT_TYPE,
+
+    EVALUATION_EVENT_TYPES.SCHEDULED,
+    EVALUATION_EVENT_TYPES.STARTED,
+
     EXPERIMENT_RUN_EVENT_TYPES.STARTED,
+    EXPERIMENT_RUN_EVENT_TYPES.EVALUATOR_RESULT,
+    EXPERIMENT_RUN_EVENT_TYPES.TARGET_RESULT,
+
+    SIMULATION_RUN_EVENT_TYPES.STARTED,
+    SIMULATION_RUN_EVENT_TYPES.MESSAGE_SNAPSHOT,
   ],
 
   map(event: Event): BillableEventRecord | null {
