@@ -156,15 +156,18 @@ describe("UsageLimitService", () => {
         const originalIsSaas = (env as any).IS_SAAS;
         (env as any).IS_SAAS = false;
 
-        const { service, organizationService } = createService();
+        try {
+          const { service, organizationService } = createService();
 
-        await service.notifyPlanLimitReached({
-          organizationId: "org_1",
-          planName: "free",
-        });
+          await service.notifyPlanLimitReached({
+            organizationId: "org_1",
+            planName: "free",
+          });
 
-        expect(organizationService.findWithAdmins).not.toHaveBeenCalled();
-        (env as any).IS_SAAS = originalIsSaas;
+          expect(organizationService.findWithAdmins).not.toHaveBeenCalled();
+        } finally {
+          (env as any).IS_SAAS = originalIsSaas;
+        }
       });
     });
 
@@ -263,19 +266,22 @@ describe("UsageLimitService", () => {
         const originalIsSaas = (env as any).IS_SAAS;
         (env as any).IS_SAAS = false;
 
-        const { service, notificationService } = createService();
+        try {
+          const { service, notificationService } = createService();
 
-        await service.notifyResourceLimitReached({
-          organizationId: "org_1",
-          limitType: "workflows",
-          current: 5,
-          max: 5,
-        });
+          await service.notifyResourceLimitReached({
+            organizationId: "org_1",
+            limitType: "workflows",
+            current: 5,
+            max: 5,
+          });
 
-        expect(
-          notificationService.sendSlackResourceLimitAlert,
-        ).not.toHaveBeenCalled();
-        (env as any).IS_SAAS = originalIsSaas;
+          expect(
+            notificationService.sendSlackResourceLimitAlert,
+          ).not.toHaveBeenCalled();
+        } finally {
+          (env as any).IS_SAAS = originalIsSaas;
+        }
       });
     });
 
