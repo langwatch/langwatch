@@ -55,7 +55,7 @@ export const createSubscriptionRouter = () => {
     itemCalculator: subscriptionItemCalculator,
     seatEventFns,
   });
-  return createSubscriptionRouterFactory({ customerService, subscriptionService });
+  return createSubscriptionRouterFactory({ customerService, subscriptionService, stripe: s });
 };
 
 let seatSyncServiceInstance: ReturnType<typeof createSeatSyncService> | null = null;

@@ -352,3 +352,88 @@ Feature: Subscription Page Plan Management
     And the organization has 2 current core members
     When I navigate to the usage page
     Then the "Team Members" resource shows "2 / 4"
+
+  # ============================================================================
+  # Invoice Display
+  # ============================================================================
+
+  @integration
+  Scenario: Invoices table displays correct columns
+    Given the organization has invoices from Stripe
+    When I view the subscription page
+    Then I see a "Recent Invoices" section
+    And the invoices table has columns: Invoice #, Date, Amount, Status, and a PDF download link
+
+  @integration
+  Scenario: Invoices section shows empty state when no invoices exist
+    Given the organization has no invoices
+    When I view the subscription page
+    Then I see a "Recent Invoices" section
+    And the invoices section displays "No invoices yet"
+
+  @integration
+  Scenario: Invoices section shows loading skeleton while fetching
+    Given invoices are being fetched
+    When I view the subscription page
+    Then the invoices section displays a loading skeleton
+
+  @integration
+  Scenario: Invoices section limits display to 12 invoices
+    Given the organization has 20 invoices from Stripe
+    When I view the subscription page
+    Then I see exactly 12 invoices in the table
+
+  @integration
+  Scenario: Invoices are ordered by date descending
+    Given the organization has invoices from Stripe
+    When I view the subscription page
+    Then the invoices are ordered by date descending
+
+  @integration
+  Scenario: Invoices section shows error message when Stripe is unreachable
+    Given the Stripe API is unavailable
+    When I view the subscription page
+    Then the invoices section displays an error message
+
+  @integration
+  Scenario: Subscription page remains functional when Stripe invoices fail
+    Given the Stripe API is unavailable
+    When I view the subscription page
+    Then the current plan block is still visible
+
+  @integration
+  Scenario: Organization without Stripe customer shows empty invoices
+    Given the organization has no Stripe customer record
+    When I view the subscription page
+    Then I see a "Recent Invoices" section
+    And the invoices section displays "No invoices yet"
+
+  @unit
+  Scenario: Draft invoices are excluded from the list
+    Given Stripe returns invoices with statuses "draft", "open", "paid"
+    When the invoices are filtered for display
+    Then draft invoices are not included in the result
+
+  @unit
+  Scenario: Status color maps "paid" to green
+    Given an invoice has status "paid"
+    When the status color is resolved
+    Then the color is green
+
+  @unit
+  Scenario: Status color maps "open" to yellow
+    Given an invoice has status "open"
+    When the status color is resolved
+    Then the color is yellow
+
+  @unit
+  Scenario: Status color maps "void" to red
+    Given an invoice has status "void"
+    When the status color is resolved
+    Then the color is red
+
+  @unit
+  Scenario: Status color maps "uncollectible" to red
+    Given an invoice has status "uncollectible"
+    When the status color is resolved
+    Then the color is red

@@ -159,6 +159,12 @@ export const mockCreateInvites = vi.fn(() => ({
   isPending: false,
 }));
 
+export const mockListInvoices = vi.fn(() => ({
+  data: [],
+  isLoading: false,
+  isError: false,
+}));
+
 export const mockOpenSeats = vi.fn();
 
 // ---------------------------------------------------------------------------

@@ -59,6 +59,7 @@ import { CurrentPlanBlock } from "./CurrentPlanBlock";
 import { UpdateSeatsBlock } from "./UpdateSeatsBlock";
 import { UpgradePlanBlock } from "./UpgradePlanBlock";
 import { ContactSalesBlock } from "./ContactSalesBlock";
+import { InvoicesBlock } from "./InvoicesBlock";
 import { UserManagementDrawer } from "./UserManagementDrawer";
 import { CONTACT_SALES_URL } from "../plans/constants";
 
@@ -465,6 +466,9 @@ export function SubscriptionPage() {
             : undefined
           }
         />
+
+        {/* Invoices Block */}
+        <InvoicesBlock organizationId={organization.id} />
 
         {/* Upgrade Block - show for free plan and TIERED legacy paid orgs */}
         {(isUpgradePlanRequired) && (

@@ -20,6 +20,7 @@ import {
   mockGetOrganizationWithMembers,
   mockGetPendingInvites,
   mockAddTeamMemberOrEvents,
+  mockListInvoices,
   mockManageSubscription,
   mockOpenSeats,
   mockUpdateUsers,
@@ -109,6 +110,9 @@ vi.mock("~/utils/api", async () => {
         },
         manage: {
           useMutation: () => setup.mockManageSubscription(),
+        },
+        listInvoices: {
+          useQuery: () => setup.mockListInvoices(),
         },
       },
       useContext: vi.fn(() => ({
