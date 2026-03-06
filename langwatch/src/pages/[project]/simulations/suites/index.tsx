@@ -260,7 +260,7 @@ function SuitesPageContent() {
   );
 
   const confirmRun = useCallback(() => {
-    if (!project || !runConfirmId) return;
+    if (!project || !runConfirmId || runMutation.isPending) return;
     const suite = suites?.find((s) => s.id === runConfirmId);
     if (suite) navigateToSuite(suite.slug);
     runMutation.mutate({ projectId: project.id, id: runConfirmId });
