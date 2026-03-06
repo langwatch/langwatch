@@ -10,7 +10,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { ExternalLink } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { CopyButton } from "~/components/CopyButton";
 import { MetadataTag } from "~/components/MetadataTag";
 import { RunScenarioModal } from "~/components/scenarios/RunScenarioModal";
@@ -24,6 +24,7 @@ import { useScenarioTarget } from "~/hooks/useScenarioTarget";
 import { useTargetNameMap } from "~/hooks/useTargetNameMap";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { api } from "~/utils/api";
+import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { TraceDetails } from "../traces/TraceDetails";
 import { Drawer } from "../ui/drawer";
 import { CustomCopilotKitChat } from "./CustomCopilotKitChat";
@@ -140,6 +141,19 @@ export function ScenarioRunDetailDrawer({
     }
     return undefined;
   }, [scenarioState?.messages]);
+
+  // Relative time that auto-updates every 30s while the drawer is open
+  const [timeAgo, setTimeAgo] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (!open || !scenarioState?.timestamp) {
+      setTimeAgo(undefined);
+      return;
+    }
+    const update = () => setTimeAgo(formatTimeAgo(scenarioState.timestamp));
+    update();
+    const interval = setInterval(update, 30_000);
+    return () => clearInterval(interval);
+  }, [open, scenarioState?.timestamp]);
 
   const suiteId = scenarioState?.metadata?.langwatch?.simulationSuiteId;
 
@@ -268,6 +282,8 @@ export function ScenarioRunDetailDrawer({
                     </VStack>
                     {scenarioState.durationInMs && (
                       <VStack
+                        borderRightWidth="1px"
+                        borderRightColor="border"
                         alignItems="flex-start"
                         paddingRight={4}
                         paddingY={3}
@@ -276,6 +292,16 @@ export function ScenarioRunDetailDrawer({
                         <Text color="fg">
                           {(scenarioState.durationInMs / 1000).toFixed(2)}s
                         </Text>
+                      </VStack>
+                    )}
+                    {timeAgo && (
+                      <VStack
+                        alignItems="flex-start"
+                        paddingRight={4}
+                        paddingY={3}
+                      >
+                        <b>Ran</b>
+                        <Text color="fg">{timeAgo}</Text>
                       </VStack>
                     )}
                   </HStack>
