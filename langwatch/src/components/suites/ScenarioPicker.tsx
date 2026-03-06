@@ -1,8 +1,8 @@
 /**
  * Picker component for selecting scenarios in a suite form.
  *
- * Renders: search input, label filter chips, scrollable checkbox list,
- * "Create New Scenario" button, and a footer with count + select all/clear.
+ * Renders: search input with inline "Add Scenario" button, label filter chips,
+ * scrollable checkbox list, and a footer with count + select all/clear.
  */
 
 import {
@@ -10,11 +10,13 @@ import {
   Box,
   Button,
   HStack,
+  IconButton,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { AlertTriangle, Plus, X } from "lucide-react";
 import { Checkbox } from "../ui/checkbox";
+import { Tooltip } from "../ui/tooltip";
 import { SearchInput } from "../ui/SearchInput";
 
 interface Scenario {
@@ -80,14 +82,27 @@ export function ScenarioPicker({
       borderRadius="md"
       width="full"
     >
-      <Box paddingX={3} paddingY={2}>
-        <SearchInput
-          size="sm"
-          placeholder="Search scenarios..."
-          value={searchQuery}
-          onChange={(e) => onSearchChange(e.target.value)}
-        />
-      </Box>
+      <HStack paddingX={3} paddingY={2} gap={2}>
+        <Box flex={1}>
+          <SearchInput
+            size="sm"
+            placeholder="Search scenarios..."
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+          />
+        </Box>
+        <Tooltip content="Add Scenario">
+          <IconButton
+            aria-label="Add Scenario"
+            size="sm"
+            variant="ghost"
+            onClick={onCreateNew}
+            data-testid="add-scenario-button"
+          >
+            <Plus size={16} />
+          </IconButton>
+        </Tooltip>
+      </HStack>
 
       {/* Label filter chips */}
       {allLabels.length > 0 && (
@@ -192,21 +207,6 @@ export function ScenarioPicker({
           ))}
         </VStack>
       )}
-
-      {/* Add new scenario */}
-      <HStack
-        paddingX={3}
-        paddingY={2}
-        cursor="pointer"
-        _hover={{ bg: "bg.subtle" }}
-        borderTopWidth="1px"
-        borderColor="border.muted"
-        color="blue.500"
-        onClick={onCreateNew}
-      >
-        <Plus size={14} />
-        <Text fontSize="sm">Create New Scenario</Text>
-      </HStack>
 
       {/* Footer with count + select all / clear */}
       <HStack

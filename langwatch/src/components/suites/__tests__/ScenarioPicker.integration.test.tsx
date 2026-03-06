@@ -129,4 +129,44 @@ describe("<ScenarioPicker />", () => {
       });
     });
   });
+
+  describe("given the inline Add Scenario button", () => {
+    describe("when the picker renders", () => {
+      it("displays an Add Scenario button inline with the search input", () => {
+        renderPicker();
+
+        expect(
+          screen.getByRole("button", { name: "Add Scenario" }),
+        ).toBeInTheDocument();
+      });
+
+      it("displays a plus icon on the Add Scenario button", () => {
+        renderPicker();
+
+        const button = screen.getByTestId("add-scenario-button");
+        expect(button.querySelector("svg")).not.toBeNull();
+      });
+
+      it("does not display the old Create New Scenario button at the bottom", () => {
+        renderPicker();
+
+        expect(
+          screen.queryByText("Create New Scenario"),
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    describe("when the Add Scenario button is clicked", () => {
+      it("calls onCreateNew", async () => {
+        const onCreateNew = vi.fn();
+        const user = userEvent.setup();
+
+        renderPicker({ onCreateNew });
+
+        await user.click(screen.getByRole("button", { name: "Add Scenario" }));
+
+        expect(onCreateNew).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
 });

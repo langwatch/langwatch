@@ -483,13 +483,12 @@ describe("<SuiteFormDrawer/>", () => {
   });
 
   describe("given the suite editor is open", () => {
-    describe("when 'Create New Scenario' is clicked", () => {
+    describe("when 'Add Scenario' is clicked", () => {
       it("opens the scenario editor as a child drawer", async () => {
         const user = userEvent.setup();
         render(<SuiteFormDrawer />, { wrapper: Wrapper });
 
-        const createNewButton = screen.getByText("Create New Scenario");
-        await user.click(createNewButton);
+        await user.click(screen.getByRole("button", { name: "Add Scenario" }));
 
         expect(screen.getByTestId("scenario-editor-child-drawer")).toBeInTheDocument();
       });
@@ -498,8 +497,7 @@ describe("<SuiteFormDrawer/>", () => {
         const user = userEvent.setup();
         render(<SuiteFormDrawer />, { wrapper: Wrapper });
 
-        const createNewButton = screen.getByText("Create New Scenario");
-        await user.click(createNewButton);
+        await user.click(screen.getByRole("button", { name: "Add Scenario" }));
 
         // Parent suite editor content remains in the DOM
         expect(screen.getByPlaceholderText("e.g., Critical Path Suite")).toBeInTheDocument();
@@ -517,8 +515,7 @@ describe("<SuiteFormDrawer/>", () => {
         await user.type(nameInput, "My Suite");
 
         // Open scenario editor
-        const createNewButton = screen.getByText("Create New Scenario");
-        await user.click(createNewButton);
+        await user.click(screen.getByRole("button", { name: "Add Scenario" }));
         expect(screen.getByTestId("scenario-editor-child-drawer")).toBeInTheDocument();
 
         // Close scenario editor (fireEvent bypasses pointer-events from parent mock)
@@ -533,12 +530,12 @@ describe("<SuiteFormDrawer/>", () => {
       });
     });
 
-    describe("when 'Add New Agent' is clicked", () => {
+    describe("when 'Add Target' is clicked", () => {
       it("opens the agent HTTP editor as a child drawer", async () => {
         const user = userEvent.setup();
         render(<SuiteFormDrawer />, { wrapper: Wrapper });
 
-        await user.click(screen.getByText("Add New Agent"));
+        await user.click(screen.getByRole("button", { name: "Add Target" }));
 
         expect(screen.getByTestId("agent-http-editor-child-drawer")).toBeInTheDocument();
       });
@@ -547,7 +544,7 @@ describe("<SuiteFormDrawer/>", () => {
         const user = userEvent.setup();
         render(<SuiteFormDrawer />, { wrapper: Wrapper });
 
-        await user.click(screen.getByText("Add New Agent"));
+        await user.click(screen.getByRole("button", { name: "Add Target" }));
 
         // Parent suite editor content remains in the DOM
         expect(screen.getByPlaceholderText("e.g., Critical Path Suite")).toBeInTheDocument();
@@ -565,7 +562,7 @@ describe("<SuiteFormDrawer/>", () => {
         await user.type(nameInput, "My Suite");
 
         // Open agent editor
-        await user.click(screen.getByText("Add New Agent"));
+        await user.click(screen.getByRole("button", { name: "Add Target" }));
         expect(screen.getByTestId("agent-http-editor-child-drawer")).toBeInTheDocument();
 
         // Close agent editor
@@ -593,7 +590,7 @@ describe("<SuiteFormDrawer/>", () => {
         await user.click(screen.getAllByRole("checkbox")[0]!);
 
         // Open and close scenario editor
-        await user.click(screen.getByText("Create New Scenario"));
+        await user.click(screen.getByRole("button", { name: "Add Scenario" }));
         fireEvent.click(screen.getByText("Close Scenario Editor"));
 
         // Verify form state is preserved (re-query to avoid stale node references)
