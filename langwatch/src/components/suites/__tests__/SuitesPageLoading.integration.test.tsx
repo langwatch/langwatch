@@ -4,7 +4,7 @@
  * Integration tests for single loading indicator on suites page (Issue #1904).
  *
  * Verifies skeleton placeholders replace the double spinner, main panel is
- * suppressed during sidebar load, and AllRunsPanel spinner works independently.
+ * suppressed during sidebar load, and RunHistoryPanel spinner works independently.
  *
  * @see specs/features/suites/single-loading-indicator.feature
  */
@@ -28,13 +28,6 @@ vi.mock("~/utils/api", () => ({
     },
     scenarios: {
       getSuiteRunData: {
-        useQuery: () => ({
-          data: { runs: [], scenarioSetIds: {}, hasMore: false },
-          isLoading: false,
-          error: null,
-        }),
-      },
-      getAllSuiteRunData: {
         useQuery: () => ({
           data: { runs: [], scenarioSetIds: {}, hasMore: false },
           isLoading: false,

@@ -49,7 +49,7 @@ vi.mock("next/router", () => ({
 vi.mock("~/utils/api", () => ({
   api: {
     scenarios: {
-      getAllScenarioSetRunData: {
+      getSuiteRunData: {
         useQuery: mockRunDataQuery,
       },
     },
@@ -80,7 +80,7 @@ describe("<ExternalSetDetailPanel/>", () => {
       ];
 
       mockRunDataQuery.mockReturnValue({
-        data: runs,
+        data: { runs, scenarioSetIds: {}, hasMore: false },
         isLoading: false,
         error: null,
       });

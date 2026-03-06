@@ -96,13 +96,6 @@ vi.mock("~/utils/api", () => ({
           error: null,
         }),
       },
-      getAllSuiteRunData: {
-        useQuery: () => ({
-          data: { runs: [], scenarioSetIds: {}, hasMore: false, nextCursor: undefined },
-          isLoading: false,
-          error: null,
-        }),
-      },
       getExternalSetSummaries: {
         useQuery: () => ({
           data: [],
