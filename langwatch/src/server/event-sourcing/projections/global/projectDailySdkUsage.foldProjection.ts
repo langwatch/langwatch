@@ -11,7 +11,21 @@ export const PROJECT_DAILY_SDK_USAGE_PROJECTION_VERSION =
   "2026-02-16" as const;
 
 function toUTCDateString(timestampMs: number): string {
-  return new Date(timestampMs).toISOString().split("T")[0]!;
+  const d = new Date(timestampMs);
+  if (isNaN(d.getTime())) {
+    throw new Error(`Invalid timestamp: ${String(timestampMs)}`);
+  }
+  return d.toISOString().split("T")[0]!;
+}
+
+/** Return the best available timestamp from an event, preferring createdAt. */
+function eventTimestampMs(event: Event): number {
+  return (
+    event.createdAt ||
+    (event as Record<string, unknown>).timestamp as number ||
+    (event as Record<string, unknown>).occurredAt as number ||
+    0
+  );
 }
 
 export interface SdkInfo {
@@ -111,7 +125,7 @@ export const projectDailySdkUsageProjection: FoldProjectionDefinition<
 
   key: (event) => {
     const { sdkName, sdkVersion, sdkLanguage } = extractSdkInfoFromEvent(event);
-    const date = toUTCDateString(event.createdAt);
+    const date = toUTCDateString(eventTimestampMs(event));
     return `${String(event.tenantId)}:${date}:${sdkName}:${sdkVersion}:${sdkLanguage}`;
   },
 
@@ -127,14 +141,15 @@ export const projectDailySdkUsageProjection: FoldProjectionDefinition<
 
   apply(state, event) {
     const { sdkName, sdkVersion, sdkLanguage } = extractSdkInfoFromEvent(event);
+    const ts = eventTimestampMs(event);
     return {
       projectId: String(event.tenantId),
-      date: toUTCDateString(event.createdAt),
+      date: toUTCDateString(ts),
       sdkName,
       sdkVersion,
       sdkLanguage,
       count: state.count + 1, // Ignored — Prisma upsert handles the count
-      lastEventTimestamp: event.createdAt,
+      lastEventTimestamp: ts,
     };
   },
 
