@@ -104,7 +104,14 @@ export class UsageLimitService {
       return null;
     }
 
-    // Check if we've sent a notification for this specific threshold in the current calendar month
+    // Check if we've sent a notification for this specific threshold in the current calendar month.
+    //
+    // NOTE: This check-then-insert pattern has a small race window where two concurrent
+    // workers could both pass the check and send duplicate emails. This is acceptable
+    // because: (1) this runs from a single cron worker and a user-initiated tRPC mutation
+    // that is unlikely to fire concurrently, and (2) the worst case is a duplicate email
+    // in the same month, which is benign. If a stronger guarantee is needed, add a unique
+    // constraint on (organizationId, threshold, yearMonth) via a database migration.
     const currentMonthStart = getCurrentMonthStart();
 
     const recentNotifications =
@@ -249,7 +256,6 @@ export class UsageLimitService {
       let recipientsFailureCount = 0;
       const failedRecipients: Array<{
         userId: string;
-        email: string | null;
         error: string;
       }> = [];
 
@@ -273,14 +279,12 @@ export class UsageLimitService {
               : String(result.reason);
           failedRecipients.push({
             userId: member.user.id,
-            email: member.user.email,
             error: errorMessage,
           });
           logger.error(
             {
               userId: member.user.id,
-              email: member.user.email,
-              error: result.reason,
+              error: errorMessage,
               organizationId,
             },
             "Failed to send usage limit warning email",
@@ -322,7 +326,6 @@ export class UsageLimitService {
           ...(recipientsFailureCount > 0 && {
             failedRecipients: failedRecipients.map((f) => ({
               userId: f.userId,
-              email: f.email,
               error: f.error,
             })),
           }),
