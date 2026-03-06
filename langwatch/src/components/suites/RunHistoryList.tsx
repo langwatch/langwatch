@@ -21,6 +21,7 @@ import { parseSuiteTargets } from "~/server/suites/types";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
 import { api } from "~/utils/api";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
 import type { Period } from "~/components/PeriodSelector";
 import { RunHistoryFilters } from "./RunHistoryFilters";
 import { RunHistoryFooter } from "./RunHistoryFooter";
@@ -28,6 +29,7 @@ import { RunRow } from "./RunRow";
 import { GroupRow } from "./GroupRow";
 import { QueueStatusBanner } from "./QueueStatusBanner";
 import { useRunHistoryStore } from "./useRunHistoryStore";
+import { getAdaptivePollingInterval } from "./getAdaptivePollingInterval";
 import {
   computeBatchRunSummary,
   computeGroupSummary,
@@ -119,12 +121,15 @@ export function RunHistoryList({ suite, onStatsReady, period, onRun }: RunHistor
   const hasQueuedJobs =
     (queueStatus?.waiting ?? 0) > 0 || (queueStatus?.active ?? 0) > 0;
 
+  const [adaptiveIntervalMs, setAdaptiveIntervalMs] = useState(15000);
+
   // Fetch all run data for this suite (unpaginated).
   // Date filtering is applied client-side to avoid capping results.
   const {
     data: runData,
     isLoading,
     error,
+    refetch: refetchRunData,
   } = api.scenarios.getAllScenarioSetRunData.useQuery(
     {
       projectId: project?.id ?? "",
@@ -132,10 +137,36 @@ export function RunHistoryList({ suite, onStatsReady, period, onRun }: RunHistor
     },
     {
       enabled: !!project,
-      // Poll faster when jobs are queued, otherwise normal interval
-      refetchInterval: hasQueuedJobs ? 3000 : 5000,
+      refetchInterval: adaptiveIntervalMs,
     },
   );
+
+  // Period-filter runs for adaptive polling so active runs outside the visible
+  // date range don't keep triggering fast polling unnecessarily.
+  const runsForAdaptivePolling = useMemo(() => {
+    if (!runData) return [];
+    if (!period) return runData;
+    const startMs = period.startDate.getTime();
+    const endMs = period.endDate.getTime();
+    return runData.filter((r) => r.timestamp >= startMs && r.timestamp <= endMs);
+  }, [runData, period]);
+
+  // Recompute adaptive polling whenever run data or queue status changes
+  useEffect(() => {
+    setAdaptiveIntervalMs(
+      hasQueuedJobs
+        ? 3000
+        : getAdaptivePollingInterval({ runs: runsForAdaptivePolling }),
+    );
+  }, [hasQueuedJobs, runsForAdaptivePolling]);
+
+  // SSE subscription for real-time updates scoped to this suite's scenarioSetId
+  useSimulationUpdateListener({
+    projectId: project?.id ?? "",
+    refetch: refetchRunData,
+    enabled: !!project,
+    filter: { scenarioSetId: setId },
+  });
 
   // Fetch scenarios for filter options and name resolution
   const { data: scenarios } = api.scenarios.getAll.useQuery(

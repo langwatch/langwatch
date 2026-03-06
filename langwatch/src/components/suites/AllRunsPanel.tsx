@@ -11,6 +11,7 @@ import type { ViewMode } from "./useRunHistoryStore";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useTargetNameMap } from "~/hooks/useTargetNameMap";
 import { api } from "~/utils/api";
@@ -23,6 +24,7 @@ import { RunHistoryFooter } from "./RunHistoryFooter";
 import { RunRow } from "./RunRow";
 import { GroupRow } from "./GroupRow";
 import { extractSuiteId } from "~/server/suites/suite-set-id";
+import { getAdaptivePollingInterval } from "./getAdaptivePollingInterval";
 import {
   computeBatchRunSummary,
   computeGroupSummary,
@@ -89,6 +91,7 @@ export function AllRunsPanel({ period }: AllRunsPanelProps) {
     data: runDataResult,
     isLoading,
     error,
+    refetch: refetchRunData,
   } = api.scenarios.getAllSuiteRunData.useQuery(
     {
       projectId: project?.id ?? "",
@@ -99,9 +102,30 @@ export function AllRunsPanel({ period }: AllRunsPanelProps) {
     },
     {
       enabled: !!project,
-      refetchInterval: pages.length <= 1 ? 5000 : undefined, // Disable auto-refresh after Load More
+      // Adaptive polling based on run statuses (active across all accumulated pages)
+      refetchInterval: getAdaptivePollingInterval({
+        runs: pages.flatMap((p) => p.runs),
+      }),
     },
   );
+
+  // SSE subscription for real-time updates (no filter = all suites).
+  // After pagination, reset to first page so new runs appear at the top.
+  const handleRealtimeRefresh = useCallback(() => {
+    if (cursor !== undefined) {
+      prevCursorRef.current = undefined;
+      setPages([]);
+      setCursor(undefined);
+      return;
+    }
+    void refetchRunData();
+  }, [cursor, refetchRunData]);
+
+  useSimulationUpdateListener({
+    projectId: project?.id ?? "",
+    refetch: handleRealtimeRefresh,
+    enabled: !!project,
+  });
 
   // Accumulate pages as data arrives
   useEffect(() => {
@@ -113,6 +137,9 @@ export function AllRunsPanel({ period }: AllRunsPanelProps) {
     } else if (cursor !== prevCursorRef.current) {
       // New cursor — append page
       setPages((prev) => [...prev, runDataResult]);
+    } else {
+      // Same cursor refetch (e.g. from polling) — update last page in place
+      setPages((prev) => [...prev.slice(0, -1), runDataResult]);
     }
     prevCursorRef.current = cursor;
   }, [runDataResult, cursor]);
