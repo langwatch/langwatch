@@ -19,6 +19,7 @@ import type { RunGroup, RunGroupSummary } from "./run-history-transforms";
 import { groupRunsByBatchId } from "./run-history-transforms";
 import { BatchSection } from "./BatchSection";
 import { RunSummaryFooter } from "./RunSummaryFooter";
+import { formatSummaryStatusLabel } from "./format-run-status-label";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import type { ViewMode } from "./useRunHistoryStore";
 
@@ -89,7 +90,7 @@ export function GroupRow({
           fontWeight="medium"
           color={summary.failedCount > 0 ? "red.600" : "green.600"}
         >
-          {Math.round(summary.passRate)}%
+          {formatSummaryStatusLabel(summary)}
         </Text>
         <Box flex={1} />
         <Text fontSize="xs" color="fg.muted">
