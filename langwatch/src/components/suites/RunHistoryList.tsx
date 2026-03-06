@@ -139,14 +139,24 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
     },
   );
 
+  // Period-filter runs for adaptive polling so active runs outside the visible
+  // date range don't keep triggering fast polling unnecessarily.
+  const runsForAdaptivePolling = useMemo(() => {
+    if (!runData) return [];
+    if (!period) return runData;
+    const startMs = period.startDate.getTime();
+    const endMs = period.endDate.getTime();
+    return runData.filter((r) => r.timestamp >= startMs && r.timestamp <= endMs);
+  }, [runData, period]);
+
   // Recompute adaptive polling whenever run data or queue status changes
   useEffect(() => {
     setAdaptiveIntervalMs(
       hasQueuedJobs
         ? 3000
-        : getAdaptivePollingInterval({ runs: runData ?? [] }),
+        : getAdaptivePollingInterval({ runs: runsForAdaptivePolling }),
     );
-  }, [hasQueuedJobs, runData]);
+  }, [hasQueuedJobs, runsForAdaptivePolling]);
 
   // SSE subscription for real-time updates scoped to this suite's scenarioSetId
   useSimulationUpdateListener({
