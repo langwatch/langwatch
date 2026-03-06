@@ -3,7 +3,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { env } from "~/env.mjs";
 import { prisma } from "~/server/db";
 import { esClient, TRACE_INDEX } from "~/server/elasticsearch";
-import { UsageLimitService } from "~/server/notifications/usage-limit.service";
+import { UsageLimitService } from "../../../../ee/billing/notifications/usage-limit.service";
 import { getApp } from "~/server/app-layer/app";
 import { ANALYTICS_KEYS } from "~/types";
 import { createLogger } from "~/utils/logger/server";

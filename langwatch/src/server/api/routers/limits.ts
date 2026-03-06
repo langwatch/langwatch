@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { prisma } from "../../db";
 import { UsageStatsService } from "../../license-enforcement/usage-stats.service";
-import { UsageLimitService } from "../../notifications/usage-limit.service";
+import { UsageLimitService } from "../../../../ee/billing/notifications/usage-limit.service";
 import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
