@@ -16,8 +16,13 @@ import {
  * Extracts a business-level deduplication key from a billable event.
  *
  * - span_received → traceId:spanId (from metadata)
+ * - evaluation.scheduled → evaluationId (from data)
  * - evaluation.started → evaluationId (from data)
  * - experiment_run.started → runId (from data)
+ * - experiment_run.target_result → experimentId:runId:target:index:targetId
+ * - experiment_run.evaluator_result → experimentId:runId:evaluator:index:targetId:evaluatorId
+ * - simulation_run.started → scenarioRunId (from data)
+ * - simulation_run.message_snapshot → scenarioRunId (from data, collapses per run)
  */
 export function extractDeduplicationKey(event: Event): string | null {
   switch (event.type) {
@@ -30,6 +35,7 @@ export function extractDeduplicationKey(event: Event): string | null {
       }
       return null;
     }
+    case EVALUATION_EVENT_TYPES.SCHEDULED:
     case EVALUATION_STARTED_EVENT_TYPE: {
       const data = event.data as { evaluationId?: string } | undefined;
       if (data?.evaluationId) {
@@ -41,6 +47,39 @@ export function extractDeduplicationKey(event: Event): string | null {
       const data = event.data as { runId?: string } | undefined;
       if (data?.runId) {
         return data.runId;
+      }
+      return null;
+    }
+    case EXPERIMENT_RUN_EVENT_TYPES.TARGET_RESULT: {
+      const data = event.data as {
+        runId?: string;
+        experimentId?: string;
+        index?: number;
+        targetId?: string;
+      } | undefined;
+      if (data?.experimentId && data?.runId && data?.index !== undefined && data?.targetId) {
+        return `${data.experimentId}:${data.runId}:target:${data.index}:${data.targetId}`;
+      }
+      return null;
+    }
+    case EXPERIMENT_RUN_EVENT_TYPES.EVALUATOR_RESULT: {
+      const data = event.data as {
+        runId?: string;
+        experimentId?: string;
+        index?: number;
+        targetId?: string;
+        evaluatorId?: string;
+      } | undefined;
+      if (data?.experimentId && data?.runId && data?.index !== undefined && data?.targetId && data?.evaluatorId) {
+        return `${data.experimentId}:${data.runId}:evaluator:${data.index}:${data.targetId}:${data.evaluatorId}`;
+      }
+      return null;
+    }
+    case SIMULATION_RUN_EVENT_TYPES.STARTED:
+    case SIMULATION_RUN_EVENT_TYPES.MESSAGE_SNAPSHOT: {
+      const data = event.data as { scenarioRunId?: string } | undefined;
+      if (data?.scenarioRunId) {
+        return data.scenarioRunId;
       }
       return null;
     }

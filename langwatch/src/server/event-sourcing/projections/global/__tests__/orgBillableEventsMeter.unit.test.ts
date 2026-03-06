@@ -118,6 +118,116 @@ function makeExperimentRunEvent(overrides: Partial<Event> = {}): Event {
   } as Event;
 }
 
+function makeEvaluationScheduledEvent(overrides: Partial<Event> = {}): Event {
+  return {
+    id: "evt-4",
+    aggregateId: "eval-2",
+    aggregateType: "evaluation",
+    tenantId: "proj-1",
+    createdAt: Date.UTC(2026, 1, 15, 10, 0, 0),
+    occurredAt: Date.now(),
+    type: "lw.evaluation.scheduled",
+    version: "2025-01-14",
+    data: { evaluationId: "eval-sched-xyz" },
+    metadata: {},
+    ...overrides,
+  } as Event;
+}
+
+function makeExperimentTargetResultEvent(
+  overrides: Partial<Event> = {},
+): Event {
+  return {
+    id: "evt-5",
+    aggregateId: "run-2",
+    aggregateType: "experiment_run",
+    tenantId: "proj-1",
+    createdAt: Date.UTC(2026, 1, 15, 10, 0, 0),
+    occurredAt: Date.now(),
+    type: "lw.experiment_run.target_result",
+    version: "2025-02-01",
+    data: {
+      runId: "run-789",
+      experimentId: "exp-abc",
+      index: 3,
+      targetId: "tgt-x",
+      entry: {},
+    },
+    metadata: {},
+    ...overrides,
+  } as Event;
+}
+
+function makeExperimentEvaluatorResultEvent(
+  overrides: Partial<Event> = {},
+): Event {
+  return {
+    id: "evt-6",
+    aggregateId: "run-3",
+    aggregateType: "experiment_run",
+    tenantId: "proj-1",
+    createdAt: Date.UTC(2026, 1, 15, 10, 0, 0),
+    occurredAt: Date.now(),
+    type: "lw.experiment_run.evaluator_result",
+    version: "2025-02-01",
+    data: {
+      runId: "run-789",
+      experimentId: "exp-abc",
+      index: 3,
+      targetId: "tgt-x",
+      evaluatorId: "eval-e1",
+      status: "processed",
+    },
+    metadata: {},
+    ...overrides,
+  } as Event;
+}
+
+function makeSimulationRunStartedEvent(
+  overrides: Partial<Event> = {},
+): Event {
+  return {
+    id: "evt-7",
+    aggregateId: "sim-1",
+    aggregateType: "simulation_run",
+    tenantId: "proj-1",
+    createdAt: Date.UTC(2026, 1, 15, 10, 0, 0),
+    occurredAt: Date.now(),
+    type: "lw.simulation_run.started",
+    version: "2026-02-01",
+    data: {
+      scenarioRunId: "run-sim-1",
+      scenarioId: "scen-1",
+      batchRunId: "batch-1",
+      scenarioSetId: "set-1",
+    },
+    metadata: {},
+    ...overrides,
+  } as Event;
+}
+
+function makeSimulationMessageSnapshotEvent(
+  overrides: Partial<Event> = {},
+): Event {
+  return {
+    id: "evt-8",
+    aggregateId: "sim-2",
+    aggregateType: "simulation_run",
+    tenantId: "proj-1",
+    createdAt: Date.UTC(2026, 1, 15, 10, 0, 0),
+    occurredAt: Date.now(),
+    type: "lw.simulation_run.message_snapshot",
+    version: "2026-02-01",
+    data: {
+      scenarioRunId: "run-sim-2",
+      messages: [],
+      traceIds: [],
+    },
+    metadata: {},
+    ...overrides,
+  } as Event;
+}
+
 // ---------------------------------------------------------------------------
 // Tests: MapProjection (pure map function)
 // ---------------------------------------------------------------------------
@@ -193,6 +303,171 @@ describe("orgBillableEventsMeterProjection.map", () => {
 
       const result = orgBillableEventsMeterProjection.map(
         makeSpanEvent({ metadata: {} }),
+      );
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe("given evaluation.scheduled event", () => {
+    it("extracts evaluationId as dedup key", async () => {
+      const { orgBillableEventsMeterProjection } = await import(
+        "../orgBillableEventsMeter.mapProjection"
+      );
+
+      const result = orgBillableEventsMeterProjection.map(
+        makeEvaluationScheduledEvent(),
+      );
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          deduplicationKey: "eval-sched-xyz",
+          eventType: "lw.evaluation.scheduled",
+        }),
+      );
+    });
+  });
+
+  describe("given evaluation.scheduled event without evaluationId", () => {
+    it("returns null", async () => {
+      const { orgBillableEventsMeterProjection } = await import(
+        "../orgBillableEventsMeter.mapProjection"
+      );
+
+      const result = orgBillableEventsMeterProjection.map(
+        makeEvaluationScheduledEvent({ data: {} }),
+      );
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe("given experiment_run.target_result event", () => {
+    it("extracts composite key as dedup key", async () => {
+      const { orgBillableEventsMeterProjection } = await import(
+        "../orgBillableEventsMeter.mapProjection"
+      );
+
+      const result = orgBillableEventsMeterProjection.map(
+        makeExperimentTargetResultEvent(),
+      );
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          deduplicationKey: "exp-abc:run-789:target:3:tgt-x",
+          eventType: "lw.experiment_run.target_result",
+        }),
+      );
+    });
+  });
+
+  describe("given experiment_run.target_result event without required fields", () => {
+    it("returns null", async () => {
+      const { orgBillableEventsMeterProjection } = await import(
+        "../orgBillableEventsMeter.mapProjection"
+      );
+
+      const result = orgBillableEventsMeterProjection.map(
+        makeExperimentTargetResultEvent({ data: { runId: "run-789" } }),
+      );
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe("given experiment_run.evaluator_result event", () => {
+    it("extracts composite key as dedup key", async () => {
+      const { orgBillableEventsMeterProjection } = await import(
+        "../orgBillableEventsMeter.mapProjection"
+      );
+
+      const result = orgBillableEventsMeterProjection.map(
+        makeExperimentEvaluatorResultEvent(),
+      );
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          deduplicationKey: "exp-abc:run-789:evaluator:3:tgt-x:eval-e1",
+          eventType: "lw.experiment_run.evaluator_result",
+        }),
+      );
+    });
+  });
+
+  describe("given experiment_run.evaluator_result event without required fields", () => {
+    it("returns null", async () => {
+      const { orgBillableEventsMeterProjection } = await import(
+        "../orgBillableEventsMeter.mapProjection"
+      );
+
+      const result = orgBillableEventsMeterProjection.map(
+        makeExperimentEvaluatorResultEvent({ data: { runId: "run-789" } }),
+      );
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe("given simulation_run.started event", () => {
+    it("extracts scenarioRunId as dedup key", async () => {
+      const { orgBillableEventsMeterProjection } = await import(
+        "../orgBillableEventsMeter.mapProjection"
+      );
+
+      const result = orgBillableEventsMeterProjection.map(
+        makeSimulationRunStartedEvent(),
+      );
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          deduplicationKey: "run-sim-1",
+          eventType: "lw.simulation_run.started",
+        }),
+      );
+    });
+  });
+
+  describe("given simulation_run.started event without scenarioRunId", () => {
+    it("returns null", async () => {
+      const { orgBillableEventsMeterProjection } = await import(
+        "../orgBillableEventsMeter.mapProjection"
+      );
+
+      const result = orgBillableEventsMeterProjection.map(
+        makeSimulationRunStartedEvent({ data: {} }),
+      );
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe("given simulation_run.message_snapshot event", () => {
+    it("extracts scenarioRunId as dedup key", async () => {
+      const { orgBillableEventsMeterProjection } = await import(
+        "../orgBillableEventsMeter.mapProjection"
+      );
+
+      const result = orgBillableEventsMeterProjection.map(
+        makeSimulationMessageSnapshotEvent(),
+      );
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          deduplicationKey: "run-sim-2",
+          eventType: "lw.simulation_run.message_snapshot",
+        }),
+      );
+    });
+  });
+
+  describe("given simulation_run.message_snapshot event without scenarioRunId", () => {
+    it("returns null", async () => {
+      const { orgBillableEventsMeterProjection } = await import(
+        "../orgBillableEventsMeter.mapProjection"
+      );
+
+      const result = orgBillableEventsMeterProjection.map(
+        makeSimulationMessageSnapshotEvent({ data: {} }),
       );
 
       expect(result).toBeNull();
