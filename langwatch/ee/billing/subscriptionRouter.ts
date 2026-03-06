@@ -1,6 +1,5 @@
 import { Currency } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-import type Stripe from "stripe";
 import { z } from "zod";
 import { checkOrganizationPermission } from "../../src/server/api/rbac";
 import {
@@ -20,11 +19,9 @@ const subscriptionPlanEnum = z.enum(SUBSCRIBABLE_PLANS);
 export const createSubscriptionRouterFactory = ({
   customerService,
   subscriptionService,
-  stripe,
 }: {
   customerService: CustomerService;
   subscriptionService: SubscriptionService;
-  stripe: Stripe;
 }) => {
   return createTRPCRouter({
     addTeamMemberOrEvents: protectedProcedure
@@ -196,33 +193,10 @@ export const createSubscriptionRouterFactory = ({
       .input(z.object({ organizationId: z.string() }))
       .use(checkOrganizationPermission("organization:view"))
       .use(billingErrorHandler)
-      .query(async ({ input, ctx }) => {
-        const org = await ctx.prisma.organization.findUnique({
-          where: { id: input.organizationId },
-          select: { stripeCustomerId: true },
+      .query(async ({ input }) => {
+        return await subscriptionService.listInvoices({
+          organizationId: input.organizationId,
         });
-
-        if (!org?.stripeCustomerId) {
-          return [];
-        }
-
-        const invoices = await stripe.invoices.list({
-          customer: org.stripeCustomerId,
-          limit: 4,
-        });
-
-        return invoices.data
-          .filter((inv) => inv.status !== "draft")
-          .map((inv) => ({
-            id: inv.id,
-            number: inv.number ?? null,
-            date: inv.created,
-            amountDue: inv.amount_due,
-            currency: inv.currency,
-            status: inv.status ?? "unknown",
-            pdfUrl: inv.invoice_pdf ?? null,
-            hostedUrl: inv.hosted_invoice_url ?? null,
-          }));
       }),
   });
 };

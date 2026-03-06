@@ -5,6 +5,18 @@ import type {
 } from "@prisma/client";
 export type BillingInterval = "monthly" | "annual";
 
+/** A Stripe invoice projected for UI display. */
+export interface DisplayInvoice {
+  id: string;
+  number: string | null;
+  date: number;
+  amountDue: number;
+  currency: string;
+  status: string;
+  pdfUrl: string | null;
+  hostedUrl: string | null;
+}
+
 /**
  * Manages Stripe subscription lifecycle -- creating checkouts, updating items,
  * cancelling, billing portal. Answers: "how do we change what this organization pays for?"
@@ -70,4 +82,8 @@ export interface SubscriptionService {
     billingInterval?: BillingInterval;
     invites: Array<{ email: string; role: OrganizationUserRole }>;
   }): Promise<{ url: string | null }>;
+
+  listInvoices(params: {
+    organizationId: string;
+  }): Promise<DisplayInvoice[]>;
 }

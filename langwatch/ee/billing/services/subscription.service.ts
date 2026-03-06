@@ -1,6 +1,6 @@
 import { Currency, type OrganizationUserRole, type PrismaClient } from "@prisma/client";
 import type Stripe from "stripe";
-import type { SubscriptionService } from "../../../src/server/app-layer/subscription/subscription.service";
+import type { DisplayInvoice, SubscriptionService } from "../../../src/server/app-layer/subscription/subscription.service";
 import type { SubscriptionRepository } from "../../../src/server/app-layer/subscription/subscription.repository";
 import { notifySubscriptionEvent } from "../notifications/notificationHandlers";
 import {
@@ -339,6 +339,39 @@ export class EESubscriptionService implements SubscriptionService {
     });
 
     return { success: true };
+  }
+
+  async listInvoices({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<DisplayInvoice[]> {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { stripeCustomerId: true },
+    });
+
+    if (!org?.stripeCustomerId) {
+      return [];
+    }
+
+    const invoices = await this.stripe.invoices.list({
+      customer: org.stripeCustomerId,
+      limit: 4,
+    });
+
+    return invoices.data
+      .filter((inv) => inv.status !== "draft")
+      .map((inv) => ({
+        id: inv.id,
+        number: inv.number ?? null,
+        date: inv.created,
+        amountDue: inv.amount_due,
+        currency: inv.currency,
+        status: inv.status ?? "unknown",
+        pdfUrl: inv.invoice_pdf ?? null,
+        hostedUrl: inv.hosted_invoice_url ?? null,
+      }));
   }
 
   // ---------------------------------------------------------------------------

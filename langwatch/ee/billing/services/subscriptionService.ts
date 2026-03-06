@@ -13,6 +13,7 @@ import type {
   prices,
 } from "./subscriptionItemCalculator";
 import { isStripePriceName } from "../stripe/stripePriceCatalog";
+import type { DisplayInvoice } from "../../../src/server/app-layer/subscription/subscription.service";
 import {
   InvalidPlanError,
   OrganizationNotFoundError,
@@ -85,6 +86,10 @@ export type SubscriptionService = {
     billingInterval?: BillingInterval;
     invites: Array<{ email: string; role: OrganizationUserRole }>;
   }): Promise<{ url: string | null }>;
+
+  listInvoices(params: {
+    organizationId: string;
+  }): Promise<DisplayInvoice[]>;
 };
 
 export const createSubscriptionService = ({
@@ -360,6 +365,35 @@ export const createSubscriptionService = ({
           teamIds,
         })),
       });
+    },
+
+    async listInvoices({ organizationId }: { organizationId: string }) {
+      const org = await db.organization.findUnique({
+        where: { id: organizationId },
+        select: { stripeCustomerId: true },
+      });
+
+      if (!org?.stripeCustomerId) {
+        return [];
+      }
+
+      const invoices = await stripe.invoices.list({
+        customer: org.stripeCustomerId,
+        limit: 4,
+      });
+
+      return invoices.data
+        .filter((inv) => inv.status !== "draft")
+        .map((inv) => ({
+          id: inv.id,
+          number: inv.number ?? null,
+          date: inv.created,
+          amountDue: inv.amount_due,
+          currency: inv.currency,
+          status: inv.status ?? "unknown",
+          pdfUrl: inv.invoice_pdf ?? null,
+          hostedUrl: inv.hosted_invoice_url ?? null,
+        }));
     },
 
     async notifyProspective({
