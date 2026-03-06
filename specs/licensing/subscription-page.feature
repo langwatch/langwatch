@@ -359,14 +359,22 @@ Feature: Subscription Page Plan Management
 
   @integration
   Scenario: Invoices table displays correct columns
-    Given the organization has invoices from Stripe
+    Given the organization has a paid subscription
+    And the organization has invoices from Stripe
     When I view the subscription page
     Then I see a "Recent Invoices" section
     And the invoices table has columns: Invoice #, Date, Amount, Status, and a PDF download link
 
   @integration
+  Scenario: Free plan organization does not see invoices section
+    Given the organization has no active paid subscription
+    When I view the subscription page
+    Then I do not see a "Recent Invoices" section
+
+  @integration
   Scenario: Invoices section shows empty state when no invoices exist
-    Given the organization has no invoices
+    Given the organization has a paid subscription
+    And the organization has no invoices
     When I view the subscription page
     Then I see a "Recent Invoices" section
     And the invoices section displays "No invoices yet"

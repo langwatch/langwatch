@@ -467,8 +467,10 @@ export function SubscriptionPage() {
           }
         />
 
-        {/* Invoices Block */}
-        <InvoicesBlock organizationId={organization.id} />
+        {/* Invoices Block - only for paying customers */}
+        {!isDeveloperPlan && (
+          <InvoicesBlock organizationId={organization.id} />
+        )}
 
         {/* Upgrade Block - show for free plan and TIERED legacy paid orgs */}
         {(isUpgradePlanRequired) && (
