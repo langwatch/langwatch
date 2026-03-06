@@ -6,7 +6,7 @@
  * Tests cross-suite run history rendering, empty states, and error handling.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AllRunsPanel } from "../AllRunsPanel";
@@ -89,9 +89,9 @@ describe("<AllRunsPanel/>", () => {
       });
       mockScenariosQuery.mockReturnValue({ data: undefined });
 
-      render(<AllRunsPanel period={defaultPeriod} />, { wrapper: Wrapper });
+      const { container } = render(<AllRunsPanel period={defaultPeriod} />, { wrapper: Wrapper });
 
-      expect(screen.getByRole("status")).toBeInTheDocument();
+      expect(container.querySelector(".chakra-spinner")).toBeInTheDocument();
     });
   });
 
@@ -131,22 +131,34 @@ describe("<AllRunsPanel/>", () => {
   });
 
   describe("given runs exist", () => {
-    it("renders All Runs title", () => {
-      const runs = [
-        {
-          batchRunId: "batch_1",
-          scenarioRunId: "run_1",
-          scenarioId: "scen_1",
-          status: "SUCCESS",
-          timestamp: Date.now(),
-          results: null,
-          messages: [],
-          name: null,
-          description: null,
-          durationInMs: 100,
-        },
-      ];
+    const runs = [
+      {
+        batchRunId: "batch_1",
+        scenarioRunId: "run_1",
+        scenarioId: "scen_1",
+        status: "SUCCESS",
+        timestamp: Date.now(),
+        results: null,
+        messages: [],
+        name: null,
+        description: null,
+        durationInMs: 100,
+      },
+      {
+        batchRunId: "batch_1",
+        scenarioRunId: "run_2",
+        scenarioId: "scen_2",
+        status: "FAILED",
+        timestamp: Date.now(),
+        results: null,
+        messages: [],
+        name: null,
+        description: null,
+        durationInMs: 200,
+      },
+    ];
 
+    function renderWithRuns() {
       mockSuitesQuery.mockReturnValue({ data: [] });
       mockRunDataQuery.mockReturnValue({
         data: {
@@ -159,9 +171,29 @@ describe("<AllRunsPanel/>", () => {
       });
       mockScenariosQuery.mockReturnValue({ data: [] });
 
-      render(<AllRunsPanel period={defaultPeriod} />, { wrapper: Wrapper });
+      return render(<AllRunsPanel period={defaultPeriod} />, { wrapper: Wrapper });
+    }
 
+    it("renders All Runs title", () => {
+      renderWithRuns();
       expect(screen.getByText("All Runs")).toBeInTheDocument();
+    });
+
+    it("displays aggregate passed and failed counts in header area", () => {
+      renderWithRuns();
+
+      const headerTotals = screen.getByTestId("all-runs-header-totals");
+      expect(headerTotals).toBeInTheDocument();
+      expect(within(headerTotals).getByText("1 passed")).toBeInTheDocument();
+      expect(within(headerTotals).getByText("1 failed")).toBeInTheDocument();
+    });
+
+    it("does not render a RunHistoryFooter", () => {
+      const { container } = renderWithRuns();
+
+      expect(
+        container.querySelector('[data-testid="run-history-footer"]'),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -310,9 +342,9 @@ describe("<AllRunsPanel/>", () => {
         const groupHeaders = screen.getAllByTestId("group-row-header");
         expect(groupHeaders.length).toBe(2);
 
-        // Verify scenario names appear as group labels
-        expect(screen.getByText("Login Flow")).toBeInTheDocument();
-        expect(screen.getByText("Checkout Flow")).toBeInTheDocument();
+        // Verify scenario names appear as group labels within headers
+        expect(within(groupHeaders[0]!).getByText("Checkout Flow")).toBeInTheDocument();
+        expect(within(groupHeaders[1]!).getByText("Login Flow")).toBeInTheDocument();
       });
 
       it("includes runs from multiple suites in grouped results", async () => {
@@ -373,7 +405,7 @@ describe("<AllRunsPanel/>", () => {
         // Both runs from different suites should be grouped under one scenario
         const groupHeaders = screen.getAllByTestId("group-row-header");
         expect(groupHeaders.length).toBe(1);
-        expect(screen.getByText("Shared Scenario")).toBeInTheDocument();
+        expect(within(groupHeaders[0]!).getByText("Shared Scenario")).toBeInTheDocument();
       });
     });
 

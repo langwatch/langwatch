@@ -327,6 +327,83 @@ describe("<RunRow/>", () => {
     });
   });
 
+  describe("when viewing summary counts in header", () => {
+    it("displays passed and failed counts alongside pass rate", () => {
+      render(
+        <RunRow
+          batchRun={makeBatchRun()}
+          summary={makeSummary({ passedCount: 8, failedCount: 2, passRate: 80 })}
+          isExpanded={false}
+          onToggle={vi.fn()}
+          resolveTargetName={() => "Prod Agent"}
+          onScenarioRunClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByText("80%")).toBeInTheDocument();
+      expect(screen.getByText("8 passed")).toBeInTheDocument();
+      expect(screen.getByText("2 failed")).toBeInTheDocument();
+    });
+
+    it("renders RunSummaryCounts inside the header", () => {
+      const { container } = render(
+        <RunRow
+          batchRun={makeBatchRun()}
+          summary={makeSummary({ passedCount: 8, failedCount: 2 })}
+          isExpanded={false}
+          onToggle={vi.fn()}
+          resolveTargetName={() => "Prod Agent"}
+          onScenarioRunClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const header = container.querySelector('[data-testid="run-row-header"]');
+      expect(header).toBeInTheDocument();
+      const counts = header?.querySelector('[data-testid="run-summary-counts"]');
+      expect(counts).toBeInTheDocument();
+    });
+  });
+
+  describe("when checking for footer removal", () => {
+    it("does not render a RunSummaryFooter when expanded", () => {
+      const { container } = render(
+        <RunRow
+          batchRun={makeBatchRun()}
+          summary={makeSummary()}
+          isExpanded={true}
+          onToggle={vi.fn()}
+          resolveTargetName={() => "Prod Agent"}
+          onScenarioRunClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(
+        container.querySelector('[data-testid="run-summary-footer"]'),
+      ).not.toBeInTheDocument();
+    });
+
+    it("does not render a RunSummaryFooter when collapsed", () => {
+      const { container } = render(
+        <RunRow
+          batchRun={makeBatchRun()}
+          summary={makeSummary()}
+          isExpanded={false}
+          onToggle={vi.fn()}
+          resolveTargetName={() => "Prod Agent"}
+          onScenarioRunClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(
+        container.querySelector('[data-testid="run-summary-footer"]'),
+      ).not.toBeInTheDocument();
+    });
+  });
+
   describe("when suiteName is not provided (Suite-specific view)", () => {
     it("does not display scenario names in header", () => {
       const batchRun = makeBatchRun({
