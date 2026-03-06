@@ -293,6 +293,10 @@ model Project {
     featureClickHouseDataSourceSimulations Boolean @default(false)
     featureClickHouseDataSourceEvaluations Boolean @default(false)
 
+    disableElasticSearchTraceWriting      Boolean @default(false)
+    disableElasticSearchEvaluationWriting Boolean @default(false)
+    disableElasticSearchSimulationWriting Boolean @default(false)
+
     @@index([teamId])
 }
 

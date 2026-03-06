@@ -108,7 +108,10 @@ app.post("/execute", zValidator("json", executionRequestSchema), async (c) => {
   // Fetch project feature flag for event sourcing routing
   const project = await prisma.project.findUnique({
     where: { id: projectId },
-    select: { featureEventSourcingEvaluationIngestion: true },
+    select: {
+      featureEventSourcingEvaluationIngestion: true,
+      disableElasticSearchEvaluationWriting: true,
+    },
   });
 
   // Stream SSE events
@@ -131,6 +134,7 @@ app.post("/execute", zValidator("json", executionRequestSchema), async (c) => {
         saveToEs: shouldSaveToEs,
         concurrency: request.concurrency,
         featureEventSourcingEvaluationIngestion: project?.featureEventSourcingEvaluationIngestion ?? false,
+        disableElasticSearchEvaluationWriting: project?.disableElasticSearchEvaluationWriting ?? false,
       });
 
       for await (const event of orchestrator) {

@@ -371,9 +371,13 @@ const processBatchEvaluation = async (
     },
   };
 
-  // When featureEventSourcingEvaluationIngestion is ON, the experimentRunEsSync
-  // reactor handles ES writes — skip direct writes to avoid double-writing.
-  if (!project.featureEventSourcingEvaluationIngestion) {
+  // Skip direct ES writes when:
+  // - featureEventSourcingEvaluationIngestion is ON (reactor handles it)
+  // - disableElasticSearchEvaluationWriting is ON (ES writes fully disabled)
+  if (
+    !project.featureEventSourcingEvaluationIngestion &&
+    !project.disableElasticSearchEvaluationWriting
+  ) {
     const client = await esClient({ projectId: project.id });
     await client.update({
       index: BATCH_EVALUATION_INDEX.alias,

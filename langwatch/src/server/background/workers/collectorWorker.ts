@@ -27,6 +27,7 @@ import {
 } from "../../api/utils";
 import { prisma } from "../../db";
 import { esClient, TRACE_INDEX, traceIndexId } from "../../elasticsearch";
+import { isElasticSearchWriteDisabled } from "../../elasticsearch/isElasticSearchWriteDisabled";
 import {
   collectorIndexDelayHistogram,
   recordJobWaitDuration,
@@ -465,9 +466,18 @@ const processCollectorJob_ = async (
     );
   }
 
-  await withSpan("updateTrace", () =>
-    updateTrace(trace, esSpans, evaluations),
-  );
+  const esWriteDisabled = project.disableElasticSearchTraceWriting;
+
+  if (!esWriteDisabled) {
+    await withSpan("updateTrace", () =>
+      updateTrace(trace, esSpans, evaluations),
+    );
+  } else {
+    logger.debug(
+      { projectId: project.id, traceId },
+      "Skipping ES trace write — disableElasticSearchTraceWriting is enabled",
+    );
+  }
 
   if (!existingTrace?.inserted_at) {
     const delay = Date.now() - data.collectedAt;
@@ -476,8 +486,8 @@ const processCollectorJob_ = async (
 
   void markProjectFirstMessage(project, trace.metadata);
 
-  if (env.IS_QUICKWIT) {
-    // Skip check and adjust for quickwit
+  if (env.IS_QUICKWIT || esWriteDisabled) {
+    // Skip check and adjust for quickwit or when ES writes are disabled
     return;
   }
 
@@ -796,6 +806,16 @@ export const processCollectorCheckAndAdjustJob = async (
 ) => {
   logger.debug({ jobId: id }, "post-processing job");
   const { traceId, projectId } = data;
+
+  // Skip entirely when ES trace writes are disabled — this job only reads/writes ES
+  if (await isElasticSearchWriteDisabled(prisma, projectId, "traces")) {
+    logger.debug(
+      { projectId, traceId },
+      "Skipping check-and-adjust — disableElasticSearchTraceWriting is enabled",
+    );
+    return;
+  }
+
   const client = await esClient({ projectId });
   const protections = await getInternalProtectionsForProject(prisma, {
     projectId,
