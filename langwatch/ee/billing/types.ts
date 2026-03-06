@@ -1,4 +1,5 @@
 import type { PlanInfo } from "../licensing/planInfo";
+import type { LimitType } from "../../src/server/license-enforcement/types";
 import type { PlanTypes } from "./planTypes";
 
 export type BillingPlanProvider = {
@@ -55,6 +56,24 @@ type ConfirmedSubscriptionNotification = SubscriptionNotificationBase & {
 export type SubscriptionNotificationPayload =
   | ProspectiveSubscriptionNotification
   | ConfirmedSubscriptionNotification;
+
+export type ResourceLimitNotificationContext = {
+  organizationId: string;
+  organizationName: string;
+  adminName?: string;
+  adminEmail?: string;
+  planName: string;
+  limitType: string;
+  current: number;
+  max: number;
+};
+
+export type ResourceLimitNotifierInput = {
+  organizationId: string;
+  limitType: LimitType;
+  current: number;
+  max: number;
+};
 
 export type LicensePurchaseNotificationPayload = {
   buyerEmail: string;

@@ -25,11 +25,7 @@ vi.mock("../../../src/utils/posthogErrorCapture", () => ({
 }));
 
 vi.mock("../../../src/server/app-layer/app", () => ({
-  getApp: vi.fn(() => ({
-    usage: {
-      getCountByProjects: vi.fn().mockResolvedValue([]),
-    },
-  })),
+  getApp: vi.fn(),
 }));
 
 vi.mock("../../../src/server/utils/dateUtils", () => ({
@@ -37,8 +33,13 @@ vi.mock("../../../src/server/utils/dateUtils", () => ({
 }));
 
 import { env } from "../../../src/env.mjs";
-import { UsageLimitService } from "../notifications/usage-limit.service";
+import {
+  UsageLimitService,
+  resourceLimitCooldown,
+} from "../notifications/usage-limit.service";
 import type { NotificationService } from "../notifications/notification.service";
+import type { NotificationRepository } from "../notifications/repositories/notification.repository";
+import type { OrganizationService } from "../../../src/server/app-layer/organizations/organization.service";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -48,31 +49,35 @@ function createMockNotificationService(): NotificationService {
   return {
     sendUsageLimitEmail: vi.fn().mockResolvedValue(undefined),
     sendSlackPlanLimitAlert: vi.fn().mockResolvedValue(undefined),
+    sendSlackResourceLimitAlert: vi.fn().mockResolvedValue(undefined),
     sendSlackSubscriptionEvent: vi.fn().mockResolvedValue(undefined),
     sendSlackLicensePurchase: vi.fn().mockResolvedValue(undefined),
     sendHubspotPlanLimitForm: vi.fn().mockResolvedValue(undefined),
   } as unknown as NotificationService;
 }
 
-function createMockPrisma() {
+function createMockNotificationRepository(): NotificationRepository {
   return {
-    organization: {
-      findUnique: vi.fn(),
-      update: vi.fn(),
-    },
-    project: {
-      findMany: vi.fn().mockResolvedValue([]),
-    },
-    notification: {
-      findMany: vi.fn().mockResolvedValue([]),
-      create: vi.fn().mockImplementation(({ data }: { data: Record<string, unknown> }) => ({
-        id: "notif_1",
-        ...data,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })),
-    },
-  } as any;
+    findRecentByOrganization: vi.fn().mockResolvedValue([]),
+    create: vi.fn().mockImplementation((params: Record<string, unknown>) => ({
+      id: "notif_1",
+      ...params,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    })),
+    findById: vi.fn().mockResolvedValue(null),
+  } as unknown as NotificationRepository;
+}
+
+function createMockOrganizationService(): OrganizationService {
+  return {
+    findWithAdmins: vi.fn().mockResolvedValue(null),
+    updateSentPlanLimitAlert: vi.fn().mockResolvedValue(undefined),
+    findProjectsWithName: vi.fn().mockResolvedValue([]),
+    getOrganizationIdByTeamId: vi.fn().mockResolvedValue(null),
+    getProjectIds: vi.fn().mockResolvedValue([]),
+    isFeatureEnabled: vi.fn().mockResolvedValue(false),
+  } as unknown as OrganizationService;
 }
 
 function createMockUsageService() {
@@ -82,16 +87,32 @@ function createMockUsageService() {
   } as any;
 }
 
+function createMockPlanProvider() {
+  return {
+    getActivePlan: vi.fn().mockResolvedValue({ name: "Launch" }),
+  } as any;
+}
+
 function createService({
-  prisma = createMockPrisma(),
+  notificationRepository = createMockNotificationRepository(),
+  organizationService = createMockOrganizationService(),
   usageService = createMockUsageService(),
   notificationService = createMockNotificationService(),
+  planProvider = createMockPlanProvider(),
 } = {}) {
   return {
-    service: UsageLimitService.create({ prisma, usageService, notificationService }),
-    prisma,
+    service: UsageLimitService.create({
+      notificationRepository,
+      organizationService,
+      usageService,
+      notificationService,
+      planProvider,
+    }),
+    notificationRepository,
+    organizationService,
     usageService,
     notificationService,
+    planProvider,
   };
 }
 
@@ -133,22 +154,22 @@ describe("UsageLimitService", () => {
         const originalIsSaas = (env as any).IS_SAAS;
         (env as any).IS_SAAS = false;
 
-        const { service, prisma } = createService();
+        const { service, organizationService } = createService();
 
         await service.notifyPlanLimitReached({
           organizationId: "org_1",
           planName: "free",
         });
 
-        expect(prisma.organization.findUnique).not.toHaveBeenCalled();
+        expect(organizationService.findWithAdmins).not.toHaveBeenCalled();
         (env as any).IS_SAAS = originalIsSaas;
       });
     });
 
     describe("when organization is not found", () => {
       it("returns without sending notifications", async () => {
-        const { service, prisma, notificationService } = createService();
-        prisma.organization.findUnique.mockResolvedValue(null);
+        const { service, organizationService, notificationService } = createService();
+        (organizationService.findWithAdmins as ReturnType<typeof vi.fn>).mockResolvedValue(null);
 
         await service.notifyPlanLimitReached({
           organizationId: "org_missing",
@@ -162,8 +183,8 @@ describe("UsageLimitService", () => {
 
     describe("when alert was sent recently (within 30 days)", () => {
       it("returns without sending notifications", async () => {
-        const { service, prisma, notificationService } = createService();
-        prisma.organization.findUnique.mockResolvedValue({
+        const { service, organizationService, notificationService } = createService();
+        (organizationService.findWithAdmins as ReturnType<typeof vi.fn>).mockResolvedValue({
           ...ORG_WITH_ADMIN,
           sentPlanLimitAlert: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), // 10 days ago
         });
@@ -179,9 +200,8 @@ describe("UsageLimitService", () => {
 
     describe("when no recent alert exists", () => {
       it("sends Slack and Hubspot notifications and updates the timestamp", async () => {
-        const { service, prisma, notificationService } = createService();
-        prisma.organization.findUnique.mockResolvedValue(ORG_WITH_ADMIN);
-        prisma.organization.update.mockResolvedValue({});
+        const { service, organizationService, notificationService } = createService();
+        (organizationService.findWithAdmins as ReturnType<typeof vi.fn>).mockResolvedValue(ORG_WITH_ADMIN);
 
         await service.notifyPlanLimitReached({
           organizationId: "org_1",
@@ -202,21 +222,20 @@ describe("UsageLimitService", () => {
             organizationId: "org_1",
           }),
         );
-        expect(prisma.organization.update).toHaveBeenCalledWith({
-          where: { id: "org_1" },
-          data: { sentPlanLimitAlert: expect.any(Date) },
-        });
+        expect(organizationService.updateSentPlanLimitAlert).toHaveBeenCalledWith(
+          "org_1",
+          expect.any(Date),
+        );
       });
     });
 
     describe("when alert was sent more than 30 days ago", () => {
       it("sends notifications again", async () => {
-        const { service, prisma, notificationService } = createService();
-        prisma.organization.findUnique.mockResolvedValue({
+        const { service, organizationService, notificationService } = createService();
+        (organizationService.findWithAdmins as ReturnType<typeof vi.fn>).mockResolvedValue({
           ...ORG_WITH_ADMIN,
           sentPlanLimitAlert: new Date(Date.now() - 31 * 24 * 60 * 60 * 1000), // 31 days ago
         });
-        prisma.organization.update.mockResolvedValue({});
 
         await service.notifyPlanLimitReached({
           organizationId: "org_1",
@@ -224,6 +243,208 @@ describe("UsageLimitService", () => {
         });
 
         expect(notificationService.sendSlackPlanLimitAlert).toHaveBeenCalled();
+      });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // notifyResourceLimitReached
+  // -------------------------------------------------------------------------
+
+  describe("notifyResourceLimitReached()", () => {
+    beforeEach(() => {
+      resourceLimitCooldown.clear();
+    });
+
+    describe("when IS_SAAS is false", () => {
+      it("returns without sending", async () => {
+        const originalIsSaas = (env as any).IS_SAAS;
+        (env as any).IS_SAAS = false;
+
+        const { service, notificationService } = createService();
+
+        await service.notifyResourceLimitReached({
+          organizationId: "org_1",
+          limitType: "workflows",
+          current: 5,
+          max: 5,
+        });
+
+        expect(
+          notificationService.sendSlackResourceLimitAlert,
+        ).not.toHaveBeenCalled();
+        (env as any).IS_SAAS = originalIsSaas;
+      });
+    });
+
+    describe("when cooldown is active for the organization", () => {
+      it("suppresses the notification", async () => {
+        const { service, notificationService } = createService();
+
+        resourceLimitCooldown.set("org_1", true);
+
+        await service.notifyResourceLimitReached({
+          organizationId: "org_1",
+          limitType: "workflows",
+          current: 5,
+          max: 5,
+        });
+
+        expect(
+          notificationService.sendSlackResourceLimitAlert,
+        ).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when cooldown is active for a different limit type", () => {
+      it("suppresses the notification (cooldown is per-org, not per-type)", async () => {
+        const { service, organizationService, notificationService } = createService();
+        (organizationService.findWithAdmins as ReturnType<typeof vi.fn>).mockResolvedValue(ORG_WITH_ADMIN);
+
+        // First call sets the cooldown
+        await service.notifyResourceLimitReached({
+          organizationId: "org_1",
+          limitType: "workflows",
+          current: 5,
+          max: 5,
+        });
+
+        vi.mocked(
+          notificationService.sendSlackResourceLimitAlert as ReturnType<
+            typeof vi.fn
+          >,
+        ).mockClear();
+
+        // Second call with different type is suppressed
+        await service.notifyResourceLimitReached({
+          organizationId: "org_1",
+          limitType: "agents",
+          current: 3,
+          max: 3,
+        });
+
+        expect(
+          notificationService.sendSlackResourceLimitAlert,
+        ).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when notification conditions are met", () => {
+      it("sends correct payload with org name, admin, plan, display label, and counts", async () => {
+        const { service, organizationService, notificationService } = createService();
+        (organizationService.findWithAdmins as ReturnType<typeof vi.fn>).mockResolvedValue(ORG_WITH_ADMIN);
+
+        await service.notifyResourceLimitReached({
+          organizationId: "org_1",
+          limitType: "workflows",
+          current: 5,
+          max: 5,
+        });
+
+        expect(
+          notificationService.sendSlackResourceLimitAlert,
+        ).toHaveBeenCalledWith({
+          organizationId: "org_1",
+          organizationName: "Acme Corp",
+          adminName: "Jane Admin",
+          adminEmail: "jane@acme.com",
+          planName: "Launch",
+          limitType: "Workflows",
+          current: 5,
+          max: 5,
+        });
+      });
+    });
+
+    describe("when called concurrently for the same organization", () => {
+      it("sends only one notification", async () => {
+        const { service, organizationService, notificationService } = createService();
+        (organizationService.findWithAdmins as ReturnType<typeof vi.fn>).mockResolvedValue(ORG_WITH_ADMIN);
+
+        await Promise.all([
+          service.notifyResourceLimitReached({
+            organizationId: "org_1",
+            limitType: "workflows",
+            current: 5,
+            max: 5,
+          }),
+          service.notifyResourceLimitReached({
+            organizationId: "org_1",
+            limitType: "workflows",
+            current: 5,
+            max: 5,
+          }),
+        ]);
+
+        expect(
+          notificationService.sendSlackResourceLimitAlert,
+        ).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when organization is not found", () => {
+      it("releases the cooldown", async () => {
+        const { service, organizationService } = createService();
+        (organizationService.findWithAdmins as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+
+        await service.notifyResourceLimitReached({
+          organizationId: "org_missing",
+          limitType: "workflows",
+          current: 5,
+          max: 5,
+        });
+
+        expect(resourceLimitCooldown.get("org_missing")).toBeUndefined();
+      });
+    });
+
+    describe("when notification dispatch fails", () => {
+      it("releases the cooldown", async () => {
+        const { service, organizationService, notificationService } = createService();
+        (organizationService.findWithAdmins as ReturnType<typeof vi.fn>).mockResolvedValue(ORG_WITH_ADMIN);
+        (
+          notificationService.sendSlackResourceLimitAlert as ReturnType<
+            typeof vi.fn
+          >
+        ).mockRejectedValue(new Error("Slack down"));
+
+        await service.notifyResourceLimitReached({
+          organizationId: "org_1",
+          limitType: "workflows",
+          current: 5,
+          max: 5,
+        });
+
+        expect(resourceLimitCooldown.get("org_1")).toBeUndefined();
+      });
+    });
+
+    describe("when plan provider fails", () => {
+      it("sends notification with 'unknown' plan name", async () => {
+        const failingPlanProvider = {
+          getActivePlan: vi.fn().mockRejectedValue(new Error("plan error")),
+        } as any;
+        const organizationService = createMockOrganizationService();
+        (organizationService.findWithAdmins as ReturnType<typeof vi.fn>).mockResolvedValue(ORG_WITH_ADMIN);
+        const { service, notificationService } = createService({
+          organizationService,
+          planProvider: failingPlanProvider,
+        });
+
+        await service.notifyResourceLimitReached({
+          organizationId: "org_1",
+          limitType: "workflows",
+          current: 5,
+          max: 5,
+        });
+
+        expect(
+          notificationService.sendSlackResourceLimitAlert,
+        ).toHaveBeenCalledWith(
+          expect.objectContaining({
+            planName: "unknown",
+          }),
+        );
       });
     });
   });
@@ -254,9 +475,9 @@ describe("UsageLimitService", () => {
       });
 
       it("sends email to admin members and creates notification record", async () => {
-        const { service, prisma, usageService, notificationService } = createService();
-        prisma.organization.findUnique.mockResolvedValue(ORG_WITH_ADMIN);
-        prisma.project.findMany.mockResolvedValue([
+        const { service, organizationService, usageService, notificationService } = createService();
+        (organizationService.findWithAdmins as ReturnType<typeof vi.fn>).mockResolvedValue(ORG_WITH_ADMIN);
+        (organizationService.findProjectsWithName as ReturnType<typeof vi.fn>).mockResolvedValue([
           { id: "p1", name: "My Project" },
         ]);
         usageService.getCountByProjects.mockResolvedValue([
@@ -289,8 +510,8 @@ describe("UsageLimitService", () => {
 
     describe("when organization is not found", () => {
       it("returns null", async () => {
-        const { service, prisma } = createService();
-        prisma.organization.findUnique.mockResolvedValue(null);
+        const { service, organizationService } = createService();
+        (organizationService.findWithAdmins as ReturnType<typeof vi.fn>).mockResolvedValue(null);
 
         const result = await service.checkAndSendWarning({
           organizationId: "org_missing",
@@ -304,8 +525,8 @@ describe("UsageLimitService", () => {
 
     describe("when organization has no admin members", () => {
       it("returns null", async () => {
-        const { service, prisma } = createService();
-        prisma.organization.findUnique.mockResolvedValue({
+        const { service, organizationService } = createService();
+        (organizationService.findWithAdmins as ReturnType<typeof vi.fn>).mockResolvedValue({
           ...ORG_WITH_ADMIN,
           members: [],
         });
@@ -322,9 +543,9 @@ describe("UsageLimitService", () => {
 
     describe("when notification was already sent for this threshold this month", () => {
       it("returns null without sending duplicate", async () => {
-        const { service, prisma, notificationService } = createService();
-        prisma.organization.findUnique.mockResolvedValue(ORG_WITH_ADMIN);
-        prisma.notification.findMany.mockResolvedValue([
+        const { service, organizationService, notificationRepository, notificationService } = createService();
+        (organizationService.findWithAdmins as ReturnType<typeof vi.fn>).mockResolvedValue(ORG_WITH_ADMIN);
+        (notificationRepository.findRecentByOrganization as ReturnType<typeof vi.fn>).mockResolvedValue([
           {
             id: "existing_notif",
             sentAt: new Date(),
@@ -348,9 +569,9 @@ describe("UsageLimitService", () => {
 
     describe("when all email sends fail", () => {
       it("throws an error without creating a notification record", async () => {
-        const { service, prisma, usageService, notificationService } = createService();
-        prisma.organization.findUnique.mockResolvedValue(ORG_WITH_ADMIN);
-        prisma.project.findMany.mockResolvedValue([]);
+        const { service, organizationService, notificationRepository, usageService, notificationService } = createService();
+        (organizationService.findWithAdmins as ReturnType<typeof vi.fn>).mockResolvedValue(ORG_WITH_ADMIN);
+        (organizationService.findProjectsWithName as ReturnType<typeof vi.fn>).mockResolvedValue([]);
         usageService.getCountByProjects.mockResolvedValue([]);
         (notificationService.sendUsageLimitEmail as ReturnType<typeof vi.fn>)
           .mockRejectedValue(new Error("SMTP failure"));
@@ -363,7 +584,7 @@ describe("UsageLimitService", () => {
           }),
         ).rejects.toThrow("All 1 usage limit warning emails failed to send");
 
-        expect(prisma.notification.create).not.toHaveBeenCalled();
+        expect(notificationRepository.create).not.toHaveBeenCalled();
       });
     });
 
@@ -383,8 +604,8 @@ describe("UsageLimitService", () => {
 
     describe("when admins have no email addresses", () => {
       it("returns null without sending emails", async () => {
-        const { service, prisma, notificationService } = createService();
-        prisma.organization.findUnique.mockResolvedValue({
+        const { service, organizationService, notificationService } = createService();
+        (organizationService.findWithAdmins as ReturnType<typeof vi.fn>).mockResolvedValue({
           ...ORG_WITH_ADMIN,
           members: [
             {
@@ -393,7 +614,7 @@ describe("UsageLimitService", () => {
             },
           ],
         });
-        prisma.project.findMany.mockResolvedValue([]);
+        (organizationService.findProjectsWithName as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
         const result = await service.checkAndSendWarning({
           organizationId: "org_1",

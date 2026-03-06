@@ -21,6 +21,8 @@ export type {
   BillingPlanProvider,
   PlanLimitNotificationContext,
   PlanLimitNotifierInput,
+  ResourceLimitNotificationContext,
+  ResourceLimitNotifierInput,
   SubscriptionNotificationPayload,
 } from "./types";
 
