@@ -3,11 +3,12 @@
  *
  * Displays aggregated run history across all suites in the project.
  * Each batch run shows its suite name and all data is fetched via getAllSuiteRunData endpoint.
+ * Supports group-by (none/scenario/target), list/grid toggle, and filters via the
+ * shared RunHistoryFilters component.
  */
 
 import { Box, Button, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ViewMode } from "./useRunHistoryStore";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { useDrawer } from "~/hooks/useDrawer";
@@ -24,6 +25,7 @@ import { RunRow } from "./RunRow";
 import { GroupRow } from "./GroupRow";
 import { extractSuiteId } from "~/server/suites/suite-set-id";
 import {
+  availableGroupByOptions,
   computeBatchRunSummary,
   computeGroupSummary,
   computeRunHistoryTotals,
@@ -32,22 +34,40 @@ import {
   groupRunsByTarget,
   type RunGroupType,
 } from "./run-history-transforms";
+import { useRunHistoryStore } from "./useRunHistoryStore";
 
 type AllRunsPanelProps = {
   period: Period;
 };
 
+/** Group-by options available for the all-runs view. */
+const ALL_RUNS_GROUP_BY_OPTIONS = availableGroupByOptions({
+  viewContext: "all-runs",
+});
+
 export function AllRunsPanel({ period }: AllRunsPanelProps) {
   const { project } = useOrganizationTeamProject();
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const hasAutoExpanded = useRef(false);
-  const [viewMode, setViewMode] = useState<ViewMode>("grid");
-  const [groupBy, setGroupBy] = useState<RunGroupType>("none");
-  const [filters, setFilters] = useState<RunHistoryFilterValues>({
-    scenarioId: "",
-    passFailStatus: "",
-  });
   const [cursor, setCursor] = useState<string | undefined>(undefined);
+
+  // Use shared zustand store for groupBy, viewMode, and filters
+  const groupBy = useRunHistoryStore((s) => s.groupBy);
+  const viewMode = useRunHistoryStore((s) => s.viewMode);
+  const filters = useRunHistoryStore((s) => s.filters);
+  const setGroupBy = useRunHistoryStore((s) => s.setGroupBy);
+  const setViewMode = useRunHistoryStore((s) => s.setViewMode);
+  const setFilters = useRunHistoryStore((s) => s.setFilters);
+
+  // Reset expanded state when groupBy changes
+  const prevGroupBy = useRef(groupBy);
+  useEffect(() => {
+    if (prevGroupBy.current !== groupBy) {
+      setExpandedIds(new Set());
+      hasAutoExpanded.current = false;
+      prevGroupBy.current = groupBy;
+    }
+  }, [groupBy]);
 
   // Reset pagination when period changes
   const startDateMs = period.startDate.getTime();
@@ -178,7 +198,7 @@ export function AllRunsPanel({ period }: AllRunsPanelProps) {
     return runs;
   }, [allRuns, filters]);
 
-  // Group filtered runs by batch
+  // Group filtered runs by batch (for groupBy "none")
   const batchRuns = useMemo(() => {
     return groupRunsByBatchId({
       runs: filteredRuns,
@@ -195,42 +215,32 @@ export function AllRunsPanel({ period }: AllRunsPanelProps) {
       : groupRunsByTarget({ runs: filteredRuns, targetNameMap });
   }, [groupBy, filteredRuns, targetNameMap]);
 
-  // Reset expanded state when groupBy changes
-  const prevGroupByRef = useRef(groupBy);
+  // Auto-expand all rows when data first loads
   useEffect(() => {
-    if (prevGroupByRef.current !== groupBy) {
-      setExpandedIds(new Set());
-      hasAutoExpanded.current = false;
-      prevGroupByRef.current = groupBy;
+    if (!hasAutoExpanded.current) {
+      if (groupBy === "none" && batchRuns.length > 0) {
+        setExpandedIds(new Set(batchRuns.map((b) => b.batchRunId)));
+        hasAutoExpanded.current = true;
+      } else if (groupBy !== "none" && groups.length > 0) {
+        setExpandedIds(new Set(groups.map((g) => g.groupKey)));
+        hasAutoExpanded.current = true;
+      }
     }
-  }, [groupBy]);
-
-  // Auto-expand all rows when data first loads or after groupBy reset
-  useEffect(() => {
-    if (hasAutoExpanded.current) return;
-
-    if (groupBy === "none" && batchRuns.length > 0) {
-      setExpandedIds(new Set(batchRuns.map((b) => b.batchRunId)));
-      hasAutoExpanded.current = true;
-    } else if (groupBy !== "none" && groups.length > 0) {
-      setExpandedIds(new Set(groups.map((g) => g.groupKey)));
-      hasAutoExpanded.current = true;
-    }
-  }, [groupBy, batchRuns, groups]);
+  }, [batchRuns, groups, groupBy]);
 
   // Compute totals from flat filtered runs
   const totals = useMemo(() => {
     return computeRunHistoryTotals({ runs: filteredRuns });
   }, [filteredRuns]);
 
-  // Toggle batch expansion
-  const toggleExpanded = useCallback((batchRunId: string) => {
+  // Toggle expansion
+  const handleToggle = useCallback((id: string) => {
     setExpandedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(batchRunId)) {
-        next.delete(batchRunId);
+      if (next.has(id)) {
+        next.delete(id);
       } else {
-        next.add(batchRunId);
+        next.add(id);
       }
       return next;
     });
@@ -271,6 +281,10 @@ export function AllRunsPanel({ period }: AllRunsPanelProps) {
     );
   }
 
+  const displayCount =
+    groupBy === "none" ? batchRuns.length : groups.length;
+  const hasActiveFilters = !!(filters.scenarioId || filters.passFailStatus);
+
   return (
     <VStack align="stretch" gap={0} height="100%" overflow="auto" paddingY={4}>
       {/* Header */}
@@ -282,35 +296,35 @@ export function AllRunsPanel({ period }: AllRunsPanelProps) {
           {groupBy === "none"
             ? `${batchRuns.length} ${batchRuns.length === 1 ? "execution" : "executions"} · `
             : `${groups.length} ${groups.length === 1 ? "group" : "groups"} · `}
-          {totals.runCount} {totals.runCount === 1 ? "run" : "runs"}
+          {totals.runCount}{" "}
+          {totals.runCount === 1 ? "run" : "runs"}
         </Text>
       </Box>
 
-      {/* Filters */}
-      <Box paddingX={6} paddingBottom={4}>
-        <RunHistoryFilters
-          scenarioOptions={scenarioOptions}
-          filters={filters}
-          onFiltersChange={setFilters}
-          groupBy={groupBy}
-          onGroupByChange={setGroupBy}
-          viewMode={viewMode}
-          onViewModeChange={setViewMode}
-        />
-      </Box>
+      {/* Filters with group-by and view toggle */}
+      <RunHistoryFilters
+        scenarioOptions={scenarioOptions}
+        filters={filters}
+        onFiltersChange={setFilters}
+        groupBy={groupBy}
+        onGroupByChange={setGroupBy}
+        groupByOptions={ALL_RUNS_GROUP_BY_OPTIONS}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+      />
 
       {/* Run list */}
-      {(groupBy === "none" ? batchRuns.length : groups.length) === 0 ? (
-        <Box paddingX={6} paddingY={8} textAlign="center">
+      {displayCount === 0 && !hasMore ? (
+        <Box paddingY={8} textAlign="center">
           <Text color="fg.muted">
-            {filters.scenarioId || filters.passFailStatus
+            {hasActiveFilters
               ? "No runs match the selected filters."
               : "No runs yet. Execute a suite to see results here."}
           </Text>
         </Box>
       ) : (
         <>
-          <VStack align="stretch" gap={0}>
+          <VStack align="stretch" gap={3}>
             {groupBy === "none"
               ? batchRuns.map((batchRun) => {
                   const summary = computeBatchRunSummary({ batchRun });
@@ -328,7 +342,7 @@ export function AllRunsPanel({ period }: AllRunsPanelProps) {
                       batchRun={batchRun}
                       summary={summary}
                       isExpanded={isExpanded}
-                      onToggle={() => toggleExpanded(batchRun.batchRunId)}
+                      onToggle={() => handleToggle(batchRun.batchRunId)}
                       resolveTargetName={resolveTargetName}
                       onScenarioRunClick={handleScenarioRunClick}
                       suiteName={suiteName ?? undefined}
@@ -344,7 +358,7 @@ export function AllRunsPanel({ period }: AllRunsPanelProps) {
                       group={group}
                       summary={summary}
                       isExpanded={expandedIds.has(group.groupKey)}
-                      onToggle={() => toggleExpanded(group.groupKey)}
+                      onToggle={() => handleToggle(group.groupKey)}
                       onScenarioRunClick={handleScenarioRunClick}
                       resolveTargetName={resolveTargetName}
                       viewMode={viewMode}
