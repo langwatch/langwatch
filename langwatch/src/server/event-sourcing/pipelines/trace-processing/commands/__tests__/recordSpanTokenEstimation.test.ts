@@ -97,7 +97,7 @@ function createDeps(): RecordSpanCommandDependencies {
     piiRedactionService: { redactSpan: vi.fn() },
     costEnrichmentService: { enrichSpan: vi.fn() },
     tokenEstimationService: {
-      estimateSpanTokens: vi.fn(async ({ span }: { span: { attributes: Array<{ key: string; value: { stringValue?: string; intValue?: number; boolValue?: boolean } }> } }) => {
+      estimateSpanTokens: vi.fn(async ({ span }: { span: { attributes: Array<{ key: string; value: { stringValue?: string | null; intValue?: number; boolValue?: boolean } }> } }) => {
         // Simulate the real token estimation service behavior:
         // Check if this is an LLM span without token counts, estimate from input/output
         const isLlm = span.attributes.some(
