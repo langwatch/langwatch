@@ -318,7 +318,7 @@ export class ScenarioEventRepository {
               // Calculate success rate from finished runs only
               finished_runs: {
                 filter: {
-                  term: { type: "scenario_run_finished" },
+                  term: { type: ScenarioEventType.RUN_FINISHED },
                 },
                 aggs: {
                   total_runs: {

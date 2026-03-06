@@ -70,7 +70,7 @@ function extractToolCalls(
       ),
     });
 
-    actionExecutionMessage.traceId = message.trace_id;
+    actionExecutionMessage.traceId = message.trace_id ?? undefined;
 
     return actionExecutionMessage;
   });
@@ -99,7 +99,7 @@ function convertMessageContent(
       role: message.role as MessageRole,
       content: content,
     });
-    textMessage.traceId = message.trace_id;
+    textMessage.traceId = message.trace_id ?? undefined;
     return [textMessage];
   }
 
@@ -122,7 +122,7 @@ function convertMixedContent(
         role: originalMessage.role as MessageRole,
         content: item.text,
       });
-      textMessage.traceId = originalMessage.trace_id;
+      textMessage.traceId = originalMessage.trace_id ?? undefined;
       messages.push(textMessage);
     } else if (typeof item === "object" && item.image) {
       const imageMessage = createImageMessage(
@@ -143,7 +143,7 @@ function convertMixedContent(
         name: item.name,
         arguments: item.arguments ?? item.input,
       });
-      actionExecutionMessage.traceId = originalMessage.trace_id;
+      actionExecutionMessage.traceId = originalMessage.trace_id ?? undefined;
       messages.push(actionExecutionMessage);
     } else if (item.type === "tool_result") {
       const resultMessage: ResultMessage & { traceId?: string } =
@@ -152,7 +152,7 @@ function convertMixedContent(
           actionName: item.name ?? "tool_result",
           result: item.content,
         });
-      resultMessage.traceId = originalMessage.trace_id;
+      resultMessage.traceId = originalMessage.trace_id ?? undefined;
       messages.push(resultMessage);
     }
   });
@@ -208,6 +208,6 @@ function createToolResultMessage(
       ),
     },
   );
-  resultMessage.traceId = message.trace_id;
+  resultMessage.traceId = message.trace_id ?? undefined;
   return resultMessage;
 }

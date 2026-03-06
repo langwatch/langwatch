@@ -99,7 +99,7 @@ export const scenarioMessageSnapshotSchema = MessagesSnapshotEventSchema.merge(
         z.union([MessageSchema, chatMessageSchema]),
         z.object({
           id: z.string().optional(),
-          trace_id: z.string().optional(),
+          trace_id: z.string().optional().nullable(),
         }),
       ),
     ),
