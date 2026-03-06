@@ -150,6 +150,8 @@ function SuitesPageContent() {
 
   const runMutation = api.suites.run.useMutation({
     onSuccess: (result, variables) => {
+      void utils.scenarios.getAllScenarioSetRunData.invalidate();
+      void utils.scenarios.getAllSuiteRunData.invalidate();
       const suiteIdForToast = variables.id;
       const archivedCount =
         (result.skippedArchived?.scenarios?.length ?? 0) +

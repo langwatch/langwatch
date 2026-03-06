@@ -12,10 +12,14 @@ import type { ScenarioJob } from "./scenario.queue";
 /** Maps BullMQ job state to ScenarioRunStatus. */
 export function mapBullMQStateToStatus(
   state: string,
-): ScenarioRunStatus.QUEUED | ScenarioRunStatus.RUNNING {
+): ScenarioRunStatus {
   switch (state) {
     case "active":
       return ScenarioRunStatus.RUNNING;
+    case "completed":
+      return ScenarioRunStatus.IN_PROGRESS;
+    case "failed":
+      return ScenarioRunStatus.ERROR;
     case "waiting":
     default:
       return ScenarioRunStatus.QUEUED;
@@ -84,25 +88,33 @@ export interface ScenarioQueueAdapter {
   getJobs(states: any): Promise<Array<{ id?: string | null; data: any; timestamp?: number }>>;
 }
 
+type JobState = "waiting" | "active" | "completed" | "failed";
+
+/** Priority order for state collapsing — higher index wins. */
+const STATE_PRIORITY: Record<JobState, number> = {
+  waiting: 0,
+  active: 1,
+  completed: 2,
+  failed: 2,
+};
+
 /**
- * Collapses waiting and active job lists by job ID to avoid
- * transitional duplicates when a job moves between states.
- * Active state overrides waiting.
+ * Collapses job lists by job ID to avoid transitional duplicates
+ * when a job moves between states. Higher-priority state wins.
  */
 function collapseJobsById(params: {
-  waitingJobs: Array<{ id?: string | null; data: unknown; timestamp?: number }>;
-  activeJobs: Array<{ id?: string | null; data: unknown; timestamp?: number }>;
-}): Array<{ job: MinimalJob; state: "waiting" | "active" }> {
-  const { waitingJobs, activeJobs } = params;
-  const byId = new Map<string, { job: MinimalJob; state: "waiting" | "active" }>();
+  jobsByState: Array<{ jobs: Array<{ id?: string | null; data: unknown; timestamp?: number }>; state: JobState }>;
+}): Array<{ job: MinimalJob; state: JobState }> {
+  const byId = new Map<string, { job: MinimalJob; state: JobState }>();
 
-  for (const job of waitingJobs) {
-    const key = String(job.id ?? "");
-    byId.set(key, { job: job as MinimalJob, state: "waiting" });
-  }
-  for (const job of activeJobs) {
-    const key = String(job.id ?? "");
-    byId.set(key, { job: job as MinimalJob, state: "active" }); // active wins
+  for (const { jobs, state } of params.jobsByState) {
+    for (const job of jobs) {
+      const key = String(job.id ?? "");
+      const existing = byId.get(key);
+      if (!existing || STATE_PRIORITY[state] >= STATE_PRIORITY[existing.state]) {
+        byId.set(key, { job: job as MinimalJob, state });
+      }
+    }
   }
 
   return [...byId.values()];
@@ -116,8 +128,11 @@ export class ScenarioJobRepository {
   constructor(private readonly queue: ScenarioQueueAdapter) {}
 
   /**
-   * Fetches all waiting and active jobs for a given setId,
+   * Fetches all jobs (waiting, active, completed, failed) for a given setId,
    * normalizes them into ScenarioRunData format.
+   *
+   * Includes completed/failed jobs so they remain visible during the gap
+   * between BullMQ completion and ES indexing.
    */
   async getQueuedAndActiveJobs(params: {
     setId: string;
@@ -125,14 +140,23 @@ export class ScenarioJobRepository {
   }): Promise<ScenarioRunData[]> {
     const { setId, projectId } = params;
 
-    const [waitingJobs, activeJobs] = await Promise.all([
+    const [waitingJobs, activeJobs, completedJobs, failedJobs] = await Promise.all([
       this.queue.getJobs(["waiting"]),
       this.queue.getJobs(["active"]),
+      this.queue.getJobs(["completed"]),
+      this.queue.getJobs(["failed"]),
     ]);
 
     const results: ScenarioRunData[] = [];
 
-    for (const { job, state } of collapseJobsById({ waitingJobs, activeJobs })) {
+    for (const { job, state } of collapseJobsById({
+      jobsByState: [
+        { jobs: waitingJobs, state: "waiting" },
+        { jobs: activeJobs, state: "active" },
+        { jobs: completedJobs, state: "completed" },
+        { jobs: failedJobs, state: "failed" },
+      ],
+    })) {
       if (job.data?.setId === setId && job.data?.projectId === projectId) {
         const normalized = normalizeJob({ job, state });
         if (normalized) results.push(normalized);
@@ -143,7 +167,7 @@ export class ScenarioJobRepository {
   }
 
   /**
-   * Fetches all waiting and active jobs for a given projectId across all sets.
+   * Fetches all jobs for a given projectId across all sets.
    * Returns both the normalized runs and a mapping of batchRunId to setId
    * for use in the All Runs cross-suite view.
    */
@@ -155,15 +179,24 @@ export class ScenarioJobRepository {
   }> {
     const { projectId } = params;
 
-    const [waitingJobs, activeJobs] = await Promise.all([
+    const [waitingJobs, activeJobs, completedJobs, failedJobs] = await Promise.all([
       this.queue.getJobs(["waiting"]),
       this.queue.getJobs(["active"]),
+      this.queue.getJobs(["completed"]),
+      this.queue.getJobs(["failed"]),
     ]);
 
     const runs: ScenarioRunData[] = [];
     const scenarioSetIds: Record<string, string> = {};
 
-    for (const { job, state } of collapseJobsById({ waitingJobs, activeJobs })) {
+    for (const { job, state } of collapseJobsById({
+      jobsByState: [
+        { jobs: waitingJobs, state: "waiting" },
+        { jobs: activeJobs, state: "active" },
+        { jobs: completedJobs, state: "completed" },
+        { jobs: failedJobs, state: "failed" },
+      ],
+    })) {
       if (job.data?.projectId !== projectId) continue;
 
       const normalized = normalizeJob({ job, state });

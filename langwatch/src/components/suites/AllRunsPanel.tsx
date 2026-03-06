@@ -299,9 +299,9 @@ export function AllRunsPanel({ period }: AllRunsPanelProps) {
   }
 
   return (
-    <VStack align="stretch" gap={0} height="100%" overflow="auto" paddingY={4}>
+    <VStack align="stretch" gap={0} height="100%" overflow="auto">
       {/* Header */}
-      <Box paddingX={6} paddingBottom={4}>
+      <Box paddingX={6} paddingY={4}>
         <Text fontSize="xl" fontWeight="bold">
           All Runs
         </Text>
