@@ -248,12 +248,18 @@ export function useSuiteForm({
     const newTargets = filteredTargets
       .filter((t) => !currentKeys.has(`${t.type}:${t.referenceId}`))
       .map((t) => ({ type: t.type, referenceId: t.referenceId }));
-    form.setValue("selectedTargets", [...current, ...newTargets]);
+    form.setValue("selectedTargets", [...current, ...newTargets], {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
   };
 
   // Clears all targets regardless of filter (matches ScenarioPicker behavior)
   const clearTargets = () => {
-    form.setValue("selectedTargets", []);
+    form.setValue("selectedTargets", [], {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
   };
 
   const selectAllScenarios = () => {

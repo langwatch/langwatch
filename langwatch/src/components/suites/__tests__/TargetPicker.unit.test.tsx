@@ -160,6 +160,23 @@ describe("<TargetPicker />", () => {
 
         expect(screen.getByText("2 of 3 selected")).toBeInTheDocument();
       });
+
+      it("excludes archived targets from the selected count", () => {
+        renderPicker({
+          targets,
+          totalCount: 3,
+          onSelectAll: vi.fn(),
+          onClear: vi.fn(),
+          selectedTargets: [
+            { type: "http", referenceId: "agent_1" },
+            { type: "prompt", referenceId: "prompt_1" },
+            { type: "http", referenceId: "agent_old" },
+          ],
+          archivedTargets: [{ type: "http", referenceId: "agent_old", name: "agent_old" }],
+        });
+
+        expect(screen.getByText("2 of 3 selected")).toBeInTheDocument();
+      });
     });
 
     describe("when Select All is clicked", () => {
