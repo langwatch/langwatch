@@ -40,6 +40,8 @@ import {
 import type { NotificationService } from "../notifications/notification.service";
 import type { NotificationRepository } from "../notifications/repositories/notification.repository";
 import type { OrganizationService } from "../../../src/server/app-layer/organizations/organization.service";
+import type { UsageService } from "../../../src/server/app-layer/usage/usage.service";
+import type { PlanProvider } from "../../../src/server/app-layer/subscription/plan-provider";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -80,17 +82,17 @@ function createMockOrganizationService(): OrganizationService {
   } as unknown as OrganizationService;
 }
 
-function createMockUsageService() {
+function createMockUsageService(): UsageService {
   return {
     getCountByProjects: vi.fn().mockResolvedValue([]),
     checkLimit: vi.fn(),
-  } as any;
+  } as unknown as UsageService;
 }
 
-function createMockPlanProvider() {
+function createMockPlanProvider(): PlanProvider {
   return {
     getActivePlan: vi.fn().mockResolvedValue({ name: "Launch" }),
-  } as any;
+  } as unknown as PlanProvider;
 }
 
 function createService({
@@ -421,9 +423,9 @@ describe("UsageLimitService", () => {
 
     describe("when plan provider fails", () => {
       it("sends notification with 'unknown' plan name", async () => {
-        const failingPlanProvider = {
+        const failingPlanProvider: PlanProvider = {
           getActivePlan: vi.fn().mockRejectedValue(new Error("plan error")),
-        } as any;
+        } as unknown as PlanProvider;
         const organizationService = createMockOrganizationService();
         (organizationService.findWithAdmins as ReturnType<typeof vi.fn>).mockResolvedValue(ORG_WITH_ADMIN);
         const { service, notificationService } = createService({
@@ -480,7 +482,7 @@ describe("UsageLimitService", () => {
         (organizationService.findProjectsWithName as ReturnType<typeof vi.fn>).mockResolvedValue([
           { id: "p1", name: "My Project" },
         ]);
-        usageService.getCountByProjects.mockResolvedValue([
+        (usageService.getCountByProjects as ReturnType<typeof vi.fn>).mockResolvedValue([
           { projectId: "p1", count: 5500 },
         ]);
 
@@ -572,7 +574,7 @@ describe("UsageLimitService", () => {
         const { service, organizationService, notificationRepository, usageService, notificationService } = createService();
         (organizationService.findWithAdmins as ReturnType<typeof vi.fn>).mockResolvedValue(ORG_WITH_ADMIN);
         (organizationService.findProjectsWithName as ReturnType<typeof vi.fn>).mockResolvedValue([]);
-        usageService.getCountByProjects.mockResolvedValue([]);
+        (usageService.getCountByProjects as ReturnType<typeof vi.fn>).mockResolvedValue([]);
         (notificationService.sendUsageLimitEmail as ReturnType<typeof vi.fn>)
           .mockRejectedValue(new Error("SMTP failure"));
 
