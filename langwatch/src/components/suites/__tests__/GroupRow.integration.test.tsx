@@ -59,11 +59,11 @@ describe("<GroupRow/>", () => {
       expect(screen.getByText("1 failed")).toBeInTheDocument();
     });
 
-    it("displays pass rate percentage", () => {
+    it("displays summary status label with scenario count", () => {
       render(
         <GroupRow
           group={makeGroup()}
-          summary={makeSummary({ passRate: 80, passedCount: 4, failedCount: 1 })}
+          summary={makeSummary({ passedCount: 4, failedCount: 1 })}
           isExpanded={false}
           onToggle={vi.fn()}
           onScenarioRunClick={vi.fn()}
@@ -72,7 +72,7 @@ describe("<GroupRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("80%")).toBeInTheDocument();
+      expect(screen.getByText("failed (4/5)")).toBeInTheDocument();
     });
   });
 

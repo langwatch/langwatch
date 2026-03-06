@@ -328,11 +328,11 @@ describe("<RunRow/>", () => {
   });
 
   describe("when viewing summary counts in header", () => {
-    it("displays passed and failed counts alongside pass rate", () => {
+    it("displays passed and failed counts alongside summary status label", () => {
       render(
         <RunRow
           batchRun={makeBatchRun()}
-          summary={makeSummary({ passedCount: 8, failedCount: 2, passRate: 80 })}
+          summary={makeSummary({ passedCount: 8, failedCount: 2 })}
           isExpanded={false}
           onToggle={vi.fn()}
           resolveTargetName={() => "Prod Agent"}
@@ -341,7 +341,7 @@ describe("<RunRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("80%")).toBeInTheDocument();
+      expect(screen.getByText("failed (8/10)")).toBeInTheDocument();
       expect(screen.getByText("8 passed")).toBeInTheDocument();
       expect(screen.getByText("2 failed")).toBeInTheDocument();
     });

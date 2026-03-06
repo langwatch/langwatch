@@ -340,11 +340,16 @@ describe("<AllRunsPanel/>", () => {
         await userEvent.selectOptions(groupBySelect, "scenario");
 
         const groupHeaders = screen.getAllByTestId("group-row-header");
-        expect(groupHeaders.length).toBe(2);
+        expect(groupHeaders).toHaveLength(2);
 
-        // Verify scenario names appear as group labels within headers
-        expect(within(groupHeaders[0]!).getByText("Checkout Flow")).toBeInTheDocument();
-        expect(within(groupHeaders[1]!).getByText("Login Flow")).toBeInTheDocument();
+        // Verify scenario names appear as group labels (order-independent)
+        const headerTexts = groupHeaders.map((h) => h.textContent ?? "");
+        expect(headerTexts).toEqual(
+          expect.arrayContaining([
+            expect.stringContaining("Checkout Flow"),
+            expect.stringContaining("Login Flow"),
+          ]),
+        );
       });
 
       it("includes runs from multiple suites in grouped results", async () => {
