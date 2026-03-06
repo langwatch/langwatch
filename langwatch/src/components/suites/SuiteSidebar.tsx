@@ -221,7 +221,7 @@ export function SuiteSidebar({
         </IconButton>
       </HStack>
 
-      <Box paddingX={3} paddingBottom={2}>
+      <Box paddingX={3} paddingBottom={3}>
         <SearchInput
           size="sm"
           placeholder="Search..."
