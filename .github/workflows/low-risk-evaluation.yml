@@ -15,6 +15,10 @@ permissions:
   contents: read
   checks: write
 
+concurrency:
+  group: low-risk-eval-${{ github.event.pull_request.number || inputs.pr_number }}
+  cancel-in-progress: true
+
 jobs:
   evaluate:
     # Skip fork PRs — secrets and write permissions are unavailable
@@ -173,6 +177,26 @@ jobs:
             const qualifies = process.env.QUALIFIES === 'true';
             const scope = process.env.SCOPE;
             const reasoning = process.env.REASONING;
+
+            // Delete previous bot assessment comments to avoid clutter
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+            });
+
+            for (const comment of comments) {
+              if (
+                comment.user?.login === "github-actions[bot]" &&
+                comment.body?.startsWith("**Automated low-risk assessment**")
+              ) {
+                await github.rest.issues.deleteComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: comment.id,
+                });
+              }
+            }
 
             if (qualifies) {
               await github.rest.issues.addLabels({
