@@ -5,7 +5,7 @@
  * Each batch run shows its suite name and all data is fetched via getAllSuiteRunData endpoint.
  */
 
-import { Box, Button, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ViewMode } from "./useRunHistoryStore";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
@@ -20,7 +20,6 @@ import {
   RunHistoryFilters,
   type RunHistoryFilterValues,
 } from "./RunHistoryFilters";
-import { RunHistoryFooter } from "./RunHistoryFooter";
 import { RunRow } from "./RunRow";
 import { GroupRow } from "./GroupRow";
 import { extractSuiteId } from "~/server/suites/suite-set-id";
@@ -293,7 +292,7 @@ export function AllRunsPanel({ period }: AllRunsPanelProps) {
   if (isLoading && pages.length === 0) {
     return (
       <Box padding={6} display="flex" justifyContent="center">
-        <Spinner size="lg" />
+        <Spinner size="lg" data-testid="loading-spinner" />
       </Box>
     );
   }
@@ -305,12 +304,20 @@ export function AllRunsPanel({ period }: AllRunsPanelProps) {
         <Text fontSize="xl" fontWeight="bold">
           All Runs
         </Text>
-        <Text fontSize="sm" color="fg.muted">
-          {groupBy === "none"
-            ? `${batchRuns.length} ${batchRuns.length === 1 ? "execution" : "executions"} · `
-            : `${groups.length} ${groups.length === 1 ? "group" : "groups"} · `}
-          {totals.runCount} {totals.runCount === 1 ? "run" : "runs"}
-        </Text>
+        <HStack gap={3} data-testid="all-runs-header-totals">
+          <Text fontSize="sm" color="fg.muted">
+            {groupBy === "none"
+              ? `${batchRuns.length} ${batchRuns.length === 1 ? "execution" : "executions"} · `
+              : `${groups.length} ${groups.length === 1 ? "group" : "groups"} · `}
+            {totals.runCount} {totals.runCount === 1 ? "run" : "runs"}
+          </Text>
+          <Text fontSize="sm" color="green.600">
+            {totals.passedCount} passed
+          </Text>
+          <Text fontSize="sm" color="red.600">
+            {totals.failedCount} failed
+          </Text>
+        </HStack>
       </Box>
 
       {/* Filters */}
@@ -391,10 +398,6 @@ export function AllRunsPanel({ period }: AllRunsPanelProps) {
         </>
       )}
 
-      {/* Footer */}
-      <Box paddingX={6}>
-        <RunHistoryFooter totals={totals} />
-      </Box>
     </VStack>
   );
 }

@@ -8,7 +8,7 @@
  * Uses the suite's setId (__internal__<suiteId>__suite) to query the scenario events.
  */
 
-import { Box, Button, EmptyState, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, EmptyState, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Play, Inbox } from "lucide-react";
 import type { SimulationSuite } from "@prisma/client";
 import { useRouter } from "next/router";
@@ -24,7 +24,6 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
 import type { Period } from "~/components/PeriodSelector";
 import { RunHistoryFilters } from "./RunHistoryFilters";
-import { RunHistoryFooter } from "./RunHistoryFooter";
 import { RunRow } from "./RunRow";
 import { GroupRow } from "./GroupRow";
 import { QueueStatusBanner } from "./QueueStatusBanner";
@@ -380,7 +379,7 @@ export function RunHistoryList({ suite, onStatsReady, period, onRun }: RunHistor
 
   return (
     <VStack align="stretch" gap={0} flex={1}>
-      {/* Filter bar with group-by selector */}
+      {/* Filter bar with group-by selector and aggregate totals */}
       <Box paddingX={6} paddingY={4}>
         <RunHistoryFilters
           scenarioOptions={scenarioOptions}
@@ -391,6 +390,17 @@ export function RunHistoryList({ suite, onStatsReady, period, onRun }: RunHistor
           viewMode={viewMode}
           onViewModeChange={setViewMode}
         />
+        <HStack gap={3} paddingTop={2} data-testid="run-history-header-totals">
+          <Text fontSize="sm" color="fg.muted">
+            {totals.runCount} {totals.runCount === 1 ? "run" : "runs"}
+          </Text>
+          <Text fontSize="sm" color="green.600">
+            {totals.passedCount} passed
+          </Text>
+          <Text fontSize="sm" color="red.600">
+            {totals.failedCount} failed
+          </Text>
+        </HStack>
       </Box>
 
       {/* Queue status banner */}
@@ -451,8 +461,6 @@ export function RunHistoryList({ suite, onStatsReady, period, onRun }: RunHistor
       </VStack>
       )}
 
-      {/* Footer */}
-      <RunHistoryFooter totals={totals} />
     </VStack>
   );
 }

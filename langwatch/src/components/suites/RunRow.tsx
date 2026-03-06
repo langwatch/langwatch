@@ -16,7 +16,7 @@ import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { BatchRun, BatchRunSummary } from "./run-history-transforms";
 import { computeIterationMap, getScenarioDisplayNames } from "./run-history-transforms";
 import { ScenarioRunContent } from "./ScenarioRunContent";
-import { RunSummaryFooter } from "./RunSummaryFooter";
+import { RunSummaryCounts } from "./RunSummaryCounts";
 import { formatSummaryStatusLabel } from "./format-run-status-label";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import type { ViewMode } from "./useRunHistoryStore";
@@ -120,6 +120,7 @@ export function RunRow({
         >
           {formatSummaryStatusLabel(summary)}
         </Text>
+        <RunSummaryCounts summary={summary} />
       </HStack>
 
       {/* Expanded content - scenario results in list or grid */}
@@ -140,7 +141,6 @@ export function RunRow({
         </>
       )}
 
-      <RunSummaryFooter summary={summary} />
     </>
   );
 }
