@@ -89,7 +89,7 @@ describe("OtlpSpanTokenEstimationService", () => {
           },
         ]);
 
-        await service.estimateSpanTokens(span);
+        await service.estimateSpanTokens({ span });
 
         const inputTokensAttr = span.attributes.find(
           (a) => a.key === "gen_ai.usage.input_tokens",
@@ -137,7 +137,7 @@ describe("OtlpSpanTokenEstimationService", () => {
           },
         ]);
 
-        await service.estimateSpanTokens(span);
+        await service.estimateSpanTokens({ span });
 
         const inputTokensAttr = span.attributes.find(
           (a) => a.key === "gen_ai.usage.input_tokens",
@@ -184,7 +184,7 @@ describe("OtlpSpanTokenEstimationService", () => {
         ]);
 
         const originalAttrCount = span.attributes.length;
-        await service.estimateSpanTokens(span);
+        await service.estimateSpanTokens({ span });
 
         // No new attributes should be pushed
         expect(span.attributes.length).toBe(originalAttrCount);
@@ -217,7 +217,7 @@ describe("OtlpSpanTokenEstimationService", () => {
           },
         ]);
 
-        await service.estimateSpanTokens(span);
+        await service.estimateSpanTokens({ span });
 
         const outputTokensAttr = span.attributes.find(
           (a) => a.key === "gen_ai.usage.output_tokens",
@@ -252,7 +252,7 @@ describe("OtlpSpanTokenEstimationService", () => {
         ]);
 
         const originalAttrCount = span.attributes.length;
-        await service.estimateSpanTokens(span);
+        await service.estimateSpanTokens({ span });
 
         expect(span.attributes.length).toBe(originalAttrCount);
         expect(deps.tokenizer.countTokens).not.toHaveBeenCalled();
@@ -278,7 +278,7 @@ describe("OtlpSpanTokenEstimationService", () => {
         ]);
 
         const originalAttrCount = span.attributes.length;
-        await service.estimateSpanTokens(span);
+        await service.estimateSpanTokens({ span });
 
         expect(span.attributes.length).toBe(originalAttrCount);
       });
@@ -303,7 +303,7 @@ describe("OtlpSpanTokenEstimationService", () => {
         ]);
 
         const originalAttrCount = span.attributes.length;
-        await service.estimateSpanTokens(span);
+        await service.estimateSpanTokens({ span });
 
         expect(span.attributes.length).toBe(originalAttrCount);
       });
@@ -323,7 +323,7 @@ describe("OtlpSpanTokenEstimationService", () => {
         ]);
 
         const originalAttrCount = span.attributes.length;
-        await service.estimateSpanTokens(span);
+        await service.estimateSpanTokens({ span });
 
         expect(span.attributes.length).toBe(originalAttrCount);
       });
@@ -355,7 +355,7 @@ describe("OtlpSpanTokenEstimationService", () => {
         ]);
 
         const originalAttrCount = span.attributes.length;
-        await service.estimateSpanTokens(span);
+        await service.estimateSpanTokens({ span });
 
         expect(span.attributes.length).toBe(originalAttrCount);
       });
@@ -392,7 +392,7 @@ describe("OtlpSpanTokenEstimationService", () => {
         ]);
 
         const originalAttrCount = span.attributes.length;
-        await service.estimateSpanTokens(span);
+        await service.estimateSpanTokens({ span });
 
         expect(span.attributes.length).toBe(originalAttrCount);
         expect(deps.tokenizer.countTokens).not.toHaveBeenCalled();
@@ -430,7 +430,7 @@ describe("OtlpSpanTokenEstimationService", () => {
           },
         ]);
 
-        await service.estimateSpanTokens(span);
+        await service.estimateSpanTokens({ span });
 
         expect(deps.tokenizer.countTokens).toHaveBeenCalledWith(
           "gpt-4o-mini",
@@ -440,6 +440,168 @@ describe("OtlpSpanTokenEstimationService", () => {
           "gpt-4o-mini",
           "42",
         );
+      });
+    });
+
+    describe("when global kill switch is enabled", () => {
+      it("skips estimation entirely", async () => {
+        const featureFlagService = {
+          isEnabled: vi.fn(async () => true),
+        };
+        const service = new OtlpSpanTokenEstimationService({
+          ...deps,
+          featureFlagService,
+        });
+
+        const span = createTestSpan([
+          {
+            key: "langwatch.span.type",
+            value: { stringValue: "llm" },
+          },
+          {
+            key: "gen_ai.request.model",
+            value: { stringValue: "gpt-4o-mini" },
+          },
+          {
+            key: "langwatch.input",
+            value: {
+              stringValue: JSON.stringify({
+                type: "chat_messages",
+                value: [{ role: "user", content: "Hello" }],
+              }),
+            },
+          },
+        ]);
+
+        const originalAttrCount = span.attributes.length;
+        await service.estimateSpanTokens({ span, tenantId: "project-123" });
+
+        expect(span.attributes.length).toBe(originalAttrCount);
+        expect(deps.tokenizer.countTokens).not.toHaveBeenCalled();
+        expect(featureFlagService.isEnabled).toHaveBeenCalledWith(
+          "token-estimation-killswitch",
+          "global",
+          false,
+        );
+      });
+    });
+
+    describe("when per-project kill switch is enabled", () => {
+      it("skips estimation for that project", async () => {
+        const featureFlagService = {
+          isEnabled: vi.fn(async (key: string) => {
+            return key === "token-estimation-project-killswitch";
+          }),
+        };
+        const service = new OtlpSpanTokenEstimationService({
+          ...deps,
+          featureFlagService,
+        });
+
+        const span = createTestSpan([
+          {
+            key: "langwatch.span.type",
+            value: { stringValue: "llm" },
+          },
+          {
+            key: "gen_ai.request.model",
+            value: { stringValue: "gpt-4o-mini" },
+          },
+          {
+            key: "langwatch.input",
+            value: {
+              stringValue: JSON.stringify({
+                type: "chat_messages",
+                value: [{ role: "user", content: "Hello" }],
+              }),
+            },
+          },
+        ]);
+
+        const originalAttrCount = span.attributes.length;
+        await service.estimateSpanTokens({ span, tenantId: "project-456" });
+
+        expect(span.attributes.length).toBe(originalAttrCount);
+        expect(deps.tokenizer.countTokens).not.toHaveBeenCalled();
+        expect(featureFlagService.isEnabled).toHaveBeenCalledWith(
+          "token-estimation-project-killswitch",
+          "project-456",
+          false,
+          { projectId: "project-456" },
+        );
+      });
+    });
+
+    describe("when kill switches are disabled", () => {
+      it("estimates tokens normally", async () => {
+        const featureFlagService = {
+          isEnabled: vi.fn(async () => false),
+        };
+        const service = new OtlpSpanTokenEstimationService({
+          ...deps,
+          featureFlagService,
+        });
+
+        const span = createTestSpan([
+          {
+            key: "langwatch.span.type",
+            value: { stringValue: "llm" },
+          },
+          {
+            key: "gen_ai.request.model",
+            value: { stringValue: "gpt-4o-mini" },
+          },
+          {
+            key: "langwatch.input",
+            value: {
+              stringValue: JSON.stringify({
+                type: "chat_messages",
+                value: [{ role: "user", content: "Hello" }],
+              }),
+            },
+          },
+        ]);
+
+        await service.estimateSpanTokens({ span, tenantId: "project-789" });
+
+        const inputTokensAttr = span.attributes.find(
+          (a) => a.key === "gen_ai.usage.input_tokens",
+        );
+        expect(inputTokensAttr).toBeDefined();
+        expect(deps.tokenizer.countTokens).toHaveBeenCalled();
+      });
+    });
+
+    describe("when no feature flag service is provided", () => {
+      it("estimates tokens normally (no kill switch check)", async () => {
+        const service = new OtlpSpanTokenEstimationService(deps);
+
+        const span = createTestSpan([
+          {
+            key: "langwatch.span.type",
+            value: { stringValue: "llm" },
+          },
+          {
+            key: "gen_ai.request.model",
+            value: { stringValue: "gpt-4o-mini" },
+          },
+          {
+            key: "langwatch.input",
+            value: {
+              stringValue: JSON.stringify({
+                type: "chat_messages",
+                value: [{ role: "user", content: "Hello" }],
+              }),
+            },
+          },
+        ]);
+
+        await service.estimateSpanTokens({ span });
+
+        const inputTokensAttr = span.attributes.find(
+          (a) => a.key === "gen_ai.usage.input_tokens",
+        );
+        expect(inputTokensAttr).toBeDefined();
       });
     });
   });

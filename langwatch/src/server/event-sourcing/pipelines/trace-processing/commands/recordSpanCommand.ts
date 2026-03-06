@@ -23,6 +23,7 @@ import type { OtlpSpan } from "../schemas/otlp";
 import { OtlpSpanCostEnrichmentService, createCostEnrichmentDeps } from "~/server/app-layer/traces/span-cost-enrichment.service";
 import { OtlpSpanPiiRedactionService } from "~/server/app-layer/traces/span-pii-redaction.service";
 import { OtlpSpanTokenEstimationService } from "~/server/app-layer/traces/span-token-estimation.service";
+import { featureFlagService } from "~/server/featureFlag";
 import { TraceRequestUtils } from "../utils/traceRequest.utils";
 
 /**
@@ -42,7 +43,10 @@ export interface RecordSpanCommandDependencies {
   };
   /** Service for estimating token counts from input/output text. */
   tokenEstimationService: {
-    estimateSpanTokens: (span: OtlpSpan) => Promise<void>;
+    estimateSpanTokens: (args: {
+      span: OtlpSpan;
+      tenantId?: string;
+    }) => Promise<void>;
   };
 }
 
@@ -55,7 +59,9 @@ function createDefaultDependencies(): RecordSpanCommandDependencies {
     costEnrichmentService: OtlpSpanCostEnrichmentService.create(
       createCostEnrichmentDeps(prisma),
     ),
-    tokenEstimationService: OtlpSpanTokenEstimationService.create(),
+    tokenEstimationService: OtlpSpanTokenEstimationService.create({
+      featureFlagService,
+    }),
   };
 }
 
@@ -137,9 +143,10 @@ export class RecordSpanCommand implements CommandHandler<
             spanToProcess,
             tenantIdStr,
           ),
-          this.deps.tokenEstimationService.estimateSpanTokens(
-            spanToProcess,
-          ),
+          this.deps.tokenEstimationService.estimateSpanTokens({
+            span: spanToProcess,
+            tenantId: tenantIdStr,
+          }),
         ]);
 
         // Cost enrichment is non-critical — log and continue
