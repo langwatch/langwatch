@@ -146,6 +146,7 @@ export function InvoicesBlock({
                             data-testid={`invoice-pdf-${invoice.id}`}
                             href={invoice.pdfUrl}
                             isExternal
+                            aria-label={`Download PDF for invoice ${invoice.number ?? invoice.id}`}
                           >
                             <HStack gap={1} color="blue.500" fontSize="sm">
                               <Download size={14} />
