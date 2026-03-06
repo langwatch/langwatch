@@ -54,9 +54,11 @@ function createMockDependencies(): {
   deps: RecordSpanCommandDependencies;
   mockRedactSpan: ReturnType<typeof vi.fn>;
   mockEnrichSpan: ReturnType<typeof vi.fn>;
+  mockEstimateSpanTokens: ReturnType<typeof vi.fn>;
 } {
   const mockRedactSpan = vi.fn();
   const mockEnrichSpan = vi.fn();
+  const mockEstimateSpanTokens = vi.fn();
 
   return {
     deps: {
@@ -66,9 +68,13 @@ function createMockDependencies(): {
       costEnrichmentService: {
         enrichSpan: mockEnrichSpan,
       },
+      tokenEstimationService: {
+        estimateSpanTokens: mockEstimateSpanTokens,
+      },
     },
     mockRedactSpan,
     mockEnrichSpan,
+    mockEstimateSpanTokens,
   };
 }
 
