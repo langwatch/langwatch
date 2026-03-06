@@ -407,12 +407,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                 onClear={suiteForm.clearTargets}
                 searchQuery={suiteForm.targetSearch}
                 onSearchChange={suiteForm.setTargetSearch}
-                onCreateAgent={() => setAgentHttpEditorOpen(true)}
-                onCreatePrompt={() => {
-                  if (project?.slug) {
-                    window.open(`/${project.slug}/prompts`, "_blank");
-                  }
-                }}
+                onAddTarget={() => setAgentHttpEditorOpen(true)}
                 hasError={!!errors.selectedTargets}
                 archivedTargets={archivedTargetsWithNames}
                 onRemoveArchived={suiteForm.removeArchivedTarget}

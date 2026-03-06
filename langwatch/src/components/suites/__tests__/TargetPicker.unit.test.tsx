@@ -1,7 +1,9 @@
 /**
  * @vitest-environment jsdom
  *
- * Integration tests for TargetPicker's archived targets section.
+ * Integration tests for TargetPicker component.
+ *
+ * @see specs/features/suites/inline-add-target-and-scenario-buttons.feature
  */
 
 import type React from "react";
@@ -37,10 +39,9 @@ function renderPicker(overrides: Partial<TargetPickerProps> = {}) {
     onToggle: vi.fn(),
     searchQuery: "",
     onSearchChange: vi.fn(),
+    onAddTarget: vi.fn(),
     onSelectAll: vi.fn(),
     onClear: vi.fn(),
-    onCreateAgent: vi.fn(),
-    onCreatePrompt: vi.fn(),
     ...overrides,
   };
   return render(<TargetPicker {...defaultProps} />, { wrapper: Wrapper });
@@ -216,6 +217,50 @@ describe("<TargetPicker />", () => {
         expect(
           screen.getByText("1 archived target linked:"),
         ).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("given the inline Add Target button", () => {
+    describe("when the picker renders", () => {
+      it("displays an Add Target button inline with the search input", () => {
+        renderPicker();
+
+        expect(
+          screen.getByRole("button", { name: "Add Target" }),
+        ).toBeInTheDocument();
+      });
+
+      it("displays a plus icon on the Add Target button", () => {
+        renderPicker();
+
+        expect(
+          screen.getByTestId("add-target-button"),
+        ).toBeInTheDocument();
+      });
+
+      it("does not display separate Add New Agent and Add New Prompt buttons", () => {
+        renderPicker();
+
+        expect(
+          screen.queryByText("Add New Agent"),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.queryByText("Add New Prompt"),
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    describe("when the Add Target button is clicked", () => {
+      it("calls onAddTarget", async () => {
+        const onAddTarget = vi.fn();
+        const user = userEvent.setup();
+
+        renderPicker({ onAddTarget });
+
+        await user.click(screen.getByRole("button", { name: "Add Target" }));
+
+        expect(onAddTarget).toHaveBeenCalledTimes(1);
       });
     });
   });
