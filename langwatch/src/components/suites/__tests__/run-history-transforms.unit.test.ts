@@ -710,7 +710,7 @@ describe("getScenarioDisplayNames()", () => {
 });
 
 describe("resolveOriginLabel()", () => {
-  describe("given a suite set ID with a matching suite name", () => {
+  describe("when a suite set ID has a matching suite name", () => {
     it("returns the suite name", () => {
       const suiteNameMap = new Map([["suite-123", "Regression Tests"]]);
 
@@ -723,7 +723,7 @@ describe("resolveOriginLabel()", () => {
     });
   });
 
-  describe("given a scenario set ID that is not a suite set ID", () => {
+  describe("when the scenario set ID is not a suite set ID", () => {
     it("returns the raw scenario set ID", () => {
       const suiteNameMap = new Map<string, string>();
 
@@ -736,7 +736,7 @@ describe("resolveOriginLabel()", () => {
     });
   });
 
-  describe("given no scenario set ID", () => {
+  describe("when no scenario set ID is provided", () => {
     it("returns null", () => {
       const suiteNameMap = new Map<string, string>();
 
@@ -749,8 +749,8 @@ describe("resolveOriginLabel()", () => {
     });
   });
 
-  describe("given a suite set ID but the suite name is not in the map", () => {
-    it("falls back to the raw scenario set ID", () => {
+  describe("when a suite set ID has no matching name in the map", () => {
+    it("returns null to avoid exposing internal IDs", () => {
       const suiteNameMap = new Map<string, string>();
 
       const result = resolveOriginLabel({
@@ -758,7 +758,7 @@ describe("resolveOriginLabel()", () => {
         suiteNameMap,
       });
 
-      expect(result).toBe("__internal__unknown-suite__suite");
+      expect(result).toBeNull();
     });
   });
 });

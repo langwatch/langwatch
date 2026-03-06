@@ -30,22 +30,3 @@ Feature: All Runs batch entries display suite or set origin
     Given a batch run with no associated scenario set ID
     When the batch entry is rendered in the All Runs panel
     Then the row header does not display an origin label
-
-  @unit
-  Scenario: Resolves suite name from suite set ID
-    Given a suite set ID "__internal__suite-123__suite"
-    And suite "suite-123" has name "Regression Tests"
-    When the origin label is resolved
-    Then the result is "Regression Tests"
-
-  @unit
-  Scenario: Falls back to raw set ID for external sets
-    Given a scenario set ID "nightly-ci" that is not a suite set ID
-    When the origin label is resolved
-    Then the result is "nightly-ci"
-
-  @unit
-  Scenario: Returns no label when set ID is absent
-    Given a batch run with no scenario set ID
-    When the origin label is resolved
-    Then the result is null
