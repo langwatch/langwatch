@@ -2,6 +2,7 @@ import { Currency, type OrganizationUserRole, type PrismaClient } from "@prisma/
 import type Stripe from "stripe";
 import type { DisplayInvoice, SubscriptionService } from "../../../src/server/app-layer/subscription/subscription.service";
 import type { SubscriptionRepository } from "../../../src/server/app-layer/subscription/subscription.repository";
+import { OrganizationRepository } from "../../../src/server/repositories/organization.repository";
 import { notifySubscriptionEvent } from "../notifications/notificationHandlers";
 import {
   type PlanTypes as PlanType,
@@ -43,6 +44,7 @@ export class EESubscriptionService implements SubscriptionService {
     private readonly repository: SubscriptionRepository,
     private readonly stripe: Stripe,
     private readonly itemCalculator: ItemCalculator,
+    private readonly organizationRepository: OrganizationRepository,
     private readonly seatEventFns?: SeatEventSubscriptionFns,
   ) {}
 
@@ -61,7 +63,8 @@ export class EESubscriptionService implements SubscriptionService {
     seatEventFns?: SeatEventSubscriptionFns;
   }): EESubscriptionService {
     const repository = new PrismaSubscriptionRepository(db);
-    return new EESubscriptionService(db, repository, stripe, itemCalculator, seatEventFns);
+    const organizationRepository = new OrganizationRepository(db);
+    return new EESubscriptionService(db, repository, stripe, itemCalculator, organizationRepository, seatEventFns);
   }
 
   async getLastNonCancelledSubscription(organizationId: string) {
@@ -346,17 +349,14 @@ export class EESubscriptionService implements SubscriptionService {
   }: {
     organizationId: string;
   }): Promise<DisplayInvoice[]> {
-    const org = await this.prisma.organization.findUnique({
-      where: { id: organizationId },
-      select: { stripeCustomerId: true },
-    });
+    const stripeCustomerId = await this.organizationRepository.getStripeCustomerId(organizationId);
 
-    if (!org?.stripeCustomerId) {
+    if (!stripeCustomerId) {
       return [];
     }
 
     const invoices = await this.stripe.invoices.list({
-      customer: org.stripeCustomerId,
+      customer: stripeCustomerId,
       limit: 4,
     });
 

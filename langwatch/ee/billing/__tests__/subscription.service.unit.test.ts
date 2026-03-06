@@ -11,6 +11,7 @@ import { PlanTypes, SubscriptionStatus } from "../planTypes";
 import { EESubscriptionService } from "../services/subscription.service";
 import { InvalidPlanError, OrganizationNotFoundError } from "../errors";
 import type { SubscriptionRepository } from "../../../src/server/app-layer/subscription/subscription.repository";
+import type { OrganizationRepository } from "../../../src/server/repositories/organization.repository";
 
 const mockNotifySubscriptionEvent = notifySubscriptionEvent as ReturnType<
   typeof vi.fn
@@ -61,11 +62,21 @@ const createMockItemCalculator = () => ({
   prices: { LAUNCH: "price_launch", FREE: undefined } as any,
 });
 
+const createMockOrganizationRepository = (): {
+  [K in keyof OrganizationRepository]: ReturnType<typeof vi.fn>;
+} => ({
+  getProjectIds: vi.fn(),
+  getOrganizationIdByTeamId: vi.fn(),
+  getPricingModel: vi.fn(),
+  getStripeCustomerId: vi.fn(),
+});
+
 describe("EESubscriptionService", () => {
   let stripe: ReturnType<typeof createMockStripe>;
   let db: ReturnType<typeof createMockDb>;
   let repository: ReturnType<typeof createMockRepository>;
   let itemCalculator: ReturnType<typeof createMockItemCalculator>;
+  let organizationRepository: ReturnType<typeof createMockOrganizationRepository>;
   let service: EESubscriptionService;
 
   beforeEach(() => {
@@ -74,11 +85,13 @@ describe("EESubscriptionService", () => {
     db = createMockDb();
     repository = createMockRepository();
     itemCalculator = createMockItemCalculator();
+    organizationRepository = createMockOrganizationRepository();
     service = new EESubscriptionService(
       db as unknown as PrismaClient,
       repository as unknown as SubscriptionRepository,
       stripe as unknown as Stripe,
       itemCalculator,
+      organizationRepository as unknown as OrganizationRepository,
     );
   });
 
@@ -404,9 +417,7 @@ describe("EESubscriptionService", () => {
   describe("listInvoices()", () => {
     describe("when organization has no stripeCustomerId", () => {
       it("returns an empty array", async () => {
-        db.organization.findUnique.mockResolvedValue({
-          stripeCustomerId: null,
-        });
+        organizationRepository.getStripeCustomerId.mockResolvedValue(null);
 
         const result = await service.listInvoices({
           organizationId: "org_no_stripe",
@@ -419,7 +430,7 @@ describe("EESubscriptionService", () => {
 
     describe("when organization is not found", () => {
       it("returns an empty array", async () => {
-        db.organization.findUnique.mockResolvedValue(null);
+        organizationRepository.getStripeCustomerId.mockResolvedValue(null);
 
         const result = await service.listInvoices({
           organizationId: "org_missing",
@@ -431,9 +442,7 @@ describe("EESubscriptionService", () => {
 
     describe("when organization has a stripeCustomerId", () => {
       it("returns mapped invoices excluding drafts", async () => {
-        db.organization.findUnique.mockResolvedValue({
-          stripeCustomerId: "cus_123",
-        });
+        organizationRepository.getStripeCustomerId.mockResolvedValue("cus_123");
 
         stripe.invoices.list.mockResolvedValue({
           data: [
