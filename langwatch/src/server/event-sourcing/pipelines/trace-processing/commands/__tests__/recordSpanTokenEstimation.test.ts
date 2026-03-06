@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createTenantId, type Command } from "../../../../";
 import type { RecordSpanCommandData } from "../../schemas/commands";
 import { RECORD_SPAN_COMMAND_TYPE } from "../../schemas/constants";
+import type { OtlpSpan } from "../../schemas/otlp";
 import {
   RecordSpanCommand,
   type RecordSpanCommandDependencies,
@@ -97,8 +98,7 @@ function createDeps(): RecordSpanCommandDependencies {
     piiRedactionService: { redactSpan: vi.fn() },
     costEnrichmentService: { enrichSpan: vi.fn() },
     tokenEstimationService: {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      estimateSpanTokens: vi.fn(async ({ span }: any) => {
+      estimateSpanTokens: vi.fn(async ({ span }: { span: OtlpSpan }) => {
         // Simulate the real token estimation service behavior:
         // Check if this is an LLM span without token counts, estimate from input/output
         const isLlm = span.attributes.some(
