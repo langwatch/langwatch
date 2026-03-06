@@ -154,5 +154,9 @@ export function createExperimentRunResultStorageMapProjection(deps: {
     ],
     map: mapEvent,
     store: deps.store,
+    options: {
+      groupKeyFn: (event: ExperimentRunResultEvent) =>
+        `result:${event.data.runId}:item:${event.data.index}`,
+    },
   };
 }
