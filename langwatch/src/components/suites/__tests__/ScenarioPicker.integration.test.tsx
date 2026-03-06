@@ -143,9 +143,8 @@ describe("<ScenarioPicker />", () => {
       it("displays a plus icon on the Add Scenario button", () => {
         renderPicker();
 
-        expect(
-          screen.getByTestId("add-scenario-button"),
-        ).toBeInTheDocument();
+        const button = screen.getByTestId("add-scenario-button");
+        expect(button.querySelector("svg")).not.toBeNull();
       });
 
       it("does not display the old Create New Scenario button at the bottom", () => {

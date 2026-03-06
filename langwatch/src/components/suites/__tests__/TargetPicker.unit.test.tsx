@@ -234,9 +234,8 @@ describe("<TargetPicker />", () => {
       it("displays a plus icon on the Add Target button", () => {
         renderPicker();
 
-        expect(
-          screen.getByTestId("add-target-button"),
-        ).toBeInTheDocument();
+        const button = screen.getByTestId("add-target-button");
+        expect(button.querySelector("svg")).not.toBeNull();
       });
 
       it("does not display separate Add New Agent and Add New Prompt buttons", () => {
