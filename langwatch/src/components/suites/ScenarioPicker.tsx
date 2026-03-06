@@ -16,6 +16,7 @@ import {
 import { AlertTriangle, Plus, X } from "lucide-react";
 import { Checkbox } from "../ui/checkbox";
 import { SearchInput } from "../ui/SearchInput";
+import { TagList } from "../ui/TagPill";
 
 interface Scenario {
   id: string;
@@ -137,18 +138,7 @@ export function ScenarioPicker({
                 <Text fontSize="sm" flex={1}>
                   {scenario.name}
                 </Text>
-                {scenario.labels.map((l) => (
-                  <Text
-                    key={l}
-                    fontSize="xs"
-                    bg="bg.muted"
-                    px={2}
-                    py={0.5}
-                    borderRadius="md"
-                  >
-                    #{l}
-                  </Text>
-                ))}
+                <TagList labels={scenario.labels} />
               </HStack>
             </Checkbox>
           </HStack>

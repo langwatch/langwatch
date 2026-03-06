@@ -55,14 +55,6 @@ vi.mock("next/router", () => ({
   }),
 }));
 
-vi.mock("next/router", () => ({
-  useRouter: () => ({
-    query: {},
-    push: mockRouterPush,
-    isReady: true,
-  }),
-}));
-
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
@@ -136,10 +128,10 @@ describe("<SuiteDetailPanel/>", () => {
       expect(screen.getByText("Core test scenarios")).toBeInTheDocument();
     });
 
-    it("displays the label", () => {
+    it("displays labels as tag pills with # prefix", () => {
       render(
         <SuiteDetailPanel
-          suite={makeSuite()}
+          suite={makeSuite({ labels: ["critical", "billing"] })}
           onEdit={vi.fn()}
           onRun={vi.fn()}
           period={defaultPeriod}
@@ -147,7 +139,45 @@ describe("<SuiteDetailPanel/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("#regression")).toBeInTheDocument();
+      expect(screen.getByText("#critical")).toBeInTheDocument();
+      expect(screen.getByText("#billing")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a suite with labels and onAddLabel provided", () => {
+    it("displays a + add button after the tags", () => {
+      render(
+        <SuiteDetailPanel
+          suite={makeSuite({ labels: ["ci"] })}
+          onEdit={vi.fn()}
+          onRun={vi.fn()}
+          period={defaultPeriod}
+          onAddLabel={vi.fn()}
+          onRemoveLabel={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByText("+ add")).toBeInTheDocument();
+    });
+
+    it("opens an inline text input when + add is clicked", async () => {
+      const user = userEvent.setup();
+
+      render(
+        <SuiteDetailPanel
+          suite={makeSuite({ labels: ["ci"] })}
+          onEdit={vi.fn()}
+          onRun={vi.fn()}
+          period={defaultPeriod}
+          onAddLabel={vi.fn()}
+          onRemoveLabel={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      await user.click(screen.getByText("+ add"));
+      expect(screen.getByPlaceholderText("Add label...")).toBeInTheDocument();
     });
   });
 
