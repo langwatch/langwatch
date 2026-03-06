@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
+import { UNLIMITED_MESSAGES } from "../../../ee/billing/planLimits";
 import type { PlanInfo } from "../../../ee/licensing/planInfo";
 import type { PlanProvider } from "../app-layer/subscription/plan-provider";
 import type { UsageUnit } from "../app-layer/usage/usage-meter-policy";
@@ -34,7 +35,8 @@ export function getMessageLimitStatus(
   current: number,
   max: number,
 ): MessageLimitStatus {
-  if (max === 0 || max === Number.MAX_SAFE_INTEGER) return "ok";
+  if (max === 0 || max === Number.MAX_SAFE_INTEGER || max >= UNLIMITED_MESSAGES)
+    return "ok";
   if (current >= max) return "exceeded";
   if (current >= max * MESSAGE_LIMIT_WARNING_THRESHOLD) return "warning";
   return "ok";
@@ -47,14 +49,16 @@ export function buildMessageLimitInfo(
   current: number,
   max: number,
 ): MessageLimitInfo {
-  const percentage = max > 0 ? current / max : 0;
   const status = getMessageLimitStatus(current, max);
   const currentFormatted = formatNumber(current);
-  const maxFormatted = formatNumber(max);
+  const isUnlimited = max >= UNLIMITED_MESSAGES;
+  const maxFormatted = isUnlimited ? "Unlimited" : formatNumber(max);
+  const percentage = max > 0 && !isUnlimited ? current / max : 0;
   const percentageFormatted = formatPercent(percentage);
 
-  const message =
-    status === "exceeded"
+  const message = isUnlimited
+    ? `You have used ${currentFormatted} messages this month (Unlimited plan).`
+    : status === "exceeded"
       ? `You reached the limit of ${maxFormatted} messages for this month, new messages will not be processed.`
       : `You have used ${percentageFormatted} of your monthly message limit (${currentFormatted} / ${maxFormatted}).`;
 

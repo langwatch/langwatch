@@ -2,6 +2,12 @@ import type { PlanInfo } from "../licensing/planInfo";
 import { PlanTypes, type PlanTypes as PlanType } from "./planTypes";
 import { GROWTH_SEAT_PLAN_TYPES } from "./utils/growthSeatEvent";
 
+/**
+ * Sentinel value representing no message cap.
+ * When a limit is set to this value, it means there is no limit.
+ */
+export const UNLIMITED_MESSAGES = 999_999_999;
+
 const PAID_FEATURES = {
   maxWorkflows: 9999,
   maxPrompts: 9999,
@@ -162,7 +168,7 @@ export const PLAN_LIMITS: Record<PlanType, PlanInfo> = {
         name: "Growth",
         maxMembers: 20,
         maxProjects: 99,
-        maxMessagesPerMonth: 200_000,
+        maxMessagesPerMonth: UNLIMITED_MESSAGES,
         evaluationsCredit: 9999,
         userPrice: { EUR: 29, USD: 32 },
         prices: { USD: 0, EUR: 0 },
