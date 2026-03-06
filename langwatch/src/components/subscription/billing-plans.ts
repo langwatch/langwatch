@@ -6,6 +6,7 @@
  */
 
 import { Currency } from "@prisma/client";
+import { UNLIMITED_MESSAGES } from "../../../ee/billing/planLimits";
 import { formatNumber } from "~/utils/formatNumber";
 
 export type { Currency } from "../../../ee/billing/pricing";
@@ -96,9 +97,11 @@ export function buildTieredCapabilities({
       ? `Up to ${formatNumber(maxMembers)} core users`
       : "Custom core user limits";
   const eventsText =
-    maxMessagesPerMonth > 0
-      ? `${formatNumber(maxMessagesPerMonth)} events included`
-      : "Custom event limits";
+    maxMessagesPerMonth >= UNLIMITED_MESSAGES
+      ? "Unlimited events"
+      : maxMessagesPerMonth > 0
+        ? `${formatNumber(maxMessagesPerMonth)} events included`
+        : "Custom event limits";
   const projectsText =
     maxProjects >= 9999
       ? "Unlimited projects"
