@@ -215,6 +215,7 @@ app.post("/:slug/run", async (c) => {
           loadedEvaluators,
           saveToEs: true,
           featureEventSourcingEvaluationIngestion: project.featureEventSourcingEvaluationIngestion,
+          disableElasticSearchEvaluationWriting: project.disableElasticSearchEvaluationWriting,
         });
 
         for await (const event of orchestrator) {
@@ -260,6 +261,7 @@ app.post("/:slug/run", async (c) => {
         saveToEs: true,
         runId, // Pass the run ID we generated
         featureEventSourcingEvaluationIngestion: project.featureEventSourcingEvaluationIngestion,
+        disableElasticSearchEvaluationWriting: project.disableElasticSearchEvaluationWriting,
       });
 
       for await (const event of orchestrator) {

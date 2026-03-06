@@ -47,6 +47,16 @@ export function createExperimentRunEsSyncReactor(
       );
       if (!enabled) return;
 
+      // Skip ES sync when evaluation ES writes are disabled for this project
+      const project = await deps.project.getById(tenantId);
+      if (project?.disableElasticSearchEvaluationWriting) {
+        logger.debug(
+          { tenantId },
+          "Skipping ES evaluation sync — disableElasticSearchEvaluationWriting is enabled",
+        );
+        return;
+      }
+
       const { repository } = deps;
       const experimentId = foldState.ExperimentId;
       const runId = foldState.RunId;

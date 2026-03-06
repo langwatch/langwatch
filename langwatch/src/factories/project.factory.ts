@@ -37,4 +37,7 @@ export const projectFactory = Factory.define<Project>(({ sequence }) => ({
   featureEventSourcingTraceIngestion: false,
   featureEventSourcingSimulationIngestion: false,
   featureEventSourcingEvaluationIngestion: false,
+  disableElasticSearchTraceWriting: false,
+  disableElasticSearchEvaluationWriting: false,
+  disableElasticSearchSimulationWriting: false,
 }));

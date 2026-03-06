@@ -9,6 +9,8 @@ import { captureError } from "../../../utils/captureError";
 import { createLogger } from "../../../utils/logger/server";
 import { safeTruncate } from "../../../utils/truncate";
 import { esClient, TRACE_INDEX, traceIndexId } from "../../elasticsearch";
+import { isElasticSearchWriteDisabled } from "../../elasticsearch/isElasticSearchWriteDisabled";
+import { prisma } from "../../db";
 import { connection } from "../../redis";
 import type { ElasticSearchEvaluation } from "../../tracer/types";
 import { EVALUATIONS_QUEUE } from "./constants";
@@ -246,6 +248,21 @@ export const updateEvaluationStatusInES = async ({
   evaluation_thread_id?: string;
   inputs?: Record<string, any>;
 }) => {
+  // Skip ES writes when evaluation ES writes are disabled for this project
+  if (
+    await isElasticSearchWriteDisabled(
+      prisma,
+      trace.project_id,
+      "evaluations",
+    )
+  ) {
+    logger.debug(
+      { projectId: trace.project_id, traceId: trace.trace_id },
+      "Skipping ES evaluation status update — disableElasticSearchEvaluationWriting is enabled",
+    );
+    return;
+  }
+
   const evaluation: ElasticSearchEvaluation = {
     evaluation_id: getEvaluationId(check),
     evaluator_id: getEvaluatorId(check),
