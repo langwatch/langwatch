@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockSlackSend = vi.fn().mockResolvedValue(undefined);
 
@@ -49,6 +49,10 @@ describe("NotificationService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     service = NotificationService.create();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   describe("create()", () => {
@@ -121,7 +125,7 @@ describe("NotificationService", () => {
 
     describe("when SLACK_PLAN_LIMIT_CHANNEL is not set", () => {
       it("returns without sending", async () => {
-        delete process.env.SLACK_PLAN_LIMIT_CHANNEL;
+        vi.stubEnv("SLACK_PLAN_LIMIT_CHANNEL", "");
 
         await service.sendSlackPlanLimitAlert(context);
 
@@ -131,21 +135,19 @@ describe("NotificationService", () => {
 
     describe("when SLACK_PLAN_LIMIT_CHANNEL is set", () => {
       it("sends a Slack message with plan limit info", async () => {
-        process.env.SLACK_PLAN_LIMIT_CHANNEL = "https://hooks.slack.com/test";
+        vi.stubEnv("SLACK_PLAN_LIMIT_CHANNEL", "https://hooks.slack.com/test");
 
         await service.sendSlackPlanLimitAlert(context);
 
         expect(mockSlackSend).toHaveBeenCalledWith({
           text: expect.stringContaining("Plan limit reached: Acme"),
         });
-
-        delete process.env.SLACK_PLAN_LIMIT_CHANNEL;
       });
     });
 
     describe("when Slack webhook fails", () => {
       it("catches the error and captures exception", async () => {
-        process.env.SLACK_PLAN_LIMIT_CHANNEL = "https://hooks.slack.com/test";
+        vi.stubEnv("SLACK_PLAN_LIMIT_CHANNEL", "https://hooks.slack.com/test");
 
         const error = new Error("webhook error");
         mockSlackSend.mockRejectedValueOnce(error);
@@ -153,8 +155,6 @@ describe("NotificationService", () => {
         await service.sendSlackPlanLimitAlert(context);
 
         expect(captureException).toHaveBeenCalledWith(error);
-
-        delete process.env.SLACK_PLAN_LIMIT_CHANNEL;
       });
     });
   });
@@ -173,21 +173,19 @@ describe("NotificationService", () => {
 
     describe("when SLACK_PLAN_LIMIT_CHANNEL is set", () => {
       it("sends with correct text including resource type and counts", async () => {
-        process.env.SLACK_PLAN_LIMIT_CHANNEL = "https://hooks.slack.com/test";
+        vi.stubEnv("SLACK_PLAN_LIMIT_CHANNEL", "https://hooks.slack.com/test");
 
         await service.sendSlackResourceLimitAlert(context);
 
         expect(mockSlackSend).toHaveBeenCalledWith({
           text: "Resource limit reached: Acme, jane@acme.com, Plan: Launch, Workflows: 5/5",
         });
-
-        delete process.env.SLACK_PLAN_LIMIT_CHANNEL;
       });
     });
 
     describe("when SLACK_PLAN_LIMIT_CHANNEL is not set", () => {
       it("returns without sending", async () => {
-        delete process.env.SLACK_PLAN_LIMIT_CHANNEL;
+        vi.stubEnv("SLACK_PLAN_LIMIT_CHANNEL", "");
 
         await service.sendSlackResourceLimitAlert(context);
 
@@ -197,7 +195,7 @@ describe("NotificationService", () => {
 
     describe("when Slack webhook fails", () => {
       it("catches the error and captures exception", async () => {
-        process.env.SLACK_PLAN_LIMIT_CHANNEL = "https://hooks.slack.com/test";
+        vi.stubEnv("SLACK_PLAN_LIMIT_CHANNEL", "https://hooks.slack.com/test");
 
         const error = new Error("webhook error");
         mockSlackSend.mockRejectedValueOnce(error);
@@ -205,8 +203,6 @@ describe("NotificationService", () => {
         await service.sendSlackResourceLimitAlert(context);
 
         expect(captureException).toHaveBeenCalledWith(error);
-
-        delete process.env.SLACK_PLAN_LIMIT_CHANNEL;
       });
     });
   });
@@ -214,7 +210,7 @@ describe("NotificationService", () => {
   describe("sendSlackSubscriptionEvent()", () => {
     describe("when SLACK_CHANNEL_SUBSCRIPTIONS is not set", () => {
       it("returns without sending", async () => {
-        delete process.env.SLACK_CHANNEL_SUBSCRIPTIONS;
+        vi.stubEnv("SLACK_CHANNEL_SUBSCRIPTIONS", "");
 
         await service.sendSlackSubscriptionEvent({
           type: "confirmed",
@@ -230,8 +226,7 @@ describe("NotificationService", () => {
 
     describe("when sending a confirmed subscription event", () => {
       it("sends Slack blocks for confirmed subscription", async () => {
-        process.env.SLACK_CHANNEL_SUBSCRIPTIONS =
-          "https://hooks.slack.com/subs";
+        vi.stubEnv("SLACK_CHANNEL_SUBSCRIPTIONS", "https://hooks.slack.com/subs");
 
         await service.sendSlackSubscriptionEvent({
           type: "confirmed",
@@ -254,15 +249,12 @@ describe("NotificationService", () => {
             }),
           ]),
         });
-
-        delete process.env.SLACK_CHANNEL_SUBSCRIPTIONS;
       });
     });
 
     describe("when sending a prospective subscription event", () => {
       it("sends Slack blocks for prospective interest", async () => {
-        process.env.SLACK_CHANNEL_SUBSCRIPTIONS =
-          "https://hooks.slack.com/subs";
+        vi.stubEnv("SLACK_CHANNEL_SUBSCRIPTIONS", "https://hooks.slack.com/subs");
 
         await service.sendSlackSubscriptionEvent({
           type: "prospective",
@@ -282,8 +274,6 @@ describe("NotificationService", () => {
             }),
           ]),
         });
-
-        delete process.env.SLACK_CHANNEL_SUBSCRIPTIONS;
       });
     });
   });
@@ -299,7 +289,7 @@ describe("NotificationService", () => {
 
     describe("when SLACK_CHANNEL_SUBSCRIPTIONS is not set", () => {
       it("returns without sending", async () => {
-        delete process.env.SLACK_CHANNEL_SUBSCRIPTIONS;
+        vi.stubEnv("SLACK_CHANNEL_SUBSCRIPTIONS", "");
 
         await service.sendSlackLicensePurchase(payload);
 
@@ -309,8 +299,7 @@ describe("NotificationService", () => {
 
     describe("when SLACK_CHANNEL_SUBSCRIPTIONS is set", () => {
       it("sends a license purchase notification via IncomingWebhook", async () => {
-        process.env.SLACK_CHANNEL_SUBSCRIPTIONS =
-          "https://hooks.slack.com/subs";
+        vi.stubEnv("SLACK_CHANNEL_SUBSCRIPTIONS", "https://hooks.slack.com/subs");
 
         await service.sendSlackLicensePurchase(payload);
 
@@ -327,8 +316,6 @@ describe("NotificationService", () => {
             ]),
           }),
         );
-
-        delete process.env.SLACK_CHANNEL_SUBSCRIPTIONS;
       });
     });
   });
@@ -344,8 +331,8 @@ describe("NotificationService", () => {
 
     describe("when HubSpot env vars are not set", () => {
       it("returns without sending", async () => {
-        delete process.env.HUBSPOT_PORTAL_ID;
-        delete process.env.HUBSPOT_REACHED_LIMIT_FORM_ID;
+        vi.stubEnv("HUBSPOT_PORTAL_ID", "");
+        vi.stubEnv("HUBSPOT_REACHED_LIMIT_FORM_ID", "");
 
         const mockFetch = vi.spyOn(global, "fetch");
 
@@ -358,8 +345,8 @@ describe("NotificationService", () => {
 
     describe("when HubSpot env vars are set", () => {
       it("submits form data to HubSpot", async () => {
-        process.env.HUBSPOT_PORTAL_ID = "12345";
-        process.env.HUBSPOT_REACHED_LIMIT_FORM_ID = "form_abc";
+        vi.stubEnv("HUBSPOT_PORTAL_ID", "12345");
+        vi.stubEnv("HUBSPOT_REACHED_LIMIT_FORM_ID", "form_abc");
 
         const mockFetch = vi
           .spyOn(global, "fetch")
@@ -376,15 +363,13 @@ describe("NotificationService", () => {
         );
 
         mockFetch.mockRestore();
-        delete process.env.HUBSPOT_PORTAL_ID;
-        delete process.env.HUBSPOT_REACHED_LIMIT_FORM_ID;
       });
     });
 
     describe("when HubSpot request fails", () => {
       it("catches the error and captures exception", async () => {
-        process.env.HUBSPOT_PORTAL_ID = "12345";
-        process.env.HUBSPOT_REACHED_LIMIT_FORM_ID = "form_abc";
+        vi.stubEnv("HUBSPOT_PORTAL_ID", "12345");
+        vi.stubEnv("HUBSPOT_REACHED_LIMIT_FORM_ID", "form_abc");
 
         const mockFetch = vi
           .spyOn(global, "fetch")
@@ -395,8 +380,6 @@ describe("NotificationService", () => {
         expect(captureException).toHaveBeenCalled();
 
         mockFetch.mockRestore();
-        delete process.env.HUBSPOT_PORTAL_ID;
-        delete process.env.HUBSPOT_REACHED_LIMIT_FORM_ID;
       });
     });
   });

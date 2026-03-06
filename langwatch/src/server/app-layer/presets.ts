@@ -195,6 +195,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     organizationService: organizations,
     usageService: usage,
     notificationService: notifications,
+    planProvider,
   });
 
   return initializeApp({

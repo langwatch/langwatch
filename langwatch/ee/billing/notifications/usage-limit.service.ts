@@ -1,6 +1,5 @@
 import { env } from "../../../src/env.mjs";
 import { createLogger } from "../../../src/utils/logger/server";
-import { getApp } from "../../../src/server/app-layer/app";
 import type { UsageService } from "../../../src/server/app-layer/usage/usage.service";
 import { getCurrentMonthStart } from "../../../src/server/utils/dateUtils";
 import { TtlCache } from "../../../src/server/utils/ttlCache";
@@ -56,13 +55,13 @@ export class UsageLimitService {
     organizationService: OrganizationService;
     usageService: UsageService;
     notificationService: NotificationService;
-    planProvider?: PlanProvider;
+    planProvider: PlanProvider;
   }) {
     this.notificationRepository = notificationRepository;
     this.organizationService = organizationService;
     this.usageService = usageService;
     this.notificationService = notificationService;
-    this.planProvider = planProvider ?? getApp().planProvider;
+    this.planProvider = planProvider;
   }
 
   /**
@@ -79,7 +78,7 @@ export class UsageLimitService {
     organizationService: OrganizationService;
     usageService: UsageService;
     notificationService: NotificationService;
-    planProvider?: PlanProvider;
+    planProvider: PlanProvider;
   }): UsageLimitService {
     return new UsageLimitService({ notificationRepository, organizationService, usageService, notificationService, planProvider });
   }
