@@ -148,7 +148,7 @@ export class OtlpSpanTokenEstimationService {
   ): boolean {
     const keys = TOKEN_COUNT_KEYS[direction];
     for (const attr of span.attributes) {
-      if (keys.includes(attr.key as (typeof keys)[number])) {
+      if ((keys as readonly string[]).includes(attr.key)) {
         const val =
           attr.value.intValue ?? attr.value.doubleValue;
         if (val !== undefined && val !== null) return true;
