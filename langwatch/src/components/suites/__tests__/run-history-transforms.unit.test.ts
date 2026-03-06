@@ -7,6 +7,7 @@ import {
   computeRunHistoryTotals,
   computeSuiteRunSummaries,
   getScenarioDisplayNames,
+  resolveOriginLabel,
 } from "../run-history-transforms";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { makeBatchRun, makeScenarioRunData } from "./test-helpers";
@@ -704,6 +705,60 @@ describe("getScenarioDisplayNames()", () => {
 
       const result = getScenarioDisplayNames({ scenarioRuns });
       expect(result).toBe("Login Flow");
+    });
+  });
+});
+
+describe("resolveOriginLabel()", () => {
+  describe("when a suite set ID has a matching suite name", () => {
+    it("returns the suite name", () => {
+      const suiteNameMap = new Map([["suite-123", "Regression Tests"]]);
+
+      const result = resolveOriginLabel({
+        scenarioSetId: "__internal__suite-123__suite",
+        suiteNameMap,
+      });
+
+      expect(result).toBe("Regression Tests");
+    });
+  });
+
+  describe("when the scenario set ID is not a suite set ID", () => {
+    it("returns the raw scenario set ID", () => {
+      const suiteNameMap = new Map<string, string>();
+
+      const result = resolveOriginLabel({
+        scenarioSetId: "nightly-ci",
+        suiteNameMap,
+      });
+
+      expect(result).toBe("nightly-ci");
+    });
+  });
+
+  describe("when no scenario set ID is provided", () => {
+    it("returns null", () => {
+      const suiteNameMap = new Map<string, string>();
+
+      const result = resolveOriginLabel({
+        scenarioSetId: undefined,
+        suiteNameMap,
+      });
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe("when a suite set ID has no matching name in the map", () => {
+    it("returns null to avoid exposing internal IDs", () => {
+      const suiteNameMap = new Map<string, string>();
+
+      const result = resolveOriginLabel({
+        scenarioSetId: "__internal__unknown-suite__suite",
+        suiteNameMap,
+      });
+
+      expect(result).toBeNull();
     });
   });
 });

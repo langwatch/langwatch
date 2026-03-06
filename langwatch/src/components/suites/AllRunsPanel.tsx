@@ -22,7 +22,6 @@ import {
 import { RunHistoryFooter } from "./RunHistoryFooter";
 import { RunRow } from "./RunRow";
 import { GroupRow } from "./GroupRow";
-import { extractSuiteId } from "~/server/suites/suite-set-id";
 import {
   computeBatchRunSummary,
   computeGroupSummary,
@@ -30,6 +29,7 @@ import {
   groupRunsByBatchId,
   groupRunsByScenarioId,
   groupRunsByTarget,
+  resolveOriginLabel,
   type RunGroupType,
 } from "./run-history-transforms";
 
@@ -316,11 +316,10 @@ export function AllRunsPanel({ period }: AllRunsPanelProps) {
                   const summary = computeBatchRunSummary({ batchRun });
                   const isExpanded = expandedIds.has(batchRun.batchRunId);
 
-                  // Extract suite name from scenarioSetId
-                  const suiteId = batchRun.scenarioSetId
-                    ? extractSuiteId(batchRun.scenarioSetId)
-                    : null;
-                  const suiteName = suiteId ? suiteNameMap.get(suiteId) ?? null : null;
+                  const originLabel = resolveOriginLabel({
+                    scenarioSetId: batchRun.scenarioSetId,
+                    suiteNameMap,
+                  });
 
                   return (
                     <RunRow
@@ -331,7 +330,7 @@ export function AllRunsPanel({ period }: AllRunsPanelProps) {
                       onToggle={() => toggleExpanded(batchRun.batchRunId)}
                       resolveTargetName={resolveTargetName}
                       onScenarioRunClick={handleScenarioRunClick}
-                      suiteName={suiteName ?? undefined}
+                      suiteName={originLabel ?? undefined}
                       viewMode={viewMode}
                     />
                   );
