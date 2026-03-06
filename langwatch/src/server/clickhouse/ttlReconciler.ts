@@ -60,6 +60,18 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
     hardcodedDefault: 30,
   },
   {
+    table: "suite_runs",
+    ttlColumn: "CreatedAt",
+    envVar: "TIERED_SUITE_RUNS_TABLE_HOT_DAYS",
+    hardcodedDefault: 30,
+  },
+  {
+    table: "suite_run_items",
+    ttlColumn: "UpdatedAt",
+    envVar: "TIERED_SUITE_RUN_ITEMS_TABLE_HOT_DAYS",
+    hardcodedDefault: 30,
+  },
+  {
     table: "stored_spans",
     ttlColumn: "EndTime",
     envVar: "TIERED_STORED_SPANS_TABLE_HOT_DAYS",

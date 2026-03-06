@@ -238,12 +238,16 @@ describe("ttlReconciler", () => {
     it("covers all expected tables", () => {
       const tableNames = TABLE_TTL_CONFIG.map((c) => c.table);
       expect(tableNames).toEqual([
+        "billable_events",
+        "evaluation_runs",
         "event_log",
+        "experiment_run_items",
+        "experiment_runs",
+        "simulation_runs",
+        "suite_runs",
+        "suite_run_items",
         "stored_spans",
         "trace_summaries",
-        "evaluation_runs",
-        "experiment_runs",
-        "experiment_run_items",
       ]);
     });
 

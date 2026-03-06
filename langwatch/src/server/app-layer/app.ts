@@ -15,6 +15,7 @@ export class App {
     AppCommands["evaluations"];
   readonly experimentRuns: AppCommands["experimentRuns"];
   readonly simulations: AppCommands["simulations"];
+  readonly suiteRuns: AppCommands["suiteRuns"];
   readonly organizations: AppDependencies["organizations"];
   readonly projects: AppDependencies["projects"];
   readonly tokenizer: AppDependencies["tokenizer"];
@@ -42,6 +43,7 @@ export class App {
     this.evaluations = { ...deps.evaluations, ...deps.commands.evaluations };
     this.experimentRuns = deps.commands.experimentRuns;
     this.simulations = deps.commands.simulations;
+    this.suiteRuns = deps.commands.suiteRuns;
     this._eventSourcing = deps._eventSourcing;
     this._gracefulCloseables = deps._gracefulCloseables ?? [];
   }

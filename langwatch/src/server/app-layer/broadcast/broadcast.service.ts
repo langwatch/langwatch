@@ -4,11 +4,12 @@ import type { Cluster } from "ioredis";
 import { createLogger } from "~/utils/logger/server";
 import { BroadcasterNotActiveError } from "./errors";
 
-export type BroadcastEventType = "trace_updated" | "simulation_updated";
+export type BroadcastEventType = "trace_updated" | "simulation_updated" | "suite_run_updated";
 
 const ALL_EVENT_TYPES: BroadcastEventType[] = [
   "trace_updated",
   "simulation_updated",
+  "suite_run_updated",
 ];
 
 function redisChannel(eventType: BroadcastEventType): string {
