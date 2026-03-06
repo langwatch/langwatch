@@ -2,8 +2,7 @@
  * Collapsible row for a grouped set of scenario runs.
  *
  * Used when group-by is set to "scenario" or "target".
- * Header: [chevron] [group_name (bold)] [status_icon] [pass_rate] ... [N runs]
- * Footer: [N passed] [N failed]
+ * Header: [chevron] [group_name (bold)] [status_icon] [pass_rate] ... [N runs] [N passed] [N failed]
  * Expanded: sub-grouped by batch, each with a lightweight header showing
  * timestamp and pass rate, then ScenarioTargetRow (list) or ScenarioGridCard (grid).
  *

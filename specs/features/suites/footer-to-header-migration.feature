@@ -3,10 +3,10 @@ Feature: Suite table footer info moved to header for clarity
   I want run summary info displayed in the row header instead of a footer
   So that I can immediately see metadata without scrolling past content
 
-  # Currently, RunRow and GroupRow show summary statistics (total runs,
-  # passed, failed, stalled, cancelled counts) in a RunSummaryFooter below
-  # expanded content. RunHistoryList and AllRunsPanel show aggregate
-  # totals in a RunHistoryFooter at the bottom of the list.
+  # Previously, run rows and group rows showed summary statistics (total runs,
+  # passed, failed, stalled, cancelled counts) in a footer bar below expanded
+  # content. The run history list and all-runs panel showed aggregate totals
+  # in a footer at the bottom of the list.
   #
   # This feature moves that information into the header area so it is
   # visible at a glance. The existing pass rate percentage and status icon
@@ -15,9 +15,9 @@ Feature: Suite table footer info moved to header for clarity
   # Note: GroupRow already shows "{N} runs" in the header. The change for
   # GroupRow is adding passed/failed counts, not the run total.
   #
-  # Note: RunHistoryFooter tracks (runCount, passedCount, failedCount) only
+  # Note: Aggregate totals track (runCount, passedCount, failedCount) only
   # -- no stalled/cancelled. Stalled/cancelled display applies only to
-  # per-row summaries (RunSummaryFooter).
+  # per-row summaries.
 
   # --- Per-Row Summary (RunRow / GroupRow) ---
 
@@ -28,10 +28,10 @@ Feature: Suite table footer info moved to header for clarity
     Then the header shows "8 passed" and "2 failed" in addition to the existing pass rate and status icon
 
   @integration
-  Scenario: Run row no longer renders a footer whether expanded or collapsed
+  Scenario: Run row no longer renders a summary footer whether expanded or collapsed
     Given a run row exists
     When I view the run row in either expanded or collapsed state
-    Then no RunSummaryFooter appears
+    Then no summary statistics appear below the row content
 
   @integration
   Scenario: Group row header additionally displays passed and failed counts
@@ -40,10 +40,10 @@ Feature: Suite table footer info moved to header for clarity
     Then the header additionally shows "4 passed" and "1 failed"
 
   @integration
-  Scenario: Group row no longer renders a footer whether expanded or collapsed
+  Scenario: Group row no longer renders a summary footer whether expanded or collapsed
     Given a group row exists
     When I view the group row in either expanded or collapsed state
-    Then no RunSummaryFooter appears
+    Then no summary statistics appear below the row content
 
   @unit
   Scenario: Stalled and cancelled counts appear only when non-zero (per-row only)
@@ -64,15 +64,11 @@ Feature: Suite table footer info moved to header for clarity
     Given a suite has run history with multiple batch runs
     When I view the suite detail panel
     Then aggregate passed and failed counts appear in the table header area
-    And no RunHistoryFooter appears at the bottom of the list
+    And no aggregate footer appears at the bottom of the list
 
   @integration
   Scenario: All runs panel shows aggregate totals in table header
     Given multiple suites have run history
     When I view the all runs panel
     Then aggregate passed and failed counts appear in the table header area
-    And no RunHistoryFooter appears at the bottom of the list
-
-  # --- Cleanup ---
-  # The RunSummaryFooter and RunHistoryFooter components and their tests
-  # should be deleted once all references are removed.
+    And no aggregate footer appears at the bottom of the list

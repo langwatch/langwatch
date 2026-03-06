@@ -89,9 +89,9 @@ describe("<AllRunsPanel/>", () => {
       });
       mockScenariosQuery.mockReturnValue({ data: undefined });
 
-      const { container } = render(<AllRunsPanel period={defaultPeriod} />, { wrapper: Wrapper });
+      render(<AllRunsPanel period={defaultPeriod} />, { wrapper: Wrapper });
 
-      expect(container.querySelector(".chakra-spinner")).toBeInTheDocument();
+      expect(screen.getByTestId("loading-spinner")).toBeInTheDocument();
     });
   });
 

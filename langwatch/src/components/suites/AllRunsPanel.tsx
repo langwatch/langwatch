@@ -265,7 +265,7 @@ export function AllRunsPanel({ period }: AllRunsPanelProps) {
   if (isLoading && pages.length === 0) {
     return (
       <Box padding={6} display="flex" justifyContent="center">
-        <Spinner size="lg" />
+        <Spinner size="lg" data-testid="loading-spinner" />
       </Box>
     );
   }
