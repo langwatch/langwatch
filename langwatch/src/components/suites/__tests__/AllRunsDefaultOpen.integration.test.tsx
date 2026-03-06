@@ -58,6 +58,13 @@ vi.mock("~/utils/api", () => ({
       },
     },
     scenarios: {
+      getSuiteRunData: {
+        useQuery: () => ({
+          data: { runs: [], scenarioSetIds: {}, hasMore: false, nextCursor: undefined },
+          isLoading: false,
+          error: null,
+        }),
+      },
       getAllSuiteRunData: {
         useQuery: () => ({
           data: { runs: [], scenarioSetIds: {}, hasMore: false, nextCursor: undefined },
@@ -108,8 +115,8 @@ vi.mock("~/components/DashboardLayout", () => ({
 }));
 
 // Mock panels to avoid deep dependency trees
-vi.mock("~/components/suites/AllRunsPanel", () => ({
-  AllRunsPanel: () => <div data-testid="all-runs-panel">All Runs Panel</div>,
+vi.mock("~/components/suites/RunHistoryPanel", () => ({
+  RunHistoryPanel: () => <div data-testid="all-runs-panel">All Runs Panel</div>,
 }));
 
 vi.mock("~/components/suites/SuiteDetailPanel", () => ({

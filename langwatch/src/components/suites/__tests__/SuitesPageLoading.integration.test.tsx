@@ -27,6 +27,13 @@ vi.mock("~/utils/api", () => ({
       run: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
     },
     scenarios: {
+      getSuiteRunData: {
+        useQuery: () => ({
+          data: { runs: [], scenarioSetIds: {}, hasMore: false },
+          isLoading: false,
+          error: null,
+        }),
+      },
       getAllSuiteRunData: {
         useQuery: () => ({
           data: { runs: [], scenarioSetIds: {}, hasMore: false },
@@ -74,8 +81,8 @@ vi.mock("~/components/DashboardLayout", () => ({
   ),
 }));
 
-vi.mock("~/components/suites/AllRunsPanel", () => ({
-  AllRunsPanel: () => {
+vi.mock("~/components/suites/RunHistoryPanel", () => ({
+  RunHistoryPanel: () => {
     if (allRunsPanelLoading) {
       return (
         <div data-testid="all-runs-panel">

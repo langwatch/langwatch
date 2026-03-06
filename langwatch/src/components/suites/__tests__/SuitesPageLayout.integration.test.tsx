@@ -36,6 +36,13 @@ vi.mock("~/utils/api", () => ({
       run: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
     },
     scenarios: {
+      getSuiteRunData: {
+        useQuery: () => ({
+          data: { runs: [], scenarioSetIds: {}, hasMore: false, nextCursor: undefined },
+          isLoading: false,
+          error: null,
+        }),
+      },
       getAllSuiteRunData: {
         useQuery: () => ({
           data: { runs: [], scenarioSetIds: {}, hasMore: false, nextCursor: undefined },
@@ -89,9 +96,9 @@ vi.mock("~/components/DashboardLayout", () => ({
   },
 }));
 
-// Mock AllRunsPanel to avoid deep dependency tree (now renders by default)
-vi.mock("~/components/suites/AllRunsPanel", () => ({
-  AllRunsPanel: () => <div data-testid="all-runs-panel">All Runs Panel</div>,
+// Mock RunHistoryPanel to avoid deep dependency tree (now renders by default)
+vi.mock("~/components/suites/RunHistoryPanel", () => ({
+  RunHistoryPanel: () => <div data-testid="all-runs-panel">All Runs Panel</div>,
 }));
 
 // We import after mocks are set up
