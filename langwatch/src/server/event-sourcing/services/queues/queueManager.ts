@@ -191,6 +191,7 @@ export class QueueManager<EventType extends Event = Event> {
         spanAttributes?: (event: EventType) => Record<string, string | number | boolean>;
         disabled?: boolean;
         killSwitch?: KillSwitchOptions;
+        groupKeyFn?: (event: EventType) => string;
       };
     }>,
     onEvent: (
@@ -211,9 +212,11 @@ export class QueueManager<EventType extends Event = Event> {
         continue;
       }
 
+      const customGroupKeyFn = handlerDef.options.groupKeyFn;
       const entry: JobRegistryEntry = {
-        groupKeyFn: (event: any) =>
-          `${String(event.tenantId)}:${event.aggregateType}:${String(event.aggregateId)}`,
+        groupKeyFn: customGroupKeyFn
+          ? (event: any) => `${String(event.tenantId)}:${customGroupKeyFn(event)}`
+          : (event: any) => `${String(event.tenantId)}:${event.aggregateType}:${String(event.aggregateId)}`,
         scoreFn: (event: any) => event.createdAt,
         process: async (event: any) => {
           await onEvent(handlerName, event, {
@@ -314,6 +317,7 @@ export class QueueManager<EventType extends Event = Event> {
       handler: CommandHandler<Command<any>, EventType>;
       schema: CommandSchema<any, CommandType>;
       getAggregateId: (payload: any) => string;
+      getGroupKey?: (payload: any) => string;
       options: CommandHandlerOptions<any>;
       commandName: string;
       commandType: CommandType;
@@ -335,6 +339,10 @@ export class QueueManager<EventType extends Event = Event> {
         registration.options?.getAggregateId ??
         handlerClass.getAggregateId.bind(handlerClass);
 
+      const getGroupKey =
+        registration.options?.getGroupKey ??
+        handlerClass.getGroupKey?.bind(handlerClass);
+
       const commandName = handlerClass.dispatcherName ?? registration.name;
 
       if (this.queues.has(this.key("command", commandName))) {
@@ -349,6 +357,7 @@ export class QueueManager<EventType extends Event = Event> {
         handler: handlerInstance,
         schema,
         getAggregateId,
+        getGroupKey,
         options: registration.options ?? {},
         commandName,
         commandType,
@@ -377,8 +386,8 @@ export class QueueManager<EventType extends Event = Event> {
 
       const jobEntry: JobRegistryEntry = {
         groupKeyFn: (payload: any) => {
-          const aggregateId = cmdEntry.getAggregateId(payload);
-          return `${String(payload.tenantId)}:${this.aggregateType}:${String(aggregateId)}`;
+          const key = cmdEntry.getGroupKey ? cmdEntry.getGroupKey(payload) : cmdEntry.getAggregateId(payload);
+          return `${String(payload.tenantId)}:${this.aggregateType}:${String(key)}`;
         },
         scoreFn: (payload: any) => payload.occurredAt as number,
         process: async (payload: any) => {
