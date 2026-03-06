@@ -210,10 +210,7 @@ export function SuiteSidebar({
       align="stretch"
       gap={0}
     >
-      <HStack paddingX={3} paddingTop={3} paddingBottom={1} justify="space-between">
-        <Text fontSize="xs" fontWeight="bold" color="fg.muted" letterSpacing="wider">
-          SUITES
-        </Text>
+      <HStack paddingX={3} paddingTop={3} paddingBottom={1} justify="flex-end">
         <IconButton
           aria-label="Collapse sidebar"
           size="xs"
