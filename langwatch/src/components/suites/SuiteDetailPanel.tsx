@@ -173,7 +173,7 @@ export function SuiteDetailPanel({
       <Separator />
 
       {/* Run history list */}
-      <RunHistoryList suite={suite} onStatsReady={setLiveStats} period={period} />
+      <RunHistoryList suite={suite} onStatsReady={setLiveStats} period={period} onRun={onRun} />
     </VStack>
   );
 }

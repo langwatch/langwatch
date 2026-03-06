@@ -27,6 +27,14 @@ vi.mock("~/hooks/useDrawer", () => ({
   }),
 }));
 
+vi.mock("~/hooks/useSSESubscription", () => ({
+  useSSESubscription: vi.fn(),
+}));
+
+vi.mock("~/hooks/usePageVisibility", () => ({
+  usePageVisibility: () => true,
+}));
+
 // Mock the hooks and API
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
@@ -42,6 +50,13 @@ vi.mock("next/router", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
+    useContext: () => ({
+      scenarios: {
+        getAllSuiteRunData: { invalidate: vi.fn() },
+        getScenarioSetBatchHistory: { invalidate: vi.fn() },
+        onSimulationUpdate: { subscribe: vi.fn() },
+      },
+    }),
     suites: {
       getAll: {
         useQuery: mockSuitesQuery,
