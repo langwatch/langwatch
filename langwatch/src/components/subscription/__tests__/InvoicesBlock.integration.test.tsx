@@ -7,7 +7,7 @@
  * and error state.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { InvoicesBlock } from "../InvoicesBlock";
 
@@ -43,10 +43,16 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-const renderInvoicesBlock = () => {
-  return render(<InvoicesBlock organizationId="test-org-id" />, {
-    wrapper: Wrapper,
-  });
+const renderInvoicesBlock = ({
+  onViewAllInStripe,
+}: { onViewAllInStripe?: () => void } = {}) => {
+  return render(
+    <InvoicesBlock
+      organizationId="test-org-id"
+      onViewAllInStripe={onViewAllInStripe}
+    />,
+    { wrapper: Wrapper },
+  );
 };
 
 // ---------------------------------------------------------------------------
@@ -168,6 +174,67 @@ describe("<InvoicesBlock/>", () => {
       expect(
         screen.queryByTestId("invoice-pdf-inv_2"),
       ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when 'View all in Stripe' link", () => {
+    it("renders when invoices exist and onViewAllInStripe is provided", () => {
+      mockListInvoicesReturn = {
+        data: [
+          {
+            id: "inv_1",
+            number: "INV-001",
+            date: 1700000000,
+            amountDue: 5000,
+            currency: "usd",
+            status: "paid",
+            pdfUrl: null,
+            hostedUrl: null,
+          },
+        ],
+        isLoading: false,
+        isError: false,
+      };
+      renderInvoicesBlock({ onViewAllInStripe: vi.fn() });
+      expect(screen.getByTestId("view-all-invoices-link")).toBeInTheDocument();
+      expect(
+        screen.getByText(/view all in stripe/i),
+      ).toBeInTheDocument();
+    });
+
+    it("does not render when there are no invoices", () => {
+      mockListInvoicesReturn = {
+        data: [],
+        isLoading: false,
+        isError: false,
+      };
+      renderInvoicesBlock({ onViewAllInStripe: vi.fn() });
+      expect(
+        screen.queryByTestId("view-all-invoices-link"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("calls onViewAllInStripe callback when clicked", () => {
+      const handleClick = vi.fn();
+      mockListInvoicesReturn = {
+        data: [
+          {
+            id: "inv_1",
+            number: "INV-001",
+            date: 1700000000,
+            amountDue: 5000,
+            currency: "usd",
+            status: "paid",
+            pdfUrl: null,
+            hostedUrl: null,
+          },
+        ],
+        isLoading: false,
+        isError: false,
+      };
+      renderInvoicesBlock({ onViewAllInStripe: handleClick });
+      fireEvent.click(screen.getByTestId("view-all-invoices-link"));
+      expect(handleClick).toHaveBeenCalledOnce();
     });
   });
 });

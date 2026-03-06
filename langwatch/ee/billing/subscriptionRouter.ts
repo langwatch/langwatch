@@ -208,7 +208,7 @@ export const createSubscriptionRouterFactory = ({
 
         const invoices = await stripe.invoices.list({
           customer: org.stripeCustomerId,
-          limit: 12,
+          limit: 4,
         });
 
         return invoices.data

@@ -7,13 +7,14 @@
 import {
   Badge,
   Card,
+  Flex,
   HStack,
   Skeleton,
   Table,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Download } from "lucide-react";
+import { Download, ExternalLink } from "lucide-react";
 import { Link } from "~/components/ui/link";
 import { api } from "~/utils/api";
 import {
@@ -24,8 +25,10 @@ import {
 
 export function InvoicesBlock({
   organizationId,
+  onViewAllInStripe,
 }: {
   organizationId: string;
+  onViewAllInStripe?: () => void;
 }) {
   const invoices = api.subscription.listInvoices.useQuery({ organizationId });
 
@@ -37,9 +40,31 @@ export function InvoicesBlock({
     >
       <Card.Body paddingY={5} paddingX={6}>
         <VStack align="stretch" gap={4}>
-          <Text fontWeight="semibold" fontSize="lg">
-            Recent Invoices
-          </Text>
+          <Flex justifyContent="space-between" alignItems="center">
+            <Text fontWeight="semibold" fontSize="lg">
+              Recent Invoices
+            </Text>
+            {!invoices.isLoading &&
+              !invoices.isError &&
+              invoices.data &&
+              invoices.data.length > 0 &&
+              onViewAllInStripe && (
+                <Text
+                  data-testid="view-all-invoices-link"
+                  as="button"
+                  fontSize="sm"
+                  color="gray.600"
+                  cursor="pointer"
+                  _hover={{ color: "blue.500" }}
+                  onClick={onViewAllInStripe}
+                >
+                  <HStack gap={1}>
+                    <span>View all in Stripe</span>
+                    <ExternalLink size={14} />
+                  </HStack>
+                </Text>
+              )}
+          </Flex>
 
           {invoices.isLoading && (
             <VStack data-testid="invoices-loading" gap={2}>
@@ -135,6 +160,8 @@ export function InvoicesBlock({
                 </Table.Body>
               </Table.Root>
             )}
+
+
         </VStack>
       </Card.Body>
     </Card.Root>

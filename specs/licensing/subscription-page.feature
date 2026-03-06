@@ -386,16 +386,32 @@ Feature: Subscription Page Plan Management
     Then the invoices section displays a loading skeleton
 
   @integration
-  Scenario: Invoices section limits display to 12 invoices
-    Given the organization has 20 invoices from Stripe
+  Scenario: Invoices section limits display to 4 invoices
+    Given the organization has a paid subscription
+    And the organization has 20 invoices from Stripe
     When I view the subscription page
-    Then I see exactly 12 invoices in the table
+    Then I see exactly 4 invoices in the table
 
   @integration
   Scenario: Invoices are ordered by date descending
-    Given the organization has invoices from Stripe
+    Given the organization has a paid subscription
+    And the organization has invoices from Stripe
     When I view the subscription page
     Then the invoices are ordered by date descending
+
+  @integration
+  Scenario: Invoices section shows "View all in Stripe" link when invoices exist
+    Given the organization has a paid subscription
+    And the organization has invoices from Stripe
+    When I view the subscription page
+    Then I see a "View all in Stripe" link in the invoices section
+
+  @integration
+  Scenario: "View all in Stripe" link is hidden when no invoices exist
+    Given the organization has a paid subscription
+    And the organization has no invoices
+    When I view the subscription page
+    Then I do not see a "View all in Stripe" link
 
   @integration
   Scenario: Invoices section shows error message when Stripe is unreachable
