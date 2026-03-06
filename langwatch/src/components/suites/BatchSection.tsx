@@ -12,6 +12,7 @@ import {
   computeIterationMap,
 } from "./run-history-transforms";
 import { ScenarioRunContent } from "./ScenarioRunContent";
+import { formatSummaryStatusLabel } from "./format-run-status-label";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import type { ViewMode } from "./useRunHistoryStore";
@@ -63,7 +64,7 @@ export function BatchSection({
           fontWeight="medium"
           color={batchSummary.failedCount > 0 ? "red.600" : "green.600"}
         >
-          {Math.round(batchSummary.passRate)}%
+          {formatSummaryStatusLabel(batchSummary)}
         </Text>
       </HStack>
 

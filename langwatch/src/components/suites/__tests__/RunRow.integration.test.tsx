@@ -25,7 +25,7 @@ describe("<RunRow/>", () => {
   });
 
   describe("when collapsed", () => {
-    it("displays pass rate percentage", () => {
+    it("displays passed/failed status with scenario count", () => {
       render(
         <RunRow
           batchRun={makeBatchRun()}
@@ -38,7 +38,8 @@ describe("<RunRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("100%")).toBeInTheDocument();
+      expect(screen.getByText("passed (2/2)")).toBeInTheDocument();
+      expect(screen.queryByText("100%")).not.toBeInTheDocument();
     });
 
     it("does not display scenario x target rows", () => {
@@ -168,11 +169,11 @@ describe("<RunRow/>", () => {
   });
 
   describe("when summary shows failures", () => {
-    it("displays pass rate with failure indicator", () => {
+    it("displays 'failed' with scenario count", () => {
       render(
         <RunRow
           batchRun={makeBatchRun()}
-          summary={makeSummary({ passRate: 88, failedCount: 1 })}
+          summary={makeSummary({ passedCount: 2, failedCount: 1 })}
           isExpanded={false}
           onToggle={vi.fn()}
           resolveTargetName={() => "Prod Agent"}
@@ -181,7 +182,7 @@ describe("<RunRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("88%")).toBeInTheDocument();
+      expect(screen.getByText("failed (2/3)")).toBeInTheDocument();
     });
   });
 
