@@ -35,6 +35,8 @@ import * as subscriptionItemCalculator from "../../../ee/billing/services/subscr
 import { UsageService } from "./usage/usage.service";
 import { StripeUsageReportingService } from "../../../ee/billing/services/usageReportingService";
 import { meters } from "../../../ee/billing/stripe/stripePriceCatalog";
+import { NotificationService } from "../../../ee/billing/notifications/notification.service";
+import { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
 
 export function initializeWebApp(): App {
   return initializeDefaultApp({ processRole: "web" });
@@ -185,6 +187,13 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     close: () => prisma.$disconnect(),
   });
 
+  const notifications = NotificationService.create();
+  const usageLimits = UsageLimitService.create({
+    prisma,
+    usageService: usage,
+    notificationService: notifications,
+  });
+
   return initializeApp({
     config,
     broadcast,
@@ -196,6 +205,8 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     usage,
     planProvider,
     subscription,
+    notifications,
+    usageLimits,
     commands,
     _eventSourcing: es,
     _gracefulCloseables: gracefulCloseables,

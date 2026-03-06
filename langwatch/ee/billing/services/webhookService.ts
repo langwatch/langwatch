@@ -1,7 +1,7 @@
 import { Currency, type PrismaClient } from "@prisma/client";
 import type Stripe from "stripe";
 import { createLogger } from "../../../src/utils/logger";
-import { notifySubscriptionEvent } from "../notifications/notificationHandlers";
+import { getApp } from "../../../src/server/app-layer/app";
 import { NUMERIC_OVERRIDE_FIELDS } from "../planProvider";
 import { PlanTypes, SubscriptionStatus } from "../planTypes";
 import type { calculateQuantityForPrice, prices } from "./subscriptionItemCalculator";
@@ -177,7 +177,7 @@ export const createWebhookService = ({
         }
       }
 
-      await notifySubscriptionEvent({
+      await getApp().notifications?.sendSlackSubscriptionEvent({
         type: "confirmed",
         organizationId: updatedSubscription.organizationId,
         organizationName: updatedSubscription.organization.name,
@@ -416,7 +416,7 @@ export const createWebhookService = ({
         await clearTrialLicenseIfPresent(updatedSubscription, "subscription updated to active");
 
         if (shouldNotify) {
-          await notifySubscriptionEvent({
+          await getApp().notifications?.sendSlackSubscriptionEvent({
             type: "confirmed",
             organizationId: updatedSubscription.organizationId,
             organizationName: updatedSubscription.organization.name,

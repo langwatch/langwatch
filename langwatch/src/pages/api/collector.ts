@@ -4,7 +4,6 @@ import superjson from "superjson";
 import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { captureException, getCurrentScope } from "~/utils/posthogErrorCapture";
-import { notifyPlanLimitReached } from "../../../ee/billing";
 import { withPagesRouterLogger } from "../../middleware/pages-router-logger";
 import { withPagesRouterTracer } from "../../middleware/pages-router-tracer";
 import { getApp } from "../../server/app-layer/app";
@@ -101,7 +100,7 @@ async function handleCollectorRequest(
         const activePlan = await getApp().planProvider.getActivePlan({
           organizationId: project.team.organizationId,
         });
-        await notifyPlanLimitReached({
+        await getApp().usageLimits?.notifyPlanLimitReached({
           organizationId: project.team.organizationId,
           planName: activePlan.name ?? "free",
         });

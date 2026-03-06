@@ -1,16 +1,22 @@
 import type { PrismaClient } from "@prisma/client";
 import { env } from "../../../src/env.mjs";
 import { createLogger } from "../../../src/utils/logger/server";
-import { sendUsageLimitEmail } from "../../../src/server/mailer/usageLimitEmail";
 import { getApp } from "../../../src/server/app-layer/app";
 import type { UsageService } from "../../../src/server/app-layer/usage/usage.service";
 import { getCurrentMonthStart } from "../../../src/server/utils/dateUtils";
+import { captureException } from "../../../src/utils/posthogErrorCapture";
+import type {
+  NotificationService,
+  UsageLimitEmailData,
+} from "./notification.service";
 import { NotificationRepository } from "./repositories/notification.repository";
 import { NOTIFICATION_TYPES } from "./types";
+import type { PlanLimitNotifierInput } from "../types";
 
 const logger = createLogger("langwatch:notifications:usageLimit");
 
 const USAGE_WARNING_THRESHOLDS = [50, 70, 90, 95, 100] as const; // Thresholds in ascending order
+const MIN_DAYS_BETWEEN_ALERTS = 30;
 
 export interface UsageLimitData {
   organizationId: string;
@@ -19,28 +25,122 @@ export interface UsageLimitData {
 }
 
 /**
- * Service layer for usage limit notification business logic
- * Single Responsibility: Handle business logic for usage limit warnings
+ * Service layer for usage limit notification business logic.
+ * Single Responsibility: Handle business logic for WHEN/WHAT to send.
  *
+ * Delegates delivery to {@link NotificationService} (HOW to send).
  * Framework-agnostic - no tRPC dependencies.
  */
 export class UsageLimitService {
   private readonly notificationRepository: NotificationRepository;
   private readonly usageService: UsageService;
+  private readonly notificationService: NotificationService;
 
-  constructor(
-    private readonly prisma: PrismaClient,
-    usageService?: UsageService,
-  ) {
+  constructor({
+    prisma,
+    usageService,
+    notificationService,
+  }: {
+    prisma: PrismaClient;
+    usageService?: UsageService;
+    notificationService: NotificationService;
+  }) {
     this.notificationRepository = new NotificationRepository(prisma);
     this.usageService = usageService ?? getApp().usage;
+    this.notificationService = notificationService;
+    this.prisma = prisma;
   }
+
+  private readonly prisma: PrismaClient;
 
   /**
    * Static factory method for creating a UsageLimitService with proper DI.
    */
-  static create(prisma: PrismaClient): UsageLimitService {
-    return new UsageLimitService(prisma);
+  static create({
+    prisma,
+    usageService,
+    notificationService,
+  }: {
+    prisma: PrismaClient;
+    usageService?: UsageService;
+    notificationService: NotificationService;
+  }): UsageLimitService {
+    return new UsageLimitService({ prisma, usageService, notificationService });
+  }
+
+  /**
+   * Notifies internal channels that an organization has reached its plan limit.
+   * Absorbed from planLimitNotifier.ts.
+   *
+   * Checks IS_SAAS env, fetches org with admin members, enforces 30-day cooldown,
+   * then delegates to NotificationService for Slack and Hubspot delivery.
+   */
+  async notifyPlanLimitReached({
+    organizationId,
+    planName,
+  }: PlanLimitNotifierInput): Promise<void> {
+    if (!env.IS_SAAS) {
+      return;
+    }
+
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      include: {
+        members: {
+          where: { role: "ADMIN" },
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
+
+    if (!organization) {
+      return;
+    }
+
+    if (organization.sentPlanLimitAlert) {
+      const timeSinceLastAlert =
+        Date.now() - organization.sentPlanLimitAlert.getTime();
+      const daysSinceLastAlert = Math.floor(
+        timeSinceLastAlert / (1000 * 60 * 60 * 24),
+      );
+
+      if (daysSinceLastAlert < MIN_DAYS_BETWEEN_ALERTS) {
+        return;
+      }
+    }
+
+    const admin = organization.members[0]?.user;
+
+    const context = {
+      organizationId,
+      organizationName: organization.name,
+      adminName: admin?.name ?? undefined,
+      adminEmail: admin?.email ?? undefined,
+      planName,
+    };
+
+    await Promise.all([
+      this.notificationService.sendSlackPlanLimitAlert(context),
+      this.notificationService.sendHubspotPlanLimitForm(context),
+    ]);
+
+    try {
+      await this.prisma.organization.update({
+        where: { id: organizationId },
+        data: {
+          sentPlanLimitAlert: new Date(),
+        },
+      });
+    } catch (error) {
+      captureException(
+        new Error(
+          `Critical: plan limit notification sent but DB timestamp update failed for org ${organizationId} on plan ${planName}`,
+          { cause: error },
+        ),
+      );
+    }
   }
 
   /**
@@ -54,18 +154,13 @@ export class UsageLimitService {
     const { organizationId, currentMonthMessagesCount, maxMonthlyUsageLimit } =
       data;
 
-    // Calculate usage percentage
     const usagePercentage =
       maxMonthlyUsageLimit > 0
         ? (currentMonthMessagesCount / maxMonthlyUsageLimit) * 100
         : 0;
 
-    // Find the highest threshold that has been crossed
-    const crossedThreshold = USAGE_WARNING_THRESHOLDS.findLast(
-      (threshold) => usagePercentage >= threshold,
-    );
+    const crossedThreshold = this.calculateThreshold(usagePercentage);
 
-    // If no threshold has been crossed, don't send notification
     if (!crossedThreshold) {
       logger.debug(
         {
@@ -78,15 +173,12 @@ export class UsageLimitService {
       return null;
     }
 
-    // Get organization with admin members
     const organization = await this.prisma.organization.findUnique({
       where: { id: organizationId },
       include: {
         members: {
           where: { role: "ADMIN" },
-          include: {
-            user: true,
-          },
+          include: { user: true },
         },
       },
     });
@@ -120,7 +212,6 @@ export class UsageLimitService {
         currentMonthStart,
       );
 
-    // Filter for USAGE_LIMIT_WARNING notifications and check if any have the same threshold
     const recentNotification = recentNotifications.find((notification) => {
       if (!notification.metadata || typeof notification.metadata !== "object") {
         return false;
@@ -147,19 +238,11 @@ export class UsageLimitService {
 
     // Fetch projects and their usage
     const projects = await this.prisma.project.findMany({
-      where: {
-        team: { organizationId },
-      },
-      select: {
-        id: true,
-        name: true,
-      },
-      orderBy: {
-        name: "asc",
-      },
+      where: { team: { organizationId } },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
     });
 
-    // Get message counts per project via UsageService
     const projectIds = projects.map((p) => p.id);
     const counts = await this.usageService.getCountByProjects({
       organizationId,
@@ -172,128 +255,41 @@ export class UsageLimitService {
       messageCount: countsMap.get(p.id) ?? 0,
     }));
 
-    // Send email to all admin members
-    const sentAt = new Date();
-    const baseUrl = env.BASE_HOST ?? "https://app.langwatch.ai";
-    const actionUrl = `${baseUrl}/settings/usage`;
+    const emailContext = this.buildEmailContext({
+      organizationName: organization.name,
+      usagePercentage,
+      currentMonthMessagesCount,
+      maxMonthlyUsageLimit,
+      crossedThreshold,
+      projectUsageData,
+    });
 
-    // Logo image URL (using PNG for better email client compatibility)
-    const logoUrl =
-      "https://ci3.googleusercontent.com/meips/ADKq_NaCbt6cv8rmCuTdJyU7KZ6qJLgPHvuxWR2ud8CtuuF97I33b_-E_lMAtaI1Qgi9VlWtWcG1rCjarfQyMZGNr_6Vevm70VjyT-G05bbo7dtXHr8At8jIeAKNhebm0bFH43okoSx3UyqcKkJcahSiOMPDB8YFhbk0Vr-12M2hpmUFcSC6_NgZ9KQQFYXxJaM=s0-d-e1-ft#https://hs-143534269.f.hubspotstarter-eu1.net/hub/143534269/hubfs/header-3.png?width=1116&upscale=true&name=header-3.png";
+    const deliverableAdmins = organization.members.filter(
+      (member) => member.user.email,
+    );
 
-    // Cap at 100% maximum, then round down to whole number (no decimal)
-    const cappedPercentage = Math.min(usagePercentage, 100);
-    const usagePercentageFormatted = Math.floor(cappedPercentage).toString();
-
-    // Determine severity based on threshold
-    let severity: string;
-    if (crossedThreshold >= 95) {
-      severity = "Critical";
-    } else if (crossedThreshold >= 90) {
-      severity = "High";
-    } else if (crossedThreshold >= 70) {
-      severity = "Medium";
-    } else {
-      severity = "Info";
+    if (deliverableAdmins.length === 0) {
+      logger.info(
+        {
+          organizationId,
+          totalAdmins: organization.members.length,
+          usagePercentage: usagePercentage.toFixed(2),
+          threshold: crossedThreshold,
+        },
+        "No admins with email addresses found, skipping notification (no deliverable recipients)",
+      );
+      return null;
     }
 
     try {
-      // Filter to only admins with email addresses (deliverable recipients)
-      const deliverableAdmins = organization.members.filter(
-        (member) => member.user.email,
-      );
+      const { recipientsSuccessCount, recipientsFailureCount, failedRecipients } =
+        await this.dispatchEmails({
+          organizationId,
+          organizationName: organization.name,
+          deliverableAdmins,
+          emailContext,
+        });
 
-      // Short-circuit if there are no deliverable recipients
-      if (deliverableAdmins.length === 0) {
-        logger.info(
-          {
-            organizationId,
-            totalAdmins: organization.members.length,
-            usagePercentage: usagePercentage.toFixed(2),
-            threshold: crossedThreshold,
-          },
-          "No admins with email addresses found, skipping notification (no deliverable recipients)",
-        );
-        return null;
-      }
-
-      // Log any admins without emails for visibility
-      const adminsWithoutEmail = organization.members.filter(
-        (member) => !member.user.email,
-      );
-      if (adminsWithoutEmail.length > 0) {
-        logger.debug(
-          {
-            organizationId,
-            adminsWithoutEmailCount: adminsWithoutEmail.length,
-            adminsWithoutEmailIds: adminsWithoutEmail.map((m) => m.user.id),
-          },
-          "Some admins lack email addresses and will not receive notifications",
-        );
-      }
-
-      // Send emails to all deliverable admins
-      const emailResults = await Promise.allSettled(
-        deliverableAdmins.map(async (member) => {
-          await sendUsageLimitEmail({
-            to: member.user.email!,
-            organizationName: organization.name,
-            usagePercentage,
-            usagePercentageFormatted,
-            currentMonthMessagesCount,
-            maxMonthlyUsageLimit,
-            crossedThreshold,
-            projectUsageData,
-            actionUrl,
-            logoUrl,
-            severity,
-          });
-        }),
-      );
-
-      // Process results: count successes and failures
-      let recipientsSuccessCount = 0;
-      let recipientsFailureCount = 0;
-      const failedRecipients: Array<{
-        userId: string;
-        error: string;
-      }> = [];
-
-      emailResults.forEach((result, index) => {
-        const member = deliverableAdmins[index];
-        if (!member) {
-          logger.warn(
-            { index, organizationId },
-            "Member not found at index, skipping",
-          );
-          return;
-        }
-
-        if (result.status === "fulfilled") {
-          recipientsSuccessCount++;
-        } else {
-          recipientsFailureCount++;
-          const errorMessage =
-            result.reason instanceof Error
-              ? result.reason.message
-              : String(result.reason);
-          failedRecipients.push({
-            userId: member.user.id,
-            error: errorMessage,
-          });
-          logger.error(
-            {
-              userId: member.user.id,
-              error: errorMessage,
-              organizationId,
-            },
-            "Failed to send usage limit warning email",
-          );
-        }
-      });
-
-      // Only create notification if at least one email succeeded
-      // This error should only occur if there were deliverable recipients but all sends failed
       if (recipientsSuccessCount === 0) {
         logger.error(
           {
@@ -310,26 +306,16 @@ export class UsageLimitService {
         );
       }
 
-      // Create a single notification record for the organization
-      const notification = await this.notificationRepository.create({
+      const notification = await this.recordNotification({
         organizationId,
-        sentAt,
-        metadata: {
-          type: NOTIFICATION_TYPES.USAGE_LIMIT_WARNING,
-          currentUsage: currentMonthMessagesCount,
-          limit: maxMonthlyUsageLimit,
-          percentage: usagePercentage,
-          threshold: crossedThreshold,
-          recipientsCount: deliverableAdmins.length,
-          recipientsSuccessCount,
-          recipientsFailureCount,
-          ...(recipientsFailureCount > 0 && {
-            failedRecipients: failedRecipients.map((f) => ({
-              userId: f.userId,
-              error: f.error,
-            })),
-          }),
-        },
+        currentMonthMessagesCount,
+        maxMonthlyUsageLimit,
+        usagePercentage,
+        crossedThreshold,
+        deliverableAdminsCount: deliverableAdmins.length,
+        recipientsSuccessCount,
+        recipientsFailureCount,
+        failedRecipients,
       });
 
       logger.info(
@@ -354,5 +340,198 @@ export class UsageLimitService {
       );
       throw error;
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // Private helpers for checkAndSendWarning
+  // -------------------------------------------------------------------------
+
+  /**
+   * Finds the highest warning threshold crossed by the current usage percentage.
+   */
+  private calculateThreshold(
+    usagePercentage: number,
+  ): (typeof USAGE_WARNING_THRESHOLDS)[number] | undefined {
+    return USAGE_WARNING_THRESHOLDS.findLast(
+      (threshold) => usagePercentage >= threshold,
+    );
+  }
+
+  /**
+   * Builds the email data object with severity, formatting, and presentation constants.
+   */
+  private buildEmailContext({
+    organizationName,
+    usagePercentage,
+    currentMonthMessagesCount,
+    maxMonthlyUsageLimit,
+    crossedThreshold,
+    projectUsageData,
+  }: {
+    organizationName: string;
+    usagePercentage: number;
+    currentMonthMessagesCount: number;
+    maxMonthlyUsageLimit: number;
+    crossedThreshold: number;
+    projectUsageData: Array<{ id: string; name: string; messageCount: number }>;
+  }): UsageLimitEmailData {
+    const baseUrl = env.BASE_HOST ?? "https://app.langwatch.ai";
+    const actionUrl = `${baseUrl}/settings/usage`;
+
+    // Logo image URL (using PNG for better email client compatibility)
+    const logoUrl =
+      "https://ci3.googleusercontent.com/meips/ADKq_NaCbt6cv8rmCuTdJyU7KZ6qJLgPHvuxWR2ud8CtuuF97I33b_-E_lMAtaI1Qgi9VlWtWcG1rCjarfQyMZGNr_6Vevm70VjyT-G05bbo7dtXHr8At8jIeAKNhebm0bFH43okoSx3UyqcKkJcahSiOMPDB8YFhbk0Vr-12M2hpmUFcSC6_NgZ9KQQFYXxJaM=s0-d-e1-ft#https://hs-143534269.f.hubspotstarter-eu1.net/hub/143534269/hubfs/header-3.png?width=1116&upscale=true&name=header-3.png";
+
+    const cappedPercentage = Math.min(usagePercentage, 100);
+    const usagePercentageFormatted = Math.floor(cappedPercentage).toString();
+
+    let severity: string;
+    if (crossedThreshold >= 95) {
+      severity = "Critical";
+    } else if (crossedThreshold >= 90) {
+      severity = "High";
+    } else if (crossedThreshold >= 70) {
+      severity = "Medium";
+    } else {
+      severity = "Info";
+    }
+
+    return {
+      organizationName,
+      usagePercentage,
+      usagePercentageFormatted,
+      currentMonthMessagesCount,
+      maxMonthlyUsageLimit,
+      crossedThreshold,
+      projectUsageData,
+      actionUrl,
+      logoUrl,
+      severity,
+    };
+  }
+
+  /**
+   * Sends usage limit emails to all deliverable admins, tracking successes and failures.
+   */
+  private async dispatchEmails({
+    organizationId,
+    organizationName,
+    deliverableAdmins,
+    emailContext,
+  }: {
+    organizationId: string;
+    organizationName: string;
+    deliverableAdmins: Array<{ user: { id: string; email: string | null } }>;
+    emailContext: UsageLimitEmailData;
+  }) {
+    // Log any admins without emails for visibility
+    const adminsWithoutEmail = deliverableAdmins.filter(
+      (member) => !member.user.email,
+    );
+    if (adminsWithoutEmail.length > 0) {
+      logger.debug(
+        {
+          organizationId,
+          adminsWithoutEmailCount: adminsWithoutEmail.length,
+          adminsWithoutEmailIds: adminsWithoutEmail.map((m) => m.user.id),
+        },
+        "Some admins lack email addresses and will not receive notifications",
+      );
+    }
+
+    const emailResults = await Promise.allSettled(
+      deliverableAdmins.map(async (member) => {
+        await this.notificationService.sendUsageLimitEmail({
+          to: member.user.email!,
+          orgName: organizationName,
+          usageData: emailContext,
+        });
+      }),
+    );
+
+    let recipientsSuccessCount = 0;
+    let recipientsFailureCount = 0;
+    const failedRecipients: Array<{ userId: string; error: string }> = [];
+
+    emailResults.forEach((result, index) => {
+      const member = deliverableAdmins[index];
+      if (!member) {
+        logger.warn(
+          { index, organizationId },
+          "Member not found at index, skipping",
+        );
+        return;
+      }
+
+      if (result.status === "fulfilled") {
+        recipientsSuccessCount++;
+      } else {
+        recipientsFailureCount++;
+        const errorMessage =
+          result.reason instanceof Error
+            ? result.reason.message
+            : String(result.reason);
+        failedRecipients.push({
+          userId: member.user.id,
+          error: errorMessage,
+        });
+        logger.error(
+          {
+            userId: member.user.id,
+            error: errorMessage,
+            organizationId,
+          },
+          "Failed to send usage limit warning email",
+        );
+      }
+    });
+
+    return { recipientsSuccessCount, recipientsFailureCount, failedRecipients };
+  }
+
+  /**
+   * Creates a notification record in the repository after successful email delivery.
+   */
+  private async recordNotification({
+    organizationId,
+    currentMonthMessagesCount,
+    maxMonthlyUsageLimit,
+    usagePercentage,
+    crossedThreshold,
+    deliverableAdminsCount,
+    recipientsSuccessCount,
+    recipientsFailureCount,
+    failedRecipients,
+  }: {
+    organizationId: string;
+    currentMonthMessagesCount: number;
+    maxMonthlyUsageLimit: number;
+    usagePercentage: number;
+    crossedThreshold: number;
+    deliverableAdminsCount: number;
+    recipientsSuccessCount: number;
+    recipientsFailureCount: number;
+    failedRecipients: Array<{ userId: string; error: string }>;
+  }) {
+    return this.notificationRepository.create({
+      organizationId,
+      sentAt: new Date(),
+      metadata: {
+        type: NOTIFICATION_TYPES.USAGE_LIMIT_WARNING,
+        currentUsage: currentMonthMessagesCount,
+        limit: maxMonthlyUsageLimit,
+        percentage: usagePercentage,
+        threshold: crossedThreshold,
+        recipientsCount: deliverableAdminsCount,
+        recipientsSuccessCount,
+        recipientsFailureCount,
+        ...(recipientsFailureCount > 0 && {
+          failedRecipients: failedRecipients.map((f) => ({
+            userId: f.userId,
+            error: f.error,
+          })),
+        }),
+      },
+    });
   }
 }
