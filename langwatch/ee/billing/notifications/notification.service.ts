@@ -429,6 +429,9 @@ export class NotificationService {
 
     const url = `https://api.hsforms.com/submissions/v3/integration/submit/${hubspotPortalId}/${hubspotFormId}`;
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), SLACK_TIMEOUT_MS);
+
     try {
       const response = await fetch(url, {
         method: "POST",
@@ -436,6 +439,7 @@ export class NotificationService {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(formData),
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -449,6 +453,8 @@ export class NotificationService {
         "Failed to send HubSpot plan-limit notification",
       );
       captureException(error);
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 }
