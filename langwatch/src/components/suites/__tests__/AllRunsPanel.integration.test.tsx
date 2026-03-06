@@ -6,7 +6,7 @@
  * Tests cross-suite run history rendering, empty states, and error handling.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { RunHistoryPanel } from "../RunHistoryPanel";
@@ -24,6 +24,14 @@ vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({
     openDrawer: vi.fn(),
   }),
+}));
+
+vi.mock("~/hooks/useSSESubscription", () => ({
+  useSSESubscription: vi.fn(),
+}));
+
+vi.mock("~/hooks/usePageVisibility", () => ({
+  usePageVisibility: () => true,
 }));
 
 // Mock the hooks and API
@@ -84,10 +92,9 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
       });
       mockScenariosQuery.mockReturnValue({ data: undefined });
 
-      const { container } = render(<RunHistoryPanel period={defaultPeriod} />, { wrapper: Wrapper });
+      render(<RunHistoryPanel period={defaultPeriod} />, { wrapper: Wrapper });
 
-      // Chakra Spinner renders as a span with class containing "spinner"
-      expect(container.querySelector(".chakra-spinner")).toBeInTheDocument();
+      expect(screen.getByTestId("loading-spinner")).toBeInTheDocument();
     });
   });
 
@@ -125,22 +132,34 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
   });
 
   describe("given runs exist", () => {
-    it("renders All Runs title", () => {
-      const runs = [
-        {
-          batchRunId: "batch_1",
-          scenarioRunId: "run_1",
-          scenarioId: "scen_1",
-          status: "SUCCESS",
-          timestamp: Date.now(),
-          results: null,
-          messages: [],
-          name: null,
-          description: null,
-          durationInMs: 100,
-        },
-      ];
+    const runs = [
+      {
+        batchRunId: "batch_1",
+        scenarioRunId: "run_1",
+        scenarioId: "scen_1",
+        status: "SUCCESS",
+        timestamp: Date.now(),
+        results: null,
+        messages: [],
+        name: null,
+        description: null,
+        durationInMs: 100,
+      },
+      {
+        batchRunId: "batch_1",
+        scenarioRunId: "run_2",
+        scenarioId: "scen_2",
+        status: "FAILED",
+        timestamp: Date.now(),
+        results: null,
+        messages: [],
+        name: null,
+        description: null,
+        durationInMs: 200,
+      },
+    ];
 
+    function renderWithRuns() {
       mockRunDataQuery.mockReturnValue({
         data: {
           runs,
@@ -152,9 +171,29 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
       });
       mockScenariosQuery.mockReturnValue({ data: [] });
 
-      render(<RunHistoryPanel period={defaultPeriod} />, { wrapper: Wrapper });
+      return render(<RunHistoryPanel period={defaultPeriod} />, { wrapper: Wrapper });
+    }
 
+    it("renders All Runs title", () => {
+      renderWithRuns();
       expect(screen.getByText("All Runs")).toBeInTheDocument();
+    });
+
+    it("displays aggregate passed and failed counts in header area", () => {
+      renderWithRuns();
+
+      const headerTotals = screen.getByTestId("all-runs-header-totals");
+      expect(headerTotals).toBeInTheDocument();
+      expect(within(headerTotals).getByText("1 passed")).toBeInTheDocument();
+      expect(within(headerTotals).getByText("1 failed")).toBeInTheDocument();
+    });
+
+    it("does not render a RunHistoryFooter", () => {
+      const { container } = renderWithRuns();
+
+      expect(
+        container.querySelector('[data-testid="run-history-footer"]'),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -298,11 +337,16 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
         await userEvent.selectOptions(groupBySelect, "scenario");
 
         const groupHeaders = screen.getAllByTestId("group-row-header");
-        expect(groupHeaders.length).toBe(2);
+        expect(groupHeaders).toHaveLength(2);
 
-        // Verify scenario names appear as group labels (may also appear in filter dropdown)
-        expect(screen.getAllByText("Login Flow").length).toBeGreaterThanOrEqual(1);
-        expect(screen.getAllByText("Checkout Flow").length).toBeGreaterThanOrEqual(1);
+        // Verify scenario names appear as group labels (order-independent)
+        const headerTexts = groupHeaders.map((h) => h.textContent ?? "");
+        expect(headerTexts).toEqual(
+          expect.arrayContaining([
+            expect.stringContaining("Checkout Flow"),
+            expect.stringContaining("Login Flow"),
+          ]),
+        );
       });
 
       it("includes runs from multiple suites in grouped results", async () => {
@@ -357,7 +401,7 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
         // Both runs from different suites should be grouped under one scenario
         const groupHeaders = screen.getAllByTestId("group-row-header");
         expect(groupHeaders.length).toBe(1);
-        expect(screen.getAllByText("Shared Scenario").length).toBeGreaterThanOrEqual(1);
+        expect(within(groupHeaders[0]!).getByText("Shared Scenario")).toBeInTheDocument();
       });
     });
 
