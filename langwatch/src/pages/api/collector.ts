@@ -1,12 +1,13 @@
-import superjson from "superjson";
-import crypto from "node:crypto";
 import type { NextApiRequest, NextApiResponse } from "next";
+import crypto from "node:crypto";
+import superjson from "superjson";
 import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { captureException, getCurrentScope } from "~/utils/posthogErrorCapture";
 import { notifyPlanLimitReached } from "../../../ee/billing";
 import { withPagesRouterLogger } from "../../middleware/pages-router-logger";
 import { withPagesRouterTracer } from "../../middleware/pages-router-tracer";
+import { getApp } from "../../server/app-layer/app";
 import { maybeAddIdsToContextList } from "../../server/background/workers/collector/rag";
 import {
   fetchExistingMD5s,
@@ -27,7 +28,7 @@ import {
   spanSchema,
   spanValidatorSchema,
 } from "../../server/tracer/types.generated";
-import { getApp } from "../../server/app-layer/app";
+import { CollectorSpanUtils } from "../../server/traces/collectorSpan.utils";
 import { createLogger } from "../../utils/logger/server";
 
 const logger = createLogger("langwatch.collector");
@@ -309,18 +310,18 @@ async function handleCollectorRequest(
       "outputs" in span &&
       typeof span.outputs !== "undefined"
     ) {
-      //@ts-ignore
+      //@ts-expect-error
       if (span.outputs.length == 0) {
         span.output = null;
-        //@ts-ignore
+        //@ts-expect-error
       } else if (span.outputs.length == 1) {
-        //@ts-ignore
+        //@ts-expect-error
         span.output = span.outputs[0];
-        //@ts-ignore
+        //@ts-expect-error
       } else if (span.outputs.length > 1) {
         span.output = {
           type: "list",
-          //@ts-ignore
+          //@ts-expect-error
           value: span.outputs,
         };
       }
@@ -474,6 +475,34 @@ async function handleCollectorRequest(
       ...existingTrace.existing_metadata.custom,
       ...customMetadata,
     };
+  }
+
+  if (project.featureEventSourcingTraceIngestion) {
+    try {
+      const resource = CollectorSpanUtils.buildResource({
+        reservedTraceMetadata,
+        customMetadata,
+        expectedOutput,
+      });
+
+      await Promise.allSettled(
+        spans.map((span) =>
+          getApp().traces.recordSpan({
+            tenantId: project.id,
+            span: CollectorSpanUtils.convertSpanToOtlp(span),
+            resource,
+            instrumentationScope: { name: "langwatch.rest.collector" },
+            piiRedactionLevel: project.piiRedactionLevel,
+            occurredAt: Date.now(),
+          }),
+        ),
+      );
+    } catch (error) {
+      logger.error(
+        { error, projectId: project.id, traceId },
+        "Error dispatching collector spans to event sourcing",
+      );
+    }
   }
 
   const forceSync = req.query.force_sync === "true";
