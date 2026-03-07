@@ -4,6 +4,11 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import {
+  createLicenseEnforcementService,
+  LimitExceededError,
+} from "../../license-enforcement";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
 import { checkOrganizationPermission, checkTeamPermission } from "../rbac";
 
@@ -350,24 +355,36 @@ export const teamRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
-      // Check teams license limit
-      const subscriptionLimits =
-        await getApp().planProvider.getActivePlan({
+      // Check teams license limit via LicenseEnforcementService
+      const enforcement = createLicenseEnforcementService(prisma);
+      try {
+        await enforcement.enforceLimitByOrganization({
           organizationId: input.organizationId,
+          limitType: "teams",
           user: ctx.session.user,
         });
+      } catch (error) {
+        if (error instanceof LimitExceededError) {
+          void getApp()
+            .usageLimits?.notifyResourceLimitReached({
+              organizationId: input.organizationId,
+              limitType: error.limitType,
+              current: error.current,
+              max: error.max,
+            })
+            .catch(captureException);
 
-      if (!subscriptionLimits.overrideAddingLimitations) {
-        const currentTeamCount = await prisma.team.count({
-          where: { organizationId: input.organizationId },
-        });
-
-        if (currentTeamCount >= subscriptionLimits.maxTeams) {
           throw new TRPCError({
             code: "FORBIDDEN",
-            message: "Over the limit of teams allowed",
+            message: error.message,
+            cause: {
+              limitType: error.limitType,
+              current: error.current,
+              max: error.max,
+            },
           });
         }
+        throw error;
       }
 
       const teamNanoId = nanoid();
