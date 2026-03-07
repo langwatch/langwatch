@@ -119,39 +119,39 @@ Feature: Trace scope classification
   Scenario: Workflow execution in production sets scope "workflow"
     Given a workflow executes with enable_tracing=true and manual_execution_mode=false
     When the trace is sent to LangWatch
-    Then the root span metadata contains "langwatch.scope" = "workflow"
+    Then the root span contains attribute "langwatch.scope" = "workflow"
 
   @unit
   Scenario: Workflow execution in development sets scope "workflow"
     Given a workflow executes with enable_tracing=true and manual_execution_mode=true
     When the trace is sent to LangWatch
-    Then the root span metadata contains "langwatch.scope" = "workflow"
+    Then the root span contains attribute "langwatch.scope" = "workflow"
 
   @unit
   Scenario: Component execution in studio sets scope "workflow"
     Given a studio component executes from the optimization studio canvas
     When the trace is sent to LangWatch
-    Then the root span metadata contains "langwatch.scope" = "workflow"
+    Then the root span contains attribute "langwatch.scope" = "workflow"
 
   @unit
   Scenario: Evaluations-v3 execution sets scope "evaluation" not "workflow"
     Given an evaluation runs from the evaluations-v3 workbench
     And the evaluation orchestrator builds a workflow and dispatches to execute_flow
     When the trace is sent to LangWatch
-    Then the root span metadata contains "langwatch.scope" = "evaluation"
+    Then the root span contains attribute "langwatch.scope" = "evaluation"
 
   @unit
   Scenario: Prompt playground execution sets scope "playground"
     Given a prompt playground session executes via PromptStudioAdapter
     And PromptStudioAdapter sends an execute_component event to the studio backend
     When the trace is sent to LangWatch
-    Then the root span metadata contains "langwatch.scope" = "playground"
+    Then the root span contains attribute "langwatch.scope" = "playground"
 
   @unit
   Scenario: Platform scenario simulation sets scope "simulation"
     Given a scenario simulation runs from the platform via SimulationRunnerService
     When the trace is sent to LangWatch
-    Then the root span metadata contains "langwatch.scope" = "simulation"
+    Then the root span contains attribute "langwatch.scope" = "simulation"
 
   # ===========================================================================
   # Step 1b: Capturing langwatch.scope from SDK-originated traces
@@ -211,15 +211,15 @@ Feature: Trace scope classification
   Scenario: execute_flow no longer sets metadata.platform
     Given a workflow executes via execute_flow after the cleanup
     When the trace is sent to LangWatch
-    Then the root span metadata does not contain "platform"
-    And the root span metadata contains "langwatch.scope" = "workflow"
+    Then the root span does not contain metadata key "platform"
+    And the root span contains attribute "langwatch.scope" = "workflow"
 
   @unit
   Scenario: execute_component no longer sets metadata.platform
     Given a studio component executes after the cleanup
     When the trace is sent to LangWatch
-    Then the root span metadata does not contain "platform"
-    And the root span metadata does not contain "environment"
+    Then the root span does not contain metadata key "platform"
+    And the root span does not contain metadata key "environment"
 
   @unit
   Scenario: Python SDK experiment no longer uses langwatch-evaluation scope name
@@ -232,7 +232,7 @@ Feature: Trace scope classification
   Scenario: TypeScript SDK experiment no longer uses langwatch-evaluation scope name
     Given a TypeScript SDK experiment runs after the cleanup
     When the experiment creates a tracer
-    Then the tracer scope name is the user's tracer name (not "langwatch-evaluation")
+    Then the tracer scope name is "langwatch" (not "langwatch-evaluation")
     And the root span contains attribute "langwatch.scope" = "evaluation"
 
   @unit
@@ -445,13 +445,6 @@ Feature: Trace scope classification
 
   @unit
   Scenario: Online evaluations run on application traces
-    Given an online evaluation monitor is enabled for the project
-    And a trace arrives with "langwatch.scope" = "application"
-    When the evaluation trigger reactor processes the trace
-    Then evaluations are triggered normally
-
-  @unit
-  Scenario: Online evaluations run on legacy traces without scope
     Given an online evaluation monitor is enabled for the project
     And a trace arrives without "langwatch.scope" set
     When the evaluation trigger reactor processes the trace

@@ -653,7 +653,7 @@ export function applySpanToSummary(
     if (filtered.length > 0) {
       mergedAttributes["langwatch.labels"] = JSON.stringify(filtered);
     } else {
-      mergedAttributes["langwatch.labels"] = JSON.stringify([]);
+      delete mergedAttributes["langwatch.labels"];
     }
   }
 

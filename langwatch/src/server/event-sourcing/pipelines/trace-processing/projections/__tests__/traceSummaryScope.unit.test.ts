@@ -238,12 +238,7 @@ describe("applySpanToSummary() langwatch.scope hoisting", () => {
 
       const state = applySpanToSummary(createInitState(), span);
 
-      // Labels should be empty or not present
-      const labelsRaw = state.attributes["langwatch.labels"];
-      if (labelsRaw) {
-        const labels = JSON.parse(labelsRaw) as string[];
-        expect(labels).toHaveLength(0);
-      }
+      expect(state.attributes["langwatch.labels"]).toBeUndefined();
     });
   });
 
