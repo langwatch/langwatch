@@ -241,6 +241,27 @@ export const clickHouseFilters: Record<
   },
 
   // Trace filters
+  "traces.origin": {
+    tableName: "trace_summaries",
+    buildQuery: (params) => {
+      const { sql: scopeSql } = buildScopeConditions(params);
+      return `
+        SELECT
+          if(ts.Attributes['langwatch.origin'] = '', 'application', ts.Attributes['langwatch.origin']) as field,
+          if(ts.Attributes['langwatch.origin'] = '', 'application', ts.Attributes['langwatch.origin']) as label,
+          count() as count
+        FROM trace_summaries ts
+        WHERE ${buildTraceSummariesConditions(params)}
+          ${buildQueryFilter("if(ts.Attributes['langwatch.origin'] = '', 'application', ts.Attributes['langwatch.origin'])", params)}
+          ${scopeSql}
+        GROUP BY field
+        ORDER BY field ASC
+        LIMIT 10000
+      `;
+    },
+    extractResults: extractStandardResults,
+  },
+
   "traces.error": {
     tableName: "trace_summaries",
     buildQuery: (params) => {

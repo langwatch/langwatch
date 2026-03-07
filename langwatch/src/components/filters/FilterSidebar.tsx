@@ -2,6 +2,7 @@ import { VStack } from "@chakra-ui/react";
 import React from "react";
 import { QueryStringFieldsFilters } from "./FieldsFilters";
 import { useFilterToggle } from "./FilterToggle";
+import { SaveAsViewButton } from "./SaveAsViewButton";
 import { TopicsSelector } from "./TopicsSelector";
 
 export const FilterSidebar = React.memo(function FilterSidebar({
@@ -25,6 +26,7 @@ export const FilterSidebar = React.memo(function FilterSidebar({
       >
         {!hideTopics && <TopicsSelector />}
         <QueryStringFieldsFilters />
+        <SaveAsViewButton />
       </VStack>
     )
   );

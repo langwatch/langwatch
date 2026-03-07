@@ -50,6 +50,39 @@ export const clickHouseFilterConditions: Record<
   }),
 
   // Traces
+  "traces.origin": (values, paramId) => {
+    const hasApplication = values.includes("application");
+    const otherValues = values.filter((v) => v !== "application");
+
+    const parts: string[] = [];
+
+    if (hasApplication) {
+      parts.push(
+        "(ts.Attributes['langwatch.origin'] = '' OR ts.Attributes['langwatch.origin'] IS NULL)",
+      );
+    }
+
+    if (otherValues.length > 0) {
+      parts.push(
+        `ts.Attributes['langwatch.origin'] IN ({${paramId}_values:Array(String)})`,
+      );
+    }
+
+    if (parts.length === 0) {
+      return { sql: "1=0", params: {} };
+    }
+
+    const params: Record<string, unknown> = {};
+    if (otherValues.length > 0) {
+      params[`${paramId}_values`] = otherValues;
+    }
+
+    return {
+      sql: parts.length === 1 ? parts[0]! : `(${parts.join(" OR ")})`,
+      params,
+    };
+  },
+
   "traces.error": (values, _paramId) => {
     const hasTrue = values.includes("true");
     const hasFalse = values.includes("false");
