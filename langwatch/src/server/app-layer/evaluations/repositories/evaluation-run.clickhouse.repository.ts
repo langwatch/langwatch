@@ -29,6 +29,7 @@ interface ClickHouseEvaluationRunRecord {
   Label: string | null;
   Details: string | null;
   Error: string | null;
+  ErrorDetails: string | null;
   CreatedAt: number;
   UpdatedAt: number;
   ArchivedAt: number | null;
@@ -121,6 +122,7 @@ export class EvaluationRunClickHouseRepository
             Label,
             Details,
             Error,
+            ErrorDetails,
             toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
             toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
             toUnixTimestamp64Milli(ArchivedAt) AS ArchivedAt,
@@ -171,6 +173,7 @@ export class EvaluationRunClickHouseRepository
       label: record.Label,
       details: record.Details,
       error: record.Error,
+      errorDetails: record.ErrorDetails,
       createdAt: Number(record.CreatedAt),
       updatedAt: Number(record.UpdatedAt),
       archivedAt: record.ArchivedAt === null ? null : Number(record.ArchivedAt),
@@ -205,6 +208,7 @@ export class EvaluationRunClickHouseRepository
       Label: data.label,
       Details: data.details,
       Error: data.error,
+      ErrorDetails: data.errorDetails,
       CreatedAt: new Date(data.createdAt),
       UpdatedAt: new Date(data.updatedAt),
       ArchivedAt: data.archivedAt != null ? new Date(data.archivedAt) : null,
