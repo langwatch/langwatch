@@ -1,4 +1,3 @@
-@backend
 Feature: Enterprise-only feature guards
   As the LangWatch platform
   I want to restrict RBAC custom roles and Audit Logs to Enterprise plans
@@ -89,6 +88,18 @@ Feature: Enterprise-only feature guards
   Scenario: Non-enterprise org cannot create teams with custom role members
     Given the organization plan is not ENTERPRISE
     When an admin creates a team with a member assigned a custom role
+    Then the request is rejected with FORBIDDEN
+
+  @unit
+  Scenario: Non-enterprise org cannot update team member role to custom role
+    Given the organization plan is not ENTERPRISE
+    When an admin updates a team member's role to a custom role
+    Then the request is rejected with FORBIDDEN
+
+  @unit
+  Scenario: Non-enterprise org cannot create invite requests with custom roles
+    Given the organization plan is not ENTERPRISE
+    When an admin creates an invite request with a custom role in team assignments
     Then the request is rejected with FORBIDDEN
 
   @unit

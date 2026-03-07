@@ -118,7 +118,7 @@ function AuditLogPage() {
         endDate: endDate.getTime(),
       },
       {
-        enabled: !!organization,
+        enabled: !!organization && isEnterprise,
       },
     );
 

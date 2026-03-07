@@ -1011,6 +1011,19 @@ export const organizationRouter = createTRPCRouter({
     )
     .use(checkOrganizationPermission("organization:view"))
     .mutation(async ({ input, ctx }) => {
+      const hasCustomRoleInvite = input.invites.some((invite) =>
+        (invite.teams ?? []).some(
+          (t) => typeof t.role === "string" && isCustomRole(t.role),
+        ),
+      );
+      if (hasCustomRoleInvite) {
+        await assertEnterprisePlan({
+          organizationId: input.organizationId,
+          user: ctx.session.user,
+          errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
+        });
+      }
+
       const prisma = ctx.prisma;
       const inviteService = InviteService.create(prisma);
 
@@ -1410,6 +1423,23 @@ export const organizationRouter = createTRPCRouter({
       const inputIsCustomRole = isCustomRole(input.role);
 
       if (inputIsCustomRole && input.customRoleId) {
+        // Check enterprise plan before allowing custom role assignment
+        const teamForPlanCheck = await prisma.team.findUnique({
+          where: { id: input.teamId },
+          select: { organizationId: true },
+        });
+        if (!teamForPlanCheck) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Team not found",
+          });
+        }
+        await assertEnterprisePlan({
+          organizationId: teamForPlanCheck.organizationId,
+          user: ctx.session.user,
+          errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
+        });
+
         const customRoleId = input.customRoleId; // Store in a const for TypeScript
 
         // Atomic transaction with admin validation
