@@ -225,14 +225,14 @@ Feature: Trace origin classification
   Scenario: Python SDK experiment no longer uses langwatch-evaluation origin name
     Given a Python SDK experiment runs after the cleanup
     When the experiment creates a tracer
-    Then the tracer origin name is "langwatch" (same as regular traces)
+    Then the tracer scope name is "langwatch" (same as regular traces)
     And the root span contains attribute "langwatch.origin" = "evaluation"
 
   @unit
   Scenario: TypeScript SDK experiment no longer uses langwatch-evaluation origin name
     Given a TypeScript SDK experiment runs after the cleanup
     When the experiment creates a tracer
-    Then the tracer origin name is "langwatch" (not "langwatch-evaluation")
+    Then the tracer scope name is "langwatch" (not "langwatch-evaluation")
     And the root span contains attribute "langwatch.origin" = "evaluation"
 
   @unit

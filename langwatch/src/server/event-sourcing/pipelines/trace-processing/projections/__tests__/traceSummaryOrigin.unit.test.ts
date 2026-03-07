@@ -65,7 +65,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
   // ---- Step 2: Hoisting langwatch.origin ----
 
   describe("when root span has langwatch.origin", () => {
-    it("hoists scope to trace summary attributes", () => {
+    it("hoists origin to trace summary attributes", () => {
       const span = createTestSpan({
         parentSpanId: null, // root span
         spanAttributes: {
@@ -80,8 +80,8 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
   });
 
   describe("when child span has langwatch.origin and root span does not", () => {
-    it("preserves child span scope value", () => {
-      // Child span arrives first with scope
+    it("preserves child span origin value", () => {
+      // Child span arrives first with origin
       const childSpan = createTestSpan({
         id: "child-1",
         spanId: "child-1",
@@ -91,7 +91,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         },
       });
 
-      // Root span arrives later without scope
+      // Root span arrives later without origin
       const rootSpan = createTestSpan({
         id: "root-1",
         spanId: "root-1",
@@ -106,9 +106,9 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
     });
   });
 
-  describe("when root span overrides child span scope", () => {
-    it("uses root span scope value", () => {
-      // Child span arrives first with scope
+  describe("when root span overrides child span origin", () => {
+    it("uses root span origin value", () => {
+      // Child span arrives first with origin
       const childSpan = createTestSpan({
         id: "child-1",
         spanId: "child-1",
@@ -118,7 +118,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         },
       });
 
-      // Root span arrives later with different scope
+      // Root span arrives later with different origin
       const rootSpan = createTestSpan({
         id: "root-1",
         spanId: "root-1",
@@ -148,9 +148,9 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
     });
   });
 
-  describe("when black-box scenario trace propagates scope through traceparent", () => {
-    it("preserves root span scope through child spans", () => {
-      // Root span with simulation scope
+  describe("when black-box scenario trace propagates origin through traceparent", () => {
+    it("preserves root span origin through child spans", () => {
+      // Root span with simulation origin
       const rootSpan = createTestSpan({
         id: "root-1",
         spanId: "root-1",
@@ -160,7 +160,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         },
       });
 
-      // Remote child span without scope
+      // Remote child span without origin
       const childSpan = createTestSpan({
         id: "child-1",
         spanId: "child-1",
@@ -344,7 +344,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
   });
 
   describe("when explicit langwatch.origin is set alongside legacy markers", () => {
-    it("uses explicit scope over all inferred signals", () => {
+    it("uses explicit origin over all inferred signals", () => {
       const span = createTestSpan({
         instrumentationScope: { name: "langwatch-evaluation", version: null },
         spanAttributes: {
@@ -359,7 +359,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
     });
   });
 
-  describe("when no scope signal exists at all", () => {
+  describe("when no origin signal exists at all", () => {
     it("does not set langwatch.origin", () => {
       const span = createTestSpan({
         spanAttributes: {},

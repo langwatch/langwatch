@@ -30,7 +30,7 @@ async def execute_component(event: ExecuteComponentPayload):
     do_not_trace = not event.workflow.enable_tracing
 
     try:
-        scope = event.origin or "workflow"
+        origin = event.origin or "workflow"
         metadata={}
         if event.thread_id:
             metadata["thread_id"] = event.thread_id

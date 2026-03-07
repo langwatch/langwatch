@@ -86,7 +86,7 @@ const STANDARD_RESOURCE_PREFIXES = [
  *   6. span attribute evaluation.run_id present -> "evaluation"
  *   7. No signal -> undefined
  */
-function inferScopeFromLegacyMarkers(span: NormalizedSpan): string | undefined {
+function inferOriginFromLegacyMarkers(span: NormalizedSpan): string | undefined {
 	// 1. instrumentationScope.name = "langwatch-evaluation"
 	if (span.instrumentationScope?.name === "langwatch-evaluation") {
 		return "evaluation";
@@ -394,9 +394,9 @@ function extractAttributesFromSpan(
 		attributes["langgraph.thread_id"] = langgraphThreadId;
 
 	// Scope attribute — forwarded for hoisting logic in applySpanToSummary
-	const langwatchScope = spanAttrs["langwatch.origin"];
-	if (typeof langwatchScope === "string")
-		attributes["langwatch.origin"] = langwatchScope;
+	const langwatchOrigin = spanAttrs["langwatch.origin"];
+	if (typeof langwatchOrigin === "string")
+		attributes["langwatch.origin"] = langwatchOrigin;
 
 	// Labels (canonical key only — canonicalization already promoted from metadata)
 	const labels = spanAttrs[ATTR_KEYS.LANGWATCH_LABELS];
@@ -658,29 +658,29 @@ export function applySpanToSummary(
   }
 
   // Hoist langwatch.origin with root-span-wins-if-set semantics
-  const isRootSpanForScope = !span.parentSpanId;
-  const explicitScope = span.spanAttributes["langwatch.origin"];
-  const hasExplicitScope = typeof explicitScope === "string" && explicitScope !== "";
+  const isRootSpan = !span.parentSpanId;
+  const explicitOrigin = span.spanAttributes["langwatch.origin"];
+  const hasExplicitOrigin = typeof explicitOrigin === "string" && explicitOrigin !== "";
 
-  if (hasExplicitScope) {
-    if (isRootSpanForScope) {
+  if (hasExplicitOrigin) {
+    if (isRootSpan) {
       // Root span with explicit scope always wins
-      mergedAttributes["langwatch.origin"] = explicitScope as string;
+      mergedAttributes["langwatch.origin"] = explicitOrigin as string;
     } else if (!state.attributes["langwatch.origin"]) {
       // Child span sets scope only if no value has been hoisted yet
-      mergedAttributes["langwatch.origin"] = explicitScope as string;
+      mergedAttributes["langwatch.origin"] = explicitOrigin as string;
     } else {
       // Keep existing hoisted value from earlier spans
       mergedAttributes["langwatch.origin"] = state.attributes["langwatch.origin"];
     }
-  } else if (isRootSpanForScope && state.attributes["langwatch.origin"]) {
+  } else if (isRootSpan && state.attributes["langwatch.origin"]) {
     // Root span without scope preserves previously hoisted child span value
     mergedAttributes["langwatch.origin"] = state.attributes["langwatch.origin"];
   } else {
     // No explicit scope on this span — try legacy inference
-    const inferred = inferScopeFromLegacyMarkers(span);
+    const inferred = inferOriginFromLegacyMarkers(span);
     if (inferred) {
-      if (isRootSpanForScope) {
+      if (isRootSpan) {
         // Root span inferred scope wins over child inferred scope
         mergedAttributes["langwatch.origin"] = inferred;
       } else if (!state.attributes["langwatch.origin"]) {
