@@ -29,9 +29,10 @@ const dataset = [
 
 // Simulated LLM response function — wrapped in a span so it appears as a
 // child of the evaluation iteration trace in the LangWatch UI.
-const tracer = trace.getTracer("langwatch");
-
+// NOTE: trace.getTracer() must be called AFTER LangWatch setup (inside the
+// function, not at module level) to pick up the registered tracer provider.
 const simulateLLM = async (question: string): Promise<string> => {
+  const tracer = trace.getTracer("langwatch");
   return tracer.startActiveSpan("simulateLLM", async (span) => {
     try {
       // Simulate some latency
