@@ -108,7 +108,7 @@ export class SpanNormalizationPipelineService {
       TraceRequestUtils.convertUnixNanoToUnixMs(startTimeUnixNano);
     const endTimeUnixMs =
       TraceRequestUtils.convertUnixNanoToUnixMs(endTimeUnixNano);
-    const durationMs = endTimeUnixMs - startTimeUnixMs;
+    const durationMs = Math.max(0, endTimeUnixMs - startTimeUnixMs);
     const parentAndTraceContext =
       TraceRequestUtils.normalizeOtlpParentAndTraceContext(
         otlpSpan.parentSpanId,
