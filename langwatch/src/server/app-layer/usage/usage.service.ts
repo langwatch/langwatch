@@ -85,13 +85,14 @@ export class UsageService {
       throw new OrganizationNotFoundForTeamError(teamId);
     }
 
-    const [count, plan, decision] = await Promise.all([
+    const [count, plan] = await Promise.all([
       this.getCurrentMonthCount({ organizationId }),
       this.planResolver(organizationId),
-      this.getCachedMeterDecision(organizationId),
     ]);
 
     if (count >= plan.maxMessagesPerMonth) {
+      // getCurrentMonthCount already warmed the decision cache, so this is a map lookup
+      const decision = await this.getCachedMeterDecision(organizationId);
       return {
         exceeded: true,
         message: buildLimitMessage({
