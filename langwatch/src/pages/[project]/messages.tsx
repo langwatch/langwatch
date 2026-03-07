@@ -3,7 +3,9 @@ import { MessagesTable } from "~/components/messages/MessagesTable";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { useTableView } from "../../components/messages/HeaderButtons";
 import { MessagesList } from "../../components/messages/MessagesList";
+import { SavedViewsBar } from "../../components/messages/SavedViewsBar";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
+import { SavedViewsProvider } from "../../hooks/useSavedViews";
 import WelcomeLayout from "../../components/welcome/WelcomeLayout";
 import { useFieldRedaction } from "../../hooks/useFieldRedaction";
 import { useFilterParams } from "../../hooks/useFilterParams";
@@ -51,17 +53,19 @@ function MessagesOrIntegrationGuideContent() {
     );
   }
 
-  if (isTableView) {
-    return (
-      <DashboardLayout>
-        <MessagesTable />
-      </DashboardLayout>
-    );
-  }
+  const content = isTableView ? <MessagesTable /> : <MessagesList />;
+  const hasClickHouse = project?.featureClickHouseDataSourceTraces === true;
 
   return (
     <DashboardLayout>
-      <MessagesList />
+      {hasClickHouse ? (
+        <SavedViewsProvider>
+          {content}
+          <SavedViewsBar />
+        </SavedViewsProvider>
+      ) : (
+        content
+      )}
     </DashboardLayout>
   );
 }

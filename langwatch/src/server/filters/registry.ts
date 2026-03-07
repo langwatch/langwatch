@@ -438,6 +438,65 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
       },
     },
   },
+  "traces.origin": {
+    name: "Origin",
+    urlKey: "origin",
+    query: (values) => {
+      // Origin data only exists in ClickHouse; ES fallback uses metadata field
+      const conditions: QueryDslQueryContainer[] = [];
+
+      const nonApplicationValues = values.filter((v) => v !== "application");
+      const hasApplication = values.includes("application");
+
+      if (nonApplicationValues.length > 0) {
+        conditions.push({
+          terms: { "metadata.langwatch_origin": nonApplicationValues },
+        });
+      }
+
+      if (hasApplication) {
+        conditions.push({
+          bool: {
+            must_not: {
+              exists: { field: "metadata.langwatch_origin" },
+            },
+          } as QueryDslBoolQuery,
+        });
+      }
+
+      if (conditions.length === 1) {
+        return conditions[0]!;
+      }
+
+      return {
+        bool: {
+          should: conditions,
+          minimum_should_match: 1,
+        } as QueryDslBoolQuery,
+      };
+    },
+    listMatch: {
+      aggregation: (_query) => ({
+        unique_values: {
+          terms: {
+            field: "metadata.langwatch_origin",
+            size: 100,
+            order: { _key: "asc" },
+            missing: "application",
+          },
+        },
+      }),
+      extract: (result: Record<string, any>) => {
+        return (
+          result.unique_values?.buckets?.map((bucket: any) => ({
+            field: bucket.key_as_string ?? bucket.key ?? "application",
+            label: bucket.key_as_string ?? bucket.key ?? "application",
+            count: bucket.doc_count,
+          })) ?? []
+        );
+      },
+    },
+  },
   "traces.error": {
     name: "Contains Error",
     urlKey: "has_error",

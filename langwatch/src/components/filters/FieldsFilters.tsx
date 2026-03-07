@@ -24,7 +24,9 @@ import { Search } from "lucide-react";
 import { LuZap } from "react-icons/lu";
 import { useDebounceValue } from "usehooks-ts";
 import { useDrawer } from "~/hooks/useDrawer";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import {
+	useOrganizationTeamProject,
+} from "~/hooks/useOrganizationTeamProject";
 import { type FilterParam, useFilterParams } from "../../hooks/useFilterParams";
 import { filterOutEmptyFilters } from "../../server/analytics/utils";
 import type { AppRouter } from "../../server/api/root";
@@ -82,7 +84,12 @@ export function FieldsFilters({
 	setFilters: (filters: Partial<Record<FilterField, FilterParam>>) => void;
 	actionButton?: React.ReactNode;
 }) {
+	const { project } = useOrganizationTeamProject();
+	const hasClickHouse =
+		project?.featureClickHouseDataSourceTraces === true;
+
 	const filterKeys: FilterField[] = [
+		...(hasClickHouse ? (["traces.origin"] as const) : []),
 		"metadata.prompt_ids",
 		"spans.model",
 		"metadata.labels",
@@ -131,6 +138,7 @@ export function FieldsFilters({
 // Filter types that should NOT allow custom values
 const BOOLEAN_FILTER_IDS: FilterField[] = [
 	"evaluations.passed",
+	"traces.origin",
 	"traces.error",
 	"annotations.hasAnnotation",
 	"evaluations.state",

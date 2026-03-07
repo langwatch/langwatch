@@ -38,6 +38,7 @@ import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
 import { stringifyIfObject } from "~/utils/stringifyIfObject";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { useMinimumSpinDuration } from "../../hooks/useMinimumSpinDuration";
+import { getOriginColor, getOriginLabel } from "../../utils/originColors";
 import { getColorForString } from "../../utils/rotatingColors";
 import { titleCase } from "../../utils/stringCasing";
 import { AddAnnotationQueueDrawer } from "../AddAnnotationQueueDrawer";
@@ -448,6 +449,49 @@ export function MessagesTable({
       value: (trace: Trace) =>
         new Date(trace.timestamps.started_at).toISOString(),
     },
+    ...(project?.featureClickHouseDataSourceTraces
+      ? {
+          "traces.origin": {
+            name: "Origin",
+            sortable: false,
+            width: 120,
+            render: (trace: TraceWithGuardrail, index: number) => {
+              const origin =
+                (trace.metadata["langwatch.origin"] as string | undefined) ??
+                "";
+              const displayOrigin = origin || "application";
+              const colors = getOriginColor(displayOrigin);
+
+              return (
+                <Table.Cell
+                  key={index}
+                  onClick={() =>
+                    openDrawer("traceDetails", {
+                      traceId: trace.trace_id,
+                    })
+                  }
+                >
+                  <Badge
+                    size="sm"
+                    paddingX={2}
+                    background={colors.background}
+                    color={colors.color}
+                    fontSize="12px"
+                  >
+                    {getOriginLabel(displayOrigin)}
+                  </Badge>
+                </Table.Cell>
+              );
+            },
+            value: (trace: Trace) => {
+              const origin =
+                (trace.metadata["langwatch.origin"] as string | undefined) ??
+                "";
+              return origin || "application";
+            },
+          } satisfies HeaderColumn,
+        }
+      : {}),
     "input.value": {
       name: "Input",
       sortable: false,
