@@ -38,6 +38,10 @@ import { ScenarioFormDrawer } from "../scenarios/ScenarioFormDrawer";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
 import { useSuiteForm, type SuiteFormData } from "./useSuiteForm";
+import {
+  SuiteRunConfirmationDialog,
+  type SuiteRunSummary,
+} from "./SuiteRunConfirmationDialog";
 import { InlineTagsInput } from "../scenarios/ui/InlineTagsInput";
 import { ScenarioPicker } from "./ScenarioPicker";
 import { TargetPicker } from "./TargetPicker";
@@ -267,14 +271,16 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
     [project, isEditMode, suite, createMutation, updateMutation],
   );
 
-  const submitAndRun = useCallback(
+  // State for run confirmation: holds the saved suite after save-before-run
+  const [pendingRunSuite, setPendingRunSuite] = useState<SimulationSuite | null>(null);
+
+  const saveAndShowConfirmation = useCallback(
     (data: SuiteFormData) => {
       if (!project) return;
       const payload = buildMutationPayload(data, project.id);
 
       const onSuccess = (saved: SimulationSuite) => {
-        runMutation.mutate({ projectId: payload.projectId, id: saved.id });
-        onRan?.(saved.id);
+        setPendingRunSuite(saved);
       };
 
       if (isEditMode && suite) {
@@ -283,24 +289,37 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
         createMutation.mutate(payload, { onSuccess });
       }
     },
-    [
-      project,
-      isEditMode,
-      suite,
-      createMutation,
-      updateMutation,
-      runMutation,
-      onRan,
-    ],
+    [project, isEditMode, suite, createMutation, updateMutation],
   );
+
+  const confirmRun = useCallback(() => {
+    if (!project || !pendingRunSuite) return;
+    runMutation.mutate({ projectId: project.id, id: pendingRunSuite.id });
+    onRan?.(pendingRunSuite.id);
+    setPendingRunSuite(null);
+  }, [project, pendingRunSuite, runMutation, onRan]);
+
+  const pendingRunSummary: SuiteRunSummary | null = useMemo(() => {
+    if (!pendingRunSuite) return null;
+    // Use the current form values since the suite was just saved from them
+    const scenarioIds = form.getValues("selectedScenarioIds");
+    const targets = form.getValues("selectedTargets");
+    const repeatCount = form.getValues("repeatCount");
+    return {
+      suiteName: pendingRunSuite.name,
+      scenarioCount: scenarioIds.length,
+      targetCount: targets.length,
+      repeatCount,
+    };
+  }, [pendingRunSuite, form]);
 
   const handleSave = useCallback(() => {
     void form.handleSubmit(submitForm)();
   }, [form, submitForm]);
 
   const handleRunNow = useCallback(() => {
-    void form.handleSubmit(submitAndRun)();
-  }, [form, submitAndRun]);
+    void form.handleSubmit(saveAndShowConfirmation)();
+  }, [form, saveAndShowConfirmation]);
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
@@ -517,6 +536,15 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
           </HStack>
         </Drawer.Footer>
       </Drawer.Content>
+
+      {/* Run confirmation dialog */}
+      <SuiteRunConfirmationDialog
+        open={!!pendingRunSuite}
+        onClose={() => setPendingRunSuite(null)}
+        onConfirm={confirmRun}
+        summary={pendingRunSummary}
+        isLoading={runMutation.isPending}
+      />
     </Drawer.Root>
 
     {/* Child drawer: Scenario Editor -- managed via local state */}
