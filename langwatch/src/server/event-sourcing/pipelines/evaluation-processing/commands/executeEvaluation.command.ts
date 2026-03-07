@@ -236,6 +236,7 @@ export function createExecuteEvaluationCommandClass(deps: ExecuteEvaluationComma
         return emitScheduledAndCompleted(data, tenantId, {
           status: "error",
           error: extractErrorMessage(error),
+          errorDetails: error instanceof Error ? error.stack ?? null : null,
         });
       }
     }
@@ -252,6 +253,7 @@ function emitScheduledAndCompleted(
     label?: string;
     details?: string;
     error?: string;
+    errorDetails?: string | null;
   },
 ): EvaluationProcessingEvent[] {
   const scheduledEvent = EventUtils.createEvent<EvaluationScheduledEvent>({
@@ -285,6 +287,7 @@ function emitScheduledAndCompleted(
       label: result.label ?? null,
       details: result.details ?? null,
       error: result.error ?? null,
+      errorDetails: result.errorDetails ?? null,
     },
     occurredAt: Date.now(),
   });
