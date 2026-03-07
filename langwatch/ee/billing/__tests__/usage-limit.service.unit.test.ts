@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -153,22 +153,23 @@ describe("UsageLimitService", () => {
 
   describe("notifyPlanLimitReached()", () => {
     describe("when IS_SAAS is false", () => {
+      beforeEach(() => {
+        vi.mocked(env).IS_SAAS = false;
+      });
+
+      afterEach(() => {
+        vi.mocked(env).IS_SAAS = true;
+      });
+
       it("returns early without querying the database", async () => {
-        const originalIsSaas = (env as any).IS_SAAS;
-        (env as any).IS_SAAS = false;
+        const { service, organizationService } = createService();
 
-        try {
-          const { service, organizationService } = createService();
+        await service.notifyPlanLimitReached({
+          organizationId: "org_1",
+          planName: "free",
+        });
 
-          await service.notifyPlanLimitReached({
-            organizationId: "org_1",
-            planName: "free",
-          });
-
-          expect(organizationService.findWithAdmins).not.toHaveBeenCalled();
-        } finally {
-          (env as any).IS_SAAS = originalIsSaas;
-        }
+        expect(organizationService.findWithAdmins).not.toHaveBeenCalled();
       });
     });
 
@@ -263,26 +264,27 @@ describe("UsageLimitService", () => {
     });
 
     describe("when IS_SAAS is false", () => {
+      beforeEach(() => {
+        vi.mocked(env).IS_SAAS = false;
+      });
+
+      afterEach(() => {
+        vi.mocked(env).IS_SAAS = true;
+      });
+
       it("returns without sending", async () => {
-        const originalIsSaas = (env as any).IS_SAAS;
-        (env as any).IS_SAAS = false;
+        const { service, notificationService } = createService();
 
-        try {
-          const { service, notificationService } = createService();
+        await service.notifyResourceLimitReached({
+          organizationId: "org_1",
+          limitType: "workflows",
+          current: 5,
+          max: 5,
+        });
 
-          await service.notifyResourceLimitReached({
-            organizationId: "org_1",
-            limitType: "workflows",
-            current: 5,
-            max: 5,
-          });
-
-          expect(
-            notificationService.sendSlackResourceLimitAlert,
-          ).not.toHaveBeenCalled();
-        } finally {
-          (env as any).IS_SAAS = originalIsSaas;
-        }
+        expect(
+          notificationService.sendSlackResourceLimitAlert,
+        ).not.toHaveBeenCalled();
       });
     });
 
