@@ -188,7 +188,16 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     close: () => prisma.$disconnect(),
   });
 
-  const notifications = NotificationService.create();
+  const notifications = NotificationService.create({
+    config: {
+      baseHost: config.baseHost,
+      slackPlanLimitChannel: config.slackPlanLimitChannel,
+      slackSignupsChannel: config.slackSignupsChannel,
+      slackSubscriptionsChannel: config.slackSubscriptionsChannel,
+      hubspotPortalId: config.hubspotPortalId,
+      hubspotReachedLimitFormId: config.hubspotReachedLimitFormId,
+    },
+  });
   const notificationRepository = new NotificationRepository(prisma);
   const usageLimits = UsageLimitService.create({
     notificationRepository,

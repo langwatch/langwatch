@@ -2,19 +2,21 @@ import {
   IncomingWebhook,
   type IncomingWebhookSendArguments,
 } from "@slack/webhook";
-import { env } from "../../../src/env.mjs";
 import { sendUsageLimitEmail } from "../../../src/server/mailer/usageLimitEmail";
 import { createLogger } from "../../../src/utils/logger/server";
 import { captureException } from "../../../src/utils/posthogErrorCapture";
+import type { AppConfig } from "../../../src/server/app-layer/config";
 import type {
   LicensePurchaseNotificationPayload,
   PlanLimitNotificationContext,
   ResourceLimitNotificationContext,
+  SignupNotificationPayload,
   SubscriptionNotificationPayload,
 } from "../types";
 
 const logger = createLogger("ee:notification-service");
 
+const DEFAULT_APP_URL = "https://app.langwatch.ai";
 const SLACK_TIMEOUT_MS = 10_000;
 
 // ---------------------------------------------------------------------------
@@ -60,10 +62,19 @@ type ConfirmedNotification = NotificationBase & {
   maxMessagesPerMonth?: number | null;
 };
 
-const getAppUrl = () => env.BASE_HOST ?? "https://app.langwatch.ai";
-
-const getAdminLink = (organizationId: string) =>
-  `${getAppUrl()}/admin#/organizations/${organizationId}`;
+type NotificationServiceOptions = {
+  config: Pick<
+    AppConfig,
+    | "baseHost"
+    | "slackPlanLimitChannel"
+    | "slackSignupsChannel"
+    | "slackSubscriptionsChannel"
+    | "hubspotPortalId"
+    | "hubspotReachedLimitFormId"
+  >;
+  createSlackWebhook?: (url: string) => Pick<IncomingWebhook, "send">;
+  fetchFn?: typeof fetch;
+};
 
 const formatNumber = (value?: number | null) =>
   typeof value === "number" ? value.toLocaleString() : "-";
@@ -78,6 +89,7 @@ const formatDate = (value?: Date | null) =>
 
 const buildProspectiveBlocks = (
   payload: ProspectiveNotification,
+  adminLink: string,
 ): IncomingWebhookSendArguments["blocks"] => {
   const blocks: IncomingWebhookSendArguments["blocks"] = [
     {
@@ -123,7 +135,7 @@ const buildProspectiveBlocks = (
       {
         type: "button",
         text: { type: "plain_text", text: "Open org in admin" },
-        url: getAdminLink(payload.organizationId),
+        url: adminLink,
         action_id: "subscription_prospective_admin",
         style: "primary",
       },
@@ -135,6 +147,7 @@ const buildProspectiveBlocks = (
 
 const buildConfirmedBlocks = (
   payload: ConfirmedNotification,
+  adminLink: string,
 ): IncomingWebhookSendArguments["blocks"] => {
   const startText = payload.startDate
     ? `Activated on ${formatDate(payload.startDate)}`
@@ -188,7 +201,7 @@ const buildConfirmedBlocks = (
         {
           type: "button",
           text: { type: "plain_text", text: "Open org in admin" },
-          url: getAdminLink(payload.organizationId),
+          url: adminLink,
           action_id: "subscription_confirmed_admin",
         },
       ],
@@ -210,11 +223,61 @@ const buildConfirmedBlocks = (
  * - notificationHandlers.ts (error safety wrapper)
  */
 export class NotificationService {
+  private readonly config: NotificationServiceOptions["config"];
+  private readonly createSlackWebhook: (
+    url: string,
+  ) => Pick<IncomingWebhook, "send">;
+  private readonly fetchFn: typeof fetch;
+
+  private constructor(options: NotificationServiceOptions) {
+    this.config = options.config;
+    this.createSlackWebhook =
+      options?.createSlackWebhook ??
+      ((url) =>
+        new IncomingWebhook(url, {
+          timeout: SLACK_TIMEOUT_MS,
+        }));
+    this.fetchFn =
+      options?.fetchFn ??
+      ((...args) => fetch(...args)) as typeof fetch;
+  }
+
   /**
    * Factory method for creating a NotificationService.
    */
-  static create(): NotificationService {
-    return new NotificationService();
+  static create(options: NotificationServiceOptions): NotificationService {
+    return new NotificationService(options);
+  }
+
+  private getAdminLink(organizationId: string): string {
+    return `${this.config.baseHost ?? DEFAULT_APP_URL}/admin#/organizations/${organizationId}`;
+  }
+
+  private async sendSlackMessage({
+    channelUrl,
+    body,
+    missingConfigLog,
+    errorLog,
+  }: {
+    channelUrl?: string;
+    body: IncomingWebhookSendArguments;
+    missingConfigLog?: string;
+    errorLog: string;
+  }): Promise<void> {
+    if (!channelUrl) {
+      if (missingConfigLog) {
+        logger.warn(missingConfigLog);
+      }
+      return;
+    }
+
+    try {
+      const webhook = this.createSlackWebhook(channelUrl);
+      await webhook.send(body);
+    } catch (error) {
+      logger.error({ error }, errorLog);
+      captureException(error);
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -263,20 +326,13 @@ export class NotificationService {
   async sendSlackPlanLimitAlert(
     context: PlanLimitNotificationContext,
   ): Promise<void> {
-    const url = process.env.SLACK_PLAN_LIMIT_CHANNEL;
-    if (!url) {
-      return;
-    }
-
-    try {
-      const webhook = new IncomingWebhook(url);
-      await webhook.send({
+    await this.sendSlackMessage({
+      channelUrl: this.config.slackPlanLimitChannel,
+      body: {
         text: `Plan limit reached: ${context.organizationName}, ${context.adminEmail ?? "unknown"}, Plan: ${context.planName}`,
-      });
-    } catch (error) {
-      logger.error({ error }, "Failed to send Slack plan-limit notification");
-      captureException(error);
-    }
+      },
+      errorLog: "Failed to send Slack plan-limit notification",
+    });
   }
 
   /**
@@ -285,23 +341,13 @@ export class NotificationService {
   async sendSlackResourceLimitAlert(
     context: ResourceLimitNotificationContext,
   ): Promise<void> {
-    const url = process.env.SLACK_PLAN_LIMIT_CHANNEL;
-    if (!url) {
-      return;
-    }
-
-    try {
-      const webhook = new IncomingWebhook(url);
-      await webhook.send({
+    await this.sendSlackMessage({
+      channelUrl: this.config.slackPlanLimitChannel,
+      body: {
         text: `Resource limit reached: ${context.organizationName}, ${context.adminEmail ?? "unknown"}, Plan: ${context.planName}, ${context.limitType}: ${context.current}/${context.max}`,
-      });
-    } catch (error) {
-      logger.error(
-        { error },
-        "Failed to send Slack resource-limit notification",
-      );
-      captureException(error);
-    }
+      },
+      errorLog: "Failed to send Slack resource-limit notification",
+    });
   }
 
   /**
@@ -310,29 +356,42 @@ export class NotificationService {
   async sendSlackSubscriptionEvent(
     payload: SubscriptionNotificationPayload,
   ): Promise<void> {
-    const webhookUrl = process.env.SLACK_CHANNEL_SUBSCRIPTIONS;
-    if (!webhookUrl) {
-      logger.warn(
-        "SLACK_CHANNEL_SUBSCRIPTIONS is not configured; skipping subscription notification",
-      );
-      return;
-    }
-
+    const adminLink = this.getAdminLink(payload.organizationId);
     const blocks =
       payload.type === "prospective"
-        ? buildProspectiveBlocks(payload)
-        : buildConfirmedBlocks(payload);
+        ? buildProspectiveBlocks(payload, adminLink)
+        : buildConfirmedBlocks(payload, adminLink);
 
-    try {
-      const webhook = new IncomingWebhook(webhookUrl);
-      await webhook.send({ blocks });
-    } catch (error) {
-      logger.error(
-        { error },
-        "Failed to send Slack subscription notification",
-      );
-      captureException(error);
-    }
+    await this.sendSlackMessage({
+      channelUrl: this.config.slackSubscriptionsChannel,
+      body: { blocks },
+      missingConfigLog:
+        "SLACK_CHANNEL_SUBSCRIPTIONS is not configured; skipping subscription notification",
+      errorLog: "Failed to send Slack subscription notification",
+    });
+  }
+
+  /**
+   * Sends a Slack notification for a new signup.
+   */
+  async sendSlackSignupEvent(payload: SignupNotificationPayload): Promise<void> {
+    const details = [
+      payload.phoneNumber,
+      payload.utmCampaign ? `Campaign: ${payload.utmCampaign}` : null,
+    ].filter(Boolean);
+
+    const organizationDetails =
+      details.length > 0 ? `, ${details.join(", ")}` : "";
+
+    await this.sendSlackMessage({
+      channelUrl: this.config.slackSignupsChannel,
+      body: {
+        text: `🔔 New user registered: ${payload.userName ?? "Unknown"}, ${payload.userEmail ?? "unknown"}. Organization: ${payload.organizationName ?? "Unknown"}${organizationDetails}`,
+      },
+      missingConfigLog:
+        "SLACK_CHANNEL_SIGNUPS is not configured; skipping signup notification",
+      errorLog: "Failed to send Slack signup notification",
+    });
   }
 
   /**
@@ -341,21 +400,14 @@ export class NotificationService {
   async sendSlackLicensePurchase(
     payload: LicensePurchaseNotificationPayload,
   ): Promise<void> {
-    const webhookUrl = process.env.SLACK_CHANNEL_SUBSCRIPTIONS;
-    if (!webhookUrl) {
-      return;
-    }
-
     const amountFormatted = new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: payload.currency,
     }).format(payload.amountPaid / 100);
 
-    try {
-      const webhook = new IncomingWebhook(webhookUrl, {
-        timeout: SLACK_TIMEOUT_MS,
-      });
-      await webhook.send({
+    await this.sendSlackMessage({
+      channelUrl: this.config.slackSubscriptionsChannel,
+      body: {
         text: "New License Purchase",
         blocks: [
           {
@@ -375,14 +427,9 @@ export class NotificationService {
             ],
           },
         ],
-      });
-    } catch (error) {
-      logger.error(
-        { error },
-        "Failed to send Slack license purchase notification",
-      );
-      captureException(error);
-    }
+      },
+      errorLog: "Failed to send Slack license purchase notification",
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -395,10 +442,9 @@ export class NotificationService {
   async sendHubspotPlanLimitForm(
     context: PlanLimitNotificationContext,
   ): Promise<void> {
-    const hubspotPortalId = process.env.HUBSPOT_PORTAL_ID;
-    const hubspotFormId = process.env.HUBSPOT_REACHED_LIMIT_FORM_ID;
+    const { hubspotPortalId, hubspotReachedLimitFormId } = this.config;
 
-    if (!hubspotPortalId || !hubspotFormId) {
+    if (!hubspotPortalId || !hubspotReachedLimitFormId) {
       return;
     }
 
@@ -427,13 +473,13 @@ export class NotificationService {
       },
     };
 
-    const url = `https://api.hsforms.com/submissions/v3/integration/submit/${hubspotPortalId}/${hubspotFormId}`;
+    const url = `https://api.hsforms.com/submissions/v3/integration/submit/${hubspotPortalId}/${hubspotReachedLimitFormId}`;
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), SLACK_TIMEOUT_MS);
 
     try {
-      const response = await fetch(url, {
+      const response = await this.fetchFn(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

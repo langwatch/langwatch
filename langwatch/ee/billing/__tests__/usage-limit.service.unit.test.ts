@@ -53,6 +53,7 @@ function createMockNotificationService(): NotificationService {
     sendSlackPlanLimitAlert: vi.fn().mockResolvedValue(undefined),
     sendSlackResourceLimitAlert: vi.fn().mockResolvedValue(undefined),
     sendSlackSubscriptionEvent: vi.fn().mockResolvedValue(undefined),
+    sendSlackSignupEvent: vi.fn().mockResolvedValue(undefined),
     sendSlackLicensePurchase: vi.fn().mockResolvedValue(undefined),
     sendHubspotPlanLimitForm: vi.fn().mockResolvedValue(undefined),
   } as unknown as NotificationService;

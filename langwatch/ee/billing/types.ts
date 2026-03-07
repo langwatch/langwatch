@@ -82,3 +82,11 @@ export type LicensePurchaseNotificationPayload = {
   amountPaid: number;
   currency: string;
 };
+
+export type SignupNotificationPayload = {
+  userName?: string | null;
+  userEmail?: string | null;
+  organizationName?: string | null;
+  phoneNumber?: string | null;
+  utmCampaign?: string | null;
+};
