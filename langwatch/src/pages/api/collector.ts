@@ -485,7 +485,7 @@ async function handleCollectorRequest(
         expectedOutput,
       });
 
-      await Promise.allSettled(
+      const results = await Promise.allSettled(
         spans.map((span) =>
           getApp().traces.recordSpan({
             tenantId: project.id,
@@ -497,10 +497,26 @@ async function handleCollectorRequest(
           }),
         ),
       );
+
+      const failures = results.filter(
+        (r): r is PromiseRejectedResult => r.status === "rejected",
+      );
+      if (failures.length > 0) {
+        logger.error(
+          {
+            projectId: project.id,
+            traceId,
+            failureCount: failures.length,
+            errors: failures.map((f) => f.reason),
+          },
+          "Error dispatching collector spans to event sourcing",
+        );
+      }
     } catch (error) {
+      // Catch synchronous errors (e.g., from buildResource)
       logger.error(
         { error, projectId: project.id, traceId },
-        "Error dispatching collector spans to event sourcing",
+        "Error initializing event sourcing dispatch",
       );
     }
   }
