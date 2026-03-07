@@ -552,7 +552,7 @@ def optional_langwatch_trace(
     with langwatch.trace(
         name=name,
         type=type,
-        metadata=metadata,
+        metadata=metadata if metadata is not None else {},
         disable_sending=do_not_trace,
     ) as trace:
         # Set langwatch.origin as a direct span attribute (not inside metadata JSON)

@@ -39,7 +39,7 @@ async def execute_component(event: ExecuteComponentPayload):
             name="execute_component",
             type="component",
             do_not_trace=do_not_trace,
-            metadata=metadata if metadata else None,
+            metadata=metadata if metadata else {},
             origin=origin,
         ) as trace:
             if trace:
