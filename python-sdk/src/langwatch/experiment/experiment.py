@@ -636,7 +636,7 @@ class Experiment:
             from opentelemetry.sdk.trace import TracerProvider
             from opentelemetry.trace import INVALID_SPAN_CONTEXT
 
-            tracer = trace.get_tracer("langwatch-evaluation")
+            tracer = trace.get_tracer("langwatch")
 
             # Start a new root span with no parent by passing an empty context
             # This ensures each target gets a unique trace_id
@@ -646,6 +646,7 @@ class Experiment:
                 f"evaluation.target.{name}",
                 context=root_context,
                 attributes={
+                    "langwatch.scope": "evaluation",
                     "evaluation.run_id": self.run_id,
                     "evaluation.index": index,
                     "evaluation.target": name,
@@ -795,7 +796,7 @@ class Experiment:
             current_item = self._current_item
 
         # Create a trace for this implicit target
-        tracer = trace.get_tracer("langwatch-evaluation")
+        tracer = trace.get_tracer("langwatch")
         root_context = otel_context.Context()
 
         # Start span and get trace_id
@@ -803,6 +804,7 @@ class Experiment:
             f"evaluation.target.{target_name}",
             context=root_context,
             attributes={
+                "langwatch.scope": "evaluation",
                 "evaluation.run_id": self.run_id,
                 "evaluation.index": index,
                 "evaluation.target": target_name,

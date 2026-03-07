@@ -30,10 +30,8 @@ async def execute_component(event: ExecuteComponentPayload):
     do_not_trace = not event.workflow.enable_tracing
 
     try:
-        metadata={
-            "platform": "optimization_studio",
-            "environment": "development",
-        }
+        scope = event.scope or "workflow"
+        metadata={}
         if event.thread_id:
             metadata["thread_id"] = event.thread_id
 
@@ -41,7 +39,8 @@ async def execute_component(event: ExecuteComponentPayload):
             name="execute_component",
             type="component",
             do_not_trace=do_not_trace,
-            metadata=metadata,
+            metadata=metadata if metadata else None,
+            scope=scope,
         ) as trace:
             if trace:
                 trace.autotrack_dspy()

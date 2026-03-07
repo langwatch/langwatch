@@ -132,6 +132,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
             ...variablesDict,
             messages: messagesHistory,
           },
+          scope: "playground",
         },
       } as StudioClientEvent;
 

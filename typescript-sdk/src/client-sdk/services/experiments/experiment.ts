@@ -226,7 +226,7 @@ export class Experiment {
     this.total = dataset.length;
     this.progress = 0;
 
-    const tracer = trace.getTracer("langwatch-evaluation");
+    const tracer = trace.getTracer("langwatch");
 
     // Process items with concurrency control
     const executing = new Set<Promise<void>>();
@@ -304,6 +304,7 @@ export class Experiment {
           "evaluation.iteration",
           {
             attributes: {
+              "langwatch.scope": "evaluation",
               "evaluation.run_id": this.runId,
               "evaluation.index": index,
             },
@@ -637,7 +638,7 @@ export class Experiment {
     // Register target
     this.registerTarget(targetName, metadata ?? undefined);
 
-    const tracer = trace.getTracer("langwatch-evaluation");
+    const tracer = trace.getTracer("langwatch");
     const startTime = Date.now();
     let result: R | undefined;
     let traceId = "";
@@ -650,6 +651,7 @@ export class Experiment {
       `evaluation.target.${targetName}`,
       {
         attributes: {
+          "langwatch.scope": "evaluation",
           "evaluation.run_id": this.runId,
           "evaluation.target": targetName,
           "evaluation.index": index,
