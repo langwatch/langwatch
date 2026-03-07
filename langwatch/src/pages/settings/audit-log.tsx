@@ -1,5 +1,6 @@
 import {
   Alert,
+  Box,
   Button,
   Card,
   Heading,
@@ -25,6 +26,7 @@ import {
   usePeriodSelector,
 } from "../../components/PeriodSelector";
 import SettingsLayout from "../../components/SettingsLayout";
+import { ContactSalesBlock } from "../../components/subscription/ContactSalesBlock";
 import { InputGroup } from "../../components/ui/input-group";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useActivePlan } from "../../hooks/useActivePlan";
@@ -144,6 +146,9 @@ function AuditLogPage() {
               </Alert.Description>
             </Alert.Content>
           </Alert.Root>
+          <Box width="full">
+            <ContactSalesBlock />
+          </Box>
         </VStack>
       </SettingsLayout>
     );

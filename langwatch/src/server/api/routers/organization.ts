@@ -45,6 +45,12 @@ import {
   LicenseLimitError,
   OrganizationNotFoundError,
 } from "../../invites/errors";
+import {
+  assertEnterprisePlan,
+  assertEnterprisePlanType,
+  isCustomRole,
+  ENTERPRISE_FEATURE_ERRORS,
+} from "../enterprise";
 import { skipPermissionCheck } from "../rbac";
 import { checkOrganizationPermission, checkTeamPermission } from "../rbac";
 import { signUpDataSchema } from "./onboarding";
@@ -754,6 +760,19 @@ export const organizationRouter = createTRPCRouter({
     )
     .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input, ctx }) => {
+      const hasCustomRoleInvite = input.invites.some((invite) =>
+        (invite.teams ?? []).some(
+          (t) => typeof t.role === "string" && isCustomRole(t.role),
+        ),
+      );
+      if (hasCustomRoleInvite) {
+        await assertEnterprisePlan({
+          organizationId: input.organizationId,
+          user: ctx.session.user,
+          errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
+        });
+      }
+
       const prisma = ctx.prisma;
 
       const organization = await prisma.organization.findFirst({
@@ -823,15 +842,15 @@ export const organizationRouter = createTRPCRouter({
             teamAssignments = invite.teams
               .filter((t) => validTeamIds.includes(t.teamId))
               .map((t) => {
-                const isCustomRole =
-                  typeof t.role === "string" && t.role.startsWith("custom:");
+                const hasCustom =
+                  typeof t.role === "string" && isCustomRole(t.role);
                 return {
                   teamId: t.teamId,
-                  role: isCustomRole
+                  role: hasCustom
                     ? TeamUserRole.CUSTOM
                     : (t.role as TeamUserRole),
                   customRoleId:
-                    isCustomRole && t.customRoleId ? t.customRoleId : undefined,
+                    hasCustom && t.customRoleId ? t.customRoleId : undefined,
                 };
               })
               .filter((t) => {
@@ -1052,15 +1071,15 @@ export const organizationRouter = createTRPCRouter({
               teamAssignments = invite.teams
                 .filter((t) => validTeamIds.includes(t.teamId))
                 .map((t) => {
-                  const isCustomRole =
-                    typeof t.role === "string" && t.role.startsWith("custom:");
+                  const hasCustom =
+                    typeof t.role === "string" && isCustomRole(t.role);
                   return {
                     teamId: t.teamId,
-                    role: isCustomRole
+                    role: hasCustom
                       ? ("CUSTOM" as TeamUserRole)
                       : (t.role as TeamUserRole),
                     customRoleId:
-                      isCustomRole && t.customRoleId
+                      hasCustom && t.customRoleId
                         ? t.customRoleId
                         : undefined,
                   };
@@ -1361,9 +1380,9 @@ export const organizationRouter = createTRPCRouter({
           customRoleId: z.string().optional(),
         })
         .superRefine((data, ctx) => {
-          const isCustomRole = data.role.startsWith("custom:");
+          const hasCustom = isCustomRole(data.role);
 
-          if (isCustomRole) {
+          if (hasCustom) {
             if (!data.customRoleId || data.customRoleId.trim() === "") {
               ctx.addIssue({
                 code: z.ZodIssueCode.custom,
@@ -1388,9 +1407,9 @@ export const organizationRouter = createTRPCRouter({
       const prisma = ctx.prisma;
 
       // Check if this is a custom role
-      const isCustomRole = input.role.startsWith("custom:");
+      const inputIsCustomRole = isCustomRole(input.role);
 
-      if (isCustomRole && input.customRoleId) {
+      if (inputIsCustomRole && input.customRoleId) {
         const customRoleId = input.customRoleId; // Store in a const for TypeScript
 
         // Atomic transaction with admin validation
@@ -1793,6 +1812,17 @@ export const organizationRouter = createTRPCRouter({
           subscriptionLimits
         );
 
+        const hasCustomRoleAssignment = (input.teamRoleUpdates ?? []).some(
+          (update) =>
+            typeof update.role === "string" && isCustomRole(update.role),
+        );
+        if (hasCustomRoleAssignment) {
+          assertEnterprisePlanType({
+            planType: subscriptionLimits.type,
+            errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
+          });
+        }
+
         await tx.organizationUser.update({
           where: {
             userId_organizationId: {
@@ -1895,15 +1925,15 @@ export const organizationRouter = createTRPCRouter({
             });
           }
 
-          const isCustomRole = teamRoleUpdate.role.startsWith("custom:");
-          if (isCustomRole && !teamRoleUpdate.customRoleId) {
+          const updateIsCustomRole = isCustomRole(teamRoleUpdate.role);
+          if (updateIsCustomRole && !teamRoleUpdate.customRoleId) {
             throw new TRPCError({
               code: "BAD_REQUEST",
               message: "Custom role ID is required for custom role updates",
             });
           }
 
-          if (isCustomRole && teamRoleUpdate.customRoleId) {
+          if (updateIsCustomRole && teamRoleUpdate.customRoleId) {
             const customRole = await tx.customRole.findUnique({
               where: { id: teamRoleUpdate.customRoleId },
               select: { organizationId: true },
@@ -1916,10 +1946,10 @@ export const organizationRouter = createTRPCRouter({
             }
           }
 
-          const nextRole = isCustomRole
+          const nextRole = updateIsCustomRole
             ? TeamUserRole.CUSTOM
             : (teamRoleUpdate.role as TeamUserRole);
-          const shouldClearCustomRole = !isCustomRole;
+          const shouldClearCustomRole = !updateIsCustomRole;
           const isDemotingLastAdmin =
             currentMembership.role === TeamUserRole.ADMIN &&
             nextRole !== TeamUserRole.ADMIN;
@@ -1994,6 +2024,12 @@ export const organizationRouter = createTRPCRouter({
     )
     .use(checkOrganizationPermission("organization:view"))
     .query(async ({ ctx, input }) => {
+      await assertEnterprisePlan({
+        organizationId: input.organizationId,
+        user: ctx.session.user,
+        errorMessage: ENTERPRISE_FEATURE_ERRORS.AUDIT_LOGS,
+      });
+
       // Get all user IDs that belong to this organization
       // This helps us filter logs with null organizationId to only show logs from org members
       const orgUserIds = await ctx.prisma.organizationUser.findMany({
