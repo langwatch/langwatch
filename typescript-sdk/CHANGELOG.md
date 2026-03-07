@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.17.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.16.1...typescript-sdk@v0.17.0) (2026-03-07)
+
+
+### Features
+
+* **examples:** add metadata and labels examples for TypeScript and Python SDKs ([#1585](https://github.com/langwatch/langwatch/issues/1585)) ([7d09ab8](https://github.com/langwatch/langwatch/commit/7d09ab805146542921e8b1f1258d5e6e59462bfe))
+* **traces:** add langwatch.origin attribute for trace origin classification ([#2066](https://github.com/langwatch/langwatch/issues/2066)) ([1d94865](https://github.com/langwatch/langwatch/commit/1d9486548e994d8d2f933a7f530196df8d255e43))
+* updated mastra example in typescript sdk to use 1.0 api ([#1872](https://github.com/langwatch/langwatch/issues/1872)) ([f738633](https://github.com/langwatch/langwatch/commit/f738633951c6f2d0db3372f9be913e9f0c7d5d51))
+
+
+### Bug Fixes
+
+* get SDK e2e CI tests passing ([#1648](https://github.com/langwatch/langwatch/issues/1648)) ([2a4583e](https://github.com/langwatch/langwatch/commit/2a4583e4fb7ccb4674e64f0154f62fd990a2d8aa))
+* typescript sdk uses correct attributes now sdk metadata ([#1651](https://github.com/langwatch/langwatch/issues/1651)) ([c499e26](https://github.com/langwatch/langwatch/commit/c499e26924a87cffe6abb37be8bdc739094a4568))
+* **typescript-sdk:** improve auto-shutdown signals and default to batch processor ([#1851](https://github.com/langwatch/langwatch/issues/1851)) ([fcf6bb7](https://github.com/langwatch/langwatch/commit/fcf6bb751eaa895c874d3ed96b455966fd8d462a))
+
+
+### Miscellaneous
+
+* **deps:** bump Node.js dependencies - batch 3 ([#1957](https://github.com/langwatch/langwatch/issues/1957)) ([e500557](https://github.com/langwatch/langwatch/commit/e500557ac7514ffc52ce26738d74e292e5428d2d)), closes [#1518](https://github.com/langwatch/langwatch/issues/1518)
+* **deps:** bump safe npm dependencies (19 dependabot PRs) ([#1931](https://github.com/langwatch/langwatch/issues/1931)) ([4d7607e](https://github.com/langwatch/langwatch/commit/4d7607e5d467749e2e47fc3b0b2b58c212bc8721))
+* **deps:** bump the npm_and_yarn group across 1 directory with 9 updates ([#1965](https://github.com/langwatch/langwatch/issues/1965)) ([3674bcc](https://github.com/langwatch/langwatch/commit/3674bccb17d52d6436dc75518aeaefe75942a318))
+
+
+### Code Refactoring
+
+* derive response_format from outputs, eliminate duality ([#1647](https://github.com/langwatch/langwatch/issues/1647)) ([856e4e7](https://github.com/langwatch/langwatch/commit/856e4e7350b26f25a44da919e4e7e7ffb5a0a0bd))
+* derive response_format from outputs, eliminate stored duality ([856e4e7](https://github.com/langwatch/langwatch/commit/856e4e7350b26f25a44da919e4e7e7ffb5a0a0bd))
+
 ## [0.16.1](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.16.0...typescript-sdk@v0.16.1) (2026-02-16)
 
 
