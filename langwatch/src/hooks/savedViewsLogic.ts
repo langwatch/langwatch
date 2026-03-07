@@ -160,7 +160,10 @@ export function normalizeFilterValue(
         .filter(Boolean) as [string, string[]][];
 
       if (innerEntries.length === 0) return null;
-      return [k, Object.fromEntries(innerEntries)] as const;
+      return [
+        k,
+        Object.fromEntries(innerEntries.sort(([a], [b]) => a.localeCompare(b))),
+      ] as const;
     })
     .filter(Boolean) as [string, FilterParam][];
 

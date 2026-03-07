@@ -3,6 +3,8 @@
  * saving the current filter state as a named custom view.
  *
  * Only visible when ClickHouse data source is enabled for the project.
+ * The inner component is split out so useSavedViews() is only called
+ * when SavedViewsProvider is guaranteed to be present.
  */
 
 import { Button, HStack, Input, VStack } from "@chakra-ui/react";
@@ -13,12 +15,19 @@ import { MAX_VIEW_NAME_LENGTH, useSavedViews } from "../../hooks/useSavedViews";
 
 export function SaveAsViewButton() {
   const { project } = useOrganizationTeamProject();
+  const hasClickHouse = project?.featureClickHouseDataSourceTraces === true;
+
+  if (!hasClickHouse) return null;
+
+  return <SaveAsViewButtonContent />;
+}
+
+function SaveAsViewButtonContent() {
   const { saveView } = useSavedViews();
   const [isNaming, setIsNaming] = useState(false);
   const [viewName, setViewName] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
-
-  const hasClickHouse = project?.featureClickHouseDataSourceTraces === true;
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const handleSaveClick = useCallback(() => {
     setIsNaming(true);
@@ -49,11 +58,19 @@ export function SaveAsViewButton() {
     [handleConfirm],
   );
 
-  if (!hasClickHouse) return null;
+  const handleBlur = useCallback(
+    (e: React.FocusEvent) => {
+      if (containerRef.current?.contains(e.relatedTarget as Node | null)) {
+        return;
+      }
+      handleConfirm();
+    },
+    [handleConfirm],
+  );
 
   if (isNaming) {
     return (
-      <VStack width="full" gap={2}>
+      <VStack ref={containerRef} width="full" gap={2} onBlur={handleBlur}>
         <Input
           ref={inputRef}
           size="sm"
@@ -63,7 +80,6 @@ export function SaveAsViewButton() {
             setViewName(e.target.value.slice(0, MAX_VIEW_NAME_LENGTH))
           }
           onKeyDown={handleKeyDown}
-          onBlur={handleConfirm}
           data-testid="save-view-name-input"
         />
         <HStack width="full" gap={2}>

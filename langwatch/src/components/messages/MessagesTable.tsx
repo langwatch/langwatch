@@ -456,10 +456,11 @@ export function MessagesTable({
             sortable: false,
             width: 120,
             render: (trace: TraceWithGuardrail, index: number) => {
-              const origin =
-                (trace.metadata["langwatch.origin"] as string | undefined) ??
-                "";
-              const displayOrigin = origin || "application";
+              const rawOrigin = trace.metadata["langwatch.origin"];
+              const displayOrigin =
+                typeof rawOrigin === "string" && rawOrigin !== ""
+                  ? rawOrigin
+                  : "application";
               const colors = getOriginColor(displayOrigin);
 
               return (
@@ -484,10 +485,10 @@ export function MessagesTable({
               );
             },
             value: (trace: Trace) => {
-              const origin =
-                (trace.metadata["langwatch.origin"] as string | undefined) ??
-                "";
-              return origin || "application";
+              const rawOrigin = trace.metadata["langwatch.origin"];
+              return typeof rawOrigin === "string" && rawOrigin !== ""
+                ? rawOrigin
+                : "application";
             },
           } satisfies HeaderColumn,
         }
