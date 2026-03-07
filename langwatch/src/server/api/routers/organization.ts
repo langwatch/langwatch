@@ -860,6 +860,29 @@ export const organizationRouter = createTRPCRouter({
                 return true;
               });
 
+            // Validate custom role IDs belong to this organization
+            const customRoleIds = teamAssignments
+              .filter((t) => t.customRoleId)
+              .map((t) => t.customRoleId!);
+            if (customRoleIds.length > 0) {
+              const validCustomRoles = await prisma.customRole.findMany({
+                where: {
+                  id: { in: customRoleIds },
+                  organizationId: input.organizationId,
+                },
+                select: { id: true },
+              });
+              const validCustomRoleIds = new Set(
+                validCustomRoles.map((r) => r.id),
+              );
+              const invalidRoleIds = customRoleIds.filter(
+                (id) => !validCustomRoleIds.has(id),
+              );
+              if (invalidRoleIds.length > 0) {
+                return null; // Skip this invite — invalid custom role
+              }
+            }
+
             teamIdsString = validTeamIds.join(",");
           } else if (invite.teamIds?.trim()) {
             const teamIdArray = invite.teamIds
@@ -1097,6 +1120,32 @@ export const organizationRouter = createTRPCRouter({
                         : undefined,
                   };
                 });
+
+              // Validate custom role IDs belong to this organization
+              const customRoleIds = teamAssignments
+                .filter((t) => t.customRoleId)
+                .map((t) => t.customRoleId!);
+              if (customRoleIds.length > 0) {
+                const validCustomRoles = await prisma.customRole.findMany({
+                  where: {
+                    id: { in: customRoleIds },
+                    organizationId: input.organizationId,
+                  },
+                  select: { id: true },
+                });
+                const validCustomRoleIds = new Set(
+                  validCustomRoles.map((r) => r.id),
+                );
+                const invalidRoleIds = customRoleIds.filter(
+                  (id) => !validCustomRoleIds.has(id),
+                );
+                if (invalidRoleIds.length > 0) {
+                  throw new TRPCError({
+                    code: "BAD_REQUEST",
+                    message: `Custom role(s) ${invalidRoleIds.join(", ")} not found in this organization`,
+                  });
+                }
+              }
 
               teamIdsString = validTeamIds.join(",");
             } else if (invite.teamIds?.trim()) {

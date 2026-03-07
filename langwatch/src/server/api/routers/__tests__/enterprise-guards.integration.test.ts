@@ -587,6 +587,102 @@ describe.skipIf(isTestcontainersOnly)(
       });
     });
 
+    // --- updateTeamMemberRole conditional guard ---
+
+    describe("organization.updateTeamMemberRole", () => {
+      describe("when assigning custom role on non-enterprise plan", () => {
+        it("rejects with FORBIDDEN", async () => {
+          mockGetActivePlan.mockResolvedValue(freePlan);
+          const caller = createCaller();
+
+          await expect(
+            caller.organization.updateTeamMemberRole({
+              teamId,
+              userId,
+              role: `custom:${customRoleId}`,
+              customRoleId,
+            }),
+          ).rejects.toMatchObject({
+            code: "FORBIDDEN",
+            message: ENTERPRISE_FEATURE_ERRORS.RBAC,
+          });
+        });
+      });
+
+      describe("when assigning built-in role on non-enterprise plan", () => {
+        it("allows update", async () => {
+          mockGetActivePlan.mockResolvedValue(freePlan);
+          const caller = createCaller();
+
+          const result = await caller.organization.updateTeamMemberRole({
+            teamId,
+            userId,
+            role: TeamUserRole.MEMBER,
+          });
+
+          expect(result).toBeDefined();
+        });
+      });
+    });
+
+    // --- createInviteRequest conditional guard ---
+
+    describe("organization.createInviteRequest", () => {
+      describe("when invites include custom role on non-enterprise plan", () => {
+        it("rejects with FORBIDDEN", async () => {
+          mockGetActivePlan.mockResolvedValue(freePlan);
+          const caller = createCaller();
+
+          await expect(
+            caller.organization.createInviteRequest({
+              organizationId,
+              invites: [
+                {
+                  email: `invite-req-${nanoid(4)}@example.com`,
+                  role: "MEMBER",
+                  teams: [
+                    {
+                      teamId,
+                      role: `custom:${customRoleId}`,
+                      customRoleId,
+                    },
+                  ],
+                },
+              ],
+            }),
+          ).rejects.toMatchObject({
+            code: "FORBIDDEN",
+            message: ENTERPRISE_FEATURE_ERRORS.RBAC,
+          });
+        });
+      });
+
+      describe("when invites use only built-in roles on non-enterprise plan", () => {
+        it("allows creation", async () => {
+          mockGetActivePlan.mockResolvedValue(freePlan);
+          const caller = createCaller();
+
+          const result = await caller.organization.createInviteRequest({
+            organizationId,
+            invites: [
+              {
+                email: `invite-req-builtin-${nanoid(4)}@example.com`,
+                role: "MEMBER",
+                teams: [
+                  {
+                    teamId,
+                    role: TeamUserRole.MEMBER,
+                  },
+                ],
+              },
+            ],
+          });
+
+          expect(result).toBeDefined();
+        });
+      });
+    });
+
     // --- Fail closed behavior ---
 
     describe("when plan provider fails", () => {

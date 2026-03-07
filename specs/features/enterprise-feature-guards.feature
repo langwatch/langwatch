@@ -171,6 +171,22 @@ Feature: Enterprise-only feature guards
     When a user calls role.getById
     Then the role details are returned successfully
 
+  # --- Custom role organization ownership validation ---
+
+  @unit
+  Scenario: Invite with foreign custom role ID is rejected
+    Given the organization plan is ENTERPRISE
+    And a custom role exists in a different organization
+    When an admin creates an invite using the foreign custom role ID
+    Then the invite is rejected with BAD_REQUEST
+
+  @unit
+  Scenario: Invite with valid custom role ID succeeds
+    Given the organization plan is ENTERPRISE
+    And a custom role exists in the same organization
+    When an admin creates an invite using the custom role ID
+    Then the invite is created successfully
+
   # --- Error handling ---
 
   @unit
