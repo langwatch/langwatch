@@ -160,3 +160,9 @@ jobs:
           name: test-results
           path: agentic-e2e-tests/test-results/
           retention-days: 7
+
+      - name: Notify Slack on failure
+        if: failure() && github.ref == 'refs/heads/main'
+        env:
+          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
+        run: bash .github/scripts/notify-slack-job-failure.sh e2e
