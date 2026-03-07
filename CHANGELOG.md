@@ -1,5 +1,91 @@
 # Changelog
 
+## [2.7.0](https://github.com/langwatch/langwatch/compare/langwatch@v2.6.0...langwatch@v2.7.0) (2026-03-07)
+
+
+### Features
+
+* add grid/list view toggle and full-width borderless tables to suites ([#1899](https://github.com/langwatch/langwatch/issues/1899)) ([3a1293e](https://github.com/langwatch/langwatch/commit/3a1293e729f53d9c10217bb34adb2436cfd42681))
+* add tracing to HTTP agent test executions ([#1898](https://github.com/langwatch/langwatch/issues/1898)) ([41693dd](https://github.com/langwatch/langwatch/commit/41693ddf32192ecb2a096aacbea6897534e28c1d))
+* **app-layer:** organization plan provider ([#1867](https://github.com/langwatch/langwatch/issues/1867)) ([0cef465](https://github.com/langwatch/langwatch/commit/0cef4655be9928e203bcee9d7af15d2f66f43c30))
+* **app-layer:** organization plan provider + import fixed ([#1887](https://github.com/langwatch/langwatch/issues/1887)) ([61e2910](https://github.com/langwatch/langwatch/commit/61e291036ffc1f7bdbd9047174a2574f40ac2a99))
+* **auth:** add structured UNAUTHORIZED error infrastructure ([#2015](https://github.com/langwatch/langwatch/issues/2015)) ([1e89302](https://github.com/langwatch/langwatch/commit/1e89302c85f5ec4d2ded68d8551e4b3e70b89222))
+* auto-copy .env files into new git worktrees ([#1901](https://github.com/langwatch/langwatch/issues/1901)) ([5bcb315](https://github.com/langwatch/langwatch/commit/5bcb315af564c3ccc4b1b3d45c218e21fcba8146))
+* automate low-risk PR evaluation with GitHub Actions workflow ([#1852](https://github.com/langwatch/langwatch/issues/1852)) ([da6b3a8](https://github.com/langwatch/langwatch/commit/da6b3a8e4f8f0dea2b53e04ee493c2d4a14e596f))
+* **billing:** add invoices display to subscription page ([#2035](https://github.com/langwatch/langwatch/issues/2035)) ([f25d48a](https://github.com/langwatch/langwatch/commit/f25d48a1eccc41adcb406115f03dae70079b52da))
+* **elasticsearch:** add flags to disable ES writes for fully-migrated ClickHouse customers ([#2034](https://github.com/langwatch/langwatch/issues/2034)) ([e44bb7e](https://github.com/langwatch/langwatch/commit/e44bb7e0be6fc334f2aadc37649769c2ac60f0e8))
+* enable ES write disable flags by default for SaaS customers ([#2051](https://github.com/langwatch/langwatch/issues/2051)) ([8a3ee8f](https://github.com/langwatch/langwatch/commit/8a3ee8f9857f7d5335d26bd65d7044b846334cdf))
+* event group queue processor speed improvements ([#1888](https://github.com/langwatch/langwatch/issues/1888)) ([999c3ed](https://github.com/langwatch/langwatch/commit/999c3ed258e6d111a75aaa134e3cb987599e91f3))
+* **event-sourcing:** add support for reactors on map projections ([#1868](https://github.com/langwatch/langwatch/issues/1868)) ([f7e1be4](https://github.com/langwatch/langwatch/commit/f7e1be40b72a0c247b993c86fdebfc344b2a8659))
+* group evaluation re-runs in trace details tab ([#1902](https://github.com/langwatch/langwatch/issues/1902)) ([064c44b](https://github.com/langwatch/langwatch/commit/064c44b4e6380198049c7b98a64149be386afa4f))
+* **licensing:** add self-serving license infrastructure ([#1891](https://github.com/langwatch/langwatch/issues/1891)) ([737a6e0](https://github.com/langwatch/langwatch/commit/737a6e00a39ee1ae31fb45b3d081ddafd3ce63f4))
+* real-time SSE + adaptive polling for suite run views ([#2007](https://github.com/langwatch/langwatch/issues/2007)) ([4afe396](https://github.com/langwatch/langwatch/commit/4afe396182ad3a62bcc58a352402ddb3dac476bd))
+* remove skip limits for self-hosted ([#1927](https://github.com/langwatch/langwatch/issues/1927)) ([ad315ef](https://github.com/langwatch/langwatch/commit/ad315efcd3a68a4e96542d90a9a916bd0a77eea4))
+* replace traces/threads switch with segmented control ([#1882](https://github.com/langwatch/langwatch/issues/1882)) ([fe8b66c](https://github.com/langwatch/langwatch/commit/fe8b66c7833e7b5cbe5bc77dbddd24fd3c2f3de9))
+* scenario run detail drawer for inline result viewing ([#1925](https://github.com/langwatch/langwatch/issues/1925)) ([c4de976](https://github.com/langwatch/langwatch/commit/c4de9762b2f3ef2f389fcc1bd93b2080f73f7f94))
+* **skynet:** bunch of improvements to stats, reliability, ux, performance ([#1871](https://github.com/langwatch/langwatch/issues/1871)) ([b5b4d5b](https://github.com/langwatch/langwatch/commit/b5b4d5b5abd29fa169257c4ed5b12bd4ef6efd5c))
+* **suites:** add group-by selector to All Runs page ([#1969](https://github.com/langwatch/langwatch/issues/1969)) ([c859f43](https://github.com/langwatch/langwatch/commit/c859f43db0442b7eedd5eb42c864fd873c79ae73))
+* **suites:** add Select All and Clear to target picker ([#1970](https://github.com/langwatch/langwatch/issues/1970)) ([ac3f020](https://github.com/langwatch/langwatch/commit/ac3f02052e874f6b4532ed2c9f4a9d23d8e03527))
+* **suites:** empty state for suites with no runs ([#2026](https://github.com/langwatch/langwatch/issues/2026)) ([7144286](https://github.com/langwatch/langwatch/commit/7144286c4c20c50122b4569a4934ddfaca52977a))
+* **suites:** exclude archived scenarios and targets from suite runs ([#1828](https://github.com/langwatch/langwatch/issues/1828)) ([7cab044](https://github.com/langwatch/langwatch/commit/7cab044c820a5ff21501181e2aa4abf0245afb3e))
+* **suites:** external SDK/CI sets in suites sidebar ([#1944](https://github.com/langwatch/langwatch/issues/1944)) ([d21d05b](https://github.com/langwatch/langwatch/commit/d21d05b0af4a8dd1a3f453a311fcfe69a58ae986))
+* **suites:** move Add Target and Add Scenario buttons inline with search ([#2039](https://github.com/langwatch/langwatch/issues/2039)) ([0fbd450](https://github.com/langwatch/langwatch/commit/0fbd4501f33d3b74ace7526eb6dad823b29562f4))
+* **suites:** move footer row info to table header ([#2027](https://github.com/langwatch/langwatch/issues/2027)) ([1e436ce](https://github.com/langwatch/langwatch/commit/1e436ce856210a2d76301d1d63de05fe7ebac23c))
+* **suites:** show time-ago metric on individual run detail view ([#2004](https://github.com/langwatch/langwatch/issues/2004)) ([b7cd573](https://github.com/langwatch/langwatch/commit/b7cd573aafd17097b098409437d4bbcb86031f02))
+* **suites:** unify pending jobs and completed runs into single data source ([#1979](https://github.com/langwatch/langwatch/issues/1979)) ([4988c36](https://github.com/langwatch/langwatch/commit/4988c365f439021c90b7573c62e49533a029425b))
+* **traces:** add langwatch.origin attribute for trace origin classification ([#2066](https://github.com/langwatch/langwatch/issues/2066)) ([1d94865](https://github.com/langwatch/langwatch/commit/1d9486548e994d8d2f933a7f530196df8d255e43))
+* updated mastra example in typescript sdk to use 1.0 api ([#1872](https://github.com/langwatch/langwatch/issues/1872)) ([f738633](https://github.com/langwatch/langwatch/commit/f738633951c6f2d0db3372f9be913e9f0c7d5d51))
+* upgrade modal support lite members restricctions ([#1953](https://github.com/langwatch/langwatch/issues/1953)) ([7ec2907](https://github.com/langwatch/langwatch/commit/7ec2907136f1e08e3bf13fe5e92826a94908e7f8))
+* **usage:** add upgrade instructions to 429 rate limit messages ([#2065](https://github.com/langwatch/langwatch/issues/2065)) ([ca0b1e9](https://github.com/langwatch/langwatch/commit/ca0b1e94f7af510a4ba92ab8a3fe99df3b210305))
+
+
+### Bug Fixes
+
+* add missing safety evaluators to type selector drawer ([#1929](https://github.com/langwatch/langwatch/issues/1929)) ([d15a861](https://github.com/langwatch/langwatch/commit/d15a861e61e0a62ea51adfd46cc11ef8f0fbeefc))
+* agent type selector drawer closes immediately in scenario editor ([#1908](https://github.com/langwatch/langwatch/issues/1908)) ([4453bd7](https://github.com/langwatch/langwatch/commit/4453bd7a2bd59611843cc823c56debe1da43e804))
+* **app-layer:** revert app-layer plan provider and circular dependency fix ([#1885](https://github.com/langwatch/langwatch/issues/1885)) ([ee48fde](https://github.com/langwatch/langwatch/commit/ee48fde2ae325410fd5605bd5b515fb9e17235bf))
+* **billing:** free plan message limit  ([#1968](https://github.com/langwatch/langwatch/issues/1968)) ([e5d5463](https://github.com/langwatch/langwatch/commit/e5d5463960c31731b9394ddc08ef0fef0679bd82))
+* **billing:** remove message cap from growth seat event plans ([#2030](https://github.com/langwatch/langwatch/issues/2030)) ([6952673](https://github.com/langwatch/langwatch/commit/6952673ac103bc32606ee867241a1a6636f828c5))
+* center status circles on suite grid cards ([d5952fa](https://github.com/langwatch/langwatch/commit/d5952fa9e3e35fe7c8e51392dfce8d7cf1d93d4b)), closes [#1905](https://github.com/langwatch/langwatch/issues/1905)
+* copy hook to .git/hooks/ instead of using core.hooksPath ([7a2316b](https://github.com/langwatch/langwatch/commit/7a2316b1a65740fe1f4c8f8b6aaae71ba996dba6))
+* copy worktree hook to .git/hooks/ instead of core.hooksPath ([#2010](https://github.com/langwatch/langwatch/issues/2010)) ([7a2316b](https://github.com/langwatch/langwatch/commit/7a2316b1a65740fe1f4c8f8b6aaae71ba996dba6))
+* **drawers:** update drawer transparency to 80% opacity and 25px blur ([#1972](https://github.com/langwatch/langwatch/issues/1972)) ([6c05ea7](https://github.com/langwatch/langwatch/commit/6c05ea77ac3a981e96f44d17c691b5cc307fb4b4))
+* import getApp directly to avoid circular dependency ([#1883](https://github.com/langwatch/langwatch/issues/1883)) ([df687c9](https://github.com/langwatch/langwatch/commit/df687c9266c375d72be4901c9a2b50941a298bf4))
+* include all span params in AI-readable trace format for evaluators ([#1996](https://github.com/langwatch/langwatch/issues/1996)) ([a7990c9](https://github.com/langwatch/langwatch/commit/a7990c9f4f2309e1348cbaece08046919d86904f)), closes [#1978](https://github.com/langwatch/langwatch/issues/1978)
+* only accept low-risk-change from automation, rename hotfix to firefighting ([#1934](https://github.com/langwatch/langwatch/issues/1934)) ([548f54c](https://github.com/langwatch/langwatch/commit/548f54ccd5411f8fc022c0c6c9142bdd4224b606))
+* register evaluations fallback worker on startup ([#1886](https://github.com/langwatch/langwatch/issues/1886)) ([20c6e10](https://github.com/langwatch/langwatch/commit/20c6e10f39221af34650debff043d6f813c6de7e))
+* restore bullboard project removed in [#1865](https://github.com/langwatch/langwatch/issues/1865) ([#1916](https://github.com/langwatch/langwatch/issues/1916)) ([94329d4](https://github.com/langwatch/langwatch/commit/94329d41c2fc68752596d83df667448d09fb0dca))
+* show agent type selector when creating agent from scenario editor ([#1897](https://github.com/langwatch/langwatch/issues/1897)) ([c4a9c8d](https://github.com/langwatch/langwatch/commit/c4a9c8d7f9cae7a487d41b379689f9dfbcb1d7d8)), closes [#1566](https://github.com/langwatch/langwatch/issues/1566)
+* **suites:** add padding under sidebar search input ([#1995](https://github.com/langwatch/langwatch/issues/1995)) ([f7832f6](https://github.com/langwatch/langwatch/commit/f7832f6fbad9f43592af7743b913132d28b9238b))
+* **suites:** drawer navigation, table width, and quick-run callbacks ([#1956](https://github.com/langwatch/langwatch/issues/1956)) ([#1974](https://github.com/langwatch/langwatch/issues/1974)) ([cbc866a](https://github.com/langwatch/langwatch/commit/cbc866af841ed9ce5ff8acee06910cf3536b630d))
+* **suites:** open child drawers as nested overlays instead of navigating ([#1973](https://github.com/langwatch/langwatch/issues/1973)) ([4767bb4](https://github.com/langwatch/langwatch/commit/4767bb40366dd70d91ed6050aa5df47a8974c765))
+* **suites:** remove redundant SUITES label from sidebar ([#2013](https://github.com/langwatch/langwatch/issues/2013)) ([f686dc9](https://github.com/langwatch/langwatch/commit/f686dc9987735d3f2d437be94f78e6abc3074040))
+* **suites:** replace double loading spinner with skeleton placeholders ([#1907](https://github.com/langwatch/langwatch/issues/1907)) ([80eb1b4](https://github.com/langwatch/langwatch/commit/80eb1b429c2bc55e3009bff0b235e64fe02da004))
+* **suites:** replace percentage with passed/failed status labels ([#1987](https://github.com/langwatch/langwatch/issues/1987)) ([a6a43b9](https://github.com/langwatch/langwatch/commit/a6a43b974bfaf3efea2d53314ebbcd31d30eeca4))
+* **suites:** replace percentage with passed/failed status labels ([#2028](https://github.com/langwatch/langwatch/issues/2028)) ([a6a43b9](https://github.com/langwatch/langwatch/commit/a6a43b974bfaf3efea2d53314ebbcd31d30eeca4))
+* **suites:** use drawer navigation consistently, fix table width, add quick-run callbacks ([cbc866a](https://github.com/langwatch/langwatch/commit/cbc866af841ed9ce5ff8acee06910cf3536b630d)), closes [#1956](https://github.com/langwatch/langwatch/issues/1956)
+* support both event structures for stale events ([#2048](https://github.com/langwatch/langwatch/issues/2048)) ([cfb9ece](https://github.com/langwatch/langwatch/commit/cfb9ece94d3e7b30d688c6e7e11a803abffedaa8))
+* **trace-processing:** update TTL and add delay for evaluationTrigger reactor ([#1881](https://github.com/langwatch/langwatch/issues/1881)) ([1d7aaaa](https://github.com/langwatch/langwatch/commit/1d7aaaa0502fec8225d2f2602f4c201af17c50cd))
+* **traces:** add token estimation to event-sourcing pipeline ([#2050](https://github.com/langwatch/langwatch/issues/2050)) ([ecb641f](https://github.com/langwatch/langwatch/commit/ecb641fe337910af6f9f632cba00162ae49c9e62))
+* **ui:** truncate long metadata values and fix popover arrows ([#2056](https://github.com/langwatch/langwatch/issues/2056)) ([be97f16](https://github.com/langwatch/langwatch/commit/be97f168e19b623b7c489fa7d5592e8549800e89))
+* updated billable event list ([#2047](https://github.com/langwatch/langwatch/issues/2047)) ([7ef76ef](https://github.com/langwatch/langwatch/commit/7ef76ef04b9debef81f4df355cd13be704beaa4d))
+* vertically center status circles on suite cards ([#2006](https://github.com/langwatch/langwatch/issues/2006)) ([d5952fa](https://github.com/langwatch/langwatch/commit/d5952fa9e3e35fe7c8e51392dfce8d7cf1d93d4b))
+
+
+### Miscellaneous
+
+* **deps:** bump @testcontainers/clickhouse from 10 to 11 ([#1971](https://github.com/langwatch/langwatch/issues/1971)) ([9eb697d](https://github.com/langwatch/langwatch/commit/9eb697dad14b0f3cd7d76dc1d3a81b3392974f24))
+* **deps:** bump Node.js dependencies - batch 2 ([#1947](https://github.com/langwatch/langwatch/issues/1947)) ([98d9f5c](https://github.com/langwatch/langwatch/commit/98d9f5cb53dc13051c500359def11b35762fd5e5))
+* **deps:** bump Python (uv) dependencies across langwatch_nlp, python-sdk, langevals ([#1940](https://github.com/langwatch/langwatch/issues/1940)) ([d103f89](https://github.com/langwatch/langwatch/commit/d103f89fc1936dc8dae73f2b90885a28b97e2775))
+* **deps:** bump Python uv lockfile packages (v2) ([#1954](https://github.com/langwatch/langwatch/issues/1954)) ([23b3a5c](https://github.com/langwatch/langwatch/commit/23b3a5ce9f16d6a722690cbdd86cb095f01dba08))
+* **deps:** bump safe npm dependencies (19 dependabot PRs) ([#1931](https://github.com/langwatch/langwatch/issues/1931)) ([4d7607e](https://github.com/langwatch/langwatch/commit/4d7607e5d467749e2e47fc3b0b2b58c212bc8721))
+* **deps:** bump the npm_and_yarn group across 1 directory with 2 updates ([#1967](https://github.com/langwatch/langwatch/issues/1967)) ([f61d05a](https://github.com/langwatch/langwatch/commit/f61d05a6fc85ab00e56a3af9c67a1530bc84b28c))
+* event sourcing pausing + simulation run state datetime bug ([#1893](https://github.com/langwatch/langwatch/issues/1893)) ([c6fb77f](https://github.com/langwatch/langwatch/commit/c6fb77f6510d9518307016fd686b30bf022ad5c0))
+* remove rate limit for skynet ([#1976](https://github.com/langwatch/langwatch/issues/1976)) ([d5b677a](https://github.com/langwatch/langwatch/commit/d5b677aedf0ecfe0b5591a75e84c5d48a42315d5))
+* schema and timestamp unification, event idempotency support, simulation timestamp fix, and partition adjustments ([#1945](https://github.com/langwatch/langwatch/issues/1945)) ([ae0f7f7](https://github.com/langwatch/langwatch/commit/ae0f7f7ddcd70c5f05b803c916e72c342fe85235))
+* simplify billing projection handling, improve skynet, improve groupqueue concurrecy ([#1892](https://github.com/langwatch/langwatch/issues/1892)) ([0273a42](https://github.com/langwatch/langwatch/commit/0273a4250799693bd5f37aa7a949dd339f9d4e25))
+* **trace-processing:** cleanup and improve span normalisation and canonicalisation, and trace summarisation ([#1869](https://github.com/langwatch/langwatch/issues/1869)) ([e7b7715](https://github.com/langwatch/langwatch/commit/e7b7715af04bb7a45ce9a78202bd8f1f2344042b))
+
 ## [2.6.0](https://github.com/langwatch/langwatch/compare/langwatch@v2.5.0...langwatch@v2.6.0) (2026-03-01)
 
 
