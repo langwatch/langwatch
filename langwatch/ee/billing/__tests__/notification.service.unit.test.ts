@@ -399,28 +399,33 @@ describe("NotificationService", () => {
 
     describe("when HubSpot env vars are not set", () => {
       it("returns without sending", async () => {
-        config.hubspotPortalId = undefined;
-        config.hubspotReachedLimitFormId = undefined;
+        const mockFetch = vi.fn();
+        const localService = NotificationService.create({
+          config: { ...config, hubspotPortalId: undefined, hubspotReachedLimitFormId: undefined },
+          fetchFn: mockFetch,
+        });
 
-        const mockFetch = vi.spyOn(global, "fetch");
-
-        await service.sendHubspotPlanLimitForm(context);
+        await localService.sendHubspotPlanLimitForm(context);
 
         expect(mockFetch).not.toHaveBeenCalled();
-        mockFetch.mockRestore();
       });
     });
 
     describe("when HubSpot env vars are set", () => {
       it("submits form data to HubSpot", async () => {
-        config.hubspotPortalId = "12345";
-        config.hubspotReachedLimitFormId = "form_abc";
-
         const mockFetch = vi
-          .spyOn(global, "fetch")
+          .fn()
           .mockResolvedValue(new Response("ok", { status: 200 }));
+        const localService = NotificationService.create({
+          config: {
+            ...config,
+            hubspotPortalId: "12345",
+            hubspotReachedLimitFormId: "form_abc",
+          },
+          fetchFn: mockFetch,
+        });
 
-        await service.sendHubspotPlanLimitForm(context);
+        await localService.sendHubspotPlanLimitForm(context);
 
         expect(mockFetch).toHaveBeenCalledWith(
           "https://api.hsforms.com/submissions/v3/integration/submit/12345/form_abc",
@@ -429,25 +434,26 @@ describe("NotificationService", () => {
             body: expect.stringContaining("jane@acme.com"),
           }),
         );
-
-        mockFetch.mockRestore();
       });
     });
 
     describe("when HubSpot request fails", () => {
       it("catches the error and captures exception", async () => {
-        config.hubspotPortalId = "12345";
-        config.hubspotReachedLimitFormId = "form_abc";
-
         const mockFetch = vi
-          .spyOn(global, "fetch")
+          .fn()
           .mockResolvedValue(new Response("fail", { status: 500 }));
+        const localService = NotificationService.create({
+          config: {
+            ...config,
+            hubspotPortalId: "12345",
+            hubspotReachedLimitFormId: "form_abc",
+          },
+          fetchFn: mockFetch,
+        });
 
-        await service.sendHubspotPlanLimitForm(context);
+        await localService.sendHubspotPlanLimitForm(context);
 
         expect(captureException).toHaveBeenCalled();
-
-        mockFetch.mockRestore();
       });
     });
   });

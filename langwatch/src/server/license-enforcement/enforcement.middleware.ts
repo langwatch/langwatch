@@ -60,11 +60,11 @@ export async function enforceLicenseLimit(
   const enforcement = createLicenseEnforcementService(ctx.prisma);
 
   try {
-    await enforcement.enforceLimit(
+    await enforcement.enforceLimitByOrganization({
       organizationId,
       limitType,
-      ctx.session.user,
-    );
+      user: ctx.session.user,
+    });
   } catch (error) {
     if (error instanceof LimitExceededError) {
       // Fire-and-forget: notify ops, never block user

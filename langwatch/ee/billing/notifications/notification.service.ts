@@ -17,7 +17,7 @@ import type {
 const logger = createLogger("ee:notification-service");
 
 const DEFAULT_APP_URL = "https://app.langwatch.ai";
-const SLACK_TIMEOUT_MS = 10_000;
+const EXTERNAL_SERVICE_TIMEOUT_MS = 10_000;
 
 // ---------------------------------------------------------------------------
 // Exported types
@@ -40,27 +40,15 @@ export interface UsageLimitEmailData {
 // Helpers (absorbed from billingNotificationRegistration.ts)
 // ---------------------------------------------------------------------------
 
-type NotificationBase = {
-  organizationId: string;
-  organizationName: string;
-  plan: string;
-};
+type ProspectiveNotification = Extract<
+  SubscriptionNotificationPayload,
+  { type: "prospective" }
+>;
 
-type ProspectiveNotification = NotificationBase & {
-  type: "prospective";
-  customerName?: string;
-  customerEmail?: string;
-  note?: string;
-  actorEmail?: string;
-};
-
-type ConfirmedNotification = NotificationBase & {
-  type: "confirmed";
-  subscriptionId: string;
-  startDate?: Date | null;
-  maxMembers?: number | null;
-  maxMessagesPerMonth?: number | null;
-};
+type ConfirmedNotification = Extract<
+  SubscriptionNotificationPayload,
+  { type: "confirmed" }
+>;
 
 type NotificationServiceOptions = {
   config: Pick<
@@ -235,7 +223,7 @@ export class NotificationService {
       options?.createSlackWebhook ??
       ((url) =>
         new IncomingWebhook(url, {
-          timeout: SLACK_TIMEOUT_MS,
+          timeout: EXTERNAL_SERVICE_TIMEOUT_MS,
         }));
     this.fetchFn =
       options?.fetchFn ??
@@ -476,7 +464,10 @@ export class NotificationService {
     const url = `https://api.hsforms.com/submissions/v3/integration/submit/${hubspotPortalId}/${hubspotReachedLimitFormId}`;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), SLACK_TIMEOUT_MS);
+    const timeoutId = setTimeout(
+      () => controller.abort(),
+      EXTERNAL_SERVICE_TIMEOUT_MS,
+    );
 
     try {
       const response = await this.fetchFn(url, {

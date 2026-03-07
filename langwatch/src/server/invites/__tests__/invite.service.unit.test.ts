@@ -14,8 +14,7 @@ import {
   InviteService,
 } from "../invite.service";
 import type { ILicenseEnforcementRepository } from "../../license-enforcement/license-enforcement.repository";
-import { LicenseLimitError } from "../errors";
-import { LICENSE_LIMIT_ERRORS } from "../../license-enforcement/license-limit-guard";
+import { LimitExceededError } from "../../license-enforcement/errors";
 import type { PlanProvider } from "../../app-layer/subscription/plan-provider";
 
 const { mockSendInviteEmail } = vi.hoisted(() => ({
@@ -221,7 +220,7 @@ describe("InviteService", () => {
     });
 
     describe("when member limit is exceeded", () => {
-      it("throws LicenseLimitError", async () => {
+      it("throws LimitExceededError with members limitType", async () => {
         vi.mocked(mockLicenseRepo.getMemberCount).mockResolvedValue(10);
         vi.mocked(mockLicenseRepo.getMembersLiteCount).mockResolvedValue(0);
         vi.mocked(mockPlanProvider.getActivePlan).mockResolvedValue({
@@ -230,26 +229,23 @@ describe("InviteService", () => {
           overrideAddingLimitations: false,
         } as any);
 
-        await expect(
-          service.checkLicenseLimits({
+        const error = await service
+          .checkLicenseLimits({
             organizationId: "org-1",
             newInvites: [{ role: OrganizationUserRole.MEMBER }],
             user: { id: "user-1" } as any,
           })
-        ).rejects.toThrow(LicenseLimitError);
+          .catch((e) => e);
 
-        await expect(
-          service.checkLicenseLimits({
-            organizationId: "org-1",
-            newInvites: [{ role: OrganizationUserRole.MEMBER }],
-            user: { id: "user-1" } as any,
-          })
-        ).rejects.toThrow(LICENSE_LIMIT_ERRORS.FULL_MEMBER_LIMIT);
+        expect(error).toBeInstanceOf(LimitExceededError);
+        expect(error.limitType).toBe("members");
+        expect(error.current).toBe(10);
+        expect(error.max).toBe(10);
       });
     });
 
     describe("when lite member limit is exceeded", () => {
-      it("throws LicenseLimitError", async () => {
+      it("throws LimitExceededError with membersLite limitType", async () => {
         vi.mocked(mockLicenseRepo.getMemberCount).mockResolvedValue(0);
         vi.mocked(mockLicenseRepo.getMembersLiteCount).mockResolvedValue(5);
         vi.mocked(mockPlanProvider.getActivePlan).mockResolvedValue({
@@ -258,21 +254,18 @@ describe("InviteService", () => {
           overrideAddingLimitations: false,
         } as any);
 
-        await expect(
-          service.checkLicenseLimits({
+        const error = await service
+          .checkLicenseLimits({
             organizationId: "org-1",
             newInvites: [{ role: OrganizationUserRole.EXTERNAL, teams: [] }],
             user: { id: "user-1" } as any,
           })
-        ).rejects.toThrow(LicenseLimitError);
+          .catch((e) => e);
 
-        await expect(
-          service.checkLicenseLimits({
-            organizationId: "org-1",
-            newInvites: [{ role: OrganizationUserRole.EXTERNAL, teams: [] }],
-            user: { id: "user-1" } as any,
-          })
-        ).rejects.toThrow(LICENSE_LIMIT_ERRORS.MEMBER_LITE_LIMIT);
+        expect(error).toBeInstanceOf(LimitExceededError);
+        expect(error.limitType).toBe("membersLite");
+        expect(error.current).toBe(5);
+        expect(error.max).toBe(5);
       });
     });
 

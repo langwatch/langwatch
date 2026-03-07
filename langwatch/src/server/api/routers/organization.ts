@@ -24,10 +24,7 @@ import {
   LicenseEnforcementRepository,
 } from "../../license-enforcement/license-enforcement.repository";
 import { getRoleChangeType } from "../../license-enforcement/member-classification";
-import {
-  assertMemberTypeLimitNotExceeded,
-  LICENSE_LIMIT_ERRORS,
-} from "../../license-enforcement/license-limit-guard";
+import { assertMemberTypeLimitNotExceeded } from "../../license-enforcement/license-limit-guard";
 import { scheduleUsageStatsForOrganization } from "~/server/background/queues/usageStatsQueue";
 import { decrypt, encrypt } from "~/utils/encryption";
 import { isTeamRoleAllowedForOrganizationRole, type TeamRoleValue } from "~/utils/memberRoleConstraints";
@@ -42,7 +39,6 @@ import {
 import {
   DuplicateInviteError,
   InviteNotFoundError,
-  LicenseLimitError,
   OrganizationNotFoundError,
 } from "../../invites/errors";
 import {
@@ -51,6 +47,8 @@ import {
   isCustomRole,
   ENTERPRISE_FEATURE_ERRORS,
 } from "../enterprise";
+import { LimitExceededError } from "../../license-enforcement/errors";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { skipPermissionCheck } from "../rbac";
 import { checkOrganizationPermission, checkTeamPermission } from "../rbac";
 import { signUpDataSchema } from "./onboarding";
@@ -804,7 +802,16 @@ export const organizationRouter = createTRPCRouter({
           user: ctx.session.user,
         });
       } catch (error) {
-        if (error instanceof LicenseLimitError) {
+        if (error instanceof LimitExceededError) {
+          void getApp()
+            .usageLimits?.notifyResourceLimitReached({
+              organizationId: input.organizationId,
+              limitType: error.limitType,
+              current: error.current,
+              max: error.max,
+            })
+            .catch(captureException);
+
           throw new TRPCError({
             code: "FORBIDDEN",
             message: error.message,
@@ -1204,7 +1211,16 @@ export const organizationRouter = createTRPCRouter({
 
         return results;
       } catch (error) {
-        if (error instanceof LicenseLimitError) {
+        if (error instanceof LimitExceededError) {
+          void getApp()
+            .usageLimits?.notifyResourceLimitReached({
+              organizationId: input.organizationId,
+              limitType: error.limitType,
+              current: error.current,
+              max: error.max,
+            })
+            .catch(captureException);
+
           throw new TRPCError({
             code: "FORBIDDEN",
             message: error.message,
@@ -1267,7 +1283,16 @@ export const organizationRouter = createTRPCRouter({
             message: error.message,
           });
         }
-        if (error instanceof LicenseLimitError) {
+        if (error instanceof LimitExceededError) {
+          void getApp()
+            .usageLimits?.notifyResourceLimitReached({
+              organizationId: input.organizationId,
+              limitType: error.limitType,
+              current: error.current,
+              max: error.max,
+            })
+            .catch(captureException);
+
           throw new TRPCError({
             code: "FORBIDDEN",
             message: error.message,
