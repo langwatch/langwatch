@@ -19,6 +19,8 @@ import { ChevronDown, Edit2, HelpCircle } from "react-feather";
 import {
   Controller,
   FormProvider,
+  type Resolver,
+  type ResolverOptions,
   useFieldArray,
   useForm,
 } from "react-hook-form";
@@ -100,8 +102,8 @@ export default function CheckConfigForm({
 
   const form = useForm<CheckConfigFormData>({
     defaultValues,
-    resolver: (data, ...args) => {
-      return zodResolver(
+    resolver: ((data, context, options) => {
+      return (zodResolver(
         z.object({
           name: z.string().min(1).max(255).refine(validateNameUniqueness),
           checkType: evaluatorTypesSchema,
@@ -120,8 +122,12 @@ export default function CheckConfigForm({
             .optional(),
           mappings: mappingStateSchema,
         }),
-      )({ ...data, settings: data.settings || {} }, ...args);
-    },
+      ) as unknown as Resolver<CheckConfigFormData>)(
+        { ...data, settings: data.settings || {} },
+        context,
+        options,
+      );
+    }) as Resolver<CheckConfigFormData>,
   });
 
   const {

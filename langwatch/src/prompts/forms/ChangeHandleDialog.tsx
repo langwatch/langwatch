@@ -13,7 +13,7 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PromptScope } from "@prisma/client";
 import { useCallback, useEffect } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, type Resolver, useForm } from "react-hook-form";
 import { LuBuilding, LuLock } from "react-icons/lu";
 import { Dialog } from "~/components/ui/dialog";
 import { Select } from "../../components/ui/select";
@@ -57,7 +57,7 @@ export function ChangeHandleDialog({
     },
     resolver: zodResolver(
       createChangeHandleFormSchema({ checkHandleUniqueness }),
-    ),
+    ) as Resolver<ChangeHandleFormValues>,
   });
 
   /**
