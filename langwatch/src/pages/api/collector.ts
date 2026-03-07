@@ -4,7 +4,6 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { captureException, getCurrentScope } from "~/utils/posthogErrorCapture";
-import { notifyPlanLimitReached } from "../../../ee/billing";
 import { withPagesRouterLogger } from "../../middleware/pages-router-logger";
 import { withPagesRouterTracer } from "../../middleware/pages-router-tracer";
 import { maybeAddIdsToContextList } from "../../server/background/workers/collector/rag";
@@ -100,7 +99,7 @@ async function handleCollectorRequest(
         const activePlan = await getApp().planProvider.getActivePlan({
           organizationId: project.team.organizationId,
         });
-        await notifyPlanLimitReached({
+        await getApp().usageLimits?.notifyPlanLimitReached({
           organizationId: project.team.organizationId,
           planName: activePlan.name ?? "free",
         });

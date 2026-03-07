@@ -231,4 +231,56 @@ describe("LicenseEnforcementService", () => {
       ).resolves.toBeUndefined();
     });
   });
+
+  describe("enforceLimitByOrganization", () => {
+    it("delegates to enforceLimit with the provided arguments", async () => {
+      const user = { id: "user-123", email: "test@example.com", name: "Test" };
+      vi.mocked(mockRepository.getProjectCount).mockResolvedValue(0);
+
+      await service.enforceLimitByOrganization({
+        organizationId: "org-456",
+        limitType: "projects",
+        user,
+      });
+
+      expect(mockPlanProvider.getActivePlan).toHaveBeenCalledWith({
+        organizationId: "org-456",
+        user: expect.objectContaining({ id: "user-123" }),
+      });
+      expect(mockRepository.getProjectCount).toHaveBeenCalledWith("org-456");
+    });
+
+    it("throws LimitExceededError when limit is reached", async () => {
+      vi.mocked(mockRepository.getTeamCount).mockResolvedValue(5);
+
+      await expect(
+        service.enforceLimitByOrganization({
+          organizationId: "org-123",
+          limitType: "teams",
+        })
+      ).rejects.toThrow(LimitExceededError);
+    });
+
+    it("does not throw when limit is not exceeded", async () => {
+      vi.mocked(mockRepository.getProjectCount).mockResolvedValue(2);
+
+      await expect(
+        service.enforceLimitByOrganization({
+          organizationId: "org-123",
+          limitType: "projects",
+        })
+      ).resolves.toBeUndefined();
+    });
+
+    it("does not require user parameter", async () => {
+      vi.mocked(mockRepository.getWorkflowCount).mockResolvedValue(0);
+
+      await expect(
+        service.enforceLimitByOrganization({
+          organizationId: "org-123",
+          limitType: "workflows",
+        })
+      ).resolves.toBeUndefined();
+    });
+  });
 });

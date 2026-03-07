@@ -1,12 +1,5 @@
 import { prisma } from "../../src/server/db";
 import { env } from "../../src/env.mjs";
-import { createPlanLimitNotifier } from "./notifications/planLimitNotifier";
-import {
-  clearBillingNotificationHandlers,
-  notifySubscriptionEvent,
-  setBillingNotificationHandlers,
-} from "./notifications/notificationHandlers";
-import { sendSlackLicensePurchaseNotification } from "./notifications/slackLicenseNotification";
 import { createSaaSPlanProvider } from "./planProvider";
 import { createCustomerService } from "./services/customerService";
 import { createSeatEventSubscriptionFns } from "./services/seatEventSubscription";
@@ -25,18 +18,13 @@ export { PLAN_LIMITS } from "./planLimits";
 export { prices } from "./services/subscriptionItemCalculator";
 export type { UsageReportingService, MeterEventResult, UsageSummary } from "./services/usageReportingService";
 export type {
-  BillingNotificationHandlers,
   BillingPlanProvider,
   PlanLimitNotificationContext,
-  PlanLimitNotificationHandlers,
   PlanLimitNotifierInput,
+  ResourceLimitNotificationContext,
+  ResourceLimitNotifierInput,
   SubscriptionNotificationPayload,
 } from "./types";
-export {
-  clearBillingNotificationHandlers,
-  notifySubscriptionEvent,
-  setBillingNotificationHandlers,
-};
 
 // Lazy Stripe singleton
 let stripe: ReturnType<typeof createStripeClient> | null = null;
@@ -81,17 +69,6 @@ export const createStripeWebhookHandler = () => {
     inviteApprover,
   });
 
-  const slackWebhookUrl = env.SLACK_CHANNEL_SUBSCRIPTIONS;
-  setBillingNotificationHandlers({
-    sendLicensePurchaseNotification: slackWebhookUrl
-      ? (payload) =>
-          sendSlackLicensePurchaseNotification({
-            payload,
-            webhookUrl: slackWebhookUrl,
-          })
-      : undefined,
-  });
-
   return createStripeWebhookHandlerFactory({ stripe: s, webhookService });
 };
 
@@ -105,15 +82,3 @@ export const getSaaSPlanProvider = () => {
   return saasPlanProvider;
 };
 
-let planLimitNotifier: ReturnType<typeof createPlanLimitNotifier> | null = null;
-
-export const notifyPlanLimitReached = async (input: {
-  organizationId: string;
-  planName: string;
-}) => {
-  if (!planLimitNotifier) {
-    planLimitNotifier = createPlanLimitNotifier(prisma);
-  }
-
-  return await planLimitNotifier(input);
-};
