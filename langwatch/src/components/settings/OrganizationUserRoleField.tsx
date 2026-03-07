@@ -22,7 +22,7 @@ export const orgRoleOptions: OrgRoleOption[] = [
   },
   {
     label: "Lite Member",
-    value: OrganizationUserRole.EXTERNAL,
+    value: OrganizationUserRole.LITE_MEMBER,
     description: "Can only view projects they are invited to, cannot see costs",
   },
 ];

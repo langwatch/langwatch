@@ -233,13 +233,13 @@ describe("RBAC Permission System", () => {
     it("allows ORGANIZATION_EXTERNAL to access organization view permissions", () => {
       expect(
         organizationRoleHasPermission(
-          OrganizationUserRole.EXTERNAL,
+          OrganizationUserRole.LITE_MEMBER,
           "organization:view",
         ),
       ).toBe(true);
       expect(
         organizationRoleHasPermission(
-          OrganizationUserRole.EXTERNAL,
+          OrganizationUserRole.LITE_MEMBER,
           "organization:manage",
         ),
       ).toBe(false);
@@ -512,7 +512,7 @@ describe("RBAC Permission System", () => {
 
       it("returns limited permissions for Lite Member (EXTERNAL)", () => {
         const permissions = getOrganizationRolePermissions(
-          OrganizationUserRole.EXTERNAL,
+          OrganizationUserRole.LITE_MEMBER,
         );
         expect(permissions).toContain("organization:view");
         expect(permissions).not.toContain("organization:manage");

@@ -95,7 +95,7 @@ vi.mock("../../components/settings/OrganizationUserRoleField", () => ({
       type="button"
       data-testid="org-role-field"
       data-value={value}
-      onClick={() => onChange("EXTERNAL")}
+      onClick={() => onChange("LITE_MEMBER")}
     >
       Change Role
     </button>
@@ -207,7 +207,7 @@ describe("Member details page", () => {
         expect(mockUpdateMemberRoleMutateAsync).toHaveBeenCalledWith({
           organizationId: "org-1",
           userId: "user-1",
-          role: OrganizationUserRole.EXTERNAL,
+          role: OrganizationUserRole.LITE_MEMBER,
           teamRoleUpdates: [],
         });
       });
@@ -265,7 +265,7 @@ describe("Member details page", () => {
         expect(mockUpdateMemberRoleMutateAsync).toHaveBeenCalledWith({
           organizationId: "org-1",
           userId: "user-1",
-          role: OrganizationUserRole.EXTERNAL,
+          role: OrganizationUserRole.LITE_MEMBER,
           teamRoleUpdates: expect.arrayContaining([
             expect.objectContaining({
               teamId: "team-1",
@@ -286,7 +286,7 @@ describe("Member details page", () => {
   describe("when viewing a Lite Member's details as a non-admin", () => {
     beforeEach(() => {
       mockHasOrgPermissionRef.current = () => false;
-      mockMemberData.role = OrganizationUserRole.EXTERNAL;
+      mockMemberData.role = OrganizationUserRole.LITE_MEMBER;
     });
 
     it("displays 'Lite Member' label instead of 'EXTERNAL'", () => {
@@ -297,7 +297,7 @@ describe("Member details page", () => {
       );
 
       expect(screen.getByText("Lite Member")).toBeTruthy();
-      expect(screen.queryByText("EXTERNAL")).toBeNull();
+      expect(screen.queryByText("LITE_MEMBER")).toBeNull();
     });
   });
 

@@ -513,7 +513,7 @@ describe("<SubscriptionPage/>", () => {
         data: [
           { role: "MEMBER", status: "PENDING" },
           { role: "ADMIN", status: "PENDING" },
-          { role: "EXTERNAL", status: "PENDING" },
+          { role: "LITE_MEMBER", status: "PENDING" },
         ],
         isLoading: false,
       });
@@ -532,7 +532,7 @@ describe("<SubscriptionPage/>", () => {
     it("excludes EXTERNAL invites from N count", async () => {
       mockGetPendingInvites.mockReturnValue({
         data: [
-          { role: "EXTERNAL", status: "PENDING" },
+          { role: "LITE_MEMBER", status: "PENDING" },
         ],
         isLoading: false,
       });

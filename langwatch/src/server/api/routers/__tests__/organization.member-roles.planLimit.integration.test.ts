@@ -210,7 +210,7 @@ describe.skipIf(isTestcontainersOnly)(
     }
 
     describe("updateMemberRole", () => {
-      describe("when demoting MEMBER to EXTERNAL (full-to-lite change)", () => {
+      describe("when demoting MEMBER to LITE_MEMBER (full-to-lite change)", () => {
         it("rejects when lite member limit reached", async () => {
           mockGetActivePlan.mockResolvedValue({
             maxMembers: 100,
@@ -224,7 +224,7 @@ describe.skipIf(isTestcontainersOnly)(
             caller.organization.updateMemberRole({
               userId: targetUserId,
               organizationId,
-              role: OrganizationUserRole.EXTERNAL,
+              role: OrganizationUserRole.LITE_MEMBER,
             }),
           ).rejects.toMatchObject({
             code: "FORBIDDEN",
@@ -244,7 +244,7 @@ describe.skipIf(isTestcontainersOnly)(
           await caller.organization.updateMemberRole({
             userId: targetUserId,
             organizationId,
-            role: OrganizationUserRole.EXTERNAL,
+            role: OrganizationUserRole.LITE_MEMBER,
           });
 
           const updated = await prisma.organizationUser.findUnique({
@@ -255,13 +255,13 @@ describe.skipIf(isTestcontainersOnly)(
               },
             },
           });
-          expect(updated?.role).toBe(OrganizationUserRole.EXTERNAL);
+          expect(updated?.role).toBe(OrganizationUserRole.LITE_MEMBER);
         });
       });
     });
 
     describe("updateTeamMemberRole", () => {
-      describe("when changing EXTERNAL user from custom role to built-in VIEWER (full-to-lite change)", () => {
+      describe("when changing LITE_MEMBER user from custom role to built-in VIEWER (full-to-lite change)", () => {
         beforeEach(async () => {
           // Set target user as EXTERNAL with custom role (non-view permissions → FullMember)
           await prisma.organizationUser.update({
@@ -271,7 +271,7 @@ describe.skipIf(isTestcontainersOnly)(
                 organizationId,
               },
             },
-            data: { role: OrganizationUserRole.EXTERNAL },
+            data: { role: OrganizationUserRole.LITE_MEMBER },
           });
           await prisma.teamUser.update({
             where: {

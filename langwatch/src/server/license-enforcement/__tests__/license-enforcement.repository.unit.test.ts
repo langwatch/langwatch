@@ -213,9 +213,9 @@ describe("LicenseEnforcementRepository", () => {
       expect(result).toBe(2);
     });
 
-    it("counts EXTERNAL role users with non-view custom role as full members (elevated from Lite Member)", async () => {
+    it("counts LITE_MEMBER role users with non-view custom role as full members (elevated from Lite Member)", async () => {
       mockPrisma.organizationUser.findMany.mockResolvedValue([
-        { userId: "u1", role: OrganizationUserRole.EXTERNAL },
+        { userId: "u1", role: OrganizationUserRole.LITE_MEMBER },
       ]);
       mockPrisma.team.findMany.mockResolvedValue([{ id: "team-1" }]);
       mockPrisma.teamUser.findMany.mockResolvedValue([
@@ -231,9 +231,9 @@ describe("LicenseEnforcementRepository", () => {
       expect(result).toBe(1);
     });
 
-    it("does not count EXTERNAL role users with view-only custom role as full members (they are Lite Member)", async () => {
+    it("does not count LITE_MEMBER role users with view-only custom role as full members (they are Lite Member)", async () => {
       mockPrisma.organizationUser.findMany.mockResolvedValue([
-        { userId: "u1", role: OrganizationUserRole.EXTERNAL },
+        { userId: "u1", role: OrganizationUserRole.LITE_MEMBER },
       ]);
       mockPrisma.team.findMany.mockResolvedValue([{ id: "team-1" }]);
       mockPrisma.teamUser.findMany.mockResolvedValue([
@@ -289,7 +289,7 @@ describe("LicenseEnforcementRepository", () => {
       ]);
       mockPrisma.organizationInvite.findMany.mockResolvedValue([
         {
-          role: OrganizationUserRole.EXTERNAL,
+          role: OrganizationUserRole.LITE_MEMBER,
           teamAssignments: [{ teamId: "team-1", customRoleId: "role-1" }],
           expiration: new Date("2024-03-20"),
         },
@@ -308,7 +308,7 @@ describe("LicenseEnforcementRepository", () => {
       ]);
       mockPrisma.organizationInvite.findMany.mockResolvedValue([
         {
-          role: OrganizationUserRole.EXTERNAL,
+          role: OrganizationUserRole.LITE_MEMBER,
           teamAssignments: [{ teamId: "team-1", customRoleId: "role-1" }],
           expiration: new Date("2024-03-20"),
         },
@@ -330,9 +330,9 @@ describe("LicenseEnforcementRepository", () => {
       expect(result).toBe(0);
     });
 
-    it("does not count EXTERNAL role users without team assignment as full members (they are Lite Member)", async () => {
+    it("does not count LITE_MEMBER role users without team assignment as full members (they are Lite Member)", async () => {
       mockPrisma.organizationUser.findMany.mockResolvedValue([
-        { userId: "u1", role: OrganizationUserRole.EXTERNAL },
+        { userId: "u1", role: OrganizationUserRole.LITE_MEMBER },
       ]);
       mockPrisma.team.findMany.mockResolvedValue([{ id: "team-1" }]);
       mockPrisma.teamUser.findMany.mockResolvedValue([]); // No team assignment
@@ -384,9 +384,9 @@ describe("LicenseEnforcementRepository", () => {
       vi.useRealTimers();
     });
 
-    it("counts EXTERNAL users without custom role as Lite Member", async () => {
+    it("counts LITE_MEMBER users without custom role as Lite Member", async () => {
       mockPrisma.organizationUser.findMany.mockResolvedValue([
-        { userId: "u1", role: OrganizationUserRole.EXTERNAL },
+        { userId: "u1", role: OrganizationUserRole.LITE_MEMBER },
       ]);
       mockPrisma.team.findMany.mockResolvedValue([{ id: "team-1" }]);
       mockPrisma.teamUser.findMany.mockResolvedValue([
@@ -400,9 +400,9 @@ describe("LicenseEnforcementRepository", () => {
       expect(result).toBe(1);
     });
 
-    it("counts EXTERNAL users with view-only custom role as Lite Member", async () => {
+    it("counts LITE_MEMBER users with view-only custom role as Lite Member", async () => {
       mockPrisma.organizationUser.findMany.mockResolvedValue([
-        { userId: "u1", role: OrganizationUserRole.EXTERNAL },
+        { userId: "u1", role: OrganizationUserRole.LITE_MEMBER },
       ]);
       mockPrisma.team.findMany.mockResolvedValue([{ id: "team-1" }]);
       mockPrisma.teamUser.findMany.mockResolvedValue([
@@ -418,9 +418,9 @@ describe("LicenseEnforcementRepository", () => {
       expect(result).toBe(1);
     });
 
-    it("does not count EXTERNAL users with non-view custom role as Lite Member", async () => {
+    it("does not count LITE_MEMBER users with non-view custom role as Lite Member", async () => {
       mockPrisma.organizationUser.findMany.mockResolvedValue([
-        { userId: "u1", role: OrganizationUserRole.EXTERNAL },
+        { userId: "u1", role: OrganizationUserRole.LITE_MEMBER },
       ]);
       mockPrisma.team.findMany.mockResolvedValue([{ id: "team-1" }]);
       mockPrisma.teamUser.findMany.mockResolvedValue([
@@ -449,13 +449,13 @@ describe("LicenseEnforcementRepository", () => {
       expect(result).toBe(0);
     });
 
-    it("counts pending invites with EXTERNAL role and no custom role as Lite Member", async () => {
+    it("counts pending invites with LITE_MEMBER role and no custom role as Lite Member", async () => {
       mockPrisma.organizationUser.findMany.mockResolvedValue([]);
       mockPrisma.team.findMany.mockResolvedValue([]);
       mockPrisma.customRole.findMany.mockResolvedValue([]);
       mockPrisma.organizationInvite.findMany.mockResolvedValue([
         {
-          role: OrganizationUserRole.EXTERNAL,
+          role: OrganizationUserRole.LITE_MEMBER,
           teamAssignments: null,
           expiration: new Date("2024-03-20"),
         },
@@ -466,7 +466,7 @@ describe("LicenseEnforcementRepository", () => {
       expect(result).toBe(1);
     });
 
-    it("counts pending invites with EXTERNAL role and view-only custom role as Lite Member", async () => {
+    it("counts pending invites with LITE_MEMBER role and view-only custom role as Lite Member", async () => {
       mockPrisma.organizationUser.findMany.mockResolvedValue([]);
       mockPrisma.team.findMany.mockResolvedValue([]);
       mockPrisma.customRole.findMany.mockResolvedValue([
@@ -474,7 +474,7 @@ describe("LicenseEnforcementRepository", () => {
       ]);
       mockPrisma.organizationInvite.findMany.mockResolvedValue([
         {
-          role: OrganizationUserRole.EXTERNAL,
+          role: OrganizationUserRole.LITE_MEMBER,
           teamAssignments: [{ teamId: "team-1", customRoleId: "role-1" }],
           expiration: new Date("2024-03-20"),
         },
@@ -493,7 +493,7 @@ describe("LicenseEnforcementRepository", () => {
       ]);
       mockPrisma.organizationInvite.findMany.mockResolvedValue([
         {
-          role: OrganizationUserRole.EXTERNAL,
+          role: OrganizationUserRole.LITE_MEMBER,
           teamAssignments: [{ teamId: "team-1", customRoleId: "role-1" }],
           expiration: new Date("2024-03-20"),
         },
@@ -535,9 +535,9 @@ describe("LicenseEnforcementRepository", () => {
       expect(result).toBe(0);
     });
 
-    it("counts EXTERNAL users without team assignment as Lite Member", async () => {
+    it("counts LITE_MEMBER users without team assignment as Lite Member", async () => {
       mockPrisma.organizationUser.findMany.mockResolvedValue([
-        { userId: "u1", role: OrganizationUserRole.EXTERNAL },
+        { userId: "u1", role: OrganizationUserRole.LITE_MEMBER },
       ]);
       mockPrisma.team.findMany.mockResolvedValue([{ id: "team-1" }]);
       mockPrisma.teamUser.findMany.mockResolvedValue([]); // No team assignment
@@ -551,7 +551,7 @@ describe("LicenseEnforcementRepository", () => {
 
     it("combines users and pending invites in total count", async () => {
       mockPrisma.organizationUser.findMany.mockResolvedValue([
-        { userId: "u1", role: OrganizationUserRole.EXTERNAL },
+        { userId: "u1", role: OrganizationUserRole.LITE_MEMBER },
       ]);
       mockPrisma.team.findMany.mockResolvedValue([{ id: "team-1" }]);
       mockPrisma.teamUser.findMany.mockResolvedValue([
@@ -560,7 +560,7 @@ describe("LicenseEnforcementRepository", () => {
       mockPrisma.customRole.findMany.mockResolvedValue([]);
       mockPrisma.organizationInvite.findMany.mockResolvedValue([
         {
-          role: OrganizationUserRole.EXTERNAL,
+          role: OrganizationUserRole.LITE_MEMBER,
           teamAssignments: null,
           expiration: new Date("2024-03-20"),
         },

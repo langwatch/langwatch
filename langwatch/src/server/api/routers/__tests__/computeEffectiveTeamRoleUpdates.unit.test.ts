@@ -4,7 +4,7 @@ import { computeEffectiveTeamRoleUpdates } from "../organization";
 
 describe("computeEffectiveTeamRoleUpdates()", () => {
   describe("when requested updates are present", () => {
-    describe("when new org role is not EXTERNAL", () => {
+    describe("when new org role is not LITE_MEMBER", () => {
       it("returns requested updates as-is", () => {
         const requested = [
           { teamId: "team-1", role: TeamUserRole.ADMIN },
@@ -40,7 +40,7 @@ describe("computeEffectiveTeamRoleUpdates()", () => {
       });
     });
 
-    describe("when new org role is EXTERNAL", () => {
+    describe("when new org role is LITE_MEMBER", () => {
       it("includes requested updates and falls back uncovered memberships to VIEWER", () => {
         const requested = [
           { teamId: "team-1", role: TeamUserRole.VIEWER },
@@ -53,7 +53,7 @@ describe("computeEffectiveTeamRoleUpdates()", () => {
             { teamId: "team-2", role: TeamUserRole.MEMBER },
             { teamId: "team-3", role: TeamUserRole.VIEWER },
           ],
-          newOrganizationRole: OrganizationUserRole.EXTERNAL,
+          newOrganizationRole: OrganizationUserRole.LITE_MEMBER,
         });
 
         expect(result).toEqual([
@@ -75,7 +75,7 @@ describe("computeEffectiveTeamRoleUpdates()", () => {
             { teamId: "team-1", role: TeamUserRole.ADMIN },
             { teamId: "team-2", role: TeamUserRole.MEMBER },
           ],
-          newOrganizationRole: OrganizationUserRole.EXTERNAL,
+          newOrganizationRole: OrganizationUserRole.LITE_MEMBER,
         });
 
         expect(result).toEqual(requested);
@@ -84,7 +84,7 @@ describe("computeEffectiveTeamRoleUpdates()", () => {
   });
 
   describe("when no requested updates are present", () => {
-    describe("when new org role is EXTERNAL", () => {
+    describe("when new org role is LITE_MEMBER", () => {
       it("auto-corrects all non-VIEWER memberships to VIEWER", () => {
         const result = computeEffectiveTeamRoleUpdates({
           requestedTeamRoleUpdates: [],
@@ -93,7 +93,7 @@ describe("computeEffectiveTeamRoleUpdates()", () => {
             { teamId: "team-2", role: TeamUserRole.MEMBER },
             { teamId: "team-3", role: TeamUserRole.VIEWER },
           ],
-          newOrganizationRole: OrganizationUserRole.EXTERNAL,
+          newOrganizationRole: OrganizationUserRole.LITE_MEMBER,
         });
 
         expect(result).toEqual([
@@ -108,7 +108,7 @@ describe("computeEffectiveTeamRoleUpdates()", () => {
           currentMemberships: [
             { teamId: "team-1", role: TeamUserRole.VIEWER },
           ],
-          newOrganizationRole: OrganizationUserRole.EXTERNAL,
+          newOrganizationRole: OrganizationUserRole.LITE_MEMBER,
         });
 
         expect(result).toEqual([]);
@@ -167,7 +167,7 @@ describe("computeEffectiveTeamRoleUpdates()", () => {
         const result = computeEffectiveTeamRoleUpdates({
           requestedTeamRoleUpdates: [],
           currentMemberships: [],
-          newOrganizationRole: OrganizationUserRole.EXTERNAL,
+          newOrganizationRole: OrganizationUserRole.LITE_MEMBER,
         });
 
         expect(result).toEqual([]);

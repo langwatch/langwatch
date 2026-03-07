@@ -232,7 +232,7 @@ function MemberRow({
 
           const currentRole = team.role;
 
-          if (orgRole === OrganizationUserRole.EXTERNAL) {
+          if (orgRole === OrganizationUserRole.LITE_MEMBER) {
             // Viewer: force all team roles to Viewer
             if (currentRole !== TeamUserRole.VIEWER) {
               setValue(`invites.${index}.teams.${teamIndex}.role`, TeamUserRole.VIEWER);
@@ -530,7 +530,7 @@ function getFilteredTeamRoles(
     customRoleId: role.id,
   }));
 
-  if (orgRole === OrganizationUserRole.EXTERNAL) {
+  if (orgRole === OrganizationUserRole.LITE_MEMBER) {
     // Viewer: only Viewer, no custom roles
     return [teamRolesOptions.VIEWER];
   }
@@ -554,7 +554,7 @@ function getFilteredTeamRoles(
  * - ADMIN: Member
  */
 function getDefaultTeamRole(orgRole: OrganizationUserRole): TeamUserRole {
-  if (orgRole === OrganizationUserRole.EXTERNAL) {
+  if (orgRole === OrganizationUserRole.LITE_MEMBER) {
     return TeamUserRole.VIEWER;
   }
   return TeamUserRole.MEMBER;

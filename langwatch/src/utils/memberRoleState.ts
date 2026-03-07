@@ -175,15 +175,15 @@ export function getLicenseLimitTypeForRoleChange(params: {
   const { previousRole, nextRole } = params;
 
   if (
-    previousRole === OrganizationUserRole.EXTERNAL &&
-    nextRole !== OrganizationUserRole.EXTERNAL
+    previousRole === OrganizationUserRole.LITE_MEMBER &&
+    nextRole !== OrganizationUserRole.LITE_MEMBER
   ) {
     return "members";
   }
 
   if (
-    previousRole !== OrganizationUserRole.EXTERNAL &&
-    nextRole === OrganizationUserRole.EXTERNAL
+    previousRole !== OrganizationUserRole.LITE_MEMBER &&
+    nextRole === OrganizationUserRole.LITE_MEMBER
   ) {
     return "membersLite";
   }
@@ -191,7 +191,7 @@ export function getLicenseLimitTypeForRoleChange(params: {
   return null;
 }
 
-/** Applies organization role constraints to all pending team roles (e.g., forces Viewer for EXTERNAL). */
+/** Applies organization role constraints to all pending team roles (e.g., forces Viewer for LITE_MEMBER). */
 export function applyOrganizationRoleToPendingTeamRoles(params: {
   organizationRole: OrganizationUserRole;
   currentPendingTeamRoles: PendingTeamRoleMap;
@@ -207,7 +207,7 @@ export function applyOrganizationRoleToPendingTeamRoles(params: {
           currentTeamRole: teamRole.role,
         }),
         customRoleId:
-          organizationRole === OrganizationUserRole.EXTERNAL
+          organizationRole === OrganizationUserRole.LITE_MEMBER
             ? undefined
             : teamRole.customRoleId,
       },

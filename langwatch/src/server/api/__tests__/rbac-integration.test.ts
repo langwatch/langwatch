@@ -9,7 +9,10 @@ import {
   hasOrganizationPermission,
   hasProjectPermission,
   hasTeamPermission,
+  resolveProjectPermission,
+  resolveTeamPermission,
   type Permission,
+  type PermissionResult,
   skipPermissionCheck,
   skipPermissionCheckProjectCreation,
 } from "../rbac";
@@ -31,6 +34,9 @@ const mockPrisma = {
   },
   teamUserCustomRole: {
     findFirst: vi.fn(),
+  },
+  customRole: {
+    findUnique: vi.fn(),
   },
   publicShare: {
     findFirst: vi.fn(),
@@ -84,6 +90,7 @@ describe("RBAC Integration Tests", () => {
         team: {
           id: "team-123",
           members: [], // No members
+          organization: { members: [] },
         },
       });
 
@@ -100,10 +107,9 @@ describe("RBAC Integration Tests", () => {
         team: {
           id: "team-123",
           members: [{ userId: "user-123", role: TeamUserRole.ADMIN }],
+          organization: { members: [] },
         },
       });
-
-      mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue(null);
 
       const result = await hasProjectPermission(
         { prisma: mockPrisma, session: mockSession },
@@ -118,6 +124,7 @@ describe("RBAC Integration Tests", () => {
         team: {
           id: "team-123",
           members: [{ userId: "user-123", role: TeamUserRole.VIEWER }],
+          organization: { members: [] },
         },
       });
 
@@ -324,6 +331,7 @@ describe("RBAC Integration Tests", () => {
           team: {
             id: "team-123",
             members: [],
+            organization: { members: [] },
           },
         });
 
@@ -345,10 +353,9 @@ describe("RBAC Integration Tests", () => {
           team: {
             id: "team-123",
             members: [{ userId: "user-123", role: TeamUserRole.ADMIN }],
+            organization: { members: [] },
           },
         });
-
-        mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue(null);
 
         const middleware = checkProjectPermission(
           "workflows:view" as Permission,
@@ -496,11 +503,13 @@ describe("RBAC Integration Tests", () => {
         mockPrisma.project.findUnique.mockResolvedValue({
           team: {
             id: "team-123",
+            organizationId: "org-1",
             members: [{ userId: "user-123", role: TeamUserRole.ADMIN }],
+            organization: {
+              members: [{ role: OrganizationUserRole.MEMBER }],
+            },
           },
         });
-
-        mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue(null);
 
         const middleware = checkPermissionOrPubliclyShared(
           checkProjectPermission("workflows:view" as Permission),
@@ -523,6 +532,7 @@ describe("RBAC Integration Tests", () => {
           team: {
             id: "team-123",
             members: [],
+            organization: { members: [] },
           },
         });
 
@@ -553,6 +563,7 @@ describe("RBAC Integration Tests", () => {
           team: {
             id: "team-123",
             members: [],
+            organization: { members: [] },
           },
         });
 
@@ -570,6 +581,706 @@ describe("RBAC Integration Tests", () => {
             next: mockNext,
           }),
         ).rejects.toThrow(TRPCError);
+      });
+    });
+  });
+
+  // ==========================================================================
+  // resolveProjectPermission
+  // ==========================================================================
+
+  describe("resolveProjectPermission", () => {
+    function setupProjectMocks({
+      orgRole,
+      teamRole,
+      hasTeamMember = true,
+    }: {
+      orgRole?: OrganizationUserRole;
+      teamRole?: TeamUserRole;
+      hasTeamMember?: boolean;
+    }) {
+      mockPrisma.project.findUnique.mockResolvedValue({
+        team: {
+          id: "team-1",
+          organizationId: "org-1",
+          members: hasTeamMember
+            ? [{ userId: "user-123", role: teamRole ?? TeamUserRole.MEMBER }]
+            : [],
+          organization: {
+            members: orgRole ? [{ role: orgRole }] : [],
+          },
+        },
+      });
+    }
+
+    describe("when user is an org ADMIN and team MEMBER", () => {
+      it("grants permission and returns ADMIN org role", async () => {
+        setupProjectMocks({
+          orgRole: OrganizationUserRole.ADMIN,
+          teamRole: TeamUserRole.MEMBER,
+        });
+
+        const result = await resolveProjectPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "project-1",
+          "analytics:view" as Permission,
+        );
+
+        expect(result.permitted).toBe(true);
+        expect(result.organizationRole).toBe(OrganizationUserRole.ADMIN);
+      });
+    });
+
+    describe("when user is an org MEMBER and team MEMBER", () => {
+      it("grants permission and returns MEMBER org role", async () => {
+        setupProjectMocks({
+          orgRole: OrganizationUserRole.MEMBER,
+          teamRole: TeamUserRole.MEMBER,
+        });
+
+        const result = await resolveProjectPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "project-1",
+          "analytics:view" as Permission,
+        );
+
+        expect(result.permitted).toBe(true);
+        expect(result.organizationRole).toBe(OrganizationUserRole.MEMBER);
+      });
+    });
+
+    describe("when user is an org LITE_MEMBER and team VIEWER", () => {
+      it("grants view permission and returns LITE_MEMBER org role", async () => {
+        setupProjectMocks({
+          orgRole: OrganizationUserRole.LITE_MEMBER,
+          teamRole: TeamUserRole.VIEWER,
+        });
+
+        const result = await resolveProjectPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "project-1",
+          "analytics:view" as Permission,
+        );
+
+        expect(result.permitted).toBe(true);
+        expect(result.organizationRole).toBe(OrganizationUserRole.LITE_MEMBER);
+      });
+    });
+
+    describe("when user is not an org member", () => {
+      it("denies permission and returns null org role", async () => {
+        setupProjectMocks({ hasTeamMember: false });
+
+        const result = await resolveProjectPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "project-1",
+          "analytics:view" as Permission,
+        );
+
+        expect(result.permitted).toBe(false);
+        expect(result.organizationRole).toBeNull();
+      });
+    });
+
+    describe("when project is a demo project", () => {
+      it("grants permission and returns null org role", async () => {
+        process.env.DEMO_PROJECT_ID = "demo-project-1";
+        try {
+          const result = await resolveProjectPermission(
+            { prisma: mockPrisma, session: mockSession },
+            "demo-project-1",
+            "analytics:view" as Permission,
+          );
+
+          expect(result.permitted).toBe(true);
+          expect(result.organizationRole).toBeNull();
+        } finally {
+          delete process.env.DEMO_PROJECT_ID;
+        }
+      });
+    });
+
+    describe("when user is unauthenticated", () => {
+      it("denies permission and returns null org role", async () => {
+        const result = await resolveProjectPermission(
+          { prisma: mockPrisma, session: null },
+          "project-1",
+          "analytics:view" as Permission,
+        );
+
+        expect(result.permitted).toBe(false);
+        expect(result.organizationRole).toBeNull();
+      });
+    });
+
+    describe("when user has CUSTOM role with granted permissions", () => {
+      it("grants permission and returns org role", async () => {
+        mockPrisma.project.findUnique.mockResolvedValue({
+          team: {
+            id: "team-1",
+            organizationId: "org-1",
+            members: [
+              {
+                userId: "user-123",
+                role: TeamUserRole.CUSTOM,
+                assignedRoleId: "custom-role-1",
+              },
+            ],
+            organization: {
+              members: [{ role: OrganizationUserRole.MEMBER }],
+            },
+          },
+        });
+
+        mockPrisma.customRole.findUnique.mockResolvedValue({
+          permissions: ["analytics:view", "datasets:view"],
+        });
+
+        const result = await resolveProjectPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "project-1",
+          "analytics:view" as Permission,
+        );
+
+        expect(result.permitted).toBe(true);
+        expect(result.organizationRole).toBe(OrganizationUserRole.MEMBER);
+      });
+    });
+
+    describe("when user has CUSTOM role without requested permission", () => {
+      it("denies permission and returns org role", async () => {
+        mockPrisma.project.findUnique.mockResolvedValue({
+          team: {
+            id: "team-1",
+            organizationId: "org-1",
+            members: [
+              {
+                userId: "user-123",
+                role: TeamUserRole.CUSTOM,
+                assignedRoleId: "custom-role-1",
+              },
+            ],
+            organization: {
+              members: [{ role: OrganizationUserRole.MEMBER }],
+            },
+          },
+        });
+
+        mockPrisma.customRole.findUnique.mockResolvedValue({
+          permissions: ["analytics:view"],
+        });
+
+        const result = await resolveProjectPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "project-1",
+          "datasets:manage" as Permission,
+        );
+
+        expect(result.permitted).toBe(false);
+        expect(result.organizationRole).toBe(OrganizationUserRole.MEMBER);
+      });
+    });
+
+    describe("when verifying permission decisions are unchanged (regression)", () => {
+      it.each([
+        { teamRole: TeamUserRole.ADMIN, permission: "analytics:view", expected: true },
+        { teamRole: TeamUserRole.ADMIN, permission: "datasets:manage", expected: true },
+        { teamRole: TeamUserRole.ADMIN, permission: "team:manage", expected: true },
+        { teamRole: TeamUserRole.MEMBER, permission: "analytics:view", expected: true },
+        { teamRole: TeamUserRole.MEMBER, permission: "datasets:manage", expected: true },
+        { teamRole: TeamUserRole.MEMBER, permission: "team:manage", expected: false },
+        { teamRole: TeamUserRole.VIEWER, permission: "analytics:view", expected: true },
+        { teamRole: TeamUserRole.VIEWER, permission: "datasets:manage", expected: false },
+        { teamRole: TeamUserRole.VIEWER, permission: "team:manage", expected: false },
+      ])(
+        "returns permitted=$expected for $teamRole with $permission",
+        async ({ teamRole, permission, expected }) => {
+          setupProjectMocks({
+            orgRole: OrganizationUserRole.MEMBER,
+            teamRole,
+          });
+
+          const result = await resolveProjectPermission(
+            { prisma: mockPrisma, session: mockSession },
+            "project-1",
+            permission as Permission,
+          );
+
+          expect(result.permitted).toBe(expected);
+          expect(result.organizationRole).toBe(OrganizationUserRole.MEMBER);
+        },
+      );
+    });
+
+    describe("when verifying org role is carried for each org role type", () => {
+      it.each([
+        OrganizationUserRole.ADMIN,
+        OrganizationUserRole.MEMBER,
+        OrganizationUserRole.LITE_MEMBER,
+      ])("returns org role %s", async (orgRole) => {
+        setupProjectMocks({
+          orgRole,
+          teamRole: TeamUserRole.MEMBER,
+        });
+
+        const result = await resolveProjectPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "project-1",
+          "analytics:view" as Permission,
+        );
+
+        expect(result.organizationRole).toBe(orgRole);
+      });
+    });
+  });
+
+  // ==========================================================================
+  // resolveTeamPermission
+  // ==========================================================================
+
+  describe("resolveTeamPermission", () => {
+    function setupTeamMocks({
+      orgRole,
+      teamRole,
+      hasTeamUser = true,
+    }: {
+      orgRole?: OrganizationUserRole;
+      teamRole?: TeamUserRole;
+      hasTeamUser?: boolean;
+    }) {
+      mockPrisma.team.findUnique.mockResolvedValue({
+        id: "team-1",
+        organizationId: "org-1",
+      });
+
+      mockPrisma.organizationUser.findFirst.mockResolvedValue(
+        orgRole ? { role: orgRole } : null,
+      );
+
+      mockPrisma.teamUser.findFirst.mockResolvedValue(
+        hasTeamUser && teamRole
+          ? { userId: "user-123", teamId: "team-1", role: teamRole }
+          : null,
+      );
+    }
+
+    describe("when user is an org ADMIN (admin bypass, not a team member)", () => {
+      it("grants permission and returns ADMIN org role", async () => {
+        setupTeamMocks({
+          orgRole: OrganizationUserRole.ADMIN,
+          hasTeamUser: false,
+        });
+
+        const result = await resolveTeamPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "team-1",
+          "team:manage" as Permission,
+        );
+
+        expect(result.permitted).toBe(true);
+        expect(result.organizationRole).toBe(OrganizationUserRole.ADMIN);
+      });
+    });
+
+    describe("when user is an org MEMBER and team MEMBER", () => {
+      it("grants permission and returns MEMBER org role", async () => {
+        setupTeamMocks({
+          orgRole: OrganizationUserRole.MEMBER,
+          teamRole: TeamUserRole.MEMBER,
+        });
+
+        const result = await resolveTeamPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "team-1",
+          "team:view" as Permission,
+        );
+
+        expect(result.permitted).toBe(true);
+        expect(result.organizationRole).toBe(OrganizationUserRole.MEMBER);
+      });
+    });
+
+    describe("when user is an org LITE_MEMBER and team VIEWER", () => {
+      it("grants view permission and returns LITE_MEMBER org role", async () => {
+        setupTeamMocks({
+          orgRole: OrganizationUserRole.LITE_MEMBER,
+          teamRole: TeamUserRole.VIEWER,
+        });
+
+        const result = await resolveTeamPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "team-1",
+          "team:view" as Permission,
+        );
+
+        expect(result.permitted).toBe(true);
+        expect(result.organizationRole).toBe(OrganizationUserRole.LITE_MEMBER);
+      });
+    });
+
+    describe("when user is not an org member", () => {
+      it("denies permission and returns null org role", async () => {
+        setupTeamMocks({ hasTeamUser: false });
+
+        const result = await resolveTeamPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "team-1",
+          "team:view" as Permission,
+        );
+
+        expect(result.permitted).toBe(false);
+        expect(result.organizationRole).toBeNull();
+      });
+    });
+
+    describe("when user has CUSTOM role with granted permissions", () => {
+      it("grants permission and returns org role", async () => {
+        mockPrisma.team.findUnique.mockResolvedValue({
+          id: "team-1",
+          organizationId: "org-1",
+        });
+
+        mockPrisma.organizationUser.findFirst.mockResolvedValue({
+          role: OrganizationUserRole.MEMBER,
+        });
+
+        mockPrisma.teamUser.findFirst.mockResolvedValue({
+          userId: "user-123",
+          teamId: "team-1",
+          role: TeamUserRole.CUSTOM,
+          assignedRoleId: "custom-role-1",
+        });
+
+        mockPrisma.customRole.findUnique.mockResolvedValue({
+          permissions: ["team:view", "analytics:view"],
+        });
+
+        const result = await resolveTeamPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "team-1",
+          "team:view" as Permission,
+        );
+
+        expect(result.permitted).toBe(true);
+        expect(result.organizationRole).toBe(OrganizationUserRole.MEMBER);
+      });
+    });
+
+    describe("when user has CUSTOM role without requested permission", () => {
+      it("denies permission and returns org role", async () => {
+        mockPrisma.team.findUnique.mockResolvedValue({
+          id: "team-1",
+          organizationId: "org-1",
+        });
+
+        mockPrisma.organizationUser.findFirst.mockResolvedValue({
+          role: OrganizationUserRole.MEMBER,
+        });
+
+        mockPrisma.teamUser.findFirst.mockResolvedValue({
+          userId: "user-123",
+          teamId: "team-1",
+          role: TeamUserRole.CUSTOM,
+          assignedRoleId: "custom-role-1",
+        });
+
+        mockPrisma.customRole.findUnique.mockResolvedValue({
+          permissions: ["team:view"],
+        });
+
+        const result = await resolveTeamPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "team-1",
+          "team:manage" as Permission,
+        );
+
+        expect(result.permitted).toBe(false);
+        expect(result.organizationRole).toBe(OrganizationUserRole.MEMBER);
+      });
+    });
+  });
+
+  // ==========================================================================
+  // Boolean API regression guards
+  // ==========================================================================
+
+  describe("boolean API regression", () => {
+    describe("when hasProjectPermission is called", () => {
+      it("returns true (boolean) when user has permission", async () => {
+        mockPrisma.project.findUnique.mockResolvedValue({
+          team: {
+            id: "team-1",
+            organizationId: "org-1",
+            members: [{ userId: "user-123", role: TeamUserRole.MEMBER }],
+            organization: {
+              members: [{ role: OrganizationUserRole.MEMBER }],
+            },
+          },
+        });
+
+        const result = await hasProjectPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "project-1",
+          "analytics:view" as Permission,
+        );
+
+        expect(result).toBe(true);
+        expect(typeof result).toBe("boolean");
+      });
+
+      it("returns false (boolean) when user lacks permission", async () => {
+        mockPrisma.project.findUnique.mockResolvedValue({
+          team: {
+            id: "team-1",
+            organizationId: "org-1",
+            members: [{ userId: "user-123", role: TeamUserRole.VIEWER }],
+            organization: {
+              members: [{ role: OrganizationUserRole.MEMBER }],
+            },
+          },
+        });
+
+        const result = await hasProjectPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "project-1",
+          "datasets:manage" as Permission,
+        );
+
+        expect(result).toBe(false);
+        expect(typeof result).toBe("boolean");
+      });
+    });
+
+    describe("when hasTeamPermission is called", () => {
+      it("returns true (boolean) when user has permission", async () => {
+        mockPrisma.team.findUnique.mockResolvedValue({
+          id: "team-1",
+          organizationId: "org-1",
+        });
+
+        mockPrisma.organizationUser.findFirst.mockResolvedValue({
+          role: OrganizationUserRole.MEMBER,
+        });
+
+        mockPrisma.teamUser.findFirst.mockResolvedValue({
+          userId: "user-123",
+          teamId: "team-1",
+          role: TeamUserRole.MEMBER,
+        });
+
+        const result = await hasTeamPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "team-1",
+          "team:view" as Permission,
+        );
+
+        expect(result).toBe(true);
+        expect(typeof result).toBe("boolean");
+      });
+
+      it("returns false (boolean) when user lacks permission", async () => {
+        mockPrisma.team.findUnique.mockResolvedValue({
+          id: "team-1",
+          organizationId: "org-1",
+        });
+
+        mockPrisma.organizationUser.findFirst.mockResolvedValue({
+          role: OrganizationUserRole.MEMBER,
+        });
+
+        mockPrisma.teamUser.findFirst.mockResolvedValue({
+          userId: "user-123",
+          teamId: "team-1",
+          role: TeamUserRole.VIEWER,
+        });
+
+        const result = await hasTeamPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "team-1",
+          "team:manage" as Permission,
+        );
+
+        expect(result).toBe(false);
+        expect(typeof result).toBe("boolean");
+      });
+    });
+  });
+
+  // ==========================================================================
+  // Middleware passes org role to downstream context
+  // ==========================================================================
+
+  describe("middleware org role propagation", () => {
+    describe("when checkProjectPermission middleware runs for a permitted user", () => {
+      it("sets organizationRole on context", async () => {
+        const ctx = {
+          prisma: mockPrisma,
+          session: mockSession,
+          permissionChecked: false,
+          publiclyShared: false,
+          organizationRole: undefined as OrganizationUserRole | null | undefined,
+        };
+
+        mockPrisma.project.findUnique.mockResolvedValue({
+          team: {
+            id: "team-1",
+            organizationId: "org-1",
+            members: [{ userId: "user-123", role: TeamUserRole.MEMBER }],
+            organization: {
+              members: [{ role: OrganizationUserRole.MEMBER }],
+            },
+          },
+        });
+
+        const mockNext = vi.fn().mockResolvedValue("success");
+        const middleware = checkProjectPermission(
+          "analytics:view" as Permission,
+        );
+
+        await middleware({
+          ctx,
+          input: { projectId: "project-1" },
+          next: mockNext,
+        });
+
+        expect(ctx.organizationRole).toBe(OrganizationUserRole.MEMBER);
+        expect(ctx.permissionChecked).toBe(true);
+      });
+    });
+
+    describe("when checkTeamPermission middleware runs for a permitted user", () => {
+      it("sets organizationRole on context", async () => {
+        const ctx = {
+          prisma: mockPrisma,
+          session: mockSession,
+          permissionChecked: false,
+          publiclyShared: false,
+          organizationRole: undefined as OrganizationUserRole | null | undefined,
+        };
+
+        mockPrisma.team.findUnique.mockResolvedValue({
+          id: "team-1",
+          organizationId: "org-1",
+        });
+
+        mockPrisma.organizationUser.findFirst.mockResolvedValue({
+          role: OrganizationUserRole.ADMIN,
+        });
+
+        const mockNext = vi.fn().mockResolvedValue("success");
+        const middleware = checkTeamPermission("team:view" as Permission);
+
+        await middleware({
+          ctx,
+          input: { teamId: "team-1" },
+          next: mockNext,
+        });
+
+        expect(ctx.organizationRole).toBe(OrganizationUserRole.ADMIN);
+        expect(ctx.permissionChecked).toBe(true);
+      });
+    });
+
+    describe("when checkProjectPermission middleware denies access", () => {
+      it("throws UNAUTHORIZED", async () => {
+        const ctx = {
+          prisma: mockPrisma,
+          session: mockSession,
+          permissionChecked: false,
+          publiclyShared: false,
+        };
+
+        mockPrisma.project.findUnique.mockResolvedValue({
+          team: {
+            id: "team-1",
+            organizationId: "org-1",
+            members: [],
+            organization: {
+              members: [],
+            },
+          },
+        });
+
+        const mockNext = vi.fn().mockResolvedValue("success");
+        const middleware = checkProjectPermission(
+          "analytics:view" as Permission,
+        );
+
+        await expect(
+          middleware({
+            ctx,
+            input: { projectId: "project-1" },
+            next: mockNext,
+          }),
+        ).rejects.toThrow(TRPCError);
+      });
+    });
+
+    describe("when checkTeamPermission middleware denies access", () => {
+      it("throws UNAUTHORIZED", async () => {
+        const ctx = {
+          prisma: mockPrisma,
+          session: mockSession,
+          permissionChecked: false,
+          publiclyShared: false,
+        };
+
+        mockPrisma.team.findUnique.mockResolvedValue({
+          id: "team-1",
+          organizationId: "org-1",
+        });
+
+        mockPrisma.organizationUser.findFirst.mockResolvedValue(null);
+        mockPrisma.teamUser.findFirst.mockResolvedValue(null);
+
+        const mockNext = vi.fn().mockResolvedValue("success");
+        const middleware = checkTeamPermission("team:view" as Permission);
+
+        await expect(
+          middleware({
+            ctx,
+            input: { teamId: "team-1" },
+            next: mockNext,
+          }),
+        ).rejects.toThrow(TRPCError);
+      });
+    });
+
+    describe("when public share fallback middleware runs for a permitted user", () => {
+      it("passes org role via checkProjectPermission", async () => {
+        const ctx = {
+          prisma: mockPrisma,
+          session: mockSession,
+          permissionChecked: false,
+          publiclyShared: false,
+          organizationRole: undefined as OrganizationUserRole | null | undefined,
+        };
+
+        mockPrisma.project.findUnique.mockResolvedValue({
+          team: {
+            id: "team-1",
+            organizationId: "org-1",
+            members: [{ userId: "user-123", role: TeamUserRole.MEMBER }],
+            organization: {
+              members: [{ role: OrganizationUserRole.MEMBER }],
+            },
+          },
+        });
+
+        const mockNext = vi.fn().mockResolvedValue("success");
+        const middleware = checkPermissionOrPubliclyShared(
+          checkProjectPermission("analytics:view" as Permission),
+          { resourceType: "TRACE", resourceParam: "traceId" },
+        );
+
+        await middleware({
+          ctx,
+          input: { projectId: "project-1", traceId: "trace-1" },
+          next: mockNext,
+        });
+
+        expect(ctx.organizationRole).toBe(OrganizationUserRole.MEMBER);
+        expect(ctx.permissionChecked).toBe(true);
       });
     });
   });

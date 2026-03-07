@@ -126,23 +126,23 @@ describe("classifyMemberType", () => {
       ).toBe("FullMember");
     });
 
-    it("returns LiteMember for EXTERNAL role with no permissions (Lite Member)", () => {
-      expect(classifyMemberType(OrganizationUserRole.EXTERNAL, undefined)).toBe(
+    it("returns LiteMember for LITE_MEMBER role with no permissions", () => {
+      expect(classifyMemberType(OrganizationUserRole.LITE_MEMBER, undefined)).toBe(
         "LiteMember"
       );
     });
   });
 
-  describe("EXTERNAL role (Lite Member) with custom permissions", () => {
+  describe("LITE_MEMBER role with custom permissions", () => {
     it("returns LiteMember for view-only permissions", () => {
       expect(
-        classifyMemberType(OrganizationUserRole.EXTERNAL, ["project:view"])
+        classifyMemberType(OrganizationUserRole.LITE_MEMBER, ["project:view"])
       ).toBe("LiteMember");
     });
 
     it("returns LiteMember for multiple view-only permissions", () => {
       expect(
-        classifyMemberType(OrganizationUserRole.EXTERNAL, [
+        classifyMemberType(OrganizationUserRole.LITE_MEMBER, [
           "project:view",
           "analytics:view",
           "traces:view",
@@ -152,7 +152,7 @@ describe("classifyMemberType", () => {
 
     it("returns FullMember for manage permission", () => {
       expect(
-        classifyMemberType(OrganizationUserRole.EXTERNAL, [
+        classifyMemberType(OrganizationUserRole.LITE_MEMBER, [
           "project:view",
           "project:manage",
         ])
@@ -161,7 +161,7 @@ describe("classifyMemberType", () => {
 
     it("returns FullMember for create permission", () => {
       expect(
-        classifyMemberType(OrganizationUserRole.EXTERNAL, [
+        classifyMemberType(OrganizationUserRole.LITE_MEMBER, [
           "project:view",
           "project:create",
         ])
@@ -170,7 +170,7 @@ describe("classifyMemberType", () => {
 
     it("returns FullMember for update permission", () => {
       expect(
-        classifyMemberType(OrganizationUserRole.EXTERNAL, [
+        classifyMemberType(OrganizationUserRole.LITE_MEMBER, [
           "project:view",
           "project:update",
         ])
@@ -179,7 +179,7 @@ describe("classifyMemberType", () => {
 
     it("returns FullMember for delete permission", () => {
       expect(
-        classifyMemberType(OrganizationUserRole.EXTERNAL, [
+        classifyMemberType(OrganizationUserRole.LITE_MEMBER, [
           "project:view",
           "project:delete",
         ])
@@ -188,7 +188,7 @@ describe("classifyMemberType", () => {
 
     it("returns FullMember for share permission", () => {
       expect(
-        classifyMemberType(OrganizationUserRole.EXTERNAL, [
+        classifyMemberType(OrganizationUserRole.LITE_MEMBER, [
           "traces:view",
           "traces:share",
         ])
@@ -196,7 +196,7 @@ describe("classifyMemberType", () => {
     });
 
     it("returns LiteMember for empty permissions array", () => {
-      expect(classifyMemberType(OrganizationUserRole.EXTERNAL, [])).toBe(
+      expect(classifyMemberType(OrganizationUserRole.LITE_MEMBER, [])).toBe(
         "LiteMember"
       );
     });
@@ -212,23 +212,23 @@ describe("isFullMember", () => {
     expect(isFullMember(OrganizationUserRole.MEMBER, undefined)).toBe(true);
   });
 
-  it("returns true for EXTERNAL with non-view permissions", () => {
+  it("returns true for LITE_MEMBER with non-view permissions", () => {
     expect(
-      isFullMember(OrganizationUserRole.EXTERNAL, [
+      isFullMember(OrganizationUserRole.LITE_MEMBER, [
         "project:view",
         "project:manage",
       ])
     ).toBe(true);
   });
 
-  it("returns false for EXTERNAL with view-only permissions", () => {
+  it("returns false for LITE_MEMBER with view-only permissions", () => {
     expect(
-      isFullMember(OrganizationUserRole.EXTERNAL, ["project:view"])
+      isFullMember(OrganizationUserRole.LITE_MEMBER, ["project:view"])
     ).toBe(false);
   });
 
-  it("returns false for EXTERNAL with no permissions", () => {
-    expect(isFullMember(OrganizationUserRole.EXTERNAL, undefined)).toBe(false);
+  it("returns false for LITE_MEMBER with no permissions", () => {
+    expect(isFullMember(OrganizationUserRole.LITE_MEMBER, undefined)).toBe(false);
   });
 });
 
@@ -241,27 +241,27 @@ describe("isLiteMember", () => {
     expect(isLiteMember(OrganizationUserRole.MEMBER, undefined)).toBe(false);
   });
 
-  it("returns false for EXTERNAL with non-view permissions", () => {
+  it("returns false for LITE_MEMBER with non-view permissions", () => {
     expect(
-      isLiteMember(OrganizationUserRole.EXTERNAL, [
+      isLiteMember(OrganizationUserRole.LITE_MEMBER, [
         "project:view",
         "project:manage",
       ])
     ).toBe(false);
   });
 
-  it("returns true for EXTERNAL with view-only permissions", () => {
+  it("returns true for LITE_MEMBER with view-only permissions", () => {
     expect(
-      isLiteMember(OrganizationUserRole.EXTERNAL, ["project:view"])
+      isLiteMember(OrganizationUserRole.LITE_MEMBER, ["project:view"])
     ).toBe(true);
   });
 
-  it("returns true for EXTERNAL with no permissions", () => {
-    expect(isLiteMember(OrganizationUserRole.EXTERNAL, undefined)).toBe(true);
+  it("returns true for LITE_MEMBER with no permissions", () => {
+    expect(isLiteMember(OrganizationUserRole.LITE_MEMBER, undefined)).toBe(true);
   });
 
-  it("returns true for EXTERNAL with empty permissions array", () => {
-    expect(isLiteMember(OrganizationUserRole.EXTERNAL, [])).toBe(true);
+  it("returns true for LITE_MEMBER with empty permissions array", () => {
+    expect(isLiteMember(OrganizationUserRole.LITE_MEMBER, [])).toBe(true);
   });
 });
 
@@ -289,21 +289,21 @@ describe("getRoleChangeType", () => {
       ).toBe("no-change");
     });
 
-    it("returns no-change when both roles are Lite Member (EXTERNAL to EXTERNAL)", () => {
+    it("returns no-change when both roles are Lite Member (LITE_MEMBER to LITE_MEMBER)", () => {
       expect(
         getRoleChangeType(
-          OrganizationUserRole.EXTERNAL,
+          OrganizationUserRole.LITE_MEMBER,
           undefined,
-          OrganizationUserRole.EXTERNAL,
+          OrganizationUserRole.LITE_MEMBER,
           ["project:view"]
         )
       ).toBe("no-change");
     });
 
-    it("returns no-change when EXTERNAL with non-view to MEMBER (both Full Member)", () => {
+    it("returns no-change when LITE_MEMBER with non-view to MEMBER (both Full Member)", () => {
       expect(
         getRoleChangeType(
-          OrganizationUserRole.EXTERNAL,
+          OrganizationUserRole.LITE_MEMBER,
           ["project:manage"],
           OrganizationUserRole.MEMBER,
           undefined
@@ -314,9 +314,9 @@ describe("getRoleChangeType", () => {
     it("returns no-change when custom role changes but stays view-only", () => {
       expect(
         getRoleChangeType(
-          OrganizationUserRole.EXTERNAL,
+          OrganizationUserRole.LITE_MEMBER,
           ["project:view"],
-          OrganizationUserRole.EXTERNAL,
+          OrganizationUserRole.LITE_MEMBER,
           ["project:view", "analytics:view"]
         )
       ).toBe("no-change");
@@ -325,9 +325,9 @@ describe("getRoleChangeType", () => {
     it("returns no-change when custom role changes but stays non-view", () => {
       expect(
         getRoleChangeType(
-          OrganizationUserRole.EXTERNAL,
+          OrganizationUserRole.LITE_MEMBER,
           ["project:manage"],
-          OrganizationUserRole.EXTERNAL,
+          OrganizationUserRole.LITE_MEMBER,
           ["project:update"]
         )
       ).toBe("no-change");
@@ -335,10 +335,10 @@ describe("getRoleChangeType", () => {
   });
 
   describe("lite-to-full scenarios", () => {
-    it("returns lite-to-full when EXTERNAL upgraded to MEMBER", () => {
+    it("returns lite-to-full when LITE_MEMBER upgraded to MEMBER", () => {
       expect(
         getRoleChangeType(
-          OrganizationUserRole.EXTERNAL,
+          OrganizationUserRole.LITE_MEMBER,
           undefined,
           OrganizationUserRole.MEMBER,
           undefined
@@ -346,10 +346,10 @@ describe("getRoleChangeType", () => {
       ).toBe("lite-to-full");
     });
 
-    it("returns lite-to-full when EXTERNAL upgraded to ADMIN", () => {
+    it("returns lite-to-full when LITE_MEMBER upgraded to ADMIN", () => {
       expect(
         getRoleChangeType(
-          OrganizationUserRole.EXTERNAL,
+          OrganizationUserRole.LITE_MEMBER,
           undefined,
           OrganizationUserRole.ADMIN,
           undefined
@@ -360,9 +360,9 @@ describe("getRoleChangeType", () => {
     it("returns lite-to-full when view-only custom role gets manage permission", () => {
       expect(
         getRoleChangeType(
-          OrganizationUserRole.EXTERNAL,
+          OrganizationUserRole.LITE_MEMBER,
           ["project:view"],
-          OrganizationUserRole.EXTERNAL,
+          OrganizationUserRole.LITE_MEMBER,
           ["project:view", "project:manage"]
         )
       ).toBe("lite-to-full");
@@ -371,9 +371,9 @@ describe("getRoleChangeType", () => {
     it("returns lite-to-full when no permissions to non-view custom role", () => {
       expect(
         getRoleChangeType(
-          OrganizationUserRole.EXTERNAL,
+          OrganizationUserRole.LITE_MEMBER,
           undefined,
-          OrganizationUserRole.EXTERNAL,
+          OrganizationUserRole.LITE_MEMBER,
           ["project:create"]
         )
       ).toBe("lite-to-full");
@@ -382,9 +382,9 @@ describe("getRoleChangeType", () => {
     it("returns lite-to-full when empty permissions to non-view custom role", () => {
       expect(
         getRoleChangeType(
-          OrganizationUserRole.EXTERNAL,
+          OrganizationUserRole.LITE_MEMBER,
           [],
-          OrganizationUserRole.EXTERNAL,
+          OrganizationUserRole.LITE_MEMBER,
           ["project:update"]
         )
       ).toBe("lite-to-full");
@@ -392,34 +392,34 @@ describe("getRoleChangeType", () => {
   });
 
   describe("full-to-lite scenarios", () => {
-    it("returns full-to-lite when MEMBER downgraded to EXTERNAL", () => {
+    it("returns full-to-lite when MEMBER downgraded to LITE_MEMBER", () => {
       expect(
         getRoleChangeType(
           OrganizationUserRole.MEMBER,
           undefined,
-          OrganizationUserRole.EXTERNAL,
+          OrganizationUserRole.LITE_MEMBER,
           undefined
         )
       ).toBe("full-to-lite");
     });
 
-    it("returns full-to-lite when ADMIN downgraded to EXTERNAL", () => {
+    it("returns full-to-lite when ADMIN downgraded to LITE_MEMBER", () => {
       expect(
         getRoleChangeType(
           OrganizationUserRole.ADMIN,
           undefined,
-          OrganizationUserRole.EXTERNAL,
+          OrganizationUserRole.LITE_MEMBER,
           undefined
         )
       ).toBe("full-to-lite");
     });
 
-    it("returns full-to-lite when MEMBER downgraded to EXTERNAL with view-only role", () => {
+    it("returns full-to-lite when MEMBER downgraded to LITE_MEMBER with view-only role", () => {
       expect(
         getRoleChangeType(
           OrganizationUserRole.MEMBER,
           undefined,
-          OrganizationUserRole.EXTERNAL,
+          OrganizationUserRole.LITE_MEMBER,
           ["project:view"]
         )
       ).toBe("full-to-lite");
@@ -428,9 +428,9 @@ describe("getRoleChangeType", () => {
     it("returns full-to-lite when non-view custom role changed to view-only", () => {
       expect(
         getRoleChangeType(
-          OrganizationUserRole.EXTERNAL,
+          OrganizationUserRole.LITE_MEMBER,
           ["project:manage"],
-          OrganizationUserRole.EXTERNAL,
+          OrganizationUserRole.LITE_MEMBER,
           ["project:view"]
         )
       ).toBe("full-to-lite");
@@ -439,9 +439,9 @@ describe("getRoleChangeType", () => {
     it("returns full-to-lite when non-view custom role removed", () => {
       expect(
         getRoleChangeType(
-          OrganizationUserRole.EXTERNAL,
+          OrganizationUserRole.LITE_MEMBER,
           ["project:update"],
-          OrganizationUserRole.EXTERNAL,
+          OrganizationUserRole.LITE_MEMBER,
           undefined
         )
       ).toBe("full-to-lite");

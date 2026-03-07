@@ -25,9 +25,9 @@ describe("memberRoleConstraints", () => {
       });
     });
 
-    describe("when role is EXTERNAL", () => {
+    describe("when role is LITE_MEMBER", () => {
       it("returns Lite Member", () => {
-        expect(getOrganizationRoleLabel(OrganizationUserRole.EXTERNAL)).toBe(
+        expect(getOrganizationRoleLabel(OrganizationUserRole.LITE_MEMBER)).toBe(
           "Lite Member",
         );
       });
@@ -39,7 +39,7 @@ describe("memberRoleConstraints", () => {
       it("allows Viewer role", () => {
         expect(
           isTeamRoleAllowedForOrganizationRole({
-            organizationRole: OrganizationUserRole.EXTERNAL,
+            organizationRole: OrganizationUserRole.LITE_MEMBER,
             teamRole: TeamUserRole.VIEWER,
           }),
         ).toBe(true);
@@ -48,7 +48,7 @@ describe("memberRoleConstraints", () => {
       it("rejects non-Viewer role", () => {
         expect(
           isTeamRoleAllowedForOrganizationRole({
-            organizationRole: OrganizationUserRole.EXTERNAL,
+            organizationRole: OrganizationUserRole.LITE_MEMBER,
             teamRole: TeamUserRole.ADMIN,
           }),
         ).toBe(false);
@@ -137,7 +137,7 @@ describe("memberRoleConstraints", () => {
       it("forces Admin to Viewer", () => {
         expect(
           getAutoCorrectedTeamRoleForOrganizationRole({
-            organizationRole: OrganizationUserRole.EXTERNAL,
+            organizationRole: OrganizationUserRole.LITE_MEMBER,
             currentTeamRole: TeamUserRole.ADMIN,
           }),
         ).toBe(TeamUserRole.VIEWER);
@@ -146,7 +146,7 @@ describe("memberRoleConstraints", () => {
       it("forces Member to Viewer", () => {
         expect(
           getAutoCorrectedTeamRoleForOrganizationRole({
-            organizationRole: OrganizationUserRole.EXTERNAL,
+            organizationRole: OrganizationUserRole.LITE_MEMBER,
             currentTeamRole: TeamUserRole.MEMBER,
           }),
         ).toBe(TeamUserRole.VIEWER);
@@ -155,7 +155,7 @@ describe("memberRoleConstraints", () => {
       it("forces custom role to Viewer", () => {
         expect(
           getAutoCorrectedTeamRoleForOrganizationRole({
-            organizationRole: OrganizationUserRole.EXTERNAL,
+            organizationRole: OrganizationUserRole.LITE_MEMBER,
             currentTeamRole: "custom:role-abc" as TeamRoleValue,
           }),
         ).toBe(TeamUserRole.VIEWER);

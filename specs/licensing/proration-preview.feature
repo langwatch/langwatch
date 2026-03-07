@@ -133,7 +133,7 @@ Feature: Proration Preview Before Seat Update
     Given I am on the members page
     And the organization has an active Growth subscription with maxMembers 5
     And the organization has 5 accepted core members
-    When I invite 1 new lite member (EXTERNAL role)
+    When I invite 1 new lite member (LITE_MEMBER role)
     Then no proration preview modal opens
     And the invite is created directly
 

@@ -14,7 +14,7 @@ export function isTeamRoleAllowedForOrganizationRole(params: {
 }): boolean {
   const { organizationRole, teamRole } = params;
 
-  if (organizationRole === OrganizationUserRole.EXTERNAL) {
+  if (organizationRole === OrganizationUserRole.LITE_MEMBER) {
     return teamRole === TeamUserRole.VIEWER;
   }
 
@@ -31,7 +31,7 @@ export function getAutoCorrectedTeamRoleForOrganizationRole(params: {
 }): TeamRoleValue {
   const { organizationRole, currentTeamRole } = params;
 
-  if (organizationRole === OrganizationUserRole.EXTERNAL) {
+  if (organizationRole === OrganizationUserRole.LITE_MEMBER) {
     return TeamUserRole.VIEWER;
   }
 

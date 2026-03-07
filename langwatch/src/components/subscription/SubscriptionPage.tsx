@@ -142,7 +142,7 @@ export function SubscriptionPage() {
       name: member.user.name ?? "",
       email: member.user.email ?? "",
       role: member.role,
-      // Note: Using simplified classification (EXTERNAL = LiteMember, others = FullMember)
+      // Note: Using simplified classification (LITE_MEMBER = LiteMember, others = FullMember)
       // Full classification with customRole permissions would require additional data
       memberType: classifyMemberType(member.role, undefined),
     }));

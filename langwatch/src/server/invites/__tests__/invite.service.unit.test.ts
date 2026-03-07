@@ -63,9 +63,9 @@ describe("classifyInvitesByMemberType()", () => {
     });
   });
 
-  describe("when invites have EXTERNAL role with no custom roles", () => {
+  describe("when invites have LITE_MEMBER role with no custom roles", () => {
     it("counts them as lite members", () => {
-      const invites = [{ role: OrganizationUserRole.EXTERNAL, teams: [] }];
+      const invites = [{ role: OrganizationUserRole.LITE_MEMBER, teams: [] }];
       const customRoleMap = new Map();
 
       const result = classifyInvitesByMemberType(invites, customRoleMap);
@@ -75,11 +75,11 @@ describe("classifyInvitesByMemberType()", () => {
     });
   });
 
-  describe("when invites have EXTERNAL role with view-only custom role", () => {
+  describe("when invites have LITE_MEMBER role with view-only custom role", () => {
     it("counts them as lite members", () => {
       const invites = [
         {
-          role: OrganizationUserRole.EXTERNAL,
+          role: OrganizationUserRole.LITE_MEMBER,
           teams: [{ customRoleId: "role-1" }],
         },
       ];
@@ -92,11 +92,11 @@ describe("classifyInvitesByMemberType()", () => {
     });
   });
 
-  describe("when invites have EXTERNAL role with non-view custom role", () => {
+  describe("when invites have LITE_MEMBER role with non-view custom role", () => {
     it("counts them as full members", () => {
       const invites = [
         {
-          role: OrganizationUserRole.EXTERNAL,
+          role: OrganizationUserRole.LITE_MEMBER,
           teams: [{ customRoleId: "role-1" }],
         },
       ];
@@ -116,7 +116,7 @@ describe("classifyInvitesByMemberType()", () => {
       const invites = [
         { role: OrganizationUserRole.ADMIN },
         { role: OrganizationUserRole.MEMBER },
-        { role: OrganizationUserRole.EXTERNAL, teams: [] },
+        { role: OrganizationUserRole.LITE_MEMBER, teams: [] },
       ];
       const customRoleMap = new Map();
 
@@ -261,7 +261,7 @@ describe("InviteService", () => {
         await expect(
           service.checkLicenseLimits({
             organizationId: "org-1",
-            newInvites: [{ role: OrganizationUserRole.EXTERNAL, teams: [] }],
+            newInvites: [{ role: OrganizationUserRole.LITE_MEMBER, teams: [] }],
             user: { id: "user-1" } as any,
           })
         ).rejects.toThrow(LicenseLimitError);
@@ -269,7 +269,7 @@ describe("InviteService", () => {
         await expect(
           service.checkLicenseLimits({
             organizationId: "org-1",
-            newInvites: [{ role: OrganizationUserRole.EXTERNAL, teams: [] }],
+            newInvites: [{ role: OrganizationUserRole.LITE_MEMBER, teams: [] }],
             user: { id: "user-1" } as any,
           })
         ).rejects.toThrow(LICENSE_LIMIT_ERRORS.MEMBER_LITE_LIMIT);

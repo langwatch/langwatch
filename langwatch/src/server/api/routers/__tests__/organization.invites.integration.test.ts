@@ -320,7 +320,7 @@ describe("Organization Invites Integration", () => {
           invites: [
             { email: "multi-a@example.com", role: "MEMBER", teamIds: teamId },
             { email: "multi-b@example.com", role: "MEMBER", teamIds: teamId },
-            { email: "multi-c@example.com", role: "EXTERNAL", teamIds: teamId },
+            { email: "multi-c@example.com", role: "LITE_MEMBER", teamIds: teamId },
           ],
         });
 
@@ -339,7 +339,7 @@ describe("Organization Invites Integration", () => {
             organizationId,
             invites: [
               { email: "dupe@example.com", role: "MEMBER", teamIds: teamId },
-              { email: "dupe@example.com", role: "EXTERNAL", teamIds: teamId },
+              { email: "dupe@example.com", role: "LITE_MEMBER", teamIds: teamId },
             ],
           }),
         ).rejects.toMatchObject({

@@ -89,7 +89,7 @@ describe("organizationRouter member role validation", () => {
         findUnique: vi.fn().mockResolvedValue({ organizationId: "org-1" }),
       },
       organizationUser: {
-        findUnique: vi.fn().mockResolvedValue({ role: OrganizationUserRole.EXTERNAL }),
+        findUnique: vi.fn().mockResolvedValue({ role: OrganizationUserRole.LITE_MEMBER }),
       },
       customRole: {
         findUnique: vi.fn().mockResolvedValue({
@@ -248,7 +248,7 @@ describe("organizationRouter member role validation", () => {
             caller.updateMemberRole({
               userId: "member-1",
               organizationId: "org-1",
-              role: OrganizationUserRole.EXTERNAL,
+              role: OrganizationUserRole.LITE_MEMBER,
               teamRoleUpdates: [
                 {
                   teamId: "team-1",
@@ -268,7 +268,7 @@ describe("organizationRouter member role validation", () => {
             caller.updateMemberRole({
               userId: "member-1",
               organizationId: "org-1",
-              role: OrganizationUserRole.EXTERNAL,
+              role: OrganizationUserRole.LITE_MEMBER,
               teamRoleUpdates: [
                 {
                   teamId: "team-1",
@@ -284,12 +284,12 @@ describe("organizationRouter member role validation", () => {
         });
       });
 
-      describe("when changing org role to EXTERNAL without explicit team role updates", () => {
+      describe("when changing org role to LITE_MEMBER without explicit team role updates", () => {
         it("auto-corrects team roles to Viewer", async () => {
           await caller.updateMemberRole({
             userId: "member-1",
             organizationId: "org-1",
-            role: OrganizationUserRole.EXTERNAL,
+            role: OrganizationUserRole.LITE_MEMBER,
           });
 
           expect(fullTxMock.teamUser!.update).toHaveBeenCalledWith(

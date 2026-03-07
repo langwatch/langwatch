@@ -96,21 +96,21 @@ Feature: Member Limit Enforcement with License
   # ============================================================================
   # Lite Member vs Full Member Classification
   # ============================================================================
-  # Lite Member: EXTERNAL role (with view-only or no custom permissions)
+  # Lite Member: LITE_MEMBER role (with view-only or no custom permissions)
   # Full Member: ADMIN/MEMBER role OR any role with non-view permissions
 
   Scenario: Lite Member users are counted separately from full members
     Given the organization has 2 Full Members
-    And the organization has 1 Lite Member with role EXTERNAL
+    And the organization has 1 Lite Member with role LITE_MEMBER
     And the organization has a license with maxMembers 3 and maxMembersLite 2
-    When I invite user "new@example.com" as EXTERNAL to the organization
+    When I invite user "new@example.com" as LITE_MEMBER to the organization
     Then the invite is created successfully
 
   Scenario: Lite Member pending invites count toward Lite Member limit
     Given the organization has 2 Full Members
-    And the organization has 1 pending invite with role EXTERNAL
+    And the organization has 1 pending invite with role LITE_MEMBER
     And the organization has a license with maxMembers 3 and maxMembersLite 1
-    When I invite user "new@example.com" as EXTERNAL to the organization
+    When I invite user "new@example.com" as LITE_MEMBER to the organization
     Then the request fails with FORBIDDEN
     And the error message contains "Over the limit of lite members allowed"
 
@@ -236,8 +236,8 @@ Feature: Member Limit Enforcement with License
     Then the result is false
 
   @unit
-  Scenario: classifyMemberType returns MemberLite for EXTERNAL role
-    Given a user with OrganizationUserRole EXTERNAL
+  Scenario: classifyMemberType returns MemberLite for LITE_MEMBER role
+    Given a user with OrganizationUserRole LITE_MEMBER
     When I classify the member type
     Then the result is "MemberLite"
 
@@ -255,13 +255,13 @@ Feature: Member Limit Enforcement with License
 
   @unit
   Scenario: classifyMemberType returns MemberLite for view-only custom role
-    Given a user with EXTERNAL role and custom role with permissions ["project:view"]
+    Given a user with LITE_MEMBER role and custom role with permissions ["project:view"]
     When I classify the member type
     Then the result is "MemberLite"
 
   @unit
   Scenario: classifyMemberType returns FullMember for custom role with non-view permission
-    Given a user with EXTERNAL role and custom role with permissions ["project:view", "project:update"]
+    Given a user with LITE_MEMBER role and custom role with permissions ["project:view", "project:update"]
     When I classify the member type
     Then the result is "FullMember"
 
@@ -328,7 +328,7 @@ Feature: Member Limit Enforcement with License
     Given the organization has 2 Full Members including "member@example.com"
     And the organization has 1 Lite Member
     And the organization has a license with maxMembersLite 1
-    When I update "member@example.com" org role to EXTERNAL
+    When I update "member@example.com" org role to LITE_MEMBER
     Then the request fails with FORBIDDEN
     And the error message contains "Lite Member limit reached"
 
@@ -336,7 +336,7 @@ Feature: Member Limit Enforcement with License
     Given the organization has 2 Full Members including "member@example.com"
     And the organization has 0 Lite Member users
     And the organization has a license with maxMembersLite 1
-    When I update "member@example.com" org role to EXTERNAL
+    When I update "member@example.com" org role to LITE_MEMBER
     Then the update succeeds
 
   Scenario: Blocks custom role change that would exceed full member limit
@@ -365,30 +365,30 @@ Feature: Member Limit Enforcement with License
 
   @unit
   Scenario: getRoleChangeType returns no-change when both roles are Lite Member
-    Given a user with role EXTERNAL and view-only permissions ["project:view"]
-    When I check the role change type to EXTERNAL with view-only permissions ["analytics:view"]
+    Given a user with role LITE_MEMBER and view-only permissions ["project:view"]
+    When I check the role change type to LITE_MEMBER with view-only permissions ["analytics:view"]
     Then the result is "no-change"
 
   @unit
-  Scenario: getRoleChangeType returns lite-to-full when upgrading EXTERNAL to MEMBER
-    Given a user with role EXTERNAL and no custom permissions
+  Scenario: getRoleChangeType returns lite-to-full when upgrading LITE_MEMBER to MEMBER
+    Given a user with role LITE_MEMBER and no custom permissions
     When I check the role change type to MEMBER with no custom permissions
     Then the result is "lite-to-full"
 
   @unit
   Scenario: getRoleChangeType returns lite-to-full when view-only role gets manage permission
-    Given a user with role EXTERNAL and view-only permissions ["project:view"]
-    When I check the role change type to EXTERNAL with permissions ["project:view", "project:manage"]
+    Given a user with role LITE_MEMBER and view-only permissions ["project:view"]
+    When I check the role change type to LITE_MEMBER with permissions ["project:view", "project:manage"]
     Then the result is "lite-to-full"
 
   @unit
-  Scenario: getRoleChangeType returns full-to-lite when downgrading MEMBER to EXTERNAL
+  Scenario: getRoleChangeType returns full-to-lite when downgrading MEMBER to LITE_MEMBER
     Given a user with role MEMBER and no custom permissions
-    When I check the role change type to EXTERNAL with no custom permissions
+    When I check the role change type to LITE_MEMBER with no custom permissions
     Then the result is "full-to-lite"
 
   @unit
   Scenario: getRoleChangeType returns full-to-lite when non-view role becomes view-only
-    Given a user with role EXTERNAL and permissions ["project:manage"]
-    When I check the role change type to EXTERNAL with view-only permissions ["project:view"]
+    Given a user with role LITE_MEMBER and permissions ["project:manage"]
+    When I check the role change type to LITE_MEMBER with view-only permissions ["project:view"]
     Then the result is "full-to-lite"

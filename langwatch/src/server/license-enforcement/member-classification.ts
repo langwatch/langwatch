@@ -30,12 +30,10 @@ export function isViewOnlyCustomRole(permissions: string[]): boolean {
  *
  * Classification rules:
  * - ADMIN or MEMBER roles are always FullMember
- * - EXTERNAL role with non-view permissions is FullMember (elevated to full access)
- * - EXTERNAL role with no permissions or view-only permissions is Lite Member
+ * - LITE_MEMBER role with non-view permissions is FullMember (elevated to full access)
+ * - LITE_MEMBER role with no permissions or view-only permissions is Lite Member
  *
- * Note: The EXTERNAL enum value corresponds to "Lite Member" in user-facing terminology.
- *
- * @param role - Organization user role (ADMIN, MEMBER, or EXTERNAL)
+ * @param role - Organization user role (ADMIN, MEMBER, or LITE_MEMBER)
  * @param permissions - Optional array of permission strings from custom role
  * @returns MemberType classification
  */
@@ -51,16 +49,16 @@ export function classifyMemberType(
     return "FullMember";
   }
 
-  // EXTERNAL role with non-view custom permissions is elevated to FullMember
+  // LITE_MEMBER role with non-view custom permissions is elevated to FullMember
   if (
-    role === OrganizationUserRole.EXTERNAL &&
+    role === OrganizationUserRole.LITE_MEMBER &&
     permissions &&
     !isViewOnlyCustomRole(permissions)
   ) {
     return "FullMember";
   }
 
-  // EXTERNAL role with no permissions or view-only permissions is Lite Member
+  // LITE_MEMBER role with no permissions or view-only permissions is Lite Member
   return "LiteMember";
 }
 
@@ -81,7 +79,7 @@ export function isFullMember(
 /**
  * Checks if a member is a Lite Member based on role and permissions.
  *
- * Lite Member users have the EXTERNAL role with view-only or no custom permissions.
+ * Lite Member users have the LITE_MEMBER role with view-only or no custom permissions.
  *
  * @param role - Organization user role
  * @param permissions - Optional array of permission strings from custom role

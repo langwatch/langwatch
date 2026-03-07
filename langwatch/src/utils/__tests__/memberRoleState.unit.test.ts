@@ -288,7 +288,7 @@ describe("memberRoleState", () => {
         const result = hasPendingRoleChanges({
           teamMemberships: [],
           pendingTeamRoles: {},
-          pendingOrganizationRole: OrganizationUserRole.EXTERNAL,
+          pendingOrganizationRole: OrganizationUserRole.LITE_MEMBER,
           currentOrganizationRole: OrganizationUserRole.MEMBER,
         });
 
@@ -400,10 +400,10 @@ describe("memberRoleState", () => {
   });
 
   describe("getLicenseLimitTypeForRoleChange()", () => {
-    describe("when changing from EXTERNAL to non-EXTERNAL", () => {
+    describe("when changing from LITE_MEMBER to non-LITE_MEMBER", () => {
       it("returns 'members'", () => {
         const result = getLicenseLimitTypeForRoleChange({
-          previousRole: OrganizationUserRole.EXTERNAL,
+          previousRole: OrganizationUserRole.LITE_MEMBER,
           nextRole: OrganizationUserRole.MEMBER,
         });
 
@@ -411,11 +411,11 @@ describe("memberRoleState", () => {
       });
     });
 
-    describe("when changing from non-EXTERNAL to EXTERNAL", () => {
+    describe("when changing from non-LITE_MEMBER to LITE_MEMBER", () => {
       it("returns 'membersLite'", () => {
         const result = getLicenseLimitTypeForRoleChange({
           previousRole: OrganizationUserRole.MEMBER,
-          nextRole: OrganizationUserRole.EXTERNAL,
+          nextRole: OrganizationUserRole.LITE_MEMBER,
         });
 
         expect(result).toBe("membersLite");
@@ -432,10 +432,10 @@ describe("memberRoleState", () => {
         expect(result).toBeNull();
       });
 
-      it("returns null for EXTERNAL to EXTERNAL", () => {
+      it("returns null for LITE_MEMBER to LITE_MEMBER", () => {
         const result = getLicenseLimitTypeForRoleChange({
-          previousRole: OrganizationUserRole.EXTERNAL,
-          nextRole: OrganizationUserRole.EXTERNAL,
+          previousRole: OrganizationUserRole.LITE_MEMBER,
+          nextRole: OrganizationUserRole.LITE_MEMBER,
         });
 
         expect(result).toBeNull();
@@ -444,10 +444,10 @@ describe("memberRoleState", () => {
   });
 
   describe("applyOrganizationRoleToPendingTeamRoles()", () => {
-    describe("when organization role is EXTERNAL", () => {
+    describe("when organization role is LITE_MEMBER", () => {
       it("forces all team roles to Viewer", () => {
         const result = applyOrganizationRoleToPendingTeamRoles({
-          organizationRole: OrganizationUserRole.EXTERNAL,
+          organizationRole: OrganizationUserRole.LITE_MEMBER,
           currentPendingTeamRoles: {
             t1: { role: "ADMIN" },
             t2: { role: "MEMBER", customRoleId: "cr-1" },

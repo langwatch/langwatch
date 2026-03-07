@@ -18,7 +18,7 @@ Feature: Member Role Team Restrictions
     And I should not see "External / Viewer" as an option
 
   # ============================================================================
-  # Lite Member (EXTERNAL) Role Restrictions
+  # Lite Member (LITE_MEMBER) Role Restrictions
   # ============================================================================
 
   Scenario: Lite Member org role restricts team role to Viewer only
@@ -168,7 +168,7 @@ Feature: Member Role Team Restrictions
     Given I am a Lite Member viewing my own member details
     When I look at the organization role field
     Then I should see "Lite Member"
-    And I should not see "EXTERNAL"
+    And I should not see "LITE_MEMBER"
 
   @integration
   Scenario: Only organization administrators can save member role changes
