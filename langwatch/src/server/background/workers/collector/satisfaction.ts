@@ -49,6 +49,7 @@ export const scoreSatisfactionFromInput = async ({
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
+        project_id: projectId,
         text: input.value,
         embeddings_litellm_params: {
           ...(await prepareLitellmParams({
