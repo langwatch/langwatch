@@ -40,8 +40,13 @@ export function createEvaluationTriggerReactor(
       // Guard: skip traces blocked by guardrail with no output
       if (foldState.blockedByGuardrail && !foldState.computedOutput) return;
 
-      // Guard: skip studio development traces TODO: test these are still hoisted
+      // Guard: skip non-application traces (evaluations, simulations, workflows, playground)
       const attrs = foldState.attributes ?? {};
+      const scope = attrs["langwatch.origin"];
+      if (scope && scope !== "application") {
+        return;
+      }
+      // TODO(2027): remove legacy guard once all traces have langwatch.origin
       if (
         attrs["langwatch.platform"] === "optimization_studio" &&
         attrs["langwatch.environment"] === "development"

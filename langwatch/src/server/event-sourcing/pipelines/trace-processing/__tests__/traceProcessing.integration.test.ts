@@ -584,6 +584,38 @@ describe.skipIf(!hasTestcontainers)(
         expect(data.attributes["service.name"]).toBe("my-agent");
       });
     });
+
+    describe("given a span with langwatch.origin attribute", () => {
+      it("persists langwatch.origin in trace summary attributes", async () => {
+        const traceId = generateTestTraceId();
+
+        await pipeline.commands.recordSpan.send({
+          tenantId: tenantIdString,
+          span: buildTestSpan({
+            traceId,
+            spanId: generateTestSpanId(),
+            name: "evaluation-span",
+            attributes: [
+              { key: "langwatch.origin", value: { stringValue: "evaluation" } },
+            ],
+          }),
+          resource: null,
+          instrumentationScope: null,
+          piiRedactionLevel: "DISABLED",
+        });
+
+        await waitForTraceSummary(pipeline, traceId, tenantId, 1);
+
+        const projection = await pipeline.service.getProjectionByName(
+          "traceSummary",
+          traceId,
+          { tenantId },
+        );
+        const data = projection?.data as TraceSummaryData;
+
+        expect(data.attributes["langwatch.origin"]).toBe("evaluation");
+      });
+    });
   },
   60000,
 );

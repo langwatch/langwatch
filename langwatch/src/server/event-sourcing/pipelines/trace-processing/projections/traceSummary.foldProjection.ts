@@ -75,6 +75,62 @@ const STANDARD_RESOURCE_PREFIXES = [
 	"webengine.",
 ] as const;
 
+/**
+ * Infers langwatch.origin from legacy markers when not explicitly set.
+ * Priority (highest to lowest):
+ *   1. instrumentationScope.name = "langwatch-evaluation" -> "evaluation"
+ *   2. instrumentationScope.name = "@langwatch/scenario" -> "simulation"
+ *   3. metadata.platform = "optimization_studio" -> "workflow"
+ *   4. metadata.labels contains "scenario-runner" -> "simulation"
+ *   5. resource attribute scenario.labels present -> "simulation"
+ *   6. span attribute evaluation.run_id present -> "evaluation"
+ *   7. No signal -> undefined
+ */
+function inferOriginFromLegacyMarkers(span: NormalizedSpan): string | undefined {
+	// 1. instrumentationScope.name = "langwatch-evaluation"
+	if (span.instrumentationScope?.name === "langwatch-evaluation") {
+		return "evaluation";
+	}
+
+	// 2. instrumentationScope.name = "@langwatch/scenario"
+	if (span.instrumentationScope?.name === "@langwatch/scenario") {
+		return "simulation";
+	}
+
+	const spanAttrs = span.spanAttributes;
+
+	// 3. metadata.platform = "optimization_studio"
+	if (spanAttrs["metadata.platform"] === "optimization_studio") {
+		return "workflow";
+	}
+
+	// 4. metadata.labels contains "scenario-runner"
+	const labels = spanAttrs[ATTR_KEYS.LANGWATCH_LABELS];
+	if (labels) {
+		const labelArray = typeof labels === "string"
+			? parseJsonStringArray(labels)
+			: Array.isArray(labels)
+				? (labels as string[])
+				: [];
+		if (labelArray.includes("scenario-runner")) {
+			return "simulation";
+		}
+	}
+
+	// 5. resource attribute scenario.labels present
+	const resourceAttrs = span.resourceAttributes;
+	if (resourceAttrs["scenario.labels"] !== undefined) {
+		return "simulation";
+	}
+
+	// 6. span attribute evaluation.run_id present
+	if (spanAttrs["evaluation.run_id"] !== undefined) {
+		return "evaluation";
+	}
+
+	return undefined;
+}
+
 const isValidTimestamp = (ts: number | undefined | null): ts is number =>
 	typeof ts === "number" && ts > 0 && Number.isFinite(ts);
 
@@ -337,6 +393,11 @@ function extractAttributesFromSpan(
 	if (typeof langgraphThreadId === "string")
 		attributes["langgraph.thread_id"] = langgraphThreadId;
 
+	// Scope attribute — forwarded for hoisting logic in applySpanToSummary
+	const langwatchOrigin = spanAttrs["langwatch.origin"];
+	if (typeof langwatchOrigin === "string")
+		attributes["langwatch.origin"] = langwatchOrigin;
+
 	// Labels (canonical key only — canonicalization already promoted from metadata)
 	const labels = spanAttrs[ATTR_KEYS.LANGWATCH_LABELS];
 	if (typeof labels === "string") {
@@ -575,6 +636,62 @@ export function applySpanToSummary(
       }
     } catch {
       // Not valid JSON on one side — keep first-wins (already in mergedAttributes)
+    }
+  }
+
+  // TODO(2027): remove this stripping code once all clients are upgraded
+  // Strip legacy platform marker "optimization_studio" — only this exact value
+  if (mergedAttributes["metadata.platform"] === "optimization_studio") {
+    delete mergedAttributes["metadata.platform"];
+  }
+
+  // TODO(2027): remove this stripping code once all clients are upgraded
+  // Strip "scenario-runner" from labels
+  if (mergedAttributes["langwatch.labels"]) {
+    const allLabels = parseJsonStringArray(mergedAttributes["langwatch.labels"]);
+    const filtered = allLabels.filter((l) => l !== "scenario-runner");
+    if (filtered.length > 0) {
+      mergedAttributes["langwatch.labels"] = JSON.stringify(filtered);
+    } else {
+      delete mergedAttributes["langwatch.labels"];
+    }
+  }
+
+  // Hoist langwatch.origin with root-span-wins-if-set semantics
+  const isRootSpan = !span.parentSpanId;
+  const explicitOrigin = span.spanAttributes["langwatch.origin"];
+  const hasExplicitOrigin = typeof explicitOrigin === "string" && explicitOrigin !== "";
+
+  if (hasExplicitOrigin) {
+    if (isRootSpan) {
+      // Root span with explicit scope always wins
+      mergedAttributes["langwatch.origin"] = explicitOrigin as string;
+    } else if (!state.attributes["langwatch.origin"]) {
+      // Child span sets scope only if no value has been hoisted yet
+      mergedAttributes["langwatch.origin"] = explicitOrigin as string;
+    } else {
+      // Keep existing hoisted value from earlier spans
+      mergedAttributes["langwatch.origin"] = state.attributes["langwatch.origin"];
+    }
+  } else if (isRootSpan && state.attributes["langwatch.origin"]) {
+    // Root span without scope preserves previously hoisted child span value
+    mergedAttributes["langwatch.origin"] = state.attributes["langwatch.origin"];
+  } else {
+    // No explicit scope on this span — try legacy inference
+    const inferred = inferOriginFromLegacyMarkers(span);
+    if (inferred) {
+      if (isRootSpan) {
+        // Root span inferred scope wins over child inferred scope
+        mergedAttributes["langwatch.origin"] = inferred;
+      } else if (!state.attributes["langwatch.origin"]) {
+        // Child inferred scope sets only if nothing hoisted yet
+        mergedAttributes["langwatch.origin"] = inferred;
+      } else {
+        mergedAttributes["langwatch.origin"] = state.attributes["langwatch.origin"];
+      }
+    } else if (state.attributes["langwatch.origin"]) {
+      // No signal from this span — preserve existing hoisted value
+      mergedAttributes["langwatch.origin"] = state.attributes["langwatch.origin"];
     }
   }
 
