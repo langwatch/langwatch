@@ -1,3 +1,4 @@
+import type { ProcessRole } from "../../app-layer/config";
 import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
 import type { CommandHandlerClass } from "../commands/commandHandlerClass";
 import type { AggregateType } from "../domain/aggregateType";
@@ -53,7 +54,7 @@ export interface EventSourcingPipelineDefinition<
     options?: CommandHandlerOptions<unknown>;
   }>;
   globalRegistry?: ProjectionRegistry<Event>;
-  processRole?: "web" | "worker";
+  processRole?: ProcessRole;
 }
 
 export interface RegisteredPipeline<
