@@ -9,6 +9,7 @@
 
 import "dotenv/config";
 import { LangWatch } from "langwatch";
+import { trace } from "@opentelemetry/api";
 
 // Check for required environment variables
 if (!process.env.LANGWATCH_API_KEY) {
@@ -26,21 +27,32 @@ const dataset = [
   { question: "What is H2O?", expected: "water" },
 ];
 
-// Simulated LLM response function
+// Simulated LLM response function — wrapped in a span so it appears as a
+// child of the evaluation iteration trace in the LangWatch UI.
+const tracer = trace.getTracer("langwatch");
+
 const simulateLLM = async (question: string): Promise<string> => {
-  // Simulate some latency
-  await new Promise((resolve) => setTimeout(resolve, 100 + Math.random() * 200));
+  return tracer.startActiveSpan("simulateLLM", async (span) => {
+    try {
+      // Simulate some latency
+      await new Promise((resolve) => setTimeout(resolve, 100 + Math.random() * 200));
 
-  // Simple mock responses
-  const responses: Record<string, string> = {
-    "What is 2+2?": "4",
-    "What is the capital of France?": "Paris",
-    "What color is the sky?": "blue",
-    "How many days in a week?": "7",
-    "What is H2O?": "water",
-  };
+      // Simple mock responses
+      const responses: Record<string, string> = {
+        "What is 2+2?": "4",
+        "What is the capital of France?": "Paris",
+        "What color is the sky?": "blue",
+        "How many days in a week?": "7",
+        "What is H2O?": "water",
+      };
 
-  return responses[question] ?? "I don't know";
+      const result = responses[question] ?? "I don't know";
+      span.setAttribute("llm.response", result);
+      return result;
+    } finally {
+      span.end();
+    }
+  });
 };
 
 const main = async () => {

@@ -330,6 +330,10 @@ class Experiment:
                 error=None,
             )
             iteration["trace"].__enter__()
+            if iteration["trace"].root_span:
+                iteration["trace"].root_span.set_attributes(
+                    {"langwatch.origin": "evaluation"}
+                )
             # Store for target() to potentially close early
             self._active_iteration_trace = iteration["trace"]
 
