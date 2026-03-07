@@ -142,15 +142,19 @@ function createJobLogger(job: Job<ScenarioJob, ScenarioJobResult, string>, jobDa
 }
 
 /**
- * Build OTEL resource attributes string for scenario labels.
- * Returns undefined if no labels are present.
+ * Build OTEL resource attributes string for scenario labels and platform source.
+ * Always includes langwatch.source=platform; appends scenario.labels if labels are present.
  * @internal Exported for testing
  */
-export function buildOtelResourceAttributes(labels: string[]): string | undefined {
-  if (!labels.length) return undefined;
-  // Escape backslashes first, then commas and equals per OTEL spec
-  const escapedLabels = labels.map((l) => l.replace(/\\/g, "\\\\").replace(/[,=]/g, "\\$&"));
-  return `scenario.labels=${escapedLabels.join(",")}`;
+export function buildOtelResourceAttributes(labels: string[]): string {
+  // Always include langwatch.source=platform for platform-originated scenario traces
+  const parts = ["langwatch.source=platform"];
+  if (labels.length) {
+    // Escape backslashes first, then commas and equals per OTEL spec
+    const escapedLabels = labels.map((l) => l.replace(/\\/g, "\\\\").replace(/[,=]/g, "\\$&"));
+    parts.push(`scenario.labels=${escapedLabels.join(",")}`);
+  }
+  return parts.join(",");
 }
 
 /**
@@ -320,7 +324,7 @@ async function spawnScenarioChildProcess(
       LANGWATCH_API_KEY: telemetry.apiKey,
       LANGWATCH_ENDPOINT: telemetry.endpoint,
       SCENARIO_HEADLESS: "true", // Prevent SDK from trying to open browser
-      ...(otelResourceAttrs && { OTEL_RESOURCE_ATTRIBUTES: otelResourceAttrs }),
+      OTEL_RESOURCE_ATTRIBUTES: otelResourceAttrs,
     });
 
     // tsx is available since the worker runs via tsx
