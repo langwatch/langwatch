@@ -42,11 +42,11 @@ export function createEvaluationTriggerReactor(
 
       // Guard: skip non-application traces (evaluations, simulations, workflows, playground)
       const attrs = foldState.attributes ?? {};
-      const scope = attrs["langwatch.scope"];
+      const scope = attrs["langwatch.origin"];
       if (scope && scope !== "application") {
         return;
       }
-      // TODO(2027): remove legacy guard once all traces have langwatch.scope
+      // TODO(2027): remove legacy guard once all traces have langwatch.origin
       if (
         attrs["langwatch.platform"] === "optimization_studio" &&
         attrs["langwatch.environment"] === "development"

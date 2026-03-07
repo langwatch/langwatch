@@ -76,7 +76,7 @@ const STANDARD_RESOURCE_PREFIXES = [
 ] as const;
 
 /**
- * Infers langwatch.scope from legacy markers when not explicitly set.
+ * Infers langwatch.origin from legacy markers when not explicitly set.
  * Priority (highest to lowest):
  *   1. instrumentationScope.name = "langwatch-evaluation" -> "evaluation"
  *   2. instrumentationScope.name = "@langwatch/scenario" -> "simulation"
@@ -394,9 +394,9 @@ function extractAttributesFromSpan(
 		attributes["langgraph.thread_id"] = langgraphThreadId;
 
 	// Scope attribute — forwarded for hoisting logic in applySpanToSummary
-	const langwatchScope = spanAttrs["langwatch.scope"];
+	const langwatchScope = spanAttrs["langwatch.origin"];
 	if (typeof langwatchScope === "string")
-		attributes["langwatch.scope"] = langwatchScope;
+		attributes["langwatch.origin"] = langwatchScope;
 
 	// Labels (canonical key only — canonicalization already promoted from metadata)
 	const labels = spanAttrs[ATTR_KEYS.LANGWATCH_LABELS];
@@ -657,41 +657,41 @@ export function applySpanToSummary(
     }
   }
 
-  // Hoist langwatch.scope with root-span-wins-if-set semantics
+  // Hoist langwatch.origin with root-span-wins-if-set semantics
   const isRootSpanForScope = !span.parentSpanId;
-  const explicitScope = span.spanAttributes["langwatch.scope"];
+  const explicitScope = span.spanAttributes["langwatch.origin"];
   const hasExplicitScope = typeof explicitScope === "string" && explicitScope !== "";
 
   if (hasExplicitScope) {
     if (isRootSpanForScope) {
       // Root span with explicit scope always wins
-      mergedAttributes["langwatch.scope"] = explicitScope as string;
-    } else if (!state.attributes["langwatch.scope"]) {
+      mergedAttributes["langwatch.origin"] = explicitScope as string;
+    } else if (!state.attributes["langwatch.origin"]) {
       // Child span sets scope only if no value has been hoisted yet
-      mergedAttributes["langwatch.scope"] = explicitScope as string;
+      mergedAttributes["langwatch.origin"] = explicitScope as string;
     } else {
       // Keep existing hoisted value from earlier spans
-      mergedAttributes["langwatch.scope"] = state.attributes["langwatch.scope"];
+      mergedAttributes["langwatch.origin"] = state.attributes["langwatch.origin"];
     }
-  } else if (isRootSpanForScope && state.attributes["langwatch.scope"]) {
+  } else if (isRootSpanForScope && state.attributes["langwatch.origin"]) {
     // Root span without scope preserves previously hoisted child span value
-    mergedAttributes["langwatch.scope"] = state.attributes["langwatch.scope"];
+    mergedAttributes["langwatch.origin"] = state.attributes["langwatch.origin"];
   } else {
     // No explicit scope on this span — try legacy inference
     const inferred = inferScopeFromLegacyMarkers(span);
     if (inferred) {
       if (isRootSpanForScope) {
         // Root span inferred scope wins over child inferred scope
-        mergedAttributes["langwatch.scope"] = inferred;
-      } else if (!state.attributes["langwatch.scope"]) {
+        mergedAttributes["langwatch.origin"] = inferred;
+      } else if (!state.attributes["langwatch.origin"]) {
         // Child inferred scope sets only if nothing hoisted yet
-        mergedAttributes["langwatch.scope"] = inferred;
+        mergedAttributes["langwatch.origin"] = inferred;
       } else {
-        mergedAttributes["langwatch.scope"] = state.attributes["langwatch.scope"];
+        mergedAttributes["langwatch.origin"] = state.attributes["langwatch.origin"];
       }
-    } else if (state.attributes["langwatch.scope"]) {
+    } else if (state.attributes["langwatch.origin"]) {
       // No signal from this span — preserve existing hoisted value
-      mergedAttributes["langwatch.scope"] = state.attributes["langwatch.scope"];
+      mergedAttributes["langwatch.origin"] = state.attributes["langwatch.origin"];
     }
   }
 

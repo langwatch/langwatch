@@ -30,7 +30,7 @@ class ExecuteComponentPayload(BaseModel):
     version_id: Optional[str] = None
     published_id: Optional[str] = None
     inputs: Dict[str, Any]
-    scope: Optional[str] = None
+    origin: Optional[str] = None
 
 
 class ExecuteComponent(BaseModel):
@@ -56,7 +56,7 @@ class ExecuteFlowPayload(BaseModel):
     manual_execution_mode: Optional[bool] = None
     do_not_trace: bool = False
     run_evaluations: bool = True
-    scope: Optional[str] = None
+    origin: Optional[str] = None
 
 
 class ExecuteFlow(BaseModel):

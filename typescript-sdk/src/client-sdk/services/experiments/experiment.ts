@@ -304,7 +304,7 @@ export class Experiment {
           "evaluation.iteration",
           {
             attributes: {
-              "langwatch.scope": "evaluation",
+              "langwatch.origin": "evaluation",
               "evaluation.run_id": this.runId,
               "evaluation.index": index,
             },
@@ -651,7 +651,7 @@ export class Experiment {
       `evaluation.target.${targetName}`,
       {
         attributes: {
-          "langwatch.scope": "evaluation",
+          "langwatch.origin": "evaluation",
           "evaluation.run_id": this.runId,
           "evaluation.target": targetName,
           "evaluation.index": index,

@@ -47,7 +47,7 @@ function createTestSpan(
   };
 }
 
-describe("applySpanToSummary() langwatch.scope hoisting", () => {
+describe("applySpanToSummary() langwatch.origin hoisting", () => {
   let extractSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
@@ -62,24 +62,24 @@ describe("applySpanToSummary() langwatch.scope hoisting", () => {
     vi.restoreAllMocks();
   });
 
-  // ---- Step 2: Hoisting langwatch.scope ----
+  // ---- Step 2: Hoisting langwatch.origin ----
 
-  describe("when root span has langwatch.scope", () => {
+  describe("when root span has langwatch.origin", () => {
     it("hoists scope to trace summary attributes", () => {
       const span = createTestSpan({
         parentSpanId: null, // root span
         spanAttributes: {
-          "langwatch.scope": "evaluation",
+          "langwatch.origin": "evaluation",
         },
       });
 
       const state = applySpanToSummary(createInitState(), span);
 
-      expect(state.attributes["langwatch.scope"]).toBe("evaluation");
+      expect(state.attributes["langwatch.origin"]).toBe("evaluation");
     });
   });
 
-  describe("when child span has langwatch.scope and root span does not", () => {
+  describe("when child span has langwatch.origin and root span does not", () => {
     it("preserves child span scope value", () => {
       // Child span arrives first with scope
       const childSpan = createTestSpan({
@@ -87,7 +87,7 @@ describe("applySpanToSummary() langwatch.scope hoisting", () => {
         spanId: "child-1",
         parentSpanId: "root-1",
         spanAttributes: {
-          "langwatch.scope": "evaluation",
+          "langwatch.origin": "evaluation",
         },
       });
 
@@ -102,7 +102,7 @@ describe("applySpanToSummary() langwatch.scope hoisting", () => {
       let state = applySpanToSummary(createInitState(), childSpan);
       state = applySpanToSummary(state, rootSpan);
 
-      expect(state.attributes["langwatch.scope"]).toBe("evaluation");
+      expect(state.attributes["langwatch.origin"]).toBe("evaluation");
     });
   });
 
@@ -114,7 +114,7 @@ describe("applySpanToSummary() langwatch.scope hoisting", () => {
         spanId: "child-1",
         parentSpanId: "root-1",
         spanAttributes: {
-          "langwatch.scope": "evaluation",
+          "langwatch.origin": "evaluation",
         },
       });
 
@@ -124,19 +124,19 @@ describe("applySpanToSummary() langwatch.scope hoisting", () => {
         spanId: "root-1",
         parentSpanId: null, // root
         spanAttributes: {
-          "langwatch.scope": "simulation",
+          "langwatch.origin": "simulation",
         },
       });
 
       let state = applySpanToSummary(createInitState(), childSpan);
       state = applySpanToSummary(state, rootSpan);
 
-      expect(state.attributes["langwatch.scope"]).toBe("simulation");
+      expect(state.attributes["langwatch.origin"]).toBe("simulation");
     });
   });
 
-  describe("when no span sets langwatch.scope", () => {
-    it("does not set langwatch.scope in summary attributes", () => {
+  describe("when no span sets langwatch.origin", () => {
+    it("does not set langwatch.origin in summary attributes", () => {
       const span = createTestSpan({
         parentSpanId: null,
         spanAttributes: {},
@@ -144,7 +144,7 @@ describe("applySpanToSummary() langwatch.scope hoisting", () => {
 
       const state = applySpanToSummary(createInitState(), span);
 
-      expect(state.attributes["langwatch.scope"]).toBeUndefined();
+      expect(state.attributes["langwatch.origin"]).toBeUndefined();
     });
   });
 
@@ -156,7 +156,7 @@ describe("applySpanToSummary() langwatch.scope hoisting", () => {
         spanId: "root-1",
         parentSpanId: null,
         spanAttributes: {
-          "langwatch.scope": "simulation",
+          "langwatch.origin": "simulation",
         },
       });
 
@@ -171,7 +171,7 @@ describe("applySpanToSummary() langwatch.scope hoisting", () => {
       let state = applySpanToSummary(createInitState(), rootSpan);
       state = applySpanToSummary(state, childSpan);
 
-      expect(state.attributes["langwatch.scope"]).toBe("simulation");
+      expect(state.attributes["langwatch.origin"]).toBe("simulation");
     });
   });
 
@@ -182,13 +182,13 @@ describe("applySpanToSummary() langwatch.scope hoisting", () => {
       const span = createTestSpan({
         spanAttributes: {
           "metadata.platform": "optimization_studio",
-          "langwatch.scope": "workflow",
+          "langwatch.origin": "workflow",
         },
       });
 
       const state = applySpanToSummary(createInitState(), span);
 
-      expect(state.attributes["langwatch.scope"]).toBe("workflow");
+      expect(state.attributes["langwatch.origin"]).toBe("workflow");
       expect(state.attributes["metadata.platform"]).toBeUndefined();
     });
   });
@@ -211,14 +211,14 @@ describe("applySpanToSummary() langwatch.scope hoisting", () => {
     it("strips scenario-runner from labels", () => {
       const span = createTestSpan({
         spanAttributes: {
-          "langwatch.scope": "simulation",
+          "langwatch.origin": "simulation",
           "langwatch.labels": JSON.stringify(["scenario-runner", "regression"]),
         },
       });
 
       const state = applySpanToSummary(createInitState(), span);
 
-      expect(state.attributes["langwatch.scope"]).toBe("simulation");
+      expect(state.attributes["langwatch.origin"]).toBe("simulation");
       const labels = JSON.parse(
         state.attributes["langwatch.labels"] ?? "[]",
       ) as string[];
@@ -231,7 +231,7 @@ describe("applySpanToSummary() langwatch.scope hoisting", () => {
     it("removes the labels attribute entirely if empty after stripping", () => {
       const span = createTestSpan({
         spanAttributes: {
-          "langwatch.scope": "simulation",
+          "langwatch.origin": "simulation",
           "langwatch.labels": JSON.stringify(["scenario-runner"]),
         },
       });
@@ -247,21 +247,21 @@ describe("applySpanToSummary() langwatch.scope hoisting", () => {
       const span = createTestSpan({
         spanAttributes: {
           "metadata.environment": "production",
-          "langwatch.scope": "workflow",
+          "langwatch.origin": "workflow",
         },
       });
 
       const state = applySpanToSummary(createInitState(), span);
 
       expect(state.attributes["metadata.environment"]).toBe("production");
-      expect(state.attributes["langwatch.scope"]).toBe("workflow");
+      expect(state.attributes["langwatch.origin"]).toBe("workflow");
     });
   });
 
   // ---- Step 3: Legacy inference ----
 
   describe("when span has instrumentationScope.name = 'langwatch-evaluation'", () => {
-    it("infers langwatch.scope = 'evaluation'", () => {
+    it("infers langwatch.origin = 'evaluation'", () => {
       const span = createTestSpan({
         instrumentationScope: { name: "langwatch-evaluation", version: null },
         spanAttributes: {},
@@ -269,12 +269,12 @@ describe("applySpanToSummary() langwatch.scope hoisting", () => {
 
       const state = applySpanToSummary(createInitState(), span);
 
-      expect(state.attributes["langwatch.scope"]).toBe("evaluation");
+      expect(state.attributes["langwatch.origin"]).toBe("evaluation");
     });
   });
 
   describe("when span has instrumentationScope.name = '@langwatch/scenario'", () => {
-    it("infers langwatch.scope = 'simulation'", () => {
+    it("infers langwatch.origin = 'simulation'", () => {
       const span = createTestSpan({
         instrumentationScope: { name: "@langwatch/scenario", version: null },
         spanAttributes: {},
@@ -282,12 +282,12 @@ describe("applySpanToSummary() langwatch.scope hoisting", () => {
 
       const state = applySpanToSummary(createInitState(), span);
 
-      expect(state.attributes["langwatch.scope"]).toBe("simulation");
+      expect(state.attributes["langwatch.origin"]).toBe("simulation");
     });
   });
 
-  describe("when span has metadata.platform = 'optimization_studio' without langwatch.scope", () => {
-    it("infers langwatch.scope = 'workflow'", () => {
+  describe("when span has metadata.platform = 'optimization_studio' without langwatch.origin", () => {
+    it("infers langwatch.origin = 'workflow'", () => {
       const span = createTestSpan({
         spanAttributes: {
           "metadata.platform": "optimization_studio",
@@ -296,12 +296,12 @@ describe("applySpanToSummary() langwatch.scope hoisting", () => {
 
       const state = applySpanToSummary(createInitState(), span);
 
-      expect(state.attributes["langwatch.scope"]).toBe("workflow");
+      expect(state.attributes["langwatch.origin"]).toBe("workflow");
     });
   });
 
-  describe("when span has metadata.labels containing 'scenario-runner' without langwatch.scope", () => {
-    it("infers langwatch.scope = 'simulation'", () => {
+  describe("when span has metadata.labels containing 'scenario-runner' without langwatch.origin", () => {
+    it("infers langwatch.origin = 'simulation'", () => {
       const span = createTestSpan({
         spanAttributes: {
           "langwatch.labels": JSON.stringify(["scenario-runner", "other"]),
@@ -310,12 +310,12 @@ describe("applySpanToSummary() langwatch.scope hoisting", () => {
 
       const state = applySpanToSummary(createInitState(), span);
 
-      expect(state.attributes["langwatch.scope"]).toBe("simulation");
+      expect(state.attributes["langwatch.origin"]).toBe("simulation");
     });
   });
 
-  describe("when span has resource attribute scenario.labels without langwatch.scope", () => {
-    it("infers langwatch.scope = 'simulation'", () => {
+  describe("when span has resource attribute scenario.labels without langwatch.origin", () => {
+    it("infers langwatch.origin = 'simulation'", () => {
       const span = createTestSpan({
         resourceAttributes: {
           "scenario.labels": "support,billing",
@@ -325,12 +325,12 @@ describe("applySpanToSummary() langwatch.scope hoisting", () => {
 
       const state = applySpanToSummary(createInitState(), span);
 
-      expect(state.attributes["langwatch.scope"]).toBe("simulation");
+      expect(state.attributes["langwatch.origin"]).toBe("simulation");
     });
   });
 
-  describe("when span has evaluation.run_id without langwatch.scope", () => {
-    it("infers langwatch.scope = 'evaluation'", () => {
+  describe("when span has evaluation.run_id without langwatch.origin", () => {
+    it("infers langwatch.origin = 'evaluation'", () => {
       const span = createTestSpan({
         spanAttributes: {
           "evaluation.run_id": "run-123",
@@ -339,35 +339,35 @@ describe("applySpanToSummary() langwatch.scope hoisting", () => {
 
       const state = applySpanToSummary(createInitState(), span);
 
-      expect(state.attributes["langwatch.scope"]).toBe("evaluation");
+      expect(state.attributes["langwatch.origin"]).toBe("evaluation");
     });
   });
 
-  describe("when explicit langwatch.scope is set alongside legacy markers", () => {
+  describe("when explicit langwatch.origin is set alongside legacy markers", () => {
     it("uses explicit scope over all inferred signals", () => {
       const span = createTestSpan({
         instrumentationScope: { name: "langwatch-evaluation", version: null },
         spanAttributes: {
-          "langwatch.scope": "evaluation",
+          "langwatch.origin": "evaluation",
           "metadata.platform": "optimization_studio",
         },
       });
 
       const state = applySpanToSummary(createInitState(), span);
 
-      expect(state.attributes["langwatch.scope"]).toBe("evaluation");
+      expect(state.attributes["langwatch.origin"]).toBe("evaluation");
     });
   });
 
   describe("when no scope signal exists at all", () => {
-    it("does not set langwatch.scope", () => {
+    it("does not set langwatch.origin", () => {
       const span = createTestSpan({
         spanAttributes: {},
       });
 
       const state = applySpanToSummary(createInitState(), span);
 
-      expect(state.attributes["langwatch.scope"]).toBeUndefined();
+      expect(state.attributes["langwatch.origin"]).toBeUndefined();
     });
   });
 });

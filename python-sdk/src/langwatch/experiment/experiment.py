@@ -646,7 +646,7 @@ class Experiment:
                 f"evaluation.target.{name}",
                 context=root_context,
                 attributes={
-                    "langwatch.scope": "evaluation",
+                    "langwatch.origin": "evaluation",
                     "evaluation.run_id": self.run_id,
                     "evaluation.index": index,
                     "evaluation.target": name,
@@ -804,7 +804,7 @@ class Experiment:
             f"evaluation.target.{target_name}",
             context=root_context,
             attributes={
-                "langwatch.scope": "evaluation",
+                "langwatch.origin": "evaluation",
                 "evaluation.run_id": self.run_id,
                 "evaluation.index": index,
                 "evaluation.target": target_name,

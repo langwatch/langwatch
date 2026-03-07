@@ -261,7 +261,7 @@ export async function* executeCell(
           },
           node_id: targetNodeId,
           inputs: buildTargetInputs(cell),
-          scope: "evaluation",
+          origin: "evaluation",
         },
       };
 
@@ -357,7 +357,7 @@ export async function* executeCell(
               },
               node_id: evaluatorNodeId,
               inputs: evaluatorInputs,
-              scope: "evaluation",
+              origin: "evaluation",
             },
           };
 

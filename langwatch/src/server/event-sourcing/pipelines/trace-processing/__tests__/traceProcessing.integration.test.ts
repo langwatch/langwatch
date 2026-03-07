@@ -585,8 +585,8 @@ describe.skipIf(!hasTestcontainers)(
       });
     });
 
-    describe("given a span with langwatch.scope attribute", () => {
-      it("persists langwatch.scope in trace summary attributes", async () => {
+    describe("given a span with langwatch.origin attribute", () => {
+      it("persists langwatch.origin in trace summary attributes", async () => {
         const traceId = generateTestTraceId();
 
         await pipeline.commands.recordSpan.send({
@@ -596,7 +596,7 @@ describe.skipIf(!hasTestcontainers)(
             spanId: generateTestSpanId(),
             name: "evaluation-span",
             attributes: [
-              { key: "langwatch.scope", value: { stringValue: "evaluation" } },
+              { key: "langwatch.origin", value: { stringValue: "evaluation" } },
             ],
           }),
           resource: null,
@@ -613,7 +613,7 @@ describe.skipIf(!hasTestcontainers)(
         );
         const data = projection?.data as TraceSummaryData;
 
-        expect(data.attributes["langwatch.scope"]).toBe("evaluation");
+        expect(data.attributes["langwatch.origin"]).toBe("evaluation");
       });
     });
   },
