@@ -86,7 +86,6 @@ function buildViewQueryString({
   return qs.stringify(cleanQuery, {
     allowDots: true,
     arrayFormat: "comma",
-    // @ts-expect-error -- qs types are missing allowEmptyArrays option
     allowEmptyArrays: true,
   });
 }
