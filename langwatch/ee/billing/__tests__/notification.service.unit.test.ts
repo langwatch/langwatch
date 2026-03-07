@@ -45,14 +45,21 @@ const mockSendUsageLimitEmail = sendUsageLimitEmail as ReturnType<
 
 describe("NotificationService", () => {
   let service: NotificationService;
+  let config: {
+    baseHost: string;
+    slackPlanLimitChannel?: string;
+    slackSignupsChannel?: string;
+    slackSubscriptionsChannel?: string;
+    hubspotPortalId?: string;
+    hubspotReachedLimitFormId?: string;
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
-    service = NotificationService.create();
-  });
-
-  afterEach(() => {
-    vi.unstubAllEnvs();
+    config = {
+      baseHost: "https://app.langwatch.ai",
+    };
+    service = NotificationService.create({ config });
   });
 
   describe("create()", () => {
@@ -125,7 +132,7 @@ describe("NotificationService", () => {
 
     describe("when SLACK_PLAN_LIMIT_CHANNEL is not set", () => {
       it("returns without sending", async () => {
-        vi.stubEnv("SLACK_PLAN_LIMIT_CHANNEL", "");
+        config.slackPlanLimitChannel = undefined;
 
         await service.sendSlackPlanLimitAlert(context);
 
@@ -135,7 +142,7 @@ describe("NotificationService", () => {
 
     describe("when SLACK_PLAN_LIMIT_CHANNEL is set", () => {
       it("sends a Slack message with plan limit info", async () => {
-        vi.stubEnv("SLACK_PLAN_LIMIT_CHANNEL", "https://hooks.slack.com/test");
+        config.slackPlanLimitChannel = "https://hooks.slack.com/test";
 
         await service.sendSlackPlanLimitAlert(context);
 
@@ -147,7 +154,7 @@ describe("NotificationService", () => {
 
     describe("when Slack webhook fails", () => {
       it("catches the error and captures exception", async () => {
-        vi.stubEnv("SLACK_PLAN_LIMIT_CHANNEL", "https://hooks.slack.com/test");
+        config.slackPlanLimitChannel = "https://hooks.slack.com/test";
 
         const error = new Error("webhook error");
         mockSlackSend.mockRejectedValueOnce(error);
@@ -173,7 +180,7 @@ describe("NotificationService", () => {
 
     describe("when SLACK_PLAN_LIMIT_CHANNEL is set", () => {
       it("sends with correct text including resource type and counts", async () => {
-        vi.stubEnv("SLACK_PLAN_LIMIT_CHANNEL", "https://hooks.slack.com/test");
+        config.slackPlanLimitChannel = "https://hooks.slack.com/test";
 
         await service.sendSlackResourceLimitAlert(context);
 
@@ -185,7 +192,7 @@ describe("NotificationService", () => {
 
     describe("when SLACK_PLAN_LIMIT_CHANNEL is not set", () => {
       it("returns without sending", async () => {
-        vi.stubEnv("SLACK_PLAN_LIMIT_CHANNEL", "");
+        config.slackPlanLimitChannel = undefined;
 
         await service.sendSlackResourceLimitAlert(context);
 
@@ -195,7 +202,7 @@ describe("NotificationService", () => {
 
     describe("when Slack webhook fails", () => {
       it("catches the error and captures exception", async () => {
-        vi.stubEnv("SLACK_PLAN_LIMIT_CHANNEL", "https://hooks.slack.com/test");
+        config.slackPlanLimitChannel = "https://hooks.slack.com/test";
 
         const error = new Error("webhook error");
         mockSlackSend.mockRejectedValueOnce(error);
@@ -210,7 +217,7 @@ describe("NotificationService", () => {
   describe("sendSlackSubscriptionEvent()", () => {
     describe("when SLACK_CHANNEL_SUBSCRIPTIONS is not set", () => {
       it("returns without sending", async () => {
-        vi.stubEnv("SLACK_CHANNEL_SUBSCRIPTIONS", "");
+        config.slackSubscriptionsChannel = undefined;
 
         await service.sendSlackSubscriptionEvent({
           type: "confirmed",
@@ -226,7 +233,7 @@ describe("NotificationService", () => {
 
     describe("when sending a confirmed subscription event", () => {
       it("sends Slack blocks for confirmed subscription", async () => {
-        vi.stubEnv("SLACK_CHANNEL_SUBSCRIPTIONS", "https://hooks.slack.com/subs");
+        config.slackSubscriptionsChannel = "https://hooks.slack.com/subs";
 
         await service.sendSlackSubscriptionEvent({
           type: "confirmed",
@@ -254,7 +261,7 @@ describe("NotificationService", () => {
 
     describe("when sending a prospective subscription event", () => {
       it("sends Slack blocks for prospective interest", async () => {
-        vi.stubEnv("SLACK_CHANNEL_SUBSCRIPTIONS", "https://hooks.slack.com/subs");
+        config.slackSubscriptionsChannel = "https://hooks.slack.com/subs";
 
         await service.sendSlackSubscriptionEvent({
           type: "prospective",
@@ -278,6 +285,67 @@ describe("NotificationService", () => {
     });
   });
 
+  describe("sendSlackSignupEvent()", () => {
+    const payload = {
+      userName: "Jane Doe",
+      userEmail: "jane@example.com",
+      organizationName: "Acme Corp",
+      phoneNumber: "+31 20 123 4567",
+      utmCampaign: "launch-week",
+    };
+
+    describe("when SLACK_CHANNEL_SIGNUPS is not set", () => {
+      it("returns without sending", async () => {
+        config.slackSignupsChannel = undefined;
+
+        await service.sendSlackSignupEvent(payload);
+
+        expect(mockSlackSend).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when optional fields are present", () => {
+      it("includes phone number and campaign in the Slack text", async () => {
+        config.slackSignupsChannel = "https://hooks.slack.com/signups";
+
+        await service.sendSlackSignupEvent(payload);
+
+        expect(mockSlackSend).toHaveBeenCalledWith({
+          text: "🔔 New user registered: Jane Doe, jane@example.com. Organization: Acme Corp, +31 20 123 4567, Campaign: launch-week",
+        });
+      });
+    });
+
+    describe("when optional fields are missing", () => {
+      it("sends the baseline signup notification text", async () => {
+        config.slackSignupsChannel = "https://hooks.slack.com/signups";
+
+        await service.sendSlackSignupEvent({
+          userName: "Jane Doe",
+          userEmail: "jane@example.com",
+          organizationName: "Acme Corp",
+        });
+
+        expect(mockSlackSend).toHaveBeenCalledWith({
+          text: "🔔 New user registered: Jane Doe, jane@example.com. Organization: Acme Corp",
+        });
+      });
+    });
+
+    describe("when Slack webhook fails", () => {
+      it("captures the exception and does not throw", async () => {
+        config.slackSignupsChannel = "https://hooks.slack.com/signups";
+
+        const error = new Error("signup webhook error");
+        mockSlackSend.mockRejectedValueOnce(error);
+
+        await service.sendSlackSignupEvent(payload);
+
+        expect(captureException).toHaveBeenCalledWith(error);
+      });
+    });
+  });
+
   describe("sendSlackLicensePurchase()", () => {
     const payload = {
       buyerEmail: "buyer@acme.com",
@@ -289,7 +357,7 @@ describe("NotificationService", () => {
 
     describe("when SLACK_CHANNEL_SUBSCRIPTIONS is not set", () => {
       it("returns without sending", async () => {
-        vi.stubEnv("SLACK_CHANNEL_SUBSCRIPTIONS", "");
+        config.slackSubscriptionsChannel = undefined;
 
         await service.sendSlackLicensePurchase(payload);
 
@@ -299,7 +367,7 @@ describe("NotificationService", () => {
 
     describe("when SLACK_CHANNEL_SUBSCRIPTIONS is set", () => {
       it("sends a license purchase notification via IncomingWebhook", async () => {
-        vi.stubEnv("SLACK_CHANNEL_SUBSCRIPTIONS", "https://hooks.slack.com/subs");
+        config.slackSubscriptionsChannel = "https://hooks.slack.com/subs";
 
         await service.sendSlackLicensePurchase(payload);
 
@@ -331,8 +399,8 @@ describe("NotificationService", () => {
 
     describe("when HubSpot env vars are not set", () => {
       it("returns without sending", async () => {
-        vi.stubEnv("HUBSPOT_PORTAL_ID", "");
-        vi.stubEnv("HUBSPOT_REACHED_LIMIT_FORM_ID", "");
+        config.hubspotPortalId = undefined;
+        config.hubspotReachedLimitFormId = undefined;
 
         const mockFetch = vi.spyOn(global, "fetch");
 
@@ -345,8 +413,8 @@ describe("NotificationService", () => {
 
     describe("when HubSpot env vars are set", () => {
       it("submits form data to HubSpot", async () => {
-        vi.stubEnv("HUBSPOT_PORTAL_ID", "12345");
-        vi.stubEnv("HUBSPOT_REACHED_LIMIT_FORM_ID", "form_abc");
+        config.hubspotPortalId = "12345";
+        config.hubspotReachedLimitFormId = "form_abc";
 
         const mockFetch = vi
           .spyOn(global, "fetch")
@@ -368,8 +436,8 @@ describe("NotificationService", () => {
 
     describe("when HubSpot request fails", () => {
       it("catches the error and captures exception", async () => {
-        vi.stubEnv("HUBSPOT_PORTAL_ID", "12345");
-        vi.stubEnv("HUBSPOT_REACHED_LIMIT_FORM_ID", "form_abc");
+        config.hubspotPortalId = "12345";
+        config.hubspotReachedLimitFormId = "form_abc";
 
         const mockFetch = vi
           .spyOn(global, "fetch")
