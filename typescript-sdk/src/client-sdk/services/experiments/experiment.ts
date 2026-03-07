@@ -248,6 +248,15 @@ export class Experiment {
     // Wait for all remaining items
     await Promise.all(executing);
 
+    // Flush OTEL spans so all child spans created inside callbacks are exported
+    const provider = trace.getTracerProvider();
+    const delegate = "getDelegate" in provider && typeof provider.getDelegate === "function"
+      ? provider.getDelegate()
+      : provider;
+    if (delegate && "forceFlush" in delegate && typeof delegate.forceFlush === "function") {
+      await delegate.forceFlush();
+    }
+
     // Send final batch with finished timestamp
     await this.flush(true);
   }
