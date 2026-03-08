@@ -14,6 +14,8 @@ import { captureException } from "~/utils/posthogErrorCapture";
 import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
 import { withAppRouterTracer } from "../../../../../middleware/app-router-tracer";
 import { prisma } from "../../../../../server/db";
+import { getApp } from "../../../../../server/app-layer/app";
+import { notifyPlanLimitReached } from "../../../../../../ee/billing";
 import { createLogger } from "../../../../../utils/logger/server";
 
 const tracer = getLangWatchTracer("langwatch.otel.metrics");
@@ -79,6 +81,49 @@ async function handleMetricsRequest(req: NextRequest) {
         );
       }
 
+      try {
+        const limitResult = await getApp().usage.checkLimit({
+          teamId: project.teamId,
+        });
+
+        if (limitResult.exceeded) {
+          try {
+            const activePlan = await getApp().planProvider.getActivePlan({
+              organizationId: project.team.organizationId,
+            });
+            await notifyPlanLimitReached({
+              organizationId: project.team.organizationId,
+              planName: activePlan.name ?? "free",
+            });
+          } catch (error) {
+            logger.error(
+              { error, projectId: project.id },
+              "Error sending plan limit notification",
+            );
+          }
+
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: "Plan limit reached.",
+          });
+
+          return NextResponse.json(
+            {
+              message: `ERR_PLAN_LIMIT: ${limitResult.message}`,
+            },
+            { status: 429 },
+          );
+        }
+      } catch (error) {
+        logger.error(
+          { error, projectId: project.id },
+          "Error checking trace limit",
+        );
+        captureException(new Error("Error checking trace limit"), {
+          extra: { projectId: project.id, error },
+        });
+      }
+
       span.setAttribute("langwatch.project.id", project.id);
 
       const body = await req.arrayBuffer();
@@ -127,6 +172,15 @@ async function handleMetricsRequest(req: NextRequest) {
             { status: 400 },
           );
         }
+      }
+
+      // Event sourcing dual-write for metrics
+      let clickHouseTask: Promise<void> | null = null;
+      if (project.featureEventSourcingTraceIngestion) {
+        clickHouseTask = getApp().traces.metricCollection.handleOtlpMetricRequest(
+          project.id,
+          metricsRequest,
+        );
       }
 
       const tracesGeneratedFromMetrics =
@@ -181,6 +235,13 @@ async function handleMetricsRequest(req: NextRequest) {
       );
 
       if (promises.length === 0) {
+        if (clickHouseTask) {
+          try {
+            await clickHouseTask;
+          } catch {
+            /* ignore, errors non-blocking and caught by tracing layer */
+          }
+        }
         return NextResponse.json({ message: "No changes" });
       }
 
@@ -191,6 +252,14 @@ async function handleMetricsRequest(req: NextRequest) {
           await Promise.all(promises);
         },
       );
+
+      if (clickHouseTask) {
+        try {
+          await clickHouseTask;
+        } catch {
+          /* ignore, errors non-blocking and caught by tracing layer */
+        }
+      }
 
       return NextResponse.json({ message: "OK" }, { status: 200 });
     },
