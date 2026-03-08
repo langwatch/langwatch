@@ -143,12 +143,12 @@ function createJobLogger(job: Job<ScenarioJob, ScenarioJobResult, string>, jobDa
 
 /**
  * Build OTEL resource attributes string for scenario labels and platform source.
- * Always includes langwatch.source=platform; appends scenario.labels if labels are present.
+ * Always includes langwatch.origin.source=platform; appends scenario.labels if labels are present.
  * @internal Exported for testing
  */
 export function buildOtelResourceAttributes(labels: string[]): string {
-  // Always include langwatch.source=platform for platform-originated scenario traces
-  const parts = ["langwatch.source=platform"];
+  // Always include langwatch.origin.source=platform for platform-originated scenario traces
+  const parts = ["langwatch.origin.source=platform"];
   if (labels.length) {
     // Escape backslashes first, then commas and equals per OTEL spec
     const escapedLabels = labels.map((l) => l.replace(/\\/g, "\\\\").replace(/[,=]/g, "\\$&"));
