@@ -29,11 +29,15 @@ export class LogRequestCollectionService {
     );
   }
 
-  async handleOtlpLogRequest(
-    tenantId: string,
-    logRequest: DeepPartial<IExportLogsServiceRequest>,
-    piiRedactionLevel: string,
-  ): Promise<void> {
+  async handleOtlpLogRequest({
+    tenantId,
+    logRequest,
+    piiRedactionLevel,
+  }: {
+    tenantId: string;
+    logRequest: DeepPartial<IExportLogsServiceRequest>;
+    piiRedactionLevel: string;
+  }): Promise<void> {
     return await this.tracer.withActiveSpan(
       "LogRequestCollectionService.handleOtlpLogRequest",
       {
@@ -71,7 +75,7 @@ export class LogRequestCollectionService {
 
               try {
                 const body = this.extractBody(logRecord.body);
-                if (!body) {
+                if (body == null) {
                   droppedCount++;
                   continue;
                 }

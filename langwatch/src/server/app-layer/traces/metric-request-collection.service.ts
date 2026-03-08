@@ -32,10 +32,13 @@ export class MetricRequestCollectionService {
     );
   }
 
-  async handleOtlpMetricRequest(
-    tenantId: string,
-    metricRequest: DeepPartial<IExportMetricsServiceRequest>,
-  ): Promise<void> {
+  async handleOtlpMetricRequest({
+    tenantId,
+    metricRequest,
+  }: {
+    tenantId: string;
+    metricRequest: DeepPartial<IExportMetricsServiceRequest>;
+  }): Promise<void> {
     return await this.tracer.withActiveSpan(
       "MetricRequestCollectionService.handleOtlpMetricRequest",
       {
@@ -224,35 +227,37 @@ export class MetricRequestCollectionService {
       | Array<Record<string, unknown>>
       | undefined;
     if (exemplars?.length) {
-      const exemplar = exemplars[0]!;
-      const traceId = decodeBase64OpenTelemetryId(exemplar.traceId);
-      const spanId = decodeBase64OpenTelemetryId(exemplar.spanId);
-      if (traceId && spanId) {
-        const value =
-          typeof dp.asDouble === "number"
-            ? dp.asDouble
-            : typeof dp.asInt === "number"
-              ? dp.asInt
-              : 0;
-        const timeUnixMs = dp.timeUnixNano
-          ? TraceRequestUtils.convertUnixNanoToUnixMs(
-              TraceRequestUtils.normalizeOtlpUnixNano(
-                dp.timeUnixNano as
-                  | string
-                  | number
-                  | { low: number; high: number },
-              ),
-            )
-          : Date.now();
+      for (const exemplar of exemplars) {
+        if (!exemplar) continue;
+        const traceId = decodeBase64OpenTelemetryId(exemplar.traceId);
+        const spanId = decodeBase64OpenTelemetryId(exemplar.spanId);
+        if (traceId && spanId) {
+          const value =
+            typeof dp.asDouble === "number"
+              ? dp.asDouble
+              : typeof dp.asInt === "number"
+                ? dp.asInt
+                : 0;
+          const timeUnixMs = dp.timeUnixNano
+            ? TraceRequestUtils.convertUnixNanoToUnixMs(
+                TraceRequestUtils.normalizeOtlpUnixNano(
+                  dp.timeUnixNano as
+                    | string
+                    | number
+                    | { low: number; high: number },
+                ),
+              )
+            : Date.now();
 
-        return {
-          traceId,
-          spanId,
-          metricType,
-          value,
-          timeUnixMs,
-          attributes: this.normalizeDataPointAttributes(dp.attributes),
-        };
+          return {
+            traceId,
+            spanId,
+            metricType,
+            value,
+            timeUnixMs,
+            attributes: this.normalizeDataPointAttributes(dp.attributes),
+          };
+        }
       }
     }
 

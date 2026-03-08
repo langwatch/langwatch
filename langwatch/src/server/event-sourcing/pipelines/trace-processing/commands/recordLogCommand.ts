@@ -103,11 +103,11 @@ export class RecordLogCommand
   }
 
   static makeJobId(payload: RecordLogCommandData): string {
-    const bodyHash = crypto
-      .createHash("md5")
+    const contentHash = crypto
+      .createHash("sha256")
       .update(payload.body)
       .digest("hex")
-      .slice(0, 12);
-    return `${payload.tenantId}:${payload.traceId}:${payload.spanId}:log:${bodyHash}`;
+      .slice(0, 16);
+    return `${payload.tenantId}:${payload.traceId}:${payload.spanId}:log:${payload.timeUnixMs}:${payload.severityNumber}:${payload.scopeName}:${contentHash}`;
   }
 }

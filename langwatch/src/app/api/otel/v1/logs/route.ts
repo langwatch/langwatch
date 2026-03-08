@@ -119,8 +119,8 @@ async function handleLogsRequest(req: NextRequest) {
           { error, projectId: project.id },
           "Error checking trace limit",
         );
-        captureException(new Error("Error checking trace limit"), {
-          extra: { projectId: project.id, error },
+        captureException(error as Error, {
+          extra: { projectId: project.id },
         });
       }
 
@@ -176,11 +176,11 @@ async function handleLogsRequest(req: NextRequest) {
       // Event sourcing dual-write for logs
       let clickHouseTask: Promise<void> | null = null;
       if (project.featureEventSourcingTraceIngestion) {
-        clickHouseTask = getApp().traces.logCollection.handleOtlpLogRequest(
-          project.id,
+        clickHouseTask = getApp().traces.logCollection.handleOtlpLogRequest({
+          tenantId: project.id,
           logRequest,
-          project.piiRedactionLevel,
-        );
+          piiRedactionLevel: project.piiRedactionLevel,
+        });
       }
 
       const tracesGeneratedFromLogs =
@@ -236,11 +236,7 @@ async function handleLogsRequest(req: NextRequest) {
 
       if (promises.length === 0) {
         if (clickHouseTask) {
-          try {
-            await clickHouseTask;
-          } catch {
-            /* ignore, errors non-blocking and caught by tracing layer */
-          }
+          await clickHouseTask;
         }
         return NextResponse.json({ message: "No changes" });
       }
@@ -254,11 +250,7 @@ async function handleLogsRequest(req: NextRequest) {
       );
 
       if (clickHouseTask) {
-        try {
-          await clickHouseTask;
-        } catch {
-          /* ignore, errors non-blocking and caught by tracing layer */
-        }
+        await clickHouseTask;
       }
 
       return NextResponse.json({ message: "OK" }, { status: 200 });

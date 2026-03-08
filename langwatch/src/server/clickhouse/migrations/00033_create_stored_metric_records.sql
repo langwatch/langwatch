@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.stored_metric_records
     INDEX idx_attr_value mapValues(Attributes) TYPE bloom_filter(0.01) GRANULARITY 4,
     INDEX idx_tenant_trace (TenantId, TraceId) TYPE bloom_filter(0.001) GRANULARITY 1
 )
-ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}TimeUnixMs)
+ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}UpdatedAt)
 PARTITION BY toYearWeek(TimeUnixMs)
 ORDER BY (TenantId, TraceId, SpanId, MetricName, ProjectionId)
 SETTINGS index_granularity = 8192, storage_policy = 'local_primary';

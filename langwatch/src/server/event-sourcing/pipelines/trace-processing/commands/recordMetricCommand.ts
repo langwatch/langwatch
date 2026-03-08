@@ -104,6 +104,6 @@ export class RecordMetricCommand
   }
 
   static makeJobId(payload: RecordMetricCommandData): string {
-    return `${payload.tenantId}:${payload.traceId}:${payload.spanId}:${payload.metricName}`;
+    return `${payload.tenantId}:${payload.traceId}:${payload.spanId}:${payload.metricName}:${payload.timeUnixMs}:${payload.metricType}`;
   }
 }
