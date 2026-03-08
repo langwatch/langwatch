@@ -13,7 +13,8 @@ import { createLogger } from "../../../../../utils/logger/server";
 import type { EvaluationExecutionService } from "../../../../app-layer/evaluations/evaluation-execution.service";
 import {
   evaluatePreconditions,
-  type PreconditionTrace,
+  buildPreconditionTraceDataFromCommand,
+  checkEvaluatorRequiredFields,
 } from "../../../../evaluations/preconditions";
 import type { CheckPreconditions } from "../../../../evaluations/types";
 import type { MappingState } from "../../../../tracer/tracesMapping";
@@ -136,35 +137,33 @@ export function createExecuteEvaluationCommandClass(deps: ExecuteEvaluationComma
         return [];
       }
 
-      // 3. Read spans from CH, check preconditions
+      // 3. Read spans from CH, check evaluator required fields + preconditions
       const spans = await deps.spanStorage.getSpansByTraceId({ tenantId, traceId: data.traceId });
 
-      const preconditionTrace: PreconditionTrace = {
-        input: { value: "" },
-        output: { value: "" },
-        metadata: {
-          labels: data.labels ?? [],
-          thread_id: data.threadId,
-          user_id: data.userId,
-          customer_id: data.customerId,
-          prompt_ids: data.promptIds,
-        },
-        expected_output: undefined,
-        origin: data.origin,
-        // Precondition evaluation only checks error presence (truthy/falsy),
-        // not message content. A sentinel object is sufficient here.
-        error: data.hasError
-          ? { has_error: true, message: "", stacktrace: [] }
-          : null,
-      };
-
-      const preconditions = (monitor.preconditions ?? []) as CheckPreconditions;
-      const preconditionsMet = evaluatePreconditions(
-        monitor.checkType,
-        preconditionTrace,
+      // Check evaluator required fields first
+      const requiredFieldsMet = checkEvaluatorRequiredFields({
+        evaluatorType: monitor.checkType,
         spans,
+      });
+      if (!requiredFieldsMet) {
+        logger.debug(
+          {
+            tenantId: tenantId,
+            evaluatorId: data.evaluatorId,
+            traceId: data.traceId,
+          },
+          "Evaluator required fields not met — skipping evaluation",
+        );
+        return [];
+      }
+
+      // Then check user-configured preconditions
+      const traceData = buildPreconditionTraceDataFromCommand({ data, spans });
+      const preconditions = (monitor.preconditions ?? []) as CheckPreconditions;
+      const preconditionsMet = evaluatePreconditions({
+        traceData,
         preconditions,
-      );
+      });
 
       if (!preconditionsMet) {
         logger.debug(

@@ -1,13 +1,13 @@
 import { z } from "zod";
-import { PRECONDITION_FIELD_CONFIG } from "./types";
+import { PRECONDITION_ALLOWED_RULES } from "../filters/precondition-matchers";
+import type { PreconditionField } from "../filters/precondition-matchers";
 import { checkPreconditionsSchema } from "./types.generated";
 
 /**
  * Refinement callback that cross-validates each precondition's rule
- * is allowed for its field, using the PRECONDITION_FIELD_CONFIG registry.
+ * is allowed for its field, using the PRECONDITION_ALLOWED_RULES registry.
  *
- * Extracted to a standalone function so both the router and tests
- * can reference the same logic without duplication.
+ * Also validates that nested key fields have a `key` provided.
  */
 export function validatePreconditionRules(
   preconditions: z.infer<typeof checkPreconditionsSchema>,
@@ -16,23 +16,30 @@ export function validatePreconditionRules(
   for (let i = 0; i < preconditions.length; i++) {
     const precondition = preconditions[i]!;
     const { field, rule } = precondition;
-    const config =
-      PRECONDITION_FIELD_CONFIG[
-        field as keyof typeof PRECONDITION_FIELD_CONFIG
-      ];
-    if (!config) {
+    const allowedRules =
+      PRECONDITION_ALLOWED_RULES[field as PreconditionField];
+    if (!allowedRules || allowedRules.length === 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: `Unknown precondition field "${field}"`,
+        message: `Field "${field}" cannot be used as a precondition`,
         path: [i, "field"],
       });
       continue;
     }
-    if (!config.allowedRules.includes(rule)) {
+    if (!allowedRules.includes(rule)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: `Rule "${rule}" is not allowed for field "${field}"`,
         path: [i, "rule"],
+      });
+    }
+
+    // Validate key requirement for nested fields
+    if (field === "metadata.value" && !precondition.key) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Field "${field}" requires a key`,
+        path: [i, "key"],
       });
     }
   }

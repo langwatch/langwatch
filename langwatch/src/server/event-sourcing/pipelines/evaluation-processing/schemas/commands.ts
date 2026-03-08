@@ -25,6 +25,15 @@ export const executeEvaluationCommandDataSchema = z.object({
   origin: z.string().optional(),
   hasError: z.boolean().optional(),
   promptIds: z.array(z.string()).optional(),
+  // Additional fields for expanded precondition matching
+  topicId: z.string().optional(),
+  subTopicId: z.string().optional(),
+  customMetadata: z.record(z.string()).optional(),
+  satisfactionScore: z.number().optional(),
+  spanTypes: z.array(z.string()).optional(),
+  spanModels: z.array(z.string()).optional(),
+  computedInput: z.string().nullable().optional(),
+  computedOutput: z.string().nullable().optional(),
 });
 
 export type ExecuteEvaluationCommandData = z.infer<

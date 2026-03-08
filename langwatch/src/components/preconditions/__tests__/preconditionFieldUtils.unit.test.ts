@@ -20,7 +20,7 @@ describe("preconditionFieldUtils", () => {
   });
 
   describe("getFieldOptionsByCategory()", () => {
-    it("returns fields grouped into 3 categories", () => {
+    it("returns fields grouped by category including Trace, Metadata, and Spans", () => {
       const groups = getFieldOptionsByCategory();
       const categoryNames = groups.map((g) => g.category);
       expect(categoryNames).toContain("Trace");
@@ -28,13 +28,26 @@ describe("preconditionFieldUtils", () => {
       expect(categoryNames).toContain("Spans");
     });
 
-    it("returns all 11 fields across all groups", () => {
+    it("includes topic, annotation, and sentiment categories", () => {
+      const groups = getFieldOptionsByCategory();
+      const categoryNames = groups.map((g) => g.category);
+      expect(categoryNames).toContain("Topics");
+      expect(categoryNames).toContain("Annotations");
+      expect(categoryNames).toContain("Sentiment");
+    });
+
+    it("returns only fields with non-empty allowed rules", () => {
       const groups = getFieldOptionsByCategory();
       const totalFields = groups.reduce(
         (sum, g) => sum + g.fields.length,
         0,
       );
-      expect(totalFields).toBe(11);
+      // Fields with non-empty rules: input, output, traces.origin, traces.error,
+      // metadata.user_id, metadata.thread_id, metadata.customer_id, metadata.labels,
+      // metadata.prompt_ids, metadata.value, spans.type, spans.model,
+      // topics.topics, topics.subtopics, annotations.hasAnnotation,
+      // sentiment.input_sentiment = 16
+      expect(totalFields).toBe(16);
     });
 
     it("places input and output in Trace category", () => {
@@ -65,7 +78,7 @@ describe("preconditionFieldUtils", () => {
   describe("getAllowedRulesForField()", () => {
     it("returns all 4 rules for text fields like input", () => {
       const rules = getAllowedRulesForField("input");
-      expect(rules).toEqual(["contains", "not_contains", "matches_regex", "is"]);
+      expect(rules).toEqual(["is", "contains", "not_contains", "matches_regex"]);
     });
 
     it("returns only 'is' for enum fields like traces.origin", () => {
@@ -93,12 +106,16 @@ describe("preconditionFieldUtils", () => {
       expect(getFieldValueType("traces.error")).toBe("boolean");
     });
 
-    it("returns 'enum' for traces.origin", () => {
-      expect(getFieldValueType("traces.origin")).toBe("enum");
+    it("returns 'boolean' for annotations.hasAnnotation", () => {
+      expect(getFieldValueType("annotations.hasAnnotation")).toBe("boolean");
     });
 
-    it("returns 'span-lookup' for spans.model", () => {
-      expect(getFieldValueType("spans.model")).toBe("span-lookup");
+    it("returns 'text' for traces.origin", () => {
+      expect(getFieldValueType("traces.origin")).toBe("text");
+    });
+
+    it("returns 'text' for spans.model", () => {
+      expect(getFieldValueType("spans.model")).toBe("text");
     });
   });
 

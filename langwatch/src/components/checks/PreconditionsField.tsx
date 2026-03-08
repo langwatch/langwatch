@@ -236,7 +236,6 @@ export const PreconditionsField = ({
               field: "output",
               rule: "contains",
               value: "",
-              threshold: 0.85,
             })
           }
         >

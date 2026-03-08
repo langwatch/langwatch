@@ -60,6 +60,15 @@ export function createEvaluationTriggerReactor(
       const hasError = foldState.containsErrorStatus;
       const promptIds = parseLabels(attrs["langwatch.prompt_ids"]);
 
+      // Additional metadata for expanded precondition matching
+      const topicId = foldState.topicId ?? undefined;
+      const subTopicId = foldState.subTopicId ?? undefined;
+      const satisfactionScore = foldState.satisfactionScore ?? undefined;
+      const spanModels = foldState.models.length > 0 ? foldState.models : undefined;
+      const customMetadata = extractCustomMetadata(attrs);
+      const computedInput = foldState.computedInput ?? undefined;
+      const computedOutput = foldState.computedOutput ?? undefined;
+
       for (const monitor of monitors) {
         const evaluationId = generate(KSUID_RESOURCES.EVALUATION).toString();
         try {
@@ -80,6 +89,13 @@ export function createEvaluationTriggerReactor(
             origin,
             hasError,
             promptIds,
+            topicId,
+            subTopicId,
+            customMetadata,
+            satisfactionScore,
+            spanModels,
+            computedInput,
+            computedOutput,
           };
 
           const isThreadLevel =
@@ -132,4 +148,43 @@ function parseLabels(labelsJson: string | undefined): string[] | undefined {
     // Not valid JSON, ignore
   }
   return undefined;
+}
+
+/**
+ * Extract custom metadata from span attributes.
+ * Entries starting with "metadata." (excluding reserved keys) are treated
+ * as custom metadata key-value pairs.
+ */
+function extractCustomMetadata(
+  attrs: Record<string, string>,
+): Record<string, string> | undefined {
+  const RESERVED_PREFIXES = [
+    "langwatch.",
+    "gen_ai.",
+    "metadata.sdk_",
+    "metadata.telemetry_",
+  ];
+  const RESERVED_KEYS = new Set([
+    "metadata.thread_id",
+    "metadata.user_id",
+    "metadata.customer_id",
+    "metadata.labels",
+    "metadata.prompt_ids",
+    "metadata.topic_id",
+    "metadata.subtopic_id",
+  ]);
+
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(attrs)) {
+    if (!key.startsWith("metadata.")) continue;
+    if (RESERVED_KEYS.has(key)) continue;
+    if (RESERVED_PREFIXES.some((p) => key.startsWith(p))) continue;
+    // Strip "metadata." prefix for the custom key
+    const customKey = key.slice("metadata.".length);
+    if (customKey) {
+      result[customKey] = value;
+    }
+  }
+
+  return Object.keys(result).length > 0 ? result : undefined;
 }

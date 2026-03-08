@@ -8,82 +8,58 @@ import type {
   RAGSpan,
   Span,
 } from "../tracer/types";
+import {
+  PRECONDITION_FIELD_MATCHERS,
+  type PreconditionTraceData,
+} from "../filters/precondition-matchers";
 import { getEvaluatorDefinitions } from "./getEvaluator";
 import type {
-  CheckPreconditionFields,
   CheckPreconditionRule,
   CheckPreconditions,
 } from "./types";
+import type { ExecuteEvaluationCommandData } from "../event-sourcing/pipelines/evaluation-processing/schemas/commands";
+
+export type { PreconditionTraceData } from "../filters/precondition-matchers";
 
 const logger = createLogger("langwatch:evaluations:preconditions");
 
-/**
- * Trace data required for evaluating preconditions.
- *
- * Backward-compatible: all new fields are optional so the legacy collector
- * path (which passes a full ElasticSearchTrace) continues to work unchanged.
- */
-export type PreconditionTrace = Pick<
-  ElasticSearchTrace,
-  "input" | "output" | "metadata" | "expected_output"
-> & {
-  /** Trace origin — empty/null/undefined means "application" */
-  origin?: string | null;
-  /** Trace error — null means no error */
-  error?: ErrorCapture | null;
-};
+// ---------------------------------------------------------------------------
+// Field value resolution via matcher registry
+// ---------------------------------------------------------------------------
 
 /**
- * Resolves the value for a given precondition field from the trace and spans.
- *
- * Returns either a string, a string array, or null/undefined for missing fields.
- * Span-lookup fields return a special marker via the `spans` parameter.
+ * Resolves the value for a given precondition field from trace data
+ * using the matcher registry.
  */
 function resolveFieldValue({
   field,
-  trace,
-  spans,
+  data,
+  key,
+  subkey,
+  value,
 }: {
-  field: CheckPreconditionFields;
-  trace: PreconditionTrace;
-  spans: Span[];
+  field: string;
+  data: PreconditionTraceData;
+  key?: string;
+  subkey?: string;
+  value: string;
 }): string | string[] | null | undefined {
-  switch (field) {
-    case "input":
-      return trace.input?.value ?? null;
-    case "output":
-      return trace.output?.value ?? null;
-    case "traces.origin":
-      // "application" sentinel: empty/null/undefined = "application"
-      return trace.origin || "application";
-    case "traces.error":
-      // Convert error presence to "true"/"false" string
-      return trace.error ? "true" : "false";
-    case "metadata.labels":
-      return trace.metadata?.labels ?? null;
-    case "metadata.user_id":
-      return trace.metadata?.user_id ?? null;
-    case "metadata.thread_id":
-      return trace.metadata?.thread_id ?? null;
-    case "metadata.customer_id":
-      return trace.metadata?.customer_id ?? null;
-    case "metadata.prompt_ids":
-      return trace.metadata?.prompt_ids ?? null;
-    case "spans.type":
-      // Collect all span types
-      return spans.map((span) => span.type);
-    case "spans.model":
-      // Collect all span models (LLM spans have .model)
-      return spans
-        .map((span) => (span as LLMSpan).model)
-        .filter((model): model is string => typeof model === "string" && model !== "");
-    default: {
-      // Exhaustiveness check
-      const _exhaustive: never = field;
-      return null;
-    }
+  const matcher =
+    PRECONDITION_FIELD_MATCHERS[
+      field as keyof typeof PRECONDITION_FIELD_MATCHERS
+    ];
+
+  if (matcher == null) {
+    // Key-selector or unavailable field — not matchable
+    return null;
   }
+
+  return matcher(data, value, key, subkey);
 }
+
+// ---------------------------------------------------------------------------
+// Rule evaluation
+// ---------------------------------------------------------------------------
 
 /**
  * Evaluates a single precondition rule against a resolved value.
@@ -212,18 +188,24 @@ function evaluateRegexRule({
   }
 }
 
+// ---------------------------------------------------------------------------
+// Evaluator required-field checks
+// ---------------------------------------------------------------------------
+
 /**
- * Evaluates all preconditions against a trace and its spans.
- * All preconditions must pass (AND logic) for the evaluation to proceed.
- *
- * Also checks evaluator-specific required fields (contexts, expected_output).
+ * Checks evaluator-specific required fields (contexts, expected_output).
+ * This is separate from precondition evaluation because it's about evaluator
+ * requirements, not user-configured precondition rules.
  */
-export function evaluatePreconditions(
-  evaluatorType: string,
-  trace: PreconditionTrace,
-  spans: Span[],
-  preconditions: CheckPreconditions,
-): boolean {
+export function checkEvaluatorRequiredFields({
+  evaluatorType,
+  spans,
+  expectedOutput,
+}: {
+  evaluatorType: string;
+  spans: Span[];
+  expectedOutput?: { value: string } | null;
+}): boolean {
   const evaluator = getEvaluatorDefinitions(evaluatorType);
 
   if (evaluator?.requiredFields.includes("contexts")) {
@@ -239,16 +221,36 @@ export function evaluatePreconditions(
   }
 
   if (evaluator?.requiredFields.includes("expected_output")) {
-    if (!trace.expected_output) {
+    if (!expectedOutput) {
       return false;
     }
   }
 
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// Main evaluation function
+// ---------------------------------------------------------------------------
+
+/**
+ * Evaluates all preconditions against trace data.
+ * All preconditions must pass (AND logic) for the evaluation to proceed.
+ */
+export function evaluatePreconditions({
+  traceData,
+  preconditions,
+}: {
+  traceData: PreconditionTraceData;
+  preconditions: CheckPreconditions;
+}): boolean {
   for (const precondition of preconditions) {
     const fieldValue = resolveFieldValue({
       field: precondition.field,
-      trace,
-      spans,
+      data: traceData,
+      key: precondition.key,
+      subkey: precondition.subkey,
+      value: precondition.value,
     });
 
     const passed = evaluateRule({
@@ -263,4 +265,91 @@ export function evaluatePreconditions(
   }
 
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// Builder helpers — create PreconditionTraceData from different sources
+// ---------------------------------------------------------------------------
+
+/**
+ * Build PreconditionTraceData from a legacy collector trace + spans.
+ */
+export function buildPreconditionTraceDataFromTrace({
+  trace,
+  spans,
+}: {
+  trace: {
+    input?: { value: string; satisfaction_score?: number } | null;
+    output?: { value: string } | null;
+    metadata?: ElasticSearchTrace["metadata"];
+    expected_output?: { value: string } | null;
+    origin?: string | null;
+    error?: ErrorCapture | null;
+  };
+  spans: Span[];
+}): PreconditionTraceData {
+  const customMetadata: Record<string, string | null> = {};
+  if (trace.metadata?.custom) {
+    for (const [key, val] of Object.entries(trace.metadata.custom)) {
+      customMetadata[key] = val != null ? String(val) : null;
+    }
+  }
+
+  return {
+    input: trace.input?.value ?? null,
+    output: trace.output?.value ?? null,
+    origin: trace.origin ?? null,
+    hasError: trace.error ? true : false,
+    userId: trace.metadata?.user_id ?? null,
+    threadId: trace.metadata?.thread_id ?? null,
+    customerId: trace.metadata?.customer_id ?? null,
+    labels: trace.metadata?.labels ?? null,
+    promptIds: trace.metadata?.prompt_ids ?? null,
+    topicId: trace.metadata?.topic_id ?? null,
+    subTopicId: trace.metadata?.subtopic_id ?? null,
+    spanTypes: spans.map((span) => span.type),
+    spanModels: spans
+      .map((span) => (span as LLMSpan).model)
+      .filter((model): model is string => typeof model === "string" && model !== ""),
+    customMetadata: Object.keys(customMetadata).length > 0 ? customMetadata : null,
+    satisfactionScore: trace.input?.satisfaction_score ?? null,
+    hasAnnotation: null, // Not available in legacy collector path
+  };
+}
+
+/**
+ * Build PreconditionTraceData from event-sourcing command data + spans.
+ */
+export function buildPreconditionTraceDataFromCommand({
+  data,
+  spans,
+}: {
+  data: ExecuteEvaluationCommandData;
+  spans: Span[];
+}): PreconditionTraceData {
+  return {
+    input: data.computedInput ?? null,
+    output: data.computedOutput ?? null,
+    origin: data.origin ?? null,
+    hasError: data.hasError ?? false,
+    userId: data.userId ?? null,
+    threadId: data.threadId ?? null,
+    customerId: data.customerId ?? null,
+    labels: data.labels ?? null,
+    promptIds: data.promptIds ?? null,
+    topicId: data.topicId ?? null,
+    subTopicId: data.subTopicId ?? null,
+    spanTypes: data.spanTypes ?? spans.map((span) => span.type),
+    spanModels:
+      data.spanModels ??
+      spans
+        .map((span) => (span as LLMSpan).model)
+        .filter(
+          (model): model is string =>
+            typeof model === "string" && model !== "",
+        ),
+    customMetadata: data.customMetadata ?? null,
+    satisfactionScore: data.satisfactionScore ?? null,
+    hasAnnotation: null, // Not available at command time
+  };
 }

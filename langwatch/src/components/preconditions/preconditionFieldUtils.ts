@@ -1,9 +1,12 @@
-import {
-  PRECONDITION_FIELD_CONFIG,
-  type CheckPreconditionFields,
-  type CheckPreconditionRule,
-  type PreconditionFieldConfig,
+import type {
+  CheckPreconditionFields,
+  CheckPreconditionRule,
 } from "../../server/evaluations/types";
+import {
+  PRECONDITION_ALLOWED_RULES,
+  getAvailablePreconditionFields,
+  type PreconditionField,
+} from "../../server/filters/precondition-matchers";
 
 /** Human-readable labels for precondition rules */
 export const RULE_LABELS: Record<CheckPreconditionRule, string> = {
@@ -13,24 +16,55 @@ export const RULE_LABELS: Record<CheckPreconditionRule, string> = {
   is: "is",
 };
 
+/**
+ * Derive a category from a precondition field name.
+ * Uses the field prefix (before first dot) to group into categories.
+ * Fields without a prefix are grouped as "Trace".
+ */
+function deriveCategory(field: string): string {
+  if (field === "input" || field === "output") return "Trace";
+  const prefix = field.split(".")[0];
+  switch (prefix) {
+    case "traces":
+      return "Trace";
+    case "metadata":
+      return "Metadata";
+    case "spans":
+      return "Spans";
+    case "topics":
+      return "Topics";
+    case "evaluations":
+      return "Evaluations";
+    case "events":
+      return "Events";
+    case "annotations":
+      return "Annotations";
+    case "sentiment":
+      return "Sentiment";
+    default:
+      return "Other";
+  }
+}
+
 /** Group field entries by category for rendering in optgroups */
 export function getFieldOptionsByCategory(): {
   category: string;
   fields: { value: CheckPreconditionFields; label: string }[];
 }[] {
+  const available = getAvailablePreconditionFields();
   const groups = new Map<
     string,
     { value: CheckPreconditionFields; label: string }[]
   >();
 
-  for (const [field, config] of Object.entries(PRECONDITION_FIELD_CONFIG)) {
-    const fieldConfig = config as PreconditionFieldConfig;
-    if (!groups.has(fieldConfig.category)) {
-      groups.set(fieldConfig.category, []);
+  for (const entry of available) {
+    const category = deriveCategory(entry.field);
+    if (!groups.has(category)) {
+      groups.set(category, []);
     }
-    groups.get(fieldConfig.category)!.push({
-      value: field as CheckPreconditionFields,
-      label: fieldConfig.label,
+    groups.get(category)!.push({
+      value: entry.field as CheckPreconditionFields,
+      label: entry.label,
     });
   }
 
@@ -44,14 +78,25 @@ export function getFieldOptionsByCategory(): {
 export function getAllowedRulesForField(
   field: CheckPreconditionFields,
 ): CheckPreconditionRule[] {
-  return PRECONDITION_FIELD_CONFIG[field]?.allowedRules ?? [];
+  return PRECONDITION_ALLOWED_RULES[field as PreconditionField] ?? [];
 }
 
-/** Get the value type for a given field */
+/**
+ * Check if a field is a boolean field (true/false selector UI).
+ */
+export function isBooleanField(field: CheckPreconditionFields): boolean {
+  return field === "traces.error" || field === "annotations.hasAnnotation";
+}
+
+/**
+ * Get the value type for a given field.
+ * Kept for backward compatibility with PreconditionsField component.
+ */
 export function getFieldValueType(
   field: CheckPreconditionFields,
-): PreconditionFieldConfig["valueType"] {
-  return PRECONDITION_FIELD_CONFIG[field]?.valueType ?? "text";
+): "text" | "boolean" | "enum" | "array" {
+  if (isBooleanField(field)) return "boolean";
+  return "text";
 }
 
 /** Check if a rule is valid for the given field */
@@ -59,9 +104,9 @@ export function isRuleAllowedForField(
   field: CheckPreconditionFields,
   rule: CheckPreconditionRule,
 ): boolean {
-  const config = PRECONDITION_FIELD_CONFIG[field];
-  if (!config) return false;
-  return config.allowedRules.includes(rule);
+  const allowedRules = PRECONDITION_ALLOWED_RULES[field as PreconditionField];
+  if (!allowedRules) return false;
+  return allowedRules.includes(rule);
 }
 
 /**
