@@ -5,9 +5,9 @@ import { createLogger } from "~/utils/logger/server";
 import type { DeepPartial } from "~/utils/types";
 import type { RecordMetricCommandData } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
 import { TraceRequestUtils } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
-import { serializeAttributes } from "./repositories/span-storage.clickhouse.repository";
 import { decodeBase64OpenTelemetryId } from "../../tracer/utils";
 import { traced } from "../tracing";
+import { serializeAttributes } from "./repositories/span-storage.clickhouse.repository";
 
 export interface MetricRequestCollectionDeps {
   recordMetric: (data: RecordMetricCommandData) => Promise<void>;
@@ -69,20 +69,30 @@ export class MetricRequestCollectionService {
               const metricName = (metric.name as string) ?? "";
               const metricUnit = (metric.unit as string) ?? "";
 
+              let results;
               try {
-                const results = this.extractDataPoints(
+                results = this.extractDataPoints({
                   metric,
                   metricName,
                   metricUnit,
                   resourceAttrs,
+                });
+              } catch (error) {
+                failedCount++;
+                this.logger.error(
+                  { error, tenantId, metricName },
+                  "Error extracting data points for metric",
                 );
+                continue;
+              }
 
-                for (const dp of results) {
-                  if (!dp.traceId || !dp.spanId) {
-                    droppedCount++;
-                    continue;
-                  }
+              for (const dp of results) {
+                if (!dp.traceId || !dp.spanId) {
+                  droppedCount++;
+                  continue;
+                }
 
+                try {
                   await this.deps.recordMetric({
                     tenantId,
                     traceId: dp.traceId,
@@ -98,13 +108,19 @@ export class MetricRequestCollectionService {
                   });
 
                   collectedCount++;
+                } catch (error) {
+                  failedCount++;
+                  this.logger.error(
+                    {
+                      error,
+                      tenantId,
+                      metricName,
+                      traceId: dp.traceId,
+                      spanId: dp.spanId,
+                    },
+                    "Error recording metric data point",
+                  );
                 }
-              } catch (error) {
-                failedCount++;
-                this.logger.error(
-                  { error, tenantId, metricName },
-                  "Error processing metric",
-                );
               }
             }
           }
@@ -117,12 +133,17 @@ export class MetricRequestCollectionService {
     );
   }
 
-  private extractDataPoints(
-    metric: Record<string, unknown>,
-    metricName: string,
-    metricUnit: string,
-    resourceAttrs: Record<string, string>,
-  ): Array<{
+  private extractDataPoints({
+    metric,
+    metricName,
+    metricUnit,
+    resourceAttrs,
+  }: {
+    metric: Record<string, unknown>;
+    metricName: string;
+    metricUnit: string;
+    resourceAttrs: Record<string, string>;
+  }): Array<{
     traceId: string | null;
     spanId: string | null;
     metricType: string;
@@ -190,7 +211,10 @@ export class MetricRequestCollectionService {
       | undefined;
     if (gauge?.dataPoints) {
       for (const dp of gauge.dataPoints) {
-        const extracted = this.extractSimpleDataPoint(dp, "gauge");
+        const extracted = this.extractSimpleDataPoint({
+          dp,
+          metricType: "gauge",
+        });
         if (extracted) results.push(extracted);
       }
     }
@@ -201,7 +225,10 @@ export class MetricRequestCollectionService {
       | undefined;
     if (sum?.dataPoints) {
       for (const dp of sum.dataPoints) {
-        const extracted = this.extractSimpleDataPoint(dp, "sum");
+        const extracted = this.extractSimpleDataPoint({
+          dp,
+          metricType: "sum",
+        });
         if (extracted) results.push(extracted);
       }
     }
@@ -209,10 +236,13 @@ export class MetricRequestCollectionService {
     return results;
   }
 
-  private extractSimpleDataPoint(
-    dp: Record<string, unknown> | undefined,
-    metricType: string,
-  ): {
+  private extractSimpleDataPoint({
+    dp,
+    metricType,
+  }: {
+    dp: Record<string, unknown> | undefined;
+    metricType: string;
+  }): {
     traceId: string | null;
     spanId: string | null;
     metricType: string;

@@ -29,10 +29,7 @@ import {
   isSpanReceivedEvent,
   isTopicAssignedEvent,
 } from "../schemas/events";
-import type {
-  NormalizedAttributes,
-  NormalizedSpan,
-} from "../schemas/spans";
+import type { NormalizedAttributes, NormalizedSpan } from "../schemas/spans";
 import { NormalizedStatusCode as StatusCode } from "../schemas/spans";
 
 export type { TraceSummaryData };
@@ -57,9 +54,18 @@ const LAST_TOKEN_EVENTS = new Set([
 ]);
 
 const STANDARD_RESOURCE_PREFIXES = [
-  "host.", "process.", "telemetry.", "service.", "os.",
-  "container.", "k8s.", "cloud.", "deployment.", "device.",
-  "faas.", "webengine.",
+  "host.",
+  "process.",
+  "telemetry.",
+  "service.",
+  "os.",
+  "container.",
+  "k8s.",
+  "cloud.",
+  "deployment.",
+  "device.",
+  "faas.",
+  "webengine.",
 ] as const;
 
 const SPRING_AI_SCOPE_NAMES = new Set([
@@ -67,9 +73,7 @@ const SPRING_AI_SCOPE_NAMES = new Set([
   "org.springframework.ai.chat.observation.ChatModelPromptContentObservationHandler",
 ]);
 
-const CLAUDE_CODE_SCOPE_NAMES = new Set([
-  "com.anthropic.claude_code.events",
-]);
+const CLAUDE_CODE_SCOPE_NAMES = new Set(["com.anthropic.claude_code.events"]);
 
 const RESOURCE_ATTR_MAPPINGS = [
   ["telemetry.sdk.name", "sdk.name"],
@@ -92,21 +96,40 @@ const LEGACY_ORIGIN_RULES: Array<{
   check: (span: NormalizedSpan) => boolean;
   origin: string;
 }> = [
-  { check: (s) => s.instrumentationScope?.name === "langwatch-evaluation", origin: "evaluation" },
-  { check: (s) => s.instrumentationScope?.name === "@langwatch/scenario", origin: "simulation" },
-  { check: (s) => s.spanAttributes["metadata.platform"] === "optimization_studio", origin: "workflow" },
+  {
+    check: (s) => s.instrumentationScope?.name === "langwatch-evaluation",
+    origin: "evaluation",
+  },
+  {
+    check: (s) => s.instrumentationScope?.name === "@langwatch/scenario",
+    origin: "simulation",
+  },
+  {
+    check: (s) =>
+      s.spanAttributes["metadata.platform"] === "optimization_studio",
+    origin: "workflow",
+  },
   {
     check: (s) => {
       const labels = s.spanAttributes[ATTR_KEYS.LANGWATCH_LABELS];
-      const arr = typeof labels === "string"
-        ? parseJsonStringArray(labels)
-        : Array.isArray(labels) ? labels as string[] : [];
+      const arr =
+        typeof labels === "string"
+          ? parseJsonStringArray(labels)
+          : Array.isArray(labels)
+            ? (labels as string[])
+            : [];
       return arr.includes("scenario-runner");
     },
     origin: "simulation",
   },
-  { check: (s) => s.resourceAttributes["scenario.labels"] !== undefined, origin: "simulation" },
-  { check: (s) => s.spanAttributes["evaluation.run_id"] !== undefined, origin: "evaluation" },
+  {
+    check: (s) => s.resourceAttributes["scenario.labels"] !== undefined,
+    origin: "simulation",
+  },
+  {
+    check: (s) => s.spanAttributes["evaluation.run_id"] !== undefined,
+    origin: "evaluation",
+  },
 ];
 
 // ─── Utilities ──────────────────────────────────────────────────────
@@ -125,7 +148,10 @@ function parseJsonStringArray(raw: string | undefined): string[] {
 const isValidTimestamp = (ts: number | undefined | null): ts is number =>
   typeof ts === "number" && ts > 0 && Number.isFinite(ts);
 
-function stringAttr(attrs: NormalizedAttributes, key: string): string | undefined {
+function stringAttr(
+  attrs: NormalizedAttributes,
+  key: string,
+): string | undefined {
   const v = attrs[key];
   return typeof v === "string" ? v : undefined;
 }
@@ -139,17 +165,24 @@ function extractModelsFromSpan(span: NormalizedSpan): string[] {
   ].filter((m): m is string => typeof m === "string" && m !== "");
 }
 
-function computeSpanCost(
-  attrs: NormalizedAttributes,
-  model: string | undefined,
-  promptTokens: number,
-  completionTokens: number,
-): number {
+function computeSpanCost({
+  attrs,
+  model,
+  promptTokens,
+  completionTokens,
+}: {
+  attrs: NormalizedAttributes;
+  model: string | undefined;
+  promptTokens: number;
+  completionTokens: number;
+}): number {
   const inputRate = attrs[ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN];
   const outputRate = attrs[ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN];
   if (typeof inputRate === "number" || typeof outputRate === "number") {
-    return promptTokens * (typeof inputRate === "number" ? inputRate : 0)
-      + completionTokens * (typeof outputRate === "number" ? outputRate : 0);
+    return (
+      promptTokens * (typeof inputRate === "number" ? inputRate : 0) +
+      completionTokens * (typeof outputRate === "number" ? outputRate : 0)
+    );
   }
 
   if (model && (promptTokens > 0 || completionTokens > 0)) {
@@ -169,7 +202,11 @@ function computeSpanCost(
 
   if (attrs[ATTR_KEYS.SPAN_TYPE] === "guardrail") {
     const rawOutput = attrs[ATTR_KEYS.LANGWATCH_OUTPUT];
-    if (rawOutput && typeof rawOutput === "object" && !Array.isArray(rawOutput)) {
+    if (
+      rawOutput &&
+      typeof rawOutput === "object" &&
+      !Array.isArray(rawOutput)
+    ) {
       const costObj = (rawOutput as Record<string, unknown>).cost as
         | { amount?: number; currency?: string }
         | undefined;
@@ -186,13 +223,20 @@ function extractTokenMetrics(span: NormalizedSpan) {
   const attrs = span.spanAttributes;
   const inputTokens = attrs[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS];
   const outputTokens = attrs[ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS];
-  const promptTokens = typeof inputTokens === "number" && inputTokens > 0 ? inputTokens : 0;
-  const completionTokens = typeof outputTokens === "number" && outputTokens > 0 ? outputTokens : 0;
+  const promptTokens =
+    typeof inputTokens === "number" && inputTokens > 0 ? inputTokens : 0;
+  const completionTokens =
+    typeof outputTokens === "number" && outputTokens > 0 ? outputTokens : 0;
 
   return {
     promptTokens,
     completionTokens,
-    cost: computeSpanCost(attrs, extractModelsFromSpan(span)[0], promptTokens, completionTokens),
+    cost: computeSpanCost({
+      attrs,
+      model: extractModelsFromSpan(span)[0],
+      promptTokens,
+      completionTokens,
+    }),
     estimated: attrs[ATTR_KEYS.LANGWATCH_TOKENS_ESTIMATED] === true,
   };
 }
@@ -210,12 +254,17 @@ function extractStatus(span: NormalizedSpan) {
   }
 
   if (!errorMessage) {
-    const msg = attrs[ATTR_KEYS.ERROR_MESSAGE] ?? attrs[ATTR_KEYS.EXCEPTION_MESSAGE];
-    if (typeof msg === "string") { errorMessage = msg; hasError = true; }
+    const msg =
+      attrs[ATTR_KEYS.ERROR_MESSAGE] ?? attrs[ATTR_KEYS.EXCEPTION_MESSAGE];
+    if (typeof msg === "string") {
+      errorMessage = msg;
+      hasError = true;
+    }
   }
 
   if (!hasError) {
-    const flag = attrs[ATTR_KEYS.ERROR_HAS_ERROR] ?? attrs[ATTR_KEYS.SPAN_ERROR_HAS_ERROR];
+    const flag =
+      attrs[ATTR_KEYS.ERROR_HAS_ERROR] ?? attrs[ATTR_KEYS.SPAN_ERROR_HAS_ERROR];
     if (flag === true || flag === "true") hasError = true;
   }
 
@@ -239,10 +288,16 @@ function extractTokenTiming(span: NormalizedSpan) {
   for (const event of span.events) {
     const delta = event.timeUnixMs - span.startTimeUnixMs;
     if (delta < 0) continue;
-    if (FIRST_TOKEN_EVENTS.has(event.name) && (timeToFirstToken === null || delta < timeToFirstToken)) {
+    if (
+      FIRST_TOKEN_EVENTS.has(event.name) &&
+      (timeToFirstToken === null || delta < timeToFirstToken)
+    ) {
       timeToFirstToken = delta;
     }
-    if (LAST_TOKEN_EVENTS.has(event.name) && (timeToLastToken === null || delta > timeToLastToken)) {
+    if (
+      LAST_TOKEN_EVENTS.has(event.name) &&
+      (timeToLastToken === null || delta > timeToLastToken)
+    ) {
       timeToLastToken = delta;
     }
   }
@@ -263,7 +318,8 @@ function extractAttributes(span: NormalizedSpan): Record<string, string> {
   for (const [key, value] of Object.entries(resourceAttrs)) {
     if (STANDARD_RESOURCE_PREFIXES.some((p) => key.startsWith(p))) continue;
     if (typeof value === "string") result[key] = value;
-    else if (typeof value === "number" || typeof value === "boolean") result[key] = String(value);
+    else if (typeof value === "number" || typeof value === "boolean")
+      result[key] = String(value);
   }
 
   for (const [source, dest] of SPAN_ATTR_MAPPINGS) {
@@ -276,13 +332,15 @@ function extractAttributes(span: NormalizedSpan): Record<string, string> {
 
   const labels = spanAttrs[ATTR_KEYS.LANGWATCH_LABELS];
   if (typeof labels === "string") result["langwatch.labels"] = labels;
-  else if (Array.isArray(labels)) result["langwatch.labels"] = JSON.stringify(labels);
+  else if (Array.isArray(labels))
+    result["langwatch.labels"] = JSON.stringify(labels);
 
   for (const [key, value] of Object.entries(spanAttrs)) {
     if (!key.startsWith("metadata.")) continue;
     if (typeof value === "string") result[key] = value;
     else if (value !== null && value !== undefined) {
-      result[key] = typeof value === "object" ? JSON.stringify(value) : String(value);
+      result[key] =
+        typeof value === "object" ? JSON.stringify(value) : String(value);
     }
   }
 
@@ -291,40 +349,51 @@ function extractAttributes(span: NormalizedSpan): Record<string, string> {
 
 // ─── Origin resolution ──────────────────────────────────────────────
 
-function inferOriginFromLegacyMarkers(span: NormalizedSpan): string | undefined {
+function inferOriginFromLegacyMarkers(
+  span: NormalizedSpan,
+): string | undefined {
   for (const rule of LEGACY_ORIGIN_RULES) {
     if (rule.check(span)) return rule.origin;
   }
   return undefined;
 }
 
-function resolveOrigin(span: NormalizedSpan, existingOrigin: string | undefined): string | undefined {
+function resolveOrigin({
+  span,
+  existingOrigin,
+}: {
+  span: NormalizedSpan;
+  existingOrigin: string | undefined;
+}): string | undefined {
   const isRoot = !span.parentSpanId;
   const explicit = stringAttr(span.spanAttributes, "langwatch.origin");
 
-  if (explicit) return (isRoot || !existingOrigin) ? explicit : existingOrigin;
+  if (explicit) return isRoot || !existingOrigin ? explicit : existingOrigin;
 
   const inferred = inferOriginFromLegacyMarkers(span);
-  if (inferred) return (isRoot || !existingOrigin) ? inferred : existingOrigin;
+  if (inferred) return isRoot || !existingOrigin ? inferred : existingOrigin;
 
   return existingOrigin;
 }
 
 // ─── Log record I/O extraction ──────────────────────────────────────
 
-function extractIOFromLogRecord(
-  data: LogRecordReceivedEventData,
-): { input: string | null; output: string | null } {
+function extractIOFromLogRecord(data: LogRecordReceivedEventData): {
+  input: string | null;
+  output: string | null;
+} {
   if (SPRING_AI_SCOPE_NAMES.has(data.scopeName)) {
     const [identifier, ...contentParts] = data.body.split("\n");
     const content = contentParts.join("\n");
     if (!identifier || !content) return { input: null, output: null };
-    if (identifier === "Chat Model Prompt Content:") return { input: content, output: null };
-    if (identifier === "Chat Model Completion:") return { input: null, output: content };
+    if (identifier === "Chat Model Prompt Content:")
+      return { input: content, output: null };
+    if (identifier === "Chat Model Completion:")
+      return { input: null, output: content };
   }
 
   if (CLAUDE_CODE_SCOPE_NAMES.has(data.scopeName)) {
-    const prompt = data.attributes["prompt"];
+    const prompt = data.attributes.prompt;
     if (prompt) return { input: prompt, output: null };
   }
 
@@ -355,53 +424,83 @@ export function shouldOverrideOutput({
   if (isRoot) return true;
   if (outputFromRoot) return false;
   if (isExplicit && !currentIsExplicit) return true;
-  if (isExplicit === currentIsExplicit && endTime >= currentEndTime) return true;
+  if (isExplicit === currentIsExplicit && endTime >= currentEndTime)
+    return true;
   return false;
 }
 
 // ─── Summary accumulation steps ─────────────────────────────────────
 
-function accumulateTiming(state: TraceSummaryData, span: NormalizedSpan) {
-  if (!isValidTimestamp(span.startTimeUnixMs) || !isValidTimestamp(span.endTimeUnixMs)) {
-    return { occurredAt: state.occurredAt, totalDurationMs: state.totalDurationMs };
+function accumulateTiming({
+  state,
+  span,
+}: {
+  state: TraceSummaryData;
+  span: NormalizedSpan;
+}) {
+  if (
+    !isValidTimestamp(span.startTimeUnixMs) ||
+    !isValidTimestamp(span.endTimeUnixMs)
+  ) {
+    return {
+      occurredAt: state.occurredAt,
+      totalDurationMs: state.totalDurationMs,
+    };
   }
 
-  const occurredAt = state.occurredAt > 0
-    ? Math.min(state.occurredAt, span.startTimeUnixMs)
-    : span.startTimeUnixMs;
-  const currentEnd = state.occurredAt > 0 ? state.occurredAt + state.totalDurationMs : 0;
+  const occurredAt =
+    state.occurredAt > 0
+      ? Math.min(state.occurredAt, span.startTimeUnixMs)
+      : span.startTimeUnixMs;
+  const currentEnd =
+    state.occurredAt > 0 ? state.occurredAt + state.totalDurationMs : 0;
   const totalDurationMs = Math.max(currentEnd, span.endTimeUnixMs) - occurredAt;
 
   return { occurredAt, totalDurationMs };
 }
 
-function accumulateTokens(state: TraceSummaryData, span: NormalizedSpan, totalDurationMs: number) {
+function accumulateTokens({
+  state,
+  span,
+  totalDurationMs,
+}: {
+  state: TraceSummaryData;
+  span: NormalizedSpan;
+  totalDurationMs: number;
+}) {
   const metrics = extractTokenMetrics(span);
-  const totalPromptTokenCount = (state.totalPromptTokenCount ?? 0) + metrics.promptTokens;
-  const totalCompletionTokenCount = (state.totalCompletionTokenCount ?? 0) + metrics.completionTokens;
+  const totalPromptTokenCount =
+    (state.totalPromptTokenCount ?? 0) + metrics.promptTokens;
+  const totalCompletionTokenCount =
+    (state.totalCompletionTokenCount ?? 0) + metrics.completionTokens;
   const totalCost = (state.totalCost ?? 0) + metrics.cost;
 
   const timing = extractTokenTiming(span);
   let timeToFirstTokenMs = state.timeToFirstTokenMs;
   if (timing.timeToFirstToken !== null) {
-    timeToFirstTokenMs = timeToFirstTokenMs === null
-      ? timing.timeToFirstToken
-      : Math.min(timeToFirstTokenMs, timing.timeToFirstToken);
+    timeToFirstTokenMs =
+      timeToFirstTokenMs === null
+        ? timing.timeToFirstToken
+        : Math.min(timeToFirstTokenMs, timing.timeToFirstToken);
   }
   let timeToLastTokenMs = state.timeToLastTokenMs;
   if (timing.timeToLastToken !== null) {
-    timeToLastTokenMs = timeToLastTokenMs === null
-      ? timing.timeToLastToken
-      : Math.max(timeToLastTokenMs, timing.timeToLastToken);
+    timeToLastTokenMs =
+      timeToLastTokenMs === null
+        ? timing.timeToLastToken
+        : Math.max(timeToLastTokenMs, timing.timeToLastToken);
   }
 
-  const tokensPerSecond = totalCompletionTokenCount > 0 && totalDurationMs > 0
-    ? Math.round((totalCompletionTokenCount / totalDurationMs) * 1000)
-    : null;
+  const tokensPerSecond =
+    totalCompletionTokenCount > 0 && totalDurationMs > 0
+      ? Math.round((totalCompletionTokenCount / totalDurationMs) * 1000)
+      : null;
 
   return {
-    totalPromptTokenCount: totalPromptTokenCount > 0 ? totalPromptTokenCount : null,
-    totalCompletionTokenCount: totalCompletionTokenCount > 0 ? totalCompletionTokenCount : null,
+    totalPromptTokenCount:
+      totalPromptTokenCount > 0 ? totalPromptTokenCount : null,
+    totalCompletionTokenCount:
+      totalCompletionTokenCount > 0 ? totalCompletionTokenCount : null,
     totalCost: totalCost > 0 ? Number(totalCost.toFixed(6)) : null,
     tokensEstimated: state.tokensEstimated || metrics.estimated,
     timeToFirstTokenMs,
@@ -410,7 +509,13 @@ function accumulateTokens(state: TraceSummaryData, span: NormalizedSpan, totalDu
   };
 }
 
-function accumulateStatus(state: TraceSummaryData, span: NormalizedSpan) {
+function accumulateStatus({
+  state,
+  span,
+}: {
+  state: TraceSummaryData;
+  span: NormalizedSpan;
+}) {
   const info = extractStatus(span);
   return {
     containsErrorStatus: state.containsErrorStatus || info.hasError,
@@ -419,10 +524,17 @@ function accumulateStatus(state: TraceSummaryData, span: NormalizedSpan) {
   };
 }
 
-function accumulateIO(state: TraceSummaryData, span: NormalizedSpan) {
+function accumulateIO({
+  state,
+  span,
+}: {
+  state: TraceSummaryData;
+  span: NormalizedSpan;
+}) {
   const spanType = span.spanAttributes[ATTR_KEYS.SPAN_TYPE];
   const currentOutputSource =
-    state.attributes["langwatch.reserved.output_source"] ?? OUTPUT_SOURCE.INFERRED;
+    state.attributes["langwatch.reserved.output_source"] ??
+    OUTPUT_SOURCE.INFERRED;
 
   let computedInput = state.computedInput;
   let computedOutput = state.computedOutput;
@@ -433,50 +545,83 @@ function accumulateIO(state: TraceSummaryData, span: NormalizedSpan) {
 
   if (spanType === "guardrail") {
     const rawOutput = span.spanAttributes[ATTR_KEYS.LANGWATCH_OUTPUT];
-    if (rawOutput && typeof rawOutput === "object" && !Array.isArray(rawOutput)) {
-      if ((rawOutput as Record<string, unknown>).passed === false) blockedByGuardrail = true;
+    if (
+      rawOutput &&
+      typeof rawOutput === "object" &&
+      !Array.isArray(rawOutput)
+    ) {
+      if ((rawOutput as Record<string, unknown>).passed === false)
+        blockedByGuardrail = true;
     }
   }
 
   if (spanType === "evaluation" || spanType === "guardrail") {
-    return { computedInput, computedOutput, outputFromRootSpan, outputSpanEndTimeMs, outputSource, blockedByGuardrail };
+    return {
+      computedInput,
+      computedOutput,
+      outputFromRootSpan,
+      outputSpanEndTimeMs,
+      outputSource,
+      blockedByGuardrail,
+    };
   }
 
   const isRoot = !span.parentSpanId;
 
-  const inputResult = traceIOExtractionService.extractRichIOFromSpan(span, "input");
+  const inputResult = traceIOExtractionService.extractRichIOFromSpan(
+    span,
+    "input",
+  );
   if (inputResult && (isRoot || computedInput === null)) {
     const raw = inputResult.raw;
     computedInput = typeof raw === "string" ? raw : JSON.stringify(raw);
   }
 
-  const outputResult = traceIOExtractionService.extractRichIOFromSpan(span, "output");
+  const outputResult = traceIOExtractionService.extractRichIOFromSpan(
+    span,
+    "output",
+  );
   if (outputResult) {
     const isExplicit = outputResult.source === "langwatch";
-    if (shouldOverrideOutput({
-      isRoot,
-      outputFromRoot: outputFromRootSpan,
-      isExplicit,
-      currentIsExplicit: currentOutputSource === OUTPUT_SOURCE.EXPLICIT,
-      endTime: span.endTimeUnixMs,
-      currentEndTime: outputSpanEndTimeMs,
-    })) {
+    if (
+      shouldOverrideOutput({
+        isRoot,
+        outputFromRoot: outputFromRootSpan,
+        isExplicit,
+        currentIsExplicit: currentOutputSource === OUTPUT_SOURCE.EXPLICIT,
+        endTime: span.endTimeUnixMs,
+        currentEndTime: outputSpanEndTimeMs,
+      })
+    ) {
       const raw = outputResult.raw;
       computedOutput = typeof raw === "string" ? raw : JSON.stringify(raw);
       outputFromRootSpan = isRoot;
       outputSpanEndTimeMs = span.endTimeUnixMs;
-      outputSource = isExplicit ? OUTPUT_SOURCE.EXPLICIT : OUTPUT_SOURCE.INFERRED;
+      outputSource = isExplicit
+        ? OUTPUT_SOURCE.EXPLICIT
+        : OUTPUT_SOURCE.INFERRED;
     }
   }
 
-  return { computedInput, computedOutput, outputFromRootSpan, outputSpanEndTimeMs, outputSource, blockedByGuardrail };
+  return {
+    computedInput,
+    computedOutput,
+    outputFromRootSpan,
+    outputSpanEndTimeMs,
+    outputSource,
+    blockedByGuardrail,
+  };
 }
 
-function accumulateAttributes(
-  state: TraceSummaryData,
-  span: NormalizedSpan,
-  outputSource: string,
-): Record<string, string> {
+function accumulateAttributes({
+  state,
+  span,
+  outputSource,
+}: {
+  state: TraceSummaryData;
+  span: NormalizedSpan;
+  outputSource: string;
+}): Record<string, string> {
   const spanAttrs = extractAttributes(span);
   const merged = { ...spanAttrs, ...state.attributes };
 
@@ -484,10 +629,12 @@ function accumulateAttributes(
   const existingLabels = state.attributes["langwatch.labels"];
   const newLabels = spanAttrs["langwatch.labels"];
   if (existingLabels || newLabels) {
-    const union = [...new Set([
-      ...parseJsonStringArray(existingLabels),
-      ...parseJsonStringArray(newLabels),
-    ])];
+    const union = [
+      ...new Set([
+        ...parseJsonStringArray(existingLabels),
+        ...parseJsonStringArray(newLabels),
+      ]),
+    ];
     if (union.length > 0) merged["langwatch.labels"] = JSON.stringify(union);
   }
 
@@ -501,34 +648,49 @@ function accumulateAttributes(
       const prevObj: unknown = JSON.parse(prev);
       const nextObj: unknown = JSON.parse(next);
       if (
-        typeof prevObj === "object" && prevObj && !Array.isArray(prevObj) &&
-        typeof nextObj === "object" && nextObj && !Array.isArray(nextObj)
+        typeof prevObj === "object" &&
+        prevObj &&
+        !Array.isArray(prevObj) &&
+        typeof nextObj === "object" &&
+        nextObj &&
+        !Array.isArray(nextObj)
       ) {
         merged[key] = JSON.stringify({ ...nextObj, ...prevObj });
       }
-    } catch { /* not JSON — keep first-wins */ }
+    } catch {
+      /* not JSON — keep first-wins */
+    }
   }
 
   // TODO(2027): strip legacy markers
-  if (merged["metadata.platform"] === "optimization_studio") delete merged["metadata.platform"];
+  if (merged["metadata.platform"] === "optimization_studio")
+    delete merged["metadata.platform"];
   if (merged["langwatch.labels"]) {
-    const filtered = parseJsonStringArray(merged["langwatch.labels"]).filter((l) => l !== "scenario-runner");
-    if (filtered.length > 0) merged["langwatch.labels"] = JSON.stringify(filtered);
+    const filtered = parseJsonStringArray(merged["langwatch.labels"]).filter(
+      (l) => l !== "scenario-runner",
+    );
+    if (filtered.length > 0)
+      merged["langwatch.labels"] = JSON.stringify(filtered);
     else delete merged["langwatch.labels"];
   }
 
   // Origin: root-wins-if-set semantics
-  const origin = resolveOrigin(span, state.attributes["langwatch.origin"]);
+  const origin = resolveOrigin({
+    span,
+    existingOrigin: state.attributes["langwatch.origin"],
+  });
   if (origin) merged["langwatch.origin"] = origin;
 
   merged["langwatch.reserved.output_source"] = outputSource;
 
   // PII redaction tracking
-  const piiStatus = span.spanAttributes[ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_STATUS];
+  const piiStatus =
+    span.spanAttributes[ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_STATUS];
   if (piiStatus === "partial" || piiStatus === "none") {
-    const key = piiStatus === "partial"
-      ? ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_PARTIAL_SPAN_IDS
-      : ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_SKIPPED_SPAN_IDS;
+    const key =
+      piiStatus === "partial"
+        ? ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_PARTIAL_SPAN_IDS
+        : ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_SKIPPED_SPAN_IDS;
     const ids = parseJsonStringArray(merged[key]);
     ids.push(span.spanId);
     merged[key] = JSON.stringify(ids);
@@ -539,24 +701,37 @@ function accumulateAttributes(
 
 // ─── Main composition ───────────────────────────────────────────────
 
-const spanNormalizationPipelineService = SpanNormalizationPipelineService.create();
+const spanNormalizationPipelineService =
+  SpanNormalizationPipelineService.create();
 const traceIOExtractionService = TraceIOExtractionService.create();
 
 /** @internal Exported for unit testing */
-export function applySpanToSummary(
-  state: TraceSummaryData,
-  span: NormalizedSpan,
-): TraceSummaryData {
-  const timing = accumulateTiming(state, span);
-  const tokens = accumulateTokens(state, span, timing.totalDurationMs);
-  const status = accumulateStatus(state, span);
-  const io = accumulateIO(state, span);
-  const attributes = accumulateAttributes(state, span, io.outputSource);
+export function applySpanToSummary({
+  state,
+  span,
+}: {
+  state: TraceSummaryData;
+  span: NormalizedSpan;
+}): TraceSummaryData {
+  const timing = accumulateTiming({ state, span });
+  const tokens = accumulateTokens({
+    state,
+    span,
+    totalDurationMs: timing.totalDurationMs,
+  });
+  const status = accumulateStatus({ state, span });
+  const io = accumulateIO({ state, span });
+  const attributes = accumulateAttributes({
+    state,
+    span,
+    outputSource: io.outputSource,
+  });
 
   const newModels = extractModelsFromSpan(span);
-  const models = newModels.length > 0
-    ? [...new Set([...state.models, ...newModels])].sort()
-    : state.models;
+  const models =
+    newModels.length > 0
+      ? [...new Set([...state.models, ...newModels])].sort()
+      : state.models;
 
   return {
     ...state,
@@ -620,7 +795,10 @@ export function createTraceSummaryFoldProjection({
       };
     },
 
-    apply(state: TraceSummaryData, event: TraceProcessingEvent): TraceSummaryData {
+    apply(
+      state: TraceSummaryData,
+      event: TraceProcessingEvent,
+    ): TraceSummaryData {
       if (isSpanReceivedEvent(event)) {
         const normalizedSpan =
           spanNormalizationPipelineService.normalizeSpanReceived(
@@ -632,7 +810,7 @@ export function createTraceSummaryFoldProjection({
         enrichRagContextIds(normalizedSpan);
 
         return {
-          ...applySpanToSummary(state, normalizedSpan),
+          ...applySpanToSummary({ state, span: normalizedSpan }),
           createdAt: state.createdAt,
           updatedAt: Date.now(),
         };
@@ -657,14 +835,20 @@ export function createTraceSummaryFoldProjection({
 
       if (isLogRecordReceivedEvent(event)) {
         const mergedAttributes = { ...state.attributes };
-        const logCount = parseInt(mergedAttributes["langwatch.reserved.log_record_count"] ?? "0", 10);
-        mergedAttributes["langwatch.reserved.log_record_count"] = String(logCount + 1);
+        const logCount = parseInt(
+          mergedAttributes["langwatch.reserved.log_record_count"] ?? "0",
+          10,
+        );
+        mergedAttributes["langwatch.reserved.log_record_count"] = String(
+          logCount + 1,
+        );
 
         let computedInput = state.computedInput;
         let computedOutput = state.computedOutput;
         let outputSpanEndTimeMs = state.outputSpanEndTimeMs;
         const currentOutputSource =
-          state.attributes["langwatch.reserved.output_source"] ?? OUTPUT_SOURCE.INFERRED;
+          state.attributes["langwatch.reserved.output_source"] ??
+          OUTPUT_SOURCE.INFERRED;
 
         const logIO = extractIOFromLogRecord(event.data);
 
@@ -673,22 +857,26 @@ export function createTraceSummaryFoldProjection({
         }
 
         if (logIO.output !== null) {
-          if (shouldOverrideOutput({
-            isRoot: false,
-            outputFromRoot: state.outputFromRootSpan,
-            isExplicit: false,
-            currentIsExplicit: currentOutputSource === OUTPUT_SOURCE.EXPLICIT,
-            endTime: event.data.timeUnixMs,
-            currentEndTime: outputSpanEndTimeMs,
-          })) {
+          if (
+            shouldOverrideOutput({
+              isRoot: false,
+              outputFromRoot: state.outputFromRootSpan,
+              isExplicit: false,
+              currentIsExplicit: currentOutputSource === OUTPUT_SOURCE.EXPLICIT,
+              endTime: event.data.timeUnixMs,
+              currentEndTime: outputSpanEndTimeMs,
+            })
+          ) {
             computedOutput = logIO.output;
             outputSpanEndTimeMs = event.data.timeUnixMs;
-            mergedAttributes["langwatch.reserved.output_source"] = OUTPUT_SOURCE.INFERRED;
+            mergedAttributes["langwatch.reserved.output_source"] =
+              OUTPUT_SOURCE.INFERRED;
           }
         }
 
         return {
           ...state,
+          traceId: state.traceId || event.data.traceId,
           computedInput,
           computedOutput,
           outputSpanEndTimeMs,
@@ -701,17 +889,24 @@ export function createTraceSummaryFoldProjection({
         let timeToFirstTokenMs = state.timeToFirstTokenMs;
         if (event.data.metricName === "gen_ai.server.time_to_first_token") {
           const ttftMs = event.data.value * 1000;
-          timeToFirstTokenMs = timeToFirstTokenMs === null
-            ? ttftMs
-            : Math.min(timeToFirstTokenMs, ttftMs);
+          timeToFirstTokenMs =
+            timeToFirstTokenMs === null
+              ? ttftMs
+              : Math.min(timeToFirstTokenMs, ttftMs);
         }
 
         const mergedAttributes = { ...state.attributes };
-        const metricCount = parseInt(mergedAttributes["langwatch.reserved.metric_record_count"] ?? "0", 10);
-        mergedAttributes["langwatch.reserved.metric_record_count"] = String(metricCount + 1);
+        const metricCount = parseInt(
+          mergedAttributes["langwatch.reserved.metric_record_count"] ?? "0",
+          10,
+        );
+        mergedAttributes["langwatch.reserved.metric_record_count"] = String(
+          metricCount + 1,
+        );
 
         return {
           ...state,
+          traceId: state.traceId || event.data.traceId,
           timeToFirstTokenMs,
           attributes: mergedAttributes,
           updatedAt: Date.now(),

@@ -8,7 +8,10 @@ import {
   DEFAULT_PII_REDACTION_LEVEL,
   type PIIRedactionLevel,
 } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
-import type { OtlpKeyValue, OtlpSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import type {
+  OtlpKeyValue,
+  OtlpSpan,
+} from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
 
 /**
@@ -97,7 +100,9 @@ export class OtlpSpanPiiRedactionService {
     this.deps = merged;
   }
 
-  static create(deps?: Partial<OtlpSpanPiiRedactionServiceDependencies>): OtlpSpanPiiRedactionService {
+  static create(
+    deps?: Partial<OtlpSpanPiiRedactionServiceDependencies>,
+  ): OtlpSpanPiiRedactionService {
     return new OtlpSpanPiiRedactionService(deps);
   }
 
@@ -177,6 +182,57 @@ export class OtlpSpanPiiRedactionService {
           value: { stringValue: statusValue },
         });
       }
+    }
+
+    await Promise.all(redactionPromises);
+  }
+
+  /**
+   * Redacts PII from the body and attributes of a log record.
+   * Mutates the log record in place for efficiency.
+   *
+   * @param log - The log record to redact (body and attributes)
+   * @param piiRedactionLevel - The project's PII redaction level
+   */
+  async redactLog(
+    log: { body: string; attributes: Record<string, string> },
+    piiRedactionLevel: PIIRedactionLevel,
+  ): Promise<void> {
+    if (process.env.DISABLE_PII_REDACTION) {
+      return;
+    }
+
+    if (piiRedactionLevel === "DISABLED") {
+      return;
+    }
+
+    const piiEnforced = this.deps.isProduction;
+
+    if (!this.deps.isLangevalsConfigured) {
+      if (piiEnforced) {
+        throw new Error(
+          "LANGEVALS_ENDPOINT is not set, PII check cannot be performed",
+        );
+      }
+      return;
+    }
+
+    const options: PIICheckOptions = {
+      piiRedactionLevel,
+      enforced: piiEnforced,
+      mainMethod: "presidio",
+    };
+
+    const redactionPromises: Promise<void>[] = [];
+
+    // Redact body
+    redactionPromises.push(this.deps.clearPII(log, ["body"], options));
+
+    // Redact attributes
+    for (const key of Object.keys(log.attributes)) {
+      redactionPromises.push(
+        this.deps.clearPII(log.attributes, [key], options),
+      );
     }
 
     await Promise.all(redactionPromises);

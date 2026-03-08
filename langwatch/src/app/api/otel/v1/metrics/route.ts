@@ -1,21 +1,21 @@
-import superjson from "superjson";
 import crypto from "node:crypto";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import type { IExportMetricsServiceRequest } from "@opentelemetry/otlp-transformer";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
 import { getLangWatchTracer } from "langwatch";
 import { type NextRequest, NextResponse } from "next/server";
+import superjson from "superjson";
 import {
   fetchExistingMD5s,
   scheduleTraceCollectionWithFallback,
 } from "~/server/background/workers/collectorWorker";
 import { openTelemetryMetricsRequestToTracesForCollection } from "~/server/tracer/otel.metrics";
 import { captureException } from "~/utils/posthogErrorCapture";
+import { notifyPlanLimitReached } from "../../../../../../ee/billing";
 import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
 import { withAppRouterTracer } from "../../../../../middleware/app-router-tracer";
-import { prisma } from "../../../../../server/db";
 import { getApp } from "../../../../../server/app-layer/app";
-import { notifyPlanLimitReached } from "../../../../../../ee/billing";
+import { prisma } from "../../../../../server/db";
 import { createLogger } from "../../../../../utils/logger/server";
 
 const tracer = getLangWatchTracer("langwatch.otel.metrics");
@@ -175,9 +175,8 @@ async function handleMetricsRequest(req: NextRequest) {
       }
 
       // Event sourcing dual-write for metrics
-      let clickHouseTask: Promise<void> | null = null;
       if (project.featureEventSourcingTraceIngestion) {
-        clickHouseTask = getApp().traces.metricCollection.handleOtlpMetricRequest({
+        await getApp().traces.metricCollection.handleOtlpMetricRequest({
           tenantId: project.id,
           metricRequest: metricsRequest,
         });
@@ -235,9 +234,6 @@ async function handleMetricsRequest(req: NextRequest) {
       );
 
       if (promises.length === 0) {
-        if (clickHouseTask) {
-          await clickHouseTask;
-        }
         return NextResponse.json({ message: "No changes" });
       }
 
@@ -248,10 +244,6 @@ async function handleMetricsRequest(req: NextRequest) {
           await Promise.all(promises);
         },
       );
-
-      if (clickHouseTask) {
-        await clickHouseTask;
-      }
 
       return NextResponse.json({ message: "OK" }, { status: 200 });
     },

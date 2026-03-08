@@ -3,11 +3,11 @@ import { z } from "zod";
 import { EventSchema } from "../../../domain/types";
 import { piiRedactionLevelSchema } from "./commands";
 import {
-	LOG_RECORD_RECEIVED_EVENT_TYPE,
-	METRIC_RECORD_RECEIVED_EVENT_TYPE,
-	SATISFACTION_SCORE_ASSIGNED_EVENT_TYPE,
-	SPAN_RECEIVED_EVENT_TYPE,
-	TOPIC_ASSIGNED_EVENT_TYPE,
+  LOG_RECORD_RECEIVED_EVENT_TYPE,
+  METRIC_RECORD_RECEIVED_EVENT_TYPE,
+  SATISFACTION_SCORE_ASSIGNED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_TYPE,
+  TOPIC_ASSIGNED_EVENT_TYPE,
 } from "./constants";
 import { instrumentationScopeSchema, resourceSchema, spanSchema } from "./otlp";
 
@@ -83,7 +83,9 @@ export const topicAssignedEventSchema = EventSchema.extend({
 export type TopicAssignedEventMetadata = z.infer<
   typeof topicAssignedEventMetadataSchema
 >;
-export type TopicAssignedEventData = z.infer<typeof topicAssignedEventDataSchema>;
+export type TopicAssignedEventData = z.infer<
+  typeof topicAssignedEventDataSchema
+>;
 export type TopicAssignedEvent = z.infer<typeof topicAssignedEventSchema>;
 
 /**
@@ -153,6 +155,7 @@ export const logRecordReceivedEventDataSchema = z.object({
   resourceAttributes: z.record(z.string(), z.string()),
   scopeName: z.string(),
   scopeVersion: z.string().nullable(),
+  piiRedactionLevel: piiRedactionLevelSchema,
 });
 
 export const logRecordReceivedEventSchema = EventSchema.extend({
