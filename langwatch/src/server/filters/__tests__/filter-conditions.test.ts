@@ -45,6 +45,53 @@ describe("clickHouseFilterConditions", () => {
     });
   });
 
+  describe("traces.origin", () => {
+    it("checks for empty or null origin when filtering for application", () => {
+      const builder = clickHouseFilterConditions["traces.origin"];
+      expect(builder).not.toBeNull();
+      const result = builder!(["application"], "f0");
+      expect(result.sql).toBe(
+        "(ts.Attributes['langwatch.origin'] = '' OR ts.Attributes['langwatch.origin'] IS NULL)",
+      );
+      expect(result.params).toEqual({});
+    });
+
+    it("uses IN clause for specific non-application values", () => {
+      const builder = clickHouseFilterConditions["traces.origin"];
+      const result = builder!(["evaluation"], "f0");
+      expect(result.sql).toBe(
+        "ts.Attributes['langwatch.origin'] IN ({f0_values:Array(String)})",
+      );
+      expect(result.params).toEqual({ f0_values: ["evaluation"] });
+    });
+
+    it("combines absence check and IN clause for mixed values", () => {
+      const builder = clickHouseFilterConditions["traces.origin"];
+      const result = builder!(["application", "evaluation"], "f0");
+      expect(result.sql).toBe(
+        "((ts.Attributes['langwatch.origin'] = '' OR ts.Attributes['langwatch.origin'] IS NULL) OR ts.Attributes['langwatch.origin'] IN ({f0_values:Array(String)}))",
+      );
+      expect(result.params).toEqual({ f0_values: ["evaluation"] });
+    });
+
+    it("handles multiple non-application values", () => {
+      const builder = clickHouseFilterConditions["traces.origin"];
+      const result = builder!(["evaluation", "simulation"], "f0");
+      expect(result.sql).toBe(
+        "ts.Attributes['langwatch.origin'] IN ({f0_values:Array(String)})",
+      );
+      expect(result.params).toEqual({
+        f0_values: ["evaluation", "simulation"],
+      });
+    });
+
+    it("returns 1=0 when no values selected", () => {
+      const builder = clickHouseFilterConditions["traces.origin"];
+      const result = builder!([], "f0");
+      expect(result.sql).toBe("1=0");
+    });
+  });
+
   describe("metadata filters", () => {
     it("generates user_id filter with correct attribute path", () => {
       const builder = clickHouseFilterConditions["metadata.user_id"];
