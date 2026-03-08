@@ -98,7 +98,7 @@ function useSavedViewsInternal() {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
   const router = useRouter();
-  const { filters, setFilters } = useFilterParams();
+  const { filters } = useFilterParams();
 
   const [customViews, setCustomViews] = useState<SavedView[]>([]);
   const [selectedViewId, setSelectedViewIdState] = useState<string | null>(
@@ -191,15 +191,6 @@ function useSavedViewsInternal() {
     // Restore the selected view's filters
     if (selectedViewId === "all-traces") return;
 
-    const defaultView = DEFAULT_VIEWS.find((v) => v.id === selectedViewId);
-    if (defaultView?.origin) {
-      skipNextMatchRef.current = true;
-      setFilters({
-        "traces.origin": [defaultView.origin],
-      } as Record<FilterField, FilterParam>);
-      return;
-    }
-
     const customView = customViews.find((v) => v.id === selectedViewId);
     if (customView) {
       skipNextMatchRef.current = true;
@@ -222,18 +213,7 @@ function useSavedViewsInternal() {
         return;
       }
 
-      // Check default views
-      const defaultView = DEFAULT_VIEWS.find((v) => v.id === viewId);
-      if (defaultView?.origin) {
-        setSelectedViewIdState(viewId);
-        persistToStorage(customViews, viewId);
-        setFilters({
-          "traces.origin": [defaultView.origin],
-        } as Record<FilterField, FilterParam>);
-        return;
-      }
-
-      // Check custom views
+      // Check custom views (includes seeded origin views)
       const customView = customViews.find((v) => v.id === viewId);
       if (customView) {
         setSelectedViewIdState(viewId);
@@ -245,7 +225,6 @@ function useSavedViewsInternal() {
       customViews,
       persistToStorage,
       resetAllFilters,
-      setFilters,
       applyViewFilters,
     ],
   );
@@ -373,7 +352,7 @@ function useSavedViewsInternal() {
   ]);
 
   return {
-    defaultViews: DEFAULT_VIEWS,
+    defaultViews: [{ id: "all-traces", name: "All Traces", origin: null }] as DefaultView[],
     customViews,
     selectedViewId,
     isInitialized,

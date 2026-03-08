@@ -8,7 +8,6 @@
  */
 
 import { Button, HStack, Input, VStack } from "@chakra-ui/react";
-import { Save } from "lucide-react";
 import React, { useCallback, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { MAX_VIEW_NAME_LENGTH, useSavedViews } from "../../hooks/useSavedViews";
@@ -110,13 +109,12 @@ function SaveAsViewButtonContent() {
 
   return (
     <Button
-      variant="subtle"
+      colorPalette="blue"
       size="sm"
-      width="full"
+      alignSelf="flex-end"
       onClick={handleSaveClick}
       data-testid="save-as-view-button"
     >
-      <Save size={14} />
       Save as view
     </Button>
   );

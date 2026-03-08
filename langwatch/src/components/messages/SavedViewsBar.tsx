@@ -1,8 +1,8 @@
 /**
- * SavedViewsBar -- fixed bottom bar showing filter presets for the traces page.
+ * SavedViewsBar -- sticky bottom bar showing filter presets for the traces page.
  *
- * Displays default origin-based views and user-defined custom views.
- * Supports edit mode for renaming, deleting, and reordering custom views.
+ * Displays "All Traces" as a permanent view and user-defined custom views
+ * (including seeded origin views) with drag-and-drop reordering in edit mode.
  * Uses @dnd-kit for drag-and-drop reordering in edit mode.
  */
 
@@ -32,33 +32,25 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { MoreVertical, X } from "lucide-react";
+import { Check, MoreVertical, X } from "lucide-react";
 import React, { useCallback, useRef, useState } from "react";
-import type { DefaultView, SavedView } from "../../hooks/useSavedViews";
+import type { SavedView } from "../../hooks/useSavedViews";
 import { useSavedViews } from "../../hooks/useSavedViews";
-import { getOriginColor } from "../../utils/originColors";
 import { getColorForString } from "../../utils/rotatingColors";
 import { Menu } from "../ui/menu";
 
 /**
  * Returns badge colors for a view.
- * Default views use origin-based colors; custom views use hash-based colors.
+ * "All Traces" uses gray; custom views use hash-based colors.
  */
-function getViewColors(
-  view: { origin?: string | null; name: string },
-  isDefault: boolean,
-): { background: string; color: string } {
-  if (isDefault && view.origin === null) {
-    return { background: "gray.subtle", color: "gray.emphasized" };
-  }
-  if (isDefault && view.origin) {
-    return getOriginColor(view.origin);
-  }
+function getViewColors(view: {
+  name: string;
+}): { background: string; color: string } {
   return getColorForString("colors", view.name);
 }
 
 /**
- * SavedViewsBar renders a fixed bar at the bottom of the traces page
+ * SavedViewsBar renders a sticky bar at the bottom of the traces page
  * with clickable view badges for quick filter switching.
  */
 export function SavedViewsBar() {
@@ -96,14 +88,16 @@ export function SavedViewsBar() {
     }),
   );
 
+  const allTracesView = defaultViews[0];
+
   return (
     <Box
-      position="fixed"
+      position="sticky"
       bottom={0}
-      left={0}
-      right={0}
-      zIndex={1000}
-      background="bg.panel"
+      width="full"
+      zIndex={10}
+      background="bg.panel/80"
+      backdropFilter="blur(8px)"
       borderTop="1px solid"
       borderColor="border"
       paddingX={6}
@@ -111,23 +105,22 @@ export function SavedViewsBar() {
       data-testid="saved-views-bar"
     >
       <HStack gap={2} overflowX="auto" width="full">
-        {/* Default views */}
-        {defaultViews.map((view) => (
+        {/* All Traces -- always first, never deletable */}
+        {allTracesView && (
           <ViewBadge
-            key={view.id}
-            id={view.id}
-            name={view.name}
-            colors={getViewColors(view, true)}
-            isSelected={selectedViewId === view.id}
+            id={allTracesView.id}
+            name={allTracesView.name}
+            colors={{ background: "gray.subtle", color: "gray.emphasized" }}
+            isSelected={selectedViewId === allTracesView.id}
             isDefault={true}
             isEditMode={isEditMode}
             onClick={() => {
-              if (!isEditMode) handleViewClick(view.id);
+              if (!isEditMode) handleViewClick(allTracesView.id);
             }}
           />
-        ))}
+        )}
 
-        {/* Custom views with drag-and-drop */}
+        {/* Custom views (including seeded origin views) with drag-and-drop */}
         {customViews.length > 0 && (
           <DndContext
             sensors={sensors}
@@ -156,6 +149,9 @@ export function SavedViewsBar() {
           </DndContext>
         )}
 
+        {/* Spacer pushes hint and button to the right */}
+        <Box flex={1} />
+
         {/* Edit mode hint */}
         {isEditMode && customViews.length > 0 && (
           <Text fontSize="xs" color="fg.subtle" flexShrink={0}>
@@ -163,30 +159,39 @@ export function SavedViewsBar() {
           </Text>
         )}
 
-        {/* Spacer */}
-        <Box flex={1} />
-
-        {/* Three-dot menu */}
-        <Menu.Root>
-          <Menu.Trigger asChild>
-            <IconButton
-              aria-label="View options"
-              variant="ghost"
-              size="xs"
-              data-testid="saved-views-menu"
-            >
-              <MoreVertical size={16} />
-            </IconButton>
-          </Menu.Trigger>
-          <Menu.Content>
-            <Menu.Item
-              value={isEditMode ? "done" : "edit"}
-              onClick={() => setIsEditMode(!isEditMode)}
-            >
-              {isEditMode ? "Done" : "Edit"}
-            </Menu.Item>
-          </Menu.Content>
-        </Menu.Root>
+        {/* Edit mode toggle */}
+        {isEditMode ? (
+          <Button
+            size="xs"
+            colorPalette="blue"
+            onClick={() => setIsEditMode(false)}
+            flexShrink={0}
+            data-testid="saved-views-done-button"
+          >
+            Done
+          </Button>
+        ) : (
+          <Menu.Root>
+            <Menu.Trigger asChild>
+              <IconButton
+                aria-label="View options"
+                variant="ghost"
+                size="xs"
+                data-testid="saved-views-menu"
+              >
+                <MoreVertical size={16} />
+              </IconButton>
+            </Menu.Trigger>
+            <Menu.Content>
+              <Menu.Item
+                value="edit"
+                onClick={() => setIsEditMode(true)}
+              >
+                Edit
+              </Menu.Item>
+            </Menu.Content>
+          </Menu.Root>
+        )}
       </HStack>
     </Box>
   );
@@ -295,23 +300,38 @@ function ViewBadge({
     >
       <HStack gap={1}>
         {isRenaming ? (
-          <Input
-            ref={inputRef}
-            size="xs"
-            value={editName}
-            onChange={(e) => setEditName(e.target.value)}
-            onBlur={handleRenameConfirm}
-            onKeyDown={handleKeyDown}
-            width="auto"
-            minWidth="60px"
-            maxWidth="150px"
-            height="18px"
-            fontSize="xs"
-            padding={0}
-            variant="flushed"
-            onClick={(e) => e.stopPropagation()}
-            data-testid={`rename-input-${id}`}
-          />
+          <>
+            <Input
+              ref={inputRef}
+              size="xs"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              onBlur={handleRenameConfirm}
+              onKeyDown={handleKeyDown}
+              width={`${Math.max(editName.length * 8, 60)}px`}
+              minWidth="60px"
+              maxWidth="150px"
+              height="18px"
+              fontSize="xs"
+              padding={0}
+              onClick={(e) => e.stopPropagation()}
+              data-testid={`rename-input-${id}`}
+            />
+            <IconButton
+              aria-label="Confirm rename"
+              variant="ghost"
+              size="2xs"
+              minWidth="14px"
+              height="14px"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleRenameConfirm();
+              }}
+              data-testid={`confirm-rename-${id}`}
+            >
+              <Check size={10} />
+            </IconButton>
+          </>
         ) : (
           <Text>{name}</Text>
         )}
@@ -324,7 +344,9 @@ function ViewBadge({
             height="14px"
             onClick={(e) => {
               e.stopPropagation();
-              onDelete?.();
+              if (window.confirm(`Delete "${name}" saved view?`)) {
+                onDelete?.();
+              }
             }}
             data-testid={`delete-view-${id}`}
           >
@@ -370,7 +392,7 @@ function SortableViewBadge({
     zIndex: isDragging ? 10 : undefined,
   };
 
-  const colors = getViewColors(view, false);
+  const colors = getViewColors(view);
 
   return (
     <ViewBadge

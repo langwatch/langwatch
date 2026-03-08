@@ -22,7 +22,7 @@ export const FilterSidebar = React.memo(function FilterSidebar({
         maxWidth="380"
         gap={8}
         paddingTop={2}
-        paddingBottom={"120px"}
+        paddingBottom={"40px"}
       >
         {!hideTopics && <TopicsSelector />}
         <QueryStringFieldsFilters />

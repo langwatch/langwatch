@@ -13,6 +13,7 @@ import {
   normalizeFilterValue,
   readSavedViewsFromStorage,
   SAVED_VIEWS_SCHEMA_VERSION,
+  SEED_VIEWS,
   type SavedView,
   type SavedViewsStorage,
   writeSavedViewsToStorage,
@@ -37,13 +38,22 @@ describe("savedViewsLogic", () => {
     });
 
     describe("when localStorage is empty", () => {
-      it("returns default empty state", () => {
+      it("returns seeded views on first load", () => {
         const result = readSavedViewsFromStorage("proj-1");
         expect(result).toEqual({
           schemaVersion: SAVED_VIEWS_SCHEMA_VERSION,
-          views: [],
+          views: SEED_VIEWS,
           selectedViewId: null,
         });
+      });
+
+      it("persists seeded views to localStorage", () => {
+        readSavedViewsFromStorage("proj-1");
+        const stored = JSON.parse(
+          localStorage.getItem(getStorageKey("proj-1"))!,
+        );
+        expect(stored.views).toHaveLength(SEED_VIEWS.length);
+        expect(stored.views[0].id).toBe("application");
       });
     });
 
@@ -132,8 +142,8 @@ describe("savedViewsLogic", () => {
         };
         const storeB: SavedViewsStorage = {
           schemaVersion: 1,
-          views: [],
-          selectedViewId: null,
+          views: [{ id: "b1", name: "Beta View", filters: {} }],
+          selectedViewId: "b1",
         };
 
         localStorage.setItem(
@@ -146,7 +156,7 @@ describe("savedViewsLogic", () => {
         );
 
         expect(readSavedViewsFromStorage("proj-alpha").views).toHaveLength(1);
-        expect(readSavedViewsFromStorage("proj-beta").views).toHaveLength(0);
+        expect(readSavedViewsFromStorage("proj-beta").views).toHaveLength(1);
       });
     });
   });
@@ -298,6 +308,7 @@ describe("savedViewsLogic", () => {
 
   describe("findMatchingView()", () => {
     const customViews: SavedView[] = [
+      ...SEED_VIEWS,
       {
         id: "custom-1",
         name: "Debug",
@@ -322,8 +333,8 @@ describe("savedViewsLogic", () => {
       });
     });
 
-    describe("when filters match a default origin view", () => {
-      it("returns the matching default view id", () => {
+    describe("when filters match a seeded origin view", () => {
+      it("returns the matching view id for evaluation", () => {
         const result = findMatchingView({
           currentFilters: { "traces.origin": ["evaluation"] },
           currentQuery: undefined,
@@ -439,8 +450,8 @@ describe("savedViewsLogic", () => {
       });
     });
 
-    describe("when default view has origin filter plus extra filters", () => {
-      it("returns null (not a default match)", () => {
+    describe("when origin filter plus extra filters with no matching custom view", () => {
+      it("returns null", () => {
         const result = findMatchingView({
           currentFilters: {
             "traces.origin": ["evaluation"],
@@ -475,6 +486,29 @@ describe("savedViewsLogic", () => {
     it("each non-all view has a string origin", () => {
       for (const view of DEFAULT_VIEWS.slice(1)) {
         expect(typeof view.origin).toBe("string");
+      }
+    });
+  });
+
+  // --- SEED_VIEWS ---
+
+  describe("SEED_VIEWS", () => {
+    it("has 4 seeded views matching the origin-based default views", () => {
+      expect(SEED_VIEWS).toHaveLength(4);
+      expect(SEED_VIEWS.map((v) => v.id)).toEqual([
+        "application",
+        "evaluations",
+        "simulations",
+        "playground",
+      ]);
+    });
+
+    it("each seed view has an origin filter", () => {
+      for (const view of SEED_VIEWS) {
+        expect(view.filters["traces.origin"]).toBeDefined();
+        expect(
+          Array.isArray(view.filters["traces.origin"]),
+        ).toBe(true);
       }
     });
   });

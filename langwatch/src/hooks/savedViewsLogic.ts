@@ -46,6 +46,18 @@ export const DEFAULT_VIEWS: DefaultView[] = [
 ];
 
 /**
+ * Seed views auto-populated into localStorage on first load.
+ * These become regular custom views that can be renamed, deleted, and reordered.
+ * "All Traces" is excluded as it remains a permanent virtual view.
+ */
+export const SEED_VIEWS: SavedView[] = [
+  { id: "application", name: "Application", filters: { "traces.origin": ["application"] } },
+  { id: "evaluations", name: "Evaluations", filters: { "traces.origin": ["evaluation"] } },
+  { id: "simulations", name: "Simulations", filters: { "traces.origin": ["simulation"] } },
+  { id: "playground", name: "Playground", filters: { "traces.origin": ["playground"] } },
+];
+
+/**
  * Returns the localStorage key for a given project ID.
  */
 export function getStorageKey(projectId: string): string {
@@ -68,7 +80,15 @@ export function readSavedViewsFromStorage(
 
   try {
     const raw = localStorage.getItem(getStorageKey(projectId));
-    if (!raw) return defaultData;
+    if (!raw) {
+      // Fresh install: seed with default origin views
+      const seeded: SavedViewsStorage = {
+        ...defaultData,
+        views: SEED_VIEWS,
+      };
+      localStorage.setItem(getStorageKey(projectId), JSON.stringify(seeded));
+      return seeded;
+    }
 
     const parsed = JSON.parse(raw) as SavedViewsStorage;
 
@@ -224,20 +244,7 @@ export function findMatchingView({
     return "all-traces";
   }
 
-  // Check default origin views
-  for (const view of DEFAULT_VIEWS) {
-    if (view.origin === null) continue; // Already checked "all-traces"
-
-    const viewFilters: Partial<Record<FilterField, FilterParam>> = {
-      "traces.origin": [view.origin],
-    };
-
-    if (filtersMatch(currentFilters, viewFilters) && !normalizedQuery) {
-      return view.id;
-    }
-  }
-
-  // Check custom views
+  // Check custom views (includes seeded origin views)
   for (const view of customViews) {
     if (
       filtersMatch(currentFilters, view.filters) &&

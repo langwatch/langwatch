@@ -19,10 +19,10 @@ export const originColors: Record<
   { background: string; color: string }
 > = {
   application: { background: "blue.subtle", color: "blue.emphasized" },
-  evaluation: { background: "orange.subtle", color: "orange.emphasized" },
+  evaluation: { background: "green.subtle", color: "green.emphasized" },
   simulation: { background: "pink.subtle", color: "pink.emphasized" },
   playground: { background: "purple.subtle", color: "purple.emphasized" },
-  workflow: { background: "green.subtle", color: "green.emphasized" },
+  workflow: { background: "teal.subtle", color: "teal.emphasized" },
 };
 
 /**

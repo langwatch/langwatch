@@ -11,11 +11,11 @@ describe("originColors", () => {
       });
     });
 
-    it("returns orange for evaluation origin", () => {
+    it("returns green for evaluation origin", () => {
       const result = getOriginColor("evaluation");
       expect(result).toEqual({
-        background: "orange.subtle",
-        color: "orange.emphasized",
+        background: "green.subtle",
+        color: "green.emphasized",
       });
     });
 
@@ -35,11 +35,11 @@ describe("originColors", () => {
       });
     });
 
-    it("returns green for workflow origin", () => {
+    it("returns teal for workflow origin", () => {
       const result = getOriginColor("workflow");
       expect(result).toEqual({
-        background: "green.subtle",
-        color: "green.emphasized",
+        background: "teal.subtle",
+        color: "teal.emphasized",
       });
     });
 
