@@ -1,23 +1,38 @@
 /**
  * @vitest-environment jsdom
+ *
+ * Integration tests for useSavedViews hook covering:
+ * - localStorage caching (views + selected view ID)
+ * - router.push called with pathname (no "project" in URL)
+ * - Full restore flow on page load
+ * - View click applies filters correctly
+ *
+ * Uses mutable mockRouterQuery + rerender() pattern from evaluations-v3 tests.
  */
-import { renderHook, act, waitFor } from "@testing-library/react";
+import {
+  renderHook,
+  act,
+  waitFor,
+  cleanup,
+} from "@testing-library/react";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
-// Mocks
+// Mocks — mutable router query simulates Next.js URL changes
 // ---------------------------------------------------------------------------
 
 const mockRouterPush = vi.fn();
 let mockRouterQuery: Record<string, string | string[] | undefined> = {};
+let mockRouterAsPath = "/[project]/messages";
+const MOCK_PATHNAME = "/[project]/messages";
 
 vi.mock("next/router", () => ({
   useRouter: () => ({
     query: mockRouterQuery,
     push: mockRouterPush,
-    pathname: "/test",
-    asPath: "/test",
+    pathname: MOCK_PATHNAME,
+    asPath: mockRouterAsPath,
   }),
 }));
 
@@ -27,14 +42,26 @@ vi.mock("../useOrganizationTeamProject", () => ({
   }),
 }));
 
+// Mock useFilterParams to return filters derived from mockRouterQuery
 vi.mock("../useFilterParams", () => ({
-  useFilterParams: () => ({
-    filters: {},
-  }),
+  useFilterParams: () => {
+    const filters: Record<string, string[]> = {};
+    if (mockRouterQuery.origin) {
+      const origin = mockRouterQuery.origin;
+      filters["traces.origin"] = Array.isArray(origin)
+        ? origin
+        : [origin];
+    }
+    return { filters };
+  },
 }));
 
+// Mock availableFilters with traces.origin so buildViewQuery can map filter fields to URL keys
 vi.mock("../../server/filters/registry", () => ({
-  availableFilters: {},
+  availableFilters: {
+    "traces.origin": { urlKey: "origin", name: "Origin" },
+    "traces.error": { urlKey: "errors", name: "Error" },
+  },
 }));
 
 const mockUseQuery = vi.fn();
@@ -120,6 +147,36 @@ const updatedDbViews = [
   },
 ];
 
+const applicationView = {
+  id: "app-view",
+  name: "Application",
+  filters: { "traces.origin": ["application"] },
+  query: null,
+  period: null,
+};
+
+// Simulates the effect of router.push: update mockRouterQuery and mockRouterAsPath
+function simulateRouterPush() {
+  mockRouterPush.mockImplementation(
+    (url: { pathname?: string; query?: Record<string, unknown> }) => {
+      if (url.query) {
+        mockRouterQuery = url.query as Record<
+          string,
+          string | string[] | undefined
+        >;
+      }
+      if (url.pathname) {
+        const queryString = Object.entries(url.query ?? {})
+          .filter(([key]) => key !== "project")
+          .map(([key, val]) => `${key}=${String(val)}`)
+          .join("&");
+        mockRouterAsPath = `${url.pathname.replace("[project]", "test-project")}${queryString ? `?${queryString}` : ""}`;
+      }
+      return Promise.resolve(true);
+    },
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -129,10 +186,12 @@ describe("useSavedViews() localStorage caching", () => {
     vi.clearAllMocks();
     localStorage.clear();
     mockRouterQuery = {};
+    mockRouterAsPath = "/[project]/messages";
     mockRouterPush.mockResolvedValue(true);
   });
 
   afterEach(() => {
+    cleanup();
     localStorage.clear();
   });
 
@@ -174,7 +233,7 @@ describe("useSavedViews() localStorage caching", () => {
       renderHook(() => useSavedViews(), { wrapper });
 
       const parsed = JSON.parse(
-        localStorage.getItem(cacheKey("test-project"))!
+        localStorage.getItem(cacheKey("test-project"))!,
       );
       expect(parsed[0]).toEqual({
         id: "db-view",
@@ -196,7 +255,7 @@ describe("useSavedViews() localStorage caching", () => {
       ];
       localStorage.setItem(
         cacheKey("test-project"),
-        JSON.stringify(cachedViews)
+        JSON.stringify(cachedViews),
       );
 
       mockUseQuery.mockReturnValue({
@@ -214,7 +273,7 @@ describe("useSavedViews() localStorage caching", () => {
     it("reports isInitialized as true even before tRPC resolves", () => {
       localStorage.setItem(
         cacheKey("test-project"),
-        JSON.stringify([{ id: "v1", name: "V1", filters: {} }])
+        JSON.stringify([{ id: "v1", name: "V1", filters: {} }]),
       );
 
       mockUseQuery.mockReturnValue({
@@ -258,7 +317,7 @@ describe("useSavedViews() localStorage caching", () => {
     it("replaces customViews with server data", () => {
       localStorage.setItem(
         cacheKey("test-project"),
-        JSON.stringify([{ id: "old-1", name: "Old View", filters: {} }])
+        JSON.stringify([{ id: "old-1", name: "Old View", filters: {} }]),
       );
 
       mockUseQuery.mockReturnValue({
@@ -276,7 +335,7 @@ describe("useSavedViews() localStorage caching", () => {
     it("updates localStorage with the newer data", () => {
       localStorage.setItem(
         cacheKey("test-project"),
-        JSON.stringify([{ id: "old-1", name: "Old View", filters: {} }])
+        JSON.stringify([{ id: "old-1", name: "Old View", filters: {} }]),
       );
 
       mockUseQuery.mockReturnValue({
@@ -287,7 +346,7 @@ describe("useSavedViews() localStorage caching", () => {
       renderHook(() => useSavedViews(), { wrapper });
 
       const stored = JSON.parse(
-        localStorage.getItem(cacheKey("test-project"))!
+        localStorage.getItem(cacheKey("test-project"))!,
       );
       expect(stored).toHaveLength(3);
       expect(stored[2].id).toBe("view-3");
@@ -331,12 +390,8 @@ describe("useSavedViews() localStorage caching", () => {
 
   describe("when mounting with the legacy selected view key", () => {
     it("reads the selected view ID from the legacy key", () => {
-      // Store under legacy key only
       localStorage.setItem(legacySelectedKey("test-project"), "view-1");
 
-      // tRPC not resolved yet, no cache -> isInitialized = false
-      // This means matching effect skips. The project change effect
-      // reads from localStorage and sets selectedViewId.
       mockUseQuery.mockReturnValue({
         data: undefined,
         isFetched: false,
@@ -344,8 +399,6 @@ describe("useSavedViews() localStorage caching", () => {
 
       const { result } = renderHook(() => useSavedViews(), { wrapper });
 
-      // When isInitialized is false, the matching effect is skipped,
-      // so the stored value from the legacy key survives.
       expect(result.current.selectedViewId).toBe("view-1");
     });
   });
@@ -385,26 +438,7 @@ describe("useSavedViews() localStorage caching", () => {
 
   describe("when tRPC transitions from loading to resolved with a stored selected view", () => {
     it("applies the selected view filters via router.push when isInitialized becomes true", async () => {
-      // Pre-seed localStorage with a cached view list and a selected view ID
-      const viewWithFilters = [
-        {
-          id: "filtered-view",
-          name: "Error Filter",
-          filters: { "traces.error": ["true"] },
-        },
-      ];
-      localStorage.setItem(
-        cacheKey("test-project"),
-        JSON.stringify(viewWithFilters)
-      );
       localStorage.setItem(selectedKey("test-project"), "filtered-view");
-
-      // Start with tRPC not fetched, BUT cache makes isInitialized true.
-      // The restore effect fires on the first render where isInitialized = true
-      // and selectedViewId has been set by the project change effect.
-      // We simulate the real scenario: no cache, tRPC resolves later.
-      // Without cache, isInitialized starts as false.
-      localStorage.removeItem(cacheKey("test-project"));
 
       mockUseQuery.mockReturnValue({
         data: undefined,
@@ -415,8 +449,6 @@ describe("useSavedViews() localStorage caching", () => {
         wrapper,
       });
 
-      // Before tRPC resolves: selectedViewId is set from localStorage
-      // but isInitialized is false, so no filters applied yet
       expect(result.current.isInitialized).toBe(false);
       expect(mockRouterPush).not.toHaveBeenCalled();
 
@@ -446,7 +478,7 @@ describe("useSavedViews() localStorage caching", () => {
     it("does not push filters to router", () => {
       localStorage.setItem(
         cacheKey("test-project"),
-        JSON.stringify(sampleDbViews)
+        JSON.stringify(sampleDbViews),
       );
       localStorage.setItem(selectedKey("test-project"), "all-traces");
 
@@ -465,9 +497,8 @@ describe("useSavedViews() localStorage caching", () => {
     it("does not push filters to router on mount", () => {
       localStorage.setItem(
         cacheKey("test-project"),
-        JSON.stringify(sampleDbViews)
+        JSON.stringify(sampleDbViews),
       );
-      // No selected view stored
 
       mockUseQuery.mockReturnValue({
         data: undefined,
@@ -478,5 +509,249 @@ describe("useSavedViews() localStorage caching", () => {
 
       expect(mockRouterPush).not.toHaveBeenCalled();
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Router pathname tests — prove "project" never leaks into URL
+// ---------------------------------------------------------------------------
+
+describe("useSavedViews() router.push always includes pathname", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    mockRouterQuery = { project: "test-project" };
+    mockRouterAsPath = "/test-project/messages";
+    simulateRouterPush();
+  });
+
+  afterEach(() => {
+    cleanup();
+    localStorage.clear();
+  });
+
+  describe("when clicking a saved view pill", () => {
+    it("calls router.push with pathname so project stays in the path, not the query string", () => {
+      mockUseQuery.mockReturnValue({
+        data: [applicationView],
+        isFetched: true,
+      });
+
+      const { result } = renderHook(() => useSavedViews(), { wrapper });
+
+      act(() => {
+        result.current.handleViewClick("app-view");
+      });
+
+      expect(mockRouterPush).toHaveBeenCalledTimes(1);
+      const pushArgs = mockRouterPush.mock.calls[0]!;
+      const urlObj = pushArgs[0] as {
+        pathname: string;
+        query: Record<string, unknown>;
+      };
+
+      // Must include pathname
+      expect(urlObj.pathname).toBe("/[project]/messages");
+
+      // "project" is in the query for Next.js dynamic route resolution,
+      // but Next.js will NOT put it in the actual URL because pathname has [project]
+      expect(urlObj.query.project).toBe("test-project");
+
+      // The filter must be in the query
+      expect(urlObj.query.origin).toEqual(["application"]);
+    });
+  });
+
+  describe("when clicking all-traces to reset filters", () => {
+    it("calls router.push with pathname for the reset", () => {
+      mockUseQuery.mockReturnValue({
+        data: [applicationView],
+        isFetched: true,
+      });
+
+      const { result } = renderHook(() => useSavedViews(), { wrapper });
+
+      // Select a view first
+      act(() => {
+        result.current.handleViewClick("app-view");
+      });
+
+      mockRouterPush.mockClear();
+
+      // Now click all-traces to reset
+      act(() => {
+        result.current.handleViewClick("all-traces");
+      });
+
+      expect(mockRouterPush).toHaveBeenCalledTimes(1);
+      const pushArgs = mockRouterPush.mock.calls[0]!;
+      const urlObj = pushArgs[0] as {
+        pathname: string;
+        query: Record<string, unknown>;
+      };
+
+      expect(urlObj.pathname).toBe("/[project]/messages");
+    });
+  });
+
+  describe("when restoring a saved view on page load", () => {
+    it("calls router.push with pathname during restore", async () => {
+      localStorage.setItem(selectedKey("test-project"), "app-view");
+      localStorage.setItem(
+        cacheKey("test-project"),
+        JSON.stringify([applicationView]),
+      );
+
+      mockUseQuery.mockReturnValue({
+        data: undefined,
+        isFetched: false,
+      });
+
+      const { rerender } = renderHook(() => useSavedViews(), { wrapper });
+
+      // Trigger initialization by resolving tRPC
+      mockUseQuery.mockReturnValue({
+        data: [applicationView],
+        isFetched: true,
+      });
+      rerender();
+
+      await waitFor(() => {
+        expect(mockRouterPush).toHaveBeenCalled();
+      });
+
+      const pushArgs = mockRouterPush.mock.calls[0]!;
+      const urlObj = pushArgs[0] as {
+        pathname: string;
+        query: Record<string, unknown>;
+      };
+
+      expect(urlObj.pathname).toBe("/[project]/messages");
+      expect(urlObj.query.origin).toEqual(["application"]);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Full restore flow: proves the entire lifecycle
+// ---------------------------------------------------------------------------
+
+describe("useSavedViews() full restore lifecycle", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    mockRouterQuery = { project: "test-project" };
+    mockRouterAsPath = "/test-project/messages";
+    simulateRouterPush();
+  });
+
+  afterEach(() => {
+    cleanup();
+    localStorage.clear();
+  });
+
+  it("restores view selection and applies filters to URL", async () => {
+    // 1. User previously selected "app-view" — stored in localStorage
+    localStorage.setItem(selectedKey("test-project"), "app-view");
+    localStorage.setItem(
+      cacheKey("test-project"),
+      JSON.stringify([applicationView]),
+    );
+
+    // 2. Page loads — tRPC not yet resolved
+    mockUseQuery.mockReturnValue({
+      data: undefined,
+      isFetched: false,
+    });
+
+    const { result, rerender } = renderHook(() => useSavedViews(), {
+      wrapper,
+    });
+
+    // 3. selectedViewId is restored synchronously from localStorage
+    expect(result.current.selectedViewId).toBe("app-view");
+
+    // 4. After effects fire, router.push syncs URL
+    await waitFor(() => {
+      expect(mockRouterPush).toHaveBeenCalled();
+    });
+
+    // 5. Verify router.push was called with correct args
+    const pushArgs = mockRouterPush.mock.calls[0]!;
+    const urlObj = pushArgs[0] as {
+      pathname: string;
+      query: Record<string, unknown>;
+    };
+
+    expect(urlObj.pathname).toBe("/[project]/messages");
+    expect(urlObj.query.origin).toEqual(["application"]);
+
+    // 6. selectedViewId persists correctly
+    expect(result.current.selectedViewId).toBe("app-view");
+    expect(localStorage.getItem(selectedKey("test-project"))).toBe("app-view");
+  });
+
+  it("handles view click → stores selection for next visit", () => {
+    mockUseQuery.mockReturnValue({
+      data: [applicationView],
+      isFetched: true,
+    });
+
+    const { result } = renderHook(() => useSavedViews(), { wrapper });
+
+    // 1. User clicks "Application" view
+    act(() => {
+      result.current.handleViewClick("app-view");
+    });
+
+    // 2. Verify selection is stored
+    expect(localStorage.getItem(selectedKey("test-project"))).toBe("app-view");
+
+    // 3. Verify router.push was called with filters + pathname
+    expect(mockRouterPush).toHaveBeenCalledTimes(1);
+    const pushArgs = mockRouterPush.mock.calls[0]!;
+    const urlObj = pushArgs[0] as {
+      pathname: string;
+      query: Record<string, unknown>;
+    };
+    expect(urlObj.query.origin).toEqual(["application"]);
+    expect(urlObj.pathname).toBe("/[project]/messages");
+  });
+
+  it("resets filters when toggling off a view", () => {
+    mockUseQuery.mockReturnValue({
+      data: [applicationView],
+      isFetched: true,
+    });
+
+    const { result } = renderHook(() => useSavedViews(), { wrapper });
+
+    // Select a view
+    act(() => {
+      result.current.handleViewClick("app-view");
+    });
+
+    mockRouterPush.mockClear();
+
+    // Click same view again to deselect
+    act(() => {
+      result.current.handleViewClick("app-view");
+    });
+
+    expect(mockRouterPush).toHaveBeenCalledTimes(1);
+    const pushArgs = mockRouterPush.mock.calls[0]!;
+    const urlObj = pushArgs[0] as {
+      pathname: string;
+      query: Record<string, unknown>;
+    };
+
+    // Reset should NOT have origin filter
+    expect(urlObj.query.origin).toBeUndefined();
+    expect(urlObj.pathname).toBe("/[project]/messages");
+
+    expect(result.current.selectedViewId).toBe("all-traces");
+    expect(localStorage.getItem(selectedKey("test-project"))).toBe(
+      "all-traces",
+    );
   });
 });

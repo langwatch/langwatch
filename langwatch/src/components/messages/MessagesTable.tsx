@@ -1432,6 +1432,8 @@ export function MessagesTable({
               {...navigationFooter}
               scrollId={traceGroups.data?.scrollId}
             />
+            {/* Spacer for fixed SavedViewsBar */}
+            <Box height="32px" flexShrink={0} />
           </VStack>
         </Box>
 

@@ -639,7 +639,7 @@ export const DashboardLayout = ({
                 <SavedViewsProvider>
                   {children}
                   {/* Spacer to prevent fixed bottom bar from covering content */}
-                  <Box height="48px" flexShrink={0} />
+                  <Box height="64px" flexShrink={0} />
                   <SavedViewsBar />
                 </SavedViewsProvider>
               ) : (

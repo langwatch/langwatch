@@ -270,10 +270,11 @@ function useSavedViewsInternal() {
     const cleanQuery = Object.fromEntries(
       Object.entries(router.query).filter(([key]) => RESET_KEEP.has(key)),
     );
-    void router.push({ query: cleanQuery }, undefined, {
-      shallow: true,
-      scroll: false,
-    });
+    void router.push(
+      { pathname: router.pathname, query: cleanQuery },
+      undefined,
+      { shallow: true, scroll: false },
+    );
   }, [router]);
 
   const applyViewFilters = useCallback(
@@ -281,7 +282,7 @@ function useSavedViewsInternal() {
       viewFilters: Partial<Record<FilterField, FilterParam>>,
       query?: string,
       period?: SavedView["period"],
-    ) => {
+    ): Promise<boolean> => {
       let startDate: string | undefined;
       let endDate: string | undefined;
 
@@ -303,8 +304,11 @@ function useSavedViewsInternal() {
         endDate,
       });
 
-      void router.push(
-        { query: queryObj as Record<string, string | string[]> },
+      return router.push(
+        {
+          pathname: router.pathname,
+          query: queryObj as Record<string, string | string[]>,
+        },
         undefined,
         { shallow: true, scroll: false },
       );
@@ -313,6 +317,10 @@ function useSavedViewsInternal() {
   );
 
   // -- Restore saved view on init -------------------------------------------
+  // Pushes the stored view's filters to the URL so it's bookmarkable/shareable.
+  // Note: useFilterParams already reads the same filters from localStorage on
+  // first render, so queries fire with correct filters immediately. This effect
+  // just syncs the URL to match.
   useEffect(() => {
     if (!isInitialized || !projectId) return;
 
@@ -320,18 +328,23 @@ function useSavedViewsInternal() {
 
     if (!selectedViewId || selectedViewId === "all-traces") return;
 
-    // Only restore when there are no existing filter params in the URL
-    const hasUrlFilters = Object.values(filters).some((v) => {
-      const norm = normalizeFilterValue(v);
-      return norm !== undefined;
-    });
-    const hasUrlQuery = !!router.query.query;
-    if (hasUrlFilters || hasUrlQuery) return;
+    // Only restore when there are no filter/date/query params in the actual URL.
+    // We check router.asPath (not `filters` from useFilterParams) because
+    // useFilterParams now includes a localStorage fallback — so `filters` may
+    // be populated even when the URL itself is clean.
+    const urlQueryString = router.asPath.split("?")[1] ?? "";
+    const urlParams = new URLSearchParams(urlQueryString);
+    const hasUrlFilters = Object.values(availableFilters).some(
+      (f) => urlParams.has(f.urlKey),
+    );
+    const hasUrlDates = urlParams.has("startDate") || urlParams.has("endDate");
+    const hasUrlQuery = urlParams.has("query");
+    if (hasUrlFilters || hasUrlDates || hasUrlQuery) return;
 
     const customView = customViews.find((v) => v.id === selectedViewId);
     if (customView) {
       skipNextMatchRef.current = true;
-      applyViewFilters(customView.filters, customView.query, customView.period);
+      void applyViewFilters(customView.filters, customView.query, customView.period);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInitialized, projectId]);
@@ -353,7 +366,7 @@ function useSavedViewsInternal() {
       if (customView) {
         setSelectedViewIdState(viewId);
         writeSelectedViewId(projectId, viewId);
-        applyViewFilters(customView.filters, customView.query, customView.period);
+        void applyViewFilters(customView.filters, customView.query, customView.period);
       }
     },
     [customViews, projectId, resetAllFilters, applyViewFilters],
@@ -529,11 +542,12 @@ function useSavedViewsInternal() {
       return;
     }
 
+    // Only update the UI highlight — don't persist to localStorage.
+    // The stored selection should only change via explicit pill clicks
+    // (handleViewClick/selectView), so adding extra filters on top of a
+    // saved view doesn't lose the user's default selection.
     if (matchedViewId !== selectedViewId) {
       setSelectedViewIdState(matchedViewId);
-      if (projectId) {
-        writeSelectedViewId(projectId, matchedViewId);
-      }
     }
   }, [matchedViewId, isInitialized, selectedViewId, projectId]);
 
@@ -567,6 +581,7 @@ export function SavedViewsProvider({
     </SavedViewsContext.Provider>
   );
 }
+
 
 export function useSavedViews(): SavedViewsContextValue {
   const context = useContext(SavedViewsContext);
