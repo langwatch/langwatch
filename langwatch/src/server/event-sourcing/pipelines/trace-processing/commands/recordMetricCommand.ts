@@ -1,5 +1,7 @@
+import crypto from "node:crypto";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
+import { OtlpSpanPiiRedactionService } from "~/server/app-layer/traces/span-pii-redaction.service";
 import type { Command, CommandHandler } from "../../../";
 import {
   createTenantId,
@@ -8,6 +10,8 @@ import {
 } from "../../../";
 import { createLogger } from "../../../../../utils/logger/server";
 import {
+  DEFAULT_PII_REDACTION_LEVEL,
+  type PIIRedactionLevel,
   recordMetricCommandDataSchema,
   type RecordMetricCommandData,
 } from "../schemas/commands";
@@ -17,6 +21,28 @@ import {
   METRIC_RECORD_RECEIVED_EVENT_VERSION_LATEST,
 } from "../schemas/constants";
 import type { MetricRecordReceivedEvent } from "../schemas/events";
+
+/**
+ * Dependencies for RecordMetricCommand that can be injected for testing.
+ */
+export interface RecordMetricCommandDependencies {
+  /** Service for redacting PII from metric attributes. */
+  piiRedactionService: {
+    redactMetricAttributes: (
+      metric: {
+        attributes: Record<string, string>;
+        resourceAttributes: Record<string, string>;
+      },
+      piiRedactionLevel: PIIRedactionLevel,
+    ) => Promise<void>;
+  };
+}
+
+function createDefaultDependencies(): RecordMetricCommandDependencies {
+  return {
+    piiRedactionService: OtlpSpanPiiRedactionService.create(),
+  };
+}
 
 export class RecordMetricCommand
   implements
@@ -34,6 +60,11 @@ export class RecordMetricCommand
   private readonly logger = createLogger(
     "langwatch:trace-processing:record-metric",
   );
+  private readonly deps: RecordMetricCommandDependencies;
+
+  constructor(deps?: RecordMetricCommandDependencies) {
+    this.deps = deps ?? createDefaultDependencies();
+  }
 
   async handle(
     command: Command<RecordMetricCommandData>,
@@ -62,6 +93,28 @@ export class RecordMetricCommand
           "Handling record metric command",
         );
 
+        const piiRedactionLevel =
+          commandData.piiRedactionLevel ?? DEFAULT_PII_REDACTION_LEVEL;
+
+        // Clone attributes before mutation
+        const metricToRedact = {
+          attributes: { ...commandData.attributes },
+          resourceAttributes: { ...commandData.resourceAttributes },
+        };
+
+        try {
+          await this.deps.piiRedactionService.redactMetricAttributes(
+            metricToRedact,
+            piiRedactionLevel,
+          );
+        } catch (error) {
+          this.logger.error(
+            { error, tenantId, traceId: commandData.traceId },
+            "PII redaction failed for metric, aborting to prevent leak",
+          );
+          throw error;
+        }
+
         const event = EventUtils.createEvent<MetricRecordReceivedEvent>({
           aggregateType: "trace",
           aggregateId: commandData.traceId,
@@ -76,8 +129,8 @@ export class RecordMetricCommand
             metricType: commandData.metricType,
             value: commandData.value,
             timeUnixMs: commandData.timeUnixMs,
-            attributes: commandData.attributes,
-            resourceAttributes: commandData.resourceAttributes,
+            attributes: metricToRedact.attributes,
+            resourceAttributes: metricToRedact.resourceAttributes,
           },
           metadata: {},
           occurredAt: commandData.occurredAt,
@@ -104,6 +157,14 @@ export class RecordMetricCommand
   }
 
   static makeJobId(payload: RecordMetricCommandData): string {
-    return `${payload.tenantId}:${payload.traceId}:${payload.spanId}:${payload.metricName}:${payload.timeUnixMs}:${payload.metricType}`;
+    const attributesHash = crypto
+      .createHash("sha256")
+      .update(JSON.stringify(Object.entries(payload.attributes).sort()))
+      .update(
+        JSON.stringify(Object.entries(payload.resourceAttributes).sort()),
+      )
+      .digest("hex")
+      .slice(0, 8);
+    return `${payload.tenantId}:${payload.traceId}:${payload.spanId}:${payload.metricName}:${payload.timeUnixMs}:${payload.metricType}:${payload.value}:${attributesHash}`;
   }
 }

@@ -595,6 +595,40 @@ const parseTraceState = (
   };
 };
 
+/**
+ * Normalizes raw OTLP attribute arrays into serialized string maps.
+ * Shared utility for log and metric collection services.
+ */
+export function normalizeOtlpAttributeMap(
+  attributes: unknown,
+): Record<string, string> {
+  if (!Array.isArray(attributes)) return {};
+  const normalized = normalizeOtlpAttributes(attributes);
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(normalized)) {
+    if (value === null || value === undefined) continue;
+    if (typeof value === "string") {
+      result[key] = value;
+    } else if (
+      typeof value === "number" ||
+      typeof value === "boolean" ||
+      typeof value === "bigint"
+    ) {
+      result[key] = String(value);
+    } else {
+      try {
+        const serialized = JSON.stringify(value);
+        if (typeof serialized === "string") {
+          result[key] = serialized;
+        }
+      } catch {
+        // Skip unserializable values
+      }
+    }
+  }
+  return result;
+}
+
 export const TraceRequestUtils = {
   normalizeOtlpId,
   normalizeOtlpSpanIds,

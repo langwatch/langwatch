@@ -63,17 +63,21 @@ export const recordLogCommandDataSchema = z.object({
 
 export type RecordLogCommandData = z.infer<typeof recordLogCommandDataSchema>;
 
+export const metricTypeSchema = z.enum(["histogram", "gauge", "sum"]);
+export type MetricType = z.infer<typeof metricTypeSchema>;
+
 export const recordMetricCommandDataSchema = z.object({
   tenantId: z.string(),
   traceId: z.string(),
   spanId: z.string(),
   metricName: z.string(),
   metricUnit: z.string(),
-  metricType: z.string(),
+  metricType: metricTypeSchema,
   value: z.number(),
   timeUnixMs: z.number(),
   attributes: z.record(z.string(), z.string()),
   resourceAttributes: z.record(z.string(), z.string()),
+  piiRedactionLevel: piiRedactionLevelSchema.optional(),
   occurredAt: z.number(),
 });
 

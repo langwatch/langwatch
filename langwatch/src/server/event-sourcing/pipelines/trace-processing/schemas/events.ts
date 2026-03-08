@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { EventSchema } from "../../../domain/types";
-import { piiRedactionLevelSchema } from "./commands";
+import { metricTypeSchema, piiRedactionLevelSchema } from "./commands";
 import {
   LOG_RECORD_RECEIVED_EVENT_TYPE,
   METRIC_RECORD_RECEIVED_EVENT_TYPE,
@@ -191,7 +191,7 @@ export const metricRecordReceivedEventDataSchema = z.object({
   spanId: z.string(),
   metricName: z.string(),
   metricUnit: z.string(),
-  metricType: z.string(),
+  metricType: metricTypeSchema,
   value: z.number(),
   timeUnixMs: z.number(),
   attributes: z.record(z.string(), z.string()),

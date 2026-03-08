@@ -238,6 +238,61 @@ export class OtlpSpanPiiRedactionService {
     await Promise.all(redactionPromises);
   }
 
+  /**
+   * Redacts PII from metric attributes and resource attributes.
+   * Metric values are numeric and don't need redaction, but attributes
+   * can contain arbitrary user-supplied strings.
+   * Mutates the record in place for efficiency.
+   */
+  async redactMetricAttributes(
+    metric: {
+      attributes: Record<string, string>;
+      resourceAttributes: Record<string, string>;
+    },
+    piiRedactionLevel: PIIRedactionLevel,
+  ): Promise<void> {
+    if (process.env.DISABLE_PII_REDACTION) {
+      return;
+    }
+
+    if (piiRedactionLevel === "DISABLED") {
+      return;
+    }
+
+    const piiEnforced = this.deps.isProduction;
+
+    if (!this.deps.isLangevalsConfigured) {
+      if (piiEnforced) {
+        throw new Error(
+          "LANGEVALS_ENDPOINT is not set, PII check cannot be performed",
+        );
+      }
+      return;
+    }
+
+    const options: PIICheckOptions = {
+      piiRedactionLevel,
+      enforced: piiEnforced,
+      mainMethod: "presidio",
+    };
+
+    const redactionPromises: Promise<void>[] = [];
+
+    for (const key of Object.keys(metric.attributes)) {
+      redactionPromises.push(
+        this.deps.clearPII(metric.attributes, [key], options),
+      );
+    }
+
+    for (const key of Object.keys(metric.resourceAttributes)) {
+      redactionPromises.push(
+        this.deps.clearPII(metric.resourceAttributes, [key], options),
+      );
+    }
+
+    await Promise.all(redactionPromises);
+  }
+
   private collectAllAttributeSets(span: OtlpSpan): OtlpKeyValue[][] {
     return [
       span.attributes,

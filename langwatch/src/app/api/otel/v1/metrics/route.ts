@@ -179,6 +179,7 @@ async function handleMetricsRequest(req: NextRequest) {
         await getApp().traces.metricCollection.handleOtlpMetricRequest({
           tenantId: project.id,
           metricRequest: metricsRequest,
+          piiRedactionLevel: project.piiRedactionLevel,
         });
       }
 

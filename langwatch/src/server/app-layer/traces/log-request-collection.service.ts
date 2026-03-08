@@ -3,11 +3,16 @@ import type { IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer"
 import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "~/utils/logger/server";
 import type { DeepPartial } from "~/utils/types";
-import type { RecordLogCommandData } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
+import {
+  type RecordLogCommandData,
+  piiRedactionLevelSchema,
+} from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
 import type { OtlpAnyValue } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
-import { TraceRequestUtils } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
+import {
+  TraceRequestUtils,
+  normalizeOtlpAttributeMap,
+} from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
 import { traced } from "../tracing";
-import { serializeAttributes } from "./repositories/span-storage.clickhouse.repository";
 
 export interface LogRequestCollectionDeps {
   recordLog: (data: RecordLogCommandData) => Promise<void>;
@@ -56,7 +61,7 @@ export class LogRequestCollectionService {
         for (const resourceLog of logRequest.resourceLogs ?? []) {
           if (!resourceLog?.scopeLogs) continue;
 
-          const resourceAttrs = this.normalizeResourceAttributes(
+          const resourceAttrs = normalizeOtlpAttributeMap(
             resourceLog.resource?.attributes,
           );
 
@@ -108,7 +113,7 @@ export class LogRequestCollectionService {
                     )
                   : Date.now();
 
-                const logAttrs = this.normalizeLogAttributes(
+                const logAttrs = normalizeOtlpAttributeMap(
                   logRecord.attributes,
                 );
 
@@ -124,10 +129,7 @@ export class LogRequestCollectionService {
                   resourceAttributes: resourceAttrs,
                   scopeName,
                   scopeVersion,
-                  piiRedactionLevel: piiRedactionLevel as
-                    | "STRICT"
-                    | "ESSENTIAL"
-                    | "DISABLED",
+                  piiRedactionLevel: piiRedactionLevelSchema.parse(piiRedactionLevel),
                   occurredAt: Date.now(),
                 });
 
@@ -210,19 +212,5 @@ export class LogRequestCollectionService {
     }
 
     return null;
-  }
-
-  private normalizeResourceAttributes(
-    attributes: unknown,
-  ): Record<string, string> {
-    if (!Array.isArray(attributes)) return {};
-    const normalized = TraceRequestUtils.normalizeOtlpAttributes(attributes);
-    return serializeAttributes(normalized);
-  }
-
-  private normalizeLogAttributes(attributes: unknown): Record<string, string> {
-    if (!Array.isArray(attributes)) return {};
-    const normalized = TraceRequestUtils.normalizeOtlpAttributes(attributes);
-    return serializeAttributes(normalized);
   }
 }

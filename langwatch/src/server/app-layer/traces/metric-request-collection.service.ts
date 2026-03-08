@@ -3,11 +3,18 @@ import type { IExportMetricsServiceRequest } from "@opentelemetry/otlp-transform
 import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "~/utils/logger/server";
 import type { DeepPartial } from "~/utils/types";
-import type { RecordMetricCommandData } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
-import { TraceRequestUtils } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
+import {
+  type MetricType,
+  type RecordMetricCommandData,
+  metricTypeSchema,
+  piiRedactionLevelSchema,
+} from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
+import {
+  TraceRequestUtils,
+  normalizeOtlpAttributeMap,
+} from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
 import { decodeBase64OpenTelemetryId } from "../../tracer/utils";
 import { traced } from "../tracing";
-import { serializeAttributes } from "./repositories/span-storage.clickhouse.repository";
 
 export interface MetricRequestCollectionDeps {
   recordMetric: (data: RecordMetricCommandData) => Promise<void>;
@@ -35,9 +42,11 @@ export class MetricRequestCollectionService {
   async handleOtlpMetricRequest({
     tenantId,
     metricRequest,
+    piiRedactionLevel,
   }: {
     tenantId: string;
     metricRequest: DeepPartial<IExportMetricsServiceRequest>;
+    piiRedactionLevel: string;
   }): Promise<void> {
     return await this.tracer.withActiveSpan(
       "MetricRequestCollectionService.handleOtlpMetricRequest",
@@ -56,7 +65,7 @@ export class MetricRequestCollectionService {
         for (const resourceMetric of metricRequest.resourceMetrics ?? []) {
           if (!resourceMetric?.scopeMetrics) continue;
 
-          const resourceAttrs = this.normalizeResourceAttributes(
+          const resourceAttrs = normalizeOtlpAttributeMap(
             resourceMetric.resource?.attributes,
           );
 
@@ -104,6 +113,7 @@ export class MetricRequestCollectionService {
                     timeUnixMs: dp.timeUnixMs,
                     attributes: dp.attributes,
                     resourceAttributes: resourceAttrs,
+                    piiRedactionLevel: piiRedactionLevelSchema.parse(piiRedactionLevel),
                     occurredAt: Date.now(),
                   });
 
@@ -146,7 +156,7 @@ export class MetricRequestCollectionService {
   }): Array<{
     traceId: string | null;
     spanId: string | null;
-    metricType: string;
+    metricType: MetricType;
     value: number;
     timeUnixMs: number;
     attributes: Record<string, string>;
@@ -154,7 +164,7 @@ export class MetricRequestCollectionService {
     const results: Array<{
       traceId: string | null;
       spanId: string | null;
-      metricType: string;
+      metricType: MetricType;
       value: number;
       timeUnixMs: number;
       attributes: Record<string, string>;
@@ -166,7 +176,7 @@ export class MetricRequestCollectionService {
       | undefined;
     if (histogram?.dataPoints) {
       for (const dp of histogram.dataPoints) {
-        const dpAttrs = this.normalizeDataPointAttributes(dp?.attributes);
+        const dpAttrs = normalizeOtlpAttributeMap(dp?.attributes);
         const exemplars = dp?.exemplars as
           | Array<Record<string, unknown>>
           | undefined;
@@ -241,11 +251,11 @@ export class MetricRequestCollectionService {
     metricType,
   }: {
     dp: Record<string, unknown> | undefined;
-    metricType: string;
+    metricType: MetricType;
   }): {
     traceId: string | null;
     spanId: string | null;
-    metricType: string;
+    metricType: MetricType;
     value: number;
     timeUnixMs: number;
     attributes: Record<string, string>;
@@ -285,28 +295,12 @@ export class MetricRequestCollectionService {
             metricType,
             value,
             timeUnixMs,
-            attributes: this.normalizeDataPointAttributes(dp.attributes),
+            attributes: normalizeOtlpAttributeMap(dp.attributes),
           };
         }
       }
     }
 
     return null;
-  }
-
-  private normalizeResourceAttributes(
-    attributes: unknown,
-  ): Record<string, string> {
-    if (!Array.isArray(attributes)) return {};
-    const normalized = TraceRequestUtils.normalizeOtlpAttributes(attributes);
-    return serializeAttributes(normalized);
-  }
-
-  private normalizeDataPointAttributes(
-    attributes: unknown,
-  ): Record<string, string> {
-    if (!Array.isArray(attributes)) return {};
-    const normalized = TraceRequestUtils.normalizeOtlpAttributes(attributes);
-    return serializeAttributes(normalized);
   }
 }
