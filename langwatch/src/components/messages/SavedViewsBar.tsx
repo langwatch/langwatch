@@ -13,6 +13,7 @@ import {
   HStack,
   IconButton,
   Input,
+  useBreakpointValue,
   Text,
 } from "@chakra-ui/react";
 import {
@@ -37,6 +38,7 @@ import React, { useCallback, useRef, useState } from "react";
 import type { SavedView } from "../../hooks/useSavedViews";
 import { useSavedViews } from "../../hooks/useSavedViews";
 import { getColorForString } from "../../utils/rotatingColors";
+import { MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "../MainMenu";
 import { Menu } from "../ui/menu";
 
 /**
@@ -90,12 +92,15 @@ export function SavedViewsBar() {
   );
 
   const allTracesView = defaultViews[0];
+  const isSmallScreen = useBreakpointValue({ base: true, lg: false });
+  const menuWidth = isSmallScreen ? MENU_WIDTH_COMPACT : MENU_WIDTH_EXPANDED;
 
   return (
     <Box
-      position="sticky"
+      position="fixed"
       bottom={0}
-      width="full"
+      left={menuWidth}
+      right={0}
       zIndex={10}
       background="bg.panel/75"
       backdropFilter="blur(8px)"
