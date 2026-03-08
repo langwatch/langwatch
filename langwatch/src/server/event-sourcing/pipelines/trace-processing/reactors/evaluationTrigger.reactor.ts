@@ -42,19 +42,9 @@ export function createEvaluationTriggerReactor(
       // Guard: skip traces blocked by guardrail with no output
       if (foldState.blockedByGuardrail && !foldState.computedOutput) return;
 
-      // Guard: skip non-application traces (evaluations, simulations, workflows, playground)
+      // Origin filtering is now handled by per-monitor preconditions.
+      // Extract trace attributes for command data.
       const attrs = foldState.attributes ?? {};
-      const scope = attrs["langwatch.origin"];
-      if (scope && scope !== "application") {
-        return;
-      }
-      // TODO(2027): remove legacy guard once all traces have langwatch.origin
-      if (
-        attrs["langwatch.platform"] === "optimization_studio" &&
-        attrs["langwatch.environment"] === "development"
-      ) {
-        return;
-      }
 
       // Read all enabled ON_MESSAGE monitors for this project
       const monitors = await deps.monitors.getEnabledOnMessageMonitors(tenantId);
@@ -66,6 +56,9 @@ export function createEvaluationTriggerReactor(
       const userId = attrs["langwatch.user_id"];
       const customerId = attrs["langwatch.customer_id"];
       const labels = parseLabels(attrs["langwatch.labels"]);
+      const origin = attrs["langwatch.origin"];
+      const hasError = foldState.containsErrorStatus;
+      const promptIds = parseLabels(attrs["langwatch.prompt_ids"]);
 
       for (const monitor of monitors) {
         const evaluationId = generate(KSUID_RESOURCES.EVALUATION).toString();
@@ -84,6 +77,9 @@ export function createEvaluationTriggerReactor(
             userId,
             customerId,
             labels,
+            origin,
+            hasError,
+            promptIds,
           };
 
           const isThreadLevel =

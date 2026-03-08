@@ -21,6 +21,10 @@ export const executeEvaluationCommandDataSchema = z.object({
   userId: z.string().optional(),
   customerId: z.string().optional(),
   labels: z.array(z.string()).optional(),
+  // Precondition fields added for expanded filtering
+  origin: z.string().optional(),
+  hasError: z.boolean().optional(),
+  promptIds: z.array(z.string()).optional(),
 });
 
 export type ExecuteEvaluationCommandData = z.infer<

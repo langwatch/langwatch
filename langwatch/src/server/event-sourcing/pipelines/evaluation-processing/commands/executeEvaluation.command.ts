@@ -147,8 +147,15 @@ export function createExecuteEvaluationCommandClass(deps: ExecuteEvaluationComma
           thread_id: data.threadId,
           user_id: data.userId,
           customer_id: data.customerId,
+          prompt_ids: data.promptIds,
         },
         expected_output: undefined,
+        origin: data.origin,
+        // Precondition evaluation only checks error presence (truthy/falsy),
+        // not message content. A sentinel object is sufficient here.
+        error: data.hasError
+          ? { has_error: true, message: "", stacktrace: [] }
+          : null,
       };
 
       const preconditions = (monitor.preconditions ?? []) as CheckPreconditions;

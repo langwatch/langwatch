@@ -30,7 +30,20 @@ import {
 import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
-import type { CheckPrecondition } from "~/server/evaluations/types";
+import type {
+  CheckPrecondition,
+  CheckPreconditionFields,
+  CheckPreconditionRule,
+} from "~/server/evaluations/types";
+import {
+  DEFAULT_PRECONDITION,
+  RULE_LABELS,
+  getAllowedRulesForField,
+  getFieldOptionsByCategory,
+  getFieldValueType,
+  isDefaultOnlyPrecondition,
+  isRuleAllowedForField,
+} from "~/components/preconditions/preconditionFieldUtils";
 import {
   type MappingState,
   THREAD_MAPPINGS,
@@ -105,19 +118,6 @@ function autoInferMappings(
   return mappings;
 }
 
-// Precondition options
-const ruleOptions: Record<CheckPrecondition["rule"], string> = {
-  not_contains: "does not contain",
-  contains: "contains",
-  matches_regex: "matches regex",
-};
-
-const fieldOptions: Record<string, string> = {
-  output: "output",
-  input: "input",
-  "metadata.labels": "metadata.labels",
-};
-
 // Module-level state to persist across drawer navigation (component unmounts/remounts)
 let onlineEvaluationDrawerState: {
   level: EvaluationLevel; // Can be null (no selection), "trace", or "thread"
@@ -178,7 +178,9 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       level: onlineEvaluationDrawerState?.level ?? null,
       name: onlineEvaluationDrawerState?.name ?? "",
       sample: onlineEvaluationDrawerState?.sample ?? 1.0,
-      preconditions: onlineEvaluationDrawerState?.preconditions ?? [],
+      preconditions: onlineEvaluationDrawerState?.preconditions ?? [
+        DEFAULT_PRECONDITION,
+      ],
       threadIdleTimeout: onlineEvaluationDrawerState?.threadIdleTimeout ?? 300,
     },
   });
@@ -333,7 +335,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
         level: null, // Start with no level selected for progressive disclosure
         name: "",
         sample: 1.0,
-        preconditions: [],
+        preconditions: [DEFAULT_PRECONDITION],
         threadIdleTimeout: 300,
       });
       setSelectedEvaluator(null);
@@ -821,6 +823,9 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     [selectedEvaluator, allFields, form],
   );
 
+  // Track whether preconditions are expanded (user clicked "Add precondition")
+  const [preconditionsExpanded, setPreconditionsExpanded] = useState(false);
+
   // Precondition handlers
   const addPrecondition = useCallback(() => {
     const current = form.getValues("preconditions");
@@ -828,29 +833,54 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       ...current,
       { field: "output", rule: "contains", value: "" },
     ]);
+    setPreconditionsExpanded(true);
   }, [form]);
 
   const removePrecondition = useCallback(
     (index: number) => {
       const current = form.getValues("preconditions");
-      form.setValue(
-        "preconditions",
-        current.filter((_, i) => i !== index),
-      );
+      const updated = current.filter((_, i) => i !== index);
+      form.setValue("preconditions", updated);
+      // Collapse back to summary if only default precondition remains
+      if (isDefaultOnlyPrecondition(updated)) {
+        setPreconditionsExpanded(false);
+      }
     },
     [form],
   );
 
   const updatePrecondition = useCallback(
-    (index: number, field: keyof CheckPrecondition, value: string) => {
+    (index: number, key: keyof CheckPrecondition, value: string) => {
       const current = form.getValues("preconditions");
-      form.setValue(
-        "preconditions",
-        current.map((p, i) => (i === index ? { ...p, [field]: value } : p)),
-      );
+      const updated = current.map((p, i) => {
+        if (i !== index) return p;
+        if (key === "field") {
+          const newField = value as CheckPreconditionFields;
+          const currentRule = p.rule as CheckPreconditionRule;
+          const updates: Partial<CheckPrecondition> = { field: newField };
+
+          // Reset rule if not allowed for new field
+          if (!isRuleAllowedForField(newField, currentRule)) {
+            const allowed = getAllowedRulesForField(newField);
+            updates.rule = allowed[0] ?? "is";
+          }
+
+          // Reset value for boolean fields
+          if (getFieldValueType(newField) === "boolean") {
+            updates.value = "true";
+          }
+
+          return { ...p, ...updates };
+        }
+        return { ...p, [key]: value };
+      });
+      form.setValue("preconditions", updated);
     },
     [form],
   );
+
+  // Compute field groups for the dropdown
+  const fieldGroups = useMemo(() => getFieldOptionsByCategory(), []);
 
   const handleSave = useCallback(() => {
     if (!selectedEvaluator || !project?.id || !name.trim()) return;
@@ -1119,106 +1149,159 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                 helper="Only run this evaluation when certain conditions are met"
               >
                 <VStack align="start" gap={3}>
-                  {preconditions.map((precondition, index) => (
-                    <Box
-                      key={index}
-                      borderLeft="4px solid"
-                      borderLeftColor="blue.400"
-                      width="full"
-                    >
-                      <VStack
-                        padding={3}
-                        width="full"
-                        align="start"
-                        position="relative"
-                      >
-                        <Button
-                          position="absolute"
-                          right={0}
-                          top={0}
-                          padding={0}
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => removePrecondition(index)}
-                          color="gray.400"
-                        >
-                          <X size={16} />
-                        </Button>
-                        <SmallLabel>{index === 0 ? "When" : "and"}</SmallLabel>
-                        <HStack gap={2} flexWrap="wrap">
-                          <NativeSelect.Root minWidth="fit-content">
-                            <NativeSelect.Field
-                              value={precondition.field}
-                              onChange={(e) =>
-                                updatePrecondition(
-                                  index,
-                                  "field",
-                                  e.target.value,
-                                )
-                              }
-                            >
-                              {Object.entries(fieldOptions).map(
-                                ([value, label]) => (
-                                  <option key={value} value={value}>
-                                    {label}
-                                  </option>
-                                ),
-                              )}
-                            </NativeSelect.Field>
-                            <NativeSelect.Indicator />
-                          </NativeSelect.Root>
+                  {isDefaultOnlyPrecondition(preconditions) &&
+                  !preconditionsExpanded ? (
+                    <>
+                      <Text color="gray.500" fontStyle="italic">
+                        This evaluation will run on every application trace
+                      </Text>
+                      <Button variant="outline" onClick={addPrecondition}>
+                        Add Precondition
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      {preconditions.map((precondition, index) => {
+                        const currentField =
+                          precondition.field as CheckPreconditionFields;
+                        const allowedRules =
+                          getAllowedRulesForField(currentField);
+                        const valueType = getFieldValueType(currentField);
 
-                          <NativeSelect.Root minWidth="fit-content">
-                            <NativeSelect.Field
-                              value={precondition.rule}
-                              onChange={(e) =>
-                                updatePrecondition(
-                                  index,
-                                  "rule",
-                                  e.target.value,
-                                )
-                              }
+                        return (
+                          <Box
+                            key={index}
+                            borderLeft="4px solid"
+                            borderLeftColor="blue.400"
+                            width="full"
+                          >
+                            <VStack
+                              padding={3}
+                              width="full"
+                              align="start"
+                              position="relative"
                             >
-                              {Object.entries(ruleOptions).map(
-                                ([value, label]) => (
-                                  <option key={value} value={value}>
-                                    {label}
-                                  </option>
-                                ),
-                              )}
-                            </NativeSelect.Field>
-                            <NativeSelect.Indicator />
-                          </NativeSelect.Root>
-                        </HStack>
-                        <HStack width="full">
-                          {precondition.rule.includes("regex") && (
-                            <Text fontSize="16px">{"/"}</Text>
-                          )}
-                          <Input
-                            value={precondition.value}
-                            onChange={(e) =>
-                              updatePrecondition(index, "value", e.target.value)
-                            }
-                            placeholder={
-                              precondition.rule.includes("regex")
-                                ? "regex"
-                                : "text"
-                            }
-                          />
-                          {precondition.rule.includes("regex") && (
-                            <Text fontSize="16px">{"/gi"}</Text>
-                          )}
-                        </HStack>
-                      </VStack>
-                    </Box>
-                  ))}
-                  <Text color="gray.500" fontStyle="italic">
-                    This evaluation will run on {runOnText}
-                    {preconditions.length > 0 && " matching the preconditions"}
-                  </Text>
-                  <Button variant="outline" onClick={addPrecondition}>
-                    Add Precondition
-                  </Button>
+                              <Button
+                                position="absolute"
+                                right={0}
+                                top={0}
+                                padding={0}
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => removePrecondition(index)}
+                                color="gray.400"
+                              >
+                                <X size={16} />
+                              </Button>
+                              <SmallLabel>
+                                {index === 0 ? "When" : "and"}
+                              </SmallLabel>
+                              <HStack gap={2} flexWrap="wrap">
+                                <NativeSelect.Root minWidth="fit-content">
+                                  <NativeSelect.Field
+                                    value={precondition.field}
+                                    onChange={(e) =>
+                                      updatePrecondition(
+                                        index,
+                                        "field",
+                                        e.target.value,
+                                      )
+                                    }
+                                  >
+                                    {fieldGroups.map((group) => (
+                                      <optgroup
+                                        key={group.category}
+                                        label={group.category}
+                                      >
+                                        {group.fields.map((f) => (
+                                          <option key={f.value} value={f.value}>
+                                            {f.label}
+                                          </option>
+                                        ))}
+                                      </optgroup>
+                                    ))}
+                                  </NativeSelect.Field>
+                                  <NativeSelect.Indicator />
+                                </NativeSelect.Root>
+
+                                <NativeSelect.Root minWidth="fit-content">
+                                  <NativeSelect.Field
+                                    value={precondition.rule}
+                                    onChange={(e) =>
+                                      updatePrecondition(
+                                        index,
+                                        "rule",
+                                        e.target.value,
+                                      )
+                                    }
+                                  >
+                                    {allowedRules.map((rule) => (
+                                      <option key={rule} value={rule}>
+                                        {RULE_LABELS[rule]}
+                                      </option>
+                                    ))}
+                                  </NativeSelect.Field>
+                                  <NativeSelect.Indicator />
+                                </NativeSelect.Root>
+                              </HStack>
+                              <HStack width="full">
+                                {valueType === "boolean" ? (
+                                  <NativeSelect.Root minWidth="fit-content">
+                                    <NativeSelect.Field
+                                      value={precondition.value}
+                                      onChange={(e) =>
+                                        updatePrecondition(
+                                          index,
+                                          "value",
+                                          e.target.value,
+                                        )
+                                      }
+                                    >
+                                      <option value="true">true</option>
+                                      <option value="false">false</option>
+                                    </NativeSelect.Field>
+                                    <NativeSelect.Indicator />
+                                  </NativeSelect.Root>
+                                ) : (
+                                  <>
+                                    {precondition.rule.includes("regex") && (
+                                      <Text fontSize="16px">{"/"}</Text>
+                                    )}
+                                    <Input
+                                      value={precondition.value}
+                                      onChange={(e) =>
+                                        updatePrecondition(
+                                          index,
+                                          "value",
+                                          e.target.value,
+                                        )
+                                      }
+                                      placeholder={
+                                        precondition.rule.includes("regex")
+                                          ? "regex"
+                                          : "text"
+                                      }
+                                    />
+                                    {precondition.rule.includes("regex") && (
+                                      <Text fontSize="16px">{"/gi"}</Text>
+                                    )}
+                                  </>
+                                )}
+                              </HStack>
+                            </VStack>
+                          </Box>
+                        );
+                      })}
+                      <Text color="gray.500" fontStyle="italic">
+                        This evaluation will run on {runOnText}
+                        {preconditions.length > 0 &&
+                          " matching the preconditions"}
+                      </Text>
+                      <Button variant="outline" onClick={addPrecondition}>
+                        Add Precondition
+                      </Button>
+                    </>
+                  )}
                 </VStack>
               </HorizontalFormControl>
             )}
