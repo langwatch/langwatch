@@ -16,7 +16,6 @@
 
 import { differenceInCalendarDays, subDays } from "date-fns";
 import { useRouter } from "next/router";
-import qs from "qs";
 import React, {
   createContext,
   useCallback,
@@ -50,16 +49,6 @@ export {
   type SavedView,
 } from "./savedViewsLogic";
 
-/** URL query keys to preserve when applying or resetting view filters */
-const PRESERVED_URL_KEYS = new Set([
-  "project",
-  "view",
-  "group_by",
-  "startDate",
-  "endDate",
-  "negateFilters",
-]);
-
 // ---------------------------------------------------------------------------
 // localStorage helpers
 // ---------------------------------------------------------------------------
@@ -90,7 +79,7 @@ function writeSelectedViewId(projectId: string, viewId: string | null): void {
       localStorage.setItem(storageKey(projectId, "selected"), viewId);
     }
   } catch {
-    // localStorage full or unavailable -- silently fail
+    // silently fail
   }
 }
 
@@ -120,7 +109,15 @@ function readCachedViews(projectId: string): SavedView[] | null {
 // URL helpers
 // ---------------------------------------------------------------------------
 
-function buildViewQueryString({
+/**
+ * Builds a Next.js query object for router.push({ query }).
+ * Preserves layout keys (view, group_by) and date params from the current URL,
+ * then overlays the view's filters, query, and optional date overrides.
+ *
+ * NOTE: "project" is included because Next.js needs it to resolve the
+ * dynamic [project] route segment — it won't appear in the actual URL.
+ */
+function buildViewQuery({
   routerQuery,
   viewFilters,
   query,
@@ -132,30 +129,36 @@ function buildViewQueryString({
   query?: string;
   startDate?: string;
   endDate?: string;
-}): string {
-  const cleanQuery: Record<string, unknown> = {};
+}): Record<string, unknown> {
+  const KEEP = new Set([
+    "project",
+    "view",
+    "group_by",
+    "startDate",
+    "endDate",
+    "negateFilters",
+  ]);
+
+  const out: Record<string, unknown> = {};
   for (const [key, val] of Object.entries(routerQuery)) {
-    if (PRESERVED_URL_KEYS.has(key)) {
-      cleanQuery[key] = val;
+    if (KEEP.has(key)) {
+      out[key] = val;
     }
   }
 
+  // Overlay filter URL params
   for (const [field, value] of Object.entries(viewFilters)) {
     const filterDef = availableFilters[field as FilterField];
     if (filterDef && value) {
-      cleanQuery[filterDef.urlKey] = value;
+      out[filterDef.urlKey] = value;
     }
   }
 
-  if (query) cleanQuery["query"] = query;
-  if (startDate) cleanQuery["startDate"] = startDate;
-  if (endDate) cleanQuery["endDate"] = endDate;
+  if (query) out["query"] = query;
+  if (startDate) out["startDate"] = startDate;
+  if (endDate) out["endDate"] = endDate;
 
-  return qs.stringify(cleanQuery, {
-    allowDots: true,
-    arrayFormat: "comma",
-    allowEmptyArrays: true,
-  });
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -198,8 +201,19 @@ function useSavedViewsInternal() {
   const skipNextMatchRef = useRef(false);
   const pendingRestoreRef = useRef(true);
 
+  // -- Read selectedViewId synchronously on projectId change ----------------
+  // This runs during render (not in an effect) so selectedViewId is available
+  // before any effects fire. React supports this pattern for derived state.
+  const prevProjectIdRef = useRef("");
+  if (projectId && projectId !== prevProjectIdRef.current) {
+    prevProjectIdRef.current = projectId;
+    const storedId = readSelectedViewId(projectId);
+    setSelectedViewIdState(storedId);
+    pendingRestoreRef.current = true;
+    skipNextMatchRef.current = true;
+  }
+
   // -- Fetch saved views from DB, seeded with localStorage cache -----------
-  // Read cached views once per projectId so we have instant data on mount.
   const cachedViews = useMemo(() => {
     if (!projectId) return undefined;
     const cached = readCachedViews(projectId);
@@ -211,7 +225,6 @@ function useSavedViewsInternal() {
     { enabled: !!projectId },
   );
 
-  // Combine: use server data when available, fall back to cache
   const rawViews = savedViewsQuery.data;
   const isInitialized = savedViewsQuery.isFetched || cachedViews !== undefined;
 
@@ -227,21 +240,6 @@ function useSavedViewsInternal() {
     const clientViews = rawViews.map(toClientView);
     writeCachedViews(projectId, clientViews);
   }, [projectId, rawViews]);
-
-  // -- Project change: reset stale state -----------------------------------
-  const prevProjectIdRef = useRef(projectId);
-  useEffect(() => {
-    if (!projectId) return;
-
-    if (prevProjectIdRef.current !== projectId) {
-      prevProjectIdRef.current = projectId;
-      pendingRestoreRef.current = true;
-      skipNextMatchRef.current = true;
-    }
-
-    const storedId = readSelectedViewId(projectId);
-    setSelectedViewIdState(storedId);
-  }, [projectId]);
 
   // -- tRPC mutations ------------------------------------------------------
   const createMutation = api.savedViews.create.useMutation({
@@ -268,11 +266,9 @@ function useSavedViewsInternal() {
   // -- Filter actions -------------------------------------------------------
 
   const resetAllFilters = useCallback(() => {
-    const RESET_PRESERVED = new Set(["project", "view", "group_by", "startDate", "endDate"]);
+    const RESET_KEEP = new Set(["project", "view", "group_by", "startDate", "endDate"]);
     const cleanQuery = Object.fromEntries(
-      Object.entries(router.query).filter(([key]) =>
-        RESET_PRESERVED.has(key),
-      ),
+      Object.entries(router.query).filter(([key]) => RESET_KEEP.has(key)),
     );
     void router.push({ query: cleanQuery }, undefined, {
       shallow: true,
@@ -299,21 +295,19 @@ function useSavedViewsInternal() {
         }
       }
 
-      const queryString = buildViewQueryString({
-        routerQuery: router.query as Record<
-          string,
-          string | string[] | undefined
-        >,
+      const queryObj = buildViewQuery({
+        routerQuery: router.query as Record<string, string | string[] | undefined>,
         viewFilters,
         query,
         startDate,
         endDate,
       });
 
-      void router.push("?" + queryString, undefined, {
-        shallow: true,
-        scroll: false,
-      });
+      void router.push(
+        { query: queryObj as Record<string, string | string[]> },
+        undefined,
+        { shallow: true, scroll: false },
+      );
     },
     [router],
   );
