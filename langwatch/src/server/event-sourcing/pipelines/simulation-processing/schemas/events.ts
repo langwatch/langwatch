@@ -5,6 +5,26 @@ import { simulationMessageSchema, simulationResultsSchema } from "./shared";
 export type { SimulationRunStatus, SimulationVerdict } from "./shared";
 
 /**
+ * RunQueued event - emitted when a simulation run is scheduled but not yet started.
+ */
+const simulationRunQueuedEventDataSchema = z.object({
+  scenarioRunId: z.string(),
+  scenarioId: z.string(),
+  batchRunId: z.string(),
+  scenarioSetId: z.string(),
+  name: z.string().optional(),
+  description: z.string().optional(),
+});
+export type SimulationRunQueuedEventData = z.infer<typeof simulationRunQueuedEventDataSchema>;
+
+export const SimulationRunQueuedEventSchema = EventSchema.extend({
+  type: z.literal(SIMULATION_RUN_EVENT_TYPES.QUEUED),
+  version: z.literal(SIMULATION_EVENT_VERSIONS.QUEUED),
+  data: simulationRunQueuedEventDataSchema,
+});
+export type SimulationRunQueuedEvent = z.infer<typeof SimulationRunQueuedEventSchema>;
+
+/**
  * RunStarted event - emitted when a simulation run begins.
  */
 const simulationRunStartedEventDataSchema = z.object({
@@ -67,6 +87,7 @@ const simulationTextMessageStartEventDataSchema = z.object({
   scenarioRunId: z.string(),
   messageId: z.string(),
   role: z.string(),
+  messageIndex: z.number().optional(),
 });
 export type SimulationTextMessageStartEventData = z.infer<typeof simulationTextMessageStartEventDataSchema>;
 
@@ -87,6 +108,7 @@ const simulationTextMessageEndEventDataSchema = z.object({
   content: z.string(),
   message: z.record(z.unknown()).optional(),
   traceId: z.string().optional(),
+  messageIndex: z.number().optional(),
 });
 export type SimulationTextMessageEndEventData = z.infer<typeof simulationTextMessageEndEventDataSchema>;
 
@@ -116,6 +138,7 @@ export type SimulationRunDeletedEvent = z.infer<typeof SimulationRunDeletedEvent
  * Union of all simulation processing event types.
  */
 export type SimulationProcessingEvent =
+  | SimulationRunQueuedEvent
   | SimulationRunStartedEvent
   | SimulationMessageSnapshotEvent
   | SimulationTextMessageStartEvent
@@ -124,6 +147,7 @@ export type SimulationProcessingEvent =
   | SimulationRunDeletedEvent;
 
 export {
+  isSimulationRunQueuedEvent,
   isSimulationMessageSnapshotEvent,
   isSimulationTextMessageStartEvent,
   isSimulationTextMessageEndEvent,

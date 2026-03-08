@@ -54,6 +54,8 @@ const config: ExperimentRunCommandConfig<
     evaluatorId: commandData.evaluatorId,
     status: commandData.status,
   }),
+  makeIdempotencyKey: (commandData) =>
+    `${commandData.tenantId}:${commandData.runId}:eval:${commandData.index}:${commandData.targetId}:${commandData.evaluatorId}`,
 };
 
 /**

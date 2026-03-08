@@ -18,6 +18,13 @@ import {
   SimulationRunStateRepositoryMemory,
 } from "./pipelines/simulation-processing/repositories";
 import { createSimulationRunStateFoldStore } from "./pipelines/simulation-processing/projections/simulationRunState.store";
+import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
+import {
+  SuiteRunStateRepositoryClickHouse,
+  SuiteRunStateRepositoryMemory,
+} from "./pipelines/suite-run-processing/repositories";
+import { createSuiteRunStateFoldStore } from "./pipelines/suite-run-processing/projections/suiteRunState.store";
+import { createSuiteRunSyncReactor } from "./pipelines/simulation-processing/reactors/suiteRunSync.reactor";
 import { createExperimentRunEsSyncReactor } from "./pipelines/experiment-run-processing/reactors/experimentRunEsSync.reactor";
 import { createSnapshotUpdateBroadcastReactor } from "./pipelines/simulation-processing/reactors/snapshotUpdateBroadcast";
 import { createElasticsearchBatchEvaluationRepository } from "../evaluations-v3/repositories/elasticsearchBatchEvaluation.repository";
@@ -42,6 +49,9 @@ import { createBillingReportingPipeline, BILLING_REPORTING_PIPELINE_NAME } from 
 import { createReportUsageForMonthCommandClass } from "./pipelines/billing-reporting/commands/reportUsageForMonth.command";
 import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
 import { createLogger } from "~/utils/logger/server";
+import { getProjectEmbeddingsModel } from "~/server/embeddings";
+import { prepareLitellmParams } from "~/server/api/routers/modelProviders";
+import { OPENAI_EMBEDDING_DIMENSION } from "~/utils/constants";
 
 const logger = createLogger("langwatch:event-sourcing:pipeline-registry");
 
@@ -77,8 +87,9 @@ export class PipelineRegistry {
   registerAll() {
     const evalPipeline = this.registerEvaluationPipeline();
     const tracePipeline = this.registerTracePipeline(evalPipeline);
+    const suiteRunPipeline = this.registerSuiteRunPipeline();
+    const simulationPipeline = this.registerSimulationPipeline(suiteRunPipeline);
     const experimentRunPipeline = this.registerExperimentRunPipeline();
-    const simulationPipeline = this.registerSimulationPipeline();
     const billingPipeline = this.registerBillingReportingPipeline();
 
     logger.info("All pipelines registered");
@@ -88,6 +99,7 @@ export class PipelineRegistry {
       evaluations: mapCommands(evalPipeline.commands),
       experimentRuns: mapCommands(experimentRunPipeline.commands),
       simulations: mapCommands(simulationPipeline.commands),
+      suiteRuns: mapCommands(suiteRunPipeline.commands),
       billing: mapCommands(billingPipeline.commands),
     };
   }
@@ -141,6 +153,14 @@ export class PipelineRegistry {
         return satisfactionCommandRef.dispatch(data);
       },
       nlpServiceUrl: process.env.LANGWATCH_NLP_SERVICE,
+      getEmbeddingsLitellmParams: async (projectId: string) => {
+        const { model, modelProvider } =
+          await getProjectEmbeddingsModel(projectId);
+        return {
+          ...(await prepareLitellmParams({ model, modelProvider, projectId })),
+          dimensions: OPENAI_EMBEDDING_DIMENSION,
+        };
+      },
     });
 
     const tracePipeline = this.deps.eventSourcing.register(
@@ -161,7 +181,19 @@ export class PipelineRegistry {
     return tracePipeline;
   }
 
-  private registerSimulationPipeline() {
+  private registerSuiteRunPipeline() {
+    const repository = this.deps.clickhouse
+      ? new SuiteRunStateRepositoryClickHouse(this.deps.clickhouse)
+      : new SuiteRunStateRepositoryMemory();
+
+    return this.deps.eventSourcing.register(
+      createSuiteRunProcessingPipeline({
+        suiteRunStateFoldStore: createSuiteRunStateFoldStore(repository),
+      }),
+    );
+  }
+
+  private registerSimulationPipeline(suiteRunPipeline: ReturnType<PipelineRegistry["registerSuiteRunPipeline"]>) {
     const repository = this.deps.clickhouse
       ? new SimulationRunStateRepositoryClickHouse(this.deps.clickhouse)
       : new SimulationRunStateRepositoryMemory();
@@ -171,10 +203,17 @@ export class PipelineRegistry {
       hasRedis: !!this.deps.eventSourcing.redisConnection,
     });
 
+    const suiteRunCommands = mapCommands(suiteRunPipeline.commands);
+    const suiteRunSyncReactor = createSuiteRunSyncReactor({
+      recordSuiteRunItemStarted: suiteRunCommands.recordSuiteRunItemStarted,
+      completeSuiteRunItem: suiteRunCommands.completeSuiteRunItem,
+    });
+
     return this.deps.eventSourcing.register(
       createSimulationProcessingPipeline({
         simulationRunStore,
         snapshotUpdateBroadcastReactor,
+        suiteRunSyncReactor,
       }),
     );
   }

@@ -62,7 +62,7 @@ export function BatchEvaluationV2EvaluationSummary({
   return (
     <VStack
       width="full"
-      background="white"
+      background="bg.surface"
       gap={0}
       position="sticky"
       left={0}

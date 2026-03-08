@@ -269,6 +269,7 @@ function emitScheduledAndCompleted(
       isGuardrail: data.isGuardrail,
     },
     occurredAt: data.occurredAt,
+    idempotencyKey: `${data.tenantId}:${data.evaluationId}:scheduled`,
   });
 
   const completedEvent = EventUtils.createEvent<EvaluationCompletedEvent>({
@@ -287,6 +288,7 @@ function emitScheduledAndCompleted(
       error: result.error ?? null,
     },
     occurredAt: Date.now(),
+    idempotencyKey: `${data.tenantId}:${data.evaluationId}:completed`,
   });
 
   return [scheduledEvent, completedEvent];

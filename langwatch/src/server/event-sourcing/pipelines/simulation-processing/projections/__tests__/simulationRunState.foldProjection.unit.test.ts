@@ -480,6 +480,24 @@ describe("simulationRunStateFoldProjection", () => {
       expect(state.TraceIds).toEqual(["trace-1"]);
     });
 
+    it("replaces message content when same messageId arrives twice", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createTextMessageStartEvent({ messageId: "msg-1", role: "assistant" }),
+        createTextMessageEndEvent(
+          { messageId: "msg-1", role: "assistant", content: "first" },
+          { id: "event-tme-1", occurredAt: 2000 },
+        ),
+        createTextMessageEndEvent(
+          { messageId: "msg-1", role: "assistant", content: "second" },
+          { id: "event-tme-2", occurredAt: 2500 },
+        ),
+      ]);
+
+      expect(state.Messages).toHaveLength(1);
+      expect(state.Messages[0]!.Content).toBe("second");
+    });
+
     it("builds Rest from extra message fields", () => {
       const state = foldEvents([
         createRunStartedEvent(),

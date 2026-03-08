@@ -1,4 +1,5 @@
 import { Box, Grid, HStack, IconButton, Text } from "@chakra-ui/react";
+import { keyframes } from "@emotion/react";
 import type React from "react";
 import { createContext, useContext, useLayoutEffect, useState } from "react";
 import { ZoomIn, ZoomOut } from "react-feather";
@@ -6,6 +7,11 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useZoom } from "~/hooks/useZoom";
 import { Tooltip } from "../ui/tooltip";
 import { SimulationChatViewer } from "./SimulationChatViewer";
+
+const cardPopIn = keyframes`
+  from { opacity: 0; transform: scale(0.9) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+`;
 
 const ZoomContext = createContext<ReturnType<typeof useZoom> | null>(null);
 
@@ -108,22 +114,6 @@ function GridComponent({ scenarioRunIds }: GridProps) {
     });
   };
 
-  // Calculate optimal column count based on container width and scale
-  const calculateColsCount = () => {
-    if (containerWidth === 0) return 3; // fallback while measuring
-
-    // Calculate effective card width considering current scale
-    const effectiveCardWidth = TARGET_CARD_WIDTH * scale;
-
-    // Calculate how many cards can fit, accounting for gaps
-    // Formula: (availableWidth + gap) / (cardWidth + gap)
-    const maxColumns = Math.floor(
-      (containerWidth + GRID_GAP) / (effectiveCardWidth + GRID_GAP),
-    );
-
-    return Math.max(1, maxColumns);
-  };
-
   // Measure container width using ResizeObserver for accuracy
   useLayoutEffect(() => {
     const measureWidth = () => {
@@ -145,14 +135,21 @@ function GridComponent({ scenarioRunIds }: GridProps) {
 
   // Update column count when width or scale changes
   useLayoutEffect(() => {
-    const newColsCount = calculateColsCount();
-    setColsCount(newColsCount);
+    if (containerWidth === 0) {
+      setColsCount(3);
+      return;
+    }
+    const effectiveCardWidth = TARGET_CARD_WIDTH * scale;
+    const maxColumns = Math.floor(
+      (containerWidth + GRID_GAP) / (effectiveCardWidth + GRID_GAP),
+    );
+    setColsCount(Math.max(1, maxColumns));
   }, [containerWidth, scale]);
 
   return (
     <Box
       ref={containerRef}
-      overflow="hidden"
+      // overflow="hidden"
       style={{
         touchAction: "none",
         userSelect: "none",
@@ -176,14 +173,10 @@ function GridComponent({ scenarioRunIds }: GridProps) {
             height="400px"
             cursor="pointer"
             onClick={() => handleExpandToggle(scenarioRunId)}
-            overflow="auto"
+            overflow="visible"
             css={{
               opacity: 0,
-              animation: `fade-in-up 0.4s ease-out ${idx * 0.06}s forwards`,
-              "@keyframes fade-in-up": {
-                from: { opacity: 0, transform: "translateY(8px)" },
-                to: { opacity: 1, transform: "translateY(0)" },
-              },
+              animation: `${cardPopIn} 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) ${idx * 0.06}s forwards`,
               minWidth: 0,
               minHeight: 0,
             }}

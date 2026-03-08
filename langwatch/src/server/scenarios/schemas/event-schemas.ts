@@ -130,6 +130,7 @@ export const scenarioTextMessageStartSchema = baseScenarioEventSchema.extend({
   type: z.literal(ScenarioEventType.TEXT_MESSAGE_START),
   messageId: z.string(),
   role: z.string(),
+  messageIndex: z.number().optional(),
 });
 
 /**
@@ -143,6 +144,7 @@ export const scenarioTextMessageEndSchema = baseScenarioEventSchema.extend({
   content: z.string().optional(),
   message: z.record(z.unknown()).optional(),
   traceId: z.string().optional(),
+  messageIndex: z.number().optional(),
 });
 
 /**

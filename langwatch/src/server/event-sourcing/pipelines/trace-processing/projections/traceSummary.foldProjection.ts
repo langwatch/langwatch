@@ -459,6 +459,79 @@ export function shouldOverrideOutput({
 	return false;
 }
 
+// TODO(2027): remove once all clients are upgraded
+function stripLegacyMarkers(mergedAttributes: Record<string, string>): void {
+  if (mergedAttributes["metadata.platform"] === "optimization_studio") {
+    delete mergedAttributes["metadata.platform"];
+  }
+
+  if (mergedAttributes["langwatch.labels"]) {
+    const allLabels = parseJsonStringArray(mergedAttributes["langwatch.labels"]);
+    const filtered = allLabels.filter((l) => l !== "scenario-runner");
+    if (filtered.length > 0) {
+      mergedAttributes["langwatch.labels"] = JSON.stringify(filtered);
+    } else {
+      delete mergedAttributes["langwatch.labels"];
+    }
+  }
+}
+
+function hoistOrigin(
+  state: TraceSummaryData,
+  span: NormalizedSpan,
+  mergedAttributes: Record<string, string>,
+): void {
+  const isRootSpan = !span.parentSpanId;
+  const explicitOrigin = span.spanAttributes["langwatch.origin"];
+  const hasExplicitOrigin = typeof explicitOrigin === "string" && explicitOrigin !== "";
+
+  if (hasExplicitOrigin) {
+    if (isRootSpan) {
+      mergedAttributes["langwatch.origin"] = explicitOrigin as string;
+    } else if (!state.attributes["langwatch.origin"]) {
+      mergedAttributes["langwatch.origin"] = explicitOrigin as string;
+    } else {
+      mergedAttributes["langwatch.origin"] = state.attributes["langwatch.origin"];
+    }
+  } else if (isRootSpan && state.attributes["langwatch.origin"]) {
+    mergedAttributes["langwatch.origin"] = state.attributes["langwatch.origin"];
+  } else {
+    const inferred = inferOriginFromLegacyMarkers(span);
+    if (inferred) {
+      if (isRootSpan) {
+        mergedAttributes["langwatch.origin"] = inferred;
+      } else if (!state.attributes["langwatch.origin"]) {
+        mergedAttributes["langwatch.origin"] = inferred;
+      } else {
+        mergedAttributes["langwatch.origin"] = state.attributes["langwatch.origin"];
+      }
+    } else if (state.attributes["langwatch.origin"]) {
+      mergedAttributes["langwatch.origin"] = state.attributes["langwatch.origin"];
+    }
+  }
+}
+
+function hoistSource(
+  state: TraceSummaryData,
+  span: NormalizedSpan,
+  mergedAttributes: Record<string, string>,
+  spanAttributes: Record<string, string>,
+): void {
+  const isRootSpan = !span.parentSpanId;
+  const explicitSource = spanAttributes["langwatch.source"];
+  if (typeof explicitSource === "string" && explicitSource !== "") {
+    if (isRootSpan) {
+      mergedAttributes["langwatch.source"] = explicitSource;
+    } else if (!state.attributes["langwatch.source"]) {
+      mergedAttributes["langwatch.source"] = explicitSource;
+    } else {
+      mergedAttributes["langwatch.source"] = state.attributes["langwatch.source"];
+    }
+  } else if (state.attributes["langwatch.source"]) {
+    mergedAttributes["langwatch.source"] = state.attributes["langwatch.source"];
+  }
+}
+
 /** @internal Exported for unit testing */
 export function applySpanToSummary(
   state: TraceSummaryData,
@@ -644,75 +717,9 @@ export function applySpanToSummary(
     }
   }
 
-  // TODO(2027): remove this stripping code once all clients are upgraded
-  // Strip legacy platform marker "optimization_studio" — only this exact value
-  if (mergedAttributes["metadata.platform"] === "optimization_studio") {
-    delete mergedAttributes["metadata.platform"];
-  }
-
-  // TODO(2027): remove this stripping code once all clients are upgraded
-  // Strip "scenario-runner" from labels
-  if (mergedAttributes["langwatch.labels"]) {
-    const allLabels = parseJsonStringArray(mergedAttributes["langwatch.labels"]);
-    const filtered = allLabels.filter((l) => l !== "scenario-runner");
-    if (filtered.length > 0) {
-      mergedAttributes["langwatch.labels"] = JSON.stringify(filtered);
-    } else {
-      delete mergedAttributes["langwatch.labels"];
-    }
-  }
-
-  // Hoist langwatch.origin with root-span-wins-if-set semantics
-  const isRootSpan = !span.parentSpanId;
-  const explicitOrigin = span.spanAttributes["langwatch.origin"];
-  const hasExplicitOrigin = typeof explicitOrigin === "string" && explicitOrigin !== "";
-
-  if (hasExplicitOrigin) {
-    if (isRootSpan) {
-      // Root span with explicit scope always wins
-      mergedAttributes["langwatch.origin"] = explicitOrigin as string;
-    } else if (!state.attributes["langwatch.origin"]) {
-      // Child span sets scope only if no value has been hoisted yet
-      mergedAttributes["langwatch.origin"] = explicitOrigin as string;
-    } else {
-      // Keep existing hoisted value from earlier spans
-      mergedAttributes["langwatch.origin"] = state.attributes["langwatch.origin"];
-    }
-  } else if (isRootSpan && state.attributes["langwatch.origin"]) {
-    // Root span without scope preserves previously hoisted child span value
-    mergedAttributes["langwatch.origin"] = state.attributes["langwatch.origin"];
-  } else {
-    // No explicit scope on this span — try legacy inference
-    const inferred = inferOriginFromLegacyMarkers(span);
-    if (inferred) {
-      if (isRootSpan) {
-        // Root span inferred scope wins over child inferred scope
-        mergedAttributes["langwatch.origin"] = inferred;
-      } else if (!state.attributes["langwatch.origin"]) {
-        // Child inferred scope sets only if nothing hoisted yet
-        mergedAttributes["langwatch.origin"] = inferred;
-      } else {
-        mergedAttributes["langwatch.origin"] = state.attributes["langwatch.origin"];
-      }
-    } else if (state.attributes["langwatch.origin"]) {
-      // No signal from this span — preserve existing hoisted value
-      mergedAttributes["langwatch.origin"] = state.attributes["langwatch.origin"];
-    }
-  }
-
-  // Hoist langwatch.source with first-wins, root-override semantics
-  const explicitSource = spanAttributes["langwatch.source"];
-  if (typeof explicitSource === "string" && explicitSource !== "") {
-    if (isRootSpan) {
-      mergedAttributes["langwatch.source"] = explicitSource;
-    } else if (!state.attributes["langwatch.source"]) {
-      mergedAttributes["langwatch.source"] = explicitSource;
-    } else {
-      mergedAttributes["langwatch.source"] = state.attributes["langwatch.source"];
-    }
-  } else if (state.attributes["langwatch.source"]) {
-    mergedAttributes["langwatch.source"] = state.attributes["langwatch.source"];
-  }
+  stripLegacyMarkers(mergedAttributes);
+  hoistOrigin(state, span, mergedAttributes);
+  hoistSource(state, span, mergedAttributes, spanAttributes);
 
   // Track output source in attributes for cross-span override decisions
   mergedAttributes["langwatch.reserved.output_source"] =

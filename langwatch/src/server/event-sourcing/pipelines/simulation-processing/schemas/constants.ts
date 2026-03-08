@@ -7,6 +7,7 @@
  * Format: "lw.simulation_run.<action>"
  */
 export const SIMULATION_RUN_EVENT_TYPES = {
+  QUEUED: "lw.simulation_run.queued",
   STARTED: "lw.simulation_run.started",
   MESSAGE_SNAPSHOT: "lw.simulation_run.message_snapshot",
   TEXT_MESSAGE_START: "lw.simulation_run.text_message_start",
@@ -16,6 +17,7 @@ export const SIMULATION_RUN_EVENT_TYPES = {
 } as const;
 
 export const SIMULATION_PROCESSING_EVENT_TYPES = [
+  SIMULATION_RUN_EVENT_TYPES.QUEUED,
   SIMULATION_RUN_EVENT_TYPES.STARTED,
   SIMULATION_RUN_EVENT_TYPES.MESSAGE_SNAPSHOT,
   SIMULATION_RUN_EVENT_TYPES.TEXT_MESSAGE_START,
@@ -32,6 +34,7 @@ export type SimulationProcessingEventType =
  * Format: "lw.simulation_run.<action>"
  */
 export const SIMULATION_RUN_COMMAND_TYPES = {
+  QUEUE: "lw.simulation_run.queue",
   START: "lw.simulation_run.start",
   MESSAGE_SNAPSHOT: "lw.simulation_run.message_snapshot",
   TEXT_MESSAGE_START: "lw.simulation_run.text_message_start",
@@ -41,6 +44,7 @@ export const SIMULATION_RUN_COMMAND_TYPES = {
 } as const;
 
 export const SIMULATION_RUN_PROCESSING_COMMAND_TYPES = [
+  SIMULATION_RUN_COMMAND_TYPES.QUEUE,
   SIMULATION_RUN_COMMAND_TYPES.START,
   SIMULATION_RUN_COMMAND_TYPES.MESSAGE_SNAPSHOT,
   SIMULATION_RUN_COMMAND_TYPES.TEXT_MESSAGE_START,
@@ -56,6 +60,7 @@ export type SimulationProcessingCommandType =
  * Event schema versions using calendar versioning (YYYY-MM-DD).
  */
 export const SIMULATION_EVENT_VERSIONS = {
+  QUEUED: "2026-03-08",
   STARTED: "2026-02-01",
   MESSAGE_SNAPSHOT: "2026-02-01",
   TEXT_MESSAGE_START: "2026-02-01",

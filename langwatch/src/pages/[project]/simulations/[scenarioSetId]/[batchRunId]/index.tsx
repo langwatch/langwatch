@@ -2,20 +2,30 @@ import { Box } from "@chakra-ui/react";
 
 import { SimulationLayout, SimulationZoomGrid } from "~/components/simulations";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import "@copilotkit/react-ui/styles.css";
-import "../../simulations.css";
-
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
+import {
+  StreamingEventProvider,
+  useStreamingEventDispatch,
+} from "~/hooks/useStreamingEventDispatch";
 import { api } from "~/utils/api";
 
 // Main layout for a single Simulation Set page
 export default function SimulationSetPage() {
+  return (
+    <StreamingEventProvider>
+      <SimulationSetPageInner />
+    </StreamingEventProvider>
+  );
+}
+
+function SimulationSetPageInner() {
   const { scenarioSetId } = useSimulationRouter();
   const { project } = useOrganizationTeamProject();
   const { batchRunId, goToSimulationBatchRuns } = useSimulationRouter();
+  const dispatchStreamingEvent = useStreamingEventDispatch();
 
   // sinceTimestamp enables conditional fetch: server returns {changed:false} cheaply when idle
   const [sinceTimestamp, setSinceTimestamp] = useState<number | undefined>(undefined);
@@ -32,7 +42,7 @@ export default function SimulationSetPage() {
     },
     {
       enabled: !!project?.id && !!scenarioSetId && !!batchRunId,
-      refetchInterval: 10_000,
+      refetchInterval: 30_000,
     },
   );
 
@@ -87,6 +97,7 @@ export default function SimulationSetPage() {
     debounceMs: 300,
     filter: batchRunId ? { batchRunId } : undefined,
     onNewBatchRun: handleNewBatchRun,
+    onStreamingEvent: dispatchStreamingEvent,
   });
 
   // Redirect to latest batch run when batchRunId is missing

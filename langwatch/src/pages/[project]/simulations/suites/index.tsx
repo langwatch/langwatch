@@ -11,7 +11,7 @@
 import { Box, HStack, Skeleton, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 import type { SimulationSuite } from "@prisma/client";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { PeriodSelector, usePeriodSelector, type Period } from "~/components/PeriodSelector";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -25,6 +25,8 @@ import {
 import { ExternalSetDetailPanel } from "~/components/suites/ExternalSetDetailPanel";
 import { SuiteSidebar } from "~/components/suites/SuiteSidebar";
 import { computeSuiteRunSummaries } from "~/components/suites/run-history-transforms";
+import { useSuiteRunMutation } from "~/components/suites/useSuiteRunMutation";
+import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import {
   ALL_RUNS_ID,
   extractExternalSetId,
@@ -69,23 +71,52 @@ function SuitesPageContent() {
     { enabled: !!project, refetchInterval: 15000 },
   );
 
-  const { data: allRunData } = api.scenarios.getSuiteRunData.useQuery(
+  const [suiteRunSinceTimestamp, setSuiteRunSinceTimestamp] = useState<number | undefined>(undefined);
+  const [cachedRunData, setCachedRunData] = useState<{
+    runs: ScenarioRunData[];
+    scenarioSetIds: Record<string, string>;
+  } | undefined>(undefined);
+
+  // Reset sinceTimestamp when period changes
+  const periodKeyRef = useRef(period.startDate.getTime());
+  useEffect(() => {
+    const key = period.startDate.getTime();
+    if (key !== periodKeyRef.current) {
+      periodKeyRef.current = key;
+      setSuiteRunSinceTimestamp(undefined);
+      setCachedRunData(undefined);
+    }
+  }, [period]);
+
+  const { data: allRunDataRaw } = api.scenarios.getSuiteRunData.useQuery(
     {
       projectId: project?.id ?? "",
       limit: 100,
       startDate: period.startDate.getTime(),
-      endDate: period.endDate.getTime(),
+      sinceTimestamp: suiteRunSinceTimestamp,
     },
-    { enabled: !!project, refetchInterval: 5000 },
+    { enabled: !!project, refetchInterval: 30_000 },
   );
 
+  // Update cached data only when server reports changes
+  useEffect(() => {
+    if (!allRunDataRaw) return;
+    if (allRunDataRaw.changed) {
+      setCachedRunData({
+        runs: allRunDataRaw.runs,
+        scenarioSetIds: allRunDataRaw.scenarioSetIds,
+      });
+      setSuiteRunSinceTimestamp(allRunDataRaw.lastUpdatedAt);
+    }
+  }, [allRunDataRaw]);
+
   const runSummaries = useMemo(() => {
-    if (!allRunData) return undefined;
+    if (!cachedRunData) return undefined;
     return computeSuiteRunSummaries({
-      runs: allRunData.runs,
-      scenarioSetIds: allRunData.scenarioSetIds,
+      runs: cachedRunData.runs,
+      scenarioSetIds: cachedRunData.scenarioSetIds,
     });
-  }, [allRunData]);
+  }, [cachedRunData]);
 
   // Build suiteId -> suite name map for AllRuns view
   const suiteNameMap = useMemo(() => {
@@ -159,60 +190,6 @@ function SuitesPageContent() {
     },
   });
 
-  const runMutation = api.suites.run.useMutation({
-    onSuccess: (result, variables) => {
-      void utils.scenarios.getSuiteRunData.invalidate();
-      const suiteIdForToast = variables.id;
-      const archivedCount =
-        (result.skippedArchived?.scenarios?.length ?? 0) +
-        (result.skippedArchived?.targets?.length ?? 0);
-
-      if (archivedCount > 0) {
-        const parts: string[] = [];
-        if (result.skippedArchived.scenarios.length > 0) {
-          parts.push(`${result.skippedArchived.scenarios.length} archived scenario${result.skippedArchived.scenarios.length > 1 ? "s" : ""}`);
-        }
-        if (result.skippedArchived.targets.length > 0) {
-          parts.push(`${result.skippedArchived.targets.length} archived target${result.skippedArchived.targets.length > 1 ? "s" : ""}`);
-        }
-
-        toaster.create({
-          title: `Suite run scheduled (${result.jobCount} jobs)`,
-          description: `${parts.join(" and ")} skipped.`,
-          type: "warning",
-          meta: { closable: true },
-          action: {
-            label: "Edit Suite",
-            onClick: () => handleEditSuite(suiteIdForToast),
-          },
-        });
-      } else {
-        toaster.create({
-          title: `Suite run scheduled (${result.jobCount} jobs)`,
-          type: "success",
-          meta: { closable: true },
-        });
-      }
-    },
-    onError: (err, variables) => {
-      const suiteIdForToast = variables.id;
-      const isAllArchived = err.data?.code === "BAD_REQUEST" &&
-        (err.message.includes("All scenarios") || err.message.includes("All targets"));
-      toaster.create({
-        title: isAllArchived ? "Cannot run suite" : "Failed to run suite",
-        description: err.message,
-        type: "error",
-        meta: { closable: true },
-        ...(isAllArchived ? {
-          action: {
-            label: "Edit Suite",
-            onClick: () => handleEditSuite(suiteIdForToast),
-          },
-        } : {}),
-      });
-    },
-  });
-
   // Handlers
   const handleSuiteSaved = useCallback(
     (suite: SimulationSuite) => {
@@ -245,12 +222,20 @@ function SuitesPageContent() {
     [openDrawer, setFlowCallbacks, handleSuiteSaved, handleSuiteRan],
   );
 
+  const { runMutation } = useSuiteRunMutation({
+    onEditSuite: handleEditSuite,
+    onSuccess: () => {
+      setSuiteRunSinceTimestamp(undefined);
+      void utils.scenarios.getSuiteRunData.invalidate();
+    },
+  });
+
   const handleRunSuite = useCallback(
     (suiteId: string) => {
       if (!project || runMutation.isPending) return;
       const suite = suites?.find((s) => s.id === suiteId);
       if (suite) navigateToSuite(suite.slug);
-      runMutation.mutate({ projectId: project.id, id: suiteId });
+      runMutation.mutate({ projectId: project.id, id: suiteId, idempotencyKey: crypto.randomUUID() });
     },
     [project, runMutation, navigateToSuite, suites],
   );

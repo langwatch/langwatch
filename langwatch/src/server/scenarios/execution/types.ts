@@ -215,6 +215,8 @@ export type ScenarioExecutionResult = z.infer<
 export const ChildProcessJobDataSchema = z.object({
   context: ExecutionContextSchema,
   scenario: ScenarioConfigSchema,
+  /** Pre-generated scenario run ID so the SDK uses the same aggregate ID. */
+  scenarioRunId: z.string().optional(),
   adapterData: TargetAdapterDataSchema,
   modelParams: LiteLLMParamsSchema,
   nlpServiceUrl: z.string(),

@@ -42,16 +42,16 @@ export function ExternalSetDetailPanel({
     {
       projectId: project?.id ?? "",
       scenarioSetId,
-      limit: 100,
+      limit: 10,
     },
     {
       enabled: !!project,
-      refetchInterval: 5000,
+      refetchInterval: 30_000,
     },
   );
 
   const batchRuns = useMemo(() => {
-    if (!runDataResult) return [];
+    if (!runDataResult || !runDataResult.changed) return [];
     return groupRunsByBatchId({ runs: runDataResult.runs });
   }, [runDataResult]);
 
@@ -81,13 +81,17 @@ export function ExternalSetDetailPanel({
 
   return (
     <VStack align="stretch" gap={0} height="100%">
-      {/* Header */}
+      {/* Header — sticky so cards don't scroll behind it */}
       <HStack
         paddingX={6}
         paddingY={4}
         borderBottom="1px solid"
         borderColor="border"
         justify="space-between"
+        position="sticky"
+        top={0}
+        zIndex={30}
+        bg="bg"
       >
         <VStack align="start" gap={0}>
           <Text
@@ -117,7 +121,7 @@ export function ExternalSetDetailPanel({
 
         {error && (
           <VStack paddingY={8}>
-            <Text color="red.500">Error loading run data</Text>
+            <Text color="red.fg">Error loading run data</Text>
             <Text fontSize="sm" color="fg.muted">
               {error.message}
             </Text>

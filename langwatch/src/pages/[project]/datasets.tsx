@@ -187,7 +187,7 @@ function DatasetsPage() {
       </PageLayout.Header>
       <PageLayout.Container maxW={"calc(100vw - 200px)"}>
         <PageLayout.Content>
-          {datasets.data && datasets.data.length == 0 ? (
+          {datasets.data && datasets.data.length === 0 ? (
             <NoDataInfoBlock
               title="No datasets yet"
               description="Upload or create datasets on your messages to do further analysis or to train your own models."

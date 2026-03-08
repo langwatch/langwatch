@@ -44,6 +44,8 @@ const config: EvaluationCommandConfig<
   getLogContext: (commandData) => ({
     status: commandData.status,
   }),
+  makeIdempotencyKey: (commandData) =>
+    `${commandData.tenantId}:${commandData.evaluationId}:completed`,
 };
 
 /**

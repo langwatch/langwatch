@@ -33,6 +33,14 @@ vi.mock("~/hooks/useDrawer", () => ({
   useDrawerParams: () => ({}),
 }));
 
+vi.mock("~/hooks/useSSESubscription", () => ({
+  useSSESubscription: vi.fn(),
+}));
+
+vi.mock("~/hooks/usePageVisibility", () => ({
+  usePageVisibility: () => true,
+}));
+
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
@@ -43,15 +51,26 @@ vi.mock("next/router", () => ({
   useRouter: () => ({
     push: mockRouterPush,
     query: {},
+    isReady: true,
   }),
 }));
 
 vi.mock("~/utils/api", () => ({
   api: {
+    useContext: () => ({
+      scenarios: { getScenarioSetBatchHistory: { invalidate: vi.fn() } },
+    }),
     scenarios: {
       getSuiteRunData: {
         useQuery: mockRunDataQuery,
       },
+      getAll: { useQuery: vi.fn(() => ({ data: [] })) },
+    },
+    agents: {
+      getAll: { useQuery: vi.fn(() => ({ data: [] })) },
+    },
+    prompts: {
+      getAllPromptsForProject: { useQuery: vi.fn(() => ({ data: [] })) },
     },
   },
 }));
@@ -80,7 +99,7 @@ describe("<ExternalSetDetailPanel/>", () => {
       ];
 
       mockRunDataQuery.mockReturnValue({
-        data: { runs, scenarioSetIds: {}, hasMore: false },
+        data: { runs, scenarioSetIds: {}, hasMore: false, changed: true },
         isLoading: false,
         error: null,
       });

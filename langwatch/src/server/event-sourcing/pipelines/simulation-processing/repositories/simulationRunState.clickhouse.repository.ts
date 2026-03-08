@@ -49,6 +49,7 @@ interface ClickHouseSimulationRunRecord {
   Error: string | null;
   DurationMs: string | null;
   StartedAt: number | null;
+  QueuedAt: number | null;
   CreatedAt: number;
   UpdatedAt: number;
   FinishedAt: number | null;
@@ -58,7 +59,7 @@ interface ClickHouseSimulationRunRecord {
 
 type ClickHouseSimulationRunWriteRecord = WithDateWrites<
   ClickHouseSimulationRunRecord,
-  "StartedAt" | "CreatedAt" | "UpdatedAt" | "FinishedAt" | "ArchivedAt" | "LastSnapshotOccurredAt"
+  "StartedAt" | "QueuedAt" | "CreatedAt" | "UpdatedAt" | "FinishedAt" | "ArchivedAt" | "LastSnapshotOccurredAt"
 >;
 
 export class SimulationRunStateRepositoryClickHouse<
@@ -94,6 +95,7 @@ export class SimulationRunStateRepositoryClickHouse<
       Error: record.Error,
       DurationMs: record.DurationMs ? parseInt(record.DurationMs, 10) : null,
       StartedAt: record.StartedAt === null ? null : Number(record.StartedAt),
+      QueuedAt: record.QueuedAt === null || record.QueuedAt === undefined ? null : Number(record.QueuedAt),
       CreatedAt: Number(record.CreatedAt),
       UpdatedAt: Number(record.UpdatedAt),
       FinishedAt: record.FinishedAt === null ? null : Number(record.FinishedAt),
@@ -133,6 +135,7 @@ export class SimulationRunStateRepositoryClickHouse<
       Error: data.Error,
       DurationMs: data.DurationMs?.toString() ?? null,
       StartedAt: new Date(data.StartedAt ?? data.CreatedAt),
+      QueuedAt: data.QueuedAt != null ? new Date(data.QueuedAt) : null,
       CreatedAt: data.CreatedAt != null ? new Date(data.CreatedAt) : new Date(),
       UpdatedAt: new Date(data.UpdatedAt),
       FinishedAt: data.FinishedAt != null ? new Date(data.FinishedAt) : null,
@@ -164,6 +167,7 @@ export class SimulationRunStateRepositoryClickHouse<
             Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
             toString(DurationMs) AS DurationMs,
             toUnixTimestamp64Milli(StartedAt) AS StartedAt,
+            if(QueuedAt IS NOT NULL, toUnixTimestamp64Milli(QueuedAt), NULL) AS QueuedAt,
             toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
             toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
             toUnixTimestamp64Milli(FinishedAt) AS FinishedAt,

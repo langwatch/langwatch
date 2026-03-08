@@ -23,6 +23,9 @@ type SatisfactionScoreResult = {
 export interface SatisfactionScoreReactorDeps {
   assignSatisfactionScore: AppCommands["traces"]["assignSatisfactionScore"];
   nlpServiceUrl: string | undefined;
+  getEmbeddingsLitellmParams: (
+    projectId: string,
+  ) => Promise<Record<string, unknown>>;
 }
 
 export function createSatisfactionScoreReactor(
@@ -59,7 +62,11 @@ export function createSatisfactionScoreReactor(
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ text: foldState.computedInput }),
+              body: JSON.stringify({
+                text: foldState.computedInput,
+                embeddings_litellm_params:
+                  await deps.getEmbeddingsLitellmParams(tenantId),
+              }),
             },
           ),
           new Promise<never>((_, reject) =>

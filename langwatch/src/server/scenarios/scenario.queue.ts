@@ -31,6 +31,8 @@ export const scenarioJobSchema = z.object({
   scenarioId: z.string(),
   /** Human-readable scenario name for display in queued job rows. */
   scenarioName: z.string().optional(),
+  /** Pre-generated scenario run ID for immediate PENDING entries in ClickHouse. */
+  scenarioRunId: z.string().optional(),
   target: z.object({
     type: z.enum(["prompt", "http", "code"]),
     referenceId: z.string(),

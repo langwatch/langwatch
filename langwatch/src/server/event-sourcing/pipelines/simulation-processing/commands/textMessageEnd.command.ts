@@ -38,6 +38,7 @@ const config: SimulationCommandConfig<
     content: commandData.content,
     message: commandData.message,
     traceId: commandData.traceId,
+    messageIndex: commandData.messageIndex,
   }),
   getLogContext: (commandData) => ({
     messageId: commandData.messageId,

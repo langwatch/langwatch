@@ -20,6 +20,10 @@ import {
   SIMULATION_PROCESSING_EVENT_TYPES,
 } from "../pipelines/simulation-processing/schemas/constants";
 import {
+  SUITE_RUN_PROCESSING_COMMAND_TYPES,
+  SUITE_RUN_PROCESSING_EVENT_TYPES,
+} from "../pipelines/suite-run-processing/schemas/constants";
+import {
   TRACE_PROCESSING_COMMAND_TYPES,
   TRACE_PROCESSING_EVENT_TYPES,
 } from "../pipelines/trace-processing/schemas/constants";
@@ -38,6 +42,7 @@ export const EVENT_TYPE_IDENTIFIERS = [
   ...EVALUATION_PROCESSING_EVENT_TYPES,
   ...EXPERIMENT_RUN_PROCESSING_EVENT_TYPES,
   ...SIMULATION_PROCESSING_EVENT_TYPES,
+  ...SUITE_RUN_PROCESSING_EVENT_TYPES,
   ...TEST_EVENT_TYPES,
 ] as const;
 
@@ -49,6 +54,7 @@ export const COMMAND_TYPE_IDENTIFIERS = [
   ...EVALUATION_PROCESSING_COMMAND_TYPES,
   ...EXPERIMENT_RUN_PROCESSING_COMMAND_TYPES,
   ...SIMULATION_RUN_PROCESSING_COMMAND_TYPES,
+  ...SUITE_RUN_PROCESSING_COMMAND_TYPES,
   ...BILLING_REPORTING_COMMAND_TYPES,
 ] as const;
 
@@ -68,6 +74,7 @@ export const AGGREGATE_TYPE_IDENTIFIERS = [
   "evaluation",
   "experiment_run",
   "simulation_run",
+  "suite_run",
   "billing_report",
   "global",
   TEST_AGGREGATE_TYPE,

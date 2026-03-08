@@ -1453,6 +1453,7 @@ export class ClickHouseTraceService {
           LIMIT 1 BY TenantId, TraceId, SpanId
         )
         ORDER BY TraceId, StartTime ASC
+        LIMIT 200 BY TraceId
       `,
             query_params: { tenantId: projectId, traceIds },
             format: "JSONEachRow",

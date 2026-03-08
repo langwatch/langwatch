@@ -1,6 +1,18 @@
 import { z } from "zod";
 import { simulationMessageSchema, simulationResultsSchema } from "./shared";
 
+export const queueRunCommandDataSchema = z.object({
+  tenantId: z.string(),
+  scenarioRunId: z.string(),
+  scenarioId: z.string(),
+  batchRunId: z.string(),
+  scenarioSetId: z.string(),
+  name: z.string().optional(),
+  description: z.string().optional(),
+  occurredAt: z.number(),
+});
+export type QueueRunCommandData = z.infer<typeof queueRunCommandDataSchema>;
+
 export const startRunCommandDataSchema = z.object({
   tenantId: z.string(),
   scenarioRunId: z.string(),
@@ -38,6 +50,7 @@ export const textMessageStartCommandDataSchema = z.object({
   scenarioRunId: z.string(),
   messageId: z.string(),
   role: z.string(),
+  messageIndex: z.number().optional(),
   occurredAt: z.number(),
 });
 export type TextMessageStartCommandData = z.infer<typeof textMessageStartCommandDataSchema>;
@@ -50,6 +63,7 @@ export const textMessageEndCommandDataSchema = z.object({
   content: z.string(),
   message: z.record(z.unknown()).optional(),
   traceId: z.string().optional(),
+  messageIndex: z.number().optional(),
   occurredAt: z.number(),
 });
 export type TextMessageEndCommandData = z.infer<typeof textMessageEndCommandDataSchema>;

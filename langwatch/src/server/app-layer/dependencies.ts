@@ -6,6 +6,8 @@ import type { EvaluationExecutionService } from "./evaluations/evaluation-execut
 import type { EvaluationRunService } from "./evaluations/evaluation-run.service";
 import type { OrganizationService } from "./organizations/organization.service";
 import type { ProjectService } from "./projects/project.service";
+import type { SimulationRunService } from "./simulations/simulation-run.service";
+import type { SuiteRunService } from "./suites/suite-run.service";
 import type { SpanStorageService } from "./traces/span-storage.service";
 import type { TokenizerService } from "./traces/tokenizer.service";
 import type { TraceRequestCollectionService } from "./traces/trace-request-collection.service";
@@ -27,6 +29,12 @@ export interface AppDependencies {
   evaluations: {
     runs: EvaluationRunService;
     execution: EvaluationExecutionService;
+  };
+  simulations: {
+    runs: SimulationRunService;
+  };
+  suiteRuns: {
+    runs: SuiteRunService;
   };
   organizations: OrganizationService;
   projects: ProjectService;

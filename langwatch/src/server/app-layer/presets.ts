@@ -13,6 +13,8 @@ import { EvaluationRunService } from "./evaluations/evaluation-run.service";
 import { MonitorService } from "./monitors/monitor.service";
 import { OrganizationService } from "./organizations/organization.service";
 import { ProjectService } from "./projects/project.service";
+import { SimulationRunService } from "./simulations/simulation-run.service";
+import { SuiteRunService } from "./suites/suite-run.service";
 import { createSpanDedupeService } from "./traces/span-dedupe.service";
 import { SpanStorageService } from "./traces/span-storage.service";
 import { TokenizerService } from "./traces/tokenizer.service";
@@ -59,6 +61,8 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const spanDedup = createSpanDedupeService(redis);
   const traceSummary = TraceSummaryService.create(clickhouse);
   const spanStorage = SpanStorageService.create(clickhouse);
+  const simulationReads = SimulationRunService.create(clickhouse);
+  // SuiteRunService is created after pipeline registration (needs startSuiteRun command)
   const evaluations = {
     runs: EvaluationRunService.create(clickhouse),
     execution: EvaluationExecutionService.create(prisma),
@@ -126,6 +130,12 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   });
   const commands = registry.registerAll();
 
+  const suiteRunService = SuiteRunService.create({
+    clickhouse,
+    startSuiteRun: commands.suiteRuns.startSuiteRun,
+    queueSimulationRun: commands.simulations.queueRun,
+  });
+
   const traceCollection = TraceRequestCollectionService.create({
     dedup: spanDedup,
     recordSpan: commands.traces.recordSpan,
@@ -172,6 +182,8 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     broadcast,
     traces,
     evaluations,
+    simulations: { runs: simulationReads },
+    suiteRuns: { runs: suiteRunService },
     organizations,
     projects,
     tokenizer,
@@ -207,6 +219,8 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       runs: EvaluationRunService.create(null),
       execution: void 0 as unknown as AppDependencies["evaluations"]["execution"],
     },
+    simulations: { runs: SimulationRunService.create(null) },
+    suiteRuns: { runs: SuiteRunService.create({ clickhouse: null, startSuiteRun: noop, queueSimulationRun: noop }) },
     organizations: OrganizationService.create(null),
     projects: ProjectService.create(null),
     tokenizer: TokenizerService.create({ disableTokenization: true }),
@@ -229,11 +243,19 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         completeExperimentRun: noop,
       } as AppCommands["experimentRuns"],
       simulations: {
+        queueRun: noop,
         startRun: noop,
         messageSnapshot: noop,
+        textMessageStart: noop,
+        textMessageEnd: noop,
         finishRun: noop,
         deleteRun: noop,
       } as AppCommands["simulations"],
+      suiteRuns: {
+        startSuiteRun: noop,
+        recordSuiteRunItemStarted: noop,
+        completeSuiteRunItem: noop,
+      } as AppCommands["suiteRuns"],
       billing: {
         reportUsageForMonth: noop,
       } as AppCommands["billing"],

@@ -35,15 +35,15 @@ function makeRunData(overrides: Partial<ScenarioRunData> = {}): ScenarioRunData 
 }
 
 describe("buildDeduplicationKey()", () => {
-  it("builds key from scenarioId, targetReferenceId, and batchRunId", () => {
+  it("builds key from scenarioId and batchRunId", () => {
     const run = makeRunData();
-    expect(buildDeduplicationKey(run)).toBe("scen_1::target_1::batch_1");
+    expect(buildDeduplicationKey(run)).toBe("scen_1::batch_1");
   });
 
-  describe("when targetReferenceId is missing", () => {
-    it("uses empty string for targetReferenceId", () => {
+  describe("when metadata is missing", () => {
+    it("produces the same key (metadata not used)", () => {
       const run = makeRunData({ metadata: null });
-      expect(buildDeduplicationKey(run)).toBe("scen_1::::batch_1");
+      expect(buildDeduplicationKey(run)).toBe("scen_1::batch_1");
     });
   });
 });

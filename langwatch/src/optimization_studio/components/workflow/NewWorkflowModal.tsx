@@ -183,7 +183,7 @@ export const NewWorkflowModal = ({
                   name={template.name}
                   icon={
                     name === "blank" ? (
-                      <File color="#666" size={16} />
+                      <File color="var(--chakra-colors-fg-muted)" size={16} />
                     ) : (
                       template.icon
                     )
@@ -232,7 +232,7 @@ export const NewWorkflowModal = ({
                 />
                 <VStack align="center" gap={2}>
                   <HStack p={2}>
-                    <Upload color="#666" size={16} />
+                    <Upload color="var(--chakra-colors-fg-muted)" size={16} />
                     <Text fontWeight="bold">From Export</Text>
                   </HStack>
                   <Text fontSize="sm" color="fg.muted" textAlign="center">

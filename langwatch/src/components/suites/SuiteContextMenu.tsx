@@ -56,7 +56,7 @@ export function SuiteContextMenu({
         <ContextMenuItem
           label="Archive"
           onClick={() => { onArchive(); onClose(); }}
-          color="orange.500"
+          color="orange.fg"
         />
       </VStack>
     </Box>

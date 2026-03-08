@@ -4,10 +4,17 @@ import type {
     SimulationProcessingEvent,
     SimulationRunDeletedEvent,
     SimulationRunFinishedEvent,
+    SimulationRunQueuedEvent,
     SimulationRunStartedEvent,
     SimulationTextMessageEndEvent,
     SimulationTextMessageStartEvent,
 } from "./events";
+
+export function isSimulationRunQueuedEvent(
+  event: SimulationProcessingEvent,
+): event is SimulationRunQueuedEvent {
+  return event.type === SIMULATION_RUN_EVENT_TYPES.QUEUED;
+}
 
 export function isSimulationRunStartedEvent(
   event: SimulationProcessingEvent,

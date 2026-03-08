@@ -309,7 +309,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
               position="sticky"
               bottom={0}
               paddingBottom={4}
-              background="white"
+              background="bg.panel"
               transition="box-shadow 0.3s ease-in-out"
               boxShadow={atBottom ? "none" : "0 -2px 5px rgba(0, 0, 0, 0.1)"}
               paddingX={6}

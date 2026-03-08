@@ -5,7 +5,7 @@
  * 1. ES/ClickHouse scenario events (completed/in-progress runs)
  * 2. BullMQ queue (waiting/active jobs)
  *
- * Deduplicates by composite key (scenarioId + targetReferenceId + batchRunId)
+ * Deduplicates by composite key (scenarioId + batchRunId)
  * and uses count-based surplus reconciliation for repeated runs.
  * ES entries win when both sources have data for the same run.
  */
@@ -15,12 +15,15 @@ import type { ScenarioRunData } from "./scenario-event.types";
 /**
  * Builds a composite dedup key for a scenario run.
  *
- * Groups by scenarioId + targetReferenceId + batchRunId so that
- * count-based dedup can handle repeats (same scenario+target in one batch).
+ * Groups by scenarioId + batchRunId so that count-based dedup can
+ * handle repeats and multiple targets within one batch.
+ *
+ * Does NOT include targetReferenceId because ClickHouse entries may
+ * not carry metadata (the column doesn't exist yet), which would cause
+ * key mismatches and duplicate cards.
  */
 export function buildDeduplicationKey(run: ScenarioRunData): string {
-  const targetRefId = run.metadata?.langwatch?.targetReferenceId ?? "";
-  return `${run.scenarioId}::${targetRefId}::${run.batchRunId}`;
+  return `${run.scenarioId}::${run.batchRunId}`;
 }
 
 /**

@@ -4,7 +4,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { SimulationService } from "~/server/simulations/simulation.service";
+import type { SimulationFacade } from "~/server/simulations/simulation.facade";
 import {
   ScenarioEventType,
   ScenarioRunStatus,
@@ -32,7 +32,7 @@ describe("ScenarioFailureHandler", () => {
       saveScenarioEvent: vi.fn(),
     };
     handler = new ScenarioFailureHandler(
-      mockService as unknown as SimulationService,
+      mockService as unknown as SimulationFacade,
     );
   });
 

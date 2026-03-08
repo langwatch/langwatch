@@ -21,7 +21,7 @@ export interface AppConfig {
   // Process role — controls which event-sourcing consumers run.
   // "web": dispatch commands only (no BullMQ workers)
   // "worker": full consumers
-  // undefined: backward-compatible "all" mode
+// undefined: backward-compatible "all" mode
   processRole?: ProcessRole;
 
   // SaaS mode

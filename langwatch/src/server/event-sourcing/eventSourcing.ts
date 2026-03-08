@@ -4,16 +4,20 @@ import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import { getLangWatchTracer } from "langwatch";
 import { makeQueueName } from "~/server/background/queues/makeQueueName";
-import { createBillingMeterDispatchReactor } from "./projections/global/billingMeterDispatch.reactor";
-import { BILLING_REPORTING_PIPELINE_NAME } from "./pipelines/billing-reporting/pipeline";
 import { createLogger } from "~/utils/logger/server";
 import { DisabledPipeline } from "./disabledPipeline";
 import type { Event, Projection } from "./domain/types";
-import type { NoCommands, RegisteredCommand, StaticPipelineDefinition } from "./pipeline/staticBuilder.types";
 import type {
-    PipelineWithCommandHandlers,
-    RegisteredPipeline,
+  NoCommands,
+  RegisteredCommand,
+  StaticPipelineDefinition,
+} from "./pipeline/staticBuilder.types";
+import type {
+  PipelineWithCommandHandlers,
+  RegisteredPipeline,
 } from "./pipeline/types";
+import { BILLING_REPORTING_PIPELINE_NAME } from "./pipelines/billing-reporting/pipeline";
+import { createBillingMeterDispatchReactor } from "./projections/global/billingMeterDispatch.reactor";
 import { orgBillableEventsMeterProjection } from "./projections/global/orgBillableEventsMeter.mapProjection";
 
 import { projectDailySdkUsageProjection } from "./projections/global/projectDailySdkUsage.foldProjection";
@@ -23,9 +27,9 @@ import { GroupQueueProcessor } from "./queues/groupQueue/groupQueue";
 import { EventSourcedQueueProcessorMemory } from "./queues/memory";
 import { EventSourcingPipeline } from "./runtimePipeline";
 import type { JobRegistryEntry } from "./services/queues/queueManager";
+import type { EventStore } from "./stores/eventStore.types";
 import { EventStoreClickHouse } from "./stores/eventStoreClickHouse";
 import { EventStoreMemory } from "./stores/eventStoreMemory";
-import type { EventStore } from "./stores/eventStore.types";
 import { EventRepositoryClickHouse } from "./stores/repositories/eventRepositoryClickHouse";
 import { EventRepositoryMemory } from "./stores/repositories/eventRepositoryMemory";
 
@@ -54,7 +58,9 @@ interface RuntimeStores {
  * Type helper to convert registered commands union to a record of queue processors.
  */
 type CommandsToProcessors<Commands extends RegisteredCommand> = {
-  [K in Commands as K["name"]]: EventSourcedQueueProcessor<K["payload"] & Record<string, unknown>>;
+  [K in Commands as K["name"]]: EventSourcedQueueProcessor<
+    K["payload"] & Record<string, unknown>
+  >;
 };
 
 /**
@@ -74,7 +80,10 @@ export class EventSourcing {
   private readonly tracer = getLangWatchTracer(
     "langwatch.event-sourcing.runtime",
   );
-  private readonly pipelines = new Map<string, PipelineWithCommandHandlers<any, any>>();
+  private readonly pipelines = new Map<
+    string,
+    PipelineWithCommandHandlers<any, any>
+  >();
   private readonly projectionRegistry: ProjectionRegistry<Event>;
 
   // Infrastructure — lazily initialized
@@ -121,13 +130,14 @@ export class EventSourcing {
     return this._enabled;
   }
 
-
   get eventStore(): EventStore | undefined {
     this.ensureInitialized();
     return this._eventStore;
   }
 
-  get globalQueue(): EventSourcedQueueProcessor<Record<string, unknown>> | undefined {
+  get globalQueue():
+    | EventSourcedQueueProcessor<Record<string, unknown>>
+    | undefined {
     this.ensureInitialized();
     return this._globalQueue;
   }
@@ -192,10 +202,7 @@ export class EventSourcing {
             : CommandsToProcessors<Commands>
         >;
 
-        if (
-          !this._enabled ||
-          !this.eventStore
-        ) {
+        if (!this._enabled || !this.eventStore) {
           logger.warn(
             {
               pipeline: definition.metadata.name,
@@ -290,9 +297,7 @@ export class EventSourcing {
     this._initialized = true;
 
     if (!this._enabled) {
-      logger.info(
-        "Event sourcing is disabled via ENABLE_EVENT_SOURCING=false",
-      );
+      logger.info("Event sourcing is disabled via ENABLE_EVENT_SOURCING=false");
       return;
     }
 
@@ -304,7 +309,9 @@ export class EventSourcing {
    * Returns null when the job type is not (yet) registered — e.g. stale Redis
    * jobs from a previous deployment picked up before all pipelines register.
    */
-  private lookupEntry(payload: Record<string, unknown>): { entry: JobRegistryEntry; clean: Record<string, unknown> } | null {
+  private lookupEntry(
+    payload: Record<string, unknown>,
+  ): { entry: JobRegistryEntry; clean: Record<string, unknown> } | null {
     const pipelineName = payload.__pipelineName as string;
     const jobType = payload.__jobType as string;
     const jobName = payload.__jobName as string;
@@ -326,7 +333,12 @@ export class EventSourcing {
       );
       return null;
     }
-    const { __pipelineName: _p, __jobType: _t, __jobName: _n, ...clean } = payload;
+    const {
+      __pipelineName: _p,
+      __jobType: _t,
+      __jobName: _n,
+      ...clean
+    } = payload;
     return { entry, clean };
   }
 
@@ -359,7 +371,11 @@ export class EventSourcing {
     logger.info(
       {
         eventStore: this._eventStore?.constructor.name ?? "none",
-        queueProcessor: this._globalQueue ? (this._redis ? "GroupQueue" : "Memory") : "none",
+        queueProcessor: this._globalQueue
+          ? this._redis
+            ? "GroupQueue"
+            : "Memory"
+          : "none",
       },
       "Event sourcing runtime initialized",
     );
@@ -398,17 +414,18 @@ export class EventSourcing {
 
     const effectiveRedis = this._redis;
     if (effectiveRedis) {
-      this._globalQueue = new GroupQueueProcessor(
-        definition,
-        effectiveRedis,
-        { consumerEnabled: this._processRole !== "web" },
-      );
+      this._globalQueue = new GroupQueueProcessor(definition, effectiveRedis, {
+        consumerEnabled: this._processRole === "worker",
+      });
     } else {
       this._globalQueue = new EventSourcedQueueProcessorMemory(definition);
     }
   }
 
-  private logDisabledWarning(context: { pipeline?: string; command?: string }): void {
+  private logDisabledWarning(context: {
+    pipeline?: string;
+    command?: string;
+  }): void {
     if (!this._loggedDisabledWarning) {
       logger.warn(
         context,
@@ -428,9 +445,7 @@ export class EventSourcing {
    * Creates an EventSourcing instance for testing with injected stores.
    * Bypasses lazy initialization and env var detection.
    */
-  static createForTesting(
-    stores: Partial<RuntimeStores>,
-  ): EventSourcing {
+  static createForTesting(stores: Partial<RuntimeStores>): EventSourcing {
     const es = new EventSourcing({ enabled: true });
 
     // Mark as initialized and inject stores directly

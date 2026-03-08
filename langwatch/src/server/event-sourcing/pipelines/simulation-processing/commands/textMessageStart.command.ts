@@ -35,6 +35,7 @@ const config: SimulationCommandConfig<
     scenarioRunId: commandData.scenarioRunId,
     messageId: commandData.messageId,
     role: commandData.role,
+    messageIndex: commandData.messageIndex,
   }),
   getLogContext: (commandData) => ({
     messageId: commandData.messageId,

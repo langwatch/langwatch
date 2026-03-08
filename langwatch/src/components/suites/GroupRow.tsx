@@ -57,7 +57,7 @@ export function GroupRow({
         paddingX={4}
         paddingY={3}
         gap={3}
-        _hover={{ bg: "bg.subtle" }}
+        _hover={{ bg: "bg.emphasized" }}
         cursor="pointer"
         onClick={onToggle}
         role="button"
@@ -66,7 +66,7 @@ export function GroupRow({
         position="sticky"
         top={0}
         zIndex={20}
-        bg="bg.panel/85"
+        bg="bg.muted"
         backdropFilter="blur(12px)"
         borderBottom="1px solid"
         borderColor="border"
@@ -87,7 +87,7 @@ export function GroupRow({
         <Text
           fontSize="sm"
           fontWeight="medium"
-          color={summary.failedCount > 0 ? "red.600" : "green.600"}
+          color={summary.failedCount > 0 ? "red.fg" : "green.fg"}
         >
           {formatSummaryStatusLabel(summary)}
         </Text>

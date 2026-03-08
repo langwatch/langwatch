@@ -1,5 +1,5 @@
 import { BaseEdge, type EdgeProps, getBezierPath } from "@xyflow/react";
-import { useColorRawValue } from "../../components/ui/color-mode";
+import { useColorModeValue, useColorRawValue } from "../../components/ui/color-mode";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { selectionColor } from "./nodes/Nodes";
 
@@ -24,7 +24,10 @@ export default function DefaultEdge(props: EdgeProps) {
 
   const [edgePath] = getBezierPath(props);
 
-  const gray350 = useColorRawValue("gray.350");
+  const edgeColor = useColorModeValue(
+    useColorRawValue("gray.350"),
+    useColorRawValue("gray.600"),
+  );
 
   return (
     <>
@@ -32,7 +35,7 @@ export default function DefaultEdge(props: EdgeProps) {
         path={edgePath}
         markerEnd={props.markerEnd}
         style={{
-          stroke: highlighted ? selectionColor : gray350,
+          stroke: highlighted ? selectionColor : edgeColor,
           strokeWidth: highlighted ? 1.5 : 2,
         }}
       />

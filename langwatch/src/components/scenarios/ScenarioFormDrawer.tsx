@@ -315,7 +315,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
               />
             </GridItem>
             {/* Right: Help Sidebar */}
-            <GridItem overflowY="auto" padding={4} bg="bg.subtle">
+            <GridItem overflowY="auto" padding={4} bg="bg.muted">
               <ScenarioEditorSidebar form={formInstance} />
             </GridItem>
           </Grid>

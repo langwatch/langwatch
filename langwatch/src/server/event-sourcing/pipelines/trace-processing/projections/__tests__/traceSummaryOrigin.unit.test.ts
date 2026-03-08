@@ -48,21 +48,19 @@ function createTestSpan(
 }
 
 describe("applySpanToSummary() langwatch.origin hoisting", () => {
-  let extractSpy: ReturnType<typeof vi.spyOn>;
-
   beforeEach(() => {
-    extractSpy = vi.spyOn(
+    vi.useFakeTimers();
+    vi.setSystemTime(99999);
+    vi.spyOn(
       TraceIOExtractionService.prototype,
       "extractRichIOFromSpan",
-    );
-    extractSpy.mockReturnValue(null);
+    ).mockReturnValue(null);
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
-
-  // ---- Step 2: Hoisting langwatch.origin ----
 
   describe("when root span has langwatch.origin", () => {
     it("hoists origin to trace summary attributes", () => {
@@ -175,8 +173,6 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
     });
   });
 
-  // ---- Step 1d: Strip legacy markers ----
-
   describe("when span has metadata.platform = 'optimization_studio'", () => {
     it("strips metadata.platform from hoisting", () => {
       const span = createTestSpan({
@@ -257,8 +253,6 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
       expect(state.attributes["langwatch.origin"]).toBe("workflow");
     });
   });
-
-  // ---- Step 3: Legacy inference ----
 
   describe("when span has instrumentationScope.name = 'langwatch-evaluation'", () => {
     it("infers langwatch.origin = 'evaluation'", () => {
@@ -373,17 +367,17 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
 });
 
 describe("applySpanToSummary() langwatch.source hoisting", () => {
-  let extractSpy: ReturnType<typeof vi.spyOn>;
-
   beforeEach(() => {
-    extractSpy = vi.spyOn(
+    vi.useFakeTimers();
+    vi.setSystemTime(99999);
+    vi.spyOn(
       TraceIOExtractionService.prototype,
       "extractRichIOFromSpan",
-    );
-    extractSpy.mockReturnValue(null);
+    ).mockReturnValue(null);
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
