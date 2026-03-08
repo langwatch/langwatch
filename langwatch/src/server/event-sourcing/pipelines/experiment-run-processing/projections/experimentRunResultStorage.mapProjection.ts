@@ -156,7 +156,7 @@ export function createExperimentRunResultStorageMapProjection(deps: {
     store: deps.store,
     options: {
       groupKeyFn: (event: ExperimentRunResultEvent) =>
-        `result:${event.data.runId}:item:${event.data.index}`,
+        `experiment:${event.data.experimentId}:result:${event.data.runId}:item:${event.data.index}`,
     },
   };
 }

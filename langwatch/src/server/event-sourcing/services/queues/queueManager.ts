@@ -213,10 +213,11 @@ export class QueueManager<EventType extends Event = Event> {
       }
 
       const customGroupKeyFn = handlerDef.options.groupKeyFn;
+      const groupKeyFn = customGroupKeyFn
+        ? (event: any) => `${String(event.tenantId)}:${customGroupKeyFn(event)}`
+        : (event: any) => `${String(event.tenantId)}:${event.aggregateType}:${String(event.aggregateId)}`;
       const entry: JobRegistryEntry = {
-        groupKeyFn: customGroupKeyFn
-          ? (event: any) => `${String(event.tenantId)}:${customGroupKeyFn(event)}`
-          : (event: any) => `${String(event.tenantId)}:${event.aggregateType}:${String(event.aggregateId)}`,
+        groupKeyFn,
         scoreFn: (event: any) => event.createdAt,
         process: async (event: any) => {
           await onEvent(handlerName, event, {
@@ -226,7 +227,9 @@ export class QueueManager<EventType extends Event = Event> {
         delay: handlerDef.options.delay,
         deduplication: resolveDeduplicationStrategy(
           handlerDef.options.deduplication,
-          this.createDefaultDeduplicationId.bind(this),
+          customGroupKeyFn
+            ? (event: EventType) => `${String(event.tenantId)}:${customGroupKeyFn(event)}`
+            : this.createDefaultDeduplicationId.bind(this),
         ),
         spanAttributes: handlerDef.options.spanAttributes,
       };
@@ -379,8 +382,8 @@ export class QueueManager<EventType extends Event = Event> {
           | DeduplicationStrategy<any>
           | undefined,
         (payload: any) => {
-          const aggregateId = cmdEntry.getAggregateId(payload);
-          return `${String(payload.tenantId)}:${this.aggregateType}:${String(aggregateId)}`;
+          const key = cmdEntry.getGroupKey ? cmdEntry.getGroupKey(payload) : cmdEntry.getAggregateId(payload);
+          return `${String(payload.tenantId)}:${this.aggregateType}:${String(key)}`;
         },
       );
 
