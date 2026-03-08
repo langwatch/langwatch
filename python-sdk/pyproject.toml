@@ -1,6 +1,6 @@
 [project]
 name = "langwatch"
-version = "0.13.0" # remember to also update it in src/langwatch/__version__.py
+version = "0.14.0" # remember to also update it in src/langwatch/__version__.py
 description = "LangWatch Python SDK, for monitoring your LLMs"
 authors = [{ name = "Langwatch Engineers", email = "engineering@langwatch.ai" }]
 requires-python = ">=3.10,<3.14"
