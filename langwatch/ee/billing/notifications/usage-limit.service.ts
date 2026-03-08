@@ -5,9 +5,9 @@ import { getCurrentMonthStart } from "../../../src/server/utils/dateUtils";
 import { TtlCache } from "../../../src/server/utils/ttlCache";
 import { LIMIT_TYPE_DISPLAY_LABELS } from "../../../src/server/license-enforcement/constants";
 import { captureException } from "../../../src/utils/posthogErrorCapture";
-import type {
+import {
   NotificationService,
-  UsageLimitEmailData,
+  type UsageLimitEmailData,
 } from "./notification.service";
 import type { NotificationRepository } from "./repositories/notification.repository";
 import type { OrganizationService } from "../../../src/server/app-layer/organizations/organization.service";
@@ -81,6 +81,27 @@ export class UsageLimitService {
     planProvider: PlanProvider;
   }): UsageLimitService {
     return new UsageLimitService({ notificationRepository, organizationService, usageService, notificationService, planProvider });
+  }
+
+  /**
+   * Null-object factory: every method is a silent noop.
+   * Use in tests or non-SaaS deployments where no notifications are needed.
+   */
+  static createNull(): UsageLimitService {
+    const noopRepo = {
+      findRecentByOrganization: async () => [],
+      create: async () => ({}) as any,
+    } as unknown as NotificationRepository;
+    const noopOrg = { findWithAdmins: async () => null } as unknown as OrganizationService;
+    const noopUsage = { getUsage: async () => ({ currentMonthMessagesCount: 0, maxMonthlyUsageLimit: 0 }) } as unknown as UsageService;
+    const noopPlan = { getActivePlan: async () => ({ name: "free" }) } as unknown as PlanProvider;
+    return new UsageLimitService({
+      notificationRepository: noopRepo,
+      organizationService: noopOrg,
+      usageService: noopUsage,
+      notificationService: NotificationService.createNull(),
+      planProvider: noopPlan,
+    });
   }
 
   /**

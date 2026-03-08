@@ -21,8 +21,8 @@ export class App {
   readonly usage: AppDependencies["usage"];
   readonly planProvider: AppDependencies["planProvider"];
   readonly subscription?: AppDependencies["subscription"];
-  readonly notifications?: AppDependencies["notifications"];
-  readonly usageLimits?: AppDependencies["usageLimits"];
+  readonly notifications: AppDependencies["notifications"];
+  readonly usageLimits: AppDependencies["usageLimits"];
 
   /** Keeps EventSourcing infrastructure safe from the greedy garbage men */
   private readonly _eventSourcing?: EventSourcing;

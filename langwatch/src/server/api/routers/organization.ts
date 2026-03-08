@@ -804,7 +804,7 @@ export const organizationRouter = createTRPCRouter({
       } catch (error) {
         if (error instanceof LimitExceededError) {
           void getApp()
-            .usageLimits?.notifyResourceLimitReached({
+            .usageLimits.notifyResourceLimitReached({
               organizationId: input.organizationId,
               limitType: error.limitType,
               current: error.current,
@@ -1213,7 +1213,7 @@ export const organizationRouter = createTRPCRouter({
       } catch (error) {
         if (error instanceof LimitExceededError) {
           void getApp()
-            .usageLimits?.notifyResourceLimitReached({
+            .usageLimits.notifyResourceLimitReached({
               organizationId: input.organizationId,
               limitType: error.limitType,
               current: error.current,
@@ -1285,7 +1285,7 @@ export const organizationRouter = createTRPCRouter({
         }
         if (error instanceof LimitExceededError) {
           void getApp()
-            .usageLimits?.notifyResourceLimitReached({
+            .usageLimits.notifyResourceLimitReached({
               organizationId: input.organizationId,
               limitType: error.limitType,
               current: error.current,

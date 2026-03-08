@@ -177,7 +177,7 @@ export const createWebhookService = ({
         }
       }
 
-      await getApp().notifications?.sendSlackSubscriptionEvent({
+      await getApp().notifications.sendSlackSubscriptionEvent({
         type: "confirmed",
         organizationId: updatedSubscription.organizationId,
         organizationName: updatedSubscription.organization.name,
@@ -416,7 +416,7 @@ export const createWebhookService = ({
         await clearTrialLicenseIfPresent(updatedSubscription, "subscription updated to active");
 
         if (shouldNotify) {
-          await getApp().notifications?.sendSlackSubscriptionEvent({
+          await getApp().notifications.sendSlackSubscriptionEvent({
             type: "confirmed",
             organizationId: updatedSubscription.organizationId,
             organizationName: updatedSubscription.organization.name,

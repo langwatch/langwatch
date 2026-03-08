@@ -228,7 +228,7 @@ export default async function handler(
             );
           }
 
-          await getApp().usageLimits?.checkAndSendWarning({
+          await getApp().usageLimits.checkAndSendWarning({
             organizationId: org.id,
             currentMonthMessagesCount,
             maxMonthlyUsageLimit: maxMessagesPerMonth,

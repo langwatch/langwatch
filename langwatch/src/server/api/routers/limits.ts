@@ -24,7 +24,7 @@ export const limitsRouter = createTRPCRouter({
     )
     .use(checkOrganizationPermission("organization:view"))
     .mutation(async ({ input }) => {
-      const notification = await getApp().usageLimits?.checkAndSendWarning({
+      const notification = await getApp().usageLimits.checkAndSendWarning({
         organizationId: input.organizationId,
         currentMonthMessagesCount: input.currentMonthMessagesCount,
         maxMonthlyUsageLimit: input.maxMonthlyUsageLimit,

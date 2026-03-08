@@ -44,7 +44,7 @@ export async function assertMemberTypeLimitNotExceeded(
     const memberCount = await licenseRepo.getMemberCount(organizationId);
     if (memberCount >= limits.maxMembers) {
       void getApp()
-        .usageLimits?.notifyResourceLimitReached({
+        .usageLimits.notifyResourceLimitReached({
           organizationId,
           limitType: "members",
           current: memberCount,
@@ -68,7 +68,7 @@ export async function assertMemberTypeLimitNotExceeded(
     const liteCount = await licenseRepo.getMembersLiteCount(organizationId);
     if (liteCount >= limits.maxMembersLite) {
       void getApp()
-        .usageLimits?.notifyResourceLimitReached({
+        .usageLimits.notifyResourceLimitReached({
           organizationId,
           limitType: "membersLite",
           current: liteCount,

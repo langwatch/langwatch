@@ -237,6 +237,16 @@ export class NotificationService {
     return new NotificationService(options);
   }
 
+  /**
+   * Null-object factory: every method is a silent noop.
+   * Use in tests or non-SaaS deployments where no notifications are needed.
+   */
+  static createNull(): NotificationService {
+    return NotificationService.create({
+      config: {} as NotificationServiceOptions["config"],
+    });
+  }
+
   private getAdminLink(organizationId: string): string {
     return `${this.config.baseHost ?? DEFAULT_APP_URL}/admin#/organizations/${organizationId}`;
   }

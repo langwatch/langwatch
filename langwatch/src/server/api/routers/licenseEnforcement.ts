@@ -77,7 +77,7 @@ export const licenseEnforcementRouter = createTRPCRouter({
 
       if (!result.allowed) {
         void getApp()
-          .usageLimits?.notifyResourceLimitReached({
+          .usageLimits.notifyResourceLimitReached({
             organizationId: input.organizationId,
             limitType: input.limitType,
             current: result.current,

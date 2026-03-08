@@ -27,7 +27,7 @@ export const blockTraceUsageExceededMiddleware: MiddlewareHandler = async (
           organizationId: team.organizationId,
         });
 
-        await getApp().usageLimits?.notifyPlanLimitReached({
+        await getApp().usageLimits.notifyPlanLimitReached({
           organizationId: team.organizationId,
           planName: activePlan.name ?? "free",
         });

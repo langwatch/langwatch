@@ -63,7 +63,7 @@ export async function handleLicensePurchase({
   );
 
   // Slack notification -- fire and forget, errors swallowed by NotificationService
-  await getApp().notifications?.sendSlackLicensePurchase({
+  await getApp().notifications.sendSlackLicensePurchase({
     buyerEmail: email,
     planType: licenseData.plan.type,
     seats: quantity,

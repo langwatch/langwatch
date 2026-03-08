@@ -89,7 +89,7 @@ async function handleTracesRequest(req: NextRequest) {
             const activePlan = await getApp().planProvider.getActivePlan({
               organizationId: project.team.organizationId,
             });
-            await getApp().usageLimits?.notifyPlanLimitReached({
+            await getApp().usageLimits.notifyPlanLimitReached({
               organizationId: project.team.organizationId,
               planName: activePlan.name ?? "free",
             });

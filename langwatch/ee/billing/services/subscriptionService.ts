@@ -412,7 +412,7 @@ export const createSubscriptionService = ({
         throw new OrganizationNotFoundError();
       }
 
-      await getApp().notifications?.sendSlackSubscriptionEvent({
+      await getApp().notifications.sendSlackSubscriptionEvent({
         type: "prospective",
         organizationId: organization.id,
         organizationName: organization.name,

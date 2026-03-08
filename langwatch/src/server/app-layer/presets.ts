@@ -265,6 +265,8 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       getActivePlan: async () => FREE_PLAN,
     }),
     subscription: undefined,
+    notifications: NotificationService.createNull(),
+    usageLimits: UsageLimitService.createNull(),
     commands: {
       traces: { recordSpan: noop, assignTopic: noop, assignSatisfactionScore: noop, recordLog: noop, recordMetric: noop } as AppCommands["traces"],
       evaluations: {

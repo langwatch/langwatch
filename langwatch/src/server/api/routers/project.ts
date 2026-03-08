@@ -140,7 +140,7 @@ export const projectRouter = createTRPCRouter({
       } catch (error) {
         if (error instanceof LimitExceededError) {
           void getApp()
-            .usageLimits?.notifyResourceLimitReached({
+            .usageLimits.notifyResourceLimitReached({
               organizationId: input.organizationId,
               limitType: error.limitType,
               current: error.current,

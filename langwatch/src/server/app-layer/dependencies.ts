@@ -44,8 +44,8 @@ export interface AppDependencies {
   usage: UsageService;
   planProvider: PlanProvider;
   subscription?: SubscriptionService;
-  notifications?: NotificationService;
-  usageLimits?: UsageLimitService;
+  notifications: NotificationService;
+  usageLimits: UsageLimitService;
   commands: AppCommands;
 
   /** Internal — keeps EventSourcing infrastructure alive for GC. */

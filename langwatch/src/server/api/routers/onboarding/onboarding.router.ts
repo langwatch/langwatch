@@ -71,7 +71,7 @@ export const onboardingRouter = createTRPCRouter({
         }
 
         try {
-          await getApp().notifications?.sendSlackSignupEvent({
+          await getApp().notifications.sendSlackSignupEvent({
             userName: ctx.session.user.name,
             userEmail: ctx.session.user.email,
             organizationName: orgResult.organization.name,

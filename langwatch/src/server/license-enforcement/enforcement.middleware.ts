@@ -69,7 +69,7 @@ export async function enforceLicenseLimit(
     if (error instanceof LimitExceededError) {
       // Fire-and-forget: notify ops, never block user
       void getApp()
-        .usageLimits?.notifyResourceLimitReached({
+        .usageLimits.notifyResourceLimitReached({
           organizationId,
           limitType: error.limitType,
           current: error.current,

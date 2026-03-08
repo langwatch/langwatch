@@ -6,7 +6,6 @@
  * Verifies:
  * - Sends notification when limit is actually reached
  * - Does not send notification when limit is not reached (fabricated request)
- * - No-ops when usageLimits is undefined (self-hosted)
  * - Captures exceptions when notification fails
  */
 import { describe, expect, it, vi, beforeEach } from "vitest";
@@ -43,9 +42,9 @@ vi.mock("~/server/license-enforcement", () => {
 });
 
 const mockNotifyResourceLimitReached = vi.fn();
-let mockUsageLimits:
-  | { notifyResourceLimitReached: typeof mockNotifyResourceLimitReached }
-  | undefined;
+const mockUsageLimits = {
+  notifyResourceLimitReached: mockNotifyResourceLimitReached,
+};
 
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({
@@ -100,9 +99,6 @@ describe("licenseEnforcement.reportLimitBlocked", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockNotifyResourceLimitReached.mockResolvedValue(undefined);
-    mockUsageLimits = {
-      notifyResourceLimitReached: mockNotifyResourceLimitReached,
-    };
   });
 
   describe("when limit is actually reached", () => {
@@ -152,27 +148,6 @@ describe("licenseEnforcement.reportLimitBlocked", () => {
         "workflows",
         expect.objectContaining({ id: "user-1" })
       );
-      expect(mockNotifyResourceLimitReached).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("when usageLimits is undefined (self-hosted)", () => {
-    it("does not throw and completes silently", async () => {
-      mockUsageLimits = undefined;
-      mockCheckLimit.mockResolvedValue({
-        allowed: false,
-        current: 5,
-        max: 5,
-        limitType: "workflows",
-      });
-
-      await expect(
-        callReportLimitBlocked({
-          organizationId: "org-123",
-          limitType: "workflows",
-        })
-      ).resolves.toBeUndefined();
-
       expect(mockNotifyResourceLimitReached).not.toHaveBeenCalled();
     });
   });
