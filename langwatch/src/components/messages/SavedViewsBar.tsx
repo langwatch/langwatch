@@ -13,6 +13,7 @@ import {
   HStack,
   IconButton,
   Input,
+  Portal,
   useBreakpointValue,
   Text,
 } from "@chakra-ui/react";
@@ -96,20 +97,21 @@ export function SavedViewsBar() {
   const menuWidth = isSmallScreen ? MENU_WIDTH_COMPACT : MENU_WIDTH_EXPANDED;
 
   return (
-    <Box
-      position="fixed"
-      bottom={0}
-      left={menuWidth}
-      right={0}
-      zIndex={10}
-      background="bg.panel/75"
-      backdropFilter="blur(8px)"
-      borderTop="1px solid"
-      borderColor="border"
-      paddingX={6}
-      paddingY={2}
-      data-testid="saved-views-bar"
-    >
+    <Portal>
+      <Box
+        position="fixed"
+        bottom={0}
+        left={menuWidth}
+        right={0}
+        zIndex={10}
+        background="bg.panel/75"
+        backdropFilter="blur(8px)"
+        borderTop="1px solid"
+        borderColor="border"
+        paddingX={6}
+        paddingY={2}
+        data-testid="saved-views-bar"
+      >
       <HStack gap={2} overflowX="auto" width="full">
         {/* All Traces -- always first, never deletable */}
         {allTracesView && (
@@ -196,7 +198,8 @@ export function SavedViewsBar() {
           </Menu.Root>
         )}
       </HStack>
-    </Box>
+      </Box>
+    </Portal>
   );
 }
 
