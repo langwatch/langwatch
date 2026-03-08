@@ -84,6 +84,10 @@ export class RecordTargetResultCommand
     return makeExperimentRunKey(payload.experimentId, payload.runId);
   }
 
+  static getGroupKey(payload: RecordTargetResultCommandData): string {
+    return `${payload.experimentId}:${payload.runId}:item:${payload.index}`;
+  }
+
   static getSpanAttributes(
     payload: RecordTargetResultCommandData,
   ): Record<string, string | number | boolean> {
