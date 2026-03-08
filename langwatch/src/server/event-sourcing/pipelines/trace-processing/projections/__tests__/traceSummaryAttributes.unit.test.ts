@@ -70,7 +70,7 @@ describe("applySpanToSummary attribute forwarding", () => {
         },
       });
 
-      const state = applySpanToSummary(createInitState(), span);
+      const state = applySpanToSummary({ state: createInitState(), span: span });
 
       expect(state.attributes["gen_ai.agent.name"]).toBe("weather-agent");
     });
@@ -84,7 +84,7 @@ describe("applySpanToSummary attribute forwarding", () => {
         },
       });
 
-      const state = applySpanToSummary(createInitState(), span);
+      const state = applySpanToSummary({ state: createInitState(), span: span });
 
       expect(state.attributes["gen_ai.agent.id"]).toBe("agent-123");
     });
@@ -98,7 +98,7 @@ describe("applySpanToSummary attribute forwarding", () => {
         },
       });
 
-      const state = applySpanToSummary(createInitState(), span);
+      const state = applySpanToSummary({ state: createInitState(), span: span });
 
       expect(state.attributes["gen_ai.provider.name"]).toBe("openai");
     });
@@ -120,8 +120,8 @@ describe("applySpanToSummary attribute forwarding", () => {
         },
       });
 
-      let state = applySpanToSummary(createInitState(), span1);
-      state = applySpanToSummary(state, span2);
+      let state = applySpanToSummary({ state: createInitState(), span: span1 });
+      state = applySpanToSummary({ state, span: span2 });
 
       // mergedAttributes uses { ...spanAttributes, ...state.attributes }
       // so state.attributes (first-wins) takes priority

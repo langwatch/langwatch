@@ -60,6 +60,18 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
     hardcodedDefault: 30,
   },
   {
+    table: "stored_log_records",
+    ttlColumn: "TimeUnixMs",
+    envVar: "TIERED_STORED_LOG_RECORDS_TABLE_HOT_DAYS",
+    hardcodedDefault: 30,
+  },
+  {
+    table: "stored_metric_records",
+    ttlColumn: "TimeUnixMs",
+    envVar: "TIERED_STORED_METRIC_RECORDS_TABLE_HOT_DAYS",
+    hardcodedDefault: 30,
+  },
+  {
     table: "stored_spans",
     ttlColumn: "EndTime",
     envVar: "TIERED_STORED_SPANS_TABLE_HOT_DAYS",

@@ -1,11 +1,13 @@
 import { z } from "zod";
 
 import { EventSchema } from "../../../domain/types";
-import { piiRedactionLevelSchema } from "./commands";
+import { metricTypeSchema, piiRedactionLevelSchema } from "./commands";
 import {
-	SATISFACTION_SCORE_ASSIGNED_EVENT_TYPE,
-	SPAN_RECEIVED_EVENT_TYPE,
-	TOPIC_ASSIGNED_EVENT_TYPE,
+  LOG_RECORD_RECEIVED_EVENT_TYPE,
+  METRIC_RECORD_RECEIVED_EVENT_TYPE,
+  SATISFACTION_SCORE_ASSIGNED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_TYPE,
+  TOPIC_ASSIGNED_EVENT_TYPE,
 } from "./constants";
 import { instrumentationScopeSchema, resourceSchema, spanSchema } from "./otlp";
 
@@ -81,7 +83,9 @@ export const topicAssignedEventSchema = EventSchema.extend({
 export type TopicAssignedEventMetadata = z.infer<
   typeof topicAssignedEventMetadataSchema
 >;
-export type TopicAssignedEventData = z.infer<typeof topicAssignedEventDataSchema>;
+export type TopicAssignedEventData = z.infer<
+  typeof topicAssignedEventDataSchema
+>;
 export type TopicAssignedEvent = z.infer<typeof topicAssignedEventSchema>;
 
 /**
@@ -132,9 +136,93 @@ export function isSatisfactionScoreAssignedEvent(
 }
 
 /**
+ * Zod schema for LogRecordReceivedEvent metadata.
+ */
+export const logRecordReceivedEventMetadataSchema = z
+  .object({
+    processingTraceparent: z.string().optional(),
+  })
+  .passthrough();
+
+export const logRecordReceivedEventDataSchema = z.object({
+  traceId: z.string(),
+  spanId: z.string(),
+  timeUnixMs: z.number(),
+  severityNumber: z.number(),
+  severityText: z.string(),
+  body: z.string(),
+  attributes: z.record(z.string(), z.string()),
+  resourceAttributes: z.record(z.string(), z.string()),
+  scopeName: z.string(),
+  scopeVersion: z.string().nullable(),
+  piiRedactionLevel: piiRedactionLevelSchema,
+});
+
+export const logRecordReceivedEventSchema = EventSchema.extend({
+  type: z.literal(LOG_RECORD_RECEIVED_EVENT_TYPE),
+  data: logRecordReceivedEventDataSchema,
+  metadata: logRecordReceivedEventMetadataSchema,
+});
+
+export type LogRecordReceivedEventData = z.infer<
+  typeof logRecordReceivedEventDataSchema
+>;
+export type LogRecordReceivedEvent = z.infer<
+  typeof logRecordReceivedEventSchema
+>;
+
+export function isLogRecordReceivedEvent(
+  event: TraceProcessingEvent,
+): event is LogRecordReceivedEvent {
+  return event.type === LOG_RECORD_RECEIVED_EVENT_TYPE;
+}
+
+/**
+ * Zod schema for MetricRecordReceivedEvent metadata.
+ */
+export const metricRecordReceivedEventMetadataSchema = z
+  .object({
+    processingTraceparent: z.string().optional(),
+  })
+  .passthrough();
+
+export const metricRecordReceivedEventDataSchema = z.object({
+  traceId: z.string(),
+  spanId: z.string(),
+  metricName: z.string(),
+  metricUnit: z.string(),
+  metricType: metricTypeSchema,
+  value: z.number(),
+  timeUnixMs: z.number(),
+  attributes: z.record(z.string(), z.string()),
+  resourceAttributes: z.record(z.string(), z.string()),
+});
+
+export const metricRecordReceivedEventSchema = EventSchema.extend({
+  type: z.literal(METRIC_RECORD_RECEIVED_EVENT_TYPE),
+  data: metricRecordReceivedEventDataSchema,
+  metadata: metricRecordReceivedEventMetadataSchema,
+});
+
+export type MetricRecordReceivedEventData = z.infer<
+  typeof metricRecordReceivedEventDataSchema
+>;
+export type MetricRecordReceivedEvent = z.infer<
+  typeof metricRecordReceivedEventSchema
+>;
+
+export function isMetricRecordReceivedEvent(
+  event: TraceProcessingEvent,
+): event is MetricRecordReceivedEvent {
+  return event.type === METRIC_RECORD_RECEIVED_EVENT_TYPE;
+}
+
+/**
  * Union of all trace processing event types.
  */
 export type TraceProcessingEvent =
   | SpanReceivedEvent
   | TopicAssignedEvent
-  | SatisfactionScoreAssignedEvent;
+  | SatisfactionScoreAssignedEvent
+  | LogRecordReceivedEvent
+  | MetricRecordReceivedEvent;
