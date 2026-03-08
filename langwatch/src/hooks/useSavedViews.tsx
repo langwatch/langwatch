@@ -181,6 +181,11 @@ function useSavedViewsInternal() {
   // (because we ourselves just applied filters)
   const skipNextMatchRef = useRef(false);
 
+  // Track whether we still need to restore the saved view on init.
+  // This prevents the matching effect from overwriting the stored selection
+  // with "all-traces" before the restore effect has a chance to apply filters.
+  const pendingRestoreRef = useRef(true);
+
   // Fetch saved views from database
   const savedViewsQuery = api.savedViews.getAll.useQuery(
     { projectId },
@@ -203,6 +208,7 @@ function useSavedViewsInternal() {
     // When switching projects, clear stale state so old views aren't briefly applied
     if (prevProjectIdRef.current !== projectId) {
       prevProjectIdRef.current = projectId;
+      pendingRestoreRef.current = true;
       skipNextMatchRef.current = true;
     }
 
@@ -293,7 +299,14 @@ function useSavedViewsInternal() {
 
   // On init, restore the selected view's filters if we have one
   useEffect(() => {
-    if (!isInitialized || !projectId || !selectedViewId) return;
+    if (!isInitialized || !projectId) {
+      return;
+    }
+
+    // Mark restore as complete so the matching effect can start running
+    pendingRestoreRef.current = false;
+
+    if (!selectedViewId || selectedViewId === "all-traces") return;
 
     // Only restore on initial load when there are no existing filter params
     const hasUrlFilters = Object.values(filters).some((v) => {
@@ -305,8 +318,6 @@ function useSavedViewsInternal() {
     if (hasUrlFilters || hasUrlQuery) return;
 
     // Restore the selected view's filters
-    if (selectedViewId === "all-traces") return;
-
     const customView = customViews.find((v) => v.id === selectedViewId);
     if (customView) {
       skipNextMatchRef.current = true;
@@ -532,6 +543,9 @@ function useSavedViewsInternal() {
   // Auto-update selectedViewId when filters change (view matching)
   useEffect(() => {
     if (!isInitialized) return;
+
+    // Don't overwrite the stored selection before the restore effect runs
+    if (pendingRestoreRef.current) return;
 
     if (skipNextMatchRef.current) {
       skipNextMatchRef.current = false;
