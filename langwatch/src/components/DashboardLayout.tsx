@@ -321,6 +321,10 @@ export const DashboardLayout = ({
 
   const menuWidth = compactMenu ? MENU_WIDTH_COMPACT : MENU_WIDTH_EXPANDED;
   const hasClickHouse = project?.featureClickHouseDataSourceTraces === true;
+  const isTracesOrAnalyticsPage =
+    router.pathname.startsWith("/[project]/messages") ||
+    router.pathname.startsWith("/[project]/analytics");
+  const showSavedViews = hasClickHouse && isTracesOrAnalyticsPage;
 
   return (
     <Box
@@ -631,9 +635,11 @@ export const DashboardLayout = ({
             <CurrentDrawer />
 
             {userIsPartOfTeam ? (
-              hasClickHouse ? (
+              showSavedViews ? (
                 <SavedViewsProvider>
                   {children}
+                  {/* Spacer to prevent fixed bottom bar from covering content */}
+                  <Box height="48px" flexShrink={0} />
                   <SavedViewsBar />
                 </SavedViewsProvider>
               ) : (

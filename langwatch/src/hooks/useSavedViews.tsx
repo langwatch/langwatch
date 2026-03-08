@@ -1,8 +1,12 @@
 /**
  * React hook and context provider for managing saved views on the traces list page.
  *
- * Pure logic functions (localStorage, matching, normalization) live in
- * savedViewsLogic.ts to enable unit testing without server dependencies.
+ * Views are stored in the database (PostgreSQL) and shared across all team
+ * members in a project via tRPC endpoints. The selected view ID is stored in
+ * localStorage per user (personal preference, not shared state).
+ *
+ * Pure logic functions (matching, normalization) live in savedViewsLogic.ts
+ * to enable unit testing without server dependencies.
  *
  * Use SavedViewsProvider at the page level, then useSavedViews() in any
  * child component to access shared state (SavedViewsBar, SaveAsViewButton, etc.)
@@ -20,6 +24,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { api } from "../utils/api";
 import type { FilterParam } from "./useFilterParams";
 import { useFilterParams } from "./useFilterParams";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
@@ -28,12 +33,8 @@ import type { FilterField } from "../server/filters/types";
 import {
   DEFAULT_VIEWS,
   findMatchingView,
-  generateViewId,
   MAX_VIEW_NAME_LENGTH,
   normalizeFilterValue,
-  readSavedViewsFromStorage,
-  SAVED_VIEWS_SCHEMA_VERSION,
-  writeSavedViewsToStorage,
   type DefaultView,
   type SavedView,
 } from "./savedViewsLogic";
@@ -45,11 +46,41 @@ export {
   SAVED_VIEWS_SCHEMA_VERSION,
   type DefaultView,
   type SavedView,
-  type SavedViewsStorage,
 } from "./savedViewsLogic";
 
 /** URL query keys to preserve when applying or resetting view filters */
 const PRESERVED_URL_KEYS = new Set(["project", "view", "group_by"]);
+
+/**
+ * Reads the selected view ID from localStorage for a project.
+ */
+function readSelectedViewId(projectId: string): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(`langwatch-selected-view-${projectId}`);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Writes the selected view ID to localStorage for a project.
+ */
+function writeSelectedViewId(
+  projectId: string,
+  viewId: string | null,
+): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (viewId === null) {
+      localStorage.removeItem(`langwatch-selected-view-${projectId}`);
+    } else {
+      localStorage.setItem(`langwatch-selected-view-${projectId}`, viewId);
+    }
+  } catch {
+    // localStorage full or unavailable -- silently fail
+  }
+}
 
 /**
  * Builds URL query params for a set of view filters and optional search query,
@@ -103,47 +134,88 @@ function buildViewQueryString({
 }
 
 /**
+ * Converts a DB saved view record to the client-side SavedView shape.
+ * The DB stores filters/period as Json; we need to cast them properly.
+ */
+function toClientView(dbView: {
+  id: string;
+  name: string;
+  userId?: string | null;
+  filters: unknown;
+  query: string | null;
+  period: unknown;
+}): SavedView {
+  return {
+    id: dbView.id,
+    name: dbView.name,
+    userId: dbView.userId,
+    filters: (dbView.filters ?? {}) as Partial<Record<FilterField, FilterParam>>,
+    query: dbView.query ?? undefined,
+    period: dbView.period as SavedView["period"],
+  };
+}
+
+/**
  * Internal hook providing saved views functionality.
- * Do not call directly — use useSavedViews() via SavedViewsProvider instead.
+ * Do not call directly -- use useSavedViews() via SavedViewsProvider instead.
  */
 function useSavedViewsInternal() {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
   const router = useRouter();
   const { filters } = useFilterParams();
+  const utils = api.useContext();
 
-  const [customViews, setCustomViews] = useState<SavedView[]>([]);
   const [selectedViewId, setSelectedViewIdState] = useState<string | null>(
     null,
   );
-  const [isInitialized, setIsInitialized] = useState(false);
 
   // Track whether we should skip the next filter-change matching cycle
   // (because we ourselves just applied filters)
   const skipNextMatchRef = useRef(false);
 
-  // Load from localStorage on mount / project change
+  // Fetch saved views from database
+  const savedViewsQuery = api.savedViews.getAll.useQuery(
+    { projectId },
+    { enabled: !!projectId },
+  );
+
+  const isInitialized = savedViewsQuery.isFetched;
+
+  // Convert DB views to client shape
+  const customViews = useMemo(() => {
+    if (!savedViewsQuery.data) return [];
+    return savedViewsQuery.data.map(toClientView);
+  }, [savedViewsQuery.data]);
+
+  // Load selectedViewId from localStorage on mount / project change
   useEffect(() => {
     if (!projectId) return;
-
-    const stored = readSavedViewsFromStorage(projectId);
-    setCustomViews(stored.views);
-    setSelectedViewIdState(stored.selectedViewId);
-    setIsInitialized(true);
+    const storedId = readSelectedViewId(projectId);
+    setSelectedViewIdState(storedId);
   }, [projectId]);
 
-  // Persist to localStorage whenever custom views or selection changes
-  const persistToStorage = useCallback(
-    (views: SavedView[], viewId: string | null) => {
-      if (!projectId) return;
-      writeSavedViewsToStorage(projectId, {
-        schemaVersion: SAVED_VIEWS_SCHEMA_VERSION,
-        views,
-        selectedViewId: viewId,
-      });
+  // tRPC mutations
+  const createMutation = api.savedViews.create.useMutation({
+    onSuccess: () => {
+      void utils.savedViews.getAll.invalidate({ projectId });
     },
-    [projectId],
-  );
+  });
+  const deleteMutation = api.savedViews.delete.useMutation({
+    onSuccess: () => {
+      void utils.savedViews.getAll.invalidate({ projectId });
+    },
+  });
+  const renameMutation = api.savedViews.rename.useMutation({
+    onSuccess: () => {
+      void utils.savedViews.getAll.invalidate({ projectId });
+    },
+  });
+  const reorderMutation = api.savedViews.reorder.useMutation({
+    onSuccess: () => {
+      void utils.savedViews.getAll.invalidate({ projectId });
+    },
+  });
 
   /**
    * Resets all filters including query and negateFilters.
@@ -236,7 +308,7 @@ function useSavedViewsInternal() {
 
       if (viewId === "all-traces") {
         setSelectedViewIdState("all-traces");
-        persistToStorage(customViews, "all-traces");
+        writeSelectedViewId(projectId, "all-traces");
         resetAllFilters();
         return;
       }
@@ -245,13 +317,13 @@ function useSavedViewsInternal() {
       const customView = customViews.find((v) => v.id === viewId);
       if (customView) {
         setSelectedViewIdState(viewId);
-        persistToStorage(customViews, viewId);
+        writeSelectedViewId(projectId, viewId);
         applyViewFilters(customView.filters, customView.query, customView.period);
       }
     },
     [
       customViews,
-      persistToStorage,
+      projectId,
       resetAllFilters,
       applyViewFilters,
     ],
@@ -275,9 +347,10 @@ function useSavedViewsInternal() {
   /**
    * Saves the current filter state as a new custom view.
    * Captures date period from URL if present.
+   * @param scope - "project" (shared) or "myself" (personal). Defaults to "project".
    */
   const saveView = useCallback(
-    (name: string) => {
+    (name: string, scope: "project" | "myself" = "project") => {
       const trimmedName = name.slice(0, MAX_VIEW_NAME_LENGTH);
       const queryParam = (router.query.query as string) || undefined;
 
@@ -298,22 +371,57 @@ function useSavedViewsInternal() {
         }
       }
 
-      const newView: SavedView = {
-        id: generateViewId(),
+      // Optimistic update: add view to cache immediately
+      const tempId = `temp-${Date.now()}`;
+      const optimisticView: SavedView = {
+        id: tempId,
         name: trimmedName,
         filters: { ...filters },
         query: queryParam,
         ...(period ? { period } : {}),
       };
 
-      const updatedViews = [...customViews, newView];
-      setCustomViews(updatedViews);
-      setSelectedViewIdState(newView.id);
-      persistToStorage(updatedViews, newView.id);
+      // Optimistically add to the list
+      utils.savedViews.getAll.setData({ projectId }, (old) => {
+        if (!old) return old;
+        return [
+          ...old,
+          {
+            ...optimisticView,
+            projectId,
+            filters: optimisticView.filters as Record<string, unknown>,
+            period: optimisticView.period ?? null,
+            query: optimisticView.query ?? null,
+            order: old.length,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          } as (typeof old)[number],
+        ];
+      });
 
-      return newView;
+      createMutation.mutate(
+        {
+          projectId,
+          name: trimmedName,
+          filters: filters as Record<string, unknown>,
+          query: queryParam,
+          period,
+          scope,
+        },
+        {
+          onSuccess: (newView) => {
+            setSelectedViewIdState(newView.id);
+            writeSelectedViewId(projectId, newView.id);
+          },
+        },
+      );
+
+      // Set temp selection immediately for snappy UI
+      setSelectedViewIdState(tempId);
+
+      return optimisticView;
     },
-    [filters, router.query.query, router.query.startDate, router.query.endDate, customViews, persistToStorage],
+    [filters, router.query.query, router.query.startDate, router.query.endDate, projectId, createMutation, utils.savedViews.getAll],
   );
 
   /**
@@ -321,19 +429,25 @@ function useSavedViewsInternal() {
    */
   const deleteView = useCallback(
     (viewId: string) => {
-      const updatedViews = customViews.filter((v) => v.id !== viewId);
       const newSelectedId =
         selectedViewId === viewId ? "all-traces" : selectedViewId;
 
-      setCustomViews(updatedViews);
+      // Optimistic update
+      utils.savedViews.getAll.setData({ projectId }, (old) => {
+        if (!old) return old;
+        return old.filter((v) => v.id !== viewId);
+      });
+
       setSelectedViewIdState(newSelectedId);
-      persistToStorage(updatedViews, newSelectedId);
+      writeSelectedViewId(projectId, newSelectedId);
 
       if (selectedViewId === viewId) {
         resetAllFilters();
       }
+
+      deleteMutation.mutate({ projectId, viewId });
     },
-    [customViews, selectedViewId, persistToStorage, resetAllFilters],
+    [selectedViewId, projectId, resetAllFilters, deleteMutation, utils.savedViews.getAll],
   );
 
   /**
@@ -342,14 +456,18 @@ function useSavedViewsInternal() {
   const renameView = useCallback(
     (viewId: string, newName: string) => {
       const trimmedName = newName.slice(0, MAX_VIEW_NAME_LENGTH);
-      const updatedViews = customViews.map((v) =>
-        v.id === viewId ? { ...v, name: trimmedName } : v,
-      );
 
-      setCustomViews(updatedViews);
-      persistToStorage(updatedViews, selectedViewId);
+      // Optimistic update
+      utils.savedViews.getAll.setData({ projectId }, (old) => {
+        if (!old) return old;
+        return old.map((v) =>
+          v.id === viewId ? { ...v, name: trimmedName } : v,
+        );
+      });
+
+      renameMutation.mutate({ projectId, viewId, name: trimmedName });
     },
-    [customViews, selectedViewId, persistToStorage],
+    [projectId, renameMutation, utils.savedViews.getAll],
   );
 
   /**
@@ -357,10 +475,25 @@ function useSavedViewsInternal() {
    */
   const reorderViews = useCallback(
     (newOrder: SavedView[]) => {
-      setCustomViews(newOrder);
-      persistToStorage(newOrder, selectedViewId);
+      const viewIds = newOrder.map((v) => v.id);
+
+      // Optimistic update
+      utils.savedViews.getAll.setData({ projectId }, (old) => {
+        if (!old) return old;
+        // Reorder the existing data to match newOrder
+        const viewMap = new Map(old.map((v) => [v.id, v]));
+        return viewIds
+          .map((id, index) => {
+            const view = viewMap.get(id);
+            if (!view) return null;
+            return { ...view, order: index };
+          })
+          .filter(Boolean) as typeof old;
+      });
+
+      reorderMutation.mutate({ projectId, viewIds });
     },
-    [selectedViewId, persistToStorage],
+    [projectId, reorderMutation, utils.savedViews.getAll],
   );
 
   // View matching: compare current filters against all views on every change
@@ -392,16 +525,14 @@ function useSavedViewsInternal() {
     if (matchedViewId !== selectedViewId) {
       setSelectedViewIdState(matchedViewId);
       if (projectId) {
-        persistToStorage(customViews, matchedViewId);
+        writeSelectedViewId(projectId, matchedViewId);
       }
     }
   }, [
     matchedViewId,
     isInitialized,
     selectedViewId,
-    customViews,
     projectId,
-    persistToStorage,
   ]);
 
   return {

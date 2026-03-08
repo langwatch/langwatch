@@ -2,193 +2,19 @@
  * @vitest-environment jsdom
  */
 import { subDays } from "date-fns";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { FilterParam } from "../useFilterParams";
 import type { FilterField } from "../../server/filters/types";
 import {
   DEFAULT_VIEWS,
   filtersMatch,
   findMatchingView,
-  getStorageKey,
   MAX_VIEW_NAME_LENGTH,
   normalizeFilterValue,
-  readSavedViewsFromStorage,
-  SAVED_VIEWS_SCHEMA_VERSION,
-  SEED_VIEWS,
   type SavedView,
-  type SavedViewsStorage,
-  writeSavedViewsToStorage,
 } from "../savedViewsLogic";
 
 describe("savedViewsLogic", () => {
-  // --- localStorage ---
-
-  describe("getStorageKey()", () => {
-    it("returns key scoped to projectId", () => {
-      expect(getStorageKey("proj-123")).toBe("langwatch-saved-views-proj-123");
-    });
-  });
-
-  describe("readSavedViewsFromStorage()", () => {
-    beforeEach(() => {
-      localStorage.clear();
-    });
-
-    afterEach(() => {
-      localStorage.clear();
-    });
-
-    describe("when localStorage is empty", () => {
-      it("returns seeded views on first load", () => {
-        const result = readSavedViewsFromStorage("proj-1");
-        expect(result).toEqual({
-          schemaVersion: SAVED_VIEWS_SCHEMA_VERSION,
-          views: SEED_VIEWS,
-          selectedViewId: null,
-        });
-      });
-
-      it("persists seeded views to localStorage", () => {
-        readSavedViewsFromStorage("proj-1");
-        const stored = JSON.parse(
-          localStorage.getItem(getStorageKey("proj-1"))!,
-        );
-        expect(stored.views).toHaveLength(SEED_VIEWS.length);
-        expect(stored.views[0].id).toBe("application");
-      });
-    });
-
-    describe("when localStorage has valid data", () => {
-      it("returns the stored views and selection", () => {
-        const stored: SavedViewsStorage = {
-          schemaVersion: 1,
-          views: [
-            {
-              id: "v1",
-              name: "My View",
-              filters: { "spans.model": ["gpt-4"] },
-            },
-          ],
-          selectedViewId: "v1",
-        };
-        localStorage.setItem(
-          getStorageKey("proj-1"),
-          JSON.stringify(stored),
-        );
-
-        const result = readSavedViewsFromStorage("proj-1");
-        expect(result.views).toHaveLength(1);
-        expect(result.views[0]!.name).toBe("My View");
-        expect(result.selectedViewId).toBe("v1");
-        expect(result.schemaVersion).toBe(1);
-      });
-    });
-
-    describe("when localStorage has corrupt JSON", () => {
-      it("returns defaults and replaces corrupt data", () => {
-        localStorage.setItem(
-          getStorageKey("proj-1"),
-          "not valid json{{{",
-        );
-
-        const result = readSavedViewsFromStorage("proj-1");
-        expect(result.views).toEqual([]);
-        expect(result.selectedViewId).toBeNull();
-
-        // Should have replaced with valid defaults
-        const stored = JSON.parse(
-          localStorage.getItem(getStorageKey("proj-1"))!,
-        );
-        expect(stored.schemaVersion).toBe(SAVED_VIEWS_SCHEMA_VERSION);
-        expect(stored.views).toEqual([]);
-      });
-    });
-
-    describe("when localStorage has structurally invalid data", () => {
-      it("returns defaults when missing schemaVersion", () => {
-        localStorage.setItem(
-          getStorageKey("proj-1"),
-          JSON.stringify({ views: [] }),
-        );
-
-        const result = readSavedViewsFromStorage("proj-1");
-        expect(result.views).toEqual([]);
-        expect(result.schemaVersion).toBe(SAVED_VIEWS_SCHEMA_VERSION);
-      });
-
-      it("returns defaults when views is not an array", () => {
-        localStorage.setItem(
-          getStorageKey("proj-1"),
-          JSON.stringify({ schemaVersion: 1, views: "not-array" }),
-        );
-
-        const result = readSavedViewsFromStorage("proj-1");
-        expect(result.views).toEqual([]);
-      });
-
-      it("returns defaults for null data", () => {
-        localStorage.setItem(getStorageKey("proj-1"), "null");
-
-        const result = readSavedViewsFromStorage("proj-1");
-        expect(result.views).toEqual([]);
-      });
-    });
-
-    describe("when reading for different projects", () => {
-      it("returns project-scoped data", () => {
-        const storeA: SavedViewsStorage = {
-          schemaVersion: 1,
-          views: [{ id: "a1", name: "Alpha View", filters: {} }],
-          selectedViewId: "a1",
-        };
-        const storeB: SavedViewsStorage = {
-          schemaVersion: 1,
-          views: [{ id: "b1", name: "Beta View", filters: {} }],
-          selectedViewId: "b1",
-        };
-
-        localStorage.setItem(
-          getStorageKey("proj-alpha"),
-          JSON.stringify(storeA),
-        );
-        localStorage.setItem(
-          getStorageKey("proj-beta"),
-          JSON.stringify(storeB),
-        );
-
-        expect(readSavedViewsFromStorage("proj-alpha").views).toHaveLength(1);
-        expect(readSavedViewsFromStorage("proj-beta").views).toHaveLength(1);
-      });
-    });
-  });
-
-  describe("writeSavedViewsToStorage()", () => {
-    beforeEach(() => {
-      localStorage.clear();
-    });
-
-    afterEach(() => {
-      localStorage.clear();
-    });
-
-    it("writes data with schemaVersion", () => {
-      const data: SavedViewsStorage = {
-        schemaVersion: SAVED_VIEWS_SCHEMA_VERSION,
-        views: [{ id: "v1", name: "Test", filters: {} }],
-        selectedViewId: "v1",
-      };
-
-      writeSavedViewsToStorage("proj-1", data);
-
-      const stored = JSON.parse(
-        localStorage.getItem(getStorageKey("proj-1"))!,
-      );
-      expect(stored.schemaVersion).toBe(SAVED_VIEWS_SCHEMA_VERSION);
-      expect(stored.views).toHaveLength(1);
-      expect(stored.selectedViewId).toBe("v1");
-    });
-  });
-
   // --- normalizeFilterValue ---
 
   describe("normalizeFilterValue()", () => {
@@ -309,7 +135,10 @@ describe("savedViewsLogic", () => {
 
   describe("findMatchingView()", () => {
     const customViews: SavedView[] = [
-      ...SEED_VIEWS,
+      { id: "application", name: "Application", filters: { "traces.origin": ["application"] } },
+      { id: "evaluations", name: "Evaluations", filters: { "traces.origin": ["evaluation"] } },
+      { id: "simulations", name: "Simulations", filters: { "traces.origin": ["simulation"] } },
+      { id: "playground", name: "Playground", filters: { "traces.origin": ["playground"] } },
       {
         id: "custom-1",
         name: "Debug",
@@ -678,29 +507,6 @@ describe("savedViewsLogic", () => {
     it("each non-all view has a string origin", () => {
       for (const view of DEFAULT_VIEWS.slice(1)) {
         expect(typeof view.origin).toBe("string");
-      }
-    });
-  });
-
-  // --- SEED_VIEWS ---
-
-  describe("SEED_VIEWS", () => {
-    it("has 4 seeded views matching the origin-based default views", () => {
-      expect(SEED_VIEWS).toHaveLength(4);
-      expect(SEED_VIEWS.map((v) => v.id)).toEqual([
-        "application",
-        "evaluations",
-        "simulations",
-        "playground",
-      ]);
-    });
-
-    it("each seed view has an origin filter", () => {
-      for (const view of SEED_VIEWS) {
-        expect(view.filters["traces.origin"]).toBeDefined();
-        expect(
-          Array.isArray(view.filters["traces.origin"]),
-        ).toBe(true);
       }
     });
   });

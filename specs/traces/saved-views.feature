@@ -11,45 +11,43 @@ Feature: Saved Views on Traces List
   # search text and topic selections). "Searches" implies full-text only.
   # The UI label on the bar is just the view name — no header needed.
   #
-  # Storage: localStorage per project (keyed by projectId, not slug).
-  # Includes schemaVersion for future migration support. No backend
-  # persistence yet — keeps scope small, avoids migrations.
+  # Storage: Database (PostgreSQL) per project via tRPC endpoints.
+  # Views are shared across all team members in a project — this is a
+  # collaborative feature. The selected view ID is stored in localStorage
+  # per user (personal preference, not shared state).
   #
-  # Default views filter on `langwatch.origin` (trace-type-classification).
-  # They are always present and cannot be deleted, only hidden in the future.
+  # Architecture: Three-layer pattern (Router → Service → Repository)
+  # following the dashboard pattern. All Prisma queries MUST include
+  # projectId for multitenancy protection.
   #
-  # "All Traces" acts as a full reset — clears field filters, search query,
-  # and negateFilters. Uses a dedicated resetAllFilters() function, not
-  # the existing clearFilters() which only handles field filters.
+  # Seed views: On first access (getAll returns empty), the service
+  # auto-creates 4 origin-based views (Application, Evaluations,
+  # Simulations, Playground). These are regular views that can be
+  # renamed, deleted, and reordered by any team member.
   #
-  # Clicking the currently-active view deselects it (same as clicking All Traces).
+  # "All Traces" is a virtual view (never stored in DB). It acts as a
+  # full reset — clears field filters, search query, and negateFilters.
+  # Uses a dedicated resetAllFilters() function, not the existing
+  # clearFilters() which only handles field filters.
+  #
+  # Clicking the currently-active view deselects it (same as clicking
+  # All Traces).
   #
   # Filter state captured: the `filters` object from useFilterParams plus
-  # the `query` search string. Period (date range), grouping, and
-  # negateFilters are NOT captured — date/grouping are orthogonal concerns;
-  # negateFilters is excluded to avoid silent inversion bugs.
+  # the `query` search string plus date period. Period is stored as
+  # relativeDays for rolling windows, or fixed ISO dates for custom ranges.
+  # Grouping and negateFilters are NOT captured.
   #
   # Origin filter infrastructure: `langwatch.origin` must be registered as
   # a filterable field (traces.origin) in the filter registry, ClickHouse
   # filter definitions, and filter conditions. The "application" value is
   # absence-based — traces with no origin attribute are "application".
-  # The filter must handle this: filtering for "application" means
-  # origin = '' OR origin IS NULL, while other values match directly.
   #
   # Feature gate: The saved views bar and origin column are only shown
   # for projects with ClickHouse enabled (featureClickHouseDataSourceTraces).
-  # The origin data only exists in ClickHouse trace_summaries, not in
-  # Elasticsearch, so the feature requires ClickHouse.
   #
-  # Colors: Origin values use colors from featureIcons (the centralized
-  # color/icon mapping for platform concepts):
-  #   - application: blue.500 (traces)
-  #   - evaluation: orange.500 (evaluations)
-  #   - simulation: pink.500 (simulations)
-  #   - playground: purple.500 (prompts)
-  #   - workflow: green.500 (workflows)
-  # Custom/user-defined view names use getColorForString hash-based colors.
-  # This mapping lives in a centralized originColors config, not inline.
+  # Colors: Origin values use colors from featureIcons. Custom/user-defined
+  # view names use getColorForString hash-based colors.
   #
   # Edit mode: blocks click-to-filter navigation. Users must exit edit
   # mode before clicking views to apply filters. Reordering uses
@@ -61,9 +59,6 @@ Feature: Saved Views on Traces List
     And the project has ClickHouse enabled for traces
 
   # ─── Step 0: Origin Filter Infrastructure ───────────────────────────
-  # The saved views bar depends on the ability to filter by trace origin.
-  # This requires registering `traces.origin` as a filter field across
-  # the filter system (types, Elasticsearch, ClickHouse, sidebar UI).
 
   @integration
   Scenario: Origin filter is available in the filter sidebar
@@ -135,7 +130,7 @@ Feature: Saved Views on Traces List
 
   @integration
   Scenario: Default origin-based views appear on first visit
-    Given I have not saved any custom views
+    Given the project has no saved views in the database
     When the saved views bar renders
     Then I see a fixed bar at the bottom of the page
     And I see the following view badges in order:
@@ -146,6 +141,13 @@ Feature: Saved Views on Traces List
       | Playground   |
     And "All Traces" appears visually selected by default
     And each default badge has its corresponding origin color
+
+  @integration
+  Scenario: Seed views are created in the database on first access
+    Given the project has no saved views in the database
+    When a team member loads the traces page
+    Then 4 seed views are created in the database for the project
+    And they are visible to all team members
 
   @integration
   Scenario: Clicking a default view filters traces by origin
@@ -179,62 +181,61 @@ Feature: Saved Views on Traces List
     When I open the filter sidebar
     Then I see a "Save as view" button at the bottom of the sidebar
     When I click "Save as view"
-    Then a name input appears
-    When I type "GPT-4 Production" and confirm
+    Then a dialog opens with a name input
+    When I type "GPT-4 Production" and click Save
     Then a new "GPT-4 Production" badge appears in the saved views bar
-    And it appears after the default origin views
+    And it appears after the existing views
     And it is automatically selected
     And its color is determined by getColorForString hash
+    And the view is persisted in the database
 
   @integration
-  Scenario: Saved view captures filters and search query
+  Scenario: Saved view captures filters, search query, and date period
     Given I have set the search query to "error timeout"
     And I have filtered by user_id "user-123"
+    And I have selected "Last 30 days" as the date range
     When I save the current state as a view named "Timeout Errors"
     And I click "All Traces" to reset
     And I click the "Timeout Errors" view badge
     Then the search query is restored to "error timeout"
     And the user_id filter is restored to "user-123"
+    And the date range is restored to approximately 30 days
 
-  @unit
-  Scenario: Saved view does not capture date range, grouping, or negation
-    When I save filters with a date range, grouping "thread_id", and negateFilters on
-    Then the saved view object contains only filters and query
-    And it does not contain startDate, endDate, group_by, or negateFilters
+  @integration
+  Scenario: Saved views are shared across team members
+    Given user A saves a view named "Critical Errors" with error filters
+    When user B loads the traces page for the same project
+    Then user B sees the "Critical Errors" badge in the saved views bar
+    And clicking it applies the same filters
 
-  # ─── Step 3: localStorage Persistence ───────────────────────────────
+  # ─── Step 3: Database Persistence ───────────────────────────────────
 
-  @unit
-  Scenario: Selected view persists across page reloads
+  @integration
+  Scenario: Views are stored in the database per project
+    When I save a custom view "Debug View"
+    Then the view exists in the SavedView table with the correct projectId
+    And the filters are stored as JSON
+
+  @integration
+  Scenario: Selected view ID persists locally per user
     Given I have clicked the "Application" view badge
     When I reload the page
-    Then the "Application" view is still selected
-    And the origin filter for "application" is still applied
+    Then the "Application" view is still selected for me
+    But another team member may have a different view selected
 
-  @unit
-  Scenario: Custom views persist across page reloads
-    Given I have saved a custom view "My Debug View"
-    When I reload the page
-    Then the "My Debug View" badge still appears in the bar
-
-  @unit
+  @integration
   Scenario: Views are scoped to project by projectId
-    Given I have saved views for project with id "proj-alpha"
-    When I switch to project with id "proj-beta"
-    Then I only see the default views
+    Given I have saved views for project "proj-alpha"
+    When I switch to project "proj-beta"
+    Then I only see the seed views for "proj-beta"
     And the custom views from "proj-alpha" do not appear
 
-  @unit
-  Scenario: localStorage includes schema version for future migration
-    When I save a custom view
-    Then the localStorage data includes a schemaVersion field
-
-  @unit
-  Scenario: Corrupt localStorage gracefully falls back to defaults
-    Given localStorage contains unparseable saved views data
-    When the saved views bar renders
-    Then only the default views appear
-    And the corrupt data is replaced with fresh defaults
+  @integration
+  Scenario: Multitenancy protection on all endpoints
+    Given a saved view belongs to project "proj-alpha"
+    When I try to access it with projectId "proj-beta"
+    Then the request returns not found
+    And the view is not exposed to the wrong project
 
   # ─── Step 4: Edit Mode ─────────────────────────────────────────────
 
@@ -247,7 +248,7 @@ Feature: Saved Views on Traces List
     Then the bar enters edit mode
     And each custom view badge shows a small "x" delete button
     And a hint "Double click to rename" appears in gray text
-    And default origin views do not show delete buttons
+    And "All Traces" does not show a delete button
 
   @integration
   Scenario: Clicking a view in edit mode does not apply filters
@@ -263,23 +264,17 @@ Feature: Saved Views on Traces List
     Then the label becomes an editable text input
     When I type "GPT-4 Prod" and press Enter
     Then the badge label updates to "GPT-4 Prod"
-    And the change is persisted to localStorage
+    And the change is persisted to the database
 
   @integration
   Scenario: Deleting a saved view
     Given the bar is in edit mode
     And I have a custom view "Old View"
     When I click the "x" button on the "Old View" badge
+    And I confirm the deletion
     Then the "Old View" badge is removed from the bar
-    And it is removed from localStorage
+    And it is removed from the database
     And if "Old View" was the active view, "All Traces" becomes selected
-
-  @integration
-  Scenario: Cannot delete default views
-    Given the bar is in edit mode
-    Then the "All Traces" badge does not show an "x" button
-    And the "Application" badge does not show an "x" button
-    And the "Evaluations" badge does not show an "x" button
 
   @integration
   Scenario: Reordering custom views by drag-and-drop
@@ -287,12 +282,13 @@ Feature: Saved Views on Traces List
     And I have custom views "View A", "View B", "View C" in that order
     When I drag "View C" before "View A"
     Then the order becomes "View C", "View A", "View B"
-    And the new order is persisted to localStorage
+    And the new order is persisted to the database
+    And all team members see the updated order
 
   @integration
   Scenario: Exiting edit mode
     Given the bar is in edit mode
-    When I click the three-dot menu and select "Done"
+    When I click "Done"
     Then the bar exits edit mode
     And delete buttons and hint text disappear
     And the views function normally for click-to-filter
@@ -310,7 +306,6 @@ Feature: Saved Views on Traces List
     Given the "Application" view is currently selected
     When I manually add a model filter in the sidebar
     Then no saved view badge appears selected
-    # The bar shows no selection — the user has a custom unsaved filter state
 
   @unit
   Scenario: Re-applying saved view's exact filters re-selects the badge
@@ -338,8 +333,42 @@ Feature: Saved Views on Traces List
     Then the name is truncated to 50 characters
 
   @unit
-  Scenario: Empty custom views list shows only defaults
-    Given localStorage has no saved views for this project
+  Scenario: Empty custom views list shows only All Traces plus seeds
+    Given the project has no saved views in the database
     When the bar renders
-    Then only the 5 default origin views appear
+    Then seed views are created and shown alongside "All Traces"
     And the three-dot menu is still visible
+
+  # ─── Step 6: tRPC Endpoints ─────────────────────────────────────────
+
+  @integration
+  Scenario: getAll returns views ordered by position
+    Given the project has saved views in the database
+    When I call savedViews.getAll with the projectId
+    Then I receive all views for that project
+    And they are ordered by the "order" field ascending
+
+  @integration
+  Scenario: create adds a new view at the end
+    When I call savedViews.create with name, filters, and projectId
+    Then a new view is created in the database
+    And its order is after all existing views
+
+  @integration
+  Scenario: delete removes a view
+    Given a saved view exists with id "view-1"
+    When I call savedViews.delete with id "view-1" and projectId
+    Then the view is removed from the database
+
+  @integration
+  Scenario: rename updates the view name
+    Given a saved view exists with name "Old Name"
+    When I call savedViews.rename with the new name "New Name"
+    Then the view name is updated in the database
+
+  @integration
+  Scenario: reorder updates the order of all views
+    Given views exist in order ["view-a", "view-b", "view-c"]
+    When I call savedViews.reorder with ["view-c", "view-a", "view-b"]
+    Then the order field is updated for each view
+    And subsequent getAll returns them in the new order

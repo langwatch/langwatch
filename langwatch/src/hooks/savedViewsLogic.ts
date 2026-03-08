@@ -12,13 +12,15 @@ import type { FilterField } from "../server/filters/types";
 /** Maximum allowed length for a view name */
 export const MAX_VIEW_NAME_LENGTH = 50;
 
-/** Schema version for localStorage migration support */
+/** Schema version for localStorage selectedViewId migration support */
 export const SAVED_VIEWS_SCHEMA_VERSION = 1;
 
 /** Represents a single saved view (custom, not default) */
 export interface SavedView {
   id: string;
   name: string;
+  /** When set, this is a personal view visible only to that user */
+  userId?: string | null;
   filters: Partial<Record<FilterField, FilterParam>>;
   query?: string;
   /**
@@ -31,13 +33,6 @@ export interface SavedView {
     startDate?: string;
     endDate?: string;
   };
-}
-
-/** Shape of data stored in localStorage */
-export interface SavedViewsStorage {
-  schemaVersion: number;
-  views: SavedView[];
-  selectedViewId: string | null;
 }
 
 /** Default view definition with display metadata */
@@ -55,109 +50,6 @@ export const DEFAULT_VIEWS: DefaultView[] = [
   { id: "simulations", name: "Simulations", origin: "simulation" },
   { id: "playground", name: "Playground", origin: "playground" },
 ];
-
-/**
- * Seed views auto-populated into localStorage on first load.
- * These become regular custom views that can be renamed, deleted, and reordered.
- * "All Traces" is excluded as it remains a permanent virtual view.
- */
-export const SEED_VIEWS: SavedView[] = [
-  { id: "application", name: "Application", filters: { "traces.origin": ["application"] } },
-  { id: "evaluations", name: "Evaluations", filters: { "traces.origin": ["evaluation"] } },
-  { id: "simulations", name: "Simulations", filters: { "traces.origin": ["simulation"] } },
-  { id: "playground", name: "Playground", filters: { "traces.origin": ["playground"] } },
-];
-
-/**
- * Returns the localStorage key for a given project ID.
- */
-export function getStorageKey(projectId: string): string {
-  return `langwatch-saved-views-${projectId}`;
-}
-
-/**
- * Reads saved views from localStorage, returning defaults on failure.
- */
-export function readSavedViewsFromStorage(
-  projectId: string,
-): SavedViewsStorage {
-  const defaultData: SavedViewsStorage = {
-    schemaVersion: SAVED_VIEWS_SCHEMA_VERSION,
-    views: [],
-    selectedViewId: null,
-  };
-
-  if (typeof window === "undefined") return defaultData;
-
-  try {
-    const raw = localStorage.getItem(getStorageKey(projectId));
-    if (!raw) {
-      // Fresh install: seed with default origin views
-      const seeded: SavedViewsStorage = {
-        ...defaultData,
-        views: SEED_VIEWS,
-      };
-      localStorage.setItem(getStorageKey(projectId), JSON.stringify(seeded));
-      return seeded;
-    }
-
-    const parsed = JSON.parse(raw) as SavedViewsStorage;
-
-    if (
-      typeof parsed !== "object" ||
-      parsed === null ||
-      typeof parsed.schemaVersion !== "number" ||
-      !Array.isArray(parsed.views)
-    ) {
-      // Corrupt data -- replace with defaults
-      localStorage.setItem(
-        getStorageKey(projectId),
-        JSON.stringify(defaultData),
-      );
-      return defaultData;
-    }
-
-    // Filter out malformed view objects
-    const validViews = parsed.views.filter(
-      (v: unknown): v is SavedView =>
-        typeof v === "object" &&
-        v !== null &&
-        typeof (v as SavedView).id === "string" &&
-        typeof (v as SavedView).name === "string" &&
-        typeof (v as SavedView).filters === "object" &&
-        (v as SavedView).filters !== null,
-    );
-
-    return {
-      schemaVersion: parsed.schemaVersion,
-      views: validViews,
-      selectedViewId: parsed.selectedViewId ?? null,
-    };
-  } catch {
-    // Unparseable -- replace with fresh defaults
-    localStorage.setItem(
-      getStorageKey(projectId),
-      JSON.stringify(defaultData),
-    );
-    return defaultData;
-  }
-}
-
-/**
- * Writes saved views to localStorage.
- */
-export function writeSavedViewsToStorage(
-  projectId: string,
-  data: SavedViewsStorage,
-): void {
-  if (typeof window === "undefined") return;
-
-  try {
-    localStorage.setItem(getStorageKey(projectId), JSON.stringify(data));
-  } catch {
-    // localStorage full or unavailable -- silently fail
-  }
-}
 
 /**
  * Normalizes a filter value for comparison.
@@ -233,7 +125,7 @@ export function filtersMatch(
 /**
  * Checks whether a view's saved period matches the current URL date state.
  */
-function periodMatches({
+export function periodMatches({
   viewPeriod,
   urlStartDate,
   urlEndDate,

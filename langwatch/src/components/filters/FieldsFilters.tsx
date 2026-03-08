@@ -40,6 +40,7 @@ import { InputGroup } from "../ui/input-group";
 import { Popover } from "../ui/popover";
 import { Slider } from "../ui/slider";
 import { Tooltip } from "../ui/tooltip";
+import { SaveAsViewButton } from "./SaveAsViewButton";
 
 export function QueryStringFieldsFilters({
 	hideTriggerButton = false,
@@ -49,27 +50,34 @@ export function QueryStringFieldsFilters({
 	const { nonEmptyFilters, setFilters } = useFilterParams();
 
 	const { openDrawer } = useDrawer();
-	const { hasPermission } = useOrganizationTeamProject();
+	const { project, hasPermission } = useOrganizationTeamProject();
 
 	const hasAnyFilters = Object.keys(nonEmptyFilters).length > 0;
+	const hasClickHouse = project?.featureClickHouseDataSourceTraces === true;
 
 	return (
 		<FieldsFilters
 			filters={nonEmptyFilters}
 			setFilters={(filters) => setFilters(filterOutEmptyFilters(filters))}
 			actionButton={
-				hasPermission("triggers:manage") && !hideTriggerButton ? (
-					<Tooltip content="Create a filter to add an automation.">
-						<Button
-							colorPalette="gray"
-							onClick={() => openDrawer("automation", undefined)}
-							disabled={!hasAnyFilters}
-						>
-							<LuZap />
-							Add Automation
-						</Button>
-					</Tooltip>
-				) : undefined
+				<HStack gap={1}>
+					{hasClickHouse && hasAnyFilters && (
+						<SaveAsViewButton />
+					)}
+					{hasPermission("triggers:manage") && !hideTriggerButton && (
+						<Tooltip content="Create a filter to add an automation.">
+							<Button
+								size="xs"
+								variant="outline"
+								onClick={() => openDrawer("automation", undefined)}
+								disabled={!hasAnyFilters}
+							>
+								<LuZap />
+								Add Automation
+							</Button>
+						</Tooltip>
+					)}
+				</HStack>
 			}
 		/>
 	);

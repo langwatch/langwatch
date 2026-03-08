@@ -401,7 +401,10 @@ export function generateClickHouseFilterConditions(
   for (const [field, filterParams] of Object.entries(filters)) {
     if (
       !filterParams ||
-      (Array.isArray(filterParams) && filterParams.length === 0)
+      (Array.isArray(filterParams) && filterParams.length === 0) ||
+      (typeof filterParams === "object" &&
+        !Array.isArray(filterParams) &&
+        Object.keys(filterParams).length === 0)
     ) {
       continue;
     }

@@ -1,42 +1,29 @@
 /**
- * SaveAsViewButton -- button at the bottom of FilterSidebar that allows
- * saving the current filter state as a named custom view.
+ * SaveAsViewButton -- button next to "Filters" heading that opens a dialog
+ * to save the current filter state as a named custom view.
  *
- * Only visible when ClickHouse data source is enabled for the project.
- * The inner component is split out so useSavedViews() is only called
- * when SavedViewsProvider is guaranteed to be present.
+ * Rendered by QueryStringFieldsFilters only when filters are active and
+ * ClickHouse is enabled. useSavedViews() is safe here because the parent
+ * tree always has SavedViewsProvider when ClickHouse is on.
  */
 
-import { Button, HStack, Input } from "@chakra-ui/react";
-import { useRouter } from "next/router";
+import { Button, HStack, Input, Text } from "@chakra-ui/react";
+import { Check, ChevronDown, User, Users } from "lucide-react";
 import React, { useCallback, useRef, useState } from "react";
-import { useFilterParams } from "../../hooks/useFilterParams";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { MAX_VIEW_NAME_LENGTH, useSavedViews } from "../../hooks/useSavedViews";
 import { Dialog } from "../ui/dialog";
+import { Menu } from "../ui/menu";
 
 export function SaveAsViewButton() {
-  const { project } = useOrganizationTeamProject();
-  const hasClickHouse = project?.featureClickHouseDataSourceTraces === true;
-
-  if (!hasClickHouse) return null;
-
-  return <SaveAsViewButtonContent />;
-}
-
-function SaveAsViewButtonContent() {
   const { saveView } = useSavedViews();
-  const { hasAnyFilters } = useFilterParams();
-  const router = useRouter();
-  const hasQuery = !!router.query.query;
-  const hasDateParams = !!router.query.startDate || !!router.query.endDate;
-  const hasAnythingToSave = hasAnyFilters || hasQuery || hasDateParams;
   const [isOpen, setIsOpen] = useState(false);
   const [viewName, setViewName] = useState("");
+  const [scope, setScope] = useState<"project" | "myself">("project");
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleOpen = useCallback(() => {
     setViewName("");
+    setScope("project");
     setIsOpen(true);
     setTimeout(() => inputRef.current?.focus(), 50);
   }, []);
@@ -44,10 +31,10 @@ function SaveAsViewButtonContent() {
   const handleConfirm = useCallback(() => {
     const trimmed = viewName.trim();
     if (!trimmed) return;
-    saveView(trimmed);
+    saveView(trimmed, scope);
     setIsOpen(false);
     setViewName("");
-  }, [viewName, saveView]);
+  }, [viewName, scope, saveView]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -61,11 +48,9 @@ function SaveAsViewButtonContent() {
   return (
     <>
       <Button
-        colorPalette="blue"
-        size="sm"
-        alignSelf="flex-end"
+        size="xs"
+        variant="outline"
         onClick={handleOpen}
-        disabled={!hasAnythingToSave}
         data-testid="save-as-view-button"
       >
         Save as view
@@ -93,28 +78,67 @@ function SaveAsViewButtonContent() {
             />
           </Dialog.Body>
           <Dialog.Footer>
-            <HStack gap={2}>
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setIsOpen(false);
-                  setViewName("");
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                colorPalette="blue"
-                onClick={handleConfirm}
-                disabled={!viewName.trim()}
-              >
-                Save
-              </Button>
+            <HStack width="full" justify="space-between">
+              <ScopeSelector scope={scope} onScopeChange={setScope} />
+              <HStack gap={2}>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setIsOpen(false);
+                    setViewName("");
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  colorPalette="blue"
+                  onClick={handleConfirm}
+                  disabled={!viewName.trim()}
+                >
+                  Save
+                </Button>
+              </HStack>
             </HStack>
           </Dialog.Footer>
           <Dialog.CloseTrigger />
         </Dialog.Content>
       </Dialog.Root>
     </>
+  );
+}
+
+/**
+ * Dropdown selector for choosing view scope (Project or Myself).
+ * Uses a Menu component for simplicity.
+ */
+function ScopeSelector({
+  scope,
+  onScopeChange,
+}: {
+  scope: "project" | "myself";
+  onScopeChange: (s: "project" | "myself") => void;
+}) {
+  return (
+    <Menu.Root>
+      <Menu.Trigger asChild>
+        <Button variant="outline" size="sm" px={2}>
+          {scope === "project" ? <Users size={14} /> : <User size={14} />}
+          <Text>{scope === "project" ? "Project" : "Myself"}</Text>
+          <ChevronDown size={12} />
+        </Button>
+      </Menu.Trigger>
+      <Menu.Content portalled={false}>
+        <Menu.Item value="myself" onClick={() => onScopeChange("myself")}>
+          <User size={14} />
+          Myself
+          {scope === "myself" && <Check size={14} />}
+        </Menu.Item>
+        <Menu.Item value="project" onClick={() => onScopeChange("project")}>
+          <Users size={14} />
+          Project
+          {scope === "project" && <Check size={14} />}
+        </Menu.Item>
+      </Menu.Content>
+    </Menu.Root>
   );
 }

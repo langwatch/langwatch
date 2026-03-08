@@ -821,19 +821,46 @@ export function MessagesTable({
 
   const [selectedHeaderColumns, setSelectedHeaderColumns] = useState<
     Record<keyof typeof headerColumns, { enabled: boolean; name: string }>
-  >(
-    localStorageHeaderColumns
-      ? localStorageHeaderColumns
-      : Object.fromEntries(
-          Object.entries(headerColumns).map(([key, column]) => [
-            key,
-            {
-              enabled: key !== "trace.trace_id",
-              name: column.name,
-            },
-          ]),
-        ),
-  );
+  >(() => {
+    if (!localStorageHeaderColumns) {
+      return Object.fromEntries(
+        Object.entries(headerColumns).map(([key, column]) => [
+          key,
+          {
+            enabled: key !== "trace.trace_id",
+            name: column.name,
+          },
+        ]),
+      );
+    }
+
+    // Re-order columns to match canonical headerColumns order,
+    // preserving enabled/name from localStorage. This ensures that
+    // column order changes in source code are respected for existing users.
+    const ordered: Record<string, { enabled: boolean; name: string }> = {};
+
+    // First: canonical columns in source order
+    for (const key of Object.keys(headerColumns)) {
+      if (key in localStorageHeaderColumns) {
+        ordered[key] = localStorageHeaderColumns[key]!;
+      } else {
+        // New column added in source — enable by default
+        ordered[key] = {
+          enabled: key !== "trace.trace_id",
+          name: headerColumns[key]!.name,
+        };
+      }
+    }
+
+    // Then: extra columns only in localStorage (e.g. dynamic evaluation columns)
+    for (const [key, value] of Object.entries(localStorageHeaderColumns)) {
+      if (!(key in ordered)) {
+        ordered[key] = value;
+      }
+    }
+
+    return ordered;
+  });
 
   const isFirstRender = useRef(true);
 

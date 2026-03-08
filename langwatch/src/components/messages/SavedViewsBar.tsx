@@ -34,22 +34,28 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Check, MoreVertical, X } from "lucide-react";
+import { Check, MoreVertical, User, X } from "lucide-react";
 import React, { useCallback, useRef, useState } from "react";
 import type { SavedView } from "../../hooks/useSavedViews";
 import { useSavedViews } from "../../hooks/useSavedViews";
+import { getOriginColor } from "../../utils/originColors";
 import { getColorForString } from "../../utils/rotatingColors";
 import { MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "../MainMenu";
 import { Menu } from "../ui/menu";
 
 /**
  * Returns badge colors for a view.
- * "All Traces" uses gray; custom views use hash-based colors.
+ * Views that filter on a single origin value reuse the origin column colors.
+ * Other custom views use hash-based colors from the rotating palette.
  */
-function getViewColors(view: { name: string }): {
+function getViewColors(view: { filters: SavedView["filters"]; name: string }): {
   background: string;
   color: string;
 } {
+  const originFilter = view.filters["traces.origin"];
+  if (Array.isArray(originFilter) && originFilter.length === 1) {
+    return getOriginColor(originFilter[0]!);
+  }
   return getColorForString("colors", view.name);
 }
 
@@ -213,6 +219,7 @@ function ViewBadge({
   colors,
   isSelected,
   isDefault,
+  isPersonal,
   isEditMode,
   onClick,
   onDelete,
@@ -227,6 +234,7 @@ function ViewBadge({
   colors: { background: string; color: string };
   isSelected: boolean;
   isDefault: boolean;
+  isPersonal?: boolean;
   isEditMode: boolean;
   onClick: () => void;
   onDelete?: () => void;
@@ -339,7 +347,10 @@ function ViewBadge({
             </IconButton>
           </>
         ) : (
-          <Text>{name}</Text>
+          <>
+            {isPersonal && <User size={10} />}
+            <Text>{name}</Text>
+          </>
         )}
         {isEditMode && !isDefault && !isRenaming && (
           <IconButton
@@ -407,6 +418,7 @@ function SortableViewBadge({
       colors={colors}
       isSelected={isSelected}
       isDefault={false}
+      isPersonal={!!view.userId}
       isEditMode={isEditMode}
       onClick={onClick}
       onDelete={onDelete}
