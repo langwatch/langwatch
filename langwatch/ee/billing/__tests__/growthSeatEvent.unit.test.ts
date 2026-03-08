@@ -10,10 +10,10 @@ vi.mock("../stripe/stripePriceCatalog", () => ({
     GROWTH_EVENTS_EUR_ANNUAL: "price_events_eur_annual",
     GROWTH_EVENTS_USD_MONTHLY: "price_events_usd_monthly",
     GROWTH_EVENTS_USD_ANNUAL: "price_events_usd_annual",
-    GROWTH_EVENTS_EUR_MONTHLY_LEGACY: "price_events_eur_monthly_legacy",
-    GROWTH_EVENTS_EUR_ANNUAL_LEGACY: "price_events_eur_annual_legacy",
-    GROWTH_EVENTS_USD_MONTHLY_LEGACY: "price_events_usd_monthly_legacy",
-    GROWTH_EVENTS_USD_ANNUAL_LEGACY: "price_events_usd_annual_legacy",
+    GROWTH_EVENTS_EUR_MONTHLY_UNTIL_MAR_2026: "price_events_eur_monthly_until_mar_2026",
+    GROWTH_EVENTS_EUR_ANNUAL_UNTIL_MAR_2026: "price_events_eur_annual_until_mar_2026",
+    GROWTH_EVENTS_USD_MONTHLY_UNTIL_MAR_2026: "price_events_usd_monthly_until_mar_2026",
+    GROWTH_EVENTS_USD_ANNUAL_UNTIL_MAR_2026: "price_events_usd_annual_until_mar_2026",
   },
 }));
 
@@ -75,21 +75,21 @@ describe("growthSeatEvent", () => {
       });
     });
 
-    describe("when given a legacy growth events price ID", () => {
-      it("returns true for EUR monthly legacy", () => {
-        expect(isGrowthEventsPrice("price_events_eur_monthly_legacy")).toBe(true);
+    describe("when given a pre-March 2026 growth events price ID", () => {
+      it("returns true for EUR monthly pre-March 2026", () => {
+        expect(isGrowthEventsPrice("price_events_eur_monthly_until_mar_2026")).toBe(true);
       });
 
-      it("returns true for EUR annual legacy", () => {
-        expect(isGrowthEventsPrice("price_events_eur_annual_legacy")).toBe(true);
+      it("returns true for EUR annual pre-March 2026", () => {
+        expect(isGrowthEventsPrice("price_events_eur_annual_until_mar_2026")).toBe(true);
       });
 
-      it("returns true for USD monthly legacy", () => {
-        expect(isGrowthEventsPrice("price_events_usd_monthly_legacy")).toBe(true);
+      it("returns true for USD monthly pre-March 2026", () => {
+        expect(isGrowthEventsPrice("price_events_usd_monthly_until_mar_2026")).toBe(true);
       });
 
-      it("returns true for USD annual legacy", () => {
-        expect(isGrowthEventsPrice("price_events_usd_annual_legacy")).toBe(true);
+      it("returns true for USD annual pre-March 2026", () => {
+        expect(isGrowthEventsPrice("price_events_usd_annual_until_mar_2026")).toBe(true);
       });
     });
 
