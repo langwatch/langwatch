@@ -106,6 +106,26 @@ export class SavedViewRepository {
   }
 
   /**
+   * Creates multiple saved views, skipping duplicates.
+   * Safe for concurrent first-access seeding.
+   */
+  async createMany(input: { views: CreateSavedViewInput[] }): Promise<void> {
+    await this.prisma.savedView.createMany({
+      data: input.views.map((v) => ({
+        id: v.id,
+        projectId: v.projectId,
+        userId: v.userId,
+        name: v.name,
+        filters: v.filters,
+        query: v.query,
+        period: v.period ?? undefined,
+        order: v.order,
+      })),
+      skipDuplicates: true,
+    });
+  }
+
+  /**
    * Updates an existing saved view.
    */
   async update(input: UpdateSavedViewInput): Promise<SavedView> {

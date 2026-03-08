@@ -22,17 +22,14 @@ const SEED_VIEWS = [
  * Throws domain-specific errors that can be mapped by the router layer.
  */
 export class SavedViewService {
-  constructor(
-    private readonly prisma: PrismaClient,
-    private readonly repository: SavedViewRepository,
-  ) {}
+  constructor(private readonly repository: SavedViewRepository) {}
 
   /**
    * Static factory method for creating a SavedViewService with proper DI.
    */
   static create(prisma: PrismaClient): SavedViewService {
     const repository = new SavedViewRepository(prisma);
-    return new SavedViewService(prisma, repository);
+    return new SavedViewService(repository);
   }
 
   /**
@@ -40,11 +37,11 @@ export class SavedViewService {
    * Returns project-level views (userId IS NULL) plus the user's personal views.
    * Auto-seeds with default origin views on first access.
    */
-  async getAll(projectId: string, userId?: string) {
+  async getAll({ projectId, userId }: { projectId: string; userId?: string }) {
     const count = await this.repository.count({ projectId, userId });
 
     if (count === 0) {
-      await this.seedViews(projectId);
+      await this.seedViews({ projectId });
     }
 
     return await this.repository.findAll({ projectId, userId });
@@ -55,16 +52,19 @@ export class SavedViewService {
    * When userId is provided, the view becomes personal (only visible to that user).
    */
   // biome-ignore lint/suspicious/useAdjacentOverloadSignatures: not an overload - static create() creates service, instance create() creates view
-  async create(
-    projectId: string,
+  async createView({
+    projectId,
+    input,
+  }: {
+    projectId: string;
     input: {
       name: string;
       filters: Prisma.InputJsonValue;
       query?: string;
       period?: Prisma.InputJsonValue;
       userId?: string;
-    },
-  ) {
+    };
+  }) {
     const lastView = await this.repository.findLast({ projectId });
     const newOrder = (lastView?.order ?? -1) + 1;
 
@@ -82,15 +82,29 @@ export class SavedViewService {
 
   /**
    * Deletes a saved view.
+   * Personal views can only be deleted by their owner.
    * @throws {SavedViewNotFoundError} if view doesn't exist
+   * @throws {SavedViewNotOwnedError} if view belongs to another user
    */
-  async delete(projectId: string, viewId: string) {
+  async delete({
+    projectId,
+    viewId,
+    userId,
+  }: {
+    projectId: string;
+    viewId: string;
+    userId: string;
+  }) {
     const view = await this.repository.findById({
       id: viewId,
       projectId,
     });
 
     if (!view) {
+      throw new SavedViewNotFoundError();
+    }
+
+    if (view.userId !== null && view.userId !== userId) {
       throw new SavedViewNotFoundError();
     }
 
@@ -102,15 +116,31 @@ export class SavedViewService {
 
   /**
    * Renames a saved view.
+   * Personal views can only be renamed by their owner.
    * @throws {SavedViewNotFoundError} if view doesn't exist
+   * @throws {SavedViewNotOwnedError} if view belongs to another user
    */
-  async rename(projectId: string, viewId: string, name: string) {
+  async rename({
+    projectId,
+    viewId,
+    name,
+    userId,
+  }: {
+    projectId: string;
+    viewId: string;
+    name: string;
+    userId: string;
+  }) {
     const view = await this.repository.findById({
       id: viewId,
       projectId,
     });
 
     if (!view) {
+      throw new SavedViewNotFoundError();
+    }
+
+    if (view.userId !== null && view.userId !== userId) {
       throw new SavedViewNotFoundError();
     }
 
@@ -125,7 +155,13 @@ export class SavedViewService {
    * Reorders saved views by updating their order field.
    * @throws {SavedViewReorderError} if any view doesn't exist
    */
-  async reorder(projectId: string, viewIds: string[]) {
+  async reorder({
+    projectId,
+    viewIds,
+  }: {
+    projectId: string;
+    viewIds: string[];
+  }) {
     const existingViews = await this.repository.findByIds({
       ids: viewIds,
       projectId,
@@ -145,17 +181,17 @@ export class SavedViewService {
 
   /**
    * Seeds a project with default origin-based views.
+   * Uses createMany with skipDuplicates to handle concurrent first-access safely.
    */
-  private async seedViews(projectId: string) {
-    for (let i = 0; i < SEED_VIEWS.length; i++) {
-      const seed = SEED_VIEWS[i]!;
-      await this.repository.create({
+  private async seedViews({ projectId }: { projectId: string }) {
+    await this.repository.createMany({
+      views: SEED_VIEWS.map((seed, i) => ({
         id: nanoid(),
         projectId,
         name: seed.name,
         filters: seed.filters as Prisma.InputJsonValue,
         order: i,
-      });
-    }
+      })),
+    });
   }
 }
