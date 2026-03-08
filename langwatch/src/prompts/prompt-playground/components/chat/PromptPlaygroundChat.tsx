@@ -81,7 +81,7 @@ const PromptPlaygroundChatInner = forwardRef<PromptPlaygroundChatRef, object>(
     const { getTabById } = useDraggableTabsBrowserStore((state) => ({
       getTabById: state.getByTabId,
     }));
-    const { setMessages, visibleMessages } = useCopilotChat();
+    const { setMessages, visibleMessages = [] } = useCopilotChat();
     const { updateTabData } = useDraggableTabsBrowserStore((state) => ({
       updateTabData: state.updateTabData,
     }));
