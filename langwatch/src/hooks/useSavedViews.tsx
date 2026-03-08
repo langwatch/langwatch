@@ -8,6 +8,7 @@
  * child component to access shared state (SavedViewsBar, SaveAsViewButton, etc.)
  */
 
+import { differenceInCalendarDays, subDays } from "date-fns";
 import { useRouter } from "next/router";
 import qs from "qs";
 import React, {
@@ -58,10 +59,14 @@ function buildViewQueryString({
   routerQuery,
   viewFilters,
   query,
+  startDate,
+  endDate,
 }: {
   routerQuery: Record<string, string | string[] | undefined>;
   viewFilters: Partial<Record<FilterField, FilterParam>>;
   query?: string;
+  startDate?: string;
+  endDate?: string;
 }): string {
   // Start with only preserved keys
   const cleanQuery: Record<string, unknown> = {};
@@ -81,6 +86,13 @@ function buildViewQueryString({
 
   if (query) {
     cleanQuery["query"] = query;
+  }
+
+  if (startDate) {
+    cleanQuery["startDate"] = startDate;
+  }
+  if (endDate) {
+    cleanQuery["endDate"] = endDate;
   }
 
   return qs.stringify(cleanQuery, {
@@ -151,13 +163,27 @@ function useSavedViewsInternal() {
   }, [router]);
 
   /**
-   * Applies a set of filters and optionally a query string to the URL.
+   * Applies a set of filters, optional query string, and optional period to the URL.
    */
   const applyViewFilters = useCallback(
     (
       viewFilters: Partial<Record<FilterField, FilterParam>>,
       query?: string,
+      period?: SavedView["period"],
     ) => {
+      let startDate: string | undefined;
+      let endDate: string | undefined;
+
+      if (period) {
+        if (period.relativeDays !== undefined) {
+          endDate = new Date().toISOString();
+          startDate = subDays(new Date(), period.relativeDays - 1).toISOString();
+        } else if (period.startDate && period.endDate) {
+          startDate = period.startDate;
+          endDate = period.endDate;
+        }
+      }
+
       const queryString = buildViewQueryString({
         routerQuery: router.query as Record<
           string,
@@ -165,6 +191,8 @@ function useSavedViewsInternal() {
         >,
         viewFilters,
         query,
+        startDate,
+        endDate,
       });
 
       void router.push("?" + queryString, undefined, {
@@ -194,7 +222,7 @@ function useSavedViewsInternal() {
     const customView = customViews.find((v) => v.id === selectedViewId);
     if (customView) {
       skipNextMatchRef.current = true;
-      applyViewFilters(customView.filters, customView.query);
+      applyViewFilters(customView.filters, customView.query, customView.period);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInitialized, projectId]);
@@ -218,7 +246,7 @@ function useSavedViewsInternal() {
       if (customView) {
         setSelectedViewIdState(viewId);
         persistToStorage(customViews, viewId);
-        applyViewFilters(customView.filters, customView.query);
+        applyViewFilters(customView.filters, customView.query, customView.period);
       }
     },
     [
@@ -246,17 +274,36 @@ function useSavedViewsInternal() {
 
   /**
    * Saves the current filter state as a new custom view.
+   * Captures date period from URL if present.
    */
   const saveView = useCallback(
     (name: string) => {
       const trimmedName = name.slice(0, MAX_VIEW_NAME_LENGTH);
       const queryParam = (router.query.query as string) || undefined;
 
+      let period: SavedView["period"] | undefined;
+      const startDateStr = router.query.startDate as string | undefined;
+      const endDateStr = router.query.endDate as string | undefined;
+
+      if (startDateStr && endDateStr) {
+        const startDate = new Date(startDateStr);
+        const endDate = new Date(endDateStr);
+        const daysDifference = differenceInCalendarDays(endDate, startDate) + 1;
+        const endIsRecent = differenceInCalendarDays(new Date(), endDate) <= 1;
+
+        if (endIsRecent) {
+          period = { relativeDays: daysDifference };
+        } else {
+          period = { startDate: startDateStr, endDate: endDateStr };
+        }
+      }
+
       const newView: SavedView = {
         id: generateViewId(),
         name: trimmedName,
         filters: { ...filters },
         query: queryParam,
+        ...(period ? { period } : {}),
       };
 
       const updatedViews = [...customViews, newView];
@@ -266,7 +313,7 @@ function useSavedViewsInternal() {
 
       return newView;
     },
-    [filters, router.query.query, customViews, persistToStorage],
+    [filters, router.query.query, router.query.startDate, router.query.endDate, customViews, persistToStorage],
   );
 
   /**
@@ -318,14 +365,20 @@ function useSavedViewsInternal() {
 
   // View matching: compare current filters against all views on every change
   const currentQuery = (router.query.query as string) || undefined;
+  const urlStartDate = router.query.startDate as string | undefined;
+  const urlEndDate = router.query.endDate as string | undefined;
+  const urlHasDateParams = !!urlStartDate || !!urlEndDate;
 
   const matchedViewId = useMemo(() => {
     return findMatchingView({
       currentFilters: filters,
       currentQuery,
       customViews,
+      urlStartDate,
+      urlEndDate,
+      urlHasDateParams,
     });
-  }, [filters, currentQuery, customViews]);
+  }, [filters, currentQuery, customViews, urlStartDate, urlEndDate, urlHasDateParams]);
 
   // Auto-update selectedViewId when filters change (view matching)
   useEffect(() => {

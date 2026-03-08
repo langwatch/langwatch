@@ -43,9 +43,10 @@ import { Menu } from "../ui/menu";
  * Returns badge colors for a view.
  * "All Traces" uses gray; custom views use hash-based colors.
  */
-function getViewColors(view: {
-  name: string;
-}): { background: string; color: string } {
+function getViewColors(view: { name: string }): {
+  background: string;
+  color: string;
+} {
   return getColorForString("colors", view.name);
 }
 
@@ -96,7 +97,7 @@ export function SavedViewsBar() {
       bottom={0}
       width="full"
       zIndex={10}
-      background="bg.panel/80"
+      background="bg.panel/75"
       backdropFilter="blur(8px)"
       borderTop="1px solid"
       borderColor="border"
@@ -183,10 +184,7 @@ export function SavedViewsBar() {
               </IconButton>
             </Menu.Trigger>
             <Menu.Content>
-              <Menu.Item
-                value="edit"
-                onClick={() => setIsEditMode(true)}
-              >
+              <Menu.Item value="edit" onClick={() => setIsEditMode(true)}>
                 Edit
               </Menu.Item>
             </Menu.Content>

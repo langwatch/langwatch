@@ -3,9 +3,7 @@ import { MessagesTable } from "~/components/messages/MessagesTable";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { useTableView } from "../../components/messages/HeaderButtons";
 import { MessagesList } from "../../components/messages/MessagesList";
-import { SavedViewsBar } from "../../components/messages/SavedViewsBar";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
-import { SavedViewsProvider } from "../../hooks/useSavedViews";
 import WelcomeLayout from "../../components/welcome/WelcomeLayout";
 import { useFieldRedaction } from "../../hooks/useFieldRedaction";
 import { useFilterParams } from "../../hooks/useFilterParams";
@@ -53,19 +51,9 @@ function MessagesOrIntegrationGuideContent() {
     );
   }
 
-  const content = isTableView ? <MessagesTable /> : <MessagesList />;
-  const hasClickHouse = project?.featureClickHouseDataSourceTraces === true;
-
   return (
     <DashboardLayout>
-      {hasClickHouse ? (
-        <SavedViewsProvider>
-          {content}
-          <SavedViewsBar />
-        </SavedViewsProvider>
-      ) : (
-        content
-      )}
+      {isTableView ? <MessagesTable /> : <MessagesList />}
     </DashboardLayout>
   );
 }

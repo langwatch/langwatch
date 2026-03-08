@@ -5,6 +5,7 @@
  * importing React or server-side dependencies (Prisma, registry).
  */
 
+import { differenceInCalendarDays } from "date-fns";
 import type { FilterParam } from "./useFilterParams";
 import type { FilterField } from "../server/filters/types";
 
@@ -20,6 +21,16 @@ export interface SavedView {
   name: string;
   filters: Partial<Record<FilterField, FilterParam>>;
   query?: string;
+  /**
+   * Saved date period. `relativeDays` = rolling window (e.g. 30 = "Last 30 days").
+   * Fixed `startDate`/`endDate` ISO strings for custom date ranges.
+   * Omitted when the view uses the default period.
+   */
+  period?: {
+    relativeDays?: number;
+    startDate?: string;
+    endDate?: string;
+  };
 }
 
 /** Shape of data stored in localStorage */
@@ -220,6 +231,42 @@ export function filtersMatch(
 }
 
 /**
+ * Checks whether a view's saved period matches the current URL date state.
+ */
+function periodMatches({
+  viewPeriod,
+  urlStartDate,
+  urlEndDate,
+  urlHasDateParams,
+}: {
+  viewPeriod: SavedView["period"];
+  urlStartDate: string | undefined;
+  urlEndDate: string | undefined;
+  urlHasDateParams: boolean;
+}): boolean {
+  // Views without a period match regardless of current dates
+  if (!viewPeriod) return true;
+
+  // Views WITH a period only match when the URL also has date params
+  if (!urlHasDateParams) return false;
+
+  if (viewPeriod.relativeDays !== undefined) {
+    if (!urlStartDate || !urlEndDate) return false;
+    const start = new Date(urlStartDate);
+    const end = new Date(urlEndDate);
+    const daysDiff = differenceInCalendarDays(end, start) + 1;
+    const endIsRecent = differenceInCalendarDays(new Date(), end) <= 1;
+    return daysDiff === viewPeriod.relativeDays && endIsRecent;
+  }
+
+  if (viewPeriod.startDate && viewPeriod.endDate) {
+    return urlStartDate === viewPeriod.startDate && urlEndDate === viewPeriod.endDate;
+  }
+
+  return false;
+}
+
+/**
  * Finds which view (default or custom) matches the current filter state.
  * Returns the view ID if matched, null otherwise.
  */
@@ -227,20 +274,26 @@ export function findMatchingView({
   currentFilters,
   currentQuery,
   customViews,
+  urlStartDate,
+  urlEndDate,
+  urlHasDateParams = false,
 }: {
   currentFilters: Partial<Record<FilterField, FilterParam>>;
   currentQuery: string | undefined;
   customViews: SavedView[];
+  urlStartDate?: string;
+  urlEndDate?: string;
+  urlHasDateParams?: boolean;
 }): string | null {
   const normalizedQuery = currentQuery || undefined;
 
-  // Check "All Traces" -- no filters, no query
+  // Check "All Traces" -- no filters, no query, no date params
   const hasFilters = Object.values(currentFilters).some((v) => {
     const norm = normalizeFilterValue(v);
     return norm !== undefined;
   });
 
-  if (!hasFilters && !normalizedQuery) {
+  if (!hasFilters && !normalizedQuery && !urlHasDateParams) {
     return "all-traces";
   }
 
@@ -248,7 +301,13 @@ export function findMatchingView({
   for (const view of customViews) {
     if (
       filtersMatch(currentFilters, view.filters) &&
-      (normalizedQuery ?? undefined) === (view.query ?? undefined)
+      (normalizedQuery ?? undefined) === (view.query ?? undefined) &&
+      periodMatches({
+        viewPeriod: view.period,
+        urlStartDate,
+        urlEndDate,
+        urlHasDateParams,
+      })
     ) {
       return view.id;
     }

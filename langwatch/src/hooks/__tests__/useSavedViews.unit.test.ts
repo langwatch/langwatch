@@ -1,6 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
+import { subDays } from "date-fns";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { FilterParam } from "../useFilterParams";
 import type { FilterField } from "../../server/filters/types";
@@ -463,6 +464,197 @@ describe("savedViewsLogic", () => {
         expect(result).toBeNull();
       });
     });
+
+    // --- period matching ---
+
+    describe("when view has no period", () => {
+      it("matches regardless of URL dates", () => {
+        const views: SavedView[] = [
+          { id: "no-period", name: "No Period", filters: { "spans.model": ["gpt-4"] } },
+        ];
+
+        const result = findMatchingView({
+          currentFilters: { "spans.model": ["gpt-4"] },
+          currentQuery: undefined,
+          customViews: views,
+          urlStartDate: "2025-01-01T00:00:00.000Z",
+          urlEndDate: "2025-01-31T00:00:00.000Z",
+          urlHasDateParams: true,
+        });
+        expect(result).toBe("no-period");
+      });
+
+      it("matches when URL has no date params", () => {
+        const views: SavedView[] = [
+          { id: "no-period", name: "No Period", filters: { "spans.model": ["gpt-4"] } },
+        ];
+
+        const result = findMatchingView({
+          currentFilters: { "spans.model": ["gpt-4"] },
+          currentQuery: undefined,
+          customViews: views,
+          urlHasDateParams: false,
+        });
+        expect(result).toBe("no-period");
+      });
+    });
+
+    describe("when view has relativeDays period", () => {
+      it("matches when URL date range has same days difference and end is recent", () => {
+        const now = new Date();
+        const start = subDays(now, 6); // 7 days range (6 diff + 1)
+        const views: SavedView[] = [
+          {
+            id: "last-7d",
+            name: "Last 7 Days",
+            filters: { "spans.model": ["gpt-4"] },
+            period: { relativeDays: 7 },
+          },
+        ];
+
+        const result = findMatchingView({
+          currentFilters: { "spans.model": ["gpt-4"] },
+          currentQuery: undefined,
+          customViews: views,
+          urlStartDate: start.toISOString(),
+          urlEndDate: now.toISOString(),
+          urlHasDateParams: true,
+        });
+        expect(result).toBe("last-7d");
+      });
+
+      it("does not match when URL has no date params", () => {
+        const views: SavedView[] = [
+          {
+            id: "last-7d",
+            name: "Last 7 Days",
+            filters: { "spans.model": ["gpt-4"] },
+            period: { relativeDays: 7 },
+          },
+        ];
+
+        const result = findMatchingView({
+          currentFilters: { "spans.model": ["gpt-4"] },
+          currentQuery: undefined,
+          customViews: views,
+          urlHasDateParams: false,
+        });
+        expect(result).toBeNull();
+      });
+
+      it("does not match when days difference is wrong", () => {
+        const now = new Date();
+        const start = subDays(now, 13); // 14 days range, not 7
+        const views: SavedView[] = [
+          {
+            id: "last-7d",
+            name: "Last 7 Days",
+            filters: { "spans.model": ["gpt-4"] },
+            period: { relativeDays: 7 },
+          },
+        ];
+
+        const result = findMatchingView({
+          currentFilters: { "spans.model": ["gpt-4"] },
+          currentQuery: undefined,
+          customViews: views,
+          urlStartDate: start.toISOString(),
+          urlEndDate: now.toISOString(),
+          urlHasDateParams: true,
+        });
+        expect(result).toBeNull();
+      });
+    });
+
+    describe("when view has fixed date period", () => {
+      it("matches when URL dates match exactly", () => {
+        const views: SavedView[] = [
+          {
+            id: "jan-2025",
+            name: "January 2025",
+            filters: { "spans.model": ["gpt-4"] },
+            period: {
+              startDate: "2025-01-01T00:00:00.000Z",
+              endDate: "2025-01-31T23:59:59.999Z",
+            },
+          },
+        ];
+
+        const result = findMatchingView({
+          currentFilters: { "spans.model": ["gpt-4"] },
+          currentQuery: undefined,
+          customViews: views,
+          urlStartDate: "2025-01-01T00:00:00.000Z",
+          urlEndDate: "2025-01-31T23:59:59.999Z",
+          urlHasDateParams: true,
+        });
+        expect(result).toBe("jan-2025");
+      });
+
+      it("does not match when URL dates differ", () => {
+        const views: SavedView[] = [
+          {
+            id: "jan-2025",
+            name: "January 2025",
+            filters: {},
+            period: {
+              startDate: "2025-01-01T00:00:00.000Z",
+              endDate: "2025-01-31T23:59:59.999Z",
+            },
+          },
+        ];
+
+        const result = findMatchingView({
+          currentFilters: {},
+          currentQuery: undefined,
+          customViews: views,
+          urlStartDate: "2025-02-01T00:00:00.000Z",
+          urlEndDate: "2025-02-28T23:59:59.999Z",
+          urlHasDateParams: true,
+        });
+        expect(result).toBeNull();
+      });
+
+      it("does not match when URL has no date params", () => {
+        const views: SavedView[] = [
+          {
+            id: "jan-2025",
+            name: "January 2025",
+            filters: {},
+            period: {
+              startDate: "2025-01-01T00:00:00.000Z",
+              endDate: "2025-01-31T23:59:59.999Z",
+            },
+          },
+        ];
+
+        const result = findMatchingView({
+          currentFilters: {},
+          currentQuery: undefined,
+          customViews: views,
+          urlHasDateParams: false,
+        });
+        // No filters + no date params + view has period => won't match the view.
+        // But also no filters => all-traces check runs first.
+        // Since urlHasDateParams is false, all-traces is returned.
+        expect(result).toBe("all-traces");
+      });
+    });
+
+    describe("when URL has date params but no filters", () => {
+      it("does not return all-traces", () => {
+        const result = findMatchingView({
+          currentFilters: {},
+          currentQuery: undefined,
+          customViews: [],
+          urlHasDateParams: true,
+          urlStartDate: "2025-01-01T00:00:00.000Z",
+          urlEndDate: "2025-01-31T23:59:59.999Z",
+        });
+        // Has date params, so all-traces check fails, and no views match
+        expect(result).toBeNull();
+      });
+    });
   });
 
   // --- DEFAULT_VIEWS ---
@@ -524,12 +716,13 @@ describe("savedViewsLogic", () => {
   // --- SavedView schema ---
 
   describe("SavedView schema", () => {
-    it("only contains id, name, filters, and optional query", () => {
+    it("contains id, name, filters, optional query, and optional period", () => {
       const view: SavedView = {
         id: "v1",
         name: "Test",
         filters: { "spans.model": ["gpt-4"] },
         query: "search term",
+        period: { relativeDays: 7 },
       };
 
       const keys = Object.keys(view);
@@ -537,10 +730,34 @@ describe("savedViewsLogic", () => {
       expect(keys).toContain("name");
       expect(keys).toContain("filters");
       expect(keys).toContain("query");
-      expect(keys).not.toContain("startDate");
-      expect(keys).not.toContain("endDate");
+      expect(keys).toContain("period");
       expect(keys).not.toContain("group_by");
       expect(keys).not.toContain("negateFilters");
+    });
+
+    it("allows period with fixed start/end dates", () => {
+      const view: SavedView = {
+        id: "v2",
+        name: "Fixed Range",
+        filters: {},
+        period: {
+          startDate: "2025-01-01T00:00:00.000Z",
+          endDate: "2025-01-31T23:59:59.999Z",
+        },
+      };
+
+      expect(view.period?.startDate).toBe("2025-01-01T00:00:00.000Z");
+      expect(view.period?.endDate).toBe("2025-01-31T23:59:59.999Z");
+    });
+
+    it("allows views without period", () => {
+      const view: SavedView = {
+        id: "v3",
+        name: "No Period",
+        filters: {},
+      };
+
+      expect(view.period).toBeUndefined();
     });
   });
 });

@@ -32,7 +32,9 @@ import { api } from "../utils/api";
 import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { trackEvent } from "../utils/tracking";
 import { CurrentDrawer } from "./CurrentDrawer";
+import { SavedViewsBar } from "./messages/SavedViewsBar";
 import { SdkRadarBanner } from "./SdkRadarBanner";
+import { SavedViewsProvider } from "../hooks/useSavedViews";
 import { FullLogo } from "./icons/FullLogo";
 import { LogoIcon } from "./icons/LogoIcon";
 import { LoadingScreen } from "./LoadingScreen";
@@ -318,6 +320,7 @@ export const DashboardLayout = ({
     team?.members.some((member) => member.userId === user?.id);
 
   const menuWidth = compactMenu ? MENU_WIDTH_COMPACT : MENU_WIDTH_EXPANDED;
+  const hasClickHouse = project?.featureClickHouseDataSourceTraces === true;
 
   return (
     <Box
@@ -628,7 +631,14 @@ export const DashboardLayout = ({
             <CurrentDrawer />
 
             {userIsPartOfTeam ? (
-              children
+              hasClickHouse ? (
+                <SavedViewsProvider>
+                  {children}
+                  <SavedViewsBar />
+                </SavedViewsProvider>
+              ) : (
+                children
+              )
             ) : (
               <Alert.Root
                 status="warning"
