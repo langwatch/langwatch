@@ -7,31 +7,33 @@ import { describe, expect, it } from "vitest";
 import { buildOtelResourceAttributes } from "../scenario.processor";
 
 describe("buildOtelResourceAttributes", () => {
-  it("returns undefined for empty labels", () => {
-    expect(buildOtelResourceAttributes([])).toBeUndefined();
+  it("always includes langwatch.source=platform", () => {
+    expect(buildOtelResourceAttributes([])).toBe(
+      "langwatch.source=platform",
+    );
   });
 
-  it("formats single label as OTEL resource attribute", () => {
+  it("formats single label as OTEL resource attribute with source", () => {
     expect(buildOtelResourceAttributes(["support"])).toBe(
-      "scenario.labels=support",
+      "langwatch.source=platform,scenario.labels=support",
     );
   });
 
   it("formats multiple labels as comma-separated OTEL resource attribute", () => {
     expect(buildOtelResourceAttributes(["support", "billing"])).toBe(
-      "scenario.labels=support,billing",
+      "langwatch.source=platform,scenario.labels=support,billing",
     );
   });
 
   it("escapes commas in label values", () => {
     expect(buildOtelResourceAttributes(["support,tier1"])).toBe(
-      "scenario.labels=support\\,tier1",
+      "langwatch.source=platform,scenario.labels=support\\,tier1",
     );
   });
 
   it("escapes equals signs in label values", () => {
     expect(buildOtelResourceAttributes(["priority=high"])).toBe(
-      "scenario.labels=priority\\=high",
+      "langwatch.source=platform,scenario.labels=priority\\=high",
     );
   });
 });

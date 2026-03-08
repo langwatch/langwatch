@@ -393,10 +393,15 @@ function extractAttributesFromSpan(
 	if (typeof langgraphThreadId === "string")
 		attributes["langgraph.thread_id"] = langgraphThreadId;
 
-	// Scope attribute — forwarded for hoisting logic in applySpanToSummary
+	// Scope attributes — forwarded for hoisting logic in applySpanToSummary
 	const langwatchOrigin = spanAttrs["langwatch.origin"];
 	if (typeof langwatchOrigin === "string")
 		attributes["langwatch.origin"] = langwatchOrigin;
+
+	const langwatchSource = spanAttrs["langwatch.source"]
+		?? resourceAttrs["langwatch.source"];
+	if (typeof langwatchSource === "string")
+		attributes["langwatch.source"] = langwatchSource;
 
 	// Labels (canonical key only — canonicalization already promoted from metadata)
 	const labels = spanAttrs[ATTR_KEYS.LANGWATCH_LABELS];
@@ -693,6 +698,20 @@ export function applySpanToSummary(
       // No signal from this span — preserve existing hoisted value
       mergedAttributes["langwatch.origin"] = state.attributes["langwatch.origin"];
     }
+  }
+
+  // Hoist langwatch.source with first-wins, root-override semantics
+  const explicitSource = spanAttributes["langwatch.source"];
+  if (typeof explicitSource === "string" && explicitSource !== "") {
+    if (isRootSpan) {
+      mergedAttributes["langwatch.source"] = explicitSource;
+    } else if (!state.attributes["langwatch.source"]) {
+      mergedAttributes["langwatch.source"] = explicitSource;
+    } else {
+      mergedAttributes["langwatch.source"] = state.attributes["langwatch.source"];
+    }
+  } else if (state.attributes["langwatch.source"]) {
+    mergedAttributes["langwatch.source"] = state.attributes["langwatch.source"];
   }
 
   // Track output source in attributes for cross-span override decisions

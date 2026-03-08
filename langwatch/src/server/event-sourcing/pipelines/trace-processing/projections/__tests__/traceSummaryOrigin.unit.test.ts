@@ -371,3 +371,115 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
     });
   });
 });
+
+describe("applySpanToSummary() langwatch.source hoisting", () => {
+  let extractSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    extractSpy = vi.spyOn(
+      TraceIOExtractionService.prototype,
+      "extractRichIOFromSpan",
+    );
+    extractSpy.mockReturnValue(null);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe("when span has langwatch.source as span attribute", () => {
+    it("hoists source to trace summary attributes", () => {
+      const span = createTestSpan({
+        parentSpanId: null,
+        spanAttributes: {
+          "langwatch.source": "platform",
+        },
+      });
+
+      const state = applySpanToSummary(createInitState(), span);
+
+      expect(state.attributes["langwatch.source"]).toBe("platform");
+    });
+  });
+
+  describe("when span has langwatch.source as resource attribute", () => {
+    it("hoists source from resource attributes", () => {
+      const span = createTestSpan({
+        parentSpanId: null,
+        resourceAttributes: {
+          "langwatch.source": "platform",
+        },
+        spanAttributes: {},
+      });
+
+      const state = applySpanToSummary(createInitState(), span);
+
+      expect(state.attributes["langwatch.source"]).toBe("platform");
+    });
+  });
+
+  describe("when root span overrides child span source", () => {
+    it("uses root span source value", () => {
+      const childSpan = createTestSpan({
+        id: "child-1",
+        spanId: "child-1",
+        parentSpanId: "root-1",
+        spanAttributes: {
+          "langwatch.source": "sdk",
+        },
+      });
+
+      const rootSpan = createTestSpan({
+        id: "root-1",
+        spanId: "root-1",
+        parentSpanId: null,
+        spanAttributes: {
+          "langwatch.source": "platform",
+        },
+      });
+
+      let state = applySpanToSummary(createInitState(), childSpan);
+      state = applySpanToSummary(state, rootSpan);
+
+      expect(state.attributes["langwatch.source"]).toBe("platform");
+    });
+  });
+
+  describe("when no span sets langwatch.source", () => {
+    it("does not set langwatch.source in summary attributes", () => {
+      const span = createTestSpan({
+        parentSpanId: null,
+        spanAttributes: {},
+      });
+
+      const state = applySpanToSummary(createInitState(), span);
+
+      expect(state.attributes["langwatch.source"]).toBeUndefined();
+    });
+  });
+
+  describe("when child span has source and root span does not", () => {
+    it("preserves child span source value", () => {
+      const childSpan = createTestSpan({
+        id: "child-1",
+        spanId: "child-1",
+        parentSpanId: "root-1",
+        spanAttributes: {
+          "langwatch.source": "platform",
+        },
+      });
+
+      const rootSpan = createTestSpan({
+        id: "root-1",
+        spanId: "root-1",
+        parentSpanId: null,
+        spanAttributes: {},
+      });
+
+      let state = applySpanToSummary(createInitState(), childSpan);
+      state = applySpanToSummary(state, rootSpan);
+
+      expect(state.attributes["langwatch.source"]).toBe("platform");
+    });
+  });
+});
