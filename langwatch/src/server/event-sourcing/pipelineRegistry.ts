@@ -21,6 +21,12 @@ import { createSimulationRunStateFoldStore } from "./pipelines/simulation-proces
 import { createExperimentRunEsSyncReactor } from "./pipelines/experiment-run-processing/reactors/experimentRunEsSync.reactor";
 import { createSnapshotUpdateBroadcastReactor } from "./pipelines/simulation-processing/reactors/snapshotUpdateBroadcast";
 import { createElasticsearchBatchEvaluationRepository } from "../evaluations-v3/repositories/elasticsearchBatchEvaluation.repository";
+import { LogRecordStorageClickHouseRepository } from "../app-layer/traces/repositories/log-record-storage.clickhouse.repository";
+import { NullLogRecordStorageRepository } from "../app-layer/traces/repositories/log-record-storage.repository";
+import { MetricRecordStorageClickHouseRepository } from "../app-layer/traces/repositories/metric-record-storage.clickhouse.repository";
+import { NullMetricRecordStorageRepository } from "../app-layer/traces/repositories/metric-record-storage.repository";
+import { LogRecordAppendStore } from "./pipelines/trace-processing/projections/logRecordStorage.store";
+import { MetricRecordAppendStore } from "./pipelines/trace-processing/projections/metricRecordStorage.store";
 import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
 import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
 import { EvaluationRunStore } from "./pipelines/evaluation-processing/projections/evaluationRun.store";
@@ -143,9 +149,18 @@ export class PipelineRegistry {
       nlpServiceUrl: process.env.LANGWATCH_NLP_SERVICE,
     });
 
+    const logRecordRepo = this.deps.clickhouse
+      ? new LogRecordStorageClickHouseRepository(this.deps.clickhouse)
+      : new NullLogRecordStorageRepository();
+    const metricRecordRepo = this.deps.clickhouse
+      ? new MetricRecordStorageClickHouseRepository(this.deps.clickhouse)
+      : new NullMetricRecordStorageRepository();
+
     const tracePipeline = this.deps.eventSourcing.register(
       createTraceProcessingPipeline({
         spanAppendStore: new SpanAppendStore(this.deps.traces.spans.repository),
+        logRecordAppendStore: new LogRecordAppendStore(logRecordRepo),
+        metricRecordAppendStore: new MetricRecordAppendStore(metricRecordRepo),
         traceSummaryStore: new TraceSummaryStore(this.deps.traces.summary.repository),
         evaluationTriggerReactor,
         traceUpdateBroadcastReactor,

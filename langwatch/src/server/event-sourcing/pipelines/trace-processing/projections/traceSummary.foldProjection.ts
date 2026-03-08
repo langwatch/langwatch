@@ -1,779 +1,582 @@
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import {
-	enrichRagContextIds,
-	SpanNormalizationPipelineService,
+  enrichRagContextIds,
+  SpanNormalizationPipelineService,
 } from "~/server/app-layer/traces/span-normalization.service";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import {
-	estimateCost,
-	matchingLLMModelCost,
+  estimateCost,
+  matchingLLMModelCost,
 } from "~/server/background/workers/collector/cost";
 import type {
-	FoldProjectionDefinition,
-	FoldProjectionStore,
+  FoldProjectionDefinition,
+  FoldProjectionStore,
 } from "~/server/event-sourcing/projections";
 import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
 import {
-	TRACE_PROCESSING_EVENT_TYPES,
-	TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
+  TRACE_PROCESSING_EVENT_TYPES,
+  TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
 } from "../schemas/constants";
-import type { TraceProcessingEvent } from "../schemas/events";
-import {
-	isSatisfactionScoreAssignedEvent,
-	isSpanReceivedEvent,
-	isTopicAssignedEvent,
+import type {
+  LogRecordReceivedEventData,
+  TraceProcessingEvent,
 } from "../schemas/events";
-import type { NormalizedSpan } from "../schemas/spans";
+import {
+  isLogRecordReceivedEvent,
+  isMetricRecordReceivedEvent,
+  isSatisfactionScoreAssignedEvent,
+  isSpanReceivedEvent,
+  isTopicAssignedEvent,
+} from "../schemas/events";
+import type {
+  NormalizedAttributes,
+  NormalizedSpan,
+} from "../schemas/spans";
 import { NormalizedStatusCode as StatusCode } from "../schemas/spans";
 
 export type { TraceSummaryData };
 
 const COMPUTED_IO_SCHEMA_VERSION = "2025-12-18" as const;
 
-function parseJsonStringArray(raw: string | undefined): string[] {
-	if (!raw) return [];
-	try {
-		const parsed: unknown = JSON.parse(raw);
-		if (!Array.isArray(parsed)) return [];
-		return parsed.filter((item): item is string => typeof item === "string");
-	} catch {
-		// Not valid JSON — treat as a single plain-string label
-		return [raw];
-	}
-}
-
 const OUTPUT_SOURCE = {
-	EXPLICIT: "explicit",
-	INFERRED: "inferred",
+  EXPLICIT: "explicit",
+  INFERRED: "inferred",
 } as const;
 
 const FIRST_TOKEN_EVENTS = new Set([
-	"gen_ai.content.chunk",
-	"first_token",
-	"llm.first_token",
+  "gen_ai.content.chunk",
+  "first_token",
+  "llm.first_token",
 ]);
 
 const LAST_TOKEN_EVENTS = new Set([
-	"gen_ai.content.chunk",
-	"last_token",
-	"llm.last_token",
+  "gen_ai.content.chunk",
+  "last_token",
+  "llm.last_token",
 ]);
 
 const STANDARD_RESOURCE_PREFIXES = [
-	"host.",
-	"process.",
-	"telemetry.",
-	"service.",
-	"os.",
-	"container.",
-	"k8s.",
-	"cloud.",
-	"deployment.",
-	"device.",
-	"faas.",
-	"webengine.",
+  "host.", "process.", "telemetry.", "service.", "os.",
+  "container.", "k8s.", "cloud.", "deployment.", "device.",
+  "faas.", "webengine.",
 ] as const;
 
-/**
- * Infers langwatch.origin from legacy markers when not explicitly set.
- * Priority (highest to lowest):
- *   1. instrumentationScope.name = "langwatch-evaluation" -> "evaluation"
- *   2. instrumentationScope.name = "@langwatch/scenario" -> "simulation"
- *   3. metadata.platform = "optimization_studio" -> "workflow"
- *   4. metadata.labels contains "scenario-runner" -> "simulation"
- *   5. resource attribute scenario.labels present -> "simulation"
- *   6. span attribute evaluation.run_id present -> "evaluation"
- *   7. No signal -> undefined
- */
-function inferOriginFromLegacyMarkers(span: NormalizedSpan): string | undefined {
-	// 1. instrumentationScope.name = "langwatch-evaluation"
-	if (span.instrumentationScope?.name === "langwatch-evaluation") {
-		return "evaluation";
-	}
+const SPRING_AI_SCOPE_NAMES = new Set([
+  "org.springframework.ai.chat.observation.ChatModelCompletionObservationHandler",
+  "org.springframework.ai.chat.observation.ChatModelPromptContentObservationHandler",
+]);
 
-	// 2. instrumentationScope.name = "@langwatch/scenario"
-	if (span.instrumentationScope?.name === "@langwatch/scenario") {
-		return "simulation";
-	}
+const CLAUDE_CODE_SCOPE_NAMES = new Set([
+  "com.anthropic.claude_code.events",
+]);
 
-	const spanAttrs = span.spanAttributes;
+const RESOURCE_ATTR_MAPPINGS = [
+  ["telemetry.sdk.name", "sdk.name"],
+  ["telemetry.sdk.version", "sdk.version"],
+  ["telemetry.sdk.language", "sdk.language"],
+  ["service.name", "service.name"],
+] as const;
 
-	// 3. metadata.platform = "optimization_studio"
-	if (spanAttrs["metadata.platform"] === "optimization_studio") {
-		return "workflow";
-	}
+const SPAN_ATTR_MAPPINGS = [
+  [ATTR_KEYS.GEN_AI_CONVERSATION_ID, "gen_ai.conversation.id"],
+  [ATTR_KEYS.LANGWATCH_USER_ID, "langwatch.user_id"],
+  [ATTR_KEYS.LANGWATCH_CUSTOMER_ID, "langwatch.customer_id"],
+  [ATTR_KEYS.GEN_AI_AGENT_NAME, "gen_ai.agent.name"],
+  [ATTR_KEYS.GEN_AI_AGENT_ID, "gen_ai.agent.id"],
+  [ATTR_KEYS.GEN_AI_PROVIDER_NAME, "gen_ai.provider.name"],
+  [ATTR_KEYS.LANGWATCH_LANGGRAPH_THREAD_ID, "langgraph.thread_id"],
+] as const;
 
-	// 4. metadata.labels contains "scenario-runner"
-	const labels = spanAttrs[ATTR_KEYS.LANGWATCH_LABELS];
-	if (labels) {
-		const labelArray = typeof labels === "string"
-			? parseJsonStringArray(labels)
-			: Array.isArray(labels)
-				? (labels as string[])
-				: [];
-		if (labelArray.includes("scenario-runner")) {
-			return "simulation";
-		}
-	}
+const LEGACY_ORIGIN_RULES: Array<{
+  check: (span: NormalizedSpan) => boolean;
+  origin: string;
+}> = [
+  { check: (s) => s.instrumentationScope?.name === "langwatch-evaluation", origin: "evaluation" },
+  { check: (s) => s.instrumentationScope?.name === "@langwatch/scenario", origin: "simulation" },
+  { check: (s) => s.spanAttributes["metadata.platform"] === "optimization_studio", origin: "workflow" },
+  {
+    check: (s) => {
+      const labels = s.spanAttributes[ATTR_KEYS.LANGWATCH_LABELS];
+      const arr = typeof labels === "string"
+        ? parseJsonStringArray(labels)
+        : Array.isArray(labels) ? labels as string[] : [];
+      return arr.includes("scenario-runner");
+    },
+    origin: "simulation",
+  },
+  { check: (s) => s.resourceAttributes["scenario.labels"] !== undefined, origin: "simulation" },
+  { check: (s) => s.spanAttributes["evaluation.run_id"] !== undefined, origin: "evaluation" },
+];
 
-	// 5. resource attribute scenario.labels present
-	const resourceAttrs = span.resourceAttributes;
-	if (resourceAttrs["scenario.labels"] !== undefined) {
-		return "simulation";
-	}
+// ─── Utilities ──────────────────────────────────────────────────────
 
-	// 6. span attribute evaluation.run_id present
-	if (spanAttrs["evaluation.run_id"] !== undefined) {
-		return "evaluation";
-	}
-
-	return undefined;
+function parseJsonStringArray(raw: string | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item): item is string => typeof item === "string");
+  } catch {
+    return [raw];
+  }
 }
 
 const isValidTimestamp = (ts: number | undefined | null): ts is number =>
-	typeof ts === "number" && ts > 0 && Number.isFinite(ts);
+  typeof ts === "number" && ts > 0 && Number.isFinite(ts);
+
+function stringAttr(attrs: NormalizedAttributes, key: string): string | undefined {
+  const v = attrs[key];
+  return typeof v === "string" ? v : undefined;
+}
+
+// ─── Span extractors ────────────────────────────────────────────────
 
 function extractModelsFromSpan(span: NormalizedSpan): string[] {
-	const models: string[] = [];
-	const attrs = span.spanAttributes;
-	const candidates = [
-		attrs[ATTR_KEYS.GEN_AI_RESPONSE_MODEL],
-		attrs[ATTR_KEYS.GEN_AI_REQUEST_MODEL],
-	];
-
-	for (const model of candidates) {
-		if (typeof model === "string" && model) {
-			models.push(model);
-		}
-	}
-
-	return models;
+  return [
+    span.spanAttributes[ATTR_KEYS.GEN_AI_RESPONSE_MODEL],
+    span.spanAttributes[ATTR_KEYS.GEN_AI_REQUEST_MODEL],
+  ].filter((m): m is string => typeof m === "string" && m !== "");
 }
 
-interface SpanTokenMetrics {
-	promptTokens: number;
-	completionTokens: number;
-	cost: number;
-	estimated: boolean;
+function computeSpanCost(
+  attrs: NormalizedAttributes,
+  model: string | undefined,
+  promptTokens: number,
+  completionTokens: number,
+): number {
+  const inputRate = attrs[ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN];
+  const outputRate = attrs[ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN];
+  if (typeof inputRate === "number" || typeof outputRate === "number") {
+    return promptTokens * (typeof inputRate === "number" ? inputRate : 0)
+      + completionTokens * (typeof outputRate === "number" ? outputRate : 0);
+  }
+
+  if (model && (promptTokens > 0 || completionTokens > 0)) {
+    const matched = matchingLLMModelCost(model, getStaticModelCosts());
+    if (matched) {
+      const computed = estimateCost({
+        llmModelCost: matched,
+        inputTokens: promptTokens,
+        outputTokens: completionTokens,
+      });
+      if (computed !== undefined && computed > 0) return computed;
+    }
+  }
+
+  const spanCost = attrs[ATTR_KEYS.LANGWATCH_SPAN_COST];
+  if (typeof spanCost === "number" && spanCost > 0) return spanCost;
+
+  if (attrs[ATTR_KEYS.SPAN_TYPE] === "guardrail") {
+    const rawOutput = attrs[ATTR_KEYS.LANGWATCH_OUTPUT];
+    if (rawOutput && typeof rawOutput === "object" && !Array.isArray(rawOutput)) {
+      const costObj = (rawOutput as Record<string, unknown>).cost as
+        | { amount?: number; currency?: string }
+        | undefined;
+      if (costObj?.currency === "USD" && typeof costObj.amount === "number") {
+        return costObj.amount;
+      }
+    }
+  }
+
+  return 0;
 }
 
-function extractTokenMetricsFromSpan(span: NormalizedSpan): SpanTokenMetrics {
-	const attrs = span.spanAttributes;
-	let promptTokens = 0;
-	let completionTokens = 0;
-	let cost = 0;
-	let estimated = false;
+function extractTokenMetrics(span: NormalizedSpan) {
+  const attrs = span.spanAttributes;
+  const inputTokens = attrs[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS];
+  const outputTokens = attrs[ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS];
+  const promptTokens = typeof inputTokens === "number" && inputTokens > 0 ? inputTokens : 0;
+  const completionTokens = typeof outputTokens === "number" && outputTokens > 0 ? outputTokens : 0;
 
-	// Token counts (canonicalization guarantees these canonical keys)
-	const inputTokens = attrs[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS];
-	if (typeof inputTokens === "number" && inputTokens > 0) {
-		promptTokens = inputTokens;
-	}
-
-	const outputTokens = attrs[ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS];
-	if (typeof outputTokens === "number" && outputTokens > 0) {
-		completionTokens = outputTokens;
-	}
-
-	// Cost: compute from model pricing instead of reading SDK cost directly
-	const models = extractModelsFromSpan(span);
-	const model = models[0];
-	if (model && (promptTokens > 0 || completionTokens > 0)) {
-		// Check span for custom cost rates (set by enrichment service)
-		const rawInputRate = attrs[ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN];
-		const rawOutputRate =
-			attrs[ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN];
-		const hasCustomRates =
-			typeof rawInputRate === "number" || typeof rawOutputRate === "number";
-
-		if (hasCustomRates) {
-			const inputRate = typeof rawInputRate === "number" ? rawInputRate : 0;
-			const outputRate = typeof rawOutputRate === "number" ? rawOutputRate : 0;
-			cost = promptTokens * inputRate + completionTokens * outputRate;
-		} else {
-			// Fallback: static registry lookup (sync, cached at module level)
-			const staticCosts = getStaticModelCosts();
-			const matched = matchingLLMModelCost(model, staticCosts);
-			if (matched) {
-				const computed = estimateCost({
-					llmModelCost: matched,
-					inputTokens: promptTokens,
-					outputTokens: completionTokens,
-				});
-				if (computed !== undefined) cost = computed;
-			}
-		}
-
-		// If model-based estimation failed, fall back to SDK-provided span cost
-		if (cost === 0) {
-			const spanCost = attrs[ATTR_KEYS.LANGWATCH_SPAN_COST];
-			if (typeof spanCost === "number" && spanCost > 0) {
-				cost = spanCost;
-			}
-		}
-	} else {
-		// No model or no tokens — fall back to SDK cost if available
-		const spanCost = attrs[ATTR_KEYS.LANGWATCH_SPAN_COST];
-		if (typeof spanCost === "number" && spanCost > 0) {
-			cost = spanCost;
-		}
-	}
-
-	// Guardrail cost: extract from langwatch.output when span is a guardrail
-	if (cost === 0) {
-		const spanType = attrs[ATTR_KEYS.SPAN_TYPE];
-		if (spanType === "guardrail") {
-			const rawOutput = attrs[ATTR_KEYS.LANGWATCH_OUTPUT];
-			if (
-				rawOutput &&
-				typeof rawOutput === "object" &&
-				!Array.isArray(rawOutput)
-			) {
-				const parsed = rawOutput as Record<string, unknown>;
-				const costObj = parsed.cost as
-					| { amount?: number; currency?: string }
-					| undefined;
-				if (
-					costObj &&
-					typeof costObj.amount === "number" &&
-					costObj.currency === "USD"
-				) {
-					cost = costObj.amount;
-				}
-			}
-		}
-	}
-
-	if (attrs[ATTR_KEYS.LANGWATCH_TOKENS_ESTIMATED] === true) {
-		estimated = true;
-	}
-
-	return { promptTokens, completionTokens, cost, estimated };
+  return {
+    promptTokens,
+    completionTokens,
+    cost: computeSpanCost(attrs, extractModelsFromSpan(span)[0], promptTokens, completionTokens),
+    estimated: attrs[ATTR_KEYS.LANGWATCH_TOKENS_ESTIMATED] === true,
+  };
 }
 
-interface SpanStatusInfo {
-	hasError: boolean;
-	hasOK: boolean;
-	errorMessage: string | null;
+function extractStatus(span: NormalizedSpan) {
+  const attrs = span.spanAttributes;
+  let hasError = false;
+  let hasOK = false;
+  let errorMessage: string | null = null;
+
+  if (span.statusCode === StatusCode.OK) hasOK = true;
+  else if (span.statusCode === StatusCode.ERROR) {
+    hasError = true;
+    if (span.statusMessage) errorMessage = span.statusMessage;
+  }
+
+  if (!errorMessage) {
+    const msg = attrs[ATTR_KEYS.ERROR_MESSAGE] ?? attrs[ATTR_KEYS.EXCEPTION_MESSAGE];
+    if (typeof msg === "string") { errorMessage = msg; hasError = true; }
+  }
+
+  if (!hasError) {
+    const flag = attrs[ATTR_KEYS.ERROR_HAS_ERROR] ?? attrs[ATTR_KEYS.SPAN_ERROR_HAS_ERROR];
+    if (flag === true || flag === "true") hasError = true;
+  }
+
+  if (!errorMessage && span.events?.length) {
+    const ex = span.events.find((e) => e.name === "exception");
+    if (ex) {
+      hasError = true;
+      const msg = ex.attributes?.["exception.message"];
+      if (typeof msg === "string") errorMessage = msg;
+    }
+  }
+
+  return { hasError, hasOK, errorMessage };
 }
 
-function extractStatusFromSpan(span: NormalizedSpan): SpanStatusInfo {
-	let hasError = false;
-	let hasOK = false;
-	let errorMessage: string | null = null;
+function extractTokenTiming(span: NormalizedSpan) {
+  let timeToFirstToken: number | null = null;
+  let timeToLastToken: number | null = null;
+  if (!span.events?.length) return { timeToFirstToken, timeToLastToken };
 
-	if (span.statusCode === StatusCode.OK) {
-		hasOK = true;
-	} else if (span.statusCode === StatusCode.ERROR) {
-		hasError = true;
-		if (span.statusMessage) {
-			errorMessage = span.statusMessage;
-		}
-	}
+  for (const event of span.events) {
+    const delta = event.timeUnixMs - span.startTimeUnixMs;
+    if (delta < 0) continue;
+    if (FIRST_TOKEN_EVENTS.has(event.name) && (timeToFirstToken === null || delta < timeToFirstToken)) {
+      timeToFirstToken = delta;
+    }
+    if (LAST_TOKEN_EVENTS.has(event.name) && (timeToLastToken === null || delta > timeToLastToken)) {
+      timeToLastToken = delta;
+    }
+  }
 
-	const attrs = span.spanAttributes;
-
-	if (!errorMessage) {
-		const errorMsg =
-			attrs[ATTR_KEYS.ERROR_MESSAGE] ?? attrs[ATTR_KEYS.EXCEPTION_MESSAGE];
-		if (typeof errorMsg === "string") {
-			errorMessage = errorMsg;
-			hasError = true;
-		}
-	}
-
-	if (!hasError) {
-		const hasErrorAttr =
-			attrs[ATTR_KEYS.ERROR_HAS_ERROR] ?? attrs[ATTR_KEYS.SPAN_ERROR_HAS_ERROR];
-		if (hasErrorAttr === true || hasErrorAttr === "true") {
-			hasError = true;
-		}
-	}
-
-	if (!errorMessage && span.events?.length) {
-		for (const event of span.events) {
-			if (event.name === "exception") {
-				hasError = true;
-				const exceptionMessage = event.attributes?.["exception.message"];
-				if (typeof exceptionMessage === "string") {
-					errorMessage = exceptionMessage;
-				}
-				break;
-			}
-		}
-	}
-
-	return { hasError, hasOK, errorMessage };
+  return { timeToFirstToken, timeToLastToken };
 }
 
-interface SpanTokenTiming {
-	timeToFirstToken: number | null;
-	timeToLastToken: number | null;
+function extractAttributes(span: NormalizedSpan): Record<string, string> {
+  const result: Record<string, string> = {};
+  const spanAttrs = span.spanAttributes;
+  const resourceAttrs = span.resourceAttributes;
+
+  for (const [source, dest] of RESOURCE_ATTR_MAPPINGS) {
+    const v = resourceAttrs[source];
+    if (typeof v === "string") result[dest] = v;
+  }
+
+  for (const [key, value] of Object.entries(resourceAttrs)) {
+    if (STANDARD_RESOURCE_PREFIXES.some((p) => key.startsWith(p))) continue;
+    if (typeof value === "string") result[key] = value;
+    else if (typeof value === "number" || typeof value === "boolean") result[key] = String(value);
+  }
+
+  for (const [source, dest] of SPAN_ATTR_MAPPINGS) {
+    const v = spanAttrs[source];
+    if (typeof v === "string") result[dest] = v;
+  }
+
+  const origin = stringAttr(spanAttrs, "langwatch.origin");
+  if (origin) result["langwatch.origin"] = origin;
+
+  const labels = spanAttrs[ATTR_KEYS.LANGWATCH_LABELS];
+  if (typeof labels === "string") result["langwatch.labels"] = labels;
+  else if (Array.isArray(labels)) result["langwatch.labels"] = JSON.stringify(labels);
+
+  for (const [key, value] of Object.entries(spanAttrs)) {
+    if (!key.startsWith("metadata.")) continue;
+    if (typeof value === "string") result[key] = value;
+    else if (value !== null && value !== undefined) {
+      result[key] = typeof value === "object" ? JSON.stringify(value) : String(value);
+    }
+  }
+
+  return result;
 }
 
-function extractTokenTimingFromSpan(span: NormalizedSpan): SpanTokenTiming {
-	let timeToFirstToken: number | null = null;
-	let timeToLastToken: number | null = null;
+// ─── Origin resolution ──────────────────────────────────────────────
 
-	if (!span.events?.length) return { timeToFirstToken, timeToLastToken };
-
-	for (const event of span.events) {
-		const timeDelta = event.timeUnixMs - span.startTimeUnixMs;
-
-		if (timeDelta >= 0 && FIRST_TOKEN_EVENTS.has(event.name)) {
-			if (timeToFirstToken === null || timeDelta < timeToFirstToken) {
-				timeToFirstToken = timeDelta;
-			}
-		}
-
-		if (timeDelta >= 0 && LAST_TOKEN_EVENTS.has(event.name)) {
-			if (timeToLastToken === null || timeDelta > timeToLastToken) {
-				timeToLastToken = timeDelta;
-			}
-		}
-	}
-
-	return { timeToFirstToken, timeToLastToken };
+function inferOriginFromLegacyMarkers(span: NormalizedSpan): string | undefined {
+  for (const rule of LEGACY_ORIGIN_RULES) {
+    if (rule.check(span)) return rule.origin;
+  }
+  return undefined;
 }
 
-function extractAttributesFromSpan(
-	span: NormalizedSpan,
-): Record<string, string> {
-	const attributes: Record<string, string> = {};
-	const spanAttrs = span.spanAttributes;
-	const resourceAttrs = span.resourceAttributes;
+function resolveOrigin(span: NormalizedSpan, existingOrigin: string | undefined): string | undefined {
+  const isRoot = !span.parentSpanId;
+  const explicit = stringAttr(span.spanAttributes, "langwatch.origin");
 
-	// SDK info from resource attributes
-	const sdkName = resourceAttrs["telemetry.sdk.name"];
-	const sdkVersion = resourceAttrs["telemetry.sdk.version"];
-	const sdkLanguage = resourceAttrs["telemetry.sdk.language"];
-	const serviceName = resourceAttrs["service.name"];
+  if (explicit) return (isRoot || !existingOrigin) ? explicit : existingOrigin;
 
-	if (typeof sdkName === "string") attributes["sdk.name"] = sdkName;
-	if (typeof sdkVersion === "string") attributes["sdk.version"] = sdkVersion;
-	if (typeof sdkLanguage === "string") attributes["sdk.language"] = sdkLanguage;
-	if (typeof serviceName === "string") attributes["service.name"] = serviceName;
+  const inferred = inferOriginFromLegacyMarkers(span);
+  if (inferred) return (isRoot || !existingOrigin) ? inferred : existingOrigin;
 
-	// Custom resource attributes
-	for (const [key, value] of Object.entries(resourceAttrs)) {
-		if (STANDARD_RESOURCE_PREFIXES.some((prefix) => key.startsWith(prefix)))
-			continue;
-		if (typeof value === "string") {
-			attributes[key] = value;
-		} else if (typeof value === "number" || typeof value === "boolean") {
-			attributes[key] = String(value);
-		}
-	}
-
-	// Thread/User context from canonical span attributes (set by canonicalization)
-	const threadId = spanAttrs[ATTR_KEYS.GEN_AI_CONVERSATION_ID];
-	const userId = spanAttrs[ATTR_KEYS.LANGWATCH_USER_ID];
-	const customerId = spanAttrs[ATTR_KEYS.LANGWATCH_CUSTOMER_ID];
-
-	if (typeof threadId === "string")
-		attributes["gen_ai.conversation.id"] = threadId;
-	if (typeof userId === "string") attributes["langwatch.user_id"] = userId;
-	if (typeof customerId === "string")
-		attributes["langwatch.customer_id"] = customerId;
-
-	// Agent/Provider info from canonical span attributes
-	const agentName = spanAttrs[ATTR_KEYS.GEN_AI_AGENT_NAME];
-	const agentId = spanAttrs[ATTR_KEYS.GEN_AI_AGENT_ID];
-	const providerName = spanAttrs[ATTR_KEYS.GEN_AI_PROVIDER_NAME];
-
-	if (typeof agentName === "string")
-		attributes["gen_ai.agent.name"] = agentName;
-	if (typeof agentId === "string") attributes["gen_ai.agent.id"] = agentId;
-	if (typeof providerName === "string")
-		attributes["gen_ai.provider.name"] = providerName;
-
-	// LangGraph metadata
-	const langgraphThreadId = spanAttrs[ATTR_KEYS.LANGWATCH_LANGGRAPH_THREAD_ID];
-	if (typeof langgraphThreadId === "string")
-		attributes["langgraph.thread_id"] = langgraphThreadId;
-
-	// Scope attributes — forwarded for hoisting logic in applySpanToSummary
-	const langwatchOrigin = spanAttrs["langwatch.origin"];
-	if (typeof langwatchOrigin === "string")
-		attributes["langwatch.origin"] = langwatchOrigin;
-
-	const langwatchSource = spanAttrs["langwatch.origin.source"]
-		?? resourceAttrs["langwatch.origin.source"];
-	if (typeof langwatchSource === "string")
-		attributes["langwatch.origin.source"] = langwatchSource;
-
-	// Labels (canonical key only — canonicalization already promoted from metadata)
-	const labels = spanAttrs[ATTR_KEYS.LANGWATCH_LABELS];
-	if (typeof labels === "string") {
-		attributes["langwatch.labels"] = labels;
-	} else if (Array.isArray(labels)) {
-		attributes["langwatch.labels"] = JSON.stringify(labels);
-	}
-
-	// Custom metadata fields — canonicalization hoists them as metadata.{key}
-	// so we just need to forward any metadata.* attributes
-	for (const [key, value] of Object.entries(spanAttrs)) {
-		if (key.startsWith("metadata.")) {
-			if (typeof value === "string") {
-				attributes[key] = value;
-			} else if (value !== null && value !== undefined) {
-				attributes[key] =
-					typeof value === "object" ? JSON.stringify(value) : String(value);
-			}
-		}
-	}
-
-	return attributes;
+  return existingOrigin;
 }
+
+// ─── Log record I/O extraction ──────────────────────────────────────
+
+function extractIOFromLogRecord(
+  data: LogRecordReceivedEventData,
+): { input: string | null; output: string | null } {
+  if (SPRING_AI_SCOPE_NAMES.has(data.scopeName)) {
+    const [identifier, ...contentParts] = data.body.split("\n");
+    const content = contentParts.join("\n");
+    if (!identifier || !content) return { input: null, output: null };
+    if (identifier === "Chat Model Prompt Content:") return { input: content, output: null };
+    if (identifier === "Chat Model Completion:") return { input: null, output: content };
+  }
+
+  if (CLAUDE_CODE_SCOPE_NAMES.has(data.scopeName)) {
+    const prompt = data.attributes["prompt"];
+    if (prompt) return { input: prompt, output: null };
+  }
+
+  return { input: null, output: null };
+}
+
+// ─── Output override logic ──────────────────────────────────────────
 
 /**
- * Determines whether a new output should replace the current one.
- * Rules (in priority order):
- * 1. Root span always wins
- * 2. Explicit (langwatch.output) beats inferred (gen_ai.output.messages)
- * 3. Among same source type, last-finishing span wins
- *
+ * Priority: root > explicit > last-finishing.
  * @internal Exported for unit testing
  */
 export function shouldOverrideOutput({
-	isRoot,
-	outputFromRoot,
-	isExplicit,
-	currentIsExplicit,
-	endTime,
-	currentEndTime,
+  isRoot,
+  outputFromRoot,
+  isExplicit,
+  currentIsExplicit,
+  endTime,
+  currentEndTime,
 }: {
-	isRoot: boolean;
-	outputFromRoot: boolean;
-	isExplicit: boolean;
-	currentIsExplicit: boolean;
-	endTime: number;
-	currentEndTime: number;
+  isRoot: boolean;
+  outputFromRoot: boolean;
+  isExplicit: boolean;
+  currentIsExplicit: boolean;
+  endTime: number;
+  currentEndTime: number;
 }): boolean {
-	if (isRoot) return true;
-	if (outputFromRoot) return false;
-	if (isExplicit && !currentIsExplicit) return true;
-	if (isExplicit === currentIsExplicit && endTime >= currentEndTime)
-		return true;
-	return false;
+  if (isRoot) return true;
+  if (outputFromRoot) return false;
+  if (isExplicit && !currentIsExplicit) return true;
+  if (isExplicit === currentIsExplicit && endTime >= currentEndTime) return true;
+  return false;
 }
+
+// ─── Summary accumulation steps ─────────────────────────────────────
+
+function accumulateTiming(state: TraceSummaryData, span: NormalizedSpan) {
+  if (!isValidTimestamp(span.startTimeUnixMs) || !isValidTimestamp(span.endTimeUnixMs)) {
+    return { occurredAt: state.occurredAt, totalDurationMs: state.totalDurationMs };
+  }
+
+  const occurredAt = state.occurredAt > 0
+    ? Math.min(state.occurredAt, span.startTimeUnixMs)
+    : span.startTimeUnixMs;
+  const currentEnd = state.occurredAt > 0 ? state.occurredAt + state.totalDurationMs : 0;
+  const totalDurationMs = Math.max(currentEnd, span.endTimeUnixMs) - occurredAt;
+
+  return { occurredAt, totalDurationMs };
+}
+
+function accumulateTokens(state: TraceSummaryData, span: NormalizedSpan, totalDurationMs: number) {
+  const metrics = extractTokenMetrics(span);
+  const totalPromptTokenCount = (state.totalPromptTokenCount ?? 0) + metrics.promptTokens;
+  const totalCompletionTokenCount = (state.totalCompletionTokenCount ?? 0) + metrics.completionTokens;
+  const totalCost = (state.totalCost ?? 0) + metrics.cost;
+
+  const timing = extractTokenTiming(span);
+  let timeToFirstTokenMs = state.timeToFirstTokenMs;
+  if (timing.timeToFirstToken !== null) {
+    timeToFirstTokenMs = timeToFirstTokenMs === null
+      ? timing.timeToFirstToken
+      : Math.min(timeToFirstTokenMs, timing.timeToFirstToken);
+  }
+  let timeToLastTokenMs = state.timeToLastTokenMs;
+  if (timing.timeToLastToken !== null) {
+    timeToLastTokenMs = timeToLastTokenMs === null
+      ? timing.timeToLastToken
+      : Math.max(timeToLastTokenMs, timing.timeToLastToken);
+  }
+
+  const tokensPerSecond = totalCompletionTokenCount > 0 && totalDurationMs > 0
+    ? Math.round((totalCompletionTokenCount / totalDurationMs) * 1000)
+    : null;
+
+  return {
+    totalPromptTokenCount: totalPromptTokenCount > 0 ? totalPromptTokenCount : null,
+    totalCompletionTokenCount: totalCompletionTokenCount > 0 ? totalCompletionTokenCount : null,
+    totalCost: totalCost > 0 ? Number(totalCost.toFixed(6)) : null,
+    tokensEstimated: state.tokensEstimated || metrics.estimated,
+    timeToFirstTokenMs,
+    timeToLastTokenMs,
+    tokensPerSecond,
+  };
+}
+
+function accumulateStatus(state: TraceSummaryData, span: NormalizedSpan) {
+  const info = extractStatus(span);
+  return {
+    containsErrorStatus: state.containsErrorStatus || info.hasError,
+    containsOKStatus: state.containsOKStatus || info.hasOK,
+    errorMessage: state.errorMessage ?? info.errorMessage,
+  };
+}
+
+function accumulateIO(state: TraceSummaryData, span: NormalizedSpan) {
+  const spanType = span.spanAttributes[ATTR_KEYS.SPAN_TYPE];
+  const currentOutputSource =
+    state.attributes["langwatch.reserved.output_source"] ?? OUTPUT_SOURCE.INFERRED;
+
+  let computedInput = state.computedInput;
+  let computedOutput = state.computedOutput;
+  let outputFromRootSpan = state.outputFromRootSpan;
+  let outputSpanEndTimeMs = state.outputSpanEndTimeMs;
+  let outputSource = currentOutputSource;
+  let blockedByGuardrail = state.blockedByGuardrail;
+
+  if (spanType === "guardrail") {
+    const rawOutput = span.spanAttributes[ATTR_KEYS.LANGWATCH_OUTPUT];
+    if (rawOutput && typeof rawOutput === "object" && !Array.isArray(rawOutput)) {
+      if ((rawOutput as Record<string, unknown>).passed === false) blockedByGuardrail = true;
+    }
+  }
+
+  if (spanType === "evaluation" || spanType === "guardrail") {
+    return { computedInput, computedOutput, outputFromRootSpan, outputSpanEndTimeMs, outputSource, blockedByGuardrail };
+  }
+
+  const isRoot = !span.parentSpanId;
+
+  const inputResult = traceIOExtractionService.extractRichIOFromSpan(span, "input");
+  if (inputResult && (isRoot || computedInput === null)) {
+    const raw = inputResult.raw;
+    computedInput = typeof raw === "string" ? raw : JSON.stringify(raw);
+  }
+
+  const outputResult = traceIOExtractionService.extractRichIOFromSpan(span, "output");
+  if (outputResult) {
+    const isExplicit = outputResult.source === "langwatch";
+    if (shouldOverrideOutput({
+      isRoot,
+      outputFromRoot: outputFromRootSpan,
+      isExplicit,
+      currentIsExplicit: currentOutputSource === OUTPUT_SOURCE.EXPLICIT,
+      endTime: span.endTimeUnixMs,
+      currentEndTime: outputSpanEndTimeMs,
+    })) {
+      const raw = outputResult.raw;
+      computedOutput = typeof raw === "string" ? raw : JSON.stringify(raw);
+      outputFromRootSpan = isRoot;
+      outputSpanEndTimeMs = span.endTimeUnixMs;
+      outputSource = isExplicit ? OUTPUT_SOURCE.EXPLICIT : OUTPUT_SOURCE.INFERRED;
+    }
+  }
+
+  return { computedInput, computedOutput, outputFromRootSpan, outputSpanEndTimeMs, outputSource, blockedByGuardrail };
+}
+
+function accumulateAttributes(
+  state: TraceSummaryData,
+  span: NormalizedSpan,
+  outputSource: string,
+): Record<string, string> {
+  const spanAttrs = extractAttributes(span);
+  const merged = { ...spanAttrs, ...state.attributes };
+
+  // Labels: union across spans
+  const existingLabels = state.attributes["langwatch.labels"];
+  const newLabels = spanAttrs["langwatch.labels"];
+  if (existingLabels || newLabels) {
+    const union = [...new Set([
+      ...parseJsonStringArray(existingLabels),
+      ...parseJsonStringArray(newLabels),
+    ])];
+    if (union.length > 0) merged["langwatch.labels"] = JSON.stringify(union);
+  }
+
+  // Metadata: deep-merge JSON objects, first-wins for primitives
+  for (const key of Object.keys(merged)) {
+    if (!key.startsWith("metadata.")) continue;
+    const prev = state.attributes[key];
+    const next = spanAttrs[key];
+    if (!prev || !next) continue;
+    try {
+      const prevObj: unknown = JSON.parse(prev);
+      const nextObj: unknown = JSON.parse(next);
+      if (
+        typeof prevObj === "object" && prevObj && !Array.isArray(prevObj) &&
+        typeof nextObj === "object" && nextObj && !Array.isArray(nextObj)
+      ) {
+        merged[key] = JSON.stringify({ ...nextObj, ...prevObj });
+      }
+    } catch { /* not JSON — keep first-wins */ }
+  }
+
+  // TODO(2027): strip legacy markers
+  if (merged["metadata.platform"] === "optimization_studio") delete merged["metadata.platform"];
+  if (merged["langwatch.labels"]) {
+    const filtered = parseJsonStringArray(merged["langwatch.labels"]).filter((l) => l !== "scenario-runner");
+    if (filtered.length > 0) merged["langwatch.labels"] = JSON.stringify(filtered);
+    else delete merged["langwatch.labels"];
+  }
+
+  // Origin: root-wins-if-set semantics
+  const origin = resolveOrigin(span, state.attributes["langwatch.origin"]);
+  if (origin) merged["langwatch.origin"] = origin;
+
+  merged["langwatch.reserved.output_source"] = outputSource;
+
+  // PII redaction tracking
+  const piiStatus = span.spanAttributes[ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_STATUS];
+  if (piiStatus === "partial" || piiStatus === "none") {
+    const key = piiStatus === "partial"
+      ? ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_PARTIAL_SPAN_IDS
+      : ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_SKIPPED_SPAN_IDS;
+    const ids = parseJsonStringArray(merged[key]);
+    ids.push(span.spanId);
+    merged[key] = JSON.stringify(ids);
+  }
+
+  return merged;
+}
+
+// ─── Main composition ───────────────────────────────────────────────
+
+const spanNormalizationPipelineService = SpanNormalizationPipelineService.create();
+const traceIOExtractionService = TraceIOExtractionService.create();
 
 /** @internal Exported for unit testing */
 export function applySpanToSummary(
   state: TraceSummaryData,
   span: NormalizedSpan,
 ): TraceSummaryData {
-  const hasValidTimestamps =
-    isValidTimestamp(span.startTimeUnixMs) &&
-    isValidTimestamp(span.endTimeUnixMs);
+  const timing = accumulateTiming(state, span);
+  const tokens = accumulateTokens(state, span, timing.totalDurationMs);
+  const status = accumulateStatus(state, span);
+  const io = accumulateIO(state, span);
+  const attributes = accumulateAttributes(state, span, io.outputSource);
 
-  // Timing
-  let occurredAt = state.occurredAt;
-  let totalDurationMs = state.totalDurationMs;
-  if (hasValidTimestamps) {
-    const newStart =
-      occurredAt > 0
-        ? Math.min(occurredAt, span.startTimeUnixMs)
-        : span.startTimeUnixMs;
-    const currentEnd = occurredAt > 0 ? occurredAt + totalDurationMs : 0;
-    const newEnd = Math.max(currentEnd, span.endTimeUnixMs);
-    occurredAt = newStart;
-    totalDurationMs = newEnd - newStart;
-  }
-
-  // Models
   const newModels = extractModelsFromSpan(span);
-  let models = state.models;
-  if (newModels.length > 0) {
-    const modelSet = new Set(models);
-    for (const m of newModels) modelSet.add(m);
-    models = Array.from(modelSet).sort();
-  }
-
-  // Token metrics
-  const tokenMetrics = extractTokenMetricsFromSpan(span);
-  const totalPromptTokenCount =
-    (state.totalPromptTokenCount ?? 0) + tokenMetrics.promptTokens;
-  const totalCompletionTokenCount =
-    (state.totalCompletionTokenCount ?? 0) + tokenMetrics.completionTokens;
-  const totalCost = (state.totalCost ?? 0) + tokenMetrics.cost;
-  const tokensEstimated = state.tokensEstimated || tokenMetrics.estimated;
-
-  // Status
-  const statusInfo = extractStatusFromSpan(span);
-  const containsErrorStatus = state.containsErrorStatus || statusInfo.hasError;
-  const containsOKStatus = state.containsOKStatus || statusInfo.hasOK;
-  const errorMessage = state.errorMessage ?? statusInfo.errorMessage;
-
-  // Token timing
-  const tokenTiming = extractTokenTimingFromSpan(span);
-  let timeToFirstTokenMs = state.timeToFirstTokenMs;
-  if (tokenTiming.timeToFirstToken !== null) {
-    timeToFirstTokenMs =
-      timeToFirstTokenMs === null
-        ? tokenTiming.timeToFirstToken
-        : Math.min(timeToFirstTokenMs, tokenTiming.timeToFirstToken);
-  }
-  let timeToLastTokenMs = state.timeToLastTokenMs;
-  if (tokenTiming.timeToLastToken !== null) {
-    timeToLastTokenMs =
-      timeToLastTokenMs === null
-        ? tokenTiming.timeToLastToken
-        : Math.max(timeToLastTokenMs, tokenTiming.timeToLastToken);
-  }
-
-  // Tokens per second
-  const finalCompletionCount =
-    totalCompletionTokenCount > 0 ? totalCompletionTokenCount : null;
-  const tokensPerSecond =
-    finalCompletionCount !== null &&
-    finalCompletionCount > 0 &&
-    totalDurationMs > 0
-      ? Math.round((finalCompletionCount / totalDurationMs) * 1000)
-      : null;
-
-  // I/O extraction (per-span heuristic)
-  // Exclude evaluation and guardrail spans from I/O extraction (matches batch logic)
-  const spanType = span.spanAttributes[ATTR_KEYS.SPAN_TYPE];
-  const isExcludedType = spanType === "evaluation" || spanType === "guardrail";
-
-  // Detect guardrail blocking
-  let blockedByGuardrail = state.blockedByGuardrail;
-  if (spanType === "guardrail") {
-    const rawOutput = span.spanAttributes[ATTR_KEYS.LANGWATCH_OUTPUT];
-    if (
-      rawOutput &&
-      typeof rawOutput === "object" &&
-      !Array.isArray(rawOutput)
-    ) {
-      const parsed = rawOutput as Record<string, unknown>;
-      if (parsed.passed === false) {
-        blockedByGuardrail = true;
-      }
-    }
-  }
-
-  let computedInput = state.computedInput;
-  let computedOutput = state.computedOutput;
-  let outputFromRoot = state.outputFromRootSpan;
-  let outputSpanEndTimeMs = state.outputSpanEndTimeMs;
-  // Track whether current output came from explicit (langwatch.*) vs inferred (gen_ai.*) source
-  const currentOutputSource =
-    state.attributes["langwatch.reserved.output_source"] ?? OUTPUT_SOURCE.INFERRED;
-  let newOutputSource: string | undefined;
-
-  if (!isExcludedType) {
-    const inputResult = traceIOExtractionService.extractRichIOFromSpan(
-      span,
-      "input",
-    );
-    if (inputResult) {
-      const isRootSpan = !span.parentSpanId;
-      // Root span input always overrides; otherwise set once from first span with input
-      if (isRootSpan || computedInput === null) {
-        const raw = inputResult.raw;
-        computedInput = typeof raw === "string" ? raw : JSON.stringify(raw);
-      }
-    }
-
-    const outputResult = traceIOExtractionService.extractRichIOFromSpan(
-      span,
-      "output",
-    );
-    if (outputResult) {
-      const isRootSpan = !span.parentSpanId;
-      const isExplicit = outputResult.source === "langwatch";
-      const currentIsExplicit = currentOutputSource === OUTPUT_SOURCE.EXPLICIT;
-
-      if (
-        shouldOverrideOutput({
-          isRoot: isRootSpan,
-          outputFromRoot,
-          isExplicit,
-          currentIsExplicit,
-          endTime: span.endTimeUnixMs,
-          currentEndTime: outputSpanEndTimeMs,
-        })
-      ) {
-        const raw = outputResult.raw;
-        computedOutput = typeof raw === "string" ? raw : JSON.stringify(raw);
-        outputFromRoot = isRootSpan;
-        outputSpanEndTimeMs = span.endTimeUnixMs;
-        newOutputSource = isExplicit
-          ? OUTPUT_SOURCE.EXPLICIT
-          : OUTPUT_SOURCE.INFERRED;
-      }
-    }
-  }
-
-  // Attributes (first-wins per key, except labels and metadata which are deep-merged)
-  const spanAttributes = extractAttributesFromSpan(span);
-  const mergedAttributes = { ...spanAttributes, ...state.attributes };
-
-  // Deep-merge labels: union across all spans
-  const existingLabels = state.attributes["langwatch.labels"];
-  const newLabels = spanAttributes["langwatch.labels"];
-  if (existingLabels || newLabels) {
-    const existing = parseJsonStringArray(existingLabels);
-    const incoming = parseJsonStringArray(newLabels);
-    const merged = [...new Set([...existing, ...incoming])];
-    if (merged.length > 0) {
-      mergedAttributes["langwatch.labels"] = JSON.stringify(merged);
-    }
-  }
-
-  // Deep-merge metadata.* fields: merge JSON objects, first-wins for primitives
-  for (const key of Object.keys(mergedAttributes)) {
-    if (!key.startsWith("metadata.")) continue;
-    const prev = state.attributes[key];
-    const next = spanAttributes[key];
-    if (!prev || !next) continue;
-    // Both sides exist — attempt JSON object merge
-    try {
-      const prevObj: unknown = JSON.parse(prev);
-      const nextObj: unknown = JSON.parse(next);
-      if (
-        typeof prevObj === "object" && prevObj !== null && !Array.isArray(prevObj) &&
-        typeof nextObj === "object" && nextObj !== null && !Array.isArray(nextObj)
-      ) {
-        mergedAttributes[key] = JSON.stringify({ ...nextObj, ...prevObj });
-      }
-    } catch {
-      // Not valid JSON on one side — keep first-wins (already in mergedAttributes)
-    }
-  }
-
-  // TODO(2027): remove this stripping code once all clients are upgraded
-  // Strip legacy platform marker "optimization_studio" — only this exact value
-  if (mergedAttributes["metadata.platform"] === "optimization_studio") {
-    delete mergedAttributes["metadata.platform"];
-  }
-
-  // TODO(2027): remove this stripping code once all clients are upgraded
-  // Strip "scenario-runner" from labels
-  if (mergedAttributes["langwatch.labels"]) {
-    const allLabels = parseJsonStringArray(mergedAttributes["langwatch.labels"]);
-    const filtered = allLabels.filter((l) => l !== "scenario-runner");
-    if (filtered.length > 0) {
-      mergedAttributes["langwatch.labels"] = JSON.stringify(filtered);
-    } else {
-      delete mergedAttributes["langwatch.labels"];
-    }
-  }
-
-  // Hoist langwatch.origin with root-span-wins-if-set semantics
-  const isRootSpan = !span.parentSpanId;
-  const explicitOrigin = span.spanAttributes["langwatch.origin"];
-  const hasExplicitOrigin = typeof explicitOrigin === "string" && explicitOrigin !== "";
-
-  if (hasExplicitOrigin) {
-    if (isRootSpan) {
-      // Root span with explicit scope always wins
-      mergedAttributes["langwatch.origin"] = explicitOrigin as string;
-    } else if (!state.attributes["langwatch.origin"]) {
-      // Child span sets scope only if no value has been hoisted yet
-      mergedAttributes["langwatch.origin"] = explicitOrigin as string;
-    } else {
-      // Keep existing hoisted value from earlier spans
-      mergedAttributes["langwatch.origin"] = state.attributes["langwatch.origin"];
-    }
-  } else if (isRootSpan && state.attributes["langwatch.origin"]) {
-    // Root span without scope preserves previously hoisted child span value
-    mergedAttributes["langwatch.origin"] = state.attributes["langwatch.origin"];
-  } else {
-    // No explicit scope on this span — try legacy inference
-    const inferred = inferOriginFromLegacyMarkers(span);
-    if (inferred) {
-      if (isRootSpan) {
-        // Root span inferred scope wins over child inferred scope
-        mergedAttributes["langwatch.origin"] = inferred;
-      } else if (!state.attributes["langwatch.origin"]) {
-        // Child inferred scope sets only if nothing hoisted yet
-        mergedAttributes["langwatch.origin"] = inferred;
-      } else {
-        mergedAttributes["langwatch.origin"] = state.attributes["langwatch.origin"];
-      }
-    } else if (state.attributes["langwatch.origin"]) {
-      // No signal from this span — preserve existing hoisted value
-      mergedAttributes["langwatch.origin"] = state.attributes["langwatch.origin"];
-    }
-  }
-
-  // Hoist langwatch.origin.source with first-wins, root-override semantics
-  const explicitSource = spanAttributes["langwatch.origin.source"];
-  if (typeof explicitSource === "string" && explicitSource !== "") {
-    if (isRootSpan) {
-      mergedAttributes["langwatch.origin.source"] = explicitSource;
-    } else if (!state.attributes["langwatch.origin.source"]) {
-      mergedAttributes["langwatch.origin.source"] = explicitSource;
-    } else {
-      mergedAttributes["langwatch.origin.source"] = state.attributes["langwatch.origin.source"];
-    }
-  } else if (state.attributes["langwatch.origin.source"]) {
-    mergedAttributes["langwatch.origin.source"] = state.attributes["langwatch.origin.source"];
-  }
-
-  // Track output source in attributes for cross-span override decisions
-  mergedAttributes["langwatch.reserved.output_source"] =
-    newOutputSource ?? currentOutputSource;
-
-  // PII redaction status tracking — accumulate span IDs by severity
-  const piiStatus =
-    span.spanAttributes[ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_STATUS];
-  if (piiStatus === "partial") {
-    const key = ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_PARTIAL_SPAN_IDS;
-    const existing = mergedAttributes[key];
-    const ids = parseJsonStringArray(existing);
-    ids.push(span.spanId);
-    mergedAttributes[key] = JSON.stringify(ids);
-  } else if (piiStatus === "none") {
-    const key = ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_SKIPPED_SPAN_IDS;
-    const existing = mergedAttributes[key];
-    const ids = parseJsonStringArray(existing);
-    ids.push(span.spanId);
-    mergedAttributes[key] = JSON.stringify(ids);
-  }
+  const models = newModels.length > 0
+    ? [...new Set([...state.models, ...newModels])].sort()
+    : state.models;
 
   return {
     ...state,
     traceId: state.traceId || span.traceId,
     spanCount: state.spanCount + 1,
-    occurredAt: occurredAt,
-    totalDurationMs: totalDurationMs,
     computedIOSchemaVersion: COMPUTED_IO_SCHEMA_VERSION,
-    computedInput: computedInput,
-    computedOutput: computedOutput,
-    outputFromRootSpan: outputFromRoot,
-    outputSpanEndTimeMs: outputSpanEndTimeMs,
-    models: models,
-    totalPromptTokenCount:
-      totalPromptTokenCount > 0 ? totalPromptTokenCount : null,
-    totalCompletionTokenCount:
-      totalCompletionTokenCount > 0 ? totalCompletionTokenCount : null,
-    totalCost: totalCost > 0 ? Number(totalCost.toFixed(6)) : null,
-    tokensEstimated: tokensEstimated,
-    containsErrorStatus: containsErrorStatus,
-    containsOKStatus: containsOKStatus,
-    errorMessage: errorMessage,
-    timeToFirstTokenMs: timeToFirstTokenMs,
-    timeToLastTokenMs: timeToLastTokenMs,
-    tokensPerSecond: tokensPerSecond,
-    blockedByGuardrail: blockedByGuardrail,
-    attributes: mergedAttributes,
+    occurredAt: timing.occurredAt,
+    totalDurationMs: timing.totalDurationMs,
+    models,
+    ...tokens,
+    ...status,
+    computedInput: io.computedInput,
+    computedOutput: io.computedOutput,
+    outputFromRootSpan: io.outputFromRootSpan,
+    outputSpanEndTimeMs: io.outputSpanEndTimeMs,
+    blockedByGuardrail: io.blockedByGuardrail,
+    attributes,
   };
 }
 
-const spanNormalizationPipelineService = SpanNormalizationPipelineService.create();
-const traceIOExtractionService = TraceIOExtractionService.create();
-
-/**
- * Creates a FoldProjection definition for trace summaries.
- *
- * Fold state = stored data. Each SpanReceivedEvent is normalized and then
- * incrementally applied to the summary. No batch aggregation — `apply()`
- * does all computation per-span.
- */
 export function createTraceSummaryFoldProjection({
   store,
 }: {
@@ -811,16 +614,13 @@ export function createTraceSummaryFoldProjection({
         subTopicId: null,
         hasAnnotation: null,
         attributes: {},
-        occurredAt: 0,
+        occurredAt: Date.now(),
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
     },
 
-    apply(
-      state: TraceSummaryData,
-      event: TraceProcessingEvent,
-    ): TraceSummaryData {
+    apply(state: TraceSummaryData, event: TraceProcessingEvent): TraceSummaryData {
       if (isSpanReceivedEvent(event)) {
         const normalizedSpan =
           spanNormalizationPipelineService.normalizeSpanReceived(
@@ -831,13 +631,10 @@ export function createTraceSummaryFoldProjection({
           );
         enrichRagContextIds(normalizedSpan);
 
-        const updatedState = applySpanToSummary(state, normalizedSpan);
-
-        const now = Date.now();
         return {
-          ...updatedState,
+          ...applySpanToSummary(state, normalizedSpan),
           createdAt: state.createdAt,
-          updatedAt: now,
+          updatedAt: Date.now(),
         };
       }
 
@@ -854,6 +651,69 @@ export function createTraceSummaryFoldProjection({
         return {
           ...state,
           satisfactionScore: event.data.satisfactionScore,
+          updatedAt: Date.now(),
+        };
+      }
+
+      if (isLogRecordReceivedEvent(event)) {
+        const mergedAttributes = { ...state.attributes };
+        const logCount = parseInt(mergedAttributes["langwatch.reserved.log_record_count"] ?? "0", 10);
+        mergedAttributes["langwatch.reserved.log_record_count"] = String(logCount + 1);
+
+        let computedInput = state.computedInput;
+        let computedOutput = state.computedOutput;
+        let outputSpanEndTimeMs = state.outputSpanEndTimeMs;
+        const currentOutputSource =
+          state.attributes["langwatch.reserved.output_source"] ?? OUTPUT_SOURCE.INFERRED;
+
+        const logIO = extractIOFromLogRecord(event.data);
+
+        if (logIO.input !== null && computedInput === null) {
+          computedInput = logIO.input;
+        }
+
+        if (logIO.output !== null) {
+          if (shouldOverrideOutput({
+            isRoot: false,
+            outputFromRoot: state.outputFromRootSpan,
+            isExplicit: false,
+            currentIsExplicit: currentOutputSource === OUTPUT_SOURCE.EXPLICIT,
+            endTime: event.data.timeUnixMs,
+            currentEndTime: outputSpanEndTimeMs,
+          })) {
+            computedOutput = logIO.output;
+            outputSpanEndTimeMs = event.data.timeUnixMs;
+            mergedAttributes["langwatch.reserved.output_source"] = OUTPUT_SOURCE.INFERRED;
+          }
+        }
+
+        return {
+          ...state,
+          computedInput,
+          computedOutput,
+          outputSpanEndTimeMs,
+          attributes: mergedAttributes,
+          updatedAt: Date.now(),
+        };
+      }
+
+      if (isMetricRecordReceivedEvent(event)) {
+        let timeToFirstTokenMs = state.timeToFirstTokenMs;
+        if (event.data.metricName === "gen_ai.server.time_to_first_token") {
+          const ttftMs = event.data.value * 1000;
+          timeToFirstTokenMs = timeToFirstTokenMs === null
+            ? ttftMs
+            : Math.min(timeToFirstTokenMs, ttftMs);
+        }
+
+        const mergedAttributes = { ...state.attributes };
+        const metricCount = parseInt(mergedAttributes["langwatch.reserved.metric_record_count"] ?? "0", 10);
+        mergedAttributes["langwatch.reserved.metric_record_count"] = String(metricCount + 1);
+
+        return {
+          ...state,
+          timeToFirstTokenMs,
+          attributes: mergedAttributes,
           updatedAt: Date.now(),
         };
       }
