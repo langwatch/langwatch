@@ -394,7 +394,9 @@ function extractIOFromLogRecord(data: LogRecordReceivedEventData): {
 
   if (CLAUDE_CODE_SCOPE_NAMES.has(data.scopeName)) {
     const prompt = data.attributes.prompt;
-    if (prompt) return { input: prompt, output: null };
+    if (prompt && typeof prompt === "string") {
+      return { input: prompt, output: null };
+    }
   }
 
   return { input: null, output: null };
