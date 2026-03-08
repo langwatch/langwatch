@@ -1,22 +1,19 @@
 import {
   Button,
-  Select as ChakraSelect,
-  createListCollection,
   Field,
   HStack,
   Input,
   Spacer,
   Text,
-  useSelectContext,
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PromptScope } from "@prisma/client";
 import { useCallback, useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { LuBuilding, LuLock } from "react-icons/lu";
+import { Building, Check, ChevronDown, Users } from "lucide-react";
 import { Dialog } from "~/components/ui/dialog";
-import { Select } from "../../components/ui/select";
+import { Menu } from "~/components/ui/menu";
 import { usePromptHandleCheck } from "../../hooks/prompts/usePromptHandleCheck";
 import {
   type ChangeHandleFormValues,
@@ -88,37 +85,6 @@ export function ChangeHandleDialog({
     required: "Prompt identifier is required",
   });
 
-  const scopesCollection = createListCollection<{
-    label: string;
-    value: PromptScope;
-    icon: React.ReactNode;
-  }>({
-    items: [
-      { label: "Project", value: PromptScope.PROJECT, icon: <LuLock /> },
-      {
-        label: "Organization",
-        value: PromptScope.ORGANIZATION,
-        icon: <LuBuilding />,
-      },
-    ],
-  });
-
-  const ScopeSelectTrigger = () => {
-    const select = useSelectContext();
-
-    return (
-      <Button px="2" variant="outline" size="sm" {...select.getTriggerProps()}>
-        {select.selectedItems[0]?.value === PromptScope.PROJECT ? (
-          <LuLock />
-        ) : (
-          <LuBuilding />
-        )}
-        <Text>{select.selectedItems[0]?.label}</Text>
-        <Select.Indicator />
-      </Button>
-    );
-  };
-
   return (
     <Dialog.Root
       open={isOpen}
@@ -186,48 +152,49 @@ export function ChangeHandleDialog({
               name="scope"
               control={control}
               render={({ field }) => (
-                <Select.Root
-                  zIndex="popover"
-                  collection={scopesCollection}
-                  width="100px"
-                  {...field}
-                  position="relative"
-                  value={[field.value]}
-                  onValueChange={(change) => {
-                    field.onChange(change.value[0]);
-                  }}
-                >
-                  <Select.HiddenSelect />
-                  <Select.Control>
-                    <ScopeSelectTrigger />
-                  </Select.Control>
-                  {/**
-                   * Our Select component uses portals which is both
-                   * not necessary here and causes issues with positioning
-                   * when used in Dialogs (nested?).
-                   */}
-                  <ChakraSelect.Content
-                    width="160px"
-                    zIndex="popover"
-                    position="absolute"
-                    marginTop={2}
-                    top="100%"
-                    left="0"
-                  >
-                    {scopesCollection.items.map((scope) => (
-                      <Select.Item item={scope} key={scope.value}>
-                        <HStack gap={2}>
-                          {scope.value === PromptScope.PROJECT ? (
-                            <LuLock />
-                          ) : (
-                            <LuBuilding />
-                          )}
-                          <Text>{scope.label}</Text>
-                        </HStack>
-                      </Select.Item>
-                    ))}
-                  </ChakraSelect.Content>
-                </Select.Root>
+                <Menu.Root>
+                  <Menu.Trigger asChild>
+                    <Button variant="outline" size="sm" px={2}>
+                      {field.value === PromptScope.PROJECT ? (
+                        <Users size={14} />
+                      ) : (
+                        <Building size={14} />
+                      )}
+                      <Text>
+                        {field.value === PromptScope.PROJECT
+                          ? "Project"
+                          : "Organization"}
+                      </Text>
+                      <ChevronDown size={12} />
+                    </Button>
+                  </Menu.Trigger>
+                  <Menu.Content portalled={false}>
+                    <Menu.Item
+                      value="project"
+                      onClick={() => field.onChange(PromptScope.PROJECT)}
+                    >
+                      <HStack gap={2}>
+                        <Users size={14} />
+                        <Text>Project</Text>
+                      </HStack>
+                      {field.value === PromptScope.PROJECT && (
+                        <Check size={14} />
+                      )}
+                    </Menu.Item>
+                    <Menu.Item
+                      value="organization"
+                      onClick={() => field.onChange(PromptScope.ORGANIZATION)}
+                    >
+                      <HStack gap={2}>
+                        <Building size={14} />
+                        <Text>Organization</Text>
+                      </HStack>
+                      {field.value === PromptScope.ORGANIZATION && (
+                        <Check size={14} />
+                      )}
+                    </Menu.Item>
+                  </Menu.Content>
+                </Menu.Root>
               )}
             />
             <Spacer />

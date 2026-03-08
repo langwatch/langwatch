@@ -93,6 +93,43 @@ describe("filter-translator", () => {
     });
 
     describe("trace filters", () => {
+      describe("when filtering by origin", () => {
+        it("translates non-application origin values with IN clause", () => {
+          const result = translateFilter("traces.origin", ["evaluation"]);
+          expect(result.whereClause).toContain("ts.Attributes['langwatch.origin'] IN");
+          expect(result.whereClause).toContain("{originValues_0:Array(String)}");
+          expect(result.params).toEqual({ originValues_0: ["evaluation"] });
+          expect(result.requiredJoins).toHaveLength(0);
+        });
+
+        it("translates application origin as empty-or-null check", () => {
+          const result = translateFilter("traces.origin", ["application"]);
+          expect(result.whereClause).toContain("ts.Attributes['langwatch.origin'] = ''");
+          expect(result.whereClause).toContain("IS NULL");
+          expect(result.params).toEqual({});
+        });
+
+        it("combines application and other origins with OR", () => {
+          const result = translateFilter("traces.origin", [
+            "application",
+            "simulation",
+            "playground",
+          ]);
+          expect(result.whereClause).toContain("OR");
+          expect(result.whereClause).toContain("ts.Attributes['langwatch.origin'] = ''");
+          expect(result.whereClause).toContain("IS NULL");
+          expect(result.whereClause).toContain("IN ({originValues_0:Array(String)})");
+          expect(result.params).toEqual({
+            originValues_0: ["simulation", "playground"],
+          });
+        });
+
+        it("returns 1=0 for empty values array (no origins selected)", () => {
+          const result = translateFilter("traces.origin", []);
+          expect(result.whereClause).toBe("1=1"); // empty array returns noOp from translateFilter
+        });
+      });
+
       it("translates traces.error filter for true using ContainsErrorStatus", () => {
         const result = translateFilter("traces.error", ["true"]);
         expect(result.whereClause).toContain("ts.ContainsErrorStatus = 1");

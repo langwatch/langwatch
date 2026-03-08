@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /** Any data shape that contains groups of items with trace_id */
 export interface TraceGroupData {
@@ -70,11 +70,17 @@ export function useBufferedTraceData<T extends TraceGroupData>({
     );
   };
 
-  // Decide how to display new data from the query
+  // Decide how to display new data from the query.
+  // Depends on both freshData AND displayData so that when reset() clears
+  // displayData while freshData is already cached (same reference), the
+  // effect still fires and populates displayData from the cache.
   useEffect(() => {
     if (!freshData) return;
 
-    // First load -- just show the data
+    // Already showing this exact data -- nothing to do
+    if (displayData === freshData) return;
+
+    // First load or after reset -- just show the data
     if (!displayData) {
       setDisplayData(freshData);
       return;
@@ -116,7 +122,7 @@ export function useBufferedTraceData<T extends TraceGroupData>({
       scheduleHighlightClear();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [freshData]);
+  }, [freshData, displayData]);
 
   // Auto-apply pending data when mouse leaves the table
   useEffect(() => {
@@ -172,7 +178,7 @@ export function useBufferedTraceData<T extends TraceGroupData>({
     setPendingCount((prev) => prev + count);
   };
 
-  const reset = () => {
+  const reset = useCallback(() => {
     setDisplayData(undefined);
     setPendingData(undefined);
     setPendingCount(0);
@@ -183,7 +189,7 @@ export function useBufferedTraceData<T extends TraceGroupData>({
       clearTimeout(highlightTimerRef.current);
       highlightTimerRef.current = null;
     }
-  };
+  }, []);
 
   // Cleanup highlight timer on unmount
   useEffect(() => {
