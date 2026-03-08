@@ -32,7 +32,7 @@ import {
   normaliseModelFromAiModelObject,
   recordValueType,
 } from "./_extraction";
-import { isRecord } from "./_guards";
+import { isNonEmptyString, isRecord } from "./_guards";
 import { extractSystemInstructionFromMessages } from "./_messages";
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 
@@ -190,6 +190,16 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
           messages.push({ role: "assistant", content: responseObj.text });
         }
 
+        // Extract object content (ai.generateObject / ai.streamObject)
+        if (messages.length === 0) {
+          const obj = responseObj.object;
+          if (isNonEmptyString(obj)) {
+            messages.push({ role: "assistant", content: obj });
+          } else if (isRecord(obj) || Array.isArray(obj)) {
+            messages.push({ role: "assistant", content: JSON.stringify(obj) });
+          }
+        }
+
         // Extract tool calls (Vercel-specific structure)
         if (Array.isArray(responseObj.toolCalls)) {
           messages.push({ tool_calls: responseObj.toolCalls });
@@ -207,6 +217,24 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
         ctx.recordRule(
           `${this.id}:ai.response(string)->gen_ai.output.messages`,
         );
+      }
+
+      // Fallback: flat ai.response.object attribute (generateObject / streamObject)
+      if (ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES] === undefined) {
+        const obj = attrs.take(ATTR_KEYS.AI_RESPONSE_OBJECT);
+        const content = isNonEmptyString(obj)
+          ? obj
+          : isRecord(obj) || Array.isArray(obj)
+            ? JSON.stringify(obj)
+            : undefined;
+        if (content !== undefined) {
+          ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, [
+            { role: "assistant", content },
+          ]);
+          ctx.recordRule(
+            `${this.id}:ai.response.object->gen_ai.output.messages`,
+          );
+        }
       }
 
       // Annotate output messages as chat_messages if we set them

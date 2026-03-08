@@ -64,7 +64,7 @@ function getSpanAttributes(
   };
 }
 
-function makeJobId(payload: ExecuteEvaluationCommandData): string {
+export function makeJobId(payload: ExecuteEvaluationCommandData): string {
   if (
     payload.threadIdleTimeout &&
     payload.threadIdleTimeout > 0 &&

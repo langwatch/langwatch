@@ -124,31 +124,40 @@ export class QueueManager<EventType extends Event = Event> {
     const globalQueue = this.globalQueue;
     const pipelineName = this.pipelineName;
 
+    const stripInternal = (payload: any) => {
+      const { __pipelineName: _p, __jobType: _t, __jobName: _n, ...clean } = payload;
+      return clean;
+    };
+
     // Namespace dedup IDs to avoid cross-pipeline/cross-type collisions
-    const namespacedDedup: DeduplicationConfig<any> | undefined =
-      entry.deduplication
-        ? {
-            ...entry.deduplication,
-            makeId: (payload: any) => {
-              const { __pipelineName: _p, __jobType: _t, __jobName: _n, ...clean } = payload;
-              return `${pipelineName}/${jobType}/${jobName}/${entry.deduplication!.makeId(clean)}`;
-            },
-          }
-        : undefined;
+    const namespaceDedup = (dedup: DeduplicationConfig<any>): DeduplicationConfig<any> => ({
+      ...dedup,
+      makeId: (payload: any) =>
+        `${pipelineName}/${jobType}/${jobName}/${dedup.makeId(stripInternal(payload))}`,
+    });
+
+    const namespacedEntryDedup: DeduplicationConfig<any> | undefined =
+      entry.deduplication ? namespaceDedup(entry.deduplication) : undefined;
 
     const facade: EventSourcedQueueProcessor<P> = {
       send: async (payload: P, options?: QueueSendOptions<P>) => {
+        const effectiveDedup = options?.deduplication
+          ? namespaceDedup(options.deduplication as DeduplicationConfig<any>)
+          : namespacedEntryDedup;
+
         await globalQueue.send(
           { ...payload, __pipelineName: pipelineName, __jobType: jobType, __jobName: jobName },
           {
             delay: options?.delay ?? entry.delay,
-            deduplication:
-              (options?.deduplication as DeduplicationConfig<any> | undefined) ??
-              namespacedDedup,
+            deduplication: effectiveDedup,
           },
         );
       },
       sendBatch: async (payloads: P[], options?: QueueSendOptions<P>) => {
+        const effectiveDedup = options?.deduplication
+          ? namespaceDedup(options.deduplication as DeduplicationConfig<any>)
+          : namespacedEntryDedup;
+
         await globalQueue.sendBatch(
           payloads.map((p) => ({
             ...p,
@@ -158,9 +167,7 @@ export class QueueManager<EventType extends Event = Event> {
           })),
           {
             delay: options?.delay ?? entry.delay,
-            deduplication:
-              (options?.deduplication as DeduplicationConfig<any> | undefined) ??
-              namespacedDedup,
+            deduplication: effectiveDedup,
           },
         );
       },
