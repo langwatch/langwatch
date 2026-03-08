@@ -603,7 +603,13 @@ export function normalizeOtlpAttributeMap(
   attributes: unknown,
 ): Record<string, string> {
   if (!Array.isArray(attributes)) return {};
-  const normalized = normalizeOtlpAttributes(attributes);
+
+  // Filter to only valid {key, value} entries to guard against malformed OTLP data
+  const validEntries = attributes.filter(
+    (attr): attr is OtlpKeyValue =>
+      typeof attr === "object" && attr !== null && "key" in attr && "value" in attr,
+  );
+  const normalized = normalizeOtlpAttributes(validEntries);
   const result: Record<string, string> = {};
   for (const [key, value] of Object.entries(normalized)) {
     if (value === null || value === undefined) continue;

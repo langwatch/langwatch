@@ -195,7 +195,11 @@ export class OtlpSpanPiiRedactionService {
    * @param piiRedactionLevel - The project's PII redaction level
    */
   async redactLog(
-    log: { body: string; attributes: Record<string, string> },
+    log: {
+      body: string;
+      attributes: Record<string, string>;
+      resourceAttributes: Record<string, string>;
+    },
     piiRedactionLevel: PIIRedactionLevel,
   ): Promise<void> {
     if (process.env.DISABLE_PII_REDACTION) {
@@ -232,6 +236,13 @@ export class OtlpSpanPiiRedactionService {
     for (const key of Object.keys(log.attributes)) {
       redactionPromises.push(
         this.deps.clearPII(log.attributes, [key], options),
+      );
+    }
+
+    // Redact resource attributes
+    for (const key of Object.keys(log.resourceAttributes)) {
+      redactionPromises.push(
+        this.deps.clearPII(log.resourceAttributes, [key], options),
       );
     }
 

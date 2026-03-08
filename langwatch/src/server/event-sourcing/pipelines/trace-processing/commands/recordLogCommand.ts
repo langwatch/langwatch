@@ -25,7 +25,11 @@ export interface RecordLogCommandDependencies {
   /** Service for redacting PII from logs. */
   piiRedactionService: {
     redactLog: (
-      log: { body: string; attributes: Record<string, string> },
+      log: {
+        body: string;
+        attributes: Record<string, string>;
+        resourceAttributes: Record<string, string>;
+      },
       piiRedactionLevel: PIIRedactionLevel,
     ) => Promise<void>;
   };
@@ -92,6 +96,7 @@ export class RecordLogCommand
         const logToRedact = {
           body: commandData.body,
           attributes: { ...commandData.attributes },
+          resourceAttributes: { ...commandData.resourceAttributes },
         };
 
         try {
@@ -121,7 +126,7 @@ export class RecordLogCommand
             severityText: commandData.severityText,
             body: logToRedact.body,
             attributes: logToRedact.attributes,
-            resourceAttributes: commandData.resourceAttributes,
+            resourceAttributes: logToRedact.resourceAttributes,
             scopeName: commandData.scopeName,
             scopeVersion: commandData.scopeVersion,
             piiRedactionLevel,
