@@ -10,6 +10,10 @@ vi.mock("../stripe/stripePriceCatalog", () => ({
     GROWTH_EVENTS_EUR_ANNUAL: "price_events_eur_annual",
     GROWTH_EVENTS_USD_MONTHLY: "price_events_usd_monthly",
     GROWTH_EVENTS_USD_ANNUAL: "price_events_usd_annual",
+    GROWTH_EVENTS_EUR_MONTHLY_LEGACY: "price_events_eur_monthly_legacy",
+    GROWTH_EVENTS_EUR_ANNUAL_LEGACY: "price_events_eur_annual_legacy",
+    GROWTH_EVENTS_USD_MONTHLY_LEGACY: "price_events_usd_monthly_legacy",
+    GROWTH_EVENTS_USD_ANNUAL_LEGACY: "price_events_usd_annual_legacy",
   },
 }));
 
@@ -68,6 +72,24 @@ describe("growthSeatEvent", () => {
 
       it("returns true for USD annual", () => {
         expect(isGrowthEventsPrice("price_events_usd_annual")).toBe(true);
+      });
+    });
+
+    describe("when given a legacy growth events price ID", () => {
+      it("returns true for EUR monthly legacy", () => {
+        expect(isGrowthEventsPrice("price_events_eur_monthly_legacy")).toBe(true);
+      });
+
+      it("returns true for EUR annual legacy", () => {
+        expect(isGrowthEventsPrice("price_events_eur_annual_legacy")).toBe(true);
+      });
+
+      it("returns true for USD monthly legacy", () => {
+        expect(isGrowthEventsPrice("price_events_usd_monthly_legacy")).toBe(true);
+      });
+
+      it("returns true for USD annual legacy", () => {
+        expect(isGrowthEventsPrice("price_events_usd_annual_legacy")).toBe(true);
       });
     });
 
