@@ -5,6 +5,8 @@ import { DeleteRunCommand } from "./commands/deleteRun.command";
 import { FinishRunCommand } from "./commands/finishRun.command";
 import { MessageSnapshotCommand } from "./commands/messageSnapshot.command";
 import { StartRunCommand } from "./commands/startRun.command";
+import { TextMessageStartCommand } from "./commands/textMessageStart.command";
+import { TextMessageEndCommand } from "./commands/textMessageEnd.command";
 import { createSimulationRunStateFoldProjection, type SimulationRunStateData } from "./projections/simulationRunState.foldProjection";
 import type { SimulationProcessingEvent } from "./schemas/events";
 
@@ -40,6 +42,8 @@ export function createSimulationProcessingPipeline(deps: SimulationProcessingPip
     .withReactor("simulationRunState", "snapshotUpdateBroadcast", deps.snapshotUpdateBroadcastReactor)
     .withCommand("startRun", StartRunCommand)
     .withCommand("messageSnapshot", MessageSnapshotCommand)
+    .withCommand("textMessageStart", TextMessageStartCommand)
+    .withCommand("textMessageEnd", TextMessageEndCommand)
     .withCommand("finishRun", FinishRunCommand)
     .withCommand("deleteRun", DeleteRunCommand)
     .build();

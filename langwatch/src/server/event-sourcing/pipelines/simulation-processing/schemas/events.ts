@@ -61,6 +61,43 @@ export const SimulationRunFinishedEventSchema = EventSchema.extend({
 export type SimulationRunFinishedEvent = z.infer<typeof SimulationRunFinishedEventSchema>;
 
 /**
+ * TextMessageStart event - emitted when a message begins (placeholder).
+ */
+const simulationTextMessageStartEventDataSchema = z.object({
+  scenarioRunId: z.string(),
+  messageId: z.string(),
+  role: z.string(),
+});
+export type SimulationTextMessageStartEventData = z.infer<typeof simulationTextMessageStartEventDataSchema>;
+
+export const SimulationTextMessageStartEventSchema = EventSchema.extend({
+  type: z.literal(SIMULATION_RUN_EVENT_TYPES.TEXT_MESSAGE_START),
+  version: z.literal(SIMULATION_EVENT_VERSIONS.TEXT_MESSAGE_START),
+  data: simulationTextMessageStartEventDataSchema,
+});
+export type SimulationTextMessageStartEvent = z.infer<typeof SimulationTextMessageStartEventSchema>;
+
+/**
+ * TextMessageEnd event - emitted when a message is complete with full content.
+ */
+const simulationTextMessageEndEventDataSchema = z.object({
+  scenarioRunId: z.string(),
+  messageId: z.string(),
+  role: z.string(),
+  content: z.string(),
+  message: z.record(z.unknown()).optional(),
+  traceId: z.string().optional(),
+});
+export type SimulationTextMessageEndEventData = z.infer<typeof simulationTextMessageEndEventDataSchema>;
+
+export const SimulationTextMessageEndEventSchema = EventSchema.extend({
+  type: z.literal(SIMULATION_RUN_EVENT_TYPES.TEXT_MESSAGE_END),
+  version: z.literal(SIMULATION_EVENT_VERSIONS.TEXT_MESSAGE_END),
+  data: simulationTextMessageEndEventDataSchema,
+});
+export type SimulationTextMessageEndEvent = z.infer<typeof SimulationTextMessageEndEventSchema>;
+
+/**
  * RunDeleted event - emitted when a simulation run is soft-deleted.
  */
 const simulationRunDeletedEventDataSchema = z.object({
@@ -81,10 +118,17 @@ export type SimulationRunDeletedEvent = z.infer<typeof SimulationRunDeletedEvent
 export type SimulationProcessingEvent =
   | SimulationRunStartedEvent
   | SimulationMessageSnapshotEvent
+  | SimulationTextMessageStartEvent
+  | SimulationTextMessageEndEvent
   | SimulationRunFinishedEvent
   | SimulationRunDeletedEvent;
 
 export {
-  isSimulationMessageSnapshotEvent, isSimulationRunDeletedEvent, isSimulationRunFinishedEvent, isSimulationRunStartedEvent
+  isSimulationMessageSnapshotEvent,
+  isSimulationTextMessageStartEvent,
+  isSimulationTextMessageEndEvent,
+  isSimulationRunDeletedEvent,
+  isSimulationRunFinishedEvent,
+  isSimulationRunStartedEvent,
 } from "./typeGuards";
 

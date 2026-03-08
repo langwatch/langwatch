@@ -33,6 +33,27 @@ export const finishRunCommandDataSchema = z.object({
 });
 export type FinishRunCommandData = z.infer<typeof finishRunCommandDataSchema>;
 
+export const textMessageStartCommandDataSchema = z.object({
+  tenantId: z.string(),
+  scenarioRunId: z.string(),
+  messageId: z.string(),
+  role: z.string(),
+  occurredAt: z.number(),
+});
+export type TextMessageStartCommandData = z.infer<typeof textMessageStartCommandDataSchema>;
+
+export const textMessageEndCommandDataSchema = z.object({
+  tenantId: z.string(),
+  scenarioRunId: z.string(),
+  messageId: z.string(),
+  role: z.string(),
+  content: z.string(),
+  message: z.record(z.unknown()).optional(),
+  traceId: z.string().optional(),
+  occurredAt: z.number(),
+});
+export type TextMessageEndCommandData = z.infer<typeof textMessageEndCommandDataSchema>;
+
 export const deleteRunCommandDataSchema = z.object({
   tenantId: z.string(),
   scenarioRunId: z.string(),

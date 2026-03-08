@@ -41,6 +41,8 @@ const config: SimulationCommandConfig<
     hasResults: !!commandData.results,
     durationMs: commandData.durationMs,
   }),
+  makeIdempotencyKey: (commandData) =>
+    `${commandData.tenantId}:${commandData.scenarioRunId}:finishRun`,
 };
 
 /**

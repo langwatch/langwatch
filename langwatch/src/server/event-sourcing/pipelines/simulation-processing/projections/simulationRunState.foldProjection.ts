@@ -10,6 +10,8 @@ import {
 import type { SimulationProcessingEvent } from "../schemas/events";
 import {
   isSimulationMessageSnapshotEvent,
+  isSimulationTextMessageStartEvent,
+  isSimulationTextMessageEndEvent,
   isSimulationRunDeletedEvent,
   isSimulationRunFinishedEvent,
   isSimulationRunStartedEvent,
@@ -134,6 +136,68 @@ function apply(
       }),
       TraceIds: Array.isArray(event.data.traceIds) ? event.data.traceIds : [],
       Status: event.data.status ?? state.Status,
+      UpdatedAt: Date.now(),
+    };
+  }
+
+  if (isSimulationTextMessageStartEvent(event)) {
+    // Idempotency: skip if message already exists
+    if (state.Messages.some((m) => m.Id === event.data.messageId)) return state;
+
+    return {
+      ...state,
+      ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
+      Status: state.Status === "PENDING" ? "IN_PROGRESS" : state.Status,
+      StartedAt: state.StartedAt ?? event.occurredAt,
+      Messages: [
+        ...state.Messages,
+        {
+          Id: event.data.messageId,
+          Role: event.data.role,
+          Content: "",
+          TraceId: "",
+          Rest: "",
+        },
+      ],
+      UpdatedAt: Date.now(),
+    };
+  }
+
+  if (isSimulationTextMessageEndEvent(event)) {
+    const existingIndex = state.Messages.findIndex(
+      (m) => m.Id === event.data.messageId,
+    );
+
+    // Build the message row from event data
+    const messageFields = event.data.message ?? {};
+    const { id: _id, role: _role, content: _content, trace_id: _traceId, ...restFields } = messageFields as Record<string, unknown>;
+    const rest = Object.keys(restFields).length > 0 ? JSON.stringify(restFields) : "";
+
+    const row: SimulationMessageRow = {
+      Id: event.data.messageId,
+      Role: event.data.role,
+      Content: event.data.content,
+      TraceId: event.data.traceId ?? "",
+      Rest: rest,
+    };
+
+    const updatedMessages =
+      existingIndex >= 0
+        ? state.Messages.map((m, i) => (i === existingIndex ? row : m))
+        : [...state.Messages, row];
+
+    // Accumulate traceId if present and not duplicate
+    const traceIds =
+      event.data.traceId && !state.TraceIds.includes(event.data.traceId)
+        ? [...state.TraceIds, event.data.traceId]
+        : state.TraceIds;
+
+    return {
+      ...state,
+      ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
+      StartedAt: state.StartedAt ?? event.occurredAt,
+      Messages: updatedMessages,
+      TraceIds: traceIds,
       UpdatedAt: Date.now(),
     };
   }

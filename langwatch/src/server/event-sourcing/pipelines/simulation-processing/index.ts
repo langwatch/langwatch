@@ -3,6 +3,8 @@ export type { SimulationProcessingPipelineDeps } from "./pipeline";
 
 export { StartRunCommand } from "./commands/startRun.command";
 export { MessageSnapshotCommand } from "./commands/messageSnapshot.command";
+export { TextMessageStartCommand } from "./commands/textMessageStart.command";
+export { TextMessageEndCommand } from "./commands/textMessageEnd.command";
 export { FinishRunCommand } from "./commands/finishRun.command";
 export { DeleteRunCommand } from "./commands/deleteRun.command";
 
