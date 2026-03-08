@@ -366,7 +366,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
   });
 });
 
-describe("applySpanToSummary() langwatch.source hoisting", () => {
+describe("applySpanToSummary() langwatch.origin.source hoisting", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(99999);
@@ -381,34 +381,34 @@ describe("applySpanToSummary() langwatch.source hoisting", () => {
     vi.restoreAllMocks();
   });
 
-  describe("when span has langwatch.source as span attribute", () => {
+  describe("when span has langwatch.origin.source as span attribute", () => {
     it("hoists source to trace summary attributes", () => {
       const span = createTestSpan({
         parentSpanId: null,
         spanAttributes: {
-          "langwatch.source": "platform",
+          "langwatch.origin.source": "platform",
         },
       });
 
       const state = applySpanToSummary(createInitState(), span);
 
-      expect(state.attributes["langwatch.source"]).toBe("platform");
+      expect(state.attributes["langwatch.origin.source"]).toBe("platform");
     });
   });
 
-  describe("when span has langwatch.source as resource attribute", () => {
+  describe("when span has langwatch.origin.source as resource attribute", () => {
     it("hoists source from resource attributes", () => {
       const span = createTestSpan({
         parentSpanId: null,
         resourceAttributes: {
-          "langwatch.source": "platform",
+          "langwatch.origin.source": "platform",
         },
         spanAttributes: {},
       });
 
       const state = applySpanToSummary(createInitState(), span);
 
-      expect(state.attributes["langwatch.source"]).toBe("platform");
+      expect(state.attributes["langwatch.origin.source"]).toBe("platform");
     });
   });
 
@@ -419,7 +419,7 @@ describe("applySpanToSummary() langwatch.source hoisting", () => {
         spanId: "child-1",
         parentSpanId: "root-1",
         spanAttributes: {
-          "langwatch.source": "sdk",
+          "langwatch.origin.source": "sdk",
         },
       });
 
@@ -428,19 +428,19 @@ describe("applySpanToSummary() langwatch.source hoisting", () => {
         spanId: "root-1",
         parentSpanId: null,
         spanAttributes: {
-          "langwatch.source": "platform",
+          "langwatch.origin.source": "platform",
         },
       });
 
       let state = applySpanToSummary(createInitState(), childSpan);
       state = applySpanToSummary(state, rootSpan);
 
-      expect(state.attributes["langwatch.source"]).toBe("platform");
+      expect(state.attributes["langwatch.origin.source"]).toBe("platform");
     });
   });
 
-  describe("when no span sets langwatch.source", () => {
-    it("does not set langwatch.source in summary attributes", () => {
+  describe("when no span sets langwatch.origin.source", () => {
+    it("does not set langwatch.origin.source in summary attributes", () => {
       const span = createTestSpan({
         parentSpanId: null,
         spanAttributes: {},
@@ -448,7 +448,7 @@ describe("applySpanToSummary() langwatch.source hoisting", () => {
 
       const state = applySpanToSummary(createInitState(), span);
 
-      expect(state.attributes["langwatch.source"]).toBeUndefined();
+      expect(state.attributes["langwatch.origin.source"]).toBeUndefined();
     });
   });
 
@@ -459,7 +459,7 @@ describe("applySpanToSummary() langwatch.source hoisting", () => {
         spanId: "child-1",
         parentSpanId: "root-1",
         spanAttributes: {
-          "langwatch.source": "platform",
+          "langwatch.origin.source": "platform",
         },
       });
 
@@ -473,7 +473,7 @@ describe("applySpanToSummary() langwatch.source hoisting", () => {
       let state = applySpanToSummary(createInitState(), childSpan);
       state = applySpanToSummary(state, rootSpan);
 
-      expect(state.attributes["langwatch.source"]).toBe("platform");
+      expect(state.attributes["langwatch.origin.source"]).toBe("platform");
     });
   });
 });

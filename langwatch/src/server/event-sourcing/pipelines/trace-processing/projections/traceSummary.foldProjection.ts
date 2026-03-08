@@ -398,10 +398,10 @@ function extractAttributesFromSpan(
 	if (typeof langwatchOrigin === "string")
 		attributes["langwatch.origin"] = langwatchOrigin;
 
-	const langwatchSource = spanAttrs["langwatch.source"]
-		?? resourceAttrs["langwatch.source"];
+	const langwatchSource = spanAttrs["langwatch.origin.source"]
+		?? resourceAttrs["langwatch.origin.source"];
 	if (typeof langwatchSource === "string")
-		attributes["langwatch.source"] = langwatchSource;
+		attributes["langwatch.origin.source"] = langwatchSource;
 
 	// Labels (canonical key only — canonicalization already promoted from metadata)
 	const labels = spanAttrs[ATTR_KEYS.LANGWATCH_LABELS];
@@ -518,17 +518,17 @@ function hoistSource(
   spanAttributes: Record<string, string>,
 ): void {
   const isRootSpan = !span.parentSpanId;
-  const explicitSource = spanAttributes["langwatch.source"];
+  const explicitSource = spanAttributes["langwatch.origin.source"];
   if (typeof explicitSource === "string" && explicitSource !== "") {
     if (isRootSpan) {
-      mergedAttributes["langwatch.source"] = explicitSource;
-    } else if (!state.attributes["langwatch.source"]) {
-      mergedAttributes["langwatch.source"] = explicitSource;
+      mergedAttributes["langwatch.origin.source"] = explicitSource;
+    } else if (!state.attributes["langwatch.origin.source"]) {
+      mergedAttributes["langwatch.origin.source"] = explicitSource;
     } else {
-      mergedAttributes["langwatch.source"] = state.attributes["langwatch.source"];
+      mergedAttributes["langwatch.origin.source"] = state.attributes["langwatch.origin.source"];
     }
-  } else if (state.attributes["langwatch.source"]) {
-    mergedAttributes["langwatch.source"] = state.attributes["langwatch.source"];
+  } else if (state.attributes["langwatch.origin.source"]) {
+    mergedAttributes["langwatch.origin.source"] = state.attributes["langwatch.origin.source"];
   }
 }
 

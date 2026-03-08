@@ -555,9 +555,9 @@ def optional_langwatch_trace(
         metadata=metadata if metadata is not None else {},
         disable_sending=do_not_trace,
     ) as trace:
-        # Set langwatch.origin and langwatch.source as direct span attributes
+        # Set langwatch.origin and langwatch.origin.source as direct span attributes
         if trace and trace.root_span:
-            attrs: dict[str, str] = {"langwatch.source": "platform"}
+            attrs: dict[str, str] = {"langwatch.origin.source": "platform"}
             if origin:
                 attrs["langwatch.origin"] = origin
             trace.root_span.set_attributes(attrs)
