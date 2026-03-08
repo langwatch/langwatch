@@ -49,7 +49,14 @@ export {
 } from "./savedViewsLogic";
 
 /** URL query keys to preserve when applying or resetting view filters */
-const PRESERVED_URL_KEYS = new Set(["project", "view", "group_by"]);
+const PRESERVED_URL_KEYS = new Set([
+  "project",
+  "view",
+  "group_by",
+  "startDate",
+  "endDate",
+  "negateFilters",
+]);
 
 /**
  * Reads the selected view ID from localStorage for a project.
@@ -188,9 +195,17 @@ function useSavedViewsInternal() {
     return savedViewsQuery.data.map(toClientView);
   }, [savedViewsQuery.data]);
 
-  // Load selectedViewId from localStorage on mount / project change
+  // Reset state and load selectedViewId on project change
+  const prevProjectIdRef = useRef(projectId);
   useEffect(() => {
     if (!projectId) return;
+
+    // When switching projects, clear stale state so old views aren't briefly applied
+    if (prevProjectIdRef.current !== projectId) {
+      prevProjectIdRef.current = projectId;
+      skipNextMatchRef.current = true;
+    }
+
     const storedId = readSelectedViewId(projectId);
     setSelectedViewIdState(storedId);
   }, [projectId]);
@@ -219,12 +234,13 @@ function useSavedViewsInternal() {
 
   /**
    * Resets all filters including query and negateFilters.
-   * Goes beyond clearFilters() which only handles field filters.
+   * Preserves date window so the time picker doesn't reset.
    */
   const resetAllFilters = useCallback(() => {
+    const RESET_PRESERVED = new Set(["project", "view", "group_by", "startDate", "endDate"]);
     const cleanQuery = Object.fromEntries(
       Object.entries(router.query).filter(([key]) =>
-        PRESERVED_URL_KEYS.has(key),
+        RESET_PRESERVED.has(key),
       ),
     );
 

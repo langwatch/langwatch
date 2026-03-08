@@ -247,12 +247,12 @@ export const clickHouseFilters: Record<
       const { sql: scopeSql } = buildScopeConditions(params);
       return `
         SELECT
-          if(ts.Attributes['langwatch.origin'] = '', 'application', ts.Attributes['langwatch.origin']) as field,
-          if(ts.Attributes['langwatch.origin'] = '', 'application', ts.Attributes['langwatch.origin']) as label,
+          if(ifNull(ts.Attributes['langwatch.origin'], '') = '', 'application', ts.Attributes['langwatch.origin']) as field,
+          if(ifNull(ts.Attributes['langwatch.origin'], '') = '', 'application', ts.Attributes['langwatch.origin']) as label,
           count() as count
         FROM trace_summaries ts
         WHERE ${buildTraceSummariesConditions(params)}
-          ${buildQueryFilter("if(ts.Attributes['langwatch.origin'] = '', 'application', ts.Attributes['langwatch.origin'])", params)}
+          ${buildQueryFilter("if(ifNull(ts.Attributes['langwatch.origin'], '') = '', 'application', ts.Attributes['langwatch.origin'])", params)}
           ${scopeSql}
         GROUP BY field
         ORDER BY field ASC
