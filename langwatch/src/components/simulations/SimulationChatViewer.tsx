@@ -4,6 +4,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSimulationStreamingState } from "~/hooks/useSimulationStreamingState";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { api } from "~/utils/api";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import "@copilotkit/react-ui/styles.css";
@@ -16,25 +17,29 @@ const AWAITING_MESSAGES_STATUSES = new Set([
   ScenarioRunStatus.QUEUED,
 ]);
 
-// TODO: move this to hook wrapper
 export function SimulationChatViewer({
   scenarioRunId,
+  data: externalData,
 }: {
   scenarioRunId: string;
+  /** When provided (grid context), skip independent polling. */
+  data?: ScenarioRunData;
 }) {
   const { project } = useOrganizationTeamProject();
-  const { data } = api.scenarios.getRunState.useQuery(
+
+  // Only poll independently when no external data is provided (e.g. standalone usage)
+  const { data: queriedData } = api.scenarios.getRunState.useQuery(
     {
       scenarioRunId,
       projectId: project?.id ?? "",
     },
     {
-      enabled: !!project,
-      // Fallback polling — primary updates come via SSE streaming events
-      // and selective invalidation from useSimulationUpdateListener.
+      enabled: !!project && !externalData,
       refetchInterval: 10_000,
     },
   );
+
+  const data = externalData ?? queriedData;
 
   const { streamingMessages, handleStreamingEvent, clearCompleted } =
     useSimulationStreamingState(scenarioRunId);

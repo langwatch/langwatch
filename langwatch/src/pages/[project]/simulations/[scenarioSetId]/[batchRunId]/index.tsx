@@ -2,7 +2,7 @@ import { Box } from "@chakra-ui/react";
 
 import { SimulationLayout, SimulationZoomGrid } from "~/components/simulations";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
@@ -10,6 +10,7 @@ import {
   StreamingEventProvider,
   useStreamingEventDispatch,
 } from "~/hooks/useStreamingEventDispatch";
+import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { api } from "~/utils/api";
 
 // Main layout for a single Simulation Set page
@@ -29,9 +30,19 @@ function SimulationSetPageInner() {
 
   // sinceTimestamp enables conditional fetch: server returns {changed:false} cheaply when idle
   const [sinceTimestamp, setSinceTimestamp] = useState<number | undefined>(undefined);
-  // Stable ordered run IDs — only updated when the server says something changed
-  const [scenarioRunIds, setScenarioRunIds] = useState<string[]>([]);
+  // Centralised run data — cards receive data from here instead of polling independently
+  const [runDataMap, setRunDataMap] = useState<Map<string, ScenarioRunData>>(new Map());
   const lastBatchRunIdRef = useRef<string | undefined>(undefined);
+
+  // Per-run timestamps so the server only returns runs that actually changed
+  const runTimestamps = useMemo(() => {
+    if (runDataMap.size === 0) return undefined;
+    const timestamps: Record<string, number> = {};
+    for (const [id, run] of runDataMap) {
+      timestamps[id] = run.timestamp;
+    }
+    return timestamps;
+  }, [runDataMap]);
 
   const { data: batchRunData, refetch } = api.scenarios.getBatchRunData.useQuery(
     {
@@ -39,6 +50,7 @@ function SimulationSetPageInner() {
       scenarioSetId: scenarioSetId ?? "",
       batchRunId: batchRunId ?? "",
       sinceTimestamp,
+      runTimestamps,
     },
     {
       enabled: !!project?.id && !!scenarioSetId && !!batchRunId,
@@ -63,17 +75,32 @@ function SimulationSetPageInner() {
     if (batchRunId !== lastBatchRunIdRef.current) {
       lastBatchRunIdRef.current = batchRunId;
       setSinceTimestamp(undefined);
-      setScenarioRunIds([]);
+      setRunDataMap(new Map());
     }
   }, [batchRunId]);
 
-  // Update stable run IDs only when data has actually changed
+  // Merge incoming run data into the map (delta updates from server)
   useEffect(() => {
     if (!batchRunData?.changed) return;
-    const sorted = [...batchRunData.runs].sort((a, b) => a.timestamp - b.timestamp);
-    setScenarioRunIds(sorted.map((r) => r.scenarioRunId));
+
+    setRunDataMap((prev) => {
+      const next = new Map(prev);
+      for (const run of batchRunData.runs) {
+        next.set(run.scenarioRunId, run);
+      }
+      return next;
+    });
+
     setSinceTimestamp(batchRunData.lastUpdatedAt);
   }, [batchRunData]);
+
+  // Derive sorted run IDs from the map — stable order by creation timestamp
+  const scenarioRunIds = useMemo(() => {
+    if (runDataMap.size === 0) return [];
+    return [...runDataMap.values()]
+      .sort((a, b) => a.timestamp - b.timestamp)
+      .map((r) => r.scenarioRunId);
+  }, [runDataMap]);
 
   const trpcUtils = api.useContext();
 
@@ -123,8 +150,8 @@ function SimulationSetPageInner() {
             <Box mb={4}>
               <SimulationZoomGrid.Controls />
             </Box>
-            {scenarioRunIds && scenarioRunIds.length > 0 && (
-              <SimulationZoomGrid.Grid scenarioRunIds={scenarioRunIds} />
+            {scenarioRunIds.length > 0 && (
+              <SimulationZoomGrid.Grid scenarioRunIds={scenarioRunIds} runDataMap={runDataMap} />
             )}
           </Box>
         </SimulationZoomGrid.Root>

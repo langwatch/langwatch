@@ -5,6 +5,7 @@ import { createContext, useContext, useLayoutEffect, useState } from "react";
 import { ZoomIn, ZoomOut } from "react-feather";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useZoom } from "~/hooks/useZoom";
+import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { Tooltip } from "../ui/tooltip";
 import { SimulationChatViewer } from "./SimulationChatViewer";
 
@@ -94,9 +95,10 @@ function Controls({ showScale = true }: ControlsProps) {
 // Grid component that renders the scaled simulation grid
 interface GridProps {
   scenarioRunIds: string[];
+  runDataMap?: Map<string, ScenarioRunData>;
 }
 
-function GridComponent({ scenarioRunIds }: GridProps) {
+function GridComponent({ scenarioRunIds, runDataMap }: GridProps) {
   const { scale, containerRef } = useZoomContext();
   const { openDrawer } = useDrawer();
 
@@ -181,7 +183,7 @@ function GridComponent({ scenarioRunIds }: GridProps) {
               minHeight: 0,
             }}
           >
-            <SimulationChatViewer scenarioRunId={scenarioRunId} />
+            <SimulationChatViewer scenarioRunId={scenarioRunId} data={runDataMap?.get(scenarioRunId)} />
           </Box>
         ))}
       </Grid>
