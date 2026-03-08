@@ -24,7 +24,10 @@ export const savedViewsRouter = createTRPCRouter({
     .use(savedViewErrorHandler)
     .query(async ({ ctx, input }) => {
       const service = SavedViewService.create(ctx.prisma);
-      return await service.getAll(input.projectId, ctx.session.user.id);
+      return await service.getAll({
+        projectId: input.projectId,
+        userId: ctx.session.user.id,
+      });
     }),
 
   /**
@@ -36,7 +39,7 @@ export const savedViewsRouter = createTRPCRouter({
     .input(
       z.object({
         projectId: z.string(),
-        name: z.string(),
+        name: z.string().min(1).max(255),
         filters: z.record(z.unknown()),
         query: z.string().optional(),
         period: z
@@ -53,12 +56,15 @@ export const savedViewsRouter = createTRPCRouter({
     .use(savedViewErrorHandler)
     .mutation(async ({ ctx, input }) => {
       const service = SavedViewService.create(ctx.prisma);
-      return await service.create(input.projectId, {
-        name: input.name,
-        filters: input.filters as Prisma.InputJsonValue,
-        query: input.query,
-        period: input.period as Prisma.InputJsonValue | undefined,
-        userId: input.scope === "myself" ? ctx.session.user.id : undefined,
+      return await service.createView({
+        projectId: input.projectId,
+        input: {
+          name: input.name,
+          filters: input.filters as Prisma.InputJsonValue,
+          query: input.query,
+          period: input.period as Prisma.InputJsonValue | undefined,
+          userId: input.scope === "myself" ? ctx.session.user.id : undefined,
+        },
       });
     }),
 
@@ -76,7 +82,11 @@ export const savedViewsRouter = createTRPCRouter({
     .use(savedViewErrorHandler)
     .mutation(async ({ ctx, input }) => {
       const service = SavedViewService.create(ctx.prisma);
-      return await service.delete(input.projectId, input.viewId);
+      return await service.delete({
+        projectId: input.projectId,
+        viewId: input.viewId,
+        userId: ctx.session.user.id,
+      });
     }),
 
   /**
@@ -87,14 +97,19 @@ export const savedViewsRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         viewId: z.string(),
-        name: z.string(),
+        name: z.string().min(1).max(255),
       }),
     )
     .use(checkProjectPermission("traces:view"))
     .use(savedViewErrorHandler)
     .mutation(async ({ ctx, input }) => {
       const service = SavedViewService.create(ctx.prisma);
-      return await service.rename(input.projectId, input.viewId, input.name);
+      return await service.rename({
+        projectId: input.projectId,
+        viewId: input.viewId,
+        name: input.name,
+        userId: ctx.session.user.id,
+      });
     }),
 
   /**
@@ -111,6 +126,9 @@ export const savedViewsRouter = createTRPCRouter({
     .use(savedViewErrorHandler)
     .mutation(async ({ ctx, input }) => {
       const service = SavedViewService.create(ctx.prisma);
-      return await service.reorder(input.projectId, input.viewIds);
+      return await service.reorder({
+        projectId: input.projectId,
+        viewIds: input.viewIds,
+      });
     }),
 });
