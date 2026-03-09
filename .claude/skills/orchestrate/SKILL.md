@@ -78,9 +78,14 @@ A shorter workflow for bug fixes. Skips planning, challenge, user approval, test
 - If issues found → invoke `/code` with reviewer feedback
 - If approved → mark task as `completed`
 
-### 5. Complete
+### 5. Commit and Draft PR
+- Invoke `/commit-push` to commit all changes and push to remote
+- Create a **draft** PR using `gh pr create --draft` with a summary of the work done
+- Include the issue number in the PR body for linking
+
+### 6. Complete
 - Verify all tasks are completed
-- Report summary to user
+- Report summary to user (include PR URL)
 
 ## Feature Workflow
 
@@ -177,10 +182,15 @@ If ANY check fails:
 
 This self-check exists because it's easy to rationalize skipping work. Don't.
 
-### 10. Complete
+### 10. Commit and Draft PR
+- Invoke `/commit-push` to commit all changes and push to remote
+- Create a **draft** PR using `gh pr create --draft` with a summary of the work done
+- Include the issue number in the PR body for linking
+
+### 11. Complete
 - Verify all tasks are completed
 - Verify self-check passed
-- Report summary to user (include E2E test status if applicable)
+- Report summary to user (include PR URL and E2E test status if applicable)
 
 ## Boundaries
 
