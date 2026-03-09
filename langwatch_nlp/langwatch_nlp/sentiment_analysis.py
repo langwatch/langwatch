@@ -1,7 +1,7 @@
 import os
 import litellm
 import numpy as np
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Any, Optional
 
@@ -12,6 +12,9 @@ from langwatch_nlp.topic_clustering.utils import (
     generate_embeddings,
     normalize_embedding_dimensions,
 )
+from langwatch_nlp.logger import get_logger, set_log_context, clear_log_context
+
+logger = get_logger("sentiment_analysis")
 
 
 # Pre-loaded embeddings
@@ -71,32 +74,58 @@ def get_embedding(text: str, embeddings_litellm_params: dict[str, str]) -> list[
 
 
 class SentimentAnalysisParams(BaseModel):
+    project_id: Optional[str] = None
     text: str
     embeddings_litellm_params: dict[str, Any]
 
 
 def setup_endpoints(app: FastAPI):
     @app.post("/sentiment")
-    def sentiment_analysis(text: SentimentAnalysisParams):
-        vector = generate_embeddings([text.text], text.embeddings_litellm_params)[0]
-        if vector is None:
-            raise ValueError("No vector returned from the embedding model")
-        sentiment_embeddings = load_embeddings(text.embeddings_litellm_params)[
-            "sentiment"
-        ]
-        positive_similarity = np.dot(vector, sentiment_embeddings[1]) / (
-            np.linalg.norm(vector) * np.linalg.norm(sentiment_embeddings[1])
-        )
-        negative_similarity = np.dot(vector, sentiment_embeddings[0]) / (
-            np.linalg.norm(vector) * np.linalg.norm(sentiment_embeddings[0])
-        )
+    def sentiment_analysis(params: SentimentAnalysisParams):
+        try:
+            if params.project_id:
+                set_log_context(project_id=params.project_id)
 
-        score = float(positive_similarity - negative_similarity)
-        score_n = min(1.0, score / (0.83 - 0.73))
-        return {
-            "score_normalized": score_n,
-            "score_raw": score,
-            "score_positive": float(positive_similarity),
-            "score_negative": float(negative_similarity),
-            "label": "negative" if score < 0 else "positive",
-        }
+            logger.info("Starting sentiment analysis", text_length=len(params.text))
+
+            # Validate API key configuration
+            embeddings_api_key = params.embeddings_litellm_params.get("api_key", "")
+            if embeddings_api_key in ("", "dummy"):
+                logger.warning("Invalid API key for sentiment analysis, skipping")
+                raise HTTPException(
+                    status_code=422,
+                    detail="Invalid or missing API key for embeddings model",
+                )
+
+            vector = generate_embeddings([params.text], params.embeddings_litellm_params)[0]
+            if vector is None:
+                raise ValueError("No vector returned from the embedding model")
+            sentiment_embeddings = load_embeddings(params.embeddings_litellm_params)[
+                "sentiment"
+            ]
+            positive_similarity = np.dot(vector, sentiment_embeddings[1]) / (
+                np.linalg.norm(vector) * np.linalg.norm(sentiment_embeddings[1])
+            )
+            negative_similarity = np.dot(vector, sentiment_embeddings[0]) / (
+                np.linalg.norm(vector) * np.linalg.norm(sentiment_embeddings[0])
+            )
+
+            score = float(positive_similarity - negative_similarity)
+            score_n = min(1.0, score / (0.83 - 0.73))
+
+            logger.info("Sentiment analysis complete", label="negative" if score < 0 else "positive", score_normalized=round(score_n, 3))
+
+            return {
+                "score_normalized": score_n,
+                "score_raw": score,
+                "score_positive": float(positive_similarity),
+                "score_negative": float(negative_similarity),
+                "label": "negative" if score < 0 else "positive",
+            }
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error("Sentiment analysis failed", error=str(e), error_type=type(e).__name__)
+            raise HTTPException(status_code=500, detail="Sentiment analysis failed") from e
+        finally:
+            clear_log_context()
