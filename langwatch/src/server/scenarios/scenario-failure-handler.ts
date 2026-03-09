@@ -10,13 +10,14 @@
 
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 import {
   ScenarioEventType,
   ScenarioRunStatus,
   Verdict,
 } from "~/server/scenarios/scenario-event.enums";
 import { SimulationService } from "~/server/simulations/simulation.service";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { createLogger } from "~/utils/logger/server";
 
 const tracer = getLangWatchTracer("langwatch.scenarios.failure-handler");
@@ -161,9 +162,9 @@ export class ScenarioFailureHandler {
   }
 
   /**
-   * Generates a synthetic scenarioRunId in the format "scenariorun_{nanoid}".
+   * Generates a synthetic scenarioRunId using KSUID with the "scenariorun" resource prefix.
    */
   private generateScenarioRunId(): string {
-    return `scenariorun_${nanoid()}`;
+    return generate(KSUID_RESOURCES.SCENARIO_RUN).toString();
   }
 }
