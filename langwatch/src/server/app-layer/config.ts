@@ -36,7 +36,9 @@ export interface AppConfig {
 }
 
 /** Reads config from createEnvConfig() — the ONE place that owns the schema. */
-export function createAppConfigFromEnv(overrides?: { processRole?: ProcessRole }): AppConfig {
+export function createAppConfigFromEnv(overrides?: {
+  processRole?: ProcessRole;
+}): AppConfig {
   const env = createEnvConfig();
 
   return {

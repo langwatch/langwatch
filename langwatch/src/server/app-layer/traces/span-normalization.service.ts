@@ -68,7 +68,7 @@ export class SpanNormalizationPipelineService {
         span.setAttributes({
           "span.record_id": normalizedSpan.id,
         });
-        this.logger.info(
+        this.logger.debug(
           {
             tenantId,
             traceId: normalizedSpan.traceId,
@@ -166,16 +166,6 @@ export class SpanNormalizationPipelineService {
             event.attributes,
           );
 
-          // Debug: log event attributes
-          this.logger.debug(
-            {
-              eventName: event.name,
-              rawAttributes: JSON.stringify(event.attributes),
-              normalizedAttributes: JSON.stringify(attributes),
-            },
-            "Normalized event attributes",
-          );
-
           return {
             name: event.name,
             timeUnixMs: TraceRequestUtils.convertUnixNanoToUnixMs(timeUnixNano),
@@ -223,7 +213,7 @@ export class SpanNormalizationPipelineService {
         span.setAttributes({
           applied_rules: result.appliedRules,
         });
-        this.logger.info(
+        this.logger.debug(
           {
             appliedRules: result.appliedRules,
           },

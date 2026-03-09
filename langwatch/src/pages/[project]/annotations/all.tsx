@@ -200,7 +200,6 @@ export default function Annotations() {
         maxW={"calc(100vw - 330px)"}
         padding={0}
         margin={0}
-        backgroundColor="white"
       >
         <AnnotationsTable
           groupedAnnotations={groupedAnnotations}

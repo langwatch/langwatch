@@ -1,14 +1,11 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { createLogger } from "~/utils/logger/server";
 import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
 import {
   extractLastUserMessageText,
   extractMessageContentText,
 } from "./canonicalisation/extractors/_messages";
 import type { NormalizedSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/spans";
-
-const logger = createLogger("langwatch:trace-processing:io-extraction-service");
 
 /**
  * Service for extracting input/output text from spans using tree traversal
@@ -57,53 +54,12 @@ export class TraceIOExtractionService {
         const tree = this.organizeSpansIntoTree(spans);
         const orderedSpans = this.flattenSpanTree(tree, "outside-in");
 
-        // Debug: log what we're looking at
-        logger.debug(
-          {
-            spanCount: spans.length,
-            orderedSpanCount: orderedSpans.length,
-            orderedSpanIds: orderedSpans.map((s) => s.spanId),
-            orderedSpanNames: orderedSpans.map((s) => s.name),
-          },
-          "Extracting first input - ordered spans",
-        );
-
         // Filter to spans with valid inputs
         const spansWithInput = orderedSpans.filter((span) => {
-          if (shouldExcludeSpan(span)) {
-            logger.debug(
-              { spanId: span.spanId, spanType: getSpanType(span) },
-              "Excluding span from input extraction",
-            );
-            return false;
-          }
+          if (shouldExcludeSpan(span)) return false;
           const input = this.extractRichIOFromSpan(span, "input");
-          const hasInput = input !== null;
-          logger.debug(
-            {
-              spanId: span.spanId,
-              spanName: span.name,
-              hasInput,
-              hasGenAiInput:
-                span.spanAttributes[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] !==
-                undefined,
-              hasLangwatchInput:
-                span.spanAttributes[ATTR_KEYS.LANGWATCH_INPUT] !== undefined,
-              genAiInputValue:
-                span.spanAttributes[ATTR_KEYS.GEN_AI_INPUT_MESSAGES],
-            },
-            "Checking span for input",
-          );
-          return hasInput;
+          return input !== null;
         });
-
-        logger.debug(
-          {
-            spansWithInputCount: spansWithInput.length,
-            spansWithInputIds: spansWithInput.map((s) => s.spanId),
-          },
-          "Spans with valid input",
-        );
 
         const firstSpan = spansWithInput[0];
 
@@ -112,7 +68,6 @@ export class TraceIOExtractionService {
             "input.found": false,
             "fallback.used": true,
           });
-          logger.debug("No spans with input found, using fallback");
           const fallback = this.getHttpFallback(orderedSpans);
           return fallback ? { raw: fallback, text: fallback, source: "langwatch" as const } : null;
         }
@@ -235,10 +190,6 @@ export class TraceIOExtractionService {
     if (genAiValue !== undefined && genAiValue !== null) {
       const text = messagesToText(genAiValue, type);
       if (text) {
-        logger.debug(
-          { spanId: span.spanId, source: keys.genAi },
-          `Extracted ${type} from GenAI messages`,
-        );
         return { raw: genAiValue, text, source: "gen_ai" };
       }
     }
@@ -251,10 +202,6 @@ export class TraceIOExtractionService {
           ? langwatchValue
           : messagesToText(langwatchValue, type);
       if (text) {
-        logger.debug(
-          { spanId: span.spanId, source: keys.langwatch },
-          `Extracted ${type} from LangWatch attribute`,
-        );
         return { raw: langwatchValue, text, source: "langwatch" };
       }
     }

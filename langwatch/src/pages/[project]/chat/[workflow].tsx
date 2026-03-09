@@ -52,7 +52,7 @@ function ChatContent() {
     <Box height="100vh">
       <Box height="full" bg="bg.muted" p={16} pt={4}>
         <FullLogo />
-        <ChakraCard.Root height="90%" bg="white" p={5} mt={4}>
+        <ChakraCard.Root height="90%" bg="bg.panel" p={5} mt={4}>
           <ChatBox
             useApi={true}
             workflowId={workflowId}

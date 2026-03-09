@@ -89,7 +89,7 @@ export function PropertiesPanel() {
         position={propertiesExpanded ? "absolute" : "relative"}
         top={0}
         right={0}
-        background="white"
+        background="bg"
         border="1px solid"
         borderColor="border.emphasized"
         borderTopWidth={0}
@@ -150,9 +150,9 @@ export function PropertiesPanel() {
           position: propertiesExpanded ? "absolute" : "relative",
           top: 0,
           right: 0,
-          background: "white",
+          background: "var(--chakra-colors-bg)",
           border: "1px solid",
-          borderColor: "var(--chakra-colors-gray-350)",
+          borderColor: "var(--chakra-colors-border-emphasized)",
           zIndex: 100,
           overflowY: "auto",
           overflowX: "hidden",

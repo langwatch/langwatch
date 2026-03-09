@@ -175,7 +175,7 @@ export function FieldsDefinition({
           >
             <HStack width="full">
               <HStack
-                background="gray.100"
+                background="bg.muted"
                 paddingRight={2}
                 borderRadius="8px"
                 width="full"
@@ -208,7 +208,7 @@ export function FieldsDefinition({
                 )}
                 <HStack
                   position="relative"
-                  background="white"
+                  background="bg"
                   borderRadius="8px"
                   paddingX={2}
                   paddingY={1}

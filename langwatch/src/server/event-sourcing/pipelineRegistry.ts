@@ -1,5 +1,8 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { PrismaClient } from "@prisma/client";
+import { prepareLitellmParams } from "~/server/api/routers/modelProviders";
+import { getProjectEmbeddingsModel } from "~/server/embeddings";
+import { OPENAI_EMBEDDING_DIMENSION } from "~/utils/constants";
 import { createLogger } from "~/utils/logger/server";
 import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
 import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";
@@ -154,6 +157,15 @@ export class PipelineRegistry {
         return satisfactionCommandRef.dispatch(data);
       },
       nlpServiceUrl: process.env.LANGWATCH_NLP_SERVICE,
+      getEmbeddingsLitellmParams: async (projectId: string) => {
+        const embeddingsModel = await getProjectEmbeddingsModel(projectId);
+        const litellmParams = await prepareLitellmParams({
+          model: embeddingsModel.model,
+          modelProvider: embeddingsModel.modelProvider,
+          projectId,
+        });
+        return { ...litellmParams, dimensions: OPENAI_EMBEDDING_DIMENSION };
+      },
     });
 
     if (!this.deps.clickhouse) {

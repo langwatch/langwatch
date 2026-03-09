@@ -49,6 +49,8 @@ const config: ExperimentRunCommandConfig<
     targetId: commandData.targetId,
     hasError: !!commandData.error,
   }),
+  makeIdempotencyKey: (commandData) =>
+    `${commandData.tenantId}:${commandData.runId}:target:${commandData.index}:${commandData.targetId}`,
 };
 
 /**

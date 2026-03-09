@@ -49,7 +49,7 @@ export async function isComponentDisabled({
       false,
     );
     if (isDisabled && logger) {
-      logger.info(
+      logger.debug(
         { componentName, componentType, tenantId, flagKey },
         "Component disabled via feature flag kill switch",
       );

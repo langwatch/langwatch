@@ -52,6 +52,7 @@
 export const FRONTEND_FEATURE_FLAGS = [
   "release_ui_suites_enabled",
   "release_ui_sdk_radar_banner_card_enabled",
+  "release_ui_dark_mode_enabled",
 ] as const;
 
 /**

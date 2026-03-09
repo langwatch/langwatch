@@ -38,6 +38,7 @@ export function getStatusCodeFromError(error: unknown): number {
 
 /**
  * Determines log level based on HTTP status code.
+ * - 404: 'info' (not found is a normal response, not a warning)
  * - 4xx: 'warn' (client errors - expected, handled)
  * - 5xx: 'error' (server errors - unexpected, needs attention)
  * - Others: 'info' (success or redirects)
@@ -46,6 +47,7 @@ export function getLogLevelFromStatusCode(
   statusCode: number,
 ): "info" | "warn" | "error" {
   if (statusCode >= 500) return "error";
+  if (statusCode === 404) return "info";
   if (statusCode >= 400) return "warn";
   return "info";
 }
