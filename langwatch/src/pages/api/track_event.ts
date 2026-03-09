@@ -7,7 +7,7 @@ import { fromZodError } from "zod-validation-error";
 import { getApp } from "~/server/app-layer/app";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { normalizeHeaderValue } from "~/utils/headers";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { generateOtelSpanId } from "~/utils/trace";
 import { prisma } from "../../../src/server/db"; // Adjust the import based on your setup
 import type { TrackEventRESTParamsValidator } from "../../../src/server/tracer/types";
@@ -92,7 +92,9 @@ export default async function handler(
       { error, body: req.body, projectId: project.id },
       "invalid event received",
     );
-    captureException(error);
+    captureException(
+      toError(error),
+    );
     const validationError = fromZodError(error as ZodError);
     return res.status(400).json({ error: validationError.message });
   }
@@ -105,7 +107,9 @@ export default async function handler(
         { error, body: req.body, projectId: project.id },
         "invalid event received",
       );
-      captureException(error);
+      captureException(
+        toError(error),
+      );
       const validationError = fromZodError(error as ZodError);
       return res.status(400).json({ error: validationError.message });
     }

@@ -2,7 +2,7 @@ import type { Dataset, DatasetRecord, PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import {
   type DatasetRecordInput,
   newDatasetEntriesSchema,
@@ -210,7 +210,9 @@ const deleteManyDatasetRecords = async ({
           message: "No records found to delete",
         });
       }
-      captureException(error);
+      captureException(
+        toError(error),
+      );
       throw error;
     }
 
@@ -409,7 +411,9 @@ export const createManyDatasetRecords = async ({
       existingRecords = fetchedRecords;
     } catch (error) {
       if ((error as any).name !== "NoSuchKey") {
-        captureException(error);
+        captureException(
+          toError(error),
+        );
         throw error;
       }
     }
@@ -513,7 +517,9 @@ export const getFullDataset = async ({
         truncated,
       };
     } catch (error) {
-      captureException(error);
+      captureException(
+        toError(error),
+      );
       throw error;
     }
   } else {

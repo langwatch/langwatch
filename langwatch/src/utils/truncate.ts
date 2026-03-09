@@ -1,4 +1,4 @@
-import { captureException } from "./posthogErrorCapture";
+import { captureException, toError } from "./posthogErrorCapture";
 
 const truncateString = (str: string, maxLength: number): string => {
   if (str.length <= maxLength) return str;
@@ -92,9 +92,10 @@ export const safeTruncate = <T>(
   try {
     return truncateWithSizeLimit(data, maxTotalLength, stringLengths) as T;
   } catch (error) {
-    captureException(error, {
-      extra: { data },
-    });
+    captureException(
+      toError(error),
+      { extra: { data } },
+    );
     return data;
   }
 };

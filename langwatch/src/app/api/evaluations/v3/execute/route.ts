@@ -21,7 +21,7 @@ import {
 } from "~/server/evaluations-v3/execution/orchestrator";
 import { executionRequestSchema } from "~/server/evaluations-v3/execution/types";
 import { createLogger } from "~/utils/logger/server";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 
 const logger = createLogger("langwatch:evaluations-v3:execute");
 
@@ -149,7 +149,10 @@ app.post("/execute", zValidator("json", executionRequestSchema), async (c) => {
       }
     } catch (error) {
       logger.error({ error, projectId }, "Orchestrator error");
-      captureException(error, { extra: { projectId } });
+      captureException(
+        toError(error),
+        { extra: { projectId } },
+      );
 
       await stream.writeSSE({
         data: JSON.stringify({

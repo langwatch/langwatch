@@ -5,7 +5,7 @@ import { handle } from "hono/vercel";
 import type { NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
 import { z } from "zod";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { addEnvs } from "../../../../optimization_studio/server/addEnvs";
 import { loadDatasets } from "../../../../optimization_studio/server/loadDatasets";
 import {
@@ -70,11 +70,14 @@ app.post(
       );
     } catch (error) {
       logger.error({ error, projectId }, "error");
-      captureException(error, {
-        extra: {
-          projectId,
+      captureException(
+        toError(error),
+        {
+          extra: {
+            projectId,
+          },
         },
-      });
+      );
       return c.json({ error: (error as Error).message }, { status: 500 });
     }
 

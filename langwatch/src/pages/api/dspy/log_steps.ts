@@ -3,7 +3,7 @@ import crypto from "crypto";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { z } from "zod";
 import { fromZodError, type ZodError } from "zod-validation-error";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import {
   estimateCost,
   matchingLLMModelCost,
@@ -93,7 +93,10 @@ export default async function handler(
       "invalid log_steps data received",
     );
     // TODO: should it be a warning instead of exception on sentry? here and all over our APIs
-    captureException(error, { extra: { projectId: project.id } });
+    captureException(
+      toError(error),
+      { extra: { projectId: project.id } },
+    );
 
     const validationError = fromZodError(error as ZodError);
     return res.status(400).json({ error: validationError.message });
@@ -150,9 +153,10 @@ export default async function handler(
           },
           "internal server error processing DSPy step",
         );
-        captureException(error, {
-          extra: { projectId: project.id, param },
-        });
+        captureException(
+          toError(error),
+          { extra: { projectId: project.id, param } },
+        );
 
         return res.status(500).json({ error: "Internal server error" });
       }

@@ -5,7 +5,7 @@ import type { z } from "zod";
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { mapZodIssuesToLogContext } from "~/utils/zod";
 import type { Workflow } from "../../../../../optimization_studio/types/dsl";
 import { getWorkflowEntryOutputs } from "../../../../../optimization_studio/utils/workflowFields";
@@ -215,12 +215,15 @@ export async function handleEvaluatorCall(
       "invalid evaluation params received",
     );
 
-    captureException(error, {
-      extra: {
-        projectId: project.id,
-        validationError: message,
+    captureException(
+      toError(error),
+      {
+        extra: {
+          projectId: project.id,
+          validationError: message,
+        },
       },
-    });
+    );
     return res.status(400).json({ error: message });
   }
 
@@ -278,12 +281,15 @@ export async function handleEvaluatorCall(
       "invalid settings received for the evaluator",
     );
 
-    captureException(error, {
-      extra: {
-        projectId: project.id,
-        validationError: message,
+    captureException(
+      toError(error),
+      {
+        extra: {
+          projectId: project.id,
+          validationError: message,
+        },
       },
-    });
+    );
     return res.status(400).json({
       error: `Invalid settings for ${checkType} evaluator: ${message}`,
     });
@@ -312,9 +318,10 @@ export async function handleEvaluatorCall(
       },
       "invalid evaluation data received",
     );
-    captureException(error, {
-      extra: { projectId: project.id, validationError: message },
-    });
+    captureException(
+      toError(error),
+      { extra: { projectId: project.id, validationError: message } },
+    );
 
     return res.status(400).json({ error: message });
   }
@@ -371,7 +378,7 @@ export async function handleEvaluatorCall(
         occurredAt: Date.now(),
       });
     } catch (eventError) {
-      captureException(eventError, {
+      captureException(toError(eventError), {
         extra: { projectId: project.id, evaluationId, event: "started" },
       });
       logger.error(
@@ -416,11 +423,14 @@ export async function handleEvaluatorCall(
       costId = cost.id;
     }
   } catch (error) {
-    captureException(error, {
-      extra: {
-        projectId: project.id,
+    captureException(
+      toError(error),
+      {
+        extra: {
+          projectId: project.id,
+        },
       },
-    });
+    );
     logger.error(
       {
         err: error,
@@ -458,7 +468,7 @@ export async function handleEvaluatorCall(
               : undefined,
         })
         .catch((eventError: unknown) => {
-          captureException(eventError, {
+          captureException(toError(eventError), {
             extra: { projectId: project.id, evaluationId, event: "completed" },
           });
           logger.error(

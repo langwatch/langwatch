@@ -844,9 +844,8 @@ export class ScenarioEventRepository {
       (id) => typeof id === "string" && id.length > 0,
     );
     if (validBatchRunIds.length !== batchRunIds.length) {
-      captureException({
-        message: "Invalid batchRunIds",
-        batchRunIds,
+      captureException(new Error("Invalid batchRunIds"), {
+        extra: { batchRunIds },
       });
     }
 

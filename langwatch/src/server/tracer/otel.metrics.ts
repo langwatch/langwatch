@@ -2,6 +2,7 @@ import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import type { IExportMetricsServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "~/utils/logger/server";
+import { toError } from "~/utils/posthogErrorCapture";
 import type { DeepPartial } from "~/utils/types";
 import {
   otelAttributesToNestedAttributes,
@@ -342,7 +343,7 @@ export const openTelemetryMetricsRequestToTracesForCollection = async (
           message: error instanceof Error ? error.message : "Unknown error",
         });
         span.recordException(
-          error instanceof Error ? error : new Error(String(error)),
+          toError(error),
         );
         throw error;
       }

@@ -2,7 +2,7 @@ import { type AlertType, AlertType as AlertTypeEnum } from "@prisma/client";
 import { IncomingWebhook } from "@slack/webhook";
 import type { Trace } from "~/server/tracer/types";
 import { env } from "../../env.mjs";
-import { captureException } from "../../utils/posthogErrorCapture";
+import { captureException, toError } from "../../utils/posthogErrorCapture";
 
 interface TriggerData {
   traceId?: string;
@@ -111,6 +111,8 @@ export const sendSlackWebhook = async ({
       icon_emoji: ":robot_face:",
     });
   } catch (err) {
-    captureException(err);
+    captureException(
+      toError(err),
+    );
   }
 };
