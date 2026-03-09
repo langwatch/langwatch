@@ -231,13 +231,10 @@ export const createWebhookService = ({
         throwOnMissing: true,
       });
 
-      const subscriptionRecord =
-        normalizeSelectedCurrency(selectedCurrency) || inviteApprover
-          ? await db.subscription.findUnique({
-              where: { stripeSubscriptionId: subscriptionId },
-              select: { id: true, organizationId: true },
-            })
-          : null;
+      const subscriptionRecord = await db.subscription.findUnique({
+        where: { stripeSubscriptionId: subscriptionId },
+        select: { id: true, organizationId: true },
+      });
 
       const normalizedCurrency = normalizeSelectedCurrency(selectedCurrency);
       if (normalizedCurrency && subscriptionRecord) {
@@ -267,6 +264,21 @@ export const createWebhookService = ({
             "[stripeWebhook] Failed to approve PAYMENT_PENDING invites after checkout, manual resolution may be needed",
           );
         }
+      }
+
+      // Cancel any active trial subscriptions for this org
+      if (subscriptionRecord) {
+        await db.subscription.updateMany({
+          where: {
+            organizationId: subscriptionRecord.organizationId,
+            isTrial: true,
+            status: SubscriptionStatus.ACTIVE,
+          },
+          data: {
+            status: SubscriptionStatus.CANCELLED,
+            endDate: new Date(),
+          },
+        });
       }
 
       return { earlyReturn: false };

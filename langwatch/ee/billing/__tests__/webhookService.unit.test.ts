@@ -115,6 +115,83 @@ describe("webhookService", () => {
           data: { stripeSubscriptionId: "sub_stripe_1" },
         });
       });
+
+      it("cancels active trial subscriptions for the org on checkout completion", async () => {
+        db.subscription.updateMany.mockResolvedValue({ count: 1 });
+        db.subscription.findUnique.mockResolvedValue({
+          id: "sub_db_1",
+          organizationId: "org_123",
+          status: SubscriptionStatus.PENDING,
+        });
+        db.subscription.update.mockResolvedValue({
+          id: "sub_db_1",
+          organizationId: "org_123",
+          organization: { name: "Acme" },
+          plan: "LAUNCH",
+          startDate: new Date(),
+          maxMembers: null,
+          maxMessagesPerMonth: null,
+          status: SubscriptionStatus.ACTIVE,
+        });
+
+        const promise = service.handleCheckoutCompleted({
+          subscriptionId: "sub_stripe_1",
+          clientReferenceId: "subscription_setup_sub_db_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        // Verify trial cancellation was called
+        expect(db.subscription.updateMany).toHaveBeenCalledWith({
+          where: {
+            organizationId: "org_123",
+            isTrial: true,
+            status: SubscriptionStatus.ACTIVE,
+          },
+          data: {
+            status: SubscriptionStatus.CANCELLED,
+            endDate: expect.any(Date),
+          },
+        });
+      });
+
+      it("checkout completion with no trial subscriptions is a no-op for trial cancellation", async () => {
+        // First updateMany (link stripe ID) succeeds, second (trial cancel) matches 0
+        db.subscription.updateMany
+          .mockResolvedValueOnce({ count: 1 })
+          .mockResolvedValueOnce({ count: 0 });
+        db.subscription.findUnique.mockResolvedValue({
+          id: "sub_db_1",
+          organizationId: "org_123",
+          status: SubscriptionStatus.PENDING,
+        });
+        db.subscription.update.mockResolvedValue({
+          id: "sub_db_1",
+          organizationId: "org_123",
+          organization: { name: "Acme" },
+          plan: "LAUNCH",
+          startDate: new Date(),
+          maxMembers: null,
+          maxMessagesPerMonth: null,
+          status: SubscriptionStatus.ACTIVE,
+        });
+
+        const promise = service.handleCheckoutCompleted({
+          subscriptionId: "sub_stripe_1",
+          clientReferenceId: "subscription_setup_sub_db_1",
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        // The trial cancellation updateMany was called but matched 0 rows
+        const trialCancellationCall = db.subscription.updateMany.mock.calls.find(
+          (call: unknown[]) => (call[0] as Record<string, unknown>)?.where &&
+            (((call[0] as Record<string, unknown>).where) as Record<string, unknown>).isTrial === true,
+        );
+        expect(trialCancellationCall).toBeDefined();
+      });
     });
   });
 

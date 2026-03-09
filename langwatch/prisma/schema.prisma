@@ -1130,6 +1130,7 @@ model Subscription {
     maxDashboards         Int?
     maxCustomGraphs       Int?
     maxAutomations        Int?
+    isTrial               Boolean            @default(false)
 
     organization Organization @relation(fields: [organizationId], references: [id])
     invoices     Invoice[]
