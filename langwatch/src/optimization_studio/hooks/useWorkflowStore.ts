@@ -23,7 +23,7 @@ export {
   updateOutputFields,
 } from "./workflowStoreCore";
 
-import { initialState, store, type WorkflowStore } from "./workflowStoreCore";
+import { store, type WorkflowStore } from "./workflowStoreCore";
 
 export const _useWorkflowStore = create<WorkflowStore>()(
   temporal(store, {
