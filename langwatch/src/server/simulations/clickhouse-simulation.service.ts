@@ -750,7 +750,7 @@ export class ClickHouseSimulationService {
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
-       WHERE DeletedAt IS NULL
+       WHERE ArchivedAt IS NULL
        GROUP BY ScenarioSetId, BatchRunId`,
       { tenantId: projectId, batchRunIds },
     );
