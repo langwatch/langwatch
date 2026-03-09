@@ -1,6 +1,7 @@
 import { Box, HStack } from "@chakra-ui/react";
 import { useTheme } from "next-themes";
 import { LuMonitor, LuMoon, LuSun } from "react-icons/lu";
+import { useFeatureFlag } from "../../hooks/useFeatureFlag";
 import { useColorModeValue } from "../ui/color-mode";
 import { MENU_ITEM_HEIGHT } from "./SideMenuLink";
 
@@ -16,12 +17,10 @@ const themeOptions: { value: ThemeOption; icon: React.ReactNode }[] = [
   { value: "dark", icon: <LuMoon size={15} /> },
 ];
 
-// Check if dark mode feature is enabled via build-time env var
-const isDarkModeEnabled =
-  process.env.NEXT_PUBLIC_FEATURE_DARK_MODE === "true" ||
-  process.env.NEXT_PUBLIC_FEATURE_DARK_MODE === "1";
-
 export const ThemeToggle = ({ showLabel = true }: ThemeToggleProps) => {
+  const { enabled: isDarkModeEnabled } = useFeatureFlag(
+    "release_ui_dark_mode_enabled",
+  );
   const { theme, setTheme } = useTheme();
 
   const selectedIndex = themeOptions.findIndex((o) => o.value === theme);

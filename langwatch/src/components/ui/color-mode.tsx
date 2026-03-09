@@ -9,10 +9,12 @@ import { LuMoon, LuSun } from "react-icons/lu";
 
 export const colorSystem = {
   gray: {
-    800: { value: "#090F1D" },
-    700: { value: "#1F2937" },
-    600: { value: "#213B41" },
-    500: { value: "#51676C" },
+    950: { value: "#09090b" },
+    900: { value: "#111113" },
+    800: { value: "#19191d" },
+    700: { value: "#232429" },
+    600: { value: "#2e3038" },
+    500: { value: "#6b6f78" },
     400: { value: "#9CA3AF" },
     375: { value: "#B8BDBD" },
     350: { value: "#DDDDDD" },
@@ -82,16 +84,16 @@ export const colorSystem = {
     900: { value: "#1D4044" },
   },
   blue: {
-    50: { value: "#ebf8ff" },
-    100: { value: "#bee3f8" },
-    200: { value: "#90cdf4" },
-    300: { value: "#63b3ed" },
-    400: { value: "#4299e1" },
-    500: { value: "#3182ce" },
-    600: { value: "#2b6cb0" },
-    700: { value: "#2c5282" },
-    800: { value: "#2a4365" },
-    900: { value: "#1A365D" },
+    50: { value: "#eff6ff" },
+    100: { value: "#dbeafe" },
+    200: { value: "#93b4f8" },
+    300: { value: "#6d9cf5" },
+    400: { value: "#4f87f0" },
+    500: { value: "#3b82f6" },
+    600: { value: "#2563eb" },
+    700: { value: "#1d4ed8" },
+    800: { value: "#1e40af" },
+    900: { value: "#1e3a8a" },
   },
   cyan: {
     50: { value: "#EDFDFD" },
@@ -134,11 +136,6 @@ export const colorSystem = {
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface ColorModeProviderProps extends ThemeProviderProps {}
 
-// Check if dark mode feature is enabled via build-time env var
-const isDarkModeEnabled =
-  process.env.NEXT_PUBLIC_FEATURE_DARK_MODE === "true" ||
-  process.env.NEXT_PUBLIC_FEATURE_DARK_MODE === "1";
-
 export function ColorModeProvider(props: ColorModeProviderProps) {
   // When dark mode feature is disabled, force light mode
   // When enabled, use system preference for automatic light/dark switching
@@ -158,12 +155,11 @@ export function ColorModeProvider(props: ColorModeProviderProps) {
       `}</style>
       <ThemeProvider
         attribute="class"
-        defaultTheme={isDarkModeEnabled ? "system" : "light"}
+        defaultTheme="light"
         disableTransitionOnChange={false}
-        enableSystem={isDarkModeEnabled}
-        enableColorScheme={isDarkModeEnabled}
-        forcedTheme={isDarkModeEnabled ? undefined : "light"}
-        themes={isDarkModeEnabled ? ["light", "dark", "system"] : ["light"]}
+        enableSystem
+        enableColorScheme
+        themes={["light", "dark", "system"]}
         {...props}
       />
     </>

@@ -11,6 +11,7 @@ import {
 import { MIN_SEARCH_QUERY_LENGTH, MIN_CATEGORY_MATCH_LENGTH } from "../constants";
 import { getPlanManagementUrl } from "~/hooks/usePlanManagementUrl";
 import { getPageCommands } from "../pageCommands";
+import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 
 export interface FilteredCommands {
   navigation: Command[];
@@ -28,6 +29,9 @@ export function useFilteredCommands(
   query: string,
   isSaas: boolean | undefined
 ): FilteredCommands {
+  const { enabled: isDarkModeEnabled } = useFeatureFlag(
+    "release_ui_dark_mode_enabled",
+  );
   const filteredNavigation = useMemo(() => {
     if (!query.trim()) return [];
 
@@ -97,9 +101,9 @@ export function useFilteredCommands(
     return filterCommands(availableCommands, query);
   }, [query, isSaas]);
 
-  // Filter theme commands based on query
+  // Filter theme commands based on query (only when dark mode flag is enabled)
   const filteredTheme = useMemo(() => {
-    if (!query.trim() || themeCommands.length === 0) return [];
+    if (!isDarkModeEnabled || !query.trim()) return [];
 
     const lowerQuery = query.toLowerCase().trim();
 
@@ -115,7 +119,7 @@ export function useFilteredCommands(
     }
 
     return filterCommands(themeCommands, query);
-  }, [query]);
+  }, [query, isDarkModeEnabled]);
 
   // Filter page-specific commands based on current route
   const router = useRouter();

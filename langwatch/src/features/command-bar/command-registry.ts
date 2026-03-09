@@ -39,11 +39,6 @@ import {
 } from "lucide-react";
 import type { Command } from "./types";
 
-// Check if dark mode feature is enabled via build-time env var
-const isDarkModeEnabled =
-  process.env.NEXT_PUBLIC_FEATURE_DARK_MODE === "true" ||
-  process.env.NEXT_PUBLIC_FEATURE_DARK_MODE === "1";
-
 /**
  * Static navigation commands that map to main app routes.
  */
@@ -482,36 +477,34 @@ export const supportCommands: Command[] = [
 ];
 
 /**
- * Theme switching commands (only available when dark mode is enabled).
+ * Theme switching commands (only shown when dark mode feature flag is enabled).
  */
-export const themeCommands: Command[] = isDarkModeEnabled
-  ? [
-      {
-        id: "action-theme-light",
-        label: "Light Theme",
-        description: "Switch to light mode",
-        icon: Sun,
-        category: "actions",
-        keywords: ["theme", "light", "mode", "bright", "day"],
-      },
-      {
-        id: "action-theme-dark",
-        label: "Dark Theme",
-        description: "Switch to dark mode",
-        icon: Moon,
-        category: "actions",
-        keywords: ["theme", "dark", "mode", "night"],
-      },
-      {
-        id: "action-theme-system",
-        label: "System Theme",
-        description: "Use system preference",
-        icon: Monitor,
-        category: "actions",
-        keywords: ["theme", "system", "auto", "default"],
-      },
-    ]
-  : [];
+export const themeCommands: Command[] = [
+  {
+    id: "action-theme-light",
+    label: "Light Theme",
+    description: "Switch to light mode",
+    icon: Sun,
+    category: "actions",
+    keywords: ["theme", "light", "mode", "bright", "day"],
+  },
+  {
+    id: "action-theme-dark",
+    label: "Dark Theme",
+    description: "Switch to dark mode",
+    icon: Moon,
+    category: "actions",
+    keywords: ["theme", "dark", "mode", "night"],
+  },
+  {
+    id: "action-theme-system",
+    label: "System Theme",
+    description: "Use system preference",
+    icon: Monitor,
+    category: "actions",
+    keywords: ["theme", "system", "auto", "default"],
+  },
+];
 
 /**
  * Top-level navigation command IDs (shown by default).
