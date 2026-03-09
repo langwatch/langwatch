@@ -3,14 +3,6 @@ Feature: Run Scenario target selector does not close the modal
   I want to select a target from the dropdown inside the Run Scenario modal
   So that I can choose a prompt or agent and then click Run without the modal closing
 
-  # Bug #2130: The TargetSelector dropdown is absolutely positioned above its
-  # trigger button. When clicking a dropdown item, the pointer event propagates
-  # to the Chakra Dialog overlay, which interprets it as an outside click and
-  # closes the entire modal.
-  #
-  # Fix: Prevent click events inside the TargetSelector dropdown from reaching
-  # the Dialog's outside-click handler, so only the dropdown closes on selection.
-
   Background:
     Given the Run Scenario modal is open
     And there is at least one prompt and one agent available

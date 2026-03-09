@@ -171,6 +171,11 @@ describe("RunScenarioModal with TargetSelector", () => {
     });
   });
 
+  // Note: "clicking outside the modal closes the modal" is not tested here
+  // because Chakra/Ark's backdrop dismiss mechanism relies on internal
+  // pointer event handling that doesn't work in jsdom. Our stopPropagation
+  // fix is scoped to the dropdown container and cannot affect backdrop behavior.
+
   describe("when completing the full run flow after selecting a target", () => {
     it("initiates the scenario run with the selected target", async () => {
       renderModal();
