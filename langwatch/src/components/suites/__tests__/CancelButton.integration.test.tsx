@@ -17,6 +17,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { ScenarioTargetRow } from "../ScenarioTargetRow";
+import { ScenarioGridCard } from "../ScenarioGridCard";
 import { RunRow } from "../RunRow";
 import { makeScenarioRunData, makeBatchRun, makeSummary } from "./test-helpers";
 
@@ -149,6 +150,82 @@ describe("<ScenarioTargetRow/> cancel button", () => {
 
       render(
         <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({ status: ScenarioRunStatus.PENDING, durationInMs: 0 })}
+          targetName="Agent"
+          onClick={onClick}
+          onCancel={onCancel}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      await user.click(screen.getByTestId("cancel-run-button"));
+      expect(onCancel).toHaveBeenCalledOnce();
+      expect(onClick).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("<ScenarioGridCard/> cancel button", () => {
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  describe("given a pending scenario run with onCancel", () => {
+    it("displays the cancel button", () => {
+      render(
+        <ScenarioGridCard
+          scenarioRun={makeScenarioRunData({ status: ScenarioRunStatus.PENDING, durationInMs: 0 })}
+          targetName="Agent"
+          onClick={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByTestId("cancel-run-button")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a completed scenario run with onCancel", () => {
+    it("does not display the cancel button", () => {
+      render(
+        <ScenarioGridCard
+          scenarioRun={makeScenarioRunData({ status: ScenarioRunStatus.SUCCESS })}
+          targetName="Agent"
+          onClick={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.queryByTestId("cancel-run-button")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a cancellable run without onCancel prop", () => {
+    it("does not display the cancel button", () => {
+      render(
+        <ScenarioGridCard
+          scenarioRun={makeScenarioRunData({ status: ScenarioRunStatus.PENDING, durationInMs: 0 })}
+          targetName="Agent"
+          onClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.queryByTestId("cancel-run-button")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the cancel button is clicked", () => {
+    it("calls onCancel and does not propagate to card onClick", async () => {
+      const user = userEvent.setup();
+      const onCancel = vi.fn();
+      const onClick = vi.fn();
+
+      render(
+        <ScenarioGridCard
           scenarioRun={makeScenarioRunData({ status: ScenarioRunStatus.PENDING, durationInMs: 0 })}
           targetName="Agent"
           onClick={onClick}

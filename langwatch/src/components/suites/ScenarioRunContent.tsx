@@ -45,6 +45,7 @@ export function ScenarioRunContent({
             targetName={resolveTargetName(scenarioRun)}
             onClick={() => onScenarioRunClick(scenarioRun)}
             iteration={iterationMap.get(scenarioRun.scenarioRunId)}
+            onCancel={onCancelRun ? () => onCancelRun(scenarioRun) : undefined}
           />
         ))}
       </Grid>

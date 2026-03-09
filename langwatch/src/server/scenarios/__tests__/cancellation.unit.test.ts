@@ -110,8 +110,9 @@ describe("ScenarioCancellationService", () => {
         result = await service.cancelJob(defaultJobParams);
       });
 
-      it("marks the job as failed in the queue", () => {
-        expect(mockJob.moveToFailed).toHaveBeenCalled();
+      it("does not attempt to move the job to failed in BullMQ", () => {
+        expect(mockJob.moveToFailed).not.toHaveBeenCalled();
+        expect(mockJob.remove).not.toHaveBeenCalled();
       });
 
       it("persists a cancellation event", () => {
@@ -363,8 +364,9 @@ describe("ScenarioCancellationService", () => {
         expect(waitingJob.remove).toHaveBeenCalled();
       });
 
-      it("moves active jobs to failed in BullMQ", () => {
-        expect(activeJob.moveToFailed).toHaveBeenCalled();
+      it("skips active jobs in BullMQ (no moveToFailed)", () => {
+        expect(activeJob.moveToFailed).not.toHaveBeenCalled();
+        expect(activeJob.remove).not.toHaveBeenCalled();
       });
     });
 
@@ -393,6 +395,34 @@ describe("ScenarioCancellationService", () => {
         });
 
         expect(otherBatchJob.remove).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when batch BullMQ jobs belong to a different project", () => {
+      it("does not touch BullMQ jobs from other projects", async () => {
+        const { deps, mockGetJobs } = createMockDeps();
+
+        const otherProjectJob = createMockBullmqJob({ state: "waiting", batchRunId: "batch1", projectId: "other-project" });
+        mockGetJobs
+          .mockResolvedValueOnce([otherProjectJob])   // waiting
+          .mockResolvedValueOnce([]);                  // active
+
+        deps.simulationService.getRunDataForBatchRun = vi.fn().mockResolvedValue({
+          changed: true,
+          lastUpdatedAt: 0,
+          runs: [
+            { scenarioRunId: "run1", scenarioId: "sc1", batchRunId: "batch1", status: ScenarioRunStatus.PENDING },
+          ],
+        });
+
+        const service = new ScenarioCancellationService(deps);
+        await service.cancelBatchRun({
+          projectId: "proj1",
+          scenarioSetId: "set1",
+          batchRunId: "batch1",
+        });
+
+        expect(otherProjectJob.remove).not.toHaveBeenCalled();
       });
     });
 

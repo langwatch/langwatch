@@ -100,7 +100,7 @@ export class ScenarioCancellationService {
    *
    * - Verifies the BullMQ job belongs to the same project (cross-project auth)
    * - If the job is queued (waiting/delayed): removes it from BullMQ
-   * - If the job is active (running): moves it to failed in BullMQ
+   * - If the job is active (running): skips BullMQ operation (cancellation event still persisted)
    * - If the job is already completed/failed: does nothing (idempotent)
    * - If the BullMQ job doesn't exist: still persists cancellation event
    * - Uses try-catch around BullMQ operations for race condition safety
@@ -130,28 +130,26 @@ export class ScenarioCancellationService {
         return { cancelled: false };
       }
 
-      // Use try-catch for race condition safety: the job may transition
-      // between getState() and the actual operation
-      try {
-        if (state === "active") {
-          await (bullmqJob as Job).moveToFailed(
-            new Error("Cancelled by user"),
-            "0",
-            false,
-          );
-          logger.info({ jobId }, "Active job moved to failed (cancelled)");
-        } else {
-          // Waiting/delayed: remove from queue
+      if (state === "active") {
+        // Active jobs cannot be safely moved to failed without the worker's
+        // lock token. We only persist the cancellation event; the worker will
+        // pick up the cancelled status on its next check.
+        logger.info({ jobId }, "Active job: skipping BullMQ operation, persisting cancellation event only");
+      } else {
+        // Waiting/delayed: remove from queue.
+        // Use try-catch for race condition safety: the job may transition
+        // between getState() and the actual operation.
+        try {
           await (bullmqJob as Job).remove();
           logger.info({ jobId, state }, "Job removed from queue (cancelled)");
+        } catch (error) {
+          // Job may have transitioned between getState() and the operation.
+          // Log the race condition but still persist the cancellation event.
+          logger.warn(
+            { jobId, state, error },
+            "BullMQ operation failed (likely race condition), persisting cancellation event anyway",
+          );
         }
-      } catch (error) {
-        // Job may have transitioned between getState() and the operation.
-        // Log the race condition but still persist the cancellation event.
-        logger.warn(
-          { jobId, state, error },
-          "BullMQ operation failed (likely race condition), persisting cancellation event anyway",
-        );
       }
     } else {
       logger.debug({ jobId }, "BullMQ job not found, persisting cancellation event only");
@@ -197,19 +195,13 @@ export class ScenarioCancellationService {
       return { cancelledCount: 0, skippedCount: 0 };
     }
 
-    // Build a map of BullMQ jobs keyed by batchRunId for quick lookup
-    const bullmqJobsByBatchRunId = new Map<string, Job<ScenarioJob>[]>();
-    for (const job of [...waitingJobs, ...activeJobs]) {
-      const typedJob = job as Job<ScenarioJob>;
-      const jobBatchRunId = typedJob.data?.batchRunId;
-      if (jobBatchRunId) {
-        const existing = bullmqJobsByBatchRunId.get(jobBatchRunId) ?? [];
-        existing.push(typedJob);
-        bullmqJobsByBatchRunId.set(jobBatchRunId, existing);
-      }
-    }
-
-    const batchBullmqJobs = bullmqJobsByBatchRunId.get(batchRunId) ?? [];
+    // Filter BullMQ jobs to this batch AND project (cross-project scoping)
+    const batchBullmqJobs = [...waitingJobs, ...activeJobs].filter(
+      (job): job is Job<ScenarioJob> => {
+        const data = (job as Job<ScenarioJob>).data;
+        return data?.batchRunId === batchRunId && data?.projectId === projectId;
+      },
+    );
 
     const cancellableRuns = batchData.runs.filter((run) =>
       isCancellableStatus(run.status as ScenarioRunStatus),
@@ -259,7 +251,8 @@ export class ScenarioCancellationService {
   }
 
   /**
-   * Cancels BullMQ jobs: removes waiting jobs, moves active jobs to failed.
+   * Cancels BullMQ jobs: removes waiting/delayed jobs, skips active jobs.
+   * Active jobs cannot be safely moved to failed without the worker's lock token.
    * Uses try-catch per job for race condition safety.
    */
   private async cancelBullmqJobs(jobs: Job<ScenarioJob>[]): Promise<void> {
@@ -270,12 +263,12 @@ export class ScenarioCancellationService {
           if (TERMINAL_BULLMQ_STATES.has(state)) return;
 
           if (state === "active") {
-            await job.moveToFailed(new Error("Cancelled by user"), "0", false);
-            logger.info({ jobId: job.id }, "Batch cancel: active job moved to failed");
-          } else {
-            await job.remove();
-            logger.info({ jobId: job.id, state }, "Batch cancel: job removed from queue");
+            logger.info({ jobId: job.id }, "Batch cancel: active job skipped in BullMQ");
+            return;
           }
+
+          await job.remove();
+          logger.info({ jobId: job.id, state }, "Batch cancel: job removed from queue");
         } catch (error) {
           logger.warn(
             { jobId: job.id, error },
