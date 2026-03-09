@@ -218,7 +218,7 @@ export function PlansComparisonPage({
   pricingModel,
 }: PlansComparisonPageProps) {
   const currentPlan = resolveCurrentComparisonPlan(activePlan);
-  const showTieredNotice = pricingModel === "TIERED";
+  const showTieredNotice = pricingModel === "TIERED" && !activePlan?.free;
 
   const detectedCurrency = api.currency.detectCurrency.useQuery({});
   const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(null);
