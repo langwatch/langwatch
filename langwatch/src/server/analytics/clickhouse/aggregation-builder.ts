@@ -486,18 +486,18 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
 
   // Pipeline metrics with numeric timeScale: use date-bucketed two-level aggregation
   if (subqueryMetrics.length > 0 && typeof input.timeScale === "number") {
-    return buildDateBucketedPipelineQuery(
+    return buildDateBucketedPipelineQuery({
       input,
-      subqueryMetrics,
+      pipelineMetrics: subqueryMetrics,
       groupByColumn,
       groupByHandlesUnknown,
       groupByAdditionalWhere,
       joinClauses,
       baseWhere,
       filterWhere,
-      allTranslationParams,
+      filterParams: allTranslationParams,
       timeZone,
-    );
+    });
   }
 
   // Build SELECT expressions for standard query
@@ -922,18 +922,29 @@ function buildSubqueryTimeseriesQuery(
  *
  * Output rows: period, date, [group_key,] <metric_alias>
  */
-function buildDateBucketedPipelineQuery(
-  input: TimeseriesQueryInput,
-  pipelineMetrics: MetricTranslation[],
-  groupByColumn: string | null,
-  groupByHandlesUnknown: boolean,
-  groupByAdditionalWhere: string | undefined,
-  joinClauses: string,
-  baseWhere: string,
-  filterWhere: string,
-  filterParams: Record<string, unknown>,
-  timeZone: string,
-): BuiltQuery {
+function buildDateBucketedPipelineQuery({
+  input,
+  pipelineMetrics,
+  groupByColumn,
+  groupByHandlesUnknown,
+  groupByAdditionalWhere,
+  joinClauses,
+  baseWhere,
+  filterWhere,
+  filterParams,
+  timeZone,
+}: {
+  input: TimeseriesQueryInput;
+  pipelineMetrics: MetricTranslation[];
+  groupByColumn: string | null;
+  groupByHandlesUnknown: boolean;
+  groupByAdditionalWhere: string | undefined;
+  joinClauses: string;
+  baseWhere: string;
+  filterWhere: string;
+  filterParams: Record<string, unknown>;
+  timeZone: string;
+}): BuiltQuery {
   const ts = tableAliases.trace_summaries;
   const dateTrunc = getDateTruncFunction(
     input.timeScale as number,

@@ -8,16 +8,20 @@ import { StorageService } from "../../storage";
 
 const storageService = new StorageService();
 
-const createDatasetRecords = (
-  entries: DatasetRecordInput[],
-  { datasetId, projectId }: { datasetId: string; projectId: string },
+const createDatasetRecords = ({
+  entries,
+  datasetId,
+  projectId,
   useS3 = false,
-) => {
+}: {
+  entries: DatasetRecordInput[];
+  datasetId: string;
+  projectId: string;
+  useS3?: boolean;
+}) => {
   return entries.map((entry, index) => {
-    const id = entry.id ?? nanoid();
-    const entryWithoutId: Omit<typeof entry, "id"> = { ...entry };
-    // @ts-ignore
-    delete entryWithoutId.id;
+    const { id: entryId, ...entryWithoutId } = entry;
+    const id = entryId ?? nanoid();
 
     const record = {
       id,
@@ -61,14 +65,12 @@ export const createManyDatasetRecords = async ({
   }
 
   if (dataset.useS3) {
-    const recordData = createDatasetRecords(
-      datasetRecords,
-      {
-        datasetId,
-        projectId,
-      },
-      true,
-    );
+    const recordData = createDatasetRecords({
+      entries: datasetRecords,
+      datasetId,
+      projectId,
+      useS3: true,
+    });
 
     let existingRecords: any[] = [];
     try {
@@ -100,7 +102,8 @@ export const createManyDatasetRecords = async ({
 
     return { success: true };
   } else {
-    const recordData = createDatasetRecords(datasetRecords, {
+    const recordData = createDatasetRecords({
+      entries: datasetRecords,
       datasetId,
       projectId,
     });
@@ -180,7 +183,7 @@ export const getFullDataset = async ({
       );
       records = recordsFromStorage;
 
-      while (!truncated) {
+      do {
         const batch = records.slice(
           currentPage * BATCH_SIZE,
           (currentPage + 1) * BATCH_SIZE,
@@ -198,9 +201,9 @@ export const getFullDataset = async ({
         truncated = batchTruncated;
         totalSize = newTotalSize;
 
-        if (truncated || batch.length < BATCH_SIZE) break;
+        if (batch.length < BATCH_SIZE) break;
         currentPage++;
-      }
+      } while (!truncated);
 
       return {
         ...dataset,
@@ -250,7 +253,7 @@ export const getFullDataset = async ({
     const BATCH_SIZE = 500;
 
     // Fetch records in batches
-    while (!truncated) {
+    do {
       const records = await prisma.datasetRecord.findMany({
         where: { datasetId, projectId },
         orderBy: { createdAt: "asc" },
@@ -270,9 +273,9 @@ export const getFullDataset = async ({
       truncated = batchTruncated;
       totalSize = newTotalSize;
 
-      if (truncated || records.length < BATCH_SIZE) break;
+      if (records.length < BATCH_SIZE) break;
       currentPage++;
-    }
+    } while (!truncated);
 
     return {
       ...dataset,
