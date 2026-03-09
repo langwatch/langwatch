@@ -2,10 +2,7 @@ import { test } from "@playwright/test";
 import {
   givenIAmLoggedIntoProject,
   givenIAmOnTheScenariosListPage,
-  whenIClickNewScenario,
-  whenIFillInNameWith,
-  whenIFillInSituationWith,
-  whenIClickSave,
+  createScenarios,
   thenScenarioAppearsInList,
   whenIOpenRowActionMenuFor,
   whenIClickArchiveInMenu,
@@ -53,15 +50,7 @@ test.describe("Scenario Archive", () => {
       "HTTP troubleshooting request",
     ];
 
-    for (const name of scenarios) {
-      await whenIClickNewScenario(page);
-      await whenIFillInNameWith(page, name);
-      await whenIFillInSituationWith(page, "Test situation for archive e2e");
-      await whenIClickSave(page);
-
-      await givenIAmOnTheScenariosListPage(page);
-      await thenScenarioAppearsInList(page, name);
-    }
+    await createScenarios(page, scenarios, "Test situation for archive e2e");
 
     // Archive "Angry double-charge refund"
     await whenIOpenRowActionMenuFor(page, "Angry double-charge refund");
@@ -96,15 +85,7 @@ test.describe("Scenario Archive", () => {
       "Batch-Angry double-charge refund",
     ];
 
-    for (const name of scenarios) {
-      await whenIClickNewScenario(page);
-      await whenIFillInNameWith(page, name);
-      await whenIFillInSituationWith(page, "Test situation for batch archive e2e");
-      await whenIClickSave(page);
-
-      await givenIAmOnTheScenariosListPage(page);
-      await thenScenarioAppearsInList(page, name);
-    }
+    await createScenarios(page, scenarios, "Test situation for batch archive e2e");
 
     // Selection: Select 2 scenarios
     await whenISelectCheckboxFor(page, "Batch-Cross-doc synthesis question");

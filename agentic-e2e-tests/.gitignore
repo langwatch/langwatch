@@ -8,5 +8,8 @@ playwright-report/
 # Auth state (contains session tokens)
 .auth/
 
+# Debug screenshots
+debug-*.png
+
 # OS files
 .DS_Store

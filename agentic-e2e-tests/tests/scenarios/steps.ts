@@ -386,6 +386,26 @@ export function getScenarioSetIdFromUrl(page: Page): string {
 }
 
 // =============================================================================
+// Scenario Setup Helpers
+// =============================================================================
+
+/**
+ * Create multiple scenarios via the UI
+ * Navigates to the scenarios list, creates each scenario, and verifies it appears
+ */
+export async function createScenarios(page: Page, names: string[], situation: string) {
+  for (const name of names) {
+    await whenIClickNewScenario(page);
+    await whenIFillInNameWith(page, name);
+    await whenIFillInSituationWith(page, situation);
+    await whenIClickSave(page);
+
+    await givenIAmOnTheScenariosListPage(page);
+    await thenScenarioAppearsInList(page, name);
+  }
+}
+
+// =============================================================================
 // Scenario Archive Steps
 // =============================================================================
 
@@ -402,7 +422,7 @@ export async function whenIOpenRowActionMenuFor(page: Page, name: string) {
 export async function whenIClickArchiveInMenu(page: Page) {
   // Wait for menu to be visible before clicking
   // Filter by visible text to avoid stale elements from closed menus
-  const archiveOption = page.getByText("Archive", { exact: true }).filter({ hasText: /^Archive$/ });
+  const archiveOption = page.getByText("Archive", { exact: true });
   await expect(archiveOption.first()).toBeVisible({ timeout: 5000 });
   await archiveOption.first().click();
 }
@@ -422,11 +442,13 @@ export async function thenISeeArchiveConfirmationModal(page: Page, name: string)
  * When I confirm the archival
  */
 export async function whenIConfirmArchival(page: Page) {
+  const archiveResponsePromise = page.waitForResponse(
+    (resp) => resp.url().includes("/api/trpc/") && resp.url().includes("scenarioSet") && resp.ok()
+  );
   await page.getByRole("button", { name: "Archive" }).last().click();
-  // Wait for dialog to close
+  await archiveResponsePromise;
+  // Wait for dialog to close after backend confirms
   await expect(page.getByText(/Archive.*scenario/).last()).not.toBeVisible({ timeout: 10000 });
-  // Wait a moment for the backend to process and UI to update
-  await page.waitForTimeout(1000);
 }
 
 /**

@@ -1,12 +1,12 @@
 # E2E test environment — extends compose.dev.yml with test-specific overrides
 #
-# Usage (from agentic-e2e-tests/ directory):
-#   docker compose up -d          # Start everything including app
-#   pnpm test                     # Run tests against localhost:5570
-#   docker compose down           # Stop all services
+# Usage from repo root:
+#   make test-e2e          # Full lifecycle: infra + migrate + build + test + teardown
+#   make test-e2e-up       # Start infrastructure only
+#   make test-e2e-down     # Stop infrastructure
 #
-# Shares node_modules and pnpm store volumes with dev for fast startup.
 # Uses isolated DB (testdb), isolated ports, and test-specific env vars.
+# See agentic-e2e-tests/README.md for full documentation.
 
 include:
   - path: ../compose.dev.yml
@@ -28,7 +28,7 @@ services:
       NEXTAUTH_URL: http://localhost:5570
       SKIP_CLICKHOUSE_MIGRATE: "true"
 
-  # Override postgres: use testdb instead of mydb
+  # Override postgres: use testdb instead of mydb, expose on host port 5433
   postgres:
     environment:
       POSTGRES_DB: testdb
@@ -42,23 +42,13 @@ services:
       timeout: 5s
       retries: 5
 
-  # Override redis: different host port
+  # Override redis: expose on host port 6380
   redis:
     ports:
       - "6380:6379"
 
-  # Override opensearch: different host port, enable for e2e
+  # Override opensearch: expose on host port 9201
   opensearch:
     ports:
       - "9201:9200"
       - "9601:9600"
-
-  # Enable NLP for e2e
-  langwatch_nlp:
-    ports:
-      - "5563:5561"
-
-  # Enable langevals for e2e
-  langevals:
-    ports:
-      - "5564:5562"
