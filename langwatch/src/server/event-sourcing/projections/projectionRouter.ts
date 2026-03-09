@@ -11,6 +11,7 @@ import {
   observeEsReactorDuration,
   withMetrics,
 } from "~/server/metrics";
+import { toError } from "~/utils/posthogErrorCapture";
 import type { AggregateType } from "../domain/aggregateType";
 import type { Event, Projection } from "../domain/types";
 import type { KillSwitchOptions } from "../pipeline/staticBuilder.types";
@@ -392,7 +393,7 @@ export class ProjectionRouter<
             if (e instanceof AggregateError) {
               errors.push(...(e.errors as Error[]));
             } else {
-              errors.push(e instanceof Error ? e : new Error(String(e)));
+              errors.push(toError(e));
             }
           }
         }
@@ -405,7 +406,7 @@ export class ProjectionRouter<
             if (e instanceof AggregateError) {
               errors.push(...(e.errors as Error[]));
             } else {
-              errors.push(e instanceof Error ? e : new Error(String(e)));
+              errors.push(toError(e));
             }
           }
         }
@@ -448,7 +449,7 @@ export class ProjectionRouter<
               },
               "Failed to dispatch batch of events to fold projection queue",
             );
-            errors.push(error instanceof Error ? error : new Error(String(error)));
+            errors.push(toError(error));
           }
         }
       }
@@ -473,7 +474,7 @@ export class ProjectionRouter<
               aggregateId: String(event.aggregateId),
               tenantId: context.tenantId,
             });
-            errors.push(error instanceof Error ? error : new Error(String(error)));
+            errors.push(toError(error));
           }
         }
       }
@@ -532,7 +533,7 @@ export class ProjectionRouter<
               },
               "Failed to dispatch batch of events to map projection queue",
             );
-            errors.push(error instanceof Error ? error : new Error(String(error)));
+            errors.push(toError(error));
           }
         }
       }
@@ -577,7 +578,7 @@ export class ProjectionRouter<
               aggregateId: String(event.aggregateId),
               tenantId: event.tenantId,
             });
-            errors.push(error instanceof Error ? error : new Error(String(error)));
+            errors.push(toError(error));
           }
         }
       }
@@ -825,7 +826,7 @@ export class ProjectionRouter<
               },
               "Failed to dispatch event to reactor queue",
             );
-            errors.push(error instanceof Error ? error : new Error(String(error)));
+            errors.push(toError(error));
           }
         } else {
           // Queue expected but not found — fall back to inline execution
@@ -860,7 +861,7 @@ export class ProjectionRouter<
               },
               "Reactor failed during inline fallback execution",
             );
-            errors.push(error instanceof Error ? error : new Error(String(error)));
+            errors.push(toError(error));
           }
         }
       } else {
@@ -888,7 +889,7 @@ export class ProjectionRouter<
             },
             "Reactor failed during inline execution — fold state persisted in CH but reactor side-effect (e.g. ES sync) was lost",
           );
-          errors.push(error instanceof Error ? error : new Error(String(error)));
+          errors.push(toError(error));
         }
       }
     }
