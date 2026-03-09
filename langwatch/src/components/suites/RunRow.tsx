@@ -9,7 +9,7 @@
  */
 
 import { Box, HStack, Text } from "@chakra-ui/react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, X } from "lucide-react";
 import { useMemo } from "react";
 import { SummaryStatusIcon } from "./SummaryStatusIcon";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
@@ -17,6 +17,7 @@ import type { BatchRun, BatchRunSummary } from "./run-history-transforms";
 import { computeIterationMap, getScenarioDisplayNames } from "./run-history-transforms";
 import { ScenarioRunContent } from "./ScenarioRunContent";
 import { RunSummaryFooter } from "./RunSummaryFooter";
+import { isCancellableStatus } from "./useCancelScenarioRun";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import type { ViewMode } from "./useRunHistoryStore";
 
@@ -30,6 +31,8 @@ type RunRowProps = {
   expectedJobCount?: number;
   suiteName?: string;
   viewMode?: ViewMode;
+  onCancelRun?: (scenarioRun: ScenarioRunData) => void;
+  onCancelAll?: () => void;
 };
 
 export function RunRow({
@@ -42,6 +45,8 @@ export function RunRow({
   expectedJobCount,
   suiteName,
   viewMode = "grid",
+  onCancelRun,
+  onCancelAll,
 }: RunRowProps) {
   const timeAgo = formatTimeAgoCompact(batchRun.timestamp);
   const scenarioNames = suiteName
@@ -50,6 +55,11 @@ export function RunRow({
 
   const iterationMap = useMemo(
     () => computeIterationMap({ scenarioRuns: batchRun.scenarioRuns }),
+    [batchRun.scenarioRuns],
+  );
+
+  const hasCancellableRuns = useMemo(
+    () => batchRun.scenarioRuns.some((run) => isCancellableStatus(run.status)),
     [batchRun.scenarioRuns],
   );
 
@@ -111,6 +121,37 @@ export function RunRow({
           </Text>
         )}
         <Box flex={1} />
+        {onCancelAll && hasCancellableRuns && (
+          <HStack
+            as="span"
+            role="button"
+            tabIndex={0}
+            gap={1}
+            paddingX={2}
+            paddingY={0.5}
+            borderRadius="sm"
+            fontSize="xs"
+            color="red.500"
+            cursor="pointer"
+            _hover={{ bg: "red.50" }}
+            onClick={(e: React.MouseEvent) => {
+              e.stopPropagation();
+              onCancelAll();
+            }}
+            onKeyDown={(e: React.KeyboardEvent) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.stopPropagation();
+                e.preventDefault();
+                onCancelAll();
+              }
+            }}
+            aria-label="Cancel all remaining runs"
+            data-testid="cancel-all-button"
+          >
+            <X size={12} />
+            <Text fontSize="xs">Cancel All</Text>
+          </HStack>
+        )}
         <SummaryStatusIcon summary={summary} />
         <Text
           fontSize="sm"
@@ -130,6 +171,7 @@ export function RunRow({
             resolveTargetName={resolveTargetName}
             onScenarioRunClick={onScenarioRunClick}
             iterationMap={iterationMap}
+            onCancelRun={onCancelRun}
           />
           {batchRun.scenarioRuns.length === 0 && (
             <Text fontSize="sm" color="fg.muted" paddingX={4} paddingY={3}>
