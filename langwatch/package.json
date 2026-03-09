@@ -279,7 +279,6 @@
     "jsdom": "^27.3.0",
     "node-mocks-http": "^1.17.2",
     "playwright": "1.57.0",
-    "prettier": "^3.8.1",
     "prisma": "5.7.0",
     "raw-loader": "^4.0.2",
     "sass": "^1.97.3",
