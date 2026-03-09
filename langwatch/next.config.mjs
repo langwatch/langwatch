@@ -141,11 +141,10 @@ const config = {
     ];
   },
 
-  // Disable minification for debugging production TDZ errors
-  swcMinify: false,
+  // Enable browser source maps for debugging production TDZ errors
+  productionBrowserSourceMaps: true,
 
   webpack: (config) => {
-    config.optimization.minimize = false;
     config.resolve.alias["@injected-dependencies.client"] = path.join(
       aliasPath,
       "injection.client.ts",
