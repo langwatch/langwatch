@@ -1,8 +1,9 @@
 import { SpanKind } from "@opentelemetry/api";
 import type { Prisma, PrismaClient, Scenario } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 import { createLogger } from "~/utils/logger/server";
+import { KSUID_RESOURCES } from "~/utils/constants";
 
 const tracer = getLangWatchTracer("langwatch.scenarios.repository");
 const logger = createLogger("langwatch:scenarios:repository");
@@ -35,7 +36,7 @@ export class ScenarioRepository {
         logger.debug({ projectId: input.projectId, operation: "INSERT" }, "Inserting scenario");
         const result = await this.prisma.scenario.create({
           data: {
-            id: `scen_${nanoid()}`,
+            id: generate(KSUID_RESOURCES.SCENARIO).toString(),
             ...input,
           },
         });
