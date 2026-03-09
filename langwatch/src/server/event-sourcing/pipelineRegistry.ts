@@ -1,6 +1,6 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { PrismaClient } from "@prisma/client";
-import { prepareLitellmParams } from "~/server/api/routers/modelProviders";
+import { prepareLitellmParams } from "~/server/api/routers/modelProviders.utils";
 import { getProjectEmbeddingsModel } from "~/server/embeddings";
 import { OPENAI_EMBEDDING_DIMENSION } from "~/utils/constants";
 import { createLogger } from "~/utils/logger/server";

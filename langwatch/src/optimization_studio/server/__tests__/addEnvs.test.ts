@@ -23,7 +23,7 @@ import { decrypt } from "../../../utils/encryption";
 import {
   getProjectModelProviders,
   prepareLitellmParams,
-} from "../../../server/api/routers/modelProviders";
+} from "../../../server/api/routers/modelProviders.utils";
 import { addEnvs } from "../addEnvs";
 
 const PROJECT_ID = "project-123";

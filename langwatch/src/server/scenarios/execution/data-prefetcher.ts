@@ -19,7 +19,7 @@ const logger = createLogger("langwatch:scenarios:data-prefetcher");
 import {
   getProjectModelProviders,
   prepareLitellmParams,
-} from "../../api/routers/modelProviders";
+} from "../../api/routers/modelProviders.utils";
 import { AgentRepository, type TypedAgent } from "../../agents/agent.repository";
 import { prisma } from "../../db";
 import { PromptService, type VersionedPrompt } from "../../prompt-config/prompt.service";

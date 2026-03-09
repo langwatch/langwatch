@@ -405,8 +405,9 @@ vi.mock("../../ui/TabContext", () => ({
 // Mock CopilotKit
 vi.mock("@copilotkit/react-core", () => ({
   CopilotKit: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  useCopilotChatInternal: () => ({
+  useCopilotChat: () => ({
     visibleMessages: [],
+    appendMessage: vi.fn(),
     setMessages: vi.fn(),
     isLoading: false,
   }),

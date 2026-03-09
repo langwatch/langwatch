@@ -7,7 +7,7 @@ import { hasProjectPermission } from "../../../server/api/rbac";
 import {
   getProjectModelProviders,
   prepareLitellmParams,
-} from "../../../server/api/routers/modelProviders";
+} from "../../../server/api/routers/modelProviders.utils";
 import { authOptions } from "../../../server/auth";
 import { prisma } from "../../../server/db";
 
