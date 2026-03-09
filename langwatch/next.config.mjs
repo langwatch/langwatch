@@ -141,7 +141,11 @@ const config = {
     ];
   },
 
+  // Disable minification for debugging production TDZ errors
+  swcMinify: false,
+
   webpack: (config) => {
+    config.optimization.minimize = false;
     config.resolve.alias["@injected-dependencies.client"] = path.join(
       aliasPath,
       "injection.client.ts",
