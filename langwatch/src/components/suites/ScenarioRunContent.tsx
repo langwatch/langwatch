@@ -30,6 +30,7 @@ type ScenarioRunContentProps = {
   resolveTargetName: (scenarioRun: ScenarioRunData) => string | null;
   onScenarioRunClick: (scenarioRun: ScenarioRunData) => void;
   iterationMap: Map<string, number>;
+  onCancelRun?: (scenarioRun: ScenarioRunData) => void;
 };
 
 /**
@@ -76,6 +77,7 @@ function PlainContent({
   resolveTargetName,
   onScenarioRunClick,
   iterationMap,
+  onCancelRun,
 }: ScenarioRunContentProps) {
   if (viewMode === "grid") {
     return (
@@ -109,6 +111,7 @@ function PlainContent({
           targetName={resolveTargetName(scenarioRun)}
           onClick={() => onScenarioRunClick(scenarioRun)}
           iteration={iterationMap.get(scenarioRun.scenarioRunId)}
+          onCancel={onCancelRun ? () => onCancelRun(scenarioRun) : undefined}
         />
       ))}
     </VStack>
