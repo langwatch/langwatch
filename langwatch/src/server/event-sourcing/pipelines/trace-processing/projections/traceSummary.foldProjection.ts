@@ -145,6 +145,17 @@ function parseJsonStringArray(raw: string | undefined): string[] {
   }
 }
 
+function parseJsonArray(raw: string | undefined): unknown[] {
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed;
+  } catch {
+    return [];
+  }
+}
+
 const isValidTimestamp = (ts: number | undefined | null): ts is number =>
   typeof ts === "number" && ts > 0 && Number.isFinite(ts);
 
@@ -342,6 +353,13 @@ function extractAttributes(span: NormalizedSpan): Record<string, string> {
       result[key] =
         typeof value === "object" ? JSON.stringify(value) : String(value);
     }
+  }
+
+  // Evaluations: forward the JSON-stringified array from canonicalization
+  const rawEvaluations =
+    spanAttrs[ATTR_KEYS.LANGWATCH_RESERVED_EVALUATIONS];
+  if (typeof rawEvaluations === "string") {
+    result[ATTR_KEYS.LANGWATCH_RESERVED_EVALUATIONS] = rawEvaluations;
   }
 
   return result;
@@ -714,6 +732,38 @@ function accumulateAttributes({
       }
     } catch {
       /* not JSON — keep first-wins */
+    }
+  }
+
+  // Evaluations: merge (union) across spans, dedup by evaluation_id.
+  // Uses first-wins semantics: the fold projection processes spans in arrival
+  // order, and once an evaluation_id is recorded it stays stable. This is
+  // intentionally different from the legacy `mapEvaluations` last-wins
+  // approach — in the fold model, accumulated state is the source of truth.
+  const existingEvals =
+    state.attributes[ATTR_KEYS.LANGWATCH_RESERVED_EVALUATIONS];
+  const newEvals = spanAttrs[ATTR_KEYS.LANGWATCH_RESERVED_EVALUATIONS];
+  if (existingEvals || newEvals) {
+    const prev = parseJsonArray(existingEvals);
+    const next = parseJsonArray(newEvals);
+    const seen = new Set<string>();
+    const union: unknown[] = [];
+    for (const e of [...prev, ...next]) {
+      // Dedup by evaluation_id if present, otherwise fall back to JSON hash
+      // to prevent unbounded growth when spans are reprocessed.
+      let id: string | undefined;
+      if (typeof e === "object" && e !== null && "evaluation_id" in e) {
+        id = (e as { evaluation_id: string }).evaluation_id;
+      } else if (typeof e === "object" && e !== null) {
+        try { id = `__hash:${JSON.stringify(e)}`; } catch { /* skip dedup */ }
+      }
+      if (id && seen.has(id)) continue;
+      if (id) seen.add(id);
+      union.push(e);
+    }
+    if (union.length > 0) {
+      merged[ATTR_KEYS.LANGWATCH_RESERVED_EVALUATIONS] =
+        JSON.stringify(union);
     }
   }
 

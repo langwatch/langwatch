@@ -128,4 +128,91 @@ describe("applySpanToSummary attribute forwarding", () => {
       expect(state.attributes["gen_ai.agent.name"]).toBe("first-agent");
     });
   });
+
+  describe("when span has langwatch.reserved.evaluations", () => {
+    it("forwards evaluations to trace summary attributes", () => {
+      const evaluations = [
+        { name: "toxicity", score: 0.1, passed: true },
+      ];
+      const span = createTestSpan({
+        spanAttributes: {
+          "langwatch.reserved.evaluations": JSON.stringify(evaluations),
+        },
+      });
+
+      const state = applySpanToSummary({ state: createInitState(), span });
+
+      expect(
+        JSON.parse(state.attributes["langwatch.reserved.evaluations"]!),
+      ).toEqual(evaluations);
+    });
+  });
+
+  describe("when multiple spans have evaluations", () => {
+    it("merges evaluations from different spans", () => {
+      const evals1 = [{ name: "toxicity", score: 0.1 }];
+      const evals2 = [{ name: "relevance", score: 0.9 }];
+
+      const span1 = createTestSpan({
+        spanAttributes: {
+          "langwatch.reserved.evaluations": JSON.stringify(evals1),
+        },
+      });
+      const span2 = createTestSpan({
+        id: "span-2",
+        spanId: "span-2",
+        spanAttributes: {
+          "langwatch.reserved.evaluations": JSON.stringify(evals2),
+        },
+      });
+
+      let state = applySpanToSummary({ state: createInitState(), span: span1 });
+      state = applySpanToSummary({ state, span: span2 });
+
+      const merged = JSON.parse(
+        state.attributes["langwatch.reserved.evaluations"]!,
+      );
+      expect(merged).toHaveLength(2);
+      expect(merged).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ name: "toxicity" }),
+          expect.objectContaining({ name: "relevance" }),
+        ]),
+      );
+    });
+
+    it("deduplicates evaluations by evaluation_id", () => {
+      const evals1 = [
+        { evaluation_id: "eval-1", name: "toxicity", score: 0.1 },
+      ];
+      const evals2 = [
+        { evaluation_id: "eval-1", name: "toxicity", score: 0.2 },
+        { evaluation_id: "eval-2", name: "relevance", score: 0.9 },
+      ];
+
+      const span1 = createTestSpan({
+        spanAttributes: {
+          "langwatch.reserved.evaluations": JSON.stringify(evals1),
+        },
+      });
+      const span2 = createTestSpan({
+        id: "span-2",
+        spanId: "span-2",
+        spanAttributes: {
+          "langwatch.reserved.evaluations": JSON.stringify(evals2),
+        },
+      });
+
+      let state = applySpanToSummary({ state: createInitState(), span: span1 });
+      state = applySpanToSummary({ state, span: span2 });
+
+      const merged = JSON.parse(
+        state.attributes["langwatch.reserved.evaluations"]!,
+      );
+      expect(merged).toHaveLength(2);
+      expect(merged.map((e: { evaluation_id?: string; name: string }) => e.evaluation_id ?? e.name)).toEqual(
+        expect.arrayContaining(["eval-1", "eval-2"]),
+      );
+    });
+  });
 });

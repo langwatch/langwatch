@@ -7,7 +7,6 @@ import {
 } from "../../../../server/evaluations/preconditions";
 import type { CheckPreconditions } from "../../../../server/evaluations/types";
 import { createLogger } from "../../../../utils/logger/server";
-import { slugify } from "../../../../utils/slugify";
 import { prisma } from "../../../db";
 import type { ElasticSearchEvaluation, Span } from "../../../tracer/types";
 import { elasticSearchEvaluationSchema } from "../../../tracer/types.generated";
@@ -16,13 +15,9 @@ import type { CollectorJob, EvaluationJob } from "../../types";
 
 const _logger = createLogger("langwatch:workers:collector:evaluations");
 
-export const evaluationNameAutoslug = (name: string) => {
-  const autoslug = slugify(name || "unnamed", {
-    lower: true,
-    strict: true,
-  }).replace(/[^a-z0-9]/g, "_");
-  return `customeval_${autoslug}`;
-};
+// Re-export from extracted module for backwards compatibility
+import { evaluationNameAutoslug } from "./evaluationNameAutoslug";
+export { evaluationNameAutoslug };
 
 export const mapEvaluations = (
   data: CollectorJob,
