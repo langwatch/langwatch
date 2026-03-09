@@ -128,6 +128,7 @@ export function TargetSelector({
         minWidth="240px"
         justifyContent="space-between"
         onClick={handleToggle}
+        data-testid="target-selector-trigger"
       >
         <HStack gap={2}>
           {value?.type === "prompt" && <BookText size={14} />}
@@ -152,6 +153,8 @@ export function TargetSelector({
           boxShadow="lg"
           zIndex={10}
           overflow="hidden"
+          onPointerDown={(e) => e.stopPropagation()}
+          data-testid="target-selector-dropdown"
         >
           {/* Search Input */}
           <Box
