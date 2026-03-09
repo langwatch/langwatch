@@ -66,7 +66,7 @@
     "@aws-sdk/client-bedrock-runtime": "^3.721.0",
     "@aws-sdk/client-cloudwatch-logs": "^3.987.0",
     "@aws-sdk/client-lambda": "^3.989.0",
-    "@aws-sdk/client-s3": "^3.750.0",
+    "@aws-sdk/client-s3": "^3.894.0",
     "@aws-sdk/client-ses": "^3.645.0",
     "@bull-board/api": "^6.16.2",
     "@bull-board/hono": "^6.16.2",
