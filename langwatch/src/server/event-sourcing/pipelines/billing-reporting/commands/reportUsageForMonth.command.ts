@@ -5,6 +5,7 @@ import { defineCommandSchema } from "../../../";
 import { createLogger } from "~/utils/logger/server";
 import {
   captureException,
+  toError,
   withScope,
 } from "~/utils/posthogErrorCapture";
 import { GROWTH_SEAT_PLAN_TYPES } from "../../../../../../ee/billing/utils/growthSeatEvent";
@@ -183,7 +184,7 @@ export function createReportUsageForMonthCommandClass(
           scope.setTag?.("handler", "reportUsageForMonth");
           scope.setExtra?.("organizationId", organizationId);
           scope.setExtra?.("billingMonth", billingMonth);
-          captureException(error);
+          captureException(toError(error));
         });
         return [];
       }
