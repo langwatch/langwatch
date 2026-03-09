@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { z } from "zod";
 import { fromZodError, type ZodError } from "zod-validation-error";
-import { getAllForProjectInput } from "../../../server/api/routers/traces";
+import { getAllForProjectInput } from "../../../server/api/routers/traces.schemas";
 import { getProtectionsForProject } from "../../../server/api/utils";
 import { prisma } from "../../../server/db";
 import type { LLMModeTrace, Span, Trace } from "../../../server/tracer/types";

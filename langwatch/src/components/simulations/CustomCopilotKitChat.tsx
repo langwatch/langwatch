@@ -1,5 +1,5 @@
 import { VStack } from "@chakra-ui/react";
-import { CopilotKit, useCopilotChatInternal } from "@copilotkit/react-core";
+import { CopilotKit, useCopilotChat } from "@copilotkit/react-core";
 import { CopilotChat } from "@copilotkit/react-ui";
 import {
   type ActionExecutionMessage,
@@ -55,7 +55,7 @@ function CustomCopilotKitChatInner({
   hideInput,
 }: CustomCopilotKitChatInnerProps) {
   const { project } = useOrganizationTeamProject();
-  const { setMessages } = useCopilotChatInternal({
+  const { setMessages } = useCopilotChat({
     headers: {
       "X-Auth-Token": project?.apiKey ?? "",
     },
@@ -104,7 +104,7 @@ function CustomCopilotKitChatInner({
 
   return (
     <CopilotChat
-      RenderTextMessage={({ message, UserMessage, ImageRenderer }) => {
+      RenderTextMessage={({ message, UserMessage }) => {
         const message_ = message as TextMessage;
         const traceId = traceIdMap.get(message_.id);
 
@@ -116,16 +116,8 @@ function CustomCopilotKitChatInner({
             {message_.role === Role.Assistant && (
               <Markdown className="markdown">{message_.content}</Markdown>
             )}
-            {UserMessage && ImageRenderer && message_.role === Role.User && (
-              <UserMessage
-                message={{
-                  id: message_.id,
-                  role: "user" as const,
-                  content: message_.content,
-                }}
-                ImageRenderer={ImageRenderer}
-                rawData={message}
-              />
+            {UserMessage && message_.role === Role.User && (
+              <UserMessage message={message_.content} rawData={message} />
             )}
             {!smallerView &&
               traceId &&
