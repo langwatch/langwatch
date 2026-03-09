@@ -1197,6 +1197,8 @@ export class ClickHouseTraceService {
           ts.TopicId AS ts_TopicId,
           ts.SubTopicId AS ts_SubTopicId,
           ts.HasAnnotation AS ts_HasAnnotation,
+          ts.ComputedInput AS ts_ComputedInput,
+          ts.ComputedOutput AS ts_ComputedOutput,
           ts.Attributes AS ts_Attributes,
           toUnixTimestamp64Milli(ts.OccurredAt) AS ts_OccurredAt,
           toUnixTimestamp64Milli(ts.CreatedAt) AS ts_CreatedAt,
@@ -1229,36 +1231,12 @@ export class ClickHouseTraceService {
           return { traces: [], totalHits, lastTrace: null };
         }
 
-        // Get trace IDs for span fetching
-        const traceIds = summaryRows.map((row) => row.ts_TraceId);
-
-        // Fetch spans for these traces
-        const tracesWithSpans = await this.fetchTracesWithSpansJoined(
-          projectId,
-          traceIds,
-        );
-
-        // Map to Trace objects and apply protections
-        const traces: Trace[] = [];
-        for (const row of summaryRows) {
-          const traceData = tracesWithSpans.get(row.ts_TraceId);
-          if (traceData) {
-            const mappedSpans = mapNormalizedSpansToSpans(traceData.spans);
-            const trace = mapTraceSummaryToTrace(
-              traceData.summary,
-              mappedSpans,
-              projectId,
-            );
-            // Apply redaction protections
-            traces.push(applyTraceProtections(trace, protections));
-          } else {
-            // Create trace without spans if not found
-            const summary = this.rowToTraceSummaryData(row);
-            const trace = mapTraceSummaryToTrace(summary, [], projectId);
-            // Apply redaction protections
-            traces.push(applyTraceProtections(trace, protections));
-          }
-        }
+        // Map to Trace objects and apply protections (no spans needed for list view)
+        const traces: Trace[] = summaryRows.map((row) => {
+          const summary = this.rowToTraceSummaryData(row);
+          const trace = mapTraceSummaryToTrace(summary, [], projectId);
+          return applyTraceProtections(trace, protections);
+        });
 
         const lastTrace =
           traces.length > 0 ? (traces[traces.length - 1] ?? null) : null;
@@ -1363,11 +1341,8 @@ export class ClickHouseTraceService {
           throw new Error("ClickHouse client not available");
         }
 
-        // Three parallel queries instead of a JOIN to reduce memory pressure:
-        // 1. Trace summaries (lightweight, no ComputedInput/Output)
-        // 2. ComputedInput/Output (one row per trace)
-        // 3. Spans (separate table, no JOIN multiplication of summary columns)
-        const [summaryResult, ioResult, spansResult] = await Promise.all([
+        // Two parallel queries: trace summaries (with I/O) and spans (separate table)
+        const [summaryResult, spansResult] = await Promise.all([
           this.clickHouseClient.query({
             query: `
         SELECT
@@ -1375,6 +1350,8 @@ export class ClickHouseTraceService {
           SpanCount AS ts_SpanCount,
           TotalDurationMs AS ts_TotalDurationMs,
           ComputedIOSchemaVersion AS ts_ComputedIOSchemaVersion,
+          ComputedInput AS ts_ComputedInput,
+          ComputedOutput AS ts_ComputedOutput,
           TimeToFirstTokenMs AS ts_TimeToFirstTokenMs,
           TimeToLastTokenMs AS ts_TimeToLastTokenMs,
           TokensPerSecond AS ts_TokensPerSecond,
@@ -1393,21 +1370,6 @@ export class ClickHouseTraceService {
           toUnixTimestamp64Milli(OccurredAt) AS ts_OccurredAt,
           toUnixTimestamp64Milli(CreatedAt) AS ts_CreatedAt,
           toUnixTimestamp64Milli(UpdatedAt) AS ts_UpdatedAt
-        FROM trace_summaries
-        WHERE TenantId = {tenantId:String}
-          AND TraceId IN ({traceIds:Array(String)})
-        ORDER BY TraceId, UpdatedAt DESC
-        LIMIT 1 BY TraceId
-      `,
-            query_params: { tenantId: projectId, traceIds },
-            format: "JSONEachRow",
-          }),
-          this.clickHouseClient.query({
-            query: `
-        SELECT
-          TraceId,
-          ComputedInput,
-          ComputedOutput
         FROM trace_summaries
         WHERE TenantId = {tenantId:String}
           AND TraceId IN ({traceIds:Array(String)})
@@ -1453,28 +1415,15 @@ export class ClickHouseTraceService {
           LIMIT 1 BY TenantId, TraceId, SpanId
         )
         ORDER BY TraceId, StartTime ASC
+        LIMIT 200 BY TraceId
       `,
             query_params: { tenantId: projectId, traceIds },
             format: "JSONEachRow",
           }),
         ]);
 
-        // Parse trace summaries
+        // Parse trace summaries (includes ComputedInput/Output)
         const summaryRows = (await summaryResult.json()) as TraceSummaryRow[];
-
-        // Parse ComputedInput/Output
-        const ioRows = (await ioResult.json()) as Array<{
-          TraceId: string;
-          ComputedInput: string | null;
-          ComputedOutput: string | null;
-        }>;
-        const ioMap = new Map<string, { computedInput: string | null; computedOutput: string | null }>();
-        for (const ioRow of ioRows) {
-          ioMap.set(ioRow.TraceId, {
-            computedInput: ioRow.ComputedInput,
-            computedOutput: ioRow.ComputedOutput,
-          });
-        }
 
         // Parse spans
         type SpanRow = {
@@ -1513,7 +1462,7 @@ export class ClickHouseTraceService {
           spansByTrace.set(row.TraceId, spans);
         }
 
-        // Build the tracesMap by combining summaries + IO + spans
+        // Build the tracesMap by combining summaries + spans
         const tracesMap = new Map<
           string,
           { summary: TraceSummaryData; spans: NormalizedSpan[] }
@@ -1522,11 +1471,6 @@ export class ClickHouseTraceService {
         for (const row of summaryRows) {
           const traceId = row.ts_TraceId;
           const summary = this.rowToTraceSummaryData(row);
-          const io = ioMap.get(traceId);
-          if (io) {
-            summary.computedInput = io.computedInput;
-            summary.computedOutput = io.computedOutput;
-          }
           tracesMap.set(traceId, {
             summary,
             spans: spansByTrace.get(traceId) ?? [],
