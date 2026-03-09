@@ -1,22 +1,45 @@
 import {
-  LambdaClient,
-  InvokeWithResponseStreamCommand,
-  CreateFunctionCommand,
-  GetFunctionCommand,
-  UpdateFunctionCodeCommand,
-} from "@aws-sdk/client-lambda";
-import {
   CloudWatchLogsClient,
-  PutRetentionPolicyCommand,
   CreateLogGroupCommand,
+  PutRetentionPolicyCommand,
 } from "@aws-sdk/client-cloudwatch-logs";
 import type { FunctionConfiguration } from "@aws-sdk/client-lambda";
-import type { StudioClientEvent } from "../../types/events";
-import * as Sentry from "@sentry/node";
+import {
+  CreateFunctionCommand,
+  GetFunctionCommand,
+  InvokeWithResponseStreamCommand,
+  LambdaClient,
+  UpdateFunctionCodeCommand,
+} from "@aws-sdk/client-lambda";
 import { env } from "../../../env.mjs";
-import { createLogger } from "../../../utils/logger";
+import { createLogger } from "../../../utils/logger/server";
+import { captureException } from "../../../utils/posthogErrorCapture";
+import type { StudioClientEvent } from "../../types/events";
 
 const logger = createLogger("langwatch:langwatch-nlp-lambda");
+
+/**
+ * Strip secrets from a studio event before passing to error reporters.
+ * Returns a shallow copy with workflow.secrets redacted.
+ */
+const sanitizeEventForLogging = (
+  event: StudioClientEvent,
+): StudioClientEvent => {
+  if (!("payload" in event) || !("workflow" in (event as any).payload)) {
+    return event;
+  }
+  const payload = (event as any).payload;
+  return {
+    ...event,
+    payload: {
+      ...payload,
+      workflow: {
+        ...payload.workflow,
+        secrets: "[REDACTED]",
+      },
+    },
+  } as StudioClientEvent;
+};
 
 type LangWatchLambdaConfig = {
   AWS_ACCESS_KEY_ID: string;
@@ -274,14 +297,13 @@ export const getProjectLambdaArn = async (
           { projectId },
           "Lambda function already exists, skipping creation",
         );
+        await new Promise((resolve) => setTimeout(resolve, 1000));
         lambdaConfig = await checkLambdaExists(lambda, functionName);
         if (!lambdaConfig) {
           throw new Error("Error retrieving Lambda function");
         }
       } else {
-        throw new Error(
-          `Failed to create Lambda function: ${(error as Error).message}`,
-        );
+        throw error;
       }
     }
   } else {
@@ -297,12 +319,27 @@ export const getProjectLambdaArn = async (
         { projectId },
         `Image URI mismatch for ${functionName}. Current: ${currentImageUri}, Expected: ${config.image_uri}. Updating lambda image`,
       );
-      lambdaConfig = await updateProjectLambdaImage(
-        lambda,
-        functionName,
-        config.image_uri,
-        projectId,
-      );
+
+      try {
+        lambdaConfig = await updateProjectLambdaImage(
+          lambda,
+          functionName,
+          config.image_uri,
+          projectId,
+        );
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          error.message.includes("An update is in progress")
+        ) {
+          logger.info(
+            { projectId },
+            "Lambda function update in progress, skipping update",
+          );
+        } else {
+          throw error;
+        }
+      }
     }
   }
 
@@ -374,7 +411,9 @@ export const invokeLambda = async (
               if (payloadText.includes('{"statusCode":')) {
                 try {
                   statusCode = parseInt(JSON.parse(payloadText).statusCode);
-                } catch {}
+                } catch {
+                  /* this is just a safe json parse fallback */
+                }
               }
               controller.enqueue(chunk.PayloadChunk.Payload);
             }
@@ -382,8 +421,8 @@ export const invokeLambda = async (
               const error = new Error(
                 `Failed run workflow: ${chunk.InvokeComplete.ErrorCode}`,
               );
-              Sentry.captureException(error, {
-                extra: { event, details: chunk.InvokeComplete.ErrorDetails },
+              captureException(error, {
+                extra: { event: sanitizeEventForLogging(event), details: chunk.InvokeComplete.ErrorDetails },
               });
               throw error;
             }
@@ -392,19 +431,19 @@ export const invokeLambda = async (
           if (statusCode < 200 || statusCode >= 300) {
             try {
               errorMessage = JSON.parse(errorMessage.trim());
-            } catch {}
+            } catch {
+              /* this is just a safe json parse fallback */
+            }
+
             if (statusCode === 422) {
-              console.error(
+              logger.error(
+                { event: sanitizeEventForLogging(event), errorMessage },
                 "Optimization Studio validation failed, please contact support",
-                "\n\n",
-                JSON.stringify(event, null, 2),
-                "\n\nValidation error:\n",
-                errorMessage,
               );
               const error = new Error(
                 `Optimization Studio validation failed, please contact support`,
               );
-              Sentry.captureException(error, { extra: { event } });
+              captureException(error, { extra: { event: sanitizeEventForLogging(event) } });
               throw error;
             }
             throw new Error(
@@ -413,7 +452,7 @@ export const invokeLambda = async (
           }
           controller.close();
         } catch (error) {
-          console.log("error", error);
+          logger.error({ error }, "failed to run workflow stream");
           controller.error(error);
         }
       },
@@ -433,19 +472,22 @@ export const invokeLambda = async (
       let body = await response.text();
       try {
         body = JSON.parse(body);
-      } catch {}
+      } catch {
+        /* this is just a safe json parse fallback */
+      }
+
       if (response.status === 422) {
         console.error(
           "Optimization Studio validation failed, please contact support",
           "\n\n",
-          JSON.stringify(event, null, 2),
+          JSON.stringify(sanitizeEventForLogging(event), null, 2),
           "\n\nValidation error:\n",
           body,
         );
         const error = new Error(
           `Optimization Studio validation failed, please contact support`,
         );
-        Sentry.captureException(error, { extra: { event } });
+        captureException(error, { extra: { event: sanitizeEventForLogging(event) } });
         throw error;
       }
       throw new Error(`Failed run workflow: ${response.statusText}\n\n${body}`);
