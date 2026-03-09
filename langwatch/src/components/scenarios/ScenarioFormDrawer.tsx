@@ -290,11 +290,9 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
 
   return (
     <Drawer.Root
-      closeOnInteractOutside={false}
       open={isOpen}
       onOpenChange={({ open }) => !open && onClose()}
       size="xl"
-      modal={false}
     >
       <Drawer.Content>
         <Drawer.CloseTrigger />

@@ -67,8 +67,26 @@ export const DrawerCloseTrigger = React.forwardRef<
   );
 });
 
+/**
+ * Wrapper around Chakra's Drawer.Root with safe defaults for nested drawers.
+ *
+ * - `modal={false}`: Prevents focus trap from stealing input in child drawers.
+ * - `closeOnInteractOutside={false}`: Prevents parent from closing when
+ *   interacting with a child drawer.
+ * - `preventScroll={false}`: Always allow background scrolling.
+ *
+ * Override `modal` or `closeOnInteractOutside` explicitly if you need
+ * different behavior (rare).
+ */
 export const DrawerRoot = function DrawerRoot(props: ChakraDrawer.RootProps) {
-  return <ChakraDrawer.Root {...props} preventScroll={false} />;
+  return (
+    <ChakraDrawer.Root
+      modal={false}
+      closeOnInteractOutside={false}
+      {...props}
+      preventScroll={false}
+    />
+  );
 };
 
 export const DrawerTrigger = ChakraDrawer.Trigger;
