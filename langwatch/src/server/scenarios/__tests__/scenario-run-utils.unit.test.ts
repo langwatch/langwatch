@@ -1,5 +1,5 @@
 /**
- * Unit tests for ScenarioRunService merge and deduplication logic.
+ * Unit tests for scenario-run merge and deduplication logic.
  *
  * Covers:
  * - ES wins when both sources have data for the same run
@@ -9,7 +9,7 @@
 
 import { describe, it, expect } from "vitest";
 import { ScenarioRunStatus } from "../../scenarios/scenario-event.enums";
-import { buildDeduplicationKey, mergeRunData } from "../scenario-run.service";
+import { buildDeduplicationKey, mergeRunData } from "../scenario-run.utils";
 import type { ScenarioRunData } from "../scenario-event.types";
 
 function makeRunData(overrides: Partial<ScenarioRunData> = {}): ScenarioRunData {
