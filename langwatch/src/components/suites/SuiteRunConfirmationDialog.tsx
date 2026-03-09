@@ -28,9 +28,15 @@ export function SuiteRunConfirmationDialog({
   const estimatedJobs = scenarioCount * targetCount;
 
   return (
-    <Dialog.Root open={open} onOpenChange={onClose} placement="center">
+    <Dialog.Root
+      open={open}
+      onOpenChange={() => {
+        if (!isLoading) onClose();
+      }}
+      placement="center"
+    >
       <Dialog.Content maxWidth="500px" onClick={(e) => e.stopPropagation()}>
-        <Dialog.CloseTrigger />
+        {!isLoading && <Dialog.CloseTrigger />}
         <Dialog.Header>
           <Dialog.Title fontSize="md" fontWeight="500">
             Run suite?

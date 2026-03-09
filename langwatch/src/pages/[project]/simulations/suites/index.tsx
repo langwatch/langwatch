@@ -121,14 +121,10 @@ function SuitesPageContent() {
     ? suites?.find((s) => s.id === runConfirmId)
     : null;
 
-  const runConfirmTargetCount = (() => {
+  const runConfirmTargetCount = useMemo(() => {
     if (!runConfirmSuite) return 0;
-    try {
-      return parseSuiteTargets(runConfirmSuite.targets).length;
-    } catch {
-      return 0;
-    }
-  })();
+    return parseSuiteTargets(runConfirmSuite.targets).length;
+  }, [runConfirmSuite]);
 
   // Mutations
   const archiveMutation = api.suites.archive.useMutation({
