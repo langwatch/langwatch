@@ -119,7 +119,7 @@ async function handleLogsRequest(req: NextRequest) {
           { error, projectId: project.id },
           "Error checking trace limit",
         );
-        captureException(error as Error, {
+        captureException(toError(error), {
           extra: { projectId: project.id },
         });
       }
