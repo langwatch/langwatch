@@ -39,7 +39,52 @@ The issue is the source of truth for requirements and acceptance criteria.
 
 Be aware of context size. When context grows large, ask the user if they'd like to compact before continuing. Agents work in isolated forks and return summaries.
 
-## Flow
+## Bug Detection
+
+Before starting any workflow, classify the issue as a **bug** or **feature**:
+
+1. **GitHub label** — the issue has the label `bug`
+2. **Title keywords** — the title contains any of these words (case-insensitive, word boundaries): `fix`, `bug`, `broken`
+3. **Issue template** — the issue was created from the `bug_report` template
+
+If **ANY** of these match → use the **Bug-Fix Workflow** below.
+Otherwise → use the **Feature Workflow** (the full plan → code → review loop).
+
+## Bug-Fix Workflow
+
+A shorter workflow for bug fixes. Skips planning, challenge, user approval, test review, and E2E — focuses on investigation, minimal fix with regression test, verification, and review.
+
+### 1. Investigate
+- Mark task as `in_progress`
+- Invoke `/code` with the issue description and instruction to investigate the root cause
+- Coder agent explores the codebase and reports findings
+
+### 2. Fix
+- Invoke `/code` with investigation findings and instruction to make the minimal fix
+- Coder agent implements the fix with TDD:
+  - Write a regression test that fails without the fix
+  - Make the fix
+  - Verify the test passes
+
+> **Note:** Steps 2 and 3 can overlap — the coder agent in step 2 should run typecheck and tests as part of its TDD cycle. Step 3 is the orchestrator's verification.
+
+### 3. Verify
+- Run `pnpm typecheck` and `pnpm test:unit` / `pnpm test:integration`
+- If failures → invoke `/code` with the errors
+- Max 3 iterations, then escalate to user
+
+### 4. Review
+- Invoke `/review` to run quality gate
+- If issues found → invoke `/code` with reviewer feedback
+- If approved → mark task as `completed`
+
+### 5. Complete
+- Verify all tasks are completed
+- Report summary to user
+
+## Feature Workflow
+
+Used for feature requests, enhancements, and all non-bug issues.
 
 ### 1. Plan (Required)
 - Check if a feature file exists in `specs/features/`
