@@ -225,14 +225,15 @@ export const getFullDataset = async ({
       entrySelection === "last" ||
       typeof entrySelection === "number"
     ) {
-      const skip =
-        entrySelection === "last"
-          ? Math.max(count - 1, 0)
-          : entrySelection === "random"
-            ? Math.floor(Math.random() * count)
-            : typeof entrySelection === "number"
-              ? Math.max(0, Math.min(entrySelection, count - 1) - 1)
-              : 0;
+      let skip = 0;
+
+      if (entrySelection === "last") {
+        skip = Math.max(count - 1, 0);
+      } else if (entrySelection === "random") {
+        skip = Math.floor(Math.random() * count);
+      } else if (typeof entrySelection === "number") {
+        skip = Math.max(0, Math.min(entrySelection, count - 1));
+      }
 
       return {
         ...dataset,
