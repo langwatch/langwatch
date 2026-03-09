@@ -11,6 +11,7 @@ import type { Job, Queue } from "bullmq";
 import { createLogger } from "~/utils/logger/server";
 import { ScenarioEventType, ScenarioRunStatus, Verdict } from "./scenario-event.enums";
 import type { SimulationService } from "~/server/simulations/simulation.service";
+import type { ScenarioJob } from "./scenario.queue";
 
 const logger = createLogger("langwatch:scenarios:cancellation");
 
@@ -67,8 +68,16 @@ export interface CancelBatchRunResult {
 
 /** Dependencies injected into the cancellation service. */
 export interface CancellationServiceDeps {
-  queue: Pick<Queue, "getJob">;
+  queue: Pick<Queue, "getJob" | "getJobs">;
   simulationService: Pick<SimulationService, "saveScenarioEvent" | "getRunDataForBatchRun">;
+}
+
+/** Error thrown when a job belongs to a different project than the request. */
+export class CrossProjectAuthorizationError extends Error {
+  constructor(jobId: string) {
+    super(`Job ${jobId} does not belong to the requested project`);
+    this.name = "CrossProjectAuthorizationError";
+  }
 }
 
 /**
@@ -78,7 +87,7 @@ export interface CancellationServiceDeps {
  * Coordinates between BullMQ (queue) and event persistence (ES/ClickHouse).
  */
 export class ScenarioCancellationService {
-  private readonly queue: Pick<Queue, "getJob">;
+  private readonly queue: Pick<Queue, "getJob" | "getJobs">;
   private readonly simulationService: Pick<SimulationService, "saveScenarioEvent" | "getRunDataForBatchRun">;
 
   constructor(deps: CancellationServiceDeps) {
@@ -89,11 +98,14 @@ export class ScenarioCancellationService {
   /**
    * Cancel a single scenario job.
    *
+   * - Verifies the BullMQ job belongs to the same project (cross-project auth)
    * - If the job is queued (waiting/delayed): removes it from BullMQ
    * - If the job is active (running): moves it to failed in BullMQ
    * - If the job is already completed/failed: does nothing (idempotent)
    * - If the BullMQ job doesn't exist: still persists cancellation event
+   * - Uses try-catch around BullMQ operations for race condition safety
    *
+   * @throws CrossProjectAuthorizationError if the job belongs to a different project
    * @returns { cancelled: true } if the job was cancelled, { cancelled: false } if already terminal
    */
   async cancelJob(params: CancelJobParams): Promise<CancelJobResult> {
@@ -104,6 +116,12 @@ export class ScenarioCancellationService {
     const bullmqJob = await this.queue.getJob(jobId);
 
     if (bullmqJob) {
+      // Cross-project authorization: verify the job belongs to this project
+      const jobData = (bullmqJob as Job<ScenarioJob>).data;
+      if (jobData?.projectId && jobData.projectId !== projectId) {
+        throw new CrossProjectAuthorizationError(jobId);
+      }
+
       const state = await (bullmqJob as Job).getState();
 
       // Terminal states: do not modify
@@ -112,18 +130,28 @@ export class ScenarioCancellationService {
         return { cancelled: false };
       }
 
-      // Active: move to failed
-      if (state === "active") {
-        await (bullmqJob as Job).moveToFailed(
-          new Error("Cancelled by user"),
-          "0",
-          false,
+      // Use try-catch for race condition safety: the job may transition
+      // between getState() and the actual operation
+      try {
+        if (state === "active") {
+          await (bullmqJob as Job).moveToFailed(
+            new Error("Cancelled by user"),
+            "0",
+            false,
+          );
+          logger.info({ jobId }, "Active job moved to failed (cancelled)");
+        } else {
+          // Waiting/delayed: remove from queue
+          await (bullmqJob as Job).remove();
+          logger.info({ jobId, state }, "Job removed from queue (cancelled)");
+        }
+      } catch (error) {
+        // Job may have transitioned between getState() and the operation.
+        // Log the race condition but still persist the cancellation event.
+        logger.warn(
+          { jobId, state, error },
+          "BullMQ operation failed (likely race condition), persisting cancellation event anyway",
         );
-        logger.info({ jobId }, "Active job moved to failed (cancelled)");
-      } else {
-        // Waiting/delayed: remove from queue
-        await (bullmqJob as Job).remove();
-        logger.info({ jobId, state }, "Job removed from queue (cancelled)");
       }
     } else {
       logger.debug({ jobId }, "BullMQ job not found, persisting cancellation event only");
@@ -144,7 +172,8 @@ export class ScenarioCancellationService {
   /**
    * Cancel all remaining (non-terminal) jobs in a batch run.
    *
-   * Fetches current run data, filters to cancellable runs, and cancels each
+   * Fetches current run data and BullMQ jobs in parallel, filters to
+   * cancellable runs, and cancels each (both BullMQ and event persistence)
    * in parallel chunks (concurrency limit of 10).
    * Completed/failed/cancelled jobs are left untouched.
    */
@@ -153,22 +182,44 @@ export class ScenarioCancellationService {
 
     logger.info({ projectId, scenarioSetId, batchRunId }, "Cancelling batch run");
 
-    const batchData = await this.simulationService.getRunDataForBatchRun({
-      projectId,
-      scenarioSetId,
-      batchRunId,
-    });
+    // Fetch run data and BullMQ jobs in parallel
+    const [batchData, waitingJobs, activeJobs] = await Promise.all([
+      this.simulationService.getRunDataForBatchRun({
+        projectId,
+        scenarioSetId,
+        batchRunId,
+      }),
+      this.getJobsSafe("waiting"),
+      this.getJobsSafe("active"),
+    ]);
 
     if (!batchData.changed || batchData.runs.length === 0) {
       return { cancelledCount: 0, skippedCount: 0 };
     }
+
+    // Build a map of BullMQ jobs keyed by batchRunId for quick lookup
+    const bullmqJobsByBatchRunId = new Map<string, Job<ScenarioJob>[]>();
+    for (const job of [...waitingJobs, ...activeJobs]) {
+      const typedJob = job as Job<ScenarioJob>;
+      const jobBatchRunId = typedJob.data?.batchRunId;
+      if (jobBatchRunId) {
+        const existing = bullmqJobsByBatchRunId.get(jobBatchRunId) ?? [];
+        existing.push(typedJob);
+        bullmqJobsByBatchRunId.set(jobBatchRunId, existing);
+      }
+    }
+
+    const batchBullmqJobs = bullmqJobsByBatchRunId.get(batchRunId) ?? [];
 
     const cancellableRuns = batchData.runs.filter((run) =>
       isCancellableStatus(run.status as ScenarioRunStatus),
     );
     const skippedCount = batchData.runs.length - cancellableRuns.length;
 
-    // Cancel in parallel with concurrency limit
+    // Cancel BullMQ jobs for this batch
+    await this.cancelBullmqJobs(batchBullmqJobs);
+
+    // Persist cancellation events in parallel with concurrency limit
     const CONCURRENCY = 10;
     for (let i = 0; i < cancellableRuns.length; i += CONCURRENCY) {
       const chunk = cancellableRuns.slice(i, i + CONCURRENCY);
@@ -193,6 +244,46 @@ export class ScenarioCancellationService {
     );
 
     return { cancelledCount, skippedCount };
+  }
+
+  /**
+   * Safely gets jobs by state from BullMQ, returning empty array on failure.
+   */
+  private async getJobsSafe(state: "waiting" | "active"): Promise<Job[]> {
+    try {
+      return await this.queue.getJobs([state]);
+    } catch (error) {
+      logger.warn({ error, state }, "Failed to get BullMQ jobs by state");
+      return [];
+    }
+  }
+
+  /**
+   * Cancels BullMQ jobs: removes waiting jobs, moves active jobs to failed.
+   * Uses try-catch per job for race condition safety.
+   */
+  private async cancelBullmqJobs(jobs: Job<ScenarioJob>[]): Promise<void> {
+    await Promise.all(
+      jobs.map(async (job) => {
+        try {
+          const state = await job.getState();
+          if (TERMINAL_BULLMQ_STATES.has(state)) return;
+
+          if (state === "active") {
+            await job.moveToFailed(new Error("Cancelled by user"), "0", false);
+            logger.info({ jobId: job.id }, "Batch cancel: active job moved to failed");
+          } else {
+            await job.remove();
+            logger.info({ jobId: job.id, state }, "Batch cancel: job removed from queue");
+          }
+        } catch (error) {
+          logger.warn(
+            { jobId: job.id, error },
+            "Batch cancel: BullMQ operation failed (likely race condition)",
+          );
+        }
+      }),
+    );
   }
 
   /**

@@ -10,9 +10,10 @@
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
 
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { ScenarioCancellationService } from "~/server/scenarios/cancellation";
+import { CrossProjectAuthorizationError, ScenarioCancellationService } from "~/server/scenarios/cancellation";
 import { scenarioQueue } from "~/server/scenarios/scenario.queue";
 import { SimulationService } from "~/server/simulations/simulation.service";
 import { createLogger } from "~/utils/logger/server";
@@ -55,7 +56,17 @@ export const cancellationRouter = createTRPCRouter({
         simulationService: SimulationService.create(ctx.prisma),
       });
 
-      return service.cancelJob(input);
+      try {
+        return await service.cancelJob(input);
+      } catch (error) {
+        if (error instanceof CrossProjectAuthorizationError) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: error.message,
+          });
+        }
+        throw error;
+      }
     }),
 
   /**

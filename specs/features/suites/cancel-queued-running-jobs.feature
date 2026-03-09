@@ -24,32 +24,41 @@ Feature: Cancel queued and running suite jobs
     Then all queued and in-progress jobs are marked as cancelled
     And completed jobs retain their original status
 
-  # Integration: single job cancellation updates queue and stored status
+  # Integration: single job cancellation removes from BullMQ and persists status
   @integration
-  Scenario: Cancelling a queued job prevents it from executing
-    Given a job is queued
+  Scenario: Cancelling a queued job removes it from BullMQ and prevents execution
+    Given a job is queued in BullMQ
     When the cancel job endpoint is called for that job
-    Then the job is removed from the queue
+    Then the job is removed from the BullMQ queue
     And the job status is persisted as cancelled
 
-  # Integration: cancelling a running job
+  # Integration: cancelling a running job signals BullMQ and persists status
   @integration
-  Scenario: Cancelling a running job marks it as cancelled
-    Given a job is actively running
+  Scenario: Cancelling a running job moves it to failed in BullMQ
+    Given a job is actively running in BullMQ
     When the cancel job endpoint is called for that job
-    Then the job is marked as cancelled
+    Then the job is moved to failed state in BullMQ
     And the job status is persisted as cancelled
 
-  # Integration: batch cancel updates all pending jobs
+  # Integration: batch cancel interacts with BullMQ for each job
   @integration
-  Scenario: Batch cancel marks all non-completed jobs as cancelled
+  Scenario: Batch cancel removes queued jobs from BullMQ and marks running jobs
     Given a batch run has jobs in queued, running, and completed states
     When the cancel all endpoint is called for the batch
-    Then queued and running jobs are cancelled
+    Then queued jobs are removed from BullMQ
+    And running jobs are moved to failed in BullMQ
+    And all non-completed job statuses are persisted as cancelled
     And completed jobs are not modified
 
-  # E2E: UI reflects cancellation immediately
-  @e2e
+  # Integration: cross-project authorization
+  @integration
+  Scenario: Cancel job rejects requests for jobs belonging to another project
+    Given a job belongs to project A
+    When the cancel job endpoint is called with project B credentials
+    Then the request is rejected with an authorization error
+
+  # Integration: UI reflects cancellation immediately
+  @integration
   Scenario: Cancelled status appears in the UI without manual refresh
     Given a job is displayed with a queued status
     When the job is cancelled
