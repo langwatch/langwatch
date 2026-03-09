@@ -1,18 +1,23 @@
 /**
  * Row inside an expanded run showing a scenario x target pair result.
  *
- * Displays: [status_icon] [target: scenario_name (#N)] [passed/failed (met/total)] [duration]
+ * Displays: [status_icon] [target: scenario_name (#N)] [passed/failed (met/total)] [duration] [cancel?]
  *
- * @see specs/features/suites/suite-list-view-status.feature
+ * When the run is in a cancellable state (PENDING, IN_PROGRESS, STALLED),
+ * a cancel button appears at the end of the row.
+ *
+ * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
 
 import { HStack, Text } from "@chakra-ui/react";
 import { Spinner } from "@chakra-ui/react";
+import { X } from "lucide-react";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
 import { STATUS_ICON_CONFIG } from "./status-icons";
 import { buildDisplayTitle } from "./run-history-transforms";
 import { formatRunStatusLabel } from "./format-run-status-label";
+import { isCancellableStatus } from "./useCancelScenarioRun";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 
 type ScenarioTargetRowProps = {
@@ -20,6 +25,7 @@ type ScenarioTargetRowProps = {
   targetName: string | null;
   onClick: () => void;
   iteration?: number;
+  onCancel?: () => void;
 };
 
 function formatDuration(ms: number): string {
@@ -50,6 +56,7 @@ export function ScenarioTargetRow({
   targetName,
   onClick,
   iteration,
+  onCancel,
 }: ScenarioTargetRowProps) {
   const scenarioName = scenarioRun.name ?? scenarioRun.scenarioId;
   const displayName = buildDisplayTitle({ scenarioName, targetName, iteration });
@@ -87,6 +94,37 @@ export function ScenarioTargetRow({
           <Text fontSize="xs" color="fg.muted">
             {formatDuration(scenarioRun.durationInMs)}
           </Text>
+        )}
+        {onCancel && isCancellableStatus(scenarioRun.status) && (
+          <HStack
+            as="span"
+            role="button"
+            tabIndex={0}
+            gap={1}
+            paddingX={2}
+            paddingY={0.5}
+            borderRadius="sm"
+            fontSize="xs"
+            color="red.500"
+            cursor="pointer"
+            _hover={{ bg: "red.50" }}
+            onClick={(e: React.MouseEvent) => {
+              e.stopPropagation();
+              onCancel();
+            }}
+            onKeyDown={(e: React.KeyboardEvent) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.stopPropagation();
+                e.preventDefault();
+                onCancel();
+              }
+            }}
+            aria-label="Cancel run"
+            data-testid="cancel-run-button"
+          >
+            <X size={12} />
+            <Text fontSize="xs">Cancel</Text>
+          </HStack>
         )}
       </HStack>
     </HStack>
