@@ -8,6 +8,7 @@ import {
   computeSuiteRunSummaries,
   getScenarioDisplayNames,
   resolveOriginLabel,
+  availableGroupByOptions,
 } from "../run-history-transforms";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { makeBatchRun, makeScenarioRunData } from "./test-helpers";
@@ -759,6 +760,29 @@ describe("resolveOriginLabel()", () => {
       });
 
       expect(result).toBeNull();
+    });
+  });
+});
+
+describe("availableGroupByOptions()", () => {
+  describe("when view context is external", () => {
+    it("returns options without target", () => {
+      const result = availableGroupByOptions({ viewContext: "external" });
+      expect(result).toEqual(["none", "scenario"]);
+    });
+  });
+
+  describe("when view context is suite", () => {
+    it("returns all options including target", () => {
+      const result = availableGroupByOptions({ viewContext: "suite" });
+      expect(result).toEqual(["none", "scenario", "target"]);
+    });
+  });
+
+  describe("when view context is all-runs", () => {
+    it("returns all options including target", () => {
+      const result = availableGroupByOptions({ viewContext: "all-runs" });
+      expect(result).toEqual(["none", "scenario", "target"]);
     });
   });
 });
