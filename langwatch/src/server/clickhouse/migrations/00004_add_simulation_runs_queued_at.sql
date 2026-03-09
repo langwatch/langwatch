@@ -12,8 +12,8 @@ ALTER TABLE ${CLICKHOUSE_DATABASE}.simulation_runs
 -- +goose ENVSUB ON
 -- +goose StatementBegin
 
-ALTER TABLE ${CLICKHOUSE_DATABASE}.simulation_runs
-    DROP COLUMN IF EXISTS QueuedAt;
+-- ALTER TABLE ${CLICKHOUSE_DATABASE}.simulation_runs
+--   DROP COLUMN IF EXISTS QueuedAt;
 
 -- +goose StatementEnd
 -- +goose ENVSUB OFF
