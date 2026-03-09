@@ -1,5 +1,5 @@
 ---
-name: issue
+name: create-issue
 description: "Create a well-structured GitHub issue with templates, labels, project fields, and epic linking."
 user-invocable: true
 allowed-tools: Bash(gh:*)
@@ -15,13 +15,13 @@ Create a standardized GitHub issue for: $ARGUMENTS
 If `$ARGUMENTS` is empty or missing, show usage instructions and stop:
 
 ```
-Usage: /issue <description of the issue>
+Usage: /create-issue <description of the issue>
 
 Examples:
-  /issue Login page throws 500 error when clicking submit
-  /issue Add CSV export for evaluation results
-  /issue Upgrade Prisma to v6
-  /issue Fix trace filtering (parent epic: #500, priority: P1, size: M)
+  /create-issue Login page throws 500 error when clicking submit
+  /create-issue Add CSV export for evaluation results
+  /create-issue Upgrade Prisma to v6
+  /create-issue Fix trace filtering (parent epic: #500, priority: P1, size: M)
 
 You can include optional metadata in parentheses:
   - parent epic: #NNN    — links as sub-issue
