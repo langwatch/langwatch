@@ -47,6 +47,10 @@ export async function givenIAmOnTheScenariosListPage(page: Page) {
 
   await page.goto(`/${projectSlug}/simulations/scenarios`);
   await expect(page).toHaveURL(/simulations\/scenarios/);
+  // Wait for page content to load (New Scenario button indicates page is ready)
+  await expect(
+    page.getByRole("button", { name: /new scenario/i })
+  ).toBeVisible({ timeout: 15000 });
 }
 
 /**
@@ -101,6 +105,10 @@ export async function thenISeeNewScenarioButton(page: Page) {
  */
 export async function whenIClickNewScenario(page: Page) {
   await page.getByRole("button", { name: /new scenario/i }).click();
+  // Wait for the Create Scenario dialog to appear before proceeding
+  await expect(
+    page.getByRole("heading", { name: /create scenario/i }).last()
+  ).toBeVisible({ timeout: 10000 });
 }
 
 /**
