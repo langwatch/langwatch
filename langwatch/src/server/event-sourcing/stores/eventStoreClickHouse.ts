@@ -54,16 +54,9 @@ export class EventStoreClickHouse<
   }
 
   protected override onStoreSuccess(
-    context: EventStoreReadContext<EventType>,
-    events: readonly EventType[],
+    _context: EventStoreReadContext<EventType>,
+    _events: readonly EventType[],
   ): void {
-    this.logger.info(
-      {
-        tenantId: context.tenantId,
-        eventCount: events.length,
-        aggregateIds: [...new Set(events.map((e) => e.aggregateId))],
-      },
-      "Stored events to ClickHouse",
-    );
+    // no-op: removed verbose per-store logging
   }
 }

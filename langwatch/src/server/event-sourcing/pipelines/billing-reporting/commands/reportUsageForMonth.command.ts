@@ -395,7 +395,7 @@ export function createReportUsageForMonthCommandClass(
           },
         });
 
-        logger.info(
+        logger.debug(
           {
             organizationId,
             billingMonth,

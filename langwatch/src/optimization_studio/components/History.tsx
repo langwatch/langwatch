@@ -46,7 +46,7 @@ export function History() {
       // modal
     >
       <Popover.Trigger asChild>
-        <Button variant="ghost" color="gray.500" size="xs" onClick={onToggle}>
+        <Button variant="ghost" color="fg.subtle" size="xs" onClick={onToggle}>
           <HistoryIcon size={16} />
         </Button>
       </Popover.Trigger>
@@ -297,7 +297,7 @@ export const VersionBox = ({
       borderRadius={4}
       fontWeight={600}
       fontSize="13px"
-      color="gray.600"
+      color="fg.muted"
       whiteSpace="nowrap"
       textAlign="center"
       minWidth="0px"
@@ -495,7 +495,7 @@ export function NewVersionFields({
     <HStack width="full">
       <Field.Root width="fit-content" invalid={!!form.formState.errors.version}>
         <VStack align="start">
-          <Field.Label as={SmallLabel} color="gray.600">
+          <Field.Label as={SmallLabel} color="fg.muted">
             Version
           </Field.Label>
           <Input
@@ -512,7 +512,7 @@ export function NewVersionFields({
       </Field.Root>
       <Field.Root width="full" invalid={!!form.formState.errors.commitMessage}>
         <VStack align="start" width="full">
-          <Field.Label as={SmallLabel} color="gray.600">
+          <Field.Label as={SmallLabel} color="fg.muted">
             Description
           </Field.Label>
           <InputGroup
@@ -568,11 +568,11 @@ export const VersionToBeUsed = ({
   return (
     <HStack width="full">
       <VStack align="start">
-        <SmallLabel color="gray.600">Version</SmallLabel>
+        <SmallLabel color="fg.muted">Version</SmallLabel>
         <Text width="74px">{versionToBeEvaluated.version}</Text>
       </VStack>
       <VStack align="start" width="full">
-        <SmallLabel color="gray.600">Description</SmallLabel>
+        <SmallLabel color="fg.muted">Description</SmallLabel>
         <Text>{versionToBeEvaluated.commitMessage}</Text>
       </VStack>
     </HStack>

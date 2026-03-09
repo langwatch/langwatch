@@ -99,7 +99,7 @@ describe("handleTrpcCallLogging", () => {
     });
 
     describe("when error is NOT_FOUND", () => {
-      it("derives 404 from TRPCError code and logs at warn level", () => {
+      it("derives 404 from TRPCError code and logs at info level", () => {
         const log = createMockLog();
         const capture = vi.fn();
         const error = new TRPCError({
@@ -114,11 +114,12 @@ describe("handleTrpcCallLogging", () => {
           capture,
         });
 
-        expect(log.warn).toHaveBeenCalledWith(
+        expect(log.info).toHaveBeenCalledWith(
           expect.objectContaining({ error, statusCode: 404 }),
           "trpc call",
         );
         expect(capture).not.toHaveBeenCalled();
+        expect(log.warn).not.toHaveBeenCalled();
       });
     });
 

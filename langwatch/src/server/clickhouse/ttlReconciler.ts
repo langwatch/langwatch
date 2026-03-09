@@ -8,6 +8,8 @@ const logger = createLogger("langwatch:clickhouse:ttl-reconciler");
 export interface TableTTLEntry {
   table: string;
   ttlColumn: string;
+  /** Override the `toDateTime(ttlColumn)` expression for non-DateTime columns (e.g. UInt64 epoch ms). */
+  ttlColumnExpression?: string;
   envVar: string;
   hardcodedDefault: number;
 }
@@ -25,37 +27,38 @@ export interface TableTTLEntry {
 export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
   {
     table: "billable_events",
-    ttlColumn: "CreatedAt",
+    ttlColumn: "EventTimestamp",
     envVar: "TIERED_BILLABLE_EVENTS_TABLE_HOT_DAYS",
     hardcodedDefault: 30,
   },
   {
     table: "evaluation_runs",
-    ttlColumn: "UpdatedAt",
+    ttlColumn: "ScheduledAt",
     envVar: "TIERED_EVALUATION_RUNS_TABLE_HOT_DAYS",
     hardcodedDefault: 30,
   },
   {
     table: "event_log",
-    ttlColumn: "CreatedAt",
+    ttlColumn: "EventOccurredAt",
+    ttlColumnExpression: "toDateTime(EventOccurredAt / 1000)",
     envVar: "TIERED_EVENT_LOG_TABLE_HOT_DAYS",
     hardcodedDefault: 30,
   },
   {
     table: "experiment_run_items",
-    ttlColumn: "CreatedAt",
+    ttlColumn: "OccurredAt",
     envVar: "TIERED_BATCH_EVAL_RESULTS_TABLE_HOT_DAYS",
     hardcodedDefault: 30,
   },
   {
     table: "experiment_runs",
-    ttlColumn: "CreatedAt",
+    ttlColumn: "StartedAt",
     envVar: "TIERED_BATCH_EVAL_RUNS_TABLE_HOT_DAYS",
     hardcodedDefault: 30,
   },
   {
     table: "simulation_runs",
-    ttlColumn: "CreatedAt",
+    ttlColumn: "StartedAt",
     envVar: "TIERED_SIMULATION_RUNS_TABLE_HOT_DAYS",
     hardcodedDefault: 30,
   },
@@ -79,7 +82,7 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
   },
   {
     table: "trace_summaries",
-    ttlColumn: "UpdatedAt",
+    ttlColumn: "OccurredAt",
     envVar: "TIERED_TRACE_SUMMARIES_TABLE_HOT_DAYS",
     hardcodedDefault: 30,
   },
@@ -143,7 +146,8 @@ export function buildDesiredTTLExpression({
   config: TableTTLEntry;
   days: number;
 }): string {
-  return `toDateTime(${config.ttlColumn}) + INTERVAL ${days} DAY TO VOLUME 'cold'`;
+  const colExpr = config.ttlColumnExpression ?? `toDateTime(${config.ttlColumn})`;
+  return `${colExpr} + INTERVAL ${days} DAY TO VOLUME 'cold'`;
 }
 
 interface ReconcileOptions {

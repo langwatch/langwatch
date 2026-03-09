@@ -79,10 +79,6 @@ export class EvaluationRunClickHouseRepository
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
 
-      logger.debug(
-        { tenantId, evaluationId: data.evaluationId, projectionId },
-        "Stored evaluation run to ClickHouse",
-      );
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
