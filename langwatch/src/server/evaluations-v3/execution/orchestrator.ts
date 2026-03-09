@@ -78,6 +78,8 @@ export type OrchestratorInput = {
   concurrency?: number;
   /** When ON, ES writes are handled by event sourcing reactors instead of direct writes */
   featureEventSourcingEvaluationIngestion?: boolean;
+  /** When ON, all direct ES writes for evaluations are skipped entirely */
+  disableElasticSearchEvaluationWriting?: boolean;
 };
 
 /**
@@ -259,6 +261,7 @@ export async function* executeCell(
           },
           node_id: targetNodeId,
           inputs: buildTargetInputs(cell),
+          origin: "evaluation",
         },
       };
 
@@ -354,6 +357,7 @@ export async function* executeCell(
               },
               node_id: evaluatorNodeId,
               inputs: evaluatorInputs,
+              origin: "evaluation",
             },
           };
 
@@ -510,6 +514,7 @@ export async function* runOrchestrator(
     runId: providedRunId,
     concurrency: requestedConcurrency,
     featureEventSourcingEvaluationIngestion = false,
+    disableElasticSearchEvaluationWriting = false,
   } = input;
 
   // Use requested concurrency, environment variable, or default
@@ -531,10 +536,14 @@ export async function* runOrchestrator(
   const commands = getApp().experimentRuns;
 
   // Get repository and initialize storage if enabled
-  // When featureEventSourcingEvaluationIngestion is ON, the experimentRunEsSync
-  // reactor handles ES writes — skip direct writes to avoid double-writing.
+  // Skip direct ES writes when:
+  // - featureEventSourcingEvaluationIngestion is ON (reactor handles it)
+  // - disableElasticSearchEvaluationWriting is ON (ES writes fully disabled)
   const repository =
-    saveToEs && experimentId && !featureEventSourcingEvaluationIngestion
+    saveToEs &&
+    experimentId &&
+    !featureEventSourcingEvaluationIngestion &&
+    !disableElasticSearchEvaluationWriting
       ? getDefaultBatchEvaluationRepository()
       : null;
 

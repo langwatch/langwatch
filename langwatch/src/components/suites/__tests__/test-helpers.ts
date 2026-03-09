@@ -65,6 +65,7 @@ export function makeSummary(
     cancelledCount: 0,
     totalCount: 2,
     inProgressCount: 0,
+    queuedCount: 0,
     ...overrides,
   };
 }

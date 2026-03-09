@@ -34,7 +34,7 @@ import {
   parseGrowthSeatPlanType,
   isAnnualTieredPlan,
   FREE_PLAN_FEATURES as DEVELOPER_FEATURES,
-  GROWTH_FEATURES,
+  getGrowthFeatures,
   ENTERPRISE_PLAN_FEATURES,
   buildTieredCapabilities,
 } from "./billing-plans";
@@ -59,8 +59,9 @@ import { CurrentPlanBlock } from "./CurrentPlanBlock";
 import { UpdateSeatsBlock } from "./UpdateSeatsBlock";
 import { UpgradePlanBlock } from "./UpgradePlanBlock";
 import { ContactSalesBlock } from "./ContactSalesBlock";
+import { InvoicesBlock } from "./InvoicesBlock";
 import { UserManagementDrawer } from "./UserManagementDrawer";
-import { CONTACT_SALES_URL } from "../plans/constants";
+import { CONTACT_SALES_URL } from "../../../ee/licensing/constants";
 
 const currencyOptions = [
   { label: "\u20AC EUR", value: PrismaCurrency.EUR },
@@ -101,6 +102,14 @@ export function SubscriptionPage() {
     }
   }, []);
 
+
+  // Fetch last Stripe-linked subscription
+  const lastSubscription = api.subscription.getLastSubscription.useQuery(
+    { organizationId: organization?.id ?? "" },
+    { enabled: !!organization },
+  );
+
+  const hasStripeSubscription = !!lastSubscription.data?.stripeSubscriptionId;
 
   // Fetch active plan
   const activePlan = api.plan.getActivePlan.useQuery(
@@ -316,7 +325,7 @@ export function SubscriptionPage() {
           perSeatPrice: monthlyEquivalent,
         };
   const currentPlanFeatures = isLicenseOverride
-    ? GROWTH_FEATURES
+    ? getGrowthFeatures(effectiveCurrency)
     : isTieredLegacyPaidPlan
     ? buildTieredCapabilities({
       maxMembers: plan?.maxMembers ?? 0,
@@ -329,7 +338,7 @@ export function SubscriptionPage() {
       ? ENTERPRISE_PLAN_FEATURES
       : isDeveloperPlan
         ? DEVELOPER_FEATURES
-        : GROWTH_FEATURES;
+        : getGrowthFeatures(effectiveCurrency);
 
 
   const isUpgradeSeatsRequired =
@@ -466,6 +475,11 @@ export function SubscriptionPage() {
           }
         />
 
+        {/* Invoices Block - only for paying customers with a Stripe subscription */}
+        {!isDeveloperPlan && hasStripeSubscription && (
+          <InvoicesBlock organizationId={organization.id} onViewAllInStripe={handleManageSubscription} />
+        )}
+
         {/* Upgrade Block - show for free plan and TIERED legacy paid orgs */}
         {(isUpgradePlanRequired) && (
           <UpgradePlanBlock
@@ -481,7 +495,7 @@ export function SubscriptionPage() {
             }
             totalPrice={upgradeBillingPriceFormatted}
             coreMembers={upgradeBillingSeats}
-            features={GROWTH_FEATURES}
+            features={getGrowthFeatures(effectiveCurrency)}
             monthlyEquivalent={monthlyEquivalent}
             onUpgrade={handleUpgrade}
             isLoading={isUpgradeLoading}

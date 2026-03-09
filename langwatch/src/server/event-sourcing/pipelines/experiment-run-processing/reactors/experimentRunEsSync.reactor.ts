@@ -29,6 +29,7 @@ export function createExperimentRunEsSyncReactor(
 ): ReactorDefinition<ExperimentRunProcessingEvent, ExperimentRunStateData> {
   return {
     name: "experimentRunEsSync",
+    options: { runIn: ["web", "worker"] },
 
     async handle(
       event: ExperimentRunProcessingEvent,
@@ -46,6 +47,16 @@ export function createExperimentRunEsSyncReactor(
         "featureEventSourcingEvaluationIngestion",
       );
       if (!enabled) return;
+
+      // Skip ES sync when evaluation ES writes are disabled for this project
+      const project = await deps.project.getById(tenantId);
+      if (project?.disableElasticSearchEvaluationWriting) {
+        logger.debug(
+          { tenantId },
+          "Skipping ES evaluation sync — disableElasticSearchEvaluationWriting is enabled",
+        );
+        return;
+      }
 
       const { repository } = deps;
       const experimentId = foldState.ExperimentId;

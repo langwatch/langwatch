@@ -1,6 +1,6 @@
 {
     "name": "langwatch",
-    "version": "0.16.1",
+    "version": "0.17.0",
     "description": "LangWatch TypeScript/JavaScript SDK. Interact with the full LangWatch API and use the LangWatch OpenTelemetry SDK to instrument your application. For more information, see https://docs.langwatch.ai/integration/typescript/guide",
     "main": "dist/index.js",
     "module": "dist/index.mjs",
@@ -91,10 +91,10 @@
         "typescript-eslint": "^8.38.0",
         "vitest": "^3.2.4",
         "vitest-mock-extended": "^3.1.0",
-        "yaml": "^2.8.1"
+        "yaml": "^2.8.1",
+        "@opentelemetry/api": "^1.9.0"
     },
     "dependencies": {
-        "@opentelemetry/api": "^1.9.0",
         "@opentelemetry/api-logs": "0.205.0",
         "@opentelemetry/core": "^2.0.1",
         "@opentelemetry/exporter-logs-otlp-http": "0.205.0",
@@ -119,6 +119,7 @@
         "zod": "^4.0.14"
     },
     "peerDependencies": {
+        "@opentelemetry/api": "^1.9.0",
         "@ai-sdk/openai": ">=2.0.0 <3.0.0",
         "@langchain/core": ">=0.3.0 <1.0.0",
         "@langchain/langgraph": ">=0.4.0 <1.0.0",

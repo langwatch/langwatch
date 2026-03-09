@@ -1,14 +1,18 @@
 /**
  * Row inside an expanded run showing a scenario x target pair result.
  *
- * Displays: [status_icon] [target: scenario_name (#N)] [pass%] ([pass/total]) [duration]
+ * Displays: [status_icon] [target: scenario_name (#N)] [passed/failed (met/total)] [duration]
+ *
+ * @see specs/features/suites/suite-list-view-status.feature
  */
 
 import { HStack, Text } from "@chakra-ui/react";
+import { Spinner } from "@chakra-ui/react";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
 import { STATUS_ICON_CONFIG } from "./status-icons";
 import { buildDisplayTitle } from "./run-history-transforms";
+import { formatRunStatusLabel } from "./format-run-status-label";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 
 type ScenarioTargetRowProps = {
@@ -24,6 +28,11 @@ function formatDuration(ms: number): string {
 }
 
 function StatusIcon({ status }: { status: ScenarioRunStatus }) {
+  // Queued and running rows show a spinner instead of a pass/fail icon
+  if (status === ScenarioRunStatus.QUEUED || status === ScenarioRunStatus.RUNNING) {
+    return <Spinner size="xs" data-testid="queued-spinner" />;
+  }
+
   const config = SCENARIO_RUN_STATUS_CONFIG[status];
   const iconConfig = STATUS_ICON_CONFIG[status];
   const Icon = iconConfig.icon;
@@ -68,15 +77,12 @@ export function ScenarioTargetRow({
         {displayName}
       </Text>
       <HStack gap={2} flexShrink={0}>
-        {config.isComplete ? (
-          <Text fontSize="xs" color={config.fgColor}>
-            {scenarioRun.status === ScenarioRunStatus.SUCCESS ? "100%" : config.label}
-          </Text>
-        ) : (
-          <Text fontSize="xs" color={config.fgColor}>
-            {config.label}
-          </Text>
-        )}
+        <Text fontSize="xs" color={config.fgColor}>
+          {formatRunStatusLabel({
+            status: scenarioRun.status,
+            results: scenarioRun.results ?? undefined,
+          })}
+        </Text>
         {scenarioRun.durationInMs > 0 && (
           <Text fontSize="xs" color="fg.muted">
             {formatDuration(scenarioRun.durationInMs)}

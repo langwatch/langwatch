@@ -40,6 +40,40 @@ function spanTypeToKind(type: SpanTypes): SpanKind {
   }
 }
 
+/**
+ * Recursively flattens a nested params object into dot-notation OTEL attributes.
+ *
+ * - Primitive values (string, number, boolean) are set directly
+ * - Plain objects are recursed into
+ * - Arrays are JSON.stringified
+ * - null/undefined values are skipped
+ * - The `_keys` field is skipped (indexing artifact)
+ */
+function flattenParams({
+  params,
+  prefix,
+  attrs,
+}: {
+  params: Record<string, unknown>;
+  prefix: string;
+  attrs: Attributes;
+}): void {
+  for (const [key, value] of Object.entries(params)) {
+    if (key === "_keys") continue;
+    if (value == null) continue;
+
+    const fullKey = prefix ? `${prefix}.${key}` : key;
+
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+      attrs[fullKey] = value;
+    } else if (Array.isArray(value)) {
+      attrs[fullKey] = JSON.stringify(value);
+    } else if (typeof value === "object") {
+      flattenParams({ params: value as Record<string, unknown>, prefix: fullKey, attrs });
+    }
+  }
+}
+
 function buildAttributes(span: Span): Attributes {
   const attrs: Attributes = {};
 
@@ -87,6 +121,8 @@ function buildAttributes(span: Span): Attributes {
       attrs["gen_ai.request.max_tokens"] = span.params.max_tokens;
     if (span.params.top_p != null)
       attrs["gen_ai.request.top_p"] = span.params.top_p;
+
+    flattenParams({ params: span.params, prefix: "", attrs });
   }
 
   // Metrics

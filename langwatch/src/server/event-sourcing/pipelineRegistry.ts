@@ -1,47 +1,56 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { PrismaClient } from "@prisma/client";
-import type { BroadcastService } from "../app-layer/broadcast/broadcast.service";
-import type { TraceSummaryService } from "../app-layer/traces/trace-summary.service";
-import type { SpanStorageService } from "../app-layer/traces/span-storage.service";
-import type { EvaluationRunService } from "../app-layer/evaluations/evaluation-run.service";
-import type { EvaluationExecutionService } from "../app-layer/evaluations/evaluation-execution.service";
-import type { ProjectService } from "../app-layer/projects/project.service";
-import type { MonitorService } from "../app-layer/monitors/monitor.service";
-import type { EvaluationEsSyncReactorDeps } from "./pipelines/evaluation-processing/reactors/evaluationEsSync.reactor";
+import { createLogger } from "~/utils/logger/server";
+import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
 import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";
-import { createTraceProcessingPipeline } from "./pipelines/trace-processing/pipeline";
-import { createEvaluationProcessingPipeline } from "./pipelines/evaluation-processing/pipeline";
-import { createExperimentRunProcessingPipeline } from "./pipelines/experiment-run-processing/pipeline";
-import { createSimulationProcessingPipeline } from "./pipelines/simulation-processing/pipeline";
-import {
-  SimulationRunStateRepositoryClickHouse,
-  SimulationRunStateRepositoryMemory,
-} from "./pipelines/simulation-processing/repositories";
-import { createSimulationRunStateFoldStore } from "./pipelines/simulation-processing/projections/simulationRunState.store";
-import { createExperimentRunEsSyncReactor } from "./pipelines/experiment-run-processing/reactors/experimentRunEsSync.reactor";
-import { createSnapshotUpdateBroadcastReactor } from "./pipelines/simulation-processing/reactors/snapshotUpdateBroadcast";
+import type { BroadcastService } from "../app-layer/broadcast/broadcast.service";
+import type { EvaluationExecutionService } from "../app-layer/evaluations/evaluation-execution.service";
+import type { EvaluationRunService } from "../app-layer/evaluations/evaluation-run.service";
+import type { MonitorService } from "../app-layer/monitors/monitor.service";
+import type { ProjectService } from "../app-layer/projects/project.service";
+import { LogRecordStorageClickHouseRepository } from "../app-layer/traces/repositories/log-record-storage.clickhouse.repository";
+import { NullLogRecordStorageRepository } from "../app-layer/traces/repositories/log-record-storage.repository";
+import { MetricRecordStorageClickHouseRepository } from "../app-layer/traces/repositories/metric-record-storage.clickhouse.repository";
+import { NullMetricRecordStorageRepository } from "../app-layer/traces/repositories/metric-record-storage.repository";
+import type { SpanStorageService } from "../app-layer/traces/span-storage.service";
+import type { TraceSummaryService } from "../app-layer/traces/trace-summary.service";
 import { createElasticsearchBatchEvaluationRepository } from "../evaluations-v3/repositories/elasticsearchBatchEvaluation.repository";
-import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
-import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
-import { EvaluationRunStore } from "./pipelines/evaluation-processing/projections/evaluationRun.store";
+import type { EventSourcing } from "./eventSourcing";
+import { mapCommands } from "./mapCommands";
+import { createReportUsageForMonthCommandClass } from "./pipelines/billing-reporting/commands/reportUsageForMonth.command";
+import {
+  BILLING_REPORTING_PIPELINE_NAME,
+  createBillingReportingPipeline,
+} from "./pipelines/billing-reporting/pipeline";
 import { createExecuteEvaluationCommandClass } from "./pipelines/evaluation-processing/commands/executeEvaluation.command";
+import { createEvaluationProcessingPipeline } from "./pipelines/evaluation-processing/pipeline";
+import { EvaluationRunStore } from "./pipelines/evaluation-processing/projections/evaluationRun.store";
+import type { EvaluationEsSyncReactorDeps } from "./pipelines/evaluation-processing/reactors/evaluationEsSync.reactor";
 import { createEvaluationEsSyncReactor } from "./pipelines/evaluation-processing/reactors/evaluationEsSync.reactor";
-import { createEvaluationTriggerReactor } from "./pipelines/trace-processing/reactors/evaluationTrigger.reactor";
-import { createSatisfactionScoreReactor } from "./pipelines/trace-processing/reactors/satisfactionScore.reactor";
-import { createTraceUpdateBroadcastReactor } from "./pipelines/trace-processing/reactors/traceUpdateBroadcast.reactor";
-import { createSpanStorageBroadcastReactor } from "./pipelines/trace-processing/reactors/spanStorageBroadcast.reactor";
+import { createExperimentRunProcessingPipeline } from "./pipelines/experiment-run-processing/pipeline";
+import { createExperimentRunItemAppendStore } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
+import { createExperimentRunStateFoldStore } from "./pipelines/experiment-run-processing/projections/experimentRunState.store";
+import { createExperimentRunEsSyncReactor } from "./pipelines/experiment-run-processing/reactors/experimentRunEsSync.reactor";
 import {
   ExperimentRunStateRepositoryClickHouse,
   ExperimentRunStateRepositoryMemory,
 } from "./pipelines/experiment-run-processing/repositories";
-import { createExperimentRunStateFoldStore } from "./pipelines/experiment-run-processing/projections/experimentRunState.store";
-import { createExperimentRunItemAppendStore } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
-import type { EventSourcing } from "./eventSourcing";
-import { mapCommands } from "./mapCommands";
-import { createBillingReportingPipeline, BILLING_REPORTING_PIPELINE_NAME } from "./pipelines/billing-reporting/pipeline";
-import { createReportUsageForMonthCommandClass } from "./pipelines/billing-reporting/commands/reportUsageForMonth.command";
-import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
-import { createLogger } from "~/utils/logger/server";
+import { createSimulationProcessingPipeline } from "./pipelines/simulation-processing/pipeline";
+import { createSimulationRunStateFoldStore } from "./pipelines/simulation-processing/projections/simulationRunState.store";
+import { createSnapshotUpdateBroadcastReactor } from "./pipelines/simulation-processing/reactors/snapshotUpdateBroadcast";
+import {
+  SimulationRunStateRepositoryClickHouse,
+  SimulationRunStateRepositoryMemory,
+} from "./pipelines/simulation-processing/repositories";
+import { createTraceProcessingPipeline } from "./pipelines/trace-processing/pipeline";
+import { LogRecordAppendStore } from "./pipelines/trace-processing/projections/logRecordStorage.store";
+import { MetricRecordAppendStore } from "./pipelines/trace-processing/projections/metricRecordStorage.store";
+import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
+import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
+import { createEvaluationTriggerReactor } from "./pipelines/trace-processing/reactors/evaluationTrigger.reactor";
+import { createSatisfactionScoreReactor } from "./pipelines/trace-processing/reactors/satisfactionScore.reactor";
+import { createSpanStorageBroadcastReactor } from "./pipelines/trace-processing/reactors/spanStorageBroadcast.reactor";
+import { createTraceUpdateBroadcastReactor } from "./pipelines/trace-processing/reactors/traceUpdateBroadcast.reactor";
 
 const logger = createLogger("langwatch:event-sourcing:pipeline-registry");
 
@@ -103,14 +112,18 @@ export class PipelineRegistry {
 
     return this.deps.eventSourcing.register(
       createEvaluationProcessingPipeline({
-        evalRunStore: new EvaluationRunStore(this.deps.evaluations.runs.repository),
+        evalRunStore: new EvaluationRunStore(
+          this.deps.evaluations.runs.repository,
+        ),
         ExecuteEvaluationCommand,
         esSyncReactor,
       }),
     );
   }
 
-  private registerTracePipeline(evalPipeline: ReturnType<PipelineRegistry["registerEvaluationPipeline"]>) {
+  private registerTracePipeline(
+    evalPipeline: ReturnType<PipelineRegistry["registerEvaluationPipeline"]>,
+  ) {
     const evaluationTriggerReactor = createEvaluationTriggerReactor({
       monitors: this.deps.monitors,
       evaluation: mapCommands(evalPipeline.commands).executeEvaluation,
@@ -143,10 +156,27 @@ export class PipelineRegistry {
       nlpServiceUrl: process.env.LANGWATCH_NLP_SERVICE,
     });
 
+    if (!this.deps.clickhouse) {
+      logger.warn(
+        "ClickHouse client not provided, log and metric record writes will be no-ops using NullRepository implementations",
+      );
+    }
+
+    const logRecordRepo = this.deps.clickhouse
+      ? new LogRecordStorageClickHouseRepository(this.deps.clickhouse)
+      : new NullLogRecordStorageRepository();
+    const metricRecordRepo = this.deps.clickhouse
+      ? new MetricRecordStorageClickHouseRepository(this.deps.clickhouse)
+      : new NullMetricRecordStorageRepository();
+
     const tracePipeline = this.deps.eventSourcing.register(
       createTraceProcessingPipeline({
         spanAppendStore: new SpanAppendStore(this.deps.traces.spans.repository),
-        traceSummaryStore: new TraceSummaryStore(this.deps.traces.summary.repository),
+        logRecordAppendStore: new LogRecordAppendStore(logRecordRepo),
+        metricRecordAppendStore: new MetricRecordAppendStore(metricRecordRepo),
+        traceSummaryStore: new TraceSummaryStore(
+          this.deps.traces.summary.repository,
+        ),
         evaluationTriggerReactor,
         traceUpdateBroadcastReactor,
         satisfactionScoreReactor,
@@ -155,8 +185,9 @@ export class PipelineRegistry {
     );
 
     // Complete the wiring now that the pipeline is registered
-    satisfactionCommandRef.dispatch =
-      mapCommands(tracePipeline.commands).assignSatisfactionScore;
+    satisfactionCommandRef.dispatch = mapCommands(
+      tracePipeline.commands,
+    ).assignSatisfactionScore;
 
     return tracePipeline;
   }
@@ -166,10 +197,12 @@ export class PipelineRegistry {
       ? new SimulationRunStateRepositoryClickHouse(this.deps.clickhouse)
       : new SimulationRunStateRepositoryMemory();
     const simulationRunStore = createSimulationRunStateFoldStore(repository);
-    const snapshotUpdateBroadcastReactor = createSnapshotUpdateBroadcastReactor({
-      broadcast: this.deps.broadcast,
-      hasRedis: !!this.deps.eventSourcing.redisConnection,
-    });
+    const snapshotUpdateBroadcastReactor = createSnapshotUpdateBroadcastReactor(
+      {
+        broadcast: this.deps.broadcast,
+        hasRedis: !!this.deps.eventSourcing.redisConnection,
+      },
+    );
 
     return this.deps.eventSourcing.register(
       createSimulationProcessingPipeline({
@@ -180,16 +213,17 @@ export class PipelineRegistry {
   }
 
   private registerBillingReportingPipeline() {
-    const ReportUsageForMonthCommand =
-      createReportUsageForMonthCommandClass({
-        prisma: this.deps.prisma,
-        getUsageReportingService: () => this.deps.usageReportingService,
-        queryBillableEventsTotal,
-        selfDispatch: (data) => {
-          const pipeline = this.deps.eventSourcing.getPipeline(BILLING_REPORTING_PIPELINE_NAME);
-          return pipeline.commands.reportUsageForMonth.send(data);
-        },
-      });
+    const ReportUsageForMonthCommand = createReportUsageForMonthCommandClass({
+      prisma: this.deps.prisma,
+      getUsageReportingService: () => this.deps.usageReportingService,
+      queryBillableEventsTotal,
+      selfDispatch: (data) => {
+        const pipeline = this.deps.eventSourcing.getPipeline(
+          BILLING_REPORTING_PIPELINE_NAME,
+        );
+        return pipeline.commands.reportUsageForMonth.send(data);
+      },
+    });
 
     return this.deps.eventSourcing.register(
       createBillingReportingPipeline({
@@ -205,8 +239,11 @@ export class PipelineRegistry {
 
     return this.deps.eventSourcing.register(
       createExperimentRunProcessingPipeline({
-        experimentRunStateFoldStore: createExperimentRunStateFoldStore(repository),
-        experimentRunItemAppendStore: createExperimentRunItemAppendStore(this.deps.clickhouse),
+        experimentRunStateFoldStore:
+          createExperimentRunStateFoldStore(repository),
+        experimentRunItemAppendStore: createExperimentRunItemAppendStore(
+          this.deps.clickhouse,
+        ),
         esSync: createExperimentRunEsSyncReactor({
           project: this.deps.projects,
           repository: createElasticsearchBatchEvaluationRepository(),

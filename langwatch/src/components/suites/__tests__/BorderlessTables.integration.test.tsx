@@ -44,6 +44,7 @@ function makeGroupSummary(
     cancelledCount: 0,
     totalCount: 1,
     inProgressCount: 0,
+    queuedCount: 0,
     ...overrides,
   };
 }

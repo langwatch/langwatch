@@ -1,9 +1,10 @@
 /**
  * Drawer for creating and editing suite configurations.
  *
- * Uses the drawer registry pattern (URL-based state management) for proper
- * focus trap stacking when child drawers (scenarioEditor, agentHttpEditor)
- * are opened.
+ * Child drawers (scenarioEditor, agentHttpEditor) are rendered via local
+ * React state so the parent stays mounted and form state is preserved.
+ * The suite editor itself uses URL-based drawer registration for root-level
+ * opening.
  *
  * This is a thin orchestrator that composes:
  * - `useSuiteForm` for all form state and logic
@@ -24,7 +25,7 @@ import {
 import type { SimulationSuite } from "@prisma/client";
 import { ChevronDown, ChevronRight, Play } from "lucide-react";
 import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   useDrawer,
   useDrawerParams,
@@ -32,6 +33,8 @@ import {
 } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { AgentHttpEditorDrawer } from "../agents/AgentHttpEditorDrawer";
+import { ScenarioFormDrawer } from "../scenarios/ScenarioFormDrawer";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
 import { useSuiteForm, type SuiteFormData } from "./useSuiteForm";
@@ -61,6 +64,8 @@ function buildMutationPayload(data: SuiteFormData, projectId: string) {
 export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
   const { project, organization } = useOrganizationTeamProject();
   const { openDrawer, closeDrawer, drawerOpen } = useDrawer();
+  const [scenarioEditorOpen, setScenarioEditorOpen] = useState(false);
+  const [agentHttpEditorOpen, setAgentHttpEditorOpen] = useState(false);
   const params = useDrawerParams();
   const utils = api.useContext();
 
@@ -300,6 +305,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
   return (
+  <>
     <Drawer.Root
       open={isOpen}
       onOpenChange={(e) => {
@@ -374,7 +380,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                 allLabels={suiteForm.allLabels}
                 activeLabelFilter={suiteForm.activeLabelFilter}
                 onLabelFilterChange={suiteForm.setActiveLabelFilter}
-                onCreateNew={() => openDrawer("scenarioEditor")}
+                onCreateNew={() => setScenarioEditorOpen(true)}
                 hasError={!!errors.selectedScenarioIds}
                 archivedIds={archivedScenariosWithNames}
                 onRemoveArchived={suiteForm.removeArchivedScenario}
@@ -397,14 +403,11 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                 totalCount={suiteForm.availableTargets.length}
                 isTargetSelected={suiteForm.isTargetSelected}
                 onToggle={suiteForm.toggleTarget}
+                onSelectAll={suiteForm.selectAllTargets}
+                onClear={suiteForm.clearTargets}
                 searchQuery={suiteForm.targetSearch}
                 onSearchChange={suiteForm.setTargetSearch}
-                onCreateAgent={() => openDrawer("agentHttpEditor")}
-                onCreatePrompt={() => {
-                  if (project?.slug) {
-                    window.open(`/${project.slug}/prompts`, "_blank");
-                  }
-                }}
+                onAddTarget={() => setAgentHttpEditorOpen(true)}
                 hasError={!!errors.selectedTargets}
                 archivedTargets={archivedTargetsWithNames}
                 onRemoveArchived={suiteForm.removeArchivedTarget}
@@ -515,5 +518,18 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
         </Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>
+
+    {/* Child drawer: Scenario Editor -- managed via local state */}
+    <ScenarioFormDrawer
+      open={scenarioEditorOpen}
+      onClose={() => setScenarioEditorOpen(false)}
+    />
+
+    {/* Child drawer: Agent HTTP Editor -- managed via local state */}
+    <AgentHttpEditorDrawer
+      open={agentHttpEditorOpen}
+      onClose={() => setAgentHttpEditorOpen(false)}
+    />
+  </>
   );
 }

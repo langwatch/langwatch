@@ -62,7 +62,7 @@ function genParamName(prefix: string): string {
  * eliminating the need for a large switch statement. Each handler knows
  * how to translate its specific filter type to ClickHouse SQL.
  */
-const filterHandlers: Partial<Record<FilterField, FilterHandler>> = {
+const filterHandlers: Record<FilterField, FilterHandler | null> = {
   // Topic Filters
   "topics.topics": (values) => translateTopicFilter(values),
   "topics.subtopics": (values) => translateSubtopicFilter(values),
@@ -80,6 +80,7 @@ const filterHandlers: Partial<Record<FilterField, FilterHandler>> = {
   "metadata.prompt_ids": (values) => translatePromptIdsFilter(values),
 
   // Trace Filters
+  "traces.origin": (values) => translateOriginFilter(values),
   "traces.error": (values) => translateErrorFilter(values),
 
   // Span Filters
@@ -110,6 +111,9 @@ const filterHandlers: Partial<Record<FilterField, FilterHandler>> = {
 
   // Annotation Filters
   "annotations.hasAnnotation": (values) => translateAnnotationFilter(values),
+
+  // Not applicable to analytics pipeline
+  "sentiment.input_sentiment": null,
 };
 
 /**
@@ -249,6 +253,48 @@ function translatePromptIdsFilter(values: string[]): FilterTranslation {
     whereClause: `hasAny(JSONExtract(${ts}.Attributes['langwatch.prompt_ids'], 'Array(String)'), {${paramName}:Array(String)})`,
     requiredJoins: [],
     params: { [paramName]: values },
+  };
+}
+
+/**
+ * Translate origin filter.
+ *
+ * "application" is the default origin for traces that have no explicit
+ * langwatch.origin attribute (empty string or NULL). All other origin
+ * values (e.g. "evaluation", "simulation", "playground") are matched
+ * directly. When multiple origins are selected they are ORed together.
+ */
+function translateOriginFilter(values: string[]): FilterTranslation {
+  const ts = tableAliases.trace_summaries;
+
+  const hasApplication = values.includes("application");
+  const otherValues = values.filter((v) => v !== "application");
+
+  const parts: string[] = [];
+  const params: Record<string, unknown> = {};
+
+  if (hasApplication) {
+    parts.push(
+      `(${ts}.Attributes['langwatch.origin'] = '' OR ${ts}.Attributes['langwatch.origin'] IS NULL)`,
+    );
+  }
+
+  if (otherValues.length > 0) {
+    const paramName = genParamName("originValues");
+    parts.push(
+      `${ts}.Attributes['langwatch.origin'] IN ({${paramName}:Array(String)})`,
+    );
+    params[paramName] = otherValues;
+  }
+
+  if (parts.length === 0) {
+    return { whereClause: "1=0", requiredJoins: [], params: {} };
+  }
+
+  return {
+    whereClause: parts.length === 1 ? parts[0]! : `(${parts.join(" OR ")})`,
+    requiredJoins: [],
+    params,
   };
 }
 

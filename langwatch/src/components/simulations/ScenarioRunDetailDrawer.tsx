@@ -10,7 +10,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { ExternalLink } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { CopyButton } from "~/components/CopyButton";
 import { MetadataTag } from "~/components/MetadataTag";
 import { RunScenarioModal } from "~/components/scenarios/RunScenarioModal";
@@ -18,12 +18,14 @@ import { ScenarioFormDrawer } from "~/components/scenarios/ScenarioFormDrawer";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
 import { buildDisplayTitle } from "~/components/suites/run-history-transforms";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
+import { useDrawerRunCallbacks } from "~/hooks/useDrawerRunCallbacks";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRunScenario } from "~/hooks/useRunScenario";
 import { useScenarioTarget } from "~/hooks/useScenarioTarget";
 import { useTargetNameMap } from "~/hooks/useTargetNameMap";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { api } from "~/utils/api";
+import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { TraceDetails } from "../traces/TraceDetails";
 import { Drawer } from "../ui/drawer";
 import { CustomCopilotKitChat } from "./CustomCopilotKitChat";
@@ -99,9 +101,13 @@ export function ScenarioRunDetailDrawer({
     });
   }, [scenarioState?.name, scenarioState?.metadata, targetNameMap]);
 
+  const { onRunComplete, onRunFailed } = useDrawerRunCallbacks();
+
   const { runScenario, isRunning } = useRunScenario({
     projectId: project?.id,
     projectSlug: project?.slug,
+    onRunComplete,
+    onRunFailed,
   });
 
   const {
@@ -141,6 +147,19 @@ export function ScenarioRunDetailDrawer({
     return undefined;
   }, [scenarioState?.messages]);
 
+  // Relative time that auto-updates every 30s while the drawer is open
+  const [timeAgo, setTimeAgo] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (!open || !scenarioState?.timestamp) {
+      setTimeAgo(undefined);
+      return;
+    }
+    const update = () => setTimeAgo(formatTimeAgo(scenarioState.timestamp));
+    update();
+    const interval = setInterval(update, 30_000);
+    return () => clearInterval(interval);
+  }, [open, scenarioState?.timestamp]);
+
   const suiteId = scenarioState?.metadata?.langwatch?.simulationSuiteId;
 
   const copyableIds = useMemo(() => {
@@ -161,7 +180,6 @@ export function ScenarioRunDetailDrawer({
         placement="end"
         size="lg"
       >
-        <Drawer.Backdrop />
         <Drawer.Content paddingX={0} maxWidth="720px" overflow="hidden">
           {!scenarioState && open && (
             <Drawer.Body>
@@ -268,6 +286,8 @@ export function ScenarioRunDetailDrawer({
                     </VStack>
                     {scenarioState.durationInMs && (
                       <VStack
+                        borderRightWidth="1px"
+                        borderRightColor="border"
                         alignItems="flex-start"
                         paddingRight={4}
                         paddingY={3}
@@ -276,6 +296,16 @@ export function ScenarioRunDetailDrawer({
                         <Text color="fg">
                           {(scenarioState.durationInMs / 1000).toFixed(2)}s
                         </Text>
+                      </VStack>
+                    )}
+                    {timeAgo && (
+                      <VStack
+                        alignItems="flex-start"
+                        paddingRight={4}
+                        paddingY={3}
+                      >
+                        <b>Ran</b>
+                        <Text color="fg">{timeAgo}</Text>
                       </VStack>
                     )}
                   </HStack>
@@ -392,7 +422,6 @@ export function ScenarioRunDetailDrawer({
         placement="end"
         size="xl"
       >
-        <Drawer.Backdrop />
         <Drawer.Content paddingX={0} maxWidth="70%">
           <Drawer.CloseTrigger zIndex={10} />
           <Drawer.Body paddingY={0} paddingX={0} overflowY="auto">

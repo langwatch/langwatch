@@ -1,17 +1,20 @@
 import type { PrismaClient } from "@prisma/client";
 import { getApp } from "~/server/app-layer/app";
-import { FREE_PLAN } from "../../../../ee/licensing/constants";
-import { env } from "../../../env.mjs";
 import { TraceUsageService } from "../../traces/trace-usage.service";
 import { EventUsageService } from "../../traces/event-usage.service";
 import type { PlanResolver } from "../subscription/plan-provider";
 import { TtlCache } from "../../utils/ttlCache";
 import { OrganizationNotFoundForTeamError } from "../organizations/errors";
 import type { OrganizationService } from "../organizations/organization.service";
-import { resolveUsageMeter, type MeterDecision } from "./usage-meter-policy";
+import {
+  resolveUsageMeter,
+  type MeterDecision,
+  type UsageUnit,
+} from "./usage-meter-policy";
 import { OrganizationRepository } from "../../repositories/organization.repository";
 import { getClickHouseClient } from "../../clickhouse/client";
 import { createLogger } from "~/utils/logger/server";
+import { env } from "~/env.mjs";
 
 const logger = createLogger("langwatch:usage:usageService");
 
@@ -87,22 +90,35 @@ export class UsageService {
       this.planResolver(organizationId),
     ]);
 
-    // Self-hosted = unlimited traces for FREE plan
-    // Preventing customers from getting blocked when no license is active
-    if (!env.IS_SAAS && plan.type === FREE_PLAN.type) {
-      return { exceeded: false };
-    }
-
     if (count >= plan.maxMessagesPerMonth) {
+      // getCurrentMonthCount already warmed the decision cache, so this is a map lookup
+      const decision = await this.getCachedMeterDecision(organizationId);
       return {
         exceeded: true,
-        message: `Monthly limit of ${plan.maxMessagesPerMonth} traces reached`,
+        message: buildLimitMessage({
+          isFree: plan.free,
+          limit: plan.maxMessagesPerMonth,
+          usageUnit: decision.usageUnit,
+        }),
         count,
         maxMessagesPerMonth: plan.maxMessagesPerMonth,
         planName: plan.name,
       };
     }
     return { exceeded: false };
+  }
+
+  /**
+   * Returns the resolved usage unit for the given organization.
+   * Delegates to the cached meter decision.
+   */
+  async getResolvedUsageUnit({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<UsageUnit> {
+    const decision = await this.getCachedMeterDecision(organizationId);
+    return decision.usageUnit;
   }
 
   async getCurrentMonthCount({
@@ -196,6 +212,7 @@ export class UsageService {
       pricingModel,
       licenseUsageUnit: plan.usageUnit,
       hasValidLicenseOverride,
+      isFree: plan.free,
       clickhouseAvailable: !!getClickHouseClient(),
     });
 
@@ -212,4 +229,42 @@ export class UsageService {
     this.cache.clear();
     this.decisionCache.clear();
   }
+}
+
+/**
+ * Builds the human-readable limit message for 429 responses.
+ *
+ * Format: "{prefix} limit of {limit} {unit} reached. To increase your limits, {action}"
+ * - prefix: "Free" for free-tier orgs, "Monthly" for paid orgs
+ * - unit: "events" or "traces" based on the meter decision
+ * - action: SaaS users are told to upgrade; self-hosted users are told to buy a license
+ */
+function buildLimitMessage({
+  isFree,
+  limit,
+  usageUnit,
+}: {
+  isFree: boolean;
+  limit: number;
+  usageUnit: UsageUnit;
+}): string {
+  const prefix = isFree ? "Free" : "Monthly";
+  const base = `${prefix} limit of ${limit} ${usageUnit} reached`;
+  const upgradeUrl = buildUpgradeUrl();
+
+  return `${base}. To increase your limits, ${upgradeUrl}`;
+}
+
+/**
+ * Returns the upgrade call-to-action based on deployment mode.
+ * SaaS: "upgrade your plan at https://app.langwatch.ai/settings/subscription"
+ * Self-hosted: "buy a license at {BASE_HOST}/settings/license"
+ */
+function buildUpgradeUrl(): string {
+  if (env.IS_SAAS) {
+    return "upgrade your plan at https://app.langwatch.ai/settings/subscription";
+  }
+
+  const baseHost = env.BASE_HOST ?? "https://app.langwatch.ai";
+  return `buy a license at ${baseHost}/settings/license`;
 }

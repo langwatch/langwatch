@@ -18,7 +18,16 @@ type SeatsVariant = {
   onConfirm: () => Promise<void>;
 };
 
-export type UpgradeModalVariant = LimitVariant | SeatsVariant;
+/** Modal shown when a lite member tries to access a restricted feature. */
+type LiteMemberRestrictionVariant = {
+  mode: "liteMemberRestriction";
+  resource?: string;
+};
+
+export type UpgradeModalVariant =
+  | LimitVariant
+  | SeatsVariant
+  | LiteMemberRestrictionVariant;
 
 interface OpenSeatsParams {
   organizationId: string;
@@ -41,6 +50,9 @@ interface UpgradeModalState {
 
   /** Open the modal in seats confirmation mode. */
   openSeats: (params: OpenSeatsParams) => void;
+
+  /** Open the modal in lite member restriction mode. */
+  openLiteMemberRestriction: (params: { resource?: string }) => void;
 
   /** Close the modal and reset all state. */
   close: () => void;
@@ -68,6 +80,16 @@ export const useUpgradeModalStore = create<UpgradeModalState>((set) => ({
       isOpen: true,
       variant: { mode: "seats", organizationId, currentSeats, newSeats, onConfirm },
       // Clear legacy fields since seats mode does not use them.
+      limitType: null,
+      current: null,
+      max: null,
+    }),
+
+  openLiteMemberRestriction: ({ resource }) =>
+    set({
+      isOpen: true,
+      variant: { mode: "liteMemberRestriction", resource },
+      // Clear legacy fields since lite member restriction mode does not use them.
       limitType: null,
       current: null,
       max: null,

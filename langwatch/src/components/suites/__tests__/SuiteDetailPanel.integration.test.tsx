@@ -22,7 +22,7 @@ const mockRouterPush = vi.hoisted(() => vi.fn());
 vi.mock("~/utils/api", () => ({
   api: {
     scenarios: {
-      getAllScenarioSetRunData: { useQuery: mockUseQuery },
+      getSuiteRunData: { useQuery: mockUseQuery },
       getAll: { useQuery: vi.fn(() => ({ data: [] })) },
     },
     agents: {
@@ -31,9 +31,7 @@ vi.mock("~/utils/api", () => ({
     prompts: {
       getAllPromptsForProject: { useQuery: vi.fn(() => ({ data: [] })) },
     },
-    suites: {
-      getQueueStatus: { useQuery: vi.fn(() => ({ data: undefined })) },
-    },
+    suites: {},
   },
 }));
 
@@ -99,9 +97,9 @@ describe("<SuiteDetailPanel/>", () => {
   });
 
   beforeEach(() => {
-    // Default: no run data (getAllScenarioSetRunData returns array directly)
+    // Default: no run data (getSuiteRunData returns paginated result)
     mockUseQuery.mockReturnValue({
-      data: [],
+      data: { runs: [], scenarioSetIds: {}, hasMore: false },
       isLoading: false,
       error: null,
     });
@@ -265,8 +263,8 @@ describe("<SuiteDetailPanel/>", () => {
         { wrapper: Wrapper },
       );
 
-      // RunHistoryList uses getAllScenarioSetRunData (unpaginated) and filters
-      // client-side by period. Verify the query is called for this suite.
+      // RunHistoryPanel uses getSuiteRunData (paginated) with scenarioSetId.
+      // Verify the query is called for this suite.
       expect(mockUseQuery).toHaveBeenCalledWith(
         expect.objectContaining({
           projectId: expect.any(String),

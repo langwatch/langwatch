@@ -18,6 +18,11 @@ const GROWTH_EVENTS_PRICE_IDS = new Set([
   prices.GROWTH_EVENTS_EUR_ANNUAL,
   prices.GROWTH_EVENTS_USD_MONTHLY,
   prices.GROWTH_EVENTS_USD_ANNUAL,
+  // Pre-March 2026 prices (grandfathered customers on old €1/$1 per 100K rate)
+  prices.GROWTH_EVENTS_EUR_MONTHLY_UNTIL_MAR_2026,
+  prices.GROWTH_EVENTS_EUR_ANNUAL_UNTIL_MAR_2026,
+  prices.GROWTH_EVENTS_USD_MONTHLY_UNTIL_MAR_2026,
+  prices.GROWTH_EVENTS_USD_ANNUAL_UNTIL_MAR_2026,
 ]);
 
 /** Checks whether a given price ID corresponds to a Growth seat price. */

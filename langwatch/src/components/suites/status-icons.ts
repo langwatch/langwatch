@@ -29,4 +29,6 @@ export const STATUS_ICON_CONFIG: Record<ScenarioRunStatus, StatusIconConfig> = {
   [ScenarioRunStatus.STALLED]: { icon: AlertTriangle, animate: false },
   [ScenarioRunStatus.IN_PROGRESS]: { icon: Loader, animate: true },
   [ScenarioRunStatus.PENDING]: { icon: Clock, animate: false },
+  [ScenarioRunStatus.QUEUED]: { icon: Clock, animate: false },
+  [ScenarioRunStatus.RUNNING]: { icon: Loader, animate: true },
 };
