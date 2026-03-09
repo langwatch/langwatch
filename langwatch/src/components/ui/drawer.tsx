@@ -73,18 +73,17 @@ export const DrawerCloseTrigger = React.forwardRef<
  * - `modal={false}`: Prevents focus trap from stealing input in child drawers.
  * - `closeOnInteractOutside={false}`: Prevents parent from closing when
  *   interacting with a child drawer.
- * - `preventScroll={false}`: Always allow background scrolling.
+ * - `preventScroll={false}`: Default to allowing background scrolling.
  *
- * Override `modal` or `closeOnInteractOutside` explicitly if you need
- * different behavior (rare).
+ * All defaults can be overridden by passing props explicitly.
  */
 export const DrawerRoot = function DrawerRoot(props: ChakraDrawer.RootProps) {
   return (
     <ChakraDrawer.Root
       modal={false}
       closeOnInteractOutside={false}
-      {...props}
       preventScroll={false}
+      {...props}
     />
   );
 };
