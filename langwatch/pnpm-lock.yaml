@@ -125,8 +125,8 @@ importers:
         specifier: ^2.0.2
         version: 2.0.2
       '@langwatch/scenario':
-        specifier: file:vendor/langwatch-scenario-0.4.2.tgz
-        version: file:vendor/langwatch-scenario-0.4.2.tgz(0b95a7633f7e8a2c1c973593bc42fb25)
+        specifier: file:vendor/langwatch-scenario-0.4.3.tgz
+        version: file:vendor/langwatch-scenario-0.4.3.tgz(b437ff848c33eb7fb31f6d13d4b83a09)
       '@microlink/react-json-view':
         specifier: ^1.27.1
         version: 1.27.1(@types/react@19.0.10)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
@@ -967,6 +967,9 @@ packages:
 
   '@ag-ui/client@0.0.47':
     resolution: {integrity: sha512-zciVwYV6gmYzdMyWwSDR/VBcOj5x1lHPG/ZGDKyxDHbCeIdGp7sKoGORKHAiPAsfUhReGLKXsR/4IknqwY2PgQ==}
+
+  '@ag-ui/core@0.0.28':
+    resolution: {integrity: sha512-2Vjuxl0gE8E2RFjFccGZNczDw3Xqxve/EfoYRVAFNX3+rY7z64Mj0OWDw5p9L+X8UG0/+t0xYIquQpw7B4NdHA==}
 
   '@ag-ui/core@0.0.39':
     resolution: {integrity: sha512-T5Hp4oFkQ+H5MynWAvSwrX/rNYJOD+PJ4qPQ0o771oSZQAxoIvDDft47Cx5wRyBNNLXAe1RWqJjfWUUwJFNKqA==}
@@ -3453,9 +3456,9 @@ packages:
     resolution: {integrity: sha512-h9zbd+nfnxmCoSitXDwr0xpW9Ij62ZoYN8SxZlkddlBzZh0v2lwZI5lFmqMyrhUPlHnRJqCoqUFnZGRO3dvORA==}
     engines: {node: '>=16.0.0'}
 
-  '@langwatch/scenario@file:vendor/langwatch-scenario-0.4.2.tgz':
-    resolution: {integrity: sha512-GlPsV++ZIWDxeViDQyVoRiJCkV2CIvkb/pXz8j0WmgmUBOuC92/hiyNee4tCiJLFj1Z8Dkv/p1piHLmYbtgxuw==, tarball: file:vendor/langwatch-scenario-0.4.2.tgz}
-    version: 0.4.2
+  '@langwatch/scenario@file:vendor/langwatch-scenario-0.4.3.tgz':
+    resolution: {integrity: sha512-Hgr/yDggP9oj2/1e4FE1prfnFmkGFDx574EJnkdtNV9CpKyf+dqSs3m1SeeS/FO+fWiCWQe0SAlQNoreZU+9Mw==, tarball: file:vendor/langwatch-scenario-0.4.3.tgz}
+    version: 0.4.3
     engines: {node: '>=20', pnpm: '>=8'}
     peerDependencies:
       ai: '>=6.0.0'
@@ -10136,21 +10139,6 @@ packages:
       '@opentelemetry/sdk-trace-web': '>=1.19.0 <3.0.0'
       langchain: '>=0.3.0 <1.0.0'
 
-  langwatch@0.9.0:
-    resolution: {integrity: sha512-GssVCD5CAG+b4LSLbaR1xPu1xaVPna8FgkJdr2YJk6ign+jKsBovy9O05GiVuUzZZS2TxKkYD2URkYUJgGNmRw==}
-    engines: {node: '>=20', pnpm: '>=8'}
-    hasBin: true
-    peerDependencies:
-      '@ai-sdk/openai': '>=2.0.0 <3.0.0'
-      '@langchain/core': '>=0.3.0 <1.0.0'
-      '@langchain/langgraph': '>=0.4.0 <1.0.0'
-      '@langchain/openai': '>=0.6.0 <1.0.0'
-      '@opentelemetry/context-async-hooks': ^2.1.0
-      '@opentelemetry/context-zone': '>=1.19.0 <3.0.0'
-      '@opentelemetry/sdk-node': '>=0.200.0 <1.0.0'
-      '@opentelemetry/sdk-trace-web': '>=1.19.0 <3.0.0'
-      langchain: '>=0.3.0 <1.0.0'
-
   layout-base@1.0.2:
     resolution: {integrity: sha512-8h2oVEZNktL4BH2JCOI90iD1yXwL6iNW7KcCKT2QZgQJR2vbqDsldCTPRU9NifTCqHZci57XvQQ15YTu+sTYPg==}
 
@@ -13590,6 +13578,11 @@ snapshots:
       rxjs: 7.8.1
       untruncate-json: 0.0.1
       uuid: 11.1.0
+      zod: 3.25.76
+
+  '@ag-ui/core@0.0.28':
+    dependencies:
+      rxjs: 7.8.1
       zod: 3.25.76
 
   '@ag-ui/core@0.0.39':
@@ -17845,14 +17838,15 @@ snapshots:
 
   '@langwatch/ksuid@2.0.2': {}
 
-  '@langwatch/scenario@file:vendor/langwatch-scenario-0.4.2.tgz(0b95a7633f7e8a2c1c973593bc42fb25)':
+  '@langwatch/scenario@file:vendor/langwatch-scenario-0.4.3.tgz(b437ff848c33eb7fb31f6d13d4b83a09)':
     dependencies:
-      '@ag-ui/core': 0.0.47
+      '@ag-ui/core': 0.0.28
       '@ai-sdk/openai': 3.0.41(zod@3.25.76)
       '@openai/agents': 0.3.9(@cfworker/json-schema@4.1.1)(bufferutil@4.0.9)(hono@4.12.4)(ws@8.19.0(bufferutil@4.0.9))(zod@3.25.76)
+      '@opentelemetry/sdk-node': 0.212.0(@opentelemetry/api@1.9.0)
       ai: 5.0.53(zod@3.25.76)
       chalk: 5.6.2
-      langwatch: 0.9.0(e2fb137c7d7d2720dc1198b1fc7a4e74)
+      langwatch: 0.16.1(59761cf770ad4182007d313e08c43fe0)
       open: 11.0.0
       rxjs: 7.8.2
       vitest: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@18.19.103)(@vitest/ui@4.0.18)(jsdom@27.3.0(bufferutil@4.0.9))(sass@1.97.3)(terser@5.46.0)(tsx@4.19.1)(yaml@2.8.1)
@@ -17863,9 +17857,9 @@ snapshots:
       - '@langchain/core'
       - '@langchain/langgraph'
       - '@langchain/openai'
+      - '@opentelemetry/api'
       - '@opentelemetry/context-async-hooks'
       - '@opentelemetry/context-zone'
-      - '@opentelemetry/sdk-node'
       - '@opentelemetry/sdk-trace-web'
       - bufferutil
       - hono
@@ -18375,7 +18369,7 @@ snapshots:
 
   '@opentelemetry/exporter-logs-otlp-grpc@0.206.0(@opentelemetry/api@1.9.0)':
     dependencies:
-      '@grpc/grpc-js': 1.14.1
+      '@grpc/grpc-js': 1.14.3
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/core': 2.1.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/otlp-exporter-base': 0.206.0(@opentelemetry/api@1.9.0)
@@ -19141,7 +19135,7 @@ snapshots:
 
   '@opentelemetry/otlp-grpc-exporter-base@0.206.0(@opentelemetry/api@1.9.0)':
     dependencies:
-      '@grpc/grpc-js': 1.14.1
+      '@grpc/grpc-js': 1.14.3
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/core': 2.1.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/otlp-exporter-base': 0.206.0(@opentelemetry/api@1.9.0)
@@ -22946,6 +22940,10 @@ snapshots:
     dependencies:
       acorn: 8.15.0
 
+  acorn-import-attributes@1.9.5(acorn@8.16.0):
+    dependencies:
+      acorn: 8.16.0
+
   acorn-walk@8.3.4:
     dependencies:
       acorn: 8.15.0
@@ -25447,8 +25445,8 @@ snapshots:
 
   import-in-the-middle@2.0.6:
     dependencies:
-      acorn: 8.15.0
-      acorn-import-attributes: 1.9.5(acorn@8.15.0)
+      acorn: 8.16.0
+      acorn-import-attributes: 1.9.5(acorn@8.16.0)
       cjs-module-lexer: 2.2.0
       module-details-from-path: 1.0.4
 
@@ -26477,7 +26475,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  langwatch@0.9.0(e2fb137c7d7d2720dc1198b1fc7a4e74):
+  langwatch@0.16.1(59761cf770ad4182007d313e08c43fe0):
     dependencies:
       '@ai-sdk/openai': 3.0.41(zod@3.25.76)
       '@langchain/core': 0.3.80(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.204.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.0.1(@opentelemetry/api@1.9.0))(openai@5.20.0(ws@8.19.0(bufferutil@4.0.9))(zod@3.25.76))
@@ -26490,23 +26488,23 @@ snapshots:
       '@opentelemetry/core': 2.0.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/exporter-logs-otlp-http': 0.205.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/exporter-trace-otlp-http': 0.205.0(@opentelemetry/api@1.9.0)
-      '@opentelemetry/instrumentation': 0.205.0(@opentelemetry/api@1.9.0)
-      '@opentelemetry/resources': 2.5.1(@opentelemetry/api@1.9.0)
+      '@opentelemetry/instrumentation': 0.212.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/resources': 2.5.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/sdk-logs': 0.205.0(@opentelemetry/api@1.9.0)
-      '@opentelemetry/sdk-metrics': 2.5.1(@opentelemetry/api@1.9.0)
-      '@opentelemetry/sdk-node': 0.203.0(@opentelemetry/api@1.9.0)
-      '@opentelemetry/sdk-trace-base': 2.5.1(@opentelemetry/api@1.9.0)
+      '@opentelemetry/sdk-metrics': 2.5.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/sdk-node': 0.212.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/sdk-trace-base': 2.5.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/sdk-trace-web': 2.0.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/semantic-conventions': 1.36.0
       '@types/prompts': 2.4.9
       chalk: 4.1.2
       commander: 12.1.0
-      dotenv: 16.6.1
+      dotenv: 17.3.1
       js-yaml: 4.1.0
       langchain: 0.3.31(@langchain/core@0.3.80(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.204.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.0.1(@opentelemetry/api@1.9.0))(openai@5.20.0(ws@8.19.0(bufferutil@4.0.9))(zod@3.25.76)))(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.204.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.0.1(@opentelemetry/api@1.9.0))(axios@1.13.6(debug@4.4.1))(handlebars@4.7.8)(openai@5.20.0(ws@8.19.0(bufferutil@4.0.9))(zod@3.25.76))(ws@8.19.0(bufferutil@4.0.9))
       liquidjs: 10.24.0
-      open: 10.2.0
-      openapi-fetch: 0.14.0
+      open: 11.0.0
+      openapi-fetch: 0.16.0
       ora: 5.4.1
       prompts: 2.4.2
       xksuid: 0.0.4
@@ -27763,7 +27761,7 @@ snapshots:
       '@opentelemetry/exporter-logs-otlp-grpc': 0.206.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/exporter-logs-otlp-http': 0.206.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/exporter-logs-otlp-proto': 0.206.0(@opentelemetry/api@1.9.0)
-      '@opentelemetry/resources': 2.5.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/resources': 2.5.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/sdk-logs': 0.206.0(@opentelemetry/api@1.9.0)
     transitivePeerDependencies:
       - '@opentelemetry/api'
@@ -28831,7 +28829,7 @@ snapshots:
   require-in-the-middle@8.0.1:
     dependencies:
       debug: 4.4.3(supports-color@8.1.1)
-      module-details-from-path: 1.0.3
+      module-details-from-path: 1.0.4
     transitivePeerDependencies:
       - supports-color
 
