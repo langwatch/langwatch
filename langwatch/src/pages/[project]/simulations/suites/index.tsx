@@ -280,11 +280,19 @@ function SuitesPageContent() {
     onSuccess: () => {
       void utils.suites.getAll.invalidate();
     },
+    onError: (err) => {
+      toaster.create({
+        title: "Failed to update labels",
+        description: err.message,
+        type: "error",
+        meta: { closable: true },
+      });
+    },
   });
 
   const handleAddLabel = useCallback(
     (label: string) => {
-      if (!project || !selectedSuite) return;
+      if (!project || !selectedSuite || updateLabelsMutation.isPending) return;
       updateLabelsMutation.mutate({
         projectId: project.id,
         id: selectedSuite.id,
@@ -296,7 +304,7 @@ function SuitesPageContent() {
 
   const handleRemoveLabel = useCallback(
     (label: string) => {
-      if (!project || !selectedSuite) return;
+      if (!project || !selectedSuite || updateLabelsMutation.isPending) return;
       updateLabelsMutation.mutate({
         projectId: project.id,
         id: selectedSuite.id,

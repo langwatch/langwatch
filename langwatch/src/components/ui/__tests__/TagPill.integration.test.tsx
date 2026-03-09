@@ -139,7 +139,7 @@ describe("<TagList/>", () => {
       );
 
       await user.click(screen.getByText("+ add"));
-      const input = screen.getByPlaceholderText("Add label...");
+      screen.getByPlaceholderText("Add label...");
       await user.keyboard("{Escape}");
       expect(
         screen.queryByPlaceholderText("Add label..."),
