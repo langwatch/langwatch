@@ -164,7 +164,7 @@ export const ModelProviderSelector = React.memo(function ModelProviderSelector({
       <Select.Trigger
         className="fix-hidden-inputs"
         width={size === "full" ? "100%" : "auto"}
-        background="white"
+        background="bg.panel"
         padding={0}
       >
         <Select.ValueText placeholder={selectValueText}>

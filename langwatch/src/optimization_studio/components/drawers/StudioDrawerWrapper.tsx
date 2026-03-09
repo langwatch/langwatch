@@ -215,7 +215,7 @@ export function StudioDrawerWrapper({
           {effectiveFooter && (
             <Drawer.Footer
               borderTopWidth="1px"
-              borderColor="gray.200"
+              borderColor="border"
               paddingX={4}
               paddingY={3}
             >
@@ -261,9 +261,9 @@ export function StudioDrawerWrapper({
                 width: `${panelWidth}px`,
                 display: "flex",
                 flexDirection: "column",
-                background: "white",
+                background: "var(--chakra-colors-bg)",
                 border: "1px solid",
-                borderColor: "var(--chakra-colors-gray-350)",
+                borderColor: "var(--chakra-colors-border-emphasized)",
                 zIndex: 100,
                 overflow: "hidden",
               }}
@@ -273,7 +273,7 @@ export function StudioDrawerWrapper({
                 paddingY={2}
                 paddingX={3}
                 borderBottomWidth="1px"
-                borderColor="gray.200"
+                borderColor="border"
                 flexShrink={0}
               >
                 {headerContent}
@@ -290,7 +290,7 @@ export function StudioDrawerWrapper({
               {effectiveFooter && (
                 <Box
                   borderTopWidth="1px"
-                  borderColor="gray.200"
+                  borderColor="border"
                   paddingX={4}
                   paddingY={3}
                   flexShrink={0}

@@ -10,6 +10,7 @@ import {
   Shield,
 } from "react-feather";
 import { Bot } from "lucide-react";
+import { useColorModeValue } from "../../components/ui/color-mode";
 import { EqualsIcon } from "../../components/icons/EqualsIcon";
 import { LLMIcon } from "../../components/icons/LLMIcon";
 import { WeaviateIcon } from "../../components/icons/WeaviateIcon";
@@ -155,9 +156,11 @@ export function WorkflowIcon({
   icon: React.ReactNode;
   size: "xs" | "md" | "lg";
 } & BoxProps) {
+  const bgColor = useColorModeValue("#F2F4F8", "#19191d");
+  const dotColor = useColorModeValue("#E5E7EB", "#2e3038");
   const reactflowBg = `<svg width="6" height="6" viewBox="0 0 6 6" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="6" height="6" fill="#F2F4F8"/>
-  <rect x="3" y="3" width="2" height="2" fill="#E5E7EB"/>
+  <rect width="6" height="6" fill="${bgColor}"/>
+  <rect x="3" y="3" width="2" height="2" fill="${dotColor}"/>
   </svg>
   `;
 
