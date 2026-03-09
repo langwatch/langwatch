@@ -95,12 +95,11 @@ export function createRunHistoryStore() {
     syncToUrl: (router: RouterLike) => {
       const { groupBy, filters } = get();
 
-      // Start from router.query but exclude Next.js dynamic path params
-      // which are not real query params (e.g. [project] → "project").
-      const pathParams = new Set(["project"]);
+      // Preserve all existing query params (including dynamic path params
+      // like "project" which Next.js needs to interpolate the pathname).
       const query: Record<string, string> = {};
       for (const [key, val] of Object.entries(router.query)) {
-        if (typeof val === "string" && !pathParams.has(key)) {
+        if (typeof val === "string") {
           query[key] = val;
         }
       }
