@@ -97,12 +97,20 @@ specs/               # BDD feature specs
 
 ## Orchestration Model
 
-Implementation tasks use `/orchestrate` to manage the plan → code → review → e2e loop:
+Implementation tasks use `/orchestrate` to manage work. The orchestrator detects whether an issue is a **bug fix** or a **feature** and selects the appropriate workflow.
 
 - `/orchestrate <requirements>` - Enter orchestration mode
 - `/implement #123` - Fetch GitHub issue → invoke `/orchestrate`
 
-The orchestrator:
+**Bug detection:** Issues are classified as bugs when they have a "bug" label, title keywords ("fix", "bug", "broken"), or use a bug report issue template. Everything else follows the feature workflow.
+
+**Bug-fix workflow:** investigate → fix → verify → review
+1. Investigates the root cause using `/code` (coder agent)
+2. Applies the fix and runs existing tests to verify
+3. Delegates to `/review` (uncle-bob-reviewer + cupid-reviewer agents in parallel)
+4. Skips `/plan` and spec creation — bugs fix existing behavior, not add new behavior
+
+**Feature workflow:** plan → code → review → e2e
 1. **Creates a task checklist** using TaskCreate to map acceptance criteria
 2. Delegates to `/plan` (self-contained), `/code` (coder agent), `/review` (uncle-bob-reviewer + cupid-reviewer agents in parallel)
 3. **Verifies with E2E tests** via `/e2e` (if feature has `@e2e` scenarios)
