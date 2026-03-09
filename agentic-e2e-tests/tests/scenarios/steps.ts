@@ -68,7 +68,9 @@ export async function givenIAmOnTheSimulationsPage(page: Page) {
 
   // Navigate directly to simulations page (Runs)
   await page.goto(`/${projectSlug}/simulations`);
-  await expect(page).toHaveURL(/simulations/, { timeout: 10000 });
+  await expect
+    .poll(() => new URL(page.url()).pathname, { timeout: 10000 })
+    .toBe(`/${projectSlug}/simulations`);
 }
 
 /**
@@ -167,10 +169,10 @@ export async function whenIAddCriterion(page: Page, criterion: string) {
  * Then the criterion appears in the criteria list
  */
 export async function thenCriterionAppearsInList(page: Page, criterion: string) {
-  // Criteria appear as input elements with the criterion as their value
-  // Use a locator that finds inputs by their value attribute
-  const criterionInput = page.locator(`input[value="${criterion}"]`).last();
-  await expect(criterionInput).toBeVisible({ timeout: 5000 });
+  // Find the last input in the criteria list and assert its value safely
+  // Using toHaveValue() handles special characters (quotes, backslashes)
+  const criterionInput = page.locator("input[name]").last();
+  await expect(criterionInput).toHaveValue(criterion, { timeout: 5000 });
 }
 
 /**
