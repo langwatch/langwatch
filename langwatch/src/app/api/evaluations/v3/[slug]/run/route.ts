@@ -32,7 +32,7 @@ import type { EvaluationV3Event } from "~/server/evaluations-v3/execution/types"
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
 import { createLogger } from "~/utils/logger/server";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 
 const logger = createLogger("langwatch:evaluations-v3:run");
 
@@ -232,7 +232,10 @@ app.post("/:slug/run", async (c) => {
           { error, projectId: project.id, slug },
           "Orchestrator error",
         );
-        captureException(error, { extra: { projectId: project.id, slug } });
+        captureException(
+          toError(error),
+          { extra: { projectId: project.id, slug } },
+        );
 
         await stream.writeSSE({
           data: JSON.stringify({
@@ -288,9 +291,10 @@ app.post("/:slug/run", async (c) => {
         { error, projectId: project.id, slug, runId },
         "Execution error",
       );
-      captureException(error, {
-        extra: { projectId: project.id, slug, runId },
-      });
+      captureException(
+        toError(error),
+        { extra: { projectId: project.id, slug, runId } },
+      );
       await runStateManager.failRun(runId, (error as Error).message);
     }
   };

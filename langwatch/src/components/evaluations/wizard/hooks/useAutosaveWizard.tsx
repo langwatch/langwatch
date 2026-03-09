@@ -1,7 +1,7 @@
 import { useRouter } from "next/router";
 import { useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
 import { getRandomWorkflowIcon } from "../../../../optimization_studio/components/workflow/NewWorkflowForm";
 import { getWorkflow } from "../../../../optimization_studio/hooks/useWorkflowStore";
@@ -140,14 +140,17 @@ const useAutosaveWizard = () => {
               closable: true,
             },
           });
-          captureException(error, {
-            extra: {
-              context: "Failed to autosave evaluation",
-              projectId: project.id,
-              workbenchState,
-              dsl,
+          captureException(
+            toError(error),
+            {
+              extra: {
+                context: "Failed to autosave evaluation",
+                projectId: project.id,
+                workbenchState,
+                dsl,
+              },
             },
-          });
+          );
         }
       })();
     }

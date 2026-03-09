@@ -3,7 +3,7 @@ import { getProtectionsForProject } from "~/server/api/utils";
 import { prisma } from "~/server/db";
 import { TraceService } from "~/server/traces/trace.service";
 import { createLogger } from "~/utils/logger/server";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { handleAddToAnnotationQueue } from "./actions/addToAnnotationQueue";
 import { handleAddToDataset } from "./actions/addToDataset";
 import { handleSendEmail } from "./actions/sendEmail";
@@ -35,16 +35,19 @@ export const processTraceBasedTrigger = async (
   try {
     parsedFilters = JSON.parse(filters as string);
   } catch (error) {
-    captureException(error, {
-      extra: {
-        triggerId,
-        projectId,
-        triggerName: name,
-        rawFilters: filters as string,
-        type: "traceBasedTrigger",
-        errorType: "JSONParseError",
+    captureException(
+      toError(error),
+      {
+        extra: {
+          triggerId,
+          projectId,
+          triggerName: name,
+          rawFilters: filters as string,
+          type: "traceBasedTrigger",
+          errorType: "JSONParseError",
+        },
       },
-    });
+    );
 
     return {
       triggerId,

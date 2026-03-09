@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 
 import { dependencies } from "../../../../injection/dependencies.server";
 import { skipPermissionCheck } from "../../rbac";
@@ -85,7 +85,9 @@ export const onboardingRouter = createTRPCRouter({
               },
             );
           } catch (err) {
-            captureException(err);
+            captureException(
+              toError(err),
+            );
           }
         }
 
@@ -99,7 +101,9 @@ export const onboardingRouter = createTRPCRouter({
           projectSlug: projectResult.projectSlug,
         };
       } catch (error) {
-        captureException(error);
+        captureException(
+          toError(error),
+        );
         throw error;
       }
     }),

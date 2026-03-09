@@ -28,7 +28,7 @@ import { prisma } from "~/server/db";
 import { DomainError } from "~/server/app-layer/domain-error";
 import { getLogLevelFromStatusCode } from "../middleware/requestLogging";
 import { createLogger } from "../../utils/logger/server";
-import { captureException } from "../../utils/posthogErrorCapture";
+import { captureException, toError } from "../../utils/posthogErrorCapture";
 import { auditLog } from "../auditLog";
 import type { PermissionMiddleware } from "./rbac";
 
@@ -245,7 +245,7 @@ export const tracerMiddleware = t.middleware(
 
         if (!result.ok) {
           const err = result.error;
-          span.recordException(err instanceof Error ? err : new Error(String(err)));
+          span.recordException(toError(err));
           span.setStatus({
             code: SpanStatusCode.ERROR,
             message: err instanceof Error ? err.message : String(err),
@@ -310,7 +310,7 @@ export function handleTrpcCallLogging({
   userAgent: string | null;
   statusCode: number | null;
   log: Pick<ReturnType<typeof createLogger>, "info" | "warn" | "error">;
-  capture: (error: unknown) => void;
+  capture: (error: Error | string) => void;
 }): void {
   const logData: Record<string, any> = {
     path,
@@ -339,7 +339,7 @@ export function handleTrpcCallLogging({
 
     // Only capture 5xx errors (actual bugs)
     if (resolvedStatus >= 500) {
-      capture(result.error);
+      capture(toError(result.error));
     }
 
     const logLevel = getLogLevelFromStatusCode(resolvedStatus);

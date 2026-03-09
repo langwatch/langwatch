@@ -5,7 +5,7 @@ import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root"
 import { getLangWatchTracer } from "langwatch";
 import { type NextRequest, NextResponse } from "next/server";
 import { notifyPlanLimitReached } from "../../../../../../ee/billing";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
 import { withAppRouterTracer } from "../../../../../middleware/app-router-tracer";
 import {
@@ -170,13 +170,16 @@ async function handleTracesRequest(req: NextRequest) {
             },
             "error parsing traces",
           );
-          captureException(error, {
-            extra: {
-              projectId: project.id,
-              traceRequest: Buffer.from(body).toString("base64"),
-              jsonError,
+          captureException(
+            toError(error),
+            {
+              extra: {
+                projectId: project.id,
+                traceRequest: Buffer.from(body).toString("base64"),
+                jsonError,
+              },
             },
-          });
+          );
 
           return NextResponse.json(
             { error: "Failed to parse traces" },

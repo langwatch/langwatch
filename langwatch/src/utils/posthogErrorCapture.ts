@@ -22,6 +22,15 @@ function getServerPostHogInstance() {
   }
 }
 
+/**
+ * Converts an unknown value to an Error instance.
+ * If the value is already an Error, returns it directly.
+ * Otherwise, wraps it in a new Error using String() coercion.
+ */
+export function toError(value: unknown): Error {
+  return value instanceof Error ? value : new Error(String(value));
+}
+
 interface CaptureExceptionOptions {
   extra?: Record<string, unknown>;
   tags?: Record<string, string>;
@@ -104,15 +113,10 @@ export function captureMessage(
  * Captures an exception/error using PostHog
  */
 export function captureException(
-  error: unknown,
+  error: Error | string,
   options?: CaptureExceptionOptions,
 ): void {
-  const errorMessage =
-    error instanceof Error
-      ? error.message
-      : typeof error === "string"
-        ? error
-        : "Unknown error";
+  const errorMessage = error instanceof Error ? error.message : error;
 
   const errorStack =
     error instanceof Error && error.stack ? error.stack : undefined;
@@ -224,7 +228,7 @@ export async function startSpan<T>(
   try {
     return await callback();
   } catch (error) {
-    captureException(error, {
+    captureException(toError(error), {
       extra: {
         span_name: options.name,
         span_op: options.op,
@@ -253,6 +257,7 @@ const PostHogErrorCapture = {
   withScope,
   startSpan,
   init,
+  toError,
 };
 
 export default PostHogErrorCapture;

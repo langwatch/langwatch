@@ -10,7 +10,7 @@ import {
   scheduleTraceCollectionWithFallback,
 } from "~/server/background/workers/collectorWorker";
 import { openTelemetryLogsRequestToTracesForCollection } from "~/server/tracer/otel.logs";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { notifyPlanLimitReached } from "../../../../../../ee/billing";
 import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
 import { withAppRouterTracer } from "../../../../../middleware/app-router-tracer";
@@ -119,7 +119,7 @@ async function handleLogsRequest(req: NextRequest) {
           { error, projectId: project.id },
           "Error checking trace limit",
         );
-        captureException(error as Error, {
+        captureException(toError(error), {
           extra: { projectId: project.id },
         });
       }
@@ -159,13 +159,16 @@ async function handleLogsRequest(req: NextRequest) {
             "error parsing logs",
           );
 
-          captureException(error, {
-            extra: {
-              projectId: project.id,
-              logRequest: Buffer.from(body).toString("base64"),
-              jsonError,
+          captureException(
+            toError(error),
+            {
+              extra: {
+                projectId: project.id,
+                logRequest: Buffer.from(body).toString("base64"),
+                jsonError,
+              },
             },
-          });
+          );
 
           return NextResponse.json(
             { error: "Failed to parse logs" },

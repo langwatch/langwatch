@@ -1,4 +1,4 @@
-import { captureException } from "../../../src/utils/posthogErrorCapture";
+import { captureException, toError } from "../../../src/utils/posthogErrorCapture";
 import type {
   BillingNotificationHandlers,
   LicensePurchaseNotificationPayload,
@@ -29,7 +29,7 @@ const runHandlerSafely = async <T>(
   try {
     await handler(payload);
   } catch (error) {
-    captureException(error);
+    captureException(toError(error));
   }
 };
 

@@ -1,7 +1,7 @@
 import { TriggerAction } from "@prisma/client";
 import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
 import { prisma } from "~/server/db";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import type { ActionParams, TriggerContext, TriggerData } from "../types";
 
 export const handleAddToAnnotationQueue = async (context: TriggerContext) => {
@@ -18,13 +18,16 @@ export const handleAddToAnnotationQueue = async (context: TriggerContext) => {
 
     await createQueueItems(triggerData, annotators ?? [], createdByUserId);
   } catch (error) {
-    captureException(error, {
-      extra: {
-        triggerId: trigger.id,
-        projectId: trigger.projectId,
-        action: TriggerAction.ADD_TO_ANNOTATION_QUEUE,
+    captureException(
+      toError(error),
+      {
+        extra: {
+          triggerId: trigger.id,
+          projectId: trigger.projectId,
+          action: TriggerAction.ADD_TO_ANNOTATION_QUEUE,
+        },
       },
-    });
+    );
   }
 };
 

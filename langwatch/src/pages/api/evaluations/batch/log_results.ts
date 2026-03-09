@@ -4,7 +4,7 @@ import { type ZodError, z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { getApp } from "~/server/app-layer/app";
 import { DomainError } from "~/server/app-layer/domain-error";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { prisma } from "../../../../server/db";
 import {
   BATCH_EVALUATION_INDEX,
@@ -101,7 +101,10 @@ export default async function handler(
       "invalid log_results data received",
     );
     // TODO: should it be a warning instead of exception? here and all over our APIs
-    captureException(error, { extra: { projectId: project.id } });
+    captureException(
+      toError(error),
+      { extra: { projectId: project.id } },
+    );
 
     const validationError = fromZodError(error as ZodError);
     return res.status(400).json({ error: validationError.message });
@@ -162,9 +165,10 @@ export default async function handler(
         { error, body: params, projectId: project.id },
         "internal server error processing batch evaluation",
       );
-      captureException(error, {
-        extra: { projectId: project.id, param: params },
-      });
+      captureException(
+        toError(error),
+        { extra: { projectId: project.id, param: params } },
+      );
 
       return res.status(500).json({ error: "Internal server error" });
     }

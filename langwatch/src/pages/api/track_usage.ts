@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { getPostHogInstance } from "../../server/posthog";
 
 export default async function handler(
@@ -19,7 +19,9 @@ export default async function handler(
         properties,
       });
     } catch (error) {
-      captureException(error);
+      captureException(
+        toError(error),
+      );
     }
   }
 

@@ -10,7 +10,7 @@ import {
   scheduleTraceCollectionWithFallback,
 } from "~/server/background/workers/collectorWorker";
 import { openTelemetryMetricsRequestToTracesForCollection } from "~/server/tracer/otel.metrics";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { notifyPlanLimitReached } from "../../../../../../ee/billing";
 import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
 import { withAppRouterTracer } from "../../../../../middleware/app-router-tracer";
@@ -119,7 +119,7 @@ async function handleMetricsRequest(req: NextRequest) {
           { error, projectId: project.id },
           "Error checking trace limit",
         );
-        captureException(error as Error, {
+        captureException(toError(error), {
           extra: { projectId: project.id },
         });
       }
@@ -159,13 +159,16 @@ async function handleMetricsRequest(req: NextRequest) {
             "error parsing metrics",
           );
 
-          captureException(error, {
-            extra: {
-              projectId: project.id,
-              metricsRequest: Buffer.from(body).toString("base64"),
-              jsonError,
+          captureException(
+            toError(error),
+            {
+              extra: {
+                projectId: project.id,
+                metricsRequest: Buffer.from(body).toString("base64"),
+                jsonError,
+              },
             },
-          });
+          );
 
           return NextResponse.json(
             { error: "Failed to parse metrics" },

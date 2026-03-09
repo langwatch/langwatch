@@ -6,7 +6,7 @@ import { nanoid } from "nanoid";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { z } from "zod";
 import { fromZodError, type ZodError } from "zod-validation-error";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { getInputsOutputs } from "../../../optimization_studio/utils/nodeUtils";
 import { getCustomEvaluators } from "../../../server/api/routers/evaluations";
 import { createCostChecker } from "../../../server/license-enforcement/license-enforcement.repository";
@@ -100,7 +100,10 @@ export default async function handler(
       { error, body: req.body, projectId: project.id },
       "invalid evaluation params received",
     );
-    captureException(error, { extra: { projectId: project.id } });
+    captureException(
+      toError(error),
+      { extra: { projectId: project.id } },
+    );
 
     const validationError = fromZodError(error as ZodError);
     return res.status(400).json({ error: validationError.message });
@@ -176,7 +179,10 @@ export default async function handler(
       { error, body: req.body, projectId: project.id },
       "invalid evaluation data received",
     );
-    captureException(error, { extra: { projectId: project.id } });
+    captureException(
+      toError(error),
+      { extra: { projectId: project.id } },
+    );
 
     const validationError = fromZodError(error as ZodError);
     return res.status(400).json({ error: validationError.message });
