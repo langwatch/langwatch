@@ -26,11 +26,12 @@ vi.mock("next/router", () => ({
 const { useMessagesNavigationFooter } = await import("../NavigationFooter");
 
 describe("useMessagesNavigationFooter()", () => {
-  beforeEach(() => {
-    mockPush.mockClear();
-  });
+  describe("given a project-scoped route with default pagination", () => {
+    beforeEach(() => {
+      mockPush.mockClear();
+    });
 
-  describe("when navigating to the next page", () => {
+    describe("when navigating to the next page", () => {
     it("preserves the project slug in the query for dynamic route resolution", () => {
       const { result } = renderHook(() => useMessagesNavigationFooter());
 
@@ -92,5 +93,6 @@ describe("useMessagesNavigationFooter()", () => {
       expect(query.pageOffset).toBeUndefined();
       expect(query.pageSize).toBe("50");
     });
+  });
   });
 });

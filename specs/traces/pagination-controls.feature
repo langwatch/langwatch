@@ -45,7 +45,7 @@ Feature: Traces tab pagination controls
     Given the current URL has no pageSize parameter
     When I change the "Items per page" dropdown to 50
     Then the URL query parameter "pageSize" is set to "50"
-    And the "pageOffset" is reset to 0
+    And the "pageOffset" query parameter is absent
 
   @integration
   Scenario: Changing items per page resets to first page
@@ -94,7 +94,7 @@ Feature: Traces tab pagination controls
   Scenario: Navigating back to the previous page
     Given I am on page 2 with pageOffset 25
     When I click the "previous page" button
-    Then the URL query parameter "pageOffset" is set to "0"
+    Then the "pageOffset" query parameter is absent
     And the trace list reloads showing the first page
 
   # ─── Page Position Indicator ────────────────────────────────────
@@ -128,11 +128,11 @@ Feature: Traces tab pagination controls
   # ─── Query/Filter Interaction ───────────────────────────────────
 
   @unit
-  Scenario: Changing search query resets page offset but preserves page size
+  Scenario: Changing search query resets pagination to defaults
     Given the pageOffset is 50 and pageSize is 100
     When the search query changes
     Then the pageOffset is reset to 0
-    And the pageSize remains 100
+    And the pageSize is reset to the default of 25
 
   @unit
   Scenario: Page size dropdown reflects current URL parameter
