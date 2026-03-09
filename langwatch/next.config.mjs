@@ -98,7 +98,6 @@ const config = {
     "@aws-sdk/client-cloudwatch-logs",
     "@aws-sdk/client-s3",
     "@aws-sdk/client-ses",
-    "prettier",
   ],
 
   experimental: {
@@ -164,7 +163,6 @@ const config = {
     config.resolve.alias["next-auth"] = `${__dirname}/node_modules/next-auth`;
     // biome-ignore lint/complexity/useLiteralKeys: using string keys for consistency with hyphenated keys
     config.resolve.alias["zod"] = `${__dirname}/node_modules/zod`;
-		config.resolve.alias["prettier"] = false;
 
     // Add fallback for pino logger requirements (browser-side)
     if (!config.isServer) {
