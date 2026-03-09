@@ -98,6 +98,7 @@ const config = {
     "@aws-sdk/client-cloudwatch-logs",
     "@aws-sdk/client-s3",
     "@aws-sdk/client-ses",
+    "prettier",
   ],
 
   experimental: {
