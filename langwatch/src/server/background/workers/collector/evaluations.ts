@@ -15,10 +15,6 @@ import type { CollectorJob, EvaluationJob } from "../../types";
 
 const _logger = createLogger("langwatch:workers:collector:evaluations");
 
-// Re-export from extracted module for backwards compatibility
-import { evaluationNameAutoslug } from "./evaluationNameAutoslug";
-export { evaluationNameAutoslug };
-
 export const mapEvaluations = (
   data: CollectorJob,
 ): ElasticSearchEvaluation[] | undefined => {
