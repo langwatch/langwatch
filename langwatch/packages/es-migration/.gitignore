@@ -1,7 +1,0 @@
-cursor-*.json
-cursor-*.jsonl
-dry-run-*.json
-dry-run-*.jsonl
-.env
-.env*
-!.env.example
