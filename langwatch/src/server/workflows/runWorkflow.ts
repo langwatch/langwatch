@@ -9,7 +9,7 @@ import type {
 import type { StudioClientEvent } from "../../optimization_studio/types/events";
 import { getEntryInputs } from "../../optimization_studio/utils/nodeUtils";
 import { lambdaFetch } from "../../utils/lambdaFetch";
-import { getProjectModelProviders } from "../api/routers/modelProviders";
+import { getProjectModelProviders } from "../api/routers/modelProviders.utils";
 import { prisma } from "../db";
 import type { SingleEvaluationResult } from "../evaluations/evaluators.generated";
 import type { MaybeStoredModelProvider } from "../modelProviders/registry";
