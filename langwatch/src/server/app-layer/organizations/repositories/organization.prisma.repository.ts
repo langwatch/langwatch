@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { Currency, PrismaClient } from "@prisma/client";
 import type { OrganizationRepository } from "./organization.repository";
 
 export class PrismaOrganizationRepository implements OrganizationRepository {
@@ -18,5 +18,26 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       select: { id: true },
     });
     return projects.map((p) => p.id);
+  }
+
+  async clearTrialLicense(organizationId: string): Promise<void> {
+    await this.prisma.organization.update({
+      where: { id: organizationId },
+      data: {
+        license: null,
+        licenseExpiresAt: null,
+        licenseLastValidatedAt: null,
+      },
+    });
+  }
+
+  async updateCurrency(input: {
+    organizationId: string;
+    currency: string;
+  }): Promise<void> {
+    await this.prisma.organization.update({
+      where: { id: input.organizationId },
+      data: { currency: input.currency as Currency },
+    });
   }
 }

@@ -20,6 +20,7 @@ import {
   InvalidPlanError,
   OrganizationNotFoundError,
   SeatBillingUnavailableError,
+  SubscriptionCreationFailedError,
 } from "../errors";
 import { isGrowthSeatEventPlan, type BillingInterval } from "../utils/growthSeatEvent";
 import type { SeatEventSubscriptionFns } from "./seatEventSubscription";
@@ -504,6 +505,10 @@ export class EESubscriptionService implements SubscriptionService {
       organizationId,
       plan,
     });
+
+    if (!subscription) {
+      throw new SubscriptionCreationFailedError();
+    }
 
     const session = await this.stripe.checkout.sessions.create({
       mode: "subscription",

@@ -14,7 +14,7 @@ import { InviteService } from "../../src/server/invites/invite.service";
 import { createSeatSyncService } from "./services/seatSyncService";
 import { createSubscriptionService } from "./services/subscriptionService";
 import * as subscriptionItemCalculator from "./services/subscriptionItemCalculator";
-import { createWebhookService } from "./services/webhookService";
+import { EEWebhookService } from "./services/webhookService";
 import { createStripeClient } from "./stripe/stripeClient";
 import { createCurrencyRouter } from "./currencyRouter";
 import { createSubscriptionRouterFactory } from "./subscriptionRouter";
@@ -74,7 +74,7 @@ export const getSeatSyncService = () => {
 export const createStripeWebhookHandler = () => {
   const s = getStripe();
   const inviteApprover = InviteService.create(prisma);
-  const webhookService = createWebhookService({
+  const webhookService = EEWebhookService.create({
     db: prisma,
     stripe: s,
     itemCalculator: subscriptionItemCalculator,
