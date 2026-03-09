@@ -78,9 +78,8 @@ Feature: Traces tab pagination controls
 
   @integration
   Scenario: Next page button is disabled on the last page
-    Given the total number of traces is 30
-    And the page size is 25
-    And I am on page 2 (pageOffset 25)
+    Given the page size is 25
+    And the total number of traces is less than the current offset plus page size
     Then the "next page" button is disabled
 
   # ─── Previous Page Navigation ───────────────────────────────────
