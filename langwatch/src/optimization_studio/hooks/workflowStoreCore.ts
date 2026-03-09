@@ -9,7 +9,7 @@ import {
   type NodeChange,
 } from "@xyflow/react";
 import { nanoid } from "nanoid";
-import { DEFAULT_MAX_TOKENS } from "~/utils/constants";
+import { DEFAULT_MAX_TOKENS, DEFAULT_MODEL } from "~/utils/constants";
 import { LlmConfigInputTypes } from "../../types";
 import { snakeCaseToPascalCase } from "../../utils/stringCasing";
 import type {
@@ -111,7 +111,7 @@ export type WorkflowStore = State & {
 };
 
 const DEFAULT_LLM_CONFIG: LLMConfig = {
-  model: "openai/gpt-5",
+  model: DEFAULT_MODEL,
   temperature: 1.0,
   max_tokens: DEFAULT_MAX_TOKENS,
 };
@@ -280,6 +280,9 @@ export const updateInputFields = (parameters: Field[], inputs: Field[]) => {
   });
 };
 
+const escapeRegex = (str: string) =>
+  str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 export const updateOutputFields = (
   parameters: Field[],
   previousOutputs: Field[],
@@ -293,9 +296,12 @@ export const updateOutputFields = (
     if (p.identifier === "code") {
       let code = p.value as string;
       for (const [index, output] of outputs.entries()) {
+        const escapedId = escapeRegex(
+          previousOutputs[index]?.identifier ?? "",
+        );
         code = code.replace(
           new RegExp(
-            `(return[\\s\\n\\t]+?\\{[^\\}]*?)"${previousOutputs[index]?.identifier}"`,
+            `(return[\\s\\n\\t]+?\\{[^\\}]*?)"${escapedId}"`,
           ),
           `$1"${output.identifier}"`,
         );
