@@ -12,30 +12,30 @@ Feature: Open trace in Playground
   # temperature pattern. The Zod schema and form value types stay unchanged.
 
   @unit
-  Scenario: Trace has null maxTokens
-    Given the trace has maxTokens set to null
-    When I build the prompt form values from the trace
-    Then the form values are created successfully
-    And maxTokens is undefined in the form values
+  Scenario: Trace without max tokens specified opens in Playground
+    Given the traced LLM call did not specify max tokens
+    When I open the trace in the Playground
+    Then the Playground loads without validation errors
+    And max tokens is left unset
 
   @unit
-  Scenario: Trace has null temperature
-    Given the trace has temperature set to null
-    When I build the prompt form values from the trace
-    Then the form values are created successfully
-    And temperature is undefined in the form values
+  Scenario: Trace without temperature specified opens in Playground
+    Given the traced LLM call did not specify temperature
+    When I open the trace in the Playground
+    Then the Playground loads without validation errors
+    And temperature is left unset
 
   @unit
-  Scenario: Trace has all LLM config values present
-    Given the trace has maxTokens set to 1024
-    And the trace has temperature set to 0.7
-    When I build the prompt form values from the trace
-    Then the form values are created successfully
-    And maxTokens is set to 1024
-    And temperature is set to 0.7
+  Scenario: Trace with LLM config values opens in Playground with those values
+    Given the traced LLM call used max tokens of 1024
+    And the traced LLM call used temperature of 0.7
+    When I open the trace in the Playground
+    Then the Playground loads without validation errors
+    And max tokens shows 1024
+    And temperature shows 0.7
 
   @unit
-  Scenario: Trace has no model specified
-    Given the trace has no model specified
-    When I build the prompt form values from the trace
-    Then the form values use the default model
+  Scenario: Trace without a model specified uses the default model
+    Given the traced LLM call did not specify a model
+    When I open the trace in the Playground
+    Then the Playground loads with the default model
