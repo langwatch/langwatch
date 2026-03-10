@@ -46,8 +46,8 @@ const baseFormSchema = z.object({
   scope: scopeSchema,
   version: z.object({
     configData: z.object({
-      messages: latestConfigVersionSchema.shape.configData.shape.messages,
-      inputs: latestConfigVersionSchema.shape.configData.shape.inputs,
+      messages: latestConfigVersionSchema.shape.configData.shape.messages.removeDefault(),
+      inputs: latestConfigVersionSchema.shape.configData.shape.inputs.removeDefault(),
       outputs: latestConfigVersionSchema.shape.configData.shape.outputs,
       llm: llmSchema,
       demonstrations:
