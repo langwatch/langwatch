@@ -20,34 +20,29 @@ Feature: Drive PR to mergeable state
     Given a PR exists for the current branch
     When /drive-pr is invoked
     And CI checks fail
-    Then the skill reads the failed check logs
-    And diagnoses and fixes the issue
-    And pushes the fix
-    And waits for CI again using gh pr checks --watch
-    And loops back to check CI and reviews
+    Then the skill identifies the failing checks
+    And applies fixes and pushes changes
+    And re-checks CI and reviews until both are green
 
   Scenario: PR with unresolved review comments
     Given a PR exists for the current branch
     When /drive-pr is invoked
     And CI checks pass
     And there are unresolved review comments
-    Then the skill triages comments into fix-now vs out-of-scope
-    And addresses fix-now comments
-    And replies to out-of-scope comments with reasoning
+    Then the skill addresses actionable comments
+    And replies to non-actionable comments with reasoning
     And pushes changes
-    And waits for CI again using gh pr checks --watch
-    And loops back to check CI and reviews
+    And re-checks CI and reviews until both are green
 
   Scenario: PR with both CI failures and review comments
     Given a PR exists for the current branch
     When /drive-pr is invoked
     And CI checks fail
     And there are unresolved review comments
-    Then the skill fixes CI failures first
-    And then addresses review comments
+    Then the skill fixes CI failures
+    And addresses review comments
     And pushes all changes
-    And waits for CI again
-    And loops back to check both
+    And re-checks CI and reviews until both are green
 
   Scenario: Max retry limit reached
     Given a PR exists for the current branch
@@ -59,8 +54,7 @@ Feature: Drive PR to mergeable state
   Scenario: Single-cycle mode
     Given a PR exists for the current branch
     When /drive-pr is invoked with --once
-    Then the skill takes a snapshot of CI status without blocking
-    And checks for unresolved review comments
-    And fixes any issues found in either
+    Then the skill checks CI status and review comments
+    And fixes any issues found
     And pushes changes if any fixes were made
-    And exits without looping or waiting for CI
+    And exits after one pass

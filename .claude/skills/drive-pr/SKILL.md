@@ -59,16 +59,21 @@ gh pr checks --watch --fail-fast 2>&1
 **`--once` mode** (when `$ARGUMENTS` contains `--once`): Take a non-blocking snapshot instead:
 
 ```bash
-gh pr checks --json name,state,conclusion,link 2>&1
+gh pr checks --json name,state,bucket,link 2>&1
 ```
+
+Parse the JSON output and inspect each check's `bucket` field:
+- All checks have `bucket == "pass"` → proceed to step 4
+- Any check has `bucket == "fail"` → handle as CI failure (step 3)
+- Some checks have `bucket == "pending"` but none failed → proceed to step 4 (do not treat pending as failure)
 
 Then proceed through steps 3-5 once and exit without looping.
 
 ### 3. Handle CI result
 
-**If CI passes (exit 0):** proceed to step 4.
+**Normal mode — If CI passes (exit 0):** proceed to step 4.
 
-**If CI fails (exit non-zero):**
+**Normal mode — If CI fails (exit non-zero):**
 
 1. Get the failed check names from the output
 2. Fetch the logs for each failed run:
@@ -88,25 +93,45 @@ Then proceed through steps 3-5 once and exit without looping.
 
 ### 4. Check for review comments
 
-Fetch PR-level reviews and comments:
+Fetch the review decision:
 
 ```bash
-gh pr view --json reviewDecision,reviews,comments --jq '{
-  reviewDecision,
-  reviews: [.reviews[] | select(.state != "APPROVED" and .state != "DISMISSED") | {author: .author.login, state: .state, body: .body}],
-  comments: [.comments[] | {author: .author.login, body: .body}]
-}'
+gh pr view --json reviewDecision --jq '.reviewDecision'
 ```
 
-Fetch inline review comments:
+Fetch unresolved review threads via GraphQL (REST does not expose thread resolution state):
 
 ```bash
-gh api repos/{owner}/{repo}/pulls/{number}/comments --jq '[.[] | select(.position != null) | {path: .path, line: .line, body: .body, author: .user.login, id: .id}]'
+gh api graphql -f query='
+  query($owner:String!, $repo:String!, $pr:Int!) {
+    repository(owner:$owner, name:$repo) {
+      pullRequest(number:$pr) {
+        reviewThreads(first: 100) {
+          nodes {
+            id
+            path
+            line
+            isResolved
+            isOutdated
+            comments(first: 10) {
+              nodes {
+                body
+                author { login }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+' -f owner='{owner}' -f repo='{repo}' -F pr={number}
 ```
 
-**If there are unaddressed review comments or changes requested:** triage and address them (step 5), then push and loop back to step 2.
+Filter for threads where `isResolved == false` and `isOutdated == false` — these are the unresolved, current threads that need attention.
 
-**If review is clean or approved:** proceed to step 6.
+**If there are unresolved threads or `reviewDecision` is `CHANGES_REQUESTED`:** triage and address them (step 5), then push and loop back to step 2.
+
+**If all threads are resolved and review is approved (or no review required):** proceed to step 6.
 
 ### 5. Triage and address review comments
 
