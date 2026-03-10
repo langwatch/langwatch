@@ -19,8 +19,9 @@ COMPOSE="docker compose -f compose.dev.yml"
 # Two worktrees on the same machine will always get different prefixes.
 # ---------------------------------------------------------------------------
 DIR_HASH=$(echo -n "$PWD" | md5sum | cut -c1-8)
-export VOLUME_PREFIX="lw-${DIR_HASH}"
-export COMPOSE_PROJECT_NAME="langwatch-${DIR_HASH}"
+VOLUME_PREFIX="lw-${DIR_HASH}"
+COMPOSE_PROJECT_NAME="langwatch-${DIR_HASH}"
+export VOLUME_PREFIX COMPOSE_PROJECT_NAME
 
 # ---------------------------------------------------------------------------
 # Find a free port starting from a base value.
@@ -34,9 +35,10 @@ find_free_port() {
   echo "$port"
 }
 
-export APP_PORT=$(find_free_port 5560)
-export BULLBOARD_PORT=$(find_free_port 3000)
-export AI_SERVER_PORT=$(find_free_port 3456)
+APP_PORT=$(find_free_port 5560)
+BULLBOARD_PORT=$(find_free_port 3000)
+AI_SERVER_PORT=$(find_free_port 3456)
+export APP_PORT BULLBOARD_PORT AI_SERVER_PORT
 
 # ---------------------------------------------------------------------------
 # Ensure .env files exist
