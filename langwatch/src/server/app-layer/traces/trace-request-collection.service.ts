@@ -12,8 +12,6 @@ import {
 } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import { TraceRequestUtils } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
 import type { SpanDedupService } from "./span-dedupe.service";
-import { traced } from "../tracing";
-
 /** An OtlpSpan whose ID fields have been normalized to hex strings. */
 type NormalizedIdSpan = OtlpSpan & { traceId: string; spanId: string };
 
@@ -58,10 +56,6 @@ export class TraceRequestCollectionService {
   );
 
   constructor(private readonly deps: TraceRequestCollectionDeps) {}
-
-  static create(deps: TraceRequestCollectionDeps): TraceRequestCollectionService {
-    return traced(new TraceRequestCollectionService(deps), "TraceRequestCollectionService");
-  }
 
   /**
    * Deserializes the OTLP request (JSON or protobuf), iterates through all spans,

@@ -40,7 +40,7 @@ export interface RecordMetricCommandDependencies {
 
 function createDefaultDependencies(): RecordMetricCommandDependencies {
   return {
-    piiRedactionService: OtlpSpanPiiRedactionService.create(),
+    piiRedactionService: new OtlpSpanPiiRedactionService(),
   };
 }
 

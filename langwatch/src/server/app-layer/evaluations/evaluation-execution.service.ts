@@ -1,10 +1,5 @@
 import type { LangEvalsClient } from "../clients/langevals/langevals.client";
-import { NullLangevalsClient } from "../clients/langevals/langevals.client";
-import { LangEvalsHttpClient } from "../clients/langevals/langevals.http.client";
-import { traced } from "../tracing";
-import type { PrismaClient } from "@prisma/client";
-import { env } from "~/env.mjs";
-import { prisma as defaultPrisma } from "~/server/db";
+import type { Protections } from "~/server/elasticsearch/protections";
 import {
   DEFAULT_MAPPINGS,
   migrateLegacyMappings,
@@ -14,7 +9,6 @@ import {
   type EvaluatorTypes,
   type SingleEvaluationResult,
 } from "~/server/evaluations/evaluators.generated";
-import { createCostChecker } from "~/server/license-enforcement/license-enforcement.repository";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
 import {
   type MappingState,
@@ -25,11 +19,8 @@ import {
   type TRACE_MAPPINGS,
 } from "~/server/tracer/tracesMapping";
 import type { Trace } from "~/server/tracer/types";
-import { runEvaluationWorkflow } from "~/server/workflows/runWorkflow";
-import {
-  createDefaultModelEnvResolver,
-  createDefaultTraceFetcher,
-} from "./evaluation-execution.factories";
+import type { TraceService } from "~/server/traces/trace.service";
+import type { ProjectService } from "../projects/project.service";
 import {
   CostLimitExceededError,
   EvaluatorConfigError,
@@ -38,28 +29,24 @@ import {
 } from "./errors";
 import type { EvaluationExecutionResult } from "./evaluation-execution.types";
 
+// Evaluations need full access to trace data — no user-facing redaction.
+const INTERNAL_PROTECTIONS: Protections = {
+  canSeeCosts: true,
+  canSeeCapturedInput: true,
+  canSeeCapturedOutput: true,
+};
+
 // ---------------------------------------------------------------------------
 // Dependency interfaces (colocated — not shared)
 // ---------------------------------------------------------------------------
 
 export interface EvaluationExecutionDeps {
-  traceFetcher: TraceFetcher;
+  traceService: TraceService;
+  projectService: ProjectService;
   costChecker: CostChecker;
   modelEnvResolver: ModelEnvResolver;
+  langevalsClient: LangEvalsClient;
   workflowExecutor: WorkflowExecutor;
-  projectFetcher: ProjectFetcher;
-}
-
-export interface TraceFetcher {
-  getTraceById(params: {
-    projectId: string;
-    traceId: string;
-  }): Promise<Trace | undefined>;
-
-  getTracesGroupedByThreadId(params: {
-    projectId: string;
-    threadId: string;
-  }): Promise<Trace[]>;
 }
 
 export interface CostChecker {
@@ -84,13 +71,6 @@ export interface WorkflowExecutor {
   ): Promise<{ result: SingleEvaluationResult; status: string }>;
 }
 
-export interface ProjectFetcher {
-  getProjectWithTeam(projectId: string): Promise<{
-    id: string;
-    team: { organizationId: string };
-  } | null>;
-}
-
 // ---------------------------------------------------------------------------
 // Internal types
 // ---------------------------------------------------------------------------
@@ -104,37 +84,7 @@ type DataForEvaluation =
 // ---------------------------------------------------------------------------
 
 export class EvaluationExecutionService {
-  constructor(
-    private readonly langevalsClient: LangEvalsClient,
-    private readonly deps: EvaluationExecutionDeps,
-  ) {}
-
-  static create(prisma?: PrismaClient): EvaluationExecutionService {
-    const p = prisma ?? defaultPrisma;
-    const client = env.LANGEVALS_ENDPOINT
-      ? new LangEvalsHttpClient(env.LANGEVALS_ENDPOINT)
-      : new NullLangevalsClient();
-
-    const deps: EvaluationExecutionDeps = {
-      traceFetcher: createDefaultTraceFetcher(p),
-      costChecker: createCostChecker(p),
-      modelEnvResolver: createDefaultModelEnvResolver(),
-      workflowExecutor: { runEvaluationWorkflow },
-      projectFetcher: {
-        getProjectWithTeam: async (projectId: string) => {
-          return p.project.findUnique({
-            where: { id: projectId, archivedAt: null },
-            include: { team: true },
-          });
-        },
-      },
-    };
-
-    return traced(
-      new EvaluationExecutionService(client, deps),
-      "EvaluationExecutionService",
-    );
-  }
+  constructor(private readonly deps: EvaluationExecutionDeps) {}
 
   async executeForTrace(params: {
     projectId: string;
@@ -156,10 +106,12 @@ export class EvaluationExecutionService {
     } = params;
 
     // 1. Fetch trace
-    const trace = await this.deps.traceFetcher.getTraceById({
+    const traces = await this.deps.traceService.getTracesWithSpans(
       projectId,
-      traceId,
-    });
+      [traceId],
+      INTERNAL_PROTECTIONS,
+    );
+    const trace = traces[0];
 
     if (!trace) {
       throw new TraceNotEvaluatableError(traceId);
@@ -296,10 +248,11 @@ export class EvaluationExecutionService {
       );
     }
 
-    const threadTraces = await this.deps.traceFetcher.getTracesGroupedByThreadId({
+    const threadTraces = await this.deps.traceService.getTracesWithSpansByThreadIds(
       projectId,
-      threadId,
-    });
+      [threadId],
+      INTERNAL_PROTECTIONS,
+    );
 
     const result: Record<string, unknown> = {};
 
@@ -380,7 +333,7 @@ export class EvaluationExecutionService {
     const { projectId, evaluatorType, data, settings, trace, workflowId } = params;
 
     // Cost limit check
-    const project = await this.deps.projectFetcher.getProjectWithTeam(projectId);
+    const project = await this.deps.projectService.getWithTeam(projectId);
     if (!project) {
       throw new EvaluatorConfigError("Project not found");
     }
@@ -414,7 +367,7 @@ export class EvaluationExecutionService {
       settings,
     });
 
-    return this.langevalsClient.evaluate({
+    return this.deps.langevalsClient.evaluate({
       evaluatorType: builtInType,
       data: data.data,
       settings: settings ?? {},
@@ -491,4 +444,3 @@ function switchMapping(
     undefined,
   )[0];
 }
-
