@@ -103,9 +103,9 @@ Fetch unresolved review threads via GraphQL (REST does not expose thread resolut
 
 ```bash
 gh api graphql -f query='
-  query($owner:String!, $repo:String!, $pr:Int!) {
-    repository(owner:$owner, name:$repo) {
-      pullRequest(number:$pr) {
+  query {
+    repository(owner: "OWNER", name: "REPO") {
+      pullRequest(number: NUMBER) {
         reviewThreads(first: 100) {
           nodes {
             id
@@ -124,8 +124,10 @@ gh api graphql -f query='
       }
     }
   }
-' -f owner='{owner}' -f repo='{repo}' -F pr={number}
+'
 ```
+
+Replace `OWNER`, `REPO`, and `NUMBER` with actual values from step 1. Use inline string substitution — do NOT use `-f`/`-F` variable parameters as they cause escaping issues with the GraphQL query.
 
 Filter for threads where `isResolved == false` and `isOutdated == false` — these are the unresolved, current threads that need attention.
 
