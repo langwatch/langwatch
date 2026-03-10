@@ -408,11 +408,12 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           errors: {},
         });
       } else {
-        // Partial execution: clear ALL data for cells being executed
-        // This ensures the correct loading sequence:
-        // 1. Gray (pending) - no data at all
-        // 2. Spinner (running) - target output arrives, evaluators pending
-        // 3. Final result - evaluator results arrive
+        // Partial execution: clear data for cells being executed.
+        // For evaluator-only scopes, preserve target data and only clear the
+        // specific evaluator's results. For other scopes, clear everything.
+        const isEvaluatorOnlyScope =
+          scope.type === "evaluator-all-rows" || scope.type === "evaluator";
+
         useEvaluationsV3Store.setState((state) => {
           const existingCells = state.results.executingCells;
           const mergedCells = existingCells
@@ -437,31 +438,43 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           let newErrors = { ...state.results.errors };
           let newEvaluatorResults = { ...state.results.evaluatorResults };
 
-          const evaluatorIds = state.evaluators.map((e) => e.id);
+          // For evaluator-only scopes, determine which single evaluator to clear
+          const specificEvaluatorId =
+            isEvaluatorOnlyScope && "evaluatorId" in scope
+              ? scope.evaluatorId
+              : undefined;
+
+          const evaluatorIds = specificEvaluatorId
+            ? [specificEvaluatorId]
+            : state.evaluators.map((e) => e.id);
 
           for (const cell of executionCells) {
-            // Clear target output
-            newTargetOutputs = clearCellFromArrayRecord(
-              newTargetOutputs,
-              cell.targetId,
-              cell.rowIndex,
-            );
+            // Only clear target data for non-evaluator scopes
+            // (evaluator scopes reuse existing target outputs)
+            if (!isEvaluatorOnlyScope) {
+              // Clear target output
+              newTargetOutputs = clearCellFromArrayRecord(
+                newTargetOutputs,
+                cell.targetId,
+                cell.rowIndex,
+              );
 
-            // Clear target metadata
-            newTargetMetadata = clearCellFromArrayRecord(
-              newTargetMetadata,
-              cell.targetId,
-              cell.rowIndex,
-            );
+              // Clear target metadata
+              newTargetMetadata = clearCellFromArrayRecord(
+                newTargetMetadata,
+                cell.targetId,
+                cell.rowIndex,
+              );
 
-            // Clear errors (also array-based with holes)
-            newErrors = clearCellFromArrayRecord(
-              newErrors,
-              cell.targetId,
-              cell.rowIndex,
-            );
+              // Clear errors (also array-based with holes)
+              newErrors = clearCellFromArrayRecord(
+                newErrors,
+                cell.targetId,
+                cell.rowIndex,
+              );
+            }
 
-            // Clear evaluator results for ALL evaluators
+            // Clear evaluator results (only specific evaluator for evaluator scopes)
             if (!newEvaluatorResults[cell.targetId]) {
               newEvaluatorResults[cell.targetId] = {};
             }
