@@ -473,31 +473,6 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                 </Box>
               </Collapsible.Content>
             </Collapsible.Root>
-
-            {/* Triggers - placeholder */}
-            <Collapsible.Root>
-              <Collapsible.Trigger asChild>
-                <HStack cursor="pointer" gap={2}>
-                  <ChevronRight size={14} />
-                  <Text fontSize="sm" fontWeight="medium">
-                    Triggers
-                  </Text>
-                </HStack>
-              </Collapsible.Trigger>
-              <Collapsible.Content>
-                <Box
-                  border="1px solid"
-                  borderColor="border"
-                  borderRadius="md"
-                  padding={3}
-                  marginTop={2}
-                >
-                  <Text fontSize="sm" color="fg.muted">
-                    Coming soon
-                  </Text>
-                </Box>
-              </Collapsible.Content>
-            </Collapsible.Root>
           </VStack>
         </Drawer.Body>
 
