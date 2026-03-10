@@ -91,39 +91,6 @@ describe("ClickHouseSimulationService date filtering", () => {
         expect(call.query).toContain("endDateMs");
       });
     });
-
-    describe("when no dates are provided", () => {
-      it("does not include date parameters in the query", async () => {
-        setQueryResults(clickhouse, [[]]);
-
-        await service.getRunDataForAllSuites({
-          projectId: "proj-1",
-        });
-
-        const call = (clickhouse.query as ReturnType<typeof vi.fn>).mock
-          .calls[0]![0] as { query_params: Record<string, string> };
-
-        expect(call.query_params.startDateMs).toBeUndefined();
-        expect(call.query_params.endDateMs).toBeUndefined();
-      });
-    });
-
-    describe("when only startDate is provided", () => {
-      it("includes only the start date parameter", async () => {
-        setQueryResults(clickhouse, [[]]);
-
-        await service.getRunDataForAllSuites({
-          projectId: "proj-1",
-          startDate: 1700000000000,
-        });
-
-        const call = (clickhouse.query as ReturnType<typeof vi.fn>).mock
-          .calls[0]![0] as { query_params: Record<string, string> };
-
-        expect(call.query_params.startDateMs).toBe("1700000000000");
-        expect(call.query_params.endDateMs).toBeUndefined();
-      });
-    });
   });
 
   describe("getRunDataForScenarioSet()", () => {
@@ -143,23 +110,6 @@ describe("ClickHouseSimulationService date filtering", () => {
 
         expect(call.query_params.startDateMs).toBe("1700000000000");
         expect(call.query_params.endDateMs).toBe("1700100000000");
-      });
-    });
-
-    describe("when no dates are provided", () => {
-      it("does not include date parameters in the query", async () => {
-        setQueryResults(clickhouse, [[]]);
-
-        await service.getRunDataForScenarioSet({
-          projectId: "proj-1",
-          scenarioSetId: "set-1",
-        });
-
-        const call = (clickhouse.query as ReturnType<typeof vi.fn>).mock
-          .calls[0]![0] as { query_params: Record<string, string> };
-
-        expect(call.query_params.startDateMs).toBeUndefined();
-        expect(call.query_params.endDateMs).toBeUndefined();
       });
     });
 

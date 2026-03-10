@@ -36,6 +36,12 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
+const defaultPeriod = {
+  startDate: new Date("2025-01-01"),
+  endDate: new Date("2025-01-31"),
+};
+const noop = vi.fn();
+
 describe("<SimulationLayout/>", () => {
   afterEach(() => {
     cleanup();
@@ -52,7 +58,7 @@ describe("<SimulationLayout/>", () => {
         });
 
         render(
-          <SimulationLayout>
+          <SimulationLayout period={defaultPeriod} setPeriod={noop}>
             <div>content</div>
           </SimulationLayout>,
           { wrapper: Wrapper }
@@ -74,7 +80,7 @@ describe("<SimulationLayout/>", () => {
         });
 
         render(
-          <SimulationLayout>
+          <SimulationLayout period={defaultPeriod} setPeriod={noop}>
             <div>content</div>
           </SimulationLayout>,
           { wrapper: Wrapper }
@@ -93,7 +99,7 @@ describe("<SimulationLayout/>", () => {
         });
 
         render(
-          <SimulationLayout>
+          <SimulationLayout period={defaultPeriod} setPeriod={noop}>
             <div>content</div>
           </SimulationLayout>,
           { wrapper: Wrapper }

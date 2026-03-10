@@ -2,9 +2,11 @@ import {
   Box,
   HStack,
   IconButton,
+  Spacer,
   Text,
 } from "@chakra-ui/react";
 import { ArrowLeft } from "react-feather";
+import { PeriodSelector, type Period } from "~/components/PeriodSelector";
 import { useSimulationRouter } from "~/hooks/simulations";
 import {
   isOnPlatformSet,
@@ -16,12 +18,16 @@ import { SetRunHistorySidebar } from "./set-run-history-sidebar";
 
 export const SimulationLayout = ({
   children,
+  period,
+  setPeriod,
 }: {
   children: React.ReactNode;
+  period: Period;
+  setPeriod: (startDate: Date, endDate: Date) => void;
 }) => {
   return (
     <DashboardLayout>
-      <Header />
+      <Header period={period} setPeriod={setPeriod} />
       <HStack w="full" h="full" alignItems="stretch" gap={0} bg="bg.surface">
         <Box
           w="340px"
@@ -29,7 +35,10 @@ export const SimulationLayout = ({
           position="relative"
           h="full"
         >
-          <SetRunHistorySidebar />
+          <SetRunHistorySidebar
+            startDate={period.startDate.getTime()}
+            endDate={period.endDate.getTime()}
+          />
         </Box>
         <Box
           w="full"
@@ -47,7 +56,13 @@ export const SimulationLayout = ({
   );
 };
 
-const Header = () => {
+const Header = ({
+  period,
+  setPeriod,
+}: {
+  period: Period;
+  setPeriod: (startDate: Date, endDate: Date) => void;
+}) => {
   const { scenarioSetId, goToSimulationSets } = useSimulationRouter();
   const displayName =
     scenarioSetId && isOnPlatformSet(scenarioSetId)
@@ -69,6 +84,8 @@ const Header = () => {
         <Text fontWeight="bold" fontSize="md">
           {displayName}
         </Text>
+        <Spacer />
+        <PeriodSelector period={period} setPeriod={setPeriod} />
       </HStack>
     </Box>
   );
