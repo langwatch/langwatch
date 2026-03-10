@@ -537,6 +537,11 @@ export const runEvaluation = async ({
     throw new Error(`Evaluator ${evaluatorType} not found`);
   }
 
+  // Validate evaluator type only contains safe URL path characters to prevent path traversal
+  if (!/^[a-zA-Z0-9_-]+(\/[a-zA-Z0-9_-]+)*$/.test(builtInEvaluatorType)) {
+    throw new Error(`Invalid evaluator type: ${builtInEvaluatorType}`);
+  }
+
   let evaluatorEnv: Record<string, string> = Object.fromEntries(
     (evaluator.envVars ?? []).map((envVar) => [envVar, process.env[envVar]!]),
   );

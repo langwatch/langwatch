@@ -11,6 +11,7 @@ export default function NewEvaluationRedirect() {
 
   useEffect(() => {
     if (!projectSlug || !router.isReady) return;
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9-]*$/.test(projectSlug)) return;
 
     void router.replace(
       `/${projectSlug}/evaluations?drawer.open=evaluatorCategorySelector`,

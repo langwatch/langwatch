@@ -113,7 +113,7 @@ export default function ProjectOnboarding() {
       },
       {
         onSuccess: (data) => {
-          if (safeReturnToPath) {
+          if (safeReturnToPath && /^\/(?!\/)[^\r\n]*$/.test(safeReturnToPath)) {
             void router.push(safeReturnToPath);
             return;
           }
