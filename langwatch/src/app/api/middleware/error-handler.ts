@@ -2,6 +2,7 @@ import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import { DomainError } from "~/server/app-layer/domain-error";
+import { LimitExceededError } from "~/server/license-enforcement/errors";
 import { NotFoundError as PromptNotFoundError } from "~/server/prompt-config/errors";
 
 import { HttpError, NotFoundError } from "../shared/errors";
@@ -47,6 +48,20 @@ function determineErrorResponse(
         error: error.kind,
         message: error.message,
       }),
+    };
+  }
+
+  // LimitExceededError maps to 403 with structured resource limit response
+  if (error instanceof LimitExceededError) {
+    return {
+      statusCode: 403,
+      response: {
+        error: "ERR_RESOURCE_LIMIT",
+        message: error.message,
+        limitType: error.limitType,
+        current: error.current,
+        max: error.max,
+      },
     };
   }
 

@@ -12,6 +12,7 @@ import {
   type AuthMiddlewareVariables,
   type OrganizationMiddlewareVariables,
   organizationMiddleware,
+  resourceLimitMiddleware,
 } from "../../middleware";
 import {
   type EvaluatorServiceMiddlewareVariables,
@@ -130,6 +131,7 @@ app.get(
 // Create evaluator
 app.post(
   "/",
+  resourceLimitMiddleware("evaluators"),
   describeRoute({
     description: "Create a new evaluator",
     responses: {
