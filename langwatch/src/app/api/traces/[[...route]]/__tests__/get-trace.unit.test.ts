@@ -83,7 +83,7 @@ describe("GET /:traceId", () => {
     project_id: "project-123",
     input: { value: "hello" },
     output: { value: "world" },
-    timestamps: { started_at: 1000, inserted_at: 2000 },
+    timestamps: { started_at: 1000, inserted_at: 2000, updated_at: 2000 },
     metadata: { thread_id: "t1" },
     spans: [],
   };
@@ -92,14 +92,13 @@ describe("GET /:traceId", () => {
     {
       evaluation_id: "eval-1",
       evaluator_id: "evaluator-1",
-      trace_id: "trace-abc",
-      project_id: "project-123",
+      name: "test-evaluator",
       status: "processed",
       score: 0.9,
       passed: true,
       label: "good",
       timestamps: { started_at: 1000, finished_at: 2000, inserted_at: 2000 },
-    } as Evaluation,
+    },
   ];
 
   beforeEach(() => {
