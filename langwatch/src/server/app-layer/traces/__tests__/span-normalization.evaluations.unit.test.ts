@@ -5,11 +5,9 @@ import { SpanNormalizationPipelineService } from "../span-normalization.service"
 
 const service = SpanNormalizationPipelineService.create();
 
-/**
- * Minimal valid OTLP span with a langwatch.evaluation.custom event.
- * Mimics what the Python SDK sends when add_evaluation() is called.
- */
-function makeOtlpSpanWithEvaluation(evalPayload: Record<string, unknown>): OtlpSpan {
+function makeOtlpSpanWithEvaluation(
+  evalPayload: Record<string, unknown>,
+): OtlpSpan {
   return {
     traceId: "aaaa0000000000000000000000000001",
     spanId: "bbbb000000000001",
@@ -18,12 +16,7 @@ function makeOtlpSpanWithEvaluation(evalPayload: Record<string, unknown>): OtlpS
     kind: 1,
     startTimeUnixNano: "1700000000000000000",
     endTimeUnixNano: "1700000001000000000",
-    attributes: [
-      {
-        key: "langwatch.span.type",
-        value: { stringValue: "llm" },
-      },
-    ],
+    attributes: [],
     events: [
       {
         timeUnixNano: "1700000000500000000",
@@ -47,14 +40,12 @@ function makeOtlpSpanWithEvaluation(evalPayload: Record<string, unknown>): OtlpS
 
 describe("SpanNormalizationPipelineService — SDK evaluation events", () => {
   describe("when OTLP span has langwatch.evaluation.custom event", () => {
-    it("produces langwatch.reserved.evaluations in normalized span attributes", () => {
-      const evalPayload = {
-        evaluation_id: "eval_abc123",
+    it("maps GenAI semconv evaluation attributes", () => {
+      const otlpSpan = makeOtlpSpanWithEvaluation({
         name: "toxicity",
         score: 0.95,
-        passed: true,
-      };
-      const otlpSpan = makeOtlpSpanWithEvaluation(evalPayload);
+        label: "safe",
+      });
 
       const normalized = service.normalizeSpanReceived(
         "tenant-1",
@@ -63,18 +54,30 @@ describe("SpanNormalizationPipelineService — SDK evaluation events", () => {
         null,
       );
 
-      const raw = normalized.spanAttributes[
-        ATTR_KEYS.LANGWATCH_RESERVED_EVALUATIONS
-      ] as string;
-      expect(raw).toBeDefined();
-      const evaluations = JSON.parse(raw);
-      expect(evaluations).toHaveLength(1);
-      expect(evaluations[0]).toMatchObject({
-        evaluation_id: "eval_abc123",
-        name: "toxicity",
-        score: 0.95,
-        passed: true,
+      expect(
+        normalized.spanAttributes[ATTR_KEYS.GEN_AI_EVALUATION_NAME],
+      ).toBe("toxicity");
+      expect(
+        normalized.spanAttributes[ATTR_KEYS.GEN_AI_EVALUATION_SCORE_VALUE],
+      ).toBe(0.95);
+    });
+
+    it("does not set langwatch.reserved.evaluations (no metadata leakage)", () => {
+      const otlpSpan = makeOtlpSpanWithEvaluation({
+        name: "test",
+        score: 1,
       });
+
+      const normalized = service.normalizeSpanReceived(
+        "tenant-1",
+        otlpSpan,
+        null,
+        null,
+      );
+
+      expect(
+        normalized.spanAttributes[ATTR_KEYS.LANGWATCH_RESERVED_EVALUATIONS],
+      ).toBeUndefined();
     });
 
     it("preserves the original event on the normalized span", () => {
@@ -90,7 +93,6 @@ describe("SpanNormalizationPipelineService — SDK evaluation events", () => {
         null,
       );
 
-      // Events remain after canonicalization (read without consuming)
       const evalEvents = normalized.events.filter(
         (e) => e.name === "langwatch.evaluation.custom",
       );

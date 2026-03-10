@@ -1,5 +1,4 @@
 import crypto from "node:crypto";
-import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import { evaluationNameAutoslug } from "~/server/background/workers/collector/evaluationNameAutoslug";
 import type { CompleteEvaluationCommandData, StartEvaluationCommandData } from "../../evaluation-processing/schemas/commands";
 import { createLogger } from "../../../../../utils/logger/server";
@@ -7,6 +6,8 @@ import type { ReactorContext, ReactorDefinition } from "../../../reactors/reacto
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import { STALE_TRACE_THRESHOLD_MS } from "../schemas/constants";
 import type { TraceProcessingEvent } from "../schemas/events";
+import { isSpanReceivedEvent } from "../schemas/events";
+import type { OtlpSpan } from "../schemas/otlp";
 
 const logger = createLogger(
   "langwatch:trace-processing:custom-evaluation-sync-reactor",
@@ -45,30 +46,57 @@ function deterministicEvaluationId(evaluation: SdkEvaluation): string {
   return `eval_md5_${hash}`;
 }
 
-function parseEvaluations(raw: string | undefined): SdkEvaluation[] {
-  if (!raw) return [];
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (item): item is SdkEvaluation =>
-        typeof item === "object" &&
-        item !== null &&
-        "name" in item &&
-        typeof (item as Record<string, unknown>).name === "string",
+const EVAL_EVENT_NAME = "langwatch.evaluation.custom";
+
+/**
+ * Extracts SDK evaluations directly from OTLP span events.
+ *
+ * Reads `langwatch.evaluation.custom` events from the raw OTLP span,
+ * parses the `json_encoded_event` attribute from each.
+ */
+export function extractEvaluationsFromSpan(span: OtlpSpan): SdkEvaluation[] {
+  const evaluations: SdkEvaluation[] = [];
+
+  for (const event of span.events ?? []) {
+    if (event.name !== EVAL_EVENT_NAME) continue;
+
+    const jsonAttr = event.attributes.find(
+      (attr) => attr.key === "json_encoded_event",
     );
-  } catch {
-    return [];
+    const jsonPayload =
+      jsonAttr?.value && "stringValue" in jsonAttr.value
+        ? jsonAttr.value.stringValue
+        : undefined;
+    if (typeof jsonPayload !== "string") continue;
+
+    try {
+      const parsed: unknown = JSON.parse(jsonPayload);
+      if (
+        typeof parsed !== "object" ||
+        parsed === null ||
+        Array.isArray(parsed)
+      )
+        continue;
+      const record = parsed as Record<string, unknown>;
+      if (typeof record.name !== "string") continue;
+      evaluations.push(record as unknown as SdkEvaluation);
+    } catch {
+      logger.warn(
+        { payloadLength: jsonPayload.length },
+        "Failed to parse json_encoded_event from evaluation span event",
+      );
+    }
   }
+
+  return evaluations;
 }
 
 /**
  * Reactor that syncs custom SDK evaluations to the evaluation-processing pipeline.
  *
- * Fires on the traceSummary fold projection. Reads evaluations from the
- * `langwatch.reserved.evaluations` attribute and sends startEvaluation +
- * completeEvaluation commands for each one. Uses deterministic IDs to
- * ensure idempotency on retries.
+ * Reads `langwatch.evaluation.custom` events directly from each SpanReceivedEvent's
+ * OTLP span data, then dispatches startEvaluation + completeEvaluation commands.
+ * Uses deterministic IDs for idempotency on retries.
  */
 export function createCustomEvaluationSyncReactor(
   deps: CustomEvaluationSyncReactorDeps,
@@ -77,7 +105,7 @@ export function createCustomEvaluationSyncReactor(
     name: "customEvaluationSync",
     options: {
       makeJobId: (payload) =>
-        `custom-eval-sync:${payload.event.tenantId}:${payload.event.aggregateId}`,
+        `custom-eval-sync:${payload.event.tenantId}:${payload.event.aggregateId}:${payload.event.id}`,
       ttl: 30_000,
       delay: 5_000,
     },
@@ -86,14 +114,14 @@ export function createCustomEvaluationSyncReactor(
       event: TraceProcessingEvent,
       context: ReactorContext<TraceSummaryData>,
     ): Promise<void> {
-      const { tenantId, aggregateId: traceId, foldState } = context;
+      if (!isSpanReceivedEvent(event)) return;
+
+      const { tenantId, aggregateId: traceId } = context;
 
       // Guard: skip old traces (resyncing)
       if (event.occurredAt < Date.now() - STALE_TRACE_THRESHOLD_MS) return;
 
-      const attrs = foldState.attributes ?? {};
-      const rawEvaluations = attrs[ATTR_KEYS.LANGWATCH_RESERVED_EVALUATIONS];
-      const evaluations = parseEvaluations(rawEvaluations);
+      const evaluations = extractEvaluationsFromSpan(event.data.span);
       if (evaluations.length === 0) return;
 
       logger.debug(

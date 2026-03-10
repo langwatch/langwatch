@@ -111,55 +111,17 @@ describe("LangWatchExtractor", () => {
 
   describe("evaluation events (langwatch.evaluation.custom)", () => {
     describe("when span has a langwatch.evaluation.custom event", () => {
-      it("sets langwatch.reserved.evaluations attribute with evaluation data", () => {
-        const evalPayload = {
-          evaluation_id: "eval_abc123",
-          name: "toxicity",
-          score: 0.95,
-          passed: true,
-          label: "safe",
-        };
-        const ctx = createExtractorContext({}, undefined, [
-          {
-            name: "langwatch.evaluation.custom",
-            timeUnixMs: Date.now(),
-            attributes: {
-              json_encoded_event: JSON.stringify(evalPayload),
-            },
-          },
-        ]);
-
-        extractor.apply(ctx);
-
-        expect(ctx.setAttr).toHaveBeenCalledWith(
-          ATTR_KEYS.LANGWATCH_RESERVED_EVALUATIONS,
-          expect.any(String),
-        );
-        const evaluations = JSON.parse(
-          ctx.out[ATTR_KEYS.LANGWATCH_RESERVED_EVALUATIONS] as string,
-        );
-        expect(evaluations).toHaveLength(1);
-        expect(evaluations[0]).toMatchObject({
-          evaluation_id: "eval_abc123",
-          name: "toxicity",
-          score: 0.95,
-          passed: true,
-          label: "safe",
-        });
-      });
-
       it("maps first evaluation to GenAI semconv attributes", () => {
-        const evalPayload = {
-          name: "toxicity",
-          score: 0.95,
-          label: "safe",
-        };
         const ctx = createExtractorContext({}, undefined, [
           {
             name: "langwatch.evaluation.custom",
             timeUnixMs: Date.now(),
             attributes: {
-              json_encoded_event: JSON.stringify(evalPayload),
+              json_encoded_event: JSON.stringify({
+                name: "toxicity",
+                score: 0.95,
+                label: "safe",
+              }),
             },
           },
         ]);
@@ -179,61 +141,52 @@ describe("LangWatchExtractor", () => {
           "safe",
         );
       });
-    });
 
-    describe("when span has multiple evaluation events", () => {
-      it("includes all evaluations in the reserved attribute", () => {
+      it("handles already-parsed json_encoded_event (from parseJsonStringValues)", () => {
         const ctx = createExtractorContext({}, undefined, [
           {
             name: "langwatch.evaluation.custom",
             timeUnixMs: Date.now(),
             attributes: {
-              json_encoded_event: JSON.stringify({ name: "toxicity", score: 0.9 }),
-            },
-          },
-          {
-            name: "langwatch.evaluation.custom",
-            timeUnixMs: Date.now(),
-            attributes: {
-              json_encoded_event: JSON.stringify({ name: "relevance", score: 0.8 }),
+              // After parseJsonStringValues, JSON strings become objects
+              json_encoded_event: { name: "toxicity", score: 0.8 },
             },
           },
         ]);
 
         extractor.apply(ctx);
 
-        const evaluations = JSON.parse(
-          ctx.out[ATTR_KEYS.LANGWATCH_RESERVED_EVALUATIONS] as string,
+        expect(ctx.setAttrIfAbsent).toHaveBeenCalledWith(
+          ATTR_KEYS.GEN_AI_EVALUATION_NAME,
+          "toxicity",
         );
-        expect(evaluations).toHaveLength(2);
-        expect(evaluations[0].name).toBe("toxicity");
-        expect(evaluations[1].name).toBe("relevance");
       });
     });
 
     describe("when span has no evaluation events", () => {
-      it("does not set langwatch.reserved.evaluations", () => {
+      it("does not set GenAI evaluation attributes", () => {
         const ctx = createExtractorContext({});
 
         extractor.apply(ctx);
 
-        expect(ctx.out[ATTR_KEYS.LANGWATCH_RESERVED_EVALUATIONS]).toBeUndefined();
+        expect(ctx.out[ATTR_KEYS.GEN_AI_EVALUATION_NAME]).toBeUndefined();
       });
     });
 
-    describe("when event has invalid json_encoded_event", () => {
-      it("skips the malformed event without throwing", () => {
+    describe("when span has no langwatch.reserved.evaluations attribute", () => {
+      it("does not leak reserved attributes to metadata", () => {
         const ctx = createExtractorContext({}, undefined, [
           {
             name: "langwatch.evaluation.custom",
             timeUnixMs: Date.now(),
             attributes: {
-              json_encoded_event: "{not valid json",
+              json_encoded_event: JSON.stringify({ name: "test", score: 1 }),
             },
           },
         ]);
 
-        expect(() => extractor.apply(ctx)).not.toThrow();
+        extractor.apply(ctx);
+
         expect(ctx.out[ATTR_KEYS.LANGWATCH_RESERVED_EVALUATIONS]).toBeUndefined();
       });
     });

@@ -411,13 +411,11 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Evaluation Events (langwatch.evaluation.custom)
-    // SDK sends span events with name "langwatch.evaluation.custom" containing
-    // a json_encoded_event attribute with evaluation data.
-    // Read without consuming so events remain for downstream processing.
-    // Maps to OTel GenAI evaluation semconv attributes.
+    // Evaluation Events (langwatch.evaluation.custom) → GenAI semconv
+    // SDK sends span events with name "langwatch.evaluation.custom".
+    // The reactor reads these directly from the OTLP span events to sync
+    // to evaluation_runs. Here we only map to GenAI semconv span attributes.
     // ─────────────────────────────────────────────────────────────────────────
-    const evaluations: Record<string, unknown>[] = [];
     for (const event of ctx.bag.events.all()) {
       if (event.name !== "langwatch.evaluation.custom") continue;
 
@@ -435,43 +433,28 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
         if (!isRecord(parsed)) continue;
 
         const evalData = parsed as Record<string, unknown>;
-        evaluations.push(evalData);
 
-        // Map to OTel GenAI evaluation semconv attributes (first evaluation wins)
-        if (evaluations.length === 1) {
-          if (typeof evalData.name === "string") {
-            ctx.setAttrIfAbsent(
-              ATTR_KEYS.GEN_AI_EVALUATION_NAME,
-              evalData.name,
-            );
-          }
-          if (typeof evalData.label === "string") {
-            ctx.setAttrIfAbsent(
-              ATTR_KEYS.GEN_AI_EVALUATION_SCORE_LABEL,
-              evalData.label,
-            );
-          }
-          if (typeof evalData.score === "number") {
-            ctx.setAttrIfAbsent(
-              ATTR_KEYS.GEN_AI_EVALUATION_SCORE_VALUE,
-              evalData.score,
-            );
-          }
+        // Map first evaluation to OTel GenAI evaluation semconv attributes
+        if (typeof evalData.name === "string") {
+          ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_EVALUATION_NAME, evalData.name);
         }
+        if (typeof evalData.label === "string") {
+          ctx.setAttrIfAbsent(
+            ATTR_KEYS.GEN_AI_EVALUATION_SCORE_LABEL,
+            evalData.label,
+          );
+        }
+        if (typeof evalData.score === "number") {
+          ctx.setAttrIfAbsent(
+            ATTR_KEYS.GEN_AI_EVALUATION_SCORE_VALUE,
+            evalData.score,
+          );
+        }
+        ctx.recordRule(`${this.id}:evaluation.custom`);
+        break; // Only first evaluation maps to semconv
       } catch {
-        logger.warn(
-          { payloadLength: jsonPayload.length },
-          "failed to parse json_encoded_event from langwatch.evaluation.custom",
-        );
+        // skip malformed events
       }
-    }
-
-    if (evaluations.length > 0) {
-      ctx.setAttr(
-        ATTR_KEYS.LANGWATCH_RESERVED_EVALUATIONS,
-        safeStringify(evaluations),
-      );
-      ctx.recordRule(`${this.id}:evaluation.custom`);
     }
   }
 }

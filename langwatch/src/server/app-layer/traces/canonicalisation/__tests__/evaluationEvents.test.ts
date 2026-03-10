@@ -24,59 +24,7 @@ const stubSpan: Pick<
 
 describe("CanonicalizeSpanAttributesService — evaluation events", () => {
   describe("when span has langwatch.evaluation.custom events", () => {
-    it("sets langwatch.reserved.evaluations from event payload", () => {
-      const evalPayload = {
-        evaluation_id: "eval_abc123",
-        name: "toxicity",
-        score: 0.95,
-        passed: true,
-        label: "safe",
-      };
-      const events: NormalizedEvent[] = [
-        {
-          name: "langwatch.evaluation.custom",
-          timeUnixMs: Date.now(),
-          attributes: {
-            json_encoded_event: JSON.stringify(evalPayload),
-          },
-        },
-      ];
-
-      const result = service.canonicalize({}, events, stubSpan as any);
-
-      expect(
-        result.attributes[ATTR_KEYS.LANGWATCH_RESERVED_EVALUATIONS],
-      ).toBeDefined();
-      const evaluations = JSON.parse(
-        result.attributes[ATTR_KEYS.LANGWATCH_RESERVED_EVALUATIONS] as string,
-      );
-      expect(evaluations).toHaveLength(1);
-      expect(evaluations[0]).toMatchObject({
-        evaluation_id: "eval_abc123",
-        name: "toxicity",
-        score: 0.95,
-        passed: true,
-        label: "safe",
-      });
-    });
-
-    it("records the langwatch:evaluation.custom rule", () => {
-      const events: NormalizedEvent[] = [
-        {
-          name: "langwatch.evaluation.custom",
-          timeUnixMs: Date.now(),
-          attributes: {
-            json_encoded_event: JSON.stringify({ name: "test-eval", score: 1 }),
-          },
-        },
-      ];
-
-      const result = service.canonicalize({}, events, stubSpan as any);
-
-      expect(result.appliedRules).toContain("langwatch:evaluation.custom");
-    });
-
-    it("sets GenAI semconv evaluation attributes from first evaluation", () => {
+    it("maps GenAI semconv attributes from first evaluation", () => {
       const events: NormalizedEvent[] = [
         {
           name: "langwatch.evaluation.custom",
@@ -103,42 +51,52 @@ describe("CanonicalizeSpanAttributesService — evaluation events", () => {
         "relevant",
       );
     });
-  });
 
-  describe("when span has no evaluation events", () => {
-    it("does not set langwatch.reserved.evaluations", () => {
-      const result = service.canonicalize({}, [], stubSpan as any);
-
-      expect(
-        result.attributes[ATTR_KEYS.LANGWATCH_RESERVED_EVALUATIONS],
-      ).toBeUndefined();
-    });
-  });
-
-  describe("when span has evaluation events mixed with other events", () => {
-    it("extracts only evaluation events", () => {
+    it("does not set langwatch.reserved.evaluations (no metadata leakage)", () => {
       const events: NormalizedEvent[] = [
-        {
-          name: "some.other.event",
-          timeUnixMs: Date.now(),
-          attributes: { foo: "bar" },
-        },
         {
           name: "langwatch.evaluation.custom",
           timeUnixMs: Date.now(),
           attributes: {
-            json_encoded_event: JSON.stringify({ name: "accuracy", score: 0.9 }),
+            json_encoded_event: JSON.stringify({
+              name: "test-eval",
+              score: 1,
+            }),
           },
         },
       ];
 
       const result = service.canonicalize({}, events, stubSpan as any);
 
-      const evaluations = JSON.parse(
-        result.attributes[ATTR_KEYS.LANGWATCH_RESERVED_EVALUATIONS] as string,
-      );
-      expect(evaluations).toHaveLength(1);
-      expect(evaluations[0].name).toBe("accuracy");
+      expect(
+        result.attributes[ATTR_KEYS.LANGWATCH_RESERVED_EVALUATIONS],
+      ).toBeUndefined();
+    });
+
+    it("records the langwatch:evaluation.custom rule", () => {
+      const events: NormalizedEvent[] = [
+        {
+          name: "langwatch.evaluation.custom",
+          timeUnixMs: Date.now(),
+          attributes: {
+            json_encoded_event: JSON.stringify({ name: "test-eval", score: 1 }),
+          },
+        },
+      ];
+
+      const result = service.canonicalize({}, events, stubSpan as any);
+
+      expect(result.appliedRules).toContain("langwatch:evaluation.custom");
+    });
+  });
+
+  describe("when span has no evaluation events", () => {
+    it("does not set GenAI evaluation attributes", () => {
+      const result = service.canonicalize({}, [], stubSpan as any);
+
+      expect(
+        result.attributes[ATTR_KEYS.GEN_AI_EVALUATION_NAME],
+      ).toBeUndefined();
     });
   });
 });

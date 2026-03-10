@@ -12,6 +12,7 @@ import type { ElasticSearchEvaluation, Span } from "../../../tracer/types";
 import { elasticSearchEvaluationSchema } from "../../../tracer/types.generated";
 import { scheduleEvaluation } from "../../queues/evaluationsQueue";
 import type { CollectorJob, EvaluationJob } from "../../types";
+import { evaluationNameAutoslug } from "./evaluationNameAutoslug";
 
 const _logger = createLogger("langwatch:workers:collector:evaluations");
 
