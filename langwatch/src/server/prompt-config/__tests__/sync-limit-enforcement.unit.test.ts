@@ -30,12 +30,12 @@ describe("PromptService", () => {
 
     const localConfigData = {
       prompt: "Hello {input}",
-      messages: [] as Array<{ role: string; content: string }>,
-      inputs: [{ identifier: "input", type: "str" as const }],
-      outputs: [{ identifier: "output", type: "str" as const }],
+      messages: [],
+      inputs: [{ identifier: "input", type: "str" }],
+      outputs: [{ identifier: "output", type: "str" }],
       model: "gpt-4",
       temperature: 0.7,
-    };
+    } as any;
 
     beforeEach(() => {
       vi.clearAllMocks();

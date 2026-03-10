@@ -53,7 +53,7 @@ describe("handleError()", () => {
     const app = new Hono();
     app.onError(handleError);
     app.use("/*", async (c, next) => {
-      c.set("project", { id: "project-123", teamId: "team-456" });
+      c.set("project" as never, { id: "project-123", teamId: "team-456" });
       await next();
     });
     app.get("/", () => {

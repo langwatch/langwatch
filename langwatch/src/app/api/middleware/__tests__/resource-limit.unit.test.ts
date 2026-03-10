@@ -87,7 +87,7 @@ describe("resourceLimitMiddleware()", () => {
     const app = new Hono();
     // Simulate authMiddleware setting project
     app.use("/*", async (c, next) => {
-      c.set("project", project);
+      c.set("project" as never, project);
       await next();
     });
     app.use("/*", resourceLimitMiddleware(limitType));
@@ -281,8 +281,8 @@ describe("resourceLimitMiddleware()", () => {
       const app = new Hono();
       // Simulate authMiddleware + organizationMiddleware setting both project and organization
       app.use("/*", async (c, next) => {
-        c.set("project", project);
-        c.set("organization", { id: "org-cached" });
+        c.set("project" as never, project);
+        c.set("organization" as never, { id: "org-cached" });
         await next();
       });
       app.use("/*", resourceLimitMiddleware(limitType));
