@@ -275,7 +275,7 @@
     "encoding": "^0.1.13",
     "esbuild": "^0.27.3",
     "fishery": "^2.4.0",
-    "jest-mock-extended": "^4.0.0-beta1",
+    "jest-mock-extended": "^4.0.0",
     "jsdom": "^27.3.0",
     "node-mocks-http": "^1.17.2",
     "playwright": "1.57.0",
