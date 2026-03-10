@@ -7,8 +7,9 @@
  */
 
 import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { toaster } from "~/components/ui/toaster";
 import { useRouter } from "next/router";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { useTargetNameMap } from "~/hooks/useTargetNameMap";
@@ -27,6 +28,7 @@ import { RunSummaryCounts } from "./RunSummaryCounts";
 import { useRunHistoryStore } from "./useRunHistoryStore";
 import { useRunHistoryPagination } from "./useRunHistoryPagination";
 import { useAutoExpansion } from "./useAutoExpansion";
+import { useCancelScenarioRun, isCancellableStatus } from "./useCancelScenarioRun";
 import {
   computeBatchRunSummary,
   computeGroupSummary,
@@ -142,11 +144,59 @@ export function RunHistoryPanel({
     return scenarios.map((s) => ({ id: s.id, name: s.name }));
   }, [scenarios]);
 
+  // Optimistic cancellation: track run IDs marked as cancelled before server confirms
+  const [optimisticCancelledIds, setOptimisticCancelledIds] = useState<Set<string>>(new Set());
+
+  // Track the specific job ID currently being cancelled for per-button loading state
+  const [cancellingJobId, setCancellingJobId] = useState<string | null>(null);
+
+  const { cancelJob, cancelBatchRun, isCancellingBatch } = useCancelScenarioRun({
+    onOptimisticUpdate: (runIds) => {
+      setOptimisticCancelledIds((prev) => {
+        const next = new Set(prev);
+        for (const id of runIds) next.add(id);
+        return next;
+      });
+    },
+    onCancelJobSuccess: () => {
+      setCancellingJobId(null);
+      toaster.create({ title: "Job cancelled", type: "success" });
+    },
+    onCancelJobError: (error) => {
+      setCancellingJobId(null);
+      toaster.create({
+        title: "Failed to cancel job",
+        description: error.message,
+        type: "error",
+      });
+    },
+    onCancelBatchSuccess: () => {
+      toaster.create({ title: "Jobs cancelled", type: "success" });
+    },
+    onCancelBatchError: (error) => {
+      toaster.create({
+        title: "Failed to cancel jobs",
+        description: error.message,
+        type: "error",
+      });
+    },
+  });
+
+  // Apply optimistic cancellation overrides to run data
+  const runsWithOptimisticCancellations = useMemo(() => {
+    if (optimisticCancelledIds.size === 0) return allRuns;
+    return allRuns.map((run) =>
+      optimisticCancelledIds.has(run.scenarioRunId)
+        ? { ...run, status: ScenarioRunStatus.CANCELLED }
+        : run,
+    );
+  }, [allRuns, optimisticCancelledIds]);
+
   // Apply filters to raw runs
   const filteredRuns = useMemo(() => {
-    if (allRuns.length === 0) return [];
+    if (runsWithOptimisticCancellations.length === 0) return [];
 
-    let runs = allRuns;
+    let runs = runsWithOptimisticCancellations;
 
     if (filters.scenarioId) {
       runs = runs.filter((r) => r.scenarioId === filters.scenarioId);
@@ -216,6 +266,36 @@ export function RunHistoryPanel({
     });
   }, [totals, lastActivityTimestamp, onStatsReady]);
 
+  const createCancelRunHandler = useCallback(
+    (setId: string) => (scenarioRun: ScenarioRunData) => {
+      if (!project?.id) return;
+      setCancellingJobId(scenarioRun.scenarioRunId);
+      cancelJob({
+        projectId: project.id,
+        jobId: scenarioRun.scenarioRunId,
+        scenarioSetId: setId,
+        batchRunId: scenarioRun.batchRunId,
+        scenarioRunId: scenarioRun.scenarioRunId,
+        scenarioId: scenarioRun.scenarioId,
+      });
+    },
+    [project?.id, cancelJob],
+  );
+
+  const handleCancelAll = useCallback(
+    (batchRunId: string, batchRunScenarioSetId: string, scenarioRuns: ScenarioRunData[]) => {
+      if (!project?.id) return;
+      const cancellableRunIds = scenarioRuns
+        .filter((run) => isCancellableStatus(run.status))
+        .map((run) => run.scenarioRunId);
+
+      cancelBatchRun(
+        { projectId: project.id, scenarioSetId: batchRunScenarioSetId, batchRunId },
+        cancellableRunIds,
+      );
+    },
+    [project?.id, cancelBatchRun],
+  );
   const { openDrawer } = useDrawer();
 
   const handleScenarioRunClick = useCallback(
@@ -372,6 +452,10 @@ export function RunHistoryPanel({
                     expectedJobCount={expectedJobCount}
                     suiteName={suiteName}
                     viewMode={viewMode}
+                    onCancelRun={createCancelRunHandler(batchRun.scenarioSetId ?? scenarioSetId ?? "")}
+                    onCancelAll={() => handleCancelAll(batchRun.batchRunId, batchRun.scenarioSetId ?? scenarioSetId ?? "", batchRun.scenarioRuns)}
+                    isCancellingBatch={isCancellingBatch}
+                    cancellingJobId={cancellingJobId}
                   />
                 );
               })

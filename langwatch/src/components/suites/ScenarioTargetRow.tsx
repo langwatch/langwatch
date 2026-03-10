@@ -9,8 +9,7 @@
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
 
-import { HStack, Text } from "@chakra-ui/react";
-import { Spinner } from "@chakra-ui/react";
+import { HStack, Spinner, Text } from "@chakra-ui/react";
 import { X } from "lucide-react";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
@@ -26,6 +25,7 @@ type ScenarioTargetRowProps = {
   onClick: () => void;
   iteration?: number;
   onCancel?: () => void;
+  isCancelling?: boolean;
 };
 
 function formatDuration(ms: number): string {
@@ -57,6 +57,7 @@ export function ScenarioTargetRow({
   onClick,
   iteration,
   onCancel,
+  isCancelling = false,
 }: ScenarioTargetRowProps) {
   const scenarioName = scenarioRun.name ?? scenarioRun.scenarioId;
   const displayName = buildDisplayTitle({ scenarioName, targetName, iteration });
@@ -99,30 +100,32 @@ export function ScenarioTargetRow({
           <HStack
             as="span"
             role="button"
-            tabIndex={0}
+            tabIndex={isCancelling ? -1 : 0}
             gap={1}
             paddingX={2}
             paddingY={0.5}
             borderRadius="sm"
             fontSize="xs"
             color="red.500"
-            cursor="pointer"
-            _hover={{ bg: "red.50" }}
+            cursor={isCancelling ? "default" : "pointer"}
+            opacity={isCancelling ? 0.6 : 1}
+            _hover={isCancelling ? undefined : { bg: "red.50" }}
             onClick={(e: React.MouseEvent) => {
               e.stopPropagation();
-              onCancel();
+              if (!isCancelling) onCancel();
             }}
             onKeyDown={(e: React.KeyboardEvent) => {
-              if (e.key === "Enter" || e.key === " ") {
+              if (!isCancelling && (e.key === "Enter" || e.key === " ")) {
                 e.stopPropagation();
                 e.preventDefault();
                 onCancel();
               }
             }}
             aria-label="Cancel run"
+            aria-disabled={isCancelling}
             data-testid="cancel-run-button"
           >
-            <X size={12} />
+            {isCancelling ? <Spinner size="xs" /> : <X size={12} />}
             <Text fontSize="xs">Cancel</Text>
           </HStack>
         )}

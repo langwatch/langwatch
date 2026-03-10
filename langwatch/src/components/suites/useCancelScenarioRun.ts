@@ -39,14 +39,40 @@ export interface CancelBatchParams {
  *
  * @param onOptimisticUpdate - Called with scenarioRunIds that should be
  *   optimistically marked as cancelled.
+ * @param onCancelJobSuccess - Called when a single job cancel succeeds.
+ * @param onCancelJobError - Called with the error when a single job cancel fails.
+ * @param onCancelBatchError - Called with the error when a batch cancel fails.
  */
 export function useCancelScenarioRun({
   onOptimisticUpdate,
+  onCancelJobSuccess,
+  onCancelJobError,
+  onCancelBatchSuccess,
+  onCancelBatchError,
 }: {
   onOptimisticUpdate?: (scenarioRunIds: string[]) => void;
+  onCancelJobSuccess?: () => void;
+  onCancelJobError?: (error: { message: string }) => void;
+  onCancelBatchSuccess?: () => void;
+  onCancelBatchError?: (error: { message: string }) => void;
 } = {}) {
-  const cancelJobMutation = api.scenarios.cancelJob.useMutation();
-  const cancelBatchRunMutation = api.scenarios.cancelBatchRun.useMutation();
+  const cancelJobMutation = api.scenarios.cancelJob.useMutation({
+    onSuccess: () => {
+      onCancelJobSuccess?.();
+    },
+    onError: (error) => {
+      onCancelJobError?.(error);
+    },
+  });
+
+  const cancelBatchRunMutation = api.scenarios.cancelBatchRun.useMutation({
+    onSuccess: () => {
+      onCancelBatchSuccess?.();
+    },
+    onError: (error) => {
+      onCancelBatchError?.(error);
+    },
+  });
 
   const cancelJob = useCallback(
     (params: CancelRunParams) => {

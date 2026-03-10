@@ -31,6 +31,7 @@ type ScenarioRunContentProps = {
   onScenarioRunClick: (scenarioRun: ScenarioRunData) => void;
   iterationMap: Map<string, number>;
   onCancelRun?: (scenarioRun: ScenarioRunData) => void;
+  cancellingJobId?: string | null;
 };
 
 /**
@@ -78,6 +79,7 @@ function PlainContent({
   onScenarioRunClick,
   iterationMap,
   onCancelRun,
+  cancellingJobId,
 }: ScenarioRunContentProps) {
   if (viewMode === "grid") {
     return (
@@ -96,6 +98,8 @@ function PlainContent({
             targetName={resolveTargetName(scenarioRun)}
             onScenarioRunClick={onScenarioRunClick}
             iteration={iterationMap.get(scenarioRun.scenarioRunId)}
+            onCancel={onCancelRun ? () => onCancelRun(scenarioRun) : undefined}
+            isCancelling={cancellingJobId === scenarioRun.scenarioRunId}
           />
         ))}
       </Grid>
@@ -112,6 +116,7 @@ function PlainContent({
           onClick={() => onScenarioRunClick(scenarioRun)}
           iteration={iterationMap.get(scenarioRun.scenarioRunId)}
           onCancel={onCancelRun ? () => onCancelRun(scenarioRun) : undefined}
+          isCancelling={cancellingJobId === scenarioRun.scenarioRunId}
         />
       ))}
     </VStack>
