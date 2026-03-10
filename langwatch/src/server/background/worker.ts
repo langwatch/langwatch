@@ -143,7 +143,7 @@ export const start = (
     startStorageStatsCollection(clickHouseClient);
   }
 
-  return new Promise<Workers | undefined>((resolve, reject) => {
+  return new Promise<Workers | undefined>(async (resolve, reject) => {
     const collectorWorker = startCollectorWorker();
     const evaluationsWorker = startEvaluationsWorker(
       runEvaluationMock ?? runEvaluationJob,
@@ -151,7 +151,7 @@ export const start = (
     const topicClusteringWorker = startTopicClusteringWorker();
     const trackEventsWorker = startTrackEventsWorker();
     const usageStatsWorker = startUsageStatsWorker();
-    const scenarioWorker = startScenarioProcessor();
+    const scenarioWorker = await startScenarioProcessor();
     const metricsServer = startMetricsServer();
 
     // Register all closeables for graceful shutdown

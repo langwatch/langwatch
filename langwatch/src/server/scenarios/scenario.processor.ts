@@ -16,6 +16,7 @@ import { Worker as BullMQWorker } from "bullmq";
 import { createLogger } from "~/utils/logger/server";
 import { prisma } from "../db";
 import { connection } from "../redis";
+import { subscribeToCancellations } from "./cancellation-channel";
 import {
   type JobContextMetadata,
   createContextFromJobData,
@@ -194,10 +195,19 @@ export function buildChildProcessEnv(
 
 /**
  * Process a scenario job by spawning an isolated child process.
+ *
+ * @param signal - BullMQ's native AbortSignal, fired when the job is cancelled.
+ *   When provided and already aborted, processing is skipped immediately.
+ *   When fired mid-execution, the spawned child process receives SIGTERM.
  */
 export async function processScenarioJob(
   job: Job<ScenarioJob, ScenarioJobResult, string>,
+  _token?: string,
+  signal?: AbortSignal,
 ): Promise<ScenarioJobResult> {
+  if (signal?.aborted) {
+    return { success: false, error: "Job was cancelled before processing started" };
+  }
   // Extract context metadata propagated from the queue (flat format: { ...payload, __context })
   const { __context: contextMetadata, ...jobData } = job.data as ScenarioJob & {
     __context?: JobContextMetadata;
@@ -258,6 +268,7 @@ export async function processScenarioJob(
       jobData,
       childProcessData,
       prefetchResult.telemetry,
+      signal,
     );
 
     const totalDurationMs = Date.now() - startTime;
@@ -293,6 +304,7 @@ async function spawnScenarioChildProcess(
   jobData: ScenarioJob,
   childProcessData: ChildProcessJobData,
   telemetry: { endpoint: string; apiKey: string },
+  signal?: AbortSignal,
 ): Promise<ScenarioExecutionResult> {
   return new Promise((resolve) => {
     const { scenarioId, projectId, batchRunId, setId } = jobData;
@@ -340,6 +352,11 @@ async function spawnScenarioChildProcess(
       env: childEnv,
       stdio: ["pipe", "pipe", "pipe"],
       cwd: packageRoot,
+    });
+
+    // Kill the child process when the BullMQ abort signal fires (job cancelled)
+    signal?.addEventListener("abort", () => {
+      child.kill("SIGTERM");
     });
 
     let stderr = "";
@@ -435,9 +452,9 @@ async function spawnScenarioChildProcess(
  *
  * @param deps - Optional injected dependencies (defaults to production implementations)
  */
-export function startScenarioProcessor(
+export async function startScenarioProcessor(
   deps: ProcessorDependencies = createProcessorDependencies(),
-): Worker<ScenarioJob, ScenarioJobResult, string> | undefined {
+): Promise<Worker<ScenarioJob, ScenarioJobResult, string> | undefined> {
   if (!connection) {
     logger.info("No Redis connection, skipping scenario processor");
     return undefined;
@@ -445,7 +462,7 @@ export function startScenarioProcessor(
 
   const worker = new BullMQWorker<ScenarioJob, ScenarioJobResult, string>(
     SCENARIO_QUEUE.NAME,
-    processScenarioJob,
+    (job, token, signal) => processScenarioJob(job, token, signal),
     {
       connection,
       concurrency: SCENARIO_WORKER.CONCURRENCY,
@@ -528,6 +545,19 @@ export function startScenarioProcessor(
       // Log but don't crash the worker - failure handler errors shouldn't affect other jobs
       eventLogger.error({ emitError }, "Failed to emit failure events");
     }
+  });
+
+  // Subscribe to cancellation signals from the web server.
+  // Redis pub/sub requires a dedicated connection — use duplicate() so the
+  // subscriber doesn't interfere with BullMQ's command connection.
+  const subscriber = connection.duplicate();
+  const unsubscribe = await subscribeToCancellations({ worker, subscriber });
+
+  // Clean up the subscriber connection when the worker shuts down
+  worker.on("closing", () => {
+    void unsubscribe().catch((err: unknown) =>
+      logger.warn({ err }, "Error closing cancellation subscriber"),
+    );
   });
 
   logger.info(
