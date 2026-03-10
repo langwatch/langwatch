@@ -12,7 +12,6 @@ import { CollapsibleMenuGroup } from "./sidebar/CollapsibleMenuGroup";
 import { SideMenuLink } from "./sidebar/SideMenuLink";
 import { SupportMenu } from "./sidebar/SupportMenu";
 import { ThemeToggle } from "./sidebar/ThemeToggle";
-import { BetaPill } from "./ui/BetaPill";
 import { UsageIndicator } from "./sidebar/UsageIndicator";
 
 export const MENU_WIDTH_EXPANDED = "200px";
@@ -175,18 +174,7 @@ export const MainMenu = React.memo(function MainMenu({
                             )
                           : "/auth/signin",
                         isActive: router.pathname.includes("/simulations/suites"),
-                        rightElement: (
-                          <BetaPill
-                            message={
-                              <Text fontSize="sm">
-                                This feature is provided in beta and is still
-                                under development. By using it, you acknowledge
-                                it may contain errors, change without notice, or
-                                be discontinued at any time.
-                              </Text>
-                            }
-                          />
-                        ),
+                        beta: "This feature is provided in beta and is still under development. By using it, you acknowledge it may contain errors, change without notice, or be discontinued at any time.",
                       },
                     ]
                   : []),

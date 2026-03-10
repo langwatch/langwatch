@@ -4,18 +4,19 @@ Feature: Beta Pill Indicator
   So that I understand the feature's maturity level and can learn more on hover
 
   Background:
-    Given a feature area wrapped with the BetaPill component
+    Given a BetaPill component that renders a "Beta" badge with a hover popover
 
   @integration
-  Scenario: Beta pill badge appears next to wrapped content
-    When the page renders
-    Then a "Beta" pill badge is visible alongside the wrapped content
+  Scenario: Beta pill badge renders with default message
+    Given a menu item configured with beta set to true
+    When the item renders
+    Then a "Beta" pill badge is visible next to the label
 
   @integration
-  Scenario: Hovering the beta pill shows a popover with the message
-    Given a custom message component is provided
+  Scenario: Beta pill badge renders with custom message
+    Given a menu item configured with beta set to a custom string
     When the user hovers over the beta pill
-    Then a popover appears displaying the custom message content
+    Then a popover appears displaying the custom string
 
   @integration
   Scenario: Popover renders styled text
@@ -32,11 +33,11 @@ Feature: Beta Pill Indicator
   @integration
   Scenario: Keyboard focus shows the popover
     When the user focuses the beta pill with the keyboard
-    Then a popover appears displaying the custom message content
+    Then a popover appears displaying the message content
 
   @integration
   Scenario: Suites sidebar item displays a beta indicator
-    Given I am viewing the sidebar navigation
-    When I look at the Suites menu item
+    Given the Suites menu item has beta configured with a disclaimer message
+    When I view the sidebar navigation
     Then I see a "Beta" pill badge next to the Suites label
-    And hovering over it shows information about the beta status
+    And hovering over it shows the beta disclaimer

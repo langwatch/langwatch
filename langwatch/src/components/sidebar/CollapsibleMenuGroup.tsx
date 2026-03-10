@@ -18,7 +18,7 @@ export type CollapsibleMenuChild = {
   label: string;
   href: string;
   isActive: boolean;
-  rightElement?: React.ReactNode;
+  beta?: string | boolean;
 };
 
 export type CollapsibleMenuGroupProps = {
@@ -156,7 +156,7 @@ const CollapsibleMenuChildItem = ({
   isActive,
   project,
   showLabel = true,
-  rightElement,
+  beta,
 }: CollapsibleMenuChildItemProps) => {
   return (
     <SideMenuLink
@@ -166,7 +166,7 @@ const CollapsibleMenuChildItem = ({
       isActive={isActive}
       project={project}
       showLabel={showLabel}
-      rightElement={rightElement}
+      beta={beta}
     />
   );
 };
