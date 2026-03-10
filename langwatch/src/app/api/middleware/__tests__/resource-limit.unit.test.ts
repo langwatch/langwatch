@@ -141,10 +141,12 @@ describe("resourceLimitMiddleware()", () => {
       const app = createTestApp("prompts");
       await app.request("/", { method: "POST" });
 
-      expect(mockNotifyPlanLimitReached).toHaveBeenCalledWith({
-        organizationId: "org-789",
-        planName: "free",
-      });
+      await vi.waitFor(() =>
+        expect(mockNotifyPlanLimitReached).toHaveBeenCalledWith({
+          organizationId: "org-789",
+          planName: "free",
+        }),
+      );
     });
   });
 

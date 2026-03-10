@@ -57,14 +57,19 @@ async function determineErrorResponse(
 
   // LimitExceededError maps to 403 with structured resource limit response
   if (error instanceof LimitExceededError) {
-    const organizationId = await resolveOrganizationIdFromContext(c);
-    const message = organizationId
-      ? await buildResourceLimitMessage({
+    let message = error.message;
+    try {
+      const organizationId = await resolveOrganizationIdFromContext(c);
+      if (organizationId) {
+        message = await buildResourceLimitMessage({
           organizationId,
           limitType: error.limitType,
           max: error.max,
-        })
-      : error.message;
+        });
+      }
+    } catch {
+      // keep the original limit message if enrichment fails
+    }
 
     return {
       statusCode: 403,
