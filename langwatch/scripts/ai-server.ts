@@ -323,7 +323,7 @@ const server = createServer(async (req, res) => {
 
       jsonResponse(res, 500, {
         error: "Internal Server Error",
-        message: errorMessage,
+        message: "An unexpected error occurred",
       });
     }
     return;
