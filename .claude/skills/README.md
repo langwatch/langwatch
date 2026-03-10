@@ -21,6 +21,7 @@ These skills use `context: fork` but contain their own instructions:
 
 | Skill | Purpose |
 |-------|---------|
+| `/drive-pr` | Drive a PR to mergeable state — fix CI failures and address review comments |
 | `/plan` | Create feature file with acceptance criteria |
 
 ### Orchestration Skills (Opt-In)
