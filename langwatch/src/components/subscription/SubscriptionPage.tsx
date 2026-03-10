@@ -34,7 +34,7 @@ import {
   parseGrowthSeatPlanType,
   isAnnualTieredPlan,
   FREE_PLAN_FEATURES as DEVELOPER_FEATURES,
-  GROWTH_FEATURES,
+  getGrowthFeatures,
   ENTERPRISE_PLAN_FEATURES,
   buildTieredCapabilities,
 } from "./billing-plans";
@@ -325,7 +325,7 @@ export function SubscriptionPage() {
           perSeatPrice: monthlyEquivalent,
         };
   const currentPlanFeatures = isLicenseOverride
-    ? GROWTH_FEATURES
+    ? getGrowthFeatures(effectiveCurrency)
     : isTieredLegacyPaidPlan
     ? buildTieredCapabilities({
       maxMembers: plan?.maxMembers ?? 0,
@@ -338,7 +338,7 @@ export function SubscriptionPage() {
       ? ENTERPRISE_PLAN_FEATURES
       : isDeveloperPlan
         ? DEVELOPER_FEATURES
-        : GROWTH_FEATURES;
+        : getGrowthFeatures(effectiveCurrency);
 
 
   const isUpgradeSeatsRequired =
@@ -495,7 +495,7 @@ export function SubscriptionPage() {
             }
             totalPrice={upgradeBillingPriceFormatted}
             coreMembers={upgradeBillingSeats}
-            features={GROWTH_FEATURES}
+            features={getGrowthFeatures(effectiveCurrency)}
             monthlyEquivalent={monthlyEquivalent}
             onUpgrade={handleUpgrade}
             isLoading={isUpgradeLoading}

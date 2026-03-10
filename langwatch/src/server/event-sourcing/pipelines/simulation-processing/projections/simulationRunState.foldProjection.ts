@@ -118,12 +118,13 @@ function apply(
       StartedAt: state.StartedAt ?? event.occurredAt,
       LastSnapshotOccurredAt: event.occurredAt,
       Messages: event.data.messages.map((m) => {
-        const { id, role, content, trace_id, ...restFields } = m as Record<
-          string,
-          unknown
-        >;
+        const { id, role, content, trace_id, ...restFields } = m;
+
         const rest =
-          Object.keys(restFields).length > 0 ? JSON.stringify(restFields) : "";
+          Object.keys(restFields).length > 0
+            ? JSON.stringify(restFields)
+            : "";
+
         return {
           Id: typeof id === "string" ? id : "",
           Role: typeof role === "string" ? role : "",

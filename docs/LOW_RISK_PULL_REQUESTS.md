@@ -16,6 +16,8 @@ A PR may be treated as **low risk** only if:
 - It is limited to:
   - UI text, layout, or styling.
   - Documentation, comments, or code formatting.
+  - Claude Code agent configuration (`.claude/` directory).
+  - BDD feature specs (`specs/` directory).
   - Other configuration or code that is explicitly documented as low risk and easy to revert.
 
 If you are unsure, do **not** use `low-risk-change`; request a normal review instead.

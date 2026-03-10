@@ -3,6 +3,7 @@ import { SpanKind } from "@opentelemetry/api";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import { getLangWatchTracer } from "langwatch";
+import type { ProcessRole } from "~/server/app-layer/config";
 import { makeQueueName } from "~/server/background/queues/makeQueueName";
 import { createBillingMeterDispatchReactor } from "./projections/global/billingMeterDispatch.reactor";
 import { BILLING_REPORTING_PIPELINE_NAME } from "./pipelines/billing-reporting/pipeline";
@@ -39,7 +40,7 @@ export interface EventSourcingOptions {
   redis?: IORedis | Cluster | null;
   enabled?: boolean; // defaults to true
   isSaas?: boolean; // defaults to false
-  processRole?: "web" | "worker";
+  processRole?: ProcessRole;
 }
 
 /**
@@ -88,7 +89,7 @@ export class EventSourcing {
   private readonly _enabled: boolean;
   private readonly _clickhouse?: ClickHouseClient | null;
   private readonly _redis?: IORedis | Cluster | null;
-  private readonly _processRole?: "web" | "worker";
+  private readonly _processRole?: ProcessRole;
 
   constructor(options: EventSourcingOptions = {}) {
     this._enabled = options.enabled ?? true;

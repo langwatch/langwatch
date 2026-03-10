@@ -64,7 +64,7 @@ function getSpanAttributes(
   };
 }
 
-function makeJobId(payload: ExecuteEvaluationCommandData): string {
+export function makeJobId(payload: ExecuteEvaluationCommandData): string {
   if (
     payload.threadIdleTimeout &&
     payload.threadIdleTimeout > 0 &&
@@ -100,7 +100,7 @@ export function createExecuteEvaluationCommandClass(deps: ExecuteEvaluationComma
     ): Promise<EvaluationProcessingEvent[]> {
       const { tenantId, data } = command;
 
-      logger.info(
+      logger.debug(
         {
           tenantId: tenantId,
           evaluationId: data.evaluationId,
@@ -236,6 +236,7 @@ export function createExecuteEvaluationCommandClass(deps: ExecuteEvaluationComma
         return emitScheduledAndCompleted(data, tenantId, {
           status: "error",
           error: extractErrorMessage(error),
+          errorDetails: error instanceof Error ? error.stack ?? null : null,
         });
       }
     }
@@ -252,6 +253,7 @@ function emitScheduledAndCompleted(
     label?: string;
     details?: string;
     error?: string;
+    errorDetails?: string | null;
   },
 ): EvaluationProcessingEvent[] {
   const scheduledEvent = EventUtils.createEvent<EvaluationScheduledEvent>({
@@ -269,6 +271,7 @@ function emitScheduledAndCompleted(
       isGuardrail: data.isGuardrail,
     },
     occurredAt: data.occurredAt,
+    idempotencyKey: `${data.tenantId}:${data.evaluationId}:scheduled`,
   });
 
   const completedEvent = EventUtils.createEvent<EvaluationCompletedEvent>({
@@ -285,8 +288,10 @@ function emitScheduledAndCompleted(
       label: result.label ?? null,
       details: result.details ?? null,
       error: result.error ?? null,
+      errorDetails: result.errorDetails ?? null,
     },
     occurredAt: Date.now(),
+    idempotencyKey: `${data.tenantId}:${data.evaluationId}:completed`,
   });
 
   return [scheduledEvent, completedEvent];

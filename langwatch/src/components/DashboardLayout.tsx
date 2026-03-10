@@ -32,7 +32,9 @@ import { api } from "../utils/api";
 import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { trackEvent } from "../utils/tracking";
 import { CurrentDrawer } from "./CurrentDrawer";
+import { SavedViewsBar } from "./messages/SavedViewsBar";
 import { SdkRadarBanner } from "./SdkRadarBanner";
+import { SavedViewsProvider } from "../hooks/useSavedViews";
 import { FullLogo } from "./icons/FullLogo";
 import { LogoIcon } from "./icons/LogoIcon";
 import { LoadingScreen } from "./LoadingScreen";
@@ -318,6 +320,11 @@ export const DashboardLayout = ({
     team?.members.some((member) => member.userId === user?.id);
 
   const menuWidth = compactMenu ? MENU_WIDTH_COMPACT : MENU_WIDTH_EXPANDED;
+  const hasClickHouse = project?.featureClickHouseDataSourceTraces === true;
+  const isTracesOrAnalyticsPage =
+    router.pathname.startsWith("/[project]/messages") ||
+    router.pathname.startsWith("/[project]/analytics");
+  const showSavedViews = hasClickHouse && isTracesOrAnalyticsPage;
 
   return (
     <Box
@@ -628,7 +635,16 @@ export const DashboardLayout = ({
             <CurrentDrawer />
 
             {userIsPartOfTeam ? (
-              children
+              showSavedViews ? (
+                <SavedViewsProvider>
+                  {children}
+                  {/* Spacer to prevent fixed bottom bar from covering content */}
+                  <Box height="64px" flexShrink={0} />
+                  <SavedViewsBar />
+                </SavedViewsProvider>
+              ) : (
+                children
+              )
             ) : (
               <Alert.Root
                 status="warning"

@@ -24,7 +24,9 @@ import { Search } from "lucide-react";
 import { LuZap } from "react-icons/lu";
 import { useDebounceValue } from "usehooks-ts";
 import { useDrawer } from "~/hooks/useDrawer";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import {
+	useOrganizationTeamProject,
+} from "~/hooks/useOrganizationTeamProject";
 import { type FilterParam, useFilterParams } from "../../hooks/useFilterParams";
 import { filterOutEmptyFilters } from "../../server/analytics/utils";
 import type { AppRouter } from "../../server/api/root";
@@ -38,6 +40,7 @@ import { InputGroup } from "../ui/input-group";
 import { Popover } from "../ui/popover";
 import { Slider } from "../ui/slider";
 import { Tooltip } from "../ui/tooltip";
+import { SaveAsViewButton } from "./SaveAsViewButton";
 
 export function QueryStringFieldsFilters({
 	hideTriggerButton = false,
@@ -47,27 +50,34 @@ export function QueryStringFieldsFilters({
 	const { nonEmptyFilters, setFilters } = useFilterParams();
 
 	const { openDrawer } = useDrawer();
-	const { hasPermission } = useOrganizationTeamProject();
+	const { project, hasPermission } = useOrganizationTeamProject();
 
 	const hasAnyFilters = Object.keys(nonEmptyFilters).length > 0;
+	const hasClickHouse = project?.featureClickHouseDataSourceTraces === true;
 
 	return (
 		<FieldsFilters
 			filters={nonEmptyFilters}
 			setFilters={(filters) => setFilters(filterOutEmptyFilters(filters))}
 			actionButton={
-				hasPermission("triggers:manage") && !hideTriggerButton ? (
-					<Tooltip content="Create a filter to add an automation.">
-						<Button
-							colorPalette="gray"
-							onClick={() => openDrawer("automation", undefined)}
-							disabled={!hasAnyFilters}
-						>
-							<LuZap />
-							Add Automation
-						</Button>
-					</Tooltip>
-				) : undefined
+				<HStack gap={1}>
+					{hasClickHouse && hasAnyFilters && (
+						<SaveAsViewButton />
+					)}
+					{hasPermission("triggers:manage") && !hideTriggerButton && (
+						<Tooltip content="Create a filter to add an automation.">
+							<Button
+								size="xs"
+								variant="outline"
+								onClick={() => openDrawer("automation", undefined)}
+								disabled={!hasAnyFilters}
+							>
+								<LuZap />
+								Add Automation
+							</Button>
+						</Tooltip>
+					)}
+				</HStack>
 			}
 		/>
 	);
@@ -82,7 +92,12 @@ export function FieldsFilters({
 	setFilters: (filters: Partial<Record<FilterField, FilterParam>>) => void;
 	actionButton?: React.ReactNode;
 }) {
+	const { project } = useOrganizationTeamProject();
+	const hasClickHouse =
+		project?.featureClickHouseDataSourceTraces === true;
+
 	const filterKeys: FilterField[] = [
+		...(hasClickHouse ? (["traces.origin"] as const) : []),
 		"metadata.prompt_ids",
 		"spans.model",
 		"metadata.labels",
@@ -131,6 +146,7 @@ export function FieldsFilters({
 // Filter types that should NOT allow custom values
 const BOOLEAN_FILTER_IDS: FilterField[] = [
 	"evaluations.passed",
+	"traces.origin",
 	"traces.error",
 	"annotations.hasAnnotation",
 	"evaluations.state",

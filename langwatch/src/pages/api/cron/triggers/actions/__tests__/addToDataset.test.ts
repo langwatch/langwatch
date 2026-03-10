@@ -19,7 +19,7 @@ vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
 }));
 
-import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord";
+import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
 import { mapTraceToDatasetEntry } from "~/server/tracer/tracesMapping";
 import { captureException } from "~/utils/posthogErrorCapture";
 

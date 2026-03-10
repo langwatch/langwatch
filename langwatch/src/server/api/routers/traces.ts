@@ -12,25 +12,17 @@ import { getApp } from "~/server/app-layer/app";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
 import { TraceService } from "~/server/traces/trace.service";
 import { createLogger } from "~/utils/logger/server";
-import { sharedFiltersInputSchema } from "../../analytics/types";
 import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
 import { evaluatePreconditions } from "../../evaluations/preconditions";
 import { checkPreconditionSchema } from "../../evaluations/types.generated";
 import { checkPermissionOrPubliclyShared, checkProjectPermission } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
+import {
+  getAllForProjectInput,
+  tracesFilterInput,
+} from "./traces.schemas";
 
-const tracesFilterInput = sharedFiltersInputSchema.extend({
-  pageOffset: z.number().optional(),
-  pageSize: z.number().optional(),
-});
-
-export const getAllForProjectInput = tracesFilterInput.extend({
-  groupBy: z.string().optional(),
-  sortBy: z.string().optional(),
-  sortDirection: z.string().optional(),
-  updatedAt: z.number().optional(),
-  scrollId: z.string().optional().nullable(),
-});
+export { getAllForProjectInput };
 
 const logger = createLogger("langwatch:traces:sse-subscription");
 

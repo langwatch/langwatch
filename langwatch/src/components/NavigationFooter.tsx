@@ -4,7 +4,7 @@ import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import { ChevronLeft, ChevronRight } from "lucide-react"; // Changed from react-feather
 import { useRouter } from "next/router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AppRouter } from "../server/api/root";
 
 // Constants
@@ -93,6 +93,36 @@ export const useMessagesNavigationFooter = () => {
     }
   }, [useCursorPagination]);
 
+  // Build a query object with pagination params, stripping defaults to keep
+  // the URL clean and avoid clobbering other params (like saved view filters).
+  const buildPaginationQuery = useCallback(
+    (overrides: {
+      pageOffset?: number;
+      pageSize?: number;
+      scrollId?: string | null;
+    }) => {
+      const {
+        pageOffset: _po,
+        pageSize: _ps,
+        scrollId: _si,
+        ...rest
+      } = router.query;
+
+      const query: Record<string, string | string[] | undefined> = { ...rest };
+
+      const offset = overrides.pageOffset ?? pageOffset;
+      const size = overrides.pageSize ?? pageSize;
+      const scroll = overrides.scrollId;
+
+      if (offset !== 0) query.pageOffset = offset.toString();
+      if (size !== DEFAULT_PAGE_SIZE) query.pageSize = size.toString();
+      if (scroll) query.scrollId = scroll;
+
+      return query;
+    },
+    [router.query, pageOffset, pageSize],
+  );
+
   /**
    * Navigate to the next page
    * @param currentResponseScrollId - Scroll ID from the current response (for cursor pagination)
@@ -102,23 +132,34 @@ export const useMessagesNavigationFooter = () => {
       if (currentResponseScrollId) {
         // Cursor-based pagination
         setCursorPageNumber((prev) => prev + 1);
-        void router.push({
-          pathname: router.pathname,
-          query: { ...router.query, scrollId: currentResponseScrollId },
-        });
+        void router.push(
+          {
+            pathname: router.pathname,
+            query: buildPaginationQuery({
+              scrollId: currentResponseScrollId,
+            }),
+          },
+          undefined,
+          { shallow: true },
+        );
       } else if (useCursorPagination) {
         // In cursor mode but no more results
         return;
       } else {
         // Offset-based pagination
-        const newOffset = pageOffset + pageSize;
-        void router.push({
-          pathname: router.pathname,
-          query: { ...router.query, pageOffset: newOffset.toString() },
-        });
+        void router.push(
+          {
+            pathname: router.pathname,
+            query: buildPaginationQuery({
+              pageOffset: pageOffset + pageSize,
+            }),
+          },
+          undefined,
+          { shallow: true },
+        );
       }
     },
-    [router, pageOffset, pageSize, useCursorPagination],
+    [router, pageOffset, pageSize, useCursorPagination, buildPaginationQuery],
   );
 
   /**
@@ -128,19 +169,28 @@ export const useMessagesNavigationFooter = () => {
     if (useCursorPagination) {
       // Reset to first page in offset mode
       setCursorPageNumber(1);
-      void router.push({
-        pathname: router.pathname,
-        query: { ...router.query, scrollId: undefined, pageOffset: "0" },
-      });
+      void router.push(
+        {
+          pathname: router.pathname,
+          query: buildPaginationQuery({ pageOffset: 0, scrollId: null }),
+        },
+        undefined,
+        { shallow: true },
+      );
     } else if (pageOffset > 0) {
       // Offset-based pagination
-      const newOffset = pageOffset - pageSize;
-      void router.push({
-        pathname: router.pathname,
-        query: { ...router.query, pageOffset: newOffset.toString() },
-      });
+      void router.push(
+        {
+          pathname: router.pathname,
+          query: buildPaginationQuery({
+            pageOffset: pageOffset - pageSize,
+          }),
+        },
+        undefined,
+        { shallow: true },
+      );
     }
-  }, [router, pageOffset, pageSize, useCursorPagination]);
+  }, [router, pageOffset, pageSize, useCursorPagination, buildPaginationQuery]);
 
   /**
    * Change the page size and reset pagination
@@ -148,17 +198,20 @@ export const useMessagesNavigationFooter = () => {
    */
   const changePageSize = useCallback(
     (size: number) => {
-      void router.push({
-        pathname: router.pathname,
-        query: {
-          ...router.query,
-          pageSize: size.toString(),
-          pageOffset: "0",
-          scrollId: undefined,
+      void router.push(
+        {
+          pathname: router.pathname,
+          query: buildPaginationQuery({
+            pageSize: size,
+            pageOffset: 0,
+            scrollId: null,
+          }),
         },
-      });
+        undefined,
+        { shallow: true },
+      );
     },
-    [router],
+    [router, buildPaginationQuery],
   );
 
   /**
@@ -177,21 +230,28 @@ export const useMessagesNavigationFooter = () => {
   };
 
   // Reset pagination when search query changes
+  const prevQueryRef = useRef(router.query.query);
   useEffect(() => {
-    // Only push if we have the required dynamic route params
     if (!router.query.project) return;
 
-    void router.push({
-      pathname: router.pathname,
-      query: {
-        ...router.query,
-        pageOffset: "0",
-        pageSize: DEFAULT_PAGE_SIZE.toString(),
-        scrollId: undefined,
+    // Skip if the search query hasn't actually changed (e.g. initial mount)
+    if (prevQueryRef.current === router.query.query) return;
+    prevQueryRef.current = router.query.query;
+
+    void router.push(
+      {
+        pathname: router.pathname,
+        query: buildPaginationQuery({
+          pageOffset: 0,
+          pageSize: DEFAULT_PAGE_SIZE,
+          scrollId: null,
+        }),
       },
-    });
+      undefined,
+      { shallow: true },
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router.query.query]); // Note: This might need adjustment based on your query param name
+  }, [router.query.query]);
 
   return {
     totalHits,

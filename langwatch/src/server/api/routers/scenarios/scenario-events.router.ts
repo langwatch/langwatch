@@ -5,7 +5,7 @@ import type { PrismaClient } from "@prisma/client";
 import { getApp } from "~/server/app-layer/app";
 import { SimulationService } from "~/server/simulations/simulation.service";
 import { ScenarioJobRepository } from "~/server/scenarios/scenario-job.repository";
-import { mergeRunData } from "~/server/scenarios/scenario-run.service";
+import { mergeRunData } from "~/server/scenarios/scenario-run.utils";
 import { scenarioQueue } from "~/server/scenarios/scenario.queue";
 import { isSuiteSetId } from "~/server/suites/suite-set-id";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
