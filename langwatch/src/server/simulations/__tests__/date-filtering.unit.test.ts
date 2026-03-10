@@ -2,8 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { ClickHouseSimulationService } from "../clickhouse-simulation.service";
 
-const DEFAULT_DATES = { startDate: 0, endDate: Date.now() } as const;
-
 function makeRunRow(overrides: Record<string, unknown> = {}) {
   return {
     ScenarioRunId: "run-1",
