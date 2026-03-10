@@ -156,11 +156,21 @@ export const createStripeWebhookHandlerFactory = ({
 
             const posthogServer = getPostHogInstance();
             if (posthogServer) {
+              posthogServer.capture({
+                distinctId: organization.id,
+                event: "subscription_created",
+                properties: {
+                  subscriptionId,
+                  $groups: { organization: organization.id },
+                },
+              });
               posthogServer.groupIdentify({
                 groupType: "organization",
                 groupKey: organization.id,
                 properties: {
-                  subscriptionCreatedAt: new Date().toISOString(),
+                  subscriptionCreatedAt: new Date(
+                    checkoutSession.created * 1000,
+                  ).toISOString(),
                   hasActiveSubscription: true,
                 },
               });
