@@ -6,8 +6,11 @@ import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { getClickHouseClient } from "~/server/clickhouse/client";
 import { prisma as defaultPrisma } from "~/server/db";
 import type { Protections } from "~/server/elasticsearch/protections";
-import { mapTraceEvaluationsToLegacyEvaluations } from "~/server/evaluations/evaluation-run.mappers";
-import { EvaluationService } from "~/server/evaluations/evaluation.service";
+import {
+  mapClickHouseEvaluationToTraceEvaluation,
+  mapTraceEvaluationsToLegacyEvaluations,
+  type ClickHouseEvaluationRunRow,
+} from "~/server/evaluations/evaluation-run.mappers";
 import type {
   NormalizedSpan,
   NormalizedSpanKind,
@@ -64,11 +67,8 @@ export class ClickHouseTraceService {
   private readonly tracer = getLangWatchTracer(
     "langwatch.traces.clickhouse-service",
   );
-  private readonly evaluationService: EvaluationService;
-
   constructor(private readonly prisma: PrismaClient) {
     this.clickHouseClient = getClickHouseClient();
-    this.evaluationService = EvaluationService.create(prisma);
   }
 
   /**
@@ -373,16 +373,9 @@ export class ClickHouseTraceService {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getAllTracesForProject",
       async (_span) => {
-        // Check if ClickHouse is enabled
-        const isEnabled = await this.isClickHouseEnabled(input.projectId);
-        if (!isEnabled || !this.clickHouseClient) {
+        if (!this.clickHouseClient) {
           return null;
         }
-
-        this.logger.debug(
-          { projectId: input.projectId, scrollId: input.scrollId },
-          "Fetching all traces for project from ClickHouse",
-        );
 
         try {
           const pageSize = input.pageSize ?? 25;
@@ -522,18 +515,45 @@ export class ClickHouseTraceService {
             "Returning traces result",
           );
 
-          // Enrich with evaluations
+          // Enrich with evaluations — direct ClickHouse query, no extra isClickHouseEnabled roundtrip
           const traceIds = groups.flat().map((t) => t.trace_id);
           let traceChecks: TracesForProjectResult["traceChecks"] = {};
-          if (traceIds.length > 0) {
-            const evaluations =
-              await this.evaluationService.getEvaluationsMultiple({
-                projectId: input.projectId,
+          if (traceIds.length > 0 && this.clickHouseClient) {
+            const evalResult = await this.clickHouseClient.query({
+              query: `
+                SELECT *
+                FROM evaluation_runs
+                WHERE TenantId = {tenantId:String}
+                  AND TraceId IN ({traceIds:Array(String)})
+                ORDER BY EvaluationId, UpdatedAt DESC
+                LIMIT 1 BY TenantId, EvaluationId
+              `,
+              query_params: {
+                tenantId: input.projectId,
                 traceIds,
-                protections,
-              });
-            traceChecks =
-              mapTraceEvaluationsToLegacyEvaluations(evaluations);
+              },
+              format: "JSONEachRow",
+            });
+
+            const evalRows =
+              (await evalResult.json()) as ClickHouseEvaluationRunRow[];
+
+            const grouped: Record<
+              string,
+              ReturnType<typeof mapClickHouseEvaluationToTraceEvaluation>[]
+            > = {};
+            for (const id of traceIds) {
+              grouped[id] = [];
+            }
+            for (const row of evalRows) {
+              if (row.TraceId && grouped[row.TraceId]) {
+                grouped[row.TraceId]!.push(
+                  mapClickHouseEvaluationToTraceEvaluation(row),
+                );
+              }
+            }
+
+            traceChecks = mapTraceEvaluationsToLegacyEvaluations(grouped);
           }
 
           return {
@@ -1104,161 +1124,111 @@ export class ClickHouseTraceService {
           throw new Error("ClickHouse client not available");
         }
 
-        // Build WHERE conditions
-        const conditions: string[] = ["ts.TenantId = {tenantId:String}"];
+        // Additional filter conditions (already parameterized by the filter module)
+        const extraFilters =
+          filterConditions && filterConditions.length > 0
+            ? " AND " + filterConditions.join(" AND ")
+            : "";
 
-        // Date range filters (use OccurredAt for event time filtering)
-        if (startDate) {
-          conditions.push(
-            "ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})",
-          );
-        }
-        if (endDate) {
-          conditions.push(
-            "ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})",
-          );
-        }
-
-        // User-specified filter conditions
-        if (filterConditions && filterConditions.length > 0) {
-          conditions.push(...filterConditions);
-        }
-
-        // Keyset pagination condition
+        // Keyset cursor condition — only for the data query
+        let cursorCondition = "";
         if (cursor) {
-          this.logger.debug(
-            {
-              cursorLastTimestamp: cursor.lastTimestamp,
-              cursorLastTraceId: cursor.lastTraceId,
-              cursorSortDirection: cursor.sortDirection,
-              cursorPageSize: cursor.pageSize,
-              currentSortDirection: sortDirection,
-              currentPageSize: pageSize,
-            },
-            "Using cursor for pagination",
-          );
-
-          if (sortDirection === "desc") {
-            // For descending order: get records BEFORE the cursor
-            conditions.push(
-              `(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) < ({lastTimestamp:UInt64}, {lastTraceId:String})`,
-            );
-          } else {
-            // For ascending order: get records AFTER the cursor
-            conditions.push(
-              `(toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) > ({lastTimestamp:UInt64}, {lastTraceId:String})`,
-            );
-          }
+          cursorCondition =
+            sortDirection === "desc"
+              ? " AND (toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) < ({lastTimestamp:UInt64}, {lastTraceId:String})"
+              : " AND (toUnixTimestamp64Milli(ts.OccurredAt), ts.TraceId) > ({lastTimestamp:UInt64}, {lastTraceId:String})";
         }
 
-        const whereClause = conditions.join(" AND ");
         const orderDirection = sortDirection === "desc" ? "DESC" : "ASC";
 
-        // First, get total count (without pagination)
-        const countResult = await this.clickHouseClient.query({
-          query: `
-        SELECT count(DISTINCT ts.TraceId) as total
-        FROM trace_summaries ts
-        WHERE ${whereClause.replace(/\(toUnixTimestamp64Milli.*\)/, "1=1")}
-      `,
-          query_params: {
-            tenantId: projectId,
-            startDate: startDate ?? 0,
-            endDate: endDate ?? Date.now(),
-            ...filterParams,
-          },
-          format: "JSONEachRow",
-        });
+        const sharedParams = {
+          tenantId: projectId,
+          startDate: startDate ?? 0,
+          endDate: endDate ?? Date.now(),
+          ...filterParams,
+        };
 
-        const countRows = (await countResult.json()) as Array<{
-          total: string;
-        }>;
+        // Run count + data queries in parallel.
+        // No FINAL (blows up RAM) and no subquery (materialises everything).
+        // Flat LIMIT 1 BY deduplicates as a streaming post-filter on the
+        // sorted output — cheap and correct for recent unmerged rows.
+        // uniq() uses HyperLogLog (~2 % error) which is fine for pagination.
+        const [countResult, summaryResult] = await Promise.all([
+          this.clickHouseClient.query({
+            query: `
+              SELECT uniq(ts.TraceId) as total
+              FROM trace_summaries ts
+              WHERE ts.TenantId = {tenantId:String}
+                AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
+                AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
+                ${extraFilters}
+            `,
+            query_params: sharedParams,
+            format: "JSONEachRow",
+          }),
+          this.clickHouseClient.query({
+            query: `
+              SELECT
+                ts.TraceId AS ts_TraceId,
+                ts.SpanCount AS ts_SpanCount,
+                ts.TotalDurationMs AS ts_TotalDurationMs,
+                ts.ComputedIOSchemaVersion AS ts_ComputedIOSchemaVersion,
+                ts.TimeToFirstTokenMs AS ts_TimeToFirstTokenMs,
+                ts.TimeToLastTokenMs AS ts_TimeToLastTokenMs,
+                ts.TokensPerSecond AS ts_TokensPerSecond,
+                ts.ContainsErrorStatus AS ts_ContainsErrorStatus,
+                ts.ContainsOKStatus AS ts_ContainsOKStatus,
+                ts.ErrorMessage AS ts_ErrorMessage,
+                ts.Models AS ts_Models,
+                ts.TotalCost AS ts_TotalCost,
+                ts.TokensEstimated AS ts_TokensEstimated,
+                ts.TotalPromptTokenCount AS ts_TotalPromptTokenCount,
+                ts.TotalCompletionTokenCount AS ts_TotalCompletionTokenCount,
+                ts.TopicId AS ts_TopicId,
+                ts.SubTopicId AS ts_SubTopicId,
+                ts.HasAnnotation AS ts_HasAnnotation,
+                ts.ComputedInput AS ts_ComputedInput,
+                ts.ComputedOutput AS ts_ComputedOutput,
+                ts.Attributes AS ts_Attributes,
+                toUnixTimestamp64Milli(ts.OccurredAt) AS ts_OccurredAt,
+                toUnixTimestamp64Milli(ts.CreatedAt) AS ts_CreatedAt,
+                toUnixTimestamp64Milli(ts.UpdatedAt) AS ts_UpdatedAt
+              FROM trace_summaries ts
+              WHERE ts.TenantId = {tenantId:String}
+                AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
+                AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
+                ${extraFilters}
+                ${cursorCondition}
+              ORDER BY ts.OccurredAt ${orderDirection}, ts.TraceId ${orderDirection}, ts.UpdatedAt DESC
+              LIMIT 1 BY ts.TraceId
+              LIMIT {pageSize:UInt32}
+            `,
+            query_params: {
+              ...sharedParams,
+              lastTimestamp: cursor?.lastTimestamp ?? 0,
+              lastTraceId: cursor?.lastTraceId ?? "",
+              pageSize,
+            },
+            format: "JSONEachRow",
+          }),
+        ]);
+
+        const [countRows, summaryRows] = await Promise.all([
+          countResult.json() as Promise<Array<{ total: string }>>,
+          summaryResult.json() as Promise<TraceSummaryRow[]>,
+        ]);
+
         const totalHits = parseInt(countRows[0]?.total ?? "0", 10);
-
-        // Fetch trace summaries with pagination
-        const summaryResult = await this.clickHouseClient.query({
-          query: `
-        SELECT
-          ts.TraceId AS ts_TraceId,
-          ts.SpanCount AS ts_SpanCount,
-          ts.TotalDurationMs AS ts_TotalDurationMs,
-          ts.ComputedIOSchemaVersion AS ts_ComputedIOSchemaVersion,
-          ts.TimeToFirstTokenMs AS ts_TimeToFirstTokenMs,
-          ts.TimeToLastTokenMs AS ts_TimeToLastTokenMs,
-          ts.TokensPerSecond AS ts_TokensPerSecond,
-          ts.ContainsErrorStatus AS ts_ContainsErrorStatus,
-          ts.ContainsOKStatus AS ts_ContainsOKStatus,
-          ts.ErrorMessage AS ts_ErrorMessage,
-          ts.Models AS ts_Models,
-          ts.TotalCost AS ts_TotalCost,
-          ts.TokensEstimated AS ts_TokensEstimated,
-          ts.TotalPromptTokenCount AS ts_TotalPromptTokenCount,
-          ts.TotalCompletionTokenCount AS ts_TotalCompletionTokenCount,
-          ts.TopicId AS ts_TopicId,
-          ts.SubTopicId AS ts_SubTopicId,
-          ts.HasAnnotation AS ts_HasAnnotation,
-          ts.Attributes AS ts_Attributes,
-          toUnixTimestamp64Milli(ts.OccurredAt) AS ts_OccurredAt,
-          toUnixTimestamp64Milli(ts.CreatedAt) AS ts_CreatedAt,
-          toUnixTimestamp64Milli(ts.UpdatedAt) AS ts_UpdatedAt
-        FROM (
-          SELECT *
-          FROM trace_summaries ts
-          WHERE ${whereClause}
-          ORDER BY TraceId, UpdatedAt DESC
-          LIMIT 1 BY TraceId
-        ) ts
-        ORDER BY ts.OccurredAt ${orderDirection}, ts.TraceId ${orderDirection}
-        LIMIT {pageSize:UInt32}
-      `,
-          query_params: {
-            tenantId: projectId,
-            startDate: startDate ?? 0,
-            endDate: endDate ?? Date.now(),
-            lastTimestamp: cursor?.lastTimestamp ?? 0,
-            lastTraceId: cursor?.lastTraceId ?? "",
-            pageSize,
-            ...filterParams,
-          },
-          format: "JSONEachRow",
-        });
-
-        const summaryRows = (await summaryResult.json()) as TraceSummaryRow[];
 
         if (summaryRows.length === 0) {
           return { traces: [], totalHits, lastTrace: null };
         }
 
-        // Get trace IDs for span fetching
-        const traceIds = summaryRows.map((row) => row.ts_TraceId);
-
-        // Fetch spans for these traces
-        const tracesWithSpans = await this.fetchTracesWithSpansJoined(
-          projectId,
-          traceIds,
-        );
-
-        // Map to Trace objects and apply protections
-        const traces: Trace[] = [];
-        for (const row of summaryRows) {
-          const traceData = tracesWithSpans.get(row.ts_TraceId);
-          if (traceData) {
-            const mappedSpans = mapNormalizedSpansToSpans(traceData.spans);
-            const trace = mapTraceSummaryToTrace(
-              traceData.summary,
-              mappedSpans,
-              projectId,
-            );
-            // Apply redaction protections
-            traces.push(applyTraceProtections(trace, protections));
-          } else {
-            // Create trace without spans if not found
-            const summary = this.rowToTraceSummaryData(row);
-            const trace = mapTraceSummaryToTrace(summary, [], projectId);
-            // Apply redaction protections
-            traces.push(applyTraceProtections(trace, protections));
-          }
-        }
+        const traces: Trace[] = summaryRows.map((row) => {
+          const summary = this.rowToTraceSummaryData(row);
+          const trace = mapTraceSummaryToTrace(summary, [], projectId);
+          return applyTraceProtections(trace, protections);
+        });
 
         const lastTrace =
           traces.length > 0 ? (traces[traces.length - 1] ?? null) : null;
@@ -1363,11 +1333,8 @@ export class ClickHouseTraceService {
           throw new Error("ClickHouse client not available");
         }
 
-        // Three parallel queries instead of a JOIN to reduce memory pressure:
-        // 1. Trace summaries (lightweight, no ComputedInput/Output)
-        // 2. ComputedInput/Output (one row per trace)
-        // 3. Spans (separate table, no JOIN multiplication of summary columns)
-        const [summaryResult, ioResult, spansResult] = await Promise.all([
+        // Two parallel queries: trace summaries (with I/O) and spans (separate table)
+        const [summaryResult, spansResult] = await Promise.all([
           this.clickHouseClient.query({
             query: `
         SELECT
@@ -1375,6 +1342,8 @@ export class ClickHouseTraceService {
           SpanCount AS ts_SpanCount,
           TotalDurationMs AS ts_TotalDurationMs,
           ComputedIOSchemaVersion AS ts_ComputedIOSchemaVersion,
+          ComputedInput AS ts_ComputedInput,
+          ComputedOutput AS ts_ComputedOutput,
           TimeToFirstTokenMs AS ts_TimeToFirstTokenMs,
           TimeToLastTokenMs AS ts_TimeToLastTokenMs,
           TokensPerSecond AS ts_TokensPerSecond,
@@ -1393,21 +1362,6 @@ export class ClickHouseTraceService {
           toUnixTimestamp64Milli(OccurredAt) AS ts_OccurredAt,
           toUnixTimestamp64Milli(CreatedAt) AS ts_CreatedAt,
           toUnixTimestamp64Milli(UpdatedAt) AS ts_UpdatedAt
-        FROM trace_summaries
-        WHERE TenantId = {tenantId:String}
-          AND TraceId IN ({traceIds:Array(String)})
-        ORDER BY TraceId, UpdatedAt DESC
-        LIMIT 1 BY TraceId
-      `,
-            query_params: { tenantId: projectId, traceIds },
-            format: "JSONEachRow",
-          }),
-          this.clickHouseClient.query({
-            query: `
-        SELECT
-          TraceId,
-          ComputedInput,
-          ComputedOutput
         FROM trace_summaries
         WHERE TenantId = {tenantId:String}
           AND TraceId IN ({traceIds:Array(String)})
@@ -1453,28 +1407,15 @@ export class ClickHouseTraceService {
           LIMIT 1 BY TenantId, TraceId, SpanId
         )
         ORDER BY TraceId, StartTime ASC
+        LIMIT 200 BY TraceId
       `,
             query_params: { tenantId: projectId, traceIds },
             format: "JSONEachRow",
           }),
         ]);
 
-        // Parse trace summaries
+        // Parse trace summaries (includes ComputedInput/Output)
         const summaryRows = (await summaryResult.json()) as TraceSummaryRow[];
-
-        // Parse ComputedInput/Output
-        const ioRows = (await ioResult.json()) as Array<{
-          TraceId: string;
-          ComputedInput: string | null;
-          ComputedOutput: string | null;
-        }>;
-        const ioMap = new Map<string, { computedInput: string | null; computedOutput: string | null }>();
-        for (const ioRow of ioRows) {
-          ioMap.set(ioRow.TraceId, {
-            computedInput: ioRow.ComputedInput,
-            computedOutput: ioRow.ComputedOutput,
-          });
-        }
 
         // Parse spans
         type SpanRow = {
@@ -1513,7 +1454,7 @@ export class ClickHouseTraceService {
           spansByTrace.set(row.TraceId, spans);
         }
 
-        // Build the tracesMap by combining summaries + IO + spans
+        // Build the tracesMap by combining summaries + spans
         const tracesMap = new Map<
           string,
           { summary: TraceSummaryData; spans: NormalizedSpan[] }
@@ -1522,11 +1463,6 @@ export class ClickHouseTraceService {
         for (const row of summaryRows) {
           const traceId = row.ts_TraceId;
           const summary = this.rowToTraceSummaryData(row);
-          const io = ioMap.get(traceId);
-          if (io) {
-            summary.computedInput = io.computedInput;
-            summary.computedOutput = io.computedOutput;
-          }
           tracesMap.set(traceId, {
             summary,
             spans: spansByTrace.get(traceId) ?? [],

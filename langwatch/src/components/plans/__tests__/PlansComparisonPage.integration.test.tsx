@@ -167,6 +167,20 @@ describe("<PlansComparisonPage/>", () => {
       expect(link).toHaveAttribute("href", "/settings/subscription");
     });
 
+    it("does not show discontinued pricing notice for free plan on TIERED organizations", () => {
+      render(
+        <PlansComparisonPage
+          activePlan={{ type: "FREE", free: true }}
+          pricingModel="TIERED"
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(
+        screen.queryByTestId("tiered-discontinued-notice"),
+      ).not.toBeInTheDocument();
+    });
+
     it("does not show discontinued pricing notice for SEAT_EVENT organizations", () => {
       render(
         <PlansComparisonPage

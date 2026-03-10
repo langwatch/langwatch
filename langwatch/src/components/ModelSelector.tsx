@@ -250,7 +250,7 @@ export const ModelSelector = React.memo(function ModelSelector({
             <InputGroup
               startElement={<Search size={16} />}
               startOffset="-4px"
-              background="white"
+              background="bg.panel"
               width="calc(100%)"
               paddingY={1}
               borderBottom="1px solid"
@@ -291,7 +291,7 @@ export const ModelSelector = React.memo(function ModelSelector({
                     {showDivider && (
                       <Box
                         borderBottom="1px solid"
-                        borderColor="blackAlpha.100"
+                        borderColor="border"
                         marginX={2}
                         marginY={1}
                       />
@@ -322,7 +322,7 @@ export const ModelSelector = React.memo(function ModelSelector({
           <Box
             position="sticky"
             bottom={0}
-            bg="white"
+            bg="bg.panel"
             borderTop="1px solid"
             borderColor="border"
             zIndex="1"

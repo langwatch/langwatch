@@ -100,7 +100,7 @@ export function createExecuteEvaluationCommandClass(deps: ExecuteEvaluationComma
     ): Promise<EvaluationProcessingEvent[]> {
       const { tenantId, data } = command;
 
-      logger.info(
+      logger.debug(
         {
           tenantId: tenantId,
           evaluationId: data.evaluationId,
@@ -271,6 +271,7 @@ function emitScheduledAndCompleted(
       isGuardrail: data.isGuardrail,
     },
     occurredAt: data.occurredAt,
+    idempotencyKey: `${data.tenantId}:${data.evaluationId}:scheduled`,
   });
 
   const completedEvent = EventUtils.createEvent<EvaluationCompletedEvent>({
@@ -290,6 +291,7 @@ function emitScheduledAndCompleted(
       errorDetails: result.errorDetails ?? null,
     },
     occurredAt: Date.now(),
+    idempotencyKey: `${data.tenantId}:${data.evaluationId}:completed`,
   });
 
   return [scheduledEvent, completedEvent];

@@ -650,10 +650,11 @@ export function DatasetTable({
               bottom={isEmbedded ? "32px" : 6}
               marginTop={6}
               marginLeft={insideWizard ? 0 : 6}
-              backgroundColor="#ffffff"
+              bg="bg"
               padding="8px"
               paddingX="16px"
-              border="1px solid #ccc"
+              border="1px solid"
+              borderColor="border"
               boxShadow="base"
               borderRadius="md"
               zIndex="100"
@@ -698,12 +699,13 @@ export function DatasetTable({
             bottom={6}
             left="50%"
             transform="translateX(-50%)"
-            backgroundColor="#ffffff"
+            bg="bg"
             padding="8px"
             paddingX="16px"
-            border="1px solid #ccc"
+            border="1px solid"
+            borderColor="border"
             boxShadow="base"
-            borderRadius={"md"}
+            borderRadius="md"
           >
             <HStack gap={3}>
               <Text>{selectedEntryIds.size} entries selected</Text>

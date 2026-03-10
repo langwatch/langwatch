@@ -1,5 +1,5 @@
 /**
- * ScenarioRunService
+ * Scenario Run Merge Helpers
  *
  * Merges data from two sources:
  * 1. ES/ClickHouse scenario events (completed/in-progress runs)

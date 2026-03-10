@@ -76,10 +76,6 @@ export function createProjectMetadataReactor(
           },
         });
 
-        logger.info(
-          { tenantId, language, isOptimizationStudio },
-          "Marked project first message",
-        );
       } catch (error) {
         logger.error(
           {

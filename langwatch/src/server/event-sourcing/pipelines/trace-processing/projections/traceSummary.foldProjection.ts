@@ -358,24 +358,6 @@ function inferOriginFromLegacyMarkers(
   return undefined;
 }
 
-function resolveOrigin({
-  span,
-  existingOrigin,
-}: {
-  span: NormalizedSpan;
-  existingOrigin: string | undefined;
-}): string | undefined {
-  const isRoot = !span.parentSpanId;
-  const explicit = stringAttr(span.spanAttributes, "langwatch.origin");
-
-  if (explicit) return isRoot || !existingOrigin ? explicit : existingOrigin;
-
-  const inferred = inferOriginFromLegacyMarkers(span);
-  if (inferred) return isRoot || !existingOrigin ? inferred : existingOrigin;
-
-  return existingOrigin;
-}
-
 // ─── Log record I/O extraction ──────────────────────────────────────
 
 function extractIOFromLogRecord(data: LogRecordReceivedEventData): {
@@ -431,7 +413,78 @@ export function shouldOverrideOutput({
   return false;
 }
 
-// ─── Summary accumulation steps ─────────────────────────────────────
+// TODO(2027): remove once all clients are upgraded
+function stripLegacyMarkers(mergedAttributes: Record<string, string>): void {
+  if (mergedAttributes["metadata.platform"] === "optimization_studio") {
+    delete mergedAttributes["metadata.platform"];
+  }
+
+  if (mergedAttributes["langwatch.labels"]) {
+    const allLabels = parseJsonStringArray(mergedAttributes["langwatch.labels"]);
+    const filtered = allLabels.filter((l) => l !== "scenario-runner");
+    if (filtered.length > 0) {
+      mergedAttributes["langwatch.labels"] = JSON.stringify(filtered);
+    } else {
+      delete mergedAttributes["langwatch.labels"];
+    }
+  }
+}
+
+function hoistOrigin(
+  state: TraceSummaryData,
+  span: NormalizedSpan,
+  mergedAttributes: Record<string, string>,
+): void {
+  const isRootSpan = !span.parentSpanId;
+  const explicitOrigin = span.spanAttributes["langwatch.origin"];
+  const hasExplicitOrigin = typeof explicitOrigin === "string" && explicitOrigin !== "";
+
+  if (hasExplicitOrigin) {
+    if (isRootSpan) {
+      mergedAttributes["langwatch.origin"] = explicitOrigin as string;
+    } else if (!state.attributes["langwatch.origin"]) {
+      mergedAttributes["langwatch.origin"] = explicitOrigin as string;
+    } else {
+      mergedAttributes["langwatch.origin"] = state.attributes["langwatch.origin"];
+    }
+  } else if (isRootSpan && state.attributes["langwatch.origin"]) {
+    mergedAttributes["langwatch.origin"] = state.attributes["langwatch.origin"];
+  } else {
+    const inferred = inferOriginFromLegacyMarkers(span);
+    if (inferred) {
+      if (isRootSpan) {
+        mergedAttributes["langwatch.origin"] = inferred;
+      } else if (!state.attributes["langwatch.origin"]) {
+        mergedAttributes["langwatch.origin"] = inferred;
+      } else {
+        mergedAttributes["langwatch.origin"] = state.attributes["langwatch.origin"];
+      }
+    } else if (state.attributes["langwatch.origin"]) {
+      mergedAttributes["langwatch.origin"] = state.attributes["langwatch.origin"];
+    }
+  }
+}
+
+function hoistSource(
+  state: TraceSummaryData,
+  span: NormalizedSpan,
+  mergedAttributes: Record<string, string>,
+  spanAttributes: Record<string, string>,
+): void {
+  const isRootSpan = !span.parentSpanId;
+  const explicitSource = spanAttributes["langwatch.source"];
+  if (typeof explicitSource === "string" && explicitSource !== "") {
+    if (isRootSpan) {
+      mergedAttributes["langwatch.source"] = explicitSource;
+    } else if (!state.attributes["langwatch.source"]) {
+      mergedAttributes["langwatch.source"] = explicitSource;
+    } else {
+      mergedAttributes["langwatch.source"] = state.attributes["langwatch.source"];
+    }
+  } else if (state.attributes["langwatch.source"]) {
+    mergedAttributes["langwatch.source"] = state.attributes["langwatch.source"];
+  }
+}
 
 function accumulateTiming({
   state,
@@ -664,28 +717,13 @@ function accumulateAttributes({
     }
   }
 
-  // TODO(2027): strip legacy markers
-  if (merged["metadata.platform"] === "optimization_studio")
-    delete merged["metadata.platform"];
-  if (merged["langwatch.labels"]) {
-    const filtered = parseJsonStringArray(merged["langwatch.labels"]).filter(
-      (l) => l !== "scenario-runner",
-    );
-    if (filtered.length > 0)
-      merged["langwatch.labels"] = JSON.stringify(filtered);
-    else delete merged["langwatch.labels"];
-  }
-
-  // Origin: root-wins-if-set semantics
-  const origin = resolveOrigin({
-    span,
-    existingOrigin: state.attributes["langwatch.origin"],
-  });
-  if (origin) merged["langwatch.origin"] = origin;
+  stripLegacyMarkers(merged);
+  hoistOrigin(state, span, merged);
+  hoistSource(state, span, merged, spanAttrs);
 
   merged["langwatch.reserved.output_source"] = outputSource;
 
-  // PII redaction tracking
+  // PII redaction status tracking — accumulate span IDs by severity
   const piiStatus =
     span.spanAttributes[ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_STATUS];
   if (piiStatus === "partial" || piiStatus === "none") {

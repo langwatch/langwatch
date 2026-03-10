@@ -105,7 +105,6 @@ export const useMessagesNavigationFooter = () => {
         pageOffset: _po,
         pageSize: _ps,
         scrollId: _si,
-        project: _proj,
         ...rest
       } = router.query;
 

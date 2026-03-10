@@ -1,11 +1,10 @@
-import { Box, Text, VStack } from "@chakra-ui/react";
+import { Box, Center, EmptyState, Icon, VStack } from "@chakra-ui/react";
 
 export const NoDataInfoBlock = ({
   title,
   description,
   icon,
   docsInfo,
-  color = "orange.400",
   children,
 }: {
   title: string;
@@ -16,22 +15,28 @@ export const NoDataInfoBlock = ({
   children?: React.ReactNode;
 }) => {
   return (
-    <VStack paddingY={"128px"}>
-      <Box
-        backgroundColor={color}
-        borderRadius={"50%"}
-        padding={4}
-        width={"fit-content"}
-        color="white"
-      >
-        {icon}
-      </Box>
-      <Text fontSize={"lg"} fontWeight={"semibold"}>
-        {title}
-      </Text>
-      <Text>{description}</Text>
-      {docsInfo}
-      {children}
-    </VStack>
+    <Center flex={1} padding={6}>
+      <EmptyState.Root>
+        <EmptyState.Content>
+          <EmptyState.Indicator>
+            <Icon size={"lg"}>
+              {icon}
+            </Icon>
+          </EmptyState.Indicator>
+          <EmptyState.Title>{title}</EmptyState.Title>
+          <EmptyState.Description>
+            <Center>
+              <VStack>
+                <Box>{description}</Box>
+                <Box>
+                  {docsInfo}
+                  {children}
+                </Box>
+              </VStack>
+            </Center>
+          </EmptyState.Description>
+        </EmptyState.Content>
+      </EmptyState.Root>
+    </Center>
   );
 };

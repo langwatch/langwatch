@@ -2,7 +2,7 @@ import crypto from "crypto";
 import {
   getProjectModelProviders,
   prepareLitellmParams,
-} from "../../server/api/routers/modelProviders";
+} from "../../server/api/routers/modelProviders.utils";
 import { prisma } from "../../server/db";
 import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
 import { decrypt } from "../../utils/encryption";

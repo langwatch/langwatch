@@ -10,7 +10,7 @@ import { api } from "~/utils/api";
 
 // Run colors for comparison mode - distinct, accessible colors
 export const RUN_COLORS = [
-  "#3182ce", // blue
+  "#3b82f6", // blue
   "#dd6b20", // orange
   "#38a169", // green
   "#d53f8c", // pink

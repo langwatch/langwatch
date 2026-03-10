@@ -48,7 +48,7 @@ export class GroupQueueDispatcher {
             error instanceof Error ? error.message : String(error);
 
           if (errorMessage.includes("Connection is closed")) {
-            this.params.logger.info(
+            this.params.logger.debug(
               { queueName: this.params.queueName },
               "Redis connection closed, stopping dispatcher",
             );
@@ -102,7 +102,9 @@ export class GroupQueueDispatcher {
 
   private async dispatchBatch(): Promise<number> {
     const availableSlots =
-      this.params.globalConcurrency - this.params.processingQueue.length();
+      this.params.globalConcurrency -
+      this.params.processingQueue.length() -
+      this.params.processingQueue.running();
     if (availableSlots <= 0) {
       return 0;
     }
