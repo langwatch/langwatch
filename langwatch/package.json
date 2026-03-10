@@ -212,7 +212,7 @@
     "react-papaparse": "^4.4.0",
     "react-resizable-panels": "^2.1.3",
     "react-select": "^5.10.2",
-    "react-spinners": "^0.14.1",
+    "react-spinners": "^0.17.0",
     "recharts": "^3.5.1",
     "remark-gfm": "^4.0.0",
     "require-in-the-middle": "7.5.1",
