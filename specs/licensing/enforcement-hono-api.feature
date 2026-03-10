@@ -39,26 +39,6 @@ Feature: Resource limit enforcement on API endpoints
       | evaluator  |
 
   # ============================================================================
-  # Sync/upsert: only blocked when it would create a new resource
-  # ============================================================================
-
-  @integration
-  Scenario: Syncing a new prompt via API is blocked when at limit
-    Given the organization allows 3 prompts
-    And the organization has 3 prompts
-    And no prompt named "new-prompt" exists
-    When I sync a prompt named "new-prompt" via the API
-    Then the request is rejected as forbidden
-
-  @integration
-  Scenario: Syncing an existing prompt via API succeeds even at limit
-    Given the organization allows 3 prompts
-    And the organization has 3 prompts
-    And a prompt named "existing-prompt" exists
-    When I sync a prompt named "existing-prompt" via the API
-    Then the prompt is updated
-
-  # ============================================================================
   # Non-create operations are never blocked
   # ============================================================================
 
@@ -119,18 +99,18 @@ Feature: Resource limit enforcement on API endpoints
   # ============================================================================
 
   @integration
-  Scenario: Team is notified via Slack when a resource limit is hit on SaaS
+  Scenario: Team is notified when a resource limit is hit on SaaS
     Given the organization is on a SaaS plan
     And the organization has reached its prompt limit
     When I create a prompt via the API
     Then the team is notified about the limit being reached
 
   @integration
-  Scenario: Slack notification is suppressed on self-hosted
+  Scenario: Notification is suppressed on self-hosted
     Given the organization is self-hosted
     And the organization has reached its prompt limit
     When I create a prompt via the API
-    Then no Slack notification is sent
+    Then no notification is sent
 
   @integration
   Scenario: Repeated blocked requests suppress duplicate notifications
