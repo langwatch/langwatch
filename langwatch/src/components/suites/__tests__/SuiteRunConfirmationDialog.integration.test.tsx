@@ -174,6 +174,38 @@ describe("<SuiteRunConfirmationDialog/>", () => {
     });
   });
 
+  describe("when repeatCount is greater than 1", () => {
+    it("displays the repeat count", () => {
+      render(
+        <SuiteRunConfirmationDialog {...defaultProps} repeatCount={5} />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByText("5x")).toBeInTheDocument();
+      expect(screen.getByText("repeats")).toBeInTheDocument();
+    });
+
+    it("multiplies estimated jobs by repeatCount", () => {
+      render(
+        <SuiteRunConfirmationDialog {...defaultProps} repeatCount={3} />,
+        { wrapper: Wrapper },
+      );
+
+      // 3 scenarios * 2 targets * 3 repeats = 18
+      expect(screen.getByText("18")).toBeInTheDocument();
+    });
+  });
+
+  describe("when repeatCount is 1 or omitted", () => {
+    it("does not display the repeats section", () => {
+      render(<SuiteRunConfirmationDialog {...defaultProps} />, {
+        wrapper: Wrapper,
+      });
+
+      expect(screen.queryByText("repeats")).not.toBeInTheDocument();
+    });
+  });
+
   describe("when scenario count uses singular form", () => {
     it("displays 'scenario' for count of 1", () => {
       render(

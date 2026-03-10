@@ -15,6 +15,7 @@ export function SuiteRunConfirmationDialog({
   suiteName,
   scenarioCount,
   targetCount,
+  repeatCount = 1,
   isLoading = false,
 }: {
   open: boolean;
@@ -23,9 +24,10 @@ export function SuiteRunConfirmationDialog({
   suiteName: string;
   scenarioCount: number;
   targetCount: number;
+  repeatCount?: number;
   isLoading?: boolean;
 }) {
-  const estimatedJobs = scenarioCount * targetCount;
+  const estimatedJobs = scenarioCount * targetCount * repeatCount;
 
   return (
     <Dialog.Root
@@ -66,6 +68,16 @@ export function SuiteRunConfirmationDialog({
                   {targetCount === 1 ? "target" : "targets"}
                 </Text>
               </VStack>
+              {repeatCount > 1 && (
+                <VStack gap={0} align="start">
+                  <Text fontSize="lg" fontWeight="semibold">
+                    {repeatCount}x
+                  </Text>
+                  <Text color="fg.muted" fontSize="sm">
+                    repeats
+                  </Text>
+                </VStack>
+              )}
               <VStack gap={0} align="start">
                 <Text fontSize="lg" fontWeight="semibold">
                   {estimatedJobs}
