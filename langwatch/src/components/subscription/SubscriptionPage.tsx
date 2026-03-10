@@ -58,6 +58,7 @@ import {
 import { CurrentPlanBlock } from "./CurrentPlanBlock";
 import { UpdateSeatsBlock } from "./UpdateSeatsBlock";
 import { UpgradePlanBlock } from "./UpgradePlanBlock";
+import { TrialUpgradeBlock } from "./TrialUpgradeBlock";
 import { ContactSalesBlock } from "./ContactSalesBlock";
 import { InvoicesBlock } from "./InvoicesBlock";
 import { UserManagementDrawer } from "./UserManagementDrawer";
@@ -150,6 +151,10 @@ export function SubscriptionPage() {
 
   const plan = activePlan.data;
   const isDeveloperPlan = plan?.free ?? true;
+  const isActiveTrial = plan?.activeTrial === true;
+  const trialDaysRemaining = isActiveTrial && plan?.trialEndDate
+    ? Math.max(0, Math.ceil((new Date(plan.trialEndDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : 0;
   const isLicenseOverride = plan?.planSource === "license";
   const isTieredPricingModel = organization?.pricingModel === PricingModel.TIERED;
   const isEnterprisePlan = plan?.type === "ENTERPRISE" && !isLicenseOverride;
@@ -309,7 +314,9 @@ export function SubscriptionPage() {
     );
   }
 
-  const currentPlanName = isLicenseOverride
+  const currentPlanName = isActiveTrial
+    ? "Growth plan (Trial)"
+    : isLicenseOverride
     ? `License: ${plan.name ?? "Growth"}`
     : isTieredPricingModel
       ? (plan.name ?? formatPlanTypeLabel(plan.type))
@@ -458,14 +465,14 @@ export function SubscriptionPage() {
         {/* Current Plan Block */}
         <CurrentPlanBlock
           planName={currentPlanName}
-          pricing={currentPlanPricing}
+          pricing={isActiveTrial ? undefined : currentPlanPricing}
           features={currentPlanFeatures}
           userCount={seatUsageN}
           maxSeats={isTieredPricingModel ? undefined : seatUsageM}
-          upgradeRequired={updateRequired}
+          upgradeRequired={isActiveTrial ? false : updateRequired}
           onUserCountClick={() => setIsDrawerOpen(true)}
           onManageSubscription={
-            !isDeveloperPlan && !isEnterprisePlan && !isLicenseOverride ? handleManageSubscription : undefined
+            !isDeveloperPlan && !isEnterprisePlan && !isLicenseOverride && !isActiveTrial ? handleManageSubscription : undefined
           }
           isManageLoading={isManageLoading}
           deprecatedNotice={isTieredLegacyPaidPlan}
@@ -475,13 +482,26 @@ export function SubscriptionPage() {
           }
         />
 
+        {/* Trial Upgrade Block - show for active trial users */}
+        {isActiveTrial && (
+          <TrialUpgradeBlock
+            daysRemaining={trialDaysRemaining}
+            totalPrice={upgradeBillingPriceFormatted}
+            coreMembers={upgradeBillingSeats}
+            features={getGrowthFeatures(effectiveCurrency)}
+            monthlyEquivalent={monthlyEquivalent}
+            onUpgrade={handleUpgrade}
+            isLoading={isUpgradeLoading}
+          />
+        )}
+
         {/* Invoices Block - only for paying customers with a Stripe subscription */}
-        {!isDeveloperPlan && hasStripeSubscription && (
+        {!isDeveloperPlan && !isActiveTrial && hasStripeSubscription && (
           <InvoicesBlock organizationId={organization.id} onViewAllInStripe={handleManageSubscription} />
         )}
 
-        {/* Upgrade Block - show for free plan and TIERED legacy paid orgs */}
-        {(isUpgradePlanRequired) && (
+        {/* Upgrade Block - show for free plan and TIERED legacy paid orgs (not during trial) */}
+        {(isUpgradePlanRequired) && !isActiveTrial && (
           <UpgradePlanBlock
             planName={
               <>

@@ -10,8 +10,8 @@ export type PlanInfo = {
   type: string;
   name: string;
   free: boolean;
-  trialDays?: number;
-  daysSinceCreation?: number;
+  activeTrial?: boolean;
+  trialEndDate?: Date | null;
   overrideAddingLimitations?: boolean;
   maxMembers: number;
   maxMembersLite: number;

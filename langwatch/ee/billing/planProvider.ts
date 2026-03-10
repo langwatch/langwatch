@@ -82,6 +82,7 @@ export const createSaaSPlanProvider = (
             in: [SubscriptionStatus.ACTIVE],
           },
         },
+        orderBy: { createdAt: "desc" },
       });
 
       const customLimits: Partial<PlanInfo> = {};
@@ -94,6 +95,45 @@ export const createSaaSPlanProvider = (
       if (!activeSubscription) {
         return {
           ...getFreePlanLimits(),
+          activeTrial: false,
+          overrideAddingLimitations,
+        };
+      }
+
+      // Handle trial subscriptions
+      if (activeSubscription.isTrial) {
+        const now = new Date();
+        if (activeSubscription.endDate && activeSubscription.endDate <= now) {
+          // Trial expired — attempt to cancel, but always return FREE
+          try {
+            await db.subscription.update({
+              where: { id: activeSubscription.id },
+              data: {
+                status: SubscriptionStatus.CANCELLED,
+              },
+            });
+          } catch {
+            // Ignore write failures — still return FREE
+          }
+          return {
+            ...getFreePlanLimits(),
+            activeTrial: false,
+            overrideAddingLimitations,
+          };
+        }
+
+        // Trial still active
+        const subscriptionPlan = activeSubscription.plan as string | undefined;
+        const isKnownPlan =
+          subscriptionPlan != null && subscriptionPlan in PLAN_LIMITS;
+
+        return {
+          ...(isKnownPlan
+            ? PLAN_LIMITS[subscriptionPlan as keyof typeof PLAN_LIMITS]
+            : getFreePlanLimits()),
+          ...customLimits,
+          activeTrial: true,
+          trialEndDate: activeSubscription.endDate,
           overrideAddingLimitations,
         };
       }
@@ -106,6 +146,7 @@ export const createSaaSPlanProvider = (
         return {
           ...PLAN_LIMITS[subscriptionPlan as keyof typeof PLAN_LIMITS],
           ...customLimits,
+          activeTrial: false,
           overrideAddingLimitations,
         };
       }
@@ -113,6 +154,7 @@ export const createSaaSPlanProvider = (
       return {
         ...getFreePlanLimits(),
         ...customLimits,
+        activeTrial: false,
         overrideAddingLimitations,
       };
     },

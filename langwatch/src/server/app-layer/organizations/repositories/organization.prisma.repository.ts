@@ -1,9 +1,5 @@
-import type { PrismaClient } from "@prisma/client";
-import type { OrganizationFeatureName } from "../organization.service";
-import type {
-  OrganizationFeatureRow,
-  OrganizationRepository,
-} from "./organization.repository";
+import type { Currency, PrismaClient } from "@prisma/client";
+import type { OrganizationRepository } from "./organization.repository";
 
 export class PrismaOrganizationRepository implements OrganizationRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -24,14 +20,24 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     return projects.map((p) => p.id);
   }
 
-  async getFeature(
-    organizationId: string,
-    feature: OrganizationFeatureName,
-  ): Promise<OrganizationFeatureRow | null> {
-    return this.prisma.organizationFeature.findUnique({
-      where: {
-        feature_organizationId: { feature, organizationId },
+  async clearTrialLicense(organizationId: string): Promise<void> {
+    await this.prisma.organization.update({
+      where: { id: organizationId },
+      data: {
+        license: null,
+        licenseExpiresAt: null,
+        licenseLastValidatedAt: null,
       },
+    });
+  }
+
+  async updateCurrency(input: {
+    organizationId: string;
+    currency: string;
+  }): Promise<void> {
+    await this.prisma.organization.update({
+      where: { id: input.organizationId },
+      data: { currency: input.currency as Currency },
     });
   }
 }

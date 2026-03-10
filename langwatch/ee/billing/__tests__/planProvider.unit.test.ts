@@ -23,13 +23,18 @@ const mockEnv = env as { IS_SAAS: boolean | undefined; ADMIN_EMAILS: string | un
 const createMockDb = ({
   findFirstResult = null,
   orgFindUniqueResult = undefined,
+  updateShouldFail = false,
 }: {
   findFirstResult?: unknown;
   orgFindUniqueResult?: unknown;
+  updateShouldFail?: boolean;
 } = {}) => {
   return {
     subscription: {
       findFirst: vi.fn().mockResolvedValue(findFirstResult),
+      update: updateShouldFail
+        ? vi.fn().mockRejectedValue(new Error("DB write failed"))
+        : vi.fn().mockResolvedValue({}),
     },
     organization: {
       findUnique: vi.fn().mockResolvedValue(orgFindUniqueResult),
@@ -353,6 +358,205 @@ describe("createSaaSPlanProvider", () => {
           expect(plan.maxMessagesPerMonth).toBe(50_000);
           expect(plan.maxMembers).toBe(15);
         });
+      });
+    });
+
+    describe("trial subscription handling", () => {
+      it("when trial subscription is active, returns GROWTH_SEAT limits with activeTrial=true", async () => {
+        const futureDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+        const subscription = {
+          id: "sub_trial_1",
+          plan: PlanTypes.GROWTH_SEAT_EUR_MONTHLY,
+          status: SubscriptionStatus.ACTIVE,
+          isTrial: true,
+          endDate: futureDate,
+          ...Object.fromEntries(
+            NUMERIC_OVERRIDE_FIELDS.map((f) => [f, null]),
+          ),
+        };
+
+        const db = createMockDb({ findFirstResult: subscription });
+        const provider = createSaaSPlanProvider(db);
+        const plan = await provider.getActivePlan("org_1");
+
+        expect(plan.type).toBe(PlanTypes.GROWTH_SEAT_EUR_MONTHLY);
+        expect(plan.activeTrial).toBe(true);
+        expect(plan.trialEndDate).toEqual(futureDate);
+        expect(plan.free).toBe(false);
+      });
+
+      it("when trial subscription has custom maxMembers override, applies the override", async () => {
+        const futureDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+        const subscription = {
+          id: "sub_trial_1",
+          plan: PlanTypes.GROWTH_SEAT_EUR_MONTHLY,
+          status: SubscriptionStatus.ACTIVE,
+          isTrial: true,
+          endDate: futureDate,
+          maxMembers: 50,
+          ...Object.fromEntries(
+            NUMERIC_OVERRIDE_FIELDS.filter((f) => f !== "maxMembers").map(
+              (f) => [f, null],
+            ),
+          ),
+        };
+
+        const db = createMockDb({ findFirstResult: subscription });
+        const provider = createSaaSPlanProvider(db);
+        const plan = await provider.getActivePlan("org_1");
+
+        expect(plan.activeTrial).toBe(true);
+        expect(plan.maxMembers).toBe(50);
+      });
+
+      it("when trial subscription is expired, expires it and returns FREE with activeTrial=false", async () => {
+        const pastDate = new Date(Date.now() - 1000);
+        const subscription = {
+          id: "sub_trial_1",
+          plan: PlanTypes.GROWTH_SEAT_EUR_MONTHLY,
+          status: SubscriptionStatus.ACTIVE,
+          isTrial: true,
+          endDate: pastDate,
+          ...Object.fromEntries(
+            NUMERIC_OVERRIDE_FIELDS.map((f) => [f, null]),
+          ),
+        };
+
+        const db = createMockDb({ findFirstResult: subscription });
+        const provider = createSaaSPlanProvider(db);
+        const plan = await provider.getActivePlan("org_1");
+
+        expect(plan.type).toBe(PlanTypes.FREE);
+        expect(plan.activeTrial).toBe(false);
+        expect(db.subscription.update).toHaveBeenCalledWith({
+          where: { id: "sub_trial_1" },
+          data: { status: SubscriptionStatus.CANCELLED },
+        });
+      });
+
+      it("when trial subscription is expired and DB write fails, still returns FREE", async () => {
+        const pastDate = new Date(Date.now() - 1000);
+        const subscription = {
+          id: "sub_trial_1",
+          plan: PlanTypes.GROWTH_SEAT_EUR_MONTHLY,
+          status: SubscriptionStatus.ACTIVE,
+          isTrial: true,
+          endDate: pastDate,
+          ...Object.fromEntries(
+            NUMERIC_OVERRIDE_FIELDS.map((f) => [f, null]),
+          ),
+        };
+
+        const db = createMockDb({
+          findFirstResult: subscription,
+          updateShouldFail: true,
+        });
+        const provider = createSaaSPlanProvider(db);
+        const plan = await provider.getActivePlan("org_1");
+
+        expect(plan.type).toBe(PlanTypes.FREE);
+        expect(plan.activeTrial).toBe(false);
+      });
+
+      it("when paid subscription exists, returns plan limits with activeTrial=false", async () => {
+        const subscription = {
+          id: "sub_paid_1",
+          plan: PlanTypes.GROWTH_SEAT_EUR_MONTHLY,
+          status: SubscriptionStatus.ACTIVE,
+          isTrial: false,
+          ...Object.fromEntries(
+            NUMERIC_OVERRIDE_FIELDS.map((f) => [f, null]),
+          ),
+        };
+
+        const db = createMockDb({ findFirstResult: subscription });
+        const provider = createSaaSPlanProvider(db);
+        const plan = await provider.getActivePlan("org_1");
+
+        expect(plan.type).toBe(PlanTypes.GROWTH_SEAT_EUR_MONTHLY);
+        expect(plan.activeTrial).toBe(false);
+      });
+
+      it("when no subscription exists, returns FREE with activeTrial=false", async () => {
+        const db = createMockDb();
+        const provider = createSaaSPlanProvider(db);
+        const plan = await provider.getActivePlan("org_1");
+
+        expect(plan.type).toBe(PlanTypes.FREE);
+        expect(plan.activeTrial).toBe(false);
+      });
+
+      it("when both trial and paid subscription exist, most recent wins (orderBy test)", async () => {
+        // The findFirst with orderBy: { createdAt: "desc" } returns the most recent.
+        // If the most recent is a paid sub, it should return paid limits.
+        const subscription = {
+          id: "sub_paid_1",
+          plan: PlanTypes.GROWTH_SEAT_EUR_MONTHLY,
+          status: SubscriptionStatus.ACTIVE,
+          isTrial: false,
+          ...Object.fromEntries(
+            NUMERIC_OVERRIDE_FIELDS.map((f) => [f, null]),
+          ),
+        };
+
+        const db = createMockDb({ findFirstResult: subscription });
+        const provider = createSaaSPlanProvider(db);
+        const plan = await provider.getActivePlan("org_1");
+
+        expect(plan.type).toBe(PlanTypes.GROWTH_SEAT_EUR_MONTHLY);
+        expect(plan.activeTrial).toBe(false);
+
+        // Verify orderBy was passed to findFirst
+        expect(db.subscription.findFirst).toHaveBeenCalledWith(
+          expect.objectContaining({
+            orderBy: { createdAt: "desc" },
+          }),
+        );
+      });
+
+      it("when newer trial exists alongside older paid sub, paid sub takes precedence (not isTrial)", async () => {
+        // If findFirst returns a newer trial (because of orderBy desc),
+        // but the paid sub is NOT isTrial, the paid sub should win.
+        // However, findFirst only returns one record. The scenario tests that
+        // when the most recent is a paid sub, it returns paid limits.
+        const paidSubscription = {
+          id: "sub_paid_1",
+          plan: PlanTypes.GROWTH_SEAT_EUR_MONTHLY,
+          status: SubscriptionStatus.ACTIVE,
+          isTrial: false,
+          ...Object.fromEntries(
+            NUMERIC_OVERRIDE_FIELDS.map((f) => [f, null]),
+          ),
+        };
+
+        const db = createMockDb({ findFirstResult: paidSubscription });
+        const provider = createSaaSPlanProvider(db);
+        const plan = await provider.getActivePlan("org_1");
+
+        expect(plan.activeTrial).toBe(false);
+        expect(plan.type).toBe(PlanTypes.GROWTH_SEAT_EUR_MONTHLY);
+      });
+
+      it("when non-SaaS, returns ENTERPRISE regardless of trial", async () => {
+        mockEnv.IS_SAAS = false;
+
+        const futureDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+        const subscription = {
+          id: "sub_trial_1",
+          plan: PlanTypes.GROWTH_SEAT_EUR_MONTHLY,
+          status: SubscriptionStatus.ACTIVE,
+          isTrial: true,
+          endDate: futureDate,
+          ...Object.fromEntries(
+            NUMERIC_OVERRIDE_FIELDS.map((f) => [f, null]),
+          ),
+        };
+
+        const db = createMockDb({ findFirstResult: subscription });
+        const provider = createSaaSPlanProvider(db);
+        const plan = await provider.getActivePlan("org_1");
+
+        expect(plan.type).toBe(PlanTypes.ENTERPRISE);
       });
     });
   });

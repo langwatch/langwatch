@@ -1,18 +1,11 @@
-import type { OrganizationFeatureName } from "../organization.service";
-
-export interface OrganizationFeatureRow {
-  feature: string;
-  organizationId: string;
-  trialEndDate: Date | null;
-}
-
 export interface OrganizationRepository {
   getOrganizationIdByTeamId(teamId: string): Promise<string | null>;
   getProjectIds(organizationId: string): Promise<string[]>;
-  getFeature(
-    organizationId: string,
-    feature: OrganizationFeatureName,
-  ): Promise<OrganizationFeatureRow | null>;
+  clearTrialLicense(organizationId: string): Promise<void>;
+  updateCurrency(input: {
+    organizationId: string;
+    currency: string;
+  }): Promise<void>;
 }
 
 export class NullOrganizationRepository implements OrganizationRepository {
@@ -24,10 +17,10 @@ export class NullOrganizationRepository implements OrganizationRepository {
     return [];
   }
 
-  async getFeature(
-    _organizationId: string,
-    _feature: OrganizationFeatureName,
-  ): Promise<OrganizationFeatureRow | null> {
-    return null;
-  }
+  async clearTrialLicense(_organizationId: string): Promise<void> {}
+
+  async updateCurrency(_input: {
+    organizationId: string;
+    currency: string;
+  }): Promise<void> {}
 }
