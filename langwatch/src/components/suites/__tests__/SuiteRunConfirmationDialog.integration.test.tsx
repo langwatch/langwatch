@@ -4,7 +4,7 @@
  * Integration tests for SuiteRunConfirmationDialog component.
  *
  * Tests that the run confirmation modal displays suite name,
- * scenario/target/job counts, Cancel and Run buttons, and fires correct callbacks.
+ * scenario/target breakdown, job count in title and button, and fires correct callbacks.
  *
  * @see specs/features/suites/suite-run-confirmation-modal.feature
  */
@@ -35,12 +35,14 @@ describe("<SuiteRunConfirmationDialog/>", () => {
   });
 
   describe("given the dialog is open", () => {
-    it("displays 'Run suite?' as the title", () => {
+    it("displays the estimated run count in the title", () => {
       render(<SuiteRunConfirmationDialog {...defaultProps} />, {
         wrapper: Wrapper,
       });
 
-      expect(screen.getByText("Run suite?")).toBeInTheDocument();
+      expect(
+        screen.getByText(/This will start 6 new runs/),
+      ).toBeInTheDocument();
     });
 
     it("displays the suite name", () => {
@@ -51,40 +53,29 @@ describe("<SuiteRunConfirmationDialog/>", () => {
       expect(screen.getByText("Regression Tests")).toBeInTheDocument();
     });
 
-    it("displays the scenario count", () => {
+    it("displays the breakdown formula", () => {
       render(<SuiteRunConfirmationDialog {...defaultProps} />, {
         wrapper: Wrapper,
       });
 
-      expect(screen.getByText("3")).toBeInTheDocument();
-      expect(screen.getByText("scenarios")).toBeInTheDocument();
+      expect(screen.getByText(/3 scenarios/)).toBeInTheDocument();
+      expect(screen.getByText(/2 targets/)).toBeInTheDocument();
     });
 
-    it("displays the target count", () => {
+    it("displays the job count in the Run button", () => {
       render(<SuiteRunConfirmationDialog {...defaultProps} />, {
         wrapper: Wrapper,
       });
 
-      expect(screen.getByText("2")).toBeInTheDocument();
-      expect(screen.getByText("targets")).toBeInTheDocument();
+      expect(screen.getByText("Run 6 Jobs")).toBeInTheDocument();
     });
 
-    it("displays the estimated job count as scenarios x targets", () => {
-      render(<SuiteRunConfirmationDialog {...defaultProps} />, {
-        wrapper: Wrapper,
-      });
-
-      expect(screen.getByText("6")).toBeInTheDocument();
-      expect(screen.getByText("estimated jobs")).toBeInTheDocument();
-    });
-
-    it("has Cancel and Run buttons", () => {
+    it("has a Cancel button", () => {
       render(<SuiteRunConfirmationDialog {...defaultProps} />, {
         wrapper: Wrapper,
       });
 
       expect(screen.getByText("Cancel")).toBeInTheDocument();
-      expect(screen.getByText("Run")).toBeInTheDocument();
     });
   });
 
@@ -119,7 +110,7 @@ describe("<SuiteRunConfirmationDialog/>", () => {
     });
   });
 
-  describe("when Run is clicked", () => {
+  describe("when Run button is clicked", () => {
     it("calls onConfirm", async () => {
       const user = userEvent.setup();
       const onConfirm = vi.fn();
@@ -132,7 +123,7 @@ describe("<SuiteRunConfirmationDialog/>", () => {
         { wrapper: Wrapper },
       );
 
-      await user.click(screen.getByText("Run"));
+      await user.click(screen.getByText("Run 6 Jobs"));
       expect(onConfirm).toHaveBeenCalledOnce();
     });
   });
@@ -154,7 +145,6 @@ describe("<SuiteRunConfirmationDialog/>", () => {
         { wrapper: Wrapper },
       );
 
-      // When loading, the Run button shows a spinner instead of text
       const buttons = screen.getAllByRole("button");
       const runButton = buttons.find(
         (btn) =>
@@ -169,20 +159,19 @@ describe("<SuiteRunConfirmationDialog/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.queryByText("Run")).not.toBeInTheDocument();
+      expect(screen.queryByText(/Run \d+ Jobs/)).not.toBeInTheDocument();
       expect(document.querySelector(".chakra-spinner")).toBeInTheDocument();
     });
   });
 
   describe("when repeatCount is greater than 1", () => {
-    it("displays the repeat count", () => {
+    it("includes repeats in the breakdown", () => {
       render(
-        <SuiteRunConfirmationDialog {...defaultProps} repeatCount={5} />,
+        <SuiteRunConfirmationDialog {...defaultProps} repeatCount={2} />,
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("5x")).toBeInTheDocument();
-      expect(screen.getByText("repeats")).toBeInTheDocument();
+      expect(screen.getByText(/2 repeats/)).toBeInTheDocument();
     });
 
     it("multiplies estimated jobs by repeatCount", () => {
@@ -192,22 +181,25 @@ describe("<SuiteRunConfirmationDialog/>", () => {
       );
 
       // 3 scenarios * 2 targets * 3 repeats = 18
-      expect(screen.getByText("18")).toBeInTheDocument();
+      expect(
+        screen.getByText(/This will start 18 new runs/),
+      ).toBeInTheDocument();
+      expect(screen.getByText("Run 18 Jobs")).toBeInTheDocument();
     });
   });
 
   describe("when repeatCount is 1 or omitted", () => {
-    it("does not display the repeats section", () => {
+    it("does not display repeats in the breakdown", () => {
       render(<SuiteRunConfirmationDialog {...defaultProps} />, {
         wrapper: Wrapper,
       });
 
-      expect(screen.queryByText("repeats")).not.toBeInTheDocument();
+      expect(screen.queryByText(/repeats/)).not.toBeInTheDocument();
     });
   });
 
-  describe("when scenario count uses singular form", () => {
-    it("displays 'scenario' for count of 1", () => {
+  describe("when using singular forms", () => {
+    it("displays singular nouns for count of 1", () => {
       render(
         <SuiteRunConfirmationDialog
           {...defaultProps}
@@ -217,9 +209,12 @@ describe("<SuiteRunConfirmationDialog/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("scenario")).toBeInTheDocument();
-      expect(screen.getByText("target")).toBeInTheDocument();
-      expect(screen.getByText("estimated job")).toBeInTheDocument();
+      expect(screen.getByText(/1 scenario/)).toBeInTheDocument();
+      expect(screen.getByText(/1 target/)).toBeInTheDocument();
+      expect(
+        screen.getByText(/This will start 1 new run$/),
+      ).toBeInTheDocument();
+      expect(screen.getByText("Run 1 Job")).toBeInTheDocument();
     });
   });
 });

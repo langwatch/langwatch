@@ -5,7 +5,7 @@
  * so the user can review what will be executed before confirming.
  */
 
-import { Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Button, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "../ui/dialog";
 
 export function SuiteRunConfirmationDialog({
@@ -41,52 +41,19 @@ export function SuiteRunConfirmationDialog({
         {!isLoading && <Dialog.CloseTrigger />}
         <Dialog.Header>
           <Dialog.Title fontSize="md" fontWeight="500">
-            Run suite?
+            This will start {estimatedJobs} new{" "}
+            {estimatedJobs === 1 ? "run" : "runs"}
           </Dialog.Title>
         </Dialog.Header>
         <Dialog.Body>
-          <VStack align="stretch" gap={4}>
-            <Text>
-              <Text as="span" fontWeight="semibold">
-                {suiteName}
-              </Text>
+          <VStack align="stretch" gap={3}>
+            <Text fontWeight="semibold">{suiteName}</Text>
+            <Text color="fg.muted" fontSize="sm">
+              {scenarioCount} {scenarioCount === 1 ? "scenario" : "scenarios"}{" "}
+              &times; {targetCount}{" "}
+              {targetCount === 1 ? "target" : "targets"}
+              {repeatCount > 1 && <> &times; {repeatCount} repeats</>}
             </Text>
-            <HStack gap={6}>
-              <VStack gap={0} align="start">
-                <Text fontSize="lg" fontWeight="semibold">
-                  {scenarioCount}
-                </Text>
-                <Text color="fg.muted" fontSize="sm">
-                  {scenarioCount === 1 ? "scenario" : "scenarios"}
-                </Text>
-              </VStack>
-              <VStack gap={0} align="start">
-                <Text fontSize="lg" fontWeight="semibold">
-                  {targetCount}
-                </Text>
-                <Text color="fg.muted" fontSize="sm">
-                  {targetCount === 1 ? "target" : "targets"}
-                </Text>
-              </VStack>
-              {repeatCount > 1 && (
-                <VStack gap={0} align="start">
-                  <Text fontSize="lg" fontWeight="semibold">
-                    {repeatCount}x
-                  </Text>
-                  <Text color="fg.muted" fontSize="sm">
-                    repeats
-                  </Text>
-                </VStack>
-              )}
-              <VStack gap={0} align="start">
-                <Text fontSize="lg" fontWeight="semibold">
-                  {estimatedJobs}
-                </Text>
-                <Text color="fg.muted" fontSize="sm">
-                  estimated {estimatedJobs === 1 ? "job" : "jobs"}
-                </Text>
-              </VStack>
-            </HStack>
           </VStack>
         </Dialog.Body>
         <Dialog.Footer>
@@ -109,7 +76,11 @@ export function SuiteRunConfirmationDialog({
             }}
             disabled={isLoading}
           >
-            {isLoading ? <Spinner size="sm" /> : "Run"}
+            {isLoading ? (
+              <Spinner size="sm" />
+            ) : (
+              `Run ${estimatedJobs} ${estimatedJobs === 1 ? "Job" : "Jobs"}`
+            )}
           </Button>
         </Dialog.Footer>
       </Dialog.Content>
