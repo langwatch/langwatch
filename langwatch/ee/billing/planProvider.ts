@@ -55,13 +55,6 @@ export const isAdmin = (user?: { email?: string | null }) => {
   return adminSet.has(user.email);
 };
 
-const getOrgPricingModel = async (db: PrismaClient, organizationId: string) => {
-  const org = await db.organization.findUnique({
-    where: { id: organizationId },
-    select: { pricingModel: true },
-  });
-  return org?.pricingModel ?? null;
-};
 
 export type SaaSPlanProvider = {
   getActivePlan(organizationId: string, user?: MinimalUser): Promise<PlanInfo>;
@@ -99,9 +92,8 @@ export const createSaaSPlanProvider = (
       }
 
       if (!activeSubscription) {
-        const pricingModel = await getOrgPricingModel(db, organizationId);
         return {
-          ...getFreePlanLimits(pricingModel),
+          ...getFreePlanLimits(),
           overrideAddingLimitations,
         };
       }
@@ -118,9 +110,8 @@ export const createSaaSPlanProvider = (
         };
       }
 
-      const pricingModel = await getOrgPricingModel(db, organizationId);
       return {
-        ...getFreePlanLimits(pricingModel),
+        ...getFreePlanLimits(),
         ...customLimits,
         overrideAddingLimitations,
       };

@@ -42,6 +42,8 @@ const config: ExperimentRunCommandConfig<
     wasFinished: !!commandData.finishedAt,
     wasStopped: !!commandData.stoppedAt,
   }),
+  makeIdempotencyKey: (commandData) =>
+    `${commandData.tenantId}:${commandData.runId}:complete`,
 };
 
 /**

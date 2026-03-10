@@ -5,14 +5,22 @@ import type { AppendStore } from "../../projections/mapProjection.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
 import { AssignSatisfactionScoreCommand } from "./commands/assignSatisfactionScoreCommand";
 import { AssignTopicCommand } from "./commands/assignTopicCommand";
+import { RecordLogCommand } from "./commands/recordLogCommand";
+import { RecordMetricCommand } from "./commands/recordMetricCommand";
 import { RecordSpanCommand } from "./commands/recordSpanCommand";
+import { createLogRecordStorageMapProjection } from "./projections/logRecordStorage.mapProjection";
+import { createMetricRecordStorageMapProjection } from "./projections/metricRecordStorage.mapProjection";
 import { createSpanStorageMapProjection } from "./projections/spanStorage.mapProjection";
 import { createTraceSummaryFoldProjection } from "./projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "./schemas/events";
+import type { NormalizedLogRecord } from "./schemas/logRecords";
+import type { NormalizedMetricRecord } from "./schemas/metricRecords";
 import type { NormalizedSpan } from "./schemas/spans";
 
 export interface TraceProcessingPipelineDeps {
   spanAppendStore: AppendStore<NormalizedSpan>;
+  logRecordAppendStore: AppendStore<NormalizedLogRecord>;
+  metricRecordAppendStore: AppendStore<NormalizedMetricRecord>;
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
   evaluationTriggerReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   traceUpdateBroadcastReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
@@ -37,6 +45,12 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
     .withMapProjection("spanStorage", createSpanStorageMapProjection({
       store: deps.spanAppendStore,
     }))
+    .withMapProjection("logRecordStorage", createLogRecordStorageMapProjection({
+      store: deps.logRecordAppendStore,
+    }))
+    .withMapProjection("metricRecordStorage", createMetricRecordStorageMapProjection({
+      store: deps.metricRecordAppendStore,
+    }))
     .withReactor("traceSummary", "evaluationTrigger", deps.evaluationTriggerReactor)
     .withReactor("traceSummary", "traceUpdateBroadcast", deps.traceUpdateBroadcastReactor)
     .withReactor("traceSummary", "satisfactionScore", deps.satisfactionScoreReactor)
@@ -44,5 +58,7 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
     .withCommand("recordSpan", RecordSpanCommand)
     .withCommand("assignTopic", AssignTopicCommand)
     .withCommand("assignSatisfactionScore", AssignSatisfactionScoreCommand)
+    .withCommand("recordLog", RecordLogCommand)
+    .withCommand("recordMetric", RecordMetricCommand)
     .build();
 }

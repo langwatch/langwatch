@@ -46,6 +46,10 @@ const createMockItemCalculator = () => ({
     GROWTH_EVENTS_EUR_ANNUAL: "price_growth_events_eur_annual",
     GROWTH_EVENTS_USD_MONTHLY: "price_growth_events_usd_monthly",
     GROWTH_EVENTS_USD_ANNUAL: "price_growth_events_usd_annual",
+    GROWTH_EVENTS_EUR_MONTHLY_UNTIL_MAR_2026: "price_growth_events_eur_monthly_until_mar_2026",
+    GROWTH_EVENTS_EUR_ANNUAL_UNTIL_MAR_2026: "price_growth_events_eur_annual_until_mar_2026",
+    GROWTH_EVENTS_USD_MONTHLY_UNTIL_MAR_2026: "price_growth_events_usd_monthly_until_mar_2026",
+    GROWTH_EVENTS_USD_ANNUAL_UNTIL_MAR_2026: "price_growth_events_usd_annual_until_mar_2026",
   },
 });
 

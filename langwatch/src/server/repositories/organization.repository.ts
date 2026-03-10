@@ -38,4 +38,15 @@ export class OrganizationRepository {
     });
     return org?.pricingModel ?? null;
   }
+
+  /**
+   * Gets the Stripe customer ID for an organization
+   */
+  async getStripeCustomerId(organizationId: string): Promise<string | null> {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { stripeCustomerId: true },
+    });
+    return org?.stripeCustomerId ?? null;
+  }
 }

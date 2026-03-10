@@ -57,7 +57,6 @@ export default function Annotations() {
         maxWidth={"calc(100vw - 330px)"}
         padding={0}
         margin={0}
-        backgroundColor="white"
       >
         <AnnotationsTable
           noDataTitle="No queued annotations for this queue"

@@ -1,4 +1,4 @@
-import { Box, Text, VStack } from "@chakra-ui/react";
+import { Box, Spinner, Text } from "@chakra-ui/react";
 import type { FC } from "react";
 import { AlertCircle, AlertTriangle, Check, X } from "react-feather";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
@@ -80,6 +80,8 @@ const OVERLAY_ICONS: Record<
   [ScenarioRunStatus.STALLED]: AlertTriangle,
   [ScenarioRunStatus.IN_PROGRESS]: Check,
   [ScenarioRunStatus.PENDING]: Check,
+  [ScenarioRunStatus.QUEUED]: Check,
+  [ScenarioRunStatus.RUNNING]: Check,
 };
 
 const OVERLAY_STATUS_TEXT: Record<ScenarioRunStatus, string> = {
@@ -90,6 +92,8 @@ const OVERLAY_STATUS_TEXT: Record<ScenarioRunStatus, string> = {
   [ScenarioRunStatus.STALLED]: "Stalled",
   [ScenarioRunStatus.IN_PROGRESS]: "",
   [ScenarioRunStatus.PENDING]: "",
+  [ScenarioRunStatus.QUEUED]: "",
+  [ScenarioRunStatus.RUNNING]: "",
 };
 
 const OVERLAY_GRADIENTS: Record<ScenarioRunStatus, GradientKey> = {
@@ -98,8 +102,10 @@ const OVERLAY_GRADIENTS: Record<ScenarioRunStatus, GradientKey> = {
   [ScenarioRunStatus.ERROR]: "fail",
   [ScenarioRunStatus.CANCELLED]: "cancelled",
   [ScenarioRunStatus.STALLED]: "stalled",
-  [ScenarioRunStatus.IN_PROGRESS]: "pass",
-  [ScenarioRunStatus.PENDING]: "pass",
+  [ScenarioRunStatus.IN_PROGRESS]: "cancelled",
+  [ScenarioRunStatus.PENDING]: "cancelled",
+  [ScenarioRunStatus.QUEUED]: "cancelled",
+  [ScenarioRunStatus.RUNNING]: "cancelled",
 };
 
 /**
@@ -128,7 +134,54 @@ export function SimulationStatusOverlay({
     config.gradientDark,
   );
 
-  if (!config.isComplete) return null;
+  if (!config.isComplete) {
+    const statusConfig = SCENARIO_RUN_STATUS_CONFIG[status];
+    const isPending = status === ScenarioRunStatus.QUEUED ||
+      status === ScenarioRunStatus.RUNNING ||
+      status === ScenarioRunStatus.IN_PROGRESS ||
+      status === ScenarioRunStatus.PENDING;
+
+    if (!isPending) return null;
+
+    return (
+      <Box
+        position="absolute"
+        top={0}
+        left={0}
+        right={0}
+        bottom={0}
+        background={bgGradient}
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+        zIndex={20}
+        borderRadius="xl"
+      >
+        <Box
+          bg="blackAlpha.100"
+          borderRadius="full"
+          boxShadow="lg"
+          p={3}
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+        >
+          <Spinner size="md" color="white" />
+        </Box>
+        <Text
+          position="absolute"
+          bottom={4}
+          left="50%"
+          transform="translateX(-50%)"
+          fontSize="md"
+          fontWeight="semibold"
+          color="white"
+        >
+          {statusConfig.label}
+        </Text>
+      </Box>
+    );
+  }
 
   const Icon = config.icon;
 
@@ -146,22 +199,28 @@ export function SimulationStatusOverlay({
       zIndex={20}
       borderRadius="xl"
     >
-      <VStack gap={3}>
-        <Box
-          bg="blackAlpha.200"
-          borderRadius="full"
-          boxShadow="lg"
-          p={3}
-          display="flex"
-          alignItems="center"
-          justifyContent="center"
-        >
-          <Icon size={32} color="white" strokeWidth={2.5} />
-        </Box>
-        <Text fontSize="md" fontWeight="semibold" color="white">
-          {config.statusText}
-        </Text>
-      </VStack>
+      <Box
+        bg="blackAlpha.200"
+        borderRadius="full"
+        boxShadow="lg"
+        p={3}
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+      >
+        <Icon size={32} color="white" strokeWidth={2.5} />
+      </Box>
+      <Text
+        position="absolute"
+        bottom={4}
+        left="50%"
+        transform="translateX(-50%)"
+        fontSize="md"
+        fontWeight="semibold"
+        color="white"
+      >
+        {config.statusText}
+      </Text>
     </Box>
   );
 }

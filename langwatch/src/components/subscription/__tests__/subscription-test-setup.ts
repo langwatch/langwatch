@@ -159,6 +159,17 @@ export const mockCreateInvites = vi.fn(() => ({
   isPending: false,
 }));
 
+export const mockListInvoices = vi.fn(() => ({
+  data: [],
+  isLoading: false,
+  isError: false,
+}));
+
+export const mockGetLastSubscription = vi.fn(() => ({
+  data: null,
+  isLoading: false,
+}));
+
 export const mockOpenSeats = vi.fn();
 
 // ---------------------------------------------------------------------------
@@ -187,6 +198,15 @@ export function resetMocks() {
   });
   mockDetectCurrency.mockReturnValue({
     data: { currency: "EUR" },
+    isLoading: false,
+  });
+  mockListInvoices.mockReturnValue({
+    data: [],
+    isLoading: false,
+    isError: false,
+  });
+  mockGetLastSubscription.mockReturnValue({
+    data: null,
     isLoading: false,
   });
 }

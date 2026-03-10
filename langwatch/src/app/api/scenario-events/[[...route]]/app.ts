@@ -76,12 +76,19 @@ app.post(
     );
 
 
-    // Legacy ES write (always runs so data is available when feature flag is off)
-    const scenarioRunnerService = new ScenarioEventService();
-    await scenarioRunnerService.saveScenarioEvent({
-      projectId: project.id,
-      ...event,
-    });
+    // Legacy ES write (runs when feature flag is off and ES writes are not disabled)
+    if (!project.disableElasticSearchSimulationWriting) {
+      const scenarioRunnerService = new ScenarioEventService();
+      await scenarioRunnerService.saveScenarioEvent({
+        projectId: project.id,
+        ...event,
+      });
+    } else {
+      logger.debug(
+        { projectId: project.id },
+        "Skipping ES scenario event write — disableElasticSearchSimulationWriting is enabled",
+      );
+    }
 
     // Dual-write to ClickHouse via event-sourcing
     if (project.featureEventSourcingSimulationIngestion) {
@@ -126,10 +133,12 @@ export const route = app.delete(
   async (c) => {
     const { project } = c.var;
 
-    const scenarioRunnerService = new ScenarioEventService();
-    await scenarioRunnerService.deleteAllEventsForProject({
-      projectId: project.id,
-    });
+    if (!project.disableElasticSearchSimulationWriting) {
+      const scenarioRunnerService = new ScenarioEventService();
+      await scenarioRunnerService.deleteAllEventsForProject({
+        projectId: project.id,
+      });
+    }
 
     // Also soft-delete in CH (fire-and-forget)
     if (project.featureEventSourcingSimulationIngestion) {

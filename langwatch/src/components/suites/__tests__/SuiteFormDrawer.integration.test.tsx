@@ -13,7 +13,7 @@
  * @see specs/suites/suite-workflow.feature - "Create / Edit Suite"
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { SimulationSuite } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -149,6 +149,26 @@ vi.mock("../ui/drawer", () => ({
 
 vi.mock("../ui/toaster", () => ({
   toaster: { create: vi.fn() },
+}));
+
+vi.mock("../../scenarios/ScenarioFormDrawer", () => ({
+  ScenarioFormDrawer: ({ open, onClose }: { open?: boolean; onClose?: () => void }) =>
+    open ? (
+      <div data-testid="scenario-editor-child-drawer">
+        <span>Create Scenario</span>
+        <button onClick={onClose}>Close Scenario Editor</button>
+      </div>
+    ) : null,
+}));
+
+vi.mock("../../agents/AgentHttpEditorDrawer", () => ({
+  AgentHttpEditorDrawer: ({ open, onClose }: { open?: boolean; onClose?: () => void }) =>
+    open ? (
+      <div data-testid="agent-http-editor-child-drawer">
+        <span>New HTTP Agent</span>
+        <button onClick={onClose}>Close Agent Editor</button>
+      </div>
+    ) : null,
 }));
 
 vi.mock("../ui/checkbox", () => ({
@@ -458,6 +478,126 @@ describe("<SuiteFormDrawer/>", () => {
         render(<SuiteFormDrawer />, { wrapper: Wrapper });
 
         expect(screen.queryByTestId("drawer")).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("given the suite editor is open", () => {
+    describe("when 'Add Scenario' is clicked", () => {
+      it("opens the scenario editor as a child drawer", async () => {
+        const user = userEvent.setup();
+        render(<SuiteFormDrawer />, { wrapper: Wrapper });
+
+        await user.click(screen.getByRole("button", { name: "Add Scenario" }));
+
+        expect(screen.getByTestId("scenario-editor-child-drawer")).toBeInTheDocument();
+      });
+
+      it("keeps the suite editor mounted underneath", async () => {
+        const user = userEvent.setup();
+        render(<SuiteFormDrawer />, { wrapper: Wrapper });
+
+        await user.click(screen.getByRole("button", { name: "Add Scenario" }));
+
+        // Parent suite editor content remains in the DOM
+        expect(screen.getByPlaceholderText("e.g., Critical Path Suite")).toBeInTheDocument();
+        expect(screen.getByText("Scenarios *")).toBeInTheDocument();
+      });
+    });
+
+    describe("when the scenario editor child drawer is closed", () => {
+      it("returns to suite editor with form state intact", async () => {
+        const user = userEvent.setup();
+        render(<SuiteFormDrawer />, { wrapper: Wrapper });
+
+        // Enter a name to establish form state
+        const nameInput = screen.getByPlaceholderText("e.g., Critical Path Suite");
+        await user.type(nameInput, "My Suite");
+
+        // Open scenario editor
+        await user.click(screen.getByRole("button", { name: "Add Scenario" }));
+        expect(screen.getByTestId("scenario-editor-child-drawer")).toBeInTheDocument();
+
+        // Close scenario editor (fireEvent bypasses pointer-events from parent mock)
+        fireEvent.click(screen.getByText("Close Scenario Editor"));
+
+        // Child drawer is gone
+        expect(screen.queryByTestId("scenario-editor-child-drawer")).not.toBeInTheDocument();
+
+        // Suite editor still shows form state
+        const nameInputAfter = screen.getByPlaceholderText("e.g., Critical Path Suite") as HTMLInputElement;
+        expect(nameInputAfter.value).toBe("My Suite");
+      });
+    });
+
+    describe("when 'Add Target' is clicked", () => {
+      it("opens the agent HTTP editor as a child drawer", async () => {
+        const user = userEvent.setup();
+        render(<SuiteFormDrawer />, { wrapper: Wrapper });
+
+        await user.click(screen.getByRole("button", { name: "Add Target" }));
+
+        expect(screen.getByTestId("agent-http-editor-child-drawer")).toBeInTheDocument();
+      });
+
+      it("keeps the suite editor mounted underneath", async () => {
+        const user = userEvent.setup();
+        render(<SuiteFormDrawer />, { wrapper: Wrapper });
+
+        await user.click(screen.getByRole("button", { name: "Add Target" }));
+
+        // Parent suite editor content remains in the DOM
+        expect(screen.getByPlaceholderText("e.g., Critical Path Suite")).toBeInTheDocument();
+        expect(screen.getByText("Scenarios *")).toBeInTheDocument();
+      });
+    });
+
+    describe("when the agent HTTP editor child drawer is closed", () => {
+      it("returns to suite editor with form state intact", async () => {
+        const user = userEvent.setup();
+        render(<SuiteFormDrawer />, { wrapper: Wrapper });
+
+        // Enter a name to establish form state
+        const nameInput = screen.getByPlaceholderText("e.g., Critical Path Suite");
+        await user.type(nameInput, "My Suite");
+
+        // Open agent editor
+        await user.click(screen.getByRole("button", { name: "Add Target" }));
+        expect(screen.getByTestId("agent-http-editor-child-drawer")).toBeInTheDocument();
+
+        // Close agent editor
+        fireEvent.click(screen.getByText("Close Agent Editor"));
+
+        // Child drawer is gone
+        expect(screen.queryByTestId("agent-http-editor-child-drawer")).not.toBeInTheDocument();
+
+        // Suite editor still shows form state
+        const nameInputAfter = screen.getByPlaceholderText("e.g., Critical Path Suite") as HTMLInputElement;
+        expect(nameInputAfter.value).toBe("My Suite");
+      });
+    });
+
+    describe("when form state is entered before opening a child drawer", () => {
+      it("preserves suite name and scenario selections through a child drawer round-trip", async () => {
+        const user = userEvent.setup();
+        render(<SuiteFormDrawer />, { wrapper: Wrapper });
+
+        // Fill in name
+        const nameInput = screen.getByPlaceholderText("e.g., Critical Path Suite");
+        await user.type(nameInput, "My Suite");
+
+        // Select a scenario
+        await user.click(screen.getAllByRole("checkbox")[0]!);
+
+        // Open and close scenario editor
+        await user.click(screen.getByRole("button", { name: "Add Scenario" }));
+        fireEvent.click(screen.getByText("Close Scenario Editor"));
+
+        // Verify form state is preserved (re-query to avoid stale node references)
+        const nameInputAfter = screen.getByPlaceholderText("e.g., Critical Path Suite") as HTMLInputElement;
+        expect(nameInputAfter.value).toBe("My Suite");
+        const scenarioCheckboxAfter = screen.getAllByRole("checkbox")[0] as HTMLInputElement;
+        expect(scenarioCheckboxAfter).toBeChecked();
       });
     });
   });

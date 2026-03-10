@@ -15,7 +15,7 @@ const logger = createLogger(
 
 type ClickHouseSummaryWriteRecord = WithDateWrites<
   ClickHouseSummaryRecord,
-  "OccurredAt" | "CreatedAt" | "LastUpdatedAt"
+  "OccurredAt" | "CreatedAt" | "UpdatedAt"
 >;
 
 interface ClickHouseSummaryRecord {
@@ -26,7 +26,7 @@ interface ClickHouseSummaryRecord {
   Attributes: Record<string, string>;
   OccurredAt: number;
   CreatedAt: number;
-  LastUpdatedAt: number;
+  UpdatedAt: number;
   ComputedIOSchemaVersion: string;
   ComputedInput: string | null;
   ComputedOutput: string | null;
@@ -82,10 +82,6 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
 
-      logger.debug(
-        { tenantId, traceId: data.traceId, projectionId },
-        "Stored trace summary to ClickHouse",
-      );
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -117,7 +113,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
             Attributes,
             toUnixTimestamp64Milli(OccurredAt) AS OccurredAt,
             toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
-            toUnixTimestamp64Milli(LastUpdatedAt) AS LastUpdatedAt,
+            toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
             ComputedIOSchemaVersion,
             ComputedInput,
             ComputedOutput,
@@ -144,7 +140,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
             AND TraceId = {traceId:String}
-          ORDER BY LastUpdatedAt DESC
+          ORDER BY UpdatedAt DESC
           LIMIT 1
         `,
         query_params: { tenantId, traceId },
@@ -199,7 +195,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       attributes: record.Attributes ?? {},
       occurredAt: record.OccurredAt,
       createdAt: record.CreatedAt,
-      lastUpdatedAt: record.LastUpdatedAt,
+      updatedAt: record.UpdatedAt,
     };
   }
 
@@ -217,7 +213,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       Attributes: data.attributes,
       OccurredAt: new Date(data.occurredAt),
       CreatedAt: new Date(data.createdAt),
-      LastUpdatedAt: new Date(data.lastUpdatedAt),
+      UpdatedAt: new Date(data.updatedAt),
       ComputedIOSchemaVersion: data.computedIOSchemaVersion,
       ComputedInput: data.computedInput,
       ComputedOutput: data.computedOutput,

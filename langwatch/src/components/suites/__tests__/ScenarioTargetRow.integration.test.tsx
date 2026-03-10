@@ -12,7 +12,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { ScenarioRunStatus, Verdict } from "~/server/scenarios/scenario-event.enums";
 import { ScenarioTargetRow } from "../ScenarioTargetRow";
 import { makeScenarioRunData } from "./test-helpers";
 
@@ -42,7 +42,7 @@ describe("<ScenarioTargetRow/>", () => {
       ).toBeInTheDocument();
     });
 
-    it("displays 100% pass rate for SUCCESS status", () => {
+    it("displays 'passed' with criteria count for SUCCESS status", () => {
       render(
         <ScenarioTargetRow
           scenarioRun={makeScenarioRunData()}
@@ -52,7 +52,8 @@ describe("<ScenarioTargetRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("100%")).toBeInTheDocument();
+      expect(screen.getByText("passed (1/1)")).toBeInTheDocument();
+      expect(screen.queryByText("100%")).not.toBeInTheDocument();
     });
 
     it("displays duration formatted as seconds", () => {
@@ -126,11 +127,17 @@ describe("<ScenarioTargetRow/>", () => {
   });
 
   describe("given a failed scenario run (ERROR status)", () => {
-    it("displays 'failed' label for ERROR status", () => {
+    it("displays 'failed' with criteria count for ERROR status", () => {
       render(
         <ScenarioTargetRow
           scenarioRun={makeScenarioRunData({
             status: ScenarioRunStatus.ERROR,
+            results: {
+              verdict: Verdict.FAILURE,
+              reasoning: "Error occurred",
+              metCriteria: ["c1"],
+              unmetCriteria: ["c2", "c3"],
+            },
           })}
           targetName="Prod Agent"
           onClick={vi.fn()}
@@ -138,16 +145,22 @@ describe("<ScenarioTargetRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("failed")).toBeInTheDocument();
+      expect(screen.getByText("failed (1/3)")).toBeInTheDocument();
     });
   });
 
   describe("given a failed scenario run (FAILED status)", () => {
-    it("displays 'failed' label for FAILED status", () => {
+    it("displays 'failed' with criteria count for FAILED status", () => {
       render(
         <ScenarioTargetRow
           scenarioRun={makeScenarioRunData({
             status: ScenarioRunStatus.FAILED,
+            results: {
+              verdict: Verdict.FAILURE,
+              reasoning: "Criteria not met",
+              metCriteria: ["c1", "c2"],
+              unmetCriteria: ["c3"],
+            },
           })}
           targetName="Prod Agent"
           onClick={vi.fn()}
@@ -155,7 +168,25 @@ describe("<ScenarioTargetRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("failed")).toBeInTheDocument();
+      expect(screen.getByText("failed (2/3)")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a successful run with no criteria results", () => {
+    it("displays 'passed' without count", () => {
+      render(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({
+            status: ScenarioRunStatus.SUCCESS,
+            results: null,
+          })}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByText("passed")).toBeInTheDocument();
     });
   });
 
@@ -174,7 +205,7 @@ describe("<ScenarioTargetRow/>", () => {
       );
 
       expect(screen.getByText("running")).toBeInTheDocument();
-      expect(screen.queryByText("100%")).not.toBeInTheDocument();
+      expect(screen.queryByText(/passed/)).not.toBeInTheDocument();
     });
   });
 

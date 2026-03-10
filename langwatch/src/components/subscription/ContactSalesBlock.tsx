@@ -12,7 +12,7 @@ import {
 import { Check } from "lucide-react";
 import { Link } from "~/components/ui/link";
 import { ENTERPRISE_PLAN_FEATURES } from "./billing-plans";
-import { CONTACT_SALES_URL } from "../plans/constants";
+import { CONTACT_SALES_URL } from "../../../ee/licensing/constants";
 
 export function ContactSalesBlock() {
   return (

@@ -15,16 +15,10 @@ import type { AgentRepository } from "../../agents/agent.repository";
 import type { LlmConfigRepository } from "../../prompt-config/repositories/llm-config.repository";
 import type { SimulationSuite } from "@prisma/client";
 
-type MockJob = {
-  data: { setId: string };
-  getState?: () => Promise<string>;
-};
-
 // Mock the scenario queue module
-const { mockRemove, mockGetJob, mockGetJobs } = vi.hoisted(() => ({
+const { mockRemove, mockGetJob } = vi.hoisted(() => ({
   mockRemove: vi.fn(() => Promise.resolve()),
   mockGetJob: vi.fn(() => Promise.resolve({ remove: vi.fn(() => Promise.resolve()) })),
-  mockGetJobs: vi.fn((_states?: string[]): Promise<MockJob[]> => Promise.resolve([])),
 }));
 
 vi.mock("../../scenarios/scenario.queue", () => ({
@@ -32,7 +26,7 @@ vi.mock("../../scenarios/scenario.queue", () => ({
   scheduleScenarioRun: vi.fn(() =>
     Promise.resolve({ id: "job_1", data: {} }),
   ),
-  scenarioQueue: { getJob: mockGetJob, getJobs: mockGetJobs },
+  scenarioQueue: { getJob: mockGetJob },
 }));
 
 import {
@@ -898,90 +892,6 @@ describe("SuiteService", () => {
           });
 
           expect(result).toBeNull();
-        });
-      });
-    });
-  });
-
-  describe("getQueueStatus()", () => {
-    describe("given a suite has 3 waiting and 1 active job in the queue", () => {
-      describe("when the queue status is queried", () => {
-        it("returns 3 waiting and 1 active", async () => {
-          const suiteId = "suite_abc123";
-          const setId = "__internal__suite_abc123__suite";
-
-          mockGetJobs.mockImplementation((states?: string[]) => {
-            if (states?.includes("waiting")) {
-              return Promise.resolve([
-                { data: { setId } },
-                { data: { setId } },
-                { data: { setId } },
-                { data: { setId: "other_set" } },
-              ]);
-            }
-            if (states?.includes("active")) {
-              return Promise.resolve([
-                { data: { setId } },
-              ]);
-            }
-            return Promise.resolve([]);
-          });
-
-          const result = await SuiteService.getQueueStatus({ suiteId });
-
-          expect(result).toEqual({
-            waiting: 3,
-            active: 1,
-          });
-        });
-      });
-    });
-
-    describe("given a suite has no jobs in the queue", () => {
-      describe("when the queue status is queried", () => {
-        it("returns 0 waiting and 0 active", async () => {
-          mockGetJobs.mockResolvedValue([]);
-
-          const result = await SuiteService.getQueueStatus({
-            suiteId: "suite_empty",
-          });
-
-          expect(result).toEqual({
-            waiting: 0,
-            active: 0,
-          });
-        });
-      });
-    });
-
-    describe("given the queue has jobs for multiple suites", () => {
-      describe("when the queue status is queried for one suite", () => {
-        it("only counts jobs matching the suite setId", async () => {
-          const targetSetId = "__internal__suite_target__suite";
-          const otherSetId = "__internal__suite_other__suite";
-
-          mockGetJobs.mockImplementation((states?: string[]) => {
-            if (states?.includes("waiting")) {
-              return Promise.resolve([
-                { data: { setId: targetSetId } },
-                { data: { setId: otherSetId } },
-              ]);
-            }
-            if (states?.includes("active")) {
-              return Promise.resolve([
-                { data: { setId: targetSetId } },
-                { data: { setId: otherSetId } },
-              ]);
-            }
-            return Promise.resolve([]);
-          });
-
-          const result = await SuiteService.getQueueStatus({ suiteId: "suite_target" });
-
-          expect(result).toEqual({
-            waiting: 1,
-            active: 1,
-          });
         });
       });
     });

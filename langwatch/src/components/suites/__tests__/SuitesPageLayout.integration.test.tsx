@@ -36,12 +36,15 @@ vi.mock("~/utils/api", () => ({
       run: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
     },
     scenarios: {
-      getAllSuiteRunData: {
+      getSuiteRunData: {
         useQuery: () => ({
           data: { runs: [], scenarioSetIds: {}, hasMore: false, nextCursor: undefined },
           isLoading: false,
           error: null,
         }),
+      },
+      getExternalSetSummaries: {
+        useQuery: () => ({ data: [], isLoading: false, error: null }),
       },
       getAll: {
         useQuery: () => ({ data: [], isLoading: false, error: null }),
@@ -86,9 +89,9 @@ vi.mock("~/components/DashboardLayout", () => ({
   },
 }));
 
-// Mock AllRunsPanel to avoid deep dependency tree (now renders by default)
-vi.mock("~/components/suites/AllRunsPanel", () => ({
-  AllRunsPanel: () => <div data-testid="all-runs-panel">All Runs Panel</div>,
+// Mock RunHistoryPanel to avoid deep dependency tree (now renders by default)
+vi.mock("~/components/suites/RunHistoryPanel", () => ({
+  RunHistoryPanel: () => <div data-testid="all-runs-panel">All Runs Panel</div>,
 }));
 
 // We import after mocks are set up
@@ -151,7 +154,7 @@ describe("Suites Page Layout (Issue #1671)", () => {
   });
 
   describe("when rendering the SuiteSidebar", () => {
-    it("renders a 'SUITES' section header in the sidebar", () => {
+    it("does not render a 'SUITES' section header in the sidebar", () => {
       const suites = [makeSuite()];
       render(
         <SuiteSidebar
@@ -164,9 +167,8 @@ describe("Suites Page Layout (Issue #1671)", () => {
         { wrapper: Wrapper },
       );
 
-      // The sidebar has a "SUITES" section header for the collapsible sidebar
       const suitesLabels = screen.queryAllByText(/^SUITES$/);
-      expect(suitesLabels).toHaveLength(1);
+      expect(suitesLabels).toHaveLength(0);
     });
   });
 });

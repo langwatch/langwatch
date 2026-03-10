@@ -22,6 +22,8 @@ import type { SpanReceivedEvent } from "../schemas/events";
 import type { OtlpSpan } from "../schemas/otlp";
 import { OtlpSpanCostEnrichmentService, createCostEnrichmentDeps } from "~/server/app-layer/traces/span-cost-enrichment.service";
 import { OtlpSpanPiiRedactionService } from "~/server/app-layer/traces/span-pii-redaction.service";
+import { OtlpSpanTokenEstimationService } from "~/server/app-layer/traces/span-token-estimation.service";
+import { featureFlagService } from "~/server/featureFlag";
 import { TraceRequestUtils } from "../utils/traceRequest.utils";
 
 /**
@@ -39,6 +41,13 @@ export interface RecordSpanCommandDependencies {
   costEnrichmentService: {
     enrichSpan: (span: OtlpSpan, tenantId: string) => Promise<void>;
   };
+  /** Service for estimating token counts from input/output text. */
+  tokenEstimationService: {
+    estimateSpanTokens: (args: {
+      span: OtlpSpan;
+      tenantId?: string;
+    }) => Promise<void>;
+  };
 }
 
 function createDefaultDependencies(): RecordSpanCommandDependencies {
@@ -50,6 +59,9 @@ function createDefaultDependencies(): RecordSpanCommandDependencies {
     costEnrichmentService: OtlpSpanCostEnrichmentService.create(
       createCostEnrichmentDeps(prisma),
     ),
+    tokenEstimationService: OtlpSpanTokenEstimationService.create({
+      featureFlagService,
+    }),
   };
 }
 
@@ -98,7 +110,7 @@ export class RecordSpanCommand implements CommandHandler<
           commandData.span,
         );
 
-        this.logger.info(
+        this.logger.debug(
           {
             tenantId,
             traceId,
@@ -120,9 +132,9 @@ export class RecordSpanCommand implements CommandHandler<
         const piiRedactionLevel =
           commandData.piiRedactionLevel ?? DEFAULT_PII_REDACTION_LEVEL;
 
-        // Run PII redaction and cost enrichment in parallel.
-        // Safe: PII modifies existing attr values; cost pushes new entries.
-        const [piiResult, costResult] = await Promise.allSettled([
+        // Run PII redaction, cost enrichment, and token estimation in parallel.
+        // Safe: PII modifies existing attr values; cost and tokens push new entries.
+        const [piiResult, costResult, tokenResult] = await Promise.allSettled([
           this.deps.piiRedactionService.redactSpan(
             spanToProcess,
             piiRedactionLevel,
@@ -131,6 +143,10 @@ export class RecordSpanCommand implements CommandHandler<
             spanToProcess,
             tenantIdStr,
           ),
+          this.deps.tokenEstimationService.estimateSpanTokens({
+            span: spanToProcess,
+            tenantId: tenantIdStr,
+          }),
         ]);
 
         // Cost enrichment is non-critical — log and continue
@@ -138,6 +154,14 @@ export class RecordSpanCommand implements CommandHandler<
           this.logger.warn(
             { error: costResult.reason },
             "Cost enrichment failed, continuing without cost data",
+          );
+        }
+
+        // Token estimation is non-critical — log and continue
+        if (tokenResult.status === "rejected") {
+          this.logger.warn(
+            { error: tokenResult.reason },
+            "Token estimation failed, continuing without estimated tokens",
           );
         }
 
@@ -166,6 +190,7 @@ export class RecordSpanCommand implements CommandHandler<
           },
           metadata: { traceId, spanId },
           occurredAt: commandData.occurredAt,
+          idempotencyKey: `${tenantIdStr}:${traceId}:${spanId}`,
         });
 
         this.logger.debug(

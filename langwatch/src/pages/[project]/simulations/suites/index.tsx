@@ -15,16 +15,22 @@ import { useCallback, useMemo, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { PeriodSelector, usePeriodSelector, type Period } from "~/components/PeriodSelector";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import { AllRunsPanel } from "~/components/suites/AllRunsPanel";
+import { RunHistoryPanel } from "~/components/suites/RunHistoryPanel";
 import { SuiteArchiveDialog } from "~/components/suites/SuiteArchiveDialog";
 import { SuiteContextMenu } from "~/components/suites/SuiteContextMenu";
 import {
   SuiteDetailPanel,
   SuiteEmptyState,
 } from "~/components/suites/SuiteDetailPanel";
+import { ExternalSetDetailPanel } from "~/components/suites/ExternalSetDetailPanel";
 import { SuiteSidebar } from "~/components/suites/SuiteSidebar";
 import { computeSuiteRunSummaries } from "~/components/suites/run-history-transforms";
-import { ALL_RUNS_ID, useSuiteRouting } from "~/components/suites/useSuiteRouting";
+import {
+  ALL_RUNS_ID,
+  extractExternalSetId,
+  isExternalSetSelection,
+  useSuiteRouting,
+} from "~/components/suites/useSuiteRouting";
 import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useDrawer } from "~/hooks/useDrawer";
@@ -58,7 +64,12 @@ function SuitesPageContent() {
     { enabled: !!project },
   );
 
-  const { data: allRunData } = api.scenarios.getAllSuiteRunData.useQuery(
+  const { data: externalSets } = api.scenarios.getExternalSetSummaries.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project, refetchInterval: 15000 },
+  );
+
+  const { data: allRunData } = api.scenarios.getSuiteRunData.useQuery(
     {
       projectId: project?.id ?? "",
       limit: 100,
@@ -76,10 +87,28 @@ function SuitesPageContent() {
     });
   }, [allRunData]);
 
+  // Build suiteId -> suite name map for AllRuns view
+  const suiteNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    if (suites) {
+      for (const suite of suites) {
+        map.set(suite.id, suite.name);
+      }
+    }
+    return map;
+  }, [suites]);
+
   const selectedSuite = useMemo(() => {
     if (!selectedSuiteSlug || selectedSuiteSlug === ALL_RUNS_ID) return null;
+    if (isExternalSetSelection(selectedSuiteSlug)) return null;
     return suites?.find((s) => s.slug === selectedSuiteSlug) ?? null;
   }, [selectedSuiteSlug, suites]);
+
+  const selectedExternalSetId = useMemo(() => {
+    if (!selectedSuiteSlug || !isExternalSetSelection(selectedSuiteSlug))
+      return null;
+    return extractExternalSetId(selectedSuiteSlug);
+  }, [selectedSuiteSlug]);
 
   const archiveTargetSuite = archiveConfirmId
     ? suites?.find((s) => s.id === archiveConfirmId)
@@ -132,6 +161,7 @@ function SuitesPageContent() {
 
   const runMutation = api.suites.run.useMutation({
     onSuccess: (result, variables) => {
+      void utils.scenarios.getSuiteRunData.invalidate();
       const suiteIdForToast = variables.id;
       const archivedCount =
         (result.skippedArchived?.scenarios?.length ?? 0) +
@@ -293,6 +323,7 @@ function SuitesPageContent() {
             suites={suites ?? []}
             selectedSuiteSlug={selectedSuiteSlug}
             runSummaries={runSummaries}
+            externalSets={externalSets ?? []}
             onSelectSuite={navigateToSuite}
             onRunSuite={handleRunSuite}
             onContextMenu={handleContextMenu}
@@ -305,12 +336,14 @@ function SuitesPageContent() {
             error={error ?? null}
             selectedSuiteSlug={selectedSuiteSlug}
             selectedSuite={selectedSuite}
+            selectedExternalSetId={selectedExternalSetId}
             isLoading={isLoading}
             onNewSuite={handleNewSuite}
             onEditSuite={handleEditSuite}
             onRunSuite={handleRunSuite}
             isRunning={runMutation.isPending}
             period={period}
+            suiteNameMap={suiteNameMap}
           />
         </Box>
       </HStack>
@@ -343,22 +376,26 @@ function MainPanel({
   error,
   selectedSuiteSlug,
   selectedSuite,
+  selectedExternalSetId,
   isLoading,
   onNewSuite,
   onEditSuite,
   onRunSuite,
   isRunning,
   period,
+  suiteNameMap,
 }: {
   error: { message: string } | null;
   selectedSuiteSlug: string | typeof ALL_RUNS_ID | null;
   selectedSuite: SimulationSuite | null;
+  selectedExternalSetId: string | null;
   isLoading: boolean;
   onNewSuite: () => void;
   onEditSuite: (id: string) => void;
   onRunSuite: (id: string) => void;
   isRunning: boolean;
   period: Period;
+  suiteNameMap: Map<string, string>;
 }) {
   if (isLoading) {
     return null;
@@ -379,8 +416,12 @@ function MainPanel({
     return null;
   }
 
+  if (selectedExternalSetId) {
+    return <ExternalSetDetailPanel scenarioSetId={selectedExternalSetId} />;
+  }
+
   if (selectedSuiteSlug === ALL_RUNS_ID) {
-    return <AllRunsPanel period={period} />;
+    return <RunHistoryPanel period={period} suiteNameMap={suiteNameMap} />;
   }
 
   if (selectedSuite) {

@@ -29,22 +29,22 @@
     "node": ">=18.0.0"
   },
   "devDependencies": {
-    "@ai-sdk/anthropic": "^2.0.15",
-    "@anthropic-ai/claude-code": "^2.1.7",
+    "@ai-sdk/anthropic": "^3.0.44",
+    "@anthropic-ai/claude-code": "^2.1.42",
     "@eslint/js": "^9.4.0",
-    "@langwatch/scenario": "^0.3.0",
+    "@langwatch/scenario": "^0.4.4",
     "@types/debug": "^4.1.12",
     "@types/eslint__js": "^8.42.3",
     "@types/node": "^16.0.0",
     "@types/yargs": "^17.0.33",
     "@typescript/native-preview": "7.0.0-dev.20250911.1",
-    "ai": "^5.0.40",
+    "ai": "^6.0.0",
     "dotenv": "^17.2.2",
     "esbuild": "^0.25.0",
     "eslint": "^8.57.0",
     "tsup": "^8.1.0",
     "tsx": "^4.20.5",
-    "typescript": "^4.9.5",
+    "typescript": "^5.0.0",
     "typescript-eslint": "^8.55.0"
   },
   "dependencies": {
@@ -56,7 +56,7 @@
     "node-pty": "^1.0.0",
     "vitest": "^3.2.4",
     "yargs": "^17.7.2",
-    "zod": "^3.25.76",
+    "zod": "^4.3.6",
     "zod-validation-error": "^5.0.0"
   },
   "bin": {

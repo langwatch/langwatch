@@ -36,8 +36,8 @@ export const DrawerContent = React.forwardRef<
           ref={ref}
           margin={2}
           borderRadius="lg"
-          background="bg.surface/75"
-          backdropFilter="blur(8px)"
+          background="bg.surface/80"
+          backdropFilter="blur(25px)"
           pointerEvents="auto"
           {...rest}
           marginTop={marginTopProp}
@@ -67,15 +67,31 @@ export const DrawerCloseTrigger = React.forwardRef<
   );
 });
 
+/**
+ * Wrapper around Chakra's Drawer.Root with safe defaults for nested drawers.
+ *
+ * - `modal={false}`: Prevents focus trap from stealing input in child drawers.
+ * - `closeOnInteractOutside={false}`: Prevents parent from closing when
+ *   interacting with a child drawer.
+ * - `preventScroll={false}`: Default to allowing background scrolling.
+ *
+ * All defaults can be overridden by passing props explicitly.
+ */
 export const DrawerRoot = function DrawerRoot(props: ChakraDrawer.RootProps) {
-  return <ChakraDrawer.Root {...props} preventScroll={false} />;
+  return (
+    <ChakraDrawer.Root
+      modal={false}
+      closeOnInteractOutside={false}
+      preventScroll={false}
+      {...props}
+    />
+  );
 };
 
 export const DrawerTrigger = ChakraDrawer.Trigger;
 export const DrawerFooter = ChakraDrawer.Footer;
 export const DrawerHeader = ChakraDrawer.Header;
 export const DrawerBody = ChakraDrawer.Body;
-export const DrawerBackdrop = ChakraDrawer.Backdrop;
 export const DrawerDescription = ChakraDrawer.Description;
 export const DrawerTitle = ChakraDrawer.Title;
 export const DrawerActionTrigger = ChakraDrawer.ActionTrigger;
@@ -88,7 +104,6 @@ export const Drawer = {
   Header: DrawerHeader,
   Body: DrawerBody,
   Footer: DrawerFooter,
-  Backdrop: DrawerBackdrop,
   Description: DrawerDescription,
   Title: DrawerTitle,
   ActionTrigger: DrawerActionTrigger,

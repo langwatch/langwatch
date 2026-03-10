@@ -54,12 +54,6 @@ export type SuiteRunResult = {
   };
 };
 
-/** Queue status counts for a suite's pending/active jobs */
-export type QueueStatus = {
-  waiting: number;
-  active: number;
-};
-
 /** Result of resolving scenario references against the database */
 type ResolvedScenarioReferences = {
   active: string[];
@@ -326,6 +320,7 @@ export class SuiteService {
 
         const jobCount = await this.scheduleJobs({
           scenarioIds: resolved.activeScenarioIds,
+          scenarioNameMap: resolved.scenarioNameMap,
           targets: resolved.activeTargets,
           suiteId: suite.id,
           projectId,
@@ -401,28 +396,6 @@ export class SuiteService {
   }
 
   /**
-   * Query the BullMQ queue for pending/active jobs belonging to a suite.
-   *
-   * Fetches waiting and active jobs from the scenario queue, then filters
-   * by the suite's setId to return only jobs for this suite.
-   */
-  static async getQueueStatus(params: {
-    suiteId: string;
-  }): Promise<QueueStatus> {
-    const setId = getSuiteSetId(params.suiteId);
-
-    const [waitingJobs, activeJobs] = await Promise.all([
-      scenarioQueue.getJobs(["waiting"]),
-      scenarioQueue.getJobs(["active"]),
-    ]);
-
-    const waiting = waitingJobs.filter((job) => job.data?.setId === setId).length;
-    const active = activeJobs.filter((job) => job.data?.setId === setId).length;
-
-    return { waiting, active };
-  }
-
-  /**
    * Check that the slug is not already taken within the project.
    * Optionally exclude a specific suite ID (for updates).
    */
@@ -447,6 +420,7 @@ export class SuiteService {
     targets: SuiteTarget[];
   }): Promise<{
     activeScenarioIds: string[];
+    scenarioNameMap: Map<string, string>;
     activeTargets: SuiteTarget[];
     skippedArchived: SuiteRunResult["skippedArchived"];
   }> {
@@ -483,8 +457,18 @@ export class SuiteService {
       throw new AllTargetsArchivedError();
     }
 
+    // Fetch scenario names for display in queued job rows
+    const scenarioNameRows = scenarioResolution.active.length > 0
+      ? await this.scenarioRepository.findNamesByIds({
+          ids: scenarioResolution.active,
+          projectId,
+        })
+      : [];
+    const scenarioNameMap = new Map(scenarioNameRows.map((r) => [r.id, r.name]));
+
     return {
       activeScenarioIds: scenarioResolution.active,
+      scenarioNameMap,
       activeTargets: targetResolution.active,
       skippedArchived: {
         scenarios: scenarioResolution.archived,
@@ -585,6 +569,7 @@ export class SuiteService {
 
   private async scheduleJobs(params: {
     scenarioIds: string[];
+    scenarioNameMap: Map<string, string>;
     targets: SuiteTarget[];
     suiteId: string;
     projectId: string;
@@ -592,7 +577,7 @@ export class SuiteService {
     batchRunId: string;
     repeatCount: number;
   }): Promise<number> {
-    const { scenarioIds, targets, suiteId, projectId, setId, batchRunId, repeatCount } = params;
+    const { scenarioIds, scenarioNameMap, targets, suiteId, projectId, setId, batchRunId, repeatCount } = params;
 
     const jobPromises: Promise<{ id?: string | null }>[] = [];
     for (const scenarioId of scenarioIds) {
@@ -602,6 +587,7 @@ export class SuiteService {
             scheduleScenarioRun({
               projectId,
               scenarioId,
+              scenarioName: scenarioNameMap.get(scenarioId) ?? scenarioId,
               target: { type: target.type, referenceId: target.referenceId },
               setId,
               batchRunId,

@@ -3,6 +3,7 @@ import type { Scenario } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { getComplexProps, setFlowCallbacks, useDrawer, useDrawerParams } from "../../hooks/useDrawer";
+import { useDrawerRunCallbacks } from "../../hooks/useDrawerRunCallbacks";
 import { AgentTypeSelectorDrawer } from "../agents/AgentTypeSelectorDrawer";
 import { checkCompoundLimits } from "../../hooks/useCompoundLicenseCheck";
 import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";
@@ -34,7 +35,11 @@ export type ScenarioFormDrawerProps = {
  */
 export function ScenarioFormDrawerFromUrl(props: Omit<ScenarioFormDrawerProps, "scenarioId">) {
   const params = useDrawerParams();
-  return <ScenarioFormDrawer {...props} scenarioId={params.scenarioId} />;
+  const { drawerOpen } = useDrawer();
+  // When rendered from the drawer registry (CurrentDrawer), no `open` prop is
+  // passed.  Fall back to checking the URL so the drawer actually opens.
+  const open = props.open ?? drawerOpen("scenarioEditor");
+  return <ScenarioFormDrawer {...props} open={open} scenarioId={params.scenarioId} />;
 }
 
 /**
@@ -58,9 +63,13 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const utils = api.useContext();
   const [formInstance, setFormInstance] =
     useState<UseFormReturn<ScenarioFormData> | null>(null);
+  const { onRunComplete, onRunFailed } = useDrawerRunCallbacks();
+
   const { runScenario, isRunning } = useRunScenario({
     projectId: project?.id,
     projectSlug: project?.slug,
+    onRunComplete,
+    onRunFailed,
   });
   const scenarioId = props.scenarioId;
 
@@ -281,11 +290,9 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
 
   return (
     <Drawer.Root
-      closeOnInteractOutside={false}
       open={isOpen}
       onOpenChange={({ open }) => !open && onClose()}
       size="xl"
-      modal={false}
     >
       <Drawer.Content>
         <Drawer.CloseTrigger />

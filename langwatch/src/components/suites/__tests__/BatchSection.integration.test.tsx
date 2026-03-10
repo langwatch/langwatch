@@ -59,7 +59,7 @@ describe("<BatchSection/>", () => {
       expect(screen.getByTestId("batch-sub-header")).toBeInTheDocument();
     });
 
-    it("displays pass rate percentage", () => {
+    it("displays passed/failed status with scenario count", () => {
       const batch = makeBatchRun({
         scenarioRuns: [
           makeScenarioRunData({ scenarioRunId: "run_1", status: ScenarioRunStatus.SUCCESS }),
@@ -77,7 +77,8 @@ describe("<BatchSection/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("100%")).toBeInTheDocument();
+      expect(screen.getByText("passed (2/2)")).toBeInTheDocument();
+      expect(screen.queryByText("100%")).not.toBeInTheDocument();
     });
 
     it("renders ScenarioRunContent with the batch scenario runs", () => {

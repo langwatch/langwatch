@@ -39,6 +39,9 @@ import { TeamUserRole } from "@prisma/client";
 import type { Session } from "next-auth";
 import type { PlanProvider } from "../app-layer/subscription/plan-provider";
 import { getApp } from "../app-layer/app";
+import { createLogger } from "~/utils/logger";
+
+const logger = createLogger("langwatch:invites");
 
 /**
  * Team assignment input for invite creation.
@@ -312,7 +315,7 @@ export class InviteService {
       await sendInviteEmail({ email, organization, inviteCode });
       return { emailNotSent: false };
     } catch (error) {
-      console.error("Failed to send invite email:", error);
+      logger.error({ error }, "Failed to send invite email");
       return { emailNotSent: true };
     }
   }

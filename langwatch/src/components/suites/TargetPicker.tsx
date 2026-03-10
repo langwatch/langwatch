@@ -1,13 +1,14 @@
 /**
  * Picker component for selecting targets (agents and prompts) in a suite form.
  *
- * Renders: search input, scrollable checkbox list with type indicators,
- * "Add New Agent" and "Add New Prompt" action rows, and a count footer.
+ * Renders: search input with inline "Add Target" button, scrollable checkbox
+ * list with type indicators, and a footer with count + select all/clear buttons.
  */
 
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import { AlertTriangle, Plus, X } from "lucide-react";
 import type { SuiteTarget } from "~/server/suites/types";
+import { Tooltip } from "../ui/tooltip";
 import { Checkbox } from "../ui/checkbox";
 import { SearchInput } from "../ui/SearchInput";
 
@@ -32,10 +33,12 @@ export interface TargetPickerProps {
   searchQuery: string;
   /** Update the search query. */
   onSearchChange: (query: string) => void;
-  /** Handler for "Add New Agent" action. */
-  onCreateAgent: () => void;
-  /** Handler for "Add New Prompt" action. */
-  onCreatePrompt: () => void;
+  /** Handler for "Add Target" action (opens target creation drawer). */
+  onAddTarget: () => void;
+  /** Select all visible targets. */
+  onSelectAll: () => void;
+  /** Clear all selections. */
+  onClear: () => void;
   /** Whether to show error styling on the border. */
   hasError?: boolean;
   /** Archived targets still linked to the suite, with display names. */
@@ -52,8 +55,9 @@ export function TargetPicker({
   onToggle,
   searchQuery,
   onSearchChange,
-  onCreateAgent,
-  onCreatePrompt,
+  onAddTarget,
+  onSelectAll,
+  onClear,
   hasError,
   archivedTargets = [],
   onRemoveArchived,
@@ -65,14 +69,27 @@ export function TargetPicker({
       borderRadius="md"
       width="full"
     >
-      <Box paddingX={3} paddingY={2}>
-        <SearchInput
-          size="sm"
-          placeholder="Search targets..."
-          value={searchQuery}
-          onChange={(e) => onSearchChange(e.target.value)}
-        />
-      </Box>
+      <HStack paddingX={3} paddingY={2} gap={2}>
+        <Box flex={1}>
+          <SearchInput
+            size="sm"
+            placeholder="Search targets..."
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+          />
+        </Box>
+        <Tooltip content="Add Target">
+          <IconButton
+            aria-label="Add Target"
+            size="sm"
+            variant="ghost"
+            onClick={onAddTarget}
+            data-testid="add-target-button"
+          >
+            <Plus size={16} />
+          </IconButton>
+        </Tooltip>
+      </HStack>
 
       <VStack
         maxHeight="200px"
@@ -154,45 +171,25 @@ export function TargetPicker({
         </VStack>
       )}
 
-      {/* Add new agent */}
       <HStack
         paddingX={3}
         paddingY={2}
-        cursor="pointer"
-        _hover={{ bg: "bg.subtle" }}
-        borderTopWidth="1px"
-        borderColor="border.muted"
-        color="blue.500"
-        onClick={onCreateAgent}
-      >
-        <Plus size={14} />
-        <Text fontSize="sm">Add New Agent</Text>
-      </HStack>
-
-      {/* Add new prompt */}
-      <HStack
-        paddingX={3}
-        paddingY={2}
-        cursor="pointer"
-        _hover={{ bg: "bg.subtle" }}
-        borderTopWidth="1px"
-        borderColor="border.muted"
-        color="blue.500"
-        onClick={onCreatePrompt}
-      >
-        <Plus size={14} />
-        <Text fontSize="sm">Add New Prompt</Text>
-      </HStack>
-
-      <HStack
-        paddingX={3}
-        paddingY={2}
+        justify="space-between"
         borderTop="1px solid"
         borderColor="border"
       >
         <Text fontSize="xs" color="fg.muted">
-          {selectedTargets.length} of {totalCount} selected
+          {selectedTargets.length - (archivedTargets?.length ?? 0)} of{" "}
+          {totalCount} selected
         </Text>
+        <HStack gap={2}>
+          <Button size="xs" variant="ghost" onClick={onSelectAll}>
+            Select All
+          </Button>
+          <Button size="xs" variant="ghost" onClick={onClear}>
+            Clear
+          </Button>
+        </HStack>
       </HStack>
     </Box>
   );

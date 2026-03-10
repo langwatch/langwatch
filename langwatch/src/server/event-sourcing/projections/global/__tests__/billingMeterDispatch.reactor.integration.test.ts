@@ -56,7 +56,7 @@ function makeEvent(projectId: string): Event {
     aggregateId: `trace-${projectId}`,
     aggregateType: "trace",
     tenantId: createTenantId(projectId),
-    timestamp: Date.now(),
+    createdAt: Date.now(),
     occurredAt: Date.now(),
     version: "2026-02-17",
     type: SPAN_RECEIVED_EVENT_TYPE,

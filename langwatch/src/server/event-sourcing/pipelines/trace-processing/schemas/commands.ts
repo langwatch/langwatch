@@ -44,3 +44,43 @@ export const assignSatisfactionScoreCommandDataSchema = z.object({
 export type AssignSatisfactionScoreCommandData = z.infer<
   typeof assignSatisfactionScoreCommandDataSchema
 >;
+
+export const recordLogCommandDataSchema = z.object({
+  tenantId: z.string(),
+  traceId: z.string(),
+  spanId: z.string(),
+  timeUnixMs: z.number(),
+  severityNumber: z.number(),
+  severityText: z.string(),
+  body: z.string(),
+  attributes: z.record(z.string(), z.string()),
+  resourceAttributes: z.record(z.string(), z.string()),
+  scopeName: z.string(),
+  scopeVersion: z.string().nullable(),
+  piiRedactionLevel: piiRedactionLevelSchema.optional(),
+  occurredAt: z.number(),
+});
+
+export type RecordLogCommandData = z.infer<typeof recordLogCommandDataSchema>;
+
+export const metricTypeSchema = z.enum(["histogram", "gauge", "sum"]);
+export type MetricType = z.infer<typeof metricTypeSchema>;
+
+export const recordMetricCommandDataSchema = z.object({
+  tenantId: z.string(),
+  traceId: z.string(),
+  spanId: z.string(),
+  metricName: z.string(),
+  metricUnit: z.string(),
+  metricType: metricTypeSchema,
+  value: z.number(),
+  timeUnixMs: z.number(),
+  attributes: z.record(z.string(), z.string()),
+  resourceAttributes: z.record(z.string(), z.string()),
+  piiRedactionLevel: piiRedactionLevelSchema.optional(),
+  occurredAt: z.number(),
+});
+
+export type RecordMetricCommandData = z.infer<
+  typeof recordMetricCommandDataSchema
+>;

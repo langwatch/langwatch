@@ -13,6 +13,7 @@ export interface EventRecord {
   EventVersion: string;
   EventPayload: unknown;
   ProcessingTraceparent: string;
+  IdempotencyKey: string;
 }
 
 /**

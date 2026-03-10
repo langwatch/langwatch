@@ -4,7 +4,7 @@ import { DEFAULT_MODEL } from "../../utils/constants";
 import {
   getProjectModelProviders,
   prepareLitellmParams,
-} from "../api/routers/modelProviders";
+} from "../api/routers/modelProviders.utils";
 import { prisma } from "../db";
 
 export const getVercelAIModel = async (projectId: string, model?: string) => {

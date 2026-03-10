@@ -64,6 +64,18 @@ export const SCENARIO_RUN_STATUS_CONFIG: Record<
     isComplete: false,
     fgColor: "fg.muted",
   },
+  [ScenarioRunStatus.QUEUED]: {
+    colorPalette: "blue",
+    label: "queued",
+    isComplete: false,
+    fgColor: "blue.fg",
+  },
+  [ScenarioRunStatus.RUNNING]: {
+    colorPalette: "orange",
+    label: "running",
+    isComplete: false,
+    fgColor: "orange.fg",
+  },
 };
 
 export const SCENARIO_RUN_STATUS_ICONS: Record<ScenarioRunStatus, LucideIcon> =
@@ -75,4 +87,6 @@ export const SCENARIO_RUN_STATUS_ICONS: Record<ScenarioRunStatus, LucideIcon> =
     [ScenarioRunStatus.STALLED]: AlertTriangle,
     [ScenarioRunStatus.IN_PROGRESS]: Clock,
     [ScenarioRunStatus.PENDING]: Clock,
+    [ScenarioRunStatus.QUEUED]: Clock,
+    [ScenarioRunStatus.RUNNING]: Clock,
   };

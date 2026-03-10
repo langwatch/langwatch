@@ -51,6 +51,10 @@ export function createEvaluationRunFoldProjection({
         label: null,
         details: null,
         error: null,
+        errorDetails: null,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        archivedAt: null,
         scheduledAt: null,
         startedAt: null,
         completedAt: null,
@@ -73,6 +77,7 @@ export function createEvaluationRunFoldProjection({
           isGuardrail: event.data.isGuardrail ?? false,
           status: "scheduled",
           scheduledAt: event.occurredAt,
+          updatedAt: Date.now(),
         };
       }
 
@@ -87,6 +92,7 @@ export function createEvaluationRunFoldProjection({
           isGuardrail: event.data.isGuardrail ?? state.isGuardrail,
           status: "in_progress",
           startedAt: event.occurredAt,
+          updatedAt: Date.now(),
         };
       }
 
@@ -99,8 +105,10 @@ export function createEvaluationRunFoldProjection({
           label: event.data.label ?? null,
           details: event.data.details ?? null,
           error: event.data.error ?? null,
+          errorDetails: event.data.errorDetails ?? null,
           completedAt: event.occurredAt,
           costId: event.data.costId ?? null,
+          updatedAt: Date.now(),
         };
       }
 

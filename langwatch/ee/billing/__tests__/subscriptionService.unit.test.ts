@@ -29,6 +29,9 @@ const createMockStripe = () => ({
       create: vi.fn(),
     },
   },
+  invoices: {
+    list: vi.fn(),
+  },
 });
 
 const createMockDb = () => ({
@@ -298,6 +301,138 @@ describe("subscriptionService", () => {
             actorEmail: "actor@acme.com",
           }),
         ).rejects.toThrow(OrganizationNotFoundError);
+      });
+    });
+  });
+
+  describe("listInvoices()", () => {
+    describe("when organization has no stripeCustomerId", () => {
+      it("returns an empty array", async () => {
+        db.organization.findUnique.mockResolvedValue({
+          stripeCustomerId: null,
+        });
+
+        const result = await service.listInvoices({
+          organizationId: "org_no_stripe",
+        });
+
+        expect(result).toEqual([]);
+        expect(stripe.invoices.list).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when organization is not found", () => {
+      it("returns an empty array", async () => {
+        db.organization.findUnique.mockResolvedValue(null);
+
+        const result = await service.listInvoices({
+          organizationId: "org_missing",
+        });
+
+        expect(result).toEqual([]);
+      });
+    });
+
+    describe("when organization has a stripeCustomerId", () => {
+      it("returns mapped invoices excluding drafts", async () => {
+        db.organization.findUnique.mockResolvedValue({
+          stripeCustomerId: "cus_123",
+        });
+
+        stripe.invoices.list.mockResolvedValue({
+          data: [
+            {
+              id: "inv_1",
+              number: "INV-001",
+              created: 1700000000,
+              amount_due: 5000,
+              currency: "usd",
+              status: "paid",
+              invoice_pdf: "https://pdf.example.com/inv_1",
+              hosted_invoice_url: "https://hosted.example.com/inv_1",
+            },
+            {
+              id: "inv_2",
+              number: null,
+              created: 1700001000,
+              amount_due: 3000,
+              currency: "eur",
+              status: "draft",
+              invoice_pdf: null,
+              hosted_invoice_url: null,
+            },
+            {
+              id: "inv_3",
+              number: "INV-003",
+              created: 1700002000,
+              amount_due: 1000,
+              currency: "usd",
+              status: "open",
+              invoice_pdf: null,
+              hosted_invoice_url: "https://hosted.example.com/inv_3",
+            },
+          ],
+        });
+
+        const result = await service.listInvoices({
+          organizationId: "org_with_stripe",
+        });
+
+        expect(stripe.invoices.list).toHaveBeenCalledWith({
+          customer: "cus_123",
+          limit: 4,
+        });
+
+        expect(result).toEqual([
+          {
+            id: "inv_1",
+            number: "INV-001",
+            date: 1700000000,
+            amountDue: 5000,
+            currency: "usd",
+            status: "paid",
+            pdfUrl: "https://pdf.example.com/inv_1",
+            hostedUrl: "https://hosted.example.com/inv_1",
+          },
+          {
+            id: "inv_3",
+            number: "INV-003",
+            date: 1700002000,
+            amountDue: 1000,
+            currency: "usd",
+            status: "open",
+            pdfUrl: null,
+            hostedUrl: "https://hosted.example.com/inv_3",
+          },
+        ]);
+      });
+
+      it("maps null status to 'unknown'", async () => {
+        db.organization.findUnique.mockResolvedValue({
+          stripeCustomerId: "cus_456",
+        });
+
+        stripe.invoices.list.mockResolvedValue({
+          data: [
+            {
+              id: "inv_4",
+              number: null,
+              created: 1700003000,
+              amount_due: 0,
+              currency: "usd",
+              status: null,
+              invoice_pdf: null,
+              hosted_invoice_url: null,
+            },
+          ],
+        });
+
+        const result = await service.listInvoices({
+          organizationId: "org_null_status",
+        });
+
+        expect(result).toHaveLength(1);
+        expect(result[0]!.status).toBe("unknown");
       });
     });
   });

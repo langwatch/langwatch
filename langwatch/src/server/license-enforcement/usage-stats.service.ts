@@ -1,6 +1,8 @@
 import type { PrismaClient } from "@prisma/client";
+import { UNLIMITED_MESSAGES } from "../../../ee/billing/planLimits";
 import type { PlanInfo } from "../../../ee/licensing/planInfo";
 import type { PlanProvider } from "../app-layer/subscription/plan-provider";
+import type { UsageUnit } from "../app-layer/usage/usage-meter-policy";
 import { formatNumber, formatPercent } from "../../utils/formatNumber";
 import { getApp } from "../app-layer/app";
 import {
@@ -33,7 +35,8 @@ export function getMessageLimitStatus(
   current: number,
   max: number,
 ): MessageLimitStatus {
-  if (max === 0 || max === Number.MAX_SAFE_INTEGER) return "ok";
+  if (max === 0 || max === Number.MAX_SAFE_INTEGER || max >= UNLIMITED_MESSAGES)
+    return "ok";
   if (current >= max) return "exceeded";
   if (current >= max * MESSAGE_LIMIT_WARNING_THRESHOLD) return "warning";
   return "ok";
@@ -46,14 +49,16 @@ export function buildMessageLimitInfo(
   current: number,
   max: number,
 ): MessageLimitInfo {
-  const percentage = max > 0 ? current / max : 0;
   const status = getMessageLimitStatus(current, max);
   const currentFormatted = formatNumber(current);
-  const maxFormatted = formatNumber(max);
+  const isUnlimited = max >= UNLIMITED_MESSAGES;
+  const maxFormatted = isUnlimited ? "Unlimited" : formatNumber(max);
+  const percentage = max > 0 && !isUnlimited ? current / max : 0;
   const percentageFormatted = formatPercent(percentage);
 
-  const message =
-    status === "exceeded"
+  const message = isUnlimited
+    ? `You have used ${currentFormatted} messages this month (Unlimited plan).`
+    : status === "exceeded"
       ? `You reached the limit of ${maxFormatted} messages for this month, new messages will not be processed.`
       : `You have used ${percentageFormatted} of your monthly message limit (${currentFormatted} / ${maxFormatted}).`;
 
@@ -77,6 +82,16 @@ export interface ITraceUsageService {
 }
 
 /**
+ * Interface for resolving the usage unit (traces or events).
+ * Follows Interface Segregation Principle.
+ */
+export interface IUsageUnitResolver {
+  getResolvedUsageUnit(params: {
+    organizationId: string;
+  }): Promise<UsageUnit>;
+}
+
+/**
  * Usage statistics result for an organization.
  */
 export interface UsageStats {
@@ -96,6 +111,7 @@ export interface UsageStats {
   experimentsCount: number;
   evaluationsCreditUsed: number;
   messageLimitInfo: MessageLimitInfo;
+  usageUnit: UsageUnit;
 }
 
 /**
@@ -114,6 +130,7 @@ export class UsageStatsService {
     private readonly repository: ILicenseEnforcementRepository,
     private readonly traceUsageService: ITraceUsageService,
     private readonly planProvider: PlanProvider,
+    private readonly usageUnitResolver: IUsageUnitResolver,
   ) {}
 
   /**
@@ -126,6 +143,7 @@ export class UsageStatsService {
       repository,
       getApp().usage,
       getApp().planProvider,
+      getApp().usage,
     );
   }
 
@@ -153,6 +171,7 @@ export class UsageStatsService {
       agentsCount,
       experimentsCount,
       evaluationsCreditUsed,
+      usageUnit,
     ] = await Promise.all([
       this.repository.getProjectCount(organizationId),
       this.traceUsageService.getCurrentMonthCount({ organizationId }),
@@ -169,6 +188,7 @@ export class UsageStatsService {
       this.repository.getAgentCount(organizationId),
       this.repository.getExperimentCount(organizationId),
       this.repository.getEvaluationsCreditUsed(organizationId),
+      this.usageUnitResolver.getResolvedUsageUnit({ organizationId }),
     ]);
 
     const messageLimitInfo = buildMessageLimitInfo(
@@ -193,6 +213,7 @@ export class UsageStatsService {
       experimentsCount,
       evaluationsCreditUsed,
       messageLimitInfo,
+      usageUnit,
     };
   }
 

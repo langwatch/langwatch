@@ -22,4 +22,8 @@ export enum ScenarioRunStatus {
   PENDING = "PENDING",
   FAILED = "FAILED",
   STALLED = "STALLED",
+  /** BullMQ waiting state - job is queued but not yet picked up by a worker */
+  QUEUED = "QUEUED",
+  /** BullMQ active state - job is being executed by a worker */
+  RUNNING = "RUNNING",
 }

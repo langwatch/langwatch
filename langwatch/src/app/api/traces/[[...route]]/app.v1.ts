@@ -14,7 +14,7 @@ import { createLogger } from "~/utils/logger/server";
 import type { AuthMiddlewareVariables } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 import { coerceToEpoch, flexibleDateSchema } from "../../shared/schemas";
-import { getAllForProjectInput } from "~/server/api/routers/traces";
+import { getAllForProjectInput } from "~/server/api/routers/traces.schemas";
 
 const logger = createLogger("langwatch:api:traces");
 

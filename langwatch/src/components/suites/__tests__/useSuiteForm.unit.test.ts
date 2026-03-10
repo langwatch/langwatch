@@ -223,6 +223,74 @@ describe("useSuiteForm()", () => {
         expect(result.current.isTargetSelected("http", "agent_1")).toBe(false);
       });
     });
+
+    describe("when selectAllTargets is called", () => {
+      it("selects all filtered targets", () => {
+        const { result } = renderHook(() => useSuiteForm(baseParams));
+
+        act(() => {
+          result.current.selectAllTargets();
+        });
+
+        expect(result.current.selectedTargets).toEqual([
+          { type: "http", referenceId: "agent_1" },
+          { type: "prompt", referenceId: "prompt_1" },
+        ]);
+      });
+    });
+
+    describe("when selectAllTargets is called with existing selections", () => {
+      it("merges without duplicates", () => {
+        const { result } = renderHook(() => useSuiteForm(baseParams));
+
+        act(() => {
+          result.current.toggleTarget({
+            type: "http",
+            referenceId: "agent_1",
+          });
+        });
+        act(() => {
+          result.current.selectAllTargets();
+        });
+
+        expect(result.current.selectedTargets).toEqual([
+          { type: "http", referenceId: "agent_1" },
+          { type: "prompt", referenceId: "prompt_1" },
+        ]);
+      });
+    });
+
+    describe("when selectAllTargets is called with a search filter active", () => {
+      it("selects only filtered targets", () => {
+        const { result } = renderHook(() => useSuiteForm(baseParams));
+
+        act(() => {
+          result.current.setTargetSearch("prod");
+        });
+        act(() => {
+          result.current.selectAllTargets();
+        });
+
+        expect(result.current.selectedTargets).toEqual([
+          { type: "http", referenceId: "agent_1" },
+        ]);
+      });
+    });
+
+    describe("when clearTargets is called", () => {
+      it("removes all selected targets", () => {
+        const { result } = renderHook(() => useSuiteForm(baseParams));
+
+        act(() => {
+          result.current.selectAllTargets();
+        });
+        act(() => {
+          result.current.clearTargets();
+        });
+
+        expect(result.current.selectedTargets).toEqual([]);
+      });
+    });
   });
 
   describe("given scenario search filtering", () => {

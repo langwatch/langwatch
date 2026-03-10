@@ -1,3 +1,4 @@
+import type { ProcessRole } from "../../app-layer/config";
 import type { createLogger } from "../../../utils/logger/server";
 import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
 import type { CommandHandlerClass } from "../commands/commandHandlerClass";
@@ -18,7 +19,7 @@ import type { JobRegistryEntry } from "./queues/queueManager";
 export interface EventSourcingOptions<EventType extends Event = Event> {
   /**
    * Strategy for ordering events when building projections.
-   * Defaults to "timestamp" (chronological order).
+   * Defaults to "createdAt" (chronological order).
    */
   ordering?: EventOrderingStrategy<EventType>;
 }
@@ -97,5 +98,5 @@ export interface EventSourcingServiceOptions<
    * "web": skip BullMQ workers (only dispatch to queues)
    * "worker" | undefined: start all consumers
    */
-  processRole?: "web" | "worker";
+  processRole?: ProcessRole;
 }

@@ -25,7 +25,7 @@ const logger = createLogger("langwatch:analytics:aggregation-builder");
 /**
  * Returns a deduped FROM-clause expression for trace_summaries.
  *
- * trace_summaries uses ReplacingMergeTree(LastUpdatedAt) which can return
+ * trace_summaries uses ReplacingMergeTree(UpdatedAt) which can return
  * multiple versions of the same trace between merges. This wraps the table
  * in a subquery that keeps only the latest version per TraceId.
  *
@@ -36,7 +36,7 @@ function dedupedTraceSummaries(alias: string): string {
   return `(
     SELECT * FROM trace_summaries
     WHERE TenantId = {tenantId:String}
-    ORDER BY TraceId, LastUpdatedAt DESC
+    ORDER BY TraceId, UpdatedAt DESC
     LIMIT 1 BY TenantId, TraceId
   ) ${alias}`;
 }
@@ -470,19 +470,6 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   const simpleMetrics = metricTranslations.filter((m) => !m.requiresSubquery);
   const subqueryMetrics = metricTranslations.filter((m) => m.requiresSubquery);
 
-  // Warn if pipeline metrics will be dropped (only supported with timeScale "full")
-  if (subqueryMetrics.length > 0 && input.timeScale !== "full") {
-    // Pipeline metrics require CTEs and are only fully supported in "full" timeScale mode.
-    // When timeScale is numeric, they're omitted from the query. This is a known limitation.
-    logger.warn(
-      {
-        droppedMetrics: subqueryMetrics.map((m) => m.alias),
-        timeScale: input.timeScale,
-      },
-      "Pipeline metrics require timeScale='full' and will be omitted",
-    );
-  }
-
   // For timeScale "full" (summary queries), always use CTE-based query to ensure
   // both current and previous periods return data (even if one is empty)
   if (input.timeScale === "full") {
@@ -495,6 +482,22 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
       filterWhere,
       allTranslationParams,
     );
+  }
+
+  // Pipeline metrics with numeric timeScale: use date-bucketed two-level aggregation
+  if (subqueryMetrics.length > 0 && typeof input.timeScale === "number") {
+    return buildDateBucketedPipelineQuery({
+      input,
+      pipelineMetrics: subqueryMetrics,
+      groupByColumn,
+      groupByHandlesUnknown,
+      groupByAdditionalWhere,
+      joinClauses,
+      baseWhere,
+      filterWhere,
+      filterParams: allTranslationParams,
+      timeZone,
+    });
   }
 
   // Build SELECT expressions for standard query
@@ -901,6 +904,241 @@ function buildSubqueryTimeseriesQuery(
       ...(input.groupByKey ? { groupByKey: input.groupByKey } : {}),
     },
   };
+}
+
+/**
+ * Build a date-bucketed pipeline query for pipeline metrics with numeric timeScale.
+ * Uses CTE-based two-level (or three-level for nested) aggregation with date bucketing.
+ *
+ * NOTE: This is structurally different from buildSubqueryTimeseriesQuery (timeScale="full")
+ * which splits current/previous into separate CTEs joined via UNION ALL. Here, both periods
+ * coexist in one CTE using a CASE-based period column + date bucketing.
+ *
+ * Injection safety: All user-facing values (projectId, dates, groupByKey, filter values) go
+ * through ClickHouse parameterized placeholders ({tenantId:String}, etc.). The interpolated
+ * SQL fragments (subquery.innerSelect, outerAggregation, groupByColumn) are produced by
+ * translatePipelineAggregation/getGroupByExpression from typed enums and constant column
+ * references — never from raw user input.
+ *
+ * Output rows: period, date, [group_key,] <metric_alias>
+ */
+function buildDateBucketedPipelineQuery({
+  input,
+  pipelineMetrics,
+  groupByColumn,
+  groupByHandlesUnknown,
+  groupByAdditionalWhere,
+  joinClauses,
+  baseWhere,
+  filterWhere,
+  filterParams,
+  timeZone,
+}: {
+  input: TimeseriesQueryInput;
+  pipelineMetrics: MetricTranslation[];
+  groupByColumn: string | null;
+  groupByHandlesUnknown: boolean;
+  groupByAdditionalWhere: string | undefined;
+  joinClauses: string;
+  baseWhere: string;
+  filterWhere: string;
+  filterParams: Record<string, unknown>;
+  timeZone: string;
+}): BuiltQuery {
+  const ts = tableAliases.trace_summaries;
+  const dateTrunc = getDateTruncFunction(
+    input.timeScale as number,
+    timeZone,
+  );
+
+  const periodCase = `
+    CASE
+      WHEN ${ts}.OccurredAt >= {currentStart:DateTime64(3)} AND ${ts}.OccurredAt < {currentEnd:DateTime64(3)} THEN 'current'
+      WHEN ${ts}.OccurredAt >= {previousStart:DateTime64(3)} AND ${ts}.OccurredAt < {previousEnd:DateTime64(3)} THEN 'previous'
+    END`;
+
+  const groupKeyExpr = groupByColumn
+    ? groupByHandlesUnknown
+      ? `${groupByColumn} AS group_key`
+      : `if(${groupByColumn} IS NULL, 'unknown', toString(${groupByColumn})) AS group_key`
+    : null;
+
+  let fullFilterWhere = filterWhere;
+  if (groupByAdditionalWhere) {
+    fullFilterWhere += ` AND ${groupByAdditionalWhere}`;
+  }
+
+  // Skip HAVING group_key != '' for boolean fields and columns that already handle unknown
+  const skipGroupKeyHaving =
+    !groupByColumn ||
+    groupByHandlesUnknown ||
+    input.groupBy === "evaluations.evaluation_passed";
+
+  const ctes = pipelineMetrics.map((metric) =>
+    buildPipelineMetricCTE(metric, {
+      ts,
+      periodCase,
+      dateTrunc,
+      groupByColumn,
+      groupKeyExpr,
+      skipGroupKeyHaving,
+      joinClauses,
+      baseWhere,
+      fullFilterWhere,
+    }),
+  );
+
+  // Build final SELECT
+  let finalSelect: string;
+  if (pipelineMetrics.length === 1) {
+    const cteName = `cte_${pipelineMetrics[0]!.alias}`;
+    finalSelect = `SELECT * FROM ${cteName} WHERE period IS NOT NULL ORDER BY period, date`;
+  } else {
+    // Multiple pipeline metrics: FULL OUTER JOIN on (period, date[, group_key])
+    const firstCteName = `cte_${pipelineMetrics[0]!.alias}`;
+    const joinKeys = groupByColumn
+      ? ["period", "date", "group_key"]
+      : ["period", "date"];
+
+    let joinSql = firstCteName;
+    const selectCols = [
+      ...joinKeys.map((k) => `${firstCteName}.${k}`),
+      `${firstCteName}.${quoteIdentifier(pipelineMetrics[0]!.alias)}`,
+    ];
+
+    for (let i = 1; i < pipelineMetrics.length; i++) {
+      const cteName = `cte_${pipelineMetrics[i]!.alias}`;
+      const onClause = joinKeys
+        .map((k) => `${firstCteName}.${k} = ${cteName}.${k}`)
+        .join(" AND ");
+      joinSql += `\n    FULL OUTER JOIN ${cteName} ON ${onClause}`;
+      selectCols.push(`${cteName}.${quoteIdentifier(pipelineMetrics[i]!.alias)}`);
+    }
+
+    finalSelect = `SELECT ${selectCols.join(", ")} FROM ${joinSql} WHERE ${firstCteName}.period IS NOT NULL ORDER BY ${firstCteName}.period, ${firstCteName}.date`;
+  }
+
+  const sql = `
+    WITH
+      ${ctes.join(",\n      ")}
+    ${finalSelect}
+  `;
+
+  return {
+    sql,
+    params: {
+      tenantId: input.projectId,
+      currentStart: input.startDate,
+      currentEnd: input.endDate,
+      previousStart: input.previousPeriodStartDate,
+      previousEnd: input.startDate,
+      ...filterParams,
+      ...(input.groupByKey ? { groupByKey: input.groupByKey } : {}),
+    },
+  };
+}
+
+/** Shared context for building a pipeline metric CTE */
+interface PipelineCTEContext {
+  ts: string;
+  periodCase: string;
+  dateTrunc: string;
+  groupByColumn: string | null;
+  groupKeyExpr: string | null;
+  skipGroupKeyHaving: boolean;
+  joinClauses: string;
+  baseWhere: string;
+  fullFilterWhere: string;
+}
+
+/**
+ * Build a single pipeline metric CTE with date bucketing.
+ * Handles both standard 2-level and nested 3-level aggregations.
+ */
+function buildPipelineMetricCTE(
+  metric: MetricTranslation,
+  ctx: PipelineCTEContext,
+): string {
+  const subquery = metric.subquery!;
+  const cteName = `cte_${metric.alias}`;
+  const hasGroup = !!ctx.groupByColumn;
+  const groupPrefix = hasGroup ? "group_key, " : "";
+  const quotedAlias = quoteIdentifier(metric.alias);
+
+  // Outer aggregation expression (strip original alias, re-alias with quoting)
+  const outerAggExpr = subquery.outerAggregation.replace(
+    ` AS ${metric.alias}`,
+    "",
+  );
+
+  // Outer GROUP BY / HAVING
+  const outerGroupByCols = ["period", "date"];
+  if (hasGroup) outerGroupByCols.push("group_key");
+  const outerHaving =
+    !ctx.skipGroupKeyHaving ? "HAVING group_key != ''" : "";
+
+  // Inner select: the base scan with period/date bucketing
+  const baseSelectCols = [
+    `${ctx.periodCase} AS period`,
+    `${ctx.dateTrunc} AS date`,
+    ...(ctx.groupKeyExpr ? [ctx.groupKeyExpr] : []),
+  ];
+
+  const baseFrom = `
+          FROM ${dedupedTraceSummaries(ctx.ts)}
+          ${ctx.joinClauses}
+          WHERE ${ctx.baseWhere}
+            ${ctx.fullFilterWhere}`;
+
+  if (subquery.nestedSubquery) {
+    // 3-level aggregation (e.g., threads per user)
+    const nested = subquery.nestedSubquery;
+    const nestedHaving = nested.having ? `HAVING ${nested.having}` : "";
+
+    const level2GroupByCols = ["period", "date"];
+    if (hasGroup) level2GroupByCols.push("group_key");
+    level2GroupByCols.push(subquery.innerGroupBy);
+
+    return `
+      ${cteName} AS (
+        SELECT period, date, ${groupPrefix}${outerAggExpr} AS ${quotedAlias}
+        FROM (
+          SELECT period, date, ${groupPrefix}${subquery.innerSelect}
+          FROM (
+            SELECT
+              ${baseSelectCols.join(",\n              ")},
+              ${nested.select}
+            ${baseFrom}
+            GROUP BY period, date, ${groupPrefix}${nested.groupBy}
+            ${nestedHaving}
+          ) thread_data
+          GROUP BY ${level2GroupByCols.join(", ")}
+          HAVING ${subquery.innerGroupBy} IS NOT NULL AND toString(${subquery.innerGroupBy}) != ''
+        ) sub
+        GROUP BY ${outerGroupByCols.join(", ")}
+        ${outerHaving}
+      )`;
+  }
+
+  // Standard 2-level aggregation
+  const innerGroupByCols = ["period", "date"];
+  if (hasGroup) innerGroupByCols.push("group_key");
+  innerGroupByCols.push(subquery.innerGroupBy);
+
+  return `
+      ${cteName} AS (
+        SELECT period, date, ${groupPrefix}${outerAggExpr} AS ${quotedAlias}
+        FROM (
+          SELECT
+            ${baseSelectCols.join(",\n            ")},
+            ${subquery.innerSelect}
+          ${baseFrom}
+          GROUP BY ${innerGroupByCols.join(", ")}
+          HAVING ${subquery.innerGroupBy} IS NOT NULL AND toString(${subquery.innerGroupBy}) != ''
+        ) sub
+        GROUP BY ${outerGroupByCols.join(", ")}
+        ${outerHaving}
+      )`;
 }
 
 /** Maps source field names to their corresponding CTE column names */

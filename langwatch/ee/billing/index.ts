@@ -1,10 +1,12 @@
 import { prisma } from "../../src/server/db";
+import { env } from "../../src/env.mjs";
 import { createPlanLimitNotifier } from "./notifications/planLimitNotifier";
 import {
   clearBillingNotificationHandlers,
   notifySubscriptionEvent,
   setBillingNotificationHandlers,
 } from "./notifications/notificationHandlers";
+import { sendSlackLicensePurchaseNotification } from "./notifications/slackLicenseNotification";
 import { createSaaSPlanProvider } from "./planProvider";
 import { createCustomerService } from "./services/customerService";
 import { createSeatEventSubscriptionFns } from "./services/seatEventSubscription";
@@ -78,6 +80,18 @@ export const createStripeWebhookHandler = () => {
     itemCalculator: subscriptionItemCalculator,
     inviteApprover,
   });
+
+  const slackWebhookUrl = env.SLACK_CHANNEL_SUBSCRIPTIONS;
+  setBillingNotificationHandlers({
+    sendLicensePurchaseNotification: slackWebhookUrl
+      ? (payload) =>
+          sendSlackLicensePurchaseNotification({
+            payload,
+            webhookUrl: slackWebhookUrl,
+          })
+      : undefined,
+  });
+
   return createStripeWebhookHandlerFactory({ stripe: s, webhookService });
 };
 

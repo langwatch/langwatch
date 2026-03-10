@@ -1,6 +1,8 @@
 import { generate } from "@langwatch/ksuid";
 import type { MonitorService } from "~/server/app-layer/monitors/monitor.service";
-import type { AppCommands } from "~/server/event-sourcing/pipelineRegistry";
+import type { QueueSendOptions } from "../../../queues";
+import { makeJobId } from "../../evaluation-processing/commands/executeEvaluation.command";
+import type { ExecuteEvaluationCommandData } from "../../evaluation-processing/schemas/commands";
 import { KSUID_RESOURCES } from "../../../../../utils/constants";
 import { createLogger } from "../../../../../utils/logger/server";
 import type { ReactorContext, ReactorDefinition } from "../../../reactors/reactor.types";
@@ -13,7 +15,7 @@ const logger = createLogger(
 
 export interface EvaluationTriggerReactorDeps {
   monitors: MonitorService;
-  evaluation: AppCommands["evaluations"]["executeEvaluation"];
+  evaluation: (data: ExecuteEvaluationCommandData, options?: QueueSendOptions<ExecuteEvaluationCommandData>) => Promise<void>;
 }
 
 export function createEvaluationTriggerReactor(
@@ -40,8 +42,13 @@ export function createEvaluationTriggerReactor(
       // Guard: skip traces blocked by guardrail with no output
       if (foldState.blockedByGuardrail && !foldState.computedOutput) return;
 
-      // Guard: skip studio development traces TODO: test these are still hoisted
+      // Guard: skip non-application traces (evaluations, simulations, workflows, playground)
       const attrs = foldState.attributes ?? {};
+      const scope = attrs["langwatch.origin"];
+      if (scope && scope !== "application") {
+        return;
+      }
+      // TODO(2027): remove legacy guard once all traces have langwatch.origin
       if (
         attrs["langwatch.platform"] === "optimization_studio" &&
         attrs["langwatch.environment"] === "development"
@@ -63,7 +70,7 @@ export function createEvaluationTriggerReactor(
       for (const monitor of monitors) {
         const evaluationId = generate(KSUID_RESOURCES.EVALUATION).toString();
         try {
-          await deps.evaluation({
+          const payload: ExecuteEvaluationCommandData = {
             tenantId,
             traceId,
             evaluationId,
@@ -77,7 +84,25 @@ export function createEvaluationTriggerReactor(
             userId,
             customerId,
             labels,
-          });
+          };
+
+          const isThreadLevel =
+            monitor.threadIdleTimeout &&
+            monitor.threadIdleTimeout > 0 &&
+            threadId;
+
+          const sendOptions: QueueSendOptions<ExecuteEvaluationCommandData> | undefined =
+            isThreadLevel
+              ? {
+                  delay: monitor.threadIdleTimeout! * 1000,
+                  deduplication: {
+                    makeId: makeJobId,
+                    ttlMs: monitor.threadIdleTimeout! * 1000,
+                  },
+                }
+              : undefined;
+
+          await deps.evaluation(payload, sendOptions);
         } catch (error) {
           logger.error(
             {

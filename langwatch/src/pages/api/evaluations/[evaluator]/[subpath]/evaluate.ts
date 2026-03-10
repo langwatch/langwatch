@@ -492,7 +492,11 @@ export async function handleEvaluatorCall(
             ...(isGuardrail ? { passed: result!.passed ?? true } : {}),
           };
 
-  if (params.trace_id && !project.featureEventSourcingEvaluationIngestion) {
+  if (
+    params.trace_id &&
+    !project.featureEventSourcingEvaluationIngestion &&
+    !project.disableElasticSearchEvaluationWriting
+  ) {
     await updateEvaluationStatusInES({
       check: {
         evaluation_id: evaluationId,

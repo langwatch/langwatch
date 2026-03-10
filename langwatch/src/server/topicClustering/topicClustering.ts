@@ -16,7 +16,7 @@ import { getExtractedInput } from "../../utils/traceExtraction";
 import {
   getProjectModelProviders,
   prepareLitellmParams,
-} from "../api/routers/modelProviders";
+} from "../api/routers/modelProviders.utils";
 import { getApp } from "../app-layer/app";
 import { scheduleTopicClusteringNextPage } from "../background/queues/topicClusteringQueue";
 import { getClickHouseClient } from "../clickhouse/client";
@@ -360,7 +360,7 @@ async function fetchTracesFromClickHouse(
         SELECT *
         FROM trace_summaries
         WHERE ${whereClause}
-        ORDER BY TraceId, LastUpdatedAt DESC
+        ORDER BY TraceId, UpdatedAt DESC
         LIMIT 1 BY TraceId
       )
       ORDER BY OccurredAt DESC, TraceId ASC

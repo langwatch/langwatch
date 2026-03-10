@@ -496,6 +496,48 @@ describe("<SuiteSidebar/>", () => {
     });
   });
 
+  describe("when viewing the expanded sidebar (remove-redundant-suites-label)", () => {
+    const suites = [
+      makeSuite({ id: "suite_1", name: "Critical Path", slug: "critical-path" }),
+      makeSuite({ id: "suite_2", name: "Billing Edge", slug: "billing-edge" }),
+    ];
+
+    it("does not display a SUITES section header", () => {
+      render(<SuiteSidebar {...defaultProps} suites={suites} />, {
+        wrapper: Wrapper,
+      });
+
+      expect(screen.queryByText(/^SUITES$/)).not.toBeInTheDocument();
+    });
+
+    it("displays suite names", () => {
+      render(<SuiteSidebar {...defaultProps} suites={suites} />, {
+        wrapper: Wrapper,
+      });
+
+      expect(screen.getByText("Critical Path")).toBeInTheDocument();
+      expect(screen.getByText("Billing Edge")).toBeInTheDocument();
+    });
+
+    it("displays the search box", () => {
+      render(<SuiteSidebar {...defaultProps} suites={suites} />, {
+        wrapper: Wrapper,
+      });
+
+      expect(screen.getByPlaceholderText("Search...")).toBeInTheDocument();
+    });
+
+    it("displays the collapse button", () => {
+      render(<SuiteSidebar {...defaultProps} suites={suites} />, {
+        wrapper: Wrapper,
+      });
+
+      expect(
+        screen.getByRole("button", { name: "Collapse sidebar" }),
+      ).toBeInTheDocument();
+    });
+  });
+
   describe("collapsible sidebar", () => {
     const suites = [
       makeSuite({ id: "suite_1", name: "Critical Path", slug: "critical-path" }),

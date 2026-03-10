@@ -55,8 +55,8 @@ interface ClickHouseExperimentRunRecord {
 }
 
 type ClickHouseExperimentRunWriteRecord = WithDateWrites<
-  Omit<ClickHouseExperimentRunRecord, "CreatedAt" | "UpdatedAt">,
-  "StartedAt" | "FinishedAt" | "StoppedAt"
+  ClickHouseExperimentRunRecord,
+  "CreatedAt" | "UpdatedAt" | "StartedAt" | "FinishedAt" | "StoppedAt"
 >;
 
 export class ExperimentRunStateRepositoryClickHouse<
@@ -83,6 +83,8 @@ export class ExperimentRunStateRepositoryClickHouse<
       AvgScoreBps: record.AvgScoreBps,
       PassRateBps: record.PassRateBps,
       Targets: record.Targets,
+      CreatedAt: Number(record.CreatedAt),
+      UpdatedAt: Number(record.UpdatedAt),
       StartedAt: record.StartedAt === null ? null : Number(record.StartedAt),
       FinishedAt: record.FinishedAt === null ? null : Number(record.FinishedAt),
       StoppedAt: record.StoppedAt === null ? null : Number(record.StoppedAt),
@@ -117,7 +119,9 @@ export class ExperimentRunStateRepositoryClickHouse<
       AvgScoreBps: data.AvgScoreBps,
       PassRateBps: data.PassRateBps,
       Targets: data.Targets,
-      StartedAt: data.StartedAt != null ? new Date(data.StartedAt) : null,
+      CreatedAt: new Date(data.CreatedAt),
+      UpdatedAt: new Date(data.UpdatedAt),
+      StartedAt: new Date(data.StartedAt ?? data.CreatedAt),
       FinishedAt: data.FinishedAt != null ? new Date(data.FinishedAt) : null,
       StoppedAt: data.StoppedAt != null ? new Date(data.StoppedAt) : null,
       LastProcessedEventId: lastProcessedEventId,
@@ -239,8 +243,6 @@ export class ExperimentRunStateRepositoryClickHouse<
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
 
-      logger.debug({ tenantId: context.tenantId, runId, projectionId: projection.id },
-        "Stored experiment run state projection to ClickHouse");
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);

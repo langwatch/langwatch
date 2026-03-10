@@ -6,6 +6,7 @@
  */
 
 import { Currency } from "@prisma/client";
+import { UNLIMITED_MESSAGES } from "../../../ee/billing/planLimits";
 import { formatNumber } from "~/utils/formatNumber";
 
 export type { Currency } from "../../../ee/billing/pricing";
@@ -26,13 +27,20 @@ export const currencySymbol: Record<Currency, string> = {
   [Currency.USD]: "$",
 };
 
+/** Returns the per-100K events pricing string for the given currency. */
+const growthEventsPricingString = (currency: Currency): string =>
+  currency === Currency.EUR
+    ? "\u20AC5 per additional 100,000 events"
+    : "$6 per additional 100,000 events";
+
 /**
- * Growth plan features for upgrade block
+ * Growth plan features for upgrade block.
+ * Accepts a currency so the events pricing line is accurate.
  */
-export const GROWTH_FEATURES = [
+export const getGrowthFeatures = (currency: Currency): string[] => [
   "Up to 20 core users",
   "200,000 events included",
-  "$1 per additional 100,000 events",
+  growthEventsPricingString(currency),
   "Unlimited lite users",
   "30 days retention",
   "Unlimited evals",
@@ -53,10 +61,14 @@ export const FREE_PLAN_FEATURES = [
   "Community support",
 ];
 
-export const GROWTH_PLAN_FEATURES = [
+/**
+ * Plan comparison page feature list for Growth.
+ * Accepts a currency so the events pricing line is accurate.
+ */
+export const getGrowthPlanFeatures = (currency: Currency): string[] => [
   "Everything in Free",
   "200,000 events included",
-  "$1 per additional 100,000 events",
+  growthEventsPricingString(currency),
   "30 days retention (+ custom at $3/GB)",
   "Up to 20 core users (volume discount available)",
   "Unlimited lite users",
@@ -96,9 +108,11 @@ export function buildTieredCapabilities({
       ? `Up to ${formatNumber(maxMembers)} core users`
       : "Custom core user limits";
   const eventsText =
-    maxMessagesPerMonth > 0
-      ? `${formatNumber(maxMessagesPerMonth)} events included`
-      : "Custom event limits";
+    maxMessagesPerMonth >= UNLIMITED_MESSAGES
+      ? "Unlimited events"
+      : maxMessagesPerMonth > 0
+        ? `${formatNumber(maxMessagesPerMonth)} events included`
+        : "Custom event limits";
   const projectsText =
     maxProjects >= 9999
       ? "Unlimited projects"

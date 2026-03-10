@@ -67,7 +67,7 @@ Feature: Settings Plans Comparison Page
       | detail                        | value                                |
       | base price                    | $29 per seat per month               |
       | included events               | 200,000                              |
-      | extra event pricing           | $1 per additional 100,000 events     |
+      | extra event pricing           | $6 per additional 100,000 events     |
       | included data retention       | 30 days                              |
       | custom retention              | $3 per GB                            |
       | core users                    | up to 20 with volume discount        |

@@ -40,7 +40,7 @@ import {
   getProjectModelProviders,
   prepareEnvKeys,
   prepareLitellmParams,
-} from "../../api/routers/modelProviders";
+} from "../../api/routers/modelProviders.utils";
 import { prisma } from "../../db";
 import {
   DEFAULT_MAPPINGS,

@@ -21,6 +21,26 @@ export const RUN_GROUP_TYPES = ["none", "scenario", "target"] as const;
 /** The grouping dimension applied to scenario runs. */
 export type RunGroupType = (typeof RUN_GROUP_TYPES)[number];
 
+/** Identifies which view is rendering, to determine available group-by options. */
+export type RunViewContext = "suite" | "external" | "all-runs";
+
+/**
+ * Returns the group-by options available for a given view context.
+ *
+ * External sets omit "target" since they have no target resolution.
+ * Suite and all-runs views include all options.
+ */
+export function availableGroupByOptions({
+  viewContext,
+}: {
+  viewContext: RunViewContext;
+}): RunGroupType[] {
+  if (viewContext === "external") {
+    return ["none", "scenario"];
+  }
+  return ["none", "scenario", "target"];
+}
+
 /** A generic group of scenario runs with a consistent shape across all grouping modes. */
 export type RunGroup = {
   groupKey: string;
@@ -45,6 +65,7 @@ export type RunGroupSummary = {
   cancelledCount: number;
   totalCount: number;
   inProgressCount: number;
+  queuedCount: number;
 };
 
 /** Backward-compatible alias for RunGroupSummary. */
@@ -55,11 +76,13 @@ export type RunHistoryTotals = {
   runCount: number;
   passedCount: number;
   failedCount: number;
+  pendingCount: number;
 };
 
 /** Returns the most severe status for a group summary, used for the overall icon. */
 export function worstStatus(summary: RunGroupSummary): ScenarioRunStatus {
   if (summary.inProgressCount > 0) return ScenarioRunStatus.IN_PROGRESS;
+  if (summary.queuedCount > 0) return ScenarioRunStatus.QUEUED;
   if (summary.stalledCount > 0) return ScenarioRunStatus.STALLED;
   if (summary.failedCount > 0) return ScenarioRunStatus.FAILED;
   if (summary.cancelledCount > 0) return ScenarioRunStatus.CANCELLED;
@@ -67,7 +90,7 @@ export function worstStatus(summary: RunGroupSummary): ScenarioRunStatus {
 }
 
 
-type RunStatusCategory = "success" | "failure" | "stalled" | "cancelled" | "in_progress";
+type RunStatusCategory = "success" | "failure" | "stalled" | "cancelled" | "in_progress" | "queued";
 
 function categorizeRunStatus(status: ScenarioRunStatus): RunStatusCategory {
   switch (status) {
@@ -82,7 +105,10 @@ function categorizeRunStatus(status: ScenarioRunStatus): RunStatusCategory {
       return "cancelled";
     case ScenarioRunStatus.IN_PROGRESS:
     case ScenarioRunStatus.PENDING:
+    case ScenarioRunStatus.RUNNING:
       return "in_progress";
+    case ScenarioRunStatus.QUEUED:
+      return "queued";
   }
 }
 
@@ -262,6 +288,7 @@ export function computeGroupSummary({
   let stalledCount = 0;
   let cancelledCount = 0;
   let inProgressCount = 0;
+  let queuedCount = 0;
 
   for (const run of group.scenarioRuns) {
     switch (categorizeRunStatus(run.status)) {
@@ -280,6 +307,9 @@ export function computeGroupSummary({
       case "in_progress":
         inProgressCount++;
         break;
+      case "queued":
+        queuedCount++;
+        break;
     }
   }
 
@@ -294,6 +324,7 @@ export function computeGroupSummary({
     cancelledCount,
     totalCount: group.scenarioRuns.length,
     inProgressCount,
+    queuedCount,
   };
 }
 
@@ -382,6 +413,30 @@ export function buildDisplayTitle({
 }
 
 /**
+ * Resolves the origin label for a batch run in the All Runs panel.
+ *
+ * - Suite runs (matching __internal__<suiteId>__suite pattern): returns the suite name from suiteNameMap
+ * - External runs: returns the raw scenario set ID as the label
+ * - No set ID: returns null
+ */
+export function resolveOriginLabel({
+  scenarioSetId,
+  suiteNameMap,
+}: {
+  scenarioSetId: string | undefined;
+  suiteNameMap: Map<string, string>;
+}): string | null {
+  if (!scenarioSetId) return null;
+
+  if (!isSuiteSetId(scenarioSetId)) return scenarioSetId;
+
+  const suiteId = extractSuiteId(scenarioSetId);
+  if (!suiteId) return null;
+
+  return suiteNameMap.get(suiteId) ?? null;
+}
+
+/**
  * Computes aggregate totals from raw scenario runs.
  * Works regardless of grouping mode since it operates on flat runs.
  */
@@ -392,17 +447,20 @@ export function computeRunHistoryTotals({
 }): RunHistoryTotals {
   let passedCount = 0;
   let failedCount = 0;
+  let pendingCount = 0;
 
   for (const run of runs) {
     const category = categorizeRunStatus(run.status);
     if (category === "success") passedCount++;
     else if (category === "failure" || category === "stalled" || category === "cancelled") failedCount++;
+    else if (category === "queued" || category === "in_progress") pendingCount++;
   }
 
   return {
     runCount: runs.length,
     passedCount,
     failedCount,
+    pendingCount,
   };
 }
 

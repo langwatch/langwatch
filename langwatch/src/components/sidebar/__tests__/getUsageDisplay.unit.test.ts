@@ -4,47 +4,51 @@ import { getUsageDisplay } from "../UsageIndicator";
 
 describe("getUsageDisplay()", () => {
   describe("given self-hosted (isSaaS = false)", () => {
-    it("returns visible with 'traces' unit label", () => {
+    it("returns visible with the provided usage unit", () => {
       const result = getUsageDisplay({
         isSaaS: false,
         pricingModel: undefined,
         isFree: false,
+        usageUnit: "traces",
       });
 
       expect(result).toEqual({ visible: true, unitLabel: "traces" });
     });
 
-    it("returns visible regardless of pricing model or plan", () => {
+    it("returns visible with events usage unit", () => {
       const result = getUsageDisplay({
         isSaaS: false,
-        pricingModel: PricingModel.SEAT_EVENT,
-        isFree: false,
+        pricingModel: undefined,
+        isFree: true,
+        usageUnit: "events",
       });
 
-      expect(result).toEqual({ visible: true, unitLabel: "traces" });
+      expect(result).toEqual({ visible: true, unitLabel: "events" });
     });
   });
 
   describe("given SaaS (isSaaS = true)", () => {
     describe("given TIERED pricing model", () => {
       describe("when plan is free", () => {
-        it("returns visible with 'traces' unit label", () => {
+        it("returns visible with the provided usage unit", () => {
           const result = getUsageDisplay({
             isSaaS: true,
             pricingModel: PricingModel.TIERED,
             isFree: true,
+            usageUnit: "events",
           });
 
-          expect(result).toEqual({ visible: true, unitLabel: "traces" });
+          expect(result).toEqual({ visible: true, unitLabel: "events" });
         });
       });
 
       describe("when plan is paid", () => {
-        it("returns visible with 'traces' unit label", () => {
+        it("returns visible with the provided usage unit", () => {
           const result = getUsageDisplay({
             isSaaS: true,
             pricingModel: PricingModel.TIERED,
             isFree: false,
+            usageUnit: "traces",
           });
 
           expect(result).toEqual({ visible: true, unitLabel: "traces" });
@@ -54,11 +58,12 @@ describe("getUsageDisplay()", () => {
 
     describe("given SEAT_EVENT pricing model", () => {
       describe("when plan is free", () => {
-        it("returns visible with 'events' unit label", () => {
+        it("returns visible with the provided usage unit", () => {
           const result = getUsageDisplay({
             isSaaS: true,
             pricingModel: PricingModel.SEAT_EVENT,
             isFree: true,
+            usageUnit: "events",
           });
 
           expect(result).toEqual({ visible: true, unitLabel: "events" });
@@ -71,6 +76,7 @@ describe("getUsageDisplay()", () => {
             isSaaS: true,
             pricingModel: PricingModel.SEAT_EVENT,
             isFree: false,
+            usageUnit: "events",
           });
 
           expect(result).toEqual({ visible: false });
@@ -80,11 +86,12 @@ describe("getUsageDisplay()", () => {
 
     describe("given no pricing model", () => {
       describe("when pricingModel is undefined", () => {
-        it("returns visible with 'traces' unit label", () => {
+        it("returns visible with the provided usage unit", () => {
           const result = getUsageDisplay({
             isSaaS: true,
             pricingModel: undefined,
             isFree: false,
+            usageUnit: "traces",
           });
 
           expect(result).toEqual({ visible: true, unitLabel: "traces" });
@@ -92,17 +99,17 @@ describe("getUsageDisplay()", () => {
       });
 
       describe("when pricingModel is null", () => {
-        it("returns visible with 'traces' unit label", () => {
+        it("returns visible with the provided usage unit", () => {
           const result = getUsageDisplay({
             isSaaS: true,
             pricingModel: null,
             isFree: false,
+            usageUnit: "events",
           });
 
-          expect(result).toEqual({ visible: true, unitLabel: "traces" });
+          expect(result).toEqual({ visible: true, unitLabel: "events" });
         });
       });
     });
   });
 });
-

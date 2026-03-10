@@ -54,7 +54,8 @@ export interface SimulationRunStateData {
   CreatedAt: number;
   UpdatedAt: number;
   FinishedAt: number | null;
-  DeletedAt: number | null;
+  ArchivedAt: number | null;
+  LastSnapshotOccurredAt: number;
 }
 
 export interface SimulationRunState extends Projection<SimulationRunStateData> {
@@ -82,7 +83,8 @@ function init(): SimulationRunStateData {
     CreatedAt: Date.now(),
     UpdatedAt: Date.now(),
     FinishedAt: null,
-    DeletedAt: null,
+    ArchivedAt: null,
+    LastSnapshotOccurredAt: 0,
   };
 }
 
@@ -101,24 +103,28 @@ function apply(
       Description: event.data.description ?? null,
       Status: "IN_PROGRESS",
       StartedAt: event.occurredAt,
-      UpdatedAt: event.occurredAt,
+      UpdatedAt: Date.now(),
     };
   }
 
   if (isSimulationMessageSnapshotEvent(event)) {
-    // Out-of-order protection: ignore snapshots older than current state
-    if (event.occurredAt <= state.UpdatedAt) return state;
+    // Out-of-order protection: ignore snapshots older than the latest applied
+    if (event.occurredAt <= state.LastSnapshotOccurredAt) return state;
 
     return {
       ...state,
       ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
+      // Default StartedAt from event.occurredAt if snapshot arrives before started event
+      StartedAt: state.StartedAt ?? event.occurredAt,
+      LastSnapshotOccurredAt: event.occurredAt,
       Messages: event.data.messages.map((m) => {
-        const { id, role, content, trace_id, ...restFields } = m as Record<
-          string,
-          unknown
-        >;
+        const { id, role, content, trace_id, ...restFields } = m;
+
         const rest =
-          Object.keys(restFields).length > 0 ? JSON.stringify(restFields) : "";
+          Object.keys(restFields).length > 0
+            ? JSON.stringify(restFields)
+            : "";
+
         return {
           Id: typeof id === "string" ? id : "",
           Role: typeof role === "string" ? role : "",
@@ -129,7 +135,7 @@ function apply(
       }),
       TraceIds: Array.isArray(event.data.traceIds) ? event.data.traceIds : [],
       Status: event.data.status ?? state.Status,
-      UpdatedAt: event.occurredAt,
+      UpdatedAt: Date.now(),
     };
   }
 
@@ -160,7 +166,7 @@ function apply(
       Error: results?.error ?? null,
       DurationMs: event.data.durationMs ?? null,
       FinishedAt: event.occurredAt,
-      UpdatedAt: event.occurredAt,
+      UpdatedAt: Date.now(),
     };
   }
 
@@ -168,8 +174,8 @@ function apply(
     return {
       ...state,
       ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
-      DeletedAt: event.occurredAt,
-      UpdatedAt: event.occurredAt,
+      ArchivedAt: Date.now(),
+      UpdatedAt: Date.now(),
     };
   }
 

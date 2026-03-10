@@ -29,6 +29,8 @@ export const KSUID_RESOURCES = {
   PROJECT: "project",
   SCENARIO_BATCH: "scenariobatch",
   SPAN: "span",
+  LOG_RECORD: "logrecord",
+  METRIC_RECORD: "metricrecord",
   TRACE_SUMMARY: "tracesummary",
   TRACKED_EVENT: "trackedevent",
   USER: "user",

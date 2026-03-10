@@ -124,31 +124,40 @@ export class QueueManager<EventType extends Event = Event> {
     const globalQueue = this.globalQueue;
     const pipelineName = this.pipelineName;
 
+    const stripInternal = (payload: any) => {
+      const { __pipelineName: _p, __jobType: _t, __jobName: _n, ...clean } = payload;
+      return clean;
+    };
+
     // Namespace dedup IDs to avoid cross-pipeline/cross-type collisions
-    const namespacedDedup: DeduplicationConfig<any> | undefined =
-      entry.deduplication
-        ? {
-            ...entry.deduplication,
-            makeId: (payload: any) => {
-              const { __pipelineName: _p, __jobType: _t, __jobName: _n, ...clean } = payload;
-              return `${pipelineName}/${jobType}/${jobName}/${entry.deduplication!.makeId(clean)}`;
-            },
-          }
-        : undefined;
+    const namespaceDedup = (dedup: DeduplicationConfig<any>): DeduplicationConfig<any> => ({
+      ...dedup,
+      makeId: (payload: any) =>
+        `${pipelineName}/${jobType}/${jobName}/${dedup.makeId(stripInternal(payload))}`,
+    });
+
+    const namespacedEntryDedup: DeduplicationConfig<any> | undefined =
+      entry.deduplication ? namespaceDedup(entry.deduplication) : undefined;
 
     const facade: EventSourcedQueueProcessor<P> = {
       send: async (payload: P, options?: QueueSendOptions<P>) => {
+        const effectiveDedup = options?.deduplication
+          ? namespaceDedup(options.deduplication as DeduplicationConfig<any>)
+          : namespacedEntryDedup;
+
         await globalQueue.send(
           { ...payload, __pipelineName: pipelineName, __jobType: jobType, __jobName: jobName },
           {
             delay: options?.delay ?? entry.delay,
-            deduplication:
-              (options?.deduplication as DeduplicationConfig<any> | undefined) ??
-              namespacedDedup,
+            deduplication: effectiveDedup,
           },
         );
       },
       sendBatch: async (payloads: P[], options?: QueueSendOptions<P>) => {
+        const effectiveDedup = options?.deduplication
+          ? namespaceDedup(options.deduplication as DeduplicationConfig<any>)
+          : namespacedEntryDedup;
+
         await globalQueue.sendBatch(
           payloads.map((p) => ({
             ...p,
@@ -158,9 +167,7 @@ export class QueueManager<EventType extends Event = Event> {
           })),
           {
             delay: options?.delay ?? entry.delay,
-            deduplication:
-              (options?.deduplication as DeduplicationConfig<any> | undefined) ??
-              namespacedDedup,
+            deduplication: effectiveDedup,
           },
         );
       },
@@ -184,6 +191,7 @@ export class QueueManager<EventType extends Event = Event> {
         spanAttributes?: (event: EventType) => Record<string, string | number | boolean>;
         disabled?: boolean;
         killSwitch?: KillSwitchOptions;
+        groupKeyFn?: (event: EventType) => string;
       };
     }>,
     onEvent: (
@@ -204,10 +212,13 @@ export class QueueManager<EventType extends Event = Event> {
         continue;
       }
 
+      const customGroupKeyFn = handlerDef.options.groupKeyFn;
+      const groupKeyFn = customGroupKeyFn
+        ? (event: any) => `${String(event.tenantId)}:${customGroupKeyFn(event)}`
+        : (event: any) => `${String(event.tenantId)}:${event.aggregateType}:${String(event.aggregateId)}`;
       const entry: JobRegistryEntry = {
-        groupKeyFn: (event: any) =>
-          `${String(event.tenantId)}:${event.aggregateType}:${String(event.aggregateId)}`,
-        scoreFn: (event: any) => event.timestamp,
+        groupKeyFn,
+        scoreFn: (event: any) => event.createdAt,
         process: async (event: any) => {
           await onEvent(handlerName, event, {
             tenantId: event.tenantId,
@@ -216,7 +227,9 @@ export class QueueManager<EventType extends Event = Event> {
         delay: handlerDef.options.delay,
         deduplication: resolveDeduplicationStrategy(
           handlerDef.options.deduplication,
-          this.createDefaultDeduplicationId.bind(this),
+          customGroupKeyFn
+            ? (event: EventType) => `${String(event.tenantId)}:${customGroupKeyFn(event)}`
+            : this.createDefaultDeduplicationId.bind(this),
         ),
         spanAttributes: handlerDef.options.spanAttributes,
       };
@@ -262,7 +275,7 @@ export class QueueManager<EventType extends Event = Event> {
               `${String(event.tenantId)}:${customGroupKeyFn(event)}`
           : (event: any) =>
               `${String(event.tenantId)}:${event.aggregateType}:${String(event.aggregateId)}`,
-        scoreFn: (event: any) => event.timestamp,
+        scoreFn: (event: any) => event.createdAt,
         process: async (event: any) => {
           await onEvent(projectionName, event, {
             tenantId: event.tenantId,
@@ -307,6 +320,7 @@ export class QueueManager<EventType extends Event = Event> {
       handler: CommandHandler<Command<any>, EventType>;
       schema: CommandSchema<any, CommandType>;
       getAggregateId: (payload: any) => string;
+      getGroupKey?: (payload: any) => string;
       options: CommandHandlerOptions<any>;
       commandName: string;
       commandType: CommandType;
@@ -328,6 +342,10 @@ export class QueueManager<EventType extends Event = Event> {
         registration.options?.getAggregateId ??
         handlerClass.getAggregateId.bind(handlerClass);
 
+      const getGroupKey =
+        registration.options?.getGroupKey ??
+        handlerClass.getGroupKey?.bind(handlerClass);
+
       const commandName = handlerClass.dispatcherName ?? registration.name;
 
       if (this.queues.has(this.key("command", commandName))) {
@@ -342,6 +360,7 @@ export class QueueManager<EventType extends Event = Event> {
         handler: handlerInstance,
         schema,
         getAggregateId,
+        getGroupKey,
         options: registration.options ?? {},
         commandName,
         commandType,
@@ -363,15 +382,15 @@ export class QueueManager<EventType extends Event = Event> {
           | DeduplicationStrategy<any>
           | undefined,
         (payload: any) => {
-          const aggregateId = cmdEntry.getAggregateId(payload);
-          return `${String(payload.tenantId)}:${this.aggregateType}:${String(aggregateId)}`;
+          const key = cmdEntry.getGroupKey ? cmdEntry.getGroupKey(payload) : cmdEntry.getAggregateId(payload);
+          return `${String(payload.tenantId)}:${this.aggregateType}:${String(key)}`;
         },
       );
 
       const jobEntry: JobRegistryEntry = {
         groupKeyFn: (payload: any) => {
-          const aggregateId = cmdEntry.getAggregateId(payload);
-          return `${String(payload.tenantId)}:${this.aggregateType}:${String(aggregateId)}`;
+          const key = cmdEntry.getGroupKey ? cmdEntry.getGroupKey(payload) : cmdEntry.getAggregateId(payload);
+          return `${String(payload.tenantId)}:${this.aggregateType}:${String(key)}`;
         },
         scoreFn: (payload: any) => payload.occurredAt as number,
         process: async (payload: any) => {
@@ -471,7 +490,7 @@ export class QueueManager<EventType extends Event = Event> {
       const entry: JobRegistryEntry = {
         groupKeyFn: (payload: any) =>
           `${String(payload.event.tenantId)}:${payload.event.aggregateType}:${String(payload.event.aggregateId)}`,
-        scoreFn: (payload: any) => payload.event.timestamp,
+        scoreFn: (payload: any) => payload.event.createdAt,
         process: async (payload: any) => {
           await onEvent(reactorName, payload, {
             tenantId: payload.event.tenantId,
