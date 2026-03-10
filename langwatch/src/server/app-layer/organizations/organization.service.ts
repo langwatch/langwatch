@@ -1,10 +1,6 @@
-import type { PrismaClient } from "@prisma/client";
-import { traced } from "../tracing";
-import { PrismaOrganizationRepository } from "./repositories/organization.prisma.repository";
-import {
-  NullOrganizationRepository,
-  type OrganizationRepository,
-  type OrganizationWithAdmins,
+import type {
+  OrganizationRepository,
+  OrganizationWithAdmins,
 } from "./repositories/organization.repository";
 
 export type OrganizationFeatureName = "billable_events_usage";
@@ -13,14 +9,7 @@ export type OrganizationFeatureName = "billable_events_usage";
  * Organization-level queries: feature checks, project lookups, org-from-team resolution.
  */
 export class OrganizationService {
-  private constructor(private readonly repo: OrganizationRepository) {}
-
-  static create(prisma: PrismaClient | null): OrganizationService {
-    const repo = prisma
-      ? new PrismaOrganizationRepository(prisma)
-      : new NullOrganizationRepository();
-    return traced(new OrganizationService(repo), "OrganizationService");
-  }
+  constructor(private readonly repo: OrganizationRepository) {}
 
   async getOrganizationIdByTeamId(teamId: string): Promise<string | null> {
     return this.repo.getOrganizationIdByTeamId(teamId);

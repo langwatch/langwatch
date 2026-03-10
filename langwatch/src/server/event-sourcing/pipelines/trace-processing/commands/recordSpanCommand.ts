@@ -23,6 +23,7 @@ import type { OtlpSpan } from "../schemas/otlp";
 import { OtlpSpanCostEnrichmentService, createCostEnrichmentDeps } from "~/server/app-layer/traces/span-cost-enrichment.service";
 import { OtlpSpanPiiRedactionService } from "~/server/app-layer/traces/span-pii-redaction.service";
 import { OtlpSpanTokenEstimationService } from "~/server/app-layer/traces/span-token-estimation.service";
+import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
 import { featureFlagService } from "~/server/featureFlag";
 import { TraceRequestUtils } from "../utils/traceRequest.utils";
 
@@ -55,11 +56,12 @@ function createDefaultDependencies(): RecordSpanCommandDependencies {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { prisma } = require("~/server/db") as { prisma: import("@prisma/client").PrismaClient };
   return {
-    piiRedactionService: OtlpSpanPiiRedactionService.create(),
-    costEnrichmentService: OtlpSpanCostEnrichmentService.create(
+    piiRedactionService: new OtlpSpanPiiRedactionService(),
+    costEnrichmentService: new OtlpSpanCostEnrichmentService(
       createCostEnrichmentDeps(prisma),
     ),
-    tokenEstimationService: OtlpSpanTokenEstimationService.create({
+    tokenEstimationService: new OtlpSpanTokenEstimationService({
+      tokenizer: new TiktokenClient(),
       featureFlagService,
     }),
   };

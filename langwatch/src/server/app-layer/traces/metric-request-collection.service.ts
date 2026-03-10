@@ -13,8 +13,6 @@ import {
   normalizeOtlpAttributeMap,
 } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
 import { decodeBase64OpenTelemetryId } from "../../tracer/utils";
-import { traced } from "../tracing";
-
 export interface MetricRequestCollectionDeps {
   recordMetric: (data: RecordMetricCommandData) => Promise<void>;
 }
@@ -28,15 +26,6 @@ export class MetricRequestCollectionService {
   );
 
   constructor(private readonly deps: MetricRequestCollectionDeps) {}
-
-  static create(
-    deps: MetricRequestCollectionDeps,
-  ): MetricRequestCollectionService {
-    return traced(
-      new MetricRequestCollectionService(deps),
-      "MetricRequestCollectionService",
-    );
-  }
 
   async handleOtlpMetricRequest({
     tenantId,

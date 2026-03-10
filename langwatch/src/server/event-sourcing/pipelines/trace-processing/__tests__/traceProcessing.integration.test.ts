@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
+import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
 import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
+import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
 import type { AggregateType } from "../../../";
 import { definePipeline } from "../../../";
 import {
@@ -118,8 +120,8 @@ function createTraceTestPipeline(): PipelineWithCommandHandlers<
     redis: redisConnection,
   });
 
-  const spanAppendStore = new SpanAppendStore(SpanStorageService.create(clickHouseClient).repository);
-  const traceSummaryStore = new TraceSummaryStore(TraceSummaryService.create(clickHouseClient).repository);
+  const spanAppendStore = new SpanAppendStore(new SpanStorageService(new SpanStorageClickHouseRepository(clickHouseClient)).repository);
+  const traceSummaryStore = new TraceSummaryStore(new TraceSummaryService(new TraceSummaryClickHouseRepository(clickHouseClient)).repository);
 
   const pipelineDefinition = definePipeline<TraceProcessingEvent>()
     .withName(pipelineName)

@@ -30,12 +30,6 @@ export class SpanNormalizationPipelineService {
     private readonly canonicalizeSpanAttributesService: CanonicalizeSpanAttributesService,
   ) {}
 
-  static create(): SpanNormalizationPipelineService {
-    return new SpanNormalizationPipelineService(
-      new CanonicalizeSpanAttributesService(),
-    );
-  }
-
   normalizeSpanReceived(
     tenantId: string,
     otlpSpan: OtlpSpan,
