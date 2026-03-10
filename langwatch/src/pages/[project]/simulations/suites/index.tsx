@@ -66,7 +66,11 @@ function SuitesPageContent() {
   );
 
   const { data: externalSets } = api.scenarios.getExternalSetSummaries.useQuery(
-    { projectId: project?.id ?? "" },
+    {
+      projectId: project?.id ?? "",
+      startDate: period.startDate.getTime(),
+      endDate: period.endDate.getTime(),
+    },
     { enabled: !!project, refetchInterval: 15000 },
   );
 
