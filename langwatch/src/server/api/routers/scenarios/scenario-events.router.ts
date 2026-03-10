@@ -131,15 +131,16 @@ async function fetchSuiteRunData({
 export const scenarioEventsRouter = createTRPCRouter({
   // Get scenario sets data for a project
   getScenarioSetsData: protectedProcedure
-    .input(projectSchema)
+    .input(projectSchema.extend(dateRangeFields))
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
       logger.debug({ projectId: input.projectId }, "Fetching scenario sets data");
       const service = SimulationService.create(ctx.prisma);
-      const data = await service.getScenarioSetsDataForProject({
+      return service.getScenarioSetsDataForProject({
         projectId: input.projectId,
+        startDate: input.startDate,
+        endDate: input.endDate,
       });
-      return data;
     }),
 
   // Unified endpoint: fetches suite run data for a single suite or all suites
@@ -323,13 +324,15 @@ export const scenarioEventsRouter = createTRPCRouter({
 
   // Get summaries for external (SDK/CI) scenario sets
   getExternalSetSummaries: protectedProcedure
-    .input(projectSchema)
+    .input(projectSchema.extend(dateRangeFields))
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
       logger.debug({ projectId: input.projectId }, "Fetching external set summaries");
       const service = SimulationService.create(ctx.prisma);
       return service.getExternalSetSummaries({
         projectId: input.projectId,
+        startDate: input.startDate,
+        endDate: input.endDate,
       });
     }),
 
