@@ -41,7 +41,7 @@ describe("<SuiteRunConfirmationDialog/>", () => {
       });
 
       expect(
-        screen.getByText(/This will start 6 new runs/),
+        screen.getByText(/Start 6 new runs\?/),
       ).toBeInTheDocument();
     });
 
@@ -53,13 +53,15 @@ describe("<SuiteRunConfirmationDialog/>", () => {
       expect(screen.getByText("Regression Tests")).toBeInTheDocument();
     });
 
-    it("displays the breakdown formula", () => {
+    it("displays scenario and target counts", () => {
       render(<SuiteRunConfirmationDialog {...defaultProps} />, {
         wrapper: Wrapper,
       });
 
-      expect(screen.getByText(/3 scenarios/)).toBeInTheDocument();
-      expect(screen.getByText(/2 targets/)).toBeInTheDocument();
+      expect(screen.getByText("3")).toBeInTheDocument();
+      expect(screen.getByText("scenarios")).toBeInTheDocument();
+      expect(screen.getByText("2")).toBeInTheDocument();
+      expect(screen.getByText("targets")).toBeInTheDocument();
     });
 
     it("displays the job count in the Run button", () => {
@@ -165,13 +167,14 @@ describe("<SuiteRunConfirmationDialog/>", () => {
   });
 
   describe("when repeatCount is greater than 1", () => {
-    it("includes repeats in the breakdown", () => {
+    it("displays the repeat count", () => {
       render(
         <SuiteRunConfirmationDialog {...defaultProps} repeatCount={2} />,
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText(/2 repeats/)).toBeInTheDocument();
+      expect(screen.getByText("2x")).toBeInTheDocument();
+      expect(screen.getByText("repeats")).toBeInTheDocument();
     });
 
     it("multiplies estimated jobs by repeatCount", () => {
@@ -182,7 +185,7 @@ describe("<SuiteRunConfirmationDialog/>", () => {
 
       // 3 scenarios * 2 targets * 3 repeats = 18
       expect(
-        screen.getByText(/This will start 18 new runs/),
+        screen.getByText(/Start 18 new runs\?/),
       ).toBeInTheDocument();
       expect(screen.getByText("Run 18 Jobs")).toBeInTheDocument();
     });
@@ -209,10 +212,10 @@ describe("<SuiteRunConfirmationDialog/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText(/1 scenario/)).toBeInTheDocument();
-      expect(screen.getByText(/1 target/)).toBeInTheDocument();
+      expect(screen.getByText("scenario")).toBeInTheDocument();
+      expect(screen.getByText("target")).toBeInTheDocument();
       expect(
-        screen.getByText(/This will start 1 new run$/),
+        screen.getByText(/Start 1 new run\?/),
       ).toBeInTheDocument();
       expect(screen.getByText("Run 1 Job")).toBeInTheDocument();
     });

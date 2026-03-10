@@ -5,7 +5,8 @@
  * so the user can review what will be executed before confirming.
  */
 
-import { Button, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Crosshair, FileText, Repeat } from "lucide-react";
 import { Dialog } from "../ui/dialog";
 
 export function SuiteRunConfirmationDialog({
@@ -41,19 +42,50 @@ export function SuiteRunConfirmationDialog({
         {!isLoading && <Dialog.CloseTrigger />}
         <Dialog.Header>
           <Dialog.Title fontSize="md" fontWeight="500">
-            This will start {estimatedJobs} new{" "}
-            {estimatedJobs === 1 ? "run" : "runs"}
+            Start {estimatedJobs} new{" "}
+            {estimatedJobs === 1 ? "run" : "runs"}?
           </Dialog.Title>
         </Dialog.Header>
         <Dialog.Body>
-          <VStack align="stretch" gap={3}>
+          <VStack align="stretch" gap={4}>
             <Text fontWeight="semibold">{suiteName}</Text>
-            <Text color="fg.muted" fontSize="sm">
-              {scenarioCount} {scenarioCount === 1 ? "scenario" : "scenarios"}{" "}
-              &times; {targetCount}{" "}
-              {targetCount === 1 ? "target" : "targets"}
-              {repeatCount > 1 && <> &times; {repeatCount} repeats</>}
-            </Text>
+            <HStack gap={6}>
+              <VStack gap={0} align="start">
+                <HStack gap={1.5} align="center">
+                  <FileText size={14} color="var(--chakra-colors-fg-muted)" />
+                  <Text fontSize="lg" fontWeight="semibold">
+                    {scenarioCount}
+                  </Text>
+                </HStack>
+                <Text color="fg.muted" fontSize="sm">
+                  {scenarioCount === 1 ? "scenario" : "scenarios"}
+                </Text>
+              </VStack>
+              <VStack gap={0} align="start">
+                <HStack gap={1.5} align="center">
+                  <Crosshair size={14} color="var(--chakra-colors-fg-muted)" />
+                  <Text fontSize="lg" fontWeight="semibold">
+                    {targetCount}
+                  </Text>
+                </HStack>
+                <Text color="fg.muted" fontSize="sm">
+                  {targetCount === 1 ? "target" : "targets"}
+                </Text>
+              </VStack>
+              {repeatCount > 1 && (
+                <VStack gap={0} align="start">
+                  <HStack gap={1.5} align="center">
+                    <Repeat size={14} color="var(--chakra-colors-fg-muted)" />
+                    <Text fontSize="lg" fontWeight="semibold">
+                      {repeatCount}x
+                    </Text>
+                  </HStack>
+                  <Text color="fg.muted" fontSize="sm">
+                    repeats
+                  </Text>
+                </VStack>
+              )}
+            </HStack>
           </VStack>
         </Dialog.Body>
         <Dialog.Footer>
