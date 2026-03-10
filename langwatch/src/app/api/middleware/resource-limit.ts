@@ -1,5 +1,4 @@
 import type { MiddlewareHandler } from "hono";
-import { notifyPlanLimitReached } from "../../../../ee/billing";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { ERR_RESOURCE_LIMIT } from "~/server/license-enforcement/constants";
@@ -109,7 +108,7 @@ async function fireNotification(organizationId: string): Promise<void> {
     organizationId,
   });
 
-  await notifyPlanLimitReached({
+  await getApp().usageLimits.notifyPlanLimitReached({
     organizationId,
     planName: activePlan.name ?? "free",
   });

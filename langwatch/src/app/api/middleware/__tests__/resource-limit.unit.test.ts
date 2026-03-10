@@ -22,10 +22,6 @@ vi.mock("~/server/app-layer/app", () => ({
   getApp: vi.fn(),
 }));
 
-vi.mock("../../../../../ee/billing", () => ({
-  notifyPlanLimitReached: vi.fn().mockResolvedValue(undefined),
-}));
-
 vi.mock("~/env.mjs", () => ({
   env: {
     IS_SAAS: false,
@@ -45,12 +41,12 @@ vi.mock("~/utils/logger/server", () => ({
 import { prisma } from "~/server/db";
 import { createLicenseEnforcementService } from "~/server/license-enforcement";
 import { getApp } from "~/server/app-layer/app";
-import { notifyPlanLimitReached } from "../../../../../ee/billing";
 import { env } from "~/env.mjs";
 
 describe("resourceLimitMiddleware()", () => {
   let mockEnforceLimit: Mock;
   let mockGetActivePlan: Mock;
+  let mockNotifyPlanLimitReached: Mock;
 
   const project = {
     id: "project-123",
@@ -76,9 +72,14 @@ describe("resourceLimitMiddleware()", () => {
       planSource: "free" as const,
     });
 
+    mockNotifyPlanLimitReached = vi.fn().mockResolvedValue(undefined);
+
     (getApp as Mock).mockReturnValue({
       planProvider: {
         getActivePlan: mockGetActivePlan,
+      },
+      usageLimits: {
+        notifyPlanLimitReached: mockNotifyPlanLimitReached,
       },
     });
   });
@@ -140,7 +141,7 @@ describe("resourceLimitMiddleware()", () => {
       const app = createTestApp("prompts");
       await app.request("/", { method: "POST" });
 
-      expect(notifyPlanLimitReached).toHaveBeenCalledWith({
+      expect(mockNotifyPlanLimitReached).toHaveBeenCalledWith({
         organizationId: "org-789",
         planName: "free",
       });
@@ -263,7 +264,7 @@ describe("resourceLimitMiddleware()", () => {
       mockEnforceLimit.mockRejectedValue(
         new LimitExceededError("prompts", 5, 5),
       );
-      (notifyPlanLimitReached as Mock).mockRejectedValue(
+      mockNotifyPlanLimitReached.mockRejectedValue(
         new Error("Slack failed"),
       );
     });
