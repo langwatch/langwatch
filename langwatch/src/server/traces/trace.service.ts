@@ -237,6 +237,7 @@ export class TraceService {
           const result = await this.clickHouseService.getAllTracesForProject(
             input,
             protections,
+            options,
           );
           if (result === null) {
             throw new Error(
