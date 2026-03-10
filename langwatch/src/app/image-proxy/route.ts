@@ -11,7 +11,7 @@ const PRIVATE_IP_PATTERNS = [
   /^169\.254\.\d+\.\d+$/, // link-local
 ];
 
-function isSafeImageUrl(rawUrl: string): boolean {
+export function isSafeImageUrl(rawUrl: string): boolean {
   let parsed: URL;
   try {
     parsed = new URL(rawUrl);
