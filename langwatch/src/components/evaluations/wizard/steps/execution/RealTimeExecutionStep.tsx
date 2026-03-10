@@ -252,10 +252,10 @@ export function RealTimeExecutionStep() {
                           <Input
                             width="110px"
                             type="number"
-                            min="0"
+                            min="0.01"
                             max="1"
                             step="0.1"
-                            placeholder="0.0"
+                            placeholder="0.01"
                             {...field}
                             onChange={(e) => field.onChange(+e.target.value)}
                           />
