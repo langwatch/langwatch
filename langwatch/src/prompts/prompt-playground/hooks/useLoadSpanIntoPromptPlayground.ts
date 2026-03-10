@@ -286,6 +286,12 @@ export function useLoadSpanIntoPromptPlayground() {
 
         if (!spanData) return;
 
+        // Build chat messages from the trace (excluding system prompt, which goes into the form config)
+        const chatMessages = addIdToMessages(
+          spanData.messages.filter((m) => m.role !== "system"),
+          spanData.traceId,
+        );
+
         // When span references a managed prompt, open the existing prompt
         if (spanData.promptHandle && spanData.promptVersionNumber) {
           const existingPrompt = await tryOpenExistingPromptTab({
@@ -302,7 +308,7 @@ export function useLoadSpanIntoPromptPlayground() {
                   currentValues: existingPrompt.formValues,
                 },
                 chat: {
-                  initialMessagesFromSpanData: [],
+                  initialMessagesFromSpanData: chatMessages,
                 },
                 meta: {
                   title: existingPrompt.formValues.handle ?? null,
@@ -316,10 +322,6 @@ export function useLoadSpanIntoPromptPlayground() {
 
         // Fall back: create new tab from trace data
         const defaultValues = createDefaultPromptFormValues(spanData);
-        const chatMessages = addIdToMessages(
-          spanData.messages,
-          spanData.traceId,
-        );
 
         addTab({
           data: TabDataSchema.parse({
