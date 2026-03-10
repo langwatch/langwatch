@@ -52,11 +52,19 @@ export function resourceLimitMiddleware(
       await enforcement.enforceLimit(organizationId, limitType);
     } catch (error) {
       if (error instanceof LimitExceededError) {
-        const message = await buildResourceLimitMessage({
-          organizationId,
-          limitType,
-          max: error.max,
-        });
+        let message = error.message;
+        try {
+          message = await buildResourceLimitMessage({
+            organizationId,
+            limitType,
+            max: error.max,
+          });
+        } catch (messageError) {
+          logger.warn(
+            { error: messageError, organizationId, limitType },
+            "Failed to build resource limit message",
+          );
+        }
 
         // Fire-and-forget notification
         fireNotification(organizationId).catch((notifyError) => {
