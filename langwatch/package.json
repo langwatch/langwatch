@@ -63,11 +63,11 @@
     "@ai-sdk/openai": "^2.0.27",
     "@ai-sdk/openai-compatible": "^1.0.15",
     "@ai-sdk/react": "^3.0.118",
-    "@aws-sdk/client-bedrock-runtime": "^3.721.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.1005.0",
     "@aws-sdk/client-cloudwatch-logs": "^3.987.0",
     "@aws-sdk/client-lambda": "^3.989.0",
-    "@aws-sdk/client-s3": "^3.750.0",
-    "@aws-sdk/client-ses": "^3.645.0",
+    "@aws-sdk/client-s3": "^3.1005.0",
+    "@aws-sdk/client-ses": "^3.1005.0",
     "@bull-board/api": "^6.16.2",
     "@bull-board/hono": "^6.16.2",
     "@chakra-ui/next-js": "^2.4.2",
@@ -306,7 +306,6 @@
   },
   "pnpm": {
     "overrides": {
-      "@aws-sdk/core>fast-xml-parser": "^4.5.4",
       "@aws-sdk/xml-builder>fast-xml-parser": "^5.5.1",
       "@langchain/community>fast-xml-parser": "^5.5.1",
       "@types/request>form-data": "^2.5.5"
