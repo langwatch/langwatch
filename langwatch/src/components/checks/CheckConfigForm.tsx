@@ -22,7 +22,7 @@ import {
   useFieldArray,
   useForm,
 } from "react-hook-form";
-import { z, type ZodType } from "zod";
+import { z } from "zod";
 import { slugify } from "~/utils/slugify";
 import { useAvailableEvaluators } from "../../hooks/useAvailableEvaluators";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -118,9 +118,7 @@ export default function CheckConfigForm({
           ])
           .optional(),
         mappings: mappingStateSchema,
-        // settings schema is chosen dynamically at runtime based on checkType,
-        // so TypeScript can't verify the output type statically
-      }) as unknown as ZodType<CheckConfigFormData>;
+      });
 
       return zodResolver(schema)(
         { ...data, settings: data.settings || {} },
