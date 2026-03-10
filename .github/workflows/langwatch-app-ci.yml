@@ -338,7 +338,7 @@ jobs:
         id: pnpm-cache
 
       - name: Cache pnpm store
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('langwatch/pnpm-lock.yaml') }}
@@ -347,14 +347,14 @@ jobs:
 
       # Cache Prisma client separately for faster regeneration
       - name: Cache Prisma client
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: langwatch/node_modules/.prisma
           key: ${{ runner.os }}-prisma-${{ hashFiles('langwatch/prisma/schema.prisma') }}
 
       # Cache Next.js build artifacts
       - name: Cache Next.js
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             langwatch/.next/cache/webpack
@@ -366,7 +366,7 @@ jobs:
 
       # Cache Turbo build outputs
       - name: Cache Turbo
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: langwatch/.turbo
           key: ${{ runner.os }}-turbo-${{ github.sha }}
