@@ -46,11 +46,15 @@ export class SimulationService {
 
   async getScenarioSetsDataForProject({
     projectId,
+    startDate,
+    endDate,
   }: {
     projectId: string;
+    startDate?: number;
+    endDate?: number;
   }) {
     if (await this.isClickHouseEnabled(projectId)) {
-      return this.chService!.getScenarioSetsData({ projectId });
+      return this.chService!.getScenarioSetsData({ projectId, startDate, endDate });
     }
     return this.esService.getScenarioSetsDataForProject({ projectId });
   }
@@ -153,6 +157,8 @@ export class SimulationService {
 
   async getExternalSetSummaries(params: {
     projectId: string;
+    startDate?: number;
+    endDate?: number;
   }) {
     if (await this.isClickHouseEnabled(params.projectId)) {
       return this.chService!.getExternalSetSummaries(params);
