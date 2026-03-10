@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   createDefaultPromptFormValues,
   coerceToNumber,
+  coerceToString,
 } from "../useLoadSpanIntoPromptPlayground";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import type { RouterOutputs } from "~/utils/api";
@@ -22,6 +23,14 @@ function buildSpanData(
       temperature: 0.5,
       maxTokens: 512,
       topP: null,
+      frequencyPenalty: null,
+      presencePenalty: null,
+      seed: null,
+      topK: null,
+      minP: null,
+      repetitionPenalty: null,
+      reasoning: null,
+      verbosity: null,
       litellmParams: {},
       ...overrides,
     },
@@ -98,6 +107,62 @@ describe("coerceToNumber()", () => {
   });
 });
 
+describe("coerceToString()", () => {
+  describe("when value is a string", () => {
+    it("returns the string as-is", () => {
+      expect(coerceToString("medium")).toBe("medium");
+    });
+
+    it("returns undefined for empty string", () => {
+      expect(coerceToString("")).toBeUndefined();
+    });
+  });
+
+  describe("when value is a number", () => {
+    it("converts a finite number to string", () => {
+      expect(coerceToString(42)).toBe("42");
+    });
+
+    it("returns undefined for NaN", () => {
+      expect(coerceToString(NaN)).toBeUndefined();
+    });
+
+    it("returns undefined for Infinity", () => {
+      expect(coerceToString(Infinity)).toBeUndefined();
+    });
+  });
+
+  describe("when value is a boolean", () => {
+    it("converts true to string", () => {
+      expect(coerceToString(true)).toBe("true");
+    });
+
+    it("converts false to string", () => {
+      expect(coerceToString(false)).toBe("false");
+    });
+  });
+
+  describe("when value is null or undefined", () => {
+    it("returns undefined for null", () => {
+      expect(coerceToString(null)).toBeUndefined();
+    });
+
+    it("returns undefined for undefined", () => {
+      expect(coerceToString(undefined)).toBeUndefined();
+    });
+  });
+
+  describe("when value is an unsupported type", () => {
+    it("returns undefined for object", () => {
+      expect(coerceToString({ value: "foo" })).toBeUndefined();
+    });
+
+    it("returns undefined for array", () => {
+      expect(coerceToString(["foo"])).toBeUndefined();
+    });
+  });
+});
+
 describe("createDefaultPromptFormValues()", () => {
   describe("when maxTokens is null", () => {
     it("creates form values successfully with undefined maxTokens", () => {
@@ -144,6 +209,97 @@ describe("createDefaultPromptFormValues()", () => {
       const result = createDefaultPromptFormValues(spanData);
 
       expect(result.version.configData.llm.model).toBe(DEFAULT_MODEL);
+    });
+  });
+
+  describe("when all numeric parameters are present", () => {
+    it("populates all numeric parameters in the form", () => {
+      const spanData = buildSpanData({
+        temperature: 0.8,
+        maxTokens: 2048,
+        topP: 0.95,
+        frequencyPenalty: 0.5,
+        presencePenalty: 0.3,
+        seed: 42,
+        topK: 50,
+        minP: 0.1,
+        repetitionPenalty: 1.2,
+      });
+
+      const result = createDefaultPromptFormValues(spanData);
+
+      expect(result.version.configData.llm.frequencyPenalty).toBe(0.5);
+      expect(result.version.configData.llm.presencePenalty).toBe(0.3);
+      expect(result.version.configData.llm.seed).toBe(42);
+      expect(result.version.configData.llm.topK).toBe(50);
+      expect(result.version.configData.llm.minP).toBe(0.1);
+      expect(result.version.configData.llm.repetitionPenalty).toBe(1.2);
+    });
+  });
+
+  describe("when reasoning effort is present", () => {
+    it("populates the reasoning parameter", () => {
+      const spanData = buildSpanData({ reasoning: "medium" });
+
+      const result = createDefaultPromptFormValues(spanData);
+
+      expect(result.version.configData.llm.reasoning).toBe("medium");
+    });
+  });
+
+  describe("when string-typed numeric parameters are provided", () => {
+    it("coerces string frequency_penalty to number", () => {
+      const spanData = buildSpanData({
+        frequencyPenalty: "0.5" as unknown as number,
+      });
+
+      const result = createDefaultPromptFormValues(spanData);
+
+      expect(result.version.configData.llm.frequencyPenalty).toBe(0.5);
+    });
+  });
+
+  describe("when unknown or garbage parameter values are provided", () => {
+    it("leaves uncoercible parameters unset", () => {
+      const spanData = buildSpanData({
+        temperature: { value: 0.5 } as unknown as number,
+        frequencyPenalty: true as unknown as number,
+        seed: "not-a-number" as unknown as number,
+      });
+
+      const result = createDefaultPromptFormValues(spanData);
+
+      expect(result.version.configData.llm.temperature).toBeUndefined();
+      expect(result.version.configData.llm.frequencyPenalty).toBeUndefined();
+      expect(result.version.configData.llm.seed).toBeUndefined();
+    });
+  });
+
+  describe("when only some parameters are specified", () => {
+    it("populates only temperature and seed", () => {
+      const spanData = buildSpanData({
+        temperature: 0.5,
+        seed: 123,
+        maxTokens: null,
+        topP: null,
+        frequencyPenalty: null,
+        presencePenalty: null,
+        topK: null,
+        minP: null,
+        repetitionPenalty: null,
+        reasoning: null,
+        verbosity: null,
+      });
+
+      const result = createDefaultPromptFormValues(spanData);
+
+      expect(result.version.configData.llm.temperature).toBe(0.5);
+      expect(result.version.configData.llm.seed).toBe(123);
+      expect(result.version.configData.llm.maxTokens).toBeUndefined();
+      expect(result.version.configData.llm.topP).toBeUndefined();
+      expect(result.version.configData.llm.frequencyPenalty).toBeUndefined();
+      expect(result.version.configData.llm.presencePenalty).toBeUndefined();
+      expect(result.version.configData.llm.reasoning).toBeUndefined();
     });
   });
 });

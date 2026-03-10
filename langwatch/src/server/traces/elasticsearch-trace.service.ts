@@ -22,6 +22,10 @@ import type {
   LLMSpan,
   Trace,
 } from "~/server/tracer/types";
+import {
+  LLM_PARAMETER_MAP,
+  KNOWN_PARAM_ALIASES,
+} from "~/prompts/prompt-playground/llmParameterMap";
 import type {
   AggregationFiltersInput,
   CustomersAndLabelsResult,
@@ -530,22 +534,43 @@ export class ElasticsearchTraceService {
       messages.push({ role: "assistant", content });
     }
 
-    // Extract LLM config
+    // Extract LLM config dynamically from the parameter map
     const params = span.params ?? {};
     const systemPrompt = messages.find((m) => m.role === "system")?.content;
-    const litellmParams: Record<string, unknown> = {};
 
-    const excludeKeys = new Set([
-      "temperature",
-      "max_tokens",
-      "maxTokens",
-      "top_p",
-      "topP",
-      "_keys",
-    ]);
+    const llmConfig: PromptStudioSpanResult["llmConfig"] = {
+      model: span.model ?? null,
+      systemPrompt,
+      temperature: null,
+      maxTokens: null,
+      topP: null,
+      frequencyPenalty: null,
+      presencePenalty: null,
+      seed: null,
+      topK: null,
+      minP: null,
+      repetitionPenalty: null,
+      reasoning: null,
+      verbosity: null,
+      litellmParams: {},
+    };
+
+    for (const param of LLM_PARAMETER_MAP) {
+      // First matching alias wins
+      for (const alias of param.traceAliases) {
+        if (alias in params && params[alias] != null) {
+          (llmConfig as Record<string, unknown>)[param.formField] =
+            params[alias];
+          break;
+        }
+      }
+    }
+
+    // Collect unknown params into litellmParams
+    const excludeKeys = new Set([...KNOWN_PARAM_ALIASES, "_keys"]);
     for (const [key, value] of Object.entries(params)) {
       if (!excludeKeys.has(key)) {
-        litellmParams[key] = value;
+        llmConfig.litellmParams[key] = value;
       }
     }
 
@@ -554,14 +579,7 @@ export class ElasticsearchTraceService {
       traceId: trace.trace_id,
       spanName: span.name ?? null,
       messages,
-      llmConfig: {
-        model: span.model ?? null,
-        systemPrompt,
-        temperature: (params.temperature as number) ?? null,
-        maxTokens: ((params.max_tokens ?? params.maxTokens) as number) ?? null,
-        topP: ((params.top_p ?? params.topP) as number) ?? null,
-        litellmParams,
-      },
+      llmConfig,
       vendor: span.vendor ?? null,
       error: span.error ?? null,
       timestamps: span.timestamps,
