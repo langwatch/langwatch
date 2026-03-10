@@ -7,7 +7,7 @@ export default function ExperimentsRedirect() {
   const { project } = router.query;
 
   useEffect(() => {
-    if (project && typeof project === "string" && /^[a-zA-Z0-9][a-zA-Z0-9-]*$/.test(project)) {
+    if (project && typeof project === "string") {
       void router.replace(`/${project}/evaluations`);
     }
   }, [project, router]);

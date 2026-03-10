@@ -14,7 +14,6 @@ export default function TraceDetailsWithSpanRedirect() {
 
   useEffect(() => {
     if (!projectSlug || !traceId || !router.isReady) return;
-    if (!/^[a-zA-Z0-9][a-zA-Z0-9-]*$/.test(projectSlug)) return;
 
     const tabParam = openTab
       ? `&drawer.openTab=${encodeURIComponent(openTab)}`

@@ -12,7 +12,6 @@ export default function TraceDetailsRedirect() {
 
   useEffect(() => {
     if (!projectSlug || !traceId || !router.isReady) return;
-    if (!/^[a-zA-Z0-9][a-zA-Z0-9-]*$/.test(projectSlug)) return;
 
     void router.replace(
       `/${projectSlug}/messages?drawer.open=traceDetails&drawer.traceId=${encodeURIComponent(traceId)}`,
