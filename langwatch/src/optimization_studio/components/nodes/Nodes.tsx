@@ -366,7 +366,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
             node={node}
             marginRight="-6px"
             marginLeft="-4px"
-            isInsideNode={true}
+
           />
         ) : (
           <Box width="54px" />
@@ -418,13 +418,11 @@ export function ComponentExecutionButton({
   node,
   iconSize = 14,
   componentOnly = false,
-  isInsideNode = false,
   ...props
 }: {
   node: Node<Component>;
   iconSize?: number;
   componentOnly?: boolean;
-  isInsideNode?: boolean;
 } & ButtonProps) {
   const { startComponentExecution, stopComponentExecution } =
     useComponentExecution();
@@ -447,8 +445,6 @@ export function ComponentExecutionButton({
 
   const shouldOpenExecutionResults =
     node?.data.execution_state && !propertiesExpanded;
-
-  const Wrapper = isInsideNode ? NodeToolbar : React.Fragment;
 
   return (
     <>
@@ -540,30 +536,35 @@ export function ComponentExecutionButton({
       ) : (
         <Menu.Root positioning={{ placement: "top-start" }}>
           <Menu.Trigger asChild>
-            <Button variant="ghost" size="xs" paddingX={2} {...props}>
+            <Button
+              variant="ghost"
+              size="xs"
+              paddingX={2}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+              {...props}
+            >
               <Play size={iconSize} />
             </Button>
           </Menu.Trigger>
-          <Wrapper>
-            <Menu.Content zIndex="popover">
-              <Menu.Item
-                value="run-manual"
-                onClick={() => node && startComponentExecution({ node })}
-              >
-                <Play size={14} />
-                Run with manual input
-              </Menu.Item>
-              <Menu.Item
-                value="run-workflow"
-                onClick={() =>
-                  node && startWorkflowExecution({ untilNodeId: node.id })
-                }
-              >
-                <Play size={14} />
-                Run workflow until here
-              </Menu.Item>
-            </Menu.Content>
-          </Wrapper>
+          <Menu.Content zIndex={1600}>
+            <Menu.Item
+              value="run-manual"
+              onClick={() => node && startComponentExecution({ node })}
+            >
+              <Play size={14} />
+              Run with manual input
+            </Menu.Item>
+            <Menu.Item
+              value="run-workflow"
+              onClick={() =>
+                node && startWorkflowExecution({ untilNodeId: node.id })
+              }
+            >
+              <Play size={14} />
+              Run workflow until here
+            </Menu.Item>
+          </Menu.Content>
         </Menu.Root>
       )}
     </>
