@@ -1226,6 +1226,83 @@ describe("useExecuteEvaluation", () => {
       });
     });
 
+    describe("when scope is evaluator-all-rows (loading state)", () => {
+      it("sets evaluator results to running status instead of clearing them", async () => {
+        setupStore();
+
+        useEvaluationsV3Store.setState((state) => ({
+          ...state,
+          evaluators: [
+            {
+              id: "eval-1",
+              evaluatorType: "langevals/exact_match",
+              settings: {},
+              inputs: [],
+              mappings: {},
+            },
+            {
+              id: "eval-2",
+              evaluatorType: "custom/contains",
+              settings: {},
+              inputs: [],
+              mappings: {},
+            },
+          ],
+          results: {
+            ...state.results,
+            targetOutputs: {
+              "target-1": [{ output: "Hello" }, { output: "World" }],
+            },
+            targetMetadata: {
+              "target-1": [
+                { cost: 0.01, duration: 100, traceId: "trace-1" },
+                { cost: 0.02, duration: 200, traceId: "trace-2" },
+              ],
+            },
+            evaluatorResults: {
+              "target-1": {
+                "eval-1": [
+                  { status: "processed", passed: true, score: 1 },
+                  { status: "processed", passed: false, score: 0 },
+                ],
+                "eval-2": [
+                  { status: "processed", passed: true, score: 0.8 },
+                  { status: "processed", passed: true, score: 0.9 },
+                ],
+              },
+            },
+          },
+        }));
+
+        mockFetchSSE.mockImplementation(async () => {
+          await new Promise(() => {});
+        });
+
+        const { result } = renderHook(() => useExecuteEvaluation());
+
+        act(() => {
+          void result.current.runEvaluatorOnAllRows("target-1", "eval-1");
+        });
+
+        await waitFor(() => {
+          const state = useEvaluationsV3Store.getState();
+
+          // eval-1 results should be set to "running" (not undefined)
+          expect(
+            state.results.evaluatorResults["target-1"]?.["eval-1"]?.[0],
+          ).toEqual({ status: "running" });
+          expect(
+            state.results.evaluatorResults["target-1"]?.["eval-1"]?.[1],
+          ).toEqual({ status: "running" });
+
+          // eval-2 results must still be preserved
+          expect(
+            state.results.evaluatorResults["target-1"]?.["eval-2"]?.[0],
+          ).toEqual({ status: "processed", passed: true, score: 0.8 });
+        });
+      });
+    });
+
     describe("when scope is evaluator (single cell rerun)", () => {
       it("preserves existing target outputs when rerunning evaluator", async () => {
         setupStore();

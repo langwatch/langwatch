@@ -475,6 +475,8 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
             }
 
             // Clear evaluator results (only specific evaluator for evaluator scopes)
+            // For evaluator-only scopes, set to "running" for UI feedback;
+            // for other scopes, clear to undefined
             if (!newEvaluatorResults[cell.targetId]) {
               newEvaluatorResults[cell.targetId] = {};
             }
@@ -483,7 +485,9 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
               const evalResults = newTargetResults[evaluatorId];
               if (evalResults && evalResults[cell.rowIndex] !== undefined) {
                 const newEvalResults = [...evalResults];
-                newEvalResults[cell.rowIndex] = undefined;
+                newEvalResults[cell.rowIndex] = isEvaluatorOnlyScope
+                  ? { status: "running" }
+                  : undefined;
                 newTargetResults[evaluatorId] = newEvalResults;
               }
             }
@@ -761,14 +765,6 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
 
       // Nothing to run if no rows have outputs
       if (Object.keys(precomputedTargetOutputs).length === 0) return;
-
-      // Mark all matching evaluator results as "running" for UI feedback
-      for (const rowIndexStr of Object.keys(precomputedTargetOutputs)) {
-        const rowIndex = Number(rowIndexStr);
-        updateEvaluatorResult(rowIndex, targetId, evaluatorId, {
-          status: "running",
-        });
-      }
 
       const scope: ExecutionScope = {
         type: "evaluator-all-rows",
