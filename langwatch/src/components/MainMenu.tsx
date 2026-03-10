@@ -179,8 +179,10 @@ export const MainMenu = React.memo(function MainMenu({
                           <BetaPill
                             message={
                               <Text fontSize="sm">
-                                Suites is currently in beta. Features and APIs
-                                may change.
+                                This feature is provided in beta and is still
+                                under development. By using it, you acknowledge
+                                it may contain errors, change without notice, or
+                                be discontinued at any time.
                               </Text>
                             }
                           />
