@@ -28,7 +28,7 @@ import { RunSummaryCounts } from "./RunSummaryCounts";
 import { useRunHistoryStore } from "./useRunHistoryStore";
 import { useRunHistoryPagination } from "./useRunHistoryPagination";
 import { useAutoExpansion } from "./useAutoExpansion";
-import { useCancelScenarioRun, isCancellableStatus } from "./useCancelScenarioRun";
+import { useCancelScenarioRun } from "./useCancelScenarioRun";
 import {
   computeBatchRunSummary,
   computeGroupSummary,
@@ -144,22 +144,13 @@ export function RunHistoryPanel({
     return scenarios.map((s) => ({ id: s.id, name: s.name }));
   }, [scenarios]);
 
-  // Optimistic cancellation: track run IDs marked as cancelled before server confirms
-  const [optimisticCancelledIds, setOptimisticCancelledIds] = useState<Set<string>>(new Set());
-
   // Track the specific job ID currently being cancelled for per-button loading state
   const [cancellingJobId, setCancellingJobId] = useState<string | null>(null);
 
   const { cancelJob, cancelBatchRun, isCancellingBatch } = useCancelScenarioRun({
-    onOptimisticUpdate: (runIds) => {
-      setOptimisticCancelledIds((prev) => {
-        const next = new Set(prev);
-        for (const id of runIds) next.add(id);
-        return next;
-      });
-    },
     onCancelJobSuccess: () => {
       setCancellingJobId(null);
+      void refetch();
       toaster.create({ title: "Job cancelled", type: "success" });
     },
     onCancelJobError: (error) => {
@@ -171,6 +162,7 @@ export function RunHistoryPanel({
       });
     },
     onCancelBatchSuccess: () => {
+      void refetch();
       toaster.create({ title: "Jobs cancelled", type: "success" });
     },
     onCancelBatchError: (error) => {
@@ -182,21 +174,11 @@ export function RunHistoryPanel({
     },
   });
 
-  // Apply optimistic cancellation overrides to run data
-  const runsWithOptimisticCancellations = useMemo(() => {
-    if (optimisticCancelledIds.size === 0) return allRuns;
-    return allRuns.map((run) =>
-      optimisticCancelledIds.has(run.scenarioRunId)
-        ? { ...run, status: ScenarioRunStatus.CANCELLED }
-        : run,
-    );
-  }, [allRuns, optimisticCancelledIds]);
-
   // Apply filters to raw runs
   const filteredRuns = useMemo(() => {
-    if (runsWithOptimisticCancellations.length === 0) return [];
+    if (allRuns.length === 0) return [];
 
-    let runs = runsWithOptimisticCancellations;
+    let runs = allRuns;
 
     if (filters.scenarioId) {
       runs = runs.filter((r) => r.scenarioId === filters.scenarioId);
@@ -215,7 +197,7 @@ export function RunHistoryPanel({
     }
 
     return runs;
-  }, [runsWithOptimisticCancellations, filters]);
+  }, [allRuns, filters]);
 
   // Group filtered runs by batch
   const batchRuns = useMemo(
@@ -283,16 +265,9 @@ export function RunHistoryPanel({
   );
 
   const handleCancelAll = useCallback(
-    (batchRunId: string, batchRunScenarioSetId: string, scenarioRuns: ScenarioRunData[]) => {
+    (batchRunId: string, batchRunScenarioSetId: string) => {
       if (!project?.id) return;
-      const cancellableRunIds = scenarioRuns
-        .filter((run) => isCancellableStatus(run.status))
-        .map((run) => run.scenarioRunId);
-
-      cancelBatchRun(
-        { projectId: project.id, scenarioSetId: batchRunScenarioSetId, batchRunId },
-        cancellableRunIds,
-      );
+      cancelBatchRun({ projectId: project.id, scenarioSetId: batchRunScenarioSetId, batchRunId });
     },
     [project?.id, cancelBatchRun],
   );
@@ -453,7 +428,7 @@ export function RunHistoryPanel({
                     suiteName={suiteName}
                     viewMode={viewMode}
                     onCancelRun={createCancelRunHandler(batchRun.scenarioSetId ?? scenarioSetId ?? "")}
-                    onCancelAll={() => handleCancelAll(batchRun.batchRunId, batchRun.scenarioSetId ?? scenarioSetId ?? "", batchRun.scenarioRuns)}
+                    onCancelAll={() => handleCancelAll(batchRun.batchRunId, batchRun.scenarioSetId ?? scenarioSetId ?? "")}
                     isCancellingBatch={isCancellingBatch}
                     cancellingJobId={cancellingJobId}
                   />

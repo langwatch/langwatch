@@ -3,8 +3,14 @@
  * @see specs/scenarios/simulation-runner.feature "Pass labels to SDK for tracing"
  */
 
-import { describe, expect, it } from "vitest";
-import { buildOtelResourceAttributes } from "../scenario.processor";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  buildOtelResourceAttributes,
+  handleCancelledJobResult,
+  handleFailedJobResult,
+  type ProcessorDependencies,
+} from "../scenario.processor";
+import type { ScenarioJob } from "../scenario.queue";
 
 describe("buildOtelResourceAttributes", () => {
   it("always includes langwatch.origin.source=platform", () => {
@@ -35,5 +41,83 @@ describe("buildOtelResourceAttributes", () => {
     expect(buildOtelResourceAttributes(["priority=high"])).toBe(
       "langwatch.origin.source=platform,scenario.labels=priority\\=high",
     );
+  });
+});
+
+describe("handleCancelledJobResult", () => {
+  let mockDeps: ProcessorDependencies;
+  const baseJobData: ScenarioJob = {
+    projectId: "proj_123",
+    scenarioId: "scen_456",
+    setId: "set_789",
+    batchRunId: "batch_abc",
+    target: { type: "prompt", referenceId: "ref_1" },
+  };
+
+  beforeEach(() => {
+    mockDeps = {
+      scenarioLookup: {
+        getById: vi.fn().mockResolvedValue({ name: "Test Scenario", situation: "A test" }),
+      },
+      failureEmitter: {
+        ensureFailureEventsEmitted: vi.fn().mockResolvedValue(undefined),
+      },
+    };
+  });
+
+  it("passes cancelled: true to failure emitter", async () => {
+    await handleCancelledJobResult(baseJobData, "Job was cancelled", mockDeps);
+
+    expect(mockDeps.failureEmitter.ensureFailureEventsEmitted).toHaveBeenCalledWith(
+      expect.objectContaining({ cancelled: true }),
+    );
+  });
+
+  it("includes scenario name and description from lookup", async () => {
+    await handleCancelledJobResult(baseJobData, "Job was cancelled", mockDeps);
+
+    expect(mockDeps.failureEmitter.ensureFailureEventsEmitted).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "Test Scenario",
+        description: "A test",
+      }),
+    );
+  });
+
+  it("defaults error message to 'Cancelled by user' when none provided", async () => {
+    await handleCancelledJobResult(baseJobData, undefined, mockDeps);
+
+    expect(mockDeps.failureEmitter.ensureFailureEventsEmitted).toHaveBeenCalledWith(
+      expect.objectContaining({ error: "Cancelled by user" }),
+    );
+  });
+});
+
+describe("handleFailedJobResult", () => {
+  let mockDeps: ProcessorDependencies;
+  const baseJobData: ScenarioJob = {
+    projectId: "proj_123",
+    scenarioId: "scen_456",
+    setId: "set_789",
+    batchRunId: "batch_abc",
+    target: { type: "prompt", referenceId: "ref_1" },
+  };
+
+  beforeEach(() => {
+    mockDeps = {
+      scenarioLookup: {
+        getById: vi.fn().mockResolvedValue({ name: "Test Scenario", situation: "A test" }),
+      },
+      failureEmitter: {
+        ensureFailureEventsEmitted: vi.fn().mockResolvedValue(undefined),
+      },
+    };
+  });
+
+  it("does not pass cancelled flag to failure emitter", async () => {
+    await handleFailedJobResult(baseJobData, "Child process exited", mockDeps);
+
+    const params = (mockDeps.failureEmitter.ensureFailureEventsEmitted as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    expect(params.cancelled).toBeUndefined();
   });
 });

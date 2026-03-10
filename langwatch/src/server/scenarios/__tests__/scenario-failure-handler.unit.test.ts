@@ -202,6 +202,52 @@ describe("ScenarioFailureHandler", () => {
       });
     });
 
+    describe("given cancelled flag is true", () => {
+      beforeEach(() => {
+        mockService.getRunDataForBatchRun.mockResolvedValue({ changed: true, runs: [] });
+      });
+
+      describe("when called with cancelled: true", () => {
+        it("emits RUN_FINISHED with CANCELLED status instead of ERROR", async () => {
+          await handler.ensureFailureEventsEmitted({
+            ...baseJobData,
+            error: "Cancelled by user",
+            cancelled: true,
+          });
+
+          const runFinishedCall = mockService.saveScenarioEvent.mock.calls[1]?.[0] as Record<string, unknown>;
+          expect(runFinishedCall.type).toBe(ScenarioEventType.RUN_FINISHED);
+          expect(runFinishedCall.status).toBe(ScenarioRunStatus.CANCELLED);
+        });
+
+        it("uses INCONCLUSIVE verdict for cancelled runs", async () => {
+          await handler.ensureFailureEventsEmitted({
+            ...baseJobData,
+            error: "Cancelled by user",
+            cancelled: true,
+          });
+
+          const runFinishedCall = mockService.saveScenarioEvent.mock.calls[1]?.[0] as Record<string, unknown>;
+          const results = runFinishedCall.results as Record<string, unknown>;
+          expect(results.verdict).toBe(Verdict.INCONCLUSIVE);
+          expect(results.reasoning).toBe("Cancelled by user");
+        });
+      });
+
+      describe("when called without cancelled flag", () => {
+        it("emits RUN_FINISHED with ERROR status", async () => {
+          await handler.ensureFailureEventsEmitted({
+            ...baseJobData,
+            error: "Child process exited with code 1",
+          });
+
+          const runFinishedCall = mockService.saveScenarioEvent.mock.calls[1]?.[0] as Record<string, unknown>;
+          expect(runFinishedCall.status).toBe(ScenarioRunStatus.ERROR);
+          expect((runFinishedCall.results as Record<string, unknown>).verdict).toBe(Verdict.FAILURE);
+        });
+      });
+    });
+
     describe("given run already has terminal status", () => {
       describe("when status is ERROR", () => {
         beforeEach(() => {

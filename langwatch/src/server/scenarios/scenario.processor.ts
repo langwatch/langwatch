@@ -127,6 +127,38 @@ export async function handleFailedJobResult(
   });
 }
 
+/**
+ * Handle a cancelled job result by emitting cancellation events to Elasticsearch.
+ *
+ * Similar to handleFailedJobResult but writes CANCELLED status instead of ERROR.
+ *
+ * @param jobData - The job data containing project/scenario identifiers
+ * @param error - Optional error message
+ * @param deps - Injected dependencies for scenario lookup and failure emission
+ * @internal Exported for testing
+ */
+export async function handleCancelledJobResult(
+  jobData: ScenarioJob,
+  error: string | undefined,
+  deps: ProcessorDependencies,
+): Promise<void> {
+  const scenario = await deps.scenarioLookup.getById({
+    projectId: jobData.projectId,
+    id: jobData.scenarioId,
+  });
+
+  await deps.failureEmitter.ensureFailureEventsEmitted({
+    projectId: jobData.projectId,
+    scenarioId: jobData.scenarioId,
+    setId: jobData.setId,
+    batchRunId: jobData.batchRunId,
+    error: error ?? "Cancelled by user",
+    name: scenario?.name,
+    description: scenario?.situation,
+    cancelled: true,
+  });
+}
+
 const logger = createLogger("langwatch:scenarios:processor");
 
 /**
@@ -206,7 +238,7 @@ export async function processScenarioJob(
   signal?: AbortSignal,
 ): Promise<ScenarioJobResult> {
   if (signal?.aborted) {
-    return { success: false, error: "Job was cancelled before processing started" };
+    return { success: false, error: "Job was cancelled before processing started", cancelled: true };
   }
   // Extract context metadata propagated from the queue (flat format: { ...payload, __context })
   const { __context: contextMetadata, ...jobData } = job.data as ScenarioJob & {
@@ -399,6 +431,12 @@ async function spawnScenarioChildProcess(
       if (resolved) return;
       resolved = true;
 
+      if (signal?.aborted) {
+        log("info", "Job cancelled via AbortSignal");
+        resolve({ success: false, error: "Job was cancelled", cancelled: true });
+        return;
+      }
+
       if (code !== 0) {
         log("error", `Child process exited with code ${code}`, { exitCode: code, stderr });
         resolve({
@@ -498,19 +536,38 @@ export async function startScenarioProcessor(
         })
       : logger;
 
-    eventLogger.error(
-      { error: error?.message, errorStack: error?.stack },
-      "Scenario job failed unexpectedly",
-    );
+    // Check if this was a cancellation (BullMQ throws AbortError when job is cancelled)
+    const isCancellation = error?.name === "AbortError" || error?.message?.includes("cancelled");
 
-    // Emit failure events for unexpected errors (e.g., exceptions in processScenarioJob)
-    if (job && jobData) {
-      void handleFailedJobResult(jobData, error?.message, deps).catch((emitError) =>
-        eventLogger.error(
-          { emitError },
-          "Failed to emit failure events from failed handler",
-        ),
+    if (isCancellation) {
+      eventLogger.info(
+        { error: error?.message },
+        "Scenario job cancelled",
       );
+    } else {
+      eventLogger.error(
+        { error: error?.message, errorStack: error?.stack },
+        "Scenario job failed unexpectedly",
+      );
+    }
+
+    // Emit appropriate events for the failure/cancellation
+    if (job && jobData) {
+      if (isCancellation) {
+        void handleCancelledJobResult(jobData, error?.message, deps).catch((emitError) =>
+          eventLogger.error(
+            { emitError },
+            "Failed to emit cancellation events from failed handler",
+          ),
+        );
+      } else {
+        void handleFailedJobResult(jobData, error?.message, deps).catch((emitError) =>
+          eventLogger.error(
+            { emitError },
+            "Failed to emit failure events from failed handler",
+          ),
+        );
+      }
     }
   });
 
@@ -528,6 +585,18 @@ export async function startScenarioProcessor(
     // If job succeeded, log at info level
     if (result?.success) {
       eventLogger.info({ success: true }, "Scenario job completed successfully");
+      return;
+    }
+
+    // Job was cancelled by user — write CANCELLED event, not ERROR
+    if (result?.cancelled) {
+      eventLogger.info("Scenario job cancelled by user");
+      try {
+        await handleCancelledJobResult(jobData, result.error, deps);
+        eventLogger.debug("Cancellation events emitted to Elasticsearch");
+      } catch (emitError) {
+        eventLogger.error({ emitError }, "Failed to emit cancellation events");
+      }
       return;
     }
 

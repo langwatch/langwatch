@@ -36,6 +36,8 @@ export interface FailureEventParams {
   name?: string;
   /** Scenario description/situation for display in UI */
   description?: string;
+  /** When true, writes CANCELLED status instead of ERROR */
+  cancelled?: boolean;
 }
 
 /** Terminal statuses that indicate a run has already finished */
@@ -84,7 +86,8 @@ export class ScenarioFailureHandler {
         },
       },
       async (span) => {
-        const { projectId, scenarioId, setId, batchRunId, error, name, description } = params;
+        const { projectId, scenarioId, setId, batchRunId, error, name, description, cancelled } = params;
+        const status = cancelled ? ScenarioRunStatus.CANCELLED : ScenarioRunStatus.ERROR;
 
         logger.info(
           { projectId, scenarioId, setId, batchRunId, error: error?.substring(0, 100) },
@@ -137,8 +140,8 @@ export class ScenarioFailureHandler {
           span.setAttribute("result.emitted_run_started", true);
         }
 
-        // Emit RUN_FINISHED with ERROR status
-        logger.debug({ projectId, scenarioId, scenarioRunId }, "Emitting RUN_FINISHED event with ERROR status");
+        // Emit RUN_FINISHED with appropriate status
+        logger.debug({ projectId, scenarioId, scenarioRunId, status }, "Emitting RUN_FINISHED event");
         await this.service.saveScenarioEvent({
           projectId,
           type: ScenarioEventType.RUN_FINISHED,
@@ -147,14 +150,22 @@ export class ScenarioFailureHandler {
           batchRunId,
           scenarioSetId: setId,
           timestamp: timestamp + 1, // Ensure RUN_FINISHED is after RUN_STARTED
-          status: ScenarioRunStatus.ERROR,
-          results: {
-            verdict: Verdict.FAILURE,
-            reasoning: error ?? "Job failed without error message",
-            metCriteria: [],
-            unmetCriteria: [],
-            error: error ?? "Job failed",
-          },
+          status,
+          results: cancelled
+            ? {
+                verdict: Verdict.INCONCLUSIVE,
+                reasoning: "Cancelled by user",
+                metCriteria: [],
+                unmetCriteria: [],
+                error: error ?? "Cancelled by user",
+              }
+            : {
+                verdict: Verdict.FAILURE,
+                reasoning: error ?? "Job failed without error message",
+                metCriteria: [],
+                unmetCriteria: [],
+                error: error ?? "Job failed",
+              },
         });
         span.setAttribute("result.emitted_run_finished", true);
 

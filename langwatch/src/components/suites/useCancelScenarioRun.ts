@@ -1,9 +1,9 @@
 /**
- * Hook for cancelling scenario runs with optimistic UI updates.
+ * Hook for cancelling scenario runs with server-confirmed status updates.
  *
  * Provides `cancelJob` (single run) and `cancelBatchRun` (all remaining)
- * mutations that immediately update the local status to CANCELLED before
- * the server confirms.
+ * mutations. Redis operations are sub-100ms so status updates appear
+ * near-instantly after the server confirms via query invalidation.
  *
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
@@ -34,23 +34,20 @@ export interface CancelBatchParams {
 /**
  * Hook providing cancel mutations for scenario runs.
  *
- * Both mutations trigger an `onOptimisticUpdate` callback immediately
- * so the parent component can update local state before the server responds.
+ * Callers should invalidate queries in the success callbacks to trigger
+ * an immediate refetch of server-confirmed status.
  *
- * @param onOptimisticUpdate - Called with scenarioRunIds that should be
- *   optimistically marked as cancelled.
  * @param onCancelJobSuccess - Called when a single job cancel succeeds.
  * @param onCancelJobError - Called with the error when a single job cancel fails.
+ * @param onCancelBatchSuccess - Called when a batch cancel succeeds.
  * @param onCancelBatchError - Called with the error when a batch cancel fails.
  */
 export function useCancelScenarioRun({
-  onOptimisticUpdate,
   onCancelJobSuccess,
   onCancelJobError,
   onCancelBatchSuccess,
   onCancelBatchError,
 }: {
-  onOptimisticUpdate?: (scenarioRunIds: string[]) => void;
   onCancelJobSuccess?: () => void;
   onCancelJobError?: (error: { message: string }) => void;
   onCancelBatchSuccess?: () => void;
@@ -76,22 +73,16 @@ export function useCancelScenarioRun({
 
   const cancelJob = useCallback(
     (params: CancelRunParams) => {
-      if (onOptimisticUpdate) {
-        onOptimisticUpdate([params.scenarioRunId]);
-      }
       cancelJobMutation.mutate(params);
     },
-    [cancelJobMutation, onOptimisticUpdate],
+    [cancelJobMutation],
   );
 
   const cancelBatchRun = useCallback(
-    (params: CancelBatchParams, cancellableRunIds: string[]) => {
-      if (onOptimisticUpdate) {
-        onOptimisticUpdate(cancellableRunIds);
-      }
+    (params: CancelBatchParams) => {
       cancelBatchRunMutation.mutate(params);
     },
-    [cancelBatchRunMutation, onOptimisticUpdate],
+    [cancelBatchRunMutation],
   );
 
   return {

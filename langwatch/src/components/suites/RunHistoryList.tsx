@@ -27,7 +27,7 @@ import { RunRow } from "./RunRow";
 import { GroupRow } from "./GroupRow";
 import { QueueStatusBanner } from "./QueueStatusBanner";
 import { useRunHistoryStore } from "./useRunHistoryStore";
-import { useCancelScenarioRun, isCancellableStatus } from "./useCancelScenarioRun";
+import { useCancelScenarioRun } from "./useCancelScenarioRun";
 import {
   computeBatchRunSummary,
   computeGroupSummary,
@@ -98,18 +98,7 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
     }
   }, [groupBy]);
 
-  // Optimistic cancellation: track run IDs marked as cancelled before server confirms
-  const [optimisticCancelledIds, setOptimisticCancelledIds] = useState<Set<string>>(new Set());
-
-  const { cancelJob, cancelBatchRun } = useCancelScenarioRun({
-    onOptimisticUpdate: (runIds) => {
-      setOptimisticCancelledIds((prev) => {
-        const next = new Set(prev);
-        for (const id of runIds) next.add(id);
-        return next;
-      });
-    },
-  });
+  const { cancelJob, cancelBatchRun } = useCancelScenarioRun();
 
   const handleCancelRun = useCallback(
     (scenarioRun: ScenarioRunData) => {
@@ -127,16 +116,9 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
   );
 
   const handleCancelAll = useCallback(
-    (batchRunId: string, scenarioRuns: ScenarioRunData[]) => {
+    (batchRunId: string) => {
       if (!project?.id) return;
-      const cancellableRunIds = scenarioRuns
-        .filter((run) => isCancellableStatus(run.status))
-        .map((run) => run.scenarioRunId);
-
-      cancelBatchRun(
-        { projectId: project.id, scenarioSetId: setId, batchRunId },
-        cancellableRunIds,
-      );
+      cancelBatchRun({ projectId: project.id, scenarioSetId: setId, batchRunId });
     },
     [project?.id, setId, cancelBatchRun],
   );
@@ -226,21 +208,11 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
       .filter(Boolean) as Array<{ id: string; name: string }>;
   }, [scenarios, suite.scenarioIds]);
 
-  // Apply optimistic cancellation overrides to run data
-  const runsWithOptimisticCancellations = useMemo(() => {
-    if (!runData || optimisticCancelledIds.size === 0) return runData;
-    return runData.map((run) =>
-      optimisticCancelledIds.has(run.scenarioRunId)
-        ? { ...run, status: ScenarioRunStatus.CANCELLED }
-        : run,
-    );
-  }, [runData, optimisticCancelledIds]);
-
   // Apply filters to raw run data (date filtering is done server-side)
   const filteredRuns = useMemo(() => {
-    if (!runsWithOptimisticCancellations) return [];
+    if (!runData) return [];
 
-    let runs: ScenarioRunData[] = runsWithOptimisticCancellations;
+    let runs: ScenarioRunData[] = runData;
 
     if (period) {
       const startMs = period.startDate.getTime();
@@ -429,7 +401,7 @@ export function RunHistoryList({ suite, onStatsReady, period }: RunHistoryListPr
                   expectedJobCount={expectedJobCount}
                   viewMode={viewMode}
                   onCancelRun={handleCancelRun}
-                  onCancelAll={() => handleCancelAll(batchRun.batchRunId, batchRun.scenarioRuns)}
+                  onCancelAll={() => handleCancelAll(batchRun.batchRunId)}
                 />
               );
             })
