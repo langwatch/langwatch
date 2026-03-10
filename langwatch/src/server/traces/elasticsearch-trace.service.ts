@@ -35,6 +35,7 @@ import type {
   TopicCountsResult,
   TracesForProjectResult,
 } from "./types";
+import { parsePromptReference } from "./parsePromptReference";
 
 /**
  * Service for fetching traces from Elasticsearch.
@@ -574,6 +575,10 @@ export class ElasticsearchTraceService {
       }
     }
 
+    // ES legacy format does not carry OTel attributes for prompt reference;
+    // parsePromptReference on params gives best-effort extraction from params
+    const promptRef = parsePromptReference(params);
+
     return {
       spanId: span.span_id,
       traceId: trace.trace_id,
@@ -584,6 +589,8 @@ export class ElasticsearchTraceService {
       error: span.error ?? null,
       timestamps: span.timestamps,
       metrics: span.metrics ?? null,
+      promptHandle: promptRef.promptHandle,
+      promptVersionNumber: promptRef.promptVersionNumber,
     };
   }
 

@@ -6,6 +6,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { formSchema } from "~/prompts/schemas";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import { LLM_PARAMETER_MAP } from "~/prompts/prompt-playground/llmParameterMap";
+import { computeInitialFormValuesForPrompt } from "~/prompts/utils/computeInitialFormValuesForPrompt";
 import type { ChatMessage } from "~/server/tracer/types";
 import { api, type RouterOutputs } from "~/utils/api";
 import { DEFAULT_MODEL } from "~/utils/constants";
@@ -201,8 +202,68 @@ function addIdToMessages(
 }
 
 /**
+ * Opens a tab for an existing LangWatch-managed prompt at a specific version.
+ * Falls back to creating a new tab from trace data if the prompt is not found.
+ *
+ * @returns The tab data to add, or null to fall back to new-tab-from-trace behavior
+ */
+async function tryOpenExistingPromptTab({
+  promptHandle,
+  promptVersionNumber,
+  projectId,
+  trpc,
+}: {
+  promptHandle: string;
+  promptVersionNumber: number;
+  projectId: string;
+  trpc: ReturnType<typeof api.useContext>;
+}): Promise<{ formValues: PromptConfigFormValues; versionNumber: number } | null> {
+  try {
+    const prompt = await trpc.prompts.getByIdOrHandle.fetch({
+      idOrHandle: promptHandle,
+      projectId,
+      version: promptVersionNumber,
+    });
+
+    if (!prompt) {
+      toaster.create({
+        title: "Prompt not found",
+        description: `The prompt "${promptHandle}" was not found in this project. Opening from trace data instead.`,
+        meta: { closable: true },
+      });
+      return null;
+    }
+
+    const formValues = computeInitialFormValuesForPrompt({
+      prompt,
+      useSystemMessage: true,
+    });
+
+    // If the requested version differs from what was returned, the version was not found
+    if (prompt.version !== promptVersionNumber) {
+      toaster.create({
+        title: "Version not found",
+        description: `Version ${promptVersionNumber} of "${promptHandle}" was not found. Opened latest version (${prompt.version}) instead.`,
+        meta: { closable: true },
+      });
+    }
+
+    return { formValues, versionNumber: prompt.version };
+  } catch {
+    toaster.create({
+      title: "Prompt not found",
+      description: `Could not load prompt "${promptHandle}". Opening from trace data instead.`,
+      meta: { closable: true },
+    });
+    return null;
+  }
+}
+
+/**
  * Hook to load span data from a trace into the prompt studio.
- * Single Responsibility: Orchestrate fetching span data and creating a new tab.
+ * When the span references a LangWatch-managed prompt (via promptHandle),
+ * opens the existing prompt at the recorded version. Otherwise, creates
+ * a new tab from the trace data.
  */
 export function useLoadSpanIntoPromptPlayground() {
   const loadedRef = useRef(false);
@@ -223,24 +284,53 @@ export function useLoadSpanIntoPromptPlayground() {
           spanId: spanId,
         });
 
-        if (spanData) {
-          const defaultValues = createDefaultPromptFormValues(spanData);
-          const chatMessages = addIdToMessages(
-            spanData.messages,
-            spanData.traceId,
-          );
+        if (!spanData) return;
 
-          addTab({
-            data: TabDataSchema.parse({
-              form: {
-                currentValues: defaultValues,
-              },
-              chat: {
-                initialMessagesFromSpanData: chatMessages,
-              },
-            }),
+        // When span references a managed prompt, open the existing prompt
+        if (spanData.promptHandle && spanData.promptVersionNumber) {
+          const existingPrompt = await tryOpenExistingPromptTab({
+            promptHandle: spanData.promptHandle,
+            promptVersionNumber: spanData.promptVersionNumber,
+            projectId: project.id,
+            trpc,
           });
+
+          if (existingPrompt) {
+            addTab({
+              data: TabDataSchema.parse({
+                form: {
+                  currentValues: existingPrompt.formValues,
+                },
+                chat: {
+                  initialMessagesFromSpanData: [],
+                },
+                meta: {
+                  title: existingPrompt.formValues.handle ?? null,
+                  versionNumber: existingPrompt.versionNumber,
+                },
+              }),
+            });
+            return;
+          }
         }
+
+        // Fall back: create new tab from trace data
+        const defaultValues = createDefaultPromptFormValues(spanData);
+        const chatMessages = addIdToMessages(
+          spanData.messages,
+          spanData.traceId,
+        );
+
+        addTab({
+          data: TabDataSchema.parse({
+            form: {
+              currentValues: defaultValues,
+            },
+            chat: {
+              initialMessagesFromSpanData: chatMessages,
+            },
+          }),
+        });
       } catch (error) {
         logger.error({ error }, "Error loading span data into prompt studio");
         toaster.create({

@@ -25,6 +25,7 @@ import {
   mapNormalizedSpansToSpans,
   mapTraceSummaryToTrace,
 } from "./mappers";
+import { parsePromptReference } from "./parsePromptReference";
 import type {
   AggregationFiltersInput,
   CustomersAndLabelsResult,
@@ -1002,6 +1003,9 @@ export class ClickHouseTraceService {
       };
     }
 
+    // Extract prompt reference from attributes
+    const promptRef = parsePromptReference(attrs);
+
     return {
       spanId: row.SpanId,
       traceId: row.TraceId,
@@ -1021,6 +1025,8 @@ export class ClickHouseTraceService {
               completion_tokens: completionTokens,
             }
           : null,
+      promptHandle: promptRef.promptHandle,
+      promptVersionNumber: promptRef.promptVersionNumber,
     };
   }
 

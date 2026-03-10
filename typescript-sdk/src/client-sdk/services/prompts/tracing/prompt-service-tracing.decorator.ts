@@ -16,17 +16,24 @@ export class PromptServiceTracingDecorator {
     options?: { version?: string }
   ): Promise<PromptResponse> {
     span.setType("prompt");
-    span.setAttribute('langwatch.prompt.id', id);
 
     const result = await this.target.get(id, options);
 
     if (result) {
-      span.setAttributes({
-        'langwatch.prompt.id': result.id,
-        'langwatch.prompt.handle': result.handle ?? '',
-        'langwatch.prompt.version.id': result.versionId,
-        'langwatch.prompt.version.number': result.version,
-      });
+      // Emit combined format when handle and version are available
+      if (result.handle != null && result.version != null) {
+        span.setAttribute(
+          'langwatch.prompt.id',
+          `${result.handle}:${result.version}`,
+        );
+      } else {
+        // Fall back to old separate-attribute format
+        span.setAttributes({
+          'langwatch.prompt.id': result.id,
+          'langwatch.prompt.handle': result.handle ?? '',
+          'langwatch.prompt.version.id': result.versionId,
+        });
+      }
     }
 
     if (result && shouldCaptureOutput()) {

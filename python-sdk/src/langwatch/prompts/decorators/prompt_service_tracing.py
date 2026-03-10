@@ -46,13 +46,21 @@ class PromptServiceTracing:
                 try:
                     result = func(self, prompt_id, version_number)
 
-                    span.set_attributes(
-                        {
-                            AttributeKey.LangWatchPromptId: result.id,
-                            AttributeKey.LangWatchPromptVersionId: result.version_id,
-                            AttributeKey.LangWatchPromptHandle: result.handle,
-                        }
-                    )
+                    # Emit combined format when handle and version are available
+                    if result.handle is not None and result.version is not None:
+                        span.set_attribute(
+                            AttributeKey.LangWatchPromptId,
+                            f"{result.handle}:{result.version}",
+                        )
+                    else:
+                        # Fall back to old separate-attribute format
+                        span.set_attributes(
+                            {
+                                AttributeKey.LangWatchPromptId: result.id,
+                                AttributeKey.LangWatchPromptVersionId: result.version_id,
+                                AttributeKey.LangWatchPromptHandle: result.handle,
+                            }
+                        )
                     return result
                 except Exception as ex:
                     span.record_exception(ex)
