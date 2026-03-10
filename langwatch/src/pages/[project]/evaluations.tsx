@@ -135,10 +135,10 @@ function EvaluationsV2() {
   };
 
   const experimentTypeToLabel: Record<ExperimentType, string> = {
-    BATCH_EVALUATION_V2: "Batch Evaluation",
+    BATCH_EVALUATION_V2: "Experiment (SDK)",
     BATCH_EVALUATION: "Batch Evaluation",
     DSPY: "DSPy Optimization",
-    EVALUATIONS_V3: "Experiment",
+    EVALUATIONS_V3: "Experiment (UI)",
   };
 
   return (
