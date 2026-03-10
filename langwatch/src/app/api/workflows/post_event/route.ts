@@ -125,8 +125,10 @@ app.post(
             }
           },
         })
-          .catch((error) => {
+          .catch((error: unknown) => {
             logger.error({ error }, "Error handling message");
+            const errorMessage =
+              error instanceof Error ? error.message : String(error);
 
             // handle component error
             if ("node_id" in message.payload && message.payload.node_id) {
@@ -137,7 +139,7 @@ app.post(
                     component_id: message.payload.node_id,
                     execution_state: {
                       status: "error",
-                      error: error.message,
+                      error: errorMessage,
                       timestamps: { finished_at: Date.now() },
                     },
                   },
@@ -147,7 +149,7 @@ app.post(
               void stream.writeSSE({
                 data: JSON.stringify({
                   type: "error",
-                  payload: { message: error.message },
+                  payload: { message: errorMessage },
                 }),
               });
             }
