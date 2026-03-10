@@ -647,9 +647,6 @@ export class PromptService {
     });
 
     // Case 1: Prompt doesn't exist on server - create new
-    // TODO: sync-create path is not guarded by resourceLimitMiddleware because it's an upsert.
-    // The middleware can't distinguish create vs update. Follow-up: enforce limits here
-    // without polluting the service with licensing concerns.
     if (!existingPrompt) {
       // Convert snake_case localConfigData to camelCase for createPrompt,
       // which internally calls transformToDbFormat. Without this conversion,
