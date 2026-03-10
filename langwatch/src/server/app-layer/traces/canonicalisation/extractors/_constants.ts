@@ -73,6 +73,7 @@ export const ATTR_KEYS = {
   AI_PROMPT_MESSAGES: "ai.prompt.messages",
   AI_RESPONSE: "ai.response",
   AI_RESPONSE_TEXT: "ai.response.text",
+  AI_RESPONSE_OBJECT: "ai.response.object",
   AI_MODEL: "ai.model",
   AI_USAGE: "ai.usage",
   AI_TOOL_CALL: "ai.toolCall",

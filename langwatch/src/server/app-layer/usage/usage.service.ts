@@ -13,10 +13,7 @@ import {
 } from "./usage-meter-policy";
 import { OrganizationRepository } from "../../repositories/organization.repository";
 import { getClickHouseClient } from "../../clickhouse/client";
-import { createLogger } from "~/utils/logger/server";
 import { env } from "~/env.mjs";
-
-const logger = createLogger("langwatch:usage:usageService");
 
 const CACHE_TTL_MS = 30_000; // 30 seconds
 
@@ -215,11 +212,6 @@ export class UsageService {
       isFree: plan.free,
       clickhouseAvailable: !!getClickHouseClient(),
     });
-
-    logger.info(
-      { organizationId, ...decision },
-      "resolved meter decision",
-    );
 
     return decision;
   }

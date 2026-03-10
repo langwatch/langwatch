@@ -2,6 +2,10 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { RoleService } from "../../role";
 import {
+  assertEnterprisePlan,
+  ENTERPRISE_FEATURE_ERRORS,
+} from "../enterprise";
+import {
   checkOrganizationPermission,
   checkTeamPermission,
   hasOrganizationPermission,
@@ -56,6 +60,12 @@ export const roleRouter = createTRPCRouter({
     )
     .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ ctx, input }) => {
+      await assertEnterprisePlan({
+        organizationId: input.organizationId,
+        user: ctx.session.user,
+        errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
+      });
+
       const roleService = new RoleService(ctx.prisma);
       return await roleService.createRole({
         organizationId: input.organizationId,
@@ -79,7 +89,7 @@ export const roleRouter = createTRPCRouter({
       const roleService = new RoleService(ctx.prisma);
       const role = await roleService.getRoleById(input.roleId);
 
-      // Check if user has permission for this organization
+      // Check permission before revealing plan details
       const hasPermission = await hasOrganizationPermission(
         ctx,
         role.organizationId,
@@ -89,6 +99,12 @@ export const roleRouter = createTRPCRouter({
       if (!hasPermission) {
         throw new TRPCError({ code: "UNAUTHORIZED" });
       }
+
+      await assertEnterprisePlan({
+        organizationId: role.organizationId,
+        user: ctx.session.user,
+        errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
+      });
 
       ctx.permissionChecked = true;
       return next();
@@ -136,7 +152,36 @@ export const roleRouter = createTRPCRouter({
         customRoleId: z.string(),
       }),
     )
-    .use(checkTeamPermission("organization:manage"))
+    .use(async ({ ctx, input, next }) => {
+      const team = await ctx.prisma.team.findUnique({
+        where: { id: input.teamId },
+        select: { organizationId: true },
+      });
+
+      if (!team) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Team not found" });
+      }
+
+      // Check permission before revealing plan details
+      const hasPermission = await hasOrganizationPermission(
+        ctx,
+        team.organizationId,
+        "organization:manage",
+      );
+
+      if (!hasPermission) {
+        throw new TRPCError({ code: "UNAUTHORIZED" });
+      }
+
+      await assertEnterprisePlan({
+        organizationId: team.organizationId,
+        user: ctx.session.user,
+        errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
+      });
+
+      ctx.permissionChecked = true;
+      return next();
+    })
     .mutation(async ({ ctx, input }) => {
       const roleService = new RoleService(ctx.prisma);
       return await roleService.assignRoleToUser(

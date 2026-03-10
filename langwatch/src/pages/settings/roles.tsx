@@ -18,6 +18,7 @@ import { useState } from "react";
 import { Eye, Plus, Shield, Users } from "react-feather";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import SettingsLayout from "../../components/SettingsLayout";
+import { ContactSalesBlock } from "../../components/subscription/ContactSalesBlock";
 import { PermissionViewer } from "../../components/settings/PermissionViewer";
 import { RoleCard } from "../../components/settings/RoleCard";
 import { RoleFormDialog } from "../../components/settings/RoleFormDialog";
@@ -65,6 +66,9 @@ function RolesSettings() {
               </Alert.Description>
             </Alert.Content>
           </Alert.Root>
+          <Box width="full">
+            <ContactSalesBlock />
+          </Box>
         </VStack>
       </SettingsLayout>
     );

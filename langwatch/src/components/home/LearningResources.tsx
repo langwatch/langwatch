@@ -6,6 +6,7 @@ import {
   HStack,
   Text,
   VStack,
+  type JsxStyleProps,
 } from "@chakra-ui/react";
 import { LuBookOpen, LuCirclePlay, LuExternalLink } from "react-icons/lu";
 import { Link } from "../ui/link";
@@ -14,8 +15,9 @@ type ResourceCard = {
   title: string;
   description: string;
   icon: React.ReactNode;
-  color: string;
-  background: string;
+  iconColor: JsxStyleProps['color'];
+  linkColor: JsxStyleProps['color'];
+  background: JsxStyleProps['backgroundColor'];
   href: string;
   cta: string;
 };
@@ -25,7 +27,8 @@ const resources: ResourceCard[] = [
     title: "Documentation",
     description: "Learn how to integrate and use LangWatch effectively",
     icon: <LuBookOpen size={18} />,
-    color: "blue",
+    iconColor: "blue.emphasized",
+    linkColor: "blue.solid",
     background: "blue.subtle",
     href: "https://docs.langwatch.ai",
     cta: "View documentation",
@@ -34,7 +37,8 @@ const resources: ResourceCard[] = [
     title: "Video Tutorials",
     description: "Watch step-by-step guides and feature walkthroughs",
     icon: <LuCirclePlay size={22} />,
-    color: "red",
+    iconColor: "red.emphasized",
+    linkColor: "red.solid",
     background: "red.subtle",
     href: "https://www.youtube.com/@LangWatch/videos",
     cta: "Watch videos",
@@ -72,7 +76,7 @@ function ResourceCardItem({ resource }: ResourceCardItemProps) {
         width="full"
       >
         <HStack gap={3} align="start">
-          <Box padding={2} borderRadius="lg" color={`${resource.color}.500`}>
+          <Box padding={2} borderRadius="lg" color={`${resource.iconColor}`}>
             {resource.icon}
           </Box>
           <VStack align="start" gap={1} flex={1}>
@@ -82,7 +86,7 @@ function ResourceCardItem({ resource }: ResourceCardItemProps) {
             <Text fontSize="xs" color="fg.muted">
               {resource.description}
             </Text>
-            <HStack color={`${resource.color}.600`} fontSize="xs">
+            <HStack color={resource.linkColor} fontSize="xs">
               <Text>{resource.cta}</Text>
               <LuExternalLink size={12} />
             </HStack>

@@ -48,21 +48,19 @@ function createTestSpan(
 }
 
 describe("applySpanToSummary() langwatch.origin hoisting", () => {
-  let extractSpy: ReturnType<typeof vi.spyOn>;
-
   beforeEach(() => {
-    extractSpy = vi.spyOn(
+    vi.useFakeTimers();
+    vi.setSystemTime(99999);
+    vi.spyOn(
       TraceIOExtractionService.prototype,
       "extractRichIOFromSpan",
-    );
-    extractSpy.mockReturnValue(null);
+    ).mockReturnValue(null);
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
-
-  // ---- Step 2: Hoisting langwatch.origin ----
 
   describe("when root span has langwatch.origin", () => {
     it("hoists origin to trace summary attributes", () => {
@@ -73,7 +71,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         },
       });
 
-      const state = applySpanToSummary(createInitState(), span);
+      const state = applySpanToSummary({ state: createInitState(), span: span });
 
       expect(state.attributes["langwatch.origin"]).toBe("evaluation");
     });
@@ -99,8 +97,8 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         spanAttributes: {},
       });
 
-      let state = applySpanToSummary(createInitState(), childSpan);
-      state = applySpanToSummary(state, rootSpan);
+      let state = applySpanToSummary({ state: createInitState(), span: childSpan });
+      state = applySpanToSummary({ state, span: rootSpan });
 
       expect(state.attributes["langwatch.origin"]).toBe("evaluation");
     });
@@ -128,8 +126,8 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         },
       });
 
-      let state = applySpanToSummary(createInitState(), childSpan);
-      state = applySpanToSummary(state, rootSpan);
+      let state = applySpanToSummary({ state: createInitState(), span: childSpan });
+      state = applySpanToSummary({ state, span: rootSpan });
 
       expect(state.attributes["langwatch.origin"]).toBe("simulation");
     });
@@ -142,7 +140,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         spanAttributes: {},
       });
 
-      const state = applySpanToSummary(createInitState(), span);
+      const state = applySpanToSummary({ state: createInitState(), span: span });
 
       expect(state.attributes["langwatch.origin"]).toBeUndefined();
     });
@@ -168,14 +166,12 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         spanAttributes: {},
       });
 
-      let state = applySpanToSummary(createInitState(), rootSpan);
-      state = applySpanToSummary(state, childSpan);
+      let state = applySpanToSummary({ state: createInitState(), span: rootSpan });
+      state = applySpanToSummary({ state, span: childSpan });
 
       expect(state.attributes["langwatch.origin"]).toBe("simulation");
     });
   });
-
-  // ---- Step 1d: Strip legacy markers ----
 
   describe("when span has metadata.platform = 'optimization_studio'", () => {
     it("strips metadata.platform from hoisting", () => {
@@ -186,7 +182,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         },
       });
 
-      const state = applySpanToSummary(createInitState(), span);
+      const state = applySpanToSummary({ state: createInitState(), span: span });
 
       expect(state.attributes["langwatch.origin"]).toBe("workflow");
       expect(state.attributes["metadata.platform"]).toBeUndefined();
@@ -201,7 +197,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         },
       });
 
-      const state = applySpanToSummary(createInitState(), span);
+      const state = applySpanToSummary({ state: createInitState(), span: span });
 
       expect(state.attributes["metadata.platform"]).toBe("my-custom-platform");
     });
@@ -216,7 +212,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         },
       });
 
-      const state = applySpanToSummary(createInitState(), span);
+      const state = applySpanToSummary({ state: createInitState(), span: span });
 
       expect(state.attributes["langwatch.origin"]).toBe("simulation");
       const labels = JSON.parse(
@@ -236,7 +232,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         },
       });
 
-      const state = applySpanToSummary(createInitState(), span);
+      const state = applySpanToSummary({ state: createInitState(), span: span });
 
       expect(state.attributes["langwatch.labels"]).toBeUndefined();
     });
@@ -251,14 +247,12 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         },
       });
 
-      const state = applySpanToSummary(createInitState(), span);
+      const state = applySpanToSummary({ state: createInitState(), span: span });
 
       expect(state.attributes["metadata.environment"]).toBe("production");
       expect(state.attributes["langwatch.origin"]).toBe("workflow");
     });
   });
-
-  // ---- Step 3: Legacy inference ----
 
   describe("when span has instrumentationScope.name = 'langwatch-evaluation'", () => {
     it("infers langwatch.origin = 'evaluation'", () => {
@@ -267,7 +261,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         spanAttributes: {},
       });
 
-      const state = applySpanToSummary(createInitState(), span);
+      const state = applySpanToSummary({ state: createInitState(), span: span });
 
       expect(state.attributes["langwatch.origin"]).toBe("evaluation");
     });
@@ -280,7 +274,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         spanAttributes: {},
       });
 
-      const state = applySpanToSummary(createInitState(), span);
+      const state = applySpanToSummary({ state: createInitState(), span: span });
 
       expect(state.attributes["langwatch.origin"]).toBe("simulation");
     });
@@ -294,7 +288,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         },
       });
 
-      const state = applySpanToSummary(createInitState(), span);
+      const state = applySpanToSummary({ state: createInitState(), span: span });
 
       expect(state.attributes["langwatch.origin"]).toBe("workflow");
     });
@@ -308,7 +302,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         },
       });
 
-      const state = applySpanToSummary(createInitState(), span);
+      const state = applySpanToSummary({ state: createInitState(), span: span });
 
       expect(state.attributes["langwatch.origin"]).toBe("simulation");
     });
@@ -323,7 +317,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         spanAttributes: {},
       });
 
-      const state = applySpanToSummary(createInitState(), span);
+      const state = applySpanToSummary({ state: createInitState(), span: span });
 
       expect(state.attributes["langwatch.origin"]).toBe("simulation");
     });
@@ -337,7 +331,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         },
       });
 
-      const state = applySpanToSummary(createInitState(), span);
+      const state = applySpanToSummary({ state: createInitState(), span: span });
 
       expect(state.attributes["langwatch.origin"]).toBe("evaluation");
     });
@@ -353,7 +347,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         },
       });
 
-      const state = applySpanToSummary(createInitState(), span);
+      const state = applySpanToSummary({ state: createInitState(), span: span });
 
       expect(state.attributes["langwatch.origin"]).toBe("evaluation");
     });
@@ -365,25 +359,25 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         spanAttributes: {},
       });
 
-      const state = applySpanToSummary(createInitState(), span);
+      const state = applySpanToSummary({ state: createInitState(), span: span });
 
       expect(state.attributes["langwatch.origin"]).toBeUndefined();
     });
   });
 });
 
-describe("applySpanToSummary() langwatch.origin.source hoisting", () => {
-  let extractSpy: ReturnType<typeof vi.spyOn>;
-
+describe("applySpanToSummary() langwatch.source hoisting", () => {
   beforeEach(() => {
-    extractSpy = vi.spyOn(
+    vi.useFakeTimers();
+    vi.setSystemTime(99999);
+    vi.spyOn(
       TraceIOExtractionService.prototype,
       "extractRichIOFromSpan",
-    );
-    extractSpy.mockReturnValue(null);
+    ).mockReturnValue(null);
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -396,7 +390,7 @@ describe("applySpanToSummary() langwatch.origin.source hoisting", () => {
         },
       });
 
-      const state = applySpanToSummary(createInitState(), span);
+      const state = applySpanToSummary({ state: createInitState(), span: span });
 
       expect(state.attributes["langwatch.origin.source"]).toBe("platform");
     });
@@ -412,7 +406,7 @@ describe("applySpanToSummary() langwatch.origin.source hoisting", () => {
         spanAttributes: {},
       });
 
-      const state = applySpanToSummary(createInitState(), span);
+      const state = applySpanToSummary({ state: createInitState(), span: span });
 
       expect(state.attributes["langwatch.origin.source"]).toBe("platform");
     });
@@ -438,8 +432,8 @@ describe("applySpanToSummary() langwatch.origin.source hoisting", () => {
         },
       });
 
-      let state = applySpanToSummary(createInitState(), childSpan);
-      state = applySpanToSummary(state, rootSpan);
+      let state = applySpanToSummary({ state: createInitState(), span: childSpan });
+      state = applySpanToSummary({ state, span: rootSpan });
 
       expect(state.attributes["langwatch.origin.source"]).toBe("platform");
     });
@@ -452,7 +446,7 @@ describe("applySpanToSummary() langwatch.origin.source hoisting", () => {
         spanAttributes: {},
       });
 
-      const state = applySpanToSummary(createInitState(), span);
+      const state = applySpanToSummary({ state: createInitState(), span: span });
 
       expect(state.attributes["langwatch.origin.source"]).toBeUndefined();
     });
@@ -476,8 +470,8 @@ describe("applySpanToSummary() langwatch.origin.source hoisting", () => {
         spanAttributes: {},
       });
 
-      let state = applySpanToSummary(createInitState(), childSpan);
-      state = applySpanToSummary(state, rootSpan);
+      let state = applySpanToSummary({ state: createInitState(), span: childSpan });
+      state = applySpanToSummary({ state, span: rootSpan });
 
       expect(state.attributes["langwatch.origin.source"]).toBe("platform");
     });

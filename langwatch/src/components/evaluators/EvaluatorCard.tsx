@@ -216,7 +216,7 @@ export function EvaluatorCard({
             <Spacer />
 
             {/* Name */}
-            <Text color="fg.muted" fontSize="sm" fontWeight={500}>
+            <Text color="fg" fontSize="sm" fontWeight={500}>
               {evaluator.name}
             </Text>
 

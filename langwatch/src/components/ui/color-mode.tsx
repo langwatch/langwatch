@@ -9,6 +9,8 @@ import { LuMoon, LuSun } from "react-icons/lu";
 
 export const colorSystem = {
   gray: {
+    950: { value: "#09090b" },
+    900: { value: "#111113" },
     800: { value: "#090F1D" },
     700: { value: "#1F2937" },
     600: { value: "#213B41" },
@@ -134,11 +136,6 @@ export const colorSystem = {
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface ColorModeProviderProps extends ThemeProviderProps {}
 
-// Check if dark mode feature is enabled via build-time env var
-const isDarkModeEnabled =
-  process.env.NEXT_PUBLIC_FEATURE_DARK_MODE === "true" ||
-  process.env.NEXT_PUBLIC_FEATURE_DARK_MODE === "1";
-
 export function ColorModeProvider(props: ColorModeProviderProps) {
   // When dark mode feature is disabled, force light mode
   // When enabled, use system preference for automatic light/dark switching
@@ -158,12 +155,11 @@ export function ColorModeProvider(props: ColorModeProviderProps) {
       `}</style>
       <ThemeProvider
         attribute="class"
-        defaultTheme={isDarkModeEnabled ? "system" : "light"}
+        defaultTheme="light"
         disableTransitionOnChange={false}
-        enableSystem={isDarkModeEnabled}
-        enableColorScheme={isDarkModeEnabled}
-        forcedTheme={isDarkModeEnabled ? undefined : "light"}
-        themes={isDarkModeEnabled ? ["light", "dark", "system"] : ["light"]}
+        enableSystem
+        enableColorScheme
+        themes={["light", "dark", "system"]}
         {...props}
       />
     </>

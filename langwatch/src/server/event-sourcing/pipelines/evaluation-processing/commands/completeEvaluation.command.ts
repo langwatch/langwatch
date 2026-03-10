@@ -39,11 +39,14 @@ const config: EvaluationCommandConfig<
     label: commandData.label,
     details: commandData.details,
     error: commandData.error,
+    errorDetails: commandData.errorDetails ?? null,
     costId: commandData.costId ?? null,
   }),
   getLogContext: (commandData) => ({
     status: commandData.status,
   }),
+  makeIdempotencyKey: (commandData) =>
+    `${commandData.tenantId}:${commandData.evaluationId}:completed`,
 };
 
 /**

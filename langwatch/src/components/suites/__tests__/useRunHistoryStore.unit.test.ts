@@ -174,7 +174,7 @@ describe("useRunHistoryStore", () => {
       );
     });
 
-    it("preserves existing query params from router but excludes path params", () => {
+    it("preserves existing query params from router including path params", () => {
       mockRouter.query.suite = "my-suite";
       getState(store).setGroupBy("target");
       getState(store).syncToUrl(mockRouter);
@@ -183,7 +183,7 @@ describe("useRunHistoryStore", () => {
       const query = (call[0] as { query: Record<string, string> }).query;
       expect(query).toHaveProperty("suite", "my-suite");
       expect(query).toHaveProperty("groupBy", "target");
-      expect(query).not.toHaveProperty("project");
+      expect(query).toHaveProperty("project", "my-project");
     });
 
     it("omits empty filter values", () => {

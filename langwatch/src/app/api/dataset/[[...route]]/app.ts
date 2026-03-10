@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
-import { createManyDatasetRecords } from "../../../../server/api/routers/datasetRecord";
+import { createManyDatasetRecords } from "../../../../server/api/routers/datasetRecord.utils";
 import type { DatasetColumns } from "../../../../server/datasets/types";
 import { prisma } from "../../../../server/db";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";

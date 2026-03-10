@@ -49,6 +49,8 @@ const config: ExperimentRunCommandConfig<
     targetId: commandData.targetId,
     hasError: !!commandData.error,
   }),
+  makeIdempotencyKey: (commandData) =>
+    `${commandData.tenantId}:${commandData.runId}:target:${commandData.index}:${commandData.targetId}`,
 };
 
 /**
@@ -82,6 +84,10 @@ export class RecordTargetResultCommand
 
   static getAggregateId(payload: RecordTargetResultCommandData): string {
     return makeExperimentRunKey(payload.experimentId, payload.runId);
+  }
+
+  static getGroupKey(payload: RecordTargetResultCommandData): string {
+    return `${payload.experimentId}:${payload.runId}:item:${payload.index}`;
   }
 
   static getSpanAttributes(

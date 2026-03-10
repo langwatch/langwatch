@@ -25,6 +25,13 @@ export interface CommandHandlerClassStatic<Payload, Type extends CommandType> {
   getAggregateId(payload: Payload): string;
 
   /**
+   * Optional: Extract a custom group key from the command payload for queue routing.
+   * When provided, enables per-item parallelism instead of per-aggregate serialization.
+   * Falls back to getAggregateId when not defined.
+   */
+  getGroupKey?(payload: Payload): string;
+
+  /**
    * Optional: Extract span attributes from the payload for observability.
    */
   getSpanAttributes?(

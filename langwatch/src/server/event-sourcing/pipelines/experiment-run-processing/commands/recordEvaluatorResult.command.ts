@@ -54,6 +54,8 @@ const config: ExperimentRunCommandConfig<
     evaluatorId: commandData.evaluatorId,
     status: commandData.status,
   }),
+  makeIdempotencyKey: (commandData) =>
+    `${commandData.tenantId}:${commandData.runId}:eval:${commandData.index}:${commandData.targetId}:${commandData.evaluatorId}`,
 };
 
 /**
@@ -87,6 +89,10 @@ export class RecordEvaluatorResultCommand
 
   static getAggregateId(payload: RecordEvaluatorResultCommandData): string {
     return makeExperimentRunKey(payload.experimentId, payload.runId);
+  }
+
+  static getGroupKey(payload: RecordEvaluatorResultCommandData): string {
+    return `${payload.experimentId}:${payload.runId}:item:${payload.index}`;
   }
 
   static getSpanAttributes(
