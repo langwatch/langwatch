@@ -35,8 +35,8 @@ Feature: Beta Pill Indicator
     Then a popover appears displaying the custom message content
 
   @integration
-  Scenario: Suites page displays a beta indicator
-    Given I am on the Suites page
-    When I look at the page header
-    Then I see a "Beta" pill badge next to the Suites heading
+  Scenario: Suites sidebar item displays a beta indicator
+    Given I am viewing the sidebar navigation
+    When I look at the Suites menu item
+    Then I see a "Beta" pill badge next to the Suites label
     And hovering over it shows information about the beta status

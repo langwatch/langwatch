@@ -9,20 +9,23 @@ import {
 } from "./popover";
 
 /**
- * BetaPill wraps content to indicate a feature is in beta.
+ * BetaPill indicates a feature is in beta.
  *
- * Displays a small "Beta" pill badge alongside children. On hover or
- * keyboard focus, a popover appears with a customizable message that
- * supports rich content (styled text, clickable links, etc.).
+ * Displays a small "Beta" pill badge. On hover or keyboard focus,
+ * a popover appears with a customizable message that supports
+ * rich content (styled text, clickable links, etc.).
  *
- * @param children - The content to wrap (e.g. a page heading)
+ * Can optionally wrap content (children) to place the badge alongside it,
+ * or be used standalone (e.g. as a rightElement in a menu item).
+ *
+ * @param children - Optional content to wrap (e.g. a page heading)
  * @param message - ReactNode rendered inside the popover on hover/focus
  */
 export function BetaPill({
   children,
   message,
 }: {
-  children: ReactNode;
+  children?: ReactNode;
   message: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -61,36 +64,44 @@ export function BetaPill({
     handleClose();
   }, [handleClose]);
 
+  const pill = (
+    <PopoverRoot
+      open={open}
+      onOpenChange={({ open: isOpen }) => setOpen(isOpen)}
+      positioning={{ placement: "bottom-start" }}
+    >
+      <PopoverTrigger asChild>
+        <Badge
+          size="sm"
+          variant="subtle"
+          colorPalette="purple"
+          cursor="pointer"
+          tabIndex={0}
+          onMouseEnter={handleOpen}
+          onMouseLeave={handleClose}
+          onFocus={handleOpen}
+          onBlur={handleClose}
+        >
+          Beta
+        </Badge>
+      </PopoverTrigger>
+      <PopoverContent
+        onMouseEnter={handlePopoverEnter}
+        onMouseLeave={handlePopoverLeave}
+      >
+        <PopoverBody>{message}</PopoverBody>
+      </PopoverContent>
+    </PopoverRoot>
+  );
+
+  if (!children) {
+    return pill;
+  }
+
   return (
     <HStack gap={2} align="center">
       {children}
-      <PopoverRoot
-        open={open}
-        onOpenChange={({ open: isOpen }) => setOpen(isOpen)}
-        positioning={{ placement: "bottom-start" }}
-      >
-        <PopoverTrigger asChild>
-          <Badge
-            size="sm"
-            variant="subtle"
-            colorPalette="purple"
-            cursor="pointer"
-            tabIndex={0}
-            onMouseEnter={handleOpen}
-            onMouseLeave={handleClose}
-            onFocus={handleOpen}
-            onBlur={handleClose}
-          >
-            Beta
-          </Badge>
-        </PopoverTrigger>
-        <PopoverContent
-          onMouseEnter={handlePopoverEnter}
-          onMouseLeave={handlePopoverLeave}
-        >
-          <PopoverBody>{message}</PopoverBody>
-        </PopoverContent>
-      </PopoverRoot>
+      {pill}
     </HStack>
   );
 }

@@ -9,8 +9,7 @@
  * @see specs/suites/suite-workflow.feature - "Layout Consistency (Issue #1671)"
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SimulationSuite } from "@prisma/client";
 
@@ -153,34 +152,7 @@ describe("Suites Page Layout (Issue #1671)", () => {
       expect(dashboardLayoutRenderCount).toBe(1);
     });
 
-    it("displays a Beta pill badge next to the Suites heading", async () => {
-      const { default: SuitesPage } = await import(
-        "~/pages/[project]/simulations/suites/index"
-      );
-
-      render(<SuitesPage />, { wrapper: Wrapper });
-
-      expect(screen.getByText("Beta")).toBeInTheDocument();
-      expect(screen.getByRole("heading", { name: "Suites" })).toBeInTheDocument();
-    });
-
-    it("shows beta status information on hover", async () => {
-      const user = userEvent.setup();
-      const { default: SuitesPage } = await import(
-        "~/pages/[project]/simulations/suites/index"
-      );
-
-      render(<SuitesPage />, { wrapper: Wrapper });
-
-      await user.hover(screen.getByText("Beta"));
-
-      await waitFor(() => {
-        expect(
-          screen.getByText(/currently in beta/),
-        ).toBeInTheDocument();
-      });
-    });
-  });
+});
 
   describe("when rendering the SuiteSidebar", () => {
     it("does not render a 'SUITES' section header in the sidebar", () => {
