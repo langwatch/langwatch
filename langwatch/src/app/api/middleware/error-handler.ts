@@ -2,7 +2,10 @@ import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import { DomainError } from "~/server/app-layer/domain-error";
+import { prisma } from "~/server/db";
+import { ERR_RESOURCE_LIMIT } from "~/server/license-enforcement/constants";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
+import { buildResourceLimitMessage } from "~/server/license-enforcement/limit-message";
 import { NotFoundError as PromptNotFoundError } from "~/server/prompt-config/errors";
 
 import { HttpError, NotFoundError } from "../shared/errors";
@@ -28,18 +31,19 @@ export const handleError = async (
 ) => {
   // Determine status code and response
   // Note: Logging is handled by the logger middleware, not here, to avoid double logging
-  const { statusCode, response } = determineErrorResponse(error);
+  const { statusCode, response } = await determineErrorResponse(error, c);
 
   return c.json(response, statusCode);
 };
 
-function determineErrorResponse(
+async function determineErrorResponse(
   error: Error & {
     status?: ContentfulStatusCode;
     code?: string;
     name?: string;
   },
-): { statusCode: ContentfulStatusCode; response: object } {
+  c: Context,
+): Promise<{ statusCode: ContentfulStatusCode; response: object }> {
   // DomainErrors are handled first — normalize to client-safe shape
   if (DomainError.is(error)) {
     return {
@@ -53,11 +57,20 @@ function determineErrorResponse(
 
   // LimitExceededError maps to 403 with structured resource limit response
   if (error instanceof LimitExceededError) {
+    const organizationId = await resolveOrganizationIdFromContext(c);
+    const message = organizationId
+      ? await buildResourceLimitMessage({
+          organizationId,
+          limitType: error.limitType,
+          max: error.max,
+        })
+      : error.message;
+
     return {
       statusCode: 403,
       response: {
-        error: "ERR_RESOURCE_LIMIT",
-        message: error.message,
+        error: ERR_RESOURCE_LIMIT,
+        message,
         limitType: error.limitType,
         current: error.current,
         max: error.max,
@@ -110,4 +123,33 @@ function determineErrorResponse(
           : "Internal server error",
     }),
   };
+}
+
+/**
+ * Resolves organizationId from the Hono context.
+ *
+ * Tries the organization middleware cache first, then falls back to
+ * resolving via the project's teamId. Returns null if neither is available.
+ */
+async function resolveOrganizationIdFromContext(
+  c: Context,
+): Promise<string | null> {
+  // Try cached organization from organizationMiddleware
+  const cachedOrg = c.get("organization") as { id: string } | undefined;
+  if (cachedOrg?.id) {
+    return cachedOrg.id;
+  }
+
+  // Fall back to resolving via project.teamId
+  const project = c.get("project") as { teamId: string } | undefined;
+  if (!project?.teamId) {
+    return null;
+  }
+
+  const team = await prisma.team.findUnique({
+    where: { id: project.teamId },
+    select: { organizationId: true },
+  });
+
+  return team?.organizationId ?? null;
 }

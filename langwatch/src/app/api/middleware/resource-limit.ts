@@ -1,10 +1,10 @@
 import type { MiddlewareHandler } from "hono";
 import { notifyPlanLimitReached } from "../../../../ee/billing";
-import { env } from "~/env.mjs";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
-import { LIMIT_TYPE_LABELS } from "~/server/license-enforcement/constants";
+import { ERR_RESOURCE_LIMIT } from "~/server/license-enforcement/constants";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
+import { buildResourceLimitMessage } from "~/server/license-enforcement/limit-message";
 import { createLicenseEnforcementService } from "~/server/license-enforcement";
 import type { LimitType } from "~/server/license-enforcement/types";
 import { createLogger } from "~/utils/logger/server";
@@ -14,8 +14,8 @@ const logger = createLogger("langwatch:api:middleware:resource-limit");
 /**
  * Creates a Hono middleware that enforces resource limits for create operations.
  *
- * Self-contained: resolves organizationId from project.teamId directly,
- * without depending on organizationMiddleware.
+ * Uses organizationMiddleware's cached organization when available (prompts, evaluators),
+ * falling back to a DB query for routes that don't use organizationMiddleware (scenarios).
  *
  * @param limitType - The resource type to enforce limits for
  * @returns Hono middleware handler
@@ -25,7 +25,14 @@ export function resourceLimitMiddleware(
 ): MiddlewareHandler {
   return async (c, next) => {
     const project = c.get("project");
-    const organizationId = await resolveOrganizationId(project.teamId);
+
+    // Prefer organization already resolved by organizationMiddleware to avoid redundant DB query.
+    // Falls back to a direct DB lookup for routes that don't use organizationMiddleware (e.g. scenarios).
+    const cachedOrganizationId = (
+      c.get("organization") as { id: string } | undefined
+    )?.id;
+    const organizationId =
+      cachedOrganizationId ?? (await resolveOrganizationId(project.teamId));
 
     if (!organizationId) {
       logger.error(
@@ -62,7 +69,7 @@ export function resourceLimitMiddleware(
 
         return c.json(
           {
-            error: "ERR_RESOURCE_LIMIT",
+            error: ERR_RESOURCE_LIMIT,
             message,
             limitType: error.limitType,
             current: error.current,
@@ -91,80 +98,6 @@ async function resolveOrganizationId(
   });
 
   return team?.organizationId ?? null;
-}
-
-/**
- * Builds a customer-facing message that varies by planSource and deployment mode.
- *
- * Message patterns:
- * - free + SaaS: "Free plan limit of {max} {label} reached. To increase your limits, upgrade your plan at ..."
- * - subscription + SaaS: "Plan limit of {max} {label} reached. To increase your limits, upgrade your plan at ..."
- * - free + self-hosted: "Free plan limit of {max} {label} reached. To increase your limits, get a license at ..."
- * - license + self-hosted: "License limit of {max} {label} reached. To increase your limits, upgrade your license at ..."
- */
-async function buildResourceLimitMessage({
-  organizationId,
-  limitType,
-  max,
-}: {
-  organizationId: string;
-  limitType: LimitType;
-  max: number;
-}): Promise<string> {
-  const label = LIMIT_TYPE_LABELS[limitType];
-
-  let planSource: "free" | "subscription" | "license" = "free";
-  try {
-    const activePlan = await getApp().planProvider.getActivePlan({
-      organizationId,
-    });
-    planSource = activePlan.planSource;
-  } catch (error) {
-    logger.error(
-      { error, organizationId },
-      "Failed to resolve plan for limit message, defaulting to free",
-    );
-  }
-
-  const prefix = buildMessagePrefix(planSource);
-  const action = buildUpgradeAction(planSource);
-
-  return `${prefix} limit of ${max} ${label} reached. To increase your limits, ${action}`;
-}
-
-/**
- * Returns the prefix for the limit message based on planSource.
- */
-function buildMessagePrefix(
-  planSource: "free" | "subscription" | "license",
-): string {
-  switch (planSource) {
-    case "free":
-      return "Free plan";
-    case "subscription":
-      return "Plan";
-    case "license":
-      return "License";
-  }
-}
-
-/**
- * Returns the upgrade action based on planSource and deployment mode.
- */
-function buildUpgradeAction(
-  planSource: "free" | "subscription" | "license",
-): string {
-  if (env.IS_SAAS) {
-    return "upgrade your plan at https://app.langwatch.ai/settings/subscription";
-  }
-
-  const baseHost = env.BASE_HOST ?? "https://app.langwatch.ai";
-
-  if (planSource === "free") {
-    return `get a license at ${baseHost}/settings/license`;
-  }
-
-  return `upgrade your license at ${baseHost}/settings/license`;
 }
 
 /**

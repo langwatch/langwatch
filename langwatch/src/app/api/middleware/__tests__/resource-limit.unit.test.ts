@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach, type Mock } from "vitest";
 import { Hono } from "hono";
 import { resourceLimitMiddleware } from "../resource-limit";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
+import { ERR_RESOURCE_LIMIT } from "~/server/license-enforcement/constants";
 import type { LimitType } from "~/server/license-enforcement/types";
 
 // Mock dependencies
@@ -128,7 +129,7 @@ describe("resourceLimitMiddleware()", () => {
 
       expect(res.status).toBe(403);
       const body = await res.json();
-      expect(body.error).toBe("ERR_RESOURCE_LIMIT");
+      expect(body.error).toBe(ERR_RESOURCE_LIMIT);
       expect(body.limitType).toBe("prompts");
       expect(body.current).toBe(5);
       expect(body.max).toBe(5);
@@ -272,6 +273,29 @@ describe("resourceLimitMiddleware()", () => {
       const res = await app.request("/", { method: "POST" });
 
       expect(res.status).toBe(403);
+    });
+  });
+
+  describe("when organizationMiddleware has already resolved organization", () => {
+    function createTestAppWithOrganization(limitType: LimitType) {
+      const app = new Hono();
+      // Simulate authMiddleware + organizationMiddleware setting both project and organization
+      app.use("/*", async (c, next) => {
+        c.set("project", project);
+        c.set("organization", { id: "org-cached" });
+        await next();
+      });
+      app.use("/*", resourceLimitMiddleware(limitType));
+      app.post("/", (c) => c.json({ created: true }));
+      return app;
+    }
+
+    it("uses cached organizationId and skips DB query", async () => {
+      const app = createTestAppWithOrganization("prompts");
+      await app.request("/", { method: "POST" });
+
+      expect(prisma.team.findUnique).not.toHaveBeenCalled();
+      expect(mockEnforceLimit).toHaveBeenCalledWith("org-cached", "prompts");
     });
   });
 });
