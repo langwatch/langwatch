@@ -448,18 +448,6 @@ function EvaluationsV2() {
                                           <MoreVertical size={16} />
                                         </Menu.Trigger>
                                         <Menu.Content>
-                                          <Menu.Item
-                                            value="view-results"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              void router.push(
-                                                `/${project?.slug}/experiments/${experiment.slug}`,
-                                              );
-                                            }}
-                                          >
-                                            <LuEye size={16} />
-                                            View Results
-                                          </Menu.Item>
                                           {experiment.type ===
                                             "EVALUATIONS_V3" && (
                                             <Menu.Item
@@ -493,6 +481,18 @@ function EvaluationsV2() {
                                                 Edit
                                               </Menu.Item>
                                             )}
+                                          <Menu.Item
+                                            value="view-results"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              void router.push(
+                                                `/${project?.slug}/experiments/${experiment.slug}`,
+                                              );
+                                            }}
+                                          >
+                                            <LuEye size={16} />
+                                            View Results
+                                          </Menu.Item>
                                           {hasPermission(
                                             "evaluations:manage",
                                           ) && (
