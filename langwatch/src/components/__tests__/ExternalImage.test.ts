@@ -36,13 +36,13 @@ describe("getImageUrl", () => {
   });
 
   describe("when URL is from a known Google image host", () => {
-    it("accepts subdomains of gstatic.com", () => {
+    it("accepts subdomains of googleusercontent.com", () => {
       expect(
         getImageUrl("https://lh3.googleusercontent.com/some/path/to/image"),
       ).toBe("https://lh3.googleusercontent.com/some/path/to/image");
     });
 
-    it("accepts subdomains of googleusercontent.com", () => {
+    it("accepts subdomains of gstatic.com", () => {
       expect(
         getImageUrl("https://encrypted-tbn0.gstatic.com/images?q=some-hash"),
       ).toBe("https://encrypted-tbn0.gstatic.com/images?q=some-hash");
