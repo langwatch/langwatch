@@ -61,6 +61,8 @@ export default function IndividualScenarioRunPage() {
     {
       scenarioRunId: scenarioRunId ?? "",
       projectId: project?.id ?? "",
+      startDate: period.startDate.getTime(),
+      endDate: period.endDate.getTime(),
     },
     {
       enabled: !!project?.id && !!scenarioRunId,

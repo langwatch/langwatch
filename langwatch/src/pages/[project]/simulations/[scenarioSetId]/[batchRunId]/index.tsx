@@ -31,6 +31,8 @@ export default function SimulationSetPage() {
       scenarioSetId: scenarioSetId ?? "",
       batchRunId: batchRunId ?? "",
       sinceTimestamp,
+      startDate: period.startDate.getTime(),
+      endDate: period.endDate.getTime(),
     },
     {
       enabled: !!project?.id && !!scenarioSetId && !!batchRunId,
