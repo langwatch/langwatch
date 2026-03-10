@@ -12,7 +12,6 @@ import {
   type outputsSchema,
   type promptingTechniqueSchema,
 } from "~/prompts/schemas/field-schemas";
-import { createLicenseEnforcementService } from "~/server/license-enforcement";
 import { SchemaVersion } from "./enums";
 import { NotFoundError, SystemPromptConflictError } from "./errors";
 import { PromptVersionService } from "./prompt-version.service";
@@ -648,13 +647,10 @@ export class PromptService {
     });
 
     // Case 1: Prompt doesn't exist on server - create new
-    // Enforce resource limit before creating to prevent exceeding plan limits.
-    // This check is done at the service layer (not middleware) because sync is an
-    // upsert: we only block when it would create a new resource, not when updating.
+    // TODO: sync-create path is not guarded by resourceLimitMiddleware because it's an upsert.
+    // The middleware can't distinguish create vs update. Follow-up: enforce limits here
+    // without polluting the service with licensing concerns.
     if (!existingPrompt) {
-      const enforcement = createLicenseEnforcementService(this.prisma);
-      await enforcement.enforceLimit(organizationId, "prompts");
-
       // Convert snake_case localConfigData to camelCase for createPrompt,
       // which internally calls transformToDbFormat. Without this conversion,
       // snake_case keys like max_tokens would be invisible to createPrompt's
