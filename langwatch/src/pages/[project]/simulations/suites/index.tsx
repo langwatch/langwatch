@@ -378,7 +378,7 @@ function MainPanel({
   }
 
   if (selectedExternalSetId) {
-    return <ExternalSetDetailPanel scenarioSetId={selectedExternalSetId} />;
+    return <ExternalSetDetailPanel scenarioSetId={selectedExternalSetId} period={period} />;
   }
 
   if (selectedSuiteSlug === ALL_RUNS_ID) {

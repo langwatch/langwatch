@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { ClickHouseSimulationService } from "../clickhouse-simulation.service";
 
+const DEFAULT_DATES = { startDate: 0, endDate: Date.now() } as const;
+
 function makeRunRow(overrides: Record<string, string | null> = {}) {
   return {
     ScenarioRunId: "run-1",
@@ -71,6 +73,7 @@ describe("ClickHouseSimulationService", () => {
         const count = await service.getBatchRunCountForScenarioSet({
           projectId: "proj-1",
           scenarioSetId: "set-1",
+          ...DEFAULT_DATES,
         });
 
         expect(count).toBe(5);
@@ -84,6 +87,7 @@ describe("ClickHouseSimulationService", () => {
         const count = await service.getBatchRunCountForScenarioSet({
           projectId: "proj-1",
           scenarioSetId: "set-1",
+          ...DEFAULT_DATES,
         });
 
         expect(count).toBe(0);
@@ -96,11 +100,12 @@ describe("ClickHouseSimulationService", () => {
       await service.getBatchRunCountForScenarioSet({
         projectId: "proj-1",
         scenarioSetId: "set-1",
+        ...DEFAULT_DATES,
       });
 
       expect(clickhouse.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          query_params: { tenantId: "proj-1", scenarioSetId: "set-1" },
+          query_params: expect.objectContaining({ tenantId: "proj-1", scenarioSetId: "set-1" }),
         }),
       );
     });
@@ -117,6 +122,7 @@ describe("ClickHouseSimulationService", () => {
         const result = await service.getScenarioRunDataByScenarioId({
           projectId: "proj-1",
           scenarioId: "scenario-1",
+          ...DEFAULT_DATES,
         });
 
         expect(result).toHaveLength(2);
@@ -132,6 +138,7 @@ describe("ClickHouseSimulationService", () => {
         const result = await service.getScenarioRunDataByScenarioId({
           projectId: "proj-1",
           scenarioId: "scenario-1",
+          ...DEFAULT_DATES,
         });
 
         expect(result).toBeNull();
@@ -151,6 +158,7 @@ describe("ClickHouseSimulationService", () => {
         const result = await service.getAllRunDataForScenarioSet({
           projectId: "proj-1",
           scenarioSetId: "set-1",
+          ...DEFAULT_DATES,
         });
 
         expect(result).toHaveLength(3);
@@ -164,6 +172,7 @@ describe("ClickHouseSimulationService", () => {
         const result = await service.getAllRunDataForScenarioSet({
           projectId: "proj-1",
           scenarioSetId: "set-1",
+          ...DEFAULT_DATES,
         });
 
         expect(result).toEqual([]);
@@ -192,6 +201,7 @@ describe("ClickHouseSimulationService", () => {
           projectId: "proj-1",
           scenarioSetId: "set-1",
           limit: 2,
+          ...DEFAULT_DATES,
         });
 
         expect(result.hasMore).toBe(true);
@@ -211,6 +221,7 @@ describe("ClickHouseSimulationService", () => {
           projectId: "proj-1",
           scenarioSetId: "set-1",
           limit: 20,
+          ...DEFAULT_DATES,
         });
 
         expect(result.hasMore).toBe(false);
@@ -226,6 +237,7 @@ describe("ClickHouseSimulationService", () => {
         const result = await service.getRunDataForScenarioSet({
           projectId: "proj-1",
           scenarioSetId: "set-1",
+          ...DEFAULT_DATES,
         });
 
         expect(result).toEqual({
@@ -251,6 +263,7 @@ describe("ClickHouseSimulationService", () => {
           projectId: "proj-1",
           scenarioSetId: "set-1",
           cursor,
+          ...DEFAULT_DATES,
         });
 
         expect(clickhouse.query).toHaveBeenCalledWith(
@@ -275,6 +288,7 @@ describe("ClickHouseSimulationService", () => {
           projectId: "proj-1",
           scenarioSetId: "set-1",
           cursor: "not-valid-base64!!!",
+          ...DEFAULT_DATES,
         });
 
         expect(result.runs).toHaveLength(1);
@@ -297,6 +311,7 @@ describe("ClickHouseSimulationService", () => {
           projectId: "proj-1",
           scenarioSetId: "set-1",
           limit: 999,
+          ...DEFAULT_DATES,
         });
 
         expect(clickhouse.query).toHaveBeenCalledWith(
@@ -353,27 +368,6 @@ describe("ClickHouseSimulationService", () => {
       });
     });
 
-    describe("when no date range is provided", () => {
-      it("omits date parameters from the query", async () => {
-        setQueryResults(clickhouse, [
-          [{ BatchRunId: "batch-1", MaxCreatedAt: "3000" }],
-          [makeRunRow({ ScenarioRunId: "run-1", BatchRunId: "batch-1" })],
-        ]);
-
-        await service.getRunDataForScenarioSet({
-          projectId: "proj-1",
-          scenarioSetId: "set-1",
-        });
-
-        expect(clickhouse.query).toHaveBeenCalledWith(
-          expect.objectContaining({
-            query_params: expect.not.objectContaining({
-              startDateMs: expect.any(String),
-            }),
-          }),
-        );
-      });
-    });
   });
 
   describe("getRunDataForAllSuites()", () => {
@@ -409,6 +403,7 @@ describe("ClickHouseSimulationService", () => {
         const result = await service.getRunDataForAllSuites({
           projectId: "proj-1",
           limit: 20,
+          ...DEFAULT_DATES,
         });
 
         expect(result.runs).toHaveLength(2);
@@ -426,6 +421,7 @@ describe("ClickHouseSimulationService", () => {
 
         const result = await service.getRunDataForAllSuites({
           projectId: "proj-1",
+          ...DEFAULT_DATES,
         });
 
         expect(result).toEqual({
@@ -460,6 +456,7 @@ describe("ClickHouseSimulationService", () => {
         const result = await service.getRunDataForAllSuites({
           projectId: "proj-1",
           limit: 1,
+          ...DEFAULT_DATES,
         });
 
         expect(result.hasMore).toBe(true);
@@ -470,7 +467,7 @@ describe("ClickHouseSimulationService", () => {
     it("uses LIKE pattern for internal suites", async () => {
       setQueryResult(clickhouse, []);
 
-      await service.getRunDataForAllSuites({ projectId: "proj-1" });
+      await service.getRunDataForAllSuites({ projectId: "proj-1", ...DEFAULT_DATES });
 
       const call = (clickhouse.query as ReturnType<typeof vi.fn>).mock
         .calls[0]![0] as { query: string };
@@ -493,6 +490,7 @@ describe("ClickHouseSimulationService", () => {
         projectId: "proj-1",
         scenarioSetId: "set-1",
         limit: 1,
+        ...DEFAULT_DATES,
       });
 
       expect(page1.nextCursor).toBeDefined();
