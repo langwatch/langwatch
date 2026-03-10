@@ -215,7 +215,7 @@ export function RunHistoryPanel({
     }
 
     return runs;
-  }, [allRuns, filters]);
+  }, [runsWithOptimisticCancellations, filters]);
 
   // Group filtered runs by batch
   const batchRuns = useMemo(
