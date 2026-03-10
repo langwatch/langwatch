@@ -24,7 +24,10 @@ export function createSpanStorageMapProjection({
   return {
     name: "spanStorage",
     eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
-    
+
+    options: {
+      groupKeyFn: (event: SpanReceivedEvent) => `span:${event.id}`,
+    },
 
     map(event: SpanReceivedEvent): NormalizedSpan {
       const span = spanNormalizationPipelineService.normalizeSpanReceived(

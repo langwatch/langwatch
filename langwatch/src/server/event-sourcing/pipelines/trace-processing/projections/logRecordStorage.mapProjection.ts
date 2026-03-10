@@ -13,6 +13,10 @@ export function createLogRecordStorageMapProjection({
     name: "logRecordStorage",
     eventTypes: [LOG_RECORD_RECEIVED_EVENT_TYPE],
 
+    options: {
+      groupKeyFn: (event: LogRecordReceivedEvent) => `log:${event.id}`,
+    },
+
     map(event: LogRecordReceivedEvent): NormalizedLogRecord {
       return {
         id: IdUtils.generateDeterministicLogRecordId(event),
