@@ -13,7 +13,7 @@ export function useSmartSetNode() {
 
   return useCallback(
     (node: Partial<Node> & { id: string }, newId?: string) => {
-      setNode(node);
+      setNode(node, newId);
       updateNodeInternals(node.id);
     },
     [setNode, updateNodeInternals],
