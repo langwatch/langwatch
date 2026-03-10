@@ -221,7 +221,6 @@ export const useDrawer = () => {
             {
               allowDots: true,
               arrayFormat: "comma",
-              // @ts-ignore - allowEmptyArrays exists
               allowEmptyArrays: true,
             },
           ),

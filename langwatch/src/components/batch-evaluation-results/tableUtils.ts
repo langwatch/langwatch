@@ -30,18 +30,18 @@ export const getTableStyles = (minTableWidth: number): SystemStyleObject => ({
   "& th": {
     position: "sticky",
     top: 0,
-    background: "white",
-    borderBottom: "1px solid var(--chakra-colors-gray-200)",
+    background: "var(--chakra-colors-bg-panel)",
+    borderBottom: "1px solid var(--chakra-colors-border)",
     padding: "8px 12px",
     textAlign: "left",
     fontSize: "12px",
     fontWeight: "600",
-    color: "var(--chakra-colors-gray-600)",
+    color: "var(--chakra-colors-fg-muted)",
     whiteSpace: "nowrap",
     zIndex: 1,
   },
   "& td": {
-    borderBottom: "1px solid var(--chakra-colors-gray-100)",
+    borderBottom: "1px solid var(--chakra-colors-border-muted)",
     padding: "12px",
     verticalAlign: "top",
     fontSize: "13px",
@@ -52,7 +52,7 @@ export const getTableStyles = (minTableWidth: number): SystemStyleObject => ({
     width: "40px",
   },
   "& tr:hover td": {
-    background: "var(--chakra-colors-gray-50)",
+    background: "var(--chakra-colors-bg-muted)",
   },
   "& td:hover .cell-action-btn": {
     opacity: 1,

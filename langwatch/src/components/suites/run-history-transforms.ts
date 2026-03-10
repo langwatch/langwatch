@@ -21,6 +21,26 @@ export const RUN_GROUP_TYPES = ["none", "scenario", "target"] as const;
 /** The grouping dimension applied to scenario runs. */
 export type RunGroupType = (typeof RUN_GROUP_TYPES)[number];
 
+/** Identifies which view is rendering, to determine available group-by options. */
+export type RunViewContext = "suite" | "external" | "all-runs";
+
+/**
+ * Returns the group-by options available for a given view context.
+ *
+ * External sets omit "target" since they have no target resolution.
+ * Suite and all-runs views include all options.
+ */
+export function availableGroupByOptions({
+  viewContext,
+}: {
+  viewContext: RunViewContext;
+}): RunGroupType[] {
+  if (viewContext === "external") {
+    return ["none", "scenario"];
+  }
+  return ["none", "scenario", "target"];
+}
+
 /** A generic group of scenario runs with a consistent shape across all grouping modes. */
 export type RunGroup = {
   groupKey: string;
@@ -390,6 +410,30 @@ export function buildDisplayTitle({
   let title = targetName ? `${targetName}: ${scenarioName}` : scenarioName;
   if (iteration != null) title += ` (#${iteration})`;
   return title;
+}
+
+/**
+ * Resolves the origin label for a batch run in the All Runs panel.
+ *
+ * - Suite runs (matching __internal__<suiteId>__suite pattern): returns the suite name from suiteNameMap
+ * - External runs: returns the raw scenario set ID as the label
+ * - No set ID: returns null
+ */
+export function resolveOriginLabel({
+  scenarioSetId,
+  suiteNameMap,
+}: {
+  scenarioSetId: string | undefined;
+  suiteNameMap: Map<string, string>;
+}): string | null {
+  if (!scenarioSetId) return null;
+
+  if (!isSuiteSetId(scenarioSetId)) return scenarioSetId;
+
+  const suiteId = extractSuiteId(scenarioSetId);
+  if (!suiteId) return null;
+
+  return suiteNameMap.get(suiteId) ?? null;
 }
 
 /**

@@ -16,7 +16,7 @@ import { getExtractedInput } from "../../utils/traceExtraction";
 import {
   getProjectModelProviders,
   prepareLitellmParams,
-} from "../api/routers/modelProviders";
+} from "../api/routers/modelProviders.utils";
 import { getApp } from "../app-layer/app";
 import { scheduleTopicClusteringNextPage } from "../background/queues/topicClusteringQueue";
 import { getClickHouseClient } from "../clickhouse/client";

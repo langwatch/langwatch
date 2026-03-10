@@ -32,6 +32,7 @@ import { promptsRouter } from "./routers/prompts";
 import { publicEnvRouter } from "./routers/publicEnv";
 import { roleRouter } from "./routers/role";
 import { subscriptionRouter } from "./routers/subscription";
+import { savedViewsRouter } from "./routers/savedViews";
 import { scenarioRouter } from "./routers/scenarios";
 import { sdkRadarRouter } from "./routers/sdkRadar";
 import { secretsRouter } from "./routers/secrets";
@@ -87,6 +88,7 @@ const coreRouters = {
   suites: suiteRouter,
   role: roleRouter,
   prompts: promptsRouter,
+  savedViews: savedViewsRouter,
   sdkRadar: sdkRadarRouter,
   secrets: secretsRouter,
   license: licenseRouter,

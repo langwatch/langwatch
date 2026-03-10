@@ -217,7 +217,7 @@ export function DatasetSelectionItem({
       border="1px solid"
       borderRadius="8px"
       borderColor="border.emphasized"
-      background="#F5F7F7"
+      background="bg.subtle"
       className="ag-borderless"
       position="relative"
       overflow="hidden"
@@ -239,7 +239,7 @@ export function DatasetSelectionItem({
                   event.stopPropagation();
                 }}
                 _hover={{
-                  backgroundColor: "gray.200",
+                  backgroundColor: "bg.emphasized",
                 }}
               >
                 <MoreHorizontal />
@@ -274,7 +274,7 @@ export function DatasetSelectionItem({
         onClick={onClick}
         zIndex={10}
       />
-      <Box width="100%" height="178px" background="#F5F7F7">
+      <Box width="100%" height="178px" background="bg.subtle">
         {rendered && (
           <DatasetPreview
             rows={rows}

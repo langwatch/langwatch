@@ -43,6 +43,8 @@ const config: ExperimentRunCommandConfig<
     experimentId: commandData.experimentId,
     total: commandData.total,
   }),
+  makeIdempotencyKey: (commandData) =>
+    `${commandData.tenantId}:${commandData.runId}:start`,
 };
 
 /**

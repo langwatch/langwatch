@@ -1,8 +1,8 @@
+import { SpanNormalizationPipelineService, enrichRagContextIds } from "~/server/app-layer/traces/span-normalization.service";
 import type { AppendStore, MapProjectionDefinition } from "../../../projections/mapProjection.types";
 import { SPAN_RECEIVED_EVENT_TYPE } from "../schemas/constants";
 import type { SpanReceivedEvent } from "../schemas/events";
 import type { NormalizedSpan } from "../schemas/spans";
-import { SpanNormalizationPipelineService, enrichRagContextIds } from "~/server/app-layer/traces/span-normalization.service";
 
 const spanNormalizationPipelineService = SpanNormalizationPipelineService.create();
 
@@ -21,6 +21,7 @@ export function createSpanStorageMapProjection({
   return {
     name: "spanStorage",
     eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
+    
 
     map(event: SpanReceivedEvent): NormalizedSpan {
       const span = spanNormalizationPipelineService.normalizeSpanReceived(

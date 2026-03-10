@@ -16,7 +16,6 @@ import { useTargetNameMap } from "~/hooks/useTargetNameMap";
 import { useDrawer } from "~/hooks/useDrawer";
 import { api } from "~/utils/api";
 import type { Period } from "~/components/PeriodSelector";
-import { extractSuiteId } from "~/server/suites/suite-set-id";
 import {
   RunHistoryFilters,
   type RunHistoryFilterValues,
@@ -28,6 +27,7 @@ import {
   computeBatchRunSummary,
   computeGroupSummary,
   computeRunHistoryTotals,
+  resolveOriginLabel,
   groupRunsByBatchId,
   groupRunsByScenarioId,
   groupRunsByTarget,
@@ -407,15 +407,13 @@ export function RunHistoryPanel({
                   const summary = computeBatchRunSummary({ batchRun });
                   const isExpanded = expandedIds.has(batchRun.batchRunId);
 
-                  // Resolve suite name for all-runs view
-                  let suiteName: string | undefined;
-                  if (suiteNameMap && batchRun.scenarioSetId) {
-                    const suiteId = extractSuiteId(batchRun.scenarioSetId);
-                    suiteName =
-                      suiteId
-                        ? (suiteNameMap.get(suiteId) ?? undefined)
-                        : undefined;
-                  }
+                  // Resolve suite/external-set name for all-runs view
+                  const suiteName = suiteNameMap
+                    ? (resolveOriginLabel({
+                        scenarioSetId: batchRun.scenarioSetId,
+                        suiteNameMap,
+                      }) ?? undefined)
+                    : undefined;
 
                   return (
                     <RunRow

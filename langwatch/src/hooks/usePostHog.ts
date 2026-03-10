@@ -17,6 +17,11 @@ export function usePostHog() {
       posthog.init(posthogKey, {
         api_host: posthogHost ?? "https://eu.i.posthog.com",
         person_profiles: "always",
+        autocapture: true,
+        capture_exceptions: true,
+        session_recording: {
+          recordCrossOriginIframes: true,
+        },
         loaded: (posthog) => {
           if (publicEnv.data?.NODE_ENV === "development") posthog.debug();
         },

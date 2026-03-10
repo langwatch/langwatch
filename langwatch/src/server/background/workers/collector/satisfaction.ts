@@ -1,4 +1,4 @@
-import { prepareLitellmParams } from "~/server/api/routers/modelProviders";
+import { prepareLitellmParams } from "~/server/api/routers/modelProviders.utils";
 import { getProjectEmbeddingsModel } from "~/server/embeddings";
 import { env } from "../../../../env.mjs";
 import { OPENAI_EMBEDDING_DIMENSION } from "../../../../utils/constants";

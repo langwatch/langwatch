@@ -58,6 +58,9 @@ export interface MapProjectionOptions {
 
   /** Whether to disable this projection. */
   disabled?: boolean;
+
+  /** Custom group key function for queue routing. Enables per-item parallelism instead of per-aggregate serialization. */
+  groupKeyFn?: (event: any) => string;
 }
 
 /**

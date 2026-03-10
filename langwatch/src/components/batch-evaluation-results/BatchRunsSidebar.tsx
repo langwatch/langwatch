@@ -314,26 +314,26 @@ export function BatchRunsSidebar({
                 role="button"
                 bg={
                   compareMode && isSelectedForComparison
-                    ? "blue.50"
+                    ? "blue.subtle"
                     : isSelected
-                      ? "blue.50"
+                      ? "blue.subtle"
                       : "transparent"
                 }
                 color={
                   compareMode && isSelectedForComparison
-                    ? "blue.700"
+                    ? "blue.fg"
                     : isSelected
-                      ? "blue.700"
-                      : "gray.700"
+                      ? "blue.fg"
+                      : "fg"
                 }
                 borderRadius="md"
                 _hover={{
                   bg:
                     compareMode && isSelectedForComparison
-                      ? "blue.100"
+                      ? "blue.muted"
                       : isSelected
-                        ? "blue.100"
-                        : "gray.100",
+                        ? "blue.muted"
+                        : "bg.muted",
                 }}
                 onClick={(e) => handleRunClick(run.runId, e)}
                 gap={2}

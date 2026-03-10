@@ -67,7 +67,7 @@ export class EventSourcedQueueProcessorMemory<
     this.queueName = name;
     this.process = process;
 
-    this.logger.info(
+    this.logger.debug(
       { queueName: this.queueName, concurrency: this.concurrency },
       "Event-sourced queue processor initialized in memory mode (no Redis)",
     );
@@ -246,7 +246,7 @@ export class EventSourcedQueueProcessorMemory<
    * Gracefully closes the queue processor, waiting for in-flight jobs to complete.
    */
   async close(): Promise<void> {
-    this.logger.info(
+    this.logger.debug(
       { queueName: this.queueName },
       "Closing memory queue processor",
     );
@@ -269,7 +269,7 @@ export class EventSourcedQueueProcessorMemory<
     this.queue.length = 0;
     this.pendingJobsByDeduplicationId.clear();
 
-    this.logger.info(
+    this.logger.debug(
       { queueName: this.queueName },
       "Memory queue processor closed successfully",
     );

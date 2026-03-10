@@ -130,7 +130,7 @@ export function serializeAttributes(
           result[key] = serialized;
         }
       } catch {
-        logger.debug(`Skipping unserializable attribute "${key}"`);
+        // skip unserializable attribute
       }
     }
   }

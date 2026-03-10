@@ -206,7 +206,7 @@ export function EvaluatorResultChip({
       borderRadius="md"
       borderWidth="1px"
       borderColor="border"
-      bg="white"
+      bg="bg.panel"
       fontSize="11px"
       fontWeight="medium"
       cursor="default"

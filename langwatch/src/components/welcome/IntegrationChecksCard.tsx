@@ -142,7 +142,7 @@ const IntegrationChecksCard: React.FC = () => {
   const slug = project?.slug ?? "";
 
   return (
-    <Box minH="160px" boxShadow="sm" borderRadius="xl" bg="white" p={4}>
+    <Box minH="160px" boxShadow="sm" borderRadius="xl" bg="bg.panel" p={4}>
       <HStack
         mb={3}
         gap={1}

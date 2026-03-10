@@ -77,6 +77,9 @@ specs/               # BDD feature specs
 | Inconsistent branch naming | Issue branches: `issue123/slug`, features: `feat/slug`. Use `/worktree #123` for automatic naming |
 | Ignoring review findings marked "NEEDS USER DECISION" or "Should fix (Important)" | Address ALL review findings before proceeding. If flagged "NEEDS USER DECISION", ask the user. Never skip "Should fix (Important)" items by rationalizing "it works anyway" |
 | Feature file scenarios with implementation details like `settings.X equals Y` | Feature files describe behavior from user perspective, not config values or internals. Write "job fails without retry" not "settings.attempts equals 1" |
+| Forgetting `projectId` in Prisma queries | Always include `projectId` in WHERE clauses for project-level models — the multitenancy middleware will reject queries without it |
+| Duplicating legacy code into new locations with minor rewrites | Reuse the existing function via import, or refactor into a shared module. Do not copy-paste legacy tree-walking/utility code into mappers or services |
+| Writing comments describing behavior that the code doesn't actually implement | If you write a comment like "extracts X from Y", the code must actually do that. Delete misleading comments, or implement what they promise |
 
 ## TypeScript
 
@@ -93,15 +96,24 @@ specs/               # BDD feature specs
 |----------------|------------------|
 | Modifying deployed migrations | Never edit migrations that have been deployed - they are immutable history. Create a new migration instead. (New migrations not yet in production can be fixed before merging) |
 | Hardcoding schema names in migrations | Use unqualified table names (e.g., `"Monitor"` not `"langwatch_db"."Monitor"`) - Prisma uses the schema from connection string |
+| Writing ClickHouse queries without TenantId filtering | Every ClickHouse query MUST include `WHERE TenantId = {tenantId:String}` — no other ID (ScenarioRunId, BatchRunId, etc.) is unique across tenants. Always make TenantId the first predicate |
 
 ## Orchestration Model
 
-Implementation tasks use `/orchestrate` to manage the plan → code → review → e2e loop:
+Implementation tasks use `/orchestrate` to manage work. The orchestrator detects whether an issue is a **bug fix** or a **feature** and selects the appropriate workflow.
 
 - `/orchestrate <requirements>` - Enter orchestration mode
 - `/implement #123` - Fetch GitHub issue → invoke `/orchestrate`
 
-The orchestrator:
+**Bug detection:** Issues are classified as bugs when they have a "bug" label, title keywords ("fix", "bug", "broken"), or use a bug report issue template. Everything else follows the feature workflow.
+
+**Bug-fix workflow:** investigate → fix → verify → review
+1. Investigates the root cause using `/code` (coder agent)
+2. Applies the fix and runs existing tests to verify
+3. Delegates to `/review` (uncle-bob-reviewer + cupid-reviewer agents in parallel)
+4. Skips `/plan` and spec creation — bugs fix existing behavior, not add new behavior
+
+**Feature workflow:** plan → code → review → e2e
 1. **Creates a task checklist** using TaskCreate to map acceptance criteria
 2. Delegates to `/plan` (self-contained), `/code` (coder agent), `/review` (uncle-bob-reviewer + cupid-reviewer agents in parallel)
 3. **Verifies with E2E tests** via `/e2e` (if feature has `@e2e` scenarios)

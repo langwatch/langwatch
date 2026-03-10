@@ -271,6 +271,7 @@ export class ProjectionRouter<
           killSwitch: mapProj.options?.killSwitch,
           concurrency: mapProj.options?.concurrency,
           disabled: mapProj.options?.disabled,
+          groupKeyFn: mapProj.options?.groupKeyFn,
         },
       };
     }

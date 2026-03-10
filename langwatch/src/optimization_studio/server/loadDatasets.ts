@@ -1,5 +1,5 @@
 import type { Node } from "@xyflow/react";
-import { getFullDataset } from "../../server/api/routers/datasetRecord";
+import { getFullDataset } from "../../server/api/routers/datasetRecord.utils";
 import type { Component, Workflow } from "../types/dsl";
 import type { StudioClientEvent } from "../types/events";
 import {

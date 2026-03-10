@@ -29,6 +29,7 @@ export function createExperimentRunEsSyncReactor(
 ): ReactorDefinition<ExperimentRunProcessingEvent, ExperimentRunStateData> {
   return {
     name: "experimentRunEsSync",
+    options: { runIn: ["web", "worker"] },
 
     async handle(
       event: ExperimentRunProcessingEvent,
