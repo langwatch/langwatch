@@ -292,18 +292,6 @@
     "vitest": "^4.0.17",
     "watch": "^1.0.2"
   },
-  "overrides": {
-    "braces": "^3.0.3",
-    "cross-spawn": "^7.0.6",
-    "exec-sh": "^0.4.0",
-    "glob": "^11.0.1",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "react-is": "19.0.0",
-    "pino": "^10.3.0",
-    "pino-pretty": "^13.0.0",
-    "thread-stream": "^4.0.0"
-  },
   "ct3aMetadata": {
     "initVersion": "7.19.0"
   },
