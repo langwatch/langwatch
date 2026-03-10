@@ -1,6 +1,6 @@
 import { vi } from "vitest";
 
-import type { NormalizedAttributes } from "../../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
+import type { NormalizedAttributes, NormalizedEvent } from "../../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
 import { SpanDataBag } from "../../spanDataBag";
 import type { ExtractorContext } from "../_types";
 
@@ -21,9 +21,10 @@ export { parseJsonStringAttrs };
 export function createExtractorContext(
   attrs: Record<string, unknown>,
   spanOverrides?: Partial<ExtractorContext["span"]>,
+  events?: NormalizedEvent[],
 ): ExtractorContext {
   const parsed = parseJsonStringAttrs(attrs);
-  const bag = new SpanDataBag(parsed as NormalizedAttributes, []);
+  const bag = new SpanDataBag(parsed as NormalizedAttributes, events ?? []);
   const out: NormalizedAttributes = {};
 
   const setAttr = vi.fn((key: string, value: unknown) => {

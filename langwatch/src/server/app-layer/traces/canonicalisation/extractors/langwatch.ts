@@ -423,10 +423,15 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
 
       const eventAttrs = (event.attributes ?? {}) as Record<string, unknown>;
       const jsonPayload = eventAttrs.json_encoded_event;
-      if (typeof jsonPayload !== "string") continue;
+      if (jsonPayload === undefined || jsonPayload === null) continue;
 
       try {
-        const parsed = JSON.parse(jsonPayload);
+        // json_encoded_event may be a string (raw OTLP) or already parsed
+        // by normalizeOtlpAttributes' parseJsonStringValues step
+        const parsed =
+          typeof jsonPayload === "string"
+            ? JSON.parse(jsonPayload)
+            : jsonPayload;
         if (!isRecord(parsed)) continue;
 
         const evalData = parsed as Record<string, unknown>;
