@@ -46,9 +46,9 @@ export const usePromptConfigForm = ({
      * @see https://react-hook-form.com/docs/useform#defaultValues
      */
     defaultValues: parsedInitialValues,
-    resolver: (data, ...args) => {
+    resolver: (data, context, options) => {
       // Use ref to get current schema (updated by useEffect)
-      return zodResolver(schemaRef.current)(data, ...args);
+      return zodResolver(schemaRef.current)(data, context, options);
     },
   });
 

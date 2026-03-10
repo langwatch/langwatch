@@ -34,6 +34,8 @@ import {
   useEvaluationWizardStore,
 } from "../../hooks/evaluation-wizard-store/useEvaluationWizardStore";
 
+type RealTimeExecutionFormData = Pick<CheckConfigFormData, "sample" | "preconditions">;
+
 export function RealTimeExecutionStep() {
   const { executionMethod, setWizardState, realTimeExecution } =
     useEvaluationWizardStore(
@@ -65,20 +67,18 @@ export function RealTimeExecutionStep() {
     focusElementById("js-next-step-button");
   };
 
-  const form = useForm<CheckConfigFormData>({
+  const form = useForm<RealTimeExecutionFormData>({
     defaultValues: {
       sample: 1,
       preconditions: [],
       ...(realTimeExecution ?? {}),
     },
-    resolver: (data, ...args) => {
-      return zodResolver(
-        z.object({
-          sample: z.number().min(0.01).max(1),
-          preconditions: checkPreconditionsSchema,
-        }),
-      )(data, ...args);
-    },
+    resolver: zodResolver(
+      z.object({
+        sample: z.number().min(0.01).max(1),
+        preconditions: checkPreconditionsSchema,
+      }),
+    ),
   });
 
   const [skipSubmit, setSkipSubmit] = useState(false);
@@ -252,10 +252,10 @@ export function RealTimeExecutionStep() {
                           <Input
                             width="110px"
                             type="number"
-                            min="0"
+                            min="0.01"
                             max="1"
                             step="0.1"
-                            placeholder="0.0"
+                            placeholder="0.01"
                             {...field}
                             onChange={(e) => field.onChange(+e.target.value)}
                           />
