@@ -13,13 +13,14 @@ export function isGroupQueue(name: string): boolean {
 }
 
 export async function discoverQueueNames(redis: IORedis): Promise<string[]> {
-  // Use SCAN instead of KEYS to avoid blocking Redis with O(N) command
+  // Use SCAN instead of KEYS to avoid blocking Redis with O(N) command.
+  // COUNT 50000 reduces roundtrips on large keyspaces (826K+ keys → ~17 iterations vs ~1650 with COUNT 500).
   const names = new Set<string>();
 
-  // Discover BullMQ queues (bull:{queueName}:...)
+  // Discover BullMQ queues via meta keys (bull:{queueName}:meta — one per queue, avoids matching all job keys)
   let cursor = "0";
   do {
-    const [nextCursor, keys] = await redis.scan(cursor, "MATCH", "bull:*", "COUNT", 500);
+    const [nextCursor, keys] = await redis.scan(cursor, "MATCH", "bull:*:meta", "COUNT", 50000);
     cursor = nextCursor;
     for (const key of keys) {
       const name = key.split(":")[1];
@@ -30,7 +31,7 @@ export async function discoverQueueNames(redis: IORedis): Promise<string[]> {
   // Discover group queues ({queueName}:gq:...)
   cursor = "0";
   do {
-    const [nextCursor, keys] = await redis.scan(cursor, "MATCH", "*:gq:ready", "COUNT", 500);
+    const [nextCursor, keys] = await redis.scan(cursor, "MATCH", "*:gq:ready", "COUNT", 50000);
     cursor = nextCursor;
     for (const key of keys) {
       // Key format: {pipeline/handler/name}:gq:ready → extract everything before :gq:ready
