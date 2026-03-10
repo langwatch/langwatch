@@ -406,6 +406,64 @@ describe("EvaluatorChip", () => {
     });
   });
 
+  describe("when evaluator has missing mappings", () => {
+    it("redirects Rerun click to onEdit", async () => {
+      const onEdit = vi.fn();
+      const onRerun = vi.fn();
+      const user = userEvent.setup();
+
+      render(
+        <EvaluatorChip
+          evaluator={createEvaluator()}
+          result={{ status: "processed", passed: true, score: 1 }}
+          hasMissingMappings={true}
+          hasTargetOutput={true}
+          hasAnyTargetOutputs={true}
+          onEdit={onEdit}
+          onRemove={vi.fn()}
+          onRerun={onRerun}
+          onRunOnAllRows={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const chip = screen.getByText("Exact Match");
+      await user.click(chip);
+      await user.click(screen.getByText("Rerun"));
+
+      expect(onEdit).toHaveBeenCalledTimes(1);
+      expect(onRerun).not.toHaveBeenCalled();
+    });
+
+    it("redirects Run on all rows click to onEdit", async () => {
+      const onEdit = vi.fn();
+      const onRunOnAllRows = vi.fn();
+      const user = userEvent.setup();
+
+      render(
+        <EvaluatorChip
+          evaluator={createEvaluator()}
+          result={{ status: "processed", passed: true, score: 1 }}
+          hasMissingMappings={true}
+          hasTargetOutput={true}
+          hasAnyTargetOutputs={true}
+          onEdit={onEdit}
+          onRemove={vi.fn()}
+          onRerun={vi.fn()}
+          onRunOnAllRows={onRunOnAllRows}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const chip = screen.getByText("Exact Match");
+      await user.click(chip);
+      await user.click(screen.getByText("Run on all rows"));
+
+      expect(onEdit).toHaveBeenCalledTimes(1);
+      expect(onRunOnAllRows).not.toHaveBeenCalled();
+    });
+  });
+
   describe("rerun functionality (legacy)", () => {
     it("shows spinner when isRunning is true", () => {
       const { container } = render(

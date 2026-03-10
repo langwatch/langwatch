@@ -250,7 +250,10 @@ export function EvaluatorChip({
         )}
         {/* "Run" for pending evaluators with existing target output */}
         {status === "pending" && hasTargetOutput && onRerun && (
-          <Menu.Item value="run" onClick={onRerun}>
+          <Menu.Item
+            value="run"
+            onClick={hasMissingMappings ? onEdit : onRerun}
+          >
             <HStack gap={2}>
               <LuPlay size={14} />
               <Text>Run</Text>
@@ -259,7 +262,10 @@ export function EvaluatorChip({
         )}
         {/* "Rerun" for completed/error evaluators (not pending, not running) */}
         {status !== "pending" && status !== "running" && onRerun && (
-          <Menu.Item value="rerun" onClick={onRerun}>
+          <Menu.Item
+            value="rerun"
+            onClick={hasMissingMappings ? onEdit : onRerun}
+          >
             <HStack gap={2}>
               <LuRefreshCw size={14} />
               <Text>Rerun</Text>
@@ -268,7 +274,10 @@ export function EvaluatorChip({
         )}
         {/* "Run on all rows" - available when not running and target outputs exist */}
         {status !== "running" && hasAnyTargetOutputs && onRunOnAllRows && (
-          <Menu.Item value="run-all-rows" onClick={onRunOnAllRows}>
+          <Menu.Item
+            value="run-all-rows"
+            onClick={hasMissingMappings ? onEdit : onRunOnAllRows}
+          >
             <HStack gap={2}>
               <LuListRestart size={14} />
               <Text>Run on all rows</Text>
