@@ -19,20 +19,22 @@ vi.mock("../../../src/server/mailer/licenseEmail", () => ({
   sendLicenseEmail: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock("../notifications/notificationHandlers", () => ({
-  notifyLicensePurchase: vi.fn().mockResolvedValue(undefined),
+const mockSendSlackLicensePurchase = vi.fn().mockResolvedValue(undefined);
+
+vi.mock("../../../src/server/app-layer/app", () => ({
+  getApp: () => ({
+    notifications: {
+      sendSlackLicensePurchase: mockSendSlackLicensePurchase,
+    },
+  }),
 }));
 
 import { generateLicenseKey } from "../../licensing/licenseGenerationService";
 import { sendLicenseEmail } from "../../../src/server/mailer/licenseEmail";
-import { notifyLicensePurchase } from "../notifications/notificationHandlers";
 import { handleLicensePurchase } from "../services/licensePurchaseHandler";
 
 const mockGenerateLicenseKey = generateLicenseKey as ReturnType<typeof vi.fn>;
 const mockSendLicenseEmail = sendLicenseEmail as ReturnType<typeof vi.fn>;
-const mockNotifyLicensePurchase = notifyLicensePurchase as ReturnType<
-  typeof vi.fn
->;
 
 const createMockStripe = () => ({
   checkout: {
@@ -112,7 +114,7 @@ describe("licensePurchaseHandler", () => {
           privateKey: "test-private-key",
         });
 
-        expect(mockNotifyLicensePurchase).toHaveBeenCalledWith({
+        expect(mockSendSlackLicensePurchase).toHaveBeenCalledWith({
           buyerEmail: "buyer@acme.com",
           planType: "GROWTH",
           seats: 5,
@@ -207,7 +209,7 @@ describe("licensePurchaseHandler", () => {
           privateKey: "test-private-key",
         });
 
-        expect(mockNotifyLicensePurchase).toHaveBeenCalledWith(
+        expect(mockSendSlackLicensePurchase).toHaveBeenCalledWith(
           expect.objectContaining({ amountPaid: 0 }),
         );
       });
@@ -223,7 +225,7 @@ describe("licensePurchaseHandler", () => {
           privateKey: "test-private-key",
         });
 
-        expect(mockNotifyLicensePurchase).toHaveBeenCalledWith(
+        expect(mockSendSlackLicensePurchase).toHaveBeenCalledWith(
           expect.objectContaining({ currency: "usd" }),
         );
       });

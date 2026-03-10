@@ -1,17 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../notifications/notificationHandlers", () => ({
-  notifySubscriptionEvent: vi.fn().mockResolvedValue(undefined),
+const mockSendSlackSubscriptionEvent = vi.fn().mockResolvedValue(undefined);
+
+vi.mock("../../../src/server/app-layer/app", () => ({
+  getApp: () => ({
+    notifications: {
+      sendSlackSubscriptionEvent: mockSendSlackSubscriptionEvent,
+    },
+  }),
 }));
 
-import { notifySubscriptionEvent } from "../notifications/notificationHandlers";
 import { PlanTypes, SubscriptionStatus } from "../planTypes";
 import { createSubscriptionService } from "../services/subscriptionService";
 import { OrganizationNotFoundError } from "../errors";
-
-const mockNotifySubscriptionEvent = notifySubscriptionEvent as ReturnType<
-  typeof vi.fn
->;
 
 const createMockStripe = () => ({
   subscriptions: {
@@ -277,7 +278,7 @@ describe("subscriptionService", () => {
         });
 
         expect(result).toEqual({ success: true });
-        expect(mockNotifySubscriptionEvent).toHaveBeenCalledWith({
+        expect(mockSendSlackSubscriptionEvent).toHaveBeenCalledWith({
           type: "prospective",
           organizationId: "org_123",
           organizationName: "Acme",

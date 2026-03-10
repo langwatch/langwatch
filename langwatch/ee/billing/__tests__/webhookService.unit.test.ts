@@ -1,17 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../notifications/notificationHandlers", () => ({
-  notifySubscriptionEvent: vi.fn().mockResolvedValue(undefined),
+const mockSendSlackSubscriptionEvent = vi.fn().mockResolvedValue(undefined);
+
+vi.mock("../../../src/server/app-layer/app", () => ({
+  getApp: () => ({
+    notifications: {
+      sendSlackSubscriptionEvent: mockSendSlackSubscriptionEvent,
+    },
+  }),
 }));
 
-import { notifySubscriptionEvent } from "../notifications/notificationHandlers";
 import { NUMERIC_OVERRIDE_FIELDS } from "../planProvider";
 import { SubscriptionStatus } from "../planTypes";
 import { createWebhookService } from "../services/webhookService";
-
-const mockNotifySubscriptionEvent = notifySubscriptionEvent as ReturnType<
-  typeof vi.fn
->;
 
 const createMockDb = () => ({
   subscription: {
@@ -349,7 +350,7 @@ describe("webhookService", () => {
         await vi.advanceTimersByTimeAsync(2000);
         await promise;
 
-        expect(mockNotifySubscriptionEvent).toHaveBeenCalledWith(
+        expect(mockSendSlackSubscriptionEvent).toHaveBeenCalledWith(
           expect.objectContaining({
             type: "confirmed",
             organizationId: "org_123",
@@ -386,7 +387,7 @@ describe("webhookService", () => {
         await vi.advanceTimersByTimeAsync(2000);
         await promise;
 
-        expect(mockNotifySubscriptionEvent).not.toHaveBeenCalled();
+        expect(mockSendSlackSubscriptionEvent).not.toHaveBeenCalled();
       });
     });
   });

@@ -51,7 +51,6 @@ import { MetricRecordAppendStore } from "./pipelines/trace-processing/projection
 import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
 import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
 import { createEvaluationTriggerReactor } from "./pipelines/trace-processing/reactors/evaluationTrigger.reactor";
-import { createSatisfactionScoreReactor } from "./pipelines/trace-processing/reactors/satisfactionScore.reactor";
 import { createSpanStorageBroadcastReactor } from "./pipelines/trace-processing/reactors/spanStorageBroadcast.reactor";
 import { createTraceUpdateBroadcastReactor } from "./pipelines/trace-processing/reactors/traceUpdateBroadcast.reactor";
 
@@ -147,27 +146,6 @@ export class PipelineRegistry {
       dispatch: AppCommands["traces"]["assignSatisfactionScore"] | null;
     } = { dispatch: null };
 
-    const satisfactionScoreReactor = createSatisfactionScoreReactor({
-      assignSatisfactionScore: (data) => {
-        if (!satisfactionCommandRef.dispatch) {
-          throw new Error(
-            "assignSatisfactionScore command not yet wired — pipeline not registered",
-          );
-        }
-        return satisfactionCommandRef.dispatch(data);
-      },
-      nlpServiceUrl: process.env.LANGWATCH_NLP_SERVICE,
-      getEmbeddingsLitellmParams: async (projectId: string) => {
-        const embeddingsModel = await getProjectEmbeddingsModel(projectId);
-        const litellmParams = await prepareLitellmParams({
-          model: embeddingsModel.model,
-          modelProvider: embeddingsModel.modelProvider,
-          projectId,
-        });
-        return { ...litellmParams, dimensions: OPENAI_EMBEDDING_DIMENSION };
-      },
-    });
-
     if (!this.deps.clickhouse) {
       logger.warn(
         "ClickHouse client not provided, log and metric record writes will be no-ops using NullRepository implementations",
@@ -191,7 +169,6 @@ export class PipelineRegistry {
         ),
         evaluationTriggerReactor,
         traceUpdateBroadcastReactor,
-        satisfactionScoreReactor,
         spanStorageBroadcastReactor,
       }),
     );

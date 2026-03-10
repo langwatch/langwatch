@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TRPCError } from "@trpc/server";
 import {
   assertMemberTypeLimitNotExceeded,
@@ -7,8 +7,32 @@ import {
 } from "../license-limit-guard";
 import type { ILicenseEnforcementRepository } from "../license-enforcement.repository";
 
+const { mockNotifyResourceLimitReached, mockCaptureException } = vi.hoisted(
+  () => ({
+    mockNotifyResourceLimitReached: vi.fn().mockResolvedValue(undefined),
+    mockCaptureException: vi.fn(),
+  })
+);
+
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({
+    usageLimits: {
+      notifyResourceLimitReached: mockNotifyResourceLimitReached,
+    },
+  }),
+}));
+
+vi.mock("~/utils/posthogErrorCapture", () => ({
+  captureException: mockCaptureException,
+}));
+
 describe("assertMemberTypeLimitNotExceeded", () => {
   const organizationId = "org_123";
+
+  beforeEach(() => {
+    mockNotifyResourceLimitReached.mockClear();
+    mockCaptureException.mockClear();
+  });
 
   function createMockRepo(
     memberCount = 0,
@@ -59,6 +83,20 @@ describe("assertMemberTypeLimitNotExceeded", () => {
       expect(mockRepo.getMemberCount).not.toHaveBeenCalled();
       expect(mockRepo.getMembersLiteCount).not.toHaveBeenCalled();
     });
+
+    it("does not send notification", async () => {
+      const mockRepo = createMockRepo();
+      const limits = createLimits();
+
+      await assertMemberTypeLimitNotExceeded(
+        "no-change",
+        organizationId,
+        mockRepo,
+        limits
+      );
+
+      expect(mockNotifyResourceLimitReached).not.toHaveBeenCalled();
+    });
   });
 
   describe("when overrideAddingLimitations is true", () => {
@@ -75,6 +113,20 @@ describe("assertMemberTypeLimitNotExceeded", () => {
 
       expect(mockRepo.getMemberCount).not.toHaveBeenCalled();
       expect(mockRepo.getMembersLiteCount).not.toHaveBeenCalled();
+    });
+
+    it("does not send notification", async () => {
+      const mockRepo = createMockRepo();
+      const limits = createLimits(5, 10, true);
+
+      await assertMemberTypeLimitNotExceeded(
+        "lite-to-full",
+        organizationId,
+        mockRepo,
+        limits
+      );
+
+      expect(mockNotifyResourceLimitReached).not.toHaveBeenCalled();
     });
   });
 
@@ -93,6 +145,20 @@ describe("assertMemberTypeLimitNotExceeded", () => {
       ).resolves.toBeUndefined();
 
       expect(mockRepo.getMemberCount).toHaveBeenCalledWith(organizationId);
+    });
+
+    it("does not send notification when under limit", async () => {
+      const mockRepo = createMockRepo(3);
+      const limits = createLimits(5);
+
+      await assertMemberTypeLimitNotExceeded(
+        "lite-to-full",
+        organizationId,
+        mockRepo,
+        limits
+      );
+
+      expect(mockNotifyResourceLimitReached).not.toHaveBeenCalled();
     });
 
     it("throws when at limit", async () => {
@@ -114,6 +180,25 @@ describe("assertMemberTypeLimitNotExceeded", () => {
           current: 5,
           max: 5,
         },
+      });
+    });
+
+    it("sends notification when at limit", async () => {
+      const mockRepo = createMockRepo(5);
+      const limits = createLimits(5);
+
+      await assertMemberTypeLimitNotExceeded(
+        "lite-to-full",
+        organizationId,
+        mockRepo,
+        limits
+      ).catch(() => {});
+
+      expect(mockNotifyResourceLimitReached).toHaveBeenCalledWith({
+        organizationId,
+        limitType: "members",
+        current: 5,
+        max: 5,
       });
     });
 
@@ -149,6 +234,20 @@ describe("assertMemberTypeLimitNotExceeded", () => {
       expect(mockRepo.getMembersLiteCount).toHaveBeenCalledWith(organizationId);
     });
 
+    it("does not send notification when under limit", async () => {
+      const mockRepo = createMockRepo(0, 5);
+      const limits = createLimits(5, 10);
+
+      await assertMemberTypeLimitNotExceeded(
+        "full-to-lite",
+        organizationId,
+        mockRepo,
+        limits
+      );
+
+      expect(mockNotifyResourceLimitReached).not.toHaveBeenCalled();
+    });
+
     it("throws when at limit", async () => {
       const mockRepo = createMockRepo(0, 10); // 10 lite members, limit is 10
       const limits = createLimits(5, 10);
@@ -168,6 +267,25 @@ describe("assertMemberTypeLimitNotExceeded", () => {
           current: 10,
           max: 10,
         },
+      });
+    });
+
+    it("sends notification when at limit", async () => {
+      const mockRepo = createMockRepo(0, 10);
+      const limits = createLimits(5, 10);
+
+      await assertMemberTypeLimitNotExceeded(
+        "full-to-lite",
+        organizationId,
+        mockRepo,
+        limits
+      ).catch(() => {});
+
+      expect(mockNotifyResourceLimitReached).toHaveBeenCalledWith({
+        organizationId,
+        limitType: "membersLite",
+        current: 10,
+        max: 10,
       });
     });
 

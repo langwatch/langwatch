@@ -1,5 +1,4 @@
 import type { MiddlewareHandler } from "hono";
-import { notifyPlanLimitReached } from "../../../../ee/billing";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { createLogger } from "~/utils/logger/server";
@@ -28,7 +27,7 @@ export const blockTraceUsageExceededMiddleware: MiddlewareHandler = async (
           organizationId: team.organizationId,
         });
 
-        await notifyPlanLimitReached({
+        await getApp().usageLimits.notifyPlanLimitReached({
           organizationId: team.organizationId,
           planName: activePlan.name ?? "free",
         });

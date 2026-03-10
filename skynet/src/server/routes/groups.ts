@@ -3,13 +3,21 @@ import type IORedis from "ioredis";
 import type { MetricsCollector } from "../services/metricsCollector.ts";
 import { stripHashTag } from "../services/queueDiscovery.ts";
 import { getCompletedJobsForGroup } from "../services/bullmqService.ts";
+import { scanGroupQueuesPaginated } from "../services/groupQueueScanner.ts";
 
 export function createGroupsRouter(redis: IORedis, metrics: MetricsCollector, getGroupQueueNames: () => string[]): Router {
   const router = Router();
 
-  router.get("/api/groups", (_req, res) => {
-    const queues = metrics.getLatestQueues();
-    res.json({ queues });
+  router.get("/api/groups", async (req, res) => {
+    try {
+      const page = Math.max(0, parseInt(req.query.page as string) || 0);
+      const pageSize = Math.min(500, Math.max(1, parseInt(req.query.pageSize as string) || 100));
+      const queues = await scanGroupQueuesPaginated(redis, getGroupQueueNames(), { page, pageSize });
+      res.json({ queues });
+    } catch (err) {
+      console.error("Groups fetch error:", err);
+      res.status(500).json({ error: "Failed to fetch groups" });
+    }
   });
 
   router.get("/api/groups/:groupId", async (req, res) => {

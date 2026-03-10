@@ -1,6 +1,6 @@
 import * as os from "node:os";
 import type IORedis from "ioredis";
-import type { DashboardData, PipelineNode, ThroughputPoint, QueueInfo, JobNameMetrics } from "../../shared/types.ts";
+import type { DashboardData, PipelineNode, ThroughputPoint, QueueInfo, QueueSummaryInfo, JobNameMetrics } from "../../shared/types.ts";
 import { THROUGHPUT_BUFFER_SIZE, METRICS_COLLECT_INTERVAL_MS, REDIS_STATE_TTL_SECONDS } from "../../shared/constants.ts";
 
 import { scanGroupQueues } from "./groupQueueScanner.ts";
@@ -98,21 +98,25 @@ export class MetricsCollector {
   }
 
   getDashboardData(): DashboardData {
-    const queues = this.latestQueues;
+    const fullQueues = this.latestQueues;
     const redisInfo = this.latestRedisInfo;
 
     let totalGroups = 0;
     let blockedGroups = 0;
     let totalPendingJobs = 0;
 
-    for (const q of queues) {
+    for (const q of fullQueues) {
       totalGroups += q.groups.length;
       blockedGroups += q.blockedGroupCount;
       totalPendingJobs += q.totalPendingJobs;
     }
 
     const treeSeedKeys = [...new Set([...this.currentPausedKeys, ...this.knownPipelinePaths])];
-    const pipelineTree = buildPipelineTree({ queues, seedKeys: treeSeedKeys });
+    const pipelineTree = buildPipelineTree({ queues: fullQueues, seedKeys: treeSeedKeys });
+
+    // Strip groups from queues — individual group data is served via /api/groups on demand.
+    // This avoids serializing potentially millions of GroupInfo objects in every SSE broadcast.
+    const queues: QueueSummaryInfo[] = fullQueues.map(({ groups: _groups, ...summary }) => summary);
 
     const mem = process.memoryUsage();
 
@@ -337,25 +341,34 @@ export class MetricsCollector {
       this.latestQueues = queues;
       this.latestRedisInfo = redisInfo;
 
-      // Collect paused keys from all group queues
-      const pausedKeySets = await Promise.all(
-        this.groupQueueNames.map((name) =>
-          this.redis.smembers(`${name}:gq:paused-jobs`),
-        ),
-      );
-      this.currentPausedKeys = [...new Set(pausedKeySets.flat())];
+      // Collect paused keys from all group queues (single pipeline instead of N parallel calls)
+      const pausedPipeline = this.redis.pipeline();
+      for (const name of this.groupQueueNames) {
+        pausedPipeline.smembers(`${name}:gq:paused-jobs`);
+      }
+      const pausedResults = await pausedPipeline.exec();
+      const pausedKeysSet = new Set<string>();
+      if (pausedResults) {
+        for (const [, result] of pausedResults) {
+          if (Array.isArray(result)) {
+            for (const key of result) pausedKeysSet.add(key as string);
+          }
+        }
+      }
+      this.currentPausedKeys = Array.from(pausedKeysSet);
 
-      // Track known pipeline paths so the tree stays stable
-      const discoveredPaths: string[] = [];
+      // Track known pipeline paths so the tree stays stable.
+      // Deduplicate paths before ZADD — many groups share the same pipeline/type/name combo.
+      const discoveredPaths = new Set<string>();
       for (const q of queues) {
         for (const g of q.groups) {
           const p = g.pipelineName ?? q.displayName;
           const t = g.jobType ?? "default";
           const n = g.jobName ?? "default";
-          discoveredPaths.push(`${p}/${t}/${n}`);
+          discoveredPaths.add(`${p}/${t}/${n}`);
         }
       }
-      if (discoveredPaths.length > 0) {
+      if (discoveredPaths.size > 0) {
         const timestamp = Date.now();
         const pipeline = this.redis.pipeline();
         for (const path of discoveredPaths) {
@@ -365,7 +378,8 @@ export class MetricsCollector {
         pipeline.zremrangebyscore(KNOWN_PIPELINES_KEY, 0, timestamp - 86400 * 1000);
         await pipeline.exec();
       }
-      const knownPaths = await this.redis.zrange(KNOWN_PIPELINES_KEY, 0, -1);
+      // Cap at 10K paths to prevent unbounded memory growth
+      const knownPaths = await this.redis.zrange(KNOWN_PIPELINES_KEY, 0, 9999);
       this.knownPipelinePaths = knownPaths;
 
       // totalInFlight from the staging layer (pending + active from scanGroupQueues)

@@ -19,13 +19,6 @@ export class InviteNotFoundError extends Error {
   }
 }
 
-export class LicenseLimitError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "LicenseLimitError";
-  }
-}
-
 export class OrganizationNotFoundError extends Error {
   constructor() {
     super("Organization not found");

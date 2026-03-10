@@ -12,18 +12,21 @@ import { QueueDetailPage } from "./pages/QueueDetailPage.tsx";
 import { StatsPage } from "./pages/StatsPage.tsx";
 import { useDashboardData } from "./hooks/useDashboardData.ts";
 import { useGroupsData } from "./hooks/useGroupsData.ts";
+import { useGroupsPolling } from "./hooks/useGroupsPolling.ts";
 
 export function App() {
   const paused = useRef(false);
   const { data, status, flush } = useDashboardData(paused);
+  const { queues: polledQueues, flush: flushGroups } = useGroupsPolling(paused);
   const { queues, update: updateQueues, sortColumn, sortDir, cycleSort } = useGroupsData();
 
-  // Feed groups data from dashboard SSE into the stable-sort hook
+  // Feed groups data from polling into the stable-sort hook
+  // (groups are no longer included in SSE broadcasts to save memory)
   useEffect(() => {
-    if (data.queues.length > 0) {
-      updateQueues(data.queues);
+    if (polledQueues.length > 0) {
+      updateQueues(polledQueues);
     }
-  }, [data.queues, updateQueues]);
+  }, [polledQueues, updateQueues]);
 
   const onPause = useCallback(() => {
     paused.current = true;
@@ -32,9 +35,10 @@ export function App() {
   const onResume = useCallback(() => {
     paused.current = false;
     flush();
-  }, [flush]);
+    flushGroups();
+  }, [flush, flushGroups]);
 
-  const displayQueues = queues.length > 0 ? queues : data.queues;
+  const displayQueues = queues.length > 0 ? queues : polledQueues;
 
   return (
     <Flex minH="100vh">
