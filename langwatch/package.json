@@ -307,8 +307,7 @@
   "pnpm": {
     "overrides": {
       "@aws-sdk/xml-builder>fast-xml-parser": "^5.5.1",
-      "@langchain/community>fast-xml-parser": "^5.5.1",
-      "@types/request>form-data": "^2.5.5"
+      "@langchain/community>fast-xml-parser": "^5.5.1"
     }
   },
   "ct3aMetadata": {
