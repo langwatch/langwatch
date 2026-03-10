@@ -3,7 +3,7 @@ import {
   getProjectModelProviders,
   prepareEnvKeys,
   prepareLitellmParams,
-} from "~/server/api/routers/modelProviders";
+} from "~/server/api/routers/modelProviders.utils";
 import { getProtectionsForProject } from "~/server/api/utils";
 import {
   getTraceById,

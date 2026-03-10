@@ -85,7 +85,7 @@ describe("applySpanToSummary PII redaction status tracking", () => {
         },
       });
 
-      const result = applySpanToSummary(createInitState(), span);
+      const result = applySpanToSummary({ state: createInitState(), span: span });
 
       expect(getPartialSpanIds(result)).toEqual(["partial-span-1"]);
       expect(getSkippedSpanIds(result)).toEqual([]);
@@ -101,7 +101,7 @@ describe("applySpanToSummary PII redaction status tracking", () => {
         },
       });
 
-      const result = applySpanToSummary(createInitState(), span);
+      const result = applySpanToSummary({ state: createInitState(), span: span });
 
       expect(getSkippedSpanIds(result)).toEqual(["skipped-span-1"]);
       expect(getPartialSpanIds(result)).toEqual([]);
@@ -115,7 +115,7 @@ describe("applySpanToSummary PII redaction status tracking", () => {
         spanAttributes: {},
       });
 
-      const result = applySpanToSummary(createInitState(), span);
+      const result = applySpanToSummary({ state: createInitState(), span: span });
 
       expect(result.attributes[PARTIAL_KEY]).toBeUndefined();
       expect(result.attributes[SKIPPED_KEY]).toBeUndefined();
@@ -138,8 +138,8 @@ describe("applySpanToSummary PII redaction status tracking", () => {
       });
 
       let state = createInitState();
-      state = applySpanToSummary(state, span1);
-      state = applySpanToSummary(state, span2);
+      state = applySpanToSummary({ state, span: span1 });
+      state = applySpanToSummary({ state, span: span2 });
 
       expect(getPartialSpanIds(state)).toEqual(["partial-1", "partial-2"]);
     });
@@ -159,8 +159,8 @@ describe("applySpanToSummary PII redaction status tracking", () => {
       });
 
       let state = createInitState();
-      state = applySpanToSummary(state, span1);
-      state = applySpanToSummary(state, span2);
+      state = applySpanToSummary({ state, span: span1 });
+      state = applySpanToSummary({ state, span: span2 });
 
       expect(getSkippedSpanIds(state)).toEqual(["skipped-1", "skipped-2"]);
     });
@@ -184,9 +184,9 @@ describe("applySpanToSummary PII redaction status tracking", () => {
       });
 
       let state = createInitState();
-      state = applySpanToSummary(state, partialSpan);
-      state = applySpanToSummary(state, skippedSpan);
-      state = applySpanToSummary(state, normalSpan);
+      state = applySpanToSummary({ state, span: partialSpan });
+      state = applySpanToSummary({ state, span: skippedSpan });
+      state = applySpanToSummary({ state, span: normalSpan });
 
       expect(getPartialSpanIds(state)).toEqual(["partial-span"]);
       expect(getSkippedSpanIds(state)).toEqual(["skipped-span"]);

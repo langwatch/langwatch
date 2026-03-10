@@ -175,6 +175,7 @@ export async function processCommand<EventType extends Event>(
  */
 export interface CommandHandlerOptions<Payload> {
   getAggregateId?: (payload: Payload) => string;
+  getGroupKey?: (payload: Payload) => string;
   delay?: number;
   deduplication?: DeduplicationStrategy<Payload>;
   concurrency?: number;

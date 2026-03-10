@@ -356,7 +356,7 @@ export const AddAnnotationQueueDrawer = ({
                               p={2}
                               position="sticky"
                               bottom={0}
-                              bg="white"
+                              bg="bg.panel"
                               borderTop="1px solid"
                               borderColor="border.muted"
                             >

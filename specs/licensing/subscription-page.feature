@@ -84,7 +84,7 @@ Feature: Subscription Page Plan Management
     Then the "Growth" plan block shows the following characteristics:
       | characteristic        | value                                    |
       | price                 | €29/seat/month                           |
-      | events included       | 200,000 + €1 per 100k extra              |
+      | events included       | 200,000 + €5 per 100k extra              |
       | data retention        | 30 days + custom retention (€3/GB)       |
       | core users            | Up to 20 (after volume discount)         |
       | lite users            | Unlimited                                |

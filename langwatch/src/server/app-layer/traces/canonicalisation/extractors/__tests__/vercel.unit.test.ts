@@ -60,6 +60,65 @@ describe("VercelExtractor", () => {
     });
   });
 
+  describe("when ai.response contains .object (generateObject / streamObject)", () => {
+    const aiSpan = {
+      name: "ai.generateObject" as const,
+      instrumentationScope: { name: "ai" as const, version: null },
+    };
+
+    it("extracts ai.response.object as output messages", () => {
+      const objectPayload = { name: "Alice", age: 30 };
+      const ctx = createExtractorContext(
+        {
+          [ATTR_KEYS.AI_RESPONSE]: JSON.stringify({
+            object: JSON.stringify(objectPayload),
+          }),
+        },
+        aiSpan,
+      );
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES]).toEqual([
+        { role: "assistant", content: JSON.stringify(objectPayload) },
+      ]);
+    });
+
+    it("extracts ai.response.object as flat attribute fallback", () => {
+      const objectPayload = { name: "Bob", score: 42 };
+      const ctx = createExtractorContext(
+        {
+          [ATTR_KEYS.AI_RESPONSE_OBJECT]: JSON.stringify(objectPayload),
+        },
+        aiSpan,
+      );
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES]).toEqual([
+        { role: "assistant", content: JSON.stringify(objectPayload) },
+      ]);
+    });
+
+    it("prefers .text over .object when both are present", () => {
+      const ctx = createExtractorContext(
+        {
+          [ATTR_KEYS.AI_RESPONSE]: JSON.stringify({
+            text: "hello",
+            object: JSON.stringify({ key: "val" }),
+          }),
+        },
+        aiSpan,
+      );
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES]).toEqual([
+        { role: "assistant", content: "hello" },
+      ]);
+    });
+  });
+
   describe("when instrumentationScope.name is not 'ai'", () => {
     it("returns early with nothing in out", () => {
       const ctx = createExtractorContext(

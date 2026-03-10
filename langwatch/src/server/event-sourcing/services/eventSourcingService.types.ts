@@ -1,3 +1,4 @@
+import type { ProcessRole } from "../../app-layer/config";
 import type { createLogger } from "../../../utils/logger/server";
 import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
 import type { CommandHandlerClass } from "../commands/commandHandlerClass";
@@ -97,5 +98,5 @@ export interface EventSourcingServiceOptions<
    * "web": skip BullMQ workers (only dispatch to queues)
    * "worker" | undefined: start all consumers
    */
-  processRole?: "web" | "worker";
+  processRole?: ProcessRole;
 }

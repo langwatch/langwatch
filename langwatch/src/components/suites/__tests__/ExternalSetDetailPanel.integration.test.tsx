@@ -52,6 +52,9 @@ vi.mock("~/utils/api", () => ({
       getSuiteRunData: {
         useQuery: mockRunDataQuery,
       },
+      getAll: {
+        useQuery: () => ({ data: undefined, isLoading: false, error: null }),
+      },
     },
   },
 }));
@@ -87,11 +90,7 @@ describe("<ExternalSetDetailPanel/>", () => {
 
       render(<ExternalSetDetailPanel scenarioSetId="ext-set-1" />, { wrapper: Wrapper });
 
-      // Expand the batch run row first
-      const runRowHeader = screen.getByTestId("run-row-header");
-      fireEvent.click(runRowHeader);
-
-      // Click the scenario run card inside the expanded row
+      // Row is auto-expanded, so click the scenario run card directly
       const scenarioCard = screen.getByLabelText(/View details for/);
       fireEvent.click(scenarioCard);
 

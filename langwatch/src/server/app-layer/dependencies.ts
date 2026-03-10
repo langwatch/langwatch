@@ -6,8 +6,12 @@ import type { EvaluationExecutionService } from "./evaluations/evaluation-execut
 import type { EvaluationRunService } from "./evaluations/evaluation-run.service";
 import type { OrganizationService } from "./organizations/organization.service";
 import type { ProjectService } from "./projects/project.service";
+import type { LogRecordStorageService } from "./traces/log-record-storage.service";
+import type { MetricRecordStorageService } from "./traces/metric-record-storage.service";
 import type { SpanStorageService } from "./traces/span-storage.service";
 import type { TokenizerService } from "./traces/tokenizer.service";
+import type { LogRequestCollectionService } from "./traces/log-request-collection.service";
+import type { MetricRequestCollectionService } from "./traces/metric-request-collection.service";
 import type { TraceRequestCollectionService } from "./traces/trace-request-collection.service";
 import type { TraceSummaryService } from "./traces/trace-summary.service";
 import type { PlanProvider } from "./subscription/plan-provider";
@@ -22,7 +26,11 @@ export interface AppDependencies {
   traces: {
     summary: TraceSummaryService;
     spans: SpanStorageService;
+    logRecords: LogRecordStorageService;
+    metricRecords: MetricRecordStorageService;
     collection: TraceRequestCollectionService;
+    logCollection: LogRequestCollectionService;
+    metricCollection: MetricRequestCollectionService;
   };
   evaluations: {
     runs: EvaluationRunService;

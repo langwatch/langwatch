@@ -8,7 +8,7 @@ import {
   type WorkflowStore,
   type State as WorkflowStoreState,
   store as workflowStore,
-} from "../../../../../optimization_studio/hooks/useWorkflowStore";
+} from "../../../../../optimization_studio/hooks/workflowStoreCore";
 import type { Workflow } from "../../../../../optimization_studio/types/dsl";
 import { checkPreconditionsSchema } from "../../../../../server/evaluations/types.generated";
 import { mappingStateSchema } from "../../../../../server/tracer/tracesMapping";

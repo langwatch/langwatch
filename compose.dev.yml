@@ -135,7 +135,17 @@ services:
     volumes:
       - ./langwatch:/app
       - app_modules:/app/node_modules
-    command: sh -c "corepack enable && pnpm run start:prepare:db && pnpm run start:app"
+    command: >
+      sh -c "
+        corepack enable &&
+        if [ ! -f /usr/local/bin/goose ]; then
+          ARCH=$$(uname -m | sed 's/aarch64/arm64/' | sed 's/x86_64/amd64/') &&
+          curl -fsSL https://github.com/pressly/goose/releases/download/v3.24.1/goose_linux_$${ARCH} -o /usr/local/bin/goose &&
+          chmod +x /usr/local/bin/goose;
+        fi &&
+        pnpm run start:prepare:db &&
+        pnpm run start:app
+      "
     ports:
       - "${APP_PORT:-5560}:5560"
     environment:

@@ -72,7 +72,7 @@ describe("applySpanToSummary cost computation", () => {
         },
       });
 
-      const result = applySpanToSummary(createInitState(), span);
+      const result = applySpanToSummary({ state: createInitState(), span: span });
 
       // 100 * 0.000005 + 50 * 0.000015 = 0.0005 + 0.00075 = 0.00125
       expect(result.totalCost).toBeCloseTo(0.00125, 6);
@@ -89,7 +89,7 @@ describe("applySpanToSummary cost computation", () => {
         },
       });
 
-      const result = applySpanToSummary(createInitState(), span);
+      const result = applySpanToSummary({ state: createInitState(), span: span });
 
       // gpt-4o is in the static registry, so cost should be computed
       // The exact value depends on the JSON file, but it should be > 0
@@ -108,7 +108,7 @@ describe("applySpanToSummary cost computation", () => {
         },
       });
 
-      const result = applySpanToSummary(createInitState(), span);
+      const result = applySpanToSummary({ state: createInitState(), span: span });
 
       expect(result.totalCost).toBeNull();
     });
@@ -122,7 +122,7 @@ describe("applySpanToSummary cost computation", () => {
         },
       });
 
-      const result = applySpanToSummary(createInitState(), span);
+      const result = applySpanToSummary({ state: createInitState(), span: span });
 
       expect(result.totalCost).toBeNull();
     });
@@ -138,7 +138,7 @@ describe("applySpanToSummary cost computation", () => {
         },
       });
 
-      const result = applySpanToSummary(createInitState(), span);
+      const result = applySpanToSummary({ state: createInitState(), span: span });
 
       expect(result.totalCost).toBeCloseTo(0.005, 6);
     });
@@ -153,7 +153,7 @@ describe("applySpanToSummary cost computation", () => {
         },
       });
 
-      const result = applySpanToSummary(createInitState(), span);
+      const result = applySpanToSummary({ state: createInitState(), span: span });
 
       expect(result.totalCost).toBeNull();
     });
@@ -171,7 +171,7 @@ describe("applySpanToSummary cost computation", () => {
         },
       });
 
-      const result = applySpanToSummary(createInitState(), span);
+      const result = applySpanToSummary({ state: createInitState(), span: span });
 
       expect(result.totalCost).toBeCloseTo(0.0042, 6);
     });
@@ -187,7 +187,7 @@ describe("applySpanToSummary cost computation", () => {
         },
       });
 
-      const result = applySpanToSummary(createInitState(), span);
+      const result = applySpanToSummary({ state: createInitState(), span: span });
 
       expect(result.totalCost).toBeNull();
     });
@@ -200,7 +200,7 @@ describe("applySpanToSummary cost computation", () => {
         },
       });
 
-      const result = applySpanToSummary(createInitState(), span);
+      const result = applySpanToSummary({ state: createInitState(), span: span });
 
       expect(result.totalCost).toBeNull();
     });
@@ -217,7 +217,7 @@ describe("applySpanToSummary cost computation", () => {
         },
       });
 
-      const result = applySpanToSummary(createInitState(), span);
+      const result = applySpanToSummary({ state: createInitState(), span: span });
 
       // 100 * 0.00001 + 50 * 0 = 0.001
       expect(result.totalCost).toBeCloseTo(0.001, 6);
@@ -249,7 +249,7 @@ describe("applySpanToSummary guardrail blocking detection", () => {
         },
       });
 
-      const result = applySpanToSummary(createInitState(), span);
+      const result = applySpanToSummary({ state: createInitState(), span: span });
 
       expect(result.blockedByGuardrail).toBe(true);
     });
@@ -264,7 +264,7 @@ describe("applySpanToSummary guardrail blocking detection", () => {
         },
       });
 
-      const result = applySpanToSummary(createInitState(), span);
+      const result = applySpanToSummary({ state: createInitState(), span: span });
 
       expect(result.blockedByGuardrail).toBe(false);
     });
@@ -278,7 +278,7 @@ describe("applySpanToSummary guardrail blocking detection", () => {
         },
       });
 
-      const result = applySpanToSummary(createInitState(), span);
+      const result = applySpanToSummary({ state: createInitState(), span: span });
 
       expect(result.blockedByGuardrail).toBe(false);
     });

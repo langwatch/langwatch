@@ -41,7 +41,7 @@ export default function GraphsLayout({
           height="full"
           gap={1}
         >
-          <MenuLink href={`/${project?.slug}`}>Overview</MenuLink>
+          <MenuLink href={`/${project?.slug}/analytics`}>Overview</MenuLink>
           <VStack align="start" width="full" gap={1}>
             {/* TODO: reduce font size to 11 once the rest of the page also have a smaller fit */}
             <SmallLabel

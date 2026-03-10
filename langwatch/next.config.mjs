@@ -1,10 +1,12 @@
+import fs from "fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-const bundleAnalyser = process.env.ANALYZE === "true"
-  ? (await import("@next/bundle-analyzer")).default
-  : null;
-import fs from "fs";
 import path from "path";
+
+const bundleAnalyser =
+  process.env.ANALYZE === "true"
+    ? (await import("@next/bundle-analyzer")).default
+    : null;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -99,6 +101,7 @@ const config = {
   ],
 
   experimental: {
+		reactCompiler: true,
     scrollRestoration: true,
     optimizePackageImports: [
       "@chakra-ui/react",
