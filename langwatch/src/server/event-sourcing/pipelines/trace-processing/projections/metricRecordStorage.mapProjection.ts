@@ -13,6 +13,10 @@ export function createMetricRecordStorageMapProjection({
     name: "metricRecordStorage",
     eventTypes: [METRIC_RECORD_RECEIVED_EVENT_TYPE],
 
+    options: {
+      groupKeyFn: (event: MetricRecordReceivedEvent) => `metric:${event.id}`,
+    },
+
     map(event: MetricRecordReceivedEvent): NormalizedMetricRecord {
       return {
         id: IdUtils.generateDeterministicMetricRecordId(event),
