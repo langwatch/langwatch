@@ -27,7 +27,10 @@ import {
   LATEST_SCHEMA_VERSION,
   type LatestConfigVersionSchema,
 } from "./repositories/llm-config-version-schema";
-import { transformCamelToSnake } from "./transformToDbFormat";
+import {
+  transformCamelToSnake,
+  transformSnakeToCamel,
+} from "./transformToDbFormat";
 
 // Extract the configData type from the schema
 type ConfigData = z.infer<
@@ -645,6 +648,13 @@ export class PromptService {
 
     // Case 1: Prompt doesn't exist on server - create new
     if (!existingPrompt) {
+      // Convert snake_case localConfigData to camelCase for createPrompt,
+      // which internally calls transformToDbFormat. Without this conversion,
+      // snake_case keys like max_tokens would be invisible to createPrompt's
+      // named params (maxTokens), causing data loss.
+      const camelCaseData = transformSnakeToCamel(
+        localConfigData as unknown as Record<string, unknown>,
+      );
       const createdPrompt = await this.createPrompt({
         handle: idOrHandle,
         projectId,
@@ -652,7 +662,7 @@ export class PromptService {
         scope: "PROJECT" as PromptScope,
         authorId,
         commitMessage: commitMessage ?? "Synced from local file",
-        ...this.transformToDbFormat(localConfigData),
+        ...camelCaseData,
       });
 
       return {
@@ -669,14 +679,51 @@ export class PromptService {
     });
 
     const remoteVersion = existingPrompt.version;
+
+    // Build remoteConfigData with ALL fields the schema expects.
+    // Only include optional sampling parameters when they are defined
+    // to avoid introducing false diffs from undefined values.
     const remoteConfigData: LatestConfigVersionSchema["configData"] = {
       model: existingPrompt.model,
-      temperature: existingPrompt.temperature,
       prompt: existingPrompt.prompt,
       messages: existingPrompt.messages.filter((msg) => msg.role !== "system"),
       inputs: existingPrompt.inputs,
       outputs: existingPrompt.outputs,
       // response_format is derived from outputs, not stored separately
+      // Include all sampling parameters only when defined
+      ...(existingPrompt.temperature !== undefined && {
+        temperature: existingPrompt.temperature,
+      }),
+      ...(existingPrompt.maxTokens !== undefined && {
+        max_tokens: existingPrompt.maxTokens,
+      }),
+      ...(existingPrompt.topP !== undefined && {
+        top_p: existingPrompt.topP,
+      }),
+      ...(existingPrompt.frequencyPenalty !== undefined && {
+        frequency_penalty: existingPrompt.frequencyPenalty,
+      }),
+      ...(existingPrompt.presencePenalty !== undefined && {
+        presence_penalty: existingPrompt.presencePenalty,
+      }),
+      ...(existingPrompt.seed !== undefined && {
+        seed: existingPrompt.seed,
+      }),
+      ...(existingPrompt.topK !== undefined && {
+        top_k: existingPrompt.topK,
+      }),
+      ...(existingPrompt.minP !== undefined && {
+        min_p: existingPrompt.minP,
+      }),
+      ...(existingPrompt.repetitionPenalty !== undefined && {
+        repetition_penalty: existingPrompt.repetitionPenalty,
+      }),
+      ...(existingPrompt.reasoning !== undefined && {
+        reasoning: existingPrompt.reasoning,
+      }),
+      ...(existingPrompt.verbosity !== undefined && {
+        verbosity: existingPrompt.verbosity,
+      }),
     };
 
     // Case 2: Same version - check content

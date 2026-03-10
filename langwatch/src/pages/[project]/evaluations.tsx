@@ -21,6 +21,7 @@ import { Copy, MoreVertical } from "react-feather";
 import {
   LuCircleCheckBig,
   LuCircleX,
+  LuEye,
   LuPencil,
   LuSquareCheckBig,
   LuTrash,
@@ -134,16 +135,16 @@ function EvaluationsV2() {
   };
 
   const experimentTypeToLabel: Record<ExperimentType, string> = {
-    BATCH_EVALUATION_V2: "API Batch Evaluation",
+    BATCH_EVALUATION_V2: "Experiment (SDK)",
     BATCH_EVALUATION: "Batch Evaluation",
     DSPY: "DSPy Optimization",
-    EVALUATIONS_V3: "Evaluations V3",
+    EVALUATIONS_V3: "Experiment (UI)",
   };
 
   return (
     <DashboardLayout>
       <PageLayout.Header>
-        <PageLayout.Heading>Evaluations Dashboard</PageLayout.Heading>
+        <PageLayout.Heading>Experiments</PageLayout.Heading>
         <Spacer />
         <HStack gap={2}>
           <NewEvaluationMenu
@@ -165,8 +166,8 @@ function EvaluationsV2() {
         <PageLayout.Container>
           <PageLayout.Content>
             <NoDataInfoBlock
-              title="No evaluations yet"
-              description="Evaluate your LLM outputs with automated checks and custom metrics."
+              title="No experiments yet"
+              description="Run experiments to evaluate your LLM outputs with automated checks and custom metrics."
               icon={<LuSquareCheckBig size={24} />}
               color="green.500"
               docsInfo={
@@ -206,9 +207,9 @@ function EvaluationsV2() {
             )}
 
             <VStack align="start" gap={1}>
-              <Heading as="h1">Evaluations</Heading>
+              <Heading as="h1">Experiments</Heading>
               <Text color="fg.muted">
-                View and analyze your evaluation results
+                View and analyze your experiment results
               </Text>
             </VStack>
 
@@ -221,7 +222,7 @@ function EvaluationsV2() {
                       <EmptyState.Indicator>
                         <LuSquareCheckBig size={32} />
                       </EmptyState.Indicator>
-                      <EmptyState.Title>No evaluations yet</EmptyState.Title>
+                      <EmptyState.Title>No experiments yet</EmptyState.Title>
                       <EmptyState.Description>
                         {project && hasPermission("evaluations:manage") && (
                           <>
@@ -447,17 +448,50 @@ function EvaluationsV2() {
                                           <MoreVertical size={16} />
                                         </Menu.Trigger>
                                         <Menu.Content>
+                                          {experiment.type ===
+                                            "EVALUATIONS_V3" && (
+                                            <Menu.Item
+                                              value="edit"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                void router.push(
+                                                  `/${project?.slug}/experiments/workbench/${experiment.slug}`,
+                                                );
+                                              }}
+                                            >
+                                              <LuPencil size={16} />
+                                              Edit
+                                            </Menu.Item>
+                                          )}
+                                          {experiment.type !==
+                                            "EVALUATIONS_V3" &&
+                                            experiment.type !==
+                                              "BATCH_EVALUATION_V2" &&
+                                            experiment.workbenchState && (
+                                              <Menu.Item
+                                                value="edit"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  void router.push(
+                                                    `/${project?.slug}/evaluations/wizard/${experiment.slug}`,
+                                                  );
+                                                }}
+                                              >
+                                                <LuPencil size={16} />
+                                                Edit
+                                              </Menu.Item>
+                                            )}
                                           <Menu.Item
-                                            value="edit"
+                                            value="view-results"
                                             onClick={(e) => {
                                               e.stopPropagation();
                                               void router.push(
-                                                `/${project?.slug}/evaluations/wizard/${experiment.slug}`,
+                                                `/${project?.slug}/experiments/${experiment.slug}`,
                                               );
                                             }}
                                           >
-                                            <LuPencil size={16} />
-                                            Edit
+                                            <LuEye size={16} />
+                                            View Results
                                           </Menu.Item>
                                           {hasPermission(
                                             "evaluations:manage",

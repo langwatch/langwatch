@@ -110,7 +110,9 @@ export class GroupQueueDispatcher {
     }
 
     const maxJobs = Math.min(availableSlots, MAX_BATCH_SIZE);
-    const randomOffset = Math.floor(Math.random() * 5000);
+    const readySize = await this.params.scripts.getReadySize();
+    const randomOffset =
+      readySize > 0 ? Math.floor(Math.random() * readySize) : 0;
     const results = await this.params.scripts.dispatchBatch({
       nowMs: Date.now(),
       activeTtlSec: this.params.activeTtlSec,

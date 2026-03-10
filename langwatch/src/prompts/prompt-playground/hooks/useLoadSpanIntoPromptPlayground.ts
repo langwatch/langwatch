@@ -83,8 +83,35 @@ function useSpanIdFromUrl() {
 }
 
 /**
+ * Safely coerces a value to a number, returning undefined for anything that
+ * cannot be cleanly converted. Trace data may store numeric LLM params as
+ * strings (e.g. "0.7"), booleans, or objects -- this function handles all
+ * of those without throwing.
+ *
+ * @param value - The value to coerce (number, string, null, or unknown)
+ * @returns The numeric value, or undefined if coercion is not possible
+ */
+export function coerceToNumber(value: unknown): number | undefined {
+  if (value == null) return undefined;
+  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "") return undefined;
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
+
+/**
  * Creates default form values for a new prompt config.
  * Single Responsibility: Generate initial prompt configuration structure from span data.
+ *
+ * Applies lenient coercion to numeric fields because trace data from customer
+ * LLM calls may store parameters as strings instead of numbers.  Values that
+ * cannot be coerced are silently dropped (set to undefined) so that the
+ * "Open in Prompts" flow never fails due to unexpected trace data shapes.
+ *
  * @param spanData - The span data containing LLM configuration
  * @returns Initial form values for a new prompt
  */
@@ -116,9 +143,10 @@ export function createDefaultPromptFormValues(
         prompt: systemPrompt,
         llm: {
           // The model should always be available here, but we fall back to the default model if it's not.
-          model: spanData.llmConfig.model ?? DEFAULT_MODEL,
-          temperature: spanData.llmConfig.temperature ?? undefined,
-          maxTokens: spanData.llmConfig.maxTokens ?? undefined,
+          model: spanData.llmConfig.model || DEFAULT_MODEL,
+          temperature: coerceToNumber(spanData.llmConfig.temperature),
+          maxTokens: coerceToNumber(spanData.llmConfig.maxTokens),
+          topP: coerceToNumber(spanData.llmConfig.topP),
         },
         inputs: [],
         outputs: [{ identifier: "output", type: "str" }],
