@@ -2,7 +2,6 @@ import { z } from "zod";
 
 import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 import {
-  DEFAULT_MODEL,
   FALLBACK_MAX_TOKENS,
   MIN_MAX_TOKENS,
 } from "~/utils/constants";
@@ -12,10 +11,7 @@ import { versionMetadataSchema } from "./version-metadata-schema";
 const latestConfigVersionSchema = getLatestConfigVersionSchema();
 
 const llmSchema = z.object({
-  model:
-    latestConfigVersionSchema.shape.configData.shape.model.default(
-      DEFAULT_MODEL,
-    ),
+  model: latestConfigVersionSchema.shape.configData.shape.model,
   // Derive from DB schema to stay in sync
   temperature: latestConfigVersionSchema.shape.configData.shape.temperature,
   maxTokens: latestConfigVersionSchema.shape.configData.shape.max_tokens,
