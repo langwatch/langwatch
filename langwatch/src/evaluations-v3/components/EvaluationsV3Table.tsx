@@ -181,8 +181,14 @@ export function EvaluationsV3Table({
   });
 
   // Execution hook for running evaluations
-  const { execute, abort, status, isAborting, rerunEvaluator } =
-    useExecuteEvaluation();
+  const {
+    execute,
+    abort,
+    status,
+    isAborting,
+    rerunEvaluator,
+    runEvaluatorOnAllRows,
+  } = useExecuteEvaluation();
 
   // Execution handlers for partial execution
   const handleRunTarget = useCallback(
@@ -212,6 +218,26 @@ export function EvaluationsV3Table({
       void rerunEvaluator(rowIndex, targetId, evaluatorId);
     },
     [rerunEvaluator],
+  );
+
+  // Handler for running an evaluator on all rows with target outputs
+  const handleRunEvaluatorOnAllRows = useCallback(
+    (targetId: string, evaluatorId: string) => {
+      void runEvaluatorOnAllRows(targetId, evaluatorId);
+    },
+    [runEvaluatorOnAllRows],
+  );
+
+  // Check if any row has a target output for a given target
+  const hasAnyTargetOutputs = useCallback(
+    (targetId: string): boolean => {
+      const outputs = results.targetOutputs[targetId];
+      if (!outputs) return false;
+      return outputs.some(
+        (output) => output !== undefined && output !== null,
+      );
+    },
+    [results.targetOutputs],
   );
 
   // Handler for stopping execution
@@ -1014,11 +1040,13 @@ export function EvaluationsV3Table({
       handleRunRow,
       handleRunCell,
       handleRerunEvaluator,
+      handleRunEvaluatorOnAllRows,
       handleStopExecution,
       isExecutionRunning,
       isTargetExecuting,
       isCellExecuting,
       isEvaluatorRunning,
+      hasAnyTargetOutputs,
       // Selection data
       selectedRows,
       allSelected,
@@ -1041,11 +1069,13 @@ export function EvaluationsV3Table({
       handleRunRow,
       handleRunCell,
       handleRerunEvaluator,
+      handleRunEvaluatorOnAllRows,
       handleStopExecution,
       isExecutionRunning,
       isTargetExecuting,
       isCellExecuting,
       isEvaluatorRunning,
+      hasAnyTargetOutputs,
       selectedRows,
       allSelected,
       someSelected,
