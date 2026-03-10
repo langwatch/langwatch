@@ -234,7 +234,7 @@
     "zod-to-json-schema": "^3.24.5",
     "zod-validation-error": "^3.0.3",
     "zundo": "^2.1.0",
-    "zustand": "^4.5.2"
+    "zustand": "^4.5.7"
   },
   "devDependencies": {
     "@biomejs/biome": "2.3.8",
