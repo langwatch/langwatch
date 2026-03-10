@@ -1,12 +1,6 @@
 import type { LimitType } from "./types";
 
 /**
- * Error code returned in API responses when a resource limit is exceeded.
- * Used by both the resource-limit middleware and the error handler.
- */
-export const ERR_RESOURCE_LIMIT = "ERR_RESOURCE_LIMIT" as const;
-
-/**
  * Human-readable labels for each limit type (lowercase, for use in sentences).
  * This is the single source of truth for limit type labels across the application.
  *

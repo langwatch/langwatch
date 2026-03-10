@@ -1,7 +1,6 @@
 import type { MiddlewareHandler } from "hono";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
-import { ERR_RESOURCE_LIMIT } from "~/server/license-enforcement/constants";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
 import { buildResourceLimitMessage } from "~/server/license-enforcement/limit-message";
 import { createLicenseEnforcementService } from "~/server/license-enforcement";
@@ -76,7 +75,7 @@ export function resourceLimitMiddleware(
 
         return c.json(
           {
-            error: ERR_RESOURCE_LIMIT,
+            error: error.kind,
             message,
             limitType: error.limitType,
             current: error.current,

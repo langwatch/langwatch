@@ -17,7 +17,7 @@ import { errorSchema } from "../shared/schemas";
  * app.onError(handleError);
  * ```
  */
-export const handleError = async (
+export const handleError = (
   error: Error & {
     status?: ContentfulStatusCode;
     code?: string;
@@ -27,19 +27,19 @@ export const handleError = async (
 ) => {
   // Determine status code and response
   // Note: Logging is handled by the logger middleware, not here, to avoid double logging
-  const { statusCode, response } = await determineErrorResponse(error, c);
+  const { statusCode, response } = determineErrorResponse(error, c);
 
   return c.json(response, statusCode);
 };
 
-async function determineErrorResponse(
+function determineErrorResponse(
   error: Error & {
     status?: ContentfulStatusCode;
     code?: string;
     name?: string;
   },
-  c: Context,
-): Promise<{ statusCode: ContentfulStatusCode; response: object }> {
+  _c: Context,
+): { statusCode: ContentfulStatusCode; response: object } {
   // DomainErrors are handled first — normalize to client-safe shape
   if (DomainError.is(error)) {
     return {

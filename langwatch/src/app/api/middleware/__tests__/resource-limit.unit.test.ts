@@ -2,7 +2,6 @@ import { describe, expect, it, vi, beforeEach, type Mock } from "vitest";
 import { Hono } from "hono";
 import { resourceLimitMiddleware } from "../resource-limit";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
-import { ERR_RESOURCE_LIMIT } from "~/server/license-enforcement/constants";
 import type { LimitType } from "~/server/license-enforcement/types";
 
 // Mock dependencies
@@ -130,7 +129,7 @@ describe("resourceLimitMiddleware()", () => {
 
       expect(res.status).toBe(403);
       const body = await res.json();
-      expect(body.error).toBe(ERR_RESOURCE_LIMIT);
+      expect(body.error).toBe("resource_limit_exceeded");
       expect(body.limitType).toBe("prompts");
       expect(body.current).toBe(5);
       expect(body.max).toBe(5);
