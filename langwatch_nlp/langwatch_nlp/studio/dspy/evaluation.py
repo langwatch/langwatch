@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import threading
 import time
 from typing import List, Optional, Any, Literal
@@ -7,7 +8,7 @@ import httpx
 import langwatch
 from pydantic import BaseModel, Field
 import dspy
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, stop_after_attempt, wait_exponential, before_log, after_log
 from langwatch_nlp.studio.runtimes.base_runtime import ServerEventQueue
 from langwatch_nlp.studio.dspy.predict_with_metadata import (
     PredictionWithMetadata,
@@ -20,6 +21,8 @@ from langwatch_nlp.studio.types.events import (
     EvaluationStateChangePayload,
 )
 from langwatch_nlp.studio.utils import SerializableWithStringFallback, get_node_by_id
+
+logger = logging.getLogger(__name__)
 
 
 class Evaluator(dspy.Module):
@@ -256,10 +259,25 @@ class EvaluationReporting:
             if finished:
                 body["timestamps"]["finished_at"] = int(time.time() * 1000)
 
+            endpoint = langwatch.get_endpoint()
+            logger.info(
+                "Sending evaluation batch: run_id=%s, experiment_slug=%s, "
+                "endpoint=%s, dataset_count=%d, eval_count=%d, "
+                "progress=%d/%d, finished=%s",
+                self.run_id,
+                body.get("experiment_slug"),
+                endpoint,
+                len(body["dataset"]),
+                len(body["evaluations"]),
+                self.progress,
+                self.total,
+                finished,
+            )
+
             # Start a new thread to send the batch
             thread = threading.Thread(
-                target=EvaluationReporting.post_results,
-                args=(self.workflow.api_key, body),
+                target=EvaluationReporting._post_results_with_logging,
+                args=(self.workflow.api_key, body, self.run_id),
             )
             thread.start()
             self.threads.append(thread)
@@ -269,18 +287,38 @@ class EvaluationReporting:
             self.last_sent = time.time()
 
     @classmethod
+    def _post_results_with_logging(cls, api_key: str, body: dict, run_id: str):
+        """Thread-safe wrapper that catches and logs errors from post_results."""
+        try:
+            cls.post_results(api_key, body)
+            logger.info(
+                "Successfully posted evaluation results: run_id=%s", run_id
+            )
+        except Exception:
+            logger.exception(
+                "Failed to post evaluation results after retries: run_id=%s, "
+                "experiment_slug=%s, endpoint=%s",
+                run_id,
+                body.get("experiment_slug"),
+                langwatch.get_endpoint(),
+            )
+
+    @classmethod
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
         reraise=True,
+        before=before_log(logger, logging.DEBUG),
+        after=after_log(logger, logging.DEBUG),
     )
     def post_results(cls, api_key: str, body: dict):
         if not api_key:
-            print("No API key found, skipping evaluation reporting")
+            logger.warning("No API key found, skipping evaluation reporting")
             return
 
+        url = f"{langwatch.get_endpoint()}/api/evaluations/batch/log_results"
         response = httpx.post(
-            f"{langwatch.get_endpoint()}/api/evaluations/batch/log_results",
+            url,
             headers={
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
@@ -288,6 +326,13 @@ class EvaluationReporting:
             data=json.dumps(body, cls=SerializableWithStringFallback, ensure_ascii=False),  # type: ignore
             timeout=60,
         )
+        if response.status_code != 200:
+            logger.error(
+                "log_results returned %d: %s (url=%s)",
+                response.status_code,
+                response.text[:500],
+                url,
+            )
         response.raise_for_status()
 
     async def wait_for_completion(self):

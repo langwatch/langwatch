@@ -182,10 +182,7 @@ export const useHandleServerMessage = ({
     setOptimizationState,
     checkIfUnreachableErrorMessage,
     stopWorkflowIfRunning,
-    setSelectedNode,
-    setPropertiesExpanded,
     setOpenResultsPanelRequest,
-    playgroundOpen,
   } = workflowStore;
 
   const alertOnError = useCallback((message: string | undefined) => {
@@ -227,9 +224,6 @@ export const useHandleServerMessage = ({
           setSocketStatus("connected");
           break;
         case "component_state_change":
-          const currentComponentState = getWorkflow().nodes.find(
-            (node) => node.id === message.payload.component_id,
-          )?.data.execution_state;
           setComponentExecutionState(
             message.payload.component_id,
             message.payload.execution_state,
@@ -245,18 +239,8 @@ export const useHandleServerMessage = ({
             });
           }
 
-          if (
-            !playgroundOpen &&
-            message.payload.execution_state?.status !== "running" &&
-            currentComponentState?.status !== "success" &&
-            ((getWorkflow().state.execution?.status === "running" &&
-              getWorkflow().state.execution?.until_node_id ===
-                message.payload.component_id) ||
-              getWorkflow().state.execution?.status !== "running")
-          ) {
-            setSelectedNode(message.payload.component_id);
-            setPropertiesExpanded(true);
-          }
+          // Don't auto-open the drawer when execution completes —
+          // let the user open it themselves if they want to inspect results
           break;
         case "execution_state_change":
           setWorkflowExecutionState(message.payload.execution_state);
@@ -323,13 +307,10 @@ export const useHandleServerMessage = ({
       alertOnError,
       checkIfUnreachableErrorMessage,
       getWorkflow,
-      playgroundOpen,
       setComponentExecutionState,
       setEvaluationState,
       setOpenResultsPanelRequest,
       setOptimizationState,
-      setPropertiesExpanded,
-      setSelectedNode,
       setSocketStatus,
       setWorkflowExecutionState,
       stopWorkflowIfRunning,
