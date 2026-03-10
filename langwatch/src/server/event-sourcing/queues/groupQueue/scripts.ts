@@ -806,6 +806,13 @@ export class GroupStagingScripts {
   }
 
   /**
+   * Get the number of groups in the ready set. O(1) via ZCARD.
+   */
+  async getReadySize(): Promise<number> {
+    return this.redis.zcard(`${this.keyPrefix}ready`);
+  }
+
+  /**
    * Get the key prefix for metrics/recovery scans.
    */
   getKeyPrefix(): string {
