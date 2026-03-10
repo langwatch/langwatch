@@ -26,9 +26,7 @@ if dedupId ~= "" and dedupTtlMs > 0 then
     redis.call("SET", dedupKey, stagedJobId, "PX", dedupTtlMs)
     redis.call("HDEL", dataKey, existingJobId)
     redis.call("HSET", dataKey, stagedJobId, jobDataJson)
-    local pendingCount = redis.call("ZCARD", groupJobsKey)
-    local score = math.sqrt(pendingCount)
-    redis.call("ZADD", readyKey, score, groupId)
+    redis.call("ZADD", readyKey, 1, groupId)
     redis.call("LPUSH", signalKey, "1")
     redis.call("LTRIM", signalKey, 0, 999)
     return 0
@@ -42,9 +40,7 @@ if dedupId ~= "" and dedupTtlMs > 0 then
   redis.call("SET", dedupKey, stagedJobId, "PX", dedupTtlMs)
 end
 
-local pendingCount = redis.call("ZCARD", groupJobsKey)
-local score = math.sqrt(pendingCount)
-redis.call("ZADD", readyKey, score, groupId)
+redis.call("ZADD", readyKey, 1, groupId)
 
 redis.call("LPUSH", signalKey, "1")
 redis.call("LTRIM", signalKey, 0, 999)
@@ -101,10 +97,7 @@ for i = 1, count do
 end
 
 for groupId, _ in pairs(affectedGroups) do
-  local groupJobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
-  local pendingCount = redis.call("ZCARD", groupJobsKey)
-  local score = math.sqrt(pendingCount)
-  redis.call("ZADD", readyKey, score, groupId)
+  redis.call("ZADD", readyKey, 1, groupId)
 end
 
 redis.call("LPUSH", signalKey, "1")
@@ -174,8 +167,7 @@ for pass = 1, maxPasses do
 
             local pendingCount = redis.call("ZCARD", jobsKey)
             if pendingCount > 0 then
-              local score = math.sqrt(pendingCount)
-              redis.call("ZADD", readyKey, score, groupId)
+              redis.call("ZADD", readyKey, 1, groupId)
             else
               redis.call("ZREM", readyKey, groupId)
             end
@@ -267,8 +259,7 @@ for pass = 1, maxPasses do
 
             local pendingCount = redis.call("ZCARD", jobsKey)
             if pendingCount > 0 then
-              local score = math.sqrt(pendingCount)
-              redis.call("ZADD", readyKey, score, groupId)
+              redis.call("ZADD", readyKey, 1, groupId)
             else
               redis.call("ZREM", readyKey, groupId)
             end
@@ -313,8 +304,7 @@ redis.call("DEL", activeKey)
 
 local pendingCount = redis.call("ZCARD", jobsKey)
 if pendingCount > 0 then
-  local score = math.sqrt(pendingCount)
-  redis.call("ZADD", readyKey, score, groupId)
+  redis.call("ZADD", readyKey, 1, groupId)
 else
   redis.call("ZREM", readyKey, groupId)
 end
@@ -405,9 +395,7 @@ redis.call("HSET", groupDataKey, newStagedJobId, jobDataJson)
 
 -- 3. Update ready set score
 local readyKey = keyPrefix .. "ready"
-local pendingCount = redis.call("ZCARD", groupJobsKey)
-local score = math.sqrt(pendingCount)
-redis.call("ZADD", readyKey, score, groupId)
+redis.call("ZADD", readyKey, 1, groupId)
 
 -- 4. Set active key TTL to match backoff period.
 --    While the key exists the group is locked (preserves FIFO ordering).
