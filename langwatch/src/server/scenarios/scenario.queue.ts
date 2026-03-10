@@ -52,6 +52,8 @@ export const scenarioJobResultSchema = z.object({
   runId: z.string().optional(),
   error: z.string().optional(),
   reasoning: z.string().optional(),
+  /** When true, the job was cancelled by user (not a crash/error). */
+  cancelled: z.boolean().optional(),
 });
 
 /** Result of scenario execution. */

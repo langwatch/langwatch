@@ -1,11 +1,9 @@
 /**
  * Router for cancelling scenario jobs and batch runs.
  *
- * Provides two mutations:
- * - cancelJob: Cancel a single scenario job
- * - cancelBatchRun: Cancel all remaining jobs in a batch run
- *
- * Both require `scenarios:manage` permission (same as running scenarios).
+ * Active jobs: cancel signal via Redis pub/sub → worker handles via AbortSignal.
+ * Queued jobs: removed from BullMQ + cancellation event written to ES
+ * (since no worker will ever process them).
  *
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
@@ -14,6 +12,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { ScenarioCancellationService } from "~/server/scenarios/cancellation";
 import { publishCancellation } from "~/server/scenarios/cancellation-channel";
+import { ScenarioJobRepository } from "~/server/scenarios/scenario-job.repository";
 import { scenarioQueue } from "~/server/scenarios/scenario.queue";
 import { connection } from "~/server/redis";
 import { SimulationService } from "~/server/simulations/simulation.service";
@@ -36,13 +35,28 @@ const cancelBatchRunSchema = projectSchema.extend({
   batchRunId: z.string(),
 });
 
+function createGetQueuedJobs() {
+  const jobRepo = new ScenarioJobRepository(scenarioQueue);
+  return (params: { setId: string; projectId: string }) =>
+    jobRepo.getQueuedAndActiveJobs(params).then((runs) =>
+      runs.map((r) => ({
+        scenarioRunId: r.scenarioRunId,
+        scenarioId: r.scenarioId,
+        batchRunId: r.batchRunId,
+        status: r.status,
+      })),
+    );
+}
+
+function createPublishCancellation() {
+  const publisher = connection;
+  return publisher
+    ? (message: Parameters<typeof publishCancellation>[0]["message"]) =>
+        publishCancellation({ publisher, message })
+    : () => Promise.resolve();
+}
+
 export const cancellationRouter = createTRPCRouter({
-  /**
-   * Cancel a single scenario job.
-   *
-   * Removes the job from the queue (if queued) or marks it as failed (if active),
-   * then persists a cancellation event. Idempotent for already-terminal jobs.
-   */
   cancelJob: protectedProcedure
     .input(cancelJobSchema)
     .use(checkProjectPermission("scenarios:manage"))
@@ -52,24 +66,17 @@ export const cancellationRouter = createTRPCRouter({
         "Cancel job request received",
       );
 
-      const publisher = connection;
+      const simulationService = SimulationService.create(ctx.prisma);
       const service = new ScenarioCancellationService({
         queue: scenarioQueue,
-        simulationService: SimulationService.create(ctx.prisma),
-        publishCancellation: publisher
-          ? (message) => publishCancellation({ publisher, message })
-          : () => Promise.resolve(),
+        publishCancellation: createPublishCancellation(),
+        getQueuedJobs: createGetQueuedJobs(),
+        saveScenarioEvent: (event) => simulationService.saveScenarioEvent(event),
       });
 
       return service.cancelJob(input);
     }),
 
-  /**
-   * Cancel all remaining (non-terminal) jobs in a batch run.
-   *
-   * Fetches current run data, filters to cancellable runs, and cancels each
-   * in parallel chunks. Completed/failed/cancelled jobs are left untouched.
-   */
   cancelBatchRun: protectedProcedure
     .input(cancelBatchRunSchema)
     .use(checkProjectPermission("scenarios:manage"))
@@ -79,13 +86,12 @@ export const cancellationRouter = createTRPCRouter({
         "Cancel batch run request received",
       );
 
-      const publisher = connection;
+      const simulationService = SimulationService.create(ctx.prisma);
       const service = new ScenarioCancellationService({
         queue: scenarioQueue,
-        simulationService: SimulationService.create(ctx.prisma),
-        publishCancellation: publisher
-          ? (message) => publishCancellation({ publisher, message })
-          : () => Promise.resolve(),
+        publishCancellation: createPublishCancellation(),
+        getQueuedJobs: createGetQueuedJobs(),
+        saveScenarioEvent: (event) => simulationService.saveScenarioEvent(event),
       });
 
       return service.cancelBatchRun(input);
