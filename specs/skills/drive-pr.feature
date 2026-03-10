@@ -54,7 +54,7 @@ Feature: Drive PR to mergeable state
     When /drive-pr is invoked
     And CI failures persist after 3 consecutive fix attempts
     Then the skill reports the situation to the user and stops
-    Note: the retry counter resets when CI passes
+    # The retry counter resets when CI passes
 
   Scenario: Single-cycle mode
     Given a PR exists for the current branch
