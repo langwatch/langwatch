@@ -530,17 +530,15 @@ export const runEvaluation = async ({
   }
 
   // At this point, evaluatorType is a built-in evaluator (not "workflow" or "custom/*")
-  const builtInEvaluatorType = evaluatorType as EvaluatorTypes;
-  const evaluator = AVAILABLE_EVALUATORS[builtInEvaluatorType];
+  const builtInEvaluatorType = (
+    Object.keys(AVAILABLE_EVALUATORS) as EvaluatorTypes[]
+  ).find((k) => k === evaluatorType);
 
-  if (!evaluator) {
+  if (!builtInEvaluatorType) {
     throw new Error(`Evaluator ${evaluatorType} not found`);
   }
 
-  // Validate evaluator type only contains safe URL path characters to prevent path traversal
-  if (!/^[a-zA-Z0-9_-]+(\/[a-zA-Z0-9_-]+)*$/.test(builtInEvaluatorType)) {
-    throw new Error(`Invalid evaluator type: ${builtInEvaluatorType}`);
-  }
+  const evaluator = AVAILABLE_EVALUATORS[builtInEvaluatorType];
 
   let evaluatorEnv: Record<string, string> = Object.fromEntries(
     (evaluator.envVars ?? []).map((envVar) => [envVar, process.env[envVar]!]),
