@@ -138,7 +138,7 @@ services:
     command: >
       sh -c "
         corepack enable &&
-        SKIP_CLICKHOUSE_MIGRATE=true pnpm run start:prepare:db &&
+        SKIP_CLICKHOUSE_MIGRATE=true SKIP_ELASTIC_MIGRATE=true pnpm run start:prepare:db &&
         pnpm run start:app
       "
     ports:
