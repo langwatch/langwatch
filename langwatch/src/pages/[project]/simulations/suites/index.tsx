@@ -12,6 +12,7 @@ import { Box, HStack, Skeleton, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 import type { SimulationSuite } from "@prisma/client";
 import { useCallback, useMemo, useState } from "react";
+import { BetaPill } from "~/components/ui/BetaPill";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { PeriodSelector, usePeriodSelector, type Period } from "~/components/PeriodSelector";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -242,7 +243,15 @@ function SuitesPageContent() {
     <DashboardLayout>
       <PageLayout.Header>
         <HStack justify="space-between" align="center" w="full">
-          <PageLayout.Heading>Suites</PageLayout.Heading>
+          <BetaPill
+            message={
+              <Text fontSize="sm">
+                Suites is currently in beta. Features and APIs may change.
+              </Text>
+            }
+          >
+            <PageLayout.Heading>Suites</PageLayout.Heading>
+          </BetaPill>
           <Spacer />
           <PeriodSelector period={period} setPeriod={setPeriod} />
           <PageLayout.HeaderButton onClick={handleNewSuite}>
