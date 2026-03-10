@@ -135,8 +135,280 @@ describe("EvaluatorChip", () => {
     });
   });
 
-  describe("rerun functionality", () => {
-    it("shows Rerun option in menu when evaluator has completed and onRerun provided", async () => {
+  describe("Run/Rerun menu items", () => {
+    describe("when status is pending", () => {
+      describe("when target output exists", () => {
+        it("shows 'Run' menu item", async () => {
+          const onRerun = vi.fn();
+          const user = userEvent.setup();
+
+          render(
+            <EvaluatorChip
+              evaluator={createEvaluator()}
+              result={undefined}
+              isRunning={false}
+              hasTargetOutput={true}
+              onEdit={vi.fn()}
+              onRemove={vi.fn()}
+              onRerun={onRerun}
+            />,
+            { wrapper: Wrapper },
+          );
+
+          const chip = screen.getByText("Exact Match");
+          await user.click(chip);
+
+          expect(screen.getByText("Run")).toBeInTheDocument();
+          expect(screen.queryByText("Rerun")).not.toBeInTheDocument();
+        });
+
+        it("calls onRerun when 'Run' is clicked", async () => {
+          const onRerun = vi.fn();
+          const user = userEvent.setup();
+
+          render(
+            <EvaluatorChip
+              evaluator={createEvaluator()}
+              result={undefined}
+              isRunning={false}
+              hasTargetOutput={true}
+              onEdit={vi.fn()}
+              onRemove={vi.fn()}
+              onRerun={onRerun}
+            />,
+            { wrapper: Wrapper },
+          );
+
+          const chip = screen.getByText("Exact Match");
+          await user.click(chip);
+          await user.click(screen.getByText("Run"));
+
+          expect(onRerun).toHaveBeenCalledTimes(1);
+        });
+      });
+
+      describe("when no target output exists", () => {
+        it("does not show 'Run' menu item", async () => {
+          const onRerun = vi.fn();
+          const user = userEvent.setup();
+
+          render(
+            <EvaluatorChip
+              evaluator={createEvaluator()}
+              result={undefined}
+              isRunning={false}
+              hasTargetOutput={false}
+              onEdit={vi.fn()}
+              onRemove={vi.fn()}
+              onRerun={onRerun}
+            />,
+            { wrapper: Wrapper },
+          );
+
+          const chip = screen.getByText("Exact Match");
+          await user.click(chip);
+
+          expect(screen.queryByText("Run")).not.toBeInTheDocument();
+          expect(screen.queryByText("Rerun")).not.toBeInTheDocument();
+        });
+      });
+    });
+
+    describe("when status is completed", () => {
+      it("shows 'Rerun' instead of 'Run'", async () => {
+        const onRerun = vi.fn();
+        const user = userEvent.setup();
+
+        render(
+          <EvaluatorChip
+            evaluator={createEvaluator()}
+            result={{ status: "processed", passed: true, score: 1 }}
+            onEdit={vi.fn()}
+            onRemove={vi.fn()}
+            onRerun={onRerun}
+          />,
+          { wrapper: Wrapper },
+        );
+
+        const chip = screen.getByText("Exact Match");
+        await user.click(chip);
+
+        expect(screen.getByText("Rerun")).toBeInTheDocument();
+        expect(screen.queryByText("Run")).not.toBeInTheDocument();
+      });
+
+      it("calls onRerun when 'Rerun' is clicked", async () => {
+        const onRerun = vi.fn();
+        const user = userEvent.setup();
+
+        render(
+          <EvaluatorChip
+            evaluator={createEvaluator()}
+            result={{ status: "processed", passed: true, score: 1 }}
+            onEdit={vi.fn()}
+            onRemove={vi.fn()}
+            onRerun={onRerun}
+          />,
+          { wrapper: Wrapper },
+        );
+
+        const chip = screen.getByText("Exact Match");
+        await user.click(chip);
+        await user.click(screen.getByText("Rerun"));
+
+        expect(onRerun).toHaveBeenCalledTimes(1);
+      });
+
+      it("does not show 'Rerun' when onRerun is not provided", async () => {
+        const user = userEvent.setup();
+
+        render(
+          <EvaluatorChip
+            evaluator={createEvaluator()}
+            result={{ status: "processed", passed: true, score: 1 }}
+            onEdit={vi.fn()}
+            onRemove={vi.fn()}
+          />,
+          { wrapper: Wrapper },
+        );
+
+        const chip = screen.getByText("Exact Match");
+        await user.click(chip);
+
+        expect(screen.queryByText("Rerun")).not.toBeInTheDocument();
+      });
+    });
+
+    describe("when status is running", () => {
+      it("hides both 'Run' and 'Rerun'", async () => {
+        const onRerun = vi.fn();
+        const user = userEvent.setup();
+
+        render(
+          <EvaluatorChip
+            evaluator={createEvaluator()}
+            result={{ status: "running" }}
+            hasTargetOutput={true}
+            onEdit={vi.fn()}
+            onRemove={vi.fn()}
+            onRerun={onRerun}
+          />,
+          { wrapper: Wrapper },
+        );
+
+        const chip = screen.getByText("Exact Match");
+        await user.click(chip);
+
+        expect(screen.queryByText("Run")).not.toBeInTheDocument();
+        expect(screen.queryByText("Rerun")).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("Run on all rows menu item", () => {
+    describe("when target outputs exist for at least one row", () => {
+      it("shows 'Run on all rows' menu item", async () => {
+        const onRunOnAllRows = vi.fn();
+        const user = userEvent.setup();
+
+        render(
+          <EvaluatorChip
+            evaluator={createEvaluator()}
+            result={{ status: "processed", passed: true, score: 1 }}
+            hasAnyTargetOutputs={true}
+            onEdit={vi.fn()}
+            onRemove={vi.fn()}
+            onRerun={vi.fn()}
+            onRunOnAllRows={onRunOnAllRows}
+          />,
+          { wrapper: Wrapper },
+        );
+
+        const chip = screen.getByText("Exact Match");
+        await user.click(chip);
+
+        expect(screen.getByText("Run on all rows")).toBeInTheDocument();
+      });
+
+      it("calls onRunOnAllRows when clicked", async () => {
+        const onRunOnAllRows = vi.fn();
+        const user = userEvent.setup();
+
+        render(
+          <EvaluatorChip
+            evaluator={createEvaluator()}
+            result={{ status: "processed", passed: true, score: 1 }}
+            hasAnyTargetOutputs={true}
+            onEdit={vi.fn()}
+            onRemove={vi.fn()}
+            onRerun={vi.fn()}
+            onRunOnAllRows={onRunOnAllRows}
+          />,
+          { wrapper: Wrapper },
+        );
+
+        const chip = screen.getByText("Exact Match");
+        await user.click(chip);
+        await user.click(screen.getByText("Run on all rows"));
+
+        expect(onRunOnAllRows).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when no rows have target outputs", () => {
+      it("does not show 'Run on all rows'", async () => {
+        const onRunOnAllRows = vi.fn();
+        const user = userEvent.setup();
+
+        render(
+          <EvaluatorChip
+            evaluator={createEvaluator()}
+            result={undefined}
+            hasAnyTargetOutputs={false}
+            onEdit={vi.fn()}
+            onRemove={vi.fn()}
+            onRerun={vi.fn()}
+            onRunOnAllRows={onRunOnAllRows}
+          />,
+          { wrapper: Wrapper },
+        );
+
+        const chip = screen.getByText("Exact Match");
+        await user.click(chip);
+
+        expect(screen.queryByText("Run on all rows")).not.toBeInTheDocument();
+      });
+    });
+
+    describe("when evaluator is running", () => {
+      it("does not show 'Run on all rows'", async () => {
+        const onRunOnAllRows = vi.fn();
+        const user = userEvent.setup();
+
+        render(
+          <EvaluatorChip
+            evaluator={createEvaluator()}
+            result={{ status: "running" }}
+            hasAnyTargetOutputs={true}
+            onEdit={vi.fn()}
+            onRemove={vi.fn()}
+            onRerun={vi.fn()}
+            onRunOnAllRows={onRunOnAllRows}
+          />,
+          { wrapper: Wrapper },
+        );
+
+        const chip = screen.getByText("Exact Match");
+        await user.click(chip);
+
+        expect(screen.queryByText("Run on all rows")).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("when evaluator has missing mappings", () => {
+    it("redirects Rerun click to onEdit", async () => {
+      const onEdit = vi.fn();
       const onRerun = vi.fn();
       const user = userEvent.setup();
 
@@ -144,94 +416,55 @@ describe("EvaluatorChip", () => {
         <EvaluatorChip
           evaluator={createEvaluator()}
           result={{ status: "processed", passed: true, score: 1 }}
-          onEdit={vi.fn()}
+          hasMissingMappings={true}
+          hasTargetOutput={true}
+          hasAnyTargetOutputs={true}
+          onEdit={onEdit}
           onRemove={vi.fn()}
           onRerun={onRerun}
+          onRunOnAllRows={vi.fn()}
         />,
         { wrapper: Wrapper },
       );
 
-      // Open the menu by clicking the chip
       const chip = screen.getByText("Exact Match");
       await user.click(chip);
+      await user.click(screen.getByText("Rerun"));
 
-      // Should show Rerun option
-      const rerunOption = screen.getByText("Rerun");
-      expect(rerunOption).toBeInTheDocument();
-
-      // Click Rerun should trigger callback
-      await user.click(rerunOption);
-      expect(onRerun).toHaveBeenCalledTimes(1);
+      expect(onEdit).toHaveBeenCalledTimes(1);
+      expect(onRerun).not.toHaveBeenCalled();
     });
 
-    it("does not show Rerun option when status is pending", async () => {
-      const onRerun = vi.fn();
-      const user = userEvent.setup();
-
-      render(
-        <EvaluatorChip
-          evaluator={createEvaluator()}
-          result={undefined}
-          isRunning={false}
-          onEdit={vi.fn()}
-          onRemove={vi.fn()}
-          onRerun={onRerun}
-        />,
-        { wrapper: Wrapper },
-      );
-
-      // Open the menu
-      const chip = screen.getByText("Exact Match");
-      await user.click(chip);
-
-      // Should NOT show Rerun option
-      expect(screen.queryByText("Rerun")).not.toBeInTheDocument();
-    });
-
-    it("does not show Rerun option when status is running", async () => {
-      const onRerun = vi.fn();
-      const user = userEvent.setup();
-
-      render(
-        <EvaluatorChip
-          evaluator={createEvaluator()}
-          result={{ status: "running" }}
-          onEdit={vi.fn()}
-          onRemove={vi.fn()}
-          onRerun={onRerun}
-        />,
-        { wrapper: Wrapper },
-      );
-
-      // Open the menu
-      const chip = screen.getByText("Exact Match");
-      await user.click(chip);
-
-      // Should NOT show Rerun option
-      expect(screen.queryByText("Rerun")).not.toBeInTheDocument();
-    });
-
-    it("does not show Rerun option when onRerun is not provided", async () => {
+    it("redirects Run on all rows click to onEdit", async () => {
+      const onEdit = vi.fn();
+      const onRunOnAllRows = vi.fn();
       const user = userEvent.setup();
 
       render(
         <EvaluatorChip
           evaluator={createEvaluator()}
           result={{ status: "processed", passed: true, score: 1 }}
-          onEdit={vi.fn()}
+          hasMissingMappings={true}
+          hasTargetOutput={true}
+          hasAnyTargetOutputs={true}
+          onEdit={onEdit}
           onRemove={vi.fn()}
+          onRerun={vi.fn()}
+          onRunOnAllRows={onRunOnAllRows}
         />,
         { wrapper: Wrapper },
       );
 
-      // Open the menu
       const chip = screen.getByText("Exact Match");
       await user.click(chip);
+      await user.click(screen.getByText("Run on all rows"));
 
-      // Should NOT show Rerun option
-      expect(screen.queryByText("Rerun")).not.toBeInTheDocument();
+      expect(onEdit).toHaveBeenCalledTimes(1);
+      expect(onRunOnAllRows).not.toHaveBeenCalled();
     });
+  });
 
+  describe("rerun functionality (legacy)", () => {
     it("shows spinner when isRunning is true", () => {
       const { container } = render(
         <EvaluatorChip

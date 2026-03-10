@@ -161,6 +161,15 @@ export const TargetCellFromMeta = ({
               tableMeta.handleRerunEvaluator?.(rowIndex, targetId, evaluatorId)
           : undefined
       }
+      onRunEvaluatorOnAllRows={
+        tableMeta?.handleRunEvaluatorOnAllRows
+          ? (evaluatorId) =>
+              tableMeta.handleRunEvaluatorOnAllRows?.(targetId, evaluatorId)
+          : undefined
+      }
+      hasAnyTargetOutputs={
+        tableMeta?.hasAnyTargetOutputs?.(targetId) ?? false
+      }
     />
   );
 };

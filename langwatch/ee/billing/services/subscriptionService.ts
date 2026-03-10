@@ -1,6 +1,6 @@
 import { Currency, type OrganizationUserRole, type PrismaClient } from "@prisma/client";
 import type Stripe from "stripe";
-import { notifySubscriptionEvent } from "../notifications/notificationHandlers";
+import { getApp } from "../../../src/server/app-layer/app";
 import {
   type PlanTypes as PlanType,
   PlanTypes,
@@ -412,7 +412,7 @@ export const createSubscriptionService = ({
         throw new OrganizationNotFoundError();
       }
 
-      await notifySubscriptionEvent({
+      await getApp().notifications.sendSlackSubscriptionEvent({
         type: "prospective",
         organizationId: organization.id,
         organizationName: organization.name,

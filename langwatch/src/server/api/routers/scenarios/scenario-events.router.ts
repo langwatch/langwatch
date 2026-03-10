@@ -15,6 +15,19 @@ import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 
 const logger = createLogger("langwatch:api:scenarios:events");
 
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** Resolves optional input dates to concrete values (defaults to last 30 days). */
+function resolveDateRange(input: { startDate?: number; endDate?: number }): {
+  startDate: number;
+  endDate: number;
+} {
+  return {
+    startDate: input.startDate ?? Date.now() - THIRTY_DAYS_MS,
+    endDate: input.endDate ?? Date.now(),
+  };
+}
+
 // Base schema for all project-related operations
 const projectSchema = z.object({
   projectId: z.string(),
@@ -45,8 +58,8 @@ async function fetchSuiteRunData({
   scenarioSetId?: string;
   limit: number;
   cursor?: string;
-  startDate?: number;
-  endDate?: number;
+  startDate: number;
+  endDate: number;
   prisma: PrismaClient;
 }): Promise<{
   runs: ScenarioRunData[];
@@ -131,15 +144,16 @@ async function fetchSuiteRunData({
 export const scenarioEventsRouter = createTRPCRouter({
   // Get scenario sets data for a project
   getScenarioSetsData: protectedProcedure
-    .input(projectSchema)
+    .input(projectSchema.extend(dateRangeFields))
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
       logger.debug({ projectId: input.projectId }, "Fetching scenario sets data");
       const service = SimulationService.create(ctx.prisma);
-      const data = await service.getScenarioSetsDataForProject({
+      const dates = resolveDateRange(input);
+      return service.getScenarioSetsDataForProject({
         projectId: input.projectId,
+        ...dates,
       });
-      return data;
     }),
 
   // Unified endpoint: fetches suite run data for a single suite or all suites
@@ -159,13 +173,13 @@ export const scenarioEventsRouter = createTRPCRouter({
         { projectId: input.projectId, scenarioSetId: input.scenarioSetId, limit: input.limit, hasCursor: !!input.cursor },
         "Fetching suite run data (unified)",
       );
+      const dates = resolveDateRange(input);
       return fetchSuiteRunData({
         projectId: input.projectId,
         scenarioSetId: input.scenarioSetId,
         limit: input.limit,
         cursor: input.cursor,
-        startDate: input.startDate,
-        endDate: input.endDate,
+        ...dates,
         prisma: ctx.prisma,
       });
     }),
@@ -188,13 +202,13 @@ export const scenarioEventsRouter = createTRPCRouter({
         "Fetching scenario set run data",
       );
       const service = SimulationService.create(ctx.prisma);
+      const dates = resolveDateRange(input);
       const data = await service.getRunDataForScenarioSet({
         projectId: input.projectId,
         scenarioSetId: input.scenarioSetId,
         limit: input.limit,
         cursor: input.cursor,
-        startDate: input.startDate,
-        endDate: input.endDate,
+        ...dates,
       });
       return data;
     }),
@@ -203,14 +217,16 @@ export const scenarioEventsRouter = createTRPCRouter({
    * @deprecated Use getSuiteRunData instead. Kept for backward compatibility.
    */
   getAllScenarioSetRunData: protectedProcedure
-    .input(projectSchema.extend({ scenarioSetId: z.string() }))
+    .input(projectSchema.extend({ scenarioSetId: z.string() }).extend(dateRangeFields))
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
       logger.debug({ projectId: input.projectId, scenarioSetId: input.scenarioSetId }, "Fetching all scenario set run data (deprecated)");
+      const dates = resolveDateRange(input);
       const result = await fetchSuiteRunData({
         projectId: input.projectId,
         scenarioSetId: input.scenarioSetId,
         limit: 100,
+        ...dates,
         prisma: ctx.prisma,
       });
       return result.runs;
@@ -221,15 +237,17 @@ export const scenarioEventsRouter = createTRPCRouter({
     .input(
       projectSchema.extend({
         scenarioRunId: z.string(),
-      }),
+      }).extend(dateRangeFields),
     )
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
       logger.debug({ projectId: input.projectId, scenarioRunId: input.scenarioRunId }, "Fetching scenario run state");
       const service = SimulationService.create(ctx.prisma);
+      const dates = resolveDateRange(input);
       const data = await service.getScenarioRunData({
         projectId: input.projectId,
         scenarioRunId: input.scenarioRunId,
+        ...dates,
       });
 
       if (!data) {
@@ -243,14 +261,16 @@ export const scenarioEventsRouter = createTRPCRouter({
 
   // Get total count of batch runs for a scenario set (for pagination)
   getScenarioSetBatchRunCount: protectedProcedure
-    .input(projectSchema.extend({ scenarioSetId: z.string() }))
+    .input(projectSchema.extend({ scenarioSetId: z.string() }).extend(dateRangeFields))
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
       logger.debug({ projectId: input.projectId, scenarioSetId: input.scenarioSetId }, "Fetching batch run count");
       const service = SimulationService.create(ctx.prisma);
+      const dates = resolveDateRange(input);
       const count = await service.getBatchRunCountForScenarioSet({
         projectId: input.projectId,
         scenarioSetId: input.scenarioSetId,
+        ...dates,
       });
       return { count };
     }),
@@ -260,15 +280,17 @@ export const scenarioEventsRouter = createTRPCRouter({
     .input(
       projectSchema.extend({
         scenarioId: z.string(),
-      }),
+      }).extend(dateRangeFields),
     )
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
       logger.debug({ projectId: input.projectId, scenarioId: input.scenarioId }, "Fetching run data by scenario id");
       const service = SimulationService.create(ctx.prisma);
+      const dates = resolveDateRange(input);
       const data = await service.getScenarioRunDataByScenarioId({
         projectId: input.projectId,
         scenarioId: input.scenarioId,
+        ...dates,
       });
       return { data };
     }),
@@ -276,11 +298,13 @@ export const scenarioEventsRouter = createTRPCRouter({
   // Get pre-aggregated batch history for the sidebar (no full messages)
   getScenarioSetBatchHistory: protectedProcedure
     .input(
-      projectSchema.extend({
-        scenarioSetId: z.string(),
-        limit: z.number().min(1).max(100).default(8),
-        cursor: z.string().optional(),
-      }),
+      projectSchema
+        .extend({
+          scenarioSetId: z.string(),
+          limit: z.number().min(1).max(100).default(8),
+          cursor: z.string().optional(),
+        })
+        .extend(dateRangeFields),
     )
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
@@ -289,11 +313,13 @@ export const scenarioEventsRouter = createTRPCRouter({
         "Fetching scenario set batch history",
       );
       const service = SimulationService.create(ctx.prisma);
+      const dates = resolveDateRange(input);
       return service.getBatchHistoryForScenarioSet({
         projectId: input.projectId,
         scenarioSetId: input.scenarioSetId,
         limit: input.limit,
         cursor: input.cursor,
+        ...dates,
       });
     }),
 
@@ -304,7 +330,7 @@ export const scenarioEventsRouter = createTRPCRouter({
         scenarioSetId: z.string(),
         batchRunId: z.string(),
         sinceTimestamp: z.number().optional(),
-      }),
+      }).extend(dateRangeFields),
     )
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
@@ -313,23 +339,27 @@ export const scenarioEventsRouter = createTRPCRouter({
         "Fetching batch run data",
       );
       const service = SimulationService.create(ctx.prisma);
+      const dates = resolveDateRange(input);
       return service.getRunDataForBatchRun({
         projectId: input.projectId,
         scenarioSetId: input.scenarioSetId,
         batchRunId: input.batchRunId,
         sinceTimestamp: input.sinceTimestamp,
+        ...dates,
       });
     }),
 
   // Get summaries for external (SDK/CI) scenario sets
   getExternalSetSummaries: protectedProcedure
-    .input(projectSchema)
+    .input(projectSchema.extend(dateRangeFields))
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
       logger.debug({ projectId: input.projectId }, "Fetching external set summaries");
       const service = SimulationService.create(ctx.prisma);
+      const dates = resolveDateRange(input);
       return service.getExternalSetSummaries({
         projectId: input.projectId,
+        ...dates,
       });
     }),
 
@@ -349,12 +379,12 @@ export const scenarioEventsRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       logger.debug({ projectId: input.projectId, limit: input.limit, hasCursor: !!input.cursor }, "Fetching all suite run data");
       const service = SimulationService.create(ctx.prisma);
+      const dates = resolveDateRange(input);
       const data = await service.getRunDataForAllSuites({
         projectId: input.projectId,
         limit: input.limit,
         cursor: input.cursor,
-        startDate: input.startDate,
-        endDate: input.endDate,
+        ...dates,
       });
 
       // Merge BullMQ queued/active jobs on the first page only

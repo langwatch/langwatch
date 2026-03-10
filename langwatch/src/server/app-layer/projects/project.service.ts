@@ -1,26 +1,21 @@
-import type { PrismaClient, Project } from "@prisma/client";
-import { traced } from "../tracing";
-import { PrismaProjectRepository } from "./repositories/project.prisma.repository";
-import {
-  NullProjectRepository,
-  type ProjectRepository,
+import type { Project } from "@prisma/client";
+import type {
+  ProjectRepository,
+  ProjectWithTeam,
 } from "./repositories/project.repository";
 
 /** All boolean fields on Project whose name starts with "feature". */
 export type ProjectFeatureFlag = Extract<keyof Project, `feature${string}`>;
 
 export class ProjectService {
-  private constructor(private readonly repo: ProjectRepository) {}
-
-  static create(prisma: PrismaClient | null): ProjectService {
-    const repo = prisma
-      ? new PrismaProjectRepository(prisma)
-      : new NullProjectRepository();
-    return traced(new ProjectService(repo), "ProjectService");
-  }
+  constructor(readonly repo: ProjectRepository) {}
 
   async getById(id: string): Promise<Project | null> {
     return this.repo.getById(id);
+  }
+
+  async getWithTeam(id: string): Promise<ProjectWithTeam | null> {
+    return this.repo.getWithTeam(id);
   }
 
   async isFeatureEnabled(

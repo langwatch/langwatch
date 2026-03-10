@@ -61,6 +61,10 @@ type TargetCellContentProps = {
   onStopCell?: () => void;
   /** Handler for re-running a specific evaluator on this cell */
   onRerunEvaluator?: (evaluatorId: string) => void;
+  /** Handler for running an evaluator on all rows with target outputs */
+  onRunEvaluatorOnAllRows?: (evaluatorId: string) => void;
+  /** Whether any row has a target output for this target */
+  hasAnyTargetOutputs?: boolean;
 };
 
 export function TargetCellContent({
@@ -76,6 +80,8 @@ export function TargetCellContent({
   onRunCell,
   onStopCell,
   onRerunEvaluator,
+  onRunEvaluatorOnAllRows,
+  hasAnyTargetOutputs,
 }: TargetCellContentProps) {
   const { openDrawer } = useDrawer();
   const targetName = useTargetName(target);
@@ -387,6 +393,8 @@ export function TargetCellContent({
           result={evaluatorResults[evaluator.id]}
           hasMissingMappings={missingMappingsSet.has(evaluator.id)}
           isRunning={isEvaluatorRunning?.(evaluator.id) ?? false}
+          hasTargetOutput={output !== undefined && output !== null}
+          hasAnyTargetOutputs={hasAnyTargetOutputs}
           onEdit={() => {
             const mappingsConfig = createMappingsConfig(evaluator);
 
@@ -409,6 +417,11 @@ export function TargetCellContent({
           onRemove={() => removeEvaluator(evaluator.id)}
           onRerun={
             onRerunEvaluator ? () => onRerunEvaluator(evaluator.id) : undefined
+          }
+          onRunOnAllRows={
+            onRunEvaluatorOnAllRows
+              ? () => onRunEvaluatorOnAllRows(evaluator.id)
+              : undefined
           }
         />
       ))}

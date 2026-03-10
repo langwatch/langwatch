@@ -38,10 +38,12 @@ export const getImageUrl = (str: unknown): string | null => {
     }
 
     // Check if url is from commonly used image hosting sites which don't end up in the imageExtensionRegex
-    if (
-      url_.hostname.endsWith("gstatic.com") ||
-      url_.hostname.endsWith("googleusercontent.com")
-    ) {
+    const isGoogleImageHost = (hostname: string) =>
+      hostname === "gstatic.com" ||
+      hostname.endsWith(".gstatic.com") ||
+      hostname === "googleusercontent.com" ||
+      hostname.endsWith(".googleusercontent.com");
+    if (isGoogleImageHost(url_.hostname)) {
       return str_;
     }
 

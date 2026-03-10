@@ -151,7 +151,8 @@ describe("Suites Page Layout (Issue #1671)", () => {
 
       expect(dashboardLayoutRenderCount).toBe(1);
     });
-  });
+
+});
 
   describe("when rendering the SuiteSidebar", () => {
     it("does not render a 'SUITES' section header in the sidebar", () => {

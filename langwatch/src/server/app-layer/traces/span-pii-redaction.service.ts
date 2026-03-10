@@ -100,12 +100,6 @@ export class OtlpSpanPiiRedactionService {
     this.deps = merged;
   }
 
-  static create(
-    deps?: Partial<OtlpSpanPiiRedactionServiceDependencies>,
-  ): OtlpSpanPiiRedactionService {
-    return new OtlpSpanPiiRedactionService(deps);
-  }
-
   /**
    * Redacts PII from specific PII-bearing attributes in the span.
    * Mutates the span in place for efficiency.

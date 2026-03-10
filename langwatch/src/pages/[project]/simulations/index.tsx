@@ -1,7 +1,8 @@
-import { Grid, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Grid, HStack, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import React, { useMemo } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
+import { PeriodSelector, usePeriodSelector } from "~/components/PeriodSelector";
 import { SetCard } from "~/components/simulations";
 import ScenarioInfoCard from "~/components/simulations/ScenarioInfoCard";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -14,6 +15,7 @@ import { sortScenarioSets } from "~/features/simulations/sort-scenario-sets";
 function SimulationsPageContent() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
+  const { period, setPeriod } = usePeriodSelector(30);
 
   const {
     data: scenarioSetsData,
@@ -21,7 +23,11 @@ function SimulationsPageContent() {
     error,
     refetch,
   } = api.scenarios.getScenarioSetsData.useQuery(
-    { projectId: project?.id ?? "" },
+    {
+      projectId: project?.id ?? "",
+      startDate: period.startDate.getTime(),
+      endDate: period.endDate.getTime(),
+    },
     {
       refetchInterval: 60_000,
       enabled: !!project,
@@ -55,6 +61,8 @@ function SimulationsPageContent() {
           <PageLayout.Header>
             <HStack justify="space-between" align="center" w="full">
               <PageLayout.Heading>Simulation Sets</PageLayout.Heading>
+              <Spacer />
+              <PeriodSelector period={period} setPeriod={setPeriod} />
             </HStack>
           </PageLayout.Header>
         )}

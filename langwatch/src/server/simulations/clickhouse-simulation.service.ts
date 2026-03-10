@@ -47,6 +47,38 @@ function buildDateHavingFilter({
   return { clause: parts.length > 0 ? parts.join(" AND ") : null, params };
 }
 
+/**
+ * Builds a WHERE clause fragment that filters on the `StartedAt` partition key
+ * to enable partition pruning. When the table is `PARTITION BY toYearWeek(StartedAt)`,
+ * adding StartedAt bounds lets ClickHouse skip cold (S3) partitions entirely.
+ *
+ * Uses separate param names (`whereStartDateMs`, `whereEndDateMs`) to avoid
+ * collision with the HAVING filter params.
+ */
+function buildStartedAtWhereFilter({
+  startDate,
+  endDate,
+}: {
+  startDate?: number;
+  endDate?: number;
+}): { clause: string | null; params: Record<string, string> } {
+  const parts: string[] = [];
+  const params: Record<string, string> = {};
+  if (startDate !== undefined) {
+    parts.push(
+      "StartedAt >= fromUnixTimestamp64Milli(toUInt64({whereStartDateMs:String}))",
+    );
+    params.whereStartDateMs = String(startDate);
+  }
+  if (endDate !== undefined) {
+    parts.push(
+      "StartedAt <= fromUnixTimestamp64Milli(toUInt64({whereEndDateMs:String}))",
+    );
+    params.whereEndDateMs = String(endDate);
+  }
+  return { clause: parts.length > 0 ? parts.join(" AND ") : null, params };
+}
+
 const RUN_COLUMNS = `
   ScenarioRunId, ScenarioId, BatchRunId, ScenarioSetId,
   Status, Name, Description,
@@ -107,9 +139,18 @@ export class ClickHouseSimulationService {
    */
   async getScenarioSetsData({
     projectId,
+    startDate,
+    endDate,
   }: {
     projectId: string;
+    startDate: number;
+    endDate: number;
   }): Promise<ScenarioSetData[]> {
+    const startedAtFilter = buildStartedAtWhereFilter({ startDate, endDate });
+    const startedAtClause = startedAtFilter.clause
+      ? `AND ${startedAtFilter.clause}`
+      : "";
+
     const rows = await this.queryRows<{
       ScenarioSetId: string;
       ScenarioCount: string;
@@ -118,18 +159,22 @@ export class ClickHouseSimulationService {
       `SELECT
         ScenarioSetId,
         toString(count(*)) AS ScenarioCount,
-        toString(toUnixTimestamp64Milli(max(UpdatedAt))) AS LastRunAt
+        toString(toUnixTimestamp64Milli(max(LatestUpdatedAt))) AS LastRunAt
        FROM (
-         SELECT *
+         SELECT
+           ScenarioSetId,
+           ScenarioRunId,
+           argMax(UpdatedAt, UpdatedAt) AS LatestUpdatedAt,
+           argMax(ArchivedAt, UpdatedAt) AS LatestArchivedAt
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
-         ORDER BY ScenarioRunId, UpdatedAt DESC
-         LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+           ${startedAtClause}
+         GROUP BY ScenarioSetId, ScenarioRunId
        )
-       WHERE ArchivedAt IS NULL
+       WHERE LatestArchivedAt IS NULL
        GROUP BY ScenarioSetId
        ORDER BY LastRunAt DESC`,
-      { tenantId: projectId },
+      { tenantId: projectId, ...startedAtFilter.params },
     );
 
     return rows.map((row) => ({
@@ -145,22 +190,32 @@ export class ClickHouseSimulationService {
   async getScenarioRunData({
     projectId,
     scenarioRunId,
+    startDate,
+    endDate,
   }: {
     projectId: string;
     scenarioRunId: string;
+    startDate: number;
+    endDate: number;
   }): Promise<ScenarioRunData | null> {
+    const startedAtFilter = buildStartedAtWhereFilter({ startDate, endDate });
+    const startedAtClause = startedAtFilter.clause
+      ? `AND ${startedAtFilter.clause}`
+      : "";
+
     const rows = await this.queryRows<ClickHouseSimulationRunRow>(
       `SELECT ${RUN_COLUMNS}
        FROM (
          SELECT *
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String} AND ScenarioRunId = {scenarioRunId:String}
+           ${startedAtClause}
          ORDER BY UpdatedAt DESC
          LIMIT 1
        )
        WHERE ArchivedAt IS NULL
        LIMIT 1`,
-      { tenantId: projectId, scenarioRunId },
+      { tenantId: projectId, scenarioRunId, ...startedAtFilter.params },
     );
 
     const row = rows[0];
@@ -177,11 +232,15 @@ export class ClickHouseSimulationService {
     scenarioSetId,
     limit = 8,
     cursor,
+    startDate,
+    endDate,
   }: {
     projectId: string;
     scenarioSetId: string;
     limit?: number;
     cursor?: string;
+    startDate: number;
+    endDate: number;
   }): Promise<{
     batches: BatchHistoryItem[];
     nextCursor?: string;
@@ -191,6 +250,11 @@ export class ClickHouseSimulationService {
   }> {
     const validatedLimit = Math.min(Math.max(1, limit), 100);
     const decoded = cursor ? this.decodeCursor(cursor) : null;
+
+    const startedAtFilter = buildStartedAtWhereFilter({ startDate, endDate });
+    const startedAtClause = startedAtFilter.clause
+      ? `AND ${startedAtFilter.clause}`
+      : "";
 
     const cursorClause = decoded
       ? `HAVING (toString(toUnixTimestamp64Milli(max(CreatedAt))) < {cursorTs:String})
@@ -205,11 +269,12 @@ export class ClickHouseSimulationService {
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND ScenarioSetId = {scenarioSetId:String}
+           ${startedAtClause}
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE ArchivedAt IS NULL`,
-      { tenantId: projectId, scenarioSetId },
+      { tenantId: projectId, scenarioSetId, ...startedAtFilter.params },
     );
 
     // Step 1: fetch batch-level aggregates
@@ -243,6 +308,7 @@ export class ClickHouseSimulationService {
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND ScenarioSetId = {scenarioSetId:String}
+           ${startedAtClause}
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
@@ -254,6 +320,7 @@ export class ClickHouseSimulationService {
       {
         tenantId: projectId,
         scenarioSetId,
+        ...startedAtFilter.params,
         ...(decoded ? { cursorTs: decoded.ts, cursorBatchRunId: decoded.batchRunId } : {}),
         fetchLimit: String(validatedLimit + 1),
       },
@@ -296,12 +363,13 @@ export class ClickHouseSimulationService {
          WHERE TenantId = {tenantId:String}
            AND ScenarioSetId = {scenarioSetId:String}
            AND BatchRunId IN ({batchRunIds:Array(String)})
+           ${startedAtClause}
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE ArchivedAt IS NULL
        ORDER BY CreatedAt ASC`,
-      { tenantId: projectId, scenarioSetId, batchRunIds },
+      { tenantId: projectId, scenarioSetId, batchRunIds, ...startedAtFilter.params },
     );
 
     // Group items by batchRunId
@@ -378,15 +446,24 @@ export class ClickHouseSimulationService {
     scenarioSetId,
     batchRunId,
     sinceTimestamp,
+    startDate,
+    endDate,
   }: {
     projectId: string;
     scenarioSetId: string;
     batchRunId: string;
     sinceTimestamp?: number;
+    startDate: number;
+    endDate: number;
   }): Promise<
     | { changed: false; lastUpdatedAt: number }
     | { changed: true; lastUpdatedAt: number; runs: ScenarioRunData[] }
   > {
+    const startedAtFilter = buildStartedAtWhereFilter({ startDate, endDate });
+    const startedAtClause = startedAtFilter.clause
+      ? `AND ${startedAtFilter.clause}`
+      : "";
+
     // Conditional check: skip full fetch if nothing changed
     if (sinceTimestamp !== undefined) {
       const tsRows = await this.queryRows<{ LastUpdatedAt: string }>(
@@ -394,8 +471,9 @@ export class ClickHouseSimulationService {
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND BatchRunId = {batchRunId:String}
+           ${startedAtClause}
            AND ArchivedAt IS NULL`,
-        { tenantId: projectId, batchRunId },
+        { tenantId: projectId, batchRunId, ...startedAtFilter.params },
       );
       const lastUpdatedAt = Number(tsRows[0]?.LastUpdatedAt ?? "0");
       if (lastUpdatedAt <= sinceTimestamp) {
@@ -411,12 +489,13 @@ export class ClickHouseSimulationService {
          WHERE TenantId = {tenantId:String}
            AND ScenarioSetId = {scenarioSetId:String}
            AND BatchRunId = {batchRunId:String}
+           ${startedAtClause}
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE ArchivedAt IS NULL
        ORDER BY CreatedAt ASC`,
-      { tenantId: projectId, scenarioSetId, batchRunId },
+      { tenantId: projectId, scenarioSetId, batchRunId, ...startedAtFilter.params },
     );
 
     const now = Date.now();
@@ -434,10 +513,19 @@ export class ClickHouseSimulationService {
   async getBatchRunCountForScenarioSet({
     projectId,
     scenarioSetId,
+    startDate,
+    endDate,
   }: {
     projectId: string;
     scenarioSetId: string;
+    startDate: number;
+    endDate: number;
   }): Promise<number> {
+    const startedAtFilter = buildStartedAtWhereFilter({ startDate, endDate });
+    const startedAtClause = startedAtFilter.clause
+      ? `AND ${startedAtFilter.clause}`
+      : "";
+
     const rows = await this.queryRows<{ BatchRunCount: string }>(
       `SELECT toString(count(DISTINCT BatchRunId)) AS BatchRunCount
        FROM (
@@ -445,11 +533,12 @@ export class ClickHouseSimulationService {
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND ScenarioSetId = {scenarioSetId:String}
+           ${startedAtClause}
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE ArchivedAt IS NULL`,
-      { tenantId: projectId, scenarioSetId },
+      { tenantId: projectId, scenarioSetId, ...startedAtFilter.params },
     );
     return parseInt(rows[0]?.BatchRunCount ?? "0", 10);
   }
@@ -461,10 +550,19 @@ export class ClickHouseSimulationService {
   async getScenarioRunDataByScenarioId({
     projectId,
     scenarioId,
+    startDate,
+    endDate,
   }: {
     projectId: string;
     scenarioId: string;
+    startDate: number;
+    endDate: number;
   }): Promise<ScenarioRunData[] | null> {
+    const startedAtFilter = buildStartedAtWhereFilter({ startDate, endDate });
+    const startedAtClause = startedAtFilter.clause
+      ? `AND ${startedAtFilter.clause}`
+      : "";
+
     const rows = await this.queryRows<ClickHouseSimulationRunRow>(
       `SELECT ${RUN_COLUMNS}
        FROM (
@@ -472,12 +570,13 @@ export class ClickHouseSimulationService {
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND ScenarioId = {scenarioId:String}
+           ${startedAtClause}
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE ArchivedAt IS NULL
        ORDER BY CreatedAt DESC`,
-      { tenantId: projectId, scenarioId },
+      { tenantId: projectId, scenarioId, ...startedAtFilter.params },
     );
 
     if (rows.length === 0) return null;
@@ -492,10 +591,19 @@ export class ClickHouseSimulationService {
   async getAllRunDataForScenarioSet({
     projectId,
     scenarioSetId,
+    startDate,
+    endDate,
   }: {
     projectId: string;
     scenarioSetId: string;
+    startDate: number;
+    endDate: number;
   }): Promise<ScenarioRunData[]> {
+    const startedAtFilter = buildStartedAtWhereFilter({ startDate, endDate });
+    const startedAtClause = startedAtFilter.clause
+      ? `AND ${startedAtFilter.clause}`
+      : "";
+
     const rows = await this.queryRows<ClickHouseSimulationRunRow>(
       `SELECT ${RUN_COLUMNS}
        FROM (
@@ -503,12 +611,13 @@ export class ClickHouseSimulationService {
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND ScenarioSetId = {scenarioSetId:String}
+           ${startedAtClause}
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE ArchivedAt IS NULL
        ORDER BY BatchRunId ASC, CreatedAt ASC`,
-      { tenantId: projectId, scenarioSetId },
+      { tenantId: projectId, scenarioSetId, ...startedAtFilter.params },
     );
 
     const now = Date.now();
@@ -531,8 +640,8 @@ export class ClickHouseSimulationService {
     scenarioSetId: string;
     limit?: number;
     cursor?: string;
-    startDate?: number;
-    endDate?: number;
+    startDate: number;
+    endDate: number;
   }): Promise<{ runs: ScenarioRunData[]; nextCursor?: string; hasMore: boolean }> {
     const validatedLimit = Math.min(Math.max(1, limit), 100);
     const decoded = cursor ? this.decodeCursor(cursor) : null;
@@ -547,6 +656,11 @@ export class ClickHouseSimulationService {
     const dateFilter = buildDateHavingFilter({ startDate, endDate });
     const combinedHaving = `HAVING ${[cursorPredicate, dateFilter.clause].filter(Boolean).join(" AND ")}`;
 
+    const startedAtFilter = buildStartedAtWhereFilter({ startDate, endDate });
+    const startedAtClause = startedAtFilter.clause
+      ? `AND ${startedAtFilter.clause}`
+      : "";
+
     const batchRows = await this.queryRows<{
       BatchRunId: string;
       MaxCreatedAt: string;
@@ -559,6 +673,7 @@ export class ClickHouseSimulationService {
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND ScenarioSetId = {scenarioSetId:String}
+           ${startedAtClause}
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
@@ -572,6 +687,7 @@ export class ClickHouseSimulationService {
         scenarioSetId,
         ...(decoded ? { cursorTs: decoded.ts, cursorBatchRunId: decoded.batchRunId } : {}),
         ...dateFilter.params,
+        ...startedAtFilter.params,
         fetchLimit: String(validatedLimit + 1),
       },
     );
@@ -590,7 +706,7 @@ export class ClickHouseSimulationService {
       : undefined;
 
     const batchRunIds = pageRows.map((r) => r.BatchRunId);
-    const runs = await this.getRunsForBatchIds({ projectId, batchRunIds });
+    const runs = await this.getRunsForBatchIds({ projectId, batchRunIds, startDate, endDate });
 
     return { runs, nextCursor, hasMore };
   }
@@ -609,8 +725,8 @@ export class ClickHouseSimulationService {
     projectId: string;
     limit?: number;
     cursor?: string;
-    startDate?: number;
-    endDate?: number;
+    startDate: number;
+    endDate: number;
   }): Promise<{
     runs: ScenarioRunData[];
     scenarioSetIds: Record<string, string>;
@@ -630,6 +746,11 @@ export class ClickHouseSimulationService {
     const dateFilter = buildDateHavingFilter({ startDate, endDate });
     const combinedHaving = `HAVING ${[cursorPredicate, dateFilter.clause].filter(Boolean).join(" AND ")}`;
 
+    const startedAtFilter = buildStartedAtWhereFilter({ startDate, endDate });
+    const startedAtClause = startedAtFilter.clause
+      ? `AND ${startedAtFilter.clause}`
+      : "";
+
     const batchRows = await this.queryRows<{
       BatchRunId: string;
       MaxCreatedAt: string;
@@ -644,6 +765,7 @@ export class ClickHouseSimulationService {
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND ScenarioSetId LIKE '__internal__%__suite'
+           ${startedAtClause}
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
@@ -656,6 +778,7 @@ export class ClickHouseSimulationService {
         tenantId: projectId,
         ...(decoded ? { cursorTs: decoded.ts, cursorBatchRunId: decoded.batchRunId } : {}),
         ...dateFilter.params,
+        ...startedAtFilter.params,
         fetchLimit: String(validatedLimit + 1),
       },
     );
@@ -678,7 +801,7 @@ export class ClickHouseSimulationService {
     }
 
     const batchRunIds = pageRows.map((r) => r.BatchRunId);
-    const runs = await this.getRunsForBatchIds({ projectId, batchRunIds });
+    const runs = await this.getRunsForBatchIds({ projectId, batchRunIds, startDate, endDate });
 
     return { runs, scenarioSetIds, nextCursor, hasMore };
   }
@@ -692,9 +815,18 @@ export class ClickHouseSimulationService {
    */
   async getExternalSetSummaries({
     projectId,
+    startDate,
+    endDate,
   }: {
     projectId: string;
+    startDate: number;
+    endDate: number;
   }): Promise<ExternalSetSummary[]> {
+    const startedAtFilter = buildStartedAtWhereFilter({ startDate, endDate });
+    const startedAtClause = startedAtFilter.clause
+      ? `AND ${startedAtFilter.clause}`
+      : "";
+
     // Step 1: Get latest batch per external set
     const setRows = await this.queryRows<{
       ScenarioSetId: string;
@@ -716,6 +848,7 @@ export class ClickHouseSimulationService {
            FROM ${TABLE_NAME}
            WHERE TenantId = {tenantId:String}
              AND NOT startsWith(ScenarioSetId, '__internal__')
+             ${startedAtClause}
            ORDER BY ScenarioRunId, UpdatedAt DESC
            LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
          )
@@ -724,7 +857,7 @@ export class ClickHouseSimulationService {
        )
        GROUP BY ScenarioSetId
        ORDER BY LastRunAt DESC`,
-      { tenantId: projectId },
+      { tenantId: projectId, ...startedAtFilter.params },
     );
 
     if (setRows.length === 0) return [];
@@ -747,12 +880,13 @@ export class ClickHouseSimulationService {
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND BatchRunId IN ({batchRunIds:Array(String)})
+           ${startedAtClause}
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE ArchivedAt IS NULL
        GROUP BY ScenarioSetId, BatchRunId`,
-      { tenantId: projectId, batchRunIds },
+      { tenantId: projectId, batchRunIds, ...startedAtFilter.params },
     );
 
     const statsMap = new Map(
@@ -798,11 +932,20 @@ export class ClickHouseSimulationService {
   private async getRunsForBatchIds({
     projectId,
     batchRunIds,
+    startDate,
+    endDate,
   }: {
     projectId: string;
     batchRunIds: string[];
+    startDate: number;
+    endDate: number;
   }): Promise<ScenarioRunData[]> {
     if (batchRunIds.length === 0) return [];
+
+    const startedAtFilter = buildStartedAtWhereFilter({ startDate, endDate });
+    const startedAtClause = startedAtFilter.clause
+      ? `AND ${startedAtFilter.clause}`
+      : "";
 
     const rows = await this.queryRows<ClickHouseSimulationRunRow>(
       `SELECT ${RUN_COLUMNS}
@@ -811,12 +954,13 @@ export class ClickHouseSimulationService {
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND BatchRunId IN ({batchRunIds:Array(String)})
+           ${startedAtClause}
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE ArchivedAt IS NULL
        ORDER BY CreatedAt ASC`,
-      { tenantId: projectId, batchRunIds },
+      { tenantId: projectId, batchRunIds, ...startedAtFilter.params },
     );
 
     const now = Date.now();

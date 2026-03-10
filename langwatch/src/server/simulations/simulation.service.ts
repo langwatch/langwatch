@@ -18,6 +18,9 @@ const logger = createLogger("langwatch:simulations:service");
  *
  * Return types intentionally match ScenarioEventService so tRPC router
  * shapes are unchanged.
+ *
+ * All read methods require `startDate` and `endDate` to enforce partition
+ * pruning on ClickHouse queries. The ES fallback ignores these fields.
  */
 export class SimulationService {
   private readonly esService: ScenarioEventService;
@@ -46,11 +49,15 @@ export class SimulationService {
 
   async getScenarioSetsDataForProject({
     projectId,
+    startDate,
+    endDate,
   }: {
     projectId: string;
+    startDate: number;
+    endDate: number;
   }) {
     if (await this.isClickHouseEnabled(projectId)) {
-      return this.chService!.getScenarioSetsData({ projectId });
+      return this.chService!.getScenarioSetsData({ projectId, startDate, endDate });
     }
     return this.esService.getScenarioSetsDataForProject({ projectId });
   }
@@ -58,12 +65,16 @@ export class SimulationService {
   async getScenarioRunData({
     projectId,
     scenarioRunId,
+    startDate,
+    endDate,
   }: {
     projectId: string;
     scenarioRunId: string;
+    startDate: number;
+    endDate: number;
   }) {
     if (await this.isClickHouseEnabled(projectId)) {
-      return this.chService!.getScenarioRunData({ projectId, scenarioRunId });
+      return this.chService!.getScenarioRunData({ projectId, scenarioRunId, startDate, endDate });
     }
     return this.esService.getScenarioRunData({ projectId, scenarioRunId });
   }
@@ -73,6 +84,8 @@ export class SimulationService {
     scenarioSetId: string;
     limit?: number;
     cursor?: string;
+    startDate: number;
+    endDate: number;
   }): Promise<BatchHistoryResult> {
     if (await this.isClickHouseEnabled(params.projectId)) {
       return this.chService!.getBatchHistoryForScenarioSet(params);
@@ -85,11 +98,15 @@ export class SimulationService {
     scenarioSetId,
     batchRunId,
     sinceTimestamp,
+    startDate,
+    endDate,
   }: {
     projectId: string;
     scenarioSetId: string;
     batchRunId: string;
     sinceTimestamp?: number;
+    startDate: number;
+    endDate: number;
   }): Promise<BatchRunDataResult> {
     if (await this.isClickHouseEnabled(projectId)) {
       return this.chService!.getRunDataForBatchRun({
@@ -97,6 +114,8 @@ export class SimulationService {
         scenarioSetId,
         batchRunId,
         sinceTimestamp,
+        startDate,
+        endDate,
       });
     }
     return this.esService.getRunDataForBatchRun({
@@ -112,8 +131,8 @@ export class SimulationService {
     scenarioSetId: string;
     limit?: number;
     cursor?: string;
-    startDate?: number;
-    endDate?: number;
+    startDate: number;
+    endDate: number;
   }) {
     if (await this.isClickHouseEnabled(params.projectId)) {
       return this.chService!.getRunDataForScenarioSet(params);
@@ -124,6 +143,8 @@ export class SimulationService {
   async getAllRunDataForScenarioSet(params: {
     projectId: string;
     scenarioSetId: string;
+    startDate: number;
+    endDate: number;
   }) {
     if (await this.isClickHouseEnabled(params.projectId)) {
       return this.chService!.getAllRunDataForScenarioSet(params);
@@ -134,6 +155,8 @@ export class SimulationService {
   async getScenarioRunDataByScenarioId(params: {
     projectId: string;
     scenarioId: string;
+    startDate: number;
+    endDate: number;
   }) {
     if (await this.isClickHouseEnabled(params.projectId)) {
       return this.chService!.getScenarioRunDataByScenarioId(params);
@@ -144,6 +167,8 @@ export class SimulationService {
   async getBatchRunCountForScenarioSet(params: {
     projectId: string;
     scenarioSetId: string;
+    startDate: number;
+    endDate: number;
   }) {
     if (await this.isClickHouseEnabled(params.projectId)) {
       return this.chService!.getBatchRunCountForScenarioSet(params);
@@ -153,6 +178,8 @@ export class SimulationService {
 
   async getExternalSetSummaries(params: {
     projectId: string;
+    startDate: number;
+    endDate: number;
   }) {
     if (await this.isClickHouseEnabled(params.projectId)) {
       return this.chService!.getExternalSetSummaries(params);
@@ -164,8 +191,8 @@ export class SimulationService {
     projectId: string;
     limit?: number;
     cursor?: string;
-    startDate?: number;
-    endDate?: number;
+    startDate: number;
+    endDate: number;
   }) {
     if (await this.isClickHouseEnabled(params.projectId)) {
       return this.chService!.getRunDataForAllSuites(params);

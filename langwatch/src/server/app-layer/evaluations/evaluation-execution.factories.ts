@@ -1,40 +1,10 @@
-import type { PrismaClient } from "@prisma/client";
 import {
   getProjectModelProviders,
   prepareEnvKeys,
   prepareLitellmParams,
-} from "~/server/api/routers/modelProviders";
-import { getProtectionsForProject } from "~/server/api/utils";
-import {
-  getTraceById,
-  getTracesGroupedByThreadId,
-} from "~/server/elasticsearch/traces";
+} from "~/server/api/routers/modelProviders.utils";
 import { EvaluatorConfigError } from "./errors";
-import type { ModelEnvResolver, TraceFetcher } from "./evaluation-execution.service";
-
-export function createDefaultTraceFetcher(prisma: PrismaClient): TraceFetcher {
-  return {
-    async getTraceById({ projectId, traceId }) {
-      const protections = await getProtectionsForProject(prisma, { projectId });
-      return getTraceById({
-        connConfig: { projectId },
-        traceId,
-        protections,
-        includeEvaluations: true,
-        includeSpans: true,
-      });
-    },
-    async getTracesGroupedByThreadId({ projectId, threadId }) {
-      const protections = await getProtectionsForProject(prisma, { projectId });
-      return getTracesGroupedByThreadId({
-        connConfig: { projectId },
-        threadId,
-        protections,
-        includeSpans: true,
-      });
-    },
-  };
-}
+import type { ModelEnvResolver } from "./evaluation-execution.service";
 
 export function createDefaultModelEnvResolver(): ModelEnvResolver {
   return {

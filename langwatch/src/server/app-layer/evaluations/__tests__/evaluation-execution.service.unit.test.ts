@@ -23,10 +23,10 @@ import {
   type CostChecker,
   type EvaluationExecutionDeps,
   type ModelEnvResolver,
-  type ProjectFetcher,
-  type TraceFetcher,
   type WorkflowExecutor,
 } from "../evaluation-execution.service";
+import type { TraceService } from "~/server/traces/trace.service";
+import type { ProjectService } from "../../projects/project.service";
 
 // Uses a real evaluator from AVAILABLE_EVALUATORS — no vi.mock needed.
 // openai/moderation: requiredFields=[], optionalFields=["input","output"], envVars=[]
@@ -53,11 +53,11 @@ function buildTrace(overrides?: Partial<Trace>): Trace {
 // ---------------------------------------------------------------------------
 
 interface TestOverrides {
-  traceFetcher?: Partial<TraceFetcher>;
+  traceService?: Partial<Pick<TraceService, "getTracesWithSpans" | "getTracesWithSpansByThreadIds">>;
   costChecker?: Partial<CostChecker>;
   modelEnvResolver?: Partial<ModelEnvResolver>;
   workflowExecutor?: Partial<WorkflowExecutor>;
-  projectFetcher?: Partial<ProjectFetcher>;
+  projectService?: Partial<Pick<ProjectService, "getWithTeam">>;
   client?: Partial<LangEvalsClient>;
   trace?: Trace | undefined;
 }
@@ -65,11 +65,11 @@ interface TestOverrides {
 function createTestService(overrides: TestOverrides = {}) {
   const defaultTrace = "trace" in overrides ? overrides.trace : buildTrace();
 
-  const mockTraceFetcher: TraceFetcher = {
-    getTraceById: vi.fn().mockResolvedValue(defaultTrace),
-    getTracesGroupedByThreadId: vi.fn().mockResolvedValue([]),
-    ...overrides.traceFetcher,
-  };
+  const mockTraceService = {
+    getTracesWithSpans: vi.fn().mockResolvedValue(defaultTrace ? [defaultTrace] : []),
+    getTracesWithSpansByThreadIds: vi.fn().mockResolvedValue([]),
+    ...overrides.traceService,
+  } as unknown as TraceService;
 
   const mockCostChecker: CostChecker = {
     maxMonthlyUsageLimit: vi.fn().mockResolvedValue(Infinity),
@@ -90,13 +90,13 @@ function createTestService(overrides: TestOverrides = {}) {
     ...overrides.workflowExecutor,
   };
 
-  const mockProjectFetcher: ProjectFetcher = {
-    getProjectWithTeam: vi.fn().mockResolvedValue({
+  const mockProjectService = {
+    getWithTeam: vi.fn().mockResolvedValue({
       id: "proj-1",
       team: { organizationId: "org-1" },
     }),
-    ...overrides.projectFetcher,
-  };
+    ...overrides.projectService,
+  } as unknown as ProjectService;
 
   const mockClient: LangEvalsClient = {
     evaluate: vi.fn().mockResolvedValue({
@@ -108,22 +108,23 @@ function createTestService(overrides: TestOverrides = {}) {
   };
 
   const deps: EvaluationExecutionDeps = {
-    traceFetcher: mockTraceFetcher,
+    traceService: mockTraceService,
+    projectService: mockProjectService,
     costChecker: mockCostChecker,
     modelEnvResolver: mockModelEnvResolver,
     workflowExecutor: mockWorkflowExecutor,
-    projectFetcher: mockProjectFetcher,
+    langevalsClient: mockClient,
   };
 
-  const service = new EvaluationExecutionService(mockClient, deps);
+  const service = new EvaluationExecutionService(deps);
 
   return {
     service,
-    mockTraceFetcher,
+    mockTraceService,
     mockCostChecker,
     mockModelEnvResolver,
     mockWorkflowExecutor,
-    mockProjectFetcher,
+    mockProjectService,
     mockClient,
   };
 }
@@ -300,8 +301,8 @@ describe("EvaluationExecutionService", () => {
     describe("when project is not found", () => {
       it("throws EvaluatorConfigError", async () => {
         const { service } = createTestService({
-          projectFetcher: {
-            getProjectWithTeam: vi.fn().mockResolvedValue(null),
+          projectService: {
+            getWithTeam: vi.fn().mockResolvedValue(null),
           },
         });
 
@@ -317,8 +318,8 @@ describe("EvaluationExecutionService", () => {
       });
 
       describe("when level param is 'thread'", () => {
-        it("calls traceFetcher.getTracesGroupedByThreadId", async () => {
-          const { service, mockTraceFetcher } = createTestService({
+        it("calls traceService.getTracesWithSpansByThreadIds", async () => {
+          const { service, mockTraceService } = createTestService({
             trace: threadTrace,
           });
 
@@ -333,10 +334,15 @@ describe("EvaluationExecutionService", () => {
             } as any,
           });
 
-          expect(mockTraceFetcher.getTracesGroupedByThreadId).toHaveBeenCalledWith({
-            projectId: "proj-1",
-            threadId: "thread-1",
-          });
+          expect(mockTraceService.getTracesWithSpansByThreadIds).toHaveBeenCalledWith(
+            "proj-1",
+            ["thread-1"],
+            expect.objectContaining({
+              canSeeCosts: true,
+              canSeeCapturedInput: true,
+              canSeeCapturedOutput: true,
+            }),
+          );
         });
 
         it("includes evaluationThreadId in result", async () => {

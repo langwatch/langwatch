@@ -25,7 +25,6 @@ export interface TraceProcessingPipelineDeps {
   evaluationTriggerReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   customEvaluationSyncReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   traceUpdateBroadcastReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
-  satisfactionScoreReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   spanStorageBroadcastReactor: ReactorDefinition<TraceProcessingEvent>;
 }
 
@@ -55,7 +54,6 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
     .withReactor("traceSummary", "evaluationTrigger", deps.evaluationTriggerReactor)
     .withReactor("traceSummary", "customEvaluationSync", deps.customEvaluationSyncReactor)
     .withReactor("traceSummary", "traceUpdateBroadcast", deps.traceUpdateBroadcastReactor)
-    .withReactor("traceSummary", "satisfactionScore", deps.satisfactionScoreReactor)
     .withReactor("spanStorage", "spanStorageBroadcast", deps.spanStorageBroadcastReactor)
     .withCommand("recordSpan", RecordSpanCommand)
     .withCommand("assignTopic", AssignTopicCommand)

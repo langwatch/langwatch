@@ -49,6 +49,7 @@ User Request
 │   ├── review/         # Delegates to uncle-bob-reviewer
 │   ├── challenge/      # Delegates to devils-advocate
 │   ├── sherpa/         # Delegates to repo-sherpa
+│   ├── drive-pr/       # Fix CI failures + address review comments
 │   └── e2e/            # Coordinates E2E test generation workflow
 └── commands/       # Slash commands (non-agent utilities)
 ```

@@ -1,5 +1,5 @@
 import { SimpleGrid, Box, Text, Stat, StatLabel, StatNumber, Heading, HStack, VStack } from "@chakra-ui/react";
-import type { DashboardData, PhaseMetrics, QueueInfo } from "../../../shared/types.ts";
+import type { DashboardData, PhaseMetrics } from "../../../shared/types.ts";
 import { formatNumber, formatLatency, formatRate } from "../../utils/formatters.ts";
 
 /** Interpolate hue from 120 (green) → 0 (red) based on fill ratio 0–1 */
@@ -194,22 +194,10 @@ function PhaseCard({ title, metrics }: { title: string; metrics: PhaseMetrics })
   );
 }
 
-export function StatCards({ data, queues }: { data: DashboardData; queues?: QueueInfo[] }) {
-  // Derive group counts from queues prop (which includes draining groups) when available,
-  // so stat cards stay in sync with the groups table below.
-  let totalGroups = data.totalGroups;
-  let blockedGroups = data.blockedGroups;
-  let totalPendingJobs = data.totalPendingJobs;
-  if (queues && queues.length > 0) {
-    totalGroups = 0;
-    blockedGroups = 0;
-    totalPendingJobs = 0;
-    for (const q of queues) {
-      totalGroups += q.groups.length;
-      blockedGroups += q.blockedGroupCount;
-      totalPendingJobs += q.totalPendingJobs;
-    }
-  }
+export function StatCards({ data }: { data: DashboardData }) {
+  const totalGroups = data.totalGroups;
+  const blockedGroups = data.blockedGroups;
+  const totalPendingJobs = data.totalPendingJobs;
 
   const hasMaxMemory = data.redisMemoryMaxBytes > 0;
   const peakBytes = data.redisMemoryPeakBytes ?? 0;

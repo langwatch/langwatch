@@ -64,6 +64,7 @@ Read `docs/adr/` (Architecture Decision Records) to explain decisions:
 │   ├── code/           # /code → coder agent
 │   ├── review/         # /review → uncle-bob-reviewer
 │   ├── sherpa/         # /sherpa → repo-sherpa
+│   ├── drive-pr/       # /drive-pr → fix CI failures + address review comments
 │   ├── plan/           # /plan → creates feature files
 │   ├── orchestrate/    # /orchestrate → manages plan/code/review loop
 │   └── implement/      # /implement #123 → fetches issue, invokes orchestrate
@@ -71,7 +72,6 @@ Read `docs/adr/` (Architecture Decision Records) to explain decisions:
     ├── README.md       # Commands vs Skills
     ├── onboard.md      # /onboard - orientation + review
     ├── refocus.md      # /refocus - realign with BDD
-    ├── pr-review.md    # /pr-review - address PR comments
     └── worktree.md     # /worktree - create git worktree
 ```
 

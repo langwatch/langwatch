@@ -27,15 +27,15 @@ export const clickHouseFilterConditions: Record<
 
   // Metadata
   "metadata.user_id": (values, paramId) => ({
-    sql: `ts.Attributes['user.id'] IN ({${paramId}_values:Array(String)})`,
+    sql: `ts.Attributes['langwatch.user_id'] IN ({${paramId}_values:Array(String)})`,
     params: { [`${paramId}_values`]: values },
   }),
   "metadata.thread_id": (values, paramId) => ({
-    sql: `ts.Attributes['thread.id'] IN ({${paramId}_values:Array(String)})`,
+    sql: `ts.Attributes['gen_ai.conversation.id'] IN ({${paramId}_values:Array(String)})`,
     params: { [`${paramId}_values`]: values },
   }),
   "metadata.customer_id": (values, paramId) => ({
-    sql: `ts.Attributes['customer.id'] IN ({${paramId}_values:Array(String)})`,
+    sql: `ts.Attributes['langwatch.customer_id'] IN ({${paramId}_values:Array(String)})`,
     params: { [`${paramId}_values`]: values },
   }),
   "metadata.labels": (values, paramId) => ({

@@ -13,7 +13,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { type UseFormReturn, useForm } from "react-hook-form";
 import { useDebounceCallback } from "usehooks-ts";
 
@@ -435,6 +435,9 @@ export function NewVersionFields({
   const generateCommitMessage =
     api.workflow.generateCommitMessage.useMutation();
 
+  const userEditedCommitMessage = useRef(false);
+  const hasTriggeredGeneration = useRef(false);
+
   const generateCommitMessageCallback = useCallback(
     (prevDsl: Workflow, newDsl: Workflow) => {
       // Skip generation if model is not available
@@ -450,7 +453,7 @@ export function NewVersionFields({
         },
         {
           onSuccess: (data) => {
-            if (data) {
+            if (data && !userEditedCommitMessage.current) {
               form.setValue("commitMessage", data as string);
             }
           },
@@ -478,7 +481,9 @@ export function NewVersionFields({
   );
 
   useEffect(() => {
-    if (canSaveNewVersion && previousVersion?.dsl) {
+    if (canSaveNewVersion && previousVersion?.dsl && !hasTriggeredGeneration.current) {
+      hasTriggeredGeneration.current = true;
+      userEditedCommitMessage.current = false;
       form.setValue("commitMessage", "");
       setTimeout(() => {
         debouncedGenerateCommitMessage(previousVersion.dsl!, getWorkflow());
@@ -524,6 +529,9 @@ export function NewVersionFields({
             <Input
               {...form.register("commitMessage", {
                 required: true,
+                onChange: () => {
+                  userEditedCommitMessage.current = true;
+                },
               })}
               placeholder={
                 generateCommitMessage.isLoading

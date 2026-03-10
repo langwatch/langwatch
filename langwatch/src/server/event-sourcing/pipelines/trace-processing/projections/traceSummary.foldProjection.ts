@@ -1,4 +1,5 @@
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
+import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
 import {
   enrichRagContextIds,
   SpanNormalizationPipelineService,
@@ -741,9 +742,10 @@ function accumulateAttributes({
 
 // ─── Main composition ───────────────────────────────────────────────
 
-const spanNormalizationPipelineService =
-  SpanNormalizationPipelineService.create();
-const traceIOExtractionService = TraceIOExtractionService.create();
+const spanNormalizationPipelineService = new SpanNormalizationPipelineService(
+  new CanonicalizeSpanAttributesService(),
+);
+const traceIOExtractionService = new TraceIOExtractionService();
 
 /** @internal Exported for unit testing */
 export function applySpanToSummary({
