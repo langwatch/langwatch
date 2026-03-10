@@ -1,5 +1,5 @@
 import { nanoid } from "nanoid";
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { toaster } from "../../components/ui/toaster";
 import type { StudioClientEvent } from "../types/events";
 import { mergeLocalConfigsIntoDsl } from "../utils/mergeLocalConfigs";
@@ -37,6 +37,15 @@ export const useEvaluationExecution = () => {
     return true;
   }, [socketStatus]);
 
+  const timeoutIdsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  useEffect(() => {
+    return () => {
+      timeoutIdsRef.current.forEach(clearTimeout);
+      timeoutIdsRef.current = [];
+    };
+  }, []);
+
   const scheduleTimeout = useCallback(
     ({
       run_id,
@@ -47,7 +56,7 @@ export const useEvaluationExecution = () => {
       timeout_on_status: "waiting" | "running";
       delayMs: number;
     }) => {
-      setTimeout(() => {
+      const timeoutId = setTimeout(() => {
         const workflow = getWorkflowRef.current();
         if (
           workflow.state.evaluation?.run_id === run_id &&
@@ -70,6 +79,8 @@ export const useEvaluationExecution = () => {
           });
         }
       }, delayMs);
+
+      timeoutIdsRef.current.push(timeoutId);
     },
     [],
   );

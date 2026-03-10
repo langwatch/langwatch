@@ -139,6 +139,44 @@ describe("useEvaluationExecution", () => {
     });
   });
 
+  describe("when hook unmounts before timeout fires", () => {
+    it("clears pending timeouts", () => {
+      const { result, unmount } = renderHook(() => useEvaluationExecution());
+
+      act(() => {
+        result.current.startEvaluationExecution({
+          workflow_version_id: "v1",
+          evaluate_on: "full",
+        });
+      });
+
+      const runId = mockSetEvaluationState.mock.calls[0]![0].run_id as string;
+
+      // Simulate that the workflow state is still "waiting"
+      mockWorkflowState = {
+        state: {
+          evaluation: {
+            run_id: runId,
+            status: "waiting",
+          },
+        },
+        nodes: [],
+      };
+
+      mockSetEvaluationState.mockClear();
+
+      // Unmount before timeout fires
+      unmount();
+
+      act(() => {
+        vi.advanceTimersByTime(20_000);
+      });
+
+      // Should NOT have set error state because timeout was cleared
+      expect(mockSetEvaluationState).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when stop evaluation stays in running status past timeout", () => {
     it("transitions to error state", () => {
       const { result } = renderHook(() => useEvaluationExecution());
