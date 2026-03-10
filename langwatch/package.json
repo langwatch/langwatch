@@ -304,6 +304,14 @@
     "pino-pretty": "^13.0.0",
     "thread-stream": "^4.0.0"
   },
+  "pnpm": {
+    "overrides": {
+      "@aws-sdk/core>fast-xml-parser": "^4.5.4",
+      "@aws-sdk/xml-builder>fast-xml-parser": "^5.5.1",
+      "@langchain/community>fast-xml-parser": "^5.5.1",
+      "@types/request>form-data": "^2.5.5"
+    }
+  },
   "ct3aMetadata": {
     "initVersion": "7.19.0"
   },
