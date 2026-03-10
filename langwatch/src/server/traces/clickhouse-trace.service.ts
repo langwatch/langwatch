@@ -18,6 +18,7 @@ import type {
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { generateClickHouseFilterConditions } from "~/server/filters/clickhouse";
 import type { Span, Trace } from "~/server/tracer/types";
+import { LLM_PARAMETER_MAP } from "~/prompts/prompt-playground/llmParameterMap";
 import { createLogger } from "~/utils/logger/server";
 import {
   applyTraceProtections,
@@ -955,12 +956,33 @@ export class ClickHouseTraceService {
       (attrs["gen_ai.request.model"] as string) ??
       (attrs["llm.model"] as string) ??
       null;
-    const temperature = (attrs["gen_ai.request.temperature"] as number) ?? null;
-    const maxTokens = (attrs["gen_ai.request.max_tokens"] as number) ?? null;
-    const topP = (attrs["gen_ai.request.top_p"] as number) ?? null;
     const vendor = (attrs["gen_ai.system"] as string) ?? null;
 
-    const systemPrompt = messages.find((m) => m.role === "system")?.content;
+    // Build llmConfig dynamically from the parameter map
+    const llmConfig: PromptStudioSpanResult["llmConfig"] = {
+      model,
+      systemPrompt: messages.find((m) => m.role === "system")?.content,
+      temperature: null,
+      maxTokens: null,
+      topP: null,
+      frequencyPenalty: null,
+      presencePenalty: null,
+      seed: null,
+      topK: null,
+      minP: null,
+      repetitionPenalty: null,
+      reasoning: null,
+      verbosity: null,
+      litellmParams: {},
+    };
+
+    for (const param of LLM_PARAMETER_MAP) {
+      if (param.otelAttr === null) continue;
+      const raw = attrs[param.otelAttr];
+      if (raw != null) {
+        (llmConfig as Record<string, unknown>)[param.formField] = raw;
+      }
+    }
 
     // Extract metrics
     const promptTokens = attrs["gen_ai.usage.prompt_tokens"] as
@@ -985,14 +1007,7 @@ export class ClickHouseTraceService {
       traceId: row.TraceId,
       spanName: row.SpanName ?? null,
       messages,
-      llmConfig: {
-        model,
-        systemPrompt,
-        temperature,
-        maxTokens,
-        topP,
-        litellmParams: {},
-      },
+      llmConfig,
       vendor,
       error,
       timestamps: {
