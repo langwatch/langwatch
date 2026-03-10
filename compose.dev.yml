@@ -300,14 +300,14 @@ services:
 
 volumes:
   db-data:
-    name: langwatch-db-data # Shared across all worktrees
+    name: ${VOLUME_PREFIX:-langwatch}-db-data
   redis-data:
-    name: langwatch-redis-data # Shared across all worktrees
+    name: ${VOLUME_PREFIX:-langwatch}-redis-data
   opensearch-data:
-    name: langwatch-opensearch-data # Shared across all worktrees
+    name: ${VOLUME_PREFIX:-langwatch}-opensearch-data
   app_modules:
-    name: langwatch-app-modules # Shared across all worktrees
+    name: ${VOLUME_PREFIX:-langwatch}-app-modules
   pnpm_store:
-    name: langwatch-pnpm-store # Shared across all worktrees
+    name: langwatch-pnpm-store # Always shared (cache only)
   bullboard_modules:
-    name: langwatch-bullboard-modules # Shared across all worktrees
+    name: ${VOLUME_PREFIX:-langwatch}-bullboard-modules

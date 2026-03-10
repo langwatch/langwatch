@@ -12,9 +12,11 @@ You coordinate E2E test creation and verification. You invoke specialized agents
 ## Prerequisites
 
 Before running this workflow:
-1. The app must be running locally (`make dev` or equivalent)
+1. The app must be running (`make dev-up` or `make dev`)
 2. E2E infrastructure must be up (`cd agentic-e2e-tests && docker compose up -d`)
 3. The feature should already be implemented and reviewed
+
+**Port discovery:** Check for `.dev-port` in the repo root (created by `make dev-up`). Source it to get `APP_PORT` and `BASE_URL`. If not found, default to port `5570`.
 
 ## Input
 
@@ -32,7 +34,7 @@ Invoke the `playwright-test-planner` agent via Task tool:
 
 ```
 Task(subagent_type: "playwright-test-planner", prompt: """
-Explore the live app at http://localhost:5570 and create a test plan for:
+Explore the live app at http://localhost:<APP_PORT> and create a test plan for:
 
 <scenarios>
 [List the @e2e scenarios from the feature file]

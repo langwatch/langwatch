@@ -12,8 +12,10 @@ You use the Playwright MCP tools to open a browser, navigate the app, and verify
 ## Input
 
 Parse `$ARGUMENTS` for:
-- **Port** (required): the number (e.g. `5570`) or `:<port>` format
+- **Port** (optional): the number (e.g. `5570`) or `:<port>` format
 - **Feature** (optional): a description of what to verify, or a path to a `specs/*.feature` file
+
+**Port auto-detection:** If no port is provided, check for a `.dev-port` file in the repo root (created by `make dev-up`). Source it and use `$APP_PORT`. If neither is available, ask the user.
 
 If a feature file path is given, read it and extract the scenarios. If a plain description is given, use it directly. If neither is provided, ask the user what to verify.
 
