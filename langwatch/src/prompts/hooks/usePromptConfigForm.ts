@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import isEqual from "lodash-es/isEqual";
 import { useEffect, useMemo, useRef } from "react";
-import { type DeepPartial, type Resolver, type ResolverOptions, useForm } from "react-hook-form";
+import { type DeepPartial, useForm } from "react-hook-form";
 import { useModelLimits } from "~/hooks/useModelLimits";
 import {
   formSchema,
@@ -46,10 +46,10 @@ export const usePromptConfigForm = ({
      * @see https://react-hook-form.com/docs/useform#defaultValues
      */
     defaultValues: parsedInitialValues,
-    resolver: ((data, context, options) => {
+    resolver: (data, context, options) => {
       // Use ref to get current schema (updated by useEffect)
-      return (zodResolver(schemaRef.current) as unknown as Resolver<PromptConfigFormValues>)(data, context, options);
-    }) as Resolver<PromptConfigFormValues>,
+      return zodResolver(schemaRef.current)(data, context, options);
+    },
   });
 
   const formData = methods.watch();

@@ -12,8 +12,6 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Controller,
   FormProvider,
-  type Resolver,
-  type ResolverOptions,
   useFieldArray,
   useForm,
 } from "react-hook-form";
@@ -25,6 +23,8 @@ import { useAnimatedFocusElementById } from "../../../../../hooks/useAnimatedFoc
 import type { CheckPreconditions } from "../../../../../server/evaluations/types";
 import { checkPreconditionsSchema } from "../../../../../server/evaluations/types.generated";
 import type { CheckConfigFormData } from "../../../../checks/CheckConfigForm";
+
+type RealTimeExecutionFormData = Pick<CheckConfigFormData, "sample" | "preconditions">;
 import { PreconditionsField } from "../../../../checks/PreconditionsField";
 import { HorizontalFormControl } from "../../../../HorizontalFormControl";
 import { Tooltip } from "../../../../ui/tooltip";
@@ -67,20 +67,18 @@ export function RealTimeExecutionStep() {
     focusElementById("js-next-step-button");
   };
 
-  const form = useForm<CheckConfigFormData>({
+  const form = useForm<RealTimeExecutionFormData>({
     defaultValues: {
       sample: 1,
       preconditions: [],
       ...(realTimeExecution ?? {}),
     },
-    resolver: ((data, context, options) => {
-      return (zodResolver(
-        z.object({
-          sample: z.number().min(0.01).max(1),
-          preconditions: checkPreconditionsSchema,
-        }),
-      ) as unknown as Resolver<CheckConfigFormData>)(data, context, options);
-    }) as Resolver<CheckConfigFormData>,
+    resolver: zodResolver(
+      z.object({
+        sample: z.number().min(0.01).max(1),
+        preconditions: checkPreconditionsSchema,
+      }),
+    ),
   });
 
   const [skipSubmit, setSkipSubmit] = useState(false);
