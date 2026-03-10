@@ -140,6 +140,39 @@ const processBatchedRecords = ({
   return { truncatedRecords, truncated, totalSize };
 };
 
+const pickSingleEntry = ({
+  records,
+  entrySelection,
+}: {
+  records: DatasetRecord[];
+  entrySelection: "first" | "last" | "random" | "all" | number;
+}) => {
+  if (
+    entrySelection !== "first" &&
+    entrySelection !== "last" &&
+    entrySelection !== "random" &&
+    typeof entrySelection !== "number"
+  ) {
+    return null;
+  }
+
+  if (records.length === 0) {
+    return [];
+  }
+
+  let index = 0;
+
+  if (entrySelection === "last") {
+    index = Math.max(records.length - 1, 0);
+  } else if (entrySelection === "random") {
+    index = Math.floor(Math.random() * records.length);
+  } else if (typeof entrySelection === "number") {
+    index = Math.max(0, Math.min(entrySelection, records.length - 1));
+  }
+
+  return [records[index] as DatasetRecord];
+};
+
 export const getFullDataset = async ({
   datasetId,
   projectId,
@@ -204,6 +237,19 @@ export const getFullDataset = async ({
         if (batch.length < BATCH_SIZE) break;
         currentPage++;
       } while (!truncated);
+
+      const selectedRecord = pickSingleEntry({
+        records,
+        entrySelection,
+      });
+
+      if (selectedRecord) {
+        return {
+          ...dataset,
+          count: records.length,
+          datasetRecords: selectedRecord,
+        };
+      }
 
       return {
         ...dataset,
