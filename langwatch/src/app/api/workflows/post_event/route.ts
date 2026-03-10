@@ -99,7 +99,15 @@ app.post(
     // Use streamSSE to create an SSE stream response
     return streamSSE(c, async (stream) => {
       // Create a promise that will resolve when the stream should end
+      let resolved = false;
       const streamDone = new Promise<void>((resolve) => {
+        const resolveOnce = () => {
+          if (!resolved) {
+            resolved = true;
+            resolve();
+          }
+        };
+
         void studioBackendPostEvent({
           projectId,
           message,
@@ -112,37 +120,41 @@ app.post(
             // If we receive a "done" event, resolve the promise to end the stream
             if (serverEvent.type === "done") {
               setTimeout(() => {
-                resolve();
+                resolveOnce();
               }, 1000);
             }
           },
-        }).catch((error) => {
-          logger.error({ error }, "Error handling message");
+        })
+          .catch((error) => {
+            logger.error({ error }, "Error handling message");
 
-          // handle component error
-          if ("node_id" in message.payload && message.payload.node_id) {
-            void stream.writeSSE({
-              data: JSON.stringify({
-                type: "component_state_change",
-                payload: {
-                  component_id: message.payload.node_id,
-                  execution_state: {
-                    status: "error",
-                    error: error.message,
-                    timestamps: { finished_at: Date.now() },
+            // handle component error
+            if ("node_id" in message.payload && message.payload.node_id) {
+              void stream.writeSSE({
+                data: JSON.stringify({
+                  type: "component_state_change",
+                  payload: {
+                    component_id: message.payload.node_id,
+                    execution_state: {
+                      status: "error",
+                      error: error.message,
+                      timestamps: { finished_at: Date.now() },
+                    },
                   },
-                },
-              }),
-            });
-          } else {
-            void stream.writeSSE({
-              data: JSON.stringify({
-                type: "error",
-                payload: { message: error.message },
-              }),
-            });
-          }
-        });
+                }),
+              });
+            } else {
+              void stream.writeSSE({
+                data: JSON.stringify({
+                  type: "error",
+                  payload: { message: error.message },
+                }),
+              });
+            }
+          })
+          .finally(() => {
+            resolveOnce();
+          });
       });
 
       // Wait for the stream to be done
