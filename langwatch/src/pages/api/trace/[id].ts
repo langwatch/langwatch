@@ -1,11 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { prisma } from "~/server/db";
-import { getTraceById } from "~/server/elasticsearch/traces";
-import {
-  generateAsciiTree,
-  toLLMModeTrace,
-} from "~/server/traces/trace-formatting";
+import { generateAsciiTree } from "~/server/traces/trace-formatting";
+import { TraceService } from "~/server/traces/trace.service";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
 
 export default async function handler(
@@ -43,18 +40,20 @@ export default async function handler(
     res.setHeader("Link", `</api/traces/${traceId}?format=${format}>; rel="successor-version"`);
 
     const protections = await getProtectionsForProject(prisma, {
-      projectId: project?.id,
+      projectId: project.id,
     });
-    const trace = await getTraceById({
-      connConfig: { projectId: project?.id },
-      traceId,
-      protections,
-      includeSpans: true,
-      includeEvaluations: true,
-    });
+    const traceService = TraceService.create(prisma);
+    const trace = await traceService.getById(project.id, traceId, protections);
     if (!trace) {
       return res.status(404).json({ message: "Trace not found." });
     }
+
+    const evaluationsMap = await traceService.getEvaluationsMultiple(
+      project.id,
+      [traceId],
+      protections,
+    );
+    const evaluations = evaluationsMap[traceId] ?? [];
 
     if (format === "digest") {
       return res.status(200).json({
@@ -62,15 +61,16 @@ export default async function handler(
         formatted_trace: formatSpansDigest(trace.spans ?? []),
         timestamps: trace.timestamps,
         metadata: trace.metadata,
-        evaluations: trace.evaluations,
+        evaluations,
       });
     }
 
     // Generate ASCII tree representation
-    const asciiTree = generateAsciiTree(trace?.spans);
+    const asciiTree = generateAsciiTree(trace.spans);
 
     return res.status(200).json({
       ...trace,
+      evaluations,
       ascii_tree: asciiTree,
     });
   } catch (error) {
