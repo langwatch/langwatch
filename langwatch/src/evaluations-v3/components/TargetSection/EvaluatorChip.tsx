@@ -16,7 +16,7 @@ import {
   LuPencil,
   LuPlay,
   LuRefreshCw,
-  LuRows3,
+  LuListRestart,
   LuTrash2,
 } from "react-icons/lu";
 
@@ -270,7 +270,7 @@ export function EvaluatorChip({
         {status !== "running" && hasAnyTargetOutputs && onRunOnAllRows && (
           <Menu.Item value="run-all-rows" onClick={onRunOnAllRows}>
             <HStack gap={2}>
-              <LuRows3 size={14} />
+              <LuListRestart size={14} />
               <Text>Run on all rows</Text>
             </HStack>
           </Menu.Item>
