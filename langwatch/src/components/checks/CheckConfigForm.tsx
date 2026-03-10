@@ -19,6 +19,7 @@ import { ChevronDown, Edit2, HelpCircle } from "react-feather";
 import {
   Controller,
   FormProvider,
+  type Resolver,
   useFieldArray,
   useForm,
 } from "react-hook-form";
@@ -120,7 +121,9 @@ export default function CheckConfigForm({
         mappings: mappingStateSchema,
       });
 
-      return zodResolver(schema)(
+      // settings is selected dynamically at runtime from data.checkType, so
+      // TypeScript cannot prove the schema output matches CheckConfigFormData.
+      return (zodResolver(schema) as unknown as Resolver<CheckConfigFormData>)(
         { ...data, settings: data.settings || {} },
         context,
         options,
