@@ -6,9 +6,12 @@ const PRIVATE_IP_PATTERNS = [
   /^10\.\d+\.\d+\.\d+$/,
   /^172\.(1[6-9]|2\d|3[01])\.\d+\.\d+$/,
   /^192\.168\.\d+\.\d+$/,
-  /^\[?::1\]?$/,
   /^0\.0\.0\.0$/,
-  /^169\.254\.\d+\.\d+$/, // link-local
+  /^169\.254\.\d+\.\d+$/, // IPv4 link-local
+  /^\[?::1\]?$/, // IPv6 loopback
+  /^\[?::ffff:/i, // IPv4-mapped IPv6
+  /^\[?f[cd][0-9a-f]*:/i, // IPv6 unique-local (fc00::/7)
+  /^\[?fe80:/i, // IPv6 link-local (fe80::/10)
 ];
 
 export function isSafeImageUrl(rawUrl: string): boolean {

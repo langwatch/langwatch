@@ -84,5 +84,25 @@ describe("isSafeImageUrl", () => {
     it("rejects link-local 169.254.x range", () => {
       expect(isSafeImageUrl("http://169.254.169.254/latest/meta-data")).toBe(false);
     });
+
+    it("rejects IPv4-mapped IPv6 ::ffff:127.0.0.1", () => {
+      expect(isSafeImageUrl("http://[::ffff:127.0.0.1]/image.png")).toBe(false);
+    });
+
+    it("rejects IPv4-mapped IPv6 ::ffff:192.168.1.1", () => {
+      expect(isSafeImageUrl("http://[::ffff:192.168.1.1]/image.png")).toBe(false);
+    });
+
+    it("rejects IPv6 unique-local fc00::/7 (fc prefix)", () => {
+      expect(isSafeImageUrl("http://[fc00::1]/image.png")).toBe(false);
+    });
+
+    it("rejects IPv6 unique-local fc00::/7 (fd prefix)", () => {
+      expect(isSafeImageUrl("http://[fd12:3456:789a::1]/image.png")).toBe(false);
+    });
+
+    it("rejects IPv6 link-local fe80::/10", () => {
+      expect(isSafeImageUrl("http://[fe80::1]/image.png")).toBe(false);
+    });
   });
 });
