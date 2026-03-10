@@ -1,6 +1,7 @@
 import { Box, HStack, Progress, Text, VStack } from "@chakra-ui/react";
 import { PricingModel } from "@prisma/client";
 import { Info } from "lucide-react";
+import type { UsageUnit } from "../../server/app-layer/usage/usage-meter-policy";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { api } from "../../utils/api";
@@ -17,32 +18,34 @@ export type UsageDisplay =
  * Determines whether the sidebar usage bar is visible and which unit label
  * to display.
  *
- * Self-hosted: always visible, label = "traces"
- * SaaS + TIERED: always visible, label = "traces"
- * SaaS + SEAT_EVENT + free: visible, label = "events"
- * SaaS + SEAT_EVENT + paid: not visible
+ * The unit label is read directly from the API via `usageUnit` rather than
+ * being derived from the pricing model on the frontend.
+ *
+ * Visibility rules:
+ * - Self-hosted: always visible
+ * - SaaS + SEAT_EVENT + paid: not visible
+ * - All other SaaS: visible
  */
 export function getUsageDisplay({
   isSaaS,
   pricingModel,
   isFree,
+  usageUnit,
 }: {
   isSaaS: boolean;
   pricingModel: PricingModel | undefined | null;
   isFree: boolean;
+  usageUnit: UsageUnit;
 }): UsageDisplay {
   if (!isSaaS) {
-    return { visible: true, unitLabel: "traces" };
+    return { visible: true, unitLabel: usageUnit };
   }
 
-  if (pricingModel === PricingModel.SEAT_EVENT) {
-    return isFree
-      ? { visible: true, unitLabel: "events" }
-      : { visible: false };
+  if (pricingModel === PricingModel.SEAT_EVENT && !isFree) {
+    return { visible: false };
   }
 
-  // TIERED or no pricing model: always show traces
-  return { visible: true, unitLabel: "traces" };
+  return { visible: true, unitLabel: usageUnit };
 }
 
 export type UsageIndicatorProps = {
@@ -71,6 +74,7 @@ export const UsageIndicator = ({ showLabel = true }: UsageIndicatorProps) => {
     isSaaS: !!isSaaS,
     pricingModel: organization?.pricingModel,
     isFree: usage.data.activePlan.free,
+    usageUnit: usage.data.usageUnit ?? "events",
   });
   if (!display.visible) return null;
 

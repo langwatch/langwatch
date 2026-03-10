@@ -188,5 +188,15 @@ export const createSubscriptionRouterFactory = ({
           actorEmail,
         });
       }),
+
+    listInvoices: protectedProcedure
+      .input(z.object({ organizationId: z.string() }))
+      .use(checkOrganizationPermission("organization:view"))
+      .use(billingErrorHandler)
+      .query(async ({ input }) => {
+        return await subscriptionService.listInvoices({
+          organizationId: input.organizationId,
+        });
+      }),
   });
 };

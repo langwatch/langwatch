@@ -12,14 +12,16 @@ import {
   TRPCClientError,
 } from "@trpc/client";
 import { createTRPCNext } from "@trpc/next";
-import { MutationCache } from "@tanstack/react-query";
+import { MutationCache, QueryCache } from "@tanstack/react-query";
 import type { inferRouterInputs, inferRouterOutputs } from "@trpc/server";
 import superjson from "superjson";
 import type { AppRouter } from "~/server/api/root";
 import { sseLink } from "./sseLink";
 import {
   extractLimitExceededInfo,
+  extractLiteMemberRestrictionInfo,
   markAsHandledByLicenseHandler,
+  markAsHandledByLiteMemberHandler,
 } from "./trpcError";
 import { useUpgradeModalStore } from "../stores/upgradeModalStore";
 
@@ -77,7 +79,6 @@ export const api = createTRPCNext<AppRouter>({
             // when condition is false, use batching
             false: httpBatchLink({
               url: `${getBaseUrl()}/api/trpc`,
-              // Split batches if URL would exceed this length to avoid 431 errors
               maxURLLength: 4000,
             }),
           }),
@@ -112,7 +113,37 @@ export const api = createTRPCNext<AppRouter>({
                 .getState()
                 .open(limitInfo.limitType, limitInfo.current, limitInfo.max);
             }
-            // Non-license errors bubble up to component-level handlers
+            // Check for lite member restriction errors
+            const restrictionInfo = extractLiteMemberRestrictionInfo(error);
+            if (restrictionInfo) {
+              if (error instanceof Error) {
+                markAsHandledByLiteMemberHandler(error);
+              }
+              useUpgradeModalStore
+                .getState()
+                .openLiteMemberRestriction({
+                  resource: restrictionInfo.resource,
+                });
+            }
+            // Non-license/non-restriction errors bubble up to component-level handlers
+          },
+        }),
+        queryCache: new QueryCache({
+          onError: (error) => {
+            const restrictionInfo = extractLiteMemberRestrictionInfo(error);
+            if (!restrictionInfo) return;
+
+            if (error instanceof Error) {
+              markAsHandledByLiteMemberHandler(error);
+            }
+
+            if (useUpgradeModalStore.getState().isOpen) return;
+
+            useUpgradeModalStore
+              .getState()
+              .openLiteMemberRestriction({
+                resource: restrictionInfo.resource,
+              });
           },
         }),
         defaultOptions: {

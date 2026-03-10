@@ -25,7 +25,7 @@ describe("<RunRow/>", () => {
   });
 
   describe("when collapsed", () => {
-    it("displays pass rate percentage", () => {
+    it("displays passed/failed status with scenario count", () => {
       render(
         <RunRow
           batchRun={makeBatchRun()}
@@ -38,7 +38,8 @@ describe("<RunRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("100%")).toBeInTheDocument();
+      expect(screen.getByText("passed (2/2)")).toBeInTheDocument();
+      expect(screen.queryByText("100%")).not.toBeInTheDocument();
     });
 
     it("does not display scenario x target rows", () => {
@@ -168,11 +169,11 @@ describe("<RunRow/>", () => {
   });
 
   describe("when summary shows failures", () => {
-    it("displays pass rate with failure indicator", () => {
+    it("displays 'failed' with scenario count", () => {
       render(
         <RunRow
           batchRun={makeBatchRun()}
-          summary={makeSummary({ passRate: 88, failedCount: 1 })}
+          summary={makeSummary({ passedCount: 2, failedCount: 1 })}
           isExpanded={false}
           onToggle={vi.fn()}
           resolveTargetName={() => "Prod Agent"}
@@ -181,7 +182,7 @@ describe("<RunRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("88%")).toBeInTheDocument();
+      expect(screen.getByText("failed (2/3)")).toBeInTheDocument();
     });
   });
 
@@ -323,6 +324,83 @@ describe("<RunRow/>", () => {
 
         expect(screen.getByText("Alpha, Beta, Delta +2 more")).toBeInTheDocument();
       });
+    });
+  });
+
+  describe("when viewing summary counts in header", () => {
+    it("displays passed and failed counts alongside summary status label", () => {
+      render(
+        <RunRow
+          batchRun={makeBatchRun()}
+          summary={makeSummary({ passedCount: 8, failedCount: 2 })}
+          isExpanded={false}
+          onToggle={vi.fn()}
+          resolveTargetName={() => "Prod Agent"}
+          onScenarioRunClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByText("failed (8/10)")).toBeInTheDocument();
+      expect(screen.getByText("8 passed")).toBeInTheDocument();
+      expect(screen.getByText("2 failed")).toBeInTheDocument();
+    });
+
+    it("renders RunSummaryCounts inside the header", () => {
+      const { container } = render(
+        <RunRow
+          batchRun={makeBatchRun()}
+          summary={makeSummary({ passedCount: 8, failedCount: 2 })}
+          isExpanded={false}
+          onToggle={vi.fn()}
+          resolveTargetName={() => "Prod Agent"}
+          onScenarioRunClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const header = container.querySelector('[data-testid="run-row-header"]');
+      expect(header).toBeInTheDocument();
+      const counts = header?.querySelector('[data-testid="run-summary-counts"]');
+      expect(counts).toBeInTheDocument();
+    });
+  });
+
+  describe("when checking for footer removal", () => {
+    it("does not render a RunSummaryFooter when expanded", () => {
+      const { container } = render(
+        <RunRow
+          batchRun={makeBatchRun()}
+          summary={makeSummary()}
+          isExpanded={true}
+          onToggle={vi.fn()}
+          resolveTargetName={() => "Prod Agent"}
+          onScenarioRunClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(
+        container.querySelector('[data-testid="run-summary-footer"]'),
+      ).not.toBeInTheDocument();
+    });
+
+    it("does not render a RunSummaryFooter when collapsed", () => {
+      const { container } = render(
+        <RunRow
+          batchRun={makeBatchRun()}
+          summary={makeSummary()}
+          isExpanded={false}
+          onToggle={vi.fn()}
+          resolveTargetName={() => "Prod Agent"}
+          onScenarioRunClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(
+        container.querySelector('[data-testid="run-summary-footer"]'),
+      ).not.toBeInTheDocument();
     });
   });
 

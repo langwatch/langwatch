@@ -135,7 +135,12 @@ services:
     volumes:
       - ./langwatch:/app
       - app_modules:/app/node_modules
-    command: sh -c "corepack enable && pnpm run start:prepare:db && pnpm run start:app"
+    command: >
+      sh -c "
+        corepack enable &&
+        SKIP_CLICKHOUSE_MIGRATE=true pnpm run start:prepare:db &&
+        pnpm run start:app
+      "
     ports:
       - "${APP_PORT:-5560}:5560"
     environment:

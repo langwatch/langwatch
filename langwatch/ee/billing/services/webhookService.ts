@@ -1,7 +1,7 @@
 import { Currency, type PrismaClient } from "@prisma/client";
 import type Stripe from "stripe";
 import { createLogger } from "../../../src/utils/logger";
-import { notifySubscriptionEvent } from "../notifications/notificationHandlers";
+import { getApp } from "../../../src/server/app-layer/app";
 import { NUMERIC_OVERRIDE_FIELDS } from "../planProvider";
 import { PlanTypes, SubscriptionStatus } from "../planTypes";
 import type { calculateQuantityForPrice, prices } from "./subscriptionItemCalculator";
@@ -62,6 +62,21 @@ export const createWebhookService = ({
     }): Promise<unknown>;
   };
 }): WebhookService => {
+  const clearTrialLicenseIfPresent = async (
+    updatedSubscription: { organizationId: string; organization: { license: string | null } },
+    reason: string,
+  ) => {
+    if (!updatedSubscription.organization.license) return;
+    logger.info(
+      { organizationId: updatedSubscription.organizationId },
+      `[stripeWebhook] Clearing trial license — ${reason}`,
+    );
+    await db.organization.update({
+      where: { id: updatedSubscription.organizationId },
+      data: { license: null, licenseExpiresAt: null, licenseLastValidatedAt: null },
+    });
+  };
+
   const normalizeSelectedCurrency = (value?: string | null): Currency | null => {
     if (value === Currency.EUR || value === Currency.USD) {
       return value;
@@ -107,17 +122,7 @@ export const createWebhookService = ({
     });
 
     if (previousSubscription.status !== SubscriptionStatus.ACTIVE) {
-      // Clear trial license — subscription supersedes it
-      if (updatedSubscription.organization.license) {
-        logger.info(
-          { organizationId: updatedSubscription.organizationId },
-          "[stripeWebhook] Clearing trial license — subscription activated",
-        );
-        await db.organization.update({
-          where: { id: updatedSubscription.organizationId },
-          data: { license: null, licenseExpiresAt: null, licenseLastValidatedAt: null },
-        });
-      }
+      await clearTrialLicenseIfPresent(updatedSubscription, "subscription activated");
 
       if (isGrowthSeatEventPlan(updatedSubscription.plan)) {
         const TIERED_PLAN_TYPES: PlanTypes[] = [
@@ -172,7 +177,7 @@ export const createWebhookService = ({
         }
       }
 
-      await notifySubscriptionEvent({
+      await getApp().notifications.sendSlackSubscriptionEvent({
         type: "confirmed",
         organizationId: updatedSubscription.organizationId,
         organizationName: updatedSubscription.organization.name,
@@ -408,20 +413,10 @@ export const createWebhookService = ({
           include: { organization: true },
         });
 
-        // Clear trial license if present — subscription supersedes it
-        if (updatedSubscription.organization.license) {
-          logger.info(
-            { organizationId: updatedSubscription.organizationId },
-            "[stripeWebhook] Clearing trial license — subscription updated to active",
-          );
-          await db.organization.update({
-            where: { id: updatedSubscription.organizationId },
-            data: { license: null, licenseExpiresAt: null, licenseLastValidatedAt: null },
-          });
-        }
+        await clearTrialLicenseIfPresent(updatedSubscription, "subscription updated to active");
 
         if (shouldNotify) {
-          await notifySubscriptionEvent({
+          await getApp().notifications.sendSlackSubscriptionEvent({
             type: "confirmed",
             organizationId: updatedSubscription.organizationId,
             organizationName: updatedSubscription.organization.name,

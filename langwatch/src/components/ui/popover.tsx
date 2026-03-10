@@ -33,7 +33,11 @@ export const PopoverArrow = React.forwardRef<
   ChakraPopover.ArrowProps
 >(function PopoverArrow(props, ref) {
   return (
-    <ChakraPopover.Arrow {...props} ref={ref}>
+    <ChakraPopover.Arrow
+      {...props}
+      ref={ref}
+      css={{ "--arrow-size": "12px", "--arrow-background": "var(--popover-bg)" }}
+    >
       <ChakraPopover.ArrowTip />
     </ChakraPopover.Arrow>
   );

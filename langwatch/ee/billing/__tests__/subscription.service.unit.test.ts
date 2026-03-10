@@ -1,20 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../notifications/notificationHandlers", () => ({
-  notifySubscriptionEvent: vi.fn().mockResolvedValue(undefined),
+const mockSendSlackSubscriptionEvent = vi.fn().mockResolvedValue(undefined);
+
+vi.mock("../../../src/server/app-layer/app", () => ({
+  getApp: () => ({
+    notifications: {
+      sendSlackSubscriptionEvent: mockSendSlackSubscriptionEvent,
+    },
+  }),
 }));
 
 import type { PrismaClient } from "@prisma/client";
 import type Stripe from "stripe";
-import { notifySubscriptionEvent } from "../notifications/notificationHandlers";
 import { PlanTypes, SubscriptionStatus } from "../planTypes";
 import { EESubscriptionService } from "../services/subscription.service";
 import { InvalidPlanError, OrganizationNotFoundError } from "../errors";
 import type { SubscriptionRepository } from "../../../src/server/app-layer/subscription/subscription.repository";
-
-const mockNotifySubscriptionEvent = notifySubscriptionEvent as ReturnType<
-  typeof vi.fn
->;
+import type { OrganizationRepository } from "../../../src/server/repositories/organization.repository";
 
 const createMockStripe = () => ({
   subscriptions: {
@@ -31,6 +33,9 @@ const createMockStripe = () => ({
     sessions: {
       create: vi.fn(),
     },
+  },
+  invoices: {
+    list: vi.fn(),
   },
 });
 
@@ -58,11 +63,21 @@ const createMockItemCalculator = () => ({
   prices: { LAUNCH: "price_launch", FREE: undefined } as any,
 });
 
+const createMockOrganizationRepository = (): {
+  [K in keyof OrganizationRepository]: ReturnType<typeof vi.fn>;
+} => ({
+  getProjectIds: vi.fn(),
+  getOrganizationIdByTeamId: vi.fn(),
+  getPricingModel: vi.fn(),
+  getStripeCustomerId: vi.fn(),
+});
+
 describe("EESubscriptionService", () => {
   let stripe: ReturnType<typeof createMockStripe>;
   let db: ReturnType<typeof createMockDb>;
   let repository: ReturnType<typeof createMockRepository>;
   let itemCalculator: ReturnType<typeof createMockItemCalculator>;
+  let organizationRepository: ReturnType<typeof createMockOrganizationRepository>;
   let service: EESubscriptionService;
 
   beforeEach(() => {
@@ -71,12 +86,14 @@ describe("EESubscriptionService", () => {
     db = createMockDb();
     repository = createMockRepository();
     itemCalculator = createMockItemCalculator();
-    service = new EESubscriptionService(
-      db as unknown as PrismaClient,
-      repository as unknown as SubscriptionRepository,
-      stripe as unknown as Stripe,
+    organizationRepository = createMockOrganizationRepository();
+    service = new EESubscriptionService({
+      prisma: db as unknown as PrismaClient,
+      repository: repository as unknown as SubscriptionRepository,
+      stripe: stripe as unknown as Stripe,
       itemCalculator,
-    );
+      organizationRepository: organizationRepository as unknown as OrganizationRepository,
+    });
   });
 
   describe("updateSubscriptionItems()", () => {
@@ -370,7 +387,7 @@ describe("EESubscriptionService", () => {
         });
 
         expect(result).toEqual({ success: true });
-        expect(mockNotifySubscriptionEvent).toHaveBeenCalledWith({
+        expect(mockSendSlackSubscriptionEvent).toHaveBeenCalledWith({
           type: "prospective",
           organizationId: "org_123",
           organizationName: "Acme",
@@ -394,6 +411,86 @@ describe("EESubscriptionService", () => {
             actorEmail: "actor@example.com",
           }),
         ).rejects.toThrow(OrganizationNotFoundError);
+      });
+    });
+  });
+
+  describe("listInvoices()", () => {
+    describe("when organization has no stripeCustomerId", () => {
+      it("returns an empty array", async () => {
+        organizationRepository.getStripeCustomerId.mockResolvedValue(null);
+
+        const result = await service.listInvoices({
+          organizationId: "org_no_stripe",
+        });
+
+        expect(result).toEqual([]);
+        expect(stripe.invoices.list).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when organization is not found", () => {
+      it("returns an empty array", async () => {
+        organizationRepository.getStripeCustomerId.mockResolvedValue(null);
+
+        const result = await service.listInvoices({
+          organizationId: "org_missing",
+        });
+
+        expect(result).toEqual([]);
+      });
+    });
+
+    describe("when organization has a stripeCustomerId", () => {
+      it("returns mapped invoices excluding drafts", async () => {
+        organizationRepository.getStripeCustomerId.mockResolvedValue("cus_123");
+
+        stripe.invoices.list.mockResolvedValue({
+          data: [
+            {
+              id: "inv_1",
+              number: "INV-001",
+              created: 1700000000,
+              amount_due: 5000,
+              currency: "usd",
+              status: "paid",
+              invoice_pdf: "https://pdf.example.com/inv_1",
+              hosted_invoice_url: "https://hosted.example.com/inv_1",
+            },
+            {
+              id: "inv_draft",
+              number: null,
+              created: 1700001000,
+              amount_due: 3000,
+              currency: "eur",
+              status: "draft",
+              invoice_pdf: null,
+              hosted_invoice_url: null,
+            },
+          ],
+        });
+
+        const result = await service.listInvoices({
+          organizationId: "org_with_stripe",
+        });
+
+        expect(stripe.invoices.list).toHaveBeenCalledWith({
+          customer: "cus_123",
+          limit: 4,
+        });
+
+        expect(result).toEqual([
+          {
+            id: "inv_1",
+            number: "INV-001",
+            date: 1700000000,
+            amountDue: 5000,
+            currency: "usd",
+            status: "paid",
+            pdfUrl: "https://pdf.example.com/inv_1",
+            hostedUrl: "https://hosted.example.com/inv_1",
+          },
+        ]);
       });
     });
   });

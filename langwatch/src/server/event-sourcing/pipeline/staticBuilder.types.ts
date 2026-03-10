@@ -23,6 +23,7 @@ export interface KillSwitchOptions {
  */
 export interface CommandHandlerOptions<Payload = any> {
   getAggregateId?: (payload: Payload) => string;
+  getGroupKey?: (payload: Payload) => string;
   makeJobId?: (payload: Payload) => string;
   delay?: number;
   concurrency?: number;

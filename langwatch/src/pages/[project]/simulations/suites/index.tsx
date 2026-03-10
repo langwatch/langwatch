@@ -15,7 +15,7 @@ import { useCallback, useMemo, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { PeriodSelector, usePeriodSelector, type Period } from "~/components/PeriodSelector";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import { AllRunsPanel } from "~/components/suites/AllRunsPanel";
+import { RunHistoryPanel } from "~/components/suites/RunHistoryPanel";
 import { SuiteArchiveDialog } from "~/components/suites/SuiteArchiveDialog";
 import { SuiteContextMenu } from "~/components/suites/SuiteContextMenu";
 import {
@@ -31,6 +31,7 @@ import {
   isExternalSetSelection,
   useSuiteRouting,
 } from "~/components/suites/useSuiteRouting";
+import { useRunSuite } from "~/components/suites/useRunSuite";
 import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useDrawer } from "~/hooks/useDrawer";
@@ -65,11 +66,15 @@ function SuitesPageContent() {
   );
 
   const { data: externalSets } = api.scenarios.getExternalSetSummaries.useQuery(
-    { projectId: project?.id ?? "" },
+    {
+      projectId: project?.id ?? "",
+      startDate: period.startDate.getTime(),
+      endDate: period.endDate.getTime(),
+    },
     { enabled: !!project, refetchInterval: 15000 },
   );
 
-  const { data: allRunData } = api.scenarios.getAllSuiteRunData.useQuery(
+  const { data: allRunData } = api.scenarios.getSuiteRunData.useQuery(
     {
       projectId: project?.id ?? "",
       limit: 100,
@@ -86,6 +91,17 @@ function SuitesPageContent() {
       scenarioSetIds: allRunData.scenarioSetIds,
     });
   }, [allRunData]);
+
+  // Build suiteId -> suite name map for AllRuns view
+  const suiteNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    if (suites) {
+      for (const suite of suites) {
+        map.set(suite.id, suite.name);
+      }
+    }
+    return map;
+  }, [suites]);
 
   const selectedSuite = useMemo(() => {
     if (!selectedSuiteSlug || selectedSuiteSlug === ALL_RUNS_ID) return null;
@@ -148,56 +164,10 @@ function SuitesPageContent() {
     },
   });
 
-  const runMutation = api.suites.run.useMutation({
-    onSuccess: (result, variables) => {
-      const suiteIdForToast = variables.id;
-      const archivedCount =
-        (result.skippedArchived?.scenarios?.length ?? 0) +
-        (result.skippedArchived?.targets?.length ?? 0);
-
-      if (archivedCount > 0) {
-        const parts: string[] = [];
-        if (result.skippedArchived.scenarios.length > 0) {
-          parts.push(`${result.skippedArchived.scenarios.length} archived scenario${result.skippedArchived.scenarios.length > 1 ? "s" : ""}`);
-        }
-        if (result.skippedArchived.targets.length > 0) {
-          parts.push(`${result.skippedArchived.targets.length} archived target${result.skippedArchived.targets.length > 1 ? "s" : ""}`);
-        }
-
-        toaster.create({
-          title: `Suite run scheduled (${result.jobCount} jobs)`,
-          description: `${parts.join(" and ")} skipped.`,
-          type: "warning",
-          meta: { closable: true },
-          action: {
-            label: "Edit Suite",
-            onClick: () => handleEditSuite(suiteIdForToast),
-          },
-        });
-      } else {
-        toaster.create({
-          title: `Suite run scheduled (${result.jobCount} jobs)`,
-          type: "success",
-          meta: { closable: true },
-        });
-      }
-    },
-    onError: (err, variables) => {
-      const suiteIdForToast = variables.id;
-      const isAllArchived = err.data?.code === "BAD_REQUEST" &&
-        (err.message.includes("All scenarios") || err.message.includes("All targets"));
-      toaster.create({
-        title: isAllArchived ? "Cannot run suite" : "Failed to run suite",
-        description: err.message,
-        type: "error",
-        meta: { closable: true },
-        ...(isAllArchived ? {
-          action: {
-            label: "Edit Suite",
-            onClick: () => handleEditSuite(suiteIdForToast),
-          },
-        } : {}),
-      });
+  const { requestRun, isPending: isRunPending, confirmationDialog } = useRunSuite({
+    onRunScheduled: (suiteId) => {
+      const suite = suites?.find((s) => s.id === suiteId);
+      if (suite) navigateToSuite(suite.slug);
     },
   });
 
@@ -209,38 +179,38 @@ function SuitesPageContent() {
     [navigateToSuite],
   );
 
-  const handleSuiteRan = useCallback((suiteId: string) => {
-    const suite = suites?.find((s) => s.id === suiteId);
-    if (suite) navigateToSuite(suite.slug);
-  }, [navigateToSuite, suites]);
+  const handleRunRequested = useCallback(
+    (suite: SimulationSuite) => {
+      requestRun(suite);
+    },
+    [requestRun],
+  );
 
   const handleNewSuite = useCallback(() => {
     setFlowCallbacks("suiteEditor", {
       onSaved: handleSuiteSaved,
-      onRan: handleSuiteRan,
+      onRunRequested: handleRunRequested,
     });
     openDrawer("suiteEditor");
-  }, [openDrawer, setFlowCallbacks, handleSuiteSaved, handleSuiteRan]);
+  }, [openDrawer, setFlowCallbacks, handleSuiteSaved, handleRunRequested]);
 
   const handleEditSuite = useCallback(
     (suiteId: string) => {
       setFlowCallbacks("suiteEditor", {
         onSaved: handleSuiteSaved,
-        onRan: handleSuiteRan,
+        onRunRequested: handleRunRequested,
       });
       openDrawer("suiteEditor", { urlParams: { suiteId } });
     },
-    [openDrawer, setFlowCallbacks, handleSuiteSaved, handleSuiteRan],
+    [openDrawer, setFlowCallbacks, handleSuiteSaved, handleRunRequested],
   );
 
   const handleRunSuite = useCallback(
     (suiteId: string) => {
-      if (!project || runMutation.isPending) return;
       const suite = suites?.find((s) => s.id === suiteId);
-      if (suite) navigateToSuite(suite.slug);
-      runMutation.mutate({ projectId: project.id, id: suiteId });
+      if (suite) requestRun(suite);
     },
-    [project, runMutation, navigateToSuite, suites],
+    [suites, requestRun],
   );
 
   const handleDuplicateSuite = useCallback(
@@ -329,8 +299,9 @@ function SuitesPageContent() {
             onNewSuite={handleNewSuite}
             onEditSuite={handleEditSuite}
             onRunSuite={handleRunSuite}
-            isRunning={runMutation.isPending}
+            isRunning={isRunPending}
             period={period}
+            suiteNameMap={suiteNameMap}
           />
         </Box>
       </HStack>
@@ -355,6 +326,9 @@ function SuitesPageContent() {
         suiteName={archiveTargetSuite?.name ?? ""}
         isLoading={archiveMutation.isPending}
       />
+
+      {/* Run confirmation dialog */}
+      {confirmationDialog}
     </DashboardLayout>
   );
 }
@@ -370,6 +344,7 @@ function MainPanel({
   onRunSuite,
   isRunning,
   period,
+  suiteNameMap,
 }: {
   error: { message: string } | null;
   selectedSuiteSlug: string | typeof ALL_RUNS_ID | null;
@@ -381,6 +356,7 @@ function MainPanel({
   onRunSuite: (id: string) => void;
   isRunning: boolean;
   period: Period;
+  suiteNameMap: Map<string, string>;
 }) {
   if (isLoading) {
     return null;
@@ -406,7 +382,7 @@ function MainPanel({
   }
 
   if (selectedSuiteSlug === ALL_RUNS_ID) {
-    return <AllRunsPanel period={period} />;
+    return <RunHistoryPanel period={period} suiteNameMap={suiteNameMap} />;
   }
 
   if (selectedSuite) {

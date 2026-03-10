@@ -8,9 +8,9 @@ import {
 import {
   DuplicateInviteError,
   InviteNotFoundError,
-  LicenseLimitError,
   OrganizationNotFoundError,
 } from "./errors";
+import { LimitExceededError } from "../license-enforcement/errors";
 import { nanoid } from "nanoid";
 import type { JsonArray } from "@prisma/client/runtime/library";
 
@@ -33,12 +33,14 @@ import {
   type ILicenseEnforcementRepository,
   LicenseEnforcementRepository,
 } from "../license-enforcement/license-enforcement.repository";
-import { LICENSE_LIMIT_ERRORS } from "../license-enforcement/license-limit-guard";
 import { sendInviteEmail } from "../mailer/inviteEmail";
 import { TeamUserRole } from "@prisma/client";
 import type { Session } from "next-auth";
 import type { PlanProvider } from "../app-layer/subscription/plan-provider";
 import { getApp } from "../app-layer/app";
+import { createLogger } from "~/utils/logger";
+
+const logger = createLogger("langwatch:invites");
 
 /**
  * Team assignment input for invite creation.
@@ -247,13 +249,21 @@ export class InviteService {
         currentFullMembers + newFullMembers >
         subscriptionLimits.maxMembers
       ) {
-        throw new LicenseLimitError(LICENSE_LIMIT_ERRORS.FULL_MEMBER_LIMIT);
+        throw new LimitExceededError(
+          "members",
+          currentFullMembers,
+          subscriptionLimits.maxMembers
+        );
       }
       if (
         currentMembersLite + newLiteMembers >
         subscriptionLimits.maxMembersLite
       ) {
-        throw new LicenseLimitError(LICENSE_LIMIT_ERRORS.MEMBER_LITE_LIMIT);
+        throw new LimitExceededError(
+          "membersLite",
+          currentMembersLite,
+          subscriptionLimits.maxMembersLite
+        );
       }
     }
   }
@@ -312,7 +322,7 @@ export class InviteService {
       await sendInviteEmail({ email, organization, inviteCode });
       return { emailNotSent: false };
     } catch (error) {
-      console.error("Failed to send invite email:", error);
+      logger.error({ error }, "Failed to send invite email");
       return { emailNotSent: true };
     }
   }

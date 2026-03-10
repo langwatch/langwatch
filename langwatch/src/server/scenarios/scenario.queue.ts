@@ -29,6 +29,8 @@ const logger = createLogger("langwatch:scenarios:queue");
 export const scenarioJobSchema = z.object({
   projectId: z.string(),
   scenarioId: z.string(),
+  /** Human-readable scenario name for display in queued job rows. */
+  scenarioName: z.string().optional(),
   target: z.object({
     type: z.enum(["prompt", "http", "code"]),
     referenceId: z.string(),

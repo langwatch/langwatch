@@ -1,8 +1,9 @@
 import { Currency, type OrganizationUserRole, type PrismaClient } from "@prisma/client";
 import type Stripe from "stripe";
-import type { SubscriptionService } from "../../../src/server/app-layer/subscription/subscription.service";
+import type { DisplayInvoice, SubscriptionService } from "../../../src/server/app-layer/subscription/subscription.service";
 import type { SubscriptionRepository } from "../../../src/server/app-layer/subscription/subscription.repository";
-import { notifySubscriptionEvent } from "../notifications/notificationHandlers";
+import { OrganizationRepository } from "../../../src/server/repositories/organization.repository";
+import { getApp } from "../../../src/server/app-layer/app";
 import {
   type PlanTypes as PlanType,
   PlanTypes,
@@ -38,13 +39,35 @@ type ItemCalculator = {
  * prisma calls for organization/team lookups (following the same pattern as DatasetService).
  */
 export class EESubscriptionService implements SubscriptionService {
-  constructor(
-    private readonly prisma: PrismaClient,
-    private readonly repository: SubscriptionRepository,
-    private readonly stripe: Stripe,
-    private readonly itemCalculator: ItemCalculator,
-    private readonly seatEventFns?: SeatEventSubscriptionFns,
-  ) {}
+  private readonly prisma: PrismaClient;
+  private readonly repository: SubscriptionRepository;
+  private readonly stripe: Stripe;
+  private readonly itemCalculator: ItemCalculator;
+  private readonly organizationRepository: OrganizationRepository;
+  private readonly seatEventFns?: SeatEventSubscriptionFns;
+
+  constructor({
+    prisma,
+    repository,
+    stripe,
+    itemCalculator,
+    organizationRepository,
+    seatEventFns,
+  }: {
+    prisma: PrismaClient;
+    repository: SubscriptionRepository;
+    stripe: Stripe;
+    itemCalculator: ItemCalculator;
+    organizationRepository: OrganizationRepository;
+    seatEventFns?: SeatEventSubscriptionFns;
+  }) {
+    this.prisma = prisma;
+    this.repository = repository;
+    this.stripe = stripe;
+    this.itemCalculator = itemCalculator;
+    this.organizationRepository = organizationRepository;
+    this.seatEventFns = seatEventFns;
+  }
 
   /**
    * Factory method that wires up the Prisma repository automatically.
@@ -61,7 +84,15 @@ export class EESubscriptionService implements SubscriptionService {
     seatEventFns?: SeatEventSubscriptionFns;
   }): EESubscriptionService {
     const repository = new PrismaSubscriptionRepository(db);
-    return new EESubscriptionService(db, repository, stripe, itemCalculator, seatEventFns);
+    const organizationRepository = new OrganizationRepository(db);
+    return new EESubscriptionService({
+      prisma: db,
+      repository,
+      stripe,
+      itemCalculator,
+      organizationRepository,
+      seatEventFns,
+    });
   }
 
   async getLastNonCancelledSubscription(organizationId: string) {
@@ -327,7 +358,7 @@ export class EESubscriptionService implements SubscriptionService {
       throw new OrganizationNotFoundError();
     }
 
-    await notifySubscriptionEvent({
+    await getApp().notifications.sendSlackSubscriptionEvent({
       type: "prospective",
       organizationId: organization.id,
       organizationName: organization.name,
@@ -339,6 +370,36 @@ export class EESubscriptionService implements SubscriptionService {
     });
 
     return { success: true };
+  }
+
+  async listInvoices({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<DisplayInvoice[]> {
+    const stripeCustomerId = await this.organizationRepository.getStripeCustomerId(organizationId);
+
+    if (!stripeCustomerId) {
+      return [];
+    }
+
+    const invoices = await this.stripe.invoices.list({
+      customer: stripeCustomerId,
+      limit: 4,
+    });
+
+    return invoices.data
+      .filter((inv) => inv.status !== "draft")
+      .map((inv) => ({
+        id: inv.id,
+        number: inv.number ?? null,
+        date: inv.created,
+        amountDue: inv.amount_due,
+        currency: inv.currency,
+        status: inv.status ?? "unknown",
+        pdfUrl: inv.invoice_pdf ?? null,
+        hostedUrl: inv.hosted_invoice_url ?? null,
+      }));
   }
 
   // ---------------------------------------------------------------------------

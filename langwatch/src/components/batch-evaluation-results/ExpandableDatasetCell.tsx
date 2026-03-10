@@ -158,10 +158,11 @@ export function ExpandableDatasetCell({
             onClick={handleExpand}
             className="cell-fade-overlay"
             css={{
-              background: "linear-gradient(to bottom, transparent, white)",
+              background:
+                "linear-gradient(to bottom, transparent, var(--chakra-colors-bg-panel))",
               "tr:hover &": {
                 background:
-                  "linear-gradient(to bottom, transparent, var(--chakra-colors-gray-50))",
+                  "linear-gradient(to bottom, transparent, var(--chakra-colors-bg-muted))",
               },
             }}
           />
@@ -181,7 +182,7 @@ export function ExpandableDatasetCell({
       className={inExpandedView ? undefined : "cell-action-btn"}
       opacity={inExpandedView ? 1 : 0}
       transition="opacity 0.15s"
-      bg="gray.50/90"
+      bg="bg.subtle/90"
       borderRadius="md"
       px={0.5}
     >
@@ -193,7 +194,7 @@ export function ExpandableDatasetCell({
         <Button
           size="xs"
           variant="ghost"
-          _hover={{ bg: "gray.200" }}
+          _hover={{ bg: "bg.emphasized" }}
           onClick={(e) => {
             e.stopPropagation();
             handleCopy();
@@ -239,10 +240,10 @@ export function ExpandableDatasetCell({
             width={`${Math.max(expandedPosition.width, 250)}px`}
             maxHeight={`calc(100vh - ${expandedPosition.top - 12}px - 32px)`}
             overflowY="auto"
-            bg="white/75"
+            bg="bg.panel/75"
             backdropFilter="blur(8px)"
             borderRadius="md"
-            boxShadow="0 0 0 2px var(--chakra-colors-gray-300), 0 4px 12px rgba(0,0,0,0.15)"
+            boxShadow="0 0 0 2px var(--chakra-colors-border-emphasized), 0 4px 12px rgba(0,0,0,0.15)"
             zIndex={1001}
             display="flex"
             flexDirection="column"

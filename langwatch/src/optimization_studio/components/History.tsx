@@ -13,7 +13,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { type UseFormReturn, useForm } from "react-hook-form";
 import { useDebounceCallback } from "usehooks-ts";
 
@@ -46,7 +46,7 @@ export function History() {
       // modal
     >
       <Popover.Trigger asChild>
-        <Button variant="ghost" color="gray.500" size="xs" onClick={onToggle}>
+        <Button variant="ghost" color="fg.subtle" size="xs" onClick={onToggle}>
           <HistoryIcon size={16} />
         </Button>
       </Popover.Trigger>
@@ -297,7 +297,7 @@ export const VersionBox = ({
       borderRadius={4}
       fontWeight={600}
       fontSize="13px"
-      color="gray.600"
+      color="fg.muted"
       whiteSpace="nowrap"
       textAlign="center"
       minWidth="0px"
@@ -435,6 +435,9 @@ export function NewVersionFields({
   const generateCommitMessage =
     api.workflow.generateCommitMessage.useMutation();
 
+  const userEditedCommitMessage = useRef(false);
+  const hasTriggeredGeneration = useRef(false);
+
   const generateCommitMessageCallback = useCallback(
     (prevDsl: Workflow, newDsl: Workflow) => {
       // Skip generation if model is not available
@@ -450,7 +453,7 @@ export function NewVersionFields({
         },
         {
           onSuccess: (data) => {
-            if (data) {
+            if (data && !userEditedCommitMessage.current) {
               form.setValue("commitMessage", data as string);
             }
           },
@@ -478,7 +481,9 @@ export function NewVersionFields({
   );
 
   useEffect(() => {
-    if (canSaveNewVersion && previousVersion?.dsl) {
+    if (canSaveNewVersion && previousVersion?.dsl && !hasTriggeredGeneration.current) {
+      hasTriggeredGeneration.current = true;
+      userEditedCommitMessage.current = false;
       form.setValue("commitMessage", "");
       setTimeout(() => {
         debouncedGenerateCommitMessage(previousVersion.dsl!, getWorkflow());
@@ -495,7 +500,7 @@ export function NewVersionFields({
     <HStack width="full">
       <Field.Root width="fit-content" invalid={!!form.formState.errors.version}>
         <VStack align="start">
-          <Field.Label as={SmallLabel} color="gray.600">
+          <Field.Label as={SmallLabel} color="fg.muted">
             Version
           </Field.Label>
           <Input
@@ -512,7 +517,7 @@ export function NewVersionFields({
       </Field.Root>
       <Field.Root width="full" invalid={!!form.formState.errors.commitMessage}>
         <VStack align="start" width="full">
-          <Field.Label as={SmallLabel} color="gray.600">
+          <Field.Label as={SmallLabel} color="fg.muted">
             Description
           </Field.Label>
           <InputGroup
@@ -524,6 +529,9 @@ export function NewVersionFields({
             <Input
               {...form.register("commitMessage", {
                 required: true,
+                onChange: () => {
+                  userEditedCommitMessage.current = true;
+                },
               })}
               placeholder={
                 generateCommitMessage.isLoading
@@ -568,11 +576,11 @@ export const VersionToBeUsed = ({
   return (
     <HStack width="full">
       <VStack align="start">
-        <SmallLabel color="gray.600">Version</SmallLabel>
+        <SmallLabel color="fg.muted">Version</SmallLabel>
         <Text width="74px">{versionToBeEvaluated.version}</Text>
       </VStack>
       <VStack align="start" width="full">
-        <SmallLabel color="gray.600">Description</SmallLabel>
+        <SmallLabel color="fg.muted">Description</SmallLabel>
         <Text>{versionToBeEvaluated.commitMessage}</Text>
       </VStack>
     </HStack>

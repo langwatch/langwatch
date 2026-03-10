@@ -1,10 +1,5 @@
 import { prisma } from "../../src/server/db";
-import { createPlanLimitNotifier } from "./notifications/planLimitNotifier";
-import {
-  clearBillingNotificationHandlers,
-  notifySubscriptionEvent,
-  setBillingNotificationHandlers,
-} from "./notifications/notificationHandlers";
+import { env } from "../../src/env.mjs";
 import { createSaaSPlanProvider } from "./planProvider";
 import { createCustomerService } from "./services/customerService";
 import { createSeatEventSubscriptionFns } from "./services/seatEventSubscription";
@@ -23,18 +18,13 @@ export { PLAN_LIMITS } from "./planLimits";
 export { prices } from "./services/subscriptionItemCalculator";
 export type { UsageReportingService, MeterEventResult, UsageSummary } from "./services/usageReportingService";
 export type {
-  BillingNotificationHandlers,
   BillingPlanProvider,
   PlanLimitNotificationContext,
-  PlanLimitNotificationHandlers,
   PlanLimitNotifierInput,
+  ResourceLimitNotificationContext,
+  ResourceLimitNotifierInput,
   SubscriptionNotificationPayload,
 } from "./types";
-export {
-  clearBillingNotificationHandlers,
-  notifySubscriptionEvent,
-  setBillingNotificationHandlers,
-};
 
 // Lazy Stripe singleton
 let stripe: ReturnType<typeof createStripeClient> | null = null;
@@ -78,6 +68,7 @@ export const createStripeWebhookHandler = () => {
     itemCalculator: subscriptionItemCalculator,
     inviteApprover,
   });
+
   return createStripeWebhookHandlerFactory({ stripe: s, webhookService });
 };
 
@@ -91,15 +82,3 @@ export const getSaaSPlanProvider = () => {
   return saasPlanProvider;
 };
 
-let planLimitNotifier: ReturnType<typeof createPlanLimitNotifier> | null = null;
-
-export const notifyPlanLimitReached = async (input: {
-  organizationId: string;
-  planName: string;
-}) => {
-  if (!planLimitNotifier) {
-    planLimitNotifier = createPlanLimitNotifier(prisma);
-  }
-
-  return await planLimitNotifier(input);
-};

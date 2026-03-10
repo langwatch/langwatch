@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.14.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.13.0...python-sdk@v0.14.0) (2026-03-08)
+
+
+### Features
+
+* **examples:** add metadata and labels examples for TypeScript and Python SDKs ([#1585](https://github.com/langwatch/langwatch/issues/1585)) ([7d09ab8](https://github.com/langwatch/langwatch/commit/7d09ab805146542921e8b1f1258d5e6e59462bfe))
+* **traces:** add langwatch.origin attribute for trace origin classification ([#2066](https://github.com/langwatch/langwatch/issues/2066)) ([1d94865](https://github.com/langwatch/langwatch/commit/1d9486548e994d8d2f933a7f530196df8d255e43))
+
+
+### Miscellaneous
+
+* **deps:** bump Python (uv) dependencies across langwatch_nlp, python-sdk, langevals ([#1940](https://github.com/langwatch/langwatch/issues/1940)) ([d103f89](https://github.com/langwatch/langwatch/commit/d103f89fc1936dc8dae73f2b90885a28b97e2775))
+* **deps:** bump Python uv lockfile packages (v2) ([#1954](https://github.com/langwatch/langwatch/issues/1954)) ([23b3a5c](https://github.com/langwatch/langwatch/commit/23b3a5ce9f16d6a722690cbdd86cb095f01dba08))
+
 ## [0.13.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.12.0...python-sdk@v0.13.0) (2026-02-15)
 
 

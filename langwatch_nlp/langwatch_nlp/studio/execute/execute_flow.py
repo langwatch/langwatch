@@ -61,14 +61,13 @@ async def execute_flow(
     # TODO: handle workflow errors here throwing an special event showing the error was during the execution of the workflow?
     yield start_workflow_event(workflow, trace_id)
 
+    origin = event.origin or "workflow"
+
     with optional_langwatch_trace(
         name="execute_flow",
         type="workflow",
         do_not_trace=do_not_trace,
-        metadata={
-            "platform": "optimization_studio",
-            "environment": "development" if manual_execution_mode else "production",
-        },
+        origin=origin,
     ) as trace:
         if not do_not_trace and trace:
             trace.autotrack_dspy()

@@ -1,3 +1,4 @@
+import type { PrismaClient } from "@prisma/client";
 import { createLogger } from "../../../../../utils/logger/server";
 import type { ElasticSearchEvaluation } from "../../../../tracer/types";
 import type {
@@ -17,6 +18,7 @@ export interface EvaluationEsSyncReactorDeps {
   esClient: (args: { projectId: string }) => Promise<{ update: (...args: any[]) => Promise<any> }>;
   traceIndex: { alias: string };
   traceIndexId: (args: { traceId: string; projectId: string }) => string;
+  prisma: PrismaClient;
 }
 
 /**
@@ -41,6 +43,19 @@ export function createEvaluationEsSyncReactor(
       if (!isEvaluationCompletedEvent(event)) return;
 
       const { tenantId, foldState } = context;
+
+      // Skip ES sync when evaluation ES writes are disabled for this project
+      const project = await deps.prisma.project.findUnique({
+        where: { id: tenantId },
+        select: { disableElasticSearchEvaluationWriting: true },
+      });
+      if (project?.disableElasticSearchEvaluationWriting) {
+        logger.debug(
+          { tenantId, evaluationId: foldState.evaluationId },
+          "Skipping ES evaluation sync — disableElasticSearchEvaluationWriting is enabled",
+        );
+        return;
+      }
 
       if (!foldState.traceId) {
         logger.debug(

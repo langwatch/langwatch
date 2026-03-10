@@ -114,7 +114,7 @@ export const NodeDraggable = (props: {
         }
       >
         <Box
-          background="white"
+          background="bg"
           ref={props.disableDrag ? undefined : drag}
           borderRadius={4}
           padding={1}
@@ -133,7 +133,7 @@ export const NodeDraggable = (props: {
               {props.component.name}
             </HoverableBigText>
             <Spacer />
-            <Box color="gray.350">
+            <Box color="fg.subtle">
               <LuGripVertical size={18} />
             </Box>
           </HStack>

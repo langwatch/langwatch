@@ -1,5 +1,6 @@
 import { Box, Button, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { ArrowLeft, Clock } from "lucide-react";
+import { useRouter } from "next/router";
 import { useCallback, useMemo, useState } from "react";
 import { RunScenarioModal } from "~/components/scenarios/RunScenarioModal";
 import { ScenarioFormDrawerFromUrl } from "~/components/scenarios/ScenarioFormDrawer";
@@ -22,18 +23,36 @@ import { useSimulationRouter } from "~/hooks/simulations";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
 import { api } from "~/utils/api";
+import { buildRoutePath } from "~/utils/routes";
 
 // Main component
 export default function IndividualScenarioRunPage() {
   const [showPreviousRuns, setShowPreviousRuns] = useState(false);
   const [runModalOpen, setRunModalOpen] = useState(false);
-  const { goToSimulationBatchRuns, scenarioRunId } = useSimulationRouter();
+  const { goToSimulationBatchRuns, scenarioRunId, scenarioSetId, batchRunId } = useSimulationRouter();
   const { project } = useOrganizationTeamProject();
-  const { scenarioSetId, batchRunId } = useSimulationRouter();
+  const router = useRouter();
   const { openDrawer, drawerOpen } = useDrawer();
+
+  const navigateToRunPage = useCallback(
+    (result: { scenarioRunId: string; setId: string; batchRunId: string }) => {
+      void router.push(
+        buildRoutePath("simulations_run", {
+          project: project?.slug ?? "",
+          scenarioSetId: result.setId,
+          batchRunId: result.batchRunId,
+          scenarioRunId: result.scenarioRunId,
+        }),
+      );
+    },
+    [router, project?.slug],
+  );
+
   const { runScenario, isRunning } = useRunScenario({
     projectId: project?.id,
     projectSlug: project?.slug,
+    onRunComplete: navigateToRunPage,
+    onRunFailed: navigateToRunPage,
   });
   // Fetch scenario run data using the correct API
   const { data: scenarioState, refetch } = api.scenarios.getRunState.useQuery(

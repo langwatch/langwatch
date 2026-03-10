@@ -12,6 +12,9 @@ describe("OrganizationService", () => {
     getOrganizationIdByTeamId: vi.fn(),
     getProjectIds: vi.fn(),
     getFeature: vi.fn(),
+    findWithAdmins: vi.fn(),
+    updateSentPlanLimitAlert: vi.fn(),
+    findProjectsWithName: vi.fn(),
   };
 
   let service: OrganizationService;

@@ -203,7 +203,7 @@ describe("<GroupRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText(`${Math.round(summary.passRate)}%`)).toBeInTheDocument();
+      expect(screen.getByText("failed (1/2)")).toBeInTheDocument();
       expect(screen.getAllByText("2 runs").length).toBeGreaterThanOrEqual(1);
     });
 
@@ -286,7 +286,7 @@ describe("<GroupRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText(`${Math.round(summary.passRate)}%`)).toBeInTheDocument();
+      expect(screen.getByText("failed (2/3)")).toBeInTheDocument();
       expect(screen.getAllByText("3 runs").length).toBeGreaterThanOrEqual(1);
     });
   });
@@ -385,7 +385,7 @@ describe("<GroupRow/>", () => {
       );
 
       const batchHeader = screen.getByTestId("batch-sub-header");
-      expect(within(batchHeader).getByText("100%")).toBeInTheDocument();
+      expect(within(batchHeader).getByText("passed (1/1)")).toBeInTheDocument();
     });
   });
 

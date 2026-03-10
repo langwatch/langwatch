@@ -51,17 +51,9 @@ function MessagesOrIntegrationGuideContent() {
     );
   }
 
-  if (isTableView) {
-    return (
-      <DashboardLayout>
-        <MessagesTable />
-      </DashboardLayout>
-    );
-  }
-
   return (
     <DashboardLayout>
-      <MessagesList />
+      {isTableView ? <MessagesTable /> : <MessagesList />}
     </DashboardLayout>
   );
 }

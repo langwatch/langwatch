@@ -1,4 +1,5 @@
 import type { PlanInfo } from "../licensing/planInfo";
+import type { LimitType } from "../../src/server/license-enforcement/types";
 import type { PlanTypes } from "./planTypes";
 
 export type BillingPlanProvider = {
@@ -26,15 +27,6 @@ export type PlanLimitNotificationContext = {
   adminName?: string;
   adminEmail?: string;
   planName: string;
-};
-
-export type PlanLimitNotificationHandlers = {
-  sendSlackNotification?: (
-    context: PlanLimitNotificationContext,
-  ) => Promise<void> | void;
-  sendHubspotNotification?: (
-    context: PlanLimitNotificationContext,
-  ) => Promise<void> | void;
 };
 
 type SubscriptionPlan = PlanTypes | (string & {});
@@ -65,8 +57,36 @@ export type SubscriptionNotificationPayload =
   | ProspectiveSubscriptionNotification
   | ConfirmedSubscriptionNotification;
 
-export type BillingNotificationHandlers = PlanLimitNotificationHandlers & {
-  sendSubscriptionNotification?: (
-    payload: SubscriptionNotificationPayload,
-  ) => Promise<void> | void;
+export type ResourceLimitNotificationContext = {
+  organizationId: string;
+  organizationName: string;
+  adminName?: string;
+  adminEmail?: string;
+  planName: string;
+  limitType: string;
+  current: number;
+  max: number;
+};
+
+export type ResourceLimitNotifierInput = {
+  organizationId: string;
+  limitType: LimitType;
+  current: number;
+  max: number;
+};
+
+export type LicensePurchaseNotificationPayload = {
+  buyerEmail: string;
+  planType: string;
+  seats: number;
+  amountPaid: number;
+  currency: string;
+};
+
+export type SignupNotificationPayload = {
+  userName?: string | null;
+  userEmail?: string | null;
+  organizationName?: string | null;
+  phoneNumber?: string | null;
+  utmCampaign?: string | null;
 };

@@ -655,7 +655,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     this.shutdownRequested = true;
     this.metricsCollector?.stop();
     this.dispatcher?.requestShutdown();
-    this.logger.info(
+    this.logger.debug(
       { queueName: this.queueName },
       "Closing group queue processor",
     );
@@ -679,7 +679,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         }),
       ]);
 
-      this.logger.info(
+      this.logger.debug(
         { queueName: this.queueName },
         "Group queue processor closed successfully",
       );

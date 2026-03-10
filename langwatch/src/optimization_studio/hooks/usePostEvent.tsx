@@ -265,18 +265,24 @@ export const useHandleServerMessage = ({
             stopWorkflowIfRunning(message.payload.execution_state.error);
           }
           break;
-        case "evaluation_run_change":
-          const currentEvaluationRun = getWorkflow().state.evaluation;
-          setEvaluationState(message.payload.evaluation_run);
-          if (message.payload.evaluation_run?.status === "error") {
-            alertOnError(message.payload.evaluation_run.error);
-            if (currentEvaluationRun?.status !== "waiting") {
+        case "evaluation_state_change":
+        case "evaluation_run_change": {
+          const evaluationState =
+            message.type === "evaluation_state_change"
+              ? message.payload.evaluation_state
+              : message.payload.evaluation_run;
+          const currentEvaluationState = getWorkflow().state.evaluation;
+          setEvaluationState(evaluationState);
+          if (evaluationState?.status === "error") {
+            alertOnError(evaluationState.error);
+            if (currentEvaluationState?.status !== "waiting") {
               setTimeout(() => {
                 setOpenResultsPanelRequest("evaluations");
               }, 500);
             }
           }
           break;
+        }
         case "optimization_state_change":
           const currentOptimizationState = getWorkflow().state.optimization;
           setOptimizationState(message.payload.optimization_state);

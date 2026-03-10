@@ -14,8 +14,12 @@ import { MonitorService } from "./monitors/monitor.service";
 import { OrganizationService } from "./organizations/organization.service";
 import { ProjectService } from "./projects/project.service";
 import { createSpanDedupeService } from "./traces/span-dedupe.service";
+import { LogRecordStorageService } from "./traces/log-record-storage.service";
+import { MetricRecordStorageService } from "./traces/metric-record-storage.service";
 import { SpanStorageService } from "./traces/span-storage.service";
 import { TokenizerService } from "./traces/tokenizer.service";
+import { LogRequestCollectionService } from "./traces/log-request-collection.service";
+import { MetricRequestCollectionService } from "./traces/metric-request-collection.service";
 import { TraceRequestCollectionService } from "./traces/trace-request-collection.service";
 import { TraceSummaryService } from "./traces/trace-summary.service";
 import { PlanProviderService } from "./subscription/plan-provider";
@@ -31,6 +35,9 @@ import * as subscriptionItemCalculator from "../../../ee/billing/services/subscr
 import { UsageService } from "./usage/usage.service";
 import { StripeUsageReportingService } from "../../../ee/billing/services/usageReportingService";
 import { meters } from "../../../ee/billing/stripe/stripePriceCatalog";
+import { NotificationService } from "../../../ee/billing/notifications/notification.service";
+import { NotificationRepository } from "../../../ee/billing/notifications/repositories/notification.repository";
+import { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
 
 export function initializeWebApp(): App {
   return initializeDefaultApp({ processRole: "web" });
@@ -59,6 +66,8 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const spanDedup = createSpanDedupeService(redis);
   const traceSummary = TraceSummaryService.create(clickhouse);
   const spanStorage = SpanStorageService.create(clickhouse);
+  const logRecordStorage = LogRecordStorageService.create(clickhouse);
+  const metricRecordStorage = MetricRecordStorageService.create(clickhouse);
   const evaluations = {
     runs: EvaluationRunService.create(clickhouse),
     execution: EvaluationExecutionService.create(prisma),
@@ -121,7 +130,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     monitors,
     traces: { summary: traceSummary, spans: spanStorage },
     evaluations: { runs: evaluations.runs, execution: evaluations.execution },
-    esSync: { esClient, traceIndex: TRACE_INDEX, traceIndexId },
+    esSync: { esClient, traceIndex: TRACE_INDEX, traceIndexId, prisma },
     usageReportingService,
   });
   const commands = registry.registerAll();
@@ -131,10 +140,22 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     recordSpan: commands.traces.recordSpan,
   });
 
+  const logCollection = LogRequestCollectionService.create({
+    recordLog: commands.traces.recordLog,
+  });
+
+  const metricCollection = MetricRequestCollectionService.create({
+    recordMetric: commands.traces.recordMetric,
+  });
+
   const traces = {
     summary: traceSummary,
     spans: spanStorage,
+    logRecords: logRecordStorage,
+    metricRecords: metricRecordStorage,
     collection: traceCollection,
+    logCollection,
+    metricCollection,
   };
 
   // Collect closeables for graceful shutdown
@@ -167,6 +188,25 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     close: () => prisma.$disconnect(),
   });
 
+  const notifications = NotificationService.create({
+    config: {
+      baseHost: config.baseHost,
+      slackPlanLimitChannel: config.slackPlanLimitChannel,
+      slackSignupsChannel: config.slackSignupsChannel,
+      slackSubscriptionsChannel: config.slackSubscriptionsChannel,
+      hubspotPortalId: config.hubspotPortalId,
+      hubspotReachedLimitFormId: config.hubspotReachedLimitFormId,
+    },
+  });
+  const notificationRepository = new NotificationRepository(prisma);
+  const usageLimits = UsageLimitService.create({
+    notificationRepository,
+    organizationService: organizations,
+    usageService: usage,
+    notificationService: notifications,
+    planProvider,
+  });
+
   return initializeApp({
     config,
     broadcast,
@@ -178,6 +218,8 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     usage,
     planProvider,
     subscription,
+    notifications,
+    usageLimits,
     commands,
     _eventSourcing: es,
     _gracefulCloseables: gracefulCloseables,
@@ -198,9 +240,17 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     traces: {
       summary: TraceSummaryService.create(null),
       spans: SpanStorageService.create(null),
+      logRecords: LogRecordStorageService.create(null),
+      metricRecords: MetricRecordStorageService.create(null),
       collection: TraceRequestCollectionService.create({
         dedup: createSpanDedupeService(null),
         recordSpan: noop,
+      }),
+      logCollection: LogRequestCollectionService.create({
+        recordLog: noop,
+      }),
+      metricCollection: MetricRequestCollectionService.create({
+        recordMetric: noop,
       }),
     },
     evaluations: {
@@ -215,8 +265,10 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       getActivePlan: async () => FREE_PLAN,
     }),
     subscription: undefined,
+    notifications: NotificationService.createNull(),
+    usageLimits: UsageLimitService.createNull(),
     commands: {
-      traces: { recordSpan: noop, assignTopic: noop, assignSatisfactionScore: noop } as AppCommands["traces"],
+      traces: { recordSpan: noop, assignTopic: noop, assignSatisfactionScore: noop, recordLog: noop, recordMetric: noop } as AppCommands["traces"],
       evaluations: {
         executeEvaluation: noop,
         startEvaluation: noop,
@@ -231,6 +283,8 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       simulations: {
         startRun: noop,
         messageSnapshot: noop,
+        textMessageStart: noop,
+        textMessageEnd: noop,
         finishRun: noop,
         deleteRun: noop,
       } as AppCommands["simulations"],

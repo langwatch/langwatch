@@ -73,7 +73,7 @@ export function ResultsPanel({
   return (
     <HStack
       display={isCollapsed ? "none" : undefined}
-      background="white"
+      background="bg"
       borderTop="2px solid"
       borderColor="border"
       width="full"

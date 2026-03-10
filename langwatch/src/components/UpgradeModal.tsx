@@ -9,7 +9,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Crown } from "lucide-react";
+import { Crown, ShieldX } from "lucide-react";
 import { Dialog } from "./ui/dialog";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { usePlanManagementUrl } from "../hooks/usePlanManagementUrl";
@@ -25,16 +25,32 @@ interface UpgradeModalProps {
   variant: UpgradeModalVariant;
 }
 
+type VariantContentMap = {
+  [K in UpgradeModalVariant["mode"]]: React.ComponentType<{
+    variant: Extract<UpgradeModalVariant, { mode: K }>;
+    onClose: () => void;
+    open: boolean;
+  }>;
+};
+
+export const MODAL_CONTENT: VariantContentMap = {
+  limit: LimitContent,
+  seats: SeatsContent,
+  liteMemberRestriction: LiteMemberRestrictionContent,
+};
+
 export function UpgradeModal({ open, onClose, variant }: UpgradeModalProps) {
+  // TS can't correlate variant.mode lookup with the matching variant type
+  const Content = MODAL_CONTENT[variant.mode] as React.ComponentType<{
+    variant: UpgradeModalVariant;
+    onClose: () => void;
+    open: boolean;
+  }>;
   return (
     <Dialog.Root open={open} onOpenChange={(e) => !e.open && onClose()}>
       <Dialog.Content>
         <Dialog.CloseTrigger />
-        {variant.mode === "limit" ? (
-          <LimitContent variant={variant} onClose={onClose} />
-        ) : (
-          <SeatsContent variant={variant} onClose={onClose} open={open} />
-        )}
+        <Content variant={variant} onClose={onClose} open={open} />
       </Dialog.Content>
     </Dialog.Root>
   );
@@ -224,6 +240,51 @@ function SeatsContent({
           disabled={isLoading || isError || !subscriptionApi}
         >
           Confirm & Update
+        </Button>
+      </Dialog.Footer>
+    </>
+  );
+}
+
+function LiteMemberRestrictionContent({
+  onClose,
+}: {
+  variant: Extract<UpgradeModalVariant, { mode: "liteMemberRestriction" }>;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const { project } = useOrganizationTeamProject();
+  const { url: planManagementUrl, buttonLabel } = usePlanManagementUrl();
+
+  const handleUpgrade = () => {
+    trackEvent("subscription_hook_click", {
+      project_id: project?.id,
+      hook: "lite_member_restriction",
+    });
+    void router.push(planManagementUrl);
+    onClose();
+  };
+
+  return (
+    <>
+      <Dialog.Header>
+        <ShieldX />
+        <Dialog.Title>Feature Not Available</Dialog.Title>
+      </Dialog.Header>
+      <Dialog.Body>
+        <VStack gap={4} align="start">
+          <Text>
+            This feature is not available for your current role. Upgrade your
+            plan to unlock full access.
+          </Text>
+        </VStack>
+      </Dialog.Body>
+      <Dialog.Footer>
+        <Button variant="ghost" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button colorPalette="blue" onClick={handleUpgrade}>
+          {buttonLabel}
         </Button>
       </Dialog.Footer>
     </>
