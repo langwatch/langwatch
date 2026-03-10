@@ -547,7 +547,7 @@ export function ComponentExecutionButton({
               <Play size={iconSize} />
             </Button>
           </Menu.Trigger>
-          <Menu.Content zIndex={1600}>
+          <Menu.Content zIndex="popover">
             <Menu.Item
               value="run-manual"
               onClick={() => node && startComponentExecution({ node })}
