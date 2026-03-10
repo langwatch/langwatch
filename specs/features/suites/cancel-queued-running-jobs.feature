@@ -1,91 +1,109 @@
 Feature: Cancel queued and running suite jobs
-  As a user who triggered a suite run
-  I want to cancel queued or in-progress jobs
-  So that I can stop a mistaken or unnecessary batch without waiting for it to finish
+  As a user
+  I want to cancel queued or in-progress suite jobs
+  So that I can stop work I no longer need without waiting for it to finish
 
-  Background:
-    Given I am logged in
-    And a suite exists with scenarios configured
+  # ---------------------------------------------------------------------------
+  # UI: cancel eligibility and status display (existing requirements)
+  # ---------------------------------------------------------------------------
 
-  # Happy path: cancel a single job
-  @e2e
-  Scenario: Cancel an individual queued job from the run table
-    Given a batch run is in progress with multiple jobs
-    And at least one job is still queued
-    When I cancel a queued job from the run table
+  @integration
+  Scenario: User cancels a single queued job from the run card
+    Given a suite run has queued jobs
+    When the user clicks cancel on a queued job
     Then the job status changes to cancelled
-    And the remaining jobs in the batch continue running
+    And the UI reflects the cancelled state immediately
 
-  # Happy path: cancel all remaining jobs
-  @e2e
-  Scenario: Cancel all remaining jobs for a batch run
-    Given a batch run is in progress with multiple jobs
-    When I cancel all remaining jobs for the batch
-    Then all queued and in-progress jobs are marked as cancelled
-    And completed jobs retain their original status
-
-  # Integration: single job cancellation updates queue and stored status
   @integration
-  Scenario: Cancelling a queued job prevents it from executing
-    Given a job is queued
-    When the cancel job endpoint is called for that job
-    Then the job is removed from the queue
-    And the job status is persisted as cancelled
+  Scenario: User cancels all remaining jobs for a batch run
+    Given a suite run has multiple queued and running jobs
+    When the user clicks cancel all on the batch run
+    Then all non-terminal jobs are cancelled
+    And the UI reflects the cancelled state for each job
 
-  # Integration: cancelling a running job
   @integration
-  Scenario: Cancelling a running job marks it as cancelled
-    Given a job is actively running
-    When the cancel job endpoint is called for that job
-    Then the job is marked as cancelled
-    And the job status is persisted as cancelled
+  Scenario: Cancel button is hidden for jobs that already completed
+    Given a suite run has a job with a terminal status
+    When the user views the run card
+    Then no cancel action is available for that job
 
-  # Integration: batch cancel updates all pending jobs
+  # ---------------------------------------------------------------------------
+  # Active job cancellation stops the child process
+  # ---------------------------------------------------------------------------
+
   @integration
-  Scenario: Batch cancel marks all non-completed jobs as cancelled
-    Given a batch run has jobs in queued, running, and completed states
-    When the cancel all endpoint is called for the batch
-    Then queued and running jobs are cancelled
-    And completed jobs are not modified
-
-  # E2E: UI reflects cancellation immediately
-  @e2e
-  Scenario: Cancelled status appears in the UI without manual refresh
-    Given a job is displayed with a queued status
+  Scenario: Cancelling a running job terminates its child process
+    Given a suite job is actively running with a spawned process
     When the job is cancelled
-    Then the UI updates to show the cancelled status
+    Then the worker terminates the spawned process
+    And the job status transitions to cancelled
 
-  # Edge case: cancelling an already completed job
   @integration
-  Scenario: Cancelling a completed job has no effect
-    Given a job has already completed successfully
-    When the cancel job endpoint is called for that job
-    Then the job retains its completed status
-    And no error is returned
+  Scenario: Worker respects the abort signal during job execution
+    Given a suite job is being processed by a worker
+    When the abort signal fires for that job
+    Then the worker stops execution promptly
+    And no further results are written for the job
 
-  # Edge case: cancelling an already cancelled job
+  # ---------------------------------------------------------------------------
+  # Distributed cancellation across worker instances
+  # ---------------------------------------------------------------------------
+
   @integration
-  Scenario: Cancelling an already cancelled job is idempotent
-    Given a job has already been cancelled
-    When the cancel job endpoint is called for that job
-    Then the job remains cancelled
-    And no error is returned
+  Scenario: Cancellation reaches a worker on a different instance
+    Given a suite job is running on worker instance A
+    When the cancellation API is called from the web server
+    Then worker instance A receives the cancellation notification
+    And the job is terminated on worker instance A
 
-  # Unit: status transition logic
-  @unit
-  Scenario: Only cancellable statuses are eligible for cancellation
-    Given a job with a queued status
-    When cancellation eligibility is checked
-    Then the job is eligible for cancellation
+  @integration
+  Scenario: Workers that are not running the cancelled job ignore the notification
+    Given worker instance B has no active job matching the cancellation
+    When a cancellation notification arrives
+    Then worker instance B takes no action
+    And other running jobs on instance B are unaffected
+
+  # ---------------------------------------------------------------------------
+  # Batch cancel also cancels BullMQ jobs
+  # ---------------------------------------------------------------------------
+
+  @integration
+  Scenario: Batch cancel removes queued jobs from the queue
+    Given a batch run has jobs still waiting in the queue
+    When the user cancels the entire batch
+    Then the queued jobs are removed from the job queue
+    And each removed job is recorded as cancelled
+
+  @integration
+  Scenario: Batch cancel terminates actively running jobs
+    Given a batch run has jobs currently being processed
+    When the user cancels the entire batch
+    Then the running jobs receive termination signals
+    And each running job transitions to cancelled
+
+  # ---------------------------------------------------------------------------
+  # Race condition: cancellation does not overwrite real results
+  # ---------------------------------------------------------------------------
 
   @unit
-  Scenario: Completed jobs are not eligible for cancellation
-    Given a job with a completed status
-    When cancellation eligibility is checked
-    Then the job is not eligible for cancellation
+  Scenario Outline: Cancellation skips a job that already has terminal results
+    Given a suite job has already completed with a <verdict> verdict
+    When a cancellation event arrives for that job
+    Then the existing <verdict> verdict is preserved
+    And the job status remains completed
+
+    Examples:
+      | verdict |
+      | pass    |
+      | fail    |
+
+  # ---------------------------------------------------------------------------
+  # Race condition: job finishes after cancellation
+  # ---------------------------------------------------------------------------
 
   @unit
-  Scenario: Failed jobs are not eligible for cancellation
-    Given a job with a failed status
-    When cancellation eligibility is checked
-    Then the job is not eligible for cancellation
+  Scenario: Late results are stored but do not flip cancelled status
+    Given a suite job has been marked as cancelled
+    When the job finishes with actual evaluation results
+    Then the evaluation results are stored and visible
+    And the job status remains cancelled

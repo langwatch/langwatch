@@ -1,5 +1,5 @@
 /**
- * Integration tests for ScenarioCancellationService.
+ * Unit tests for ScenarioCancellationService.
  *
  * Tests the cancellation orchestration logic with mocked external boundaries:
  * - Queue operations (remove, move to failed)
@@ -17,16 +17,20 @@ function createMockDeps() {
   const mockGetJob = vi.fn();
   const mockSaveScenarioEvent = vi.fn().mockResolvedValue(undefined);
   const mockGetRunDataForBatchRun = vi.fn();
+  const mockGetScenarioRunData = vi.fn().mockResolvedValue(null);
+  const mockPublishCancellation = vi.fn().mockResolvedValue(undefined);
 
   const deps: CancellationServiceDeps = {
     queue: { getJob: mockGetJob },
     simulationService: {
       saveScenarioEvent: mockSaveScenarioEvent,
       getRunDataForBatchRun: mockGetRunDataForBatchRun,
+      getScenarioRunData: mockGetScenarioRunData,
     },
+    publishCancellation: mockPublishCancellation,
   };
 
-  return { deps, mockGetJob, mockSaveScenarioEvent, mockGetRunDataForBatchRun };
+  return { deps, mockGetJob, mockSaveScenarioEvent, mockGetRunDataForBatchRun, mockGetScenarioRunData, mockPublishCancellation };
 }
 
 const defaultJobParams = {
@@ -78,24 +82,25 @@ describe("ScenarioCancellationService", () => {
 
     describe("when the job is actively running", () => {
       let result: { cancelled: boolean };
-      let mockJob: { getState: ReturnType<typeof vi.fn>; moveToFailed: ReturnType<typeof vi.fn> };
+      let mockPublishCancellation: ReturnType<typeof vi.fn>;
       let mockSaveScenarioEvent: ReturnType<typeof vi.fn>;
 
       beforeEach(async () => {
-        const { deps, mockGetJob, mockSaveScenarioEvent: saveFn } = createMockDeps();
+        const { deps, mockGetJob, mockSaveScenarioEvent: saveFn, mockPublishCancellation: publishFn } = createMockDeps();
         mockSaveScenarioEvent = saveFn;
-        mockJob = {
+        mockPublishCancellation = publishFn;
+        mockGetJob.mockResolvedValue({
           getState: vi.fn().mockResolvedValue("active"),
-          moveToFailed: vi.fn().mockResolvedValue(undefined),
-        };
-        mockGetJob.mockResolvedValue(mockJob);
+        });
 
         const service = new ScenarioCancellationService(deps);
         result = await service.cancelJob(defaultJobParams);
       });
 
-      it("marks the job as failed in the queue", () => {
-        expect(mockJob.moveToFailed).toHaveBeenCalled();
+      it("publishes a cancellation signal via Redis pub/sub", () => {
+        expect(mockPublishCancellation).toHaveBeenCalledWith(
+          expect.objectContaining({ jobId: "job-1" }),
+        );
       });
 
       it("persists a cancellation event", () => {
@@ -192,10 +197,27 @@ describe("ScenarioCancellationService", () => {
     describe("when a batch has jobs in mixed states", () => {
       let result: { cancelledCount: number; skippedCount: number };
       let mockSaveScenarioEvent: ReturnType<typeof vi.fn>;
+      let mockGetJob: ReturnType<typeof vi.fn>;
+      let mockPublishCancellation: ReturnType<typeof vi.fn>;
+      let mockRemoveRun1: ReturnType<typeof vi.fn>;
 
       beforeEach(async () => {
-        const { deps, mockSaveScenarioEvent: saveFn } = createMockDeps();
+        const { deps, mockSaveScenarioEvent: saveFn, mockGetJob: getJobFn, mockPublishCancellation: publishFn } = createMockDeps();
         mockSaveScenarioEvent = saveFn;
+        mockGetJob = getJobFn;
+        mockPublishCancellation = publishFn;
+
+        mockRemoveRun1 = vi.fn().mockResolvedValue(undefined);
+
+        // run1 (PENDING) => queued BullMQ job
+        // run2 (IN_PROGRESS) => active BullMQ job
+        // run3 (SUCCESS) => skipped, cancelBatchRun filters it out before calling cancelJob
+        mockGetJob.mockImplementation(async (jobId: string) => {
+          if (jobId === "run1") return { getState: vi.fn().mockResolvedValue("waiting"), remove: mockRemoveRun1 };
+          if (jobId === "run2") return { getState: vi.fn().mockResolvedValue("active") };
+          return undefined;
+        });
+
         deps.simulationService.getRunDataForBatchRun = vi.fn().mockResolvedValue({
           changed: true,
           lastUpdatedAt: 0,
@@ -212,6 +234,16 @@ describe("ScenarioCancellationService", () => {
           scenarioSetId: "set1",
           batchRunId: "batch1",
         });
+      });
+
+      it("removes the queued BullMQ job for the pending run", () => {
+        expect(mockRemoveRun1).toHaveBeenCalled();
+      });
+
+      it("publishes a cancellation signal for the active run", () => {
+        expect(mockPublishCancellation).toHaveBeenCalledWith(
+          expect.objectContaining({ jobId: "run2" }),
+        );
       });
 
       it("persists cancellation events for pending and in-progress runs only", () => {
@@ -263,12 +295,47 @@ describe("ScenarioCancellationService", () => {
       });
     });
 
+    describe("when the BullMQ job does not exist for a run", () => {
+      let mockSaveScenarioEvent: ReturnType<typeof vi.fn>;
+      let mockGetJob: ReturnType<typeof vi.fn>;
+
+      beforeEach(async () => {
+        const { deps, mockSaveScenarioEvent: saveFn, mockGetJob: getJobFn } = createMockDeps();
+        mockSaveScenarioEvent = saveFn;
+        mockGetJob = getJobFn;
+        mockGetJob.mockResolvedValue(undefined);
+
+        deps.simulationService.getRunDataForBatchRun = vi.fn().mockResolvedValue({
+          changed: true,
+          lastUpdatedAt: 0,
+          runs: [
+            { scenarioRunId: "run1", scenarioId: "sc1", batchRunId: "batch1", status: ScenarioRunStatus.PENDING },
+          ],
+        });
+
+        const service = new ScenarioCancellationService(deps);
+        await service.cancelBatchRun({
+          projectId: "proj1",
+          scenarioSetId: "set1",
+          batchRunId: "batch1",
+        });
+      });
+
+      it("still persists the cancellation event", () => {
+        expect(mockSaveScenarioEvent).toHaveBeenCalledWith(
+          expect.objectContaining({ status: ScenarioRunStatus.CANCELLED }),
+        );
+      });
+    });
+
     describe("when cancelling with concurrency", () => {
       it("processes cancellable runs in parallel chunks", async () => {
-        const { deps } = createMockDeps();
+        const { deps, mockGetJob } = createMockDeps();
         const callOrder: number[] = [];
         let concurrentCount = 0;
         let maxConcurrent = 0;
+
+        mockGetJob.mockResolvedValue(undefined);
 
         deps.simulationService.getRunDataForBatchRun = vi.fn().mockResolvedValue({
           changed: true,

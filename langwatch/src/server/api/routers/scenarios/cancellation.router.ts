@@ -13,7 +13,9 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { ScenarioCancellationService } from "~/server/scenarios/cancellation";
+import { publishCancellation } from "~/server/scenarios/cancellation-channel";
 import { scenarioQueue } from "~/server/scenarios/scenario.queue";
+import { connection } from "~/server/redis";
 import { SimulationService } from "~/server/simulations/simulation.service";
 import { createLogger } from "~/utils/logger/server";
 import { checkProjectPermission } from "../../rbac";
@@ -50,9 +52,13 @@ export const cancellationRouter = createTRPCRouter({
         "Cancel job request received",
       );
 
+      const publisher = connection;
       const service = new ScenarioCancellationService({
         queue: scenarioQueue,
         simulationService: SimulationService.create(ctx.prisma),
+        publishCancellation: publisher
+          ? (message) => publishCancellation({ publisher, message })
+          : () => Promise.resolve(),
       });
 
       return service.cancelJob(input);
@@ -73,9 +79,13 @@ export const cancellationRouter = createTRPCRouter({
         "Cancel batch run request received",
       );
 
+      const publisher = connection;
       const service = new ScenarioCancellationService({
         queue: scenarioQueue,
         simulationService: SimulationService.create(ctx.prisma),
+        publishCancellation: publisher
+          ? (message) => publishCancellation({ publisher, message })
+          : () => Promise.resolve(),
       });
 
       return service.cancelBatchRun(input);

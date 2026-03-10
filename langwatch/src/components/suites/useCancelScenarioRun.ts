@@ -10,19 +10,9 @@
 
 import { useCallback } from "react";
 import { api } from "~/utils/api";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { isCancellableStatus } from "~/server/scenarios/scenario-event.enums";
 
-/** Statuses eligible for cancellation (mirrors server-side CANCELLABLE_STATUSES). */
-const CANCELLABLE_STATUSES = new Set<ScenarioRunStatus>([
-  ScenarioRunStatus.PENDING,
-  ScenarioRunStatus.IN_PROGRESS,
-  ScenarioRunStatus.STALLED,
-]);
-
-/** Checks whether a run status can be cancelled. */
-export function isCancellableStatus(status: ScenarioRunStatus): boolean {
-  return CANCELLABLE_STATUSES.has(status);
-}
+export { isCancellableStatus };
 
 /** Parameters for cancelling a single scenario run. */
 export interface CancelRunParams {

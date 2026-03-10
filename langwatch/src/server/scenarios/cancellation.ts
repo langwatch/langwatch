@@ -9,33 +9,15 @@
 
 import type { Job, Queue } from "bullmq";
 import { createLogger } from "~/utils/logger/server";
-import { ScenarioEventType, ScenarioRunStatus, Verdict } from "./scenario-event.enums";
+import { ScenarioEventType, ScenarioRunStatus, isCancellableStatus } from "./scenario-event.enums";
+export { isCancellableStatus };
 import type { SimulationService } from "~/server/simulations/simulation.service";
+import type { CancellationMessage } from "./cancellation-channel";
 
 const logger = createLogger("langwatch:scenarios:cancellation");
 
-/** Statuses that are eligible for cancellation (still in-flight). */
-const CANCELLABLE_STATUSES = new Set<ScenarioRunStatus>([
-  ScenarioRunStatus.PENDING,
-  ScenarioRunStatus.IN_PROGRESS,
-  ScenarioRunStatus.STALLED,
-]);
-
 /** BullMQ job states that represent terminal jobs (not cancellable). */
 const TERMINAL_BULLMQ_STATES = new Set(["completed", "failed"]);
-
-/**
- * Determines whether a scenario run with the given status can be cancelled.
- *
- * Only in-flight statuses (PENDING, IN_PROGRESS, STALLED) are cancellable.
- * Terminal statuses (SUCCESS, FAILED, ERROR, CANCELLED) are not.
- *
- * @param status - The current status of the scenario run
- * @returns true if the run is eligible for cancellation
- */
-export function isCancellableStatus(status: ScenarioRunStatus): boolean {
-  return CANCELLABLE_STATUSES.has(status);
-}
 
 /** Parameters for cancelling a single scenario job. */
 export interface CancelJobParams {
@@ -68,8 +50,17 @@ export interface CancelBatchRunResult {
 /** Dependencies injected into the cancellation service. */
 export interface CancellationServiceDeps {
   queue: Pick<Queue, "getJob">;
-  simulationService: Pick<SimulationService, "saveScenarioEvent" | "getRunDataForBatchRun">;
+  simulationService: Pick<SimulationService, "saveScenarioEvent" | "getRunDataForBatchRun" | "getScenarioRunData">;
+  /** Publishes a cancel signal to all worker instances via Redis pub/sub. */
+  publishCancellation: (message: CancellationMessage) => Promise<void>;
 }
+
+/** Terminal statuses that indicate a run already has a real result. */
+const TERMINAL_RUN_STATUSES = new Set<ScenarioRunStatus>([
+  ScenarioRunStatus.SUCCESS,
+  ScenarioRunStatus.FAILED,
+  ScenarioRunStatus.ERROR,
+]);
 
 /**
  * Service responsible for cancelling scenario runs.
@@ -79,11 +70,13 @@ export interface CancellationServiceDeps {
  */
 export class ScenarioCancellationService {
   private readonly queue: Pick<Queue, "getJob">;
-  private readonly simulationService: Pick<SimulationService, "saveScenarioEvent" | "getRunDataForBatchRun">;
+  private readonly simulationService: Pick<SimulationService, "saveScenarioEvent" | "getRunDataForBatchRun" | "getScenarioRunData">;
+  private readonly publishCancellation: (message: CancellationMessage) => Promise<void>;
 
   constructor(deps: CancellationServiceDeps) {
     this.queue = deps.queue;
     this.simulationService = deps.simulationService;
+    this.publishCancellation = deps.publishCancellation;
   }
 
   /**
@@ -112,14 +105,11 @@ export class ScenarioCancellationService {
         return { cancelled: false };
       }
 
-      // Active: move to failed
+      // Active: publish cancellation signal via Redis pub/sub so any worker
+      // instance that owns this job can abort it cleanly
       if (state === "active") {
-        await (bullmqJob as Job).moveToFailed(
-          new Error("Cancelled by user"),
-          "0",
-          false,
-        );
-        logger.info({ jobId }, "Active job moved to failed (cancelled)");
+        await this.publishCancellation({ jobId, projectId, scenarioRunId, batchRunId });
+        logger.info({ jobId }, "Cancellation signal published for active job");
       } else {
         // Waiting/delayed: remove from queue
         await (bullmqJob as Job).remove();
@@ -174,12 +164,15 @@ export class ScenarioCancellationService {
       const chunk = cancellableRuns.slice(i, i + CONCURRENCY);
       await Promise.all(
         chunk.map((run) =>
-          this.persistCancellationEvent({
+          this.cancelJob({
             projectId,
-            scenarioId: run.scenarioId,
-            scenarioRunId: run.scenarioRunId,
-            batchRunId: run.batchRunId,
+            // By convention, scenarioRunId is used as the BullMQ job ID when
+            // jobs are enqueued — so jobId and scenarioRunId are always equal.
+            jobId: run.scenarioRunId,
             scenarioSetId,
+            batchRunId: run.batchRunId,
+            scenarioRunId: run.scenarioRunId,
+            scenarioId: run.scenarioId,
           }),
         ),
       );
@@ -197,6 +190,9 @@ export class ScenarioCancellationService {
 
   /**
    * Persists a RUN_FINISHED event with CANCELLED status.
+   *
+   * Race guard: if the run already has a terminal result (SUCCESS, FAILED, ERROR),
+   * the cancellation event is skipped to avoid overwriting real results.
    */
   private async persistCancellationEvent({
     projectId,
@@ -211,6 +207,19 @@ export class ScenarioCancellationService {
     batchRunId: string;
     scenarioSetId: string;
   }): Promise<void> {
+    const existingRun = await this.simulationService.getScenarioRunData({
+      projectId,
+      scenarioRunId,
+    });
+
+    if (existingRun && TERMINAL_RUN_STATUSES.has(existingRun.status as ScenarioRunStatus)) {
+      logger.debug(
+        { projectId, scenarioRunId, existingStatus: existingRun.status },
+        "Run already has terminal result — skipping cancellation event to preserve real results",
+      );
+      return;
+    }
+
     await this.simulationService.saveScenarioEvent({
       projectId,
       type: ScenarioEventType.RUN_FINISHED,
@@ -220,12 +229,7 @@ export class ScenarioCancellationService {
       scenarioSetId,
       timestamp: Date.now(),
       status: ScenarioRunStatus.CANCELLED,
-      results: {
-        verdict: Verdict.INCONCLUSIVE,
-        reasoning: "Cancelled by user",
-        metCriteria: [],
-        unmetCriteria: [],
-      },
+      results: null,
     });
   }
 }
