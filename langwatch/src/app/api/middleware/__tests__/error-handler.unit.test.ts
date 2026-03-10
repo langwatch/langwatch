@@ -1,16 +1,7 @@
-import { describe, expect, it, vi, beforeEach, type Mock } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
 import { handleError } from "../error-handler";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
-import { ERR_RESOURCE_LIMIT } from "~/server/license-enforcement/constants";
-
-vi.mock("~/server/db", () => ({
-  prisma: {
-    team: {
-      findUnique: vi.fn(),
-    },
-  },
-}));
 
 vi.mock("~/server/app-layer/app", () => ({
   getApp: vi.fn(),
@@ -32,9 +23,6 @@ vi.mock("~/utils/logger/server", () => ({
   }),
 }));
 
-import { prisma } from "~/server/db";
-import { getApp } from "~/server/app-layer/app";
-
 describe("handleError()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -49,69 +37,31 @@ describe("handleError()", () => {
     return app;
   }
 
-  function createTestAppWithProject(errorToThrow: Error) {
-    const app = new Hono();
-    app.onError(handleError);
-    app.use("/*", async (c, next) => {
-      c.set("project" as never, { id: "project-123", teamId: "team-456" });
-      await next();
-    });
-    app.get("/", () => {
-      throw errorToThrow;
-    });
-    return app;
-  }
-
   describe("when error is a LimitExceededError", () => {
-    describe("when organizationId can be resolved from project", () => {
-      beforeEach(() => {
-        (prisma.team.findUnique as Mock).mockResolvedValue({
-          id: "team-456",
-          organizationId: "org-789",
-        });
+    it("returns 403 with DomainError shape", async () => {
+      const error = new LimitExceededError("prompts", 5, 5);
+      const app = createTestApp(error);
 
-        (getApp as Mock).mockReturnValue({
-          planProvider: {
-            getActivePlan: vi.fn().mockResolvedValue({
-              name: "free",
-              planSource: "free" as const,
-            }),
-          },
-        });
-      });
+      const res = await app.request("/");
 
-      it("returns 403 with upgrade guidance in message", async () => {
-        const error = new LimitExceededError("prompts", 5, 5);
-        const app = createTestAppWithProject(error);
-
-        const res = await app.request("/");
-
-        expect(res.status).toBe(403);
-        const body = await res.json();
-        expect(body.error).toBe(ERR_RESOURCE_LIMIT);
-        expect(body.message).toContain("Free plan limit of 5 prompts reached");
-        expect(body.message).toContain("get a license at");
-        expect(body.limitType).toBe("prompts");
-        expect(body.current).toBe(5);
-        expect(body.max).toBe(5);
-      });
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body.error).toBe("resource_limit_exceeded");
+      expect(body.message).toBe(
+        "You have reached the maximum number of prompts",
+      );
     });
 
-    describe("when organizationId cannot be resolved", () => {
-      it("falls back to generic error message", async () => {
-        const error = new LimitExceededError("prompts", 5, 5);
-        const app = createTestApp(error);
+    it("does not include limitType, current, or max in response body", async () => {
+      const error = new LimitExceededError("prompts", 5, 5);
+      const app = createTestApp(error);
 
-        const res = await app.request("/");
+      const res = await app.request("/");
 
-        expect(res.status).toBe(403);
-        const body = await res.json();
-        expect(body.error).toBe(ERR_RESOURCE_LIMIT);
-        expect(body.message).toContain("prompts");
-        expect(body.limitType).toBe("prompts");
-        expect(body.current).toBe(5);
-        expect(body.max).toBe(5);
-      });
+      const body = await res.json();
+      expect(body).not.toHaveProperty("limitType");
+      expect(body).not.toHaveProperty("current");
+      expect(body).not.toHaveProperty("max");
     });
   });
 });

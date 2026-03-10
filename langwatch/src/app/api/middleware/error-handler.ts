@@ -2,10 +2,6 @@ import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import { DomainError } from "~/server/app-layer/domain-error";
-import { prisma } from "~/server/db";
-import { ERR_RESOURCE_LIMIT } from "~/server/license-enforcement/constants";
-import { LimitExceededError } from "~/server/license-enforcement/errors";
-import { buildResourceLimitMessage } from "~/server/license-enforcement/limit-message";
 import { NotFoundError as PromptNotFoundError } from "~/server/prompt-config/errors";
 
 import { HttpError, NotFoundError } from "../shared/errors";
@@ -55,34 +51,6 @@ async function determineErrorResponse(
     };
   }
 
-  // LimitExceededError maps to 403 with structured resource limit response
-  if (error instanceof LimitExceededError) {
-    let message = error.message;
-    try {
-      const organizationId = await resolveOrganizationIdFromContext(c);
-      if (organizationId) {
-        message = await buildResourceLimitMessage({
-          organizationId,
-          limitType: error.limitType,
-          max: error.max,
-        });
-      }
-    } catch {
-      // keep the original limit message if enrichment fails
-    }
-
-    return {
-      statusCode: 403,
-      response: {
-        error: ERR_RESOURCE_LIMIT,
-        message,
-        limitType: error.limitType,
-        current: error.current,
-        max: error.max,
-      },
-    };
-  }
-
   // Check if it's a "not found" error
   const isNotFoundError =
     error.message?.includes("not found") ||
@@ -128,33 +96,4 @@ async function determineErrorResponse(
           : "Internal server error",
     }),
   };
-}
-
-/**
- * Resolves organizationId from the Hono context.
- *
- * Tries the organization middleware cache first, then falls back to
- * resolving via the project's teamId. Returns null if neither is available.
- */
-async function resolveOrganizationIdFromContext(
-  c: Context,
-): Promise<string | null> {
-  // Try cached organization from organizationMiddleware
-  const cachedOrg = c.get("organization") as { id: string } | undefined;
-  if (cachedOrg?.id) {
-    return cachedOrg.id;
-  }
-
-  // Fall back to resolving via project.teamId
-  const project = c.get("project") as { teamId: string } | undefined;
-  if (!project?.teamId) {
-    return null;
-  }
-
-  const team = await prisma.team.findUnique({
-    where: { id: project.teamId },
-    select: { organizationId: true },
-  });
-
-  return team?.organizationId ?? null;
 }
