@@ -23,8 +23,6 @@ import { useAnimatedFocusElementById } from "../../../../../hooks/useAnimatedFoc
 import type { CheckPreconditions } from "../../../../../server/evaluations/types";
 import { checkPreconditionsSchema } from "../../../../../server/evaluations/types.generated";
 import type { CheckConfigFormData } from "../../../../checks/CheckConfigForm";
-
-type RealTimeExecutionFormData = Pick<CheckConfigFormData, "sample" | "preconditions">;
 import { PreconditionsField } from "../../../../checks/PreconditionsField";
 import { HorizontalFormControl } from "../../../../HorizontalFormControl";
 import { Tooltip } from "../../../../ui/tooltip";
@@ -35,6 +33,8 @@ import {
   EXECUTION_METHODS,
   useEvaluationWizardStore,
 } from "../../hooks/evaluation-wizard-store/useEvaluationWizardStore";
+
+type RealTimeExecutionFormData = Pick<CheckConfigFormData, "sample" | "preconditions">;
 
 export function RealTimeExecutionStep() {
   const { executionMethod, setWizardState, realTimeExecution } =
