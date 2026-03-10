@@ -176,6 +176,28 @@ export class LicenseEnforcementService {
   }
 
   /**
+   * Enforces a limit using organizationId as the entry point.
+   * Use this when you have an organizationId but no projectId
+   * (e.g., project creation, team creation).
+   *
+   * @param params.organizationId - The organization to check
+   * @param params.limitType - The type of resource being created
+   * @param params.user - Optional user for plan resolution
+   * @throws LimitExceededError if the limit is reached
+   */
+  async enforceLimitByOrganization({
+    organizationId,
+    limitType,
+    user,
+  }: {
+    organizationId: string;
+    limitType: LimitType;
+    user?: MinimalUser;
+  }): Promise<void> {
+    return this.enforceLimit(organizationId, limitType, user);
+  }
+
+  /**
    * Gets the current count for a resource type.
    * Uses LIMIT_TYPE_CONFIG mapping for OCP compliance.
    */

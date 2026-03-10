@@ -35,6 +35,9 @@ import * as subscriptionItemCalculator from "../../../ee/billing/services/subscr
 import { UsageService } from "./usage/usage.service";
 import { StripeUsageReportingService } from "../../../ee/billing/services/usageReportingService";
 import { meters } from "../../../ee/billing/stripe/stripePriceCatalog";
+import { NotificationService } from "../../../ee/billing/notifications/notification.service";
+import { NotificationRepository } from "../../../ee/billing/notifications/repositories/notification.repository";
+import { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
 
 export function initializeWebApp(): App {
   return initializeDefaultApp({ processRole: "web" });
@@ -185,6 +188,25 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     close: () => prisma.$disconnect(),
   });
 
+  const notifications = NotificationService.create({
+    config: {
+      baseHost: config.baseHost,
+      slackPlanLimitChannel: config.slackPlanLimitChannel,
+      slackSignupsChannel: config.slackSignupsChannel,
+      slackSubscriptionsChannel: config.slackSubscriptionsChannel,
+      hubspotPortalId: config.hubspotPortalId,
+      hubspotReachedLimitFormId: config.hubspotReachedLimitFormId,
+    },
+  });
+  const notificationRepository = new NotificationRepository(prisma);
+  const usageLimits = UsageLimitService.create({
+    notificationRepository,
+    organizationService: organizations,
+    usageService: usage,
+    notificationService: notifications,
+    planProvider,
+  });
+
   return initializeApp({
     config,
     broadcast,
@@ -196,6 +218,8 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     usage,
     planProvider,
     subscription,
+    notifications,
+    usageLimits,
     commands,
     _eventSourcing: es,
     _gracefulCloseables: gracefulCloseables,
@@ -241,6 +265,8 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       getActivePlan: async () => FREE_PLAN,
     }),
     subscription: undefined,
+    notifications: NotificationService.createNull(),
+    usageLimits: UsageLimitService.createNull(),
     commands: {
       traces: { recordSpan: noop, assignTopic: noop, assignSatisfactionScore: noop, recordLog: noop, recordMetric: noop } as AppCommands["traces"],
       evaluations: {
