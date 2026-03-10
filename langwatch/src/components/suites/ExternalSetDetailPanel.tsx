@@ -15,6 +15,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { Period } from "~/components/PeriodSelector";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
@@ -37,6 +38,7 @@ import { useRunHistoryStore } from "./useRunHistoryStore";
 
 type ExternalSetDetailPanelProps = {
   scenarioSetId: string;
+  period: Period;
 };
 
 /** Group-by options available for external sets (no target). */
@@ -46,6 +48,7 @@ const EXTERNAL_GROUP_BY_OPTIONS = availableGroupByOptions({
 
 export function ExternalSetDetailPanel({
   scenarioSetId,
+  period,
 }: ExternalSetDetailPanelProps) {
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
@@ -84,6 +87,8 @@ export function ExternalSetDetailPanel({
       projectId: project?.id ?? "",
       scenarioSetId,
       limit: 100,
+      startDate: period.startDate.getTime(),
+      endDate: period.endDate.getTime(),
     },
     {
       enabled: !!project,

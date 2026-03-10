@@ -277,11 +277,13 @@ export const scenarioEventsRouter = createTRPCRouter({
   // Get pre-aggregated batch history for the sidebar (no full messages)
   getScenarioSetBatchHistory: protectedProcedure
     .input(
-      projectSchema.extend({
-        scenarioSetId: z.string(),
-        limit: z.number().min(1).max(100).default(8),
-        cursor: z.string().optional(),
-      }),
+      projectSchema
+        .extend({
+          scenarioSetId: z.string(),
+          limit: z.number().min(1).max(100).default(8),
+          cursor: z.string().optional(),
+        })
+        .extend(dateRangeFields),
     )
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
@@ -295,6 +297,8 @@ export const scenarioEventsRouter = createTRPCRouter({
         scenarioSetId: input.scenarioSetId,
         limit: input.limit,
         cursor: input.cursor,
+        startDate: input.startDate,
+        endDate: input.endDate,
       });
     }),
 

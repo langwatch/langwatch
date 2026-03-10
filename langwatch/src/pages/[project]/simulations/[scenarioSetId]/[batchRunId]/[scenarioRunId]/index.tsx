@@ -2,6 +2,7 @@ import { Box, Button, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { ArrowLeft, Clock } from "lucide-react";
 import { useRouter } from "next/router";
 import { useCallback, useMemo, useState } from "react";
+import { usePeriodSelector } from "~/components/PeriodSelector";
 import { RunScenarioModal } from "~/components/scenarios/RunScenarioModal";
 import { ScenarioFormDrawerFromUrl } from "~/components/scenarios/ScenarioFormDrawer";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
@@ -31,6 +32,7 @@ export default function IndividualScenarioRunPage() {
   const [runModalOpen, setRunModalOpen] = useState(false);
   const { goToSimulationBatchRuns, scenarioRunId, scenarioSetId, batchRunId } = useSimulationRouter();
   const { project } = useOrganizationTeamProject();
+  const { period, setPeriod } = usePeriodSelector(30);
   const router = useRouter();
   const { openDrawer, drawerOpen } = useDrawer();
 
@@ -137,7 +139,7 @@ export default function IndividualScenarioRunPage() {
   }
 
   return (
-    <SimulationLayout>
+    <SimulationLayout period={period} setPeriod={setPeriod}>
       <PageLayout.Container
         w="full"
         padding={6}

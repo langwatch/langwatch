@@ -6,6 +6,7 @@ import "@copilotkit/react-ui/styles.css";
 import "../../simulations.css";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { usePeriodSelector } from "~/components/PeriodSelector";
 import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
@@ -16,6 +17,7 @@ export default function SimulationSetPage() {
   const { scenarioSetId } = useSimulationRouter();
   const { project } = useOrganizationTeamProject();
   const { batchRunId, goToSimulationBatchRuns } = useSimulationRouter();
+  const { period, setPeriod } = usePeriodSelector(30);
 
   // sinceTimestamp enables conditional fetch: server returns {changed:false} cheaply when idle
   const [sinceTimestamp, setSinceTimestamp] = useState<number | undefined>(undefined);
@@ -42,6 +44,8 @@ export default function SimulationSetPage() {
       projectId: project?.id ?? "",
       scenarioSetId: scenarioSetId ?? "",
       limit: 1,
+      startDate: period.startDate.getTime(),
+      endDate: period.endDate.getTime(),
     },
     {
       enabled: !!project?.id && !!scenarioSetId && !batchRunId,
@@ -99,7 +103,7 @@ export default function SimulationSetPage() {
   }, [batchHistory, scenarioSetId, batchRunId, goToSimulationBatchRuns]);
 
   return (
-    <SimulationLayout>
+    <SimulationLayout period={period} setPeriod={setPeriod}>
       <PageLayout.Container
         marginTop={0}
         h="full"

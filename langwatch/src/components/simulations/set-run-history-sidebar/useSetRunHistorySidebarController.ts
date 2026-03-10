@@ -20,7 +20,10 @@ const logger = createLogger("useSetRunHistorySidebarController");
  *
  * @returns Object containing runs data, click handlers, pagination controls, and state flags
  */
-export const useSetRunHistorySidebarController = () => {
+export const useSetRunHistorySidebarController = (props: {
+  startDate?: number;
+  endDate?: number;
+}) => {
   const { goToSimulationBatchRuns, scenarioSetId, batchRunId } =
     useSimulationRouter();
   const { project } = useOrganizationTeamProject();
@@ -50,6 +53,8 @@ export const useSetRunHistorySidebarController = () => {
       scenarioSetId: scenarioSetId ?? "",
       limit,
       cursor,
+      startDate: props?.startDate,
+      endDate: props?.endDate,
     },
     {
       enabled: !!project?.id && !!scenarioSetId,

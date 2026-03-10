@@ -77,6 +77,8 @@ export class SimulationService {
     scenarioSetId: string;
     limit?: number;
     cursor?: string;
+    startDate?: number;
+    endDate?: number;
   }): Promise<BatchHistoryResult> {
     if (await this.isClickHouseEnabled(params.projectId)) {
       return this.chService!.getBatchHistoryForScenarioSet(params);

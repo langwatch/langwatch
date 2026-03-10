@@ -222,11 +222,15 @@ export class ClickHouseSimulationService {
     scenarioSetId,
     limit = 8,
     cursor,
+    startDate,
+    endDate,
   }: {
     projectId: string;
     scenarioSetId: string;
     limit?: number;
     cursor?: string;
+    startDate?: number;
+    endDate?: number;
   }): Promise<{
     batches: BatchHistoryItem[];
     nextCursor?: string;
@@ -236,6 +240,11 @@ export class ClickHouseSimulationService {
   }> {
     const validatedLimit = Math.min(Math.max(1, limit), 100);
     const decoded = cursor ? this.decodeCursor(cursor) : null;
+
+    const startedAtFilter = buildStartedAtWhereFilter({ startDate, endDate });
+    const startedAtClause = startedAtFilter.clause
+      ? `AND ${startedAtFilter.clause}`
+      : "";
 
     const cursorClause = decoded
       ? `HAVING (toString(toUnixTimestamp64Milli(max(CreatedAt))) < {cursorTs:String})
@@ -250,11 +259,12 @@ export class ClickHouseSimulationService {
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND ScenarioSetId = {scenarioSetId:String}
+           ${startedAtClause}
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE ArchivedAt IS NULL`,
-      { tenantId: projectId, scenarioSetId },
+      { tenantId: projectId, scenarioSetId, ...startedAtFilter.params },
     );
 
     // Step 1: fetch batch-level aggregates
@@ -288,6 +298,7 @@ export class ClickHouseSimulationService {
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND ScenarioSetId = {scenarioSetId:String}
+           ${startedAtClause}
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
@@ -299,6 +310,7 @@ export class ClickHouseSimulationService {
       {
         tenantId: projectId,
         scenarioSetId,
+        ...startedAtFilter.params,
         ...(decoded ? { cursorTs: decoded.ts, cursorBatchRunId: decoded.batchRunId } : {}),
         fetchLimit: String(validatedLimit + 1),
       },
@@ -341,12 +353,13 @@ export class ClickHouseSimulationService {
          WHERE TenantId = {tenantId:String}
            AND ScenarioSetId = {scenarioSetId:String}
            AND BatchRunId IN ({batchRunIds:Array(String)})
+           ${startedAtClause}
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE ArchivedAt IS NULL
        ORDER BY CreatedAt ASC`,
-      { tenantId: projectId, scenarioSetId, batchRunIds },
+      { tenantId: projectId, scenarioSetId, batchRunIds, ...startedAtFilter.params },
     );
 
     // Group items by batchRunId
