@@ -110,7 +110,7 @@ export class RecordSpanCommand implements CommandHandler<
           commandData.span,
         );
 
-        this.logger.info(
+        this.logger.debug(
           {
             tenantId,
             traceId,

@@ -83,7 +83,7 @@ export class RecordMetricCommand
         const { tenantId: tenantIdStr, data: commandData } = command;
         const tenantId = createTenantId(tenantIdStr);
 
-        this.logger.info(
+        this.logger.debug(
           {
             tenantId,
             traceId: commandData.traceId,

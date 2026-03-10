@@ -243,8 +243,6 @@ export class ExperimentRunStateRepositoryClickHouse<
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
 
-      logger.debug({ tenantId: context.tenantId, runId, projectionId: projection.id },
-        "Stored experiment run state projection to ClickHouse");
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);

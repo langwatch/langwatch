@@ -31,7 +31,7 @@ export function WorkflowCardBase(props: React.ComponentProps<typeof VStack>) {
       padding={4}
       gap={2}
       borderRadius="xl"
-      background="white"
+      background="bg.panel"
       boxShadow="md"
       height="142px"
       cursor="pointer"
@@ -74,7 +74,7 @@ export function WorkflowCardDisplay({
         {action}
       </HStack>
       <Spacer />
-      <Text paddingX={4} color="fg.muted" fontSize="sm" fontWeight={500}>
+      <Text paddingX={4} color="fg" fontSize="sm" fontWeight={500}>
         {name}
       </Text>
       {updatedAt && (
@@ -263,7 +263,7 @@ export function WorkflowCard({
         <HStack gap={4} paddingX={4} paddingBottom={2} width="full">
           <WorkflowIcon icon={icon} size={"lg"} />
           {description && (
-            <Text color="fg.muted" fontSize="sm" fontWeight={500}>
+            <Text color="fg" fontSize="sm" fontWeight={500}>
               {name}
             </Text>
           )}
@@ -379,7 +379,7 @@ export function WorkflowCard({
         {!description && <Spacer />}
         <Text
           paddingX={4}
-          color="fg.muted"
+          color="fg"
           fontSize="sm"
           fontWeight={!description ? 500 : undefined}
         >

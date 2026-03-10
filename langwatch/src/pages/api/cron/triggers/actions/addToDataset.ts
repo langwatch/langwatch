@@ -1,5 +1,5 @@
 import { TriggerAction } from "@prisma/client";
-import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord";
+import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
 import type { DatasetRecordEntry } from "~/server/datasets/types";
 import {
   mapTraceToDatasetEntry,
