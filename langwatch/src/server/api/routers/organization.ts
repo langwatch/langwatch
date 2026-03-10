@@ -30,6 +30,7 @@ import { decrypt, encrypt } from "~/utils/encryption";
 import { isTeamRoleAllowedForOrganizationRole, type TeamRoleValue } from "~/utils/memberRoleConstraints";
 import { slugify } from "~/utils/slugify";
 import { getApp } from "~/server/app-layer/app";
+import { trackServerEvent } from "~/server/posthog";
 import { elasticsearchMigrate } from "../../../tasks/elasticMigrate";
 import {
   INVITE_EXPIRATION_MS,
@@ -963,6 +964,15 @@ export const organizationRouter = createTRPCRouter({
       const createdRecords = inviteRecords.filter(
         (r): r is NonNullable<typeof r> => r !== null,
       );
+
+      if (createdRecords.length > 0) {
+        trackServerEvent({
+          userId: ctx.session.user.id,
+          event: "team_member_invited",
+          properties: { inviteCount: createdRecords.length },
+        });
+      }
+
       const invites = await Promise.all(
         createdRecords.map(async (record) => {
           const { emailNotSent } = await inviteService.trySendInviteEmail({

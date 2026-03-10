@@ -35,6 +35,10 @@ vi.mock("micro", () => ({
   buffer: vi.fn().mockResolvedValue(Buffer.from("raw-body")),
 }));
 
+vi.mock("../../../src/server/posthog", () => ({
+  getPostHogInstance: vi.fn().mockReturnValue(null),
+}));
+
 import { handleLicensePurchase } from "../services/licensePurchaseHandler";
 import { createStripeWebhookHandlerFactory } from "../stripeWebhook";
 import { prisma } from "../../../src/server/db";

@@ -7,6 +7,7 @@ import { prisma } from "../../src/server/db";
 import { createLogger } from "../../src/utils/logger";
 import type { WebhookService } from "./services/webhookService";
 import { handleLicensePurchase } from "./services/licensePurchaseHandler";
+import { getPostHogInstance } from "../../src/server/posthog";
 
 const VALID_CURRENCIES = new Set<string>(Object.values(Currency));
 
@@ -151,6 +152,18 @@ export const createStripeWebhookHandlerFactory = ({
                 "[stripeWebhook] No client_reference_id in checkout session",
               );
               return res.json({ received: true });
+            }
+
+            const posthogServer = getPostHogInstance();
+            if (posthogServer) {
+              posthogServer.groupIdentify({
+                groupType: "organization",
+                groupKey: organization.id,
+                properties: {
+                  subscriptionCreatedAt: new Date().toISOString(),
+                  hasActiveSubscription: true,
+                },
+              });
             }
             break;
           }
