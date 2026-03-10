@@ -198,6 +198,67 @@ describe("workflowStoreCore", () => {
         expect(state.edges[0]!.target).toBe("new_target");
       });
 
+      it("preserves edges when renamed node is both source and target", () => {
+        const nodes: Node[] = [
+          makeNode({
+            id: "middle",
+            inputs: [{ identifier: "input", type: "str" }],
+            outputs: [{ identifier: "output", type: "str" }],
+          }),
+          makeNode({
+            id: "upstream",
+            outputs: [{ identifier: "output", type: "str" }],
+          }),
+          makeNode({
+            id: "downstream",
+            inputs: [{ identifier: "input", type: "str" }],
+          }),
+        ];
+        const edges: Edge[] = [
+          makeEdge({
+            source: "upstream",
+            target: "middle",
+            sourceHandle: "outputs.output",
+            targetHandle: "inputs.input",
+          }),
+          makeEdge({
+            source: "middle",
+            target: "downstream",
+            sourceHandle: "outputs.output",
+            targetHandle: "inputs.input",
+          }),
+        ];
+
+        testStore.setState({ nodes, edges });
+
+        testStore.getState().setNode(
+          {
+            id: "middle",
+            data: {
+              inputs: [{ identifier: "input", type: "str" }],
+              outputs: [{ identifier: "output", type: "str" }],
+            },
+          } as Partial<Node> & { id: string },
+          "renamed_middle",
+        );
+
+        const state = testStore.getState();
+        expect(state.nodes.find((n) => n.id === "renamed_middle")).toBeTruthy();
+        expect(state.nodes.find((n) => n.id === "middle")).toBeFalsy();
+
+        expect(state.edges).toHaveLength(2);
+
+        const incomingEdge = state.edges.find(
+          (e) => e.source === "upstream",
+        );
+        expect(incomingEdge?.target).toBe("renamed_middle");
+
+        const outgoingEdge = state.edges.find(
+          (e) => e.target === "downstream",
+        );
+        expect(outgoingEdge?.source).toBe("renamed_middle");
+      });
+
       it("updates parameter refs in other nodes", () => {
         const nodes: Node[] = [
           makeNode({
