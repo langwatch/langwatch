@@ -118,7 +118,7 @@ local activeTtlSec = tonumber(ARGV[3])
 local hasPauses = redis.call("SCARD", pausedJobKey) > 0
 local scanStart = 0
 local scanEnd = 99
-local maxPasses = hasPauses and 5 or 1
+local maxPasses = hasPauses and 5 or 3
 
 for pass = 1, maxPasses do
   local groups = redis.call("ZREVRANGE", readyKey, scanStart, scanEnd)
@@ -195,17 +195,19 @@ local readyKey     = KEYS[1]
 local blockedKey   = KEYS[2]
 local pausedJobKey = KEYS[3]
 
-local keyPrefix    = ARGV[1]
-local nowMs        = tonumber(ARGV[2])
-local activeTtlSec = tonumber(ARGV[3])
-local maxJobs      = tonumber(ARGV[4])
+local keyPrefix      = ARGV[1]
+local nowMs          = tonumber(ARGV[2])
+local activeTtlSec   = tonumber(ARGV[3])
+local maxJobs        = tonumber(ARGV[4])
+local randomOffset   = tonumber(ARGV[5]) or 0
 
 local hasPauses = redis.call("SCARD", pausedJobKey) > 0
 local scanWindow = maxJobs * 3
-local maxPasses = hasPauses and 5 or 1
+local maxPasses = hasPauses and 5 or 3
 local results = {}
 local dispatched = 0
-local scanStart = 0
+local readySize = redis.call("ZCARD", readyKey)
+local scanStart = (readySize > 0) and (randomOffset % readySize) or 0
 
 for pass = 1, maxPasses do
   if dispatched >= maxJobs then break end
@@ -565,10 +567,12 @@ export class GroupStagingScripts {
     nowMs,
     activeTtlSec,
     maxJobs,
+    randomOffset,
   }: {
     nowMs: number;
     activeTtlSec: number;
     maxJobs: number;
+    randomOffset?: number;
   }): Promise<DispatchResult[]> {
     const readyKey = `${this.keyPrefix}ready`;
     const blockedKey = `${this.keyPrefix}blocked`;
@@ -584,6 +588,7 @@ export class GroupStagingScripts {
       String(nowMs),
       String(activeTtlSec),
       String(maxJobs),
+      String(randomOffset ?? 0),
     );
 
     if (!result || !Array.isArray(result) || result.length < 4) {
