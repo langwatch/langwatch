@@ -3,7 +3,6 @@ import { definePipeline } from "../../";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { AppendStore } from "../../projections/mapProjection.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
-import { AssignSatisfactionScoreCommand } from "./commands/assignSatisfactionScoreCommand";
 import { AssignTopicCommand } from "./commands/assignTopicCommand";
 import { RecordLogCommand } from "./commands/recordLogCommand";
 import { RecordMetricCommand } from "./commands/recordMetricCommand";
@@ -57,7 +56,6 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
     .withReactor("spanStorage", "spanStorageBroadcast", deps.spanStorageBroadcastReactor)
     .withCommand("recordSpan", RecordSpanCommand)
     .withCommand("assignTopic", AssignTopicCommand)
-    .withCommand("assignSatisfactionScore", AssignSatisfactionScoreCommand)
     .withCommand("recordLog", RecordLogCommand)
     .withCommand("recordMetric", RecordMetricCommand)
     .build();

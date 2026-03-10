@@ -3,7 +3,6 @@ import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { analyticsMetrics } from "../../server/analytics/registry";
 import { TopicsSelector } from "../filters/TopicsSelector";
 import { CustomGraph, type CustomGraphInput } from "./CustomGraph";
-import { SatisfactionGraphs } from "./SatisfactionGraph";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
@@ -197,7 +196,6 @@ export function UserMetrics() {
               <TopicsSelector showTitle={false} />
             </Card.Body>
           </Card.Root>
-          {isNotQuickwit && <SatisfactionGraphs />}
         </VStack>
       </GridItem>
       {isNotQuickwit && (

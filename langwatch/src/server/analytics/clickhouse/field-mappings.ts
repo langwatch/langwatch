@@ -308,14 +308,6 @@ export const fieldMappings: Record<string, FieldMapping> = {
     isArray: true,
   },
 
-  // ===== Input/Output Sentiment =====
-  "input.satisfaction_score": {
-    table: "trace_summaries",
-    column: "Attributes['langwatch.input.satisfaction_score']",
-    description: "Input sentiment satisfaction score",
-    mapValueType: "number",
-  },
-
   // ===== Annotation Fields =====
   annotations: {
     table: "trace_summaries",

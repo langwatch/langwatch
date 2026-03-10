@@ -145,14 +145,6 @@ export const analyticsMetrics = {
     },
   },
   sentiment: {
-    input_sentiment: {
-      ...numericFieldAnalyticsWithPercentiles("input.satisfaction_score"),
-      label: "Input Sentiment Score",
-      colorSet: "yellowTones",
-      format: "0.00%",
-      increaseIs: "good",
-      quickwitSupport: false,
-    },
     thumbs_up_down: {
       label: "Thumbs Up/Down Score",
       colorSet: "purpleTones",
@@ -917,47 +909,6 @@ export const analyticsGroups = {
     },
   },
   sentiment: {
-    input_sentiment: {
-      label: "Input Sentiment",
-      aggregation: (aggToGroup) => ({
-        input_sentiment_group: {
-          filters: {
-            filters: {
-              positive: {
-                script: {
-                  script: {
-                    source:
-                      "doc['input.satisfaction_score'].size() == 0 ? false : doc['input.satisfaction_score'].value >= 0.1",
-                    lang: "painless",
-                  },
-                },
-              },
-              negative: {
-                script: {
-                  script: {
-                    source:
-                      "doc['input.satisfaction_score'].size() == 0 ? false : doc['input.satisfaction_score'].value <= -0.1",
-                    lang: "painless",
-                  },
-                },
-              },
-              neutral: {
-                script: {
-                  script: {
-                    source:
-                      "doc['input.satisfaction_score'].size() == 0 ? false : (doc['input.satisfaction_score'].value < 0.1 && doc['input.satisfaction_score'].value > -0.1)",
-                    lang: "painless",
-                  },
-                },
-              },
-            },
-          },
-          aggs: aggToGroup,
-        },
-      }),
-      extractionPath: () => "input_sentiment_group>buckets",
-      quickwitSupport: false,
-    },
     thumbs_up_down: {
       label: "Thumbs Up/Down",
       aggregation: (aggToGroup) => {

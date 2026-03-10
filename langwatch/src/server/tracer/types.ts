@@ -264,7 +264,6 @@ export type ElasticSearchSpan = Omit<
 
 export type TraceInput = {
   value: string;
-  satisfaction_score?: number;
 };
 
 export type TraceOutput = {
