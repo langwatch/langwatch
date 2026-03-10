@@ -97,6 +97,12 @@ export type StudioServerEvent =
       };
     }
   | {
+      type: "evaluation_state_change";
+      payload: {
+        evaluation_state: Workflow["state"]["evaluation"];
+      };
+    }
+  | {
       type: "optimization_state_change";
       payload: {
         optimization_state: Workflow["state"]["optimization"];

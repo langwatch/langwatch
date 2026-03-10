@@ -3,6 +3,7 @@ import type { OrganizationFeatureName } from "../organization.service";
 import type {
   OrganizationFeatureRow,
   OrganizationRepository,
+  OrganizationWithAdmins,
 } from "./organization.repository";
 
 export class PrismaOrganizationRepository implements OrganizationRepository {
@@ -32,6 +33,42 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       where: {
         feature_organizationId: { feature, organizationId },
       },
+    });
+  }
+
+  async findWithAdmins(
+    organizationId: string,
+  ): Promise<OrganizationWithAdmins | null> {
+    return this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      include: {
+        members: {
+          where: { role: "ADMIN" },
+          include: {
+            user: true,
+          },
+        },
+      },
+    }) as Promise<OrganizationWithAdmins | null>;
+  }
+
+  async updateSentPlanLimitAlert(
+    organizationId: string,
+    timestamp: Date,
+  ): Promise<void> {
+    await this.prisma.organization.update({
+      where: { id: organizationId },
+      data: { sentPlanLimitAlert: timestamp },
+    });
+  }
+
+  async findProjectsWithName(
+    organizationId: string,
+  ): Promise<Array<{ id: string; name: string }>> {
+    return this.prisma.project.findMany({
+      where: { team: { organizationId } },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
     });
   }
 }

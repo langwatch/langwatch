@@ -3,7 +3,7 @@ import type Stripe from "stripe";
 import type { DisplayInvoice, SubscriptionService } from "../../../src/server/app-layer/subscription/subscription.service";
 import type { SubscriptionRepository } from "../../../src/server/app-layer/subscription/subscription.repository";
 import { OrganizationRepository } from "../../../src/server/repositories/organization.repository";
-import { notifySubscriptionEvent } from "../notifications/notificationHandlers";
+import { getApp } from "../../../src/server/app-layer/app";
 import {
   type PlanTypes as PlanType,
   PlanTypes,
@@ -358,7 +358,7 @@ export class EESubscriptionService implements SubscriptionService {
       throw new OrganizationNotFoundError();
     }
 
-    await notifySubscriptionEvent({
+    await getApp().notifications.sendSlackSubscriptionEvent({
       type: "prospective",
       organizationId: organization.id,
       organizationName: organization.name,

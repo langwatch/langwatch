@@ -1,21 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../notifications/notificationHandlers", () => ({
-  notifySubscriptionEvent: vi.fn().mockResolvedValue(undefined),
+const mockSendSlackSubscriptionEvent = vi.fn().mockResolvedValue(undefined);
+
+vi.mock("../../../src/server/app-layer/app", () => ({
+  getApp: () => ({
+    notifications: {
+      sendSlackSubscriptionEvent: mockSendSlackSubscriptionEvent,
+    },
+  }),
 }));
 
 import type { PrismaClient } from "@prisma/client";
 import type Stripe from "stripe";
-import { notifySubscriptionEvent } from "../notifications/notificationHandlers";
 import { PlanTypes, SubscriptionStatus } from "../planTypes";
 import { EESubscriptionService } from "../services/subscription.service";
 import { InvalidPlanError, OrganizationNotFoundError } from "../errors";
 import type { SubscriptionRepository } from "../../../src/server/app-layer/subscription/subscription.repository";
 import type { OrganizationRepository } from "../../../src/server/repositories/organization.repository";
-
-const mockNotifySubscriptionEvent = notifySubscriptionEvent as ReturnType<
-  typeof vi.fn
->;
 
 const createMockStripe = () => ({
   subscriptions: {
@@ -386,7 +387,7 @@ describe("EESubscriptionService", () => {
         });
 
         expect(result).toEqual({ success: true });
-        expect(mockNotifySubscriptionEvent).toHaveBeenCalledWith({
+        expect(mockSendSlackSubscriptionEvent).toHaveBeenCalledWith({
           type: "prospective",
           organizationId: "org_123",
           organizationName: "Acme",

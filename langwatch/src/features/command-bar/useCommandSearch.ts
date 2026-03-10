@@ -2,7 +2,6 @@ import { useMemo } from "react";
 import { useDebounceValue } from "usehooks-ts";
 import { Bot, BookText, Percent, Table, Workflow } from "lucide-react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useAllPromptsForProject } from "~/prompts/hooks/useAllPromptsForProject";
 import { api } from "~/utils/api";
 import type { SearchResult } from "./types";
 import { SEARCH_DEBOUNCE_MS, MIN_SEARCH_QUERY_LENGTH } from "./constants";
@@ -72,7 +71,7 @@ export function detectEntityId(
  * Hook for searching entities (prompts, agents, datasets, workflows, evaluators).
  * Uses debounced query to prevent excessive API calls.
  */
-export function useCommandSearch(query: string) {
+export function useCommandSearch(query: string, isOpen: boolean) {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
   const projectSlug = project?.slug ?? "";
@@ -81,23 +80,28 @@ export function useCommandSearch(query: string) {
   const [debouncedQuery] = useDebounceValue(query, SEARCH_DEBOUNCE_MS);
   const shouldSearch = debouncedQuery.length >= MIN_SEARCH_QUERY_LENGTH;
 
-  // Fetch all entities - queries only run when project is available
+  // Only fetch entities when the command bar is open
+  const canFetch = isOpen && !!projectId;
+
   const { data: prompts, isLoading: promptsLoading } =
-    useAllPromptsForProject();
+    api.prompts.getAllPromptsForProject.useQuery(
+      { projectId },
+      { enabled: canFetch }
+    );
 
   const { data: agents, isLoading: agentsLoading } = api.agents.getAll.useQuery(
     { projectId },
-    { enabled: !!projectId }
+    { enabled: canFetch }
   );
 
   const { data: datasets, isLoading: datasetsLoading } =
-    api.dataset.getAll.useQuery({ projectId }, { enabled: !!projectId });
+    api.dataset.getAll.useQuery({ projectId }, { enabled: canFetch });
 
   const { data: workflows, isLoading: workflowsLoading } =
-    api.workflow.getAll.useQuery({ projectId }, { enabled: !!projectId });
+    api.workflow.getAll.useQuery({ projectId }, { enabled: canFetch });
 
   const { data: evaluators, isLoading: evaluatorsLoading } =
-    api.evaluators.getAll.useQuery({ projectId }, { enabled: !!projectId });
+    api.evaluators.getAll.useQuery({ projectId }, { enabled: canFetch });
 
   const isLoading =
     promptsLoading ||

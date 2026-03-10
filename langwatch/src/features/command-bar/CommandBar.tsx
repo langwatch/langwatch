@@ -145,7 +145,7 @@ export function CommandBar() {
     idResult,
     searchResults,
     isLoading: searchLoading,
-  } = useCommandSearch(query);
+  } = useCommandSearch(query, isOpen);
   const { groupedItems, addRecentItem } = useRecentItems();
 
   const inputRef = useRef<HTMLInputElement>(null);

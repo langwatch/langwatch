@@ -5,6 +5,8 @@ import { createLicenseEnforcementService } from "./index";
 import { LimitExceededError, ProjectNotFoundError } from "./errors";
 import type { LimitType } from "./types";
 import { getOrganizationIdForProject } from "./utils";
+import { getApp } from "~/server/app-layer/app";
+import { captureException } from "~/utils/posthogErrorCapture";
 
 /**
  * Context type expected by the license enforcement middleware.
@@ -58,13 +60,23 @@ export async function enforceLicenseLimit(
   const enforcement = createLicenseEnforcementService(ctx.prisma);
 
   try {
-    await enforcement.enforceLimit(
+    await enforcement.enforceLimitByOrganization({
       organizationId,
       limitType,
-      ctx.session.user,
-    );
+      user: ctx.session.user,
+    });
   } catch (error) {
     if (error instanceof LimitExceededError) {
+      // Fire-and-forget: notify ops, never block user
+      void getApp()
+        .usageLimits.notifyResourceLimitReached({
+          organizationId,
+          limitType: error.limitType,
+          current: error.current,
+          max: error.max,
+        })
+        .catch(captureException);
+
       throw new TRPCError({
         code: "FORBIDDEN",
         message: error.message,

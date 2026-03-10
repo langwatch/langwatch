@@ -4,6 +4,7 @@ import { PrismaOrganizationRepository } from "./repositories/organization.prisma
 import {
   NullOrganizationRepository,
   type OrganizationRepository,
+  type OrganizationWithAdmins,
 } from "./repositories/organization.repository";
 
 export type OrganizationFeatureName = "billable_events_usage";
@@ -39,5 +40,24 @@ export class OrganizationService {
       return false;
     }
     return true;
+  }
+
+  async findWithAdmins(
+    organizationId: string,
+  ): Promise<OrganizationWithAdmins | null> {
+    return this.repo.findWithAdmins(organizationId);
+  }
+
+  async updateSentPlanLimitAlert(
+    organizationId: string,
+    timestamp: Date,
+  ): Promise<void> {
+    return this.repo.updateSentPlanLimitAlert(organizationId, timestamp);
+  }
+
+  async findProjectsWithName(
+    organizationId: string,
+  ): Promise<Array<{ id: string; name: string }>> {
+    return this.repo.findProjectsWithName(organizationId);
   }
 }
