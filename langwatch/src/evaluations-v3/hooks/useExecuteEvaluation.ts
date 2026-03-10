@@ -48,6 +48,11 @@ export type UseExecuteEvaluationReturn = {
     targetId: string,
     evaluatorId: string,
   ) => Promise<void>;
+  /** Run an evaluator on all rows that have existing target outputs */
+  runEvaluatorOnAllRows: (
+    targetId: string,
+    evaluatorId: string,
+  ) => Promise<void>;
   /** Request abort of current execution */
   abort: () => Promise<void>;
   /** Reset state to idle */
@@ -719,6 +724,52 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
     [execute, updateEvaluatorResult],
   );
 
+  /**
+   * Run an evaluator on all rows that have existing target outputs.
+   * Builds a map of pre-computed outputs and trace IDs, then executes via
+   * the evaluator-all-rows scope.
+   */
+  const runEvaluatorOnAllRows = useCallback(
+    async (targetId: string, evaluatorId: string) => {
+      const state = useEvaluationsV3Store.getState();
+      const targetOutputs = state.results.targetOutputs[targetId] ?? [];
+      const targetMetadata = state.results.targetMetadata[targetId] ?? [];
+
+      // Build maps of only rows that have target outputs
+      const precomputedTargetOutputs: Record<number, unknown> = {};
+      const traceIds: Record<number, string | undefined> = {};
+
+      for (let i = 0; i < targetOutputs.length; i++) {
+        if (targetOutputs[i] !== undefined && targetOutputs[i] !== null) {
+          precomputedTargetOutputs[i] = targetOutputs[i];
+          traceIds[i] = targetMetadata[i]?.traceId;
+        }
+      }
+
+      // Nothing to run if no rows have outputs
+      if (Object.keys(precomputedTargetOutputs).length === 0) return;
+
+      // Mark all matching evaluator results as "running" for UI feedback
+      for (const rowIndexStr of Object.keys(precomputedTargetOutputs)) {
+        const rowIndex = Number(rowIndexStr);
+        updateEvaluatorResult(rowIndex, targetId, evaluatorId, {
+          status: "running",
+        });
+      }
+
+      const scope: ExecutionScope = {
+        type: "evaluator-all-rows",
+        targetId,
+        evaluatorId,
+        precomputedTargetOutputs,
+        traceIds,
+      };
+
+      await execute(scope);
+    },
+    [execute, updateEvaluatorResult],
+  );
+
   return {
     status,
     runId,
@@ -728,6 +779,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
     isAborting,
     execute,
     rerunEvaluator,
+    runEvaluatorOnAllRows,
     abort,
     reset,
   };

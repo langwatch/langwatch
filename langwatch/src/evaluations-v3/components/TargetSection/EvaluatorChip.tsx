@@ -14,7 +14,9 @@ import {
   LuCircleAlert,
   LuCircleX,
   LuPencil,
+  LuPlay,
   LuRefreshCw,
+  LuRows3,
   LuTrash2,
 } from "react-icons/lu";
 
@@ -42,10 +44,16 @@ type EvaluatorChipProps = {
   hasMissingMappings?: boolean;
   /** Whether this specific evaluator is currently running (from runningEvaluators state) */
   isRunning?: boolean;
+  /** Whether the current row has a target output (enables "Run" for pending evaluators) */
+  hasTargetOutput?: boolean;
+  /** Whether any row has a target output for this target (enables "Run on all rows") */
+  hasAnyTargetOutputs?: boolean;
   onEdit: () => void;
   onRemove: () => void;
-  /** Called when user wants to re-run this evaluator */
+  /** Called when user wants to run or re-run this evaluator on the current row */
   onRerun?: () => void;
+  /** Called when user wants to run this evaluator on all rows with target outputs */
+  onRunOnAllRows?: () => void;
 };
 
 export function EvaluatorChip({
@@ -53,9 +61,12 @@ export function EvaluatorChip({
   result,
   hasMissingMappings = false,
   isRunning = false,
+  hasTargetOutput = false,
+  hasAnyTargetOutputs = false,
   onEdit,
   onRemove,
   onRerun,
+  onRunOnAllRows,
 }: EvaluatorChipProps) {
   const evaluatorName = useEvaluatorName(evaluator);
   const parsed = parseEvaluationResult(result);
@@ -237,12 +248,30 @@ export function EvaluatorChip({
             <Box borderTopWidth="1px" borderColor="border" />
           </>
         )}
-        {/* Show Rerun option only if evaluator has been run (not pending) and not currently running */}
+        {/* "Run" for pending evaluators with existing target output */}
+        {status === "pending" && hasTargetOutput && onRerun && (
+          <Menu.Item value="run" onClick={onRerun}>
+            <HStack gap={2}>
+              <LuPlay size={14} />
+              <Text>Run</Text>
+            </HStack>
+          </Menu.Item>
+        )}
+        {/* "Rerun" for completed/error evaluators (not pending, not running) */}
         {status !== "pending" && status !== "running" && onRerun && (
           <Menu.Item value="rerun" onClick={onRerun}>
             <HStack gap={2}>
               <LuRefreshCw size={14} />
               <Text>Rerun</Text>
+            </HStack>
+          </Menu.Item>
+        )}
+        {/* "Run on all rows" - available when not running and target outputs exist */}
+        {status !== "running" && hasAnyTargetOutputs && onRunOnAllRows && (
+          <Menu.Item value="run-all-rows" onClick={onRunOnAllRows}>
+            <HStack gap={2}>
+              <LuRows3 size={14} />
+              <Text>Run on all rows</Text>
             </HStack>
           </Menu.Item>
         )}
