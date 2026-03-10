@@ -26,6 +26,16 @@ export interface QueueInfo {
   groups: GroupInfo[];
 }
 
+/** Queue info without the groups array — used in SSE broadcasts to avoid serializing all groups every 2s */
+export interface QueueSummaryInfo {
+  name: string;
+  displayName: string;
+  pendingGroupCount: number;
+  blockedGroupCount: number;
+  activeGroupCount: number;
+  totalPendingJobs: number;
+}
+
 export interface ThroughputPoint {
   timestamp: number;
   stagedPerSec: number;
@@ -93,7 +103,7 @@ export interface DashboardData {
   processMemoryTotalMb: number;
   throughputHistory: ThroughputPoint[];
   pipelineTree: PipelineNode[];
-  queues: QueueInfo[];
+  queues: QueueSummaryInfo[];
   latencyP50Ms: number;
   latencyP99Ms: number;
   peakLatencyP50Ms: number;

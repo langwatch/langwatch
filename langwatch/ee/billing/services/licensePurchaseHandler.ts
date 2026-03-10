@@ -1,7 +1,7 @@
 import type Stripe from "stripe";
 import { generateLicenseKey } from "../../licensing/licenseGenerationService";
 import { sendLicenseEmail } from "../../../src/server/mailer/licenseEmail";
-import { notifyLicensePurchase } from "../notifications/notificationHandlers";
+import { getApp } from "../../../src/server/app-layer/app";
 import { createLogger } from "../../../src/utils/logger";
 
 const logger = createLogger("langwatch:billing:licensePurchaseHandler");
@@ -62,8 +62,8 @@ export async function handleLicensePurchase({
     "[licensePurchaseHandler] License email sent",
   );
 
-  // Slack notification — fire and forget, errors swallowed by notifyLicensePurchase
-  await notifyLicensePurchase({
+  // Slack notification -- fire and forget, errors swallowed by NotificationService
+  await getApp().notifications.sendSlackLicensePurchase({
     buyerEmail: email,
     planType: licenseData.plan.type,
     seats: quantity,

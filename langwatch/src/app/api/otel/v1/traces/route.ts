@@ -4,7 +4,6 @@ import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
 import { getLangWatchTracer } from "langwatch";
 import { type NextRequest, NextResponse } from "next/server";
-import { notifyPlanLimitReached } from "../../../../../../ee/billing";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
 import { withAppRouterTracer } from "../../../../../middleware/app-router-tracer";
@@ -90,7 +89,7 @@ async function handleTracesRequest(req: NextRequest) {
             const activePlan = await getApp().planProvider.getActivePlan({
               organizationId: project.team.organizationId,
             });
-            await notifyPlanLimitReached({
+            await getApp().usageLimits.notifyPlanLimitReached({
               organizationId: project.team.organizationId,
               planName: activePlan.name ?? "free",
             });

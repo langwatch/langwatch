@@ -41,6 +41,7 @@ describe.skipIf(isTestcontainersOnly)(
     let organizationId: string;
     let userId: string;
     let mockGetActivePlan: ReturnType<typeof vi.fn>;
+    let mockNotifyResourceLimitReached: ReturnType<typeof vi.fn>;
 
     beforeAll(async () => {
       const organization = await prisma.organization.create({
@@ -88,10 +89,15 @@ describe.skipIf(isTestcontainersOnly)(
     beforeEach(() => {
       resetApp();
       mockGetActivePlan = vi.fn();
+      mockNotifyResourceLimitReached = vi.fn().mockResolvedValue(undefined);
       globalForApp.__langwatch_app = createTestApp({
         planProvider: PlanProviderService.create({
           getActivePlan: mockGetActivePlan as PlanProvider["getActivePlan"],
         }),
+        usageLimits: {
+          notifyResourceLimitReached: mockNotifyResourceLimitReached,
+          checkAndSendWarning: vi.fn().mockResolvedValue(undefined),
+        } as any,
       });
     });
 
@@ -172,7 +178,36 @@ describe.skipIf(isTestcontainersOnly)(
           }),
         ).rejects.toMatchObject({
           code: "FORBIDDEN",
-          message: "Over the limit of teams allowed",
+          message: "You have reached the maximum number of teams",
+        });
+      });
+
+      it("sends a Slack notification to the ops team", async () => {
+        const plan: PlanInfo = {
+          ...FREE_PLAN,
+          maxTeams: 0,
+          overrideAddingLimitations: false,
+        };
+        mockGetActivePlan.mockResolvedValue(plan);
+
+        const caller = createCaller();
+
+        await expect(
+          caller.team.createTeamWithMembers({
+            organizationId,
+            name: "Triggers Notification",
+            members: [{ userId, role: "ADMIN" }],
+          }),
+        ).rejects.toMatchObject({ code: "FORBIDDEN" });
+
+        // Wait for fire-and-forget notification promise to settle
+        await vi.waitFor(() => {
+          expect(mockNotifyResourceLimitReached).toHaveBeenCalledWith(
+            expect.objectContaining({
+              organizationId,
+              limitType: "teams",
+            }),
+          );
         });
       });
     });
