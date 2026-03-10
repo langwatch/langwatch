@@ -65,11 +65,11 @@ Feature: Complete notification coverage for all limit enforcement paths
     And the backend re-verifies the limit server-side before notifying
     And a Slack notification is sent to the ops team
 
-  Scenario: UI notification respects 24-hour cooldown
-    Given a resource limit notification was already sent within the last 24 hours
+  Scenario: UI notification respects 24-hour cooldown per limit type
+    Given a resource limit notification for "workflows" was already sent within the last 24 hours
     When the UI pre-check blocks a workflow creation
     And a notification request is sent to the backend
-    Then no duplicate Slack notification is sent
+    Then no duplicate Slack notification is sent for "workflows"
 
   Scenario: UI notification does not trust client-provided values
     Given the organization has NOT reached any limits

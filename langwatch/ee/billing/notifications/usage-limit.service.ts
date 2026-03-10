@@ -167,8 +167,8 @@ export class UsageLimitService {
   /**
    * Notifies internal channels that an organization has reached a resource limit.
    *
-   * Uses an in-memory 24-hour cooldown keyed by organizationId to avoid
-   * duplicate Slack alerts. The cooldown applies across all limit types.
+   * Uses an in-memory 24-hour cooldown keyed by organizationId:limitType to avoid
+   * duplicate Slack alerts. Each limit type has its own cooldown window.
    */
   async notifyResourceLimitReached({
     organizationId,
@@ -180,17 +180,19 @@ export class UsageLimitService {
       return;
     }
 
-    if (resourceLimitCooldown.get(organizationId)) {
+    const cooldownKey = `${organizationId}:${limitType}`;
+
+    if (resourceLimitCooldown.get(cooldownKey)) {
       return;
     }
 
-    resourceLimitCooldown.set(organizationId, true);
+    resourceLimitCooldown.set(cooldownKey, true);
 
     try {
       const org = await this.organizationService.findWithAdmins(organizationId);
 
       if (!org) {
-        resourceLimitCooldown.delete(organizationId);
+        resourceLimitCooldown.delete(cooldownKey);
         return;
       }
 
@@ -218,7 +220,7 @@ export class UsageLimitService {
         max,
       });
     } catch {
-      resourceLimitCooldown.delete(organizationId);
+      resourceLimitCooldown.delete(cooldownKey);
     }
   }
 

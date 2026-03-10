@@ -288,11 +288,11 @@ describe("UsageLimitService", () => {
       });
     });
 
-    describe("when cooldown is active for the organization", () => {
+    describe("when cooldown is active for the organization and limit type", () => {
       it("suppresses the notification", async () => {
         const { service, notificationService } = createService();
 
-        resourceLimitCooldown.set("org_1", true);
+        resourceLimitCooldown.set("org_1:workflows", true);
 
         await service.notifyResourceLimitReached({
           organizationId: "org_1",
@@ -308,11 +308,11 @@ describe("UsageLimitService", () => {
     });
 
     describe("when cooldown is active for a different limit type", () => {
-      it("suppresses the notification (cooldown is per-org, not per-type)", async () => {
+      it("sends the notification (cooldown is per-org+type)", async () => {
         const { service, organizationService, notificationService } = createService();
         (organizationService.findWithAdmins as ReturnType<typeof vi.fn>).mockResolvedValue(ORG_WITH_ADMIN);
 
-        // First call sets the cooldown
+        // First call sets the cooldown for workflows
         await service.notifyResourceLimitReached({
           organizationId: "org_1",
           limitType: "workflows",
@@ -326,7 +326,7 @@ describe("UsageLimitService", () => {
           >,
         ).mockClear();
 
-        // Second call with different type is suppressed
+        // Second call with different type is NOT suppressed
         await service.notifyResourceLimitReached({
           organizationId: "org_1",
           limitType: "agents",
@@ -336,7 +336,7 @@ describe("UsageLimitService", () => {
 
         expect(
           notificationService.sendSlackResourceLimitAlert,
-        ).not.toHaveBeenCalled();
+        ).toHaveBeenCalled();
       });
     });
 
@@ -405,7 +405,7 @@ describe("UsageLimitService", () => {
           max: 5,
         });
 
-        expect(resourceLimitCooldown.get("org_missing")).toBeUndefined();
+        expect(resourceLimitCooldown.get("org_missing:workflows")).toBeUndefined();
       });
     });
 
@@ -426,7 +426,7 @@ describe("UsageLimitService", () => {
           max: 5,
         });
 
-        expect(resourceLimitCooldown.get("org_1")).toBeUndefined();
+        expect(resourceLimitCooldown.get("org_1:workflows")).toBeUndefined();
       });
     });
 
