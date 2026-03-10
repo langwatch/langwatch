@@ -19,12 +19,10 @@ import { ChevronDown, Edit2, HelpCircle } from "react-feather";
 import {
   Controller,
   FormProvider,
-  type Resolver,
-  type ResolverOptions,
   useFieldArray,
   useForm,
 } from "react-hook-form";
-import { z } from "zod";
+import { z, type ZodType } from "zod";
 import { slugify } from "~/utils/slugify";
 import { useAvailableEvaluators } from "../../hooks/useAvailableEvaluators";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -102,32 +100,34 @@ export default function CheckConfigForm({
 
   const form = useForm<CheckConfigFormData>({
     defaultValues,
-    resolver: ((data, context, options) => {
-      return (zodResolver(
-        z.object({
-          name: z.string().min(1).max(255).refine(validateNameUniqueness),
-          checkType: evaluatorTypesSchema,
-          sample: z.number().min(0.01).max(1),
-          preconditions: checkPreconditionsSchema,
-          settings: data.checkType?.startsWith("custom/")
-            ? z.object({}).optional()
-            : evaluatorsSchema.shape[data.checkType ?? "langevals/basic"].shape
-                .settings,
-          executionMode: z
-            .enum([
-              EvaluationExecutionMode.ON_MESSAGE,
-              EvaluationExecutionMode.AS_GUARDRAIL,
-              EvaluationExecutionMode.MANUALLY,
-            ])
-            .optional(),
-          mappings: mappingStateSchema,
-        }),
-      ) as unknown as Resolver<CheckConfigFormData>)(
+    resolver: (data, context, options) => {
+      const schema = z.object({
+        name: z.string().min(1).max(255).refine(validateNameUniqueness),
+        checkType: evaluatorTypesSchema,
+        sample: z.number().min(0.01).max(1),
+        preconditions: checkPreconditionsSchema,
+        settings: data.checkType?.startsWith("custom/")
+          ? z.object({}).optional()
+          : evaluatorsSchema.shape[data.checkType ?? "langevals/basic"].shape
+              .settings,
+        executionMode: z
+          .enum([
+            EvaluationExecutionMode.ON_MESSAGE,
+            EvaluationExecutionMode.AS_GUARDRAIL,
+            EvaluationExecutionMode.MANUALLY,
+          ])
+          .optional(),
+        mappings: mappingStateSchema,
+        // settings schema is chosen dynamically at runtime based on checkType,
+        // so TypeScript can't verify the output type statically
+      }) as unknown as ZodType<CheckConfigFormData>;
+
+      return zodResolver(schema)(
         { ...data, settings: data.settings || {} },
         context,
         options,
       );
-    }) as Resolver<CheckConfigFormData>,
+    },
   });
 
   const {
