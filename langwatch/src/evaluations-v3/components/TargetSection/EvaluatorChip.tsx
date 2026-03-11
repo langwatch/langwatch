@@ -48,6 +48,8 @@ type EvaluatorChipProps = {
   hasTargetOutput?: boolean;
   /** Whether any row has a target output for this target (enables "Run on all rows") */
   hasAnyTargetOutputs?: boolean;
+  /** The type of the target (prompt, agent, evaluator) — used for tooltip copy */
+  targetType?: "prompt" | "agent" | "evaluator";
   onEdit: () => void;
   onRemove: () => void;
   /** Called when user wants to run or re-run this evaluator on the current row */
@@ -63,6 +65,7 @@ export function EvaluatorChip({
   isRunning = false,
   hasTargetOutput = false,
   hasAnyTargetOutputs = false,
+  targetType = "prompt",
   onEdit,
   onRemove,
   onRerun,
@@ -251,7 +254,7 @@ export function EvaluatorChip({
         {/* "Run" for pending evaluators */}
         {status === "pending" && onRerun && (
           <Tooltip
-            content="Run the target first to generate output"
+            content={`Run the ${targetType} first to generate output`}
             disabled={hasTargetOutput}
             positioning={{ placement: "left" }}
             openDelay={0}
@@ -283,7 +286,7 @@ export function EvaluatorChip({
         {/* "Run on all rows" - always shown when not running, disabled when no outputs */}
         {status !== "running" && onRunOnAllRows && (
           <Tooltip
-            content="Run the target first to generate outputs"
+            content={`Run the ${targetType} first to generate outputs`}
             disabled={hasAnyTargetOutputs}
             positioning={{ placement: "left" }}
             openDelay={0}

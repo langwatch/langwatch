@@ -395,6 +395,7 @@ export function TargetCellContent({
           isRunning={isEvaluatorRunning?.(evaluator.id) ?? false}
           hasTargetOutput={output !== undefined && output !== null}
           hasAnyTargetOutputs={hasAnyTargetOutputs}
+          targetType={target.type}
           onEdit={() => {
             const mappingsConfig = createMappingsConfig(evaluator);
 
