@@ -136,7 +136,7 @@ export async function GET(req: NextRequest) {
     let currentResolution = resolution;
     let response: Response | undefined;
 
-    for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    for (let hop = 0; hop < MAX_REDIRECTS; hop++) {
       response = await pinnedFetch(currentUrl, currentResolution);
 
       if (response.status >= 300 && response.status < 400) {
@@ -166,6 +166,13 @@ export async function GET(req: NextRequest) {
     if (!response) {
       return NextResponse.json(
         { error: "Failed to fetch image" },
+        { status: 502 },
+      );
+    }
+
+    if (response.status >= 300 && response.status < 400) {
+      return NextResponse.json(
+        { error: "Too many redirects" },
         { status: 502 },
       );
     }
