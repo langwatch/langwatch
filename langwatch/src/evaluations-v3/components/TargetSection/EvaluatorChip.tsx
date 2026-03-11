@@ -248,17 +248,25 @@ export function EvaluatorChip({
             <Box borderTopWidth="1px" borderColor="border" />
           </>
         )}
-        {/* "Run" for pending evaluators with existing target output */}
-        {status === "pending" && hasTargetOutput && onRerun && (
-          <Menu.Item
-            value="run"
-            onClick={hasMissingMappings ? onEdit : onRerun}
+        {/* "Run" for pending evaluators */}
+        {status === "pending" && onRerun && (
+          <Tooltip
+            content="Run the target first to generate output"
+            disabled={hasTargetOutput}
+            positioning={{ placement: "left" }}
+            openDelay={0}
           >
-            <HStack gap={2}>
-              <LuPlay size={14} />
-              <Text>Run</Text>
-            </HStack>
-          </Menu.Item>
+            <Menu.Item
+              value="run"
+              disabled={!hasTargetOutput}
+              onClick={hasMissingMappings ? onEdit : onRerun}
+            >
+              <HStack gap={2}>
+                <LuPlay size={14} />
+                <Text>Run</Text>
+              </HStack>
+            </Menu.Item>
+          </Tooltip>
         )}
         {/* "Rerun" for completed/error evaluators (not pending, not running) */}
         {status !== "pending" && status !== "running" && onRerun && (
@@ -272,17 +280,25 @@ export function EvaluatorChip({
             </HStack>
           </Menu.Item>
         )}
-        {/* "Run on all rows" - available when not running and target outputs exist */}
-        {status !== "running" && hasAnyTargetOutputs && onRunOnAllRows && (
-          <Menu.Item
-            value="run-all-rows"
-            onClick={hasMissingMappings ? onEdit : onRunOnAllRows}
+        {/* "Run on all rows" - always shown when not running, disabled when no outputs */}
+        {status !== "running" && onRunOnAllRows && (
+          <Tooltip
+            content="Run the target first to generate outputs"
+            disabled={hasAnyTargetOutputs}
+            positioning={{ placement: "left" }}
+            openDelay={0}
           >
-            <HStack gap={2}>
-              <LuListRestart size={14} />
-              <Text>Run on all rows</Text>
-            </HStack>
-          </Menu.Item>
+            <Menu.Item
+              value="run-all-rows"
+              disabled={!hasAnyTargetOutputs}
+              onClick={hasMissingMappings ? onEdit : onRunOnAllRows}
+            >
+              <HStack gap={2}>
+                <LuListRestart size={14} />
+                <Text>Run on all rows</Text>
+              </HStack>
+            </Menu.Item>
+          </Tooltip>
         )}
         <Menu.Item value="edit" onClick={onEdit}>
           <HStack gap={2}>
