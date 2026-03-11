@@ -20,13 +20,15 @@ Lessons learned from running `/browser-test` against the LangWatch app.
 
 ### Standard Test Credentials
 
-Always use these credentials for consistency across browser tests, E2E tests, and verification scripts:
+Always use these credentials for `/browser-test` runs and verification scripts:
 
 - **Email:** `browser-test@langwatch.ai`
 - **Password:** `BrowserTest123!`
 - **Org name (onboarding):** `Browser Test Org`
 
-These are used by `scripts/verify-browser-test.js` and `agentic-e2e-tests/tests/auth.setup.ts`. Using consistent credentials avoids orphaned test accounts and makes auth state reusable across tools.
+These are used by `scripts/verify-browser-test.js` and should be used when `/browser-test` drives the browser interactively. Using consistent credentials avoids orphaned test accounts and makes auth state reusable across runs.
+
+Note: The stable E2E suite (`agentic-e2e-tests/`) uses separate credentials (`e2e-test@langwatch.ai` / `TestPassword123!`) — don't mix them.
 
 ## Chakra UI Gotchas
 
