@@ -85,6 +85,25 @@ export class QueueManager<EventType extends Event = Event> {
     return `${String(event.tenantId)}:${event.aggregateType}:${String(event.aggregateId)}`;
   }
 
+  /**
+   * Builds a hierarchical group key function: `${tenantId}/${jobPath}/${domainKey}`.
+   *
+   * - jobPath reflects the pipeline topology (e.g. `fold/traceSummary/reactor/evaluationTrigger`)
+   * - domainKey defaults to `${aggregateType}:${aggregateId}`, overridable via custom fn
+   */
+  private buildGroupKey({
+    jobPath,
+    getTenantId,
+    domainKeyFn,
+  }: {
+    jobPath: string;
+    getTenantId: (payload: any) => string;
+    domainKeyFn: (payload: any) => string;
+  }): (payload: any) => string {
+    return (payload: any) =>
+      `${getTenantId(payload)}/${jobPath}/${domainKeyFn(payload)}`;
+  }
+
   private key(
     type: "handler" | "projection" | "command" | "reactor",
     name: string,
@@ -213,9 +232,13 @@ export class QueueManager<EventType extends Event = Event> {
       }
 
       const customGroupKeyFn = handlerDef.options.groupKeyFn;
-      const groupKeyFn = customGroupKeyFn
-        ? (event: any) => `${String(event.tenantId)}:${customGroupKeyFn(event)}`
-        : (event: any) => `${String(event.tenantId)}:${event.aggregateType}:${String(event.aggregateId)}`;
+      const groupKeyFn = this.buildGroupKey({
+        jobPath: `map/${handlerName}`,
+        getTenantId: (event: any) => String(event.tenantId),
+        domainKeyFn: customGroupKeyFn
+          ? (event: any) => customGroupKeyFn(event)
+          : (event: any) => `${event.aggregateType}:${String(event.aggregateId)}`,
+      });
       const entry: JobRegistryEntry = {
         groupKeyFn,
         scoreFn: (event: any) => event.createdAt,
@@ -269,12 +292,15 @@ export class QueueManager<EventType extends Event = Event> {
       }
 
       const customGroupKeyFn = projectionDef.groupKeyFn;
+      const groupKeyFn = this.buildGroupKey({
+        jobPath: `fold/${projectionName}`,
+        getTenantId: (event: any) => String(event.tenantId),
+        domainKeyFn: customGroupKeyFn
+          ? (event: any) => customGroupKeyFn(event)
+          : (event: any) => `${event.aggregateType}:${String(event.aggregateId)}`,
+      });
       const entry: JobRegistryEntry = {
-        groupKeyFn: customGroupKeyFn
-          ? (event: any) =>
-              `${String(event.tenantId)}:${customGroupKeyFn(event)}`
-          : (event: any) =>
-              `${String(event.tenantId)}:${event.aggregateType}:${String(event.aggregateId)}`,
+        groupKeyFn,
         scoreFn: (event: any) => event.createdAt,
         process: async (event: any) => {
           await onEvent(projectionName, event, {
@@ -387,11 +413,16 @@ export class QueueManager<EventType extends Event = Event> {
         },
       );
 
-      const jobEntry: JobRegistryEntry = {
-        groupKeyFn: (payload: any) => {
+      const commandGroupKeyFn = this.buildGroupKey({
+        jobPath: `command/${cmdName}`,
+        getTenantId: (payload: any) => String(payload.tenantId),
+        domainKeyFn: (payload: any) => {
           const key = cmdEntry.getGroupKey ? cmdEntry.getGroupKey(payload) : cmdEntry.getAggregateId(payload);
-          return `${String(payload.tenantId)}:${this.aggregateType}:${String(key)}`;
+          return `${this.aggregateType}:${String(key)}`;
         },
+      });
+      const jobEntry: JobRegistryEntry = {
+        groupKeyFn: commandGroupKeyFn,
         scoreFn: (payload: any) => payload.occurredAt as number,
         process: async (payload: any) => {
           await processCommand({
@@ -468,7 +499,10 @@ export class QueueManager<EventType extends Event = Event> {
   initializeReactorQueues(
     reactors: Record<string, {
       name: string;
+      parentProjection: string;
+      parentType: "fold" | "map";
       handler: { handle: (payload: { event: EventType; foldState: unknown }) => Promise<void> };
+      groupKeyFn?: (payload: { event: EventType; foldState: unknown }) => string;
       options?: {
         killSwitch?: KillSwitchOptions;
         disabled?: boolean;
@@ -487,9 +521,16 @@ export class QueueManager<EventType extends Event = Event> {
     }
 
     for (const [reactorName, reactorDef] of Object.entries(reactors)) {
+      const customGroupKeyFn = reactorDef.groupKeyFn;
+      const reactorGroupKeyFn = this.buildGroupKey({
+        jobPath: `${reactorDef.parentType}/${reactorDef.parentProjection}/reactor/${reactorName}`,
+        getTenantId: (payload: any) => String(payload.event.tenantId),
+        domainKeyFn: customGroupKeyFn
+          ? (payload: any) => customGroupKeyFn(payload)
+          : (payload: any) => `${payload.event.aggregateType}:${String(payload.event.aggregateId)}`,
+      });
       const entry: JobRegistryEntry = {
-        groupKeyFn: (payload: any) =>
-          `${String(payload.event.tenantId)}:${payload.event.aggregateType}:${String(payload.event.aggregateId)}`,
+        groupKeyFn: reactorGroupKeyFn,
         scoreFn: (payload: any) => payload.event.createdAt,
         process: async (payload: any) => {
           await onEvent(reactorName, payload, {
