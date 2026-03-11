@@ -44,9 +44,10 @@ ensure_prepared() {
 }
 
 # Find a free port starting from base
+# Checks both host processes (lsof) and Docker port bindings.
 find_free_port() {
   local port=$1
-  while lsof -i :$port >/dev/null 2>&1; do
+  while lsof -i :$port >/dev/null 2>&1 || docker ps --format '{{.Ports}}' 2>/dev/null | grep -q "0.0.0.0:${port}->"; do
     port=$((port + 1))
   done
   echo $port

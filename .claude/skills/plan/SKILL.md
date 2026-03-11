@@ -13,7 +13,7 @@ Create a BDD feature file for: $ARGUMENTS
 **Before writing any feature file, read `specs/README.md`** to understand:
 - What makes a good feature file
 - How to achieve non-overlapping test coverage
-- The distinction between @e2e, @integration, and @unit scenarios
+- The distinction between @integration and @unit scenarios (see ADR-010 for @e2e guidance)
 
 Also reference `docs/TESTING_PHILOSOPHY.md` for the test hierarchy and decision tree.
 
@@ -47,7 +47,7 @@ Each scenario must be tagged with exactly ONE of:
 
 | Tag | What It Tests | Mocking |
 |-----|---------------|---------|
-| `@e2e` | Happy paths, full system flow | None |
+| `@e2e` | Stable happy paths only (sparingly — see ADR-010) | None |
 | `@integration` | Edge cases, error handling, module boundaries | External services only |
 | `@unit` | Pure logic, branches, single function | Collaborators |
 
