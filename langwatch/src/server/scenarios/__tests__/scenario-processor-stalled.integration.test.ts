@@ -302,6 +302,7 @@ describe("startScenarioProcessor", () => {
           scenarioId: "scen_test",
           setId: "set_test",
           batchRunId: "batch_test",
+          scenarioRunId: "scenariorun_test123",
           target: { type: "http", referenceId: "agent_test" },
         },
       });
