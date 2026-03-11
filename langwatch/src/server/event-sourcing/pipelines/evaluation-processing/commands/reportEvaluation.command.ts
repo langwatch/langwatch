@@ -89,7 +89,7 @@ export class ReportEvaluationCommand
       "Emitting evaluation reported event",
     );
 
-    return Promise.resolve([event]);
+    return [event];
   }
 
   static getAggregateId(payload: ReportEvaluationCommandData): string {
