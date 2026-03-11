@@ -16,20 +16,11 @@ import {
   buildInputMappings,
 } from "../../utils/edgeMappingUtils";
 
-/**
- * Check whether the node's current fields already cover the config's fields.
- * Returns true if every identifier in `configFields` already exists in
- * `nodeFields` — meaning the node handles don't need updating.
- * Extra identifiers in nodeFields (e.g. edge-connected inputs from a
- * previous config) are fine; they're preserved by the node.
- */
-function nodeHandlesCoverConfig(
-  nodeFields: Field[],
-  configFields: { identifier: string }[],
-): boolean {
-  if (nodeFields.length === 0 && configFields.length > 0) return false;
-  const nodeIds = new Set(nodeFields.map((f) => f.identifier));
-  return configFields.every((f) => nodeIds.has(f.identifier));
+/** Check whether two sets of fields have identical identifiers (order-independent). */
+function identifiersMatch(a: Field[], b: { identifier: string }[]): boolean {
+  if (a.length !== b.length) return false;
+  const ids = new Set(a.map((f) => f.identifier));
+  return b.every((f) => ids.has(f.identifier));
 }
 
 /**
@@ -223,10 +214,9 @@ export function SignaturePromptEditorBridge({
       const oldInputs = signatureNode.data.inputs ?? [];
       const oldOutputs = signatureNode.data.outputs ?? [];
 
-      // Only update inputs when the config introduces identifiers the node
-      // doesn't already have. This prevents spurious updates from form
-      // defaults (e.g. "input") and avoids triggering removeInvalidEdges.
-      if (config.inputs && !nodeHandlesCoverConfig(oldInputs, config.inputs)) {
+      // Only update inputs when the set of identifiers actually changed.
+      // Skipping avoids triggering removeInvalidEdges on drawer open.
+      if (config.inputs && !identifiersMatch(oldInputs, config.inputs)) {
         const currentEdges = getWorkflow().edges;
         const incomingEdges = currentEdges.filter(
           (e) => e.target === node.id && e.targetHandle?.startsWith("inputs."),
@@ -249,7 +239,7 @@ export function SignaturePromptEditorBridge({
         if (remapped) setEdges(remapped);
       }
 
-      if (config.outputs && !nodeHandlesCoverConfig(oldOutputs, config.outputs)) {
+      if (config.outputs && !identifiersMatch(oldOutputs, config.outputs)) {
         const currentEdges = getWorkflow().edges;
         const outgoingEdges = currentEdges.filter(
           (e) => e.source === node.id && e.sourceHandle?.startsWith("outputs."),
