@@ -121,8 +121,6 @@ export const PRECONDITION_FIELD_MATCHERS: Record<
         : "false"
       : null,
 
-  // Sentiment field — not useful as a precondition
-  "sentiment.input_sentiment": null,
 };
 
 // ---------------------------------------------------------------------------
@@ -189,9 +187,6 @@ export const PRECONDITION_ALLOWED_RULES: Record<
 
   // Annotation fields
   "annotations.hasAnnotation": BOOLEAN_RULES,
-
-  // Sentiment field — not useful as a precondition
-  "sentiment.input_sentiment": EMPTY_RULES,
 };
 
 // ---------------------------------------------------------------------------

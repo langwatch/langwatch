@@ -280,7 +280,6 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
       "events.metrics.value",
       "events.event_details.key",
       "metadata.key",
-      "sentiment.input_sentiment",
     ];
 
     it("has null matchers for evaluation, event, and key-selector fields", () => {

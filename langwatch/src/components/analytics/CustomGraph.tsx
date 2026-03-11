@@ -228,9 +228,6 @@ const CustomGraph_ = React.memo(
             params.groupKey,
           );
           filterParams = { ...filterParams, ...metadataFilters };
-        } else if (input.groupBy === "sentiment.input_sentiment") {
-          // Use sentiment filter (urlKey: "sentiment")
-          filterParams.sentiment = params.groupKey;
         } else {
           // Look up the filter in the registry to get the correct urlKey
           const filter = availableFilters[input.groupBy as FilterField];
