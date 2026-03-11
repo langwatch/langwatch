@@ -18,13 +18,13 @@ const ACTION_META: Record<
   string,
   { label: string; icon: React.ComponentType<{ size?: number }> }
 > = {
-  "agent.create": { label: "Created", icon: Bot },
-  "agent.update": { label: "Updated", icon: Edit },
-  "agent.delete": { label: "Deleted", icon: Trash2 },
-  "agent.archive": { label: "Archived", icon: Trash2 },
-  "agent.copy": { label: "Replicated", icon: Copy },
-  "agent.pushToCopies": { label: "Pushed to replicas", icon: ArrowUp },
-  "agent.syncFromSource": { label: "Synced from source", icon: RefreshCw },
+  "agents.create": { label: "Created", icon: Bot },
+  "agents.update": { label: "Updated", icon: Edit },
+  "agents.delete": { label: "Deleted", icon: Trash2 },
+  "agents.cascadeArchive": { label: "Archived", icon: Trash2 },
+  "agents.copy": { label: "Replicated", icon: Copy },
+  "agents.pushToCopies": { label: "Pushed to replicas", icon: ArrowUp },
+  "agents.syncFromSource": { label: "Synced from source", icon: RefreshCw },
 };
 
 function actionMeta(action: string) {
