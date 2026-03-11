@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Flex, Box } from "@chakra-ui/react";
 import { Routes, Route } from "react-router-dom";
 import { Sidebar } from "./components/layout/Sidebar.tsx";
@@ -6,10 +6,8 @@ import { Header } from "./components/layout/Header.tsx";
 import { DashboardPage } from "./pages/DashboardPage.tsx";
 import { GroupDetailPage } from "./pages/GroupDetailPage.tsx";
 import { JobDetailPage } from "./pages/JobDetailPage.tsx";
-import { ErrorInspectorPage } from "./pages/ErrorInspectorPage.tsx";
-import { QueueListPage } from "./pages/QueueListPage.tsx";
-import { QueueDetailPage } from "./pages/QueueDetailPage.tsx";
 import { StatsPage } from "./pages/StatsPage.tsx";
+import { UnblockSession, type UnblockSessionConfig } from "./components/UnblockSession.tsx";
 import { useDashboardData } from "./hooks/useDashboardData.ts";
 import { useGroupsData } from "./hooks/useGroupsData.ts";
 import { useGroupsPolling } from "./hooks/useGroupsPolling.ts";
@@ -19,6 +17,7 @@ export function App() {
   const { data, status, flush } = useDashboardData(paused);
   const { queues: polledQueues, flush: flushGroups } = useGroupsPolling(paused);
   const { queues, update: updateQueues, sortColumn, sortDir, cycleSort } = useGroupsData();
+  const [unblockSession, setUnblockSession] = useState<UnblockSessionConfig | null>(null);
 
   // Feed groups data from polling into the stable-sort hook
   // (groups are no longer included in SSE broadcasts to save memory)
@@ -41,33 +40,36 @@ export function App() {
   const displayQueues = queues.length > 0 ? queues : polledQueues;
 
   return (
-    <Flex minH="100vh">
-      <Sidebar />
-      <Box flex="1">
-        <Header status={status} paused={paused} />
-        <Routes>
-          <Route
-            index
-            element={
-              <DashboardPage
-                data={data}
-                queues={displayQueues}
-                onPause={onPause}
-                onResume={onResume}
-                sortColumn={sortColumn}
-                sortDir={sortDir}
-                cycleSort={cycleSort}
-              />
-            }
-          />
-          <Route path="stats" element={<StatsPage data={data} />} />
-          <Route path="groups/:groupId" element={<GroupDetailPage />} />
-          <Route path="jobs/:jobId" element={<JobDetailPage />} />
-          <Route path="errors" element={<ErrorInspectorPage />} />
-          <Route path="queues" element={<QueueListPage />} />
-          <Route path="queues/:queueName" element={<QueueDetailPage />} />
-        </Routes>
-      </Box>
-    </Flex>
+    <>
+      <Flex minH="100vh">
+        <Sidebar />
+        <Box flex="1" minW={0} overflow="hidden">
+          <Header status={status} paused={paused} />
+          <Routes>
+            <Route
+              index
+              element={
+                <DashboardPage
+                  data={data}
+                  queues={displayQueues}
+                  onPause={onPause}
+                  onResume={onResume}
+                  sortColumn={sortColumn}
+                  sortDir={sortDir}
+                  cycleSort={cycleSort}
+                  onStartUnblockSession={setUnblockSession}
+                />
+              }
+            />
+            <Route path="stats" element={<StatsPage data={data} />} />
+            <Route path="groups/:groupId" element={<GroupDetailPage />} />
+            <Route path="jobs/:jobId" element={<JobDetailPage />} />
+          </Routes>
+        </Box>
+      </Flex>
+      {unblockSession && (
+        <UnblockSession config={unblockSession} onClose={() => setUnblockSession(null)} />
+      )}
+    </>
   );
 }

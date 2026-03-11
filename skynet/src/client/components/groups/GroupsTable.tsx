@@ -12,6 +12,7 @@ import { useNavigate } from "react-router-dom";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { QueueInfo, GroupInfo, GroupDetailData } from "../../../shared/types.ts";
 import type { SortColumn, SortDir } from "../../hooks/useGroupsData.ts";
+import type { UnblockSessionConfig } from "../UnblockSession.tsx";
 import { QueueSummary } from "../dashboard/QueueSummary.tsx";
 import { useTickingTimeAgo } from "../../hooks/useTickingTimeAgo.ts";
 import { apiFetch, apiPost } from "../../hooks/useApi.ts";
@@ -54,6 +55,32 @@ function drainingOpacity(group: { _draining?: boolean; _drainingUntil?: number }
 function TickingTimeAgo({ ms }: { ms: number | null }) {
   const text = useTickingTimeAgo(ms);
   return <Text fontSize="xs" color="#4a6a7a">{text}</Text>;
+}
+
+function BlockedFor({ errorTimestamp }: { errorTimestamp: number | null }) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!errorTimestamp) return;
+    const interval = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(interval);
+  }, [errorTimestamp]);
+
+  if (!errorTimestamp) return null;
+  const ms = Date.now() - errorTimestamp;
+  if (ms < 1000) return null;
+
+  const color = ms > 3_600_000 ? "#ff0033" : ms > 300_000 ? "#ffaa00" : "#4a6a7a";
+
+  let label: string;
+  if (ms < 60_000) label = `${Math.floor(ms / 1000)}s`;
+  else if (ms < 3_600_000) label = `${Math.floor(ms / 60_000)}m`;
+  else label = `${Math.floor(ms / 3_600_000)}h ${Math.floor((ms % 3_600_000) / 60_000)}m`;
+
+  return (
+    <Text fontSize="9px" color={color} sx={{ fontVariantNumeric: "tabular-nums" }}>
+      {label}
+    </Text>
+  );
 }
 
 interface GroupDetailModalProps {
@@ -483,9 +510,23 @@ function GroupRow({ group, queueName, onSelect }: GroupRowProps) {
           <Text fontSize="xs" color="#4a6a7a">None</Text>
         )}
       </Td>
-      <Td w="200px" px={4}>
+      <Td w="250px" px={4}>
         <HStack spacing={2}>
           <StatusBadge group={group} changed={statusChanged} />
+          {group.retryCount !== null && group.retryCount > 0 && (
+            <Badge
+              bg="rgba(255, 170, 0, 0.12)"
+              color="#ffaa00"
+              fontSize="9px"
+              borderRadius="2px"
+              sx={{ fontVariantNumeric: "tabular-nums" }}
+            >
+              r/{group.retryCount}
+            </Badge>
+          )}
+          {group.isBlocked && group.errorTimestamp && (
+            <BlockedFor errorTimestamp={group.errorTimestamp} />
+          )}
           {group.isBlocked && (
             <Button
               size="xs"
@@ -555,25 +596,30 @@ interface GroupsTableProps {
   sortDir: SortDir;
   cycleSort: (col: SortColumn) => void;
   pipelineFilter?: string | null;
+  onStartUnblockSession?: (config: UnblockSessionConfig) => void;
 }
 
-export function GroupsTable({ queues, onPause, onResume, sortColumn, sortDir, cycleSort, pipelineFilter }: GroupsTableProps) {
+export function GroupsTable({ queues, onPause, onResume, sortColumn, sortDir, cycleSort, pipelineFilter, onStartUnblockSession }: GroupsTableProps) {
   const [search, setSearch] = useState("");
+  const [showBlockedOnly, setShowBlockedOnly] = useState(false);
   const debouncedSearch = useDebouncedValue(search, SEARCH_DEBOUNCE_MS);
 
   const filteredQueues = queues.map((queue) => ({
     ...queue,
     groups: queue.groups.filter(
       (g) => {
-        const matchesSearch =
-          g.groupId.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-          (g.pipelineName ?? "").toLowerCase().includes(debouncedSearch.toLowerCase());
+        const term = debouncedSearch.toLowerCase();
+        const matchesSearch = !term ||
+          g.groupId.toLowerCase().includes(term) ||
+          (g.pipelineName ?? "").toLowerCase().includes(term) ||
+          (g.errorMessage ?? "").toLowerCase().includes(term);
         // Pipeline filter matches any of: pipelineName, jobType, or jobName
         const matchesPipeline = !pipelineFilter ||
           (g.pipelineName ?? "") === pipelineFilter ||
           (g.jobType ?? "") === pipelineFilter ||
           (g.jobName ?? "") === pipelineFilter;
-        return matchesSearch && matchesPipeline;
+        const matchesBlocked = !showBlockedOnly || g.isBlocked;
+        return matchesSearch && matchesPipeline && matchesBlocked;
       },
     ),
   })).filter((q) => q.groups.length > 0);
@@ -598,6 +644,9 @@ export function GroupsTable({ queues, onPause, onResume, sortColumn, sortDir, cy
         case "newestJobMs":
           cmp = (a.newestJobMs ?? 0) - (b.newestJobMs ?? 0);
           break;
+        case "retryCount":
+          cmp = (a.retryCount ?? 0) - (b.retryCount ?? 0);
+          break;
       }
       return sortDir === "desc" ? -cmp : cmp;
     });
@@ -611,7 +660,7 @@ export function GroupsTable({ queues, onPause, onResume, sortColumn, sortDir, cy
     >
       <HStack mb={4}>
         <Input
-          placeholder="SEARCH GROUPS OR PIPELINES..."
+          placeholder="SEARCH BY GROUP ID, TENANT, AGGREGATE, PIPELINE..."
           size="sm"
           bg="#060a12"
           border="1px solid"
@@ -626,6 +675,25 @@ export function GroupsTable({ queues, onPause, onResume, sortColumn, sortDir, cy
           onBlur={onResume}
           maxW="400px"
         />
+        <Button
+          size="sm"
+          variant={showBlockedOnly ? "solid" : "outline"}
+          color={showBlockedOnly ? "#0a0e17" : "#ff0033"}
+          bg={showBlockedOnly ? "#ff0033" : "transparent"}
+          borderColor="rgba(255, 0, 51, 0.3)"
+          borderRadius="2px"
+          _hover={{
+            borderColor: "#ff0033",
+            boxShadow: "0 0 8px rgba(255, 0, 51, 0.3)",
+            bg: showBlockedOnly ? "#ff3366" : "rgba(255, 0, 51, 0.1)",
+          }}
+          onClick={() => setShowBlockedOnly(!showBlockedOnly)}
+          textTransform="uppercase"
+          letterSpacing="0.05em"
+          fontSize="xs"
+        >
+          Blocked Only
+        </Button>
       </HStack>
 
       {sortedQueues.map((queue) => (
@@ -635,6 +703,7 @@ export function GroupsTable({ queues, onPause, onResume, sortColumn, sortDir, cy
           sortColumn={sortColumn}
           sortDir={sortDir}
           cycleSort={cycleSort}
+          onStartUnblockSession={onStartUnblockSession}
         />
       ))}
 
@@ -652,13 +721,14 @@ interface QueueSectionProps {
   sortColumn: SortColumn;
   sortDir: SortDir;
   cycleSort: (col: SortColumn) => void;
+  onStartUnblockSession?: (config: UnblockSessionConfig) => void;
 }
 
 const ROW_HEIGHT = 36;
 const VIRTUALIZE_THRESHOLD = 500;
 const MAX_VISIBLE_ROWS = 20;
 
-function QueueSection({ queue, sortColumn, sortDir, cycleSort }: QueueSectionProps) {
+function QueueSection({ queue, sortColumn, sortDir, cycleSort, onStartUnblockSession }: QueueSectionProps) {
   const toast = useToast();
   const { isOpen, onToggle } = useDisclosure({ defaultIsOpen: true });
   const [showAll, setShowAll] = useState(false);
@@ -688,12 +758,22 @@ function QueueSection({ queue, sortColumn, sortDir, cycleSort }: QueueSectionPro
 
   const handleUnblockAll = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!window.confirm(`Unblock ALL ${queue.blockedGroupCount} blocked groups at once?`)) return;
     try {
       await apiPost("/api/actions/unblock-all", { queueName: queue.name });
       toast({ title: "All groups unblocked", status: "success", duration: 2000, isClosable: true });
     } catch (err) {
       toast({ title: "Failed to unblock all", description: err instanceof Error ? err.message : "Unknown error", status: "error", duration: 4000, isClosable: true });
     }
+  };
+
+  const handleStartSession = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onStartUnblockSession?.({
+      queueName: queue.name,
+      displayName: queue.displayName,
+      totalBlocked: queue.blockedGroupCount,
+    });
   };
 
   // Keep selectedGroup data in sync with latest SSE data
@@ -714,7 +794,7 @@ function QueueSection({ queue, sortColumn, sortDir, cycleSort }: QueueSectionPro
       <SortableTh label="Oldest" column="oldestJobMs" currentSort={sortColumn} currentDir={sortDir} onSort={cycleSort} w="90px" />
       <SortableTh label="Newest" column="newestJobMs" currentSort={sortColumn} currentDir={sortDir} onSort={cycleSort} w="90px" />
       <Th w="130px">Active Job</Th>
-      <Th w="200px">Status</Th>
+      <SortableTh label="Status" column="retryCount" currentSort={sortColumn} currentDir={sortDir} onSort={cycleSort} w="250px" />
     </Tr>
   );
 
@@ -755,16 +835,28 @@ function QueueSection({ queue, sortColumn, sortDir, cycleSort }: QueueSectionPro
           <HStack spacing={2}>
             <QueueSummary queue={queue} />
             {queue.blockedGroupCount > 0 && (
-              <Button
-                size="xs"
-                variant="outline"
-                color="#ff0033"
-                borderColor="rgba(255, 0, 51, 0.3)"
-                _hover={{ borderColor: "#ff0033", boxShadow: "0 0 8px rgba(255, 0, 51, 0.3)" }}
-                onClick={handleUnblockAll}
-              >
-                Unblock All
-              </Button>
+              <>
+                <Button
+                  size="xs"
+                  variant="outline"
+                  color="#ffaa00"
+                  borderColor="rgba(255, 170, 0, 0.3)"
+                  _hover={{ borderColor: "#ffaa00", boxShadow: "0 0 8px rgba(255, 170, 0, 0.3)" }}
+                  onClick={handleStartSession}
+                >
+                  Unblock Session
+                </Button>
+                <Button
+                  size="xs"
+                  variant="outline"
+                  color="#ff0033"
+                  borderColor="rgba(255, 0, 51, 0.3)"
+                  _hover={{ borderColor: "#ff0033", boxShadow: "0 0 8px rgba(255, 0, 51, 0.3)" }}
+                  onClick={handleUnblockAll}
+                >
+                  Unblock All
+                </Button>
+              </>
             )}
           </HStack>
         </Box>

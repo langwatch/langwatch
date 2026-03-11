@@ -185,13 +185,26 @@ export function GroupDetailPage() {
         )}
       </HStack>
 
-      <HStack spacing={6} mb={6} fontSize="sm" color="#4a6a7a">
+      <HStack spacing={6} mb={6} fontSize="sm" color="#4a6a7a" flexWrap="wrap">
         <Text>Queue: <Text as="span" color="#b0c4d8">{group.displayName}</Text></Text>
         {group.pipelineName && <Text>Pipeline: <Text as="span" color="#b0c4d8">{group.pipelineName}</Text></Text>}
         {group.jobType && <Text>Type: <Text as="span" color="#b0c4d8">{group.jobType}</Text></Text>}
         <Text>Pending: <Text as="span" color="#00f0ff">{group.pendingJobs}</Text></Text>
         {group.activeJobId && (
           <Text>Active: <Text as="span" fontFamily="mono" color="#00ff41">{group.activeJobId}</Text></Text>
+        )}
+        {group.isBlocked && group.errorTimestamp && (
+          <Text>Blocked for: <Text as="span" color="#ff0033">
+            {(() => {
+              const ms = Date.now() - group.errorTimestamp;
+              if (ms < 60_000) return `${Math.floor(ms / 1000)}s`;
+              if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}m`;
+              return `${Math.floor(ms / 3_600_000)}h ${Math.floor((ms % 3_600_000) / 60_000)}m`;
+            })()}
+          </Text></Text>
+        )}
+        {group.retryCount !== null && group.retryCount > 0 && (
+          <Text>Retries: <Text as="span" color="#ffaa00">{group.retryCount}</Text></Text>
         )}
       </HStack>
 

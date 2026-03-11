@@ -14,6 +14,9 @@ export interface GroupInfo {
   errorMessage: string | null;
   errorStack: string | null;
   errorTimestamp: number | null;
+  retryCount: number | null;
+  activeKeyTtlSec: number | null;
+  processingDurationMs: number | null;
 }
 
 export interface QueueInfo {
@@ -41,6 +44,8 @@ export interface ThroughputPoint {
   stagedPerSec: number;
   completedPerSec: number;
   failedPerSec: number;
+  pendingCount: number;
+  blockedCount: number;
 }
 
 export interface PhaseMetrics {
@@ -115,6 +120,7 @@ export interface DashboardData {
   };
   jobNameMetrics: JobNameMetrics[];
   pausedKeys: string[];
+  topErrors: ErrorCluster[];
 }
 
 export interface JobInfo {
@@ -138,6 +144,7 @@ export interface GroupDetailData {
   errorMessage: string | null;
   errorStack: string | null;
   errorTimestamp: number | null;
+  retryCount: number | null;
 }
 
 export interface FailedJob {
@@ -194,6 +201,27 @@ export interface BullMQQueueInfo {
   completed: number;
   failed: number;
   delayed: number;
+}
+
+export interface ErrorCluster {
+  normalizedMessage: string;
+  sampleMessage: string;
+  sampleStack: string | null;
+  count: number;
+  pipelineName: string | null;
+  sampleGroupIds: string[];
+}
+
+export interface BlockedSummary {
+  totalBlocked: number;
+  clusters: ErrorCluster[];
+}
+
+export interface BatchProgress {
+  operation: string;
+  processed: number;
+  total: number;
+  status: "running" | "completed" | "failed";
 }
 
 export type SSEEvent =

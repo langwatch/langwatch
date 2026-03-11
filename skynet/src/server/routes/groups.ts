@@ -3,20 +3,107 @@ import type IORedis from "ioredis";
 import type { MetricsCollector } from "../services/metricsCollector.ts";
 import { stripHashTag } from "../services/queueDiscovery.ts";
 import { getCompletedJobsForGroup } from "../services/bullmqService.ts";
-import { scanGroupQueuesPaginated } from "../services/groupQueueScanner.ts";
+import { analyzeBlockedGroups } from "../services/blockedGroupAnalyzer.ts";
 
 export function createGroupsRouter(redis: IORedis, metrics: MetricsCollector, getGroupQueueNames: () => string[]): Router {
   const router = Router();
 
   router.get("/api/groups", async (req, res) => {
     try {
-      const page = Math.max(0, parseInt(req.query.page as string) || 0);
-      const pageSize = Math.min(500, Math.max(1, parseInt(req.query.pageSize as string) || 100));
-      const queues = await scanGroupQueuesPaginated(redis, getGroupQueueNames(), { page, pageSize });
+      const queues = metrics.getLatestQueues();
       res.json({ queues });
     } catch (err) {
       console.error("Groups fetch error:", err);
       res.status(500).json({ error: "Failed to fetch groups" });
+    }
+  });
+
+  router.get("/api/blocked-summary", async (req, res) => {
+    try {
+      const summary = await analyzeBlockedGroups({ redis, queueNames: getGroupQueueNames() });
+      res.json(summary);
+    } catch (err) {
+      console.error("Blocked summary error:", err);
+      res.status(500).json({ error: "Failed to compute blocked summary" });
+    }
+  });
+
+  router.get("/api/blocked-groups/export", async (req, res) => {
+    try {
+      const queueName = req.query.queueName as string | undefined;
+      const format = (req.query.format as string) ?? "json";
+      if (!queueName) {
+        res.status(400).json({ error: "queueName query param is required" });
+        return;
+      }
+
+      const prefix = `${queueName}:gq:`;
+      const blockedKey = `${prefix}blocked`;
+      const groups: Array<{ groupId: string; errorMessage: string; errorStack: string; errorTimestamp: string; pipelineName: string | null }> = [];
+
+      let cursor = "0";
+      do {
+        const [nextCursor, members] = await redis.sscan(blockedKey, cursor, "COUNT", 500);
+        cursor = nextCursor;
+
+        if (members.length === 0) continue;
+
+        const pipeline = redis.pipeline();
+        for (const groupId of members) {
+          pipeline.hgetall(`${prefix}group:${groupId}:error`);
+          pipeline.zrange(`${prefix}group:${groupId}:jobs`, 0, 0);
+        }
+        const results = await pipeline.exec();
+
+        const jobDataPipeline = redis.pipeline();
+        const jobDataRequests: { groupId: string }[] = [];
+        for (let i = 0; i < members.length; i++) {
+          const jobArr = (results?.[i * 2 + 1]?.[1] as string[]) ?? [];
+          if (jobArr[0]) {
+            jobDataPipeline.hget(`${prefix}group:${members[i]!}:data`, jobArr[0]);
+            jobDataRequests.push({ groupId: members[i]! });
+          }
+        }
+        const jobDataResults = jobDataRequests.length > 0 ? await jobDataPipeline.exec() : [];
+
+        const pipelineNames = new Map<string, string>();
+        for (let j = 0; j < jobDataRequests.length; j++) {
+          const raw = jobDataResults?.[j]?.[1] as string | null;
+          if (raw) {
+            try {
+              const parsed = JSON.parse(raw);
+              if (parsed.__pipelineName) pipelineNames.set(jobDataRequests[j]!.groupId, parsed.__pipelineName);
+            } catch {}
+          }
+        }
+
+        for (let i = 0; i < members.length; i++) {
+          const groupId = members[i]!;
+          const errorHash = results?.[i * 2]?.[1] as Record<string, string> | null;
+          groups.push({
+            groupId,
+            errorMessage: errorHash?.message ?? "",
+            errorStack: errorHash?.stack ?? "",
+            errorTimestamp: errorHash?.timestamp ?? "",
+            pipelineName: pipelineNames.get(groupId) ?? null,
+          });
+        }
+      } while (cursor !== "0");
+
+      if (format === "csv") {
+        res.setHeader("Content-Type", "text/csv");
+        res.setHeader("Content-Disposition", "attachment; filename=blocked-groups.csv");
+        const header = "groupId,pipelineName,errorMessage,errorTimestamp\n";
+        const rows = groups.map((g) =>
+          `"${g.groupId}","${g.pipelineName ?? ""}","${g.errorMessage.replace(/"/g, '""')}","${g.errorTimestamp}"`
+        ).join("\n");
+        res.send(header + rows);
+      } else {
+        res.json({ groups });
+      }
+    } catch (err) {
+      console.error("Export blocked groups error:", err);
+      res.status(500).json({ error: "Failed to export blocked groups" });
     }
   });
 
@@ -46,6 +133,7 @@ export function createGroupsRouter(redis: IORedis, metrics: MetricsCollector, ge
           errorMessage: group.errorMessage,
           errorStack: group.errorStack,
           errorTimestamp: group.errorTimestamp,
+          retryCount: group.retryCount ?? null,
         });
         return;
       }
@@ -88,6 +176,7 @@ export function createGroupsRouter(redis: IORedis, metrics: MetricsCollector, ge
             errorMessage: errorHash?.message ?? null,
             errorStack: errorHash?.stack ?? null,
             errorTimestamp: errorHash?.timestamp ? parseFloat(errorHash.timestamp) : null,
+            retryCount: null,
           });
           return;
         }
@@ -113,6 +202,10 @@ export function createGroupsRouter(redis: IORedis, metrics: MetricsCollector, ge
             pipelineName: null,
             jobType: null,
             jobName: null,
+            errorMessage: null,
+            errorStack: null,
+            errorTimestamp: null,
+            retryCount: null,
             status: "completed",
             completedJobs,
           });

@@ -19,6 +19,9 @@ function makeGroup(overrides: Partial<GroupInfo> = {}): GroupInfo {
     errorMessage: null,
     errorStack: null,
     errorTimestamp: null,
+    retryCount: null,
+    activeKeyTtlSec: null,
+    processingDurationMs: null,
     ...overrides,
   };
 }
