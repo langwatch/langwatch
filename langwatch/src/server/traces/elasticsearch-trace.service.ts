@@ -483,7 +483,46 @@ export class ElasticsearchTraceService {
       return null;
     }
 
-    return this.extractPromptStudioData(trace, span as LLMSpan);
+    const result = this.extractPromptStudioData(trace, span as LLMSpan);
+
+    // If the LLM span itself doesn't have a prompt reference,
+    // walk up ancestor spans to find it (SDK sets it on the parent span)
+    if (!result.promptHandle) {
+      const ancestorRef = this.findPromptRefFromTraceAncestors(trace, spanId);
+      if (ancestorRef) {
+        result.promptHandle = ancestorRef.promptHandle;
+        result.promptVersionNumber = ancestorRef.promptVersionNumber;
+        result.promptVariables = ancestorRef.promptVariables;
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Walk up parent spans in an ES trace to find the nearest ancestor
+   * with a prompt reference. Used when the LLM span itself doesn't have one.
+   */
+  private findPromptRefFromTraceAncestors(
+    trace: Trace,
+    spanId: string,
+  ): ReturnType<typeof parsePromptReference> | null {
+    const allSpans = trace.spans ?? [];
+    const spanMap = new Map(allSpans.map((s) => [s.span_id, s]));
+    const target = spanMap.get(spanId);
+    if (!target) return null;
+
+    let currentId: string | null | undefined = target.parent_id;
+    while (currentId) {
+      const parent = spanMap.get(currentId);
+      if (!parent) break;
+
+      const ref = parsePromptReference(parent.params ?? {});
+      if (ref.promptHandle) return ref;
+
+      currentId = parent.parent_id;
+    }
+    return null;
   }
 
   /**

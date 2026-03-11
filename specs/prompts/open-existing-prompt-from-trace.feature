@@ -116,6 +116,31 @@ Feature: Open existing prompt from trace
     Then the response has promptHandle null and promptVersionNumber null
     And the response has promptVariables null
 
+  # --- Ancestor span lookup ---
+  # The SDK sets langwatch.prompt.id on the Prompt.compile/get span (parent),
+  # not on the LLM span itself. The backend must walk up the parent chain.
+
+  @unit
+  Scenario: Prompt reference found on immediate parent span
+    Given an LLM span with no langwatch.prompt.id attribute
+    And its parent span has "langwatch.prompt.id" = "team/sample-prompt:3"
+    When the prompt reference is looked up
+    Then the prompt reference is found with handle "team/sample-prompt" and version 3
+
+  @unit
+  Scenario: Prompt reference found on grandparent span
+    Given an LLM span with no langwatch.prompt.id attribute
+    And its grandparent span has "langwatch.prompt.id" = "team/sample-prompt:3"
+    When the prompt reference is looked up
+    Then the prompt reference is found with handle "team/sample-prompt" and version 3
+
+  @unit
+  Scenario: No prompt reference on any ancestor span
+    Given an LLM span with no langwatch.prompt.id attribute
+    And no ancestor spans have a langwatch.prompt.id attribute
+    When the prompt reference is looked up
+    Then no prompt reference is found
+
   # --- Metadata hoisting: combine prompt IDs across spans ---
 
   @unit

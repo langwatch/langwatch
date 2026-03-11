@@ -39,7 +39,15 @@ import { RenderInputOutput } from "./RenderInputOutput";
  * @param props.span - The span object containing trace data
  * @param props.project - The project context (maintained for API compatibility)
  */
-export function SpanDetails({ span }: { project: Project; span: Span }) {
+export function SpanDetails({
+  span,
+  allSpans,
+}: {
+  project: Project;
+  span: Span;
+  /** All spans in the trace, used to walk up parent chain for prompt reference lookup */
+  allSpans?: Span[];
+}) {
   const estimatedCost = (
     <Tooltip content="When `metrics.completion_tokens` and `metrics.prompt_tokens` are not available, they are estimated based on input, output and the model for calculating costs.">
       <Text as="span" color="fg.subtle" borderBottom="1px dotted">
@@ -54,15 +62,33 @@ export function SpanDetails({ span }: { project: Project; span: Span }) {
     return span.type === "llm" && !!span.span_id;
   }, [span]);
 
-  /** Extract prompt reference from span params (nested object from OTel attribute unflattening) */
+  /** Extract prompt reference from span params, walking up parent spans if needed */
   const promptRef = useMemo(() => {
+    // Check the span's own params first
     const promptId = (span.params as Record<string, any>)?.langwatch?.prompt
       ?.id as string | undefined;
     if (typeof promptId === "string" && promptId.includes(":")) {
       return promptId;
     }
+
+    // Walk up parent spans to find the prompt reference
+    if (allSpans) {
+      const spanMap = new Map(allSpans.map((s) => [s.span_id, s]));
+      let currentId: string | null | undefined = span.parent_id;
+      while (currentId) {
+        const parent = spanMap.get(currentId);
+        if (!parent) break;
+        const parentPromptId = (parent.params as Record<string, any>)
+          ?.langwatch?.prompt?.id as string | undefined;
+        if (typeof parentPromptId === "string" && parentPromptId.includes(":")) {
+          return parentPromptId;
+        }
+        currentId = parent.parent_id;
+      }
+    }
+
     return null;
-  }, [span.params]);
+  }, [span.params, span.parent_id, allSpans]);
 
   return (
     <VStack flexGrow={1} gap={3} align="start">

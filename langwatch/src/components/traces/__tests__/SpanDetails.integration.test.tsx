@@ -152,6 +152,110 @@ describe("<SpanDetails/>", () => {
     });
   });
 
+  describe("when prompt reference is on parent span (ancestor lookup)", () => {
+    it("renders a dropdown menu trigger button", () => {
+      const parentSpan = buildLLMSpan({
+        span_id: "parent-span",
+        type: "span" as Span["type"],
+        params: {
+          langwatch: {
+            prompt: {
+              id: "team/sample-prompt:3",
+            },
+          },
+        },
+      });
+      const llmSpan = buildLLMSpan({
+        span_id: "span-123",
+        parent_id: "parent-span",
+        params: null,
+      });
+
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <SpanDetails
+            project={project}
+            span={llmSpan}
+            allSpans={[parentSpan, llmSpan]}
+          />
+        </ChakraProvider>,
+      );
+
+      const button = screen.getByRole("button", {
+        name: /Open in Prompts/i,
+      });
+      expect(button).toBeDefined();
+    });
+
+    it("finds prompt reference on grandparent span", () => {
+      const grandparent = buildLLMSpan({
+        span_id: "grandparent-span",
+        type: "span" as Span["type"],
+        params: {
+          langwatch: {
+            prompt: {
+              id: "org/deep-prompt:7",
+            },
+          },
+        },
+      });
+      const parent = buildLLMSpan({
+        span_id: "parent-span",
+        parent_id: "grandparent-span",
+        type: "span" as Span["type"],
+        params: null,
+      });
+      const llmSpan = buildLLMSpan({
+        span_id: "span-123",
+        parent_id: "parent-span",
+        params: null,
+      });
+
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <SpanDetails
+            project={project}
+            span={llmSpan}
+            allSpans={[grandparent, parent, llmSpan]}
+          />
+        </ChakraProvider>,
+      );
+
+      const button = screen.getByRole("button", {
+        name: /Open in Prompts/i,
+      });
+      expect(button).toBeDefined();
+    });
+
+    it("renders simple link when no ancestor has prompt reference", () => {
+      const parentSpan = buildLLMSpan({
+        span_id: "parent-span",
+        type: "span" as Span["type"],
+        params: null,
+      });
+      const llmSpan = buildLLMSpan({
+        span_id: "span-123",
+        parent_id: "parent-span",
+        params: null,
+      });
+
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <SpanDetails
+            project={project}
+            span={llmSpan}
+            allSpans={[parentSpan, llmSpan]}
+          />
+        </ChakraProvider>,
+      );
+
+      const link = screen.getByRole("link", {
+        name: /Open in Prompts/i,
+      });
+      expect(link).toBeDefined();
+    });
+  });
+
   describe("when span is not an LLM type", () => {
     it("does not render any Open in Prompts button", () => {
       const span = buildLLMSpan({ type: "span" as Span["type"] });

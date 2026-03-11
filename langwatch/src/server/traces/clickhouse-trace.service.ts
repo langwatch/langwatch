@@ -25,6 +25,7 @@ import {
   mapNormalizedSpansToSpans,
   mapTraceSummaryToTrace,
 } from "./mappers";
+import { findPromptReferenceInAncestors } from "./findPromptReferenceInAncestors";
 import { parsePromptReference } from "./parsePromptReference";
 import type {
   AggregationFiltersInput,
@@ -826,7 +827,7 @@ export class ClickHouseTraceService {
 
         try {
           // Query for the span
-          const result = await this.clickHouseClient.query({
+          const queryResult = await this.clickHouseClient.query({
             query: `
               SELECT
                 ss.SpanId,
@@ -850,7 +851,7 @@ export class ClickHouseTraceService {
             format: "JSONEachRow",
           });
 
-          const rows = (await result.json()) as Array<{
+          const rows = (await queryResult.json()) as Array<{
             SpanId: string;
             TraceId: string;
             SpanName: string;
@@ -876,7 +877,28 @@ export class ClickHouseTraceService {
           }
 
           // Extract span data from attributes
-          return this.extractPromptStudioDataFromClickHouse(row, protections);
+          const result = this.extractPromptStudioDataFromClickHouse(
+            row,
+            protections,
+          );
+
+          // If the LLM span itself doesn't have a prompt reference,
+          // walk up ancestor spans to find it (SDK sets it on the parent span)
+          if (!result.promptHandle) {
+            const ancestorRef =
+              await this.findPromptReferenceFromAncestors({
+                projectId,
+                traceId: row.TraceId,
+                spanId: row.SpanId,
+              });
+            if (ancestorRef) {
+              result.promptHandle = ancestorRef.promptHandle;
+              result.promptVersionNumber = ancestorRef.promptVersionNumber;
+              result.promptVariables = ancestorRef.promptVariables;
+            }
+          }
+
+          return result;
         } catch (error) {
           this.logger.error(
             {
@@ -1029,6 +1051,73 @@ export class ClickHouseTraceService {
       promptVersionNumber: promptRef.promptVersionNumber,
       promptVariables: promptRef.promptVariables,
     };
+  }
+
+  /**
+   * Query all spans in a trace and walk up the parent chain from the target span
+   * to find the nearest ancestor with a prompt reference.
+   *
+   * The SDK sets `langwatch.prompt.id` on the parent span (e.g. `Prompt.compile`),
+   * not on the LLM span itself. This method bridges that gap.
+   *
+   * @param params.projectId - The project (tenant) ID
+   * @param params.traceId - The trace containing the spans
+   * @param params.spanId - The LLM span to start walking up from
+   * @returns The ancestor's PromptReference, or null if none found
+   */
+  private async findPromptReferenceFromAncestors({
+    projectId,
+    traceId,
+    spanId,
+  }: {
+    projectId: string;
+    traceId: string;
+    spanId: string;
+  }) {
+    const result = await this.clickHouseClient!.query({
+      query: `
+        SELECT
+          SpanId,
+          ParentSpanId,
+          SpanAttributes['langwatch.prompt.id'] as PromptId,
+          SpanAttributes['langwatch.prompt.variables'] as PromptVariables,
+          SpanAttributes['langwatch.prompt.handle'] as PromptHandle,
+          SpanAttributes['langwatch.prompt.version.number'] as PromptVersionNumber
+        FROM stored_spans
+        WHERE TenantId = {tenantId:String}
+          AND TraceId = {traceId:String}
+      `,
+      query_params: { tenantId: projectId, traceId },
+      format: "JSONEachRow",
+    });
+
+    const rows = (await result.json()) as Array<{
+      SpanId: string;
+      ParentSpanId: string;
+      PromptId: string;
+      PromptVariables: string;
+      PromptHandle: string;
+      PromptVersionNumber: string;
+    }>;
+
+    // Map ClickHouse rows into the shape expected by the pure walk function
+    const spans = rows.map((r) => {
+      const attributes: Record<string, unknown> = {};
+      if (r.PromptId) attributes["langwatch.prompt.id"] = r.PromptId;
+      if (r.PromptVariables)
+        attributes["langwatch.prompt.variables"] = r.PromptVariables;
+      if (r.PromptHandle)
+        attributes["langwatch.prompt.handle"] = r.PromptHandle;
+      if (r.PromptVersionNumber)
+        attributes["langwatch.prompt.version.number"] = r.PromptVersionNumber;
+      return {
+        spanId: r.SpanId,
+        parentSpanId: r.ParentSpanId || null,
+        attributes,
+      };
+    });
+
+    return findPromptReferenceInAncestors({ targetSpanId: spanId, spans });
   }
 
   /**
