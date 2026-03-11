@@ -38,6 +38,8 @@ export const TabDataSchema = z.object({
       title: z.string().nullable(),
       versionNumber: z.number().optional(),
       scope: z.enum(["PROJECT", "ORGANIZATION"]).optional(),
+      /** When true the version history panel opens automatically when the tab mounts. */
+      openHistoryOnLoad: z.boolean().optional(),
     })
     .default({
       title: null,

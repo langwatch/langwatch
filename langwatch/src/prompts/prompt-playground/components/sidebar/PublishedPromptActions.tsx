@@ -1,7 +1,7 @@
 import { Box, Button, Text } from "@chakra-ui/react";
 import { useCallback, useState } from "react";
 import { ArrowUp, Copy, RefreshCw } from "react-feather";
-import { LuEllipsisVertical, LuPencil, LuTrash2 } from "react-icons/lu";
+import { LuClock, LuEllipsisVertical, LuPencil, LuTrash2 } from "react-icons/lu";
 import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
@@ -11,6 +11,8 @@ import { CopyPromptDialog } from "~/prompts/components/CopyPromptDialog";
 import { PushToCopiesDialog } from "~/prompts/components/PushToCopiesDialog";
 import { usePrompts } from "~/prompts/hooks/usePrompts";
 import { useRenamePromptHandle } from "~/prompts/hooks/useRenamePromptHandle";
+import { computeInitialFormValuesForPrompt } from "~/prompts/utils/computeInitialFormValuesForPrompt";
+import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { api } from "~/utils/api";
 import { getDisplayHandle } from "./PublishedPromptsList";
@@ -36,6 +38,7 @@ export function PublishedPromptActions({
     useState(false);
   const { deletePrompt } = usePrompts();
   const { project, hasPermission } = useOrganizationTeamProject();
+  const { addTab } = useDraggableTabsBrowserStore(({ addTab }) => ({ addTab }));
   const {
     renameHandle,
     canRename,
@@ -138,6 +141,36 @@ export function PublishedPromptActions({
             </Button>
           </Menu.Trigger>
           <Menu.Content onClick={(event) => event.stopPropagation()}>
+            <Menu.Item
+              value="view-history"
+              onClick={() => {
+                if (!prompt) return;
+                const projectDefaultModel = project?.defaultModel;
+                const normalizedDefaultModel =
+                  typeof projectDefaultModel === "string"
+                    ? projectDefaultModel
+                    : undefined;
+                const defaultValues = computeInitialFormValuesForPrompt({
+                  prompt,
+                  defaultModel: normalizedDefaultModel,
+                  useSystemMessage: true,
+                });
+                addTab({
+                  data: {
+                    chat: { initialMessagesFromSpanData: [] },
+                    form: { currentValues: defaultValues },
+                    meta: {
+                      title: defaultValues.handle ?? null,
+                      versionNumber: defaultValues.versionMetadata?.versionNumber,
+                      openHistoryOnLoad: true,
+                    },
+                    variableValues: {},
+                  },
+                });
+              }}
+            >
+              <LuClock size={16} /> View history
+            </Menu.Item>
             {isCopiedPrompt && (
               <Tooltip
                 content={
