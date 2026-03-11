@@ -25,6 +25,7 @@ import { LuChevronsUpDown, LuList, LuRefreshCw } from "react-icons/lu";
 import { useLocalStorage } from "usehooks-ts";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useTraceDetailsDrawer } from "~/hooks/useTraceDetailsDrawer";
 import { useTraceUpdateListener } from "~/hooks/useTraceUpdateListener";
 import { getEvaluatorDefinitions } from "~/server/evaluations/getEvaluator";
 import type { ElasticSearchEvaluation, Trace } from "~/server/tracer/types";
@@ -77,6 +78,7 @@ export function MessagesTable({
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
+  const { openTraceDetailsDrawer } = useTraceDetailsDrawer();
   const queryClient = api.useContext();
 
   const { filterParams, queryOpts } = useFilterParams();
@@ -275,7 +277,7 @@ export function MessagesTable({
             paddingLeft={2}
             marginRight={1}
             onClick={() =>
-              openDrawer("traceDetails", {
+              openTraceDetailsDrawer({
                 traceId,
                 selectedTab: "messages",
               })
@@ -352,7 +354,7 @@ export function MessagesTable({
           <Table.Cell
             key={index}
             onClick={() =>
-              openDrawer("traceDetails", {
+              openTraceDetailsDrawer({
                 traceId: trace.trace_id,
               })
             }
@@ -438,7 +440,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -457,7 +459,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -480,7 +482,7 @@ export function MessagesTable({
             key={index}
             maxWidth="300px"
             onClick={() =>
-              openDrawer("traceDetails", {
+              openTraceDetailsDrawer({
                 traceId: trace.trace_id,
               })
             }
@@ -514,7 +516,7 @@ export function MessagesTable({
           <Table.Cell
             key={index}
             onClick={() =>
-              openDrawer("traceDetails", {
+              openTraceDetailsDrawer({
                 traceId: trace.trace_id,
               })
             }
@@ -527,7 +529,7 @@ export function MessagesTable({
           <Table.Cell
             key={index}
             onClick={() =>
-              openDrawer("traceDetails", {
+              openTraceDetailsDrawer({
                 traceId: trace.trace_id,
               })
             }
@@ -646,7 +648,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -674,7 +676,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -702,7 +704,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -719,7 +721,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -736,7 +738,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -756,7 +758,7 @@ export function MessagesTable({
           minWidth="300px"
           maxWidth="300px"
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -775,7 +777,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -799,7 +801,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
