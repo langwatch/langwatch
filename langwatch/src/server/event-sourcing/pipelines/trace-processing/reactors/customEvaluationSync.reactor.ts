@@ -154,7 +154,7 @@ export function createCustomEvaluationSyncReactor(
             evaluatorType: "custom",
             evaluatorName: evaluation.name,
             traceId,
-            isGuardrail: evaluation.is_guardrail,
+            isGuardrail: evaluation.is_guardrail ?? undefined,
             occurredAt,
           });
 
