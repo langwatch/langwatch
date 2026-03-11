@@ -73,6 +73,37 @@ describe("CanonicalizeSpanAttributesService — evaluation events", () => {
       ).toBeUndefined();
     });
 
+    describe("when json_encoded_event is already a parsed object", () => {
+      it("maps GenAI semconv attributes from pre-parsed payload", () => {
+        const events: NormalizedEvent[] = [
+          {
+            name: "langwatch.evaluation.custom",
+            timeUnixMs: Date.now(),
+            attributes: {
+              json_encoded_event: {
+                name: "toxicity",
+                score: 0.95,
+                label: "safe",
+              },
+            },
+          },
+        ];
+
+        const result = service.canonicalize({}, events, stubSpan as any);
+
+        expect(result.attributes[ATTR_KEYS.GEN_AI_EVALUATION_NAME]).toBe(
+          "toxicity",
+        );
+        expect(
+          result.attributes[ATTR_KEYS.GEN_AI_EVALUATION_SCORE_VALUE],
+        ).toBe(0.95);
+        expect(
+          result.attributes[ATTR_KEYS.GEN_AI_EVALUATION_SCORE_LABEL],
+        ).toBe("safe");
+        expect(result.appliedRules).toContain("langwatch:evaluation.custom");
+      });
+    });
+
     it("records the langwatch:evaluation.custom rule", () => {
       const events: NormalizedEvent[] = [
         {
