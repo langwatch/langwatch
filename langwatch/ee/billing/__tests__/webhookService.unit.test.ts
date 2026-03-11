@@ -39,6 +39,9 @@ const createMockOrganizationRepository = () => ({
   findProjectsWithName: vi.fn(),
   clearTrialLicense: vi.fn(),
   updateCurrency: vi.fn(),
+  getPricingModel: vi.fn(),
+  getStripeCustomerId: vi.fn(),
+  findNameById: vi.fn(),
 });
 
 const createMockItemCalculator = () => ({

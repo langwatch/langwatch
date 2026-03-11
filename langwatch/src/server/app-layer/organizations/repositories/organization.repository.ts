@@ -45,6 +45,11 @@ export interface OrganizationRepository {
     organizationId: string;
     currency: string;
   }): Promise<void>;
+  getPricingModel(organizationId: string): Promise<string | null>;
+  getStripeCustomerId(organizationId: string): Promise<string | null>;
+  findNameById(
+    organizationId: string,
+  ): Promise<{ id: string; name: string } | null>;
 }
 
 export class NullOrganizationRepository implements OrganizationRepository {
@@ -88,4 +93,18 @@ export class NullOrganizationRepository implements OrganizationRepository {
     organizationId: string;
     currency: string;
   }): Promise<void> {}
+
+  async getPricingModel(_organizationId: string): Promise<string | null> {
+    return null;
+  }
+
+  async getStripeCustomerId(_organizationId: string): Promise<string | null> {
+    return null;
+  }
+
+  async findNameById(
+    _organizationId: string,
+  ): Promise<{ id: string; name: string } | null> {
+    return null;
+  }
 }

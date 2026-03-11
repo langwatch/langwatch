@@ -92,4 +92,30 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       data: { currency: input.currency as Currency },
     });
   }
+
+  async getPricingModel(organizationId: string): Promise<string | null> {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { pricingModel: true },
+    });
+    return org?.pricingModel ?? null;
+  }
+
+  async getStripeCustomerId(organizationId: string): Promise<string | null> {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { stripeCustomerId: true },
+    });
+    return org?.stripeCustomerId ?? null;
+  }
+
+  async findNameById(
+    organizationId: string,
+  ): Promise<{ id: string; name: string } | null> {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { id: true, name: true },
+    });
+    return org ?? null;
+  }
 }

@@ -2,7 +2,9 @@ import { Currency, type OrganizationUserRole, type PrismaClient } from "@prisma/
 import type Stripe from "stripe";
 import type { DisplayInvoice, SubscriptionService } from "../../../src/server/app-layer/subscription/subscription.service";
 import type { SubscriptionRepository } from "../../../src/server/app-layer/subscription/subscription.repository";
-import { OrganizationRepository } from "../../../src/server/repositories/organization.repository";
+import type { OrganizationRepository } from "../../../src/server/app-layer/organizations/repositories/organization.repository";
+import { PrismaOrganizationRepository } from "../../../src/server/app-layer/organizations/repositories/organization.prisma.repository";
+import { traced } from "../../../src/server/app-layer/tracing";
 import { getApp } from "../../../src/server/app-layer/app";
 import {
   type PlanTypes as PlanType,
@@ -26,6 +28,8 @@ import { isGrowthSeatEventPlan, type BillingInterval } from "../utils/growthSeat
 import type { SeatEventSubscriptionFns } from "./seatEventSubscription";
 import { PrismaSubscriptionRepository } from "./subscription.repository";
 
+export const RECENT_INVOICES_LIMIT = 4;
+
 type ItemCalculator = {
   getItemsToUpdate: typeof getItemsToUpdate;
   createItemsToAdd: typeof createItemsToAdd;
@@ -36,8 +40,8 @@ type ItemCalculator = {
  * EE (SaaS) implementation of {@link SubscriptionService}.
  * Manages Stripe subscription lifecycle: checkouts, upgrades, cancellations, billing portal.
  *
- * Uses {@link SubscriptionRepository} for subscription-table operations and direct
- * prisma calls for organization/team lookups (following the same pattern as DatasetService).
+ * Uses {@link SubscriptionRepository} for subscription-table operations and
+ * {@link OrganizationRepository} for organization lookups via interface-based DI.
  */
 export class EESubscriptionService implements SubscriptionService {
   private readonly prisma: PrismaClient;
@@ -83,17 +87,20 @@ export class EESubscriptionService implements SubscriptionService {
     db: PrismaClient;
     itemCalculator: ItemCalculator;
     seatEventFns?: SeatEventSubscriptionFns;
-  }): EESubscriptionService {
+  }): SubscriptionService {
     const repository = new PrismaSubscriptionRepository(db);
-    const organizationRepository = new OrganizationRepository(db);
-    return new EESubscriptionService({
-      prisma: db,
-      repository,
-      stripe,
-      itemCalculator,
-      organizationRepository,
-      seatEventFns,
-    });
+    const organizationRepository = new PrismaOrganizationRepository(db);
+    return traced(
+      new EESubscriptionService({
+        prisma: db,
+        repository,
+        stripe,
+        itemCalculator,
+        organizationRepository,
+        seatEventFns,
+      }),
+      "EESubscriptionService",
+    );
   }
 
   async getLastNonCancelledSubscription(organizationId: string) {
@@ -119,11 +126,9 @@ export class EESubscriptionService implements SubscriptionService {
     const effectiveTraces = upgradeTraces ? totalTraces : 0;
 
     if (this.seatEventFns) {
-      const org = await this.prisma.organization.findUnique({
-        where: { id: organizationId },
-        select: { pricingModel: true },
-      });
-      if (org?.pricingModel === "SEAT_EVENT") {
+      const pricingModel =
+        await this.organizationRepository.getPricingModel(organizationId);
+      if (pricingModel === "SEAT_EVENT") {
         return this.seatEventFns.updateSeatEventItems({
           organizationId,
           totalMembers: effectiveMembers,
@@ -183,10 +188,8 @@ export class EESubscriptionService implements SubscriptionService {
     billingInterval?: BillingInterval;
   }): Promise<{ url: string | null }> {
     if (isGrowthSeatEventPlan(plan) && this.seatEventFns) {
-      const org = await this.prisma.organization.findUnique({
-        where: { id: organizationId },
-        select: { pricingModel: true },
-      });
+      const pricingModel =
+        await this.organizationRepository.getPricingModel(organizationId);
 
       return this.seatEventFns.createSeatEventCheckout({
         organizationId,
@@ -195,7 +198,7 @@ export class EESubscriptionService implements SubscriptionService {
         currency: currency ?? Currency.EUR,
         billingInterval: billingInterval ?? "monthly",
         membersToAdd,
-        isUpgradeFromTiered: org?.pricingModel === "TIERED",
+        isUpgradeFromTiered: pricingModel === "TIERED",
       });
     }
 
@@ -248,12 +251,10 @@ export class EESubscriptionService implements SubscriptionService {
     baseUrl: string;
     organizationId: string;
   }): Promise<{ url: string }> {
-    if (this.seatEventFns && organizationId) {
-      const org = await this.prisma.organization.findUnique({
-        where: { id: organizationId },
-        select: { pricingModel: true },
-      });
-      if (org?.pricingModel === "SEAT_EVENT") {
+    if (this.seatEventFns) {
+      const pricingModel =
+        await this.organizationRepository.getPricingModel(organizationId);
+      if (pricingModel === "SEAT_EVENT") {
         return this.seatEventFns.seatEventBillingPortalUrl({
           customerId,
           baseUrl,
@@ -307,6 +308,7 @@ export class EESubscriptionService implements SubscriptionService {
       throw new SeatBillingUnavailableError();
     }
 
+    // TECH-DEBT: extract to TeamRepository
     const firstTeam = await this.prisma.team.findFirst({
       where: { organizationId },
       orderBy: { createdAt: "asc" },
@@ -315,10 +317,8 @@ export class EESubscriptionService implements SubscriptionService {
 
     const teamIds = firstTeam?.id ?? "";
 
-    const org = await this.prisma.organization.findUnique({
-      where: { id: organizationId },
-      select: { pricingModel: true },
-    });
+    const pricingModel =
+      await this.organizationRepository.getPricingModel(organizationId);
 
     return this.seatEventFns.createSeatEventCheckout({
       organizationId,
@@ -327,7 +327,7 @@ export class EESubscriptionService implements SubscriptionService {
       currency: currency ?? Currency.EUR,
       billingInterval: billingInterval ?? "monthly",
       membersToAdd,
-      isUpgradeFromTiered: org?.pricingModel === "TIERED",
+      isUpgradeFromTiered: pricingModel === "TIERED",
       invites: invites.map((inv) => ({
         email: inv.email,
         role: inv.role,
@@ -351,9 +351,8 @@ export class EESubscriptionService implements SubscriptionService {
     note?: string;
     actorEmail: string;
   }): Promise<{ success: boolean }> {
-    const organization = await this.prisma.organization.findUnique({
-      where: { id: organizationId },
-    });
+    const organization =
+      await this.organizationRepository.findNameById(organizationId);
 
     if (!organization) {
       throw new OrganizationNotFoundError();
@@ -386,7 +385,7 @@ export class EESubscriptionService implements SubscriptionService {
 
     const invoices = await this.stripe.invoices.list({
       customer: stripeCustomerId,
-      limit: 4,
+      limit: RECENT_INVOICES_LIMIT,
     });
 
     return invoices.data
