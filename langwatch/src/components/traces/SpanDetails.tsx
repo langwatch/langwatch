@@ -50,11 +50,7 @@ export function SpanDetails({ span }: { project: Project; span: Span }) {
   const { buildUrl } = useGoToSpanInPlaygroundTabUrlBuilder();
 
   const canOpenSpanInPromptStudio = useMemo(() => {
-    return (
-      span.type === "llm" &&
-      span.span_id &&
-      span.input?.type === "chat_messages"
-    );
+    return span.type === "llm" && !!span.span_id;
   }, [span]);
 
   return (
