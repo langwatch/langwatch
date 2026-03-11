@@ -235,7 +235,7 @@ describe("<SuiteSidebar/>", () => {
         ],
       ]);
 
-      it("displays pass count and total", () => {
+      it("displays pass count", () => {
         render(
           <SuiteSidebar
             {...defaultProps}
@@ -245,7 +245,7 @@ describe("<SuiteSidebar/>", () => {
           { wrapper: Wrapper },
         );
 
-        expect(screen.getByText(/8\/8 passed/)).toBeInTheDocument();
+        expect(screen.getByText(/8 passed/)).toBeInTheDocument();
       });
 
       it("displays a checkmark status icon", () => {
@@ -287,7 +287,7 @@ describe("<SuiteSidebar/>", () => {
         ],
       ]);
 
-      it("displays pass count and total showing the gap", () => {
+      it("displays pass count", () => {
         render(
           <SuiteSidebar
             {...defaultProps}
@@ -297,7 +297,7 @@ describe("<SuiteSidebar/>", () => {
           { wrapper: Wrapper },
         );
 
-        expect(screen.getByText(/9\/12 passed/)).toBeInTheDocument();
+        expect(screen.getByText(/9 passed/)).toBeInTheDocument();
       });
 
       it("displays an error status icon", () => {
@@ -363,7 +363,7 @@ describe("<SuiteSidebar/>", () => {
           { wrapper: Wrapper },
         );
 
-        expect(screen.getByText(/7\/8 passed/)).toBeInTheDocument();
+        expect(screen.getByText(/7 passed/)).toBeInTheDocument();
 
         const updatedSummaries = new Map([
           [
@@ -386,8 +386,8 @@ describe("<SuiteSidebar/>", () => {
           </Wrapper>,
         );
 
-        expect(screen.getByText(/8\/8 passed/)).toBeInTheDocument();
-        expect(screen.queryByText(/7\/8 passed/)).not.toBeInTheDocument();
+        expect(screen.getByText(/8 passed/)).toBeInTheDocument();
+        expect(screen.queryByText(/7 passed/)).not.toBeInTheDocument();
       });
     });
   });
