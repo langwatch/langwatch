@@ -18,8 +18,9 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import { signIn, signOut } from "next-auth/react";
 import numeral from "numeral";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useDrawer } from "../hooks/useDrawer";
+import { useLiteMemberGuard } from "../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { useUpgradeModalStore } from "../stores/upgradeModalStore";
 import { UpgradeModal } from "./UpgradeModal";
@@ -641,6 +642,8 @@ export const DashboardLayout = ({
 
             <CurrentDrawer />
 
+            <LiteMemberRestrictionOverlay />
+
             {userIsPartOfTeam ? (
               showSavedViews ? (
                 <SavedViewsProvider>
@@ -675,6 +678,35 @@ export const DashboardLayout = ({
     </Box>
   );
 };
+
+/**
+ * Overlay that blocks the content area when a lite member navigates
+ * to a restricted route. Opens the restriction modal on mount and
+ * renders a semi-transparent backdrop so the page remains visible
+ * but non-interactive.
+ */
+function LiteMemberRestrictionOverlay() {
+  const { isRestricted } = useLiteMemberGuard();
+  const { openLiteMemberRestriction } = useUpgradeModalStore();
+
+  useEffect(() => {
+    if (isRestricted) {
+      openLiteMemberRestriction({});
+    }
+  }, [isRestricted, openLiteMemberRestriction]);
+
+  if (!isRestricted) return null;
+
+  return (
+    <Box
+      position="absolute"
+      inset={0}
+      zIndex="overlay"
+      backgroundColor="blackAlpha.200"
+      pointerEvents="auto"
+    />
+  );
+}
 
 function GlobalUpgradeModal() {
   const { isOpen, variant, close } = useUpgradeModalStore();
