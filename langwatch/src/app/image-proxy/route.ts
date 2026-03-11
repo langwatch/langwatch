@@ -39,8 +39,8 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const imageBlob = await response.blob();
-    return new NextResponse(imageBlob, {
+    const imageBuffer = await response.arrayBuffer();
+    return new NextResponse(imageBuffer, {
       headers: {
         "Content-Type": contentType,
         "Cache-Control": "public, max-age=31536000",

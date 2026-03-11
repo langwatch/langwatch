@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
+import type { Response as UndiciResponse } from "undici";
 import { GET } from "../route";
 import { NextRequest } from "next/server";
 
@@ -17,14 +18,13 @@ function makeRequest(url: string | null): NextRequest {
 }
 
 function makeImageResponse(contentType = "image/png", status = 200) {
-  const blob = new Blob(["fake-image-data"], { type: contentType });
   return {
     ok: status >= 200 && status < 300,
     status,
     statusText: status === 200 ? "OK" : "Not Found",
     headers: new Headers({ "content-type": contentType }),
-    blob: () => Promise.resolve(blob),
-  } as unknown as Response;
+    arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
+  } as unknown as UndiciResponse;
 }
 
 describe("GET /image-proxy", () => {
