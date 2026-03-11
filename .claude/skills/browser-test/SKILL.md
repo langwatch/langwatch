@@ -17,27 +17,27 @@ Parse `$ARGUMENTS` for:
 
 If a feature file path is given, read it and extract the scenarios. If a plain description is given, use it directly. If neither is provided, ask the user what to verify.
 
-## Port Discovery
+## Port Discovery & App Lifecycle
 
-Resolve the port in this order:
-1. Explicit port in `$ARGUMENTS`
-2. Read `.dev-port` file in the repo root (written by `scripts/dev-up.sh`)
-3. Ask the user
+Resolve the port in this order — **do not ask the user for a port**:
+1. Explicit port in `$ARGUMENTS` → use it
+2. Read `.dev-port` file in the repo root → source it for `APP_PORT`
+3. **No port and no `.dev-port`?** → run `scripts/dev-up.sh` to start an isolated dev instance, then read the `.dev-port` it creates
 
 ```bash
-# .dev-port format:
+# .dev-port format (written by dev-up.sh):
 APP_PORT=5560
 BASE_URL=http://localhost:5560
 COMPOSE_PROJECT_NAME=langwatch-abcd1234
 ```
 
+If you started the app (step 3), you own the lifecycle — run `scripts/dev-down.sh` when the browser test is complete.
+
 ## Before You Start
 
-When running interactively (not invoked by `/orchestrate`):
-1. **Which browser?** Ask the user — Chrome (Chromium) or Firefox
-2. Confirm the port if not resolved via `.dev-port` or arguments
+Always use Chromium. Do not prompt for browser choice.
 
-When invoked by `/orchestrate`, skip prompts — use Chromium and the `.dev-port` values.
+Skip all interactive prompts — resolve everything automatically. The only reason to ask the user anything is if you need credentials for auth and can't find them.
 
 ## Artifact Directory
 
@@ -120,5 +120,5 @@ https://raw.githubusercontent.com/OWNER/REPO/BRANCH/browser-tests/<feature-name>
 - Use `browser_snapshot` (accessibility tree) for interactions, not screenshots — it's faster and gives you element refs
 - Use `browser_take_screenshot` to capture each key verification step and failures
 - Don't create any test files — this is interactive verification only
-- If the app isn't running and `.dev-port` doesn't exist, tell the caller and stop
+- If the app isn't running and `.dev-port` doesn't exist, run `scripts/dev-up.sh` to start one — don't ask, just do it
 - If a page requires auth/login, walk through login first and ask the user for credentials if needed
