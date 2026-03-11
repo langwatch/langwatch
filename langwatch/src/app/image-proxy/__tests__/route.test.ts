@@ -1,175 +1,139 @@
-import { describe, expect, it, vi } from "vitest";
-import { isSafeImageUrl } from "../route";
+import { describe, expect, it, vi, beforeEach } from "vitest";
+import { GET } from "../route";
+import { NextRequest } from "next/server";
 
-// Mock DNS so tests are deterministic and don't hit the network.
-// resolvesToPrivateAddress is only called for non-IP hostnames that pass the
-// fast-path pattern check, so we only need to cover "example.com" here.
-vi.mock("node:dns/promises", () => ({
-  default: {
-    resolve4: vi.fn().mockResolvedValue(["93.184.216.34"]),
-    resolve6: vi.fn().mockResolvedValue([]),
-  },
+// Mock the shared SSRF utility so tests are deterministic and don't hit the network.
+vi.mock("../../../utils/ssrfProtection", () => ({
+  ssrfSafeFetch: vi.fn(),
 }));
 
-describe("isSafeImageUrl", () => {
-  describe("when URL is valid and external", () => {
-    it("accepts https image URLs", async () => {
-      expect(await isSafeImageUrl("https://example.com/image.png")).toBe(true);
-    });
+import { ssrfSafeFetch } from "../../../utils/ssrfProtection";
 
-    it("accepts http image URLs", async () => {
-      expect(await isSafeImageUrl("http://example.com/image.jpg")).toBe(true);
-    });
+function makeRequest(url: string | null): NextRequest {
+  const rawUrl = url
+    ? `http://localhost/api/image-proxy?url=${encodeURIComponent(url)}`
+    : "http://localhost/api/image-proxy";
+  return new NextRequest(rawUrl);
+}
 
-    it("accepts URLs with ports", async () => {
-      expect(
-        await isSafeImageUrl("https://example.com:8080/image.png"),
-      ).toBe(true);
+function makeImageResponse(contentType = "image/png", status = 200) {
+  const blob = new Blob(["fake-image-data"], { type: contentType });
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    statusText: status === 200 ? "OK" : "Not Found",
+    headers: new Headers({ "content-type": contentType }),
+    blob: () => Promise.resolve(blob),
+  } as unknown as Response;
+}
+
+describe("GET /image-proxy", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe("when url param is missing", () => {
+    it("returns 400", async () => {
+      const res = await GET(makeRequest(null));
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toBe("Missing url");
     });
   });
 
-  describe("when URL has a disallowed scheme", () => {
+  describe("when url is malformed", () => {
+    it("returns 400 for a plain string", async () => {
+      const res = await GET(makeRequest("not-a-url"));
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe("when url has a disallowed scheme", () => {
     it("rejects javascript: URLs", async () => {
-      expect(await isSafeImageUrl("javascript:alert(1)")).toBe(false);
+      const res = await GET(makeRequest("javascript:alert(1)"));
+      expect(res.status).toBe(400);
+      expect(ssrfSafeFetch).not.toHaveBeenCalled();
     });
 
     it("rejects file: URLs", async () => {
-      expect(await isSafeImageUrl("file:///etc/passwd")).toBe(false);
+      const res = await GET(makeRequest("file:///etc/passwd"));
+      expect(res.status).toBe(400);
+      expect(ssrfSafeFetch).not.toHaveBeenCalled();
     });
 
     it("rejects ftp: URLs", async () => {
-      expect(await isSafeImageUrl("ftp://example.com/image.png")).toBe(false);
+      const res = await GET(makeRequest("ftp://example.com/image.png"));
+      expect(res.status).toBe(400);
+      expect(ssrfSafeFetch).not.toHaveBeenCalled();
     });
   });
 
-  describe("when URL is malformed", () => {
-    it("rejects plain strings", async () => {
-      expect(await isSafeImageUrl("not-a-url")).toBe(false);
-    });
-
-    it("rejects empty string", async () => {
-      expect(await isSafeImageUrl("")).toBe(false);
+  describe("when ssrfSafeFetch blocks the URL", () => {
+    it("returns 500 when ssrfSafeFetch throws", async () => {
+      vi.mocked(ssrfSafeFetch).mockRejectedValueOnce(
+        new Error("Access to private or localhost IP addresses is not allowed"),
+      );
+      const res = await GET(makeRequest("http://192.168.1.1/image.png"));
+      expect(res.status).toBe(500);
+      const body = await res.json();
+      expect(body.error).toBe("Failed to fetch image");
     });
   });
 
-  describe("when URL targets a private or internal host", () => {
-    it("rejects localhost", async () => {
-      expect(await isSafeImageUrl("http://localhost/image.png")).toBe(false);
-    });
-
-    it("rejects 127.0.0.1", async () => {
-      expect(await isSafeImageUrl("http://127.0.0.1/image.png")).toBe(false);
-    });
-
-    it("rejects 127.x.x.x loopback range", async () => {
-      expect(await isSafeImageUrl("http://127.0.0.2/image.png")).toBe(false);
-    });
-
-    it("rejects 10.x private range", async () => {
-      expect(await isSafeImageUrl("http://10.0.0.1/image.png")).toBe(false);
-    });
-
-    it("rejects 172.16.x private range", async () => {
-      expect(await isSafeImageUrl("http://172.16.0.1/image.png")).toBe(false);
-    });
-
-    it("rejects 172.31.x private range", async () => {
-      expect(await isSafeImageUrl("http://172.31.255.255/image.png")).toBe(
-        false,
+  describe("when the remote server returns a non-OK status", () => {
+    it("proxies the error status", async () => {
+      vi.mocked(ssrfSafeFetch).mockResolvedValueOnce(
+        makeImageResponse("image/png", 404),
       );
-    });
-
-    it("accepts 172.32.x (outside private range)", async () => {
-      expect(await isSafeImageUrl("http://172.32.0.1/image.png")).toBe(true);
-    });
-
-    it("rejects 192.168.x private range", async () => {
-      expect(await isSafeImageUrl("http://192.168.1.1/image.png")).toBe(false);
-    });
-
-    it("rejects IPv6 loopback ::1", async () => {
-      expect(await isSafeImageUrl("http://[::1]/image.png")).toBe(false);
-    });
-
-    it("rejects 0.0.0.0", async () => {
-      expect(await isSafeImageUrl("http://0.0.0.0/image.png")).toBe(false);
-    });
-
-    it("rejects link-local 169.254.x range", async () => {
-      expect(
-        await isSafeImageUrl("http://169.254.169.254/latest/meta-data"),
-      ).toBe(false);
-    });
-
-    it("rejects IPv4-mapped IPv6 ::ffff:127.0.0.1", async () => {
-      expect(
-        await isSafeImageUrl("http://[::ffff:127.0.0.1]/image.png"),
-      ).toBe(false);
-    });
-
-    it("rejects IPv4-mapped IPv6 ::ffff:192.168.1.1", async () => {
-      expect(
-        await isSafeImageUrl("http://[::ffff:192.168.1.1]/image.png"),
-      ).toBe(false);
-    });
-
-    it("rejects IPv6 unique-local fc00::/7 (fc prefix)", async () => {
-      expect(await isSafeImageUrl("http://[fc00::1]/image.png")).toBe(false);
-    });
-
-    it("rejects IPv6 unique-local fc00::/7 (fd prefix)", async () => {
-      expect(
-        await isSafeImageUrl("http://[fd12:3456:789a::1]/image.png"),
-      ).toBe(false);
-    });
-
-    it("rejects IPv6 link-local fe80::/10", async () => {
-      expect(await isSafeImageUrl("http://[fe80::1]/image.png")).toBe(false);
+      const res = await GET(makeRequest("https://example.com/missing.png"));
+      expect(res.status).toBe(404);
     });
   });
 
-  describe("when hostname resolves to a private IP via DNS", () => {
-    it("rejects a domain that resolves to 127.0.0.1", async () => {
-      const { default: dns } = await import("node:dns/promises");
-      vi.mocked(dns.resolve4).mockResolvedValueOnce(["127.0.0.1"]);
-      vi.mocked(dns.resolve6).mockResolvedValueOnce([]);
-      expect(await isSafeImageUrl("http://evil.example.com/image.png")).toBe(
-        false,
+  describe("when the response is not an image", () => {
+    it("returns 400 for text/html content type", async () => {
+      vi.mocked(ssrfSafeFetch).mockResolvedValueOnce(
+        makeImageResponse("text/html", 200),
+      );
+      const res = await GET(makeRequest("https://example.com/page.html"));
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toBe("URL does not point to an image");
+    });
+  });
+
+  describe("when the URL points to a valid image", () => {
+    it("proxies the image with correct headers for https URL", async () => {
+      vi.mocked(ssrfSafeFetch).mockResolvedValueOnce(
+        makeImageResponse("image/png"),
+      );
+      const res = await GET(
+        makeRequest("https://example.com/image.png"),
+      );
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toBe("image/png");
+      expect(res.headers.get("cache-control")).toBe(
+        "public, max-age=31536000",
       );
     });
 
-    it("rejects a domain that resolves to a private 10.x IP", async () => {
-      const { default: dns } = await import("node:dns/promises");
-      vi.mocked(dns.resolve4).mockResolvedValueOnce(["10.0.0.1"]);
-      vi.mocked(dns.resolve6).mockResolvedValueOnce([]);
-      expect(
-        await isSafeImageUrl("http://internal.corp.example.com/image.png"),
-      ).toBe(false);
+    it("proxies the image with correct headers for http URL", async () => {
+      vi.mocked(ssrfSafeFetch).mockResolvedValueOnce(
+        makeImageResponse("image/jpeg"),
+      );
+      const res = await GET(makeRequest("http://example.com/photo.jpg"));
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toBe("image/jpeg");
     });
 
-    it("rejects a domain that resolves to any private IP even alongside public IPs", async () => {
-      const { default: dns } = await import("node:dns/promises");
-      vi.mocked(dns.resolve4).mockResolvedValueOnce([
-        "93.184.216.34",
-        "192.168.1.1",
-      ]);
-      vi.mocked(dns.resolve6).mockResolvedValueOnce([]);
-      expect(
-        await isSafeImageUrl("http://mixed.example.com/image.png"),
-      ).toBe(false);
-    });
-
-    it("rejects a domain whose DNS cannot be resolved", async () => {
-      const { default: dns } = await import("node:dns/promises");
-      vi.mocked(dns.resolve4).mockRejectedValueOnce(
-        new Error("ENOTFOUND nxdomain.example.com"),
+    it("passes the url to ssrfSafeFetch", async () => {
+      vi.mocked(ssrfSafeFetch).mockResolvedValueOnce(
+        makeImageResponse("image/gif"),
       );
-      vi.mocked(dns.resolve6).mockRejectedValueOnce(
-        new Error("ENOTFOUND nxdomain.example.com"),
+      await GET(makeRequest("https://example.com/anim.gif"));
+      expect(ssrfSafeFetch).toHaveBeenCalledWith(
+        "https://example.com/anim.gif",
       );
-      expect(
-        await isSafeImageUrl("http://nxdomain.example.com/image.png"),
-      ).toBe(false);
     });
   });
 });
