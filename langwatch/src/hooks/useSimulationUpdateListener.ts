@@ -76,6 +76,8 @@ export function useSimulationUpdateListener({
 
     // Invalidate sidebar batch history queries so they refetch too
     void trpcUtils.scenarios.getScenarioSetBatchHistory.invalidate();
+    // Invalidate suite run data queries so RunHistoryPanel refreshes
+    void trpcUtils.scenarios.getSuiteRunData.invalidate();
 
     if (refetch) {
       void refetch();
