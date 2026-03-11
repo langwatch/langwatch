@@ -20,7 +20,6 @@ Simple slash commands that provide instructions to Claude without spawning agent
 |---------|---------|
 | `/onboard` | Orientation via sherpa + code review |
 | `/refocus` | Compact context and realign with BDD workflow |
-| `/pr-review` | Address PR comments from Code Rabbit/reviewers |
 | `/worktree` | Create git worktree with proper setup |
 | `/review` | Quick review invocation (same thread) |
 | `/sherpa` | Quick sherpa invocation (same thread) |

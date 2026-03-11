@@ -93,19 +93,27 @@ describe("clickHouseFilterConditions", () => {
   });
 
   describe("metadata filters", () => {
-    it("generates user_id filter with correct attribute path", () => {
+    it("generates user_id filter with langwatch.user_id attribute key", () => {
       const builder = clickHouseFilterConditions["metadata.user_id"];
       const result = builder!(["user1"], "f0");
       expect(result.sql).toBe(
-        "ts.Attributes['user.id'] IN ({f0_values:Array(String)})"
+        "ts.Attributes['langwatch.user_id'] IN ({f0_values:Array(String)})"
       );
     });
 
-    it("generates thread_id filter with correct attribute path", () => {
+    it("generates thread_id filter with gen_ai.conversation.id attribute key", () => {
       const builder = clickHouseFilterConditions["metadata.thread_id"];
       const result = builder!(["thread1"], "f0");
       expect(result.sql).toBe(
-        "ts.Attributes['thread.id'] IN ({f0_values:Array(String)})"
+        "ts.Attributes['gen_ai.conversation.id'] IN ({f0_values:Array(String)})"
+      );
+    });
+
+    it("generates customer_id filter with langwatch.customer_id attribute key", () => {
+      const builder = clickHouseFilterConditions["metadata.customer_id"];
+      const result = builder!(["cust1"], "f0");
+      expect(result.sql).toBe(
+        "ts.Attributes['langwatch.customer_id'] IN ({f0_values:Array(String)})"
       );
     });
   });

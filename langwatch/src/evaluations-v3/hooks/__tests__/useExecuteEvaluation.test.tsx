@@ -959,6 +959,490 @@ describe("useExecuteEvaluation", () => {
     });
   });
 
+  describe("evaluator-only scope execution", () => {
+    describe("when scope is evaluator-all-rows", () => {
+      it("preserves existing target outputs", async () => {
+        setupStore();
+
+        // Add evaluators and pre-populate results
+        useEvaluationsV3Store.setState((state) => ({
+          ...state,
+          evaluators: [
+            {
+              id: "eval-1",
+              evaluatorType: "langevals/exact_match",
+              settings: {},
+              inputs: [],
+              mappings: {},
+            },
+            {
+              id: "eval-2",
+              evaluatorType: "custom/contains",
+              settings: {},
+              inputs: [],
+              mappings: {},
+            },
+          ],
+          results: {
+            ...state.results,
+            targetOutputs: {
+              "target-1": [{ output: "Hello" }, { output: "World" }],
+            },
+            targetMetadata: {
+              "target-1": [
+                { cost: 0.01, duration: 100, traceId: "trace-1" },
+                { cost: 0.02, duration: 200, traceId: "trace-2" },
+              ],
+            },
+            errors: {
+              "target-1": [undefined, "Some previous error"] as any,
+            },
+            evaluatorResults: {
+              "target-1": {
+                "eval-1": [
+                  { status: "processed", passed: true, score: 1 },
+                  { status: "processed", passed: false, score: 0 },
+                ],
+                "eval-2": [
+                  { status: "processed", passed: true, score: 0.8 },
+                  { status: "processed", passed: true, score: 0.9 },
+                ],
+              },
+            },
+          },
+        }));
+
+        // Setup SSE mock
+        mockFetchSSE.mockImplementation(async () => {
+          await new Promise(() => {});
+        });
+
+        const { result } = renderHook(() => useExecuteEvaluation());
+
+        // Run evaluator on all rows
+        act(() => {
+          void result.current.runEvaluatorOnAllRows("target-1", "eval-1");
+        });
+
+        // Wait for state update
+        await waitFor(() => {
+          const state = useEvaluationsV3Store.getState();
+
+          // Target outputs must be preserved (NOT cleared)
+          expect(state.results.targetOutputs["target-1"]?.[0]).toEqual({
+            output: "Hello",
+          });
+          expect(state.results.targetOutputs["target-1"]?.[1]).toEqual({
+            output: "World",
+          });
+        });
+      });
+
+      it("preserves existing target metadata", async () => {
+        setupStore();
+
+        useEvaluationsV3Store.setState((state) => ({
+          ...state,
+          evaluators: [
+            {
+              id: "eval-1",
+              evaluatorType: "langevals/exact_match",
+              settings: {},
+              inputs: [],
+              mappings: {},
+            },
+          ],
+          results: {
+            ...state.results,
+            targetOutputs: {
+              "target-1": [{ output: "Hello" }, { output: "World" }],
+            },
+            targetMetadata: {
+              "target-1": [
+                { cost: 0.01, duration: 100, traceId: "trace-1" },
+                { cost: 0.02, duration: 200, traceId: "trace-2" },
+              ],
+            },
+            evaluatorResults: {
+              "target-1": {
+                "eval-1": [
+                  { status: "processed", passed: true, score: 1 },
+                  { status: "processed", passed: false, score: 0 },
+                ],
+              },
+            },
+          },
+        }));
+
+        mockFetchSSE.mockImplementation(async () => {
+          await new Promise(() => {});
+        });
+
+        const { result } = renderHook(() => useExecuteEvaluation());
+
+        act(() => {
+          void result.current.runEvaluatorOnAllRows("target-1", "eval-1");
+        });
+
+        await waitFor(() => {
+          const state = useEvaluationsV3Store.getState();
+
+          // Target metadata must be preserved
+          expect(state.results.targetMetadata["target-1"]?.[0]).toEqual({
+            cost: 0.01,
+            duration: 100,
+            traceId: "trace-1",
+          });
+          expect(state.results.targetMetadata["target-1"]?.[1]).toEqual({
+            cost: 0.02,
+            duration: 200,
+            traceId: "trace-2",
+          });
+        });
+      });
+
+      it("preserves existing errors", async () => {
+        setupStore();
+
+        useEvaluationsV3Store.setState((state) => ({
+          ...state,
+          evaluators: [
+            {
+              id: "eval-1",
+              evaluatorType: "langevals/exact_match",
+              settings: {},
+              inputs: [],
+              mappings: {},
+            },
+          ],
+          results: {
+            ...state.results,
+            targetOutputs: {
+              "target-1": [{ output: "Hello" }, undefined] as any,
+            },
+            errors: {
+              "target-1": [undefined, "Target failed for row 1"] as any,
+            },
+            evaluatorResults: {
+              "target-1": {
+                "eval-1": [
+                  { status: "processed", passed: true, score: 1 },
+                  undefined,
+                ] as any,
+              },
+            },
+          },
+        }));
+
+        mockFetchSSE.mockImplementation(async () => {
+          await new Promise(() => {});
+        });
+
+        const { result } = renderHook(() => useExecuteEvaluation());
+
+        // Only row 0 has an output, so only row 0 will be included
+        act(() => {
+          void result.current.runEvaluatorOnAllRows("target-1", "eval-1");
+        });
+
+        await waitFor(() => {
+          const state = useEvaluationsV3Store.getState();
+
+          // Errors must be preserved
+          expect(state.results.errors["target-1"]?.[1]).toBe(
+            "Target failed for row 1",
+          );
+        });
+      });
+
+      it("clears only the specific evaluator results, not other evaluators", async () => {
+        setupStore();
+
+        useEvaluationsV3Store.setState((state) => ({
+          ...state,
+          evaluators: [
+            {
+              id: "eval-1",
+              evaluatorType: "langevals/exact_match",
+              settings: {},
+              inputs: [],
+              mappings: {},
+            },
+            {
+              id: "eval-2",
+              evaluatorType: "custom/contains",
+              settings: {},
+              inputs: [],
+              mappings: {},
+            },
+          ],
+          results: {
+            ...state.results,
+            targetOutputs: {
+              "target-1": [{ output: "Hello" }, { output: "World" }],
+            },
+            targetMetadata: {
+              "target-1": [
+                { cost: 0.01, duration: 100, traceId: "trace-1" },
+                { cost: 0.02, duration: 200, traceId: "trace-2" },
+              ],
+            },
+            evaluatorResults: {
+              "target-1": {
+                "eval-1": [
+                  { status: "processed", passed: true, score: 1 },
+                  { status: "processed", passed: false, score: 0 },
+                ],
+                "eval-2": [
+                  { status: "processed", passed: true, score: 0.8 },
+                  { status: "processed", passed: true, score: 0.9 },
+                ],
+              },
+            },
+          },
+        }));
+
+        mockFetchSSE.mockImplementation(async () => {
+          await new Promise(() => {});
+        });
+
+        const { result } = renderHook(() => useExecuteEvaluation());
+
+        act(() => {
+          void result.current.runEvaluatorOnAllRows("target-1", "eval-1");
+        });
+
+        await waitFor(() => {
+          const state = useEvaluationsV3Store.getState();
+
+          // eval-2 results must be preserved (not cleared)
+          expect(
+            state.results.evaluatorResults["target-1"]?.["eval-2"]?.[0],
+          ).toEqual({ status: "processed", passed: true, score: 0.8 });
+          expect(
+            state.results.evaluatorResults["target-1"]?.["eval-2"]?.[1],
+          ).toEqual({ status: "processed", passed: true, score: 0.9 });
+        });
+      });
+    });
+
+    describe("when scope is evaluator-all-rows (loading state)", () => {
+      it("sets evaluator results to running status instead of clearing them", async () => {
+        setupStore();
+
+        useEvaluationsV3Store.setState((state) => ({
+          ...state,
+          evaluators: [
+            {
+              id: "eval-1",
+              evaluatorType: "langevals/exact_match",
+              settings: {},
+              inputs: [],
+              mappings: {},
+            },
+            {
+              id: "eval-2",
+              evaluatorType: "custom/contains",
+              settings: {},
+              inputs: [],
+              mappings: {},
+            },
+          ],
+          results: {
+            ...state.results,
+            targetOutputs: {
+              "target-1": [{ output: "Hello" }, { output: "World" }],
+            },
+            targetMetadata: {
+              "target-1": [
+                { cost: 0.01, duration: 100, traceId: "trace-1" },
+                { cost: 0.02, duration: 200, traceId: "trace-2" },
+              ],
+            },
+            evaluatorResults: {
+              "target-1": {
+                "eval-1": [
+                  { status: "processed", passed: true, score: 1 },
+                  { status: "processed", passed: false, score: 0 },
+                ],
+                "eval-2": [
+                  { status: "processed", passed: true, score: 0.8 },
+                  { status: "processed", passed: true, score: 0.9 },
+                ],
+              },
+            },
+          },
+        }));
+
+        mockFetchSSE.mockImplementation(async () => {
+          await new Promise(() => {});
+        });
+
+        const { result } = renderHook(() => useExecuteEvaluation());
+
+        act(() => {
+          void result.current.runEvaluatorOnAllRows("target-1", "eval-1");
+        });
+
+        await waitFor(() => {
+          const state = useEvaluationsV3Store.getState();
+
+          // eval-1 results should be set to "running" (not undefined)
+          expect(
+            state.results.evaluatorResults["target-1"]?.["eval-1"]?.[0],
+          ).toEqual({ status: "running" });
+          expect(
+            state.results.evaluatorResults["target-1"]?.["eval-1"]?.[1],
+          ).toEqual({ status: "running" });
+
+          // eval-2 results must still be preserved
+          expect(
+            state.results.evaluatorResults["target-1"]?.["eval-2"]?.[0],
+          ).toEqual({ status: "processed", passed: true, score: 0.8 });
+        });
+      });
+    });
+
+    describe("when evaluator has never been run (no prior results)", () => {
+      it("sets evaluator results to running status for a brand new evaluator", async () => {
+        setupStore();
+
+        useEvaluationsV3Store.setState((state) => ({
+          ...state,
+          evaluators: [
+            {
+              id: "eval-new",
+              evaluatorType: "langevals/exact_match",
+              settings: {},
+              inputs: [],
+              mappings: {},
+            },
+          ],
+          results: {
+            ...state.results,
+            targetOutputs: {
+              "target-1": [{ output: "Hello" }, { output: "World" }],
+            },
+            targetMetadata: {
+              "target-1": [
+                { cost: 0.01, duration: 100, traceId: "trace-1" },
+                { cost: 0.02, duration: 200, traceId: "trace-2" },
+              ],
+            },
+            // No evaluatorResults for eval-new — it was just added
+            evaluatorResults: {},
+          },
+        }));
+
+        mockFetchSSE.mockImplementation(async () => {
+          await new Promise(() => {});
+        });
+
+        const { result } = renderHook(() => useExecuteEvaluation());
+
+        act(() => {
+          void result.current.runEvaluatorOnAllRows("target-1", "eval-new");
+        });
+
+        await waitFor(() => {
+          const state = useEvaluationsV3Store.getState();
+
+          // eval-new should be set to "running" even though it never had results before
+          expect(
+            state.results.evaluatorResults["target-1"]?.["eval-new"]?.[0],
+          ).toEqual({ status: "running" });
+          expect(
+            state.results.evaluatorResults["target-1"]?.["eval-new"]?.[1],
+          ).toEqual({ status: "running" });
+        });
+      });
+    });
+
+    describe("when scope is evaluator (single cell rerun)", () => {
+      it("preserves existing target outputs when rerunning evaluator", async () => {
+        setupStore();
+
+        useEvaluationsV3Store.setState((state) => ({
+          ...state,
+          evaluators: [
+            {
+              id: "eval-1",
+              evaluatorType: "langevals/exact_match",
+              settings: {},
+              inputs: [],
+              mappings: {},
+            },
+            {
+              id: "eval-2",
+              evaluatorType: "custom/contains",
+              settings: {},
+              inputs: [],
+              mappings: {},
+            },
+          ],
+          results: {
+            ...state.results,
+            targetOutputs: {
+              "target-1": [{ output: "Hello" }, { output: "World" }],
+            },
+            targetMetadata: {
+              "target-1": [
+                { cost: 0.01, duration: 100, traceId: "trace-1" },
+                { cost: 0.02, duration: 200, traceId: "trace-2" },
+              ],
+            },
+            evaluatorResults: {
+              "target-1": {
+                "eval-1": [
+                  { status: "processed", passed: true, score: 1 },
+                  { status: "processed", passed: false, score: 0 },
+                ],
+                "eval-2": [
+                  { status: "processed", passed: true, score: 0.8 },
+                  { status: "processed", passed: true, score: 0.9 },
+                ],
+              },
+            },
+          },
+        }));
+
+        mockFetchSSE.mockImplementation(async () => {
+          await new Promise(() => {});
+        });
+
+        const { result } = renderHook(() => useExecuteEvaluation());
+
+        act(() => {
+          void result.current.rerunEvaluator(0, "target-1", "eval-1");
+        });
+
+        await waitFor(() => {
+          const state = useEvaluationsV3Store.getState();
+
+          // Target outputs must be preserved
+          expect(state.results.targetOutputs["target-1"]?.[0]).toEqual({
+            output: "Hello",
+          });
+          expect(state.results.targetOutputs["target-1"]?.[1]).toEqual({
+            output: "World",
+          });
+
+          // Target metadata must be preserved
+          expect(state.results.targetMetadata["target-1"]?.[0]).toEqual({
+            cost: 0.01,
+            duration: 100,
+            traceId: "trace-1",
+          });
+
+          // Other evaluator's results must be preserved
+          expect(
+            state.results.evaluatorResults["target-1"]?.["eval-2"]?.[0],
+          ).toEqual({ status: "processed", passed: true, score: 0.8 });
+        });
+      });
+    });
+  });
+
   describe("Concurrent Execution", () => {
     /**
      * This tests that when two cells are executed concurrently,

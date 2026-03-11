@@ -89,10 +89,13 @@ export class ScenarioFailureHandler {
         );
 
         // Check for existing events for this specific scenario
+        // Use wide date range — failure handler must find the batch regardless of age
         const batchRunResult = await this.service.getRunDataForBatchRun({
           projectId,
           scenarioSetId: setId,
           batchRunId,
+          startDate: 0,
+          endDate: Date.now(),
         });
 
         // Filter by scenarioId to get the correct run for this scenario

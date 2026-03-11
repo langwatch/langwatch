@@ -44,6 +44,10 @@ export const orgBillableEventsMeterProjection: MapProjectionDefinition<
     SIMULATION_RUN_EVENT_TYPES.MESSAGE_SNAPSHOT,
   ],
 
+  options: {
+    groupKeyFn: (event: Event) => `billing:${event.id}`,
+  },
+
   map(event: Event): BillableEventRecord {
     return {
       organizationId: "", // resolved by store

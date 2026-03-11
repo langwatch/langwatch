@@ -621,6 +621,13 @@ export type TableMeta = {
     targetId: string,
     evaluatorId: string,
   ) => void;
+  /** Run an evaluator on all rows that have target outputs */
+  handleRunEvaluatorOnAllRows?: (
+    targetId: string,
+    evaluatorId: string,
+  ) => void;
+  /** Check if any row has a target output for a given target */
+  hasAnyTargetOutputs?: (targetId: string) => boolean;
   handleStopExecution?: () => void;
   /** Whether any execution is currently running */
   isExecutionRunning?: boolean;

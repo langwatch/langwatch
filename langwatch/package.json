@@ -63,11 +63,11 @@
     "@ai-sdk/openai": "^2.0.27",
     "@ai-sdk/openai-compatible": "^1.0.15",
     "@ai-sdk/react": "^3.0.118",
-    "@aws-sdk/client-bedrock-runtime": "^3.721.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.1005.0",
     "@aws-sdk/client-cloudwatch-logs": "^3.987.0",
     "@aws-sdk/client-lambda": "^3.989.0",
-    "@aws-sdk/client-s3": "^3.750.0",
-    "@aws-sdk/client-ses": "^3.645.0",
+    "@aws-sdk/client-s3": "^3.1005.0",
+    "@aws-sdk/client-ses": "^3.1005.0",
     "@bull-board/api": "^6.16.2",
     "@bull-board/hono": "^6.16.2",
     "@chakra-ui/next-js": "^2.4.2",
@@ -86,7 +86,7 @@
     "@google-cloud/dlp": "^5.12.0",
     "@hono/node-server": "^1.19.10",
     "@hono/zod-validator": "^0.4.3",
-    "@hookform/resolvers": "^3.3.2",
+    "@hookform/resolvers": "^5.2.2",
     "@langwatch/ksuid": "^2.0.2",
     "@langwatch/scenario": "file:vendor/langwatch-scenario-0.4.3.tgz",
     "@microlink/react-json-view": "^1.27.1",
@@ -205,7 +205,7 @@
     "react-dom": "^19.0.0",
     "react-error-boundary": "^6.1.1",
     "react-feather": "^2.0.10",
-    "react-hook-form": "^7.47.0",
+    "react-hook-form": "^7.55.0",
     "react-icons": "^5.5.0",
     "react-international-phone": "^4.2.8",
     "react-markdown": "^9.0.0",
@@ -303,6 +303,12 @@
     "pino": "^10.3.0",
     "pino-pretty": "^13.0.0",
     "thread-stream": "^4.0.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "@aws-sdk/xml-builder>fast-xml-parser": "^5.5.1",
+      "@langchain/community>fast-xml-parser": "^5.5.1"
+    }
   },
   "ct3aMetadata": {
     "initVersion": "7.19.0"

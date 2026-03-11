@@ -18,6 +18,7 @@ export type CollapsibleMenuChild = {
   label: string;
   href: string;
   isActive: boolean;
+  beta?: string | boolean;
 };
 
 export type CollapsibleMenuGroupProps = {
@@ -155,6 +156,7 @@ const CollapsibleMenuChildItem = ({
   isActive,
   project,
   showLabel = true,
+  beta,
 }: CollapsibleMenuChildItemProps) => {
   return (
     <SideMenuLink
@@ -164,6 +166,7 @@ const CollapsibleMenuChildItem = ({
       isActive={isActive}
       project={project}
       showLabel={showLabel}
+      beta={beta}
     />
   );
 };

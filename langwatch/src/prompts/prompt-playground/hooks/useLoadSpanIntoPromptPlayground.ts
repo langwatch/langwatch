@@ -5,6 +5,7 @@ import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { formSchema } from "~/prompts/schemas";
 import type { PromptConfigFormValues } from "~/prompts/types";
+import { LLM_PARAMETER_MAP } from "~/prompts/prompt-playground/llmParameterMap";
 import type { ChatMessage } from "~/server/tracer/types";
 import { api, type RouterOutputs } from "~/utils/api";
 import { DEFAULT_MODEL } from "~/utils/constants";
@@ -83,12 +84,55 @@ function useSpanIdFromUrl() {
 }
 
 /**
+ * Safely coerces a value to a number, returning undefined for anything that
+ * cannot be cleanly converted. Trace data may store numeric LLM params as
+ * strings (e.g. "0.7"), booleans, or objects -- this function handles all
+ * of those without throwing.
+ *
+ * @param value - The value to coerce (number, string, null, or unknown)
+ * @returns The numeric value, or undefined if coercion is not possible
+ */
+export function coerceToNumber(value: unknown): number | undefined {
+  if (value == null) return undefined;
+  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "") return undefined;
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * Safely coerces a value to a string, returning undefined for anything that
+ * cannot be meaningfully converted. Nulls, undefined, objects, and arrays
+ * are rejected.  Numbers and booleans are converted via String().
+ *
+ * @param value - The value to coerce
+ * @returns The string value, or undefined if coercion is not possible
+ */
+export function coerceToString(value: unknown): string | undefined {
+  if (value == null) return undefined;
+  if (typeof value === "string") return value === "" ? undefined : value;
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : undefined;
+  if (typeof value === "boolean") return String(value);
+  return undefined;
+}
+
+/**
  * Creates default form values for a new prompt config.
  * Single Responsibility: Generate initial prompt configuration structure from span data.
+ *
+ * Applies lenient coercion to numeric fields because trace data from customer
+ * LLM calls may store parameters as strings instead of numbers.  Values that
+ * cannot be coerced are silently dropped (set to undefined) so that the
+ * "Open in Prompts" flow never fails due to unexpected trace data shapes.
+ *
  * @param spanData - The span data containing LLM configuration
  * @returns Initial form values for a new prompt
  */
-function createDefaultPromptFormValues(
+export function createDefaultPromptFormValues(
   spanData: RouterOutputs["spans"]["getForPromptStudio"],
 ): PromptConfigFormValues {
   if (!spanData.llmConfig?.model) {
@@ -108,18 +152,29 @@ function createDefaultPromptFormValues(
     logger.warn({ spanData }, "System prompt is empty. This is not expected.");
   }
 
+  // Build LLM config dynamically from the parameter map
+  const llm: Record<string, unknown> = {
+    model: spanData.llmConfig.model || DEFAULT_MODEL,
+  };
+
+  for (const param of LLM_PARAMETER_MAP) {
+    const raw = (spanData.llmConfig as Record<string, unknown>)[
+      param.formField
+    ];
+    const coerced =
+      param.coercion === "number" ? coerceToNumber(raw) : coerceToString(raw);
+    if (coerced !== undefined) {
+      llm[param.formField] = coerced;
+    }
+  }
+
   return formSchema.parse({
     handle: null,
     scope: "PROJECT",
     version: {
       configData: {
         prompt: systemPrompt,
-        llm: {
-          // The model should always be available here, but we fall back to the default model if it's not.
-          model: spanData.llmConfig.model ?? DEFAULT_MODEL,
-          temperature: spanData.llmConfig.temperature ?? undefined,
-          maxTokens: spanData.llmConfig.maxTokens,
-        },
+        llm,
         inputs: [],
         outputs: [{ identifier: "output", type: "str" }],
         messages: [{ role: "system", content: systemPrompt }],

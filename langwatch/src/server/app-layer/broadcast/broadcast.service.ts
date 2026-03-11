@@ -30,17 +30,12 @@ export class BroadcastService {
   private emitterEmptyTimes = new Map<string, number>(); // tenantId -> timestamp when emitter became empty
   private active: boolean = false;
 
-  private constructor(private readonly redis: Cluster | IORedis | null) {
+  constructor(private readonly redis: Cluster | IORedis | null) {
     this.subscriber = redis?.duplicate() ?? null;
     this.setupRedisSubscription();
     this.startCleanupInterval();
     this.active = true;
   }
-
-  static create(redis: Cluster | IORedis | null): BroadcastService {
-    return new BroadcastService(redis);
-  }
-
 
   private setupRedisSubscription() {
     if (!this.subscriber) {

@@ -466,48 +466,77 @@ export const store = (
     return newHandle;
   },
   setNode: (node: Partial<Node> & { id: string }, newId?: string) => {
+    const oldId = node.id;
+    const updatedNodes = get().nodes.map((n) =>
+      n.id === oldId
+        ? {
+            ...n,
+            ...node,
+            data: {
+              ...n.data,
+              ...node.data,
+              ...(newId && n.type === "code"
+                ? {
+                    parameters: updateCodeClassName(
+                      (node.data?.parameters as Field[]) ??
+                        n.data?.parameters ??
+                        [],
+                      n.id,
+                      newId,
+                    ),
+                  }
+                : {}),
+              ...((node.data?.inputs || node.data?.outputs) &&
+              n.type === "code"
+                ? {
+                    parameters: updateOutputFields(
+                      updateInputFields(
+                        (node.data?.parameters as Field[]) ??
+                          n.data?.parameters ??
+                          [],
+                        (node.data?.inputs ?? []) as Field[],
+                      ),
+                      n.data.outputs ?? [],
+                      (node.data?.outputs ?? []) as Field[],
+                    ),
+                  }
+                : {}),
+            },
+            id: newId ? newId : n.id,
+          }
+        : n,
+    );
+
+    // When renaming, update edges and parameter refs that reference the old ID
+    const updatedEdges = newId
+      ? get().edges.map((edge) => ({
+          ...edge,
+          source: edge.source === oldId ? newId : edge.source,
+          target: edge.target === oldId ? newId : edge.target,
+        }))
+      : get().edges;
+
+    const nodesWithUpdatedRefs = newId
+      ? updatedNodes.map((n) => {
+          if (n.id === newId || !n.data.parameters) return n;
+          return {
+            ...n,
+            data: {
+              ...n.data,
+              parameters: (n.data.parameters as Field[]).map((p) =>
+                (p.value as { ref: string })?.ref === oldId
+                  ? { ...p, value: { ref: newId } }
+                  : p,
+              ),
+            },
+          };
+        })
+      : updatedNodes;
+
     set(
       removeInvalidEdges({
-        nodes: get().nodes.map((n) =>
-          n.id === node.id
-            ? {
-                ...n,
-                ...node,
-                data: {
-                  ...n.data,
-                  ...node.data,
-                  ...(newId && n.type === "code"
-                    ? {
-                        parameters: updateCodeClassName(
-                          (node.data?.parameters as Field[]) ??
-                            n.data?.parameters ??
-                            [],
-                          n.id,
-                          newId,
-                        ),
-                      }
-                    : {}),
-                  ...((node.data?.inputs || node.data?.outputs) &&
-                  n.type === "code"
-                    ? {
-                        parameters: updateOutputFields(
-                          updateInputFields(
-                            (node.data?.parameters as Field[]) ??
-                              n.data?.parameters ??
-                              [],
-                            (node.data?.inputs ?? []) as Field[],
-                          ),
-                          n.data.outputs ?? [],
-                          (node.data?.outputs ?? []) as Field[],
-                        ),
-                      }
-                    : {}),
-                },
-                id: newId ? newId : n.id,
-              }
-            : n,
-        ),
-        edges: get().edges,
+        nodes: nodesWithUpdatedRefs,
+        edges: updatedEdges,
       }),
     );
   },

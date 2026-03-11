@@ -11,15 +11,15 @@ import type { ClickHouseFilterQueryParams } from "../clickhouse/types";
 
 describe("ATTRIBUTE_KEYS", () => {
   it("defines thread_id attribute key", () => {
-    expect(ATTRIBUTE_KEYS.thread_id).toBe("Attributes['thread.id']");
+    expect(ATTRIBUTE_KEYS.thread_id).toBe("Attributes['gen_ai.conversation.id']");
   });
 
   it("defines user_id attribute key", () => {
-    expect(ATTRIBUTE_KEYS.user_id).toBe("Attributes['user.id']");
+    expect(ATTRIBUTE_KEYS.user_id).toBe("Attributes['langwatch.user_id']");
   });
 
   it("defines customer_id attribute key", () => {
-    expect(ATTRIBUTE_KEYS.customer_id).toBe("Attributes['customer.id']");
+    expect(ATTRIBUTE_KEYS.customer_id).toBe("Attributes['langwatch.customer_id']");
   });
 });
 
