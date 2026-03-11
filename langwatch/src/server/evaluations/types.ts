@@ -4,37 +4,56 @@ import type {
   EvaluationResultError,
   EvaluationResultSkipped,
 } from "./evaluators.generated";
-import type { FilterField } from "../filters/types";
+import { filterFieldsEnum } from "../filters/types";
 
-export type CheckPreconditionRule =
-  | "contains"
-  | "not_contains"
-  | "matches_regex"
-  | "is";
+// ---------------------------------------------------------------------------
+// Precondition schemas (Zod-first, types inferred)
+// ---------------------------------------------------------------------------
 
-/** All fields that can be used in preconditions: every FilterField plus input/output */
-export type CheckPreconditionFields = FilterField | "input" | "output";
+export const checkPreconditionRuleSchema = z.enum([
+  "contains",
+  "not_contains",
+  "matches_regex",
+  "is",
+]);
 
-export type CheckPrecondition = {
-  field: CheckPreconditionFields;
-  rule: CheckPreconditionRule;
-  /**
-   * @minLength 1
-   * @maxLength 500
-   */
-  value: string;
+export type CheckPreconditionRule = z.infer<typeof checkPreconditionRuleSchema>;
+
+/** All fields usable in preconditions: every FilterField plus input/output */
+export const checkPreconditionFieldsSchema = z.union([
+  filterFieldsEnum,
+  z.literal("input"),
+  z.literal("output"),
+]);
+
+export type CheckPreconditionFields = z.infer<
+  typeof checkPreconditionFieldsSchema
+>;
+
+export const checkPreconditionSchema = z.object({
+  field: checkPreconditionFieldsSchema,
+  rule: checkPreconditionRuleSchema,
+  value: z.string().min(1).max(500),
   /** Key for nested filters (e.g., metadata key name for metadata.value) */
-  key?: string;
+  key: z.string().optional(),
   /** Subkey for double-nested filters (e.g., event detail key) */
-  subkey?: string;
-};
+  subkey: z.string().optional(),
+});
 
-export type CheckPreconditions = CheckPrecondition[];
+export type CheckPrecondition = z.infer<typeof checkPreconditionSchema>;
 
-export type Conversation = {
-  input?: string;
-  output?: string;
-}[];
+export const checkPreconditionsSchema = z.array(checkPreconditionSchema);
+
+export type CheckPreconditions = z.infer<typeof checkPreconditionsSchema>;
+
+export const conversationSchema = z.array(
+  z.object({
+    input: z.string().optional(),
+    output: z.string().optional(),
+  }),
+);
+
+export type Conversation = z.infer<typeof conversationSchema>;
 
 export const evaluationInputSchema = z.object({
   trace_id: z.string().optional().nullable(),

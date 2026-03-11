@@ -14,7 +14,7 @@ import { TraceService } from "~/server/traces/trace.service";
 import { createLogger } from "~/utils/logger/server";
 import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
 import { evaluatePreconditions, buildPreconditionTraceDataFromTrace, checkEvaluatorRequiredFields } from "../../evaluations/preconditions";
-import { checkPreconditionSchema } from "../../evaluations/types.generated";
+import { checkPreconditionSchema } from "../../evaluations/types";
 import { checkPermissionOrPubliclyShared, checkProjectPermission } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
 import {

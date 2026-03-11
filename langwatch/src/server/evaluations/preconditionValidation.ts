@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { PRECONDITION_ALLOWED_RULES } from "../filters/precondition-matchers";
 import type { PreconditionField } from "../filters/precondition-matchers";
-import { checkPreconditionsSchema } from "./types.generated";
+import { checkPreconditionsSchema } from "./types";
 
 /**
  * Refinement callback that cross-validates each precondition's rule
