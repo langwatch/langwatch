@@ -13,7 +13,8 @@ interface PromptInput {
  * - Extracts variables from the `prompt` field and all `messages[*].content`
  * - Explicit inputs preserve their type (e.g., "json" is not overwritten to "str")
  * - New auto-detected variables default to type "str"
- * - Result is sorted alphabetically by identifier for deterministic ordering
+ * - The locked "input" variable always sorts first
+ * - Remaining inputs are sorted alphabetically for deterministic ordering
  */
 export function mergeAutoDetectedInputs({
   prompt,
@@ -59,8 +60,12 @@ export function mergeAutoDetectedInputs({
     }
   }
 
-  // Convert to array and sort alphabetically by identifier
+  // Convert to array and sort: "input" first (locked variable), then alphabetically
   return Array.from(mergedMap.entries())
     .map(([identifier, type]) => ({ identifier, type }))
-    .sort((a, b) => a.identifier.localeCompare(b.identifier));
+    .sort((a, b) => {
+      if (a.identifier === "input") return -1;
+      if (b.identifier === "input") return 1;
+      return a.identifier.localeCompare(b.identifier);
+    });
 }
