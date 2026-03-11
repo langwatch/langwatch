@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { FoldProjectionStore } from "../../../../projections/foldProjection.types";
-import type { EvaluationCompletedEvent, EvaluationStartedEvent } from "../../schemas/events";
+import type {
+  EvaluationCompletedEvent,
+  EvaluationReportedEvent,
+  EvaluationStartedEvent,
+} from "../../schemas/events";
 import { createEvaluationRunFoldProjection } from "../evaluationRun.foldProjection";
 
 function createStubStore(): FoldProjectionStore<EvaluationRunData> {
@@ -69,6 +73,36 @@ function createCompletedEvent(
   } as unknown as EvaluationCompletedEvent;
 }
 
+function createReportedEvent(
+  overrides: Partial<EvaluationReportedEvent> = {},
+): EvaluationReportedEvent {
+  return {
+    id: "evt-3",
+    aggregateId: "eval-1",
+    aggregateType: "evaluation",
+    tenantId: "tenant-1",
+    createdAt: Date.now(),
+    occurredAt: 1700000000000,
+    type: "lw.evaluation.reported",
+    version: "2025-01-14",
+    data: {
+      evaluationId: "eval-1",
+      evaluatorId: "evaluator-1",
+      evaluatorType: "custom",
+      evaluatorName: "toxicity",
+      traceId: "trace-1",
+      isGuardrail: false,
+      status: "processed",
+      score: 0.9,
+      passed: true,
+      label: null,
+      details: null,
+      error: null,
+    },
+    ...overrides,
+  } as unknown as EvaluationReportedEvent;
+}
+
 describe("evaluationRun foldProjection", () => {
   describe("apply()", () => {
     describe("when EvaluationCompletedEvent arrives after EvaluationStartedEvent", () => {
@@ -101,6 +135,66 @@ describe("evaluationRun foldProjection", () => {
         ).toThrow(
           /Received EvaluationCompletedEvent for evaluation eval-1 but state has no evaluationId/,
         );
+      });
+    });
+
+    describe("when EvaluationReportedEvent is applied", () => {
+      it("sets all fields in one shot", () => {
+        const projection = createEvaluationRunFoldProjection({
+          store: createStubStore(),
+        });
+        const state = createInitState();
+        const afterReported = projection.apply(state, createReportedEvent());
+
+        expect(afterReported.evaluationId).toBe("eval-1");
+        expect(afterReported.evaluatorId).toBe("evaluator-1");
+        expect(afterReported.evaluatorType).toBe("custom");
+        expect(afterReported.evaluatorName).toBe("toxicity");
+        expect(afterReported.traceId).toBe("trace-1");
+        expect(afterReported.isGuardrail).toBe(false);
+        expect(afterReported.status).toBe("processed");
+        expect(afterReported.score).toBe(0.9);
+        expect(afterReported.passed).toBe(true);
+        expect(afterReported.label).toBeNull();
+        expect(afterReported.details).toBeNull();
+        expect(afterReported.error).toBeNull();
+        expect(afterReported.startedAt).toBe(1700000000000);
+        expect(afterReported.completedAt).toBe(1700000000000);
+      });
+
+      it("does not require a prior started event", () => {
+        const projection = createEvaluationRunFoldProjection({
+          store: createStubStore(),
+        });
+        const emptyState = createInitState();
+
+        expect(() =>
+          projection.apply(emptyState, createReportedEvent()),
+        ).not.toThrow();
+      });
+
+      it("defaults optional fields to null or false", () => {
+        const projection = createEvaluationRunFoldProjection({
+          store: createStubStore(),
+        });
+        const state = createInitState();
+        const afterReported = projection.apply(
+          state,
+          createReportedEvent({
+            data: {
+              evaluationId: "eval-1",
+              evaluatorId: "evaluator-1",
+              evaluatorType: "custom",
+              status: "processed",
+            },
+          } as Partial<EvaluationReportedEvent>),
+        );
+
+        expect(afterReported.evaluatorName).toBeNull();
+        expect(afterReported.traceId).toBeNull();
+        expect(afterReported.isGuardrail).toBe(false);
+        expect(afterReported.score).toBeNull();
+        expect(afterReported.passed).toBeNull();
       });
     });
   });

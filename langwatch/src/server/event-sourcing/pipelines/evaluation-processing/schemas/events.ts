@@ -2,6 +2,7 @@ import { z } from "zod";
 import { EventSchema } from "../../../domain/types";
 import {
   EVALUATION_COMPLETED_EVENT_TYPE,
+  EVALUATION_REPORTED_EVENT_TYPE,
   EVALUATION_SCHEDULED_EVENT_TYPE,
   EVALUATION_STARTED_EVENT_TYPE,
 } from "./constants";
@@ -94,17 +95,52 @@ export type EvaluationCompletedEvent = z.infer<
 >;
 
 /**
+ * Evaluation reported event - emitted when a custom SDK evaluation is reported atomically.
+ * Carries ALL evaluation data (evaluator identity + results) in a single event,
+ * avoiding ClickHouse replica lag from two-event approaches.
+ */
+export const evaluationReportedEventDataSchema = z.object({
+  evaluationId: z.string(),
+  evaluatorId: z.string(),
+  evaluatorType: z.string(),
+  evaluatorName: z.string().optional(),
+  traceId: z.string().optional(),
+  isGuardrail: z.boolean().optional(),
+  status: z.enum(["processed", "error", "skipped"]),
+  score: z.number().nullable().optional(),
+  passed: z.boolean().nullable().optional(),
+  label: z.string().nullable().optional(),
+  details: z.string().nullable().optional(),
+  error: z.string().nullable().optional(),
+});
+
+export const evaluationReportedEventSchema = EventSchema.extend({
+  type: z.literal(EVALUATION_REPORTED_EVENT_TYPE),
+  data: evaluationReportedEventDataSchema,
+  metadata: evaluationEventMetadataSchema.optional(),
+});
+
+export type EvaluationReportedEventData = z.infer<
+  typeof evaluationReportedEventDataSchema
+>;
+export type EvaluationReportedEvent = z.infer<
+  typeof evaluationReportedEventSchema
+>;
+
+/**
  * Union of all evaluation processing event types.
  */
 export type EvaluationProcessingEvent =
   | EvaluationScheduledEvent
   | EvaluationStartedEvent
-  | EvaluationCompletedEvent;
+  | EvaluationCompletedEvent
+  | EvaluationReportedEvent;
 
 // Re-export type guards for backwards compatibility
 export {
   isEvaluationCompletedEvent,
+  isEvaluationReportedEvent,
   isEvaluationScheduledEvent,
-  isEvaluationStartedEvent
+  isEvaluationStartedEvent,
 } from "./typeGuards";
 

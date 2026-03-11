@@ -4,16 +4,13 @@ import { createLogger } from "../../../../../utils/logger/server";
 import type { ReportEvaluationCommandData } from "../schemas/commands";
 import { reportEvaluationCommandDataSchema } from "../schemas/commands";
 import {
-  EVALUATION_COMPLETED_EVENT_TYPE,
-  EVALUATION_COMPLETED_EVENT_VERSION_LATEST,
-  EVALUATION_STARTED_EVENT_TYPE,
-  EVALUATION_STARTED_EVENT_VERSION_LATEST,
+  EVALUATION_REPORTED_EVENT_TYPE,
+  EVALUATION_REPORTED_EVENT_VERSION_LATEST,
   REPORT_EVALUATION_COMMAND_TYPE,
 } from "../schemas/constants";
 import type {
-  EvaluationCompletedEvent,
   EvaluationProcessingEvent,
-  EvaluationStartedEvent,
+  EvaluationReportedEvent,
 } from "../schemas/events";
 import { makeJobIdWithSuffix } from "./base.command";
 
@@ -24,11 +21,9 @@ const logger = createLogger(
 /**
  * Command handler for reporting a custom SDK evaluation atomically.
  *
- * Unlike startEvaluation + completeEvaluation (two separate commands),
- * this handler emits BOTH EvaluationStartedEvent and EvaluationCompletedEvent
- * from a single command. This avoids ClickHouse replica lag where the
- * completeEvaluation fold reads stale state because the startEvaluation
- * write hasn't replicated yet.
+ * Emits a single EvaluationReportedEvent carrying ALL evaluation data
+ * (evaluator identity + results). This avoids ClickHouse replica lag
+ * that occurs when two separate events are dispatched as separate jobs.
  */
 export class ReportEvaluationCommand
   implements
@@ -40,7 +35,7 @@ export class ReportEvaluationCommand
   static readonly schema = defineCommandSchema(
     REPORT_EVALUATION_COMMAND_TYPE,
     reportEvaluationCommandDataSchema,
-    "Command to report a custom SDK evaluation (start + complete atomically)",
+    "Command to report a custom SDK evaluation (single atomic event)",
   );
 
   handle(
@@ -58,12 +53,12 @@ export class ReportEvaluationCommand
       "Handling report evaluation command",
     );
 
-    const startedEvent = EventUtils.createEvent<EvaluationStartedEvent>({
+    const event = EventUtils.createEvent<EvaluationReportedEvent>({
       aggregateType: "evaluation",
       aggregateId: data.evaluationId,
       tenantId,
-      type: EVALUATION_STARTED_EVENT_TYPE,
-      version: EVALUATION_STARTED_EVENT_VERSION_LATEST,
+      type: EVALUATION_REPORTED_EVENT_TYPE,
+      version: EVALUATION_REPORTED_EVENT_VERSION_LATEST,
       data: {
         evaluationId: data.evaluationId,
         evaluatorId: data.evaluatorId,
@@ -71,42 +66,28 @@ export class ReportEvaluationCommand
         evaluatorName: data.evaluatorName,
         traceId: data.traceId,
         isGuardrail: data.isGuardrail,
-      },
-      occurredAt: data.occurredAt,
-      idempotencyKey: `${data.tenantId}:${data.evaluationId}:started`,
-    });
-
-    const completedEvent = EventUtils.createEvent<EvaluationCompletedEvent>({
-      aggregateType: "evaluation",
-      aggregateId: data.evaluationId,
-      tenantId,
-      type: EVALUATION_COMPLETED_EVENT_TYPE,
-      version: EVALUATION_COMPLETED_EVENT_VERSION_LATEST,
-      data: {
-        evaluationId: data.evaluationId,
         status: data.status,
         score: data.score ?? null,
         passed: data.passed ?? null,
         label: data.label ?? null,
         details: data.details ?? null,
         error: data.error ?? null,
-        errorDetails: null,
-        costId: null,
       },
-      occurredAt: data.occurredAt + 1,
-      idempotencyKey: `${data.tenantId}:${data.evaluationId}:completed`,
+      occurredAt: data.occurredAt,
+      idempotencyKey: `${data.tenantId}:${data.evaluationId}:reported`,
     });
 
     logger.debug(
       {
         tenantId,
         evaluationId: data.evaluationId,
-        eventCount: 2,
+        eventId: event.id,
+        eventType: event.type,
       },
-      "Emitting evaluation started + completed events",
+      "Emitting evaluation reported event",
     );
 
-    return Promise.resolve([startedEvent, completedEvent]);
+    return Promise.resolve([event]);
   }
 
   static getAggregateId(payload: ReportEvaluationCommandData): string {

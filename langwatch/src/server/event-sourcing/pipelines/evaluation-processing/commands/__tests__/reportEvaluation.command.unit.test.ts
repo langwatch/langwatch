@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Command } from "../../../../";
 import type { ReportEvaluationCommandData } from "../../schemas/commands";
-import {
-  EVALUATION_COMPLETED_EVENT_TYPE,
-  EVALUATION_STARTED_EVENT_TYPE,
-} from "../../schemas/constants";
+import { EVALUATION_REPORTED_EVENT_TYPE } from "../../schemas/constants";
 import { ReportEvaluationCommand } from "../reportEvaluation.command";
 
 function makeCommand(
@@ -37,68 +34,53 @@ function makeCommand(
 describe("ReportEvaluationCommand", () => {
   describe("handle()", () => {
     describe("when invoked with valid command data", () => {
-      it("emits two events (started + completed)", async () => {
+      it("emits a single EvaluationReportedEvent", async () => {
         const handler = new ReportEvaluationCommand();
         const events = await handler.handle(makeCommand());
 
-        expect(events).toHaveLength(2);
-        expect(events[0]!.type).toBe(EVALUATION_STARTED_EVENT_TYPE);
-        expect(events[1]!.type).toBe(EVALUATION_COMPLETED_EVENT_TYPE);
+        expect(events).toHaveLength(1);
+        expect(events[0]!.type).toBe(EVALUATION_REPORTED_EVENT_TYPE);
       });
 
-      it("sets the started event data from command fields", async () => {
+      it("sets all evaluation data in the single event", async () => {
         const handler = new ReportEvaluationCommand();
         const events = await handler.handle(makeCommand());
 
-        const startedEvent = events[0]!;
-        expect(startedEvent.data).toMatchObject({
+        const event = events[0]!;
+        expect(event.data).toMatchObject({
           evaluationId: "eval-1",
           evaluatorId: "evaluator-1",
           evaluatorType: "custom",
           evaluatorName: "toxicity",
           traceId: "trace-1",
           isGuardrail: false,
-        });
-      });
-
-      it("sets the completed event data from command fields", async () => {
-        const handler = new ReportEvaluationCommand();
-        const events = await handler.handle(makeCommand());
-
-        const completedEvent = events[1]!;
-        expect(completedEvent.data).toMatchObject({
-          evaluationId: "eval-1",
           status: "processed",
           score: 0.9,
           passed: true,
           label: null,
           details: null,
           error: null,
-          errorDetails: null,
-          costId: null,
         });
       });
 
-      it("offsets the completed event occurredAt by +1ms", async () => {
+      it("uses the command occurredAt for the event", async () => {
         const handler = new ReportEvaluationCommand();
         const occurredAt = 1700000000000;
         const events = await handler.handle(makeCommand({ occurredAt }));
 
         expect(events[0]!.occurredAt).toBe(occurredAt);
-        expect(events[1]!.occurredAt).toBe(occurredAt + 1);
       });
 
-      it("uses the same aggregateId for both events", async () => {
+      it("sets the correct aggregateId", async () => {
         const handler = new ReportEvaluationCommand();
         const events = await handler.handle(makeCommand());
 
         expect(events[0]!.aggregateId).toBe("eval-1");
-        expect(events[1]!.aggregateId).toBe("eval-1");
       });
     });
 
     describe("when optional fields are undefined", () => {
-      it("defaults score, passed, label, details, error to null in completed event", async () => {
+      it("defaults score, passed, label, details, error to null", async () => {
         const handler = new ReportEvaluationCommand();
         const events = await handler.handle(
           makeCommand({
@@ -110,8 +92,8 @@ describe("ReportEvaluationCommand", () => {
           }),
         );
 
-        const completedEvent = events[1]!;
-        expect(completedEvent.data).toMatchObject({
+        const event = events[0]!;
+        expect(event.data).toMatchObject({
           score: null,
           passed: null,
           label: null,

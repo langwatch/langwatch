@@ -10,12 +10,14 @@ export const EVALUATION_EVENT_TYPES = {
   SCHEDULED: "lw.evaluation.scheduled",
   STARTED: "lw.evaluation.started",
   COMPLETED: "lw.evaluation.completed",
+  REPORTED: "lw.evaluation.reported",
 } as const;
 
 // Legacy exports for backwards compatibility
 export const EVALUATION_SCHEDULED_EVENT_TYPE = EVALUATION_EVENT_TYPES.SCHEDULED;
 export const EVALUATION_STARTED_EVENT_TYPE = EVALUATION_EVENT_TYPES.STARTED;
 export const EVALUATION_COMPLETED_EVENT_TYPE = EVALUATION_EVENT_TYPES.COMPLETED;
+export const EVALUATION_REPORTED_EVENT_TYPE = EVALUATION_EVENT_TYPES.REPORTED;
 
 /**
  * Event schema versions using calendar versioning (YYYY-MM-DD).
@@ -35,6 +37,8 @@ export const EVALUATION_EVENT_VERSIONS = {
   STARTED: "2025-01-14",
   /** Initial schema version introduced with event sourcing feature */
   COMPLETED: "2025-01-14",
+  /** Initial schema version for single-event custom SDK evaluations */
+  REPORTED: "2025-01-14",
 } as const;
 
 // Legacy exports for backwards compatibility
@@ -44,11 +48,14 @@ export const EVALUATION_STARTED_EVENT_VERSION_LATEST =
   EVALUATION_EVENT_VERSIONS.STARTED;
 export const EVALUATION_COMPLETED_EVENT_VERSION_LATEST =
   EVALUATION_EVENT_VERSIONS.COMPLETED;
+export const EVALUATION_REPORTED_EVENT_VERSION_LATEST =
+  EVALUATION_EVENT_VERSIONS.REPORTED;
 
 export const EVALUATION_PROCESSING_EVENT_TYPES = [
   EVALUATION_EVENT_TYPES.SCHEDULED,
   EVALUATION_EVENT_TYPES.STARTED,
   EVALUATION_EVENT_TYPES.COMPLETED,
+  EVALUATION_EVENT_TYPES.REPORTED,
 ] as const;
 
 export type EvaluationProcessingEventType =

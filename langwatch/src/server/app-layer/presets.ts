@@ -403,6 +403,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         executeEvaluation: noop,
         startEvaluation: noop,
         completeEvaluation: noop,
+        reportEvaluation: noop,
       } as AppCommands["evaluations"],
       experimentRuns: {
         startExperimentRun: noop,
