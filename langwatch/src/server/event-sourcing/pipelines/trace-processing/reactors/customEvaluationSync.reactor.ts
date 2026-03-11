@@ -29,6 +29,7 @@ interface SdkEvaluation {
   score?: number;
   label?: string;
   details?: string;
+  cost_id?: string;
   error?: { message: string; stacktrace?: string[] };
   timestamps?: { started_at?: number; finished_at?: number };
 }
@@ -163,6 +164,8 @@ export function createCustomEvaluationSyncReactor(
             label: evaluation.label ?? null,
             details: evaluation.details ?? null,
             error: evaluation.error?.message ?? null,
+            errorDetails: evaluation.error?.stacktrace?.join("\n") ?? null,
+            costId: evaluation.cost_id ?? null,
             occurredAt,
           });
         } catch (error) {

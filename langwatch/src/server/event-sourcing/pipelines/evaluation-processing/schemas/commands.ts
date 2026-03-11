@@ -92,6 +92,8 @@ export const reportEvaluationCommandDataSchema = z.object({
   label: z.string().nullable().optional(),
   details: z.string().nullable().optional(),
   error: z.string().nullable().optional(),
+  errorDetails: z.string().nullable().optional(),
+  costId: z.string().nullable().optional(),
   occurredAt: z.number(),
 });
 

@@ -21,9 +21,9 @@ const logger = createLogger(
 /**
  * Command handler for reporting a custom SDK evaluation atomically.
  *
- * Emits a single EvaluationReportedEvent carrying ALL evaluation data
- * (evaluator identity + results). This avoids ClickHouse replica lag
- * that occurs when two separate events are dispatched as separate jobs.
+ * Emits a single EvaluationReportedEvent carrying evaluator identity
+ * and results in one event. This avoids ClickHouse replica lag that
+ * occurs when two separate events are dispatched as separate jobs.
  */
 export class ReportEvaluationCommand
   implements
@@ -72,6 +72,8 @@ export class ReportEvaluationCommand
         label: data.label ?? null,
         details: data.details ?? null,
         error: data.error ?? null,
+        errorDetails: data.errorDetails ?? null,
+        costId: data.costId ?? null,
       },
       occurredAt: data.occurredAt,
       idempotencyKey: `${data.tenantId}:${data.evaluationId}:reported`,

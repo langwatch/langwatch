@@ -27,7 +27,7 @@ export interface EvaluationRun extends Projection<EvaluationRunData> {
  * - EvaluationScheduledEvent -> status: "scheduled"
  * - EvaluationStartedEvent -> status: "in_progress"
  * - EvaluationCompletedEvent -> status: "processed" | "error" | "skipped"
- * - EvaluationReportedEvent -> sets ALL fields in one shot (evaluator identity + results)
+ * - EvaluationReportedEvent -> sets all fields in one shot (evaluator identity + results)
  */
 export function createEvaluationRunFoldProjection({
   store,
@@ -134,6 +134,8 @@ export function createEvaluationRunFoldProjection({
           label: event.data.label ?? null,
           details: event.data.details ?? null,
           error: event.data.error ?? null,
+          errorDetails: event.data.errorDetails ?? null,
+          costId: event.data.costId ?? null,
           startedAt: event.occurredAt,
           completedAt: event.occurredAt,
           updatedAt: Date.now(),

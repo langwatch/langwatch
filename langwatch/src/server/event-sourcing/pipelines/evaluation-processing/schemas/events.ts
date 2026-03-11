@@ -96,8 +96,8 @@ export type EvaluationCompletedEvent = z.infer<
 
 /**
  * Evaluation reported event - emitted when a custom SDK evaluation is reported atomically.
- * Carries ALL evaluation data (evaluator identity + results) in a single event,
- * avoiding ClickHouse replica lag from two-event approaches.
+ * Carries evaluator identity and results in a single event, avoiding ClickHouse
+ * replica lag from two-event approaches.
  */
 export const evaluationReportedEventDataSchema = z.object({
   evaluationId: z.string(),
@@ -112,6 +112,8 @@ export const evaluationReportedEventDataSchema = z.object({
   label: z.string().nullable().optional(),
   details: z.string().nullable().optional(),
   error: z.string().nullable().optional(),
+  errorDetails: z.string().nullable().optional(),
+  costId: z.string().nullable().optional(),
 });
 
 export const evaluationReportedEventSchema = EventSchema.extend({
