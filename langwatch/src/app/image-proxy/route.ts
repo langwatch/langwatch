@@ -56,7 +56,8 @@ export async function isSafeImageUrl(rawUrl: string): Promise<boolean> {
     parsed.hostname.startsWith("[") ||
     parsed.hostname.includes(":");
   if (isRawIp) {
-    return true;
+    // For literal IPs, rely solely on pattern checks and skip DNS.
+    return !isPrivateAddress(parsed.hostname);
   }
   // DNS check: resolve and verify every returned IP is public
   return !(await resolvesToPrivateAddress(parsed.hostname));
