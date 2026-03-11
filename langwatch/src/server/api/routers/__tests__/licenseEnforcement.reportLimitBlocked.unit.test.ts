@@ -9,7 +9,6 @@
  * - Captures exceptions when notification fails
  */
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { z } from "zod";
 import { createInnerTRPCContext } from "../../trpc";
 
 vi.mock("~/env.mjs", () => ({
@@ -50,31 +49,13 @@ const {
   };
 });
 
-vi.mock("~/server/license-enforcement", () => {
-  const limitTypes = [
-    "workflows",
-    "prompts",
-    "evaluators",
-    "scenarios",
-    "projects",
-    "teams",
-    "members",
-    "membersLite",
-    "agents",
-    "experiments",
-    "onlineEvaluations",
-    "datasets",
-    "dashboards",
-    "customGraphs",
-    "automations",
-  ] as const;
-
+vi.mock("~/server/license-enforcement", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("~/server/license-enforcement")>();
   return {
+    ...actual,
     createLicenseEnforcementService: () => ({
       checkLimit: mockCheckLimit,
     }),
-    limitTypes,
-    limitTypeSchema: z.enum(limitTypes),
   };
 });
 
@@ -86,6 +67,15 @@ vi.mock("~/server/app-layer/app", () => ({
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: mockCaptureException,
+}));
+
+const mockTrackServerEvent = vi.fn();
+vi.mock("~/server/posthog", () => ({
+  trackServerEvent: mockTrackServerEvent,
+}));
+
+vi.mock("../../../auditLog", () => ({
+  auditLog: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Mock RBAC to allow all permission checks (unit test, not testing auth)
@@ -158,6 +148,31 @@ describe("licenseEnforcement.reportLimitBlocked", () => {
         max: 10,
       });
     });
+
+    it("fires a limit_blocked event with ui_pre_check source", async () => {
+      mockCheckLimit.mockResolvedValue({
+        allowed: false,
+        current: 10,
+        max: 10,
+        limitType: "workflows",
+      });
+
+      await callReportLimitBlocked({
+        organizationId: "org-123",
+        limitType: "workflows",
+      });
+
+      expect(mockTrackServerEvent).toHaveBeenCalledWith({
+        userId: "user-1",
+        event: "limit_blocked",
+        properties: {
+          limitType: "workflows",
+          current: 10,
+          max: 10,
+          source: "ui_pre_check",
+        },
+      });
+    });
   });
 
   describe("when limit is not reached (fabricated request)", () => {
@@ -180,6 +195,7 @@ describe("licenseEnforcement.reportLimitBlocked", () => {
         expect.objectContaining({ id: "user-1" })
       );
       expect(mockNotifyResourceLimitReached).not.toHaveBeenCalled();
+      expect(mockTrackServerEvent).not.toHaveBeenCalled();
     });
   });
 
