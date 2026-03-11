@@ -14,7 +14,14 @@ import {
 import { EvaluationExecutionMode } from "@prisma/client";
 import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
 import { AlertTriangle, ArrowLeft, HelpCircle, Spool, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useForm } from "react-hook-form";
 import { LuListTree } from "react-icons/lu";
 import { Drawer } from "~/components/ui/drawer";
@@ -22,6 +29,7 @@ import type { FieldMapping as UIFieldMapping } from "~/components/variables";
 import { validateEvaluatorMappingsWithFields } from "~/evaluations-v3/utils/mappingValidation";
 import {
   getComplexProps,
+  getDrawerStack,
   navigateToDrawer,
   setFlowCallbacks,
   useDrawer,
@@ -39,6 +47,7 @@ import {
   DEFAULT_PRECONDITION,
   RULE_LABELS,
   getAllowedRulesForField,
+  fieldRequiresKey,
   getFieldOptionsByCategory,
   getFieldValueType,
   isDefaultOnlyPrecondition,
@@ -136,6 +145,36 @@ export const clearOnlineEvaluationDrawerState = () => {
 };
 
 /**
+ * Drawers that are part of the online evaluation flow.
+ * When navigating TO these drawers, module-level state should be preserved.
+ * When the component mounts and the stack does NOT contain onlineEvaluation
+ * (meaning we're not returning from a flow sub-drawer), stale state is cleared.
+ */
+const FLOW_SUB_DRAWERS = new Set([
+  "evaluatorList",
+  "evaluatorEditor",
+  "evaluatorCategorySelector",
+]);
+
+/**
+ * Check if the drawer stack indicates we're in an active evaluation flow.
+ * This is true when the stack contains "onlineEvaluation" as a parent entry
+ * (navigated to sub-drawer and coming back), OR when flow sub-drawers are
+ * still in the stack (flow is in progress).
+ *
+ * When `closeDrawer()` is called (e.g., user closes a sub-drawer entirely),
+ * the stack is emptied — so this correctly returns false for abandoned flows.
+ */
+function isInActiveEvaluationFlow(): boolean {
+  const stack = getDrawerStack();
+  return stack.some(
+    (entry) =>
+      entry.drawer === "onlineEvaluation" ||
+      FLOW_SUB_DRAWERS.has(entry.drawer),
+  );
+}
+
+/**
  * Drawer for creating/editing online evaluations (monitors).
  * Allows selecting an evaluator, configuring sampling, preconditions, and mappings.
  */
@@ -203,6 +242,19 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
 
   // Track if the form has been modified (dirty state)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  // Clear module-level state on unmount, unless navigating to a flow sub-drawer.
+  // This catches: page navigation, sub-drawer closed entirely, etc.
+  useLayoutEffect(() => {
+    return () => {
+      const nextDrawer =
+        getDrawerStack()[getDrawerStack().length - 1]?.drawer;
+      if (!nextDrawer || !FLOW_SUB_DRAWERS.has(nextDrawer)) {
+        onlineEvaluationDrawerState = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Skip the first watch trigger (initial render)
   const isInitialRenderRef = useRef(true);
@@ -329,8 +381,18 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
   // This effect must run BEFORE the persist effect to check the state before it's updated
   const prevIsOpenRef = useRef(false); // Start as false so first open is detected
   useEffect(() => {
-    // If drawer is opening (was closed, now open) and there's no persisted state, reset form
-    if (!prevIsOpenRef.current && isOpen && !onlineEvaluationDrawerState) {
+    // If drawer is opening (was closed, now open), check if we need to reset.
+    // Reset when: no persisted state, OR stale state from a previous abandoned session.
+    // Stale state = module-level state exists but we're NOT returning from a flow sub-drawer
+    // (the drawer stack would have "onlineEvaluation" if we're returning from evaluator list/editor).
+    const hasStaleState =
+      !!onlineEvaluationDrawerState && !isInActiveEvaluationFlow();
+    if (
+      !prevIsOpenRef.current &&
+      isOpen &&
+      (!onlineEvaluationDrawerState || hasStaleState)
+    ) {
+      onlineEvaluationDrawerState = null;
       form.reset({
         level: null, // Start with no level selected for progressive disclosure
         name: "",
@@ -870,6 +932,10 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
             updates.value = "true";
           }
 
+          // Clear key/subkey when switching fields
+          updates.key = undefined;
+          updates.subkey = undefined;
+
           return { ...p, ...updates };
         }
         return { ...p, [key]: value };
@@ -1167,6 +1233,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                         const allowedRules =
                           getAllowedRulesForField(currentField);
                         const valueType = getFieldValueType(currentField);
+                        const keyInfo = fieldRequiresKey(currentField);
 
                         return (
                           <Box
@@ -1223,6 +1290,22 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                                   </NativeSelect.Field>
                                   <NativeSelect.Indicator />
                                 </NativeSelect.Root>
+
+                                {keyInfo && (
+                                  <Input
+                                    value={precondition.key ?? ""}
+                                    onChange={(e) =>
+                                      updatePrecondition(
+                                        index,
+                                        "key",
+                                        e.target.value,
+                                      )
+                                    }
+                                    placeholder={`${keyInfo.label} key`}
+                                    minWidth="120px"
+                                    maxWidth="200px"
+                                  />
+                                )}
 
                                 <NativeSelect.Root minWidth="fit-content">
                                   <NativeSelect.Field
