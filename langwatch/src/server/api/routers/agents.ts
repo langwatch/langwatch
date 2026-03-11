@@ -515,32 +515,7 @@ export const agentsRouter = createTRPCRouter({
     .input(z.object({ agentId: z.string(), projectId: z.string() }))
     .use(checkProjectPermission("evaluations:view"))
     .query(async ({ ctx, input }) => {
-      const logs = await ctx.prisma.auditLog.findMany({
-        where: {
-          projectId: input.projectId,
-          action: { startsWith: "agents." },
-          OR: [
-            { args: { path: ["id"], equals: input.agentId } },
-            { args: { path: ["agentId"], equals: input.agentId } },
-          ],
-        },
-        orderBy: { createdAt: "desc" },
-        take: 100,
-      });
-
-      const userIds = [...new Set(logs.map((l) => l.userId))];
-      const users = await ctx.prisma.user.findMany({
-        where: { id: { in: userIds } },
-        select: { id: true, name: true, email: true },
-      });
-      const usersById = Object.fromEntries(users.map((u) => [u.id, u]));
-
-      return logs.map((log) => ({
-        id: log.id,
-        action: log.action,
-        createdAt: log.createdAt,
-        args: log.args,
-        user: usersById[log.userId] ?? null,
-      }));
+      const service = AgentService.create(ctx.prisma);
+      return service.getHistory(input.agentId, input.projectId);
     }),
 });
