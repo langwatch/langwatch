@@ -132,7 +132,7 @@ Orchestration mode is explicit - use one of:
 ┌─────────────────────────────────────────────────────────┐
 │ 2. TEST-REVIEW                                          │
 │    - /test-review validates pyramid placement           │
-│    - Checks @e2e, @integration, @unit appropriateness   │
+│    - Checks @integration, @unit appropriateness           │
 │    - Violations? → fix feature file, re-review          │
 │    - Approved? → Continue                               │
 └─────────────────────────────────────────────────────────┘

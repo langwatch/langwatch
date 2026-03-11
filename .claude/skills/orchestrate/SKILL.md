@@ -133,7 +133,7 @@ Used for feature requests, enhancements, and all non-bug issues.
 ### 4. Test Review (Required)
 - Invoke `/test-review` on the feature file
 - Validates pyramid placement before any implementation begins
-- Checks that `@e2e`, `@integration`, `@unit` tags are appropriate
+- Checks that `@integration`, `@unit` tags are appropriate
 - If violations found:
   - Update the feature file to fix tag placement
   - Re-run `/test-review` to confirm fixes
