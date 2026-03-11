@@ -74,8 +74,11 @@ export function SpanDetails({
     // Walk up parent spans to find the prompt reference
     if (allSpans) {
       const spanMap = new Map(allSpans.map((s) => [s.span_id, s]));
+      const visited = new Set<string>([span.span_id]);
       let currentId: string | null | undefined = span.parent_id;
       while (currentId) {
+        if (visited.has(currentId)) break;
+        visited.add(currentId);
         const parent = spanMap.get(currentId);
         if (!parent) break;
         const parentPromptId = (parent.params as Record<string, any>)

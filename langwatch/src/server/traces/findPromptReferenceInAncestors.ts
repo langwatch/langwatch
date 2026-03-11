@@ -38,10 +38,15 @@ export function findPromptReferenceInAncestors({
     return null;
   }
 
-  // Start from the target span's parent (skip the target itself)
+  // Start from the target span's parent (skip the target itself).
+  // Track visited IDs to guard against malformed cyclic parent chains.
+  const visited = new Set<string>([targetSpanId]);
   let currentId: string | null = targetSpan.parentSpanId;
 
   while (currentId) {
+    if (visited.has(currentId)) break;
+    visited.add(currentId);
+
     const current = spanMap.get(currentId);
     if (!current) break;
 

@@ -512,8 +512,12 @@ export class ElasticsearchTraceService {
     const target = spanMap.get(spanId);
     if (!target) return null;
 
+    const visited = new Set<string>([spanId]);
     let currentId: string | null | undefined = target.parent_id;
     while (currentId) {
+      if (visited.has(currentId)) break;
+      visited.add(currentId);
+
       const parent = spanMap.get(currentId);
       if (!parent) break;
 

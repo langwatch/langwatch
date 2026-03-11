@@ -213,6 +213,59 @@ describe("findPromptReferenceInAncestors()", () => {
     });
   });
 
+  describe("when parent chain has a self-cycle", () => {
+    it("breaks out instead of looping forever", () => {
+      const spans = [
+        {
+          spanId: "llm-span",
+          parentSpanId: "parent-span",
+          attributes: {},
+        },
+        {
+          spanId: "parent-span",
+          parentSpanId: "parent-span", // points to itself
+          attributes: {},
+        },
+      ];
+
+      const result = findPromptReferenceInAncestors({
+        targetSpanId: "llm-span",
+        spans,
+      });
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe("when parent chain has a two-node cycle", () => {
+    it("breaks out instead of looping forever", () => {
+      const spans = [
+        {
+          spanId: "llm-span",
+          parentSpanId: "span-a",
+          attributes: {},
+        },
+        {
+          spanId: "span-a",
+          parentSpanId: "span-b",
+          attributes: {},
+        },
+        {
+          spanId: "span-b",
+          parentSpanId: "span-a", // cycle back
+          attributes: {},
+        },
+      ];
+
+      const result = findPromptReferenceInAncestors({
+        targetSpanId: "llm-span",
+        spans,
+      });
+
+      expect(result).toBeNull();
+    });
+  });
+
   describe("when target span is not found in the span list", () => {
     it("returns null", () => {
       const spans = [
