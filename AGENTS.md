@@ -108,16 +108,17 @@ Implementation tasks use `/orchestrate` to manage work. The orchestrator detects
 
 **Bug detection:** Issues are classified as bugs when they have a "bug" label, title keywords ("fix", "bug", "broken"), or use a bug report issue template. Everything else follows the feature workflow.
 
-**Bug-fix workflow:** investigate → fix → verify → review
+**Bug-fix workflow:** investigate → fix → verify → review → browser-verify
 1. Investigates the root cause using `/code` (coder agent)
 2. Applies the fix and runs existing tests to verify
 3. Delegates to `/review` (uncle-bob-reviewer + cupid-reviewer agents in parallel)
-4. Skips `/plan` and spec creation — bugs fix existing behavior, not add new behavior
+4. **Verifies in a real browser** via `dev-up.sh` + `/browser-test`
+5. Skips `/plan` and spec creation — bugs fix existing behavior, not add new behavior
 
-**Feature workflow:** plan → code → review → e2e
+**Feature workflow:** plan → code → review → browser-verify
 1. **Creates a task checklist** using TaskCreate to map acceptance criteria
 2. Delegates to `/plan` (self-contained), `/code` (coder agent), `/review` (uncle-bob-reviewer + cupid-reviewer agents in parallel)
-3. **Verifies with E2E tests** via `/e2e` (if feature has `@e2e` scenarios)
+3. **Verifies in a real browser** via `dev-up.sh` + `/browser-test` — spins up an isolated dev instance, drives the browser to verify acceptance criteria, saves screenshots to `browser-tests/`
 4. Tracks progress via task status updates
 5. Does NOT read or write code directly
 

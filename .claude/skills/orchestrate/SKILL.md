@@ -52,7 +52,7 @@ Otherwise → use the **Feature Workflow** (the full plan → code → review lo
 
 ## Bug-Fix Workflow
 
-A shorter workflow for bug fixes. Skips planning, challenge, user approval, test review, and E2E — focuses on investigation, minimal fix with regression test, verification, and review.
+A shorter workflow for bug fixes. Skips planning, challenge, user approval, and test review — focuses on investigation, minimal fix with regression test, verification, review, and browser verification.
 
 ### 1. Investigate
 - Mark task as `in_progress`
@@ -78,12 +78,25 @@ A shorter workflow for bug fixes. Skips planning, challenge, user approval, test
 - If issues found → invoke `/code` with reviewer feedback
 - If approved → mark task as `completed`
 
-### 5. Commit and Draft PR
+### 5. Browser Verification
+- Start an isolated dev instance: `scripts/dev-up.sh`
+  - Wait for it to complete — it writes `.dev-port` with the app URL
+  - Read `.dev-port` to get `APP_PORT` and `BASE_URL`
+- Invoke `/browser-test` with the port and bug description
+  - Verify the bug is actually fixed in the browser
+  - Screenshots are saved to `browser-tests/<bug-slug>/<YYYY-MM-DD>/`
+- If verification fails → invoke `/code` with findings, re-run `/browser-test`
+  - Max 2 iterations, then escalate to user
+- Tear down the dev instance: `scripts/dev-down.sh`
+
+### 6. Commit and Draft PR
 - Invoke `/commit-push` to commit all changes and push to remote
 - Create a **draft** PR using `gh pr create --draft` with a summary of the work done
 - Include the issue number in the PR body for linking
+- Include browser verification screenshots in the PR body using absolute URLs:
+  `https://raw.githubusercontent.com/OWNER/REPO/BRANCH/browser-tests/<slug>/<date>/screenshots/<file>.png`
 
-### 6. Complete
+### 7. Complete
 - Verify all tasks are completed
 - Report summary to user (include PR URL)
 
@@ -143,19 +156,20 @@ Used for feature requests, enhancements, and all non-bug issues.
 - If issues found → invoke `/code` with reviewer feedback
 - If approved → mark task as `completed`
 
-### 8. E2E Verification (Conditional)
-- Check if feature file has `@e2e` tagged scenarios
-- If yes:
-  - Mark e2e task as `in_progress`
-  - Invoke `/e2e` with the feature file path
-  - E2E workflow: explores app → generates tests → runs until passing
-  - If tests fail due to **test issues** → healer fixes them
-  - If tests fail due to **app bugs** (behavior doesn't match spec):
-    - Invoke `/code` with the failing scenario and expected vs actual behavior
-    - After fix, re-run `/e2e` to verify
-    - Max 2 iterations, then escalate to user
-  - If all pass → mark task as `completed`
-- If no `@e2e` scenarios → skip to Complete
+### 8. Browser Verification (Required)
+- Mark browser-test task as `in_progress`
+- Start an isolated dev instance: `scripts/dev-up.sh`
+  - Wait for it to complete — it writes `.dev-port` with the app URL
+  - Read `.dev-port` to get `APP_PORT` and `BASE_URL`
+- Invoke `/browser-test` with the port and feature file path
+  - The browser-test skill drives a real browser to verify acceptance criteria
+  - Screenshots are saved to `browser-tests/<feature-name>/<YYYY-MM-DD>/`
+- If verification fails due to **app bugs**:
+  - Invoke `/code` with the failing scenario and expected vs actual behavior
+  - After fix, re-run `/browser-test` to verify
+  - Max 2 iterations, then escalate to user
+- Tear down the dev instance: `scripts/dev-down.sh`
+- If all scenarios pass → mark task as `completed`
 
 ### 9. Self-Check (Required)
 
@@ -167,7 +181,7 @@ Before completing, verify you didn't make mistakes:
 - Did you skip any reviewer recommendations without justification?
 
 **Test Coverage:**
-- Check the feature file for `@unit`, `@integration`, `@e2e` tags
+- Check the feature file for `@unit`, `@integration` tags
 - Verify tests exist for EACH tagged scenario
 - If a scenario is tagged `@integration` but only unit tests exist, that's incomplete
 
@@ -177,7 +191,7 @@ Before completing, verify you didn't make mistakes:
 
 If ANY check fails:
 1. Do NOT proceed to Complete
-2. Go back to the appropriate step (Implement, Review, or E2E)
+2. Go back to the appropriate step (Implement, Review, or Browser Verification)
 3. Fix the gap before continuing
 
 This self-check exists because it's easy to rationalize skipping work. Don't.
@@ -186,11 +200,13 @@ This self-check exists because it's easy to rationalize skipping work. Don't.
 - Invoke `/commit-push` to commit all changes and push to remote
 - Create a **draft** PR using `gh pr create --draft` with a summary of the work done
 - Include the issue number in the PR body for linking
+- Include browser verification screenshots in the PR body using absolute URLs:
+  `https://raw.githubusercontent.com/OWNER/REPO/BRANCH/browser-tests/<feature>/<date>/screenshots/<file>.png`
 
 ### 11. Complete
 - Verify all tasks are completed
 - Verify self-check passed
-- Report summary to user (include PR URL and E2E test status if applicable)
+- Report summary to user (include PR URL and browser verification status)
 
 ## Boundaries
 
@@ -199,6 +215,10 @@ You delegate, you don't implement:
 - `/test-review` validates pyramid placement before implementation
 - `/code` writes code and runs tests
 - `/review` checks quality
-- `/e2e` generates and verifies E2E tests
+- `/browser-test` verifies features work in a real browser
+
+You manage infra lifecycle:
+- `scripts/dev-up.sh` starts an isolated dev instance (writes `.dev-port`)
+- `scripts/dev-down.sh` tears it down
 
 Read only feature files and planning docs, not source code.

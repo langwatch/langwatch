@@ -32,16 +32,18 @@ Lessons learned from running `/browser-test` against the LangWatch app.
 
 ## Screenshots
 
-Always save screenshots to `.browser-test-screenshots/` (gitignored). Never save to repo root.
+Save screenshots to the structured artifact directory: `browser-tests/<feature-name>/<YYYY-MM-DD>/screenshots/`.
 
 ```text
-browser_take_screenshot → filename: ".browser-test-screenshots/my-screenshot.png"
+browser_take_screenshot → filename: "browser-tests/plans-comparison/2026-03-11/screenshots/01-sign-in.png"
 ```
+
+These are committed to the branch and referenced in PR descriptions using absolute `raw.githubusercontent.com` URLs. **Never use relative paths in PR bodies** — they don't render.
 
 ## After Finishing
 
-1. **Save run notes** in `.claude/skills/browser-test/history/` using the template in `_TEMPLATE.md`.
-2. **Report results** using the summary table format from `SKILL.md`.
+1. **Save report** to `browser-tests/<feature-name>/<YYYY-MM-DD>/report.md` (see SKILL.md for format).
+2. **Report results** to the caller using the summary table format from `SKILL.md`.
 
 ## Known Issues
 
