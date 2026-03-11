@@ -13,9 +13,11 @@ import { generate } from "@langwatch/ksuid";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { normalizeJob } from "../scenario-job.repository";
 import type { MinimalJob } from "../scenario-job.repository";
-import type { ChildProcessJobData } from "../execution/types";
 
-/** Mirrors the generateScenarioRunId implementation without heavy imports */
+/**
+ * Uses the same KSUID resource as production generateScenarioRunId().
+ * Cannot import directly from scenario.queue due to transitive Prisma/Redis deps.
+ */
 function generateScenarioRunId(): string {
   return generate(KSUID_RESOURCES.SCENARIO_RUN).toString();
 }
@@ -81,40 +83,4 @@ describe("scenario run ID passthrough", () => {
     });
   });
 
-  describe("child process job data context", () => {
-    describe("when scenarioRunId is set in the context", () => {
-      it("includes scenarioRunId in the context for SDK passthrough", () => {
-        const jobData: ChildProcessJobData = {
-          context: {
-            projectId: "proj_test",
-            scenarioId: "scen_test",
-            setId: "set_test",
-            batchRunId: "batch_test",
-            scenarioRunId: "scenariorun_preassigned456",
-          },
-          scenario: {
-            id: "scen_test",
-            name: "Test",
-            situation: "Test situation",
-            criteria: ["Must pass"],
-            labels: [],
-          },
-          adapterData: {
-            type: "prompt",
-            promptId: "prompt_test",
-            systemPrompt: "You are helpful",
-            messages: [],
-          },
-          modelParams: {
-            api_key: "test-key",
-            model: "openai/gpt-4",
-          },
-          nlpServiceUrl: "http://localhost:8080",
-          target: { type: "prompt", referenceId: "prompt_test" },
-        };
-
-        expect(jobData.context.scenarioRunId).toBe("scenariorun_preassigned456");
-      });
-    });
-  });
 });
