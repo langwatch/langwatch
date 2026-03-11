@@ -29,6 +29,7 @@ vi.mock("~/server/tracer/spanToReadableSpan", () => ({
 
 vi.mock("~/server/traces/trace-formatting", () => ({
   generateAsciiTree: vi.fn().mockReturnValue("ascii tree"),
+  formatTraceSummaryDigest: vi.fn().mockReturnValue("Input: hello\nOutput: world"),
 }));
 
 vi.mock("~/utils/logger/server", () => ({

@@ -4,10 +4,9 @@ import { fromZodError, type ZodError } from "zod-validation-error";
 import { getAllForProjectInput } from "../../../server/api/routers/traces.schemas";
 import { getProtectionsForProject } from "../../../server/api/utils";
 import { prisma } from "../../../server/db";
-import type { LLMModeTrace, Span, Trace } from "../../../server/tracer/types";
+import type { Span, Trace } from "../../../server/tracer/types";
 import { TraceService } from "../../../server/traces/trace.service";
-import { toLLMModeTrace } from "~/server/traces/trace-formatting";
-import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
+import { toLLMModeTrace, formatTraceSummaryDigest } from "~/server/traces/trace-formatting";
 
 export const config = {
   api: {
@@ -98,24 +97,23 @@ export default async function handler(
     protections,
     {
       downloadMode: true,
-      includeSpans: format === "digest",
       scrollId: params.scrollId ?? undefined,
     },
   );
 
-  const rawTraces = results.groups.flat() as (Trace & { spans?: Span[] })[];
+  const rawTraces = results.groups.flat() as Trace[];
 
   let traces: unknown[];
   if (format === "digest") {
-    traces = await Promise.all(rawTraces.map(async (trace) => ({
+    traces = rawTraces.map((trace) => ({
       trace_id: trace.trace_id,
-      formatted_trace: await formatSpansDigest(trace.spans ?? []),
+      formatted_trace: formatTraceSummaryDigest(trace),
       input: trace.input,
       output: trace.output,
       timestamps: trace.timestamps,
       metadata: trace.metadata,
       error: trace.error,
-    })));
+    }));
   } else if (params.llmMode) {
     // Legacy llmMode behavior (kept for backward compat, but format=digest is preferred)
     traces = (rawTraces as Trace[]).map((trace) => ({
