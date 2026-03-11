@@ -21,9 +21,6 @@ export default defineConfig({
   /* Global setup - validates environment before running tests */
   globalSetup: require.resolve("./tests/global-setup.ts"),
 
-  /* Ignore the MCP seed file - it's only for planning exploration */
-  testIgnore: ["**/seed.spec.ts"],
-
   /* Run tests sequentially - important for agentic debugging */
   fullyParallel: false,
   workers: 1,
@@ -53,12 +50,6 @@ export default defineConfig({
     actionTimeout: 15000,
     navigationTimeout: 30000,
   },
-
-  /* Start test environment via Docker Compose (local only, CI uses services)
-   * Note: Run `docker compose -f compose.test.yml up -d` manually before tests
-   * The webServer is disabled to avoid complexity with container lifecycle
-   */
-  webServer: undefined,
 
   /* Project configurations */
   projects: [
