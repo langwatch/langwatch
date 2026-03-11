@@ -1,12 +1,11 @@
 import { prisma } from "../../src/server/db";
-import { env } from "../../src/env.mjs";
 import { createSaaSPlanProvider } from "./planProvider";
 import { createCustomerService } from "./services/customerService";
 import { createSeatEventSubscriptionFns } from "./services/seatEventSubscription";
 import { InviteService } from "../../src/server/invites/invite.service";
 import { createSeatSyncService } from "./services/seatSyncService";
-import { createSubscriptionService } from "./services/subscriptionService";
 import * as subscriptionItemCalculator from "./services/subscriptionItemCalculator";
+import { EESubscriptionService } from "./services/subscription.service";
 import { EEWebhookService } from "./services/webhookService";
 import { createStripeClient } from "./stripe/stripeClient";
 import { createCurrencyRouter } from "./currencyRouter";
@@ -39,7 +38,7 @@ export const createSubscriptionRouter = () => {
   const s = getStripe();
   const customerService = createCustomerService({ stripe: s, db: prisma });
   const seatEventFns = createSeatEventSubscriptionFns({ stripe: s, db: prisma });
-  const subscriptionService = createSubscriptionService({
+  const subscriptionService = EESubscriptionService.create({
     stripe: s,
     db: prisma,
     itemCalculator: subscriptionItemCalculator,
