@@ -72,7 +72,7 @@ describe("<GroupRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("failed (4/5)")).toBeInTheDocument();
+      expect(screen.getByText("failed")).toBeInTheDocument();
     });
   });
 

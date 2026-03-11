@@ -548,7 +548,7 @@ async function handleCollectorRequest(
           evaluation.status ??
           (evaluation.error ? "error" : "processed");
 
-        await app.evaluations.startEvaluation({
+        await app.evaluations.reportEvaluation({
           tenantId: project.id,
           evaluationId,
           evaluatorId,
@@ -556,12 +556,6 @@ async function handleCollectorRequest(
           evaluatorName: evaluation.name,
           traceId,
           isGuardrail: evaluation.is_guardrail ?? undefined,
-          occurredAt,
-        });
-
-        await app.evaluations.completeEvaluation({
-          tenantId: project.id,
-          evaluationId,
           status,
           score: evaluation.score ?? null,
           passed: evaluation.passed ?? null,

@@ -154,6 +154,9 @@ export const ExecutionContextSchema = z.object({
   scenarioId: z.string(),
   setId: z.string(),
   batchRunId: z.string(),
+  /** Pre-assigned scenario run ID passed through to the SDK to prevent duplicate entries.
+   *  Optional during validation prefetch; required at execution time. */
+  scenarioRunId: z.string().optional(),
 });
 export type ExecutionContext = z.infer<typeof ExecutionContextSchema>;
 

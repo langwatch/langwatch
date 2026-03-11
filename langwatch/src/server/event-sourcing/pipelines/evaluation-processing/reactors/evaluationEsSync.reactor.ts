@@ -7,7 +7,7 @@ import type {
 } from "../../../reactors/reactor.types";
 import type { EvaluationRunData } from "../projections/evaluationRun.foldProjection";
 import type { EvaluationProcessingEvent } from "../schemas/events";
-import { isEvaluationCompletedEvent } from "../schemas/events";
+import { isEvaluationCompletedEvent, isEvaluationReportedEvent } from "../schemas/events";
 
 const logger = createLogger(
   "langwatch:evaluation-processing:es-sync-reactor",
@@ -22,13 +22,13 @@ export interface EvaluationEsSyncReactorDeps {
 }
 
 /**
- * Creates a reactor that syncs evaluation state to Elasticsearch after a CompletedEvent.
+ * Creates a reactor that syncs evaluation state to Elasticsearch.
  *
  * Evaluations are stored as nested documents inside trace documents in ES.
  * This reactor upserts the evaluation into the trace's `evaluations[]` array
  * using the same Painless script as the legacy `updateEvaluationStatusInES`.
  *
- * Only fires on CompletedEvent — intermediate states are not synced to ES.
+ * Fires on CompletedEvent and ReportedEvent — intermediate states are not synced.
  */
 export function createEvaluationEsSyncReactor(
   deps: EvaluationEsSyncReactorDeps,
@@ -40,7 +40,7 @@ export function createEvaluationEsSyncReactor(
       event: EvaluationProcessingEvent,
       context: ReactorContext<EvaluationRunData>,
     ): Promise<void> {
-      if (!isEvaluationCompletedEvent(event)) return;
+      if (!isEvaluationCompletedEvent(event) && !isEvaluationReportedEvent(event)) return;
 
       const { tenantId, foldState } = context;
 

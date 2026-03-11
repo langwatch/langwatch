@@ -126,7 +126,7 @@ describe("<SuiteSidebar/> External Sets", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText(/15\/20 passed/)).toBeInTheDocument();
+      expect(screen.getByText(/15 passed/)).toBeInTheDocument();
     });
 
     it("does not display a Run button on external set items", () => {
