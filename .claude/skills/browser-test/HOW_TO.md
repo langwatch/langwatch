@@ -18,6 +18,16 @@ Lessons learned from running `/browser-test` against the LangWatch app.
 - After successful login, the app redirects back and shows a loading splash while queries resolve. Wait for it.
 - **New accounts hit onboarding** — you'll need to fill in an org name, accept ToS, and pick a product flavour before reaching the main app.
 
+### Standard Test Credentials
+
+Always use these credentials for consistency across browser tests, E2E tests, and verification scripts:
+
+- **Email:** `browser-test@langwatch.ai`
+- **Password:** `BrowserTest123!`
+- **Org name (onboarding):** `Browser Test Org`
+
+These are used by `scripts/verify-browser-test.js` and `agentic-e2e-tests/tests/auth.setup.ts`. Using consistent credentials avoids orphaned test accounts and makes auth state reusable across tools.
+
 ## Chakra UI Gotchas
 
 - **Checkbox clicks get intercepted** by Chakra's overlay `<div>`. If clicking a checkbox times out with "intercepts pointer events", click the **label text** or the **adjacent img element** instead.

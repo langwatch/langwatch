@@ -24,5 +24,7 @@ Initial proof-of-concept run validating that AI agents can drive a real browser 
 
 - Test user already existed, so sign-up was skipped (registration returned 400).
 - Onboarding was bypassed — user already set up.
-- 3 Playwright specs ran: auth setup, plans comparison, smoke test. All passed in 48.9s.
-- See `e2e-test-run.txt` and `verify-output.txt` for raw logs.
+- Screenshots 01-05 were captured by `scripts/verify-browser-test.js` (see `verify-output.txt`).
+- Screenshot 06 (plans comparison) was captured during a separate Playwright E2E test run (see `e2e-test-run.txt`).
+- 3 Playwright specs ran in the E2E run: auth setup, plans comparison, smoke test. All passed in 48.9s.
+- Test credentials: `browser-test@langwatch.ai` / `BrowserTest123!`.

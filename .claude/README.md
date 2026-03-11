@@ -16,14 +16,14 @@ User Request
 │  - Does NOT read/write code directly                                │
 └─────────────────────────────────────────────────────────────────────┘
      │                         │                         │
-     │ /code                   │ /review                 │ /e2e
+     │ /code                   │ /review                 │ /browser-test
      ▼                         ▼                         ▼
 ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────────────┐
-│  CODER AGENT     │  │  UNCLE-BOB-      │  │  E2E WORKFLOW            │
-│  (context: fork) │  │  REVIEWER        │  │  (coordinates agents)    │
-│  - TDD workflow  │  │  (context: fork) │  │  - planner → generator   │
-│  - Returns       │  │  - SOLID/TDD     │  │  - healer → reviewer     │
-│    summary       │  │  - Returns       │  │  - Returns test status   │
+│  CODER AGENT     │  │  UNCLE-BOB-      │  │  BROWSER VERIFICATION    │
+│  (context: fork) │  │  REVIEWER        │  │  (interactive)           │
+│  - TDD workflow  │  │  (context: fork) │  │  - Drives real browser   │
+│  - Returns       │  │  - SOLID/TDD     │  │  - Screenshots + report  │
+│    summary       │  │  - Returns       │  │  - No test files         │
 │                  │  │    findings      │  │                          │
 └──────────────────┘  └──────────────────┘  └──────────────────────────┘
 ```
@@ -37,10 +37,10 @@ User Request
 │   ├── repo-sherpa.md
 │   ├── uncle-bob-reviewer.md
 │   ├── devils-advocate.md            # Stress-test proposals and plans
-│   ├── playwright-test-planner.md    # E2E: explores app, creates plans
-│   ├── playwright-test-generator.md  # E2E: generates tests from plans
-│   ├── playwright-test-healer.md     # E2E: fixes failing tests
-│   └── test-reviewer.md              # E2E: reviews test quality
+│   ├── playwright-test-planner.md    # Ad-hoc: explores app, creates plans
+│   ├── playwright-test-generator.md  # Ad-hoc: generates tests from plans
+│   ├── playwright-test-healer.md     # Ad-hoc: fixes failing tests
+│   └── test-reviewer.md              # Reviews test quality
 ├── skills/         # Skills (entry points that invoke agents)
 │   ├── orchestrate/    # Manual: /orchestrate <requirements>
 │   ├── implement/      # Manual: /implement #123 (invokes /orchestrate)
@@ -50,7 +50,7 @@ User Request
 │   ├── challenge/      # Delegates to devils-advocate
 │   ├── sherpa/         # Delegates to repo-sherpa
 │   ├── drive-pr/       # Fix CI failures + address review comments
-│   └── e2e/            # Coordinates E2E test generation workflow
+│   └── browser-test/   # Interactive browser verification
 └── commands/       # Slash commands (non-agent utilities)
 ```
 
@@ -66,12 +66,12 @@ Agents are **specialized personas** with defined workflows and expertise. They r
 | `uncle-bob-reviewer` | SOLID/Clean Code review | Opus |
 | `devils-advocate` | Stress-test proposals, plans, and architecture decisions | Opus |
 | `repo-sherpa` | Documentation, DX, meta-layer | Opus |
-| `playwright-test-planner` | Explore live app, create test plans | Opus |
-| `playwright-test-generator` | Generate Playwright tests from plans | Sonnet |
-| `playwright-test-healer` | Debug and fix failing tests | Sonnet |
+| `playwright-test-planner` | Explore live app, create test plans (ad-hoc) | Opus |
+| `playwright-test-generator` | Generate Playwright tests from plans (ad-hoc) | Sonnet |
+| `playwright-test-healer` | Debug and fix failing tests (ad-hoc) | Sonnet |
 | `test-reviewer` | Review test quality and pyramid placement | Opus |
 
-Agents are invoked **only through skills**, never directly (except E2E agents which are invoked via Task tool from the `/e2e` skill).
+Agents are invoked **only through skills**, never directly.
 
 ### Skills (.claude/skills/)
 
@@ -162,13 +162,13 @@ Orchestration mode is explicit - use one of:
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────┐
-│ 6. E2E VERIFICATION (if @e2e scenarios exist)           │
-│    - /e2e with feature file path                        │
-│    - Explores live app → generates tests → heals        │
-│    - All tests pass? → Complete                         │
-│    - App bug detected? → /code with fix details ──┐     │
-│    - Inconclusive? → escalate to user             │     │
-└───────────────────────────────────────────────────│─────┘
+│ 6. BROWSER VERIFICATION                                 │
+│    - dev-up.sh → /browser-test → dev-down.sh           │
+│    - Drives real browser, takes screenshots             │
+│    - Pass? → Complete                                   │
+│    - Fail? → /code with findings ────────────────┐      │
+│    - Max 2 iterations, then escalate             │      │
+└──────────────────────────────────────────────────│──────┘
                           │                         │
                           │    ┌────────────────────┘
                           │    │ (loop back to implement)
@@ -178,7 +178,7 @@ Orchestration mode is explicit - use one of:
                           ▼
 ┌─────────────────────────────────────────────────────────┐
 │ 7. COMPLETE                                             │
-│    - Report summary to user (code + tests)              │
+│    - Report summary to user (code + verification)       │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -189,7 +189,7 @@ The orchestrator delegates, it doesn't implement:
 - `/test-review` validates pyramid placement before implementation
 - `/code` writes code and runs tests
 - `/review` checks quality
-- `/e2e` generates and verifies E2E tests
+- `/browser-test` verifies features work in a real browser
 
 The orchestrator reads only feature files and planning docs, not source code.
 
@@ -225,16 +225,10 @@ ORCHESTRATOR (main thread)
 │                  - Failure mode analysis
 │                  - Alternative approaches
 │
-├── /e2e  ───────► E2E WORKFLOW (coordinates agents)
-│                  ├── playwright-test-planner
-│                  │   - Explore live app
-│                  │   - Create test plans
-│                  ├── playwright-test-generator
-│                  │   - Generate Playwright tests
-│                  ├── playwright-test-healer
-│                  │   - Fix failing tests
-│                  └── test-reviewer
-│                      - Review test quality
+├── /browser-test ► BROWSER VERIFICATION (interactive)
+│                  - Drives real browser via Playwright MCP
+│                  - Screenshots + report to browser-tests/
+│                  - No test files generated
 │
 └── /sherpa ─────► REPO-SHERPA
                    - Documentation
@@ -263,7 +257,7 @@ When changes touch these areas, invoke `/sherpa` for guidance.
 | `/code <task>` | coder | Implement with TDD |
 | `/review <focus>` | uncle-bob + cupid + test-reviewer | Quality review (parallel) |
 | `/challenge <proposal>` | devils-advocate | Stress-test proposals and plans |
-| `/e2e <feature>` | (coordinates e2e agents) | Generate and verify E2E tests |
+| `/browser-test [port] [feature]` | (interactive verification) | Verify feature works in real browser |
 | `/sherpa <question>` | repo-sherpa | Docs/DX/meta-layer |
 
 ## Token-Conscious Principle
