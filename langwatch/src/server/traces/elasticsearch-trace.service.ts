@@ -591,6 +591,7 @@ export class ElasticsearchTraceService {
       metrics: span.metrics ?? null,
       promptHandle: promptRef.promptHandle,
       promptVersionNumber: promptRef.promptVersionNumber,
+      promptVariables: promptRef.promptVariables,
     };
   }
 

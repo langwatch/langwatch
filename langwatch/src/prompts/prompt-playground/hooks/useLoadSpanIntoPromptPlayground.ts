@@ -20,6 +20,9 @@ import {
 const logger = createLogger("useLoadSpanIntoPromptPlayground");
 
 const QUERY_PARAM_PROMPT_PLAYGROUND_SPAN_ID = "promptPlaygroundSpanId";
+const QUERY_PARAM_ACTION = "action";
+
+export type PlaygroundAction = "open-existing" | "create-new";
 
 /**
  * Hook for navigation to prompt playground with a span ID.
@@ -32,9 +35,10 @@ export function useGoToSpanInPlaygroundTabUrlBuilder() {
    * buildUrl
    * Single Responsibility: Constructs URL to prompt playground page with span ID query parameter.
    * @param spanId - The ID of the span to load into the prompt playground
+   * @param action - Optional action: "open-existing" to open the referenced prompt, "create-new" to always create a new tab
    * @returns A URL object if the project slug is available, otherwise null
    */
-  const buildUrl = (spanId: string) => {
+  const buildUrl = (spanId: string, action?: PlaygroundAction) => {
     if (!project?.slug) {
       logger.warn("Cannot build URL: project slug is missing");
       return null;
@@ -45,6 +49,9 @@ export function useGoToSpanInPlaygroundTabUrlBuilder() {
       window.location.origin,
     );
     url.searchParams.set(QUERY_PARAM_PROMPT_PLAYGROUND_SPAN_ID, spanId);
+    if (action) {
+      url.searchParams.set(QUERY_PARAM_ACTION, action);
+    }
     return url;
   };
 
@@ -52,6 +59,7 @@ export function useGoToSpanInPlaygroundTabUrlBuilder() {
     /**
      * Build a URL to the prompt playground page with the given span ID.
      * @param spanId - The ID of the span to load into the prompt playground.
+     * @param action - Optional action: "open-existing" or "create-new".
      * @returns A URL object if the project slug is available, otherwise null.
      */
     buildUrl,
@@ -59,29 +67,36 @@ export function useGoToSpanInPlaygroundTabUrlBuilder() {
 }
 
 /**
- * Hook to read and clear URL query parameter for span ID.
- * Single Responsibility: Extract span ID from URL and clean up the URL.
- * @returns Object with spanId and clearSpanIdFromUrl function
+ * Hook to read and clear URL query parameters for span ID and action.
+ * Single Responsibility: Extract span ID and action from URL and clean up the URL.
+ * @returns Object with spanId, action, and clearParamsFromUrl function
  */
 function useSpanIdFromUrl() {
   const searchParams = useSearchParams();
   const spanId = searchParams?.get(QUERY_PARAM_PROMPT_PLAYGROUND_SPAN_ID);
+  const rawAction = searchParams?.get(QUERY_PARAM_ACTION);
+  const action: PlaygroundAction | null =
+    rawAction === "open-existing" || rawAction === "create-new"
+      ? rawAction
+      : null;
   const router = useRouter();
 
   /**
-   * clearSpanIdFromUrl
-   * Single Responsibility: Removes span ID query parameter from URL without full page reload.
+   * clearParamsFromUrl
+   * Single Responsibility: Removes span ID and action query parameters from URL without full page reload.
    */
-  const clearSpanIdFromUrl = () => {
-    // Create a copy of router.query without the span ID param
-    const { [QUERY_PARAM_PROMPT_PLAYGROUND_SPAN_ID]: _, ...query } =
-      router.query;
+  const clearParamsFromUrl = () => {
+    const {
+      [QUERY_PARAM_PROMPT_PLAYGROUND_SPAN_ID]: _spanId,
+      [QUERY_PARAM_ACTION]: _action,
+      ...query
+    } = router.query;
     void router.replace({ pathname: router.pathname, query }, undefined, {
       shallow: true,
     });
   };
 
-  return { spanId, clearSpanIdFromUrl };
+  return { spanId, action, clearParamsFromUrl };
 }
 
 /**
@@ -260,22 +275,65 @@ async function tryOpenExistingPromptTab({
 }
 
 /**
+ * Merges traced variables into an existing prompt's inputs.
+ * For variables that exist in the prompt's input schema, fills them.
+ * For variables NOT in the prompt's input schema, adds them as new inputs.
+ *
+ * @param formValues - The existing prompt form values
+ * @param promptVariables - The traced variable values
+ * @returns Updated form values with merged inputs
+ */
+function mergeTracedVariablesIntoInputs(
+  formValues: PromptConfigFormValues,
+  promptVariables: Record<string, string>,
+): PromptConfigFormValues {
+  const existingInputs = formValues.version?.configData?.inputs ?? [];
+  const existingIdentifiers = new Set(
+    existingInputs.map((input) => input.identifier),
+  );
+
+  const newInputs = Object.keys(promptVariables)
+    .filter((key) => !existingIdentifiers.has(key))
+    .map((key) => ({ identifier: key, type: "str" as const }));
+
+  if (newInputs.length === 0) {
+    return formValues;
+  }
+
+  return {
+    ...formValues,
+    version: {
+      ...formValues.version,
+      configData: {
+        ...formValues.version.configData,
+        inputs: [...existingInputs, ...newInputs],
+      },
+    },
+  };
+}
+
+/**
  * Hook to load span data from a trace into the prompt studio.
  * When the span references a LangWatch-managed prompt (via promptHandle),
  * opens the existing prompt at the recorded version. Otherwise, creates
  * a new tab from the trace data.
+ *
+ * Supports an `action` URL parameter:
+ * - "open-existing": open the referenced prompt at the traced version
+ * - "create-new": always create a new tab from trace data
+ * - absent: auto-detect based on whether promptHandle is present
  */
 export function useLoadSpanIntoPromptPlayground() {
   const loadedRef = useRef(false);
   const { project } = useOrganizationTeamProject();
-  const { spanId, clearSpanIdFromUrl } = useSpanIdFromUrl();
+  const { spanId, action, clearParamsFromUrl } = useSpanIdFromUrl();
   const trpc = api.useContext();
   const { addTab } = useDraggableTabsBrowserStore(({ addTab }) => ({ addTab }));
 
   useEffect(() => {
     if (!spanId || loadedRef.current || !project?.id) return;
 
-    clearSpanIdFromUrl();
+    clearParamsFromUrl();
 
     void (async () => {
       try {
@@ -292,8 +350,21 @@ export function useLoadSpanIntoPromptPlayground() {
           spanData.traceId,
         );
 
-        // When span references a managed prompt, open the existing prompt
-        if (spanData.promptHandle && spanData.promptVersionNumber) {
+        const variables = spanData.promptVariables ?? {};
+
+        // Determine effective action: explicit or auto-detected from prompt reference
+        const effectiveAction: PlaygroundAction =
+          action ??
+          (spanData.promptHandle && spanData.promptVersionNumber
+            ? "open-existing"
+            : "create-new");
+
+        // When action is "open-existing" and span references a managed prompt
+        if (
+          effectiveAction === "open-existing" &&
+          spanData.promptHandle &&
+          spanData.promptVersionNumber
+        ) {
           const existingPrompt = await tryOpenExistingPromptTab({
             promptHandle: spanData.promptHandle,
             promptVersionNumber: spanData.promptVersionNumber,
@@ -302,18 +373,24 @@ export function useLoadSpanIntoPromptPlayground() {
           });
 
           if (existingPrompt) {
+            const mergedValues = mergeTracedVariablesIntoInputs(
+              existingPrompt.formValues,
+              variables,
+            );
+
             addTab({
               data: TabDataSchema.parse({
                 form: {
-                  currentValues: existingPrompt.formValues,
+                  currentValues: mergedValues,
                 },
                 chat: {
                   initialMessagesFromSpanData: chatMessages,
                 },
                 meta: {
-                  title: existingPrompt.formValues.handle ?? null,
+                  title: mergedValues.handle ?? null,
                   versionNumber: existingPrompt.versionNumber,
                 },
+                variableValues: variables,
               }),
             });
             return;
@@ -331,6 +408,7 @@ export function useLoadSpanIntoPromptPlayground() {
             chat: {
               initialMessagesFromSpanData: chatMessages,
             },
+            variableValues: variables,
           }),
         });
       } catch (error) {
@@ -348,9 +426,10 @@ export function useLoadSpanIntoPromptPlayground() {
     loadedRef.current = true;
   }, [
     spanId,
+    action,
     project?.id,
     trpc.spans.getForPromptStudio,
-    clearSpanIdFromUrl,
+    clearParamsFromUrl,
     addTab,
   ]);
 }

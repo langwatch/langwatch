@@ -8,6 +8,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "team/sample-prompt",
         promptVersionNumber: 3,
+        promptVariables: null,
       });
     });
 
@@ -16,6 +17,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "my-org/deep/nested-prompt",
         promptVersionNumber: 12,
+        promptVariables: null,
       });
     });
 
@@ -24,6 +26,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "simple-prompt",
         promptVersionNumber: 1,
+        promptVariables: null,
       });
     });
 
@@ -32,6 +35,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: null,
         promptVersionNumber: null,
+        promptVariables: null,
       });
     });
 
@@ -40,6 +44,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: null,
         promptVersionNumber: null,
+        promptVariables: null,
       });
     });
 
@@ -48,6 +53,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: null,
         promptVersionNumber: null,
+        promptVariables: null,
       });
     });
 
@@ -56,6 +62,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: null,
         promptVersionNumber: null,
+        promptVariables: null,
       });
     });
 
@@ -64,6 +71,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: null,
         promptVersionNumber: null,
+        promptVariables: null,
       });
     });
   });
@@ -77,6 +85,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "team/sample-prompt",
         promptVersionNumber: 2,
+        promptVariables: null,
       });
     });
 
@@ -88,6 +97,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "team/sample-prompt",
         promptVersionNumber: 5,
+        promptVariables: null,
       });
     });
 
@@ -96,6 +106,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: null,
         promptVersionNumber: null,
+        promptVariables: null,
       });
     });
 
@@ -104,6 +115,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: null,
         promptVersionNumber: null,
+        promptVariables: null,
       });
     });
   });
@@ -113,6 +125,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference({})).toEqual({
         promptHandle: null,
         promptVersionNumber: null,
+        promptVariables: null,
       });
     });
 
@@ -124,6 +137,7 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: null,
         promptVersionNumber: null,
+        promptVariables: null,
       });
     });
   });
@@ -138,7 +152,101 @@ describe("parsePromptReference()", () => {
       expect(parsePromptReference(attrs)).toEqual({
         promptHandle: "team/new-prompt",
         promptVersionNumber: 5,
+        promptVariables: null,
       });
+    });
+  });
+
+  describe("when prompt variables are present", () => {
+    it("extracts variables from valid JSON wrapper", () => {
+      const attrs = {
+        "langwatch.prompt.id": "team/sample-prompt:3",
+        "langwatch.prompt.variables":
+          '{"type":"json","value":{"name":"Alice","topic":"AI"}}',
+      };
+      const result = parsePromptReference(attrs);
+      expect(result.promptVariables).toEqual({
+        name: "Alice",
+        topic: "AI",
+      });
+    });
+
+    it("converts non-string values to strings", () => {
+      const attrs = {
+        "langwatch.prompt.id": "team/sample-prompt:3",
+        "langwatch.prompt.variables":
+          '{"type":"json","value":{"count":42,"active":true,"empty":null}}',
+      };
+      const result = parsePromptReference(attrs);
+      expect(result.promptVariables).toEqual({
+        count: "42",
+        active: "true",
+        empty: "null",
+      });
+    });
+
+    it("returns null variables for invalid JSON", () => {
+      const attrs = {
+        "langwatch.prompt.id": "team/sample-prompt:3",
+        "langwatch.prompt.variables": "not valid json",
+      };
+      const result = parsePromptReference(attrs);
+      expect(result.promptVariables).toBeNull();
+    });
+
+    it("returns null variables when value key is missing", () => {
+      const attrs = {
+        "langwatch.prompt.id": "team/sample-prompt:3",
+        "langwatch.prompt.variables": '{"type":"json"}',
+      };
+      const result = parsePromptReference(attrs);
+      expect(result.promptVariables).toBeNull();
+    });
+
+    it("returns null variables when value is not an object", () => {
+      const attrs = {
+        "langwatch.prompt.id": "team/sample-prompt:3",
+        "langwatch.prompt.variables": '{"type":"json","value":"string-value"}',
+      };
+      const result = parsePromptReference(attrs);
+      expect(result.promptVariables).toBeNull();
+    });
+
+    it("returns null variables when value is an array", () => {
+      const attrs = {
+        "langwatch.prompt.id": "team/sample-prompt:3",
+        "langwatch.prompt.variables": '{"type":"json","value":["a","b"]}',
+      };
+      const result = parsePromptReference(attrs);
+      expect(result.promptVariables).toBeNull();
+    });
+
+    it("returns null variables when attribute is not a string", () => {
+      const attrs = {
+        "langwatch.prompt.id": "team/sample-prompt:3",
+        "langwatch.prompt.variables": 123,
+      };
+      const result = parsePromptReference(attrs);
+      expect(result.promptVariables).toBeNull();
+    });
+
+    it("returns null variables when attribute is missing", () => {
+      const attrs = {
+        "langwatch.prompt.id": "team/sample-prompt:3",
+      };
+      const result = parsePromptReference(attrs);
+      expect(result.promptVariables).toBeNull();
+    });
+
+    it("extracts variables even without prompt handle", () => {
+      const attrs = {
+        "langwatch.prompt.variables":
+          '{"type":"json","value":{"name":"Alice"}}',
+      };
+      const result = parsePromptReference(attrs);
+      expect(result.promptHandle).toBeNull();
+      expect(result.promptVersionNumber).toBeNull();
+      expect(result.promptVariables).toEqual({ name: "Alice" });
     });
   });
 });

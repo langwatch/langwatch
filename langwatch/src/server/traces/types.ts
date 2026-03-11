@@ -100,4 +100,6 @@ export interface PromptStudioSpanResult {
   promptHandle: string | null;
   /** Prompt version number from span attributes (new combined or old format) */
   promptVersionNumber: number | null;
+  /** Prompt variables extracted from span attributes */
+  promptVariables: Record<string, string> | null;
 }

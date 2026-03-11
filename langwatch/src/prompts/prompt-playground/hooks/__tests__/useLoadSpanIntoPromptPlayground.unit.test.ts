@@ -40,6 +40,7 @@ function buildSpanData(
     metrics: null,
     promptHandle: null,
     promptVersionNumber: null,
+    promptVariables: null,
   };
 }
 

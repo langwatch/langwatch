@@ -1027,6 +1027,7 @@ export class ClickHouseTraceService {
           : null,
       promptHandle: promptRef.promptHandle,
       promptVersionNumber: promptRef.promptVersionNumber,
+      promptVariables: promptRef.promptVariables,
     };
   }
 

@@ -40,14 +40,14 @@ def test_get_method_emits_combined_format_when_handle_and_version_present(
         assert span.attributes.get(AttributeKey.LangWatchPromptVersionId) is None
 
 
-def test_get_method_falls_back_to_old_format_when_handle_missing(
+def test_get_method_emits_nothing_when_handle_missing(
     span_exporter: MockSpanExporter, mock_api_response_for_tracing
 ):
-    """Test that PromptService.get falls back to old format when handle is None"""
+    """Test that PromptService.get emits no prompt id when handle is None"""
     mock_client = Mock()
     service = PromptApiService(mock_client)
 
-    # Override handle to None to trigger fallback
+    # Override handle to None to trigger emit-nothing behavior
     mock_api_response_for_tracing.handle = None
 
     with (
@@ -66,20 +66,20 @@ def test_get_method_falls_back_to_old_format_when_handle_missing(
         assert span is not None
 
         assert span.attributes is not None
-        # Old format: separate attributes with UUID as prompt id
-        assert span.attributes.get(AttributeKey.LangWatchPromptId) == "prompt_123"
-        assert span.attributes.get(AttributeKey.LangWatchPromptVersionId) == "prompt_version_3"
+        # No prompt id attribute should be set
+        assert span.attributes.get(AttributeKey.LangWatchPromptId) is None
         assert span.attributes.get(AttributeKey.LangWatchPromptHandle) is None
+        assert span.attributes.get(AttributeKey.LangWatchPromptVersionId) is None
 
 
-def test_get_method_falls_back_to_old_format_when_version_missing(
+def test_get_method_emits_nothing_when_version_missing(
     span_exporter: MockSpanExporter, mock_api_response_for_tracing
 ):
-    """Test that PromptService.get falls back to old format when version is None"""
+    """Test that PromptService.get emits no prompt id when version is None"""
     mock_client = Mock()
     service = PromptApiService(mock_client)
 
-    # Override version to None to trigger fallback
+    # Override version to None to trigger emit-nothing behavior
     mock_api_response_for_tracing.version = None
 
     with (
@@ -98,7 +98,7 @@ def test_get_method_falls_back_to_old_format_when_version_missing(
         assert span is not None
 
         assert span.attributes is not None
-        # Old format: separate attributes
-        assert span.attributes.get(AttributeKey.LangWatchPromptId) == "prompt_123"
-        assert span.attributes.get(AttributeKey.LangWatchPromptVersionId) == "prompt_version_3"
-        assert span.attributes.get(AttributeKey.LangWatchPromptHandle) == "prompt_123"
+        # No prompt id attribute should be set
+        assert span.attributes.get(AttributeKey.LangWatchPromptId) is None
+        assert span.attributes.get(AttributeKey.LangWatchPromptHandle) is None
+        assert span.attributes.get(AttributeKey.LangWatchPromptVersionId) is None

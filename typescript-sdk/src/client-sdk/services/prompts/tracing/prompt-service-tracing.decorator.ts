@@ -20,19 +20,12 @@ export class PromptServiceTracingDecorator {
     const result = await this.target.get(id, options);
 
     if (result) {
-      // Emit combined format when handle and version are available
+      // Only emit combined format when both handle and version are available
       if (result.handle != null && result.version != null) {
         span.setAttribute(
           'langwatch.prompt.id',
           `${result.handle}:${result.version}`,
         );
-      } else {
-        // Fall back to old separate-attribute format
-        span.setAttributes({
-          'langwatch.prompt.id': result.id,
-          'langwatch.prompt.handle': result.handle ?? '',
-          'langwatch.prompt.version.id': result.versionId,
-        });
       }
     }
 
