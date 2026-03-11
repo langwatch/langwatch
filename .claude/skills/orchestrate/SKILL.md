@@ -91,9 +91,31 @@ A shorter workflow for bug fixes. Skips planning, challenge, user approval, and 
 - Create a **draft** PR using `gh pr create --draft` with a summary of the work done (browser-test screenshots are already in the PR body)
 - Include the issue number in the PR body for linking
 
-### 7. Complete
-- Verify all tasks are completed
-- Report summary to user (include PR URL)
+### 7. Verify and Finish
+
+Before reporting done, run through this checklist. **Every item must pass** — if any fails, go back to the appropriate step.
+
+**Deliverables:**
+- [ ] All tasks in the task list are marked `completed`
+- [ ] `git status` is clean — no uncommitted changes
+- [ ] `git push` is up to date with remote — no unpushed commits
+- [ ] PR exists and is linked to the issue
+
+**Quality:**
+- [ ] `pnpm typecheck` passes
+- [ ] All relevant tests pass (`pnpm test:unit`, `pnpm test:integration`)
+- [ ] Regression test exists for the bug fix
+
+**PR completeness:**
+- [ ] PR description includes what the bug was and how it was fixed
+- [ ] If browser-test ran: screenshots are visible in the PR body (not just local files)
+- [ ] CI is green or only has expected pending checks (e.g. `check-approval-or-label`)
+
+**Issue alignment:**
+- [ ] Re-read the original issue — does the fix actually address the reported problem?
+- [ ] Are there any acceptance criteria in the issue that aren't covered?
+
+If everything passes → report summary to user (include PR URL). If anything fails → fix it first.
 
 ## Feature Workflow
 
@@ -193,10 +215,33 @@ This self-check exists because it's easy to rationalize skipping work. Don't.
 - Create a **draft** PR using `gh pr create --draft` with a summary of the work done (browser-test screenshots are already in the PR body)
 - Include the issue number in the PR body for linking
 
-### 11. Complete
-- Verify all tasks are completed
-- Verify self-check passed
-- Report summary to user (include PR URL and browser verification status)
+### 11. Verify and Finish
+
+Before reporting done, run through this checklist. **Every item must pass** — if any fails, go back to the appropriate step.
+
+**Deliverables:**
+- [ ] All tasks in the task list are marked `completed`
+- [ ] Self-check (step 9) passed
+- [ ] `git status` is clean — no uncommitted changes
+- [ ] `git push` is up to date with remote — no unpushed commits
+- [ ] PR exists and is linked to the issue
+
+**Quality:**
+- [ ] `pnpm typecheck` passes
+- [ ] All relevant tests pass (`pnpm test:unit`, `pnpm test:integration`)
+- [ ] Test coverage matches feature file tags (`@unit`, `@integration`, `@e2e`)
+
+**PR completeness:**
+- [ ] PR description summarizes the feature and links to the issue
+- [ ] If browser-test ran: screenshots are visible in the PR body (not just local files)
+- [ ] CI is green or only has expected pending checks (e.g. `check-approval-or-label`)
+
+**Spec alignment:**
+- [ ] Re-read the feature file — every scenario is implemented and tested
+- [ ] Re-read the original issue — every acceptance criterion is covered
+- [ ] No TODO comments left in the code for work that should have been done
+
+If everything passes → report summary to user (include PR URL and browser verification status). If anything fails → fix it first.
 
 ## Boundaries
 
