@@ -457,4 +457,216 @@ describe("NotificationService", () => {
       });
     });
   });
+
+  describe("sendHubspotSignupForm()", () => {
+    const payload = {
+      userName: "Jane Doe",
+      userEmail: "jane@example.com",
+      organizationName: "Acme Corp",
+      phoneNumber: "+31 20 123 4567",
+      signUpData: {
+        featureUsage: "Evaluations",
+        yourRole: "Engineer",
+        usage: "Production",
+        solution: "LLM monitoring",
+        companySize: "10",
+        utmCampaign: "launch-week",
+      },
+    };
+
+    describe("when hubspotFormId is not configured", () => {
+      it("returns without sending", async () => {
+        const mockFetch = vi.fn();
+        const localService = NotificationService.create({
+          config: {
+            ...config,
+            hubspotPortalId: "12345",
+            hubspotFormId: undefined,
+          },
+          fetchFn: mockFetch,
+        });
+
+        await localService.sendHubspotSignupForm(payload);
+
+        expect(mockFetch).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when hubspotPortalId is not configured", () => {
+      it("returns without sending", async () => {
+        const mockFetch = vi.fn();
+        const localService = NotificationService.create({
+          config: {
+            ...config,
+            hubspotPortalId: undefined,
+            hubspotFormId: "form_signup",
+          },
+          fetchFn: mockFetch,
+        });
+
+        await localService.sendHubspotSignupForm(payload);
+
+        expect(mockFetch).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when both hubspotPortalId and hubspotFormId are configured", () => {
+      it("submits form data to the correct HubSpot URL with correct fields", async () => {
+        const mockFetch = vi
+          .fn()
+          .mockResolvedValue(new Response("ok", { status: 200 }));
+        const localService = NotificationService.create({
+          config: {
+            ...config,
+            hubspotPortalId: "12345",
+            hubspotFormId: "form_signup",
+          },
+          fetchFn: mockFetch,
+        });
+
+        await localService.sendHubspotSignupForm(payload);
+
+        expect(mockFetch).toHaveBeenCalledWith(
+          "https://api.hsforms.com/submissions/v3/integration/submit/12345/form_signup",
+          expect.objectContaining({
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: expect.any(AbortSignal),
+          }),
+        );
+
+        const body = JSON.parse(mockFetch.mock.calls[0]![1]!.body as string);
+        expect(body.fields).toEqual(
+          expect.arrayContaining([
+            { objectTypeId: "0-1", name: "company", value: "Acme Corp" },
+            { objectTypeId: "0-1", name: "firstname", value: "Jane" },
+            { objectTypeId: "0-1", name: "lastname", value: "Doe" },
+            { objectTypeId: "0-1", name: "email", value: "jane@example.com" },
+            {
+              objectTypeId: "0-1",
+              name: "mobilephone",
+              value: "+31 20 123 4567",
+            },
+            {
+              objectTypeId: "0-1",
+              name: "Features_usage_multiple",
+              value: "Evaluations",
+            },
+            { objectTypeId: "0-1", name: "user_role", value: "Engineer" },
+            { objectTypeId: "0-1", name: "product_usage", value: "Production" },
+            {
+              objectTypeId: "0-1",
+              name: "product_solution",
+              value: "LLM monitoring",
+            },
+            { objectTypeId: "0-1", name: "organization_size", value: "10" },
+            {
+              objectTypeId: "0-1",
+              name: "utm_campaign",
+              value: "launch-week",
+            },
+          ]),
+        );
+        expect(body.context).toEqual({
+          pageUri: "app.langwatch.ai",
+          pageName: "Sign Up",
+        });
+      });
+
+      it("splits a multi-word userName into firstname and lastname", async () => {
+        const mockFetch = vi
+          .fn()
+          .mockResolvedValue(new Response("ok", { status: 200 }));
+        const localService = NotificationService.create({
+          config: {
+            ...config,
+            hubspotPortalId: "12345",
+            hubspotFormId: "form_signup",
+          },
+          fetchFn: mockFetch,
+        });
+
+        await localService.sendHubspotSignupForm({
+          ...payload,
+          userName: "Mary Jane Watson",
+        });
+
+        const body = JSON.parse(mockFetch.mock.calls[0]![1]!.body as string);
+        const firstNameField = body.fields.find(
+          (f: any) => f.name === "firstname",
+        );
+        const lastNameField = body.fields.find(
+          (f: any) => f.name === "lastname",
+        );
+        expect(firstNameField.value).toBe("Mary");
+        expect(lastNameField.value).toBe("Watson");
+      });
+
+      it("uses empty strings for missing signUpData fields", async () => {
+        const mockFetch = vi
+          .fn()
+          .mockResolvedValue(new Response("ok", { status: 200 }));
+        const localService = NotificationService.create({
+          config: {
+            ...config,
+            hubspotPortalId: "12345",
+            hubspotFormId: "form_signup",
+          },
+          fetchFn: mockFetch,
+        });
+
+        await localService.sendHubspotSignupForm({
+          userName: "Jane",
+          userEmail: "jane@example.com",
+          organizationName: "Acme",
+        });
+
+        const body = JSON.parse(mockFetch.mock.calls[0]![1]!.body as string);
+        const usageField = body.fields.find(
+          (f: any) => f.name === "Features_usage_multiple",
+        );
+        expect(usageField.value).toBe("Other");
+      });
+    });
+
+    describe("when HubSpot request fails", () => {
+      it("catches the error and captures exception", async () => {
+        const mockFetch = vi
+          .fn()
+          .mockRejectedValue(new Error("Network error"));
+        const localService = NotificationService.create({
+          config: {
+            ...config,
+            hubspotPortalId: "12345",
+            hubspotFormId: "form_signup",
+          },
+          fetchFn: mockFetch,
+        });
+
+        await localService.sendHubspotSignupForm(payload);
+
+        expect(captureException).toHaveBeenCalled();
+      });
+    });
+
+    describe("when HubSpot returns a non-OK status", () => {
+      it("captures a descriptive error", async () => {
+        const mockFetch = vi
+          .fn()
+          .mockResolvedValue(new Response("fail", { status: 500 }));
+        const localService = NotificationService.create({
+          config: {
+            ...config,
+            hubspotPortalId: "12345",
+            hubspotFormId: "form_signup",
+          },
+          fetchFn: mockFetch,
+        });
+
+        await localService.sendHubspotSignupForm(payload);
+
+        expect(captureException).toHaveBeenCalled();
+      });
+    });
+  });
 });

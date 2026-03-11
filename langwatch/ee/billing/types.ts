@@ -89,4 +89,12 @@ export type SignupNotificationPayload = {
   organizationName?: string | null;
   phoneNumber?: string | null;
   utmCampaign?: string | null;
+  signUpData?: {
+    featureUsage?: string | null;
+    yourRole?: string | null;
+    usage?: string | null;
+    solution?: string | null;
+    companySize?: string | null;
+    utmCampaign?: string | null;
+  } | null;
 };

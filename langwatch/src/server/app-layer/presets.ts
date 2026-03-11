@@ -301,6 +301,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       slackSubscriptionsChannel: config.slackSubscriptionsChannel,
       hubspotPortalId: config.hubspotPortalId,
       hubspotReachedLimitFormId: config.hubspotReachedLimitFormId,
+      hubspotFormId: config.hubspotFormId,
     },
   });
   const notificationRepository = new NotificationRepository(prisma);

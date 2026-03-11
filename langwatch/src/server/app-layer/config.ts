@@ -20,6 +20,7 @@ export interface AppConfig {
   slackSubscriptionsChannel?: string;
   hubspotPortalId?: string;
   hubspotReachedLimitFormId?: string;
+  hubspotFormId?: string;
 
   // Event sourcing
   enableEventSourcing?: boolean;
@@ -61,6 +62,7 @@ export function createAppConfigFromEnv(overrides?: {
     slackSubscriptionsChannel: env.SLACK_CHANNEL_SUBSCRIPTIONS,
     hubspotPortalId: env.HUBSPOT_PORTAL_ID,
     hubspotReachedLimitFormId: env.HUBSPOT_REACHED_LIMIT_FORM_ID,
+    hubspotFormId: env.HUBSPOT_FORM_ID,
     enableEventSourcing: env.ENABLE_EVENT_SOURCING,
     processRole: overrides?.processRole,
     isSaas: env.IS_SAAS,
