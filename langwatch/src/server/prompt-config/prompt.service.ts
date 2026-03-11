@@ -698,9 +698,11 @@ export class PromptService {
       model: existingPrompt.model,
       prompt: existingPrompt.prompt,
       messages: existingPrompt.messages.filter((msg) => msg.role !== "system"),
-      inputs: [...existingPrompt.inputs].sort((a, b) =>
-        a.identifier.localeCompare(b.identifier),
-      ),
+      inputs: [...existingPrompt.inputs].sort((a, b) => {
+        if (a.identifier === "input") return -1;
+        if (b.identifier === "input") return 1;
+        return a.identifier.localeCompare(b.identifier);
+      }),
       outputs: existingPrompt.outputs,
       // response_format is derived from outputs, not stored separately
       // Include all sampling parameters only when defined

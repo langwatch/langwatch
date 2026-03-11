@@ -134,12 +134,23 @@ describe("mergeAutoDetectedInputs()", () => {
         const identifiers = result.map((i) => i.identifier);
         expect(identifiers).toEqual(["alpha", "middle", "zebra"]);
       });
+
+      it("pins 'input' first, then sorts the rest alphabetically", () => {
+        const result = mergeAutoDetectedInputs({
+          prompt: "{{zebra}} {{input}} {{alpha}}",
+          messages: [],
+          inputs: [],
+        });
+
+        const identifiers = result.map((i) => i.identifier);
+        expect(identifiers).toEqual(["input", "alpha", "zebra"]);
+      });
     });
   });
 
   describe("given a CLI default input that does not appear in template", () => {
     describe("when merging", () => {
-      it("keeps the CLI default input alongside auto-detected variables", () => {
+      it("keeps the CLI default input first, then auto-detected variables", () => {
         const result = mergeAutoDetectedInputs({
           prompt: "hello {{name}}",
           messages: [],
@@ -147,8 +158,7 @@ describe("mergeAutoDetectedInputs()", () => {
         });
 
         const identifiers = result.map((i) => i.identifier);
-        expect(identifiers).toContain("input");
-        expect(identifiers).toContain("name");
+        expect(identifiers).toEqual(["input", "name"]);
       });
     });
   });
@@ -185,8 +195,9 @@ describe("mergeAutoDetectedInputs()", () => {
           expect(input.type).toBe("str");
         }
 
-        // Should be sorted alphabetically
-        expect(identifiers).toEqual([...identifiers].sort());
+        // "input" should be first, then the rest alphabetically
+        expect(identifiers[0]).toBe("input");
+        expect(identifiers.slice(1)).toEqual([...identifiers.slice(1)].sort());
       });
     });
   });
