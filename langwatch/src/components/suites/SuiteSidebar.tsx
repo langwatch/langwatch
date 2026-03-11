@@ -384,7 +384,7 @@ function RunSummaryLine({
     <HStack gap={1}>
       <StatusIcon passed={passedCount} total={totalCount} />
       <Text fontSize="xs">
-        {passedCount}/{totalCount} passed
+        {passedCount} passed
         {lastRunTimestamp && (
           <Text as="span" color="fg.muted">
             {" · "}

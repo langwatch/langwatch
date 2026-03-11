@@ -162,23 +162,23 @@ describe("formatSummaryStatusLabel()", () => {
   });
 
   describe("when all scenarios passed", () => {
-    it("returns 'passed' with scenario count", () => {
+    it("returns 'passed' without x/n count", () => {
       const result = formatSummaryStatusLabel(makeSummary({
         passedCount: 5,
         totalCount: 5,
       }));
-      expect(result).toBe("passed (5/5)");
+      expect(result).toBe("passed");
     });
   });
 
   describe("when some scenarios failed", () => {
-    it("returns 'failed' with passed/finished count", () => {
+    it("returns 'failed' without x/n count", () => {
       const result = formatSummaryStatusLabel(makeSummary({
         passedCount: 3,
         failedCount: 2,
         totalCount: 5,
       }));
-      expect(result).toBe("failed (3/5)");
+      expect(result).toBe("failed");
     });
   });
 
@@ -200,26 +200,26 @@ describe("formatSummaryStatusLabel()", () => {
   });
 
   describe("when some scenarios are stalled", () => {
-    it("includes stalled in finished count", () => {
+    it("returns 'failed' without x/n count", () => {
       const result = formatSummaryStatusLabel(makeSummary({
         passedCount: 2,
         failedCount: 1,
         stalledCount: 1,
         totalCount: 4,
       }));
-      expect(result).toBe("failed (2/4)");
+      expect(result).toBe("failed");
     });
   });
 
   describe("when some are finished and some still running", () => {
-    it("shows only finished scenarios in count", () => {
+    it("returns 'passed' without x/n count", () => {
       const result = formatSummaryStatusLabel(makeSummary({
         passedCount: 3,
         failedCount: 0,
         inProgressCount: 2,
         totalCount: 5,
       }));
-      expect(result).toBe("passed (3/3)");
+      expect(result).toBe("passed");
     });
   });
 });
