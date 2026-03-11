@@ -412,7 +412,7 @@ describe("customEvaluationSync reactor", () => {
   });
 
   describe("when a single evaluation command fails", () => {
-    it("continues processing remaining evaluations", async () => {
+    it("continues processing remaining evaluations then re-throws", async () => {
       deps.startEvaluation = vi
         .fn()
         .mockRejectedValueOnce(new Error("network error"))
@@ -425,12 +425,15 @@ describe("customEvaluationSync reactor", () => {
         { name: "relevance", score: 0.9 },
       ]);
 
-      await reactor.handle(
-        createSpanReceivedEvent(span),
-        createContext(createFoldState()),
-      );
+      await expect(
+        reactor.handle(
+          createSpanReceivedEvent(span),
+          createContext(createFoldState()),
+        ),
+      ).rejects.toThrow("network error");
 
       expect(deps.startEvaluation).toHaveBeenCalledTimes(2);
+      expect(deps.completeEvaluation).toHaveBeenCalledTimes(1);
     });
   });
 

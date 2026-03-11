@@ -135,6 +135,8 @@ export function createCustomEvaluationSyncReactor(
         "Syncing custom SDK evaluations",
       );
 
+      const errors: Error[] = [];
+
       for (const evaluation of evaluations) {
         const evaluationId =
           evaluation.evaluation_id ??
@@ -182,14 +184,18 @@ export function createCustomEvaluationSyncReactor(
             },
             "Failed to sync custom evaluation",
           );
-          throw error;
+          errors.push(error instanceof Error ? error : new Error(String(error)));
         }
       }
 
       logger.debug(
-        { tenantId, traceId, evaluationCount: evaluations.length },
+        { tenantId, traceId, evaluationCount: evaluations.length, failedCount: errors.length },
         "Custom SDK evaluations synced",
       );
+
+      if (errors.length > 0) {
+        throw errors[0];
+      }
     },
   };
 }
