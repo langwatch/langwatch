@@ -15,6 +15,8 @@ describe("OrganizationService", () => {
     findWithAdmins: vi.fn(),
     updateSentPlanLimitAlert: vi.fn(),
     findProjectsWithName: vi.fn(),
+    clearTrialLicense: vi.fn(),
+    updateCurrency: vi.fn(),
   };
 
   let service: OrganizationService;

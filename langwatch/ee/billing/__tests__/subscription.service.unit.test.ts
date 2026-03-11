@@ -46,6 +46,14 @@ const createMockRepository = (): {
   createPending: vi.fn(),
   updateStatus: vi.fn(),
   updatePlan: vi.fn(),
+  findByStripeId: vi.fn(),
+  linkStripeId: vi.fn(),
+  activate: vi.fn(),
+  recordPaymentFailure: vi.fn(),
+  cancel: vi.fn(),
+  cancelTrialSubscriptions: vi.fn(),
+  migrateToSeatEvent: vi.fn(),
+  updateQuantities: vi.fn(),
 });
 
 const createMockDb = () => ({
