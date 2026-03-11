@@ -25,6 +25,8 @@ export interface ReactorOptions {
   makeJobId?: (payload: { event: Event; foldState: unknown }) => string;
   /** Process roles where this reactor runs. Omit to run everywhere. */
   runIn?: ProcessRole[];
+  /** Custom group key function for queue routing. Overrides the domain part of the hierarchical key. */
+  groupKeyFn?: (payload: { event: Event; foldState: unknown }) => string;
 }
 
 /**
