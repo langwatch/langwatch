@@ -1,6 +1,8 @@
+import type { z } from "zod";
 import type { PlanInfo } from "../licensing/planInfo";
 import type { LimitType } from "../../src/server/license-enforcement/types";
 import type { PlanTypes } from "./planTypes";
+import type { signUpDataSchema } from "../../src/server/api/routers/onboarding/schemas/sign-up-data.schema";
 
 export type BillingPlanProvider = {
   getActivePlan(
@@ -89,12 +91,5 @@ export type SignupNotificationPayload = {
   organizationName?: string | null;
   phoneNumber?: string | null;
   utmCampaign?: string | null;
-  signUpData?: {
-    featureUsage?: string | null;
-    yourRole?: string | null;
-    usage?: string | null;
-    solution?: string | null;
-    companySize?: string | null;
-    utmCampaign?: string | null;
-  } | null;
+  signUpData?: z.infer<typeof signUpDataSchema> | null;
 };
