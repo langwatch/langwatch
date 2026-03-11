@@ -6,6 +6,7 @@ import {
   checkPermissionOrPubliclyShared,
   checkProjectPermission,
   checkTeamPermission,
+  EXTERNAL_MEMBER_PERMISSIONS,
   hasOrganizationPermission,
   hasProjectPermission,
   hasTeamPermission,
@@ -16,6 +17,7 @@ import {
   skipPermissionCheck,
   skipPermissionCheckProjectCreation,
 } from "../rbac";
+import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
 
 // Mock Prisma client
 const mockPrisma = {
@@ -901,7 +903,23 @@ describe("RBAC Integration Tests", () => {
     });
 
     describe("when user is an org EXTERNAL and team VIEWER", () => {
-      it("grants view permission and returns EXTERNAL org role", async () => {
+      it("grants allowed permission and returns EXTERNAL org role", async () => {
+        setupTeamMocks({
+          orgRole: OrganizationUserRole.EXTERNAL,
+          teamRole: TeamUserRole.VIEWER,
+        });
+
+        const result = await resolveTeamPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "team-1",
+          "analytics:view" as Permission,
+        );
+
+        expect(result.permitted).toBe(true);
+        expect(result.organizationRole).toBe(OrganizationUserRole.EXTERNAL);
+      });
+
+      it("denies restricted permission and returns EXTERNAL org role", async () => {
         setupTeamMocks({
           orgRole: OrganizationUserRole.EXTERNAL,
           teamRole: TeamUserRole.VIEWER,
@@ -913,7 +931,7 @@ describe("RBAC Integration Tests", () => {
           "team:view" as Permission,
         );
 
-        expect(result.permitted).toBe(true);
+        expect(result.permitted).toBe(false);
         expect(result.organizationRole).toBe(OrganizationUserRole.EXTERNAL);
       });
     });
@@ -1215,6 +1233,388 @@ describe("RBAC Integration Tests", () => {
 
         expect(ctx.organizationRole).toBe(OrganizationUserRole.MEMBER);
         expect(ctx.permissionChecked).toBe(true);
+      });
+    });
+  });
+
+  // ==========================================================================
+  // EXTERNAL (lite member) restriction logic
+  // ==========================================================================
+
+  describe("EXTERNAL (lite member) restriction logic", () => {
+    function setupProjectWithExternalUser({
+      teamRole = TeamUserRole.VIEWER,
+      assignedRoleId,
+    }: {
+      teamRole?: TeamUserRole;
+      assignedRoleId?: string;
+    } = {}) {
+      mockPrisma.project.findUnique.mockResolvedValue({
+        team: {
+          id: "team-1",
+          organizationId: "org-1",
+          members: [
+            {
+              userId: "user-123",
+              role: teamRole,
+              assignedRoleId: assignedRoleId ?? null,
+            },
+          ],
+          organization: {
+            members: [{ role: OrganizationUserRole.EXTERNAL }],
+          },
+        },
+      });
+    }
+
+    function setupTeamWithExternalUser({
+      teamRole = TeamUserRole.VIEWER,
+      assignedRoleId,
+    }: {
+      teamRole?: TeamUserRole;
+      assignedRoleId?: string;
+    } = {}) {
+      mockPrisma.team.findUnique.mockResolvedValue({
+        id: "team-1",
+        organizationId: "org-1",
+      });
+
+      mockPrisma.organizationUser.findFirst.mockResolvedValue({
+        role: OrganizationUserRole.EXTERNAL,
+      });
+
+      mockPrisma.teamUser.findFirst.mockResolvedValue({
+        userId: "user-123",
+        teamId: "team-1",
+        role: teamRole,
+        assignedRoleId: assignedRoleId ?? null,
+      });
+    }
+
+    describe("when EXTERNAL user requests a restricted permission via project", () => {
+      it.each([
+        "datasets:view",
+        "prompts:view",
+        "annotations:view",
+        "secrets:view",
+        "team:view",
+        "cost:view",
+        "triggers:view",
+      ] as Permission[])(
+        "denies %s",
+        async (permission) => {
+          setupProjectWithExternalUser();
+
+          const result = await resolveProjectPermission(
+            { prisma: mockPrisma, session: mockSession },
+            "project-1",
+            permission,
+          );
+
+          expect(result.permitted).toBe(false);
+          expect(result.organizationRole).toBe(OrganizationUserRole.EXTERNAL);
+        },
+      );
+    });
+
+    describe("when EXTERNAL user requests an allowed permission via project", () => {
+      it.each([
+        "project:view",
+        "analytics:view",
+        "traces:view",
+        "scenarios:view",
+        "evaluations:view",
+        "workflows:view",
+      ] as Permission[])(
+        "grants %s",
+        async (permission) => {
+          setupProjectWithExternalUser();
+
+          const result = await resolveProjectPermission(
+            { prisma: mockPrisma, session: mockSession },
+            "project-1",
+            permission,
+          );
+
+          expect(result.permitted).toBe(true);
+          expect(result.organizationRole).toBe(OrganizationUserRole.EXTERNAL);
+        },
+      );
+    });
+
+    describe("when EXTERNAL user requests a restricted permission via team", () => {
+      it.each([
+        "datasets:view",
+        "prompts:view",
+        "annotations:view",
+        "secrets:view",
+        "team:view",
+      ] as Permission[])(
+        "denies %s",
+        async (permission) => {
+          setupTeamWithExternalUser();
+
+          const result = await resolveTeamPermission(
+            { prisma: mockPrisma, session: mockSession },
+            "team-1",
+            permission,
+          );
+
+          expect(result.permitted).toBe(false);
+          expect(result.organizationRole).toBe(OrganizationUserRole.EXTERNAL);
+        },
+      );
+    });
+
+    describe("when EXTERNAL user requests an allowed permission via team", () => {
+      it.each([
+        "project:view",
+        "analytics:view",
+        "traces:view",
+        "scenarios:view",
+        "evaluations:view",
+        "workflows:view",
+      ] as Permission[])(
+        "grants %s",
+        async (permission) => {
+          setupTeamWithExternalUser();
+
+          const result = await resolveTeamPermission(
+            { prisma: mockPrisma, session: mockSession },
+            "team-1",
+            permission,
+          );
+
+          expect(result.permitted).toBe(true);
+          expect(result.organizationRole).toBe(OrganizationUserRole.EXTERNAL);
+        },
+      );
+    });
+
+    describe("when EXTERNAL user has a custom role granting additional permissions", () => {
+      it("grants the custom role permission (overrides restricted defaults)", async () => {
+        setupProjectWithExternalUser({
+          teamRole: TeamUserRole.CUSTOM,
+          assignedRoleId: "custom-role-1",
+        });
+
+        mockPrisma.customRole.findUnique.mockResolvedValue({
+          permissions: ["datasets:view", "prompts:view"],
+        });
+
+        const result = await resolveProjectPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "project-1",
+          "datasets:view" as Permission,
+        );
+
+        expect(result.permitted).toBe(true);
+        expect(result.organizationRole).toBe(OrganizationUserRole.EXTERNAL);
+      });
+
+      it("denies permissions not in the custom role", async () => {
+        setupProjectWithExternalUser({
+          teamRole: TeamUserRole.CUSTOM,
+          assignedRoleId: "custom-role-1",
+        });
+
+        mockPrisma.customRole.findUnique.mockResolvedValue({
+          permissions: ["datasets:view"],
+        });
+
+        const result = await resolveProjectPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "project-1",
+          "prompts:view" as Permission,
+        );
+
+        expect(result.permitted).toBe(false);
+        expect(result.organizationRole).toBe(OrganizationUserRole.EXTERNAL);
+      });
+    });
+
+    describe("when non-EXTERNAL user (MEMBER) has VIEWER team role", () => {
+      it("grants full VIEWER permissions (all :view permissions)", async () => {
+        mockPrisma.project.findUnique.mockResolvedValue({
+          team: {
+            id: "team-1",
+            organizationId: "org-1",
+            members: [
+              { userId: "user-123", role: TeamUserRole.VIEWER, assignedRoleId: null },
+            ],
+            organization: {
+              members: [{ role: OrganizationUserRole.MEMBER }],
+            },
+          },
+        });
+
+        // VIEWER gets datasets:view, prompts:view, etc. — these are NOT restricted for MEMBER org role
+        const datasetsResult = await resolveProjectPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "project-1",
+          "datasets:view" as Permission,
+        );
+        expect(datasetsResult.permitted).toBe(true);
+
+        const promptsResult = await resolveProjectPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "project-1",
+          "prompts:view" as Permission,
+        );
+        expect(promptsResult.permitted).toBe(true);
+
+        const secretsResult = await resolveProjectPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "project-1",
+          "secrets:view" as Permission,
+        );
+        expect(secretsResult.permitted).toBe(true);
+      });
+    });
+
+    describe("when non-EXTERNAL user (ADMIN org role) accesses resources", () => {
+      it("grants full team-role-based access", async () => {
+        mockPrisma.project.findUnique.mockResolvedValue({
+          team: {
+            id: "team-1",
+            organizationId: "org-1",
+            members: [
+              { userId: "user-123", role: TeamUserRole.ADMIN, assignedRoleId: null },
+            ],
+            organization: {
+              members: [{ role: OrganizationUserRole.ADMIN }],
+            },
+          },
+        });
+
+        const result = await resolveProjectPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "project-1",
+          "datasets:manage" as Permission,
+        );
+
+        expect(result.permitted).toBe(true);
+        expect(result.organizationRole).toBe(OrganizationUserRole.ADMIN);
+      });
+    });
+
+    describe("when checkProjectPermission middleware denies EXTERNAL user", () => {
+      it("throws TRPCError with LiteMemberRestrictedError cause", async () => {
+        setupProjectWithExternalUser();
+
+        const ctx = {
+          prisma: mockPrisma,
+          session: mockSession,
+          permissionChecked: false,
+          publiclyShared: false,
+          organizationRole: undefined as OrganizationUserRole | null | undefined,
+        };
+
+        const mockNext = vi.fn().mockResolvedValue("success");
+        const middleware = checkProjectPermission("datasets:view" as Permission);
+
+        try {
+          await middleware({
+            ctx,
+            input: { projectId: "project-1" },
+            next: mockNext,
+          });
+          expect.unreachable("Expected middleware to throw");
+        } catch (error) {
+          expect(error).toBeInstanceOf(TRPCError);
+          const trpcError = error as TRPCError;
+          expect(trpcError.code).toBe("UNAUTHORIZED");
+          expect(trpcError.message).toBe("This feature is not available for your account");
+          expect(trpcError.cause).toBeInstanceOf(LiteMemberRestrictedError);
+          expect((trpcError.cause as LiteMemberRestrictedError).meta.resource).toBe("datasets");
+        }
+      });
+    });
+
+    describe("when checkTeamPermission middleware denies EXTERNAL user", () => {
+      it("throws TRPCError with LiteMemberRestrictedError cause", async () => {
+        setupTeamWithExternalUser();
+
+        const ctx = {
+          prisma: mockPrisma,
+          session: mockSession,
+          permissionChecked: false,
+          publiclyShared: false,
+          organizationRole: undefined as OrganizationUserRole | null | undefined,
+        };
+
+        const mockNext = vi.fn().mockResolvedValue("success");
+        const middleware = checkTeamPermission("datasets:view" as Permission);
+
+        try {
+          await middleware({
+            ctx,
+            input: { teamId: "team-1" },
+            next: mockNext,
+          });
+          expect.unreachable("Expected middleware to throw");
+        } catch (error) {
+          expect(error).toBeInstanceOf(TRPCError);
+          const trpcError = error as TRPCError;
+          expect(trpcError.code).toBe("UNAUTHORIZED");
+          expect(trpcError.message).toBe("This feature is not available for your account");
+          expect(trpcError.cause).toBeInstanceOf(LiteMemberRestrictedError);
+          expect((trpcError.cause as LiteMemberRestrictedError).meta.resource).toBe("datasets");
+        }
+      });
+    });
+
+    describe("when checkProjectPermission middleware denies non-EXTERNAL user", () => {
+      it("throws generic UNAUTHORIZED without LiteMemberRestrictedError", async () => {
+        mockPrisma.project.findUnique.mockResolvedValue({
+          team: {
+            id: "team-1",
+            organizationId: "org-1",
+            members: [],
+            organization: {
+              members: [{ role: OrganizationUserRole.MEMBER }],
+            },
+          },
+        });
+
+        const ctx = {
+          prisma: mockPrisma,
+          session: mockSession,
+          permissionChecked: false,
+          publiclyShared: false,
+          organizationRole: undefined as OrganizationUserRole | null | undefined,
+        };
+
+        const mockNext = vi.fn().mockResolvedValue("success");
+        const middleware = checkProjectPermission("datasets:view" as Permission);
+
+        try {
+          await middleware({
+            ctx,
+            input: { projectId: "project-1" },
+            next: mockNext,
+          });
+          expect.unreachable("Expected middleware to throw");
+        } catch (error) {
+          expect(error).toBeInstanceOf(TRPCError);
+          const trpcError = error as TRPCError;
+          expect(trpcError.code).toBe("UNAUTHORIZED");
+          expect(trpcError.message).toBe("You do not have permission to access this project resource");
+          expect(trpcError.cause).toBeUndefined();
+        }
+      });
+    });
+
+    describe("when EXTERNAL_MEMBER_PERMISSIONS constant is defined", () => {
+      it("contains exactly the expected permissions", () => {
+        expect(EXTERNAL_MEMBER_PERMISSIONS).toEqual([
+          "project:view",
+          "analytics:view",
+          "traces:view",
+          "scenarios:view",
+          "evaluations:view",
+          "workflows:view",
+        ]);
       });
     });
   });

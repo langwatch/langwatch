@@ -6,6 +6,7 @@ import {
 import { TRPCError } from "@trpc/server";
 import type { Session } from "next-auth";
 import { env } from "~/env.mjs";
+import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
 
 // ============================================================================
 // PERMISSION DEFINITIONS
@@ -218,6 +219,20 @@ const ORGANIZATION_ROLE_PERMISSIONS: Record<
   [OrganizationUserRole.EXTERNAL]: ["organization:view"], // Limited view for Lite Member users
 };
 
+/**
+ * Restricted permission set for EXTERNAL (lite member) users.
+ * These users can view observability data but cannot create, edit, or manage resources.
+ * Custom roles (when allowed in the future) override these defaults.
+ */
+export const EXTERNAL_MEMBER_PERMISSIONS: Permission[] = [
+  "project:view",
+  "analytics:view",
+  "traces:view",
+  "scenarios:view",
+  "evaluations:view",
+  "workflows:view", // Experiments use workflows:view internally
+];
+
 // ============================================================================
 // PERMISSION CHECKING
 // ============================================================================
@@ -375,6 +390,13 @@ export const checkProjectPermission =
     );
 
     if (!permitted) {
+      if (organizationRole === OrganizationUserRole.EXTERNAL) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "This feature is not available for your account",
+          cause: new LiteMemberRestrictedError(permission.split(":")[0] ?? "unknown"),
+        });
+      }
       throw new TRPCError({
         code: "UNAUTHORIZED",
         message: "You do not have permission to access this project resource",
@@ -403,6 +425,13 @@ export const checkTeamPermission =
     );
 
     if (!permitted) {
+      if (organizationRole === OrganizationUserRole.EXTERNAL) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "This feature is not available for your account",
+          cause: new LiteMemberRestrictedError(permission.split(":")[0] ?? "unknown"),
+        });
+      }
       throw new TRPCError({
         code: "UNAUTHORIZED",
         message: "You do not have permission to access this team resource",
@@ -520,6 +549,13 @@ export async function resolveProjectPermission(
         };
       }
       // Fall back to built-in role if custom role has no permissions
+      // EXTERNAL users get restricted defaults instead of full team role
+      if (organizationRole === OrganizationUserRole.EXTERNAL) {
+        return {
+          permitted: hasPermissionWithHierarchy(EXTERNAL_MEMBER_PERMISSIONS, permission),
+          organizationRole,
+        };
+      }
       return {
         permitted: teamRoleHasPermission(teamMember.role, permission),
         organizationRole,
@@ -528,6 +564,13 @@ export async function resolveProjectPermission(
   }
 
   // Only fall back to built-in team role if NO custom role exists
+  // EXTERNAL users get restricted defaults instead of full VIEWER permissions
+  if (organizationRole === OrganizationUserRole.EXTERNAL) {
+    return {
+      permitted: hasPermissionWithHierarchy(EXTERNAL_MEMBER_PERMISSIONS, permission),
+      organizationRole,
+    };
+  }
   return {
     permitted: teamRoleHasPermission(teamMember.role, permission),
     organizationRole,
@@ -622,6 +665,13 @@ export async function resolveTeamPermission(
   }
 
   // Fall back to user's built-in team role only
+  // EXTERNAL users get restricted defaults instead of full team role permissions
+  if (organizationRole === OrganizationUserRole.EXTERNAL) {
+    return {
+      permitted: hasPermissionWithHierarchy(EXTERNAL_MEMBER_PERMISSIONS, permission),
+      organizationRole,
+    };
+  }
   return {
     permitted: teamRoleHasPermission(teamUser.role, permission),
     organizationRole,
