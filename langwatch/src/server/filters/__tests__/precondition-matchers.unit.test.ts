@@ -267,6 +267,77 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     });
   });
 
+  describe("events.event_type matcher", () => {
+    const matcher = PRECONDITION_FIELD_MATCHERS["events.event_type"]!;
+
+    it("returns event types from trace data", () => {
+      const data = makeTraceData({
+        events: [
+          { event_type: "thumbs_up_down", metrics: [], event_details: [] },
+          { event_type: "purchase", metrics: [], event_details: [] },
+        ],
+      });
+      expect(matcher(data, "")).toEqual(["thumbs_up_down", "purchase"]);
+    });
+
+    it("returns null when events is null", () => {
+      expect(matcher(makeTraceData({ events: null }), "")).toBeNull();
+    });
+  });
+
+  describe("events.metrics.key matcher", () => {
+    const matcher = PRECONDITION_FIELD_MATCHERS["events.metrics.key"]!;
+
+    it("returns metric keys for a specific event type", () => {
+      const data = makeTraceData({
+        events: [
+          { event_type: "thumbs_up_down", metrics: [{ key: "vote", value: 1 }], event_details: [] },
+        ],
+      });
+      expect(matcher(data, "", "thumbs_up_down")).toEqual(["vote"]);
+    });
+
+    it("returns null when key (event_type) is not provided", () => {
+      const data = makeTraceData({
+        events: [
+          { event_type: "thumbs_up_down", metrics: [{ key: "vote", value: 1 }], event_details: [] },
+        ],
+      });
+      expect(matcher(data, "")).toBeNull();
+    });
+
+    it("returns null when no matching event type", () => {
+      const data = makeTraceData({
+        events: [
+          { event_type: "purchase", metrics: [{ key: "amount", value: 99 }], event_details: [] },
+        ],
+      });
+      expect(matcher(data, "", "thumbs_up_down")).toBeNull();
+    });
+  });
+
+  describe("events.event_details.key matcher", () => {
+    const matcher = PRECONDITION_FIELD_MATCHERS["events.event_details.key"]!;
+
+    it("returns event detail keys for a specific event type", () => {
+      const data = makeTraceData({
+        events: [
+          { event_type: "purchase", metrics: [], event_details: [{ key: "item", value: "shoes" }] },
+        ],
+      });
+      expect(matcher(data, "", "purchase")).toEqual(["item"]);
+    });
+
+    it("returns null when key (event_type) is not provided", () => {
+      const data = makeTraceData({
+        events: [
+          { event_type: "purchase", metrics: [], event_details: [{ key: "item", value: "shoes" }] },
+        ],
+      });
+      expect(matcher(data, "")).toBeNull();
+    });
+  });
+
   describe("non-matchable fields", () => {
     const nonMatchableFields: PreconditionField[] = [
       "evaluations.evaluator_id",
@@ -275,14 +346,11 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
       "evaluations.score",
       "evaluations.state",
       "evaluations.label",
-      "events.event_type",
-      "events.metrics.key",
       "events.metrics.value",
-      "events.event_details.key",
       "metadata.key",
     ];
 
-    it("has null matchers for evaluation, event, and key-selector fields", () => {
+    it("has null matchers for evaluation, numeric event, and key-selector fields", () => {
       for (const field of nonMatchableFields) {
         expect(PRECONDITION_FIELD_MATCHERS[field]).toBeNull();
       }
@@ -312,7 +380,9 @@ describe("PRECONDITION_ALLOWED_RULES", () => {
     expect(PRECONDITION_ALLOWED_RULES["traces.origin"]).toEqual(["is"]);
     expect(PRECONDITION_ALLOWED_RULES["spans.type"]).toEqual(["is"]);
     expect(PRECONDITION_ALLOWED_RULES["spans.model"]).toEqual(["is"]);
-    // sentiment.input_sentiment is excluded from preconditions
+    expect(PRECONDITION_ALLOWED_RULES["events.event_type"]).toEqual(["is"]);
+    expect(PRECONDITION_ALLOWED_RULES["events.metrics.key"]).toEqual(["is"]);
+    expect(PRECONDITION_ALLOWED_RULES["events.event_details.key"]).toEqual(["is"]);
   });
 
   it("allows is, contains, not_contains for array fields", () => {
@@ -340,7 +410,7 @@ describe("PRECONDITION_ALLOWED_RULES", () => {
   it("has empty rules for non-precondition fields", () => {
     expect(PRECONDITION_ALLOWED_RULES["metadata.key"]).toEqual([]);
     expect(PRECONDITION_ALLOWED_RULES["evaluations.evaluator_id"]).toEqual([]);
-    expect(PRECONDITION_ALLOWED_RULES["events.event_type"]).toEqual([]);
+    expect(PRECONDITION_ALLOWED_RULES["events.metrics.value"]).toEqual([]);
   });
 });
 
@@ -356,12 +426,12 @@ describe("getAvailablePreconditionFields()", () => {
     }
   });
 
-  it("excludes key-selector and evaluation/event fields", () => {
+  it("excludes key-selector, evaluation, and numeric event fields", () => {
     const fields = getAvailablePreconditionFields();
     const fieldNames = fields.map((f) => f.field);
     expect(fieldNames).not.toContain("metadata.key");
     expect(fieldNames).not.toContain("evaluations.evaluator_id");
-    expect(fieldNames).not.toContain("events.event_type");
+    expect(fieldNames).not.toContain("events.metrics.value");
   });
 
   it("includes all matchable precondition fields", () => {
@@ -379,7 +449,9 @@ describe("getAvailablePreconditionFields()", () => {
     expect(fieldNames).toContain("topics.topics");
     expect(fieldNames).toContain("topics.subtopics");
     expect(fieldNames).toContain("annotations.hasAnnotation");
-    expect(fieldNames).not.toContain("sentiment.input_sentiment");
+    expect(fieldNames).toContain("events.event_type");
+    expect(fieldNames).toContain("events.metrics.key");
+    expect(fieldNames).toContain("events.event_details.key");
   });
 
   it("returns correct labels for each field", () => {

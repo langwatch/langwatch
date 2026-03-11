@@ -173,7 +173,7 @@ describe("<OnlineEvaluationDrawer /> preconditions", () => {
   });
 
   describe("when field dropdown is opened", () => {
-    it("shows all 11 fields grouped by category", async () => {
+    it("shows all 18 fields grouped by category", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       await setupWithEvaluator(user);
 
@@ -194,10 +194,13 @@ describe("<OnlineEvaluationDrawer /> preconditions", () => {
       expect(selectWithOptgroups).toBeDefined();
 
       // Check that all categories are present
-      // We check for fields from each category:
-      // Trace: Input, Output, Origin, Has Error
-      // Metadata: Labels, User ID, Thread ID, Customer ID, Prompt IDs
+      // We check for representative fields from each category:
+      // Trace: Input, Output, Origin, Contains Error
+      // Metadata: Labels, User ID, Thread ID, Customer ID, Prompt IDs, Metadata Value
       // Spans: Span Type, Model
+      // Topics: Topics, Subtopics
+      // Annotations: Has Annotation
+      // Events: Event Type, Event Metrics Key, Event Details Key
       const fieldOptions = selectWithOptgroups!.querySelectorAll("option");
       const optionTexts = Array.from(fieldOptions).map(
         (o) => o.textContent,
@@ -206,15 +209,22 @@ describe("<OnlineEvaluationDrawer /> preconditions", () => {
       expect(optionTexts).toContain("Input");
       expect(optionTexts).toContain("Output");
       expect(optionTexts).toContain("Origin");
-      expect(optionTexts).toContain("Has Error");
-      expect(optionTexts).toContain("Labels");
+      expect(optionTexts).toContain("Contains Error");
+      expect(optionTexts).toContain("Label");
       expect(optionTexts).toContain("User ID");
       expect(optionTexts).toContain("Thread ID");
       expect(optionTexts).toContain("Customer ID");
-      expect(optionTexts).toContain("Prompt IDs");
+      expect(optionTexts).toContain("Prompt ID");
       expect(optionTexts).toContain("Span Type");
       expect(optionTexts).toContain("Model");
-      expect(optionTexts).toHaveLength(11);
+      expect(optionTexts).toContain("Topic");
+      expect(optionTexts).toContain("Subtopic");
+      expect(optionTexts).toContain("Metadata");
+      expect(optionTexts).toContain("Annotations");
+      expect(optionTexts).toContain("Event");
+      expect(optionTexts).toContain("Metric");
+      expect(optionTexts).toContain("Event Detail");
+      expect(optionTexts).toHaveLength(18);
     });
   });
 

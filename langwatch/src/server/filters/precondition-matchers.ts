@@ -28,6 +28,11 @@ export interface PreconditionTraceData {
   customMetadata?: Record<string, string | null> | null;
   satisfactionScore?: number | null;
   hasAnnotation?: boolean | null;
+  events?: Array<{
+    event_type: string;
+    metrics: Array<{ key: string; value: number }>;
+    event_details: Array<{ key: string; value: string }>;
+  }> | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -107,11 +112,20 @@ export const PRECONDITION_FIELD_MATCHERS: Record<
   "evaluations.state": null,
   "evaluations.label": null,
 
-  // Event fields — not available at trace arrival time
-  "events.event_type": null,
-  "events.metrics.key": null,
-  "events.metrics.value": null,
-  "events.event_details.key": null,
+  // Event fields — fetched on demand when event preconditions exist
+  "events.event_type": (data) =>
+    data.events?.map((e) => e.event_type) ?? null,
+  "events.metrics.key": (data, _value, key) => {
+    if (!key || !data.events) return null;
+    const event = data.events.find((e) => e.event_type === key);
+    return event?.metrics.map((m) => m.key) ?? null;
+  },
+  "events.metrics.value": null, // numeric — not supported in string-based preconditions
+  "events.event_details.key": (data, _value, key) => {
+    if (!key || !data.events) return null;
+    const event = data.events.find((e) => e.event_type === key);
+    return event?.event_details.map((d) => d.key) ?? null;
+  },
 
   // Annotation fields
   "annotations.hasAnnotation": (data) =>
@@ -179,11 +193,11 @@ export const PRECONDITION_ALLOWED_RULES: Record<
   "evaluations.state": EMPTY_RULES,
   "evaluations.label": EMPTY_RULES,
 
-  // Event fields — not usable as preconditions
-  "events.event_type": EMPTY_RULES,
-  "events.metrics.key": EMPTY_RULES,
+  // Event fields — fetched on demand
+  "events.event_type": ENUM_RULES,
+  "events.metrics.key": ENUM_RULES, // requires event_type key
   "events.metrics.value": EMPTY_RULES, // numeric
-  "events.event_details.key": EMPTY_RULES,
+  "events.event_details.key": ENUM_RULES, // requires event_type key
 
   // Annotation fields
   "annotations.hasAnnotation": BOOLEAN_RULES,

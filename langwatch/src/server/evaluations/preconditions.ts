@@ -267,6 +267,16 @@ export function evaluatePreconditions({
   return true;
 }
 
+/**
+ * Check if any preconditions reference event fields, requiring an
+ * additional trace fetch to get event data.
+ */
+export function preconditionsNeedEvents(
+  preconditions: CheckPreconditions,
+): boolean {
+  return preconditions.some((p) => p.field.startsWith("events."));
+}
+
 // ---------------------------------------------------------------------------
 // Builder helpers — create PreconditionTraceData from different sources
 // ---------------------------------------------------------------------------
@@ -277,6 +287,7 @@ export function evaluatePreconditions({
 export function buildPreconditionTraceDataFromTrace({
   trace,
   spans,
+  events,
 }: {
   trace: {
     input?: { value: string; satisfaction_score?: number } | null;
@@ -287,6 +298,7 @@ export function buildPreconditionTraceDataFromTrace({
     error?: ErrorCapture | null;
   };
   spans: Span[];
+  events?: ElasticSearchTrace["events"];
 }): PreconditionTraceData {
   const customMetadata: Record<string, string | null> = {};
   if (trace.metadata?.custom) {
@@ -314,6 +326,11 @@ export function buildPreconditionTraceDataFromTrace({
     customMetadata: Object.keys(customMetadata).length > 0 ? customMetadata : null,
     satisfactionScore: trace.input?.satisfaction_score ?? null,
     hasAnnotation: null, // Not available in legacy collector path
+    events: events?.map((e) => ({
+      event_type: e.event_type,
+      metrics: e.metrics ?? [],
+      event_details: e.event_details ?? [],
+    })) ?? null,
   };
 }
 
@@ -323,9 +340,11 @@ export function buildPreconditionTraceDataFromTrace({
 export function buildPreconditionTraceDataFromCommand({
   data,
   spans,
+  events,
 }: {
   data: ExecuteEvaluationCommandData;
   spans: Span[];
+  events?: PreconditionTraceData["events"];
 }): PreconditionTraceData {
   return {
     input: data.computedInput ?? null,
@@ -351,5 +370,6 @@ export function buildPreconditionTraceDataFromCommand({
     customMetadata: data.customMetadata ?? null,
     satisfactionScore: data.satisfactionScore ?? null,
     hasAnnotation: null, // Not available at command time
+    events: events ?? null,
   };
 }

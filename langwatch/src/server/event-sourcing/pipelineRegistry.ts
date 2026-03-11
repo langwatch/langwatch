@@ -108,6 +108,7 @@ export class PipelineRegistry {
     const ExecuteEvaluationCommand = createExecuteEvaluationCommandClass({
       prisma: this.deps.prisma,
       spanStorage: this.deps.traces.spans,
+      traceEvents: this.deps.traces.spans,
       evaluationExecution: this.deps.evaluations.execution,
     });
 

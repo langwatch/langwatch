@@ -144,6 +144,13 @@ export const clearOnlineEvaluationDrawerState = () => {
   onlineEvaluationDrawerState = null;
 };
 
+/** Set persisted drawer state (for testing) */
+export const setOnlineEvaluationDrawerState = (
+  state: typeof onlineEvaluationDrawerState,
+) => {
+  onlineEvaluationDrawerState = state;
+};
+
 /**
  * Drawers that are part of the online evaluation flow.
  * When navigating TO these drawers, module-level state should be preserved.

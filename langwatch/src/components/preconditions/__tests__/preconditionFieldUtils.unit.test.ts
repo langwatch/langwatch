@@ -45,8 +45,9 @@ describe("preconditionFieldUtils", () => {
       // Fields with non-empty rules: input, output, traces.origin, traces.error,
       // metadata.user_id, metadata.thread_id, metadata.customer_id, metadata.labels,
       // metadata.prompt_ids, metadata.value, spans.type, spans.model,
-      // topics.topics, topics.subtopics, annotations.hasAnnotation = 15
-      expect(totalFields).toBe(15);
+      // topics.topics, topics.subtopics, annotations.hasAnnotation,
+      // events.event_type, events.metrics.key, events.event_details.key = 18
+      expect(totalFields).toBe(18);
     });
 
     it("places input and output in Trace category", () => {

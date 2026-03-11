@@ -15,10 +15,12 @@ import {
   evaluatePreconditions,
   buildPreconditionTraceDataFromCommand,
   checkEvaluatorRequiredFields,
+  preconditionsNeedEvents,
 } from "../../../../evaluations/preconditions";
+import type { PreconditionTraceData } from "../../../../filters/precondition-matchers";
 import type { CheckPreconditions } from "../../../../evaluations/types";
 import type { MappingState } from "../../../../tracer/tracesMapping";
-import type { Span } from "../../../../tracer/types";
+import type { ElasticSearchEvent, Span } from "../../../../tracer/types";
 import type { ExecuteEvaluationCommandData } from "../schemas/commands";
 import { executeEvaluationCommandDataSchema } from "../schemas/commands";
 import {
@@ -38,6 +40,7 @@ const logger = createLogger(
 export interface ExecuteEvaluationCommandDeps {
   prisma: PrismaClient;
   spanStorage: { getSpansByTraceId(params: { tenantId: string; traceId: string }): Promise<Span[]> };
+  traceEvents: { getEventsByTraceId(params: { tenantId: string; traceId: string }): Promise<ElasticSearchEvent[]> };
   evaluationExecution: EvaluationExecutionService;
 }
 
@@ -158,8 +161,23 @@ export function createExecuteEvaluationCommandClass(deps: ExecuteEvaluationComma
       }
 
       // Then check user-configured preconditions
-      const traceData = buildPreconditionTraceDataFromCommand({ data, spans });
       const preconditions = (monitor.preconditions ?? []) as CheckPreconditions;
+
+      // Fetch events on demand if any preconditions reference event fields
+      let events: PreconditionTraceData["events"] = null;
+      if (preconditionsNeedEvents(preconditions)) {
+        const traceEvents = await deps.traceEvents.getEventsByTraceId({
+          tenantId,
+          traceId: data.traceId,
+        });
+        events = traceEvents.map((e) => ({
+          event_type: e.event_type,
+          metrics: e.metrics ?? [],
+          event_details: e.event_details ?? [],
+        }));
+      }
+
+      const traceData = buildPreconditionTraceDataFromCommand({ data, spans, events });
       const preconditionsMet = evaluatePreconditions({
         traceData,
         preconditions,
