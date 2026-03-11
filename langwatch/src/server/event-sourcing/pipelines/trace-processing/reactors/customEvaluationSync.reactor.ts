@@ -167,7 +167,9 @@ export function createCustomEvaluationSyncReactor(
             label: evaluation.label ?? null,
             details: evaluation.details ?? null,
             error: evaluation.error?.message ?? null,
-            occurredAt,
+            // +1ms ensures the group queue dispatches complete AFTER start,
+            // since both share the same group key and occurredAt is used as the sort score.
+            occurredAt: occurredAt + 1,
           });
         } catch (error) {
           logger.error(
