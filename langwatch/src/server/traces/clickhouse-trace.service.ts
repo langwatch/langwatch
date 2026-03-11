@@ -370,6 +370,7 @@ export class ClickHouseTraceService {
   async getAllTracesForProject(
     input: GetAllTracesForProjectInput,
     protections: Protections,
+    options: { includeSpans?: boolean } = {},
   ): Promise<TracesForProjectResult | null> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getAllTracesForProject",
@@ -456,7 +457,7 @@ export class ClickHouseTraceService {
           }
 
           // Build the query with keyset pagination
-          const { traces, totalHits, lastTrace } =
+          let { traces, totalHits, lastTrace } =
             await this.fetchTracesWithPagination(
               input.projectId,
               pageSize,
@@ -468,6 +469,15 @@ export class ClickHouseTraceService {
               filterConditions,
               filterParams,
             );
+
+          // When includeSpans is requested, fetch and attach actual spans
+          if (options.includeSpans && traces.length > 0) {
+            traces = await this.enrichTracesWithSpans(
+              traces,
+              input.projectId,
+              protections,
+            );
+          }
 
           // Generate new scrollId from last trace
           let newScrollId: string | undefined;
@@ -1321,6 +1331,39 @@ export class ClickHouseTraceService {
     }
 
     return Array.from(groups.values());
+  }
+
+  /**
+   * Enrich traces (which have empty spans) with actual span data from ClickHouse.
+   *
+   * Fetches spans via fetchTracesWithSpansJoined and replaces the empty span
+   * arrays on each trace with the real spans. Traces whose spans are not found
+   * are returned unchanged (with empty spans).
+   *
+   * @internal
+   */
+  private async enrichTracesWithSpans(
+    traces: Trace[],
+    projectId: string,
+    protections: Protections,
+  ): Promise<Trace[]> {
+    const traceIds = traces.map((t) => t.trace_id);
+    const tracesWithSpans = await this.fetchTracesWithSpansJoined(
+      projectId,
+      traceIds,
+    );
+
+    return traces.map((trace) => {
+      const data = tracesWithSpans.get(trace.trace_id);
+      if (!data || data.spans.length === 0) {
+        return trace;
+      }
+      const mappedSpans = mapNormalizedSpansToSpans(data.spans);
+      return applyTraceProtections(
+        mapTraceSummaryToTrace(data.summary, mappedSpans, projectId),
+        protections,
+      );
+    });
   }
 
   /**

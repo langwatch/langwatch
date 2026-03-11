@@ -683,6 +683,13 @@ export class LlmConfigRepository {
       const normalized1 = parseResult1.data;
       const normalized2 = parseResult2.data;
 
+      // Strip response_format before comparison — it is derived from outputs
+      // at read time and never stored in new data. Older CLIs may still send it
+      // alongside outputs, causing a false diff against the server's
+      // remoteConfigData which never includes it.
+      delete normalized1.response_format;
+      delete normalized2.response_format;
+
       // Compare normalized configs using deterministic JSON serialization
       // Deep-sort all keys so nested objects (messages, inputs, outputs)
       // are compared correctly regardless of property order.
