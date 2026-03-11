@@ -1,8 +1,8 @@
 @unit
-Feature: Fetch org role during permission resolution
+Feature: Organization role available during permission checks
   As a LangWatch developer
-  I want the user's organization role available during permission resolution
-  So that downstream features can use it to restrict access based on org role
+  I want the user's organization role included in permission check results
+  So that downstream features can restrict access based on org role
 
   Background:
     Given a user "user-123" exists
@@ -11,109 +11,81 @@ Feature: Fetch org role during permission resolution
     And a project "project-1" exists in team "team-1"
 
   # ============================================================================
-  # Project permission resolution carries org role
+  # Project permission checks include the user's organization role
   # ============================================================================
 
-  Scenario: Project permission result includes org role for an org admin
+  Scenario: Admin's org role is included when checking project permissions
     Given user "user-123" is an ADMIN in organization "org-1"
     And user "user-123" is a MEMBER of team "team-1"
-    When project permission "analytics:view" is checked for user "user-123" on project "project-1"
+    When permission "analytics:view" is checked for user "user-123" on project "project-1"
     Then the permission is granted
-    And the org role in the result is ADMIN
+    And the result includes organization role ADMIN
 
-  Scenario: Project permission result includes org role for an org member
+  Scenario: Member's org role is included when checking project permissions
     Given user "user-123" is a MEMBER in organization "org-1"
     And user "user-123" is a MEMBER of team "team-1"
-    When project permission "analytics:view" is checked for user "user-123" on project "project-1"
+    When permission "analytics:view" is checked for user "user-123" on project "project-1"
     Then the permission is granted
-    And the org role in the result is MEMBER
+    And the result includes organization role MEMBER
 
-  Scenario: Project permission result includes org role for an external user
-    Given user "user-123" is an EXTERNAL in organization "org-1"
+  Scenario: External user's org role is included when checking project permissions
+    Given user "user-123" is an EXTERNAL member of organization "org-1"
     And user "user-123" is a VIEWER of team "team-1"
-    When project permission "analytics:view" is checked for user "user-123" on project "project-1"
+    When permission "analytics:view" is checked for user "user-123" on project "project-1"
     Then the permission is granted
-    And the org role in the result is EXTERNAL
+    And the result includes organization role EXTERNAL
 
-  Scenario: Project permission result has no org role when user is not an org member
+  Scenario: No org role when user is not in the organization
     Given user "user-123" is not a member of organization "org-1"
-    When project permission "analytics:view" is checked for user "user-123" on project "project-1"
+    When permission "analytics:view" is checked for user "user-123" on project "project-1"
     Then the permission is denied
-    And the org role in the result is null
+    And no organization role is returned
 
-  Scenario: Demo project permission result has no org role
+  Scenario: Demo project grants access without an org role
     Given project "project-1" is a demo project
-    When project permission "analytics:view" is checked for user "user-123" on project "project-1"
+    When permission "analytics:view" is checked for user "user-123" on project "project-1"
     Then the permission is granted
-    And the org role in the result is null
+    And no organization role is returned
 
   # ============================================================================
-  # Team permission resolution carries org role
+  # Team permission checks include the user's organization role
   # ============================================================================
 
-  Scenario: Team permission result includes org role for an org admin via admin bypass
+  Scenario: Org admin bypasses team membership and org role is included
     Given user "user-123" is an ADMIN in organization "org-1"
     And user "user-123" is not a member of team "team-1"
     When team permission "team:manage" is checked for user "user-123" on team "team-1"
     Then the permission is granted
-    And the org role in the result is ADMIN
+    And the result includes organization role ADMIN
 
-  Scenario: Team permission result includes org role for an org member
+  Scenario: Member's org role is included when checking team permissions
     Given user "user-123" is a MEMBER in organization "org-1"
     And user "user-123" is a MEMBER of team "team-1"
     When team permission "team:view" is checked for user "user-123" on team "team-1"
     Then the permission is granted
-    And the org role in the result is MEMBER
+    And the result includes organization role MEMBER
 
-  Scenario: Team permission result includes org role for an external user
-    Given user "user-123" is an EXTERNAL in organization "org-1"
+  Scenario: External user's org role is included when checking team permissions
+    Given user "user-123" is an EXTERNAL member of organization "org-1"
     And user "user-123" is a VIEWER of team "team-1"
     When team permission "team:view" is checked for user "user-123" on team "team-1"
     Then the permission is granted
-    And the org role in the result is EXTERNAL
+    And the result includes organization role EXTERNAL
 
-  Scenario: Team permission result has no org role when user is not an org member
+  Scenario: No org role for team checks when user is not in the organization
     Given user "user-123" is not a member of organization "org-1"
     When team permission "team:view" is checked for user "user-123" on team "team-1"
     Then the permission is denied
-    And the org role in the result is null
+    And no organization role is returned
 
   # ============================================================================
-  # Backward-compatible boolean API unchanged
-  # ============================================================================
-
-  Scenario: Boolean permission check still returns true when user has permission
-    Given user "user-123" is a MEMBER in organization "org-1"
-    And user "user-123" is a MEMBER of team "team-1"
-    When project permission "analytics:view" is boolean-checked for user "user-123" on project "project-1"
-    Then the boolean result is true
-
-  Scenario: Boolean permission check still returns false when user lacks permission
-    Given user "user-123" is a MEMBER in organization "org-1"
-    And user "user-123" is a VIEWER of team "team-1"
-    When project permission "datasets:manage" is boolean-checked for user "user-123" on project "project-1"
-    Then the boolean result is false
-
-  Scenario: Boolean team permission check still returns true when user has permission
-    Given user "user-123" is a MEMBER in organization "org-1"
-    And user "user-123" is a MEMBER of team "team-1"
-    When team permission "team:view" is boolean-checked for user "user-123" on team "team-1"
-    Then the boolean result is true
-
-  Scenario: Boolean team permission check still returns false when user lacks permission
-    Given user "user-123" is a MEMBER in organization "org-1"
-    And user "user-123" is a VIEWER of team "team-1"
-    When team permission "team:manage" is boolean-checked for user "user-123" on team "team-1"
-    Then the boolean result is false
-
-  # ============================================================================
-  # Permission decisions unchanged (regression guard)
+  # Existing permission behavior is unchanged
   # ============================================================================
 
   Scenario Outline: Permission decisions are unchanged for all team roles
     Given user "user-123" is a MEMBER in organization "org-1"
     And user "user-123" is a <teamRole> of team "team-1"
-    When project permission "<permission>" is checked for user "user-123" on project "project-1"
+    When permission "<permission>" is checked for user "user-123" on project "project-1"
     Then the permission is <outcome>
 
     Examples:
@@ -128,82 +100,110 @@ Feature: Fetch org role during permission resolution
       | VIEWER   | datasets:manage  | denied  |
       | VIEWER   | team:manage      | denied  |
 
-  Scenario: Custom role grant carries org role
+  Scenario: Boolean permission API still returns true when granted
     Given user "user-123" is a MEMBER in organization "org-1"
-    And user "user-123" is a CUSTOM member of team "team-1" with permissions ["analytics:view", "datasets:view"]
-    When project permission "analytics:view" is checked for user "user-123" on project "project-1"
+    And user "user-123" is a MEMBER of team "team-1"
+    When permission "analytics:view" is boolean-checked for user "user-123" on project "project-1"
+    Then the boolean result is true
+
+  Scenario: Boolean permission API still returns false when denied
+    Given user "user-123" is a MEMBER in organization "org-1"
+    And user "user-123" is a VIEWER of team "team-1"
+    When permission "datasets:manage" is boolean-checked for user "user-123" on project "project-1"
+    Then the boolean result is false
+
+  Scenario: Boolean team permission API still returns true when granted
+    Given user "user-123" is a MEMBER in organization "org-1"
+    And user "user-123" is a MEMBER of team "team-1"
+    When team permission "team:view" is boolean-checked for user "user-123" on team "team-1"
+    Then the boolean result is true
+
+  Scenario: Boolean team permission API still returns false when denied
+    Given user "user-123" is a MEMBER in organization "org-1"
+    And user "user-123" is a VIEWER of team "team-1"
+    When team permission "team:manage" is boolean-checked for user "user-123" on team "team-1"
+    Then the boolean result is false
+
+  # ============================================================================
+  # Custom roles include org role in result
+  # ============================================================================
+
+  Scenario: Custom role grant includes org role in result
+    Given user "user-123" is a MEMBER in organization "org-1"
+    And user "user-123" has a custom role on team "team-1" with permissions ["analytics:view", "datasets:view"]
+    When permission "analytics:view" is checked for user "user-123" on project "project-1"
     Then the permission is granted
-    And the org role in the result is MEMBER
+    And the result includes organization role MEMBER
 
-  Scenario: Custom role denial carries org role
+  Scenario: Custom role denial includes org role in result
     Given user "user-123" is a MEMBER in organization "org-1"
-    And user "user-123" is a CUSTOM member of team "team-1" with permissions ["analytics:view"]
-    When project permission "datasets:manage" is checked for user "user-123" on project "project-1"
+    And user "user-123" has a custom role on team "team-1" with permissions ["analytics:view"]
+    When permission "datasets:manage" is checked for user "user-123" on project "project-1"
     Then the permission is denied
-    And the org role in the result is MEMBER
+    And the result includes organization role MEMBER
 
   # ============================================================================
-  # Middleware passes org role to downstream context
+  # Org role is available in request context after authorization
   # ============================================================================
 
-  Scenario: Project permission middleware passes org role to downstream context
+  Scenario: Project-scoped request makes org role available to subsequent handlers
     Given user "user-123" is a MEMBER in organization "org-1"
     And user "user-123" is a MEMBER of team "team-1"
-    When the project permission middleware runs for "analytics:view" on project "project-1"
-    Then downstream context includes org role MEMBER
+    When a project-scoped request for "analytics:view" on project "project-1" is authorized
+    Then the request context includes organization role MEMBER
 
-  Scenario: Team permission middleware passes org role to downstream context
+  Scenario: Team-scoped request makes org role available to subsequent handlers
     Given user "user-123" is an ADMIN in organization "org-1"
-    When the team permission middleware runs for "team:view" on team "team-1"
-    Then downstream context includes org role ADMIN
+    When a team-scoped request for "team:view" on team "team-1" is authorized
+    Then the request context includes organization role ADMIN
 
-  Scenario: Project permission middleware still denies unauthorized users
+  Scenario: Unauthorized project-scoped request is still denied
     Given user "user-123" is not a member of any team
-    When the project permission middleware runs for "analytics:view" on project "project-1"
+    When a project-scoped request for "analytics:view" on project "project-1" is authorized
     Then the request is denied with UNAUTHORIZED
 
-  Scenario: Team permission middleware still denies unauthorized users
+  Scenario: Unauthorized team-scoped request is still denied
     Given user "user-123" is not a member of any team
-    When the team permission middleware runs for "team:view" on team "team-1"
+    When a team-scoped request for "team:view" on team "team-1" is authorized
     Then the request is denied with UNAUTHORIZED
 
-  Scenario: Public share fallback middleware passes org role when permitted
+  Scenario: Public share fallback makes org role available when permitted
     Given user "user-123" is a MEMBER in organization "org-1"
     And user "user-123" is a MEMBER of team "team-1"
-    When the public share fallback middleware runs for "analytics:view" on project "project-1"
-    Then downstream context includes org role MEMBER
+    When a public-share-fallback request for "analytics:view" on project "project-1" is authorized
+    Then the request context includes organization role MEMBER
 
   # ============================================================================
-  # Frontend hook exposes org role
+  # Frontend exposes organization role
   # ============================================================================
 
   @integration
-  Scenario: Organization team project hook exposes org role for a member
+  Scenario: Frontend context includes org role for a member
     Given user "user-123" is a MEMBER in organization "org-1"
-    When the organization team project hook resolves
-    Then the hook result includes org role MEMBER
+    When the frontend loads organization and project context
+    Then the context includes organization role MEMBER
 
   @integration
-  Scenario: Organization team project hook exposes org role for an external user
-    Given user "user-123" is an EXTERNAL in organization "org-1"
-    When the organization team project hook resolves
-    Then the hook result includes org role EXTERNAL
+  Scenario: Frontend context includes org role for an external user
+    Given user "user-123" is an EXTERNAL member of organization "org-1"
+    When the frontend loads organization and project context
+    Then the context includes organization role EXTERNAL
 
   @integration
-  Scenario: Organization team project hook exposes org role for an admin
+  Scenario: Frontend context includes org role for an admin
     Given user "user-123" is an ADMIN in organization "org-1"
-    When the organization team project hook resolves
-    Then the hook result includes org role ADMIN
+    When the frontend loads organization and project context
+    Then the context includes organization role ADMIN
 
   # ============================================================================
-  # Org role correctly resolved across all org role types
+  # Org role resolved for all org role types
   # ============================================================================
 
-  Scenario Outline: Org role is carried for each org role type
+  Scenario Outline: Org role is included for each org role type
     Given user "user-123" is an <orgRole> in organization "org-1"
     And user "user-123" is a MEMBER of team "team-1"
-    When project permission "analytics:view" is checked for user "user-123" on project "project-1"
-    Then the org role in the result is <orgRole>
+    When permission "analytics:view" is checked for user "user-123" on project "project-1"
+    Then the result includes organization role <orgRole>
 
     Examples:
       | orgRole  |
