@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
   let attempts = 0;
   const maxAttempts = 3;
   while (attempts < maxAttempts) {
-    response = await fetch(`${env.BASE_HOST}/api/workflows/${workflowId}/run`, {
+    response = await fetch(`${env.BASE_HOST}/api/workflows/${workflow.id}/run`, {
       method: "POST",
       headers: {
         "X-Auth-Token": authToken,

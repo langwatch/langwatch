@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { ssrfSafeFetch } from "../../utils/ssrfProtection";
 
 export async function GET(req: NextRequest) {
   const url = req.nextUrl.searchParams.get("url");
@@ -7,7 +8,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const response = await fetch(url);
+    const response = await ssrfSafeFetch(url);
 
     if (!response.ok) {
       return NextResponse.json(
@@ -24,8 +25,8 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const imageBlob = await response.blob();
-    return new NextResponse(imageBlob, {
+    const imageBuffer = await response.arrayBuffer();
+    return new NextResponse(imageBuffer, {
       headers: {
         "Content-Type": contentType,
         "Cache-Control": "public, max-age=31536000",
