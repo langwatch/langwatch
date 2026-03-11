@@ -37,6 +37,8 @@ export const scenarioJobSchema = z.object({
   }),
   setId: z.string(),
   batchRunId: z.string(),
+  /** Pre-assigned scenario run ID for the SDK. Generated at queue time to prevent duplicate entries. */
+  scenarioRunId: z.string(),
 });
 
 /** Data required to execute a scenario job. */
@@ -84,6 +86,11 @@ export function generateBatchRunId(): string {
   return generate(KSUID_RESOURCES.SCENARIO_BATCH).toString();
 }
 
+/** Generates a unique scenario run ID with `scenariorun_` prefix for SDK passthrough */
+export function generateScenarioRunId(): string {
+  return generate(KSUID_RESOURCES.SCENARIO_RUN).toString();
+}
+
 /**
  * Schedule a scenario for execution.
  *
@@ -91,7 +98,7 @@ export function generateBatchRunId(): string {
  * @param options - Optional job configuration (delay, priority, etc.)
  */
 export async function scheduleScenarioRun(
-  params: ScenarioJob & { index: number },
+  params: Omit<ScenarioJob, "scenarioRunId"> & { index: number },
   options?: { delay?: number; priority?: number },
 ): Promise<Job<ScenarioJob, ScenarioJobResult, string>> {
   const { projectId, scenarioId, batchRunId, target, index } = params;
@@ -121,7 +128,12 @@ export async function scheduleScenarioRun(
     return existingJob;
   }
 
-  return await scenarioQueue.add(SCENARIO_QUEUE.JOB, params, {
+  const jobData: ScenarioJob = {
+    ...params,
+    scenarioRunId: generateScenarioRunId(),
+  };
+
+  return await scenarioQueue.add(SCENARIO_QUEUE.JOB, jobData, {
     jobId,
     delay: options?.delay,
     priority: options?.priority,
