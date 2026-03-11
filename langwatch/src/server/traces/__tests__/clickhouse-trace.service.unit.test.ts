@@ -1,0 +1,208 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { Protections } from "~/server/elasticsearch/protections";
+import type { GetAllTracesForProjectInput } from "../types";
+
+// ---------------------------------------------------------------------------
+// Hoisted mocks
+// ---------------------------------------------------------------------------
+const { mockClickHouseQuery, mockPrismaFindUnique } = vi.hoisted(() => ({
+  mockClickHouseQuery: vi.fn(),
+  mockPrismaFindUnique: vi.fn(),
+}));
+
+vi.mock("~/server/clickhouse/client", () => ({
+  getClickHouseClient: () => ({ query: mockClickHouseQuery }),
+}));
+
+vi.mock("~/server/db", () => ({
+  prisma: {},
+}));
+
+vi.mock("langwatch", () => ({
+  getLangWatchTracer: () => ({
+    withActiveSpan: (
+      _name: string,
+      ...args: unknown[]
+    ) => {
+      const fn = args.length === 1 ? args[0] : args[1];
+      const span = { setAttribute: () => {} };
+      return (fn as (span: { setAttribute: () => void }) => Promise<unknown>)(span);
+    },
+  }),
+}));
+
+// Stub the filter module to return empty conditions
+vi.mock("~/server/filters/clickhouse", () => ({
+  generateClickHouseFilterConditions: () => ({
+    conditions: [],
+    params: {},
+    hasUnsupportedFilters: false,
+  }),
+}));
+
+describe("ClickHouseTraceService", () => {
+  const protections: Protections = {
+    canSeeCosts: true,
+    canSeePiiData: true,
+    canSeeTopics: true,
+  } as Protections;
+
+  const baseInput = {
+    projectId: "proj_123",
+    startDate: Date.now() - 86400000,
+    endDate: Date.now(),
+    pageSize: 2,
+    pageOffset: 0,
+  } as GetAllTracesForProjectInput;
+
+  // A minimal trace summary row from ClickHouse
+  const makeSummaryRow = (traceId: string) => ({
+    ts_TraceId: traceId,
+    ts_SpanCount: 1,
+    ts_TotalDurationMs: 100,
+    ts_ComputedIOSchemaVersion: 1,
+    ts_ComputedInput: '{"type":"text","value":"hello"}',
+    ts_ComputedOutput: '{"type":"text","value":"world"}',
+    ts_TimeToFirstTokenMs: 10,
+    ts_TimeToLastTokenMs: 90,
+    ts_TokensPerSecond: 5,
+    ts_ContainsErrorStatus: false,
+    ts_ContainsOKStatus: true,
+    ts_ErrorMessage: "",
+    ts_Models: ["gpt-4"],
+    ts_TotalCost: 0.01,
+    ts_TokensEstimated: false,
+    ts_TotalPromptTokenCount: 10,
+    ts_TotalCompletionTokenCount: 20,
+    ts_TopicId: "",
+    ts_SubTopicId: "",
+    ts_HasAnnotation: false,
+    ts_Attributes: {},
+    ts_OccurredAt: Date.now(),
+    ts_CreatedAt: Date.now(),
+    ts_UpdatedAt: Date.now(),
+  });
+
+  // A minimal span row from ClickHouse stored_spans table
+  const makeSpanRow = (traceId: string, spanId: string) => ({
+    SpanId: spanId,
+    TraceId: traceId,
+    TenantId: "proj_123",
+    ParentSpanId: null,
+    ParentTraceId: null,
+    ParentIsRemote: null,
+    Sampled: true,
+    StartTime: Date.now(),
+    EndTime: Date.now() + 100,
+    DurationMs: 100,
+    SpanName: "test-span",
+    SpanKind: 1,
+    ResourceAttributes: {},
+    SpanAttributes: {},
+    StatusCode: 1,
+    StatusMessage: "",
+    ScopeName: "test",
+    ScopeVersion: "1.0",
+    Events_Timestamp: [],
+    Events_Name: [],
+    Events_Attributes: [],
+    Links_TraceId: [],
+    Links_SpanId: [],
+    Links_Attributes: [],
+  });
+
+  let ClickHouseTraceService: typeof import("../clickhouse-trace.service").ClickHouseTraceService;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+
+    mockPrismaFindUnique.mockResolvedValue({
+      featureClickHouseDataSourceTraces: true,
+    });
+
+    // Dynamic import to get fresh module after mocks are set
+    const mod = await import("../clickhouse-trace.service");
+    ClickHouseTraceService = mod.ClickHouseTraceService;
+  });
+
+  describe("getAllTracesForProject()", () => {
+    describe("when includeSpans is false or not provided", () => {
+      it("returns traces with empty spans", async () => {
+        const summaryRow = makeSummaryRow("trace-1");
+
+        // First call: count query
+        mockClickHouseQuery
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([{ total: "1" }]),
+          })
+          // Second call: summary query
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([summaryRow]),
+          })
+          // Third call: evaluation query
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([]),
+          });
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        const result = await service.getAllTracesForProject(
+          baseInput,
+          protections,
+        );
+
+        expect(result).not.toBeNull();
+        const traces = result!.groups.flat();
+        expect(traces).toHaveLength(1);
+        expect(traces[0]!.spans).toEqual([]);
+      });
+    });
+
+    describe("when includeSpans is true", () => {
+      it("fetches and attaches spans to traces", async () => {
+        const summaryRow = makeSummaryRow("trace-1");
+        const spanRow = makeSpanRow("trace-1", "span-1");
+
+        mockClickHouseQuery
+          // 1st call: count query (fetchTracesWithPagination)
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([{ total: "1" }]),
+          })
+          // 2nd call: summary query (fetchTracesWithPagination)
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([summaryRow]),
+          })
+          // 3rd call: trace summary query (fetchTracesWithSpansJoined - summaries)
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([summaryRow]),
+          })
+          // 4th call: spans query (fetchTracesWithSpansJoined - spans)
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([spanRow]),
+          })
+          // 5th call: evaluation query
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([]),
+          });
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        const result = await service.getAllTracesForProject(
+          baseInput,
+          protections,
+          { includeSpans: true },
+        );
+
+        expect(result).not.toBeNull();
+        const traces = result!.groups.flat();
+        expect(traces).toHaveLength(1);
+        expect(traces[0]!.spans).toHaveLength(1);
+        expect(traces[0]!.spans[0]!.span_id).toBe("span-1");
+      });
+    });
+  });
+});
