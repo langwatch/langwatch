@@ -119,21 +119,18 @@ When the sub-agent returns:
 
 3. If you started the app (no `.dev-port` existed before), tear it down: `scripts/dev-down.sh`
 
-## Step 4: Commit, push, and update the PR
+## Step 4: Upload screenshots and update the PR
 
-This step is **not optional**. The skill is not done until artifacts are committed and the PR is updated.
+Screenshots are uploaded to **img402.dev** (free, no auth) instead of committed to git. This avoids binary bloat in the repo.
 
-1. **Commit and push** the `browser-tests/<feature-name>/` directory:
+1. **Upload each screenshot** to img402.dev:
    ```bash
-   git add browser-tests/<feature-name>/
-   git commit -m "docs: add <feature-name> browser test results"
-   git push origin HEAD
+   curl -s -F "image=@browser-tests/<feature>/<date>/screenshots/01-xxx.jpeg" https://img402.dev/api/free
+   # Returns: {"url":"https://i.img402.dev/abc123.jpg", ...}
    ```
+   Collect the returned URLs for each screenshot.
 
-2. **Update the PR description** to include the browser test results with screenshots. Use absolute `raw.githubusercontent.com` URLs so images render in the PR body:
-   ```
-   https://raw.githubusercontent.com/langwatch/langwatch/<branch>/browser-tests/<feature-name>/<date>/screenshots/<file>.png
-   ```
+2. **Update the PR description** with the results table using img402 URLs so images render inline:
 
    Read the current PR body first (`gh pr view --json body`), then append a new section:
    ```markdown
@@ -141,16 +138,19 @@ This step is **not optional**. The skill is not done until artifacts are committ
 
    | # | Scenario | Result | Screenshot |
    |---|----------|--------|------------|
-   | 1 | <name> | PASS | ![01](https://raw.githubusercontent.com/langwatch/langwatch/<branch>/browser-tests/...) |
+   | 1 | <name> | PASS | ![01](https://i.img402.dev/abc123.jpg) |
    ```
 
    Use `gh api repos/langwatch/langwatch/pulls/<number> -X PATCH -f body="..."` to update (not `gh pr edit`).
+
+3. **Do NOT commit `browser-tests/`** — it is gitignored. Screenshots are ephemeral local artifacts; the img402 URLs in the PR body are the permanent record.
 
 ## Step 5: Report
 
 Return the summary to the user/orchestrator. Include:
 - The results table
 - Link to the PR where screenshots are now visible
+- Note: img402.dev free tier has 7-day retention; screenshots expire but remain in the PR body as broken images after that
 
 ## Rules
 

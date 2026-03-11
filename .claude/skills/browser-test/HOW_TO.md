@@ -42,13 +42,19 @@ Used by `scripts/verify-browser-test.js`, `agentic-e2e-tests/tests/auth.setup.ts
 
 ## Screenshots
 
-Save screenshots to the structured artifact directory: `browser-tests/<feature-name>/<YYYY-MM-DD>/screenshots/`.
+Save screenshots to the local artifact directory: `browser-tests/<feature-name>/<YYYY-MM-DD>/screenshots/`.
 
 ```text
 browser_take_screenshot → filename: "browser-tests/plans-comparison/2026-03-11/screenshots/01-sign-in.png"
 ```
 
-These are committed to the branch and referenced in PR descriptions using absolute `raw.githubusercontent.com` URLs. **Never use relative paths in PR bodies** — they don't render.
+Screenshots are **uploaded to img402.dev** (not committed to git). Upload via:
+```bash
+curl -s -F "image=@<path>" https://img402.dev/api/free
+# Returns: {"url":"https://i.img402.dev/abc123.jpg", ...}
+```
+
+Use the returned `https://i.img402.dev/...` URLs in PR descriptions. **Never commit `browser-tests/`** — it is gitignored. Free tier: 1MB max, 7-day retention.
 
 ## After Finishing
 
