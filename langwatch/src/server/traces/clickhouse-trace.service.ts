@@ -962,6 +962,7 @@ export class ClickHouseTraceService {
     const messages: PromptStudioSpanResult["messages"] = [];
 
     // Extract input messages from gen_ai.prompt or langwatch.input
+    // Note: langwatch.input includes system messages; gen_ai.input.messages does not
     const inputStr =
       (attrs["gen_ai.prompt"] as string) ??
       (attrs["langwatch.input"] as string);
@@ -970,6 +971,13 @@ export class ClickHouseTraceService {
         const parsed = JSON.parse(inputStr);
         if (parsed.type === "chat_messages" && Array.isArray(parsed.value)) {
           messages.push(...parsed.value);
+        } else if (Array.isArray(parsed)) {
+          // Raw array of message objects (without TypedValueJson wrapper)
+          for (const item of parsed) {
+            if (item && typeof item === "object" && typeof item.content === "string") {
+              messages.push({ role: item.role ?? "user", content: item.content });
+            }
+          }
         } else if (typeof parsed.value === "string") {
           messages.push({ role: "user", content: parsed.value });
         } else if (typeof parsed === "string") {
@@ -980,15 +988,23 @@ export class ClickHouseTraceService {
       }
     }
 
-    // Extract output messages from gen_ai.completion or langwatch.output
+    // Extract output messages from gen_ai.completion, gen_ai.output.messages, or langwatch.output
     const outputStr =
       (attrs["gen_ai.completion"] as string) ??
+      (attrs["gen_ai.output.messages"] as string) ??
       (attrs["langwatch.output"] as string);
     if (outputStr) {
       try {
         const parsed = JSON.parse(outputStr);
         if (parsed.type === "chat_messages" && Array.isArray(parsed.value)) {
           messages.push(...parsed.value);
+        } else if (Array.isArray(parsed)) {
+          // Raw array of message objects (without TypedValueJson wrapper)
+          for (const item of parsed) {
+            if (item && typeof item === "object" && typeof item.content === "string") {
+              messages.push({ role: item.role ?? "assistant", content: item.content });
+            }
+          }
         } else if (typeof parsed.value === "string") {
           messages.push({ role: "assistant", content: parsed.value });
         } else if (typeof parsed === "string") {
