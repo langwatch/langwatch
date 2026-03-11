@@ -41,30 +41,29 @@ describe("GET /image-proxy", () => {
     });
   });
 
-  describe("when url is malformed", () => {
-    it("returns 400 for a plain string", async () => {
+  describe("when url is malformed or has a disallowed scheme", () => {
+    it("returns 500 for a plain string (ssrfSafeFetch throws)", async () => {
+      vi.mocked(ssrfSafeFetch).mockRejectedValueOnce(
+        new Error("Invalid URL format"),
+      );
       const res = await GET(makeRequest("not-a-url"));
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(500);
     });
-  });
 
-  describe("when url has a disallowed scheme", () => {
-    it("rejects javascript: URLs", async () => {
+    it("returns 500 for javascript: URL (ssrfSafeFetch throws)", async () => {
+      vi.mocked(ssrfSafeFetch).mockRejectedValueOnce(
+        new Error("Unsupported protocol: javascript:"),
+      );
       const res = await GET(makeRequest("javascript:alert(1)"));
-      expect(res.status).toBe(400);
-      expect(ssrfSafeFetch).not.toHaveBeenCalled();
+      expect(res.status).toBe(500);
     });
 
-    it("rejects file: URLs", async () => {
-      const res = await GET(makeRequest("file:///etc/passwd"));
-      expect(res.status).toBe(400);
-      expect(ssrfSafeFetch).not.toHaveBeenCalled();
-    });
-
-    it("rejects ftp: URLs", async () => {
+    it("returns 500 for ftp: URL (ssrfSafeFetch throws)", async () => {
+      vi.mocked(ssrfSafeFetch).mockRejectedValueOnce(
+        new Error("Unsupported protocol: ftp:"),
+      );
       const res = await GET(makeRequest("ftp://example.com/image.png"));
-      expect(res.status).toBe(400);
-      expect(ssrfSafeFetch).not.toHaveBeenCalled();
+      expect(res.status).toBe(500);
     });
   });
 

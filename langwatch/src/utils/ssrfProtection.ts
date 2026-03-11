@@ -390,6 +390,12 @@ export function createSSRFValidator(config: SSRFConfig) {
       throw new Error("Invalid URL format");
     }
 
+    if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+      throw new Error(
+        `Unsupported protocol: ${parsedUrl.protocol} — only http and https are allowed`,
+      );
+    }
+
     const hostname = parsedUrl.hostname.toLowerCase();
     const port = parsedUrl.port
       ? parseInt(parsedUrl.port, 10)

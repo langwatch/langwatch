@@ -123,6 +123,18 @@ describe("createSSRFValidator()", () => {
         "Access to cloud provider internal domains is not allowed for security reasons"
       );
     });
+
+    it("blocks non-http/https schemes like ftp:", async () => {
+      await expect(
+        validate("ftp://example.com/file.png")
+      ).rejects.toThrow(/Unsupported protocol: ftp:/);
+    });
+
+    it("blocks non-http/https schemes like javascript:", async () => {
+      await expect(
+        validate("javascript:alert(1)")
+      ).rejects.toThrow(/Unsupported protocol: javascript:/);
+    });
   });
 });
 

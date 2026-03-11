@@ -7,20 +7,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Missing url" }, { status: 400 });
   }
 
-  // Only allow http and https schemes — ssrfSafeFetch handles the rest.
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    return NextResponse.json({ error: "Invalid URL" }, { status: 400 });
-  }
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    return NextResponse.json(
-      { error: "Invalid or disallowed URL" },
-      { status: 400 },
-    );
-  }
-
   try {
     const response = await ssrfSafeFetch(url);
 
