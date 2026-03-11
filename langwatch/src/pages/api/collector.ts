@@ -537,7 +537,7 @@ async function handleCollectorRequest(
       for (const evaluation of params.evaluations) {
         const evaluationMD5 = crypto
           .createHash("md5")
-          .update(JSON.stringify(evaluation))
+          .update(JSON.stringify({ traceId, evaluation }))
           .digest("hex");
         const evaluationId =
           evaluation.evaluation_id ?? `eval_md5_${evaluationMD5}`;

@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
+import { EvaluationRunClickHouseRepository } from "~/server/app-layer/evaluations/repositories/evaluation-run.clickhouse.repository";
 import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
+import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
 import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
+import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
 import type { AggregateType } from "../../../../";
 import { definePipeline } from "../../../../";
 import {
@@ -139,7 +142,7 @@ describe.skipIf(!hasTestcontainers)(
 
       // --- Evaluation pipeline ---
       const evalRunStore = new EvaluationRunStore(
-        EvaluationRunService.create(clickHouseClient).repository,
+        new EvaluationRunService(new EvaluationRunClickHouseRepository(clickHouseClient)).repository,
       );
       const evalPipelineName = `eval_processing_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       const evalPipelineDef = definePipeline<EvaluationProcessingEvent>()
@@ -159,10 +162,10 @@ describe.skipIf(!hasTestcontainers)(
       // --- Trace pipeline (with customEvaluationSync reactor wired to eval pipeline) ---
 
       const spanAppendStore = new SpanAppendStore(
-        SpanStorageService.create(clickHouseClient).repository,
+        new SpanStorageService(new SpanStorageClickHouseRepository(clickHouseClient)).repository,
       );
       const traceSummaryStore = new TraceSummaryStore(
-        TraceSummaryService.create(clickHouseClient).repository,
+        new TraceSummaryService(new TraceSummaryClickHouseRepository(clickHouseClient)).repository,
       );
 
       // Create the reactor with zero delay for faster tests

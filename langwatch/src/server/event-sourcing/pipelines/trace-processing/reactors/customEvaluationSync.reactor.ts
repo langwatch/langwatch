@@ -38,10 +38,16 @@ interface SdkEvaluation {
  * Generates a deterministic evaluation ID by hashing the evaluation JSON.
  * Matches the legacy `mapEvaluations` behavior for idempotency.
  */
-function deterministicEvaluationId(evaluation: SdkEvaluation): string {
+function deterministicEvaluationId({
+  traceId,
+  evaluation,
+}: {
+  traceId: string;
+  evaluation: SdkEvaluation;
+}): string {
   const hash = crypto
     .createHash("md5")
-    .update(JSON.stringify(evaluation))
+    .update(JSON.stringify({ traceId, evaluation }))
     .digest("hex");
   return `eval_md5_${hash}`;
 }
@@ -131,7 +137,8 @@ export function createCustomEvaluationSyncReactor(
 
       for (const evaluation of evaluations) {
         const evaluationId =
-          evaluation.evaluation_id ?? deterministicEvaluationId(evaluation);
+          evaluation.evaluation_id ??
+          deterministicEvaluationId({ traceId, evaluation });
         const evaluatorId =
           evaluation.evaluator_id ?? evaluationNameAutoslug(evaluation.name);
         const status =
@@ -173,6 +180,7 @@ export function createCustomEvaluationSyncReactor(
             },
             "Failed to sync custom evaluation",
           );
+          throw error;
         }
       }
 
