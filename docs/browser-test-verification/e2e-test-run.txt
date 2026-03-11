@@ -1,0 +1,29 @@
+
+============================================================
+E2E Test Global Setup
+============================================================
+
+🔍 Validating environment configuration...
+  Running locally
+✅ Environment configuration looks good
+
+
+🔍 Checking app availability at http://localhost:5560...
+✅ App is ready (status: 200)
+
+============================================================
+Global setup complete, starting tests...
+============================================================
+
+
+Running 3 tests using 1 worker
+
+Test user already exists, proceeding with sign in
+Waiting for post-login page to load...
+No onboarding detected, user already set up
+Authentication state saved to: <worktree>/.auth/user.json
+  ✓  1 [setup] › tests/auth.setup.ts:30:6 › authenticate (39.6s)
+  ✓  2 [chromium] › tests/settings/plans-comparison.spec.ts:13:7 › Settings Plans Comparison › member compares plans on the plans page (3.2s)
+  ✓  3 [chromium] › tests/smoke.spec.ts:10:5 › app loads after authentication (3.6s)
+
+  3 passed (48.9s)

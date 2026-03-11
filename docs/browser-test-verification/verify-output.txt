@@ -1,0 +1,28 @@
+
+=== Browser Test Verification ===
+App URL:     http://localhost:5560
+Chromium:    <system-cache>/ms-playwright/chromium-1208/chrome-linux/chrome
+Screenshots: <worktree>/docs/browser-test-verification
+
+Step 1: Loading sign-in page...
+  -> Screenshot: 01-sign-in-page.png
+Step 2: Registering test user...
+  -> Registration: 400 (user already exists)
+Step 3: Signing in...
+  -> Screenshot: 02-credentials-filled.png
+  -> Screenshot: 03-post-sign-in.png
+  -> Current URL: http://localhost:5560/browser-test-org-vWlMrE
+Step 4: No onboarding (user already set up)
+Step 5: Capturing authenticated app state...
+  -> Screenshot: 05-authenticated-app.png
+  -> Final URL: http://localhost:5560/browser-test-org-vWlMrE
+
+=== Verification Complete ===
+Screenshots captured: 5
+  01-sign-in-page.png
+  02-credentials-filled.png
+  03-post-sign-in.png
+  04-onboarding-filled.png
+  05-authenticated-app.png
+
+All screenshots saved to: <worktree>/docs/browser-test-verification

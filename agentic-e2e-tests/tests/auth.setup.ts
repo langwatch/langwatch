@@ -30,12 +30,14 @@ const TEST_USER = {
 setup("authenticate", async ({ page, request }) => {
   // Step 1: Try to register the test user (may already exist)
   try {
-    const registerResponse = await request.post("/api/trpc/user.register", {
+    const registerResponse = await request.post("/api/trpc/user.register?batch=1", {
       data: {
-        json: {
-          name: TEST_USER.name,
-          email: TEST_USER.email,
-          password: TEST_USER.password,
+        "0": {
+          json: {
+            name: TEST_USER.name,
+            email: TEST_USER.email,
+            password: TEST_USER.password,
+          },
         },
       },
     });
@@ -56,8 +58,8 @@ setup("authenticate", async ({ page, request }) => {
     console.log("Registration skipped (user may already exist):", error);
   }
 
-  // Step 2: Sign in through the UI
-  await page.goto("/auth/signin");
+  // Step 2: Sign in through the UI (callbackUrl ensures redirect to app root after sign-in)
+  await page.goto("/auth/signin?callbackUrl=%2F");
 
   // Wait for the sign in form to be ready
   await expect(page.getByRole("heading", { name: /sign in/i })).toBeVisible();
