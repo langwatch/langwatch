@@ -210,7 +210,7 @@ describe("mapNormalizedSpanToSpan", () => {
   });
 
   describe("when output has evaluation_result annotated type", () => {
-    it("preserves the evaluation_result type wrapper", () => {
+    it("preserves the evaluation_result type wrapper from native objects", () => {
       const span = makeSpan({
         spanAttributes: {
           "langwatch.span.type": "evaluation",
@@ -226,6 +226,23 @@ describe("mapNormalizedSpanToSpan", () => {
         value: { status: "processed", passed: true, score: 0.95 },
       });
     });
+
+    it("parses JSON strings from ClickHouse Map(String, String)", () => {
+      const span = makeSpan({
+        spanAttributes: {
+          "langwatch.span.type": "evaluation",
+          "langwatch.output": JSON.stringify({ status: "processed", passed: true, score: 99, details: "This is a custom manual evaluation" }),
+          "langwatch.reserved.value_types": JSON.stringify(["langwatch.output=evaluation_result"]),
+        },
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect(result.output).toEqual({
+        type: "evaluation_result",
+        value: { status: "processed", passed: true, score: 99, details: "This is a custom manual evaluation" },
+      });
+    });
   });
 
   describe("when output has guardrail_result annotated type", () => {
@@ -233,8 +250,8 @@ describe("mapNormalizedSpanToSpan", () => {
       const span = makeSpan({
         spanAttributes: {
           "langwatch.span.type": "guardrail",
-          "langwatch.output": { status: "processed", passed: false, score: 0.1 },
-          "langwatch.reserved.value_types": ["langwatch.output=guardrail_result"],
+          "langwatch.output": JSON.stringify({ status: "processed", passed: false, score: 0.1 }),
+          "langwatch.reserved.value_types": JSON.stringify(["langwatch.output=guardrail_result"]),
         },
       });
 
