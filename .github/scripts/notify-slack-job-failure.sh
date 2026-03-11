@@ -22,43 +22,45 @@ COMMIT_MSG=$(git log -1 --pretty=format:'%s' 2>/dev/null || echo "Unknown commit
 COMMIT_AUTHOR=$(git log -1 --pretty=format:'%an' 2>/dev/null || echo "Unknown")
 RUN_URL="https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
 
-# Create the Slack message
-MESSAGE=$(cat <<EOF
-{
-  "blocks": [
-    {
-      "type": "header",
-      "text": {
-        "type": "plain_text",
-        "text": "🚨 CI Job Failed on main",
-        "emoji": true
-      }
-    },
-    {
-      "type": "section",
-      "text": {
-        "type": "mrkdwn",
-        "text": "*Job:* $JOB_NAME\n*Commit:* \`$COMMIT_SHA\` - $COMMIT_MSG\n*Author:* $COMMIT_AUTHOR"
-      }
-    },
-    {
-      "type": "actions",
-      "elements": [
-        {
-          "type": "button",
-          "text": {
-            "type": "plain_text",
-            "text": "View Run",
-            "emoji": true
-          },
-          "url": "$RUN_URL"
+# Create the Slack message with proper JSON escaping via jq
+SECTION_TEXT=$(printf '*Job:* %s\n*Commit:* `%s` - %s\n*Author:* %s' "$JOB_NAME" "$COMMIT_SHA" "$COMMIT_MSG" "$COMMIT_AUTHOR")
+
+MESSAGE=$(jq -n \
+  --arg section_text "$SECTION_TEXT" \
+  --arg run_url "$RUN_URL" \
+  '{
+    blocks: [
+      {
+        type: "header",
+        text: {
+          type: "plain_text",
+          text: "🚨 CI Job Failed on main",
+          emoji: true
         }
-      ]
-    }
-  ]
-}
-EOF
-)
+      },
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: $section_text
+        }
+      },
+      {
+        type: "actions",
+        elements: [
+          {
+            type: "button",
+            text: {
+              type: "plain_text",
+              text: "View Run",
+              emoji: true
+            },
+            url: $run_url
+          }
+        ]
+      }
+    ]
+  }')
 
 # Send to Slack
 curl -X POST \
