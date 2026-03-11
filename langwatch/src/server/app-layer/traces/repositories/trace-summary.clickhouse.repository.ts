@@ -145,6 +145,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
         `,
         query_params: { tenantId, traceId },
         format: "JSONEachRow",
+        clickhouse_settings: { select_sequential_consistency: "1" },
       });
 
       const rows = await result.json<ClickHouseSummaryRecord>();
