@@ -328,12 +328,23 @@ export function useLoadSpanIntoPromptPlayground() {
   const { project } = useOrganizationTeamProject();
   const { spanId, action, clearParamsFromUrl } = useSpanIdFromUrl();
   const trpc = api.useContext();
-  const { addTab } = useDraggableTabsBrowserStore(({ addTab }) => ({ addTab }));
+  const { addTab, updateTabData, removeTab } = useDraggableTabsBrowserStore(
+    ({ addTab, updateTabData, removeTab }) => ({ addTab, updateTabData, removeTab }),
+  );
 
   useEffect(() => {
     if (!spanId || loadedRef.current || !project?.id) return;
 
     clearParamsFromUrl();
+
+    // Create a placeholder loading tab immediately so the user sees feedback
+    const loadingTabId = addTab({
+      data: TabDataSchema.parse({
+        loading: true,
+        form: { currentValues: {} },
+        meta: { title: "Loading..." },
+      }),
+    });
 
     void (async () => {
       try {
@@ -342,7 +353,10 @@ export function useLoadSpanIntoPromptPlayground() {
           spanId: spanId,
         });
 
-        if (!spanData) return;
+        if (!spanData) {
+          removeTab({ tabId: loadingTabId });
+          return;
+        }
 
         // Build chat messages from the trace (excluding system prompt, which goes into the form config)
         const chatMessages = addIdToMessages(
@@ -378,20 +392,23 @@ export function useLoadSpanIntoPromptPlayground() {
               variables,
             );
 
-            addTab({
-              data: TabDataSchema.parse({
-                form: {
-                  currentValues: mergedValues,
-                },
-                chat: {
-                  initialMessagesFromSpanData: chatMessages,
-                },
-                meta: {
-                  title: mergedValues.handle ?? null,
-                  versionNumber: existingPrompt.versionNumber,
-                },
-                variableValues: variables,
-              }),
+            updateTabData({
+              tabId: loadingTabId,
+              updater: () =>
+                TabDataSchema.parse({
+                  loading: false,
+                  form: {
+                    currentValues: mergedValues,
+                  },
+                  chat: {
+                    initialMessagesFromSpanData: chatMessages,
+                  },
+                  meta: {
+                    title: mergedValues.handle ?? null,
+                    versionNumber: existingPrompt.versionNumber,
+                  },
+                  variableValues: variables,
+                }),
             });
             return;
           }
@@ -400,19 +417,23 @@ export function useLoadSpanIntoPromptPlayground() {
         // Fall back: create new tab from trace data
         const defaultValues = createDefaultPromptFormValues(spanData);
 
-        addTab({
-          data: TabDataSchema.parse({
-            form: {
-              currentValues: defaultValues,
-            },
-            chat: {
-              initialMessagesFromSpanData: chatMessages,
-            },
-            variableValues: variables,
-          }),
+        updateTabData({
+          tabId: loadingTabId,
+          updater: () =>
+            TabDataSchema.parse({
+              loading: false,
+              form: {
+                currentValues: defaultValues,
+              },
+              chat: {
+                initialMessagesFromSpanData: chatMessages,
+              },
+              variableValues: variables,
+            }),
         });
       } catch (error) {
         logger.error({ error }, "Error loading span data into prompt studio");
+        removeTab({ tabId: loadingTabId });
         toaster.create({
           title: "Error loading span data into prompt studio",
           description: (error as Error).message,
@@ -431,5 +452,7 @@ export function useLoadSpanIntoPromptPlayground() {
     trpc.spans.getForPromptStudio,
     clearParamsFromUrl,
     addTab,
+    updateTabData,
+    removeTab,
   ]);
 }
