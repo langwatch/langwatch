@@ -8,6 +8,7 @@ import {
 import { checkOrganizationPermission } from "../rbac";
 import { getApp } from "../../app-layer/app";
 import { captureException } from "../../../utils/posthogErrorCapture";
+import { trackServerEvent } from "~/server/posthog";
 
 export const licenseEnforcementRouter = createTRPCRouter({
   /**
@@ -84,6 +85,17 @@ export const licenseEnforcementRouter = createTRPCRouter({
             max: result.max,
           })
           .catch(captureException);
+
+        trackServerEvent({
+          userId: ctx.session.user.id,
+          event: "limit_blocked",
+          properties: {
+            limitType: input.limitType,
+            current: result.current,
+            max: result.max,
+            source: "ui_pre_check",
+          },
+        });
       }
     }),
 });
