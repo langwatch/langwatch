@@ -4,6 +4,7 @@ import {
   buildPreconditionTraceDataFromTrace,
   buildPreconditionTraceDataFromCommand,
   checkEvaluatorRequiredFields,
+  preconditionsNeedEvents,
   type PreconditionTraceData,
 } from "../preconditions";
 import type { Span, RAGSpan, RAGChunk } from "../../tracer/types";
@@ -1116,6 +1117,191 @@ describe("evaluatePreconditions()", () => {
       });
     });
   });
+
+  // -------------------------------------------------------------------------
+  // Event preconditions
+  // -------------------------------------------------------------------------
+
+  describe("when precondition matches events.event_type", () => {
+    it("passes when event type is present", () => {
+      expect(
+        evaluatePreconditions({
+          traceData: {
+            events: [
+              { event_type: "thumbs_up_down", metrics: [{ key: "vote", value: 1 }], event_details: [] },
+              { event_type: "purchase", metrics: [], event_details: [{ key: "item", value: "shoes" }] },
+            ],
+          },
+          preconditions: [
+            { field: "events.event_type", rule: "is", value: "thumbs_up_down" },
+          ],
+        }),
+      ).toBe(true);
+    });
+
+    it("fails when event type is not present", () => {
+      expect(
+        evaluatePreconditions({
+          traceData: {
+            events: [
+              { event_type: "purchase", metrics: [], event_details: [] },
+            ],
+          },
+          preconditions: [
+            { field: "events.event_type", rule: "is", value: "thumbs_up_down" },
+          ],
+        }),
+      ).toBe(false);
+    });
+
+    it("fails when events is null", () => {
+      expect(
+        evaluatePreconditions({
+          traceData: { events: null },
+          preconditions: [
+            { field: "events.event_type", rule: "is", value: "thumbs_up_down" },
+          ],
+        }),
+      ).toBe(false);
+    });
+  });
+
+  describe("when precondition matches events.metrics.key", () => {
+    it("passes when metric key exists for the given event type", () => {
+      expect(
+        evaluatePreconditions({
+          traceData: {
+            events: [
+              { event_type: "thumbs_up_down", metrics: [{ key: "vote", value: 1 }], event_details: [] },
+            ],
+          },
+          preconditions: [
+            { field: "events.metrics.key", rule: "is", value: "vote", key: "thumbs_up_down" },
+          ],
+        }),
+      ).toBe(true);
+    });
+
+    it("fails when metric key does not exist", () => {
+      expect(
+        evaluatePreconditions({
+          traceData: {
+            events: [
+              { event_type: "thumbs_up_down", metrics: [{ key: "vote", value: 1 }], event_details: [] },
+            ],
+          },
+          preconditions: [
+            { field: "events.metrics.key", rule: "is", value: "score", key: "thumbs_up_down" },
+          ],
+        }),
+      ).toBe(false);
+    });
+  });
+
+  describe("when precondition matches events.event_details.key", () => {
+    it("passes when event detail key exists for the given event type", () => {
+      expect(
+        evaluatePreconditions({
+          traceData: {
+            events: [
+              { event_type: "purchase", metrics: [], event_details: [{ key: "item", value: "shoes" }] },
+            ],
+          },
+          preconditions: [
+            { field: "events.event_details.key", rule: "is", value: "item", key: "purchase" },
+          ],
+        }),
+      ).toBe(true);
+    });
+
+    it("fails when event detail key does not exist for the event type", () => {
+      expect(
+        evaluatePreconditions({
+          traceData: {
+            events: [
+              { event_type: "purchase", metrics: [], event_details: [{ key: "item", value: "shoes" }] },
+            ],
+          },
+          preconditions: [
+            { field: "events.event_details.key", rule: "is", value: "color", key: "purchase" },
+          ],
+        }),
+      ).toBe(false);
+    });
+  });
+
+  describe("when combining event preconditions with other fields", () => {
+    it("passes when all preconditions match", () => {
+      expect(
+        evaluatePreconditions({
+          traceData: {
+            input: "hello",
+            origin: "application",
+            events: [
+              { event_type: "thumbs_up_down", metrics: [{ key: "vote", value: 1 }], event_details: [] },
+            ],
+          },
+          preconditions: [
+            { field: "input", rule: "contains", value: "hello" },
+            { field: "events.event_type", rule: "is", value: "thumbs_up_down" },
+          ],
+        }),
+      ).toBe(true);
+    });
+
+    it("fails when event precondition does not match", () => {
+      expect(
+        evaluatePreconditions({
+          traceData: {
+            input: "hello",
+            events: [
+              { event_type: "purchase", metrics: [], event_details: [] },
+            ],
+          },
+          preconditions: [
+            { field: "input", rule: "contains", value: "hello" },
+            { field: "events.event_type", rule: "is", value: "thumbs_up_down" },
+          ],
+        }),
+      ).toBe(false);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// preconditionsNeedEvents()
+// ---------------------------------------------------------------------------
+
+describe("preconditionsNeedEvents()", () => {
+  it("returns true when any precondition references event fields", () => {
+    expect(
+      preconditionsNeedEvents([
+        { field: "input", rule: "contains", value: "hello" },
+        { field: "events.event_type", rule: "is", value: "thumbs_up_down" },
+      ]),
+    ).toBe(true);
+  });
+
+  it("returns true for events.metrics.key preconditions", () => {
+    expect(
+      preconditionsNeedEvents([
+        { field: "events.metrics.key", rule: "is", value: "vote", key: "thumbs_up_down" },
+      ]),
+    ).toBe(true);
+  });
+
+  it("returns false when no preconditions reference event fields", () => {
+    expect(
+      preconditionsNeedEvents([
+        { field: "input", rule: "contains", value: "hello" },
+        { field: "traces.origin", rule: "is", value: "application" },
+      ]),
+    ).toBe(false);
+  });
+
+  it("returns false for empty preconditions", () => {
+    expect(preconditionsNeedEvents([])).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1353,6 +1539,25 @@ describe("buildPreconditionTraceDataFromCommand()", () => {
       const result = buildPreconditionTraceDataFromCommand({ data, spans });
       expect(result.spanTypes).toEqual(["rag", "tool"]);
       expect(result.spanModels).toEqual(["claude-3"]);
+    });
+  });
+
+  describe("when events are provided", () => {
+    it("includes events in the trace data", () => {
+      const data = makeCommandData();
+      const events = [
+        { event_type: "thumbs_up_down", metrics: [{ key: "vote", value: 1 }], event_details: [] },
+      ];
+      const result = buildPreconditionTraceDataFromCommand({ data, spans: [], events });
+      expect(result.events).toEqual(events);
+    });
+  });
+
+  describe("when events are not provided", () => {
+    it("defaults events to null", () => {
+      const data = makeCommandData();
+      const result = buildPreconditionTraceDataFromCommand({ data, spans: [] });
+      expect(result.events).toBeNull();
     });
   });
 });
