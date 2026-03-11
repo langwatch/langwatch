@@ -181,7 +181,7 @@ export const serializeWorkflow = <T extends { nodes: Node[]; edges: Edge[] }>(
     ...workflow,
     nodes: workflow.nodes.map((node) => {
       const { selected, dragging, ...rest } = node;
-      const { execution_state, ...dataRest } = rest.data as any;
+      const { execution_state, ...dataRest } = rest.data as Record<string, unknown>;
       return { ...rest, data: dataRest };
     }) as T["nodes"],
     edges: workflow.edges.map((edge) => {
@@ -221,15 +221,15 @@ export const removeInvalidEdges = ({
           },
           "dropping edge: node missing",
         );
-        console.trace("removeInvalidEdges: dropping edge (node missing)");
+
         return false;
       }
 
-      const sourceHandles = source.data[
-        sourceHandleGroup as any
+      const sourceHandles = (source.data as Record<string, unknown>)[
+        sourceHandleGroup as string
       ] as Field[] | undefined;
-      const targetHandles = target.data[
-        targetHandleGroup as any
+      const targetHandles = (target.data as Record<string, unknown>)[
+        targetHandleGroup as string
       ] as Field[] | undefined;
 
       // If the handle group doesn't exist as an array, preserve the edge
@@ -256,7 +256,7 @@ export const removeInvalidEdges = ({
           },
           "dropping edge: handle identifier missing",
         );
-        console.trace("removeInvalidEdges: dropping edge (handle missing)");
+
       }
 
       return sourceValid && targetValid;
@@ -439,7 +439,7 @@ export const store = (
           },
           "setWorkflow: edges count decreased",
         );
-        console.trace("setWorkflow: edges decreased");
+
       }
     }
     set(resolved);
@@ -462,7 +462,7 @@ export const store = (
         { removeChanges },
         "onNodesChange: REMOVING nodes",
       );
-      console.trace("onNodesChange: removing nodes");
+
     }
     set({
       nodes: applyNodeChanges(changes, get().nodes),
@@ -483,7 +483,7 @@ export const store = (
         },
         "onEdgesChange: REMOVING edges",
       );
-      console.trace("onEdgesChange: removing edges");
+
     }
     set({
       edges: applyEdgeChanges(changes, get().edges),
@@ -530,7 +530,7 @@ export const store = (
         },
         "setEdges: edges count decreased",
       );
-      console.trace("setEdges: edges decreased");
+
     }
     set({ edges });
   },
