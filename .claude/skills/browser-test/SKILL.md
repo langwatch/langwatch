@@ -15,7 +15,7 @@ Parse `$ARGUMENTS` for:
 - **Port** (optional): the number (e.g. `5570`) or `:<port>` format
 - **Feature** (optional): a description of what to verify, or a path to a `specs/*.feature` file
 
-If a feature file path is given, read it and extract the scenarios. If a plain description is given, use it directly. If neither is provided, ask the user what to verify.
+If a feature file path is given, read it and extract the scenarios. If a plain description is given, use it directly. If neither is provided, run the **default smoke test**: app loads, sign in works, dashboard renders after auth.
 
 ## Port Discovery & App Lifecycle
 
@@ -35,9 +35,11 @@ If you started the app (step 3), you own the lifecycle — run `scripts/dev-down
 
 ## Before You Start
 
+**Read `HOW_TO.md` in this skill directory first** — it has critical gotchas about auth, port mismatches, Chakra UI, and dev mode slowness. Do this before any browser interaction.
+
 Always use Chromium. Do not prompt for browser choice.
 
-Skip all interactive prompts — resolve everything automatically. The only reason to ask the user anything is if you need credentials for auth and can't find them.
+**Never ask the user for anything.** Resolve everything automatically — ports, features, credentials, browser choice. This skill must be fully autonomous.
 
 ## Artifact Directory
 
@@ -59,6 +61,21 @@ browser-tests/<feature-name>/<YYYY-MM-DD>/
 
 Create the directory at the start of the run.
 
+## Authentication
+
+The app requires login. Use these credentials — **never ask the user for them**:
+
+- **Email:** `browser-test@langwatch.ai`
+- **Password:** `BrowserTest123!`
+- **Org name (if onboarding appears):** `Browser Test Org`
+
+Auth flow (local dev uses NextAuth credentials, NOT Auth0):
+1. Navigate to the app URL → it redirects to `/auth/signin` showing a simple Email + Password form with a "Sign in" button
+2. If the test account doesn't exist yet, click "Register new account", fill in the same credentials, then sign in
+3. After sign-in, the app may show a loading splash while Turbopack compiles — wait up to 120s
+4. If onboarding appears (new account), fill in org name (`Browser Test Org`), accept ToS, pick any product flavour
+5. You should land on the dashboard showing "Hello, Browser" with the "Browser Test Org" in the header
+
 ## Workflow
 
 ### 1. Navigate to the app
@@ -67,9 +84,13 @@ Create the directory at the start of the run.
 browser_navigate → http://localhost:<port>
 ```
 
-Take a snapshot to confirm the app is loaded.
+Take a snapshot to confirm the app is loaded. Dev mode first-page loads can take **60-120 seconds** for Turbopack compilation — use `browser_wait_for` with generous timeouts.
 
-### 2. Walk through each scenario
+### 2. Sign in
+
+Follow the Authentication flow above. Take a screenshot after successful login.
+
+### 3. Walk through each scenario
 
 For each scenario or verification step:
 
@@ -80,7 +101,7 @@ For each scenario or verification step:
 
 Use `browser_wait_for` when you need to wait for async operations (toasts, loading states, API calls).
 
-### 3. Save report
+### 4. Save report
 
 Write `browser-tests/<feature-name>/<YYYY-MM-DD>/report.md`:
 
@@ -106,7 +127,7 @@ Write `browser-tests/<feature-name>/<YYYY-MM-DD>/report.md`:
 <any observations, timing issues, flakiness>
 ```
 
-### 4. Report to caller
+### 5. Report to caller
 
 Return the summary to the user or orchestrator. Include the artifact directory path and, if this will be used in a PR, note that screenshots can be linked using:
 
@@ -117,8 +138,9 @@ https://raw.githubusercontent.com/OWNER/REPO/BRANCH/browser-tests/<feature-name>
 ## Rules
 
 - Read `HOW_TO.md` in this skill directory before your first run — it has critical gotchas about auth, port mismatches, Chakra UI, and dev mode slowness
+- **Never ask the user for anything** — ports, credentials, feature descriptions, browser choice are all resolved automatically by this skill
 - Use `browser_snapshot` (accessibility tree) for interactions, not screenshots — it's faster and gives you element refs
 - Use `browser_take_screenshot` to capture each key verification step and failures
 - Don't create any test files — this is interactive verification only
-- If the app isn't running and `.dev-port` doesn't exist, run `scripts/dev-up.sh` to start one — don't ask, just do it
-- If a page requires auth/login, walk through login first and ask the user for credentials if needed
+- If the app isn't running and `.dev-port` doesn't exist, run `scripts/dev-up.sh` to start one automatically
+- If a page requires auth/login, use the standard test credentials from the Authentication section above

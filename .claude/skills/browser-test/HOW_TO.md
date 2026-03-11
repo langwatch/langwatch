@@ -12,11 +12,11 @@ Lessons learned from running `/browser-test` against the LangWatch app.
 
 ## Authentication
 
-- The app uses **Auth0** for login. Navigating to `/auth/signin` triggers a redirect to Auth0's hosted login page.
-- For fresh accounts, you need to **sign up first** — Auth0 will show a "Sign up" link on the login page.
-- After signup, Auth0 shows an **OAuth consent screen** — click "Accept".
-- After successful login, the app redirects back and shows a loading splash while queries resolve. Wait for it.
-- **New accounts hit onboarding** — you'll need to fill in an org name, accept ToS, and pick a product flavour before reaching the main app.
+- Local dev uses **NextAuth credentials** (not Auth0). Navigating to the app URL redirects to `/auth/signin` — a simple Email + Password form with a "Sign in" button.
+- For fresh accounts, click **"Register new account"** on the sign-in page, fill in the credentials, then sign in.
+- After successful login, the app redirects to the dashboard. Dev mode may show a loading splash while Turbopack compiles — wait up to 120s.
+- **New accounts hit onboarding** — you'll need to fill in an org name (`Browser Test Org`), accept ToS, and pick a product flavour before reaching the main app.
+- After auth, you should see the dashboard with "Hello, Browser" and "Browser Test Org" in the header.
 
 ### Standard Test Credentials
 
