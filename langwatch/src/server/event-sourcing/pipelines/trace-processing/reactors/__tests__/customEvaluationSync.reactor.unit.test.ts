@@ -357,6 +357,22 @@ describe("customEvaluationSync reactor", () => {
       const startCall = vi.mocked(deps.startEvaluation).mock.calls[0]![0];
       expect(startCall.evaluatorId).toBe("my-evaluator");
     });
+
+    it("offsets completeEvaluation occurredAt by +1ms for group queue ordering", async () => {
+      const reactor = createCustomEvaluationSyncReactor(deps);
+      const span = makeOtlpSpan([{ name: "toxicity", score: 0.1 }]);
+      const eventOccurredAt = Date.now();
+      const event = createSpanReceivedEvent(span, {
+        occurredAt: eventOccurredAt,
+      } as any);
+
+      await reactor.handle(event, createContext(createFoldState()));
+
+      const startCall = vi.mocked(deps.startEvaluation).mock.calls[0]![0];
+      const completeCall = vi.mocked(deps.completeEvaluation).mock.calls[0]![0];
+      expect(startCall.occurredAt).toBe(eventOccurredAt);
+      expect(completeCall.occurredAt).toBe(eventOccurredAt + 1);
+    });
   });
 
   describe("when event is too old", () => {
@@ -396,7 +412,7 @@ describe("customEvaluationSync reactor", () => {
   });
 
   describe("when a single evaluation command fails", () => {
-    it("continues processing remaining evaluations", async () => {
+    it("continues processing remaining evaluations then re-throws", async () => {
       deps.startEvaluation = vi
         .fn()
         .mockRejectedValueOnce(new Error("network error"))
@@ -409,12 +425,15 @@ describe("customEvaluationSync reactor", () => {
         { name: "relevance", score: 0.9 },
       ]);
 
-      await reactor.handle(
-        createSpanReceivedEvent(span),
-        createContext(createFoldState()),
-      );
+      await expect(
+        reactor.handle(
+          createSpanReceivedEvent(span),
+          createContext(createFoldState()),
+        ),
+      ).rejects.toThrow("network error");
 
       expect(deps.startEvaluation).toHaveBeenCalledTimes(2);
+      expect(deps.completeEvaluation).toHaveBeenCalledTimes(1);
     });
   });
 

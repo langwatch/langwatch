@@ -67,7 +67,17 @@ function getAnnotatedType(
   spanAttributes: NormalizedAttributes,
   attrKey: string,
 ): string | null {
-  const raw = spanAttributes["langwatch.reserved.value_types"];
+  let raw = spanAttributes["langwatch.reserved.value_types"];
+
+  // ClickHouse Map(String, String) stores arrays as JSON strings
+  if (typeof raw === "string") {
+    try {
+      raw = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+
   if (!Array.isArray(raw)) return null;
 
   const prefix = `${attrKey}=`;
@@ -98,8 +108,19 @@ function extractInput(
   }
 
   // Priority 2: langwatch.input → use annotated type or infer
-  const lwInput = spanAttributes["langwatch.input"];
+  let lwInput = spanAttributes["langwatch.input"];
   if (lwInput !== undefined) {
+    // ClickHouse Map(String, String) stores objects as JSON strings
+    if (typeof lwInput === "string") {
+      try {
+        const parsed = JSON.parse(lwInput);
+        if (typeof parsed === "object" && parsed !== null) {
+          lwInput = parsed;
+        }
+      } catch {
+        // Not JSON — keep as string
+      }
+    }
     const annotatedType = getAnnotatedType(spanAttributes, "langwatch.input");
     if (annotatedType === "chat_messages" && Array.isArray(lwInput)) {
       return {
@@ -138,14 +159,34 @@ function extractOutput(
   }
 
   // Priority 2: langwatch.output → use annotated type or infer
-  const lwOutput = spanAttributes["langwatch.output"];
+  let lwOutput = spanAttributes["langwatch.output"];
   if (lwOutput !== undefined) {
+    // ClickHouse Map(String, String) stores objects as JSON strings
+    if (typeof lwOutput === "string") {
+      try {
+        const parsed = JSON.parse(lwOutput);
+        if (typeof parsed === "object" && parsed !== null) {
+          lwOutput = parsed;
+        }
+      } catch {
+        // Not JSON — keep as string
+      }
+    }
     const annotatedType = getAnnotatedType(spanAttributes, "langwatch.output");
     if (annotatedType === "chat_messages" && Array.isArray(lwOutput)) {
       return {
         type: "chat_messages",
         value: toJsonSerializable(lwOutput) as ChatMessage[],
       };
+    }
+    if (
+      annotatedType === "evaluation_result" ||
+      annotatedType === "guardrail_result"
+    ) {
+      return {
+        type: annotatedType,
+        value: toJsonSerializable(lwOutput),
+      } as unknown as SpanInputOutput;
     }
     if (annotatedType === "text" || typeof lwOutput === "string") {
       return { type: "text", value: String(lwOutput) };
