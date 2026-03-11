@@ -6,6 +6,7 @@ import { LimitExceededError, ProjectNotFoundError } from "./errors";
 import type { LimitType } from "./types";
 import { getOrganizationIdForProject } from "./utils";
 import { getApp } from "~/server/app-layer/app";
+import { trackServerEvent } from "~/server/posthog";
 import { captureException } from "~/utils/posthogErrorCapture";
 
 /**
@@ -77,6 +78,16 @@ export async function enforceLicenseLimit(
         })
         .catch(captureException);
 
+      trackServerEvent({
+        userId: ctx.session.user.id,
+        event: "limit_blocked",
+        projectId,
+        properties: {
+          limitType: error.limitType,
+          current: error.current,
+          max: error.max,
+        },
+      });
       throw new TRPCError({
         code: "FORBIDDEN",
         message: error.message,
