@@ -61,13 +61,31 @@ export type WebhookService = {
 };
 
 export class EEWebhookService implements WebhookService {
-  constructor(
-    private readonly subscriptionRepository: SubscriptionRepository,
-    private readonly organizationRepository: OrganizationRepository,
-    private readonly stripe: Stripe,
-    private readonly itemCalculator: ItemCalculator,
-    private readonly inviteApprover?: InviteApprover,
-  ) {}
+  private readonly subscriptionRepository: SubscriptionRepository;
+  private readonly organizationRepository: OrganizationRepository;
+  private readonly stripe: Stripe;
+  private readonly itemCalculator: ItemCalculator;
+  private readonly inviteApprover?: InviteApprover;
+
+  constructor({
+    subscriptionRepository,
+    organizationRepository,
+    stripe,
+    itemCalculator,
+    inviteApprover,
+  }: {
+    subscriptionRepository: SubscriptionRepository;
+    organizationRepository: OrganizationRepository;
+    stripe: Stripe;
+    itemCalculator: ItemCalculator;
+    inviteApprover?: InviteApprover;
+  }) {
+    this.subscriptionRepository = subscriptionRepository;
+    this.organizationRepository = organizationRepository;
+    this.stripe = stripe;
+    this.itemCalculator = itemCalculator;
+    this.inviteApprover = inviteApprover;
+  }
 
   static create({
     db,
@@ -81,13 +99,13 @@ export class EEWebhookService implements WebhookService {
     inviteApprover?: InviteApprover;
   }): WebhookService {
     return traced(
-      new EEWebhookService(
-        new PrismaSubscriptionRepository(db),
-        new PrismaOrganizationRepository(db),
+      new EEWebhookService({
+        subscriptionRepository: new PrismaSubscriptionRepository(db),
+        organizationRepository: new PrismaOrganizationRepository(db),
         stripe,
         itemCalculator,
         inviteApprover,
-      ),
+      }),
       "EEWebhookService",
     );
   }
@@ -211,6 +229,8 @@ export class EEWebhookService implements WebhookService {
   }: {
     stripeSubscriptionId: string;
   }): Promise<void> {
+    await waitForStripeConsistency();
+
     const existingSubscription =
       await this.subscriptionRepository.findByStripeId(stripeSubscriptionId);
 

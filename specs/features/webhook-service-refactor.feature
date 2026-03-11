@@ -1,171 +1,171 @@
-Feature: Webhook service refactor
-  The EEWebhookService class replaces the existing createWebhookService
-  factory. All five webhook handlers retain identical behavior but delegate
-  database access through SubscriptionRepository and OrganizationRepository
-  instead of calling Prisma directly. The old factory is removed entirely.
+Feature: Stripe webhook billing event handling
+  The billing system processes Stripe webhook events to keep subscription
+  state, organization settings, and payment records consistent. Each event
+  handler waits for Stripe eventual consistency before querying the database,
+  and all state changes are persisted through dedicated repository abstractions.
 
-  # --- Interface compliance ---
-
-  @unit
-  Scenario: New class implements the WebhookService interface
-    Given the WebhookService interface in the billing layer
-    When EEWebhookService.create() is called with repository and Stripe dependencies
-    Then it returns an object satisfying the WebhookService interface
-
-  # --- handleCheckoutCompleted ---
+  # --- Checkout completed ---
 
   @unit
-  Scenario: handleCheckoutCompleted strips subscription_setup_ prefix and links Stripe subscription
-    Given a pending subscription with client reference ID "subscription_setup_sub_db_1"
-    When handleCheckoutCompleted is called with a Stripe subscription ID and currency
-    Then the Stripe subscription ID is linked to subscription "sub_db_1"
+  Scenario: Successful checkout links and activates the subscription
+    Given a pending subscription matching the checkout reference
+    When the checkout completed event arrives with a Stripe subscription ID and currency
+    Then the Stripe subscription is linked to the pending subscription
     And the subscription is activated
     And the selected currency is persisted on the organization
     And pending payment invites are approved
     And active trial subscriptions for the organization are cancelled
 
   @unit
-  Scenario: handleCheckoutCompleted returns early when client reference ID is missing
-    Given no client reference ID in the checkout event
-    When handleCheckoutCompleted is called
-    Then it returns earlyReturn true without touching any repository
+  Scenario: Checkout without a reference ID is ignored
+    Given a checkout event with no client reference ID
+    When the checkout completed event arrives
+    Then the event is ignored without modifying any subscription state
 
   @unit
-  Scenario: handleCheckoutCompleted throws when no subscription matches
-    Given a client reference ID that matches no subscription record
-    When handleCheckoutCompleted is called
-    Then SubscriptionRecordNotFoundError is thrown
+  Scenario: Checkout fails when no subscription matches the reference
+    Given a checkout reference that matches no existing subscription
+    When the checkout completed event arrives
+    Then the system reports a missing subscription error
 
   @unit
-  Scenario: handleCheckoutCompleted continues when currency update fails
-    Given a pending subscription with a matching client reference ID
-    And the currency update will fail
-    When handleCheckoutCompleted is called
+  Scenario: Checkout succeeds even when currency persistence fails
+    Given a pending subscription matching the checkout reference
+    And persisting the selected currency will fail
+    When the checkout completed event arrives
     Then the subscription is still activated
     And trial subscriptions are still cancelled
 
   @unit
-  Scenario: handleCheckoutCompleted continues when invite approval fails
-    Given a pending subscription with a matching client reference ID
-    And the invite approver will fail
-    When handleCheckoutCompleted is called
+  Scenario: Checkout succeeds even when invite approval fails
+    Given a pending subscription matching the checkout reference
+    And approving pending invites will fail
+    When the checkout completed event arrives
     Then the subscription is still activated
     And trial subscriptions are still cancelled
 
   @unit
-  Scenario: handleCheckoutCompleted completes without invite approver
-    Given a pending subscription with a matching client reference ID
-    And no invite approver is configured
-    When handleCheckoutCompleted is called
+  Scenario: Checkout succeeds without an invite approval mechanism
+    Given a pending subscription matching the checkout reference
+    And no invite approval mechanism is configured
+    When the checkout completed event arrives
     Then the subscription is activated without attempting invite approval
 
-  # --- handleInvoicePaymentSucceeded ---
+  # --- Invoice payment succeeded ---
 
   @unit
-  Scenario: handleInvoicePaymentSucceeded activates and clears trial license
-    Given a subscription matched by Stripe subscription ID that was not previously active
-    When handleInvoicePaymentSucceeded is called
+  Scenario: First successful payment activates the subscription and clears a trial license
+    Given a subscription that has not yet been activated
+    And the organization has a trial license
+    When the invoice payment succeeded event arrives
     Then the subscription is activated
     And the trial license is cleared on the organization
-    And a subscription confirmed notification is dispatched
+    And a subscription confirmed notification is sent
 
   @unit
-  Scenario: handleInvoicePaymentSucceeded sets startDate only on first activation
-    Given a subscription matched by Stripe subscription ID that is already active
-    When handleInvoicePaymentSucceeded is called
-    Then the subscription startDate is not changed
-    And no notification is dispatched
+  Scenario: Subsequent payment renewals do not re-notify
+    Given a subscription that is already active
+    When the invoice payment succeeded event arrives
+    Then the subscription start date is not changed
+    And no notification is sent
 
   @unit
-  Scenario: handleInvoicePaymentSucceeded migrates tiered subscriptions during upgrade
-    Given a subscription on a growth seat-event plan that was not previously active
-    When handleInvoicePaymentSucceeded is called
-    Then old tiered subscriptions and pricing model are migrated atomically
-    And the old Stripe subscriptions are cancelled with proration by the service
-    And Stripe cancellation failures are logged but do not fail the handler
+  Scenario: Upgrade to a seat-event plan migrates old subscriptions
+    Given a subscription on a seat-event plan that has not yet been activated
+    When the invoice payment succeeded event arrives
+    Then old tiered subscriptions are migrated atomically
+    And the corresponding Stripe subscriptions are cancelled with proration
+    And failures to cancel old Stripe subscriptions are logged but do not block the handler
 
-  # --- handleInvoicePaymentFailed ---
+  # --- Invoice payment failed ---
 
   @unit
-  Scenario: handleInvoicePaymentFailed records failure but keeps active status
+  Scenario: Payment failure on an active subscription records the failure
     Given a subscription that is currently active
-    When handleInvoicePaymentFailed is called
+    When the invoice payment failed event arrives
     Then the payment failure is recorded
-    And the subscription status remains ACTIVE
+    And the subscription remains active
 
   @unit
-  Scenario: handleInvoicePaymentFailed sets FAILED status for pending subscription
+  Scenario: Payment failure on a pending subscription marks it as failed
     Given a subscription that is currently pending
-    When handleInvoicePaymentFailed is called
-    Then the subscription status is set to FAILED
+    When the invoice payment failed event arrives
+    Then the subscription status is set to failed
     And the payment failure date is recorded
 
-  # --- handleSubscriptionDeleted ---
+  # --- Subscription deleted ---
 
   @unit
-  Scenario: handleSubscriptionDeleted cancels and nullifies overrides
-    Given a subscription matched by Stripe subscription ID that is not already cancelled
-    When handleSubscriptionDeleted is called
-    Then the subscription is cancelled with nullified overrides
+  Scenario: Subscription deletion cancels the subscription
+    Given a subscription that is not already cancelled
+    When the subscription deleted event arrives
+    Then the system waits for Stripe eventual consistency
+    And the subscription is cancelled
 
   @unit
-  Scenario: handleSubscriptionDeleted is idempotent for already cancelled subscriptions
+  Scenario: Subscription deletion is idempotent
     Given a subscription that is already cancelled
-    When handleSubscriptionDeleted is called
-    Then no repository update is performed
+    When the subscription deleted event arrives
+    Then no state change occurs
 
-  # --- handleSubscriptionUpdated ---
+  # --- Subscription updated ---
 
   @unit
-  Scenario: handleSubscriptionUpdated cancels when Stripe status is not active
+  Scenario: Subscription marked inactive or ended is cancelled
     Given a subscription where the Stripe status is not active
-    When handleSubscriptionUpdated is called
-    Then the subscription is cancelled with nullified overrides
+    When the subscription updated event arrives
+    Then the subscription is cancelled
 
   @unit
-  Scenario: handleSubscriptionUpdated cancels when Stripe reports ended
+  Scenario: Subscription with ended_at is cancelled even if status is active
     Given a subscription where the Stripe object has ended_at set
-    When handleSubscriptionUpdated is called
-    Then the subscription is cancelled with nullified overrides
+    When the subscription updated event arrives
+    Then the subscription is cancelled
 
   @unit
-  Scenario: handleSubscriptionUpdated does NOT cancel when only canceled_at is set
-    Given a subscription where the Stripe status is active and canceled_at is set but ended_at is null
-    When handleSubscriptionUpdated is called
+  Scenario: Scheduled cancellation does not cancel immediately
+    Given a subscription where canceled_at is set but ended_at is null and status is active
+    When the subscription updated event arrives
     Then the subscription is NOT cancelled
     And quantities are updated as normal
 
   @unit
-  Scenario: handleSubscriptionUpdated recalculates quantities when active
-    Given a subscription where the Stripe status is active
-    When handleSubscriptionUpdated is called with updated item quantities
-    Then member and trace quantities are recalculated from the updated Stripe items
-    And the subscription quantities are updated
-    And the trial license is cleared on the organization
+  Scenario: Active subscription recalculates quantities from Stripe items
+    Given a subscription that is currently active
+    When the subscription updated event arrives with changed item quantities
+    Then member and trace quantities are recalculated from the Stripe items
+    And the subscription quantities are persisted
 
   @unit
-  Scenario: handleSubscriptionUpdated notifies on status transition to active
+  Scenario: Active subscription update clears a trial license
+    Given a subscription that is currently active
+    And the organization has a trial license
+    When the subscription updated event arrives with Stripe status active
+    Then the trial license is cleared on the organization
+
+  @unit
+  Scenario: Transition to active triggers a notification
     Given a subscription that was not previously active
-    When handleSubscriptionUpdated is called with Stripe status active
-    Then a subscription confirmed notification is dispatched
+    When the subscription updated event arrives with Stripe status active
+    Then a subscription confirmed notification is sent
 
   @unit
-  Scenario: handleSubscriptionUpdated does NOT re-notify when already active
+  Scenario: Already-active subscription does not re-notify
     Given a subscription that is already active
-    When handleSubscriptionUpdated is called with Stripe status active
-    Then no notification is dispatched
+    When the subscription updated event arrives with Stripe status active
+    Then no notification is sent
 
   # --- Shared skip behavior ---
 
   @unit
-  Scenario Outline: <handler> skips when no subscription found
+  Scenario Outline: Unrecognized subscription ID is ignored by <handler>
     Given no subscription matches the Stripe subscription ID
-    When <handler> is called
-    Then no repository update is performed
+    When the <handler> event arrives
+    Then no state change occurs
 
     Examples:
-      | handler                        |
-      | handleInvoicePaymentSucceeded  |
-      | handleInvoicePaymentFailed     |
-      | handleSubscriptionDeleted      |
-      | handleSubscriptionUpdated      |
+      | handler                       |
+      | invoice payment succeeded     |
+      | invoice payment failed        |
+      | subscription deleted          |
+      | subscription updated          |

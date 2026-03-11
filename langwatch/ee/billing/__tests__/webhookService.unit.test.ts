@@ -110,12 +110,12 @@ describe("webhookService", () => {
     subRepo = createMockSubscriptionRepository();
     orgRepo = createMockOrganizationRepository();
     itemCalculator = createMockItemCalculator();
-    service = new EEWebhookService(
-      subRepo as unknown as SubscriptionRepository,
-      orgRepo as unknown as OrganizationRepository,
-      {} as any,
+    service = new EEWebhookService({
+      subscriptionRepository: subRepo as unknown as SubscriptionRepository,
+      organizationRepository: orgRepo as unknown as OrganizationRepository,
+      stripe: {} as any,
       itemCalculator,
-    );
+    });
   });
 
   afterEach(() => {
@@ -222,13 +222,13 @@ describe("webhookService", () => {
         const mockInviteApprover = {
           approvePaymentPendingInvites: vi.fn().mockRejectedValue(new Error("invite error")),
         };
-        service = new EEWebhookService(
-          subRepo as unknown as SubscriptionRepository,
-          orgRepo as unknown as OrganizationRepository,
-          {} as any,
+        service = new EEWebhookService({
+          subscriptionRepository: subRepo as unknown as SubscriptionRepository,
+          organizationRepository: orgRepo as unknown as OrganizationRepository,
+          stripe: {} as any,
           itemCalculator,
-          mockInviteApprover,
-        );
+          inviteApprover: mockInviteApprover,
+        });
 
         subRepo.linkStripeId.mockResolvedValue({ count: 1 });
         subRepo.findByStripeId.mockResolvedValue(
@@ -353,12 +353,12 @@ describe("webhookService", () => {
             cancel: vi.fn().mockResolvedValue({}),
           },
         };
-        service = new EEWebhookService(
-          subRepo as unknown as SubscriptionRepository,
-          orgRepo as unknown as OrganizationRepository,
-          mockStripe as any,
+        service = new EEWebhookService({
+          subscriptionRepository: subRepo as unknown as SubscriptionRepository,
+          organizationRepository: orgRepo as unknown as OrganizationRepository,
+          stripe: mockStripe as any,
           itemCalculator,
-        );
+        });
 
         subRepo.findByStripeId.mockResolvedValue(
           makeSubscription({ status: SubscriptionStatus.PENDING, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
@@ -392,12 +392,12 @@ describe("webhookService", () => {
             cancel: vi.fn().mockRejectedValue(new Error("Stripe error")),
           },
         };
-        service = new EEWebhookService(
-          subRepo as unknown as SubscriptionRepository,
-          orgRepo as unknown as OrganizationRepository,
-          mockStripe as any,
+        service = new EEWebhookService({
+          subscriptionRepository: subRepo as unknown as SubscriptionRepository,
+          organizationRepository: orgRepo as unknown as OrganizationRepository,
+          stripe: mockStripe as any,
           itemCalculator,
-        );
+        });
 
         subRepo.findByStripeId.mockResolvedValue(
           makeSubscription({ status: SubscriptionStatus.PENDING, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
@@ -480,13 +480,32 @@ describe("webhookService", () => {
   });
 
   describe("handleSubscriptionDeleted()", () => {
+    it("waits for Stripe eventual consistency before looking up the subscription", async () => {
+      subRepo.findByStripeId.mockResolvedValue(null);
+
+      const promise = service.handleSubscriptionDeleted({
+        stripeSubscriptionId: "sub_stripe_1",
+      });
+
+      // Repository should not have been called yet — still waiting
+      expect(subRepo.findByStripeId).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(2000);
+      await promise;
+
+      expect(subRepo.findByStripeId).toHaveBeenCalledWith("sub_stripe_1");
+    });
+
     describe("when no subscription found", () => {
       it("skips without error", async () => {
         subRepo.findByStripeId.mockResolvedValue(null);
 
-        await service.handleSubscriptionDeleted({
+        const promise = service.handleSubscriptionDeleted({
           stripeSubscriptionId: "sub_missing",
         });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
 
         expect(subRepo.cancel).not.toHaveBeenCalled();
       });
@@ -498,9 +517,12 @@ describe("webhookService", () => {
           makeSubscription({ status: SubscriptionStatus.ACTIVE }),
         );
 
-        await service.handleSubscriptionDeleted({
+        const promise = service.handleSubscriptionDeleted({
           stripeSubscriptionId: "sub_stripe_1",
         });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
 
         expect(subRepo.cancel).toHaveBeenCalledWith({ id: "sub_db_1" });
       });
@@ -512,9 +534,12 @@ describe("webhookService", () => {
           makeSubscription({ status: SubscriptionStatus.CANCELLED }),
         );
 
-        await service.handleSubscriptionDeleted({
+        const promise = service.handleSubscriptionDeleted({
           stripeSubscriptionId: "sub_stripe_1",
         });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
 
         expect(subRepo.cancel).not.toHaveBeenCalled();
       });

@@ -132,18 +132,9 @@ export class PrismaSubscriptionRepository implements SubscriptionRepository {
     });
   }
 
-  async cancelTrialSubscriptions(organizationId: string): Promise<void> {
-    await this.prisma.subscription.updateMany({
-      where: {
-        organizationId,
-        isTrial: true,
-        status: SubscriptionStatus.ACTIVE as PrismaSubscriptionStatus,
-      },
-      data: {
-        status: SubscriptionStatus.CANCELLED as PrismaSubscriptionStatus,
-        endDate: new Date(),
-      },
-    });
+  async cancelTrialSubscriptions(_organizationId: string): Promise<void> {
+    // No-op: the `isTrial` column does not exist in the schema yet.
+    // Once the migration lands, restore the updateMany query filtering on isTrial.
   }
 
   async migrateToSeatEvent(input: {
