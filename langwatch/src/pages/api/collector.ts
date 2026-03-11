@@ -7,6 +7,7 @@ import { captureException, getCurrentScope } from "~/utils/posthogErrorCapture";
 import { withPagesRouterLogger } from "../../middleware/pages-router-logger";
 import { withPagesRouterTracer } from "../../middleware/pages-router-tracer";
 import { getApp } from "../../server/app-layer/app";
+import { evaluationNameAutoslug } from "../../server/background/workers/collector/evaluationNameAutoslug";
 import { maybeAddIdsToContextList } from "../../server/background/workers/collector/rag";
 import {
   fetchExistingMD5s,
@@ -516,6 +517,64 @@ async function handleCollectorRequest(
       logger.error(
         { error, projectId: project.id, traceId },
         "Error initializing event sourcing dispatch",
+      );
+    }
+  }
+
+  // Dispatch custom SDK evaluations to the event-sourcing evaluation pipeline.
+  // The REST collector receives evaluations as a separate field (not as span events),
+  // so they must be dispatched independently from the spans above.
+  if (
+    project.featureEventSourcingEvaluationIngestion &&
+    params.evaluations &&
+    params.evaluations.length > 0 &&
+    traceId
+  ) {
+    try {
+      const app = getApp();
+      const occurredAt = Date.now();
+
+      for (const evaluation of params.evaluations) {
+        const evaluationMD5 = crypto
+          .createHash("md5")
+          .update(JSON.stringify({ traceId, evaluation }))
+          .digest("hex");
+        const evaluationId =
+          evaluation.evaluation_id ?? `eval_md5_${evaluationMD5}`;
+        const evaluatorId =
+          evaluation.evaluator_id ??
+          evaluationNameAutoslug(evaluation.name);
+        const status =
+          evaluation.status ??
+          (evaluation.error ? "error" : "processed");
+
+        await app.evaluations.startEvaluation({
+          tenantId: project.id,
+          evaluationId,
+          evaluatorId,
+          evaluatorType: "custom",
+          evaluatorName: evaluation.name,
+          traceId,
+          isGuardrail: evaluation.is_guardrail ?? undefined,
+          occurredAt,
+        });
+
+        await app.evaluations.completeEvaluation({
+          tenantId: project.id,
+          evaluationId,
+          status,
+          score: evaluation.score ?? null,
+          passed: evaluation.passed ?? null,
+          label: evaluation.label ?? null,
+          details: evaluation.details ?? null,
+          error: evaluation.error?.message ?? null,
+          occurredAt,
+        });
+      }
+    } catch (error) {
+      logger.error(
+        { error, projectId: project.id, traceId },
+        "Error dispatching REST evaluations to event sourcing",
       );
     }
   }

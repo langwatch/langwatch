@@ -11,7 +11,7 @@ import type { Workflow } from "../../../../../optimization_studio/types/dsl";
 import { getWorkflowEntryOutputs } from "../../../../../optimization_studio/utils/workflowFields";
 import { getApp } from "../../../../../server/app-layer/app";
 import { updateEvaluationStatusInES } from "../../../../../server/background/queues/evaluationsQueue";
-import { evaluationNameAutoslug } from "../../../../../server/background/workers/collector/evaluations";
+import { evaluationNameAutoslug } from "../../../../../server/background/workers/collector/evaluationNameAutoslug";
 import {
   type DataForEvaluation,
   runEvaluation,
