@@ -7,6 +7,32 @@ import type { CheckPreconditions } from "./types";
 
 const logger = createLogger("langwatch:evaluations:preconditions");
 
+/**
+ * Coerces a span input/output value to a string for precondition matching.
+ * Handles chat_messages arrays, JSON objects, and plain strings.
+ */
+function coerceToString(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) {
+    // Chat messages: extract content fields for matching
+    return value
+      .map((item) =>
+        typeof item === "object" && item !== null && "content" in item
+          ? String((item as { content: unknown }).content ?? "")
+          : typeof item === "string"
+            ? item
+            : JSON.stringify(item),
+      )
+      .join("\n");
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
 export type PreconditionTrace = Pick<
   ElasticSearchTrace,
   "input" | "output" | "metadata" | "expected_output"
@@ -41,12 +67,14 @@ export function evaluatePreconditions(
   }
 
   for (const precondition of preconditions) {
-    const valueMap = {
-      input: trace.input?.value ?? "",
-      output: trace.output?.value ?? "",
-      "metadata.labels": trace.metadata.labels ?? [],
+    const valueMap: Record<string, string | string[]> = {
+      input: coerceToString(trace.input?.value),
+      output: coerceToString(trace.output?.value),
+      "metadata.labels": (trace.metadata.labels ?? []).filter(
+        (l): l is string => typeof l === "string",
+      ),
     };
-    const valueToCheck = valueMap[precondition.field];
+    const valueToCheck = valueMap[precondition.field] ?? "";
     const valueToCheckArrayOrLowercase = Array.isArray(valueToCheck)
       ? valueToCheck.map((value) => value.toLowerCase())
       : valueToCheck.toLowerCase();
