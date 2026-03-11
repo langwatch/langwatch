@@ -141,36 +141,6 @@ export function PublishedPromptActions({
             </Button>
           </Menu.Trigger>
           <Menu.Content onClick={(event) => event.stopPropagation()}>
-            <Menu.Item
-              value="view-history"
-              onClick={() => {
-                if (!prompt) return;
-                const projectDefaultModel = project?.defaultModel;
-                const normalizedDefaultModel =
-                  typeof projectDefaultModel === "string"
-                    ? projectDefaultModel
-                    : undefined;
-                const defaultValues = computeInitialFormValuesForPrompt({
-                  prompt,
-                  defaultModel: normalizedDefaultModel,
-                  useSystemMessage: true,
-                });
-                addTab({
-                  data: {
-                    chat: { initialMessagesFromSpanData: [] },
-                    form: { currentValues: defaultValues },
-                    meta: {
-                      title: defaultValues.handle ?? null,
-                      versionNumber: defaultValues.versionMetadata?.versionNumber,
-                      openHistoryOnLoad: true,
-                    },
-                    variableValues: {},
-                  },
-                });
-              }}
-            >
-              <LuClock size={16} /> View history
-            </Menu.Item>
             {isCopiedPrompt && (
               <Tooltip
                 content={
@@ -241,6 +211,36 @@ export function PublishedPromptActions({
                 <Copy size={16} /> Replicate to another project
               </Menu.Item>
             </Tooltip>
+            <Menu.Item
+              value="view-history"
+              onClick={() => {
+                if (!prompt) return;
+                const projectDefaultModel = project?.defaultModel;
+                const normalizedDefaultModel =
+                  typeof projectDefaultModel === "string"
+                    ? projectDefaultModel
+                    : undefined;
+                const defaultValues = computeInitialFormValuesForPrompt({
+                  prompt,
+                  defaultModel: normalizedDefaultModel,
+                  useSystemMessage: true,
+                });
+                addTab({
+                  data: {
+                    chat: { initialMessagesFromSpanData: [] },
+                    form: { currentValues: defaultValues },
+                    meta: {
+                      title: defaultValues.handle ?? null,
+                      versionNumber: defaultValues.versionMetadata?.versionNumber,
+                      openHistoryOnLoad: true,
+                    },
+                    variableValues: {},
+                  },
+                });
+              }}
+            >
+              <LuClock size={16} /> View history
+            </Menu.Item>
             <Tooltip
               content={renamePermissionReason}
               disabled={canRename}
