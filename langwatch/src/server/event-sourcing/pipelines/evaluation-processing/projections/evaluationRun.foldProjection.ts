@@ -97,6 +97,11 @@ export function createEvaluationRunFoldProjection({
       }
 
       if (isEvaluationCompletedEvent(event)) {
+        if (!state.evaluationId) {
+          throw new Error(
+            `Received EvaluationCompletedEvent for evaluation ${event.data.evaluationId} but state has no evaluationId — likely a replica lag issue, retrying`,
+          );
+        }
         return {
           ...state,
           status: event.data.status,

@@ -62,6 +62,7 @@ export const EVALUATION_COMMAND_TYPES = {
   EXECUTE: "lw.evaluation.execute",
   START: "lw.evaluation.start",
   COMPLETE: "lw.evaluation.complete",
+  REPORT: "lw.evaluation.report",
 } as const;
 
 // Legacy exports for backwards compatibility
@@ -72,10 +73,14 @@ export const COMPLETE_EVALUATION_COMMAND_TYPE =
 export const EXECUTE_EVALUATION_COMMAND_TYPE =
   EVALUATION_COMMAND_TYPES.EXECUTE;
 
+export const REPORT_EVALUATION_COMMAND_TYPE =
+  EVALUATION_COMMAND_TYPES.REPORT;
+
 export const EVALUATION_PROCESSING_COMMAND_TYPES = [
   EVALUATION_COMMAND_TYPES.EXECUTE,
   EVALUATION_COMMAND_TYPES.START,
   EVALUATION_COMMAND_TYPES.COMPLETE,
+  EVALUATION_COMMAND_TYPES.REPORT,
 ] as const;
 
 export type EvaluationProcessingCommandType =

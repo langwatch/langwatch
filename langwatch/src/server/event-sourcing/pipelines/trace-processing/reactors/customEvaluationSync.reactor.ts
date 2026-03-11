@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { evaluationNameAutoslug } from "~/server/background/workers/collector/evaluationNameAutoslug";
-import type { CompleteEvaluationCommandData, StartEvaluationCommandData } from "../../evaluation-processing/schemas/commands";
+import type { ReportEvaluationCommandData } from "../../evaluation-processing/schemas/commands";
 import { createLogger } from "../../../../../utils/logger/server";
 import type { ReactorContext, ReactorDefinition } from "../../../reactors/reactor.types";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
@@ -14,8 +14,7 @@ const logger = createLogger(
 );
 
 export interface CustomEvaluationSyncReactorDeps {
-  startEvaluation: (data: StartEvaluationCommandData) => Promise<void>;
-  completeEvaluation: (data: CompleteEvaluationCommandData) => Promise<void>;
+  reportEvaluation: (data: ReportEvaluationCommandData) => Promise<void>;
 }
 
 interface SdkEvaluation {
@@ -101,7 +100,8 @@ export function extractEvaluationsFromSpan(span: OtlpSpan): SdkEvaluation[] {
  * Reactor that syncs custom SDK evaluations to the evaluation-processing pipeline.
  *
  * Reads `langwatch.evaluation.custom` events directly from each SpanReceivedEvent's
- * OTLP span data, then dispatches startEvaluation + completeEvaluation commands.
+ * OTLP span data, then dispatches a single reportEvaluation command that emits
+ * both started and completed events atomically.
  * Uses deterministic IDs for idempotency on retries.
  */
 export function createCustomEvaluationSyncReactor(
@@ -149,7 +149,7 @@ export function createCustomEvaluationSyncReactor(
         const occurredAt = event.occurredAt;
 
         try {
-          await deps.startEvaluation({
+          await deps.reportEvaluation({
             tenantId,
             evaluationId,
             evaluatorId,
@@ -157,21 +157,13 @@ export function createCustomEvaluationSyncReactor(
             evaluatorName: evaluation.name,
             traceId,
             isGuardrail: evaluation.is_guardrail ?? undefined,
-            occurredAt,
-          });
-
-          await deps.completeEvaluation({
-            tenantId,
-            evaluationId,
             status,
             score: evaluation.score ?? null,
             passed: evaluation.passed ?? null,
             label: evaluation.label ?? null,
             details: evaluation.details ?? null,
             error: evaluation.error?.message ?? null,
-            // +1ms ensures the group queue dispatches complete AFTER start,
-            // since both share the same group key and occurredAt is used as the sort score.
-            occurredAt: occurredAt + 1,
+            occurredAt,
           });
         } catch (error) {
           logger.error(

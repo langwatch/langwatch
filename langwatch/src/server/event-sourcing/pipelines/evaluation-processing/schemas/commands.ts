@@ -72,3 +72,29 @@ export const completeEvaluationCommandDataSchema = z.object({
 export type CompleteEvaluationCommandData = z.infer<
   typeof completeEvaluationCommandDataSchema
 >;
+
+/**
+ * Command data for reporting a custom SDK evaluation atomically.
+ * Combines start + complete fields so a single command emits both events,
+ * avoiding ClickHouse replica lag between two separate commands.
+ */
+export const reportEvaluationCommandDataSchema = z.object({
+  tenantId: z.string(),
+  evaluationId: z.string(),
+  evaluatorId: z.string(),
+  evaluatorType: z.string(),
+  evaluatorName: z.string().optional(),
+  traceId: z.string().optional(),
+  isGuardrail: z.boolean().optional(),
+  status: z.enum(["processed", "error", "skipped"]),
+  score: z.number().nullable().optional(),
+  passed: z.boolean().nullable().optional(),
+  label: z.string().nullable().optional(),
+  details: z.string().nullable().optional(),
+  error: z.string().nullable().optional(),
+  occurredAt: z.number(),
+});
+
+export type ReportEvaluationCommandData = z.infer<
+  typeof reportEvaluationCommandDataSchema
+>;
