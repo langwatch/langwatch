@@ -723,18 +723,13 @@ export async function* runOrchestrator(
       const evaluationId = generate(KSUID_RESOURCES.EVALUATION).toString();
       try {
         const app = getApp();
-        await app.evaluations.startEvaluation({
+        await app.evaluations.reportEvaluation({
           tenantId: projectId,
           evaluationId,
           evaluatorId: event.evaluatorId,
           evaluatorType: evaluatorConfig?.evaluatorType ?? "unknown",
           evaluatorName: dbEvaluator?.name,
           traceId,
-          occurredAt: Date.now(),
-        });
-        await app.evaluations.completeEvaluation({
-          tenantId: projectId,
-          evaluationId,
           status: evalResult.status,
           score: evalResult.status === "processed" ? (evalResult.score ?? undefined) : undefined,
           passed: evalResult.status === "processed" ? (evalResult.passed ?? undefined) : undefined,
