@@ -16,15 +16,15 @@ if (!fs.existsSync(AUTH_DIR)) {
  * Creates a test user and authenticates before all tests run.
  * Session state is saved to .auth/user.json and reused by all test projects.
  *
- * Test user credentials:
- * - Email: e2e-test@langwatch.ai
- * - Password: TestPassword123!
+ * Test user credentials (shared with /browser-test and verify-browser-test.js):
+ * - Email: browser-test@langwatch.ai
+ * - Password: BrowserTest123!
  */
 
 const TEST_USER = {
-  name: "E2E Test User",
-  email: "e2e-test@langwatch.ai",
-  password: "TestPassword123!",
+  name: "Browser Test Agent",
+  email: "browser-test@langwatch.ai",
+  password: "BrowserTest123!",
 };
 
 setup("authenticate", async ({ page, request }) => {
@@ -100,7 +100,7 @@ setup("authenticate", async ({ page, request }) => {
 
     // Fill in organization/company name
     const companyInput = page.getByPlaceholder("Company Name");
-    await companyInput.fill("E2E Test Organization");
+    await companyInput.fill("Browser Test Org");
     console.log("  - Filled company name");
 
     // Accept terms of service (click the label since Chakra checkbox control intercepts pointer events)
@@ -187,7 +187,7 @@ setup("authenticate", async ({ page, request }) => {
     console.log("Creating test project...");
     const projectNameInput = page.getByRole("textbox", { name: /name/i });
     if (await projectNameInput.isVisible()) {
-      await projectNameInput.fill("E2E Test Project");
+      await projectNameInput.fill("Browser Test Project");
       await page.getByRole("button", { name: /create/i }).click();
       await page.waitForTimeout(3000);
     }
