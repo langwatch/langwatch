@@ -466,7 +466,7 @@ export class NotificationService {
         { objectTypeId: "0-1", name: "product_usage", value: signUpData?.usage ?? "" },
         { objectTypeId: "0-1", name: "product_solution", value: signUpData?.solution ?? "" },
         { objectTypeId: "0-1", name: "organization_size", value: signUpData?.companySize ?? "1" },
-        { objectTypeId: "0-1", name: "utm_campaign", value: signUpData?.utmCampaign ?? "" },
+        { objectTypeId: "0-1", name: "utm_campaign", value: signUpData?.utmCampaign ?? payload.utmCampaign ?? "" },
       ],
       context: {
         pageUri: "app.langwatch.ai",

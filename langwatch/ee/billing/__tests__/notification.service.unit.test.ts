@@ -602,7 +602,7 @@ describe("NotificationService", () => {
         expect(lastNameField.value).toBe("Watson");
       });
 
-      it("uses empty strings for missing signUpData fields", async () => {
+      it("applies per-field defaults when signUpData is missing", async () => {
         const mockFetch = vi
           .fn()
           .mockResolvedValue(new Response("ok", { status: 200 }));
@@ -622,10 +622,42 @@ describe("NotificationService", () => {
         });
 
         const body = JSON.parse(mockFetch.mock.calls[0]![1]!.body as string);
-        const usageField = body.fields.find(
-          (f: any) => f.name === "Features_usage_multiple",
+        const field = (name: string) =>
+          body.fields.find((f: any) => f.name === name)?.value;
+
+        expect(field("Features_usage_multiple")).toBe("Other");
+        expect(field("user_role")).toBe("Other");
+        expect(field("product_usage")).toBe("");
+        expect(field("product_solution")).toBe("");
+        expect(field("organization_size")).toBe("1");
+        expect(field("utm_campaign")).toBe("");
+      });
+
+      it("falls back to top-level utmCampaign when signUpData has none", async () => {
+        const mockFetch = vi
+          .fn()
+          .mockResolvedValue(new Response("ok", { status: 200 }));
+        const localService = NotificationService.create({
+          config: {
+            ...config,
+            hubspotPortalId: "12345",
+            hubspotFormId: "form_signup",
+          },
+          fetchFn: mockFetch,
+        });
+
+        await localService.sendHubspotSignupForm({
+          userName: "Jane",
+          userEmail: "jane@example.com",
+          organizationName: "Acme",
+          utmCampaign: "top-level-campaign",
+        });
+
+        const body = JSON.parse(mockFetch.mock.calls[0]![1]!.body as string);
+        const campaignField = body.fields.find(
+          (f: any) => f.name === "utm_campaign",
         );
-        expect(usageField.value).toBe("Other");
+        expect(campaignField.value).toBe("top-level-campaign");
       });
     });
 
