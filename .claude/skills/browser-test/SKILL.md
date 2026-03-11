@@ -7,22 +7,21 @@ argument-hint: "[port] [feature description or feature-file-path]"
 
 # Browser Test — Interactive Feature Validation
 
-You use the Playwright MCP tools to open a browser, navigate the app, and verify a feature works as expected. No test files, no framework — just drive the browser and report results.
+You are the **orchestrator**. You do NOT drive the browser yourself. You spawn a focused sub-agent to do the browser work, monitor its progress, and collect results.
 
-## Input
+## Step 1: Prepare
 
 Parse `$ARGUMENTS` for:
-- **Port** (optional): the number (e.g. `5570`) or `:<port>` format
+- **Port** (optional): a number (e.g. `5570`) or `:<port>` format
 - **Feature** (optional): a description of what to verify, or a path to a `specs/*.feature` file
 
-If a feature file path is given, read it and extract the scenarios. If a plain description is given, use it directly. If neither is provided, run the **default smoke test**: app loads, sign in works, dashboard renders after auth.
+If a feature file path is given, **read it now** and extract the scenarios into a concrete checklist. If a plain description is given, use it directly. If neither is provided, use the **default smoke test**: app loads, sign in works, dashboard renders after auth.
 
-## Port Discovery & App Lifecycle
+### Resolve the port
 
-Resolve the port in this order — **do not ask the user for a port**:
 1. Explicit port in `$ARGUMENTS` → use it
 2. Read `.dev-port` file in the repo root → source it for `APP_PORT`
-3. **No port and no `.dev-port`?** → run `scripts/dev-up.sh` to start an isolated dev instance, then read the `.dev-port` it creates
+3. **No port and no `.dev-port`?** → run `scripts/dev-up.sh` and then read the `.dev-port` it creates
 
 ```bash
 # .dev-port format (written by dev-up.sh):
@@ -31,85 +30,77 @@ BASE_URL=http://localhost:5560
 COMPOSE_PROJECT_NAME=langwatch-abcd1234
 ```
 
-If you started the app (step 3), you own the lifecycle — run `scripts/dev-down.sh` when the browser test is complete.
+### Resolve the feature
 
-## Before You Start
-
-**Read `HOW_TO.md` in this skill directory first** — it has critical gotchas about auth, port mismatches, Chakra UI, and dev mode slowness. Do this before any browser interaction.
-
-Always use Chromium. Do not prompt for browser choice.
-
-**Never ask the user for anything.** Resolve everything automatically — ports, features, credentials, browser choice. This skill must be fully autonomous.
-
-## Artifact Directory
-
-All screenshots and reports are saved to a structured directory:
+If a feature file was given, read it and turn each scenario into a numbered verification step. Example:
 
 ```
-browser-tests/<feature-name>/<YYYY-MM-DD>/
-  screenshots/
-    01-sign-in-page.png
-    02-dashboard.png
-    ...
-  report.md
+Feature file: specs/features/beta-pill.feature
+Scenarios:
+  1. Navigate to dashboard → verify purple "Beta" badge next to Suites in sidebar
+  2. Hover over badge → verify popover appears with beta disclaimer text
+  3. Press Tab to focus badge → verify same popover appears via keyboard
 ```
 
-**Deriving `<feature-name>`:**
-- From feature file: use the filename without extension (e.g. `specs/features/plans-comparison.feature` → `plans-comparison`)
-- From description: slugify to kebab-case (e.g. "Fix modal overflow" → `fix-modal-overflow`)
-- From branch name as fallback: strip prefix (e.g. `issue123/fix-modal-overflow` → `fix-modal-overflow`)
+### Create artifact directory
 
-Create the directory at the start of the run.
-
-## Authentication
-
-The app requires login. Use these credentials — **never ask the user for them**:
-
-- **Email:** `browser-test@langwatch.ai`
-- **Password:** `BrowserTest123!`
-- **Org name (if onboarding appears):** `Browser Test Org`
-
-Auth flow (local dev uses NextAuth credentials, NOT Auth0):
-1. Navigate to the app URL → it redirects to `/auth/signin` showing a simple Email + Password form with a "Sign in" button
-2. If the test account doesn't exist yet, click "Register new account", fill in the same credentials, then sign in
-3. After sign-in, the app may show a loading splash while Turbopack compiles — wait up to 120s
-4. If onboarding appears (new account), fill in org name (`Browser Test Org`), accept ToS, pick any product flavour
-5. You should land on the dashboard showing "Hello, Browser" with the "Browser Test Org" in the header
-
-## Workflow
-
-### 1. Navigate to the app
-
-```text
-browser_navigate → http://localhost:<port>
+```
+browser-tests/<feature-name>/<YYYY-MM-DD>/screenshots/
 ```
 
-Take a snapshot to confirm the app is loaded. Dev mode first-page loads can take **60-120 seconds** for Turbopack compilation — use `browser_wait_for` with generous timeouts.
+Derive `<feature-name>` from: feature filename (without extension) > slugified description > branch name suffix.
 
-### 2. Sign in
+## Step 2: Spawn the browser agent
 
-Follow the Authentication flow above. Take a screenshot after successful login.
+Use the **Agent tool** to spawn a sub-agent. Give it everything it needs in the prompt — port, verification steps, credentials, artifact path. The sub-agent has access to Playwright MCP tools and Bash.
 
-### 3. Walk through each scenario
+**Critical:** The sub-agent prompt must include ALL of the following. Do not assume it knows anything — it starts with zero context:
 
-For each scenario or verification step:
+```
+You are a browser test agent. Your ONLY job is to drive a browser and verify features.
 
-1. **Snapshot** the page to see current state
-2. **Interact** — click, type, select — using the MCP tools (`browser_click`, `browser_type`, `browser_select_option`, etc.)
-3. **Verify** — snapshot again and check the expected outcome is visible
-4. **Screenshot** each key step — save to `browser-tests/<feature-name>/<YYYY-MM-DD>/screenshots/`
+## Your mission
+<paste the numbered verification steps here>
 
-Use `browser_wait_for` when you need to wait for async operations (toasts, loading states, API calls).
+## Connection
+- App URL: http://localhost:<port>
+- Browser: Chromium (headless) — use Playwright MCP tools
+- Save screenshots to: <absolute artifact path>/screenshots/
 
-### 4. Save report
+## Auth (NextAuth credentials form, NOT Auth0)
+- Navigate to the app → redirects to /auth/signin (Email + Password form)
+- Email: browser-test@langwatch.ai
+- Password: BrowserTest123!
+- If "Register new account" needed, register first with same credentials
+- Org name if onboarding: Browser Test Org
+- After auth: dashboard shows "Hello, Browser" + "Browser Test Org" header
 
-Write `browser-tests/<feature-name>/<YYYY-MM-DD>/report.md`:
+## How to interact
+- Use browser_snapshot (accessibility tree) for finding elements — it's faster than screenshots
+- Use browser_take_screenshot to capture evidence at each key step
+- Use browser_wait_for with generous timeouts (60-120s for first page loads, dev mode is slow)
+- Number screenshots sequentially: 01-sign-in.png, 02-dashboard.png, etc.
+
+## Guardrails — READ THESE
+- You have a maximum of 15 tool calls. If you haven't finished, report what you verified and what's left.
+- Do NOT debug app issues. If something doesn't work, screenshot it, mark it FAIL, and move on.
+- Do NOT modify any files, fix any code, or investigate root causes.
+- Do NOT go off-script. Only verify the steps listed above.
+- If a step fails, take a screenshot, record FAIL, and continue to the next step.
+- When done, return a markdown summary table: | # | Step | Result | Screenshot |
+```
+
+## Step 3: Collect results
+
+When the sub-agent returns:
+1. Parse its summary table
+2. Write the report to `browser-tests/<feature-name>/<YYYY-MM-DD>/report.md`:
 
 ```markdown
 # Browser Test: <feature-name>
 **Date:** YYYY-MM-DD
 **App:** http://localhost:<port>
-**Browser:** Chromium | Firefox
+**Browser:** Chromium (headless)
 **Branch:** <current branch>
 **PR:** #<number> (if known)
 
@@ -118,29 +109,27 @@ Write `browser-tests/<feature-name>/<YYYY-MM-DD>/report.md`:
 | # | Scenario | Result | Screenshot |
 |---|----------|--------|------------|
 | 1 | <name>   | PASS   | screenshots/01-xxx.png |
-| 2 | <name>   | FAIL   | screenshots/02-xxx.png |
 
 ## Failures (if any)
 - **Scenario 2:** Expected X but saw Y.
 
 ## Notes
-<any observations, timing issues, flakiness>
+<any observations>
 ```
 
-### 5. Report to caller
+3. If you started the app (no `.dev-port` existed before), tear it down: `scripts/dev-down.sh`
 
-Return the summary to the user or orchestrator. Include the artifact directory path and, if this will be used in a PR, note that screenshots can be linked using:
+## Step 4: Report
 
-```
-https://raw.githubusercontent.com/OWNER/REPO/BRANCH/browser-tests/<feature-name>/<date>/screenshots/<file>.png
-```
+Return the summary to the user/orchestrator. Include:
+- The results table
+- The artifact directory path
+- For PR use: `https://raw.githubusercontent.com/OWNER/REPO/BRANCH/browser-tests/<feature-name>/<date>/screenshots/<file>.png`
 
 ## Rules
 
-- Read `HOW_TO.md` in this skill directory before your first run — it has critical gotchas about auth, port mismatches, Chakra UI, and dev mode slowness
-- **Never ask the user for anything** — ports, credentials, feature descriptions, browser choice are all resolved automatically by this skill
-- Use `browser_snapshot` (accessibility tree) for interactions, not screenshots — it's faster and gives you element refs
-- Use `browser_take_screenshot` to capture each key verification step and failures
-- Don't create any test files — this is interactive verification only
-- If the app isn't running and `.dev-port` doesn't exist, run `scripts/dev-up.sh` to start one automatically
-- If a page requires auth/login, use the standard test credentials from the Authentication section above
+- **You are the orchestrator, not the browser driver.** Spawn a sub-agent for all browser work.
+- **Never ask the user for anything.** Ports, credentials, features, browser choice — all resolved automatically.
+- **Read `HOW_TO.md`** in this skill directory before your first run — it has gotchas about Chakra UI, dev mode slowness, and known issues. Include relevant warnings in the sub-agent prompt.
+- **One sub-agent per run.** If it fails or times out, report the failure — don't retry.
+- **Don't create test files.** This is interactive verification only.
