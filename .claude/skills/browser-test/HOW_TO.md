@@ -45,6 +45,10 @@ These are committed to the branch and referenced in PR descriptions using absolu
 1. **Save report** to `browser-tests/<feature-name>/<YYYY-MM-DD>/report.md` (see SKILL.md for format).
 2. **Report results** to the caller using the summary table format from `SKILL.md`.
 
+## Example Run
+
+See `browser-tests/proof-of-concept/` for a complete proof-of-concept run with screenshots, raw logs, and a report. This was the first successful AI-driven browser verification against a local dev instance.
+
 ## Known Issues
 
 | Issue | Workaround |
