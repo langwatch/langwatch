@@ -12,7 +12,7 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { LuChevronRight } from "react-icons/lu";
 import { HistoryIcon } from "~/components/icons/History";
 import { Popover } from "~/components/ui/popover";
@@ -341,6 +341,7 @@ export function VersionHistoryListPopover({
   onRestoreSuccess,
   hasUnsavedChanges,
   label,
+  initialOpen,
 }: {
   configId: string;
   /** The versionId of the version currently being edited. If not provided, defaults to latest. */
@@ -348,8 +349,18 @@ export function VersionHistoryListPopover({
   onRestoreSuccess?: (prompt: VersionedPrompt) => Promise<void>;
   hasUnsavedChanges?: boolean;
   label?: string;
+  /** When true the popover opens automatically on first render. */
+  initialOpen?: boolean;
 }) {
   const { open, setOpen, onClose } = useDisclosure();
+
+  useEffect(() => {
+    if (initialOpen) {
+      setOpen(true);
+    }
+    // Only run on mount — intentionally omitting setOpen and initialOpen from deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const { project } = useOrganizationTeamProject();
   const { data: prompts = [], isLoading } =
     api.prompts.getAllVersionsForPrompt.useQuery(

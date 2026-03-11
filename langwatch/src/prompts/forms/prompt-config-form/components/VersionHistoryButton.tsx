@@ -8,6 +8,7 @@ export function VersionHistoryButton({
   onRestoreSuccess,
   hasUnsavedChanges,
   label,
+  initialOpen,
 }: {
   configId: string;
   /** The versionId of the version currently being edited. If not provided, defaults to latest. */
@@ -15,6 +16,8 @@ export function VersionHistoryButton({
   onRestoreSuccess?: (prompt: VersionedPrompt) => Promise<void>;
   hasUnsavedChanges?: boolean;
   label?: string;
+  /** When true the history panel opens automatically on mount. */
+  initialOpen?: boolean;
 }) {
   return (
     <Tooltip
@@ -29,6 +32,7 @@ export function VersionHistoryButton({
         onRestoreSuccess={onRestoreSuccess}
         hasUnsavedChanges={hasUnsavedChanges}
         label={label}
+        initialOpen={initialOpen}
       />
     </Tooltip>
   );
