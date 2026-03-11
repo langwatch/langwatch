@@ -75,6 +75,10 @@ app.post(
       "Received scenario event",
     );
 
+    // Dual-write to ClickHouse via event-sourcing
+    if (project.featureEventSourcingSimulationIngestion) {
+      await dispatchSimulationEvent(project.id, event);
+    }
 
     // Legacy ES write (runs when feature flag is off and ES writes are not disabled)
     if (!project.disableElasticSearchSimulationWriting) {
@@ -88,11 +92,6 @@ app.post(
         { projectId: project.id },
         "Skipping ES scenario event write — disableElasticSearchSimulationWriting is enabled",
       );
-    }
-
-    // Dual-write to ClickHouse via event-sourcing
-    if (project.featureEventSourcingSimulationIngestion) {
-      await dispatchSimulationEvent(project.id, event);
     }
 
     const path = `/${project.slug}/simulations/${
