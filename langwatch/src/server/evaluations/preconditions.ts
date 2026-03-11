@@ -19,7 +19,7 @@ function coerceToString(value: unknown): string {
     return value
       .map((item) =>
         typeof item === "object" && item !== null && "content" in item
-          ? String((item as { content: unknown }).content ?? "")
+          ? String(item.content ?? "")
           : typeof item === "string"
             ? item
             : JSON.stringify(item),
