@@ -81,22 +81,15 @@ A shorter workflow for bug fixes. Skips planning, challenge, user approval, and 
 ### 5. Browser Verification (Conditional)
 **Only when the bug affects browser-observable behavior** (UI rendering, user interactions, page navigation, etc.). Skip for backend-only, infra, script, or docs changes.
 
-- Start an isolated dev instance: `scripts/dev-up.sh`
-  - Wait for it to complete — it writes `.dev-port` with the app URL
-  - Read `.dev-port` to get `APP_PORT` and `BASE_URL`
-- Invoke `/browser-test` with the port and bug description
-  - Verify the bug is actually fixed in the browser
-  - Screenshots are saved to `browser-tests/<bug-slug>/<YYYY-MM-DD>/`
+- Invoke `/browser-test` with the bug description
+  - `/browser-test` handles everything: dev instance lifecycle, browser verification, screenshots, commit/push, and PR description update
 - If verification fails → invoke `/code` with findings, re-run `/browser-test`
   - Max 2 iterations, then escalate to user
-- Tear down the dev instance: `scripts/dev-down.sh`
 
 ### 6. Commit and Draft PR
-- Invoke `/commit-push` to commit all changes and push to remote
-- Create a **draft** PR using `gh pr create --draft` with a summary of the work done
+- Invoke `/commit-push` to commit all remaining changes and push to remote
+- Create a **draft** PR using `gh pr create --draft` with a summary of the work done (browser-test screenshots are already in the PR body)
 - Include the issue number in the PR body for linking
-- Include browser verification screenshots in the PR body using absolute URLs:
-  `https://raw.githubusercontent.com/OWNER/REPO/BRANCH/browser-tests/<slug>/<date>/screenshots/<file>.png`
 
 ### 7. Complete
 - Verify all tasks are completed
@@ -162,17 +155,12 @@ Used for feature requests, enhancements, and all non-bug issues.
 **Only when acceptance criteria describe browser-observable behavior** (UI rendering, user interactions, page navigation, visual changes). Skip for backend-only, infra, script, or docs features.
 
 - Mark browser-test task as `in_progress`
-- Start an isolated dev instance: `scripts/dev-up.sh`
-  - Wait for it to complete — it writes `.dev-port` with the app URL
-  - Read `.dev-port` to get `APP_PORT` and `BASE_URL`
-- Invoke `/browser-test` with the port and feature file path
-  - The browser-test skill drives a real browser to verify acceptance criteria
-  - Screenshots are saved to `browser-tests/<feature-name>/<YYYY-MM-DD>/`
+- Invoke `/browser-test` with the feature file path
+  - `/browser-test` handles everything: dev instance lifecycle, browser verification, screenshots, commit/push, and PR description update
 - If verification fails due to **app bugs**:
   - Invoke `/code` with the failing scenario and expected vs actual behavior
   - After fix, re-run `/browser-test` to verify
   - Max 2 iterations, then escalate to user
-- Tear down the dev instance: `scripts/dev-down.sh`
 - If all scenarios pass → mark task as `completed`
 
 ### 9. Self-Check (Required)
@@ -201,11 +189,9 @@ If ANY check fails:
 This self-check exists because it's easy to rationalize skipping work. Don't.
 
 ### 10. Commit and Draft PR
-- Invoke `/commit-push` to commit all changes and push to remote
-- Create a **draft** PR using `gh pr create --draft` with a summary of the work done
+- Invoke `/commit-push` to commit all remaining changes and push to remote
+- Create a **draft** PR using `gh pr create --draft` with a summary of the work done (browser-test screenshots are already in the PR body)
 - Include the issue number in the PR body for linking
-- Include browser verification screenshots in the PR body using absolute URLs:
-  `https://raw.githubusercontent.com/OWNER/REPO/BRANCH/browser-tests/<feature>/<date>/screenshots/<file>.png`
 
 ### 11. Complete
 - Verify all tasks are completed

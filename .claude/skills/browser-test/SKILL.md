@@ -119,12 +119,38 @@ When the sub-agent returns:
 
 3. If you started the app (no `.dev-port` existed before), tear it down: `scripts/dev-down.sh`
 
-## Step 4: Report
+## Step 4: Commit, push, and update the PR
+
+This step is **not optional**. The skill is not done until artifacts are committed and the PR is updated.
+
+1. **Commit and push** the `browser-tests/<feature-name>/` directory:
+   ```bash
+   git add browser-tests/<feature-name>/
+   git commit -m "docs: add <feature-name> browser test results"
+   git push origin HEAD
+   ```
+
+2. **Update the PR description** to include the browser test results with screenshots. Use absolute `raw.githubusercontent.com` URLs so images render in the PR body:
+   ```
+   https://raw.githubusercontent.com/langwatch/langwatch/<branch>/browser-tests/<feature-name>/<date>/screenshots/<file>.png
+   ```
+
+   Read the current PR body first (`gh pr view --json body`), then append a new section:
+   ```markdown
+   ## Browser Test: <feature-name>
+
+   | # | Scenario | Result | Screenshot |
+   |---|----------|--------|------------|
+   | 1 | <name> | PASS | ![01](https://raw.githubusercontent.com/langwatch/langwatch/<branch>/browser-tests/...) |
+   ```
+
+   Use `gh api repos/langwatch/langwatch/pulls/<number> -X PATCH -f body="..."` to update (not `gh pr edit`).
+
+## Step 5: Report
 
 Return the summary to the user/orchestrator. Include:
 - The results table
-- The artifact directory path
-- For PR use: `https://raw.githubusercontent.com/OWNER/REPO/BRANCH/browser-tests/<feature-name>/<date>/screenshots/<file>.png`
+- Link to the PR where screenshots are now visible
 
 ## Rules
 
