@@ -59,6 +59,7 @@ type NotificationServiceOptions = {
     | "slackSubscriptionsChannel"
     | "hubspotPortalId"
     | "hubspotReachedLimitFormId"
+    | "hubspotFormId"
   >;
   createSlackWebhook?: (url: string) => Pick<IncomingWebhook, "send">;
   fetchFn?: typeof fetch;
@@ -433,6 +434,79 @@ export class NotificationService {
   // -------------------------------------------------------------------------
   // Hubspot
   // -------------------------------------------------------------------------
+
+  /**
+   * Submits a HubSpot signup lead form when a new user registers.
+   */
+  async sendHubspotSignupForm(
+    payload: SignupNotificationPayload,
+  ): Promise<void> {
+    const { hubspotPortalId, hubspotFormId } = this.config;
+
+    if (!hubspotPortalId || !hubspotFormId) {
+      return;
+    }
+
+    const nameParts = (payload.userName ?? "").split(" ").filter(Boolean);
+    const firstName = nameParts[0] ?? "";
+    const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1]! : "";
+
+    const signUpData = payload.signUpData;
+
+    const formData = {
+      submittedAt: Date.now(),
+      fields: [
+        { objectTypeId: "0-1", name: "company", value: payload.organizationName ?? "" },
+        { objectTypeId: "0-1", name: "firstname", value: firstName },
+        { objectTypeId: "0-1", name: "lastname", value: lastName },
+        { objectTypeId: "0-1", name: "email", value: payload.userEmail ?? "" },
+        { objectTypeId: "0-1", name: "mobilephone", value: payload.phoneNumber ?? "" },
+        { objectTypeId: "0-1", name: "Features_usage_multiple", value: signUpData?.featureUsage ?? "Other" },
+        { objectTypeId: "0-1", name: "user_role", value: signUpData?.yourRole ?? "Other" },
+        { objectTypeId: "0-1", name: "product_usage", value: signUpData?.usage ?? "" },
+        { objectTypeId: "0-1", name: "product_solution", value: signUpData?.solution ?? "" },
+        { objectTypeId: "0-1", name: "organization_size", value: signUpData?.companySize ?? "1" },
+        { objectTypeId: "0-1", name: "utm_campaign", value: signUpData?.utmCampaign ?? payload.utmCampaign ?? "" },
+      ],
+      context: {
+        pageUri: "app.langwatch.ai",
+        pageName: "Sign Up",
+      },
+    };
+
+    const url = `https://api.hsforms.com/submissions/v3/integration/submit/${hubspotPortalId}/${hubspotFormId}`;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(
+      () => controller.abort(),
+      EXTERNAL_SERVICE_TIMEOUT_MS,
+    );
+
+    try {
+      const response = await this.fetchFn(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        captureException(
+          new Error(`HubSpot signup form request failed: ${response.status}`),
+        );
+      }
+    } catch (error) {
+      logger.error(
+        { error },
+        "Failed to send HubSpot signup form notification",
+      );
+      captureException(error);
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
 
   /**
    * Submits a HubSpot form when a plan limit is reached.

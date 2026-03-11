@@ -6,11 +6,13 @@ const {
   mockCreateProject,
   mockCaptureException,
   mockSendSlackSignupEvent,
+  mockSendHubspotSignupForm,
 } = vi.hoisted(() => ({
   mockCreateAndAssign: vi.fn(),
   mockCreateProject: vi.fn(),
   mockCaptureException: vi.fn(),
   mockSendSlackSignupEvent: vi.fn(),
+  mockSendHubspotSignupForm: vi.fn(),
 }));
 
 vi.mock("../../rbac", async (importOriginal) => {
@@ -44,6 +46,7 @@ vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({
     notifications: {
       sendSlackSignupEvent: mockSendSlackSignupEvent,
+      sendHubspotSignupForm: mockSendHubspotSignupForm,
     },
   }),
 }));
@@ -94,6 +97,7 @@ describe("onboarding.initializeOrganization", () => {
   describe("when notifications are available", () => {
     it("sends the signup event after creating the organization", async () => {
       mockSendSlackSignupEvent.mockResolvedValue(undefined);
+      mockSendHubspotSignupForm.mockResolvedValue(undefined);
       const caller = createCaller();
 
       const result = await caller.initializeOrganization({
@@ -111,12 +115,43 @@ describe("onboarding.initializeOrganization", () => {
         organizationId: "org_1",
         projectSlug: "acme-project",
       });
-      expect(mockSendSlackSignupEvent).toHaveBeenCalledWith({
+      expect(mockSendSlackSignupEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userName: "Jane Doe",
+          userEmail: "jane@example.com",
+          organizationName: "Acme Corp",
+          phoneNumber: "+31 20 123 4567",
+          utmCampaign: "launch-week",
+        }),
+      );
+    });
+
+    it("sends the HubSpot signup form alongside the Slack event", async () => {
+      mockSendSlackSignupEvent.mockResolvedValue(undefined);
+      mockSendHubspotSignupForm.mockResolvedValue(undefined);
+      const caller = createCaller();
+
+      await caller.initializeOrganization({
+        orgName: "Acme Corp",
+        phoneNumber: "+31 20 123 4567",
+        signUpData: {
+          utmCampaign: "launch-week",
+          featureUsage: "Evaluations",
+          yourRole: "Engineer",
+        },
+        projectName: "Acme Project",
+      });
+
+      expect(mockSendHubspotSignupForm).toHaveBeenCalledWith({
         userName: "Jane Doe",
         userEmail: "jane@example.com",
         organizationName: "Acme Corp",
         phoneNumber: "+31 20 123 4567",
-        utmCampaign: "launch-week",
+        signUpData: {
+          utmCampaign: "launch-week",
+          featureUsage: "Evaluations",
+          yourRole: "Engineer",
+        },
       });
     });
   });
