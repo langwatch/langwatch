@@ -147,6 +147,15 @@ function extractOutput(
         value: toJsonSerializable(lwOutput) as ChatMessage[],
       };
     }
+    if (
+      annotatedType === "evaluation_result" ||
+      annotatedType === "guardrail_result"
+    ) {
+      return {
+        type: annotatedType,
+        value: toJsonSerializable(lwOutput),
+      } as unknown as SpanInputOutput;
+    }
     if (annotatedType === "text" || typeof lwOutput === "string") {
       return { type: "text", value: String(lwOutput) };
     }

@@ -208,6 +208,44 @@ describe("mapNormalizedSpanToSpan", () => {
       expect(result.metrics?.cache_read_input_tokens).toBe(200);
     });
   });
+
+  describe("when output has evaluation_result annotated type", () => {
+    it("preserves the evaluation_result type wrapper", () => {
+      const span = makeSpan({
+        spanAttributes: {
+          "langwatch.span.type": "evaluation",
+          "langwatch.output": { status: "processed", passed: true, score: 0.95 },
+          "langwatch.reserved.value_types": ["langwatch.output=evaluation_result"],
+        },
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect(result.output).toEqual({
+        type: "evaluation_result",
+        value: { status: "processed", passed: true, score: 0.95 },
+      });
+    });
+  });
+
+  describe("when output has guardrail_result annotated type", () => {
+    it("preserves the guardrail_result type wrapper", () => {
+      const span = makeSpan({
+        spanAttributes: {
+          "langwatch.span.type": "guardrail",
+          "langwatch.output": { status: "processed", passed: false, score: 0.1 },
+          "langwatch.reserved.value_types": ["langwatch.output=guardrail_result"],
+        },
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect(result.output).toEqual({
+        type: "guardrail_result",
+        value: { status: "processed", passed: false, score: 0.1 },
+      });
+    });
+  });
 });
 
 describe("unflattenDotNotation", () => {
