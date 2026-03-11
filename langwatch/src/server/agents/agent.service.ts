@@ -245,6 +245,7 @@ export class AgentService {
         OR: [
           { args: { path: ["id"], equals: agentId } },
           { args: { path: ["agentId"], equals: agentId } },
+          { args: { path: ["newAgentId"], equals: agentId } },
         ],
       },
       orderBy: { createdAt: "desc" },
