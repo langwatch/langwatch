@@ -135,8 +135,7 @@ export class PipelineRegistry {
     });
 
     const customEvaluationSyncReactor = createCustomEvaluationSyncReactor({
-      startEvaluation: evalCommands.startEvaluation,
-      completeEvaluation: evalCommands.completeEvaluation,
+      reportEvaluation: evalCommands.reportEvaluation,
     });
 
     const traceUpdateBroadcastReactor = createTraceUpdateBroadcastReactor({

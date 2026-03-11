@@ -185,8 +185,7 @@ describe("customEvaluationSync reactor", () => {
     vi.useFakeTimers();
     vi.setSystemTime(Date.now());
     deps = {
-      startEvaluation: vi.fn().mockResolvedValue(undefined),
-      completeEvaluation: vi.fn().mockResolvedValue(undefined),
+      reportEvaluation: vi.fn().mockResolvedValue(undefined),
     };
   });
 
@@ -201,7 +200,7 @@ describe("customEvaluationSync reactor", () => {
 
       await reactor.handle(createNonSpanEvent(), createContext(state));
 
-      expect(deps.startEvaluation).not.toHaveBeenCalled();
+      expect(deps.reportEvaluation).not.toHaveBeenCalled();
     });
   });
 
@@ -216,12 +215,12 @@ describe("customEvaluationSync reactor", () => {
         createContext(createFoldState()),
       );
 
-      expect(deps.startEvaluation).not.toHaveBeenCalled();
+      expect(deps.reportEvaluation).not.toHaveBeenCalled();
     });
   });
 
   describe("when span has evaluation events", () => {
-    it("dispatches startEvaluation and completeEvaluation for each evaluation", async () => {
+    it("dispatches reportEvaluation for each evaluation", async () => {
       const reactor = createCustomEvaluationSyncReactor(deps);
       const span = makeOtlpSpan([
         { name: "toxicity", score: 0.1, passed: true },
@@ -233,8 +232,7 @@ describe("customEvaluationSync reactor", () => {
         createContext(createFoldState()),
       );
 
-      expect(deps.startEvaluation).toHaveBeenCalledTimes(2);
-      expect(deps.completeEvaluation).toHaveBeenCalledTimes(2);
+      expect(deps.reportEvaluation).toHaveBeenCalledTimes(2);
     });
 
     it("uses deterministic evaluation IDs based on MD5 hash", async () => {
@@ -246,8 +244,8 @@ describe("customEvaluationSync reactor", () => {
         createContext(createFoldState()),
       );
 
-      const startCall = vi.mocked(deps.startEvaluation).mock.calls[0]![0];
-      expect(startCall.evaluationId).toMatch(/^eval_md5_[a-f0-9]{32}$/);
+      const call = vi.mocked(deps.reportEvaluation).mock.calls[0]![0];
+      expect(call.evaluationId).toMatch(/^eval_md5_[a-f0-9]{32}$/);
     });
 
     it("uses evaluationNameAutoslug for evaluator ID", async () => {
@@ -259,8 +257,8 @@ describe("customEvaluationSync reactor", () => {
         createContext(createFoldState()),
       );
 
-      const startCall = vi.mocked(deps.startEvaluation).mock.calls[0]![0];
-      expect(startCall.evaluatorId).toMatch(/^customeval_/);
+      const call = vi.mocked(deps.reportEvaluation).mock.calls[0]![0];
+      expect(call.evaluatorId).toMatch(/^customeval_/);
     });
 
     it("sets evaluatorType to 'custom'", async () => {
@@ -272,8 +270,8 @@ describe("customEvaluationSync reactor", () => {
         createContext(createFoldState()),
       );
 
-      const startCall = vi.mocked(deps.startEvaluation).mock.calls[0]![0];
-      expect(startCall.evaluatorType).toBe("custom");
+      const call = vi.mocked(deps.reportEvaluation).mock.calls[0]![0];
+      expect(call.evaluatorType).toBe("custom");
     });
 
     it("sets traceId from the aggregate ID", async () => {
@@ -285,11 +283,11 @@ describe("customEvaluationSync reactor", () => {
         createContext(createFoldState()),
       );
 
-      const startCall = vi.mocked(deps.startEvaluation).mock.calls[0]![0];
-      expect(startCall.traceId).toBe("trace-1");
+      const call = vi.mocked(deps.reportEvaluation).mock.calls[0]![0];
+      expect(call.traceId).toBe("trace-1");
     });
 
-    it("passes score, passed, label, details to completeEvaluation", async () => {
+    it("passes score, passed, label, details, and status to reportEvaluation", async () => {
       const reactor = createCustomEvaluationSyncReactor(deps);
       const span = makeOtlpSpan([
         {
@@ -307,12 +305,12 @@ describe("customEvaluationSync reactor", () => {
         createContext(createFoldState()),
       );
 
-      const completeCall = vi.mocked(deps.completeEvaluation).mock.calls[0]![0];
-      expect(completeCall.score).toBe(0.1);
-      expect(completeCall.passed).toBe(true);
-      expect(completeCall.label).toBe("safe");
-      expect(completeCall.details).toBe("No toxic content found");
-      expect(completeCall.status).toBe("processed");
+      const call = vi.mocked(deps.reportEvaluation).mock.calls[0]![0];
+      expect(call.score).toBe(0.1);
+      expect(call.passed).toBe(true);
+      expect(call.label).toBe("safe");
+      expect(call.details).toBe("No toxic content found");
+      expect(call.status).toBe("processed");
     });
 
     it("defaults status to 'processed' when not provided and no error", async () => {
@@ -324,8 +322,8 @@ describe("customEvaluationSync reactor", () => {
         createContext(createFoldState()),
       );
 
-      const completeCall = vi.mocked(deps.completeEvaluation).mock.calls[0]![0];
-      expect(completeCall.status).toBe("processed");
+      const call = vi.mocked(deps.reportEvaluation).mock.calls[0]![0];
+      expect(call.status).toBe("processed");
     });
 
     it("uses provided evaluation_id when present", async () => {
@@ -339,8 +337,8 @@ describe("customEvaluationSync reactor", () => {
         createContext(createFoldState()),
       );
 
-      const startCall = vi.mocked(deps.startEvaluation).mock.calls[0]![0];
-      expect(startCall.evaluationId).toBe("my-eval-1");
+      const call = vi.mocked(deps.reportEvaluation).mock.calls[0]![0];
+      expect(call.evaluationId).toBe("my-eval-1");
     });
 
     it("uses provided evaluator_id when present", async () => {
@@ -354,11 +352,11 @@ describe("customEvaluationSync reactor", () => {
         createContext(createFoldState()),
       );
 
-      const startCall = vi.mocked(deps.startEvaluation).mock.calls[0]![0];
-      expect(startCall.evaluatorId).toBe("my-evaluator");
+      const call = vi.mocked(deps.reportEvaluation).mock.calls[0]![0];
+      expect(call.evaluatorId).toBe("my-evaluator");
     });
 
-    it("offsets completeEvaluation occurredAt by +1ms for group queue ordering", async () => {
+    it("passes occurredAt from the event", async () => {
       const reactor = createCustomEvaluationSyncReactor(deps);
       const span = makeOtlpSpan([{ name: "toxicity", score: 0.1 }]);
       const eventOccurredAt = Date.now();
@@ -368,10 +366,8 @@ describe("customEvaluationSync reactor", () => {
 
       await reactor.handle(event, createContext(createFoldState()));
 
-      const startCall = vi.mocked(deps.startEvaluation).mock.calls[0]![0];
-      const completeCall = vi.mocked(deps.completeEvaluation).mock.calls[0]![0];
-      expect(startCall.occurredAt).toBe(eventOccurredAt);
-      expect(completeCall.occurredAt).toBe(eventOccurredAt + 1);
+      const call = vi.mocked(deps.reportEvaluation).mock.calls[0]![0];
+      expect(call.occurredAt).toBe(eventOccurredAt);
     });
   });
 
@@ -385,7 +381,7 @@ describe("customEvaluationSync reactor", () => {
 
       await reactor.handle(oldEvent, createContext(createFoldState()));
 
-      expect(deps.startEvaluation).not.toHaveBeenCalled();
+      expect(deps.reportEvaluation).not.toHaveBeenCalled();
     });
   });
 
@@ -405,19 +401,18 @@ describe("customEvaluationSync reactor", () => {
         createContext(createFoldState()),
       );
 
-      const completeCall = vi.mocked(deps.completeEvaluation).mock.calls[0]![0];
-      expect(completeCall.status).toBe("error");
-      expect(completeCall.error).toBe("Evaluation failed");
+      const call = vi.mocked(deps.reportEvaluation).mock.calls[0]![0];
+      expect(call.status).toBe("error");
+      expect(call.error).toBe("Evaluation failed");
     });
   });
 
   describe("when a single evaluation command fails", () => {
     it("continues processing remaining evaluations then re-throws", async () => {
-      deps.startEvaluation = vi
+      deps.reportEvaluation = vi
         .fn()
         .mockRejectedValueOnce(new Error("network error"))
         .mockResolvedValueOnce(undefined);
-      deps.completeEvaluation = vi.fn().mockResolvedValue(undefined);
 
       const reactor = createCustomEvaluationSyncReactor(deps);
       const span = makeOtlpSpan([
@@ -432,8 +427,7 @@ describe("customEvaluationSync reactor", () => {
         ),
       ).rejects.toThrow("network error");
 
-      expect(deps.startEvaluation).toHaveBeenCalledTimes(2);
-      expect(deps.completeEvaluation).toHaveBeenCalledTimes(1);
+      expect(deps.reportEvaluation).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -446,14 +440,14 @@ describe("customEvaluationSync reactor", () => {
       await reactor.handle(event, createContext(createFoldState()));
       await reactor.handle(event, createContext(createFoldState()));
 
-      const id1 = vi.mocked(deps.startEvaluation).mock.calls[0]![0].evaluationId;
-      const id2 = vi.mocked(deps.startEvaluation).mock.calls[1]![0].evaluationId;
+      const id1 = vi.mocked(deps.reportEvaluation).mock.calls[0]![0].evaluationId;
+      const id2 = vi.mocked(deps.reportEvaluation).mock.calls[1]![0].evaluationId;
       expect(id1).toBe(id2);
     });
   });
 
   describe("when evaluation has is_guardrail flag", () => {
-    it("passes isGuardrail to startEvaluation command", async () => {
+    it("passes isGuardrail to reportEvaluation command", async () => {
       const reactor = createCustomEvaluationSyncReactor(deps);
       const span = makeOtlpSpan([
         { name: "content filter", score: 1.0, is_guardrail: true },
@@ -464,8 +458,8 @@ describe("customEvaluationSync reactor", () => {
         createContext(createFoldState()),
       );
 
-      const startCall = vi.mocked(deps.startEvaluation).mock.calls[0]![0];
-      expect(startCall.isGuardrail).toBe(true);
+      const call = vi.mocked(deps.reportEvaluation).mock.calls[0]![0];
+      expect(call.isGuardrail).toBe(true);
     });
   });
 });
