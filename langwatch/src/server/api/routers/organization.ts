@@ -970,6 +970,7 @@ export const organizationRouter = createTRPCRouter({
           userId: ctx.session.user.id,
           event: "team_member_invited",
           properties: { inviteCount: createdRecords.length },
+          session: ctx.session,
         });
       }
 

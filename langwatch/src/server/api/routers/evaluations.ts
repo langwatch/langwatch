@@ -74,12 +74,12 @@ export const evaluationsRouter = createTRPCRouter({
         protections,
       });
 
-      // Dispatch to evaluation processing pipeline when flag is ON
       if (result) {
         trackServerEvent({
           userId: ctx.session.user.id,
           event: "evaluation_ran",
           projectId: input.projectId,
+          session: ctx.session,
         });
       }
 

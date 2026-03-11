@@ -8,18 +8,26 @@
  * - Calls posthog.group with organization data
  * - Calls posthog.reset on logout (userId disappears)
  * - Tracks upgrade_modal_shown via Zustand subscribe
+ * - Suppresses all PostHog capturing during impersonation
  */
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { renderHook } from "@testing-library/react";
+import { cleanup, renderHook } from "@testing-library/react";
 
-const { mockIdentify, mockGroup, mockReset, mockCapture } = vi.hoisted(
-  () => ({
-    mockIdentify: vi.fn(),
-    mockGroup: vi.fn(),
-    mockReset: vi.fn(),
-    mockCapture: vi.fn(),
-  }),
-);
+const {
+  mockIdentify,
+  mockGroup,
+  mockReset,
+  mockCapture,
+  mockOptOutCapturing,
+  mockOptInCapturing,
+} = vi.hoisted(() => ({
+  mockIdentify: vi.fn(),
+  mockGroup: vi.fn(),
+  mockReset: vi.fn(),
+  mockCapture: vi.fn(),
+  mockOptOutCapturing: vi.fn(),
+  mockOptInCapturing: vi.fn(),
+}));
 
 vi.mock("posthog-js", () => ({
   default: {
@@ -27,6 +35,8 @@ vi.mock("posthog-js", () => ({
     group: mockGroup,
     reset: mockReset,
     capture: mockCapture,
+    opt_out_capturing: mockOptOutCapturing,
+    opt_in_capturing: mockOptInCapturing,
   },
 }));
 
@@ -35,6 +45,7 @@ import { usePostHogIdentify } from "../usePostHogIdentify";
 
 describe("usePostHogIdentify", () => {
   beforeEach(() => {
+    cleanup();
     vi.clearAllMocks();
     useUpgradeModalStore.getState().close();
   });
@@ -290,6 +301,143 @@ describe("usePostHogIdentify", () => {
       useUpgradeModalStore.getState().close();
 
       expect(mockCapture).not.toHaveBeenCalled();
+    });
+
+    it("does not capture during impersonation", () => {
+      renderHook(() =>
+        usePostHogIdentify({
+          session: {
+            user: {
+              id: "user-1",
+              impersonator: { email: "admin@example.com" },
+            },
+          },
+          organization: undefined,
+          planType: undefined,
+        }),
+      );
+
+      useUpgradeModalStore.getState().open("workflows", 5, 5);
+
+      expect(mockCapture).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when session has an impersonator", () => {
+    it("opts out of PostHog capturing", () => {
+      renderHook(() =>
+        usePostHogIdentify({
+          session: {
+            user: {
+              id: "user-1",
+              email: "impersonated@example.com",
+              impersonator: { email: "admin@example.com" },
+            },
+          },
+          organization: { id: "org-1", name: "Acme Corp" },
+          planType: "pro",
+        }),
+      );
+
+      expect(mockOptOutCapturing).toHaveBeenCalled();
+    });
+
+    it("does not call identify", () => {
+      renderHook(() =>
+        usePostHogIdentify({
+          session: {
+            user: {
+              id: "user-1",
+              impersonator: { email: "admin@example.com" },
+            },
+          },
+          organization: undefined,
+          planType: undefined,
+        }),
+      );
+
+      expect(mockIdentify).not.toHaveBeenCalled();
+    });
+
+    it("does not call group", () => {
+      renderHook(() =>
+        usePostHogIdentify({
+          session: {
+            user: {
+              id: "user-1",
+              impersonator: { email: "admin@example.com" },
+            },
+          },
+          organization: { id: "org-1", name: "Acme Corp" },
+          planType: "pro",
+        }),
+      );
+
+      expect(mockGroup).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when session has no impersonator", () => {
+    it("opts in to PostHog capturing", () => {
+      renderHook(() =>
+        usePostHogIdentify({
+          session: { user: { id: "user-1", email: "test@example.com" } },
+          organization: undefined,
+          planType: undefined,
+        }),
+      );
+
+      expect(mockOptInCapturing).toHaveBeenCalled();
+    });
+  });
+
+  describe("when impersonation ends", () => {
+    it("re-enables capturing and re-identifies user", () => {
+      type SessionType = {
+        user: {
+          id: string;
+          email?: string | null;
+          impersonator?: { email?: string | null };
+        };
+      } | null;
+
+      const { rerender } = renderHook(
+        ({ session }: { session: SessionType }) =>
+          usePostHogIdentify({
+            session,
+            organization: undefined,
+            planType: undefined,
+          }),
+        {
+          initialProps: {
+            session: {
+              user: {
+                id: "user-1",
+                email: "impersonated@example.com",
+                impersonator: { email: "admin@example.com" },
+              },
+            } as SessionType,
+          },
+        },
+      );
+
+      expect(mockOptOutCapturing).toHaveBeenCalled();
+      expect(mockIdentify).not.toHaveBeenCalled();
+
+      vi.clearAllMocks();
+
+      // Transition to normal session (impersonation ends)
+      rerender({
+        session: {
+          user: { id: "real-user", email: "real@example.com" },
+        },
+      });
+
+      expect(mockOptInCapturing).toHaveBeenCalled();
+      expect(mockReset).toHaveBeenCalled();
+      expect(mockIdentify).toHaveBeenCalledWith("real-user", {
+        email: "real@example.com",
+      });
     });
   });
 });
