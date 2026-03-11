@@ -666,6 +666,7 @@ export class PromptService {
       const camelCaseData = transformSnakeToCamel(
         resolvedConfigData as unknown as Record<string, unknown>,
       );
+
       const createdPrompt = await this.createPrompt({
         handle: idOrHandle,
         projectId,

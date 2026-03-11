@@ -31,6 +31,7 @@ import { TraceSummaryStore } from "../../projections/traceSummary.store";
 import { createCustomEvaluationSyncReactor } from "../customEvaluationSync.reactor";
 import { StartEvaluationCommand } from "../../../../pipelines/evaluation-processing/commands/startEvaluation.command";
 import { CompleteEvaluationCommand } from "../../../../pipelines/evaluation-processing/commands/completeEvaluation.command";
+import { ReportEvaluationCommand } from "../../../../pipelines/evaluation-processing/commands/reportEvaluation.command";
 import { createEvaluationRunFoldProjection } from "../../../../pipelines/evaluation-processing/projections";
 import { EvaluationRunStore } from "../../../../pipelines/evaluation-processing/projections/evaluationRun.store";
 import type { EvaluationProcessingEvent } from "../../../../pipelines/evaluation-processing/schemas/events";
@@ -150,6 +151,7 @@ describe.skipIf(!hasTestcontainers)(
         .withAggregateType("evaluation" as AggregateType)
         .withCommand("startEvaluation", StartEvaluationCommand as any)
         .withCommand("completeEvaluation", CompleteEvaluationCommand as any)
+        .withCommand("reportEvaluation", ReportEvaluationCommand as any)
         .withFoldProjection(
           "evaluationRun",
           createEvaluationRunFoldProjection({ store: evalRunStore }) as any,
@@ -170,8 +172,7 @@ describe.skipIf(!hasTestcontainers)(
 
       // Create the reactor with zero delay for faster tests
       const reactor = createCustomEvaluationSyncReactor({
-        startEvaluation: evalCommands.startEvaluation,
-        completeEvaluation: evalCommands.completeEvaluation,
+        reportEvaluation: evalCommands.reportEvaluation,
       });
       const fastReactor = {
         ...reactor,
