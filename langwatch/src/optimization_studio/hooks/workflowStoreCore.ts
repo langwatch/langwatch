@@ -179,18 +179,31 @@ export const removeInvalidEdges = ({
       const source = nodes.find((node) => node.id === edge.source);
       const [sourceHandleGroup, sourceHandleIdentifier] =
         edge.sourceHandle?.split(".") ?? [null, null];
-      const sourceHandle = (
-        source?.data[sourceHandleGroup as any] as Field[]
-      )?.find((field) => field.identifier === sourceHandleIdentifier);
 
       const target = nodes.find((node) => node.id === edge.target);
       const [targetHandleGroup, targetHandleIdentifier] =
         edge.targetHandle?.split(".") ?? [null, null];
-      const targetHandle = (
-        target?.data[targetHandleGroup as any] as Field[]
-      )?.find((field) => field.identifier === targetHandleIdentifier);
 
-      return source && target && sourceHandle && targetHandle;
+      if (!source || !target) return false;
+
+      const sourceHandles = source.data[
+        sourceHandleGroup as any
+      ] as Field[] | undefined;
+      const targetHandles = target.data[
+        targetHandleGroup as any
+      ] as Field[] | undefined;
+
+      // If the handle group doesn't exist as an array, preserve the edge
+      // (the group hasn't been loaded/set yet). Only drop if the group
+      // IS an array but the specific identifier is missing.
+      const sourceValid =
+        !Array.isArray(sourceHandles) ||
+        sourceHandles.some((f) => f.identifier === sourceHandleIdentifier);
+      const targetValid =
+        !Array.isArray(targetHandles) ||
+        targetHandles.some((f) => f.identifier === targetHandleIdentifier);
+
+      return sourceValid && targetValid;
     }),
   };
 };
@@ -474,7 +487,14 @@ export const store = (
             ...node,
             data: {
               ...n.data,
-              ...node.data,
+              // Filter out undefined values to prevent accidental overwrites of
+              // existing arrays (e.g., inputs/outputs) when a partial update
+              // passes undefined for a field that hasn't changed.
+              ...Object.fromEntries(
+                Object.entries(node.data ?? {}).filter(
+                  ([, v]) => v !== undefined,
+                ),
+              ),
               ...(newId && n.type === "code"
                 ? {
                     parameters: updateCodeClassName(

@@ -109,6 +109,114 @@ describe("workflowStoreCore", () => {
         expect(result.edges).toHaveLength(0);
       });
     });
+
+    describe("when a node has an undefined handle group", () => {
+      it("preserves edges (handle group not yet loaded)", () => {
+        const nodes: ReturnType<typeof makeNode>[] = [
+          {
+            id: "nodeA",
+            type: "component",
+            position: { x: 0, y: 0 },
+            data: {
+              outputs: undefined,
+            },
+          } as any,
+          makeNode({
+            id: "nodeB",
+            inputs: [{ identifier: "input", type: "str" }],
+          }),
+        ];
+        const edges = [
+          makeEdge({
+            source: "nodeA",
+            target: "nodeB",
+            sourceHandle: "outputs.output",
+            targetHandle: "inputs.input",
+          }),
+        ];
+
+        const result = removeInvalidEdges({ nodes, edges });
+        expect(result.edges).toHaveLength(1);
+      });
+
+      it("preserves edges when target handle group is undefined", () => {
+        const nodes: ReturnType<typeof makeNode>[] = [
+          makeNode({
+            id: "nodeA",
+            outputs: [{ identifier: "output", type: "str" }],
+          }),
+          {
+            id: "nodeB",
+            type: "component",
+            position: { x: 0, y: 0 },
+            data: {
+              inputs: undefined,
+            },
+          } as any,
+        ];
+        const edges = [
+          makeEdge({
+            source: "nodeA",
+            target: "nodeB",
+            sourceHandle: "outputs.output",
+            targetHandle: "inputs.input",
+          }),
+        ];
+
+        const result = removeInvalidEdges({ nodes, edges });
+        expect(result.edges).toHaveLength(1);
+      });
+    });
+
+    describe("when a handle group is an array but the identifier is missing", () => {
+      it("removes the edge for a missing source handle identifier", () => {
+        const nodes = [
+          makeNode({
+            id: "nodeA",
+            outputs: [{ identifier: "other_output", type: "str" }],
+          }),
+          makeNode({
+            id: "nodeB",
+            inputs: [{ identifier: "input", type: "str" }],
+          }),
+        ];
+        const edges = [
+          makeEdge({
+            source: "nodeA",
+            target: "nodeB",
+            sourceHandle: "outputs.output",
+            targetHandle: "inputs.input",
+          }),
+        ];
+
+        const result = removeInvalidEdges({ nodes, edges });
+        expect(result.edges).toHaveLength(0);
+      });
+
+      it("removes the edge for a missing target handle identifier", () => {
+        const nodes = [
+          makeNode({
+            id: "nodeA",
+            outputs: [{ identifier: "output", type: "str" }],
+          }),
+          makeNode({
+            id: "nodeB",
+            inputs: [{ identifier: "other_input", type: "str" }],
+          }),
+        ];
+        const edges = [
+          makeEdge({
+            source: "nodeA",
+            target: "nodeB",
+            sourceHandle: "outputs.output",
+            targetHandle: "inputs.input",
+          }),
+        ];
+
+        const result = removeInvalidEdges({ nodes, edges });
+        expect(result.edges).toHaveLength(0);
+      });
+    });
   });
 
   describe("setNode", () => {
@@ -259,6 +367,48 @@ describe("workflowStoreCore", () => {
         expect(outgoingEdge?.source).toBe("renamed_middle");
       });
 
+    });
+
+    describe("when updating a node without renaming", () => {
+      it("does not wipe existing inputs when node.data.inputs is undefined", () => {
+        const nodes: Node[] = [
+          makeNode({
+            id: "nodeA",
+            inputs: [{ identifier: "input", type: "str" }],
+            outputs: [{ identifier: "output", type: "str" }],
+          }),
+          makeNode({
+            id: "nodeB",
+            inputs: [{ identifier: "input", type: "str" }],
+          }),
+        ];
+        const edges: Edge[] = [
+          makeEdge({
+            source: "nodeA",
+            target: "nodeB",
+            sourceHandle: "outputs.output",
+            targetHandle: "inputs.input",
+          }),
+        ];
+
+        testStore.setState({ nodes, edges });
+
+        testStore.getState().setNode({
+          id: "nodeA",
+          data: {
+            inputs: undefined,
+          },
+        } as Partial<Node> & { id: string });
+
+        const state = testStore.getState();
+        const nodeA = state.nodes.find((n) => n.id === "nodeA");
+        expect(nodeA?.data.inputs).toEqual([{ identifier: "input", type: "str" }]);
+        // Edge must still be alive — the inputs array was preserved
+        expect(state.edges).toHaveLength(1);
+      });
+    });
+
+    describe("when renaming a node with newId", () => {
       it("updates parameter refs in other nodes", () => {
         const nodes: Node[] = [
           makeNode({

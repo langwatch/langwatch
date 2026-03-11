@@ -152,10 +152,7 @@ export const useRunEvalution = () => {
           });
           versionId = versionResponse.id;
 
-          setWorkflow({
-            ...workflow,
-            version: nextVersion,
-          });
+          setWorkflow({ version: nextVersion });
 
           void trpc.workflow.getVersions.invalidate();
         } catch {
