@@ -121,13 +121,8 @@ export const PRECONDITION_FIELD_MATCHERS: Record<
         : "false"
       : null,
 
-  // Sentiment field
-  "sentiment.input_sentiment": (data) => {
-    if (data.satisfactionScore == null) return null;
-    if (data.satisfactionScore >= 0.1) return "positive";
-    if (data.satisfactionScore <= -0.1) return "negative";
-    return "neutral";
-  },
+  // Sentiment field — not useful as a precondition
+  "sentiment.input_sentiment": null,
 };
 
 // ---------------------------------------------------------------------------
@@ -195,8 +190,8 @@ export const PRECONDITION_ALLOWED_RULES: Record<
   // Annotation fields
   "annotations.hasAnnotation": BOOLEAN_RULES,
 
-  // Sentiment field
-  "sentiment.input_sentiment": ENUM_RULES,
+  // Sentiment field — not useful as a precondition
+  "sentiment.input_sentiment": EMPTY_RULES,
 };
 
 // ---------------------------------------------------------------------------

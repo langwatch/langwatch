@@ -7,6 +7,8 @@ import {
   getAvailablePreconditionFields,
   type PreconditionField,
 } from "../../server/filters/precondition-matchers";
+import { availableFilters } from "../../server/filters/registry";
+import type { FilterField } from "../../server/filters/types";
 
 /** Human-readable labels for precondition rules */
 export const RULE_LABELS: Record<CheckPreconditionRule, string> = {
@@ -39,8 +41,6 @@ function deriveCategory(field: string): string {
       return "Events";
     case "annotations":
       return "Annotations";
-    case "sentiment":
-      return "Sentiment";
     default:
       return "Other";
   }
@@ -97,6 +97,26 @@ export function getFieldValueType(
 ): "text" | "boolean" | "enum" | "array" {
   if (isBooleanField(field)) return "boolean";
   return "text";
+}
+
+/**
+ * Check if a precondition field requires a key (nested filter).
+ * e.g., metadata.value requires a metadata key name.
+ * Returns the key filter label if required, or null.
+ */
+export function fieldRequiresKey(
+  field: CheckPreconditionFields,
+): { keyFilterField: FilterField; label: string } | null {
+  const filterDef = availableFilters[field as FilterField];
+  if (!filterDef?.requiresKey) return null;
+
+  const keyFilter = availableFilters[filterDef.requiresKey.filter];
+  if (!keyFilter) return null;
+
+  return {
+    keyFilterField: filterDef.requiresKey.filter,
+    label: keyFilter.name,
+  };
 }
 
 /** Check if a rule is valid for the given field */

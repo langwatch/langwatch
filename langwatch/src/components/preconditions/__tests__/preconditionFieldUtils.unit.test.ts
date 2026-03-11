@@ -28,12 +28,12 @@ describe("preconditionFieldUtils", () => {
       expect(categoryNames).toContain("Spans");
     });
 
-    it("includes topic, annotation, and sentiment categories", () => {
+    it("includes topic and annotation categories", () => {
       const groups = getFieldOptionsByCategory();
       const categoryNames = groups.map((g) => g.category);
       expect(categoryNames).toContain("Topics");
       expect(categoryNames).toContain("Annotations");
-      expect(categoryNames).toContain("Sentiment");
+      expect(categoryNames).not.toContain("Sentiment");
     });
 
     it("returns only fields with non-empty allowed rules", () => {
@@ -45,9 +45,8 @@ describe("preconditionFieldUtils", () => {
       // Fields with non-empty rules: input, output, traces.origin, traces.error,
       // metadata.user_id, metadata.thread_id, metadata.customer_id, metadata.labels,
       // metadata.prompt_ids, metadata.value, spans.type, spans.model,
-      // topics.topics, topics.subtopics, annotations.hasAnnotation,
-      // sentiment.input_sentiment = 16
-      expect(totalFields).toBe(16);
+      // topics.topics, topics.subtopics, annotations.hasAnnotation = 15
+      expect(totalFields).toBe(15);
     });
 
     it("places input and output in Trace category", () => {

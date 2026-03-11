@@ -267,44 +267,6 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
     });
   });
 
-  describe("sentiment.input_sentiment matcher", () => {
-    const matcher =
-      PRECONDITION_FIELD_MATCHERS["sentiment.input_sentiment"]!;
-
-    it("returns 'positive' for score >= 0.1", () => {
-      expect(matcher(makeTraceData({ satisfactionScore: 0.5 }), "")).toBe(
-        "positive",
-      );
-      expect(matcher(makeTraceData({ satisfactionScore: 0.1 }), "")).toBe(
-        "positive",
-      );
-    });
-
-    it("returns 'negative' for score <= -0.1", () => {
-      expect(matcher(makeTraceData({ satisfactionScore: -0.5 }), "")).toBe(
-        "negative",
-      );
-      expect(matcher(makeTraceData({ satisfactionScore: -0.1 }), "")).toBe(
-        "negative",
-      );
-    });
-
-    it("returns 'neutral' for score between -0.1 and 0.1", () => {
-      expect(matcher(makeTraceData({ satisfactionScore: 0.0 }), "")).toBe(
-        "neutral",
-      );
-      expect(matcher(makeTraceData({ satisfactionScore: 0.05 }), "")).toBe(
-        "neutral",
-      );
-    });
-
-    it("returns null when satisfactionScore is null", () => {
-      expect(
-        matcher(makeTraceData({ satisfactionScore: null }), ""),
-      ).toBeNull();
-    });
-  });
-
   describe("non-matchable fields", () => {
     const nonMatchableFields: PreconditionField[] = [
       "evaluations.evaluator_id",
@@ -318,6 +280,7 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
       "events.metrics.value",
       "events.event_details.key",
       "metadata.key",
+      "sentiment.input_sentiment",
     ];
 
     it("has null matchers for evaluation, event, and key-selector fields", () => {
@@ -350,9 +313,7 @@ describe("PRECONDITION_ALLOWED_RULES", () => {
     expect(PRECONDITION_ALLOWED_RULES["traces.origin"]).toEqual(["is"]);
     expect(PRECONDITION_ALLOWED_RULES["spans.type"]).toEqual(["is"]);
     expect(PRECONDITION_ALLOWED_RULES["spans.model"]).toEqual(["is"]);
-    expect(PRECONDITION_ALLOWED_RULES["sentiment.input_sentiment"]).toEqual([
-      "is",
-    ]);
+    // sentiment.input_sentiment is excluded from preconditions
   });
 
   it("allows is, contains, not_contains for array fields", () => {
@@ -419,7 +380,7 @@ describe("getAvailablePreconditionFields()", () => {
     expect(fieldNames).toContain("topics.topics");
     expect(fieldNames).toContain("topics.subtopics");
     expect(fieldNames).toContain("annotations.hasAnnotation");
-    expect(fieldNames).toContain("sentiment.input_sentiment");
+    expect(fieldNames).not.toContain("sentiment.input_sentiment");
   });
 
   it("returns correct labels for each field", () => {

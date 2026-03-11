@@ -17,6 +17,7 @@ import type {
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import {
   RULE_LABELS,
+  fieldRequiresKey,
   getAllowedRulesForField,
   getFieldOptionsByCategory,
   getFieldValueType,
@@ -65,6 +66,10 @@ export const PreconditionsField = ({
     if (newValueType === "boolean") {
       setValue(`preconditions.${index}.value`, "true");
     }
+
+    // Clear key/subkey when switching fields
+    setValue(`preconditions.${index}.key`, undefined);
+    setValue(`preconditions.${index}.subkey`, undefined);
   };
 
   return (
@@ -124,6 +129,7 @@ export const PreconditionsField = ({
             ?.field as CheckPreconditionFields;
           const allowedRules = getAllowedRulesForField(currentField);
           const valueType = getFieldValueType(currentField);
+          const keyInfo = fieldRequiresKey(currentField);
 
           return (
             <Box
@@ -173,6 +179,15 @@ export const PreconditionsField = ({
                     </NativeSelect.Field>
                     <NativeSelect.Indicator />
                   </NativeSelect.Root>
+
+                  {keyInfo && (
+                    <Input
+                      {...control.register(`preconditions.${index}.key`)}
+                      placeholder={`${keyInfo.label} key`}
+                      minWidth="120px"
+                      maxWidth="200px"
+                    />
+                  )}
 
                   <NativeSelect.Root minWidth="fit-content">
                     <NativeSelect.Field

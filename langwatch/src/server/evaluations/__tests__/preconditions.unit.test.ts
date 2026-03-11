@@ -1069,64 +1069,6 @@ describe("evaluatePreconditions()", () => {
     });
   });
 
-  // ── Sentiment matching ──
-  describe("given a precondition: sentiment.input_sentiment is 'positive'", () => {
-    const preconditions = [
-      {
-        field: "sentiment.input_sentiment" as const,
-        rule: "is" as const,
-        value: "positive",
-      },
-    ];
-
-    describe("when trace has satisfactionScore 0.5", () => {
-      it("passes the precondition", () => {
-        const traceData = makeTraceData({ satisfactionScore: 0.5 });
-        expect(
-          evaluatePreconditions({
-            traceData,
-            preconditions,
-          }),
-        ).toBe(true);
-      });
-    });
-
-    describe("when trace has satisfactionScore -0.5", () => {
-      it("fails the precondition", () => {
-        const traceData = makeTraceData({ satisfactionScore: -0.5 });
-        expect(
-          evaluatePreconditions({
-            traceData,
-            preconditions,
-          }),
-        ).toBe(false);
-      });
-    });
-
-    describe("when trace has satisfactionScore 0.0 (neutral)", () => {
-      it("fails the precondition", () => {
-        const traceData = makeTraceData({ satisfactionScore: 0.0 });
-        expect(
-          evaluatePreconditions({
-            traceData,
-            preconditions,
-          }),
-        ).toBe(false);
-      });
-    });
-
-    describe("when trace has no satisfactionScore", () => {
-      it("fails the precondition", () => {
-        const traceData = makeTraceData({ satisfactionScore: null });
-        expect(
-          evaluatePreconditions({
-            traceData,
-            preconditions,
-          }),
-        ).toBe(false);
-      });
-    });
-  });
 
   // ── Annotation matching ──
   describe("given a precondition: annotations.hasAnnotation is 'true'", () => {
