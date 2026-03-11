@@ -7,7 +7,7 @@ import { getProtectionsForProject } from "~/server/api/utils";
 import { prisma } from "~/server/db";
 import type { Span, Trace } from "~/server/tracer/types";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
-import { generateAsciiTree } from "~/server/traces/trace-formatting";
+import { generateAsciiTree, formatTraceSummaryDigest } from "~/server/traces/trace-formatting";
 import { TraceService } from "~/server/traces/trace.service";
 import { createLogger } from "~/utils/logger/server";
 import type { AuthMiddlewareVariables } from "../../middleware";
@@ -102,24 +102,23 @@ app.post(
       protections,
       {
         downloadMode: true,
-        includeSpans: format === "digest",
         scrollId: scrollId ?? undefined,
       },
     );
 
-    const rawTraces = results.groups.flat() as (Trace & { spans?: Span[] })[];
+    const rawTraces = results.groups.flat() as Trace[];
 
     let traces: unknown[];
     if (format === "digest") {
-      traces = await Promise.all(rawTraces.map(async (trace) => ({
+      traces = rawTraces.map((trace) => ({
         trace_id: trace.trace_id,
-        formatted_trace: await formatSpansDigest(trace.spans ?? []),
+        formatted_trace: formatTraceSummaryDigest(trace),
         input: trace.input,
         output: trace.output,
         timestamps: trace.timestamps,
         metadata: trace.metadata,
         error: trace.error,
-      })));
+      }));
     } else {
       traces = rawTraces;
     }
