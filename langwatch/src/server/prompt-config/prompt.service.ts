@@ -27,6 +27,7 @@ import {
   LATEST_SCHEMA_VERSION,
   type LatestConfigVersionSchema,
 } from "./repositories/llm-config-version-schema";
+import { mergeAutoDetectedInputs } from "./mergeAutoDetectedInputs";
 import {
   transformCamelToSnake,
   transformSnakeToCamel,
@@ -639,6 +640,16 @@ export class PromptService {
       commitMessage,
     } = params;
 
+    // Must run before comparison/creation so both code paths use the merged inputs.
+    const resolvedConfigData = {
+      ...localConfigData,
+      inputs: mergeAutoDetectedInputs({
+        prompt: localConfigData.prompt,
+        messages: localConfigData.messages ?? [],
+        inputs: localConfigData.inputs ?? [],
+      }),
+    };
+
     // Check if prompt exists on server
     const existingPrompt = await this.getPromptByIdOrHandle({
       idOrHandle,
@@ -648,12 +659,12 @@ export class PromptService {
 
     // Case 1: Prompt doesn't exist on server - create new
     if (!existingPrompt) {
-      // Convert snake_case localConfigData to camelCase for createPrompt,
+      // Convert snake_case resolvedConfigData to camelCase for createPrompt,
       // which internally calls transformToDbFormat. Without this conversion,
       // snake_case keys like max_tokens would be invisible to createPrompt's
       // named params (maxTokens), causing data loss.
       const camelCaseData = transformSnakeToCamel(
-        localConfigData as unknown as Record<string, unknown>,
+        resolvedConfigData as unknown as Record<string, unknown>,
       );
       const createdPrompt = await this.createPrompt({
         handle: idOrHandle,
@@ -687,7 +698,9 @@ export class PromptService {
       model: existingPrompt.model,
       prompt: existingPrompt.prompt,
       messages: existingPrompt.messages.filter((msg) => msg.role !== "system"),
-      inputs: existingPrompt.inputs,
+      inputs: [...existingPrompt.inputs].sort((a, b) =>
+        a.identifier.localeCompare(b.identifier),
+      ),
       outputs: existingPrompt.outputs,
       // response_format is derived from outputs, not stored separately
       // Include all sampling parameters only when defined
@@ -729,7 +742,7 @@ export class PromptService {
     // Case 2: Same version - check content
     if (localVersion === remoteVersion) {
       const comparison = this.repository.compareConfigContent(
-        localConfigData,
+        resolvedConfigData,
         remoteConfigData,
       );
 
@@ -744,7 +757,7 @@ export class PromptService {
           data: {
             authorId,
             commitMessage: commitMessage ?? "Updated from local file",
-            ...this.transformToDbFormat(localConfigData),
+            ...this.transformToDbFormat(resolvedConfigData),
             schemaVersion: SchemaVersion.V1_0,
           },
         });
@@ -768,7 +781,7 @@ export class PromptService {
 
       if (localBaseVersion) {
         const baseComparison = this.repository.compareConfigContent(
-          localConfigData,
+          resolvedConfigData,
           localBaseVersion.configData as Record<string, unknown>,
         );
 
@@ -786,7 +799,7 @@ export class PromptService {
           remoteVersion,
           differences:
             this.repository.compareConfigContent(
-              localConfigData,
+              resolvedConfigData,
               remoteConfigData,
             ).differences ?? [],
           remoteConfigData,
@@ -802,7 +815,7 @@ export class PromptService {
         remoteVersion,
         differences:
           this.repository.compareConfigContent(
-            localConfigData,
+            resolvedConfigData,
             remoteConfigData,
           ).differences ?? [],
         remoteConfigData,
