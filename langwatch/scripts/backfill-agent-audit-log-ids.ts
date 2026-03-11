@@ -5,11 +5,10 @@
  * generated agent ID in args, making those events invisible in the history drawer.
  *
  * Strategy:
- *   - agents.create: find the Agent row created by the same user in the same
- *     project within 60s of the audit log timestamp, write its id into args.id
+ *   - agents.create: find the Agent row created in the same project within 60s
+ *     of the audit log timestamp. Skips logs with no projectId or ambiguous matches.
  *   - agents.copy: find the Agent row with copiedFromAgentId = args.agentId
- *     created by the same user in the target project within 60s, write its id
- *     into args.newAgentId
+ *     created in the target project within 60s. Skips ambiguous matches.
  *
  * Run with:
  *   DATABASE_URL=... npx tsx scripts/backfill-agent-audit-log-ids.ts
@@ -37,22 +36,35 @@ async function backfillCreate() {
   let patched = 0;
 
   for (const log of filteredLogs) {
+    if (!log.projectId) {
+      console.warn(`  [SKIP] log ${log.id} — no projectId on audit log`);
+      continue;
+    }
+
     const windowStart = new Date(log.createdAt.getTime() - WINDOW_MS);
     const windowEnd = new Date(log.createdAt.getTime() + WINDOW_MS);
 
-    const agent = await prisma.agent.findFirst({
+    const candidates = await prisma.agent.findMany({
       where: {
-        projectId: log.projectId ?? undefined,
+        projectId: log.projectId,
         createdAt: { gte: windowStart, lte: windowEnd },
       },
       orderBy: { createdAt: "asc" },
     });
 
-    if (!agent) {
+    if (candidates.length === 0) {
       console.warn(`  [SKIP] log ${log.id} — no matching agent found`);
       continue;
     }
 
+    if (candidates.length > 1) {
+      console.warn(
+        `  [SKIP] log ${log.id} — ambiguous: ${candidates.length} agents match the time window (ids: ${candidates.map((a) => a.id).join(", ")})`,
+      );
+      continue;
+    }
+
+    const agent = candidates[0]!;
     const updatedArgs = { ...(log.args as Record<string, unknown>), id: agent.id };
 
     if (DRY_RUN) {
@@ -84,6 +96,11 @@ async function backfillCopy() {
   let patched = 0;
 
   for (const log of logs) {
+    if (!log.projectId) {
+      console.warn(`  [SKIP] log ${log.id} — no projectId on audit log`);
+      continue;
+    }
+
     const args = log.args as Record<string, unknown>;
     const sourceAgentId = args["agentId"] as string | undefined;
 
@@ -95,20 +112,28 @@ async function backfillCopy() {
     const windowStart = new Date(log.createdAt.getTime() - WINDOW_MS);
     const windowEnd = new Date(log.createdAt.getTime() + WINDOW_MS);
 
-    const agent = await prisma.agent.findFirst({
+    const candidates = await prisma.agent.findMany({
       where: {
         copiedFromAgentId: sourceAgentId,
-        projectId: log.projectId ?? undefined,
+        projectId: log.projectId,
         createdAt: { gte: windowStart, lte: windowEnd },
       },
       orderBy: { createdAt: "asc" },
     });
 
-    if (!agent) {
+    if (candidates.length === 0) {
       console.warn(`  [SKIP] log ${log.id} — no matching copied agent found`);
       continue;
     }
 
+    if (candidates.length > 1) {
+      console.warn(
+        `  [SKIP] log ${log.id} — ambiguous: ${candidates.length} agents match the time window (ids: ${candidates.map((a) => a.id).join(", ")})`,
+      );
+      continue;
+    }
+
+    const agent = candidates[0]!;
     const updatedArgs = { ...args, newAgentId: agent.id };
 
     if (DRY_RUN) {

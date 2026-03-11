@@ -224,7 +224,8 @@ export class AgentService {
   }
 
   /**
-   * Returns the audit log history for a specific agent, enriched with user info.
+   * Returns recent audit log history for a specific agent, enriched with user info.
+   * Capped at the 100 most recent entries.
    */
   async getHistory(
     agentId: string,
