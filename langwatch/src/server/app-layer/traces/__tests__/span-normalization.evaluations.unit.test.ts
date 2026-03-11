@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { OtlpSpan } from "../../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import { CanonicalizeSpanAttributesService } from "../canonicalisation/canonicalizeSpanAttributesService";
 import { ATTR_KEYS } from "../canonicalisation/extractors/_constants";
 import { SpanNormalizationPipelineService } from "../span-normalization.service";
 
-const service = SpanNormalizationPipelineService.create();
+const service = new SpanNormalizationPipelineService(
+  new CanonicalizeSpanAttributesService(),
+);
 
 function makeOtlpSpanWithEvaluation(
   evalPayload: Record<string, unknown>,
@@ -94,7 +97,7 @@ describe("SpanNormalizationPipelineService — SDK evaluation events", () => {
       );
 
       const evalEvents = normalized.events.filter(
-        (e) => e.name === "langwatch.evaluation.custom",
+        (e: { name: string }) => e.name === "langwatch.evaluation.custom",
       );
       expect(evalEvents).toHaveLength(1);
     });
