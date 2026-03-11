@@ -51,15 +51,10 @@ describe("Prompt tracing", () => {
     });
 
     it("should set prompt metadata attributes", () => {
+      // New combined format: handle:version
       expect(getSpan?.attributes[attributes.ATTR_LANGWATCH_PROMPT_ID]).toBe(
-        "prompt_123",
+        "test-prompt-1:1",
       );
-      expect(
-        getSpan?.attributes[attributes.ATTR_LANGWATCH_PROMPT_VERSION_ID],
-      ).toMatch(/^prompt_version_\d+$/);
-      expect(
-        getSpan?.attributes[attributes.ATTR_LANGWATCH_PROMPT_VERSION_NUMBER],
-      ).toBeTypeOf("number");
     });
 
     it("should set output data", () => {
@@ -106,17 +101,10 @@ describe("Prompt tracing", () => {
     });
 
     it("should set prompt metadata attributes", () => {
+      // New combined format: handle:version
       expect(compileSpan?.attributes[attributes.ATTR_LANGWATCH_PROMPT_ID]).toBe(
-        "prompt_123",
+        "test-prompt-1:1",
       );
-      expect(
-        compileSpan?.attributes[attributes.ATTR_LANGWATCH_PROMPT_VERSION_ID],
-      ).toMatch(/^prompt_version_\d+$/);
-      expect(
-        compileSpan?.attributes[
-          attributes.ATTR_LANGWATCH_PROMPT_VERSION_NUMBER
-        ],
-      ).toBeTypeOf("number");
     });
 
     it("should set output data", () => {
