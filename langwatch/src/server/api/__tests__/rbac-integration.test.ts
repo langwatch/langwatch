@@ -1434,42 +1434,35 @@ describe("RBAC Integration Tests", () => {
     });
 
     describe("when non-EXTERNAL user (MEMBER) has VIEWER team role", () => {
-      it("grants full VIEWER permissions (all :view permissions)", async () => {
-        mockPrisma.project.findUnique.mockResolvedValue({
-          team: {
-            id: "team-1",
-            organizationId: "org-1",
-            members: [
-              { userId: "user-123", role: TeamUserRole.VIEWER, assignedRoleId: null },
-            ],
-            organization: {
-              members: [{ role: OrganizationUserRole.MEMBER }],
+      it.each([
+        "datasets:view",
+        "prompts:view",
+        "secrets:view",
+      ] as Permission[])(
+        "grants %s",
+        async (permission) => {
+          mockPrisma.project.findUnique.mockResolvedValue({
+            team: {
+              id: "team-1",
+              organizationId: "org-1",
+              members: [
+                { userId: "user-123", role: TeamUserRole.VIEWER, assignedRoleId: null },
+              ],
+              organization: {
+                members: [{ role: OrganizationUserRole.MEMBER }],
+              },
             },
-          },
-        });
+          });
 
-        // VIEWER gets datasets:view, prompts:view, etc. — these are NOT restricted for MEMBER org role
-        const datasetsResult = await resolveProjectPermission(
-          { prisma: mockPrisma, session: mockSession },
-          "project-1",
-          "datasets:view" as Permission,
-        );
-        expect(datasetsResult.permitted).toBe(true);
+          const result = await resolveProjectPermission(
+            { prisma: mockPrisma, session: mockSession },
+            "project-1",
+            permission,
+          );
 
-        const promptsResult = await resolveProjectPermission(
-          { prisma: mockPrisma, session: mockSession },
-          "project-1",
-          "prompts:view" as Permission,
-        );
-        expect(promptsResult.permitted).toBe(true);
-
-        const secretsResult = await resolveProjectPermission(
-          { prisma: mockPrisma, session: mockSession },
-          "project-1",
-          "secrets:view" as Permission,
-        );
-        expect(secretsResult.permitted).toBe(true);
-      });
+          expect(result.permitted).toBe(true);
+        },
+      );
     });
 
     describe("when non-EXTERNAL user (ADMIN org role) accesses resources", () => {

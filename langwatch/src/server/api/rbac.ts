@@ -94,9 +94,6 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Triggers
     "triggers:view",
     "triggers:manage",
-    // Workflows
-    "workflows:view",
-    "workflows:manage",
     // Prompts
     "prompts:view",
     "prompts:manage",
@@ -137,9 +134,6 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Triggers
     "triggers:view",
     "triggers:manage",
-    // Workflows
-    "workflows:view",
-    "workflows:manage",
     // Prompts
     "prompts:view",
     "prompts:manage",

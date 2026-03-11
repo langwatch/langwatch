@@ -679,12 +679,6 @@ export const DashboardLayout = ({
   );
 };
 
-/**
- * Overlay that blocks the content area when a lite member navigates
- * to a restricted route. Opens the restriction modal on mount and
- * renders a semi-transparent backdrop so the page remains visible
- * but non-interactive.
- */
 function LiteMemberRestrictionOverlay() {
   const { isRestricted } = useLiteMemberGuard();
   const { openLiteMemberRestriction } = useUpgradeModalStore();
