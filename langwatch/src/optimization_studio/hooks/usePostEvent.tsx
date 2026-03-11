@@ -122,7 +122,7 @@ export const usePostEvent = () => {
         // Process each event
         onEvent: (serverEvent) => {
           // Log the event
-          logger.info({ serverEvent, event }, "received message");
+          logger.debug({ serverEvent, event }, "received message");
 
           // Handle the event with the workflow store
           handleServerMessage(serverEvent);
@@ -220,10 +220,17 @@ export const useHandleServerMessage = ({
             clearTimeout(pythonDisconnectedTimeout);
             pythonDisconnectedTimeout = null;
           }
-          logger.info("python is alive, setting status to connected");
+          logger.debug("python is alive, setting status to connected");
           setSocketStatus("connected");
           break;
         case "component_state_change":
+          logger.debug(
+            {
+              componentId: message.payload.component_id,
+              status: message.payload.execution_state?.status,
+            },
+            "component_state_change received",
+          );
           setComponentExecutionState(
             message.payload.component_id,
             message.payload.execution_state,
@@ -243,6 +250,10 @@ export const useHandleServerMessage = ({
           // let the user open it themselves if they want to inspect results
           break;
         case "execution_state_change":
+          logger.debug(
+            { status: message.payload.execution_state?.status },
+            "execution_state_change received",
+          );
           setWorkflowExecutionState(message.payload.execution_state);
           if (message.payload.execution_state?.status === "error") {
             alertOnError(message.payload.execution_state.error);
@@ -255,6 +266,13 @@ export const useHandleServerMessage = ({
             message.type === "evaluation_state_change"
               ? message.payload.evaluation_state
               : message.payload.evaluation_run;
+          logger.debug(
+            {
+              status: evaluationState?.status,
+              progress: evaluationState?.progress,
+            },
+            `${message.type} received`,
+          );
           const currentEvaluationState = getWorkflow().state.evaluation;
           setEvaluationState(evaluationState);
           if (evaluationState?.status === "error") {
@@ -280,6 +298,10 @@ export const useHandleServerMessage = ({
           }
           break;
         case "error":
+          logger.error(
+            { message: message.payload.message },
+            "error event received from server",
+          );
           checkIfUnreachableErrorMessage(message.payload.message);
           stopWorkflowIfRunning(message.payload.message);
           alertOnError(message.payload.message);
@@ -287,6 +309,7 @@ export const useHandleServerMessage = ({
         case "debug":
           break;
         case "done":
+          logger.debug("stream completed (done event received)");
           break;
         default:
           toaster.create({

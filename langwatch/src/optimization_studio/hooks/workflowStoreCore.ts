@@ -10,6 +10,7 @@ import {
 } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import { DEFAULT_MAX_TOKENS, DEFAULT_MODEL } from "~/utils/constants";
+import { createLogger } from "~/utils/logger";
 import { LlmConfigInputTypes } from "../../types";
 import { snakeCaseToPascalCase } from "../../utils/stringCasing";
 import type {
@@ -21,6 +22,8 @@ import type {
 } from "../types/dsl";
 import { hasDSLChanged } from "../utils/dslUtils";
 import { findLowestAvailableName, nameToId } from "../utils/nodeUtils";
+
+const logger = createLogger("langwatch:studio:workflowStore");
 
 export type SocketStatus = "disconnected" | "connecting-python" | "connected";
 
@@ -166,6 +169,28 @@ export const getWorkflow = (state: State) => {
   };
 };
 
+/**
+ * Strips transient UI state (selected, dragging, execution_state) from the
+ * workflow before serialization (autosave, execution payloads). This prevents
+ * UI-only state from being persisted to the database.
+ */
+export const serializeWorkflow = <T extends { nodes: Node[]; edges: Edge[] }>(
+  workflow: T,
+): T => {
+  return {
+    ...workflow,
+    nodes: workflow.nodes.map((node) => {
+      const { selected, dragging, ...rest } = node;
+      const { execution_state, ...dataRest } = rest.data as any;
+      return { ...rest, data: dataRest };
+    }) as T["nodes"],
+    edges: workflow.edges.map((edge) => {
+      const { selected, ...rest } = edge;
+      return rest;
+    }) as T["edges"],
+  };
+};
+
 export const removeInvalidEdges = ({
   nodes,
   edges,
@@ -184,7 +209,21 @@ export const removeInvalidEdges = ({
       const [targetHandleGroup, targetHandleIdentifier] =
         edge.targetHandle?.split(".") ?? [null, null];
 
-      if (!source || !target) return false;
+      if (!source || !target) {
+        logger.warn(
+          {
+            edgeId: edge.id,
+            source: edge.source,
+            target: edge.target,
+            sourceHandle: edge.sourceHandle,
+            targetHandle: edge.targetHandle,
+            reason: !source ? "source node not found" : "target node not found",
+          },
+          "dropping edge: node missing",
+        );
+        console.trace("removeInvalidEdges: dropping edge (node missing)");
+        return false;
+      }
 
       const sourceHandles = source.data[
         sourceHandleGroup as any
@@ -202,6 +241,23 @@ export const removeInvalidEdges = ({
       const targetValid =
         !Array.isArray(targetHandles) ||
         targetHandles.some((f) => f.identifier === targetHandleIdentifier);
+
+      if (!sourceValid || !targetValid) {
+        logger.warn(
+          {
+            edgeId: edge.id,
+            source: edge.source,
+            target: edge.target,
+            sourceHandle: edge.sourceHandle,
+            targetHandle: edge.targetHandle,
+            reason: !sourceValid
+              ? `source handle identifier '${sourceHandleIdentifier}' not found in '${sourceHandleGroup}' array`
+              : `target handle identifier '${targetHandleIdentifier}' not found in '${targetHandleGroup}' array`,
+          },
+          "dropping edge: handle identifier missing",
+        );
+        console.trace("removeInvalidEdges: dropping edge (handle missing)");
+      }
 
       return sourceValid && targetValid;
     }),
@@ -361,7 +417,32 @@ export const store = (
   setWorkflow: (
     workflow: Partial<Workflow> | ((current: Workflow) => Partial<Workflow>),
   ) => {
-    set(workflow);
+    const resolved =
+      typeof workflow === "function" ? workflow(get().getWorkflow()) : workflow;
+    const keys = Object.keys(resolved);
+    logger.debug({ keys }, "setWorkflow: updating workflow");
+    if ("edges" in resolved) {
+      const currentEdges = get().edges;
+      const newEdges = (resolved as { edges: Edge[] }).edges;
+      if (newEdges && newEdges.length < currentEdges.length) {
+        logger.warn(
+          {
+            before: currentEdges.length,
+            after: newEdges.length,
+            removed: currentEdges
+              .filter((e) => !newEdges.some((ne: Edge) => ne.id === e.id))
+              .map((e) => ({
+                id: e.id,
+                source: e.source,
+                target: e.target,
+              })),
+          },
+          "setWorkflow: edges count decreased",
+        );
+        console.trace("setWorkflow: edges decreased");
+      }
+    }
+    set(resolved);
   },
   setPreviousWorkflow: (workflow: Workflow | undefined) => {
     set({ previousWorkflow: workflow });
@@ -375,6 +456,14 @@ export const store = (
     });
   },
   onNodesChange: (changes: NodeChange[]) => {
+    const removeChanges = changes.filter((c) => c.type === "remove");
+    if (removeChanges.length > 0) {
+      logger.warn(
+        { removeChanges },
+        "onNodesChange: REMOVING nodes",
+      );
+      console.trace("onNodesChange: removing nodes");
+    }
     set({
       nodes: applyNodeChanges(changes, get().nodes),
     });
@@ -385,6 +474,17 @@ export const store = (
     });
   },
   onEdgesChange: (changes: EdgeChange[]) => {
+    const removeChanges = changes.filter((c) => c.type === "remove");
+    if (removeChanges.length > 0) {
+      logger.warn(
+        {
+          removeChanges,
+          totalChanges: changes.length,
+        },
+        "onEdgesChange: REMOVING edges",
+      );
+      console.trace("onEdgesChange: removing edges");
+    }
     set({
       edges: applyEdgeChanges(changes, get().edges),
     });
@@ -412,6 +512,26 @@ export const store = (
     set({ nodes });
   },
   setEdges: (edges: Edge[]) => {
+    const currentEdges = get().edges;
+    if (edges.length < currentEdges.length) {
+      logger.warn(
+        {
+          before: currentEdges.length,
+          after: edges.length,
+          removed: currentEdges
+            .filter((e) => !edges.some((ne) => ne.id === e.id))
+            .map((e) => ({
+              id: e.id,
+              source: e.source,
+              target: e.target,
+              sourceHandle: e.sourceHandle,
+              targetHandle: e.targetHandle,
+            })),
+        },
+        "setEdges: edges count decreased",
+      );
+      console.trace("setEdges: edges decreased");
+    }
     set({ edges });
   },
   edgeConnectToNewHandle: (
@@ -480,6 +600,20 @@ export const store = (
   },
   setNode: (node: Partial<Node> & { id: string }, newId?: string) => {
     const oldId = node.id;
+    const dataEntries = Object.entries(node.data ?? {});
+    const filteredOutKeys = dataEntries
+      .filter(([, v]) => v === undefined)
+      .map(([k]) => k);
+    if (filteredOutKeys.length > 0) {
+      logger.warn(
+        { nodeId: oldId, filteredOutKeys },
+        "setNode: undefined values filtered from node.data to prevent overwriting existing fields",
+      );
+    }
+    logger.debug(
+      { nodeId: oldId, newId, dataKeys: dataEntries.map(([k]) => k) },
+      "setNode: updating node",
+    );
     const updatedNodes = get().nodes.map((n) =>
       n.id === oldId
         ? {
@@ -491,9 +625,7 @@ export const store = (
               // existing arrays (e.g., inputs/outputs) when a partial update
               // passes undefined for a field that hasn't changed.
               ...Object.fromEntries(
-                Object.entries(node.data ?? {}).filter(
-                  ([, v]) => v !== undefined,
-                ),
+                dataEntries.filter(([, v]) => v !== undefined),
               ),
               ...(newId && n.type === "code"
                 ? {
@@ -595,6 +727,7 @@ export const store = (
     });
   },
   deleteNode: (id: string) => {
+    logger.info({ nodeId: id }, "deleteNode: deleting node");
     set(
       removeInvalidEdges({
         nodes: removeInvalidDecorations(
@@ -639,6 +772,10 @@ export const store = (
     id: string,
     executionState: BaseComponent["execution_state"],
   ) => {
+    logger.debug(
+      { componentId: id, status: executionState?.status },
+      "setComponentExecutionState: execution state changed",
+    );
     set({
       nodes: get().nodes.map((node) => {
         if (node.id === id) {

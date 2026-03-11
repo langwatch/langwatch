@@ -123,56 +123,125 @@ export function SignaturePromptEditorBridge({
         const oldInputs = signatureNode.data.inputs ?? [];
         const newInputs = config.inputs;
 
-        data.inputs = newInputs.map((i) => {
-          // Preserve field.value from existing input (hardcoded value mappings)
-          const existing = oldInputs.find(
-            (e) => e.identifier === i.identifier,
-          );
-          return {
-            identifier: i.identifier,
-            type: i.type as Field["type"],
-            ...(existing?.value != null ? { value: existing.value } : {}),
-          };
-        });
+        // Check if the identifiers are identical — if so, skip the update
+        // to avoid triggering removeInvalidEdges unnecessarily.
+        const oldIds = new Set(oldInputs.map((i) => i.identifier));
+        const newIds = new Set(newInputs.map((i) => i.identifier));
+        const identifiersMatch =
+          oldIds.size === newIds.size &&
+          [...oldIds].every((id) => newIds.has(id));
 
-        // When input identifiers change (e.g. prompt loads with "input" but
-        // node had "question"), update existing edge targetHandles to match
-        // the new identifiers so edges stay connected.
-        if (oldInputs.length > 0 && newInputs.length > 0) {
+        if (!identifiersMatch) {
+          // Find edges connected to this node's inputs
           const currentEdges = getWorkflow().edges;
-          let updatedEdges = currentEdges;
+          const connectedEdges = currentEdges.filter(
+            (e) => e.target === node.id && e.targetHandle?.startsWith("inputs."),
+          );
 
-          for (
-            let idx = 0;
-            idx < Math.min(oldInputs.length, newInputs.length);
-            idx++
-          ) {
-            const oldId = oldInputs[idx]?.identifier;
-            const newId = newInputs[idx]?.identifier;
-            if (oldId && newId && oldId !== newId) {
-              updatedEdges = updatedEdges.map((edge) => {
-                if (
-                  edge.target === node.id &&
-                  edge.targetHandle === `inputs.${oldId}`
-                ) {
-                  return { ...edge, targetHandle: `inputs.${newId}` };
-                }
-                return edge;
-              });
+          // Build the new inputs list, preserving field.value from existing inputs
+          data.inputs = newInputs.map((i) => {
+            const existing = oldInputs.find(
+              (e) => e.identifier === i.identifier,
+            );
+            return {
+              identifier: i.identifier,
+              type: i.type as Field["type"],
+              ...(existing?.value != null ? { value: existing.value } : {}),
+            };
+          });
+
+          // Also preserve any old inputs that have connected edges but aren't
+          // in the new config — this prevents edge disconnection when the
+          // prompt form syncs during drawer initialization.
+          for (const oldInput of oldInputs) {
+            const hasEdge = connectedEdges.some(
+              (e) => e.targetHandle === `inputs.${oldInput.identifier}`,
+            );
+            const isInNewInputs = newIds.has(oldInput.identifier);
+            if (hasEdge && !isInNewInputs) {
+              (data.inputs as Field[]).push(oldInput);
             }
           }
 
-          if (updatedEdges !== currentEdges) {
-            setEdges(updatedEdges);
+          // Remap edges when old inputs have edges but the identifier changed.
+          // Match by position only when old input had an edge and new input
+          // doesn't already exist in oldInputs (i.e., it's genuinely new).
+          if (oldInputs.length > 0 && newInputs.length > 0) {
+            let updatedEdges = currentEdges;
+
+            for (
+              let idx = 0;
+              idx < Math.min(oldInputs.length, newInputs.length);
+              idx++
+            ) {
+              const oldId = oldInputs[idx]?.identifier;
+              const newId = newInputs[idx]?.identifier;
+              if (oldId && newId && oldId !== newId) {
+                // Only remap if the old identifier has an edge and the new
+                // identifier doesn't already exist as a separate old input
+                // (which would mean it's a reorder, not a rename).
+                const oldHasEdge = connectedEdges.some(
+                  (e) => e.targetHandle === `inputs.${oldId}`,
+                );
+                const newExistsInOld = oldInputs.some(
+                  (i) => i.identifier === newId,
+                );
+                if (oldHasEdge && !newExistsInOld) {
+                  updatedEdges = updatedEdges.map((edge) => {
+                    if (
+                      edge.target === node.id &&
+                      edge.targetHandle === `inputs.${oldId}`
+                    ) {
+                      return { ...edge, targetHandle: `inputs.${newId}` };
+                    }
+                    return edge;
+                  });
+                }
+              }
+            }
+
+            if (updatedEdges !== currentEdges) {
+              setEdges(updatedEdges);
+            }
           }
         }
+        // If identifiers match, don't set data.inputs — node already has the right inputs
       }
 
       if (config.outputs) {
-        data.outputs = config.outputs.map((o) => ({
-          identifier: o.identifier,
-          type: o.type as Field["type"],
-        }));
+        const oldOutputs = signatureNode.data.outputs ?? [];
+        const newOutputs = config.outputs;
+        const oldOutIds = new Set(oldOutputs.map((o) => o.identifier));
+        const newOutIds = new Set(newOutputs.map((o) => o.identifier));
+        const outputsMatch =
+          oldOutIds.size === newOutIds.size &&
+          [...oldOutIds].every((id) => newOutIds.has(id));
+
+        if (!outputsMatch) {
+          // Find edges connected to this node's outputs
+          const currentEdges = getWorkflow().edges;
+          const connectedOutEdges = currentEdges.filter(
+            (e) =>
+              e.source === node.id &&
+              e.sourceHandle?.startsWith("outputs."),
+          );
+
+          data.outputs = newOutputs.map((o) => ({
+            identifier: o.identifier,
+            type: o.type as Field["type"],
+          }));
+
+          // Preserve old outputs that have connected edges but aren't in new config
+          for (const oldOutput of oldOutputs) {
+            const hasEdge = connectedOutEdges.some(
+              (e) => e.sourceHandle === `outputs.${oldOutput.identifier}`,
+            );
+            const isInNewOutputs = newOutIds.has(oldOutput.identifier);
+            if (hasEdge && !isInNewOutputs) {
+              (data.outputs as Field[]).push(oldOutput);
+            }
+          }
+        }
       }
 
       setNode({ id: node.id, data });
@@ -181,6 +250,7 @@ export function SignaturePromptEditorBridge({
     [
       node.id,
       signatureNode.data.inputs,
+      signatureNode.data.outputs,
       setNode,
       updateNodeInternals,
       getWorkflow,

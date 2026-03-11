@@ -5,13 +5,16 @@ import { useShallow } from "zustand/react/shallow";
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
+import { createLogger } from "~/utils/logger";
 import { useVersionState } from "../components/History";
 import type { StudioClientEvent } from "../types/events";
 import { hasDSLChanged } from "../utils/dslUtils";
 import { mergeLocalConfigsIntoDsl } from "../utils/mergeLocalConfigs";
 import { usePostEvent } from "./usePostEvent";
 
-import { useWorkflowStore } from "./useWorkflowStore";
+import { useWorkflowStore, serializeWorkflow } from "./useWorkflowStore";
+
+const logger = createLogger("langwatch:studio:evaluation");
 
 /**
  * This is the non-socket version of the useEvaluationExecution hook.
@@ -62,6 +65,13 @@ export const useRunEvalution = () => {
       workflow.state.evaluation?.run_id === triggerTimeout.run_id &&
       workflow.state.evaluation?.status === triggerTimeout.timeout_on_status
     ) {
+      logger.warn(
+        {
+          run_id: triggerTimeout.run_id,
+          timeout_on_status: triggerTimeout.timeout_on_status,
+        },
+        "evaluation timeout triggered",
+      );
       setEvaluationState({
         status: "error",
         error: "Timeout",
@@ -109,6 +119,11 @@ export const useRunEvalution = () => {
 
       const run_id = `run_${nanoid()}`;
       const workflow = getWorkflow();
+      logger.info(
+        { run_id, workflowId, evaluate_on: evaluate_on ?? "full" },
+        "evaluation starting",
+      );
+
       const hasChanges =
         latestVersion?.autoSaved &&
         (previousVersion?.dsl
@@ -130,7 +145,11 @@ export const useRunEvalution = () => {
                 newDsl: getWorkflow(),
               });
             commitMessage = (commitMessageResponse as string) ?? "autosaved";
-          } catch {
+          } catch (err) {
+            logger.error(
+              { error: err },
+              "evaluation: error auto-generating version description",
+            );
             toaster.create({
               title: "Error auto-generating version description",
               type: "error",
@@ -145,17 +164,22 @@ export const useRunEvalution = () => {
             projectId: project.id,
             workflowId,
             commitMessage,
-            dsl: {
+            dsl: serializeWorkflow({
               ...workflow,
               version: nextVersion,
-            },
+            }),
           });
           versionId = versionResponse.id;
+          logger.info(
+            { version: nextVersion, versionId },
+            "evaluation: auto-committed new version",
+          );
 
           setWorkflow({ version: nextVersion });
 
           void trpc.workflow.getVersions.invalidate();
-        } catch {
+        } catch (err) {
+          logger.error({ error: err }, "evaluation: error saving version");
           toaster.create({
             title: "Error saving version",
             type: "error",
@@ -207,6 +231,7 @@ export const useRunEvalution = () => {
 
   const stopEvaluation = useCallback(
     ({ run_id }: { run_id: string }) => {
+      logger.info({ run_id }, "evaluation stopping");
       const workflow = getWorkflow();
       const current_state = workflow.state.evaluation?.status;
       if (current_state === "waiting") {
@@ -236,7 +261,7 @@ export const useRunEvalution = () => {
         });
       }, 10_000);
     },
-    [setEvaluationState],
+    [setEvaluationState, getWorkflow, setTriggerTimeout, postEvent],
   );
 
   return {
