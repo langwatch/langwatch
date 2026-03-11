@@ -78,7 +78,9 @@ A shorter workflow for bug fixes. Skips planning, challenge, user approval, and 
 - If issues found → invoke `/code` with reviewer feedback
 - If approved → mark task as `completed`
 
-### 5. Browser Verification
+### 5. Browser Verification (Conditional)
+**Only when the bug affects browser-observable behavior** (UI rendering, user interactions, page navigation, etc.). Skip for backend-only, infra, script, or docs changes.
+
 - Start an isolated dev instance: `scripts/dev-up.sh`
   - Wait for it to complete — it writes `.dev-port` with the app URL
   - Read `.dev-port` to get `APP_PORT` and `BASE_URL`
@@ -156,7 +158,9 @@ Used for feature requests, enhancements, and all non-bug issues.
 - If issues found → invoke `/code` with reviewer feedback
 - If approved → mark task as `completed`
 
-### 8. Browser Verification (Required)
+### 8. Browser Verification (Conditional)
+**Only when acceptance criteria describe browser-observable behavior** (UI rendering, user interactions, page navigation, visual changes). Skip for backend-only, infra, script, or docs features.
+
 - Mark browser-test task as `in_progress`
 - Start an isolated dev instance: `scripts/dev-up.sh`
   - Wait for it to complete — it writes `.dev-port` with the app URL
@@ -181,9 +185,9 @@ Before completing, verify you didn't make mistakes:
 - Did you skip any reviewer recommendations without justification?
 
 **Test Coverage:**
-- Check the feature file for `@unit`, `@integration` tags
+- Check the feature file for `@unit`, `@integration`, and `@e2e` tags
 - Verify tests exist for EACH tagged scenario
-- If a scenario is tagged `@integration` but only unit tests exist, that's incomplete
+- If a scenario is tagged `@integration` or `@e2e` but only unit tests exist, that's incomplete
 
 **Acceptance Criteria:**
 - Re-read the feature file acceptance criteria
