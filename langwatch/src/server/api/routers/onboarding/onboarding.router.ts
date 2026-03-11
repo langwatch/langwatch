@@ -71,13 +71,21 @@ export const onboardingRouter = createTRPCRouter({
         }
 
         try {
-          await getApp().notifications.sendSlackSignupEvent({
+          const signupPayload = {
             userName: ctx.session.user.name,
             userEmail: ctx.session.user.email,
             organizationName: orgResult.organization.name,
             phoneNumber: input.phoneNumber,
-            utmCampaign: input.signUpData?.utmCampaign,
-          });
+            signUpData: input.signUpData,
+          };
+
+          await Promise.all([
+            getApp().notifications.sendSlackSignupEvent({
+              ...signupPayload,
+              utmCampaign: input.signUpData?.utmCampaign,
+            }),
+            getApp().notifications.sendHubspotSignupForm(signupPayload),
+          ]);
         } catch (error) {
           captureException(error);
         }

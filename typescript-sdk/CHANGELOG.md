@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.18.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.17.0...typescript-sdk@v0.18.0) (2026-03-11)
+
+
+### Features
+
+* **prompts:** open existing prompt from trace when prompt handle is present ([#2223](https://github.com/langwatch/langwatch/issues/2223)) ([428f8ff](https://github.com/langwatch/langwatch/commit/428f8ff22b8cb5a4be5942d5b26bf2d62f44d7be))
+
+
+### Bug Fixes
+
+* **deps:** pin transitive npm deps for Dependabot high-severity alerts ([#2220](https://github.com/langwatch/langwatch/issues/2220)) ([a179da1](https://github.com/langwatch/langwatch/commit/a179da1d55859b8c9a476a6443dbfaf6bf632af3))
+
 ## [0.17.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.16.1...typescript-sdk@v0.17.0) (2026-03-08)
 
 

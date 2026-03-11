@@ -188,7 +188,7 @@ describe("EvaluatorChip", () => {
       });
 
       describe("when no target output exists", () => {
-        it("does not show 'Run' menu item", async () => {
+        it("shows disabled 'Run' menu item", async () => {
           const onRerun = vi.fn();
           const user = userEvent.setup();
 
@@ -208,9 +208,10 @@ describe("EvaluatorChip", () => {
           const chip = screen.getByText("Exact Match");
           await user.click(chip);
 
-          expect(screen.queryByText("Run")).not.toBeInTheDocument();
-          expect(screen.queryByText("Rerun")).not.toBeInTheDocument();
+          const runItem = screen.getByText("Run").closest("[data-disabled]");
+          expect(runItem).toBeInTheDocument();
         });
+
       });
     });
 
@@ -356,7 +357,7 @@ describe("EvaluatorChip", () => {
     });
 
     describe("when no rows have target outputs", () => {
-      it("does not show 'Run on all rows'", async () => {
+      it("shows disabled 'Run on all rows'", async () => {
         const onRunOnAllRows = vi.fn();
         const user = userEvent.setup();
 
@@ -376,8 +377,12 @@ describe("EvaluatorChip", () => {
         const chip = screen.getByText("Exact Match");
         await user.click(chip);
 
-        expect(screen.queryByText("Run on all rows")).not.toBeInTheDocument();
+        const item = screen
+          .getByText("Run on all rows")
+          .closest("[data-disabled]");
+        expect(item).toBeInTheDocument();
       });
+
     });
 
     describe("when evaluator is running", () => {

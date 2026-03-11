@@ -2,14 +2,14 @@
  * Unit tests for scenario-run merge and deduplication logic.
  *
  * Covers:
- * - ES wins when both sources have data for the same run
+ * - Stored entries win when both sources share a scenarioRunId
  * - Non-overlapping entries from both sources are preserved
- * - Edge cases: no queued jobs, no ES data
+ * - Edge cases: no queued jobs, no stored data
  */
 
 import { describe, it, expect } from "vitest";
 import { ScenarioRunStatus } from "../../scenarios/scenario-event.enums";
-import { buildDeduplicationKey, mergeRunData } from "../scenario-run.utils";
+import { mergeRunData } from "../scenario-run.utils";
 import type { ScenarioRunData } from "../scenario-event.types";
 
 function makeRunData(overrides: Partial<ScenarioRunData> = {}): ScenarioRunData {
@@ -19,12 +19,7 @@ function makeRunData(overrides: Partial<ScenarioRunData> = {}): ScenarioRunData 
     scenarioRunId: "run_1",
     name: "Angry refund request",
     description: null,
-    metadata: {
-      langwatch: {
-        targetReferenceId: "target_1",
-        targetType: "prompt" as const,
-      },
-    },
+    metadata: null,
     status: ScenarioRunStatus.SUCCESS,
     results: null,
     messages: [],
@@ -34,29 +29,13 @@ function makeRunData(overrides: Partial<ScenarioRunData> = {}): ScenarioRunData 
   };
 }
 
-describe("buildDeduplicationKey()", () => {
-  it("builds key from scenarioId, targetReferenceId, and batchRunId", () => {
-    const run = makeRunData();
-    expect(buildDeduplicationKey(run)).toBe("scen_1::target_1::batch_1");
-  });
-
-  describe("when targetReferenceId is missing", () => {
-    it("uses empty string for targetReferenceId", () => {
-      const run = makeRunData({ metadata: null });
-      expect(buildDeduplicationKey(run)).toBe("scen_1::::batch_1");
-    });
-  });
-});
-
 describe("mergeRunData()", () => {
-  describe("given ES and queued rows with no overlap", () => {
-    const esRuns = [makeRunData({ scenarioId: "scen_1" })];
+  describe("given stored and queued rows with no overlap", () => {
+    const esRuns = [makeRunData({ scenarioRunId: "scenariorun_aaa" })];
     const queuedRuns = [
       makeRunData({
-        scenarioId: "scen_2",
-        scenarioRunId: "job_2",
+        scenarioRunId: "scenariorun_bbb",
         status: ScenarioRunStatus.QUEUED,
-        metadata: { langwatch: { targetReferenceId: "target_2", targetType: "prompt" as const } },
       }),
     ];
 
@@ -65,55 +44,53 @@ describe("mergeRunData()", () => {
       expect(result).toHaveLength(2);
     });
 
-    it("places ES rows first", () => {
+    it("places stored rows first", () => {
       const result = mergeRunData({ esRuns, queuedRuns });
-      expect(result[0]?.scenarioId).toBe("scen_1");
-      expect(result[1]?.scenarioId).toBe("scen_2");
+      expect(result[0]?.scenarioRunId).toBe("scenariorun_aaa");
+      expect(result[1]?.scenarioRunId).toBe("scenariorun_bbb");
     });
   });
 
-  describe("given overlapping entries (same scenario+target+batch)", () => {
+  describe("given overlapping entries (same scenarioRunId)", () => {
     const esRun = makeRunData({
-      scenarioId: "scen_1",
+      scenarioRunId: "scenariorun_same",
       status: ScenarioRunStatus.SUCCESS,
-      scenarioRunId: "es_run_1",
     });
     const queuedRun = makeRunData({
-      scenarioId: "scen_1",
+      scenarioRunId: "scenariorun_same",
       status: ScenarioRunStatus.QUEUED,
-      scenarioRunId: "job_run_1",
     });
 
-    it("returns only the ES version", () => {
+    it("returns only the stored version", () => {
       const result = mergeRunData({ esRuns: [esRun], queuedRuns: [queuedRun] });
       expect(result).toHaveLength(1);
-      expect(result[0]?.scenarioRunId).toBe("es_run_1");
+      expect(result[0]?.scenarioRunId).toBe("scenariorun_same");
       expect(result[0]?.status).toBe(ScenarioRunStatus.SUCCESS);
     });
   });
 
   describe("given no queued jobs", () => {
-    const esRuns = [makeRunData(), makeRunData({ scenarioId: "scen_2", scenarioRunId: "run_2" })];
+    const esRuns = [
+      makeRunData({ scenarioRunId: "scenariorun_aaa" }),
+      makeRunData({ scenarioRunId: "scenariorun_bbb" }),
+    ];
 
-    it("returns only ES data", () => {
+    it("returns only stored data", () => {
       const result = mergeRunData({ esRuns, queuedRuns: [] });
       expect(result).toHaveLength(2);
       expect(result).toEqual(esRuns);
     });
   });
 
-  describe("given no ES data", () => {
+  describe("given no stored data", () => {
     const queuedRuns = [
       makeRunData({
-        scenarioId: "scen_1",
+        scenarioRunId: "scenariorun_aaa",
         status: ScenarioRunStatus.QUEUED,
-        scenarioRunId: "job_1",
       }),
       makeRunData({
-        scenarioId: "scen_2",
+        scenarioRunId: "scenariorun_bbb",
         status: ScenarioRunStatus.RUNNING,
-        scenarioRunId: "job_2",
-        metadata: { langwatch: { targetReferenceId: "target_2", targetType: "prompt" as const } },
       }),
     ];
 
@@ -125,49 +102,21 @@ describe("mergeRunData()", () => {
     });
   });
 
-  describe("given repeat > 1 with partial completion", () => {
-    // 3 queued jobs for the same scenario+target+batch (repeat=3)
-    // 1 already completed in ES
-    const esRuns = [
-      makeRunData({ scenarioId: "scen_1", scenarioRunId: "es_run_0" }),
-    ];
-    const queuedRuns = [
-      makeRunData({ scenarioId: "scen_1", status: ScenarioRunStatus.QUEUED, scenarioRunId: "job_0" }),
-      makeRunData({ scenarioId: "scen_1", status: ScenarioRunStatus.QUEUED, scenarioRunId: "job_1" }),
-      makeRunData({ scenarioId: "scen_1", status: ScenarioRunStatus.QUEUED, scenarioRunId: "job_2" }),
-    ];
-
-    it("keeps surplus queued rows not yet matched by ES", () => {
-      const result = mergeRunData({ esRuns, queuedRuns });
-      // 1 ES + 2 surplus queued = 3 total
-      expect(result).toHaveLength(3);
-      expect(result[0]?.scenarioRunId).toBe("es_run_0");
-      expect(result.filter((r) => r.status === ScenarioRunStatus.QUEUED)).toHaveLength(2);
-    });
-  });
-
   describe("given mixed overlap and unique entries", () => {
     const esRuns = [
-      makeRunData({ scenarioId: "scen_1", scenarioRunId: "es_1" }),
-      makeRunData({
-        scenarioId: "scen_3",
-        scenarioRunId: "es_3",
-        metadata: { langwatch: { targetReferenceId: "target_3", targetType: "prompt" as const } },
-      }),
+      makeRunData({ scenarioRunId: "scenariorun_aaa" }),
+      makeRunData({ scenarioRunId: "scenariorun_ccc" }),
     ];
     const queuedRuns = [
       // Overlaps with esRuns[0] — should be filtered out
       makeRunData({
-        scenarioId: "scen_1",
+        scenarioRunId: "scenariorun_aaa",
         status: ScenarioRunStatus.QUEUED,
-        scenarioRunId: "job_1",
       }),
       // Unique — should be included
       makeRunData({
-        scenarioId: "scen_2",
+        scenarioRunId: "scenariorun_bbb",
         status: ScenarioRunStatus.QUEUED,
-        scenarioRunId: "job_2",
-        metadata: { langwatch: { targetReferenceId: "target_2", targetType: "prompt" as const } },
       }),
     ];
 
@@ -175,10 +124,16 @@ describe("mergeRunData()", () => {
       const result = mergeRunData({ esRuns, queuedRuns });
       expect(result).toHaveLength(3);
       const ids = result.map((r) => r.scenarioRunId);
-      expect(ids).toContain("es_1");
-      expect(ids).toContain("es_3");
-      expect(ids).toContain("job_2");
-      expect(ids).not.toContain("job_1");
+      expect(ids).toContain("scenariorun_aaa");
+      expect(ids).toContain("scenariorun_ccc");
+      expect(ids).toContain("scenariorun_bbb");
+    });
+
+    it("does not include the duplicate queued entry", () => {
+      const result = mergeRunData({ esRuns, queuedRuns });
+      const queuedResults = result.filter((r) => r.status === ScenarioRunStatus.QUEUED);
+      expect(queuedResults).toHaveLength(1);
+      expect(queuedResults[0]?.scenarioRunId).toBe("scenariorun_bbb");
     });
   });
 });

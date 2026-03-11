@@ -21,6 +21,7 @@ import {
 } from "~/server/evaluations-v3/execution/orchestrator";
 import { executionRequestSchema } from "~/server/evaluations-v3/execution/types";
 import { createLogger } from "~/utils/logger/server";
+import { trackServerEvent } from "~/server/posthog";
 import { captureException } from "~/utils/posthogErrorCapture";
 
 const logger = createLogger("langwatch:evaluations-v3:execute");
@@ -144,6 +145,13 @@ app.post("/execute", zValidator("json", executionRequestSchema), async (c) => {
 
         // End stream on done or stopped
         if (event.type === "done" || event.type === "stopped") {
+          if (session?.user?.id) {
+            trackServerEvent({
+              userId: session.user.id,
+              event: "evaluation_ran",
+              projectId,
+            });
+          }
           break;
         }
       }

@@ -15,6 +15,7 @@ import {
   type AuthMiddlewareVariables,
   type OrganizationMiddlewareVariables,
   organizationMiddleware,
+  resourceLimitMiddleware,
 } from "../../middleware";
 import {
   type PromptServiceMiddlewareVariables,
@@ -190,6 +191,7 @@ app.get(
 // Create prompt with initial version
 app.post(
   "/",
+  resourceLimitMiddleware("prompts"),
   describeRoute({
     description: "Create a new prompt with default initial version",
     responses: {

@@ -57,9 +57,9 @@ export function normalizeJob({ job, state }: NormalizeJobParams): ScenarioRunDat
   return {
     scenarioId: data.scenarioId,
     batchRunId: data.batchRunId,
-    // Queued jobs don't have a scenarioRunId yet (generated at execution time).
-    // Use the BullMQ job ID as a stable placeholder for table rendering.
-    scenarioRunId: job.id ?? `job_${data.scenarioId}_${data.batchRunId}`,
+    // Prefer the pre-assigned scenarioRunId from job data (generated at queue time).
+    // Fall back to BullMQ job ID as a stable placeholder for table rendering.
+    scenarioRunId: data.scenarioRunId ?? job.id ?? `job_${data.scenarioId}_${data.batchRunId}`,
     name: data.scenarioName ?? null,
     description: null,
     metadata: {

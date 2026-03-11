@@ -34,6 +34,7 @@ function makeJobData(overrides: Partial<ScenarioJob> = {}): ScenarioJob {
     target: { type: "http", referenceId: "target_1" },
     setId: "__internal__suite_1__suite",
     batchRunId: "batch_1",
+    scenarioRunId: "scenariorun_test123",
     ...overrides,
   };
 }
@@ -88,9 +89,9 @@ describe("normalizeJob()", () => {
       expect(result?.metadata?.langwatch?.targetReferenceId).toBe("target_1");
     });
 
-    it("uses job ID as scenarioRunId placeholder", () => {
+    it("uses pre-assigned scenarioRunId from job data", () => {
       const result = normalizeJob({ job, state: "waiting" });
-      expect(result?.scenarioRunId).toBe("scenario_proj_1_scen_1_target_1_batch_1_0");
+      expect(result?.scenarioRunId).toBe("scenariorun_test123");
     });
 
     it("returns zero durationInMs", () => {
@@ -101,6 +102,16 @@ describe("normalizeJob()", () => {
     it("returns empty messages array", () => {
       const result = normalizeJob({ job, state: "waiting" });
       expect(result?.messages).toEqual([]);
+    });
+  });
+
+  describe("given a job without scenarioRunId in data (legacy)", () => {
+    const data = { ...makeJobData(), scenarioRunId: undefined } as unknown as ScenarioJob;
+    const job = makeJob({ id: "job_fallback", data });
+
+    it("falls back to job ID as scenarioRunId", () => {
+      const result = normalizeJob({ job, state: "waiting" });
+      expect(result?.scenarioRunId).toBe("job_fallback");
     });
   });
 

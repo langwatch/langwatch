@@ -52,7 +52,7 @@ Otherwise → use the **Feature Workflow** (the full plan → code → review lo
 
 ## Bug-Fix Workflow
 
-A shorter workflow for bug fixes. Skips planning, challenge, user approval, test review, and E2E — focuses on investigation, minimal fix with regression test, verification, and review.
+A shorter workflow for bug fixes. Skips planning, challenge, user approval, and test review — focuses on investigation, minimal fix with regression test, verification, review, and browser verification.
 
 ### 1. Investigate
 - Mark task as `in_progress`
@@ -78,14 +78,44 @@ A shorter workflow for bug fixes. Skips planning, challenge, user approval, test
 - If issues found → invoke `/code` with reviewer feedback
 - If approved → mark task as `completed`
 
-### 5. Commit and Draft PR
-- Invoke `/commit-push` to commit all changes and push to remote
-- Create a **draft** PR using `gh pr create --draft` with a summary of the work done
+### 5. Browser Verification (Conditional)
+**Only when the bug affects browser-observable behavior** (UI rendering, user interactions, page navigation, etc.). Skip for backend-only, infra, script, or docs changes.
+
+- Invoke `/browser-test` with the bug description
+  - `/browser-test` handles everything: dev instance lifecycle, browser verification, screenshots, commit/push, and PR description update
+- If verification fails → invoke `/code` with findings, re-run `/browser-test`
+  - Max 2 iterations, then escalate to user
+
+### 6. Commit and Draft PR
+- Invoke `/commit-push` to commit all remaining changes and push to remote
+- Create a **draft** PR using `gh pr create --draft` with a summary of the work done (browser-test screenshots are already in the PR body)
 - Include the issue number in the PR body for linking
 
-### 6. Complete
-- Verify all tasks are completed
-- Report summary to user (include PR URL)
+### 7. Verify and Finish
+
+Before reporting done, run through this checklist. **Every item must pass** — if any fails, go back to the appropriate step.
+
+**Deliverables:**
+- [ ] All tasks in the task list are marked `completed`
+- [ ] `git status` is clean — no uncommitted changes
+- [ ] `git push` is up to date with remote — no unpushed commits
+- [ ] PR exists and is linked to the issue
+
+**Quality:**
+- [ ] `pnpm typecheck` passes
+- [ ] All relevant tests pass (`pnpm test:unit`, `pnpm test:integration`)
+- [ ] Regression test exists for the bug fix
+
+**PR completeness:**
+- [ ] PR description includes what the bug was and how it was fixed
+- [ ] If browser-test ran: screenshots are visible in the PR body (not just local files)
+- [ ] CI is green or only has expected pending checks (e.g. `check-approval-or-label`)
+
+**Issue alignment:**
+- [ ] Re-read the original issue — does the fix actually address the reported problem?
+- [ ] Are there any acceptance criteria in the issue that aren't covered?
+
+If everything passes → report summary to user (include PR URL). If anything fails → fix it first.
 
 ## Feature Workflow
 
@@ -120,7 +150,7 @@ Used for feature requests, enhancements, and all non-bug issues.
 ### 4. Test Review (Required)
 - Invoke `/test-review` on the feature file
 - Validates pyramid placement before any implementation begins
-- Checks that `@e2e`, `@integration`, `@unit` tags are appropriate
+- Checks that `@integration`, `@unit` tags are appropriate
 - If violations found:
   - Update the feature file to fix tag placement
   - Re-run `/test-review` to confirm fixes
@@ -143,19 +173,17 @@ Used for feature requests, enhancements, and all non-bug issues.
 - If issues found → invoke `/code` with reviewer feedback
 - If approved → mark task as `completed`
 
-### 8. E2E Verification (Conditional)
-- Check if feature file has `@e2e` tagged scenarios
-- If yes:
-  - Mark e2e task as `in_progress`
-  - Invoke `/e2e` with the feature file path
-  - E2E workflow: explores app → generates tests → runs until passing
-  - If tests fail due to **test issues** → healer fixes them
-  - If tests fail due to **app bugs** (behavior doesn't match spec):
-    - Invoke `/code` with the failing scenario and expected vs actual behavior
-    - After fix, re-run `/e2e` to verify
-    - Max 2 iterations, then escalate to user
-  - If all pass → mark task as `completed`
-- If no `@e2e` scenarios → skip to Complete
+### 8. Browser Verification (Conditional)
+**Only when acceptance criteria describe browser-observable behavior** (UI rendering, user interactions, page navigation, visual changes). Skip for backend-only, infra, script, or docs features.
+
+- Mark browser-test task as `in_progress`
+- Invoke `/browser-test` with the feature file path
+  - `/browser-test` handles everything: dev instance lifecycle, browser verification, screenshots, commit/push, and PR description update
+- If verification fails due to **app bugs**:
+  - Invoke `/code` with the failing scenario and expected vs actual behavior
+  - After fix, re-run `/browser-test` to verify
+  - Max 2 iterations, then escalate to user
+- If all scenarios pass → mark task as `completed`
 
 ### 9. Self-Check (Required)
 
@@ -167,9 +195,9 @@ Before completing, verify you didn't make mistakes:
 - Did you skip any reviewer recommendations without justification?
 
 **Test Coverage:**
-- Check the feature file for `@unit`, `@integration`, `@e2e` tags
+- Check the feature file for `@unit`, `@integration`, and `@e2e` tags
 - Verify tests exist for EACH tagged scenario
-- If a scenario is tagged `@integration` but only unit tests exist, that's incomplete
+- If a scenario is tagged `@integration` or `@e2e` but only unit tests exist, that's incomplete
 
 **Acceptance Criteria:**
 - Re-read the feature file acceptance criteria
@@ -177,20 +205,43 @@ Before completing, verify you didn't make mistakes:
 
 If ANY check fails:
 1. Do NOT proceed to Complete
-2. Go back to the appropriate step (Implement, Review, or E2E)
+2. Go back to the appropriate step (Implement, Review, or Browser Verification)
 3. Fix the gap before continuing
 
 This self-check exists because it's easy to rationalize skipping work. Don't.
 
 ### 10. Commit and Draft PR
-- Invoke `/commit-push` to commit all changes and push to remote
-- Create a **draft** PR using `gh pr create --draft` with a summary of the work done
+- Invoke `/commit-push` to commit all remaining changes and push to remote
+- Create a **draft** PR using `gh pr create --draft` with a summary of the work done (browser-test screenshots are already in the PR body)
 - Include the issue number in the PR body for linking
 
-### 11. Complete
-- Verify all tasks are completed
-- Verify self-check passed
-- Report summary to user (include PR URL and E2E test status if applicable)
+### 11. Verify and Finish
+
+Before reporting done, run through this checklist. **Every item must pass** — if any fails, go back to the appropriate step.
+
+**Deliverables:**
+- [ ] All tasks in the task list are marked `completed`
+- [ ] Self-check (step 9) passed
+- [ ] `git status` is clean — no uncommitted changes
+- [ ] `git push` is up to date with remote — no unpushed commits
+- [ ] PR exists and is linked to the issue
+
+**Quality:**
+- [ ] `pnpm typecheck` passes
+- [ ] All relevant tests pass (`pnpm test:unit`, `pnpm test:integration`)
+- [ ] Test coverage matches feature file tags (`@unit`, `@integration`, `@e2e`)
+
+**PR completeness:**
+- [ ] PR description summarizes the feature and links to the issue
+- [ ] If browser-test ran: screenshots are visible in the PR body (not just local files)
+- [ ] CI is green or only has expected pending checks (e.g. `check-approval-or-label`)
+
+**Spec alignment:**
+- [ ] Re-read the feature file — every scenario is implemented and tested
+- [ ] Re-read the original issue — every acceptance criterion is covered
+- [ ] No TODO comments left in the code for work that should have been done
+
+If everything passes → report summary to user (include PR URL and browser verification status). If anything fails → fix it first.
 
 ## Boundaries
 
@@ -199,6 +250,10 @@ You delegate, you don't implement:
 - `/test-review` validates pyramid placement before implementation
 - `/code` writes code and runs tests
 - `/review` checks quality
-- `/e2e` generates and verifies E2E tests
+- `/browser-test` verifies features work in a real browser
+
+You manage infra lifecycle:
+- `scripts/dev-up.sh` starts an isolated dev instance (writes `.dev-port`)
+- `scripts/dev-down.sh` tears it down
 
 Read only feature files and planning docs, not source code.

@@ -85,6 +85,35 @@ export const generateAsciiTree = (spans: Span[]): string => {
   return result;
 };
 
+const SUMMARY_TRUNCATE_LENGTH = 200;
+
+/**
+ * Truncates a string to the given length, appending "..." if truncated.
+ */
+function truncate(value: string, maxLength: number): string {
+  if (value.length <= maxLength) return value;
+  return value.slice(0, maxLength) + "...";
+}
+
+/**
+ * Formats a compact digest from trace summary data (input/output) without
+ * requiring span data. Suitable for search/list views where a quick overview
+ * is sufficient.
+ */
+export function formatTraceSummaryDigest(trace: {
+  input?: { value: string } | null;
+  output?: { value: string } | null;
+}): string {
+  const inputStr = trace.input?.value
+    ? truncate(String(trace.input.value), SUMMARY_TRUNCATE_LENGTH)
+    : "N/A";
+  const outputStr = trace.output?.value
+    ? truncate(String(trace.output.value), SUMMARY_TRUNCATE_LENGTH)
+    : "N/A";
+
+  return `Input: ${inputStr}\nOutput: ${outputStr}`;
+}
+
 /**
  * Convert a Trace to an LLM-friendly format with human-readable timestamps
  * and an ASCII tree representation.

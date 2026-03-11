@@ -123,8 +123,6 @@ describe("applySpanToSummary attribute forwarding", () => {
       let state = applySpanToSummary({ state: createInitState(), span: span1 });
       state = applySpanToSummary({ state, span: span2 });
 
-      // mergedAttributes uses { ...spanAttributes, ...state.attributes }
-      // so state.attributes (first-wins) takes priority
       expect(state.attributes["gen_ai.agent.name"]).toBe("first-agent");
     });
   });

@@ -108,4 +108,87 @@ describe("LangWatchExtractor", () => {
       });
     });
   });
+
+  describe("evaluation events (langwatch.evaluation.custom)", () => {
+    describe("when span has a langwatch.evaluation.custom event", () => {
+      it("maps first evaluation to GenAI semconv attributes", () => {
+        const ctx = createExtractorContext({}, undefined, [
+          {
+            name: "langwatch.evaluation.custom",
+            timeUnixMs: Date.now(),
+            attributes: {
+              json_encoded_event: JSON.stringify({
+                name: "toxicity",
+                score: 0.95,
+                label: "safe",
+              }),
+            },
+          },
+        ]);
+
+        extractor.apply(ctx);
+
+        expect(ctx.setAttrIfAbsent).toHaveBeenCalledWith(
+          ATTR_KEYS.GEN_AI_EVALUATION_NAME,
+          "toxicity",
+        );
+        expect(ctx.setAttrIfAbsent).toHaveBeenCalledWith(
+          ATTR_KEYS.GEN_AI_EVALUATION_SCORE_VALUE,
+          0.95,
+        );
+        expect(ctx.setAttrIfAbsent).toHaveBeenCalledWith(
+          ATTR_KEYS.GEN_AI_EVALUATION_SCORE_LABEL,
+          "safe",
+        );
+      });
+
+      it("handles already-parsed json_encoded_event (from parseJsonStringValues)", () => {
+        const ctx = createExtractorContext({}, undefined, [
+          {
+            name: "langwatch.evaluation.custom",
+            timeUnixMs: Date.now(),
+            attributes: {
+              // After parseJsonStringValues, JSON strings become objects
+              json_encoded_event: { name: "toxicity", score: 0.8 },
+            },
+          },
+        ]);
+
+        extractor.apply(ctx);
+
+        expect(ctx.setAttrIfAbsent).toHaveBeenCalledWith(
+          ATTR_KEYS.GEN_AI_EVALUATION_NAME,
+          "toxicity",
+        );
+      });
+    });
+
+    describe("when span has no evaluation events", () => {
+      it("does not set GenAI evaluation attributes", () => {
+        const ctx = createExtractorContext({});
+
+        extractor.apply(ctx);
+
+        expect(ctx.out[ATTR_KEYS.GEN_AI_EVALUATION_NAME]).toBeUndefined();
+      });
+    });
+
+    describe("when span has no langwatch.reserved.evaluations attribute", () => {
+      it("does not leak reserved attributes to metadata", () => {
+        const ctx = createExtractorContext({}, undefined, [
+          {
+            name: "langwatch.evaluation.custom",
+            timeUnixMs: Date.now(),
+            attributes: {
+              json_encoded_event: JSON.stringify({ name: "test", score: 1 }),
+            },
+          },
+        ]);
+
+        extractor.apply(ctx);
+
+        expect(ctx.out[ATTR_KEYS.LANGWATCH_RESERVED_EVALUATIONS]).toBeUndefined();
+      });
+    });
+  });
 });
