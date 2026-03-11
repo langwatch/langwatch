@@ -12,11 +12,21 @@ Lessons learned from running `/browser-test` against the LangWatch app.
 
 ## Authentication
 
-- The app uses **Auth0** for login. Navigating to `/auth/signin` triggers a redirect to Auth0's hosted login page.
-- For fresh accounts, you need to **sign up first** — Auth0 will show a "Sign up" link on the login page.
-- After signup, Auth0 shows an **OAuth consent screen** — click "Accept".
-- After successful login, the app redirects back and shows a loading splash while queries resolve. Wait for it.
-- **New accounts hit onboarding** — you'll need to fill in an org name, accept ToS, and pick a product flavour before reaching the main app.
+- Local dev uses **NextAuth credentials** (not Auth0). Navigating to the app URL redirects to `/auth/signin` — a simple Email + Password form with a "Sign in" button.
+- For fresh accounts, click **"Register new account"** on the sign-in page, fill in the credentials, then sign in.
+- After successful login, the app redirects to the dashboard. Dev mode may show a loading splash while Turbopack compiles — wait up to 120s.
+- **New accounts hit onboarding** — you'll need to fill in an org name (`Browser Test Org`), accept ToS, and pick a product flavour before reaching the main app.
+- After auth, you should see the dashboard with "Hello, Browser" and "Browser Test Org" in the header.
+
+### Standard Test Credentials
+
+Always use these credentials — they're shared across `/browser-test`, the stable E2E suite, and verification scripts:
+
+- **Email:** `browser-test@langwatch.ai`
+- **Password:** `BrowserTest123!`
+- **Org name (onboarding):** `Browser Test Org`
+
+Used by `scripts/verify-browser-test.js`, `agentic-e2e-tests/tests/auth.setup.ts`, and interactive `/browser-test` runs. One set of credentials means one test account and reusable auth state across all tools.
 
 ## Chakra UI Gotchas
 
@@ -32,16 +42,28 @@ Lessons learned from running `/browser-test` against the LangWatch app.
 
 ## Screenshots
 
-Always save screenshots to `.browser-test-screenshots/` (gitignored). Never save to repo root.
+Save screenshots to the local artifact directory: `browser-tests/<feature-name>/<YYYY-MM-DD>/screenshots/`.
 
 ```text
-browser_take_screenshot → filename: ".browser-test-screenshots/my-screenshot.png"
+browser_take_screenshot → filename: "browser-tests/plans-comparison/2026-03-11/screenshots/01-sign-in.png"
 ```
+
+Screenshots are **uploaded to img402.dev** (not committed to git). Upload via:
+```bash
+curl -s -F "image=@<path>" https://img402.dev/api/free
+# Returns: {"url":"https://i.img402.dev/abc123.jpg", ...}
+```
+
+Use the returned `https://i.img402.dev/...` URLs in PR descriptions. **Never commit `browser-tests/`** — it is gitignored. Free tier: 1MB max, 7-day retention.
 
 ## After Finishing
 
-1. **Save run notes** in `.claude/skills/browser-test/history/` using the template in `_TEMPLATE.md`.
-2. **Report results** using the summary table format from `SKILL.md`.
+1. **Save report** to `browser-tests/<feature-name>/<YYYY-MM-DD>/report.md` (see SKILL.md for format).
+2. **Report results** to the caller using the summary table format from `SKILL.md`.
+
+## Example Run
+
+See `browser-tests/proof-of-concept/` for a complete proof-of-concept run with screenshots, raw logs, and a report. This was the first successful AI-driven browser verification against a local dev instance.
 
 ## Known Issues
 
