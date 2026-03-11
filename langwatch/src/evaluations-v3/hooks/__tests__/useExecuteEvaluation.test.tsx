@@ -1303,6 +1303,61 @@ describe("useExecuteEvaluation", () => {
       });
     });
 
+    describe("when evaluator has never been run (no prior results)", () => {
+      it("sets evaluator results to running status for a brand new evaluator", async () => {
+        setupStore();
+
+        useEvaluationsV3Store.setState((state) => ({
+          ...state,
+          evaluators: [
+            {
+              id: "eval-new",
+              evaluatorType: "langevals/exact_match",
+              settings: {},
+              inputs: [],
+              mappings: {},
+            },
+          ],
+          results: {
+            ...state.results,
+            targetOutputs: {
+              "target-1": [{ output: "Hello" }, { output: "World" }],
+            },
+            targetMetadata: {
+              "target-1": [
+                { cost: 0.01, duration: 100, traceId: "trace-1" },
+                { cost: 0.02, duration: 200, traceId: "trace-2" },
+              ],
+            },
+            // No evaluatorResults for eval-new — it was just added
+            evaluatorResults: {},
+          },
+        }));
+
+        mockFetchSSE.mockImplementation(async () => {
+          await new Promise(() => {});
+        });
+
+        const { result } = renderHook(() => useExecuteEvaluation());
+
+        act(() => {
+          void result.current.runEvaluatorOnAllRows("target-1", "eval-new");
+        });
+
+        await waitFor(() => {
+          const state = useEvaluationsV3Store.getState();
+
+          // eval-new should be set to "running" even though it never had results before
+          expect(
+            state.results.evaluatorResults["target-1"]?.["eval-new"]?.[0],
+          ).toEqual({ status: "running" });
+          expect(
+            state.results.evaluatorResults["target-1"]?.["eval-new"]?.[1],
+          ).toEqual({ status: "running" });
+        });
+      });
+    });
+
     describe("when scope is evaluator (single cell rerun)", () => {
       it("preserves existing target outputs when rerunning evaluator", async () => {
         setupStore();

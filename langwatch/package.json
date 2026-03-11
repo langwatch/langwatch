@@ -63,11 +63,11 @@
     "@ai-sdk/openai": "^2.0.27",
     "@ai-sdk/openai-compatible": "^1.0.15",
     "@ai-sdk/react": "^3.0.118",
-    "@aws-sdk/client-bedrock-runtime": "^3.721.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.1005.0",
     "@aws-sdk/client-cloudwatch-logs": "^3.987.0",
     "@aws-sdk/client-lambda": "^3.989.0",
-    "@aws-sdk/client-s3": "^3.750.0",
-    "@aws-sdk/client-ses": "^3.645.0",
+    "@aws-sdk/client-s3": "^3.1005.0",
+    "@aws-sdk/client-ses": "^3.1005.0",
     "@bull-board/api": "^6.16.2",
     "@bull-board/hono": "^6.16.2",
     "@chakra-ui/next-js": "^2.4.2",
@@ -291,6 +291,24 @@
     "typescript": "^5.9.3",
     "vitest": "^4.0.17",
     "watch": "^1.0.2"
+  },
+  "overrides": {
+    "braces": "^3.0.3",
+    "cross-spawn": "^7.0.6",
+    "exec-sh": "^0.4.0",
+    "glob": "^11.0.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-is": "19.0.0",
+    "pino": "^10.3.0",
+    "pino-pretty": "^13.0.0",
+    "thread-stream": "^4.0.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "@aws-sdk/xml-builder>fast-xml-parser": "^5.5.1",
+      "@langchain/community>fast-xml-parser": "^5.5.1"
+    }
   },
   "ct3aMetadata": {
     "initVersion": "7.19.0"

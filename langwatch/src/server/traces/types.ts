@@ -82,6 +82,14 @@ export interface PromptStudioSpanResult {
     temperature: number | null;
     maxTokens: number | null;
     topP: number | null;
+    frequencyPenalty: number | null;
+    presencePenalty: number | null;
+    seed: number | null;
+    topK: number | null;
+    minP: number | null;
+    repetitionPenalty: number | null;
+    reasoning: string | null;
+    verbosity: string | null;
     litellmParams: Record<string, unknown>;
   };
   vendor: string | null;

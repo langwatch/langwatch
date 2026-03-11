@@ -483,11 +483,18 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
             const newTargetResults = { ...newEvaluatorResults[cell.targetId] };
             for (const evaluatorId of evaluatorIds) {
               const evalResults = newTargetResults[evaluatorId];
-              if (evalResults && evalResults[cell.rowIndex] !== undefined) {
+              if (isEvaluatorOnlyScope) {
+                // Always set to "running" for evaluator scopes, even if no
+                // prior results exist (freshly added evaluator)
+                const newEvalResults = evalResults ? [...evalResults] : [];
+                newEvalResults[cell.rowIndex] = { status: "running" };
+                newTargetResults[evaluatorId] = newEvalResults;
+              } else if (
+                evalResults &&
+                evalResults[cell.rowIndex] !== undefined
+              ) {
                 const newEvalResults = [...evalResults];
-                newEvalResults[cell.rowIndex] = isEvaluatorOnlyScope
-                  ? { status: "running" }
-                  : undefined;
+                newEvalResults[cell.rowIndex] = undefined;
                 newTargetResults[evaluatorId] = newEvalResults;
               }
             }

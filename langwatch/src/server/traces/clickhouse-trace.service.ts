@@ -18,6 +18,7 @@ import type {
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { generateClickHouseFilterConditions } from "~/server/filters/clickhouse";
 import type { Span, Trace } from "~/server/tracer/types";
+import { LLM_PARAMETER_MAP } from "~/prompts/prompt-playground/llmParameterMap";
 import { createLogger } from "~/utils/logger/server";
 import {
   applyTraceProtections,
@@ -369,6 +370,7 @@ export class ClickHouseTraceService {
   async getAllTracesForProject(
     input: GetAllTracesForProjectInput,
     protections: Protections,
+    options: { includeSpans?: boolean } = {},
   ): Promise<TracesForProjectResult | null> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getAllTracesForProject",
@@ -455,7 +457,7 @@ export class ClickHouseTraceService {
           }
 
           // Build the query with keyset pagination
-          const { traces, totalHits, lastTrace } =
+          let { traces, totalHits, lastTrace } =
             await this.fetchTracesWithPagination(
               input.projectId,
               pageSize,
@@ -467,6 +469,15 @@ export class ClickHouseTraceService {
               filterConditions,
               filterParams,
             );
+
+          // When includeSpans is requested, fetch and attach actual spans
+          if (options.includeSpans && traces.length > 0) {
+            traces = await this.enrichTracesWithSpans(
+              traces,
+              input.projectId,
+              protections,
+            );
+          }
 
           // Generate new scrollId from last trace
           let newScrollId: string | undefined;
@@ -955,12 +966,33 @@ export class ClickHouseTraceService {
       (attrs["gen_ai.request.model"] as string) ??
       (attrs["llm.model"] as string) ??
       null;
-    const temperature = (attrs["gen_ai.request.temperature"] as number) ?? null;
-    const maxTokens = (attrs["gen_ai.request.max_tokens"] as number) ?? null;
-    const topP = (attrs["gen_ai.request.top_p"] as number) ?? null;
     const vendor = (attrs["gen_ai.system"] as string) ?? null;
 
-    const systemPrompt = messages.find((m) => m.role === "system")?.content;
+    // Build llmConfig dynamically from the parameter map
+    const llmConfig: PromptStudioSpanResult["llmConfig"] = {
+      model,
+      systemPrompt: messages.find((m) => m.role === "system")?.content,
+      temperature: null,
+      maxTokens: null,
+      topP: null,
+      frequencyPenalty: null,
+      presencePenalty: null,
+      seed: null,
+      topK: null,
+      minP: null,
+      repetitionPenalty: null,
+      reasoning: null,
+      verbosity: null,
+      litellmParams: {},
+    };
+
+    for (const param of LLM_PARAMETER_MAP) {
+      if (param.otelAttr === null) continue;
+      const raw = attrs[param.otelAttr];
+      if (raw != null) {
+        (llmConfig as Record<string, unknown>)[param.formField] = raw;
+      }
+    }
 
     // Extract metrics
     const promptTokens = attrs["gen_ai.usage.prompt_tokens"] as
@@ -985,14 +1017,7 @@ export class ClickHouseTraceService {
       traceId: row.TraceId,
       spanName: row.SpanName ?? null,
       messages,
-      llmConfig: {
-        model,
-        systemPrompt,
-        temperature,
-        maxTokens,
-        topP,
-        litellmParams: {},
-      },
+      llmConfig,
       vendor,
       error,
       timestamps: {
@@ -1306,6 +1331,39 @@ export class ClickHouseTraceService {
     }
 
     return Array.from(groups.values());
+  }
+
+  /**
+   * Enrich traces (which have empty spans) with actual span data from ClickHouse.
+   *
+   * Fetches spans via fetchTracesWithSpansJoined and replaces the empty span
+   * arrays on each trace with the real spans. Traces whose spans are not found
+   * are returned unchanged (with empty spans).
+   *
+   * @internal
+   */
+  private async enrichTracesWithSpans(
+    traces: Trace[],
+    projectId: string,
+    protections: Protections,
+  ): Promise<Trace[]> {
+    const traceIds = traces.map((t) => t.trace_id);
+    const tracesWithSpans = await this.fetchTracesWithSpansJoined(
+      projectId,
+      traceIds,
+    );
+
+    return traces.map((trace) => {
+      const data = tracesWithSpans.get(trace.trace_id);
+      if (!data || data.spans.length === 0) {
+        return trace;
+      }
+      const mappedSpans = mapNormalizedSpansToSpans(data.spans);
+      return applyTraceProtections(
+        mapTraceSummaryToTrace(data.summary, mappedSpans, projectId),
+        protections,
+      );
+    });
   }
 
   /**
