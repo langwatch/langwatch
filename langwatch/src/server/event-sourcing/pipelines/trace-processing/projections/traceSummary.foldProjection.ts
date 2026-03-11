@@ -336,6 +336,11 @@ function extractAttributes(span: NormalizedSpan): Record<string, string> {
   else if (Array.isArray(labels))
     result["langwatch.labels"] = JSON.stringify(labels);
 
+  const promptId = stringAttr(spanAttrs, "langwatch.prompt.id");
+  if (promptId && promptId.includes(":")) {
+    result["langwatch.prompt.id"] = promptId;
+  }
+
   for (const [key, value] of Object.entries(spanAttrs)) {
     if (!key.startsWith("metadata.")) continue;
     if (typeof value === "string") result[key] = value;
@@ -693,6 +698,22 @@ function accumulateAttributes({
     ];
     if (union.length > 0) merged["langwatch.labels"] = JSON.stringify(union);
   }
+
+  // Prompt IDs: union across spans
+  const existingPromptIds = state.attributes["langwatch.prompt_ids"];
+  const newPromptId = spanAttrs["langwatch.prompt.id"];
+  if (existingPromptIds || newPromptId) {
+    const union = [
+      ...new Set([
+        ...parseJsonStringArray(existingPromptIds),
+        ...(newPromptId ? [newPromptId] : []),
+      ]),
+    ];
+    if (union.length > 0)
+      merged["langwatch.prompt_ids"] = JSON.stringify(union);
+  }
+  // Remove the per-span key so it doesn't leak into trace-level attributes
+  delete merged["langwatch.prompt.id"];
 
   // Metadata: deep-merge JSON objects, first-wins for primitives
   for (const key of Object.keys(merged)) {
