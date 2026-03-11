@@ -50,6 +50,7 @@ import { LogRecordAppendStore } from "./pipelines/trace-processing/projections/l
 import { MetricRecordAppendStore } from "./pipelines/trace-processing/projections/metricRecordStorage.store";
 import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
 import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
+import { createCustomEvaluationSyncReactor } from "./pipelines/trace-processing/reactors/customEvaluationSync.reactor";
 import { createEvaluationTriggerReactor } from "./pipelines/trace-processing/reactors/evaluationTrigger.reactor";
 import { createSpanStorageBroadcastReactor } from "./pipelines/trace-processing/reactors/spanStorageBroadcast.reactor";
 import { createTraceUpdateBroadcastReactor } from "./pipelines/trace-processing/reactors/traceUpdateBroadcast.reactor";
@@ -126,9 +127,16 @@ export class PipelineRegistry {
   private registerTracePipeline(
     evalPipeline: ReturnType<PipelineRegistry["registerEvaluationPipeline"]>,
   ) {
+    const evalCommands = mapCommands(evalPipeline.commands);
+
     const evaluationTriggerReactor = createEvaluationTriggerReactor({
       monitors: this.deps.monitors,
-      evaluation: mapCommands(evalPipeline.commands).executeEvaluation,
+      evaluation: evalCommands.executeEvaluation,
+    });
+
+    const customEvaluationSyncReactor = createCustomEvaluationSyncReactor({
+      startEvaluation: evalCommands.startEvaluation,
+      completeEvaluation: evalCommands.completeEvaluation,
     });
 
     const traceUpdateBroadcastReactor = createTraceUpdateBroadcastReactor({
@@ -168,6 +176,7 @@ export class PipelineRegistry {
           this.deps.traces.summary.repository,
         ),
         evaluationTriggerReactor,
+        customEvaluationSyncReactor,
         traceUpdateBroadcastReactor,
         spanStorageBroadcastReactor,
       }),
