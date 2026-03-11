@@ -2,6 +2,7 @@ import type { JsonValue } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import { auditLog } from "../../auditLog";
 import {
   codeComponentSchema,
   customComponentSchema,
@@ -116,15 +117,24 @@ export const agentsRouter = createTRPCRouter({
       await enforceLicenseLimit(ctx, input.projectId, "agents");
 
       const agentService = AgentService.create(ctx.prisma);
+      const agentId = `agent_${nanoid()}`;
       // Config is validated by the refine above, safe to cast
-      return await agentService.create({
-        id: `agent_${nanoid()}`,
+      const agent = await agentService.create({
+        id: agentId,
         projectId: input.projectId,
         name: input.name,
         type: input.type,
         config: input.config as AgentComponentConfig,
         workflowId: input.workflowId,
       });
+      void auditLog({
+        userId: ctx.session.user.id,
+        projectId: input.projectId,
+        action: "agent.create",
+        args: { name: input.name, type: input.type },
+        metadata: { agentId },
+      });
+      return agent;
     }),
 
   /**
@@ -148,7 +158,7 @@ export const agentsRouter = createTRPCRouter({
       const agentService = AgentService.create(ctx.prisma);
 
       // Repository will validate config against the type's DSL schema
-      return await agentService.update({
+      const agent = await agentService.update({
         id: input.id,
         projectId: input.projectId,
         data: {
@@ -160,6 +170,14 @@ export const agentsRouter = createTRPCRouter({
           }),
         },
       });
+      void auditLog({
+        userId: ctx.session.user.id,
+        projectId: input.projectId,
+        action: "agent.update",
+        args: { name: input.name, type: input.type },
+        metadata: { agentId: input.id },
+      });
+      return agent;
     }),
 
   /**
@@ -234,6 +252,13 @@ export const agentsRouter = createTRPCRouter({
           });
         }
 
+        void auditLog({
+          userId: ctx.session.user.id,
+          projectId: input.projectId,
+          action: "agent.archive",
+          metadata: { agentId: input.id },
+        });
+
         return {
           agent: archivedAgent,
           archivedWorkflow,
@@ -249,10 +274,17 @@ export const agentsRouter = createTRPCRouter({
     .use(checkProjectPermission("evaluations:manage"))
     .mutation(async ({ ctx, input }) => {
       const agentService = AgentService.create(ctx.prisma);
-      return await agentService.softDelete({
+      const result = await agentService.softDelete({
         id: input.id,
         projectId: input.projectId,
       });
+      void auditLog({
+        userId: ctx.session.user.id,
+        projectId: input.projectId,
+        action: "agent.delete",
+        metadata: { agentId: input.id },
+      });
+      return result;
     }),
 
   /**
@@ -377,6 +409,12 @@ export const agentsRouter = createTRPCRouter({
         }
         throw error;
       }
+      void auditLog({
+        userId: ctx.session.user.id,
+        projectId: input.projectId,
+        action: "agent.copy",
+        metadata: { agentId: input.agentId, targetProjectId: input.projectId },
+      });
     }),
 
   /**
@@ -414,11 +452,18 @@ export const agentsRouter = createTRPCRouter({
           : permittedCopyIds;
 
       try {
-        return await agentService.pushToCopies(
+        const result = await agentService.pushToCopies(
           input.agentId,
           input.projectId,
           copyIdsToPush,
         );
+        void auditLog({
+          userId: ctx.session.user.id,
+          projectId: input.projectId,
+          action: "agent.pushToCopies",
+          metadata: { agentId: input.agentId },
+        });
+        return result;
       } catch (error) {
         if (error instanceof Error) {
           if (error.message === "Agent not found") {
@@ -484,10 +529,17 @@ export const agentsRouter = createTRPCRouter({
         });
       }
       try {
-        return await agentService.syncFromSource(
+        const result = await agentService.syncFromSource(
           input.agentId,
           input.projectId,
         );
+        void auditLog({
+          userId: ctx.session.user.id,
+          projectId: input.projectId,
+          action: "agent.syncFromSource",
+          metadata: { agentId: input.agentId },
+        });
+        return result;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         if (
@@ -505,5 +557,41 @@ export const agentsRouter = createTRPCRouter({
         }
         throw error;
       }
+    }),
+
+  /**
+   * Returns the audit log history for a specific agent.
+   * Used by the "View History" drawer on the agents page.
+   */
+  getHistory: protectedProcedure
+    .input(z.object({ agentId: z.string(), projectId: z.string() }))
+    .use(checkProjectPermission("evaluations:view"))
+    .query(async ({ ctx, input }) => {
+      const logs = await ctx.prisma.auditLog.findMany({
+        where: {
+          projectId: input.projectId,
+          metadata: {
+            path: ["agentId"],
+            equals: input.agentId,
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 100,
+      });
+
+      const userIds = [...new Set(logs.map((l) => l.userId))];
+      const users = await ctx.prisma.user.findMany({
+        where: { id: { in: userIds } },
+        select: { id: true, name: true, email: true },
+      });
+      const usersById = Object.fromEntries(users.map((u) => [u.id, u]));
+
+      return logs.map((log) => ({
+        id: log.id,
+        action: log.action,
+        createdAt: log.createdAt,
+        args: log.args,
+        user: usersById[log.userId] ?? null,
+      }));
     }),
 });
