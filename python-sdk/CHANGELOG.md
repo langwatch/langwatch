@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.14.0...python-sdk@v0.15.0) (2026-03-11)
+
+
+### Features
+
+* **prompts:** open existing prompt from trace when prompt handle is present ([#2223](https://github.com/langwatch/langwatch/issues/2223)) ([428f8ff](https://github.com/langwatch/langwatch/commit/428f8ff22b8cb5a4be5942d5b26bf2d62f44d7be))
+
 ## [0.14.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.13.0...python-sdk@v0.14.0) (2026-03-08)
 
 
