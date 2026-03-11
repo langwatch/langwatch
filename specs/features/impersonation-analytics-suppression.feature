@@ -4,72 +4,54 @@ Feature: Suppress PostHog analytics during admin impersonation
   So that impersonation sessions do not pollute real user metrics
 
   Background:
-    The EE sessionHandler rewrites session.user to the impersonated user and adds
-    an `impersonator` field. Today, neither the client-side PostHog hook
-    (usePostHogIdentify) nor the server-side trackServerEvent checks for this
-    field, so every identify, group, capture, and server event is attributed to
-    the impersonated user.
+    The EE sessionHandler allows admins to impersonate users for support
+    and debugging. During impersonation, all actions appear as if performed
+    by the impersonated user. Analytics events should not be recorded
+    during these sessions to avoid polluting real user metrics.
 
     Design decisions:
-    - Scope: PostHog only (Google Analytics / trackEvent is out of scope)
-    - Client-side: use posthog.opt_out_capturing() / opt_in_capturing() to
-      globally suppress all client-side events including autocapture
-    - Server-side: trackServerEvent accepts a session/user object (not a bare
-      boolean) to centralize the impersonation check and prevent forgotten-caller bugs
-    - Session type: augment next-auth Session to include impersonator field
-    - All server events are suppressed during impersonation, including limit_blocked
-
-  # --- Client-side: usePostHogIdentify hook ---
+    - Scope: PostHog only (Google Analytics is out of scope)
+    - All PostHog events are suppressed during impersonation, including
+      autocapture, page views, identify, group, and server-side events
+    - All server-side tracked events are suppressed, including limit_blocked
 
   @unit
-  Scenario: Disables PostHog capturing during impersonation
-    Given a session with an impersonator field present
-    When the usePostHogIdentify hook runs
-    Then posthog.opt_out_capturing is called
-    And posthog.identify is not called
-    And posthog.group is not called
-    And posthog.capture is not called
+  Scenario: No analytics are recorded during an impersonation session
+    Given an admin is impersonating a user
+    When the impersonated session is active
+    Then no PostHog events are recorded for the impersonated user
+    And no user identification is sent to PostHog
+    And no organization grouping is sent to PostHog
 
   @unit
-  Scenario: Enables PostHog capturing and identifies user without impersonator
-    Given a session without an impersonator field
-    When the usePostHogIdentify hook runs
-    Then posthog.opt_in_capturing is called
-    And posthog.identify is called with the user ID and email
+  Scenario: Analytics resume normally after impersonation ends
+    Given an admin was impersonating a user
+    When the admin stops impersonating and returns to their own session
+    Then the previous impersonated identity is cleared from PostHog
+    And the admin is identified as themselves in PostHog
+    And analytics events resume recording normally
 
   @unit
-  Scenario: Re-enables capturing and re-identifies user after impersonation ends
-    Given the hook previously ran with an impersonated session
-    When the session changes to a normal session without impersonator
-    Then posthog.opt_in_capturing is called
-    And posthog.reset is called
-    And posthog.identify is called with the real user ID
-
-  # --- Server-side: trackServerEvent ---
+  Scenario: Analytics work normally for non-impersonated sessions
+    Given a regular user is logged in without impersonation
+    When the user performs actions in the dashboard
+    Then PostHog records events attributed to that user
+    And the user is identified in PostHog with their ID and email
 
   @unit
-  Scenario: Skips server event capture when session has impersonator
-    Given PostHog is initialized
-    When trackServerEvent is called with a session that has an impersonator
-    Then posthog.capture is not called on the server
+  Scenario: Server-side events are suppressed during impersonation
+    Given an admin is impersonating a user
+    When the impersonated user triggers a tracked server action
+    Then no server-side analytics event is recorded
 
   @unit
-  Scenario: Captures server event normally when session has no impersonator
-    Given PostHog is initialized
-    When trackServerEvent is called with a session without impersonator
-    Then posthog.capture is called with the userId as distinctId
-
-  @unit
-  Scenario: Captures server event normally when no session is provided
-    Given PostHog is initialized
-    When trackServerEvent is called without a session
-    Then posthog.capture is called with the userId as distinctId
-
-  # --- Caller integration: session is passed through ---
+  Scenario: Server-side events record normally without impersonation
+    Given a regular user is logged in without impersonation
+    When the user triggers a tracked server action
+    Then the server-side analytics event is recorded for that user
 
   @integration
-  Scenario: tRPC router passes session to trackServerEvent during impersonation
-    Given an admin is impersonating a user via the EE session handler
-    When a tracked server action completes (e.g. scenario creation)
-    Then trackServerEvent receives the session with impersonator
-    And no analytics event is recorded
+  Scenario: Tracked server actions suppress analytics during impersonation
+    Given an admin is impersonating a user via the session handler
+    When a server action that tracks analytics completes
+    Then no analytics event reaches PostHog
