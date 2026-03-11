@@ -104,7 +104,7 @@ describe("POST /search", () => {
   });
 
   describe("when format is digest", () => {
-    it("does not pass includeSpans to the trace service", async () => {
+    it("passes includeSpans as false by default", async () => {
       await searchRequest({
         startDate: 1000,
         endDate: 5000,
@@ -112,7 +112,7 @@ describe("POST /search", () => {
       });
 
       const options = mockGetAllTracesForProject.mock.calls[0]![2];
-      expect(options).not.toHaveProperty("includeSpans");
+      expect(options.includeSpans).toBe(false);
     });
 
     it("returns compact summary digests instead of full span content", async () => {
@@ -143,6 +143,20 @@ describe("POST /search", () => {
       expect(first).toHaveProperty("output");
       expect(first).toHaveProperty("timestamps");
       expect(first).toHaveProperty("metadata");
+    });
+  });
+
+  describe("when includeSpans is true", () => {
+    it("passes includeSpans true to the trace service", async () => {
+      await searchRequest({
+        startDate: 1000,
+        endDate: 5000,
+        format: "json",
+        includeSpans: true,
+      });
+
+      const options = mockGetAllTracesForProject.mock.calls[0]![2];
+      expect(options.includeSpans).toBe(true);
     });
   });
 

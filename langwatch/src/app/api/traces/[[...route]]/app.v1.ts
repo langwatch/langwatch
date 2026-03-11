@@ -44,6 +44,12 @@ const traceSearchBodySchema = getAllForProjectInput
       .describe(
         "Output format: 'digest' (AI-readable trace digest) or 'json' (full raw data)"
       ),
+    includeSpans: z
+      .boolean()
+      .optional()
+      .describe(
+        "When true, fetches full span data for each trace. Useful for bulk export. Default false."
+      ),
     llmMode: z.boolean().optional(),
   });
 
@@ -78,6 +84,7 @@ app.post(
     const params = c.req.valid("json");
     const {
       format: formatParam,
+      includeSpans,
       llmMode,
       scrollId,
       ...searchFields
@@ -102,6 +109,7 @@ app.post(
       protections,
       {
         downloadMode: true,
+        includeSpans: includeSpans ?? false,
         scrollId: scrollId ?? undefined,
       },
     );
