@@ -96,4 +96,10 @@ export interface PromptStudioSpanResult {
   error: Span["error"] | null;
   timestamps: SpanTimestamps | undefined;
   metrics: LLMSpan["metrics"] | null;
+  /** Prompt handle from span attributes (new combined or old format) */
+  promptHandle: string | null;
+  /** Prompt version number from span attributes (new combined or old format) */
+  promptVersionNumber: number | null;
+  /** Prompt variables extracted from span attributes */
+  promptVariables: Record<string, string> | null;
 }

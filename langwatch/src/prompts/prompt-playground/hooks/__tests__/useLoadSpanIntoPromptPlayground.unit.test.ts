@@ -38,6 +38,9 @@ function buildSpanData(
     error: null,
     timestamps: undefined,
     metrics: null,
+    promptHandle: null,
+    promptVersionNumber: null,
+    promptVariables: null,
   };
 }
 
