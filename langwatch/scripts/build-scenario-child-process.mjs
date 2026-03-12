@@ -40,10 +40,7 @@ await build({
     "pino-pretty",
     "sharp",
   ],
-  // Resolve path aliases from tsconfig.workers.json
-  alias: {
-    "~/*": path.join(packageRoot, "src", "*"),
-  },
+  // Path aliases (~/...) are resolved via tsconfig paths
   tsconfig: path.join(packageRoot, "tsconfig.workers.json"),
   sourcemap: true,
   logLevel: "info",

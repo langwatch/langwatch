@@ -72,15 +72,6 @@ describe("resolveChildProcessSpawn", () => {
         ).toThrow(/Pre-compiled scenario child process bundle not found/);
       });
 
-      it("does not silently fall back to tsx", () => {
-        expect(() =>
-          resolveChildProcessSpawn({
-            packageRoot: PACKAGE_ROOT,
-            nodeEnv: "production",
-          }),
-        ).toThrow();
-      });
-
       it("includes the expected bundle path in the error message", () => {
         expect(() =>
           resolveChildProcessSpawn({

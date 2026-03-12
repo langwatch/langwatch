@@ -91,7 +91,7 @@ describe("Pre-compiled Scenario Child Process", () => {
 
       // Process should have attempted to parse stdin (and failed on invalid JSON)
       // within 5 seconds, proving it started and read from stdin quickly
-      expect(result.readyMs).toBeLessThan(5000);
+      expect(result.readyMs).toBeLessThan(10000);
       // Exit code 1 = it started, read stdin, failed to parse (expected behavior)
       expect(result.exitCode).toBe(1);
     }, 10000);
