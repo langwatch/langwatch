@@ -203,11 +203,11 @@ describe("<GroupRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("failed")).toBeInTheDocument();
+      expect(screen.getByText("1 ✗")).toBeInTheDocument();
       expect(screen.getAllByText("2 runs").length).toBeGreaterThanOrEqual(1);
     });
 
-    it("displays passed and failed counts in summary footer", () => {
+    it("displays compact counts with icons in header", () => {
       const group = makeGroup();
       const summary = computeGroupSummary({ group });
 
@@ -223,8 +223,8 @@ describe("<GroupRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("1 passed")).toBeInTheDocument();
-      expect(screen.getByText("1 failed")).toBeInTheDocument();
+      expect(screen.getByText("1 ✓")).toBeInTheDocument();
+      expect(screen.getByText("1 ✗")).toBeInTheDocument();
     });
   });
 
@@ -286,7 +286,7 @@ describe("<GroupRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("failed")).toBeInTheDocument();
+      expect(screen.getByText("1 ✗")).toBeInTheDocument();
       expect(screen.getAllByText("3 runs").length).toBeGreaterThanOrEqual(1);
     });
   });
@@ -385,7 +385,7 @@ describe("<GroupRow/>", () => {
       );
 
       const batchHeader = screen.getByTestId("batch-sub-header");
-      expect(within(batchHeader).getByText("passed")).toBeInTheDocument();
+      expect(within(batchHeader).getByText("1 ✓")).toBeInTheDocument();
     });
   });
 

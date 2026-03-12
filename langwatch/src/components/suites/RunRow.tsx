@@ -17,7 +17,6 @@ import type { BatchRun, BatchRunSummary } from "./run-history-transforms";
 import { computeIterationMap, getScenarioDisplayNames } from "./run-history-transforms";
 import { ScenarioRunContent } from "./ScenarioRunContent";
 import { RunSummaryCounts } from "./RunSummaryCounts";
-import { formatSummaryStatusLabel } from "./format-run-status-label";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import type { ViewMode } from "./useRunHistoryStore";
 
@@ -113,13 +112,6 @@ export function RunRow({
         )}
         <Box flex={1} />
         <SummaryStatusIcon summary={summary} />
-        <Text
-          fontSize="sm"
-          fontWeight="medium"
-          color={summary.failedCount > 0 ? "red.600" : "green.600"}
-        >
-          {formatSummaryStatusLabel(summary)}
-        </Text>
         <RunSummaryCounts summary={summary} />
       </HStack>
 

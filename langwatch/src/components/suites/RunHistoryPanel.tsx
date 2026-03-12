@@ -374,12 +374,16 @@ export function RunHistoryPanel({
                 : `${groups.length} ${groups.length === 1 ? "group" : "groups"} · `}
               {totals.runCount} {totals.runCount === 1 ? "run" : "runs"}
             </Text>
-            <Text fontSize="sm" color="green.600">
-              {totals.passedCount} passed
-            </Text>
-            <Text fontSize="sm" color="red.600">
-              {totals.failedCount} failed
-            </Text>
+            {totals.passedCount > 0 && (
+              <Text fontSize="sm" color="green.600">
+                {totals.passedCount} ✓
+              </Text>
+            )}
+            {totals.failedCount > 0 && (
+              <Text fontSize="sm" color="red.600">
+                {totals.failedCount} ✗
+              </Text>
+            )}
           </HStack>
         </Box>
       )}

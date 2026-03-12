@@ -1,9 +1,8 @@
 /**
- * Inline summary counts for run/group row headers.
+ * Compact inline summary counts for run/group row headers.
  *
- * Displays passed/failed counts and optionally stalled/cancelled
- * when non-zero. Designed to sit inside an HStack header alongside
- * existing pass rate percentage and status icon.
+ * Displays counts with status icons (✓ passed, ✗ failed, ⏸ stalled, ⊘ cancelled).
+ * Only renders statuses with non-zero counts to keep the display minimal.
  */
 
 import { HStack, Text } from "@chakra-ui/react";
@@ -16,20 +15,24 @@ type RunSummaryCountsProps = {
 export function RunSummaryCounts({ summary }: RunSummaryCountsProps) {
   return (
     <HStack gap={2} data-testid="run-summary-counts">
-      <Text fontSize="xs" color="green.600">
-        {summary.passedCount} passed
-      </Text>
-      <Text fontSize="xs" color="red.600">
-        {summary.failedCount} failed
-      </Text>
+      {summary.passedCount > 0 && (
+        <Text fontSize="xs" color="green.600">
+          {summary.passedCount} ✓
+        </Text>
+      )}
+      {summary.failedCount > 0 && (
+        <Text fontSize="xs" color="red.600">
+          {summary.failedCount} ✗
+        </Text>
+      )}
       {summary.stalledCount > 0 && (
         <Text fontSize="xs" color="yellow.600">
-          {summary.stalledCount} stalled
+          {summary.stalledCount} ⏸
         </Text>
       )}
       {summary.cancelledCount > 0 && (
         <Text fontSize="xs" color="fg.muted">
-          {summary.cancelledCount} cancelled
+          {summary.cancelledCount} ⊘
         </Text>
       )}
     </HStack>

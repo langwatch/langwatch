@@ -41,7 +41,7 @@ describe("<GroupRow/>", () => {
   });
 
   describe("when viewing the header", () => {
-    it("displays passed and failed counts alongside run count", () => {
+    it("displays compact counts with icons alongside run count", () => {
       render(
         <GroupRow
           group={makeGroup()}
@@ -55,11 +55,11 @@ describe("<GroupRow/>", () => {
       );
 
       expect(screen.getByText("5 runs")).toBeInTheDocument();
-      expect(screen.getByText("4 passed")).toBeInTheDocument();
-      expect(screen.getByText("1 failed")).toBeInTheDocument();
+      expect(screen.getByText("4 ✓")).toBeInTheDocument();
+      expect(screen.getByText("1 ✗")).toBeInTheDocument();
     });
 
-    it("displays summary status label with scenario count", () => {
+    it("does not display redundant standalone status label", () => {
       render(
         <GroupRow
           group={makeGroup()}
@@ -72,7 +72,9 @@ describe("<GroupRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("failed")).toBeInTheDocument();
+      // No standalone "passed" or "failed" text -- only compact icons
+      expect(screen.queryByText("passed")).not.toBeInTheDocument();
+      expect(screen.queryByText("failed")).not.toBeInTheDocument();
     });
   });
 
