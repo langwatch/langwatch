@@ -40,6 +40,7 @@ const categoryEvaluators: Record<
     "ragas/context_f1",
   ],
   quality: [
+    "langevals/sentiment",
     "lingua/language_detection",
     "ragas/summarization_score",
     "langevals/valid_format",
