@@ -389,7 +389,7 @@ export function EvaluateModalContent({
           )}
           <HStack width="full">
             <Text fontWeight={500}>
-              {isDatasetLoading ? "Loading dataset..." : `${estimatedTotal} entries`}
+              {isDatasetLoading ? "Loading dataset..." : `${estimatedTotal ?? 0} entries`}
             </Text>
             <Spacer />
             <Tooltip content={isDisabled}>
