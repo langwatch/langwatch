@@ -204,7 +204,7 @@ export function ScenarioTable({
           <Table.Row
             key={row.id}
             cursor="pointer"
-            _hover={{ bg: "gray.50" }}
+            _hover={{ bg: "bg.emphasized" }}
             onClick={() => onRowClick(row.original.id)}
           >
             {row.getVisibleCells().map((cell) => (

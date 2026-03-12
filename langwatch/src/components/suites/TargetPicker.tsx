@@ -146,7 +146,7 @@ export function TargetPicker({
         >
           <HStack gap={2}>
             <AlertTriangle size={14} color="var(--chakra-colors-orange-500)" />
-            <Text fontSize="xs" color="orange.700" _dark={{ color: "orange.200" }}>
+            <Text fontSize="xs" color="orange.fg">
               {archivedTargets.length} archived target{archivedTargets.length > 1 ? "s" : ""} linked:
             </Text>
           </HStack>

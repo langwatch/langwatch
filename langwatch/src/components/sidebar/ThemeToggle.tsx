@@ -4,6 +4,7 @@ import { LuMonitor, LuMoon, LuSun } from "react-icons/lu";
 import { useFeatureFlag } from "../../hooks/useFeatureFlag";
 import { useColorModeValue } from "../ui/color-mode";
 import { MENU_ITEM_HEIGHT } from "./SideMenuLink";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 export type ThemeToggleProps = {
   showLabel?: boolean;
@@ -18,8 +19,16 @@ const themeOptions: { value: ThemeOption; icon: React.ReactNode }[] = [
 ];
 
 export const ThemeToggle = ({ showLabel = true }: ThemeToggleProps) => {
+  const { organization, projectId } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
+
   const { enabled: isDarkModeEnabled } = useFeatureFlag(
-    "release_ui_dark_mode_enabled",
+    "release_ui_dark_mode_enabled", {
+      organizationId: organization?.id,
+      projectId: projectId,
+    },
   );
   const { theme, setTheme } = useTheme();
 

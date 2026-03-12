@@ -62,7 +62,7 @@ export function BatchSection({
         <Text
           fontSize="xs"
           fontWeight="medium"
-          color={batchSummary.failedCount > 0 ? "red.600" : "green.600"}
+          color={batchSummary.failedCount > 0 ? "red.fg" : "green.fg"}
         >
           {formatSummaryStatusLabel(batchSummary)}
         </Text>

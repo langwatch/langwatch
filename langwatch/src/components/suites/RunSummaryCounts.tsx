@@ -16,14 +16,14 @@ type RunSummaryCountsProps = {
 export function RunSummaryCounts({ summary }: RunSummaryCountsProps) {
   return (
     <HStack gap={2} data-testid="run-summary-counts">
-      <Text fontSize="xs" color="green.600">
+      <Text fontSize="xs" color="green.fg">
         {summary.passedCount} passed
       </Text>
-      <Text fontSize="xs" color="red.600">
+      <Text fontSize="xs" color="red.fg">
         {summary.failedCount} failed
       </Text>
       {summary.stalledCount > 0 && (
-        <Text fontSize="xs" color="yellow.600">
+        <Text fontSize="xs" color="yellow.fg">
           {summary.stalledCount} stalled
         </Text>
       )}
