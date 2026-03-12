@@ -288,10 +288,10 @@ describe("evaluatePreconditions()", () => {
       });
     });
 
-    describe("when a trace arrives with spanModels [undefined, 'gpt-4']", () => {
+    describe("when a trace arrives with multiple spanModels including gpt-4", () => {
       it("passes the precondition (ANY semantics)", () => {
         const traceData = makeTraceData({
-          spanModels: ["gpt-4"],
+          spanModels: ["claude-3", "gpt-4"],
         });
         expect(
           evaluatePreconditions({

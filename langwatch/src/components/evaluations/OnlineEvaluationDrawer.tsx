@@ -936,9 +936,11 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
             updates.rule = allowed[0] ?? "is";
           }
 
-          // Reset value for boolean fields
-          if (getFieldValueType(newField) === "boolean") {
-            updates.value = "true";
+          // Reset value when switching between boolean and non-boolean fields
+          const newType = getFieldValueType(newField);
+          const oldType = getFieldValueType(p.field as CheckPreconditionFields);
+          if (newType !== oldType) {
+            updates.value = newType === "boolean" ? "true" : "";
           }
 
           // Clear key/subkey when switching fields
@@ -1258,6 +1260,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                               position="relative"
                             >
                               <Button
+                                aria-label={`Remove precondition ${index + 1}`}
                                 position="absolute"
                                 right={0}
                                 top={0}

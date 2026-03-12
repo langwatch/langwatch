@@ -7,6 +7,7 @@
 UPDATE "Monitor"
 SET "preconditions" = '[{"field":"traces.origin","rule":"is","value":"application"}]'::jsonb
 WHERE "preconditions" IS NULL
+   OR "preconditions"::text = 'null'
    OR "preconditions"::text = '[]'
    OR "preconditions"::text = '{}';
 
