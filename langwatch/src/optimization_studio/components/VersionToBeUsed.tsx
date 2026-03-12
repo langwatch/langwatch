@@ -151,7 +151,7 @@ function NewVersionFields() {
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canSave]);
+  }, [canSave, previousVersion?.dsl]);
 
   return (
     <HStack width="full">
