@@ -1,4 +1,4 @@
-import { Card, Grid, GridItem, Heading, Tabs, VStack } from "@chakra-ui/react";
+import { Card, Grid, GridItem, Heading, Tabs } from "@chakra-ui/react";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { analyticsMetrics } from "../../server/analytics/registry";
 import { TopicsSelector } from "../filters/TopicsSelector";
@@ -187,16 +187,14 @@ export function UserMetrics() {
         </Card.Root>
       </GridItem>
       <GridItem rowSpan={2}>
-        <VStack gap={6}>
-          <Card.Root width="100%" minHeight={isNotQuickwit ? "300px" : "528px"}>
-            <Card.Header paddingBottom={4}>
-              <Heading size="sm">Top Topics</Heading>
-            </Card.Header>
-            <Card.Body maxHeight="240px" overflowY="auto">
-              <TopicsSelector showTitle={false} />
-            </Card.Body>
-          </Card.Root>
-        </VStack>
+        <Card.Root width="100%" height="100%">
+          <Card.Header paddingBottom={4}>
+            <Heading size="sm">Top Topics</Heading>
+          </Card.Header>
+          <Card.Body overflowY="auto">
+            <TopicsSelector showTitle={false} />
+          </Card.Body>
+        </Card.Root>
       </GridItem>
       {isNotQuickwit && (
         <GridItem>
