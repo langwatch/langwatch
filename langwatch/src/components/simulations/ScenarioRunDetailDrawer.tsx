@@ -353,6 +353,7 @@ export function ScenarioRunDetailDrawer({
                         messages={scenarioState.messages ?? []}
                         hideInput
                         smallerView={false}
+                        onViewTrace={setTraceDrawerTraceId}
                       />
                     </Box>
                   </Box>
@@ -421,6 +422,8 @@ export function ScenarioRunDetailDrawer({
         onOpenChange={() => setTraceDrawerTraceId(null)}
         placement="end"
         size="xl"
+        // Override DrawerRoot's modal={false} default — child drawers need
+        // modal behavior for close triggers and outside-click to work.
         modal={true}
       >
         <Drawer.Content paddingX={0} maxWidth="70%">
