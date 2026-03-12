@@ -27,6 +27,7 @@ export const KSUID_RESOURCES = {
   MONITOR: "monitor",
   ORGANIZATION: "organization",
   PROJECT: "project",
+  SCENARIO: "scenario",
   SCENARIO_BATCH: "scenariobatch",
   SCENARIO_RUN: "scenariorun",
   SPAN: "span",
