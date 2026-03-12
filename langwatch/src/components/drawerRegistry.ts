@@ -32,6 +32,7 @@ import { GuardrailsDrawer } from "./evaluations/GuardrailsDrawer";
 import { OnlineEvaluationDrawer } from "./evaluations/OnlineEvaluationDrawer";
 import { EvaluatorCategorySelectorDrawer } from "./evaluators/EvaluatorCategorySelectorDrawer";
 import { EvaluatorEditorDrawer } from "./evaluators/EvaluatorEditorDrawer";
+import { EvaluatorHistoryDrawer } from "./evaluators/EvaluatorHistoryDrawer";
 import { EvaluatorListDrawer } from "./evaluators/EvaluatorListDrawer";
 import { EvaluatorTypeSelectorDrawer } from "./evaluators/EvaluatorTypeSelectorDrawer";
 import { WorkflowSelectorForEvaluatorDrawer } from "./evaluators/WorkflowSelectorForEvaluatorDrawer";
@@ -78,6 +79,7 @@ export const drawers = {
   agentCodeEditor: AgentCodeEditorDrawer,
   agentHttpEditor: AgentHttpEditorDrawer,
   workflowSelector: WorkflowSelectorDrawer,
+  evaluatorHistory: EvaluatorHistoryDrawer,
   evaluatorList: EvaluatorListDrawer,
   evaluatorCategorySelector: EvaluatorCategorySelectorDrawer,
   evaluatorTypeSelector: EvaluatorTypeSelectorDrawer,

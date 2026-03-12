@@ -252,6 +252,11 @@ function Page() {
                 onSyncFromSource={() =>
                   handleSyncFromSource(evaluator.id)
                 }
+                onViewHistory={() =>
+                  openDrawer("evaluatorHistory", {
+                    urlParams: { evaluatorId: evaluator.id },
+                  })
+                }
                 hasEvaluationsManagePermission={hasEvaluationsManagePermission}
               />
             ))}
