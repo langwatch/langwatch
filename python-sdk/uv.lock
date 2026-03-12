@@ -3410,7 +3410,7 @@ examples = [
     { name = "python-dotenv", specifier = "==1.2.1" },
     { name = "strands-agents", extras = ["otel"], specifier = ">=1.14.0,<2.0.0" },
     { name = "streamlit", specifier = ">=1.37.1,<2.0.0" },
-    { name = "unstructured", extras = ["pdf"], specifier = ">=0.18.3" },
+    { name = "unstructured", extras = ["pdf"], specifier = ">=0.18.18" },
     { name = "uvicorn", specifier = ">=0.38.0,<0.41.0" },
 ]
 tests = [
