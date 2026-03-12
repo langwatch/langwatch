@@ -33,6 +33,7 @@ dependencies = [
     "uvicorn>=0.31.1",
     "watchdog>=5.0.3",
     "structlog>=24.1.0",
+    "tornado>=6.5.5",  # security: CVE-2026-31958 (#555)
 ]
 
 [project.optional-dependencies]

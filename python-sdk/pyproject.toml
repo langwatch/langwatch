@@ -106,6 +106,7 @@ examples = [
     "langsmith>=0.6.3",  # security: CVE-2026-25528 (#394)
     "pypdf>=6.8.0",  # security: CVE-2026-31826 (#543)
     "strands-agents[otel]>=1.14.0,<2.0.0",
+    "tornado>=6.5.5",  # security: CVE-2026-31958 (#555)
     "nltk>=3.9.3",
     "unstructured[pdf]>=0.18.18",
 ]
