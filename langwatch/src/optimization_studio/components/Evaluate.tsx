@@ -332,7 +332,7 @@ export function EvaluateModalContent({
 
   const needsACommitMessage = canSave && !commitMessage;
 
-  const isDatasetLoading = datasetQuery.isLoading;
+  const isDatasetLoading = total === undefined && datasetQuery.isFetching;
 
   const isDisabled = hasProvidersWithoutCustomKeys
     ? "Set up your API keys to run evaluations"
