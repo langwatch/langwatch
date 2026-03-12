@@ -28,7 +28,7 @@ import { api } from "~/utils/api";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { TraceDetails } from "../traces/TraceDetails";
 import { Drawer } from "../ui/drawer";
-import { CustomCopilotKitChat } from "./CustomCopilotKitChat";
+import { ConversationArea } from "./ConversationArea";
 import { ScenarioRunActions } from "./ScenarioRunActions";
 import { ScenarioRunStatusIcon } from "./ScenarioRunStatusIcon";
 import { SimulationConsole } from "./simulation-console/SimulationConsole";
@@ -341,22 +341,11 @@ export function ScenarioRunDetailDrawer({
                 flexDirection="column"
                 width="full"
               >
-                {/* Conversation — hidden when empty (e.g. stalled runs) */}
-                {(scenarioState.messages ?? []).length > 0 && (
-                  <Box
-                    paddingX={6}
-                    paddingY={6}
-                    background="bg.muted"
-                  >
-                    <Box borderRadius="md" overflow="hidden">
-                      <CustomCopilotKitChat
-                        messages={scenarioState.messages ?? []}
-                        hideInput
-                        smallerView={false}
-                      />
-                    </Box>
-                  </Box>
-                )}
+                {/* Conversation — shows thinking indicator when in progress */}
+                <ConversationArea
+                  messages={scenarioState.messages ?? []}
+                  status={scenarioState.status}
+                />
 
                 {/* Results */}
                 <Box
