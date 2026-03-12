@@ -96,7 +96,7 @@ export function ExternalSetDetailPanel({
     },
   );
 
-  const runData = runDataResult?.runs;
+  const runData = runDataResult && "runs" in runDataResult ? runDataResult.runs : undefined;
 
   // Fetch scenarios for filter options
   const { data: scenarios } = api.scenarios.getAll.useQuery(
