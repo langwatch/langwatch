@@ -224,6 +224,52 @@ export class AgentService {
   }
 
   /**
+   * Returns recent audit log history for a specific agent, enriched with user info.
+   * Capped at the 100 most recent entries.
+   */
+  async getHistory(
+    agentId: string,
+    projectId: string,
+  ): Promise<
+    {
+      id: string;
+      action: string;
+      createdAt: Date;
+      args: unknown;
+      user: { id: string; name: string | null; email: string | null } | null;
+    }[]
+  > {
+    const logs = await this.prisma.auditLog.findMany({
+      where: {
+        projectId,
+        action: { startsWith: "agents." },
+        OR: [
+          { args: { path: ["id"], equals: agentId } },
+          { args: { path: ["agentId"], equals: agentId } },
+          { args: { path: ["newAgentId"], equals: agentId } },
+        ],
+      },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
+
+    const userIds = [...new Set(logs.map((l) => l.userId))];
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: userIds } },
+      select: { id: true, name: true, email: true },
+    });
+    const usersById = Object.fromEntries(users.map((u) => [u.id, u]));
+
+    return logs.map((log) => ({
+      id: log.id,
+      action: log.action,
+      createdAt: log.createdAt,
+      args: log.args,
+      user: usersById[log.userId] ?? null,
+    }));
+  }
+
+  /**
    * Sync a copied agent from its source (pull name/config from source).
    * Throws if agent is not a copy or source not found.
    */

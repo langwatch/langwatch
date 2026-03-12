@@ -89,6 +89,8 @@ export const agentsRouter = createTRPCRouter({
     .input(
       z
         .object({
+          // Generated server-side so it's present in audit log args for history lookup
+          id: z.string().default(() => `agent_${nanoid()}`),
           projectId: z.string(),
           name: z.string().min(1).max(255),
           type: agentTypeSchema,
@@ -118,7 +120,7 @@ export const agentsRouter = createTRPCRouter({
       const agentService = AgentService.create(ctx.prisma);
       // Config is validated by the refine above, safe to cast
       return await agentService.create({
-        id: `agent_${nanoid()}`,
+        id: input.id,
         projectId: input.projectId,
         name: input.name,
         type: input.type,
@@ -310,6 +312,8 @@ export const agentsRouter = createTRPCRouter({
         agentId: z.string(),
         projectId: z.string(),
         sourceProjectId: z.string(),
+        // Generated server-side so it's present in audit log args for history lookup
+        newAgentId: z.string().default(() => `agent_${nanoid()}`),
       }),
     )
     .use(checkProjectPermission("evaluations:manage"))
@@ -336,7 +340,7 @@ export const agentsRouter = createTRPCRouter({
             sourceAgentId: input.agentId,
             sourceProjectId: input.sourceProjectId,
             targetProjectId: input.projectId,
-            newAgentId: `agent_${nanoid()}`,
+            newAgentId: input.newAgentId,
           },
           {
             copyWorkflow: async (opts) => {
@@ -505,5 +509,17 @@ export const agentsRouter = createTRPCRouter({
         }
         throw error;
       }
+    }),
+
+  /**
+   * Returns the audit log history for a specific agent.
+   * Used by the "View History" drawer on the agents page.
+   */
+  getHistory: protectedProcedure
+    .input(z.object({ agentId: z.string(), projectId: z.string() }))
+    .use(checkProjectPermission("evaluations:view"))
+    .query(async ({ ctx, input }) => {
+      const service = AgentService.create(ctx.prisma);
+      return service.getHistory(input.agentId, input.projectId);
     }),
 });

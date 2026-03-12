@@ -15,6 +15,7 @@ import { AddOrEditAnnotationScoreDrawer } from "./AddOrEditAnnotationScoreDrawer
 import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
 import { AutomationDrawer } from "./AddAutomationDrawer";
 import { AgentCodeEditorDrawer } from "./agents/AgentCodeEditorDrawer";
+import { AgentHistoryDrawer } from "./agents/AgentHistoryDrawer";
 import { AgentHttpEditorDrawer } from "./agents/AgentHttpEditorDrawer";
 import { AgentListDrawer } from "./agents/AgentListDrawer";
 import { AgentTypeSelectorDrawer } from "./agents/AgentTypeSelectorDrawer";
@@ -72,6 +73,7 @@ export const drawers = {
   promptList: PromptListDrawer,
   promptEditor: PromptEditorDrawer,
   agentList: AgentListDrawer,
+  agentHistory: AgentHistoryDrawer,
   agentTypeSelector: AgentTypeSelectorDrawer,
   agentCodeEditor: AgentCodeEditorDrawer,
   agentHttpEditor: AgentHttpEditorDrawer,
