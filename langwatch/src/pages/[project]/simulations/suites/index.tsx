@@ -85,7 +85,7 @@ function SuitesPageContent() {
   );
 
   const runSummaries = useMemo(() => {
-    if (!allRunData) return undefined;
+    if (!allRunData || !("runs" in allRunData)) return undefined;
     return computeSuiteRunSummaries({
       runs: allRunData.runs,
       scenarioSetIds: allRunData.scenarioSetIds,

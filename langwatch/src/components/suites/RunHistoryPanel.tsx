@@ -144,7 +144,7 @@ export function RunHistoryPanel({
 
   // Accumulate pages as data arrives
   useEffect(() => {
-    if (!runDataResult) return;
+    if (!runDataResult || !("runs" in runDataResult)) return;
 
     if (cursor === undefined) {
       setPages([runDataResult]);

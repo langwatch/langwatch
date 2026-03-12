@@ -1,5 +1,5 @@
 import { Box, type BoxProps } from "@chakra-ui/react";
-import { CopilotKit, useCopilotChat } from "@copilotkit/react-core";
+import { CopilotKit, useCopilotChatInternal } from "@copilotkit/react-core";
 import {
   AssistantMessage,
   CopilotChat,
@@ -64,7 +64,7 @@ const PromptPlaygroundChat = forwardRef<
           // @ts-expect-error - Total hack to pass additional params to the service adapter
           model: additionalParams,
         }}
-        onError={(error: Error) => {
+        onError={(error) => {
           console.error("CopilotKit error:", error);
         }}
         disableSystemMessage
@@ -81,7 +81,7 @@ const PromptPlaygroundChatInner = forwardRef<PromptPlaygroundChatRef, object>(
     const { getTabById } = useDraggableTabsBrowserStore((state) => ({
       getTabById: state.getByTabId,
     }));
-    const { setMessages, visibleMessages } = useCopilotChat();
+    const { setMessages, visibleMessages } = useCopilotChatInternal();
     const { updateTabData } = useDraggableTabsBrowserStore((state) => ({
       updateTabData: state.updateTabData,
     }));
