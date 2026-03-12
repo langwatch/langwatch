@@ -250,13 +250,15 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
   // Track if the form has been modified (dirty state)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  // Clear module-level state on unmount, unless navigating to a flow sub-drawer.
+  // Clear module-level state on unmount, unless we're in an active evaluation flow.
   // This catches: page navigation, sub-drawer closed entirely, etc.
+  // Uses isInActiveEvaluationFlow() instead of checking just the last stack entry,
+  // because React StrictMode double-mounts effects — during the simulated cleanup,
+  // the stack may contain "onlineEvaluation" (which isn't in FLOW_SUB_DRAWERS)
+  // and we must preserve state to avoid losing pendingEvaluatorId.
   useLayoutEffect(() => {
     return () => {
-      const nextDrawer =
-        getDrawerStack()[getDrawerStack().length - 1]?.drawer;
-      if (!nextDrawer || !FLOW_SUB_DRAWERS.has(nextDrawer)) {
+      if (!isInActiveEvaluationFlow()) {
         onlineEvaluationDrawerState = null;
       }
     };
@@ -1308,7 +1310,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                                         e.target.value,
                                       )
                                     }
-                                    placeholder={`${keyInfo.label} key`}
+                                    placeholder={keyInfo.label}
                                     minWidth="120px"
                                     maxWidth="200px"
                                   />

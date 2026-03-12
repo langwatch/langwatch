@@ -183,7 +183,7 @@ export const PreconditionsField = ({
                   {keyInfo && (
                     <Input
                       {...control.register(`preconditions.${index}.key`)}
-                      placeholder={`${keyInfo.label} key`}
+                      placeholder={keyInfo.label}
                       minWidth="120px"
                       maxWidth="200px"
                     />
