@@ -4,6 +4,7 @@ import {
   Bot,
   Copy,
   Edit,
+  type LucideIcon,
   RefreshCw,
   Trash2,
   X,
@@ -14,10 +15,7 @@ import { api } from "~/utils/api";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { Drawer } from "../ui/drawer";
 
-const ACTION_META: Record<
-  string,
-  { label: string; icon: React.ComponentType<{ size?: number }> }
-> = {
+const ACTION_META = {
   "agents.create": { label: "Created", icon: Bot },
   "agents.update": { label: "Updated", icon: Edit },
   "agents.delete": { label: "Deleted", icon: Trash2 },
@@ -25,10 +23,10 @@ const ACTION_META: Record<
   "agents.copy": { label: "Replicated", icon: Copy },
   "agents.pushToCopies": { label: "Pushed to replicas", icon: ArrowUp },
   "agents.syncFromSource": { label: "Synced from source", icon: RefreshCw },
-};
+} as const satisfies Record<string, { label: string; icon: LucideIcon }>;
 
 function actionMeta(action: string) {
-  return ACTION_META[action] ?? { label: action, icon: X };
+  return (ACTION_META as Record<string, { label: string; icon: LucideIcon }>)[action] ?? { label: action, icon: X };
 }
 
 export function AgentHistoryDrawer({
@@ -41,7 +39,7 @@ export function AgentHistoryDrawer({
   const { closeDrawer } = useDrawer();
   const { project } = useOrganizationTeamProject();
 
-  const { data, isLoading } = api.agents.getHistory.useQuery(
+  const { data, isLoading, isError } = api.agents.getHistory.useQuery(
     { agentId, projectId: project?.id ?? "" },
     { enabled: !!project?.id && !!agentId },
   );
@@ -61,7 +59,12 @@ export function AgentHistoryDrawer({
               <Spinner />
             </HStack>
           )}
-          {!isLoading && (!data || data.length === 0) && (
+          {isError && (
+            <Text color="red.fg" textAlign="center" paddingY={8}>
+              Failed to load history.
+            </Text>
+          )}
+          {!isLoading && !isError && (!data || data.length === 0) && (
             <Text color="fg.muted" textAlign="center" paddingY={8}>
               No history recorded yet.
             </Text>
