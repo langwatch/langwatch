@@ -1,19 +1,20 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import { createLogger } from "~/utils/logger/server";
 import type {
   BatchHistoryItem,
   ExternalSetSummary,
   ScenarioRunData,
   ScenarioSetData,
-} from "../scenarios/scenario-event.types";
-import { resolveRunStatus } from "../scenarios/stall-detection";
+} from "~/server/scenarios/scenario-event.types";
+import { resolveRunStatus } from "~/server/scenarios/stall-detection";
 import {
   mapClickHouseRowToScenarioRunData,
   mapStatus,
   type ClickHouseSimulationRunRow,
-} from "./simulation-run.mappers";
+} from "~/server/simulations/simulation-run.mappers";
+import { createLogger } from "~/utils/logger/server";
+import type { SimulationRepository } from "./simulation.repository";
 
-const logger = createLogger("langwatch:simulations:clickhouse-service");
+const logger = createLogger("langwatch:app-layer:simulations:clickhouse-repository");
 
 const TABLE_NAME = "simulation_runs" as const;
 
@@ -47,43 +48,32 @@ function buildDateHavingFilter({
   return { clause: parts.length > 0 ? parts.join(" AND ") : null, params };
 }
 
-/**
- * Builds a WHERE clause fragment that filters on the `StartedAt` partition key
- * to enable partition pruning. When the table is `PARTITION BY toYearWeek(StartedAt)`,
- * adding StartedAt bounds lets ClickHouse skip cold (S3) partitions entirely.
- *
- * Uses separate param names (`whereStartDateMs`, `whereEndDateMs`) to avoid
- * collision with the HAVING filter params.
- */
-function buildStartedAtWhereFilter({
-  startDate,
-  endDate,
-}: {
-  startDate?: number;
-  endDate?: number;
-}): { clause: string | null; params: Record<string, string> } {
-  const parts: string[] = [];
-  const params: Record<string, string> = {};
-  if (startDate !== undefined) {
-    parts.push(
-      "StartedAt >= fromUnixTimestamp64Milli(toUInt64({whereStartDateMs:String}))",
-    );
-    params.whereStartDateMs = String(startDate);
-  }
-  if (endDate !== undefined) {
-    parts.push(
-      "StartedAt <= fromUnixTimestamp64Milli(toUInt64({whereEndDateMs:String}))",
-    );
-    params.whereEndDateMs = String(endDate);
-  }
-  return { clause: parts.length > 0 ? parts.join(" AND ") : null, params };
-}
-
 const RUN_COLUMNS = `
   ScenarioRunId, ScenarioId, BatchRunId, ScenarioSetId,
   Status, Name, Description,
   \`Messages.Id\`, \`Messages.Role\`, \`Messages.Content\`,
   \`Messages.TraceId\`, \`Messages.Rest\`,
+  TraceIds,
+  Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
+  toString(DurationMs) AS DurationMs,
+  toString(toUnixTimestamp64Milli(CreatedAt)) AS CreatedAt,
+  toString(toUnixTimestamp64Milli(UpdatedAt)) AS UpdatedAt,
+  toString(toUnixTimestamp64Milli(FinishedAt)) AS FinishedAt,
+  toString(toUnixTimestamp64Milli(ArchivedAt)) AS ArchivedAt` as const;
+
+/**
+ * Columns for list/grid views — truncated messages and no heavy JSON blobs.
+ * Keeps first 6 messages (3 turns) for grid card previews.
+ * Omits Messages.Rest (tool call JSON) and Messages.TraceId.
+ */
+const LIST_COLUMNS = `
+  ScenarioRunId, ScenarioId, BatchRunId, ScenarioSetId,
+  Status, Name, Description,
+  arraySlice(\`Messages.Id\`, 1, 6) AS \`Messages.Id\`,
+  arraySlice(\`Messages.Role\`, 1, 6) AS \`Messages.Role\`,
+  arraySlice(\`Messages.Content\`, 1, 6) AS \`Messages.Content\`,
+  CAST([] AS Array(String)) AS \`Messages.TraceId\`,
+  CAST([] AS Array(String)) AS \`Messages.Rest\`,
   TraceIds,
   Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
   toString(DurationMs) AS DurationMs,
@@ -104,23 +94,8 @@ interface CursorPayload {
   batchRunId: string;
 }
 
-/**
- * ClickHouse-backed read service for simulation runs.
- *
- * Queries the `simulation_runs` ReplacingMergeTree table
- * to collapse versions. Returns data in the same ScenarioRunData shape
- * that the ES-backed ScenarioEventService produces, so callers can
- * switch backends transparently.
- */
-export class ClickHouseSimulationService {
+export class SimulationClickHouseRepository implements SimulationRepository {
   constructor(private readonly clickhouse: ClickHouseClient) {}
-
-  static create(
-    clickhouse: ClickHouseClient | null,
-  ): ClickHouseSimulationService | null {
-    if (!clickhouse) return null;
-    return new ClickHouseSimulationService(clickhouse);
-  }
 
   private async queryRows<T>(
     query: string,
@@ -134,23 +109,11 @@ export class ClickHouseSimulationService {
     return result.json<T>();
   }
 
-  /**
-   * Returns scenario set metadata for a project.
-   */
   async getScenarioSetsData({
     projectId,
-    startDate,
-    endDate,
   }: {
     projectId: string;
-    startDate: number;
-    endDate: number;
   }): Promise<ScenarioSetData[]> {
-    const startedAtFilter = buildStartedAtWhereFilter({ startDate, endDate });
-    const startedAtClause = startedAtFilter.clause
-      ? `AND ${startedAtFilter.clause}`
-      : "";
-
     const rows = await this.queryRows<{
       ScenarioSetId: string;
       ScenarioCount: string;
@@ -159,22 +122,18 @@ export class ClickHouseSimulationService {
       `SELECT
         ScenarioSetId,
         toString(count(*)) AS ScenarioCount,
-        toString(toUnixTimestamp64Milli(max(LatestUpdatedAt))) AS LastRunAt
+        toString(toUnixTimestamp64Milli(max(UpdatedAt))) AS LastRunAt
        FROM (
-         SELECT
-           ScenarioSetId,
-           ScenarioRunId,
-           argMax(UpdatedAt, UpdatedAt) AS LatestUpdatedAt,
-           argMax(ArchivedAt, UpdatedAt) AS LatestArchivedAt
+         SELECT *
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
-           ${startedAtClause}
-         GROUP BY ScenarioSetId, ScenarioRunId
+         ORDER BY ScenarioRunId, UpdatedAt DESC
+         LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
-       WHERE LatestArchivedAt IS NULL
+       WHERE ArchivedAt IS NULL
        GROUP BY ScenarioSetId
        ORDER BY LastRunAt DESC`,
-      { tenantId: projectId, ...startedAtFilter.params },
+      { tenantId: projectId },
     );
 
     return rows.map((row) => ({
@@ -184,38 +143,25 @@ export class ClickHouseSimulationService {
     }));
   }
 
-  /**
-   * Returns run data for a specific scenario run.
-   */
   async getScenarioRunData({
     projectId,
     scenarioRunId,
-    startDate,
-    endDate,
   }: {
     projectId: string;
     scenarioRunId: string;
-    startDate: number;
-    endDate: number;
   }): Promise<ScenarioRunData | null> {
-    const startedAtFilter = buildStartedAtWhereFilter({ startDate, endDate });
-    const startedAtClause = startedAtFilter.clause
-      ? `AND ${startedAtFilter.clause}`
-      : "";
-
     const rows = await this.queryRows<ClickHouseSimulationRunRow>(
       `SELECT ${RUN_COLUMNS}
        FROM (
          SELECT *
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String} AND ScenarioRunId = {scenarioRunId:String}
-           ${startedAtClause}
          ORDER BY UpdatedAt DESC
          LIMIT 1
        )
        WHERE ArchivedAt IS NULL
        LIMIT 1`,
-      { tenantId: projectId, scenarioRunId, ...startedAtFilter.params },
+      { tenantId: projectId, scenarioRunId },
     );
 
     const row = rows[0];
@@ -223,24 +169,16 @@ export class ClickHouseSimulationService {
     return mapClickHouseRowToScenarioRunData(row);
   }
 
-  /**
-   * Returns pre-aggregated batch history for the sidebar.
-   * No full message arrays — only messagePreview (first 4 messages, role+content).
-   */
   async getBatchHistoryForScenarioSet({
     projectId,
     scenarioSetId,
     limit = 8,
     cursor,
-    startDate,
-    endDate,
   }: {
     projectId: string;
     scenarioSetId: string;
     limit?: number;
     cursor?: string;
-    startDate: number;
-    endDate: number;
   }): Promise<{
     batches: BatchHistoryItem[];
     nextCursor?: string;
@@ -250,11 +188,6 @@ export class ClickHouseSimulationService {
   }> {
     const validatedLimit = Math.min(Math.max(1, limit), 100);
     const decoded = cursor ? this.decodeCursor(cursor) : null;
-
-    const startedAtFilter = buildStartedAtWhereFilter({ startDate, endDate });
-    const startedAtClause = startedAtFilter.clause
-      ? `AND ${startedAtFilter.clause}`
-      : "";
 
     const cursorClause = decoded
       ? `HAVING (toString(toUnixTimestamp64Milli(max(CreatedAt))) < {cursorTs:String})
@@ -269,12 +202,11 @@ export class ClickHouseSimulationService {
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND ScenarioSetId = {scenarioSetId:String}
-           ${startedAtClause}
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE ArchivedAt IS NULL`,
-      { tenantId: projectId, scenarioSetId, ...startedAtFilter.params },
+      { tenantId: projectId, scenarioSetId },
     );
 
     // Step 1: fetch batch-level aggregates
@@ -308,7 +240,6 @@ export class ClickHouseSimulationService {
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND ScenarioSetId = {scenarioSetId:String}
-           ${startedAtClause}
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
@@ -320,7 +251,6 @@ export class ClickHouseSimulationService {
       {
         tenantId: projectId,
         scenarioSetId,
-        ...startedAtFilter.params,
         ...(decoded ? { cursorTs: decoded.ts, cursorBatchRunId: decoded.batchRunId } : {}),
         fetchLimit: String(validatedLimit + 1),
       },
@@ -344,8 +274,6 @@ export class ClickHouseSimulationService {
     const batchRunIds = pageRows.map((r) => r.BatchRunId);
 
     // Step 2: fetch slim item rows (preview columns only)
-    // Filter by ScenarioSetId to avoid cross-set contamination when a BatchRunId
-    // spans multiple scenario sets.
     const itemRows = await this.queryRows<{
       ScenarioRunId: string;
       BatchRunId: string;
@@ -363,13 +291,12 @@ export class ClickHouseSimulationService {
          WHERE TenantId = {tenantId:String}
            AND ScenarioSetId = {scenarioSetId:String}
            AND BatchRunId IN ({batchRunIds:Array(String)})
-           ${startedAtClause}
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE ArchivedAt IS NULL
        ORDER BY CreatedAt ASC`,
-      { tenantId: projectId, scenarioSetId, batchRunIds, ...startedAtFilter.params },
+      { tenantId: projectId, scenarioSetId, batchRunIds },
     );
 
     // Group items by batchRunId
@@ -390,7 +317,6 @@ export class ClickHouseSimulationService {
       const items = (itemsByBatch.get(b.BatchRunId) ?? []).map((r) => {
         const baseStatus = mapStatus(r.Status);
         const durationMs = r.DurationMs != null ? parseInt(r.DurationMs, 10) : 0;
-        // stall detection uses UpdatedAt — not available in preview rows, approximate with now
         const resolvedStatus = resolveRunStatus({
           finishedStatus: ["SUCCESS","FAILED","FAILURE","ERROR","CANCELLED"].includes(r.Status)
             ? baseStatus
@@ -411,9 +337,8 @@ export class ClickHouseSimulationService {
         };
       });
 
-      // Recompute stalledCount from resolved statuses
       const stalledCount = items.filter((i) => i.status === "STALLED").length;
-      const runningCount = Number(b.RunningCount) - stalledCount; // adjust for items that became stalled
+      const runningCount = Number(b.RunningCount) - stalledCount;
 
       const firstCompletedAt = Number(b.FirstCompletedAt);
       const allCompletedAt = Number(b.AllCompletedAt);
@@ -436,44 +361,28 @@ export class ClickHouseSimulationService {
     return { batches, nextCursor, hasMore, lastUpdatedAt: globalLastUpdatedAt, totalCount };
   }
 
-  /**
-   * Returns all run data for a specific batch run.
-   * Accepts an optional sinceTimestamp for conditional fetching:
-   * returns { changed: false } when nothing has been updated since that timestamp.
-   */
   async getRunDataForBatchRun({
     projectId,
     scenarioSetId,
     batchRunId,
     sinceTimestamp,
-    startDate,
-    endDate,
   }: {
     projectId: string;
     scenarioSetId: string;
     batchRunId: string;
     sinceTimestamp?: number;
-    startDate: number;
-    endDate: number;
   }): Promise<
     | { changed: false; lastUpdatedAt: number }
     | { changed: true; lastUpdatedAt: number; runs: ScenarioRunData[] }
   > {
-    const startedAtFilter = buildStartedAtWhereFilter({ startDate, endDate });
-    const startedAtClause = startedAtFilter.clause
-      ? `AND ${startedAtFilter.clause}`
-      : "";
-
-    // Conditional check: skip full fetch if nothing changed
     if (sinceTimestamp !== undefined) {
       const tsRows = await this.queryRows<{ LastUpdatedAt: string }>(
         `SELECT toString(toUnixTimestamp64Milli(max(UpdatedAt))) AS LastUpdatedAt
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND BatchRunId = {batchRunId:String}
-           ${startedAtClause}
            AND ArchivedAt IS NULL`,
-        { tenantId: projectId, batchRunId, ...startedAtFilter.params },
+        { tenantId: projectId, batchRunId },
       );
       const lastUpdatedAt = Number(tsRows[0]?.LastUpdatedAt ?? "0");
       if (lastUpdatedAt <= sinceTimestamp) {
@@ -489,13 +398,12 @@ export class ClickHouseSimulationService {
          WHERE TenantId = {tenantId:String}
            AND ScenarioSetId = {scenarioSetId:String}
            AND BatchRunId = {batchRunId:String}
-           ${startedAtClause}
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE ArchivedAt IS NULL
        ORDER BY CreatedAt ASC`,
-      { tenantId: projectId, scenarioSetId, batchRunId, ...startedAtFilter.params },
+      { tenantId: projectId, scenarioSetId, batchRunId },
     );
 
     const now = Date.now();
@@ -507,25 +415,13 @@ export class ClickHouseSimulationService {
     return { changed: true, lastUpdatedAt, runs };
   }
 
-  /**
-   * Returns the number of distinct batch runs for a scenario set.
-   */
   async getBatchRunCountForScenarioSet({
     projectId,
     scenarioSetId,
-    startDate,
-    endDate,
   }: {
     projectId: string;
     scenarioSetId: string;
-    startDate: number;
-    endDate: number;
   }): Promise<number> {
-    const startedAtFilter = buildStartedAtWhereFilter({ startDate, endDate });
-    const startedAtClause = startedAtFilter.clause
-      ? `AND ${startedAtFilter.clause}`
-      : "";
-
     const rows = await this.queryRows<{ BatchRunCount: string }>(
       `SELECT toString(count(DISTINCT BatchRunId)) AS BatchRunCount
        FROM (
@@ -533,36 +429,22 @@ export class ClickHouseSimulationService {
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND ScenarioSetId = {scenarioSetId:String}
-           ${startedAtClause}
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE ArchivedAt IS NULL`,
-      { tenantId: projectId, scenarioSetId, ...startedAtFilter.params },
+      { tenantId: projectId, scenarioSetId },
     );
     return parseInt(rows[0]?.BatchRunCount ?? "0", 10);
   }
 
-  /**
-   * Returns all run data for a specific scenario (by ScenarioId).
-   * Returns null when no rows found (matches ES semantics).
-   */
   async getScenarioRunDataByScenarioId({
     projectId,
     scenarioId,
-    startDate,
-    endDate,
   }: {
     projectId: string;
     scenarioId: string;
-    startDate: number;
-    endDate: number;
   }): Promise<ScenarioRunData[] | null> {
-    const startedAtFilter = buildStartedAtWhereFilter({ startDate, endDate });
-    const startedAtClause = startedAtFilter.clause
-      ? `AND ${startedAtFilter.clause}`
-      : "";
-
     const rows = await this.queryRows<ClickHouseSimulationRunRow>(
       `SELECT ${RUN_COLUMNS}
        FROM (
@@ -570,13 +452,12 @@ export class ClickHouseSimulationService {
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND ScenarioId = {scenarioId:String}
-           ${startedAtClause}
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE ArchivedAt IS NULL
        ORDER BY CreatedAt DESC`,
-      { tenantId: projectId, scenarioId, ...startedAtFilter.params },
+      { tenantId: projectId, scenarioId },
     );
 
     if (rows.length === 0) return null;
@@ -585,25 +466,13 @@ export class ClickHouseSimulationService {
     return rows.map((row) => mapClickHouseRowToScenarioRunData(row, now));
   }
 
-  /**
-   * Returns all run data for a scenario set (unpaginated).
-   */
   async getAllRunDataForScenarioSet({
     projectId,
     scenarioSetId,
-    startDate,
-    endDate,
   }: {
     projectId: string;
     scenarioSetId: string;
-    startDate: number;
-    endDate: number;
   }): Promise<ScenarioRunData[]> {
-    const startedAtFilter = buildStartedAtWhereFilter({ startDate, endDate });
-    const startedAtClause = startedAtFilter.clause
-      ? `AND ${startedAtFilter.clause}`
-      : "";
-
     const rows = await this.queryRows<ClickHouseSimulationRunRow>(
       `SELECT ${RUN_COLUMNS}
        FROM (
@@ -611,23 +480,18 @@ export class ClickHouseSimulationService {
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND ScenarioSetId = {scenarioSetId:String}
-           ${startedAtClause}
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE ArchivedAt IS NULL
        ORDER BY BatchRunId ASC, CreatedAt ASC`,
-      { tenantId: projectId, scenarioSetId, ...startedAtFilter.params },
+      { tenantId: projectId, scenarioSetId },
     );
 
     const now = Date.now();
     return rows.map((row) => mapClickHouseRowToScenarioRunData(row, now));
   }
 
-  /**
-   * Returns paginated run data for a scenario set, grouped by batch run.
-   * Uses keyset cursor pagination on (max(CreatedAt) DESC, BatchRunId ASC).
-   */
   async getRunDataForScenarioSet({
     projectId,
     scenarioSetId,
@@ -640,8 +504,8 @@ export class ClickHouseSimulationService {
     scenarioSetId: string;
     limit?: number;
     cursor?: string;
-    startDate: number;
-    endDate: number;
+    startDate?: number;
+    endDate?: number;
   }): Promise<{ runs: ScenarioRunData[]; nextCursor?: string; hasMore: boolean }> {
     const validatedLimit = Math.min(Math.max(1, limit), 100);
     const decoded = cursor ? this.decodeCursor(cursor) : null;
@@ -656,11 +520,6 @@ export class ClickHouseSimulationService {
     const dateFilter = buildDateHavingFilter({ startDate, endDate });
     const combinedHaving = `HAVING ${[cursorPredicate, dateFilter.clause].filter(Boolean).join(" AND ")}`;
 
-    const startedAtFilter = buildStartedAtWhereFilter({ startDate, endDate });
-    const startedAtClause = startedAtFilter.clause
-      ? `AND ${startedAtFilter.clause}`
-      : "";
-
     const batchRows = await this.queryRows<{
       BatchRunId: string;
       MaxCreatedAt: string;
@@ -673,7 +532,6 @@ export class ClickHouseSimulationService {
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND ScenarioSetId = {scenarioSetId:String}
-           ${startedAtClause}
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
@@ -687,7 +545,6 @@ export class ClickHouseSimulationService {
         scenarioSetId,
         ...(decoded ? { cursorTs: decoded.ts, cursorBatchRunId: decoded.batchRunId } : {}),
         ...dateFilter.params,
-        ...startedAtFilter.params,
         fetchLimit: String(validatedLimit + 1),
       },
     );
@@ -706,33 +563,52 @@ export class ClickHouseSimulationService {
       : undefined;
 
     const batchRunIds = pageRows.map((r) => r.BatchRunId);
-    const runs = await this.getRunsForBatchIds({ projectId, batchRunIds, startDate, endDate });
+    const runs = await this.getRunsForBatchIds({ projectId, batchRunIds });
 
     return { runs, nextCursor, hasMore };
   }
 
-  /**
-   * Returns paginated run data across all internal suites.
-   * Filters to scenario set IDs matching the `__internal__*__suite` pattern.
-   */
   async getRunDataForAllSuites({
     projectId,
     limit = 20,
     cursor,
     startDate,
     endDate,
+    sinceTimestamp,
   }: {
     projectId: string;
     limit?: number;
     cursor?: string;
-    startDate: number;
-    endDate: number;
-  }): Promise<{
-    runs: ScenarioRunData[];
-    scenarioSetIds: Record<string, string>;
-    nextCursor?: string;
-    hasMore: boolean;
-  }> {
+    startDate?: number;
+    endDate?: number;
+    sinceTimestamp?: number;
+  }): Promise<
+    | { changed: false; lastUpdatedAt: number }
+    | {
+        changed: true;
+        lastUpdatedAt: number;
+        runs: ScenarioRunData[];
+        scenarioSetIds: Record<string, string>;
+        nextCursor?: string;
+        hasMore: boolean;
+      }
+  > {
+    // Cheap timestamp check: skip heavy query if nothing changed
+    if (sinceTimestamp !== undefined) {
+      const tsRows = await this.queryRows<{ LastUpdatedAt: string }>(
+        `SELECT toString(toUnixTimestamp64Milli(max(UpdatedAt))) AS LastUpdatedAt
+         FROM ${TABLE_NAME}
+         WHERE TenantId = {tenantId:String}
+           AND ScenarioSetId LIKE '__internal__%__suite'
+           AND ArchivedAt IS NULL`,
+        { tenantId: projectId },
+      );
+      const lastUpdatedAt = Number(tsRows[0]?.LastUpdatedAt ?? "0");
+      if (lastUpdatedAt <= sinceTimestamp) {
+        return { changed: false, lastUpdatedAt };
+      }
+    }
+
     const validatedLimit = Math.min(Math.max(1, limit), 100);
     const decoded = cursor ? this.decodeCursor(cursor) : null;
 
@@ -745,11 +621,6 @@ export class ClickHouseSimulationService {
 
     const dateFilter = buildDateHavingFilter({ startDate, endDate });
     const combinedHaving = `HAVING ${[cursorPredicate, dateFilter.clause].filter(Boolean).join(" AND ")}`;
-
-    const startedAtFilter = buildStartedAtWhereFilter({ startDate, endDate });
-    const startedAtClause = startedAtFilter.clause
-      ? `AND ${startedAtFilter.clause}`
-      : "";
 
     const batchRows = await this.queryRows<{
       BatchRunId: string;
@@ -765,7 +636,6 @@ export class ClickHouseSimulationService {
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND ScenarioSetId LIKE '__internal__%__suite'
-           ${startedAtClause}
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
@@ -778,7 +648,6 @@ export class ClickHouseSimulationService {
         tenantId: projectId,
         ...(decoded ? { cursorTs: decoded.ts, cursorBatchRunId: decoded.batchRunId } : {}),
         ...dateFilter.params,
-        ...startedAtFilter.params,
         fetchLimit: String(validatedLimit + 1),
       },
     );
@@ -787,7 +656,7 @@ export class ClickHouseSimulationService {
     const pageRows = hasMore ? batchRows.slice(0, validatedLimit) : batchRows;
 
     if (pageRows.length === 0) {
-      return { runs: [], scenarioSetIds: {}, nextCursor: undefined, hasMore: false };
+      return { changed: true, lastUpdatedAt: 0, runs: [], scenarioSetIds: {}, nextCursor: undefined, hasMore: false };
     }
 
     const lastRow = pageRows[pageRows.length - 1]!;
@@ -801,32 +670,20 @@ export class ClickHouseSimulationService {
     }
 
     const batchRunIds = pageRows.map((r) => r.BatchRunId);
-    const runs = await this.getRunsForBatchIds({ projectId, batchRunIds, startDate, endDate });
+    const runs = await this.getRunsForBatchIds({ projectId, batchRunIds });
+    const lastUpdatedAt = runs.reduce(
+      (max, r) => Math.max(max, r.timestamp),
+      0,
+    );
 
-    return { runs, scenarioSetIds, nextCursor, hasMore };
+    return { changed: true, lastUpdatedAt, runs, scenarioSetIds, nextCursor, hasMore };
   }
 
-  /**
-   * Returns summaries for external (non-internal) scenario sets.
-   *
-   * Groups by ScenarioSetId, computes pass/total from the most recent batch,
-   * and orders by most recent run first. Only includes sets whose
-   * ScenarioSetId does NOT start with '__internal__'.
-   */
   async getExternalSetSummaries({
     projectId,
-    startDate,
-    endDate,
   }: {
     projectId: string;
-    startDate: number;
-    endDate: number;
   }): Promise<ExternalSetSummary[]> {
-    const startedAtFilter = buildStartedAtWhereFilter({ startDate, endDate });
-    const startedAtClause = startedAtFilter.clause
-      ? `AND ${startedAtFilter.clause}`
-      : "";
-
     // Step 1: Get latest batch per external set
     const setRows = await this.queryRows<{
       ScenarioSetId: string;
@@ -848,7 +705,6 @@ export class ClickHouseSimulationService {
            FROM ${TABLE_NAME}
            WHERE TenantId = {tenantId:String}
              AND NOT startsWith(ScenarioSetId, '__internal__')
-             ${startedAtClause}
            ORDER BY ScenarioRunId, UpdatedAt DESC
            LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
          )
@@ -857,7 +713,7 @@ export class ClickHouseSimulationService {
        )
        GROUP BY ScenarioSetId
        ORDER BY LastRunAt DESC`,
-      { tenantId: projectId, ...startedAtFilter.params },
+      { tenantId: projectId },
     );
 
     if (setRows.length === 0) return [];
@@ -880,13 +736,12 @@ export class ClickHouseSimulationService {
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND BatchRunId IN ({batchRunIds:Array(String)})
-           ${startedAtClause}
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE ArchivedAt IS NULL
        GROUP BY ScenarioSetId, BatchRunId`,
-      { tenantId: projectId, batchRunIds, ...startedAtFilter.params },
+      { tenantId: projectId, batchRunIds },
     );
 
     const statsMap = new Map(
@@ -905,6 +760,20 @@ export class ClickHouseSimulationService {
         lastRunTimestamp: Number(row.LastRunAt),
       };
     });
+  }
+
+  async getAllRunIdsForProject({
+    projectId,
+  }: {
+    projectId: string;
+  }): Promise<string[]> {
+    const result = await this.clickhouse.query({
+      query: `SELECT DISTINCT ScenarioRunId FROM ${TABLE_NAME} WHERE TenantId = {tenantId:String} AND ArchivedAt IS NULL`,
+      query_params: { tenantId: projectId },
+      format: "JSONEachRow",
+    });
+    const rows = await result.json<{ ScenarioRunId: string }>();
+    return rows.map((r) => r.ScenarioRunId);
   }
 
   // ---- Cursor helpers ----
@@ -932,53 +801,28 @@ export class ClickHouseSimulationService {
   private async getRunsForBatchIds({
     projectId,
     batchRunIds,
-    startDate,
-    endDate,
   }: {
     projectId: string;
     batchRunIds: string[];
-    startDate: number;
-    endDate: number;
   }): Promise<ScenarioRunData[]> {
     if (batchRunIds.length === 0) return [];
 
-    const startedAtFilter = buildStartedAtWhereFilter({ startDate, endDate });
-    const startedAtClause = startedAtFilter.clause
-      ? `AND ${startedAtFilter.clause}`
-      : "";
-
     const rows = await this.queryRows<ClickHouseSimulationRunRow>(
-      `SELECT ${RUN_COLUMNS}
+      `SELECT ${LIST_COLUMNS}
        FROM (
          SELECT *
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND BatchRunId IN ({batchRunIds:Array(String)})
-           ${startedAtClause}
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE ArchivedAt IS NULL
        ORDER BY CreatedAt ASC`,
-      { tenantId: projectId, batchRunIds, ...startedAtFilter.params },
+      { tenantId: projectId, batchRunIds },
     );
 
     const now = Date.now();
     return rows.map((row) => mapClickHouseRowToScenarioRunData(row, now));
-  }
-
-  /**
-   * Soft-deletes all simulation runs for a project by setting ArchivedAt.
-   */
-  async softDeleteAllForProject({
-    projectId,
-  }: {
-    projectId: string;
-  }): Promise<void> {
-    await this.clickhouse.command({
-      query: `ALTER TABLE ${TABLE_NAME} UPDATE ArchivedAt = now64(3) WHERE TenantId = {tenantId:String} AND ArchivedAt IS NULL`,
-      query_params: { tenantId: projectId },
-    });
-    logger.info({ projectId }, "Soft-deleted all simulation runs for project");
   }
 }

@@ -1,8 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
-import { ClickHouseSimulationService } from "../clickhouse-simulation.service";
-
-const DEFAULT_DATES = { startDate: 0, endDate: Date.now() } as const;
+import { SimulationClickHouseRepository } from "../repositories/simulation.clickhouse.repository";
 
 function makeRunRow(overrides: Record<string, string | null> = {}) {
   return {
@@ -56,13 +54,13 @@ function setQueryResults(
   }
 }
 
-describe("ClickHouseSimulationService", () => {
+describe("SimulationClickHouseRepository", () => {
   let clickhouse: ClickHouseClient;
-  let service: ClickHouseSimulationService;
+  let repo: SimulationClickHouseRepository;
 
   beforeEach(() => {
     clickhouse = createMockClickHouse();
-    service = new ClickHouseSimulationService(clickhouse);
+    repo = new SimulationClickHouseRepository(clickhouse);
   });
 
   describe("getBatchRunCountForScenarioSet()", () => {
@@ -70,10 +68,9 @@ describe("ClickHouseSimulationService", () => {
       it("returns the count", async () => {
         setQueryResult(clickhouse, [{ BatchRunCount: "5" }]);
 
-        const count = await service.getBatchRunCountForScenarioSet({
+        const count = await repo.getBatchRunCountForScenarioSet({
           projectId: "proj-1",
           scenarioSetId: "set-1",
-          ...DEFAULT_DATES,
         });
 
         expect(count).toBe(5);
@@ -84,10 +81,9 @@ describe("ClickHouseSimulationService", () => {
       it("returns 0", async () => {
         setQueryResult(clickhouse, []);
 
-        const count = await service.getBatchRunCountForScenarioSet({
+        const count = await repo.getBatchRunCountForScenarioSet({
           projectId: "proj-1",
           scenarioSetId: "set-1",
-          ...DEFAULT_DATES,
         });
 
         expect(count).toBe(0);
@@ -97,15 +93,14 @@ describe("ClickHouseSimulationService", () => {
     it("passes correct query params", async () => {
       setQueryResult(clickhouse, [{ BatchRunCount: "0" }]);
 
-      await service.getBatchRunCountForScenarioSet({
+      await repo.getBatchRunCountForScenarioSet({
         projectId: "proj-1",
         scenarioSetId: "set-1",
-        ...DEFAULT_DATES,
       });
 
       expect(clickhouse.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          query_params: expect.objectContaining({ tenantId: "proj-1", scenarioSetId: "set-1" }),
+          query_params: { tenantId: "proj-1", scenarioSetId: "set-1" },
         }),
       );
     });
@@ -119,10 +114,9 @@ describe("ClickHouseSimulationService", () => {
           makeRunRow({ ScenarioRunId: "run-2" }),
         ]);
 
-        const result = await service.getScenarioRunDataByScenarioId({
+        const result = await repo.getScenarioRunDataByScenarioId({
           projectId: "proj-1",
           scenarioId: "scenario-1",
-          ...DEFAULT_DATES,
         });
 
         expect(result).toHaveLength(2);
@@ -135,10 +129,9 @@ describe("ClickHouseSimulationService", () => {
       it("returns null", async () => {
         setQueryResult(clickhouse, []);
 
-        const result = await service.getScenarioRunDataByScenarioId({
+        const result = await repo.getScenarioRunDataByScenarioId({
           projectId: "proj-1",
           scenarioId: "scenario-1",
-          ...DEFAULT_DATES,
         });
 
         expect(result).toBeNull();
@@ -155,10 +148,9 @@ describe("ClickHouseSimulationService", () => {
           makeRunRow({ ScenarioRunId: "run-3", BatchRunId: "batch-2" }),
         ]);
 
-        const result = await service.getAllRunDataForScenarioSet({
+        const result = await repo.getAllRunDataForScenarioSet({
           projectId: "proj-1",
           scenarioSetId: "set-1",
-          ...DEFAULT_DATES,
         });
 
         expect(result).toHaveLength(3);
@@ -169,10 +161,9 @@ describe("ClickHouseSimulationService", () => {
       it("returns empty array", async () => {
         setQueryResult(clickhouse, []);
 
-        const result = await service.getAllRunDataForScenarioSet({
+        const result = await repo.getAllRunDataForScenarioSet({
           projectId: "proj-1",
           scenarioSetId: "set-1",
-          ...DEFAULT_DATES,
         });
 
         expect(result).toEqual([]);
@@ -183,13 +174,11 @@ describe("ClickHouseSimulationService", () => {
   describe("getRunDataForScenarioSet()", () => {
     describe("when first page has results and more pages", () => {
       it("returns runs, cursor, and hasMore=true", async () => {
-        // First query: batch IDs (limit+1 = 3 rows means hasMore)
-        // Second query: run data for those batch IDs
         setQueryResults(clickhouse, [
           [
             { BatchRunId: "batch-1", MaxCreatedAt: "3000" },
             { BatchRunId: "batch-2", MaxCreatedAt: "2000" },
-            { BatchRunId: "batch-3", MaxCreatedAt: "1000" }, // extra row → hasMore
+            { BatchRunId: "batch-3", MaxCreatedAt: "1000" },
           ],
           [
             makeRunRow({ ScenarioRunId: "run-1", BatchRunId: "batch-1" }),
@@ -197,11 +186,10 @@ describe("ClickHouseSimulationService", () => {
           ],
         ]);
 
-        const result = await service.getRunDataForScenarioSet({
+        const result = await repo.getRunDataForScenarioSet({
           projectId: "proj-1",
           scenarioSetId: "set-1",
           limit: 2,
-          ...DEFAULT_DATES,
         });
 
         expect(result.hasMore).toBe(true);
@@ -217,11 +205,10 @@ describe("ClickHouseSimulationService", () => {
           [makeRunRow({ ScenarioRunId: "run-1", BatchRunId: "batch-1" })],
         ]);
 
-        const result = await service.getRunDataForScenarioSet({
+        const result = await repo.getRunDataForScenarioSet({
           projectId: "proj-1",
           scenarioSetId: "set-1",
           limit: 20,
-          ...DEFAULT_DATES,
         });
 
         expect(result.hasMore).toBe(false);
@@ -234,10 +221,9 @@ describe("ClickHouseSimulationService", () => {
       it("returns empty response", async () => {
         setQueryResult(clickhouse, []);
 
-        const result = await service.getRunDataForScenarioSet({
+        const result = await repo.getRunDataForScenarioSet({
           projectId: "proj-1",
           scenarioSetId: "set-1",
-          ...DEFAULT_DATES,
         });
 
         expect(result).toEqual({
@@ -259,11 +245,10 @@ describe("ClickHouseSimulationService", () => {
           [makeRunRow({ ScenarioRunId: "run-6", BatchRunId: "batch-6" })],
         ]);
 
-        await service.getRunDataForScenarioSet({
+        await repo.getRunDataForScenarioSet({
           projectId: "proj-1",
           scenarioSetId: "set-1",
           cursor,
-          ...DEFAULT_DATES,
         });
 
         expect(clickhouse.query).toHaveBeenCalledWith(
@@ -284,15 +269,13 @@ describe("ClickHouseSimulationService", () => {
           [makeRunRow({ ScenarioRunId: "run-1", BatchRunId: "batch-1" })],
         ]);
 
-        const result = await service.getRunDataForScenarioSet({
+        const result = await repo.getRunDataForScenarioSet({
           projectId: "proj-1",
           scenarioSetId: "set-1",
           cursor: "not-valid-base64!!!",
-          ...DEFAULT_DATES,
         });
 
         expect(result.runs).toHaveLength(1);
-        // No cursor params should be in the query
         expect(clickhouse.query).toHaveBeenCalledWith(
           expect.objectContaining({
             query_params: expect.not.objectContaining({
@@ -307,17 +290,16 @@ describe("ClickHouseSimulationService", () => {
       it("clamps to 100", async () => {
         setQueryResult(clickhouse, []);
 
-        await service.getRunDataForScenarioSet({
+        await repo.getRunDataForScenarioSet({
           projectId: "proj-1",
           scenarioSetId: "set-1",
           limit: 999,
-          ...DEFAULT_DATES,
         });
 
         expect(clickhouse.query).toHaveBeenCalledWith(
           expect.objectContaining({
             query_params: expect.objectContaining({
-              fetchLimit: "101", // 100 + 1
+              fetchLimit: "101",
             }),
           }),
         );
@@ -331,7 +313,7 @@ describe("ClickHouseSimulationService", () => {
           [makeRunRow({ ScenarioRunId: "run-1", BatchRunId: "batch-1" })],
         ]);
 
-        await service.getRunDataForScenarioSet({
+        await repo.getRunDataForScenarioSet({
           projectId: "proj-1",
           scenarioSetId: "set-1",
           startDate: 1000,
@@ -354,7 +336,7 @@ describe("ClickHouseSimulationService", () => {
           [makeRunRow({ ScenarioRunId: "run-1", BatchRunId: "batch-1" })],
         ]);
 
-        await service.getRunDataForScenarioSet({
+        await repo.getRunDataForScenarioSet({
           projectId: "proj-1",
           scenarioSetId: "set-1",
           startDate: 1000,
@@ -368,6 +350,27 @@ describe("ClickHouseSimulationService", () => {
       });
     });
 
+    describe("when no date range is provided", () => {
+      it("omits date parameters from the query", async () => {
+        setQueryResults(clickhouse, [
+          [{ BatchRunId: "batch-1", MaxCreatedAt: "3000" }],
+          [makeRunRow({ ScenarioRunId: "run-1", BatchRunId: "batch-1" })],
+        ]);
+
+        await repo.getRunDataForScenarioSet({
+          projectId: "proj-1",
+          scenarioSetId: "set-1",
+        });
+
+        expect(clickhouse.query).toHaveBeenCalledWith(
+          expect.objectContaining({
+            query_params: expect.not.objectContaining({
+              startDateMs: expect.any(String),
+            }),
+          }),
+        );
+      });
+    });
   });
 
   describe("getRunDataForAllSuites()", () => {
@@ -400,12 +403,13 @@ describe("ClickHouseSimulationService", () => {
           ],
         ]);
 
-        const result = await service.getRunDataForAllSuites({
+        const result = await repo.getRunDataForAllSuites({
           projectId: "proj-1",
           limit: 20,
-          ...DEFAULT_DATES,
         });
 
+        expect(result.changed).toBe(true);
+        if (!result.changed) throw new Error("expected changed");
         expect(result.runs).toHaveLength(2);
         expect(result.scenarioSetIds).toEqual({
           "batch-1": "__internal__foo__suite",
@@ -419,12 +423,13 @@ describe("ClickHouseSimulationService", () => {
       it("returns empty response with empty scenarioSetIds", async () => {
         setQueryResult(clickhouse, []);
 
-        const result = await service.getRunDataForAllSuites({
+        const result = await repo.getRunDataForAllSuites({
           projectId: "proj-1",
-          ...DEFAULT_DATES,
         });
 
         expect(result).toEqual({
+          changed: true,
+          lastUpdatedAt: 0,
           runs: [],
           scenarioSetIds: {},
           nextCursor: undefined,
@@ -453,12 +458,13 @@ describe("ClickHouseSimulationService", () => {
           ],
         ]);
 
-        const result = await service.getRunDataForAllSuites({
+        const result = await repo.getRunDataForAllSuites({
           projectId: "proj-1",
           limit: 1,
-          ...DEFAULT_DATES,
         });
 
+        expect(result.changed).toBe(true);
+        if (!result.changed) throw new Error("expected changed");
         expect(result.hasMore).toBe(true);
         expect(result.nextCursor).toBeDefined();
       });
@@ -467,7 +473,7 @@ describe("ClickHouseSimulationService", () => {
     it("uses LIKE pattern for internal suites", async () => {
       setQueryResult(clickhouse, []);
 
-      await service.getRunDataForAllSuites({ projectId: "proj-1", ...DEFAULT_DATES });
+      await repo.getRunDataForAllSuites({ projectId: "proj-1" });
 
       const call = (clickhouse.query as ReturnType<typeof vi.fn>).mock
         .calls[0]![0] as { query: string };
@@ -477,7 +483,6 @@ describe("ClickHouseSimulationService", () => {
 
   describe("cursor roundtrip", () => {
     it("encodes and decodes correctly through pagination", async () => {
-      // Page 1: returns 2 batch IDs + 1 extra (hasMore)
       setQueryResults(clickhouse, [
         [
           { BatchRunId: "batch-a", MaxCreatedAt: "5000" },
@@ -486,16 +491,14 @@ describe("ClickHouseSimulationService", () => {
         [makeRunRow({ BatchRunId: "batch-a" })],
       ]);
 
-      const page1 = await service.getRunDataForScenarioSet({
+      const page1 = await repo.getRunDataForScenarioSet({
         projectId: "proj-1",
         scenarioSetId: "set-1",
         limit: 1,
-        ...DEFAULT_DATES,
       });
 
       expect(page1.nextCursor).toBeDefined();
 
-      // Decode to verify structure
       const decoded = JSON.parse(
         Buffer.from(page1.nextCursor!, "base64").toString("utf-8"),
       );

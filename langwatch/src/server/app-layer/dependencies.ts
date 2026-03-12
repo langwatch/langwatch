@@ -8,6 +8,7 @@ import type { OrganizationService } from "./organizations/organization.service";
 import type { ProjectService } from "./projects/project.service";
 import type { LogRecordStorageService } from "./traces/log-record-storage.service";
 import type { MetricRecordStorageService } from "./traces/metric-record-storage.service";
+import type { SimulationRunService } from "./simulations/simulation-run.service";
 import type { SpanStorageService } from "./traces/span-storage.service";
 import type { TokenizerService } from "./traces/tokenizer.service";
 import type { LogRequestCollectionService } from "./traces/log-request-collection.service";
@@ -37,6 +38,9 @@ export interface AppDependencies {
   evaluations: {
     runs: EvaluationRunService;
     execution: EvaluationExecutionService;
+  };
+  simulations: {
+    runs: SimulationRunService;
   };
   organizations: OrganizationService;
   projects: ProjectService;
