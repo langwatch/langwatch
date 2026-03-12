@@ -902,7 +902,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     const current = form.getValues("preconditions");
     form.setValue("preconditions", [
       ...current,
-      { field: "output", rule: "contains", value: "" },
+      { field: "metadata.labels", rule: "contains", value: "" },
     ]);
     setPreconditionsExpanded(true);
   }, [form]);

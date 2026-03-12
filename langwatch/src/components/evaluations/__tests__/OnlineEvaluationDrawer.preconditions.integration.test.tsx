@@ -229,7 +229,7 @@ describe("<OnlineEvaluationDrawer /> preconditions", () => {
   });
 
   describe("when selecting different fields", () => {
-    it("filters rule dropdown for input field to show 4 rules", async () => {
+    it("defaults new precondition to metadata.labels with 3 rules", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       await setupWithEvaluator(user);
 
@@ -237,17 +237,13 @@ describe("<OnlineEvaluationDrawer /> preconditions", () => {
       await user.click(screen.getByText("Add Precondition"));
       await vi.advanceTimersByTimeAsync(50);
 
-      // The new (second) row defaults to field "output" which has 4 rules
-      // Find the rule select for the second row
+      // The new (second) row defaults to field "metadata.labels" which has 3 rules
       await waitFor(() => {
         expect(screen.getByText("and")).toBeInTheDocument();
       });
 
       // Get all comboboxes, find the rule select for the second precondition row
       const comboboxes = screen.getAllByRole("combobox");
-      // Second row's rule select should have 4 options: contains, not_contains, matches_regex, is
-      // The comboboxes are: row1-field, row1-rule, row2-field, row2-rule, row2-value(if boolean)
-      // For "output" field: row2 has field + rule selects
       const secondRowRuleSelect = comboboxes[3]; // 0: row1-field, 1: row1-rule, 2: row2-field, 3: row2-rule
       expect(secondRowRuleSelect).toBeDefined();
 
@@ -255,9 +251,8 @@ describe("<OnlineEvaluationDrawer /> preconditions", () => {
       const ruleTexts = Array.from(ruleOptions).map((o) => o.textContent);
       expect(ruleTexts).toContain("contains");
       expect(ruleTexts).toContain("does not contain");
-      expect(ruleTexts).toContain("matches regex");
       expect(ruleTexts).toContain("is");
-      expect(ruleTexts).toHaveLength(4);
+      expect(ruleTexts).toHaveLength(3);
     });
 
     it("filters rule dropdown for traces.origin to show only 'is'", async () => {
