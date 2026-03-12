@@ -95,6 +95,7 @@ jobs:
       DISABLE_PII_REDACTION: "true"
       SKIP_CLICKHOUSE_MIGRATE: "true"
       SKIP_REDIS: "true"
+      LANGWATCH_LICENSE_PUBLIC_KEY: ${{ secrets.TEST_LICENSE_PUBLIC_KEY }}
 
     services:
       opensearch:
