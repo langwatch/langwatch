@@ -33,8 +33,10 @@ function actionMeta(action: string) {
 
 export function EvaluatorHistoryDrawer({
   evaluatorId,
+  evaluatorName,
 }: {
   evaluatorId: string;
+  evaluatorName?: string;
 }) {
   const { closeDrawer } = useDrawer();
   const { project } = useOrganizationTeamProject();
@@ -49,7 +51,7 @@ export function EvaluatorHistoryDrawer({
       <Drawer.Content>
         <Drawer.Header>
           <Text fontWeight="semibold" fontSize="lg">
-            Evaluator history
+            {evaluatorName ? `${evaluatorName} history` : "Evaluator history"}
           </Text>
           <Drawer.CloseTrigger />
         </Drawer.Header>

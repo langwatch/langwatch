@@ -254,7 +254,7 @@ function Page() {
                 }
                 onViewHistory={() =>
                   openDrawer("evaluatorHistory", {
-                    urlParams: { evaluatorId: evaluator.id },
+                    urlParams: { evaluatorId: evaluator.id, evaluatorName: evaluator.name },
                   })
                 }
                 hasEvaluationsManagePermission={hasEvaluationsManagePermission}

@@ -31,7 +31,13 @@ function actionMeta(action: string) {
   return ACTION_META[action] ?? { label: action, icon: X };
 }
 
-export function AgentHistoryDrawer({ agentId }: { agentId: string }) {
+export function AgentHistoryDrawer({
+  agentId,
+  agentName,
+}: {
+  agentId: string;
+  agentName?: string;
+}) {
   const { closeDrawer } = useDrawer();
   const { project } = useOrganizationTeamProject();
 
@@ -45,7 +51,7 @@ export function AgentHistoryDrawer({ agentId }: { agentId: string }) {
       <Drawer.Content>
         <Drawer.Header>
           <Text fontWeight="semibold" fontSize="lg">
-            Agent history
+            {agentName ? `${agentName} history` : "Agent history"}
           </Text>
           <Drawer.CloseTrigger />
         </Drawer.Header>
