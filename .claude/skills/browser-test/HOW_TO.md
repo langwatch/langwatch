@@ -47,12 +47,12 @@ Many features require existing data to be testable. The sub-agent should create 
 - If results depend on background workers, allow up to 120s
 
 **Creating traces via the SDK or API:**
-- Use a quick Bash command to send traces when UI seeding is impractical:
+- Use a quick Bash command to send traces when UI seeding is impractical. The payload below is illustrative — replace placeholders with valid values:
   ```bash
   curl -X POST http://localhost:<port>/api/collector \
     -H "X-Auth-Token: <project-api-key>" \
     -H "Content-Type: application/json" \
-    -d '{"traces": [{"trace_id": "test-trace-001", "spans": [...]}]}'
+    -d '<valid trace payload JSON>'
   ```
 - Find the project API key on the project settings page in the UI
 

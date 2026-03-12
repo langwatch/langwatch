@@ -52,7 +52,7 @@ Derive `<feature-name>` from: feature filename (without extension) > slugified d
 
 ## Step 2: Determine data seeding needs
 
-Before verification, decide what data the feature under test requires. Many features need pre-existing data to be meaningful (e.g., a suites page needs at least one suite with runs, a trace viewer needs traces, an evaluations dashboard needs completed evaluations).
+Before verification, decide what data the feature under test requires. Many features need pre-existing data to be meaningful (e.g., a suites page needs at least one suite with runs, a trace viewer needs traces, an evaluations dashboard requires completed evaluations).
 
 1. **Analyze the verification steps** from Step 1. For each step, ask: "What data must already exist for this to be testable?"
 2. **Build a seeding checklist** — the minimal set of entities needed. Examples:
