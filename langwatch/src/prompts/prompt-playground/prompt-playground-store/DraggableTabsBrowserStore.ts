@@ -487,6 +487,25 @@ function createDraggableTabsBrowserStore(projectId: string) {
         name: storageKey,
         storage: createJSONStorage(() => localStorage),
 
+        // Strip transient UI flags before writing to localStorage so they
+        // don't re-trigger on page reload.
+        partialize: (state) => ({
+          ...state,
+          windows: state.windows.map((w) => ({
+            ...w,
+            tabs: w.tabs.map((t) => ({
+              ...t,
+              data: {
+                ...t.data,
+                meta: {
+                  ...t.data.meta,
+                  openHistoryOnLoad: undefined,
+                },
+              },
+            })),
+          })),
+        }),
+
         // Validate and handle corrupted data during rehydration
         onRehydrateStorage: () => (state, error) => {
           if (error) {
