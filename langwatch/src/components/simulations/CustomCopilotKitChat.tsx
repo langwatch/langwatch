@@ -1,12 +1,8 @@
 import { VStack } from "@chakra-ui/react";
 import { CopilotKit, useCopilotChatInternal } from "@copilotkit/react-core";
 import { CopilotChat } from "@copilotkit/react-ui";
-import {
-  type ActionExecutionMessage,
-  type ResultMessage,
-  Role,
-  type TextMessage,
-} from "@copilotkit/runtime-client-gql";
+import { Role } from "@copilotkit/runtime-client-gql";
+import type { Message } from "@copilotkit/shared";
 import { useEffect, useMemo } from "react";
 import type { ScenarioMessageSnapshotEvent } from "~/server/scenarios/scenario-event.types";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -47,6 +43,10 @@ export function CustomCopilotKitChat({
       <CustomCopilotKitChatInner {...innerProps} />
     </CopilotKit>
   );
+}
+
+function isTextLike(msg: Message): msg is Message & { content: string } {
+  return msg.role === "user" || msg.role === "assistant";
 }
 
 function CustomCopilotKitChatInner({
@@ -105,55 +105,38 @@ function CustomCopilotKitChatInner({
   return (
     <CopilotChat
       RenderMessage={({ message, UserMessage, ImageRenderer }) => {
-        const msg = message as any;
-        const traceId = traceIdMap.get(msg.id);
-        const role = msg.role as string | undefined;
-        const type = msg.type as string | undefined;
+        const traceId = traceIdMap.get(message.id);
 
-        // Text messages (user or assistant)
-        if (role === "user" || role === "assistant") {
-          const content = msg.content as string ?? "";
+        if (isTextLike(message)) {
           return (
             <VStack
-              align={role === "assistant" ? "flex-start" : "flex-end"}
+              align={message.role === "assistant" ? "flex-start" : "flex-end"}
               css={fadeInCss}
             >
-              {role === "assistant" && (
-                <Markdown className="markdown">{content}</Markdown>
+              {message.role === "assistant" && (
+                <Markdown className="markdown">{message.content}</Markdown>
               )}
-              {UserMessage && role === "user" && (
+              {UserMessage && message.role === "user" && (
                 <UserMessage
-                  message={{ id: msg.id, role: "user" as const, content }}
+                  message={{ id: message.id, role: "user" as const, content: message.content }}
                   ImageRenderer={ImageRenderer!}
                   rawData={message}
                 />
               )}
               {!smallerView &&
                 traceId &&
-                role === "assistant" && (
+                message.role === "assistant" && (
                   <TraceMessage traceId={traceId} />
                 )}
             </VStack>
           );
         }
 
-        // Action execution (tool call)
-        if (type === "ActionExecutionMessage") {
+        // Tool results or other unhandled message types
+        if ("content" in message) {
           return (
             <VStack align="flex-start" gap={6} css={fadeInCss}>
-              <ToolCallMessage message={msg as ActionExecutionMessage} />
-              {!smallerView && traceId && (
-                <TraceMessage traceId={traceId} />
-              )}
-            </VStack>
-          );
-        }
-
-        // Result message (tool result)
-        if (type === "ResultMessage" || role === "tool") {
-          return (
-            <VStack align="flex-start" gap={6} css={fadeInCss}>
-              <ToolResultMessage message={msg as ResultMessage} />
+              <ToolResultMessage message={message as any} />
               {!smallerView && traceId && (
                 <TraceMessage traceId={traceId} />
               )}
