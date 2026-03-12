@@ -44,27 +44,6 @@ const threadsPerTopic = {
   height: 300,
 };
 
-const inputSentimenPerTopic = {
-  graphId: "custom",
-  graphType: "horizontal_bar",
-  series: [
-    {
-      name: "",
-      colorSet: "greenTones",
-      metric: "sentiment.input_sentiment",
-      aggregation: "median",
-      pipeline: {
-        field: "trace_id",
-        aggregation: "avg",
-      },
-    },
-  ],
-  groupBy: "topics.topics",
-  includePrevious: false,
-  timeScale: "full",
-  height: 300,
-};
-
 const mostDisucussedTopics = {
   graphId: "custom",
   graphType: "horizontal_bar",
@@ -107,21 +86,6 @@ function TopicsContent() {
               </Card.Header>
               <Card.Body>
                 <CustomGraph input={threadsPerTopic as CustomGraphInput} />
-              </Card.Body>
-            </Card.Root>
-          </GridItem>
-          <GridItem colSpan={2} display="inline-grid">
-            <Card.Root>
-              <Card.Header>
-                <HStack gap={2}>
-                  <BarChart2 color="orange" />
-                  <Heading size="sm">Input Sentiment Per Topic</Heading>
-                </HStack>
-              </Card.Header>
-              <Card.Body>
-                <CustomGraph
-                  input={inputSentimenPerTopic as CustomGraphInput}
-                />
               </Card.Body>
             </Card.Root>
           </GridItem>

@@ -107,7 +107,6 @@ export type GroupByField =
   | "evaluations.evaluation_label"
   | "evaluations.evaluation_processing_state"
   | "events.event_type"
-  | "sentiment.input_sentiment"
   | "sentiment.thumbs_up_down"
   | "error.has_error";
 
@@ -206,15 +205,6 @@ const groupByExpressions: Partial<
     column: `arrayJoin(${tableAliases.stored_spans}."Events.Name")`,
     requiredJoins: ["stored_spans"],
     usesArrayJoin: true,
-  }),
-
-  "sentiment.input_sentiment": () => ({
-    column: `multiIf(
-      toFloat64OrNull(${tableAliases.trace_summaries}.Attributes['langwatch.input.satisfaction_score']) >= 0.1, 'positive',
-      toFloat64OrNull(${tableAliases.trace_summaries}.Attributes['langwatch.input.satisfaction_score']) <= -0.1, 'negative',
-      'neutral'
-    )`,
-    requiredJoins: [],
   }),
 
   "sentiment.thumbs_up_down": () => ({

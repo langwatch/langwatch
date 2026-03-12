@@ -26,7 +26,6 @@ import type {
 import {
   isLogRecordReceivedEvent,
   isMetricRecordReceivedEvent,
-  isSatisfactionScoreAssignedEvent,
   isSpanReceivedEvent,
   isTopicAssignedEvent,
 } from "../schemas/events";
@@ -847,7 +846,6 @@ export function createTraceSummaryFoldProjection({
         outputFromRootSpan: false,
         outputSpanEndTimeMs: 0,
         blockedByGuardrail: false,
-        satisfactionScore: null,
         topicId: null,
         subTopicId: null,
         hasAnnotation: null,
@@ -884,14 +882,6 @@ export function createTraceSummaryFoldProjection({
           ...state,
           topicId: event.data.topicId ?? state.topicId,
           subTopicId: event.data.subtopicId ?? state.subTopicId,
-          updatedAt: Date.now(),
-        };
-      }
-
-      if (isSatisfactionScoreAssignedEvent(event)) {
-        return {
-          ...state,
-          satisfactionScore: event.data.satisfactionScore,
           updatedAt: Date.now(),
         };
       }
