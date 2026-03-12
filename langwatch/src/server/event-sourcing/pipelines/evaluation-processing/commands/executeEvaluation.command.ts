@@ -13,11 +13,14 @@ import { createLogger } from "../../../../../utils/logger/server";
 import type { EvaluationExecutionService } from "../../../../app-layer/evaluations/evaluation-execution.service";
 import {
   evaluatePreconditions,
-  type PreconditionTrace,
+  buildPreconditionTraceDataFromCommand,
+  checkEvaluatorRequiredFields,
+  preconditionsNeedEvents,
 } from "../../../../evaluations/preconditions";
+import type { PreconditionTraceData } from "../../../../filters/precondition-matchers";
 import type { CheckPreconditions } from "../../../../evaluations/types";
 import type { MappingState } from "../../../../tracer/tracesMapping";
-import type { Span } from "../../../../tracer/types";
+import type { ElasticSearchEvent, Span } from "../../../../tracer/types";
 import type { ExecuteEvaluationCommandData } from "../schemas/commands";
 import { executeEvaluationCommandDataSchema } from "../schemas/commands";
 import {
@@ -37,6 +40,7 @@ const logger = createLogger(
 export interface ExecuteEvaluationCommandDeps {
   prisma: PrismaClient;
   spanStorage: { getSpansByTraceId(params: { tenantId: string; traceId: string }): Promise<Span[]> };
+  traceEvents: { getEventsByTraceId(params: { tenantId: string; traceId: string }): Promise<ElasticSearchEvent[]> };
   evaluationExecution: EvaluationExecutionService;
 }
 
@@ -136,28 +140,48 @@ export function createExecuteEvaluationCommandClass(deps: ExecuteEvaluationComma
         return [];
       }
 
-      // 3. Read spans from CH, check preconditions
+      // 3. Read spans from CH, check evaluator required fields + preconditions
       const spans = await deps.spanStorage.getSpansByTraceId({ tenantId, traceId: data.traceId });
 
-      const preconditionTrace: PreconditionTrace = {
-        input: { value: "" },
-        output: { value: "" },
-        metadata: {
-          labels: data.labels ?? [],
-          thread_id: data.threadId,
-          user_id: data.userId,
-          customer_id: data.customerId,
-        },
-        expected_output: undefined,
-      };
-
-      const preconditions = (monitor.preconditions ?? []) as CheckPreconditions;
-      const preconditionsMet = evaluatePreconditions(
-        monitor.checkType,
-        preconditionTrace,
+      // Check evaluator required fields first
+      const requiredFieldsMet = checkEvaluatorRequiredFields({
+        evaluatorType: monitor.checkType,
         spans,
+      });
+      if (!requiredFieldsMet) {
+        logger.debug(
+          {
+            tenantId: tenantId,
+            evaluatorId: data.evaluatorId,
+            traceId: data.traceId,
+          },
+          "Evaluator required fields not met — skipping evaluation",
+        );
+        return [];
+      }
+
+      // Then check user-configured preconditions
+      const preconditions = (monitor.preconditions ?? []) as CheckPreconditions;
+
+      // Fetch events on demand if any preconditions reference event fields
+      let events: PreconditionTraceData["events"] = null;
+      if (preconditionsNeedEvents(preconditions)) {
+        const traceEvents = await deps.traceEvents.getEventsByTraceId({
+          tenantId,
+          traceId: data.traceId,
+        });
+        events = traceEvents.map((e) => ({
+          event_type: e.event_type,
+          metrics: e.metrics ?? [],
+          event_details: e.event_details ?? [],
+        }));
+      }
+
+      const traceData = buildPreconditionTraceDataFromCommand({ data, spans, events });
+      const preconditionsMet = evaluatePreconditions({
+        traceData,
         preconditions,
-      );
+      });
 
       if (!preconditionsMet) {
         logger.debug(
