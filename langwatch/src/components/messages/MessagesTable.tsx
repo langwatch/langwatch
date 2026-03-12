@@ -587,7 +587,7 @@ export function MessagesTable({
                 <Table.Cell
                   key={index}
                   onClick={() =>
-                    openDrawer("traceDetails", {
+                    openTraceDetailsDrawer({
                       traceId: trace.trace_id,
                     })
                   }
