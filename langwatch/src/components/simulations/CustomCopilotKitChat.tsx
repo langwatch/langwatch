@@ -25,8 +25,6 @@ interface CustomCopilotKitChatInnerProps {
   messages: ScenarioMessageSnapshotEvent["messages"];
   smallerView?: boolean;
   hideInput?: boolean;
-  /** When provided, overrides the default URL-based drawer for "View Trace" buttons. */
-  onViewTrace?: (traceId: string) => void;
 }
 
 /**
@@ -55,7 +53,6 @@ function CustomCopilotKitChatInner({
   messages,
   smallerView,
   hideInput,
-  onViewTrace,
 }: CustomCopilotKitChatInnerProps) {
   const { project } = useOrganizationTeamProject();
   const { setMessages } = useCopilotChat({
@@ -125,7 +122,7 @@ function CustomCopilotKitChatInner({
             {!smallerView &&
               traceId &&
               message_.role === Role.Assistant && (
-                <TraceMessage traceId={traceId} onViewTrace={onViewTrace} />
+                <TraceMessage traceId={traceId} />
               )}
           </VStack>
         );
@@ -138,7 +135,7 @@ function CustomCopilotKitChatInner({
           <VStack align="flex-start" gap={6} css={fadeInCss}>
             <ToolCallMessage message={message_} />
             {!smallerView && traceId && (
-              <TraceMessage traceId={traceId} onViewTrace={onViewTrace} />
+              <TraceMessage traceId={traceId} />
             )}
           </VStack>
         );
@@ -151,7 +148,7 @@ function CustomCopilotKitChatInner({
           <VStack align="flex-start" gap={6} css={fadeInCss}>
             <ToolResultMessage message={message_} />
             {!smallerView && traceId && (
-              <TraceMessage traceId={traceId} onViewTrace={onViewTrace} />
+              <TraceMessage traceId={traceId} />
             )}
           </VStack>
         );

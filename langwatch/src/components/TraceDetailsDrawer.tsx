@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { getDrawerStack, useDrawer } from "~/hooks/useDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 import { Drawer } from "../components/ui/drawer";
 import { useAnnotationCommentStore } from "../hooks/useAnnotationCommentStore";
 import { TraceDetails } from "./traces/TraceDetails";
@@ -11,7 +11,7 @@ interface TraceDetailsDrawerProps {
 }
 
 export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
-  const { closeDrawer } = useDrawer();
+  const { goBack } = useDrawer();
   const commentState = useAnnotationCommentStore();
 
   const [traceView, setTraceView] = useState<"span" | "full">("span");
@@ -27,12 +27,7 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
       placement="end"
       size={traceView === "full" ? "full" : "xl"}
       onOpenChange={() => {
-        // Only close if we're not navigating to another drawer.
-        // When openDrawer() is called, the stack is pushed before this
-        // unmount fires, so stack.length > 1 means forward navigation.
-        if (getDrawerStack().length <= 1) {
-          closeDrawer();
-        }
+        goBack();
         commentState.resetComment();
       }}
     >

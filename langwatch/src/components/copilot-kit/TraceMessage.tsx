@@ -23,11 +23,9 @@ const TRACE_QUERY_CONFIG = {
 
 interface TraceMessageProps extends StackProps {
   traceId: string;
-  /** When provided, overrides the default URL-based drawer navigation. */
-  onViewTrace?: (traceId: string) => void;
 }
 
-export function TraceMessage({ traceId, onViewTrace, ...props }: TraceMessageProps) {
+export function TraceMessage({ traceId, ...props }: TraceMessageProps) {
   const { project } = useOrganizationTeamProject();
 
   const traceQuery = api.traces.getById.useQuery(
@@ -43,15 +41,14 @@ export function TraceMessage({ traceId, onViewTrace, ...props }: TraceMessagePro
     return null;
   }
 
-  return <TraceSuccessState {...props} traceId={traceId} onViewTrace={onViewTrace} />;
+  return <TraceSuccessState {...props} traceId={traceId} />;
 }
 
 // Success state component
 function TraceSuccessState({
   traceId,
-  onViewTrace,
   ...props
-}: { traceId: string; onViewTrace?: (traceId: string) => void } & StackProps) {
+}: { traceId: string } & StackProps) {
   const { openDrawer, drawerOpen } = useDrawer();
 
   return (
@@ -59,10 +56,6 @@ function TraceSuccessState({
       <Button
         colorPalette="gray"
         onClick={() => {
-          if (onViewTrace) {
-            onViewTrace(traceId);
-            return;
-          }
           if (drawerOpen("traceDetails")) {
             openDrawer(
               "traceDetails",
