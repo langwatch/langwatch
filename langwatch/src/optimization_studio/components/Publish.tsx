@@ -475,7 +475,7 @@ function PublishModalContent({
 
   const formVersion = form.watch("version");
 
-  const { versions, versionToBeEvaluated, nextVersion, canSaveNewVersion } =
+  const { versions, versionToBeEvaluated, canSaveNewVersion } =
     useVersionState({
       project,
       form,

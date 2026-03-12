@@ -180,7 +180,7 @@ export function OptimizeModalContent({
     },
   );
 
-  const { versions, canSaveNewVersion, nextVersion, versionToBeEvaluated } =
+  const { versions, canSaveNewVersion, versionToBeEvaluated } =
     useVersionState({
       project,
       form: form as unknown as UseFormReturn<{
