@@ -53,6 +53,7 @@ jobs:
         if: failure() && github.ref == 'refs/heads/main'
         env:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
+          GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/notify-slack-job-failure.sh typecheck
 
   test-unit:
@@ -321,6 +322,7 @@ jobs:
         if: failure() && github.ref == 'refs/heads/main'
         env:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
+          GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/notify-slack-job-failure.sh lint
 
   build:
@@ -397,4 +399,5 @@ jobs:
         if: failure() && github.ref == 'refs/heads/main'
         env:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
+          GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/notify-slack-job-failure.sh build
