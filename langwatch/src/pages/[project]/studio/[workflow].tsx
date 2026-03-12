@@ -12,11 +12,25 @@ import { api } from "../../../utils/api";
 export default function Studio() {
   const { workflow } = useLoadWorkflow();
 
-  const { reset, setWorkflow, setPreviousWorkflow } = useWorkflowStore(
-    ({ reset, setWorkflow, setPreviousWorkflow }) => ({
+  const {
+    reset,
+    setWorkflow,
+    setAutosavedWorkflow,
+    setLastCommittedWorkflow,
+    setCurrentVersionId,
+  } = useWorkflowStore(
+    ({
       reset,
       setWorkflow,
-      setPreviousWorkflow,
+      setAutosavedWorkflow,
+      setLastCommittedWorkflow,
+      setCurrentVersionId,
+    }) => ({
+      reset,
+      setWorkflow,
+      setAutosavedWorkflow,
+      setLastCommittedWorkflow,
+      setCurrentVersionId,
     }),
   );
   const { clear } = _useWorkflowStore.temporal.getState();
@@ -37,7 +51,7 @@ export default function Studio() {
       | undefined;
     if (dsl) {
       // Prevent autosave from triggering after load
-      setPreviousWorkflow(undefined);
+      setAutosavedWorkflow(undefined);
       setWorkflow({
         ...dsl,
         workflow_id: workflow.data?.id,
@@ -46,6 +60,8 @@ export default function Studio() {
           selected: false,
         })),
       });
+      setLastCommittedWorkflow(dsl);
+      setCurrentVersionId(workflow.data?.currentVersion?.id);
     } else {
       reset();
       clear();

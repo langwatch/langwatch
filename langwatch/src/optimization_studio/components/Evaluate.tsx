@@ -3,7 +3,6 @@ import {
   createListCollection,
   HStack,
   Input,
-  Skeleton,
   Spacer,
   Text,
   useDisclosure,
@@ -15,6 +14,7 @@ import { CheckSquare } from "react-feather";
 import {
   Controller,
   type ControllerRenderProps,
+  FormProvider,
   type UseFormReturn,
   useForm,
 } from "react-hook-form";
@@ -33,7 +33,7 @@ import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Entry } from "../types/dsl";
 import { trainTestSplit } from "../utils/datasetUtils";
 import { AddModelProviderKey } from "./AddModelProviderKey";
-import { useVersionState, VersionToBeUsed } from "./History";
+import { VersionToBeUsed } from "./VersionToBeUsed";
 
 export function Evaluate() {
   const { open, onToggle, onClose, setOpen } = useDisclosure();
@@ -103,6 +103,10 @@ export function EvaluateModalContent({
     evaluationState,
     deselectAllNodes,
     setOpenResultsPanelRequest,
+    canCommitNewVersion,
+    setLastCommittedWorkflow,
+    setCurrentVersionId,
+    currentVersionId,
   } = useWorkflowStore(
     ({
       workflow_id: workflowId,
@@ -110,12 +114,20 @@ export function EvaluateModalContent({
       state,
       deselectAllNodes,
       setOpenResultsPanelRequest,
+      canCommitNewVersion,
+      setLastCommittedWorkflow,
+      setCurrentVersionId,
+      currentVersionId,
     }) => ({
       workflowId,
       getWorkflow,
       evaluationState: state.evaluation,
       deselectAllNodes: deselectAllNodes,
       setOpenResultsPanelRequest: setOpenResultsPanelRequest,
+      canCommitNewVersion,
+      setLastCommittedWorkflow,
+      setCurrentVersionId,
+      currentVersionId,
     }),
   );
 
@@ -200,15 +212,8 @@ export function EvaluateModalContent({
     return 0;
   }, [evaluateOn, total, train.length, test.length]);
 
-  const { versions, canSaveNewVersion, nextVersion, versionToBeEvaluated } =
-    useVersionState({
-      project,
-      form: form as unknown as UseFormReturn<{
-        version: string;
-        commitMessage: string;
-      }>,
-      allowSaveIfAutoSaveIsCurrentButNotLatest: false,
-    });
+  const canSave = canCommitNewVersion();
+  const trpc = api.useContext();
 
   const commitVersion = api.workflow.commitVersion.useMutation();
   const { startEvaluationExecution } = useEvaluationExecution();
@@ -233,7 +238,7 @@ export function EvaluateModalContent({
     async ({ version, commitMessage, evaluateOn }: EvaluateForm) => {
       if (!project || !workflowId) return;
 
-      let versionId: string | undefined = versionToBeEvaluated.id;
+      let versionId: string | undefined = canSave ? undefined : currentVersionId;
 
       if (!estimatedTotal) {
         return;
@@ -257,7 +262,7 @@ export function EvaluateModalContent({
         return;
       }
 
-      if (canSaveNewVersion) {
+      if (canSave) {
         try {
           const versionResponse = await commitVersion.mutateAsync({
             projectId: project.id,
@@ -269,6 +274,8 @@ export function EvaluateModalContent({
             },
           });
           versionId = versionResponse.id;
+          setLastCommittedWorkflow(getWorkflow());
+          setCurrentVersionId(versionId);
         } catch (error) {
           toaster.create({
             title: "Error saving version",
@@ -290,7 +297,7 @@ export function EvaluateModalContent({
         return;
       }
 
-      void versions.refetch();
+      void trpc.workflow.getVersions.invalidate();
 
       startEvaluationExecution({
         workflow_version_id: versionId,
@@ -301,14 +308,16 @@ export function EvaluateModalContent({
       setHasStarted(true);
     },
     [
-      canSaveNewVersion,
+      canSave,
       commitVersion,
+      currentVersionId,
       estimatedTotal,
       getWorkflow,
       project,
+      setCurrentVersionId,
+      setLastCommittedWorkflow,
       startEvaluationExecution,
-      versionToBeEvaluated.id,
-      versions,
+      trpc.workflow.getVersions,
       workflowId,
     ],
   );
@@ -319,25 +328,7 @@ export function EvaluateModalContent({
     return null;
   }
 
-  if (!versions.data) {
-    return (
-      <Dialog.Content borderTop="5px solid" borderTopColor="green.400">
-        <Dialog.Header>
-          <Dialog.Title fontWeight={600}>Evaluate Workflow</Dialog.Title>
-          <Dialog.CloseTrigger />
-        </Dialog.Header>
-        <Dialog.Body>
-          <VStack align="start" width="full">
-            <Skeleton width="full" height="20px" />
-            <Skeleton width="full" height="20px" />
-          </VStack>
-        </Dialog.Body>
-        <Dialog.Footer />
-      </Dialog.Content>
-    );
-  }
-
-  const needsACommitMessage = canSaveNewVersion && !commitMessage;
+  const needsACommitMessage = canSave && !commitMessage;
 
   const isDisabled = hasProvidersWithoutCustomKeys
     ? "Set up your API keys to run evaluations"
@@ -348,6 +339,7 @@ export function EvaluateModalContent({
         : false;
 
   return (
+    <FormProvider {...form}>
     <Dialog.Content
       as="form"
       // eslint-disable-next-line @typescript-eslint/no-misused-promises
@@ -362,17 +354,7 @@ export function EvaluateModalContent({
       <Dialog.Body>
         <VStack align="start" width="full" gap={4}>
           <VStack align="start" width="full">
-            <VersionToBeUsed
-              form={
-                form as unknown as UseFormReturn<{
-                  version: string;
-                  commitMessage: string;
-                }>
-              }
-              nextVersion={nextVersion}
-              canSaveNewVersion={canSaveNewVersion}
-              versionToBeEvaluated={versionToBeEvaluated}
-            />
+            <VersionToBeUsed />
           </VStack>
           <VStack align="start" width="full" gap={2}>
             <SmallLabel>Evaluate on</SmallLabel>
@@ -413,13 +395,14 @@ export function EvaluateModalContent({
                 }
               >
                 <CheckSquare size={16} />
-                {canSaveNewVersion ? "Save & Run Evaluation" : "Run Evaluation"}
+                {canSave ? "Save & Run Evaluation" : "Run Evaluation"}
               </Button>
             </Tooltip>
           </HStack>
         </VStack>
       </Dialog.Footer>
     </Dialog.Content>
+    </FormProvider>
   );
 }
 

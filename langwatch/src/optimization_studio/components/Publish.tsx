@@ -26,7 +26,7 @@ import {
   Share2,
   XCircle,
 } from "react-feather";
-import { useForm } from "react-hook-form";
+import { FormProvider, useForm } from "react-hook-form";
 import { RenderCode } from "~/components/code/RenderCode";
 import { langwatchEndpoint } from "../../components/code/langwatchEndpointEnv";
 import { SmallLabel } from "../../components/SmallLabel";
@@ -48,7 +48,8 @@ import {
 } from "../utils/datasetUtils";
 import { getEntryInputs } from "../utils/nodeUtils";
 import { AddModelProviderKey } from "./AddModelProviderKey";
-import { useVersionState, VersionToBeUsed } from "./History";
+import { useVersionState } from "./History";
+import { VersionToBeUsed } from "./VersionToBeUsed";
 
 // Type with dataset property
 interface NodeDataWithDataset {
@@ -620,6 +621,7 @@ function PublishModalContent({
     : false;
 
   return (
+    <FormProvider {...form}>
     <Dialog.Content
       as="form"
       // eslint-disable-next-line @typescript-eslint/no-misused-promises
@@ -637,14 +639,7 @@ function PublishModalContent({
             Publish your workflow to make it available via API, as a component
             to other workflows, or as a custom evaluator.
           </Text>
-          {versionToBeEvaluated && (
-            <VersionToBeUsed
-              form={form}
-              nextVersion={nextVersion}
-              canSaveNewVersion={canSaveNewVersion}
-              versionToBeEvaluated={versionToBeEvaluated}
-            />
-          )}
+          <VersionToBeUsed />
         </VStack>
       </Dialog.Body>
       <Dialog.Footer borderTop="1px solid" borderColor="border" marginTop={4}>
@@ -699,6 +694,7 @@ function PublishModalContent({
         </VStack>
       </Dialog.Footer>
     </Dialog.Content>
+    </FormProvider>
   );
 }
 

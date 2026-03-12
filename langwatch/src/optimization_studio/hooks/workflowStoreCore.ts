@@ -34,7 +34,9 @@ export type State = Workflow & {
   propertiesExpanded: boolean;
   triggerValidation: boolean;
   workflowSelected: boolean;
-  previousWorkflow: Workflow | undefined;
+  autosavedWorkflow: Workflow | undefined;
+  lastCommittedWorkflow: Workflow | undefined;
+  currentVersionId: string | undefined;
   openResultsPanelRequest:
     | "evaluations"
     | "optimizations"
@@ -46,14 +48,17 @@ export type State = Workflow & {
 export type WorkflowStore = State & {
   reset: () => void;
   getWorkflow: () => Workflow;
-  getPreviousWorkflow: () => Workflow | undefined;
+  getAutosavedWorkflow: () => Workflow | undefined;
   hasPendingChanges: () => boolean;
   setWorkflow: (
     workflow:
       | (Partial<Workflow> & { workflow_id?: string })
       | ((current: Workflow) => Partial<Workflow> & { workflow_id?: string }),
   ) => void;
-  setPreviousWorkflow: (workflow: Workflow | undefined) => void;
+  setAutosavedWorkflow: (workflow: Workflow | undefined) => void;
+  setLastCommittedWorkflow: (workflow: Workflow | undefined) => void;
+  setCurrentVersionId: (id: string | undefined) => void;
+  canCommitNewVersion: () => boolean;
   setSocketStatus: (
     status: SocketStatus | ((status: SocketStatus) => SocketStatus),
   ) => void;
@@ -144,7 +149,9 @@ export const initialState: State = {
   propertiesExpanded: false,
   triggerValidation: false,
   workflowSelected: false,
-  previousWorkflow: undefined,
+  autosavedWorkflow: undefined,
+  lastCommittedWorkflow: undefined,
+  currentVersionId: undefined,
   openResultsPanelRequest: undefined,
   playgroundOpen: false,
 };
@@ -403,16 +410,16 @@ export const store = (
     const state = get();
     return getWorkflow(state);
   },
-  getPreviousWorkflow: () => {
-    return get().previousWorkflow;
+  getAutosavedWorkflow: () => {
+    return get().autosavedWorkflow;
   },
   hasPendingChanges: () => {
-    const previousWorkflow = get().previousWorkflow;
+    const autosavedWorkflow = get().autosavedWorkflow;
     const currentWorkflow = get().getWorkflow();
-    if (!previousWorkflow || !currentWorkflow) {
+    if (!autosavedWorkflow || !currentWorkflow) {
       return false;
     }
-    return hasDSLChanged(previousWorkflow, currentWorkflow, true);
+    return hasDSLChanged(autosavedWorkflow, currentWorkflow, true);
   },
   setWorkflow: (
     workflow: Partial<Workflow> | ((current: Workflow) => Partial<Workflow>),
@@ -444,8 +451,22 @@ export const store = (
     }
     set(resolved);
   },
-  setPreviousWorkflow: (workflow: Workflow | undefined) => {
-    set({ previousWorkflow: workflow });
+  setAutosavedWorkflow: (workflow: Workflow | undefined) => {
+    set({ autosavedWorkflow: workflow });
+  },
+  setLastCommittedWorkflow: (workflow: Workflow | undefined) => {
+    set({ lastCommittedWorkflow: workflow });
+  },
+  setCurrentVersionId: (id: string | undefined) => {
+    set({ currentVersionId: id });
+  },
+  canCommitNewVersion: () => {
+    const lastCommitted = get().lastCommittedWorkflow;
+    const currentWorkflow = get().getWorkflow();
+    if (!lastCommitted || !currentWorkflow) {
+      return false;
+    }
+    return hasDSLChanged(currentWorkflow, lastCommitted, false);
   },
   setSocketStatus: (
     status: SocketStatus | ((status: SocketStatus) => SocketStatus),
