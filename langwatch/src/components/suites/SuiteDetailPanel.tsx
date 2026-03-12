@@ -256,12 +256,12 @@ export function SuiteEmptyState({ onNewSuite }: { onNewSuite: () => void }) {
           <EmptyState.Indicator>
             <FolderOpen size={32} />
           </EmptyState.Indicator>
-          <EmptyState.Title>No suite selected</EmptyState.Title>
+          <EmptyState.Title>No run plan selected</EmptyState.Title>
           <EmptyState.Description>
-            Select a suite from the sidebar or create a new one
+            Select a run plan from the sidebar or create a new one
           </EmptyState.Description>
           <Button colorPalette="blue" onClick={onNewSuite}>
-            <Plus size={16} /> New Suite
+            <Plus size={16} /> New Run Plan
           </Button>
         </EmptyState.Content>
       </EmptyState.Root>

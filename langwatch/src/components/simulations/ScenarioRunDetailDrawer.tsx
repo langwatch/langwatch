@@ -168,7 +168,7 @@ export function ScenarioRunDetailDrawer({
       { label: "Scenario ID", value: scenarioId },
       { label: "Batch Run ID", value: batchRunId },
       { label: "Run ID", value: scenarioRunId },
-      ...(suiteId ? [{ label: "Suite ID", value: suiteId }] : []),
+      ...(suiteId ? [{ label: "Run Plan ID", value: suiteId }] : []),
     ];
   }, [scenarioId, batchRunId, scenarioRunId, suiteId]);
 

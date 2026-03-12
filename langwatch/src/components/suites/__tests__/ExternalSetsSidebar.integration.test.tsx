@@ -306,7 +306,7 @@ describe("<SuiteSidebar/> External Sets", () => {
         expect(
           screen.queryByTestId("external-sets-header"),
         ).not.toBeInTheDocument();
-        expect(screen.getByText("No matching suites")).toBeInTheDocument();
+        expect(screen.getByText("No matching run plans")).toBeInTheDocument();
       });
     });
   });

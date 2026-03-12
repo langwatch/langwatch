@@ -324,11 +324,11 @@ describe("<SuiteEmptyState/>", () => {
     );
 
     expect(
-      screen.getByText("Select a suite from the sidebar or create a new one"),
+      screen.getByText("Select a run plan from the sidebar or create a new one"),
     ).toBeInTheDocument();
   });
 
-  describe("when New Suite button is clicked", () => {
+  describe("when New Run Plan button is clicked", () => {
     it("calls onNewSuite", async () => {
       const user = userEvent.setup();
       const onNewSuite = vi.fn();
@@ -342,7 +342,7 @@ describe("<SuiteEmptyState/>", () => {
         },
       );
 
-      await user.click(screen.getByText("New Suite"));
+      await user.click(screen.getByText("New Run Plan"));
       expect(onNewSuite).toHaveBeenCalledOnce();
     });
   });

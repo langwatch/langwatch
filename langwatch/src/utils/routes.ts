@@ -128,7 +128,7 @@ export const projectRoutes = {
   },
   simulation_runs: {
     path: "/[project]/simulations",
-    title: "Runs",
+    title: "Run History",
     parent: "simulations",
   },
   scenarios: {
@@ -138,7 +138,7 @@ export const projectRoutes = {
   },
   suites: {
     path: "/[project]/simulations/suites",
-    title: "Suites",
+    title: "Run Plans",
     parent: "simulations",
   },
   simulations_batch: {

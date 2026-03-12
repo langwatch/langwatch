@@ -100,7 +100,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
   );
 
   const isEditMode = !!suiteId;
-  const title = isEditMode ? "Edit Suite" : "New Suite";
+  const title = isEditMode ? "Edit Run Plan" : "New Run Plan";
 
   const suiteForm = useSuiteForm({
     suite: suite ?? null,
@@ -156,14 +156,14 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
       onSaved?.(data);
       closeDrawer();
       toaster.create({
-        title: "Suite created",
+        title: "Run plan created",
         type: "success",
         meta: { closable: true },
       });
     },
     onError: (err) => {
       toaster.create({
-        title: "Failed to create suite",
+        title: "Failed to create run plan",
         description: err.message,
         type: "error",
         meta: { closable: true },
@@ -181,14 +181,14 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
       onSaved?.(data);
       closeDrawer();
       toaster.create({
-        title: "Suite updated",
+        title: "Run plan updated",
         type: "success",
         meta: { closable: true },
       });
     },
     onError: (err) => {
       toaster.create({
-        title: "Failed to update suite",
+        title: "Failed to update run plan",
         description: err.message,
         type: "error",
         meta: { closable: true },
@@ -274,7 +274,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                 Name *
               </Text>
               <Input
-                placeholder="e.g., Critical Path Suite"
+                placeholder="e.g., Critical Path Run Plan"
                 {...form.register("name")}
                 borderColor={errors.name ? "red.500" : undefined}
               />

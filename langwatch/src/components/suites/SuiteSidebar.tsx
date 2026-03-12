@@ -260,7 +260,7 @@ export function SuiteSidebar({
             paddingY={4}
             textAlign="center"
           >
-            No suites yet
+            No run plans yet
           </Text>
         )}
         {hasNoResults &&
@@ -272,7 +272,7 @@ export function SuiteSidebar({
               paddingY={4}
               textAlign="center"
             >
-              No matching suites
+              No matching run plans
             </Text>
           )}
         {filteredSuites.map((suite) => (

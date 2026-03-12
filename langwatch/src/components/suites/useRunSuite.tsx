@@ -58,12 +58,12 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
 
         const suiteIdForEdit = variables.id;
         toaster.create({
-          title: `Suite run scheduled (${result.jobCount} jobs)`,
+          title: `Run plan scheduled (${result.jobCount} jobs)`,
           description: `${parts.join(" and ")} skipped.`,
           type: "warning",
           meta: { closable: true },
           action: {
-            label: "Edit Suite",
+            label: "Edit Run Plan",
             onClick: () => {
               openDrawer("suiteEditor", {
                 urlParams: { suiteId: suiteIdForEdit },
@@ -73,7 +73,7 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
         });
       } else {
         toaster.create({
-          title: `Suite run scheduled (${result.jobCount} jobs)`,
+          title: `Run plan scheduled (${result.jobCount} jobs)`,
           type: "success",
           meta: { closable: true },
         });
@@ -91,14 +91,14 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
         (err.message.includes("All scenarios") ||
           err.message.includes("All targets"));
       toaster.create({
-        title: isAllArchived ? "Cannot run suite" : "Failed to run suite",
+        title: isAllArchived ? "Cannot start run plan" : "Run plan failed to start",
         description: err.message,
         type: "error",
         meta: { closable: true },
         ...(isAllArchived
           ? {
               action: {
-                label: "Edit Suite",
+                label: "Edit Run Plan",
                 onClick: () => {
                   openDrawer("suiteEditor", {
                     urlParams: { suiteId: suiteIdForToast },
