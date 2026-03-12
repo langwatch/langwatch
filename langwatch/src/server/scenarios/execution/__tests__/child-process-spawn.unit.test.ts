@@ -108,6 +108,19 @@ describe("resolveChildProcessSpawn", () => {
     });
   });
 
+  describe("when NODE_ENV is test", () => {
+    it("falls back to development mode (tsx)", () => {
+      const result = resolveChildProcessSpawn({
+        packageRoot: PACKAGE_ROOT,
+        nodeEnv: "test",
+      });
+
+      expect(result.command).toBe("pnpm");
+      expect(result.args[0]).toBe("exec");
+      expect(result.args[1]).toBe("tsx");
+    });
+  });
+
   describe("when NODE_ENV is undefined", () => {
     it("falls back to development mode (tsx)", () => {
       const result = resolveChildProcessSpawn({

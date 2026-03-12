@@ -30,7 +30,7 @@ await build({
   bundle: true,
   platform: "node",
   format: "cjs",
-  target: "node22",
+  target: "node24",
   external: [
     // Shared singletons — must resolve to the same instance at runtime
     "@opentelemetry/api",

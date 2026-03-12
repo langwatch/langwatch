@@ -5,8 +5,7 @@
  * @see specs/scenarios/pre-compiled-child-process.feature
  */
 
-import { execSync } from "child_process";
-import { spawn } from "child_process";
+import { execSync, spawnSync, spawn } from "child_process";
 import fs from "fs";
 import path from "path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -40,6 +39,27 @@ describe("Pre-compiled Scenario Child Process", () => {
 
       const content = fs.readFileSync(BUNDLE_PATH, "utf8");
       expect(content.length).toBeGreaterThan(0);
+    });
+
+    it("resolves all require() calls without module errors", () => {
+      // The bundle executes main() on require, which reads stdin and exits 1
+      // when no input is provided. That's expected. What we're checking is that
+      // no MODULE_NOT_FOUND errors occur — meaning all externals resolve.
+      const result = spawnSync("node", ["-e", `require('${BUNDLE_PATH}')`], {
+        cwd: PACKAGE_ROOT,
+        stdio: "pipe",
+        env: {
+          ...process.env,
+          SKIP_ENV_VALIDATION: "1",
+          LANGWATCH_API_KEY: "test-key",
+          LANGWATCH_ENDPOINT: "http://localhost:9999",
+        },
+        timeout: 10000,
+      });
+
+      const stderr = result.stderr?.toString() ?? "";
+      expect(stderr).not.toContain("MODULE_NOT_FOUND");
+      expect(stderr).not.toContain("Cannot find module");
     });
 
     it("excludes shared singleton dependencies from the bundle", () => {
@@ -91,9 +111,9 @@ describe("Pre-compiled Scenario Child Process", () => {
 
       // Process should have attempted to parse stdin (and failed on invalid JSON)
       // within 5 seconds, proving it started and read from stdin quickly
-      expect(result.readyMs).toBeLessThan(10000);
+      expect(result.readyMs).toBeLessThan(5000);
       // Exit code 1 = it started, read stdin, failed to parse (expected behavior)
       expect(result.exitCode).toBe(1);
-    }, 10000);
+    }, 8000);
   });
 });

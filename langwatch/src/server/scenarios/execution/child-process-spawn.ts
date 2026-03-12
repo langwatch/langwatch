@@ -18,6 +18,9 @@ export interface SpawnConfig {
 /**
  * Resolves the spawn command and args for the scenario child process.
  *
+ * Only NODE_ENV === "production" uses the pre-compiled bundle.
+ * All other values (development, test, staging, undefined) use tsx.
+ *
  * @param packageRoot - Absolute path to the langwatch package root
  * @param nodeEnv - Current NODE_ENV value
  * @returns Command and args to pass to child_process.spawn
