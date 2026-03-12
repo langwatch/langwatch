@@ -107,7 +107,7 @@ Only create what is listed above. Do not add extra data beyond what is needed.
 - Number screenshots sequentially: 01-sign-in.png, 02-dashboard.png, etc.
 
 ## Guardrails — READ THESE
-- You have a maximum of 15 tool calls. If you haven't finished, report what you verified and what's left.
+- You have a maximum of 40 tool calls (seeding + verification). If you haven't finished, report what you verified and what's left.
 - Do NOT debug app issues. If something doesn't work, screenshot it, mark it FAIL, and move on.
 - Do NOT modify any files, fix any code, or investigate root causes.
 - Do NOT go off-script. Only verify the steps listed above.
