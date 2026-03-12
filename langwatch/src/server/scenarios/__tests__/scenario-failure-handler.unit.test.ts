@@ -121,6 +121,28 @@ describe("ScenarioFailureHandler", () => {
       });
     });
 
+    describe("given no events exist but scenarioRunId is pre-assigned", () => {
+      beforeEach(() => {
+        mockService.getRunDataForBatchRun.mockResolvedValue({ changed: true, runs: [] });
+      });
+
+      describe("when called with a pre-assigned scenarioRunId", () => {
+        it("uses the pre-assigned scenarioRunId instead of generating a new one", async () => {
+          await handler.ensureFailureEventsEmitted({
+            ...baseJobData,
+            scenarioRunId: "scenariorun_preassigned123",
+            error: "Child process exited with code 1",
+          });
+
+          const runStartedCall = mockService.saveScenarioEvent.mock.calls[0]?.[0] as Record<string, unknown>;
+          expect(runStartedCall.scenarioRunId).toBe("scenariorun_preassigned123");
+
+          const runFinishedCall = mockService.saveScenarioEvent.mock.calls[1]?.[0] as Record<string, unknown>;
+          expect(runFinishedCall.scenarioRunId).toBe("scenariorun_preassigned123");
+        });
+      });
+    });
+
     describe("given RUN_STARTED event already exists", () => {
       const existingScenarioRunId = "scenariorun_existing123";
 

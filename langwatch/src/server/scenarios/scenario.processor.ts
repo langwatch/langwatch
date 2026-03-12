@@ -119,6 +119,7 @@ export async function handleFailedJobResult(
     scenarioId: jobData.scenarioId,
     setId: jobData.setId,
     batchRunId: jobData.batchRunId,
+    scenarioRunId: jobData.scenarioRunId,
     error,
     name: scenario?.name,
     description: scenario?.situation,
