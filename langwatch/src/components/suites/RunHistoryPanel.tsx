@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
 import { useTargetNameMap } from "~/hooks/useTargetNameMap";
 import { useDrawer } from "~/hooks/useDrawer";
 import { api } from "~/utils/api";
@@ -131,6 +132,14 @@ export function RunHistoryPanel({
       refetchInterval: pages.length <= 1 ? 5000 : undefined,
     },
   );
+
+  // Subscribe to real-time SSE updates so the panel refreshes on simulation
+  // events (e.g. deduplicated runs) regardless of pagination state.
+  useSimulationUpdateListener({
+    projectId: project?.id ?? "",
+    enabled: !!project,
+    filter: scenarioSetId ? { scenarioSetId } : undefined,
+  });
 
   // Accumulate pages as data arrives
   useEffect(() => {
