@@ -20,6 +20,15 @@ Feature: Scenario Failure Handler
     And both events share the same scenarioRunId
 
   @unit
+  Scenario: Use pre-assigned scenarioRunId when no events exist in Elasticsearch
+    Given a scenario job failed with error "Child process exited with code 1"
+    And no events exist in Elasticsearch for this batchRunId
+    And the job data includes a pre-assigned scenarioRunId
+    When ScenarioFailureHandler.ensureFailureEventsEmitted is called
+    Then the pre-assigned scenarioRunId is used for both events
+    And no new scenarioRunId is generated
+
+  @unit
   Scenario: Emit only RUN_FINISHED when RUN_STARTED exists
     Given a scenario job failed with error "Scenario execution timed out"
     And a RUN_STARTED event exists for this batchRunId

@@ -29,6 +29,8 @@ export interface FailureEventParams {
   scenarioId: string;
   setId: string;
   batchRunId: string;
+  /** Pre-assigned scenario run ID from the job queue. Used to prevent duplicate run entries when ES hasn't indexed the SDK's RUN_STARTED event yet. */
+  scenarioRunId?: string;
   error?: string;
   /** Scenario name for display in UI */
   name?: string;
@@ -116,7 +118,7 @@ export class ScenarioFailureHandler {
         }
 
         const timestamp = Date.now();
-        const scenarioRunId = existingRun?.scenarioRunId ?? this.generateScenarioRunId();
+        const scenarioRunId = existingRun?.scenarioRunId ?? params.scenarioRunId ?? this.generateScenarioRunId();
         span.setAttribute("scenario.run.id", scenarioRunId);
 
         // If no RUN_STARTED event exists, emit one
