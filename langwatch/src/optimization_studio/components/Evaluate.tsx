@@ -62,6 +62,7 @@ export function Evaluate() {
           size="sm"
           onClick={() => {
             trackEvent("evaluate_click", { project_id: project?.id });
+            form.reset({ version: "", commitMessage: "", evaluateOn: undefined });
             onToggle();
           }}
           disabled={isRunning}
