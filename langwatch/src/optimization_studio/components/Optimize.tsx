@@ -19,6 +19,7 @@ import { CheckSquare, Info, TrendingUp } from "react-feather";
 import {
   Controller,
   type ControllerRenderProps,
+  FormProvider,
   type UseFormReturn,
   useForm,
 } from "react-hook-form";
@@ -41,7 +42,8 @@ import { trainTestSplit } from "../utils/datasetUtils";
 import { checkIsEvaluator } from "../utils/nodeUtils";
 
 import { AddModelProviderKey } from "./AddModelProviderKey";
-import { useVersionState, VersionToBeUsed } from "./History";
+import { useVersionState } from "./History";
+import { VersionToBeUsed } from "./VersionToBeUsed";
 import { OptimizationStudioLLMConfigField } from "./properties/llm-configs/OptimizationStudioLLMConfigField";
 
 const optimizerOptions: {
@@ -178,7 +180,7 @@ export function OptimizeModalContent({
     },
   );
 
-  const { versions, canSaveNewVersion, nextVersion, versionToBeEvaluated } =
+  const { versions, canSaveNewVersion, versionToBeEvaluated } =
     useVersionState({
       project,
       form: form as unknown as UseFormReturn<{
@@ -333,6 +335,7 @@ export function OptimizeModalContent({
   const llmConfig = form.watch("params.llm");
 
   return (
+    <FormProvider {...form}>
     <Dialog.Content
       as="form"
       // eslint-disable-next-line @typescript-eslint/no-misused-promises
@@ -345,17 +348,7 @@ export function OptimizeModalContent({
       <Dialog.Body display="flex" flexDirection="column" gap={4}>
         <VStack align="start" width="full" gap={4}>
           <VStack align="start" width="full">
-            <VersionToBeUsed
-              form={
-                form as unknown as UseFormReturn<{
-                  version: string;
-                  commitMessage: string;
-                }>
-              }
-              nextVersion={nextVersion}
-              canSaveNewVersion={canSaveNewVersion}
-              versionToBeEvaluated={versionToBeEvaluated}
-            />
+            <VersionToBeUsed />
           </VStack>
           <VStack align="start" width="full" gap={2}>
             <SmallLabel>Optimizer</SmallLabel>
@@ -505,6 +498,7 @@ export function OptimizeModalContent({
         </VStack>
       </Dialog.Footer>
     </Dialog.Content>
+    </FormProvider>
   );
 }
 
