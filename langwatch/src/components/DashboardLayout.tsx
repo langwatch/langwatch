@@ -681,13 +681,15 @@ export const DashboardLayout = ({
 
 function LiteMemberRestrictionOverlay() {
   const { isRestricted } = useLiteMemberGuard();
-  const { openLiteMemberRestriction } = useUpgradeModalStore();
+  const { openLiteMemberRestriction, isOpen } = useUpgradeModalStore();
 
   useEffect(() => {
-    if (isRestricted) {
+    if (isRestricted && !isOpen) {
       openLiteMemberRestriction({});
     }
-  }, [isRestricted, openLiteMemberRestriction]);
+    // Only open on initial restriction, not after user dismisses
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRestricted]);
 
   if (!isRestricted) return null;
 
