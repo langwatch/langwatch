@@ -21,6 +21,7 @@ export {
   updateCodeClassName,
   updateInputFields,
   updateOutputFields,
+  serializeWorkflow,
 } from "./workflowStoreCore";
 
 import { store, type WorkflowStore } from "./workflowStoreCore";

@@ -38,7 +38,14 @@ export default function Studio() {
     if (dsl) {
       // Prevent autosave from triggering after load
       setPreviousWorkflow(undefined);
-      setWorkflow({ ...dsl, workflow_id: workflow.data?.id });
+      setWorkflow({
+        ...dsl,
+        workflow_id: workflow.data?.id,
+        nodes: (dsl.nodes ?? []).map((node: any) => ({
+          ...node,
+          selected: false,
+        })),
+      });
     } else {
       reset();
       clear();
