@@ -10,7 +10,7 @@ license = {text = "MIT"}
 requires-python = ">=3.11"
 dependencies = [
     "langevals-core>=0.1.0",
-    "ragas==0.2.9",
+    "ragas==0.3.0rc2",
     "langchain-openai>=0.1.23",
     "langchain_community>=0.2.16",
     "litellm>=1.79.0",
