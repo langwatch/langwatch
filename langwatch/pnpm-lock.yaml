@@ -78,19 +78,19 @@ importers:
         specifier: ^1.13.0
         version: 1.13.0
       '@copilotkit/react-core':
-        specifier: ~1.53.0
+        specifier: ^1.53.0
         version: 1.53.0(@ag-ui/core@0.0.39)(@types/mdast@4.0.4)(@types/react-dom@19.0.4(@types/react@19.0.10))(@types/react@19.0.10)(encoding@0.1.13)(graphql@16.13.1)(micromark-util-types@2.0.2)(micromark@4.0.2)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(zod@3.25.76)
       '@copilotkit/react-ui':
-        specifier: ~1.53.0
+        specifier: ^1.53.0
         version: 1.53.0(@ag-ui/core@0.0.39)(@types/mdast@4.0.4)(@types/react-dom@19.0.4(@types/react@19.0.10))(@types/react@19.0.10)(encoding@0.1.13)(graphql@16.13.1)(micromark-util-types@2.0.2)(micromark@4.0.2)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(zod@3.25.76)
       '@copilotkit/runtime':
-        specifier: ~1.53.0
+        specifier: ^1.53.0
         version: 1.53.0(12c12e66927ea5ec7a77a47dda03ff2c)
       '@copilotkit/runtime-client-gql':
-        specifier: 1.53.0
+        specifier: ^1.53.0
         version: 1.53.0(@ag-ui/core@0.0.39)(encoding@0.1.13)(graphql@16.13.1)(react@19.1.0)
       '@copilotkit/shared':
-        specifier: 1.53.0
+        specifier: ^1.53.0
         version: 1.53.0(@ag-ui/core@0.0.39)(encoding@0.1.13)
       '@dnd-kit/core':
         specifier: ^6.3.1
