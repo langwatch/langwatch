@@ -290,10 +290,11 @@ class EvaluationReporting:
     def _post_results_with_logging(cls, api_key: str, body: dict, run_id: str):
         """Thread-safe wrapper that catches and logs errors from post_results."""
         try:
-            cls.post_results(api_key, body)
-            logger.info(
-                "Successfully posted evaluation results: run_id=%s", run_id
-            )
+            posted = cls.post_results(api_key, body)
+            if posted:
+                logger.info(
+                    "Successfully posted evaluation results: run_id=%s", run_id
+                )
         except Exception:
             logger.exception(
                 "Failed to post evaluation results after retries: run_id=%s, "
@@ -311,10 +312,10 @@ class EvaluationReporting:
         before=before_log(logger, logging.DEBUG),
         after=after_log(logger, logging.DEBUG),
     )
-    def post_results(cls, api_key: str, body: dict):
+    def post_results(cls, api_key: str, body: dict) -> bool:
         if not api_key:
             logger.warning("No API key found, skipping evaluation reporting")
-            return
+            return False
 
         url = f"{langwatch.get_endpoint()}/api/evaluations/batch/log_results"
         response = httpx.post(
@@ -328,12 +329,12 @@ class EvaluationReporting:
         )
         if response.status_code != 200:
             logger.error(
-                "log_results returned %d: %s (url=%s)",
+                "log_results returned %d (url=%s)",
                 response.status_code,
-                response.text[:500],
                 url,
             )
         response.raise_for_status()
+        return True
 
     async def wait_for_completion(self):
         # Send any remaining batch

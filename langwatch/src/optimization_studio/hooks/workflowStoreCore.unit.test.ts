@@ -403,8 +403,41 @@ describe("workflowStoreCore", () => {
         const state = testStore.getState();
         const nodeA = state.nodes.find((n) => n.id === "nodeA");
         expect(nodeA?.data.inputs).toEqual([{ identifier: "input", type: "str" }]);
-        // Edge must still be alive — the inputs array was preserved
+        // Edge survives because nodeA.outputs and nodeB.inputs still match the handles
         expect(state.edges).toHaveLength(1);
+      });
+
+      it("clears non-array fields when undefined is passed intentionally", () => {
+        const nodes: Node[] = [
+          makeNode({
+            id: "nodeA",
+            inputs: [{ identifier: "input", type: "str" }],
+          }),
+        ];
+
+        testStore.setState({ nodes, edges: [] });
+
+        // Simulate a node that has localConfig set
+        testStore.getState().setNode({
+          id: "nodeA",
+          data: { localConfig: { someKey: "someValue" } },
+        } as Partial<Node> & { id: string });
+
+        let state = testStore.getState();
+        let nodeA = state.nodes.find((n) => n.id === "nodeA");
+        expect((nodeA?.data as Record<string, unknown>)["localConfig"]).toEqual({ someKey: "someValue" });
+
+        // Now clear it by passing undefined
+        testStore.getState().setNode({
+          id: "nodeA",
+          data: { localConfig: undefined },
+        } as Partial<Node> & { id: string });
+
+        state = testStore.getState();
+        nodeA = state.nodes.find((n) => n.id === "nodeA");
+        expect((nodeA?.data as Record<string, unknown>)["localConfig"]).toBeUndefined();
+        // Array fields remain untouched
+        expect(nodeA?.data.inputs).toEqual([{ identifier: "input", type: "str" }]);
       });
     });
 

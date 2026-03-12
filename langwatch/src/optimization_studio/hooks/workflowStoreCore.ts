@@ -601,63 +601,67 @@ export const store = (
   setNode: (node: Partial<Node> & { id: string }, newId?: string) => {
     const oldId = node.id;
     const dataEntries = Object.entries(node.data ?? {});
-    const filteredOutKeys = dataEntries
-      .filter(([, v]) => v === undefined)
-      .map(([k]) => k);
-    if (filteredOutKeys.length > 0) {
-      logger.warn(
-        { nodeId: oldId, filteredOutKeys },
-        "setNode: undefined values filtered from node.data to prevent overwriting existing fields",
-      );
-    }
     logger.debug(
       { nodeId: oldId, newId, dataKeys: dataEntries.map(([k]) => k) },
       "setNode: updating node",
     );
-    const updatedNodes = get().nodes.map((n) =>
-      n.id === oldId
-        ? {
-            ...n,
-            ...node,
-            data: {
-              ...n.data,
-              // Filter out undefined values to prevent accidental overwrites of
-              // existing arrays (e.g., inputs/outputs) when a partial update
-              // passes undefined for a field that hasn't changed.
-              ...Object.fromEntries(
-                dataEntries.filter(([, v]) => v !== undefined),
-              ),
-              ...(newId && n.type === "code"
-                ? {
-                    parameters: updateCodeClassName(
-                      (node.data?.parameters as Field[]) ??
-                        n.data?.parameters ??
-                        [],
-                      n.id,
-                      newId,
-                    ),
-                  }
-                : {}),
-              ...((node.data?.inputs || node.data?.outputs) &&
-              n.type === "code"
-                ? {
-                    parameters: updateOutputFields(
-                      updateInputFields(
-                        (node.data?.parameters as Field[]) ??
-                          n.data?.parameters ??
-                          [],
-                        (node.data?.inputs ?? []) as Field[],
-                      ),
-                      n.data.outputs ?? [],
-                      (node.data?.outputs ?? []) as Field[],
-                    ),
-                  }
-                : {}),
-            },
-            id: newId ? newId : n.id,
-          }
-        : n,
-    );
+    const updatedNodes = get().nodes.map((n) => {
+      if (n.id !== oldId) return n;
+
+      // Only filter out undefined when the existing field is an Array, to
+      // prevent accidental overwrites of arrays (e.g., inputs/outputs).
+      // Non-array fields allow undefined through so callers can intentionally
+      // clear fields like localConfig and localPromptConfig.
+      const existingData = n.data as Record<string, unknown>;
+      const arrayPreservedKeys = dataEntries
+        .filter(([k, v]) => v === undefined && Array.isArray(existingData[k]))
+        .map(([k]) => k);
+      if (arrayPreservedKeys.length > 0) {
+        logger.warn(
+          { nodeId: oldId, arrayPreservedKeys },
+          "setNode: undefined values filtered to preserve existing arrays",
+        );
+      }
+      const filteredDataEntries = dataEntries.filter(
+        ([k, v]) => v !== undefined || !Array.isArray(existingData[k]),
+      );
+
+      return {
+        ...n,
+        ...node,
+        data: {
+          ...n.data,
+          ...Object.fromEntries(filteredDataEntries),
+          ...(newId && n.type === "code"
+            ? {
+                parameters: updateCodeClassName(
+                  (node.data?.parameters as Field[]) ??
+                    n.data?.parameters ??
+                    [],
+                  n.id,
+                  newId,
+                ),
+              }
+            : {}),
+          ...((node.data?.inputs || node.data?.outputs) &&
+          n.type === "code"
+            ? {
+                parameters: updateOutputFields(
+                  updateInputFields(
+                    (node.data?.parameters as Field[]) ??
+                      n.data?.parameters ??
+                      [],
+                    (node.data?.inputs ?? []) as Field[],
+                  ),
+                  n.data.outputs ?? [],
+                  (node.data?.outputs ?? []) as Field[],
+                ),
+              }
+            : {}),
+        },
+        id: newId ? newId : n.id,
+      };
+    });
 
     // When renaming, update edges and parameter refs that reference the old ID
     const updatedEdges = newId
