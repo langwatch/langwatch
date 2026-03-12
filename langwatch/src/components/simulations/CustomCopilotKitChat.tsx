@@ -104,54 +104,64 @@ function CustomCopilotKitChatInner({
 
   return (
     <CopilotChat
-      RenderTextMessage={({ message, UserMessage, ImageRenderer }) => {
-        const message_ = message as TextMessage;
-        const traceId = traceIdMap.get(message_.id);
+      RenderMessage={({ message, UserMessage, ImageRenderer }) => {
+        const msg = message as any;
+        const traceId = traceIdMap.get(msg.id);
+        const role = msg.role as string | undefined;
+        const type = msg.type as string | undefined;
 
-        return (
-          <VStack
-            align={message_.role === Role.Assistant ? "flex-start" : "flex-end"}
-            css={fadeInCss}
-          >
-            {message_.role === Role.Assistant && (
-              <Markdown className="markdown">{message_.content}</Markdown>
-            )}
-            {UserMessage && ImageRenderer && message_.role === Role.User && (
-              <UserMessage message={{ id: message_.id, role: "user" as const, content: message_.content }} ImageRenderer={ImageRenderer} rawData={message} />
-            )}
-            {!smallerView &&
-              traceId &&
-              message_.role === Role.Assistant && (
+        // Text messages (user or assistant)
+        if (role === "user" || role === "assistant") {
+          const content = msg.content as string ?? "";
+          return (
+            <VStack
+              align={role === "assistant" ? "flex-start" : "flex-end"}
+              css={fadeInCss}
+            >
+              {role === "assistant" && (
+                <Markdown className="markdown">{content}</Markdown>
+              )}
+              {UserMessage && role === "user" && (
+                <UserMessage
+                  message={{ id: msg.id, role: "user" as const, content }}
+                  ImageRenderer={ImageRenderer!}
+                  rawData={message}
+                />
+              )}
+              {!smallerView &&
+                traceId &&
+                role === "assistant" && (
+                  <TraceMessage traceId={traceId} />
+                )}
+            </VStack>
+          );
+        }
+
+        // Action execution (tool call)
+        if (type === "ActionExecutionMessage") {
+          return (
+            <VStack align="flex-start" gap={6} css={fadeInCss}>
+              <ToolCallMessage message={msg as ActionExecutionMessage} />
+              {!smallerView && traceId && (
                 <TraceMessage traceId={traceId} />
               )}
-          </VStack>
-        );
-      }}
-      RenderActionExecutionMessage={({ message }) => {
-        const message_ = message as ActionExecutionMessage;
-        const traceId = traceIdMap.get(message_.id);
+            </VStack>
+          );
+        }
 
-        return (
-          <VStack align="flex-start" gap={6} css={fadeInCss}>
-            <ToolCallMessage message={message_} />
-            {!smallerView && traceId && (
-              <TraceMessage traceId={traceId} />
-            )}
-          </VStack>
-        );
-      }}
-      RenderResultMessage={({ message }) => {
-        const message_ = message as ResultMessage;
-        const traceId = traceIdMap.get(message_.id);
+        // Result message (tool result)
+        if (type === "ResultMessage" || role === "tool") {
+          return (
+            <VStack align="flex-start" gap={6} css={fadeInCss}>
+              <ToolResultMessage message={msg as ResultMessage} />
+              {!smallerView && traceId && (
+                <TraceMessage traceId={traceId} />
+              )}
+            </VStack>
+          );
+        }
 
-        return (
-          <VStack align="flex-start" gap={6} css={fadeInCss}>
-            <ToolResultMessage message={message_} />
-            {!smallerView && traceId && (
-              <TraceMessage traceId={traceId} />
-            )}
-          </VStack>
-        );
+        return null;
       }}
       Input={hideInput ? () => <div></div> : undefined}
     />
