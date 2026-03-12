@@ -185,14 +185,15 @@ async function handleTracesRequest(req: NextRequest) {
       }
 
       // For ClickHouse, ingest raw OTEL spans directly (bypasses otel.traces.ts transformation)
-      let clickHouseTask: Promise<void> | null = null;
       if (project.featureEventSourcingTraceIngestion) {
-        clickHouseTask = getApp().traces.collection.handleOtlpTraceRequest(
+        await getApp().traces.collection.handleOtlpTraceRequest(
           project.id,
           traceRequest,
           project.piiRedactionLevel,
         );
       }
+      if (project.disableElasticSearchTraceWriting)
+        return;
 
       const tracesForCollection =
         await openTelemetryTraceRequestToTracesForCollection(traceRequest);
@@ -264,13 +265,6 @@ async function handleTracesRequest(req: NextRequest) {
       );
 
       if (promises.length === 0) {
-        if (clickHouseTask) {
-          try {
-            await clickHouseTask;
-          } catch {
-            /* ignore, errors non-blocking and caught by tracing layer */
-          }
-        }
         return NextResponse.json({ message: "No changes" });
       }
 
@@ -281,14 +275,6 @@ async function handleTracesRequest(req: NextRequest) {
           await Promise.all(promises);
         },
       );
-
-      if (clickHouseTask) {
-        try {
-          await clickHouseTask;
-        } catch {
-          /* ignore, errors non-blocking and caught by tracing layer */
-        }
-      }
 
       return NextResponse.json({ message: "Trace received successfully." });
     },
