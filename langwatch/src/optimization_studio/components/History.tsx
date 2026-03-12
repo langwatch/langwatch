@@ -165,9 +165,9 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
 
       // Prevent autosave from triggering after restore
       setAutosavedWorkflow(undefined);
-      setLastCommittedWorkflow(undefined);
-      setCurrentVersionId(undefined);
       const dsl = version.dsl as unknown as Workflow;
+      setLastCommittedWorkflow(dsl);
+      setCurrentVersionId(version.id);
       setWorkflow({
         ...dsl,
         nodes: (dsl.nodes ?? []).map((node) => ({
