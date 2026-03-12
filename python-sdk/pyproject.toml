@@ -102,7 +102,7 @@ examples = [
     "openinference-instrumentation-litellm>=0.1.19",
     "pandas>=2.2.3",
     "strands-agents[otel]>=1.14.0,<2.0.0",
-    "unstructured[pdf]>=0.18.3",
+    "unstructured[pdf]>=0.18.18",
 ]
 tests = [
     "factory-boy>=3.3.3",
