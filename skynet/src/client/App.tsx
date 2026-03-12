@@ -7,6 +7,7 @@ import { DashboardPage } from "./pages/DashboardPage.tsx";
 import { GroupDetailPage } from "./pages/GroupDetailPage.tsx";
 import { JobDetailPage } from "./pages/JobDetailPage.tsx";
 import { StatsPage } from "./pages/StatsPage.tsx";
+import { DejaViewPage } from "./pages/DejaViewPage.tsx";
 import { UnblockSession, type UnblockSessionConfig } from "./components/UnblockSession.tsx";
 import { useDashboardData } from "./hooks/useDashboardData.ts";
 import { useGroupsData } from "./hooks/useGroupsData.ts";
@@ -62,6 +63,7 @@ export function App() {
               }
             />
             <Route path="stats" element={<StatsPage data={data} />} />
+            <Route path="dejaview" element={<DejaViewPage />} />
             <Route path="groups/:groupId" element={<GroupDetailPage />} />
             <Route path="jobs/:jobId" element={<JobDetailPage />} />
           </Routes>

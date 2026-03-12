@@ -11,6 +11,7 @@ import { createGroupsRouter } from "./routes/groups.ts";
 import { createJobsRouter } from "./routes/jobs.ts";
 import { createActionsRouter } from "./routes/actions.ts";
 import { createBullMQRouter } from "./routes/bullmq.ts";
+import { createDejaViewRouter } from "./routes/dejaview.ts";
 import type { SSEManager } from "./sse/sseManager.ts";
 import type { MetricsCollector } from "./services/metricsCollector.ts";
 
@@ -44,6 +45,7 @@ export function createApp({ redis, sseManager, metrics, getGroupQueueNames, getQ
   app.use(createJobsRouter(redis, getGroupQueueNames));
   app.use(createActionsRouter(redis, getGroupQueueNames));
   app.use(createBullMQRouter(redis, getQueueNames));
+  app.use(createDejaViewRouter());
 
   // Serve SPA static files (only when built assets exist, i.e. production)
   if (fs.existsSync(clientDir)) {
