@@ -695,4 +695,31 @@ describe("<SuiteSidebar/>", () => {
       });
     });
   });
+
+  describe("given external sets with different timestamps", () => {
+    const externalSets = [
+      { scenarioSetId: "oldest-set", passedCount: 3, totalCount: 5, lastRunTimestamp: 1000 },
+      { scenarioSetId: "newest-set", passedCount: 5, totalCount: 5, lastRunTimestamp: 3000 },
+      { scenarioSetId: "middle-set", passedCount: 4, totalCount: 5, lastRunTimestamp: 2000 },
+    ];
+
+    describe("when rendered in the expanded sidebar", () => {
+      it("sorts external sets by most recent run first", () => {
+        render(
+          <SuiteSidebar
+            {...defaultProps}
+            externalSets={externalSets}
+          />,
+          { wrapper: Wrapper },
+        );
+
+        const items = screen.getAllByTestId("external-set-list-item");
+        const labels = items.map((el) => el.textContent);
+
+        expect(labels[0]).toContain("newest-set");
+        expect(labels[1]).toContain("middle-set");
+        expect(labels[2]).toContain("oldest-set");
+      });
+    });
+  });
 });

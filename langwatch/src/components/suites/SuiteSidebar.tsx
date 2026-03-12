@@ -86,10 +86,13 @@ export function SuiteSidebar({
   }, [suites, searchQuery]);
 
   const filteredExternalSets = useMemo(() => {
-    if (!searchQuery.trim()) return externalSets;
-    const query = searchQuery.toLowerCase();
-    return externalSets.filter((s) =>
-      s.scenarioSetId.toLowerCase().includes(query),
+    const filtered = searchQuery.trim()
+      ? externalSets.filter((s) =>
+          s.scenarioSetId.toLowerCase().includes(searchQuery.toLowerCase()),
+        )
+      : externalSets;
+    return [...filtered].sort(
+      (a, b) => b.lastRunTimestamp - a.lastRunTimestamp,
     );
   }, [externalSets, searchQuery]);
 
