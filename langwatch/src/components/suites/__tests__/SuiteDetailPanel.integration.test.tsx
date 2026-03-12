@@ -11,16 +11,34 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { SimulationSuite } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+/** Local type standing in for Prisma's SimulationSuite (avoids generated-client dependency). */
+type SimulationSuite = {
+  id: string;
+  projectId: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  scenarioIds: string[];
+  targets: Array<{ type: string; referenceId: string }>;
+  repeatCount: number;
+  labels: string[];
+  archivedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
 import { SuiteDetailPanel, SuiteEmptyState } from "../SuiteDetailPanel";
 
 // Hoisted mocks
 const mockUseQuery = vi.hoisted(() => vi.fn());
 const mockRouterPush = vi.hoisted(() => vi.fn());
 
+vi.mock("@prisma/client", () => ({}));
+
 vi.mock("~/utils/api", () => ({
   api: {
+    useContext: () => ({}),
     scenarios: {
       getSuiteRunData: { useQuery: mockUseQuery },
       getAll: { useQuery: vi.fn(() => ({ data: [] })) },
@@ -33,6 +51,20 @@ vi.mock("~/utils/api", () => ({
     },
     suites: {},
   },
+}));
+
+vi.mock("~/hooks/useSSESubscription", () => ({
+  useSSESubscription: vi.fn(),
+}));
+
+vi.mock("~/hooks/usePageVisibility", () => ({
+  usePageVisibility: () => true,
+}));
+
+vi.mock("~/hooks/useDrawer", () => ({
+  useDrawer: () => ({
+    openDrawer: vi.fn(),
+  }),
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({

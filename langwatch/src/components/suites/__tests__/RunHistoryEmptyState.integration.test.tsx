@@ -15,6 +15,7 @@ const mockGetSuiteRunData = vi.hoisted(() => vi.fn());
 
 vi.mock("~/utils/api", () => ({
   api: {
+    useContext: () => ({}),
     scenarios: {
       getSuiteRunData: { useQuery: mockGetSuiteRunData },
       getAll: { useQuery: vi.fn(() => ({ data: [] })) },
@@ -26,6 +27,14 @@ vi.mock("~/utils/api", () => ({
       getAllPromptsForProject: { useQuery: vi.fn(() => ({ data: [] })) },
     },
   },
+}));
+
+vi.mock("~/hooks/useSSESubscription", () => ({
+  useSSESubscription: vi.fn(),
+}));
+
+vi.mock("~/hooks/usePageVisibility", () => ({
+  usePageVisibility: () => true,
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({

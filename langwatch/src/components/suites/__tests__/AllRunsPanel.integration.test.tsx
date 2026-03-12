@@ -51,6 +51,7 @@ vi.mock("next/router", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
+    useContext: () => ({}),
     scenarios: {
       getSuiteRunData: {
         useQuery: mockRunDataQuery,
