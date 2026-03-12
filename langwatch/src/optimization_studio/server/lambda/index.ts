@@ -11,10 +11,10 @@ import {
   LambdaClient,
   UpdateFunctionCodeCommand,
 } from "@aws-sdk/client-lambda";
-import { env } from "../../env.mjs";
-import { createLogger } from "../../utils/logger/server";
-import { captureException } from "../../utils/posthogErrorCapture";
-import type { StudioClientEvent } from "../types/events";
+import { env } from "../../../env.mjs";
+import { createLogger } from "../../../utils/logger/server";
+import { captureException } from "../../../utils/posthogErrorCapture";
+import type { StudioClientEvent } from "../../types/events";
 
 const logger = createLogger("langwatch:langwatch-nlp-lambda");
 
@@ -275,7 +275,12 @@ export const getProjectLambdaArn = async (
   const functionName = `langwatch_nlp-${projectId}`;
 
   // Check if Lambda exists
-  let lambdaConfig = await checkLambdaExists(lambda, functionName);
+  let lambdaConfig = await checkLambdaExists(lambda, functionName).catch(
+    (error) => {
+      logger.error({ projectId, error }, "Failed to check Lambda exists");
+      return null;
+    },
+  );
 
   if (!lambdaConfig) {
     // Create the Lambda function (includes log group creation with retention)
