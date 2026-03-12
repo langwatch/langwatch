@@ -10,10 +10,7 @@ import {
   type EvaluatorTypes,
 } from "../../evaluations/evaluators.generated";
 import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
-import {
-  validatePreconditionRules,
-  validatedPreconditionsSchema,
-} from "../../evaluations/preconditionValidation";
+import { validatedPreconditionsSchema } from "../../evaluations/preconditionValidation";
 import { enforceLicenseLimit } from "../../license-enforcement";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
