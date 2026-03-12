@@ -20,7 +20,6 @@ import { signIn, signOut } from "next-auth/react";
 import numeral from "numeral";
 import React, { useEffect, useState } from "react";
 import { useDrawer } from "../hooks/useDrawer";
-import { useLiteMemberGuard } from "../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { useUpgradeModalStore } from "../stores/upgradeModalStore";
 import { UpgradeModal } from "./UpgradeModal";
@@ -642,8 +641,6 @@ export const DashboardLayout = ({
 
             <CurrentDrawer />
 
-            <LiteMemberRestrictionOverlay />
-
             {userIsPartOfTeam ? (
               showSavedViews ? (
                 <SavedViewsProvider>
@@ -679,30 +676,6 @@ export const DashboardLayout = ({
   );
 };
 
-function LiteMemberRestrictionOverlay() {
-  const { isRestricted } = useLiteMemberGuard();
-  const { openLiteMemberRestriction, isOpen } = useUpgradeModalStore();
-
-  useEffect(() => {
-    if (isRestricted && !isOpen) {
-      openLiteMemberRestriction({});
-    }
-    // Only open on initial restriction, not after user dismisses
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRestricted]);
-
-  if (!isRestricted) return null;
-
-  return (
-    <Box
-      position="absolute"
-      inset={0}
-      zIndex="overlay"
-      backgroundColor="blackAlpha.200"
-      pointerEvents="auto"
-    />
-  );
-}
 
 function GlobalUpgradeModal() {
   const { isOpen, variant, close } = useUpgradeModalStore();
