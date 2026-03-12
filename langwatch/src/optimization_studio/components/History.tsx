@@ -31,7 +31,7 @@ import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { DEFAULT_MODEL } from "../../utils/constants";
-import { useWorkflowStore } from "../hooks/useWorkflowStore";
+import { useWorkflowStore, serializeWorkflow } from "../hooks/useWorkflowStore";
 import type { Workflow } from "../types/dsl";
 import { hasDSLChanged } from "../utils/dslUtils";
 
@@ -103,10 +103,10 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
         projectId: project.id,
         workflowId,
         commitMessage,
-        dsl: {
+        dsl: serializeWorkflow({
           ...getWorkflow(),
           version,
-        },
+        }),
       },
       {
         onSuccess: () => {
@@ -154,7 +154,14 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
 
       // Prevent autosave from triggering after restore
       setPreviousWorkflow(undefined);
-      setWorkflow(version.dsl as unknown as Workflow);
+      const dsl = version.dsl as unknown as Workflow;
+      setWorkflow({
+        ...dsl,
+        nodes: (dsl.nodes ?? []).map((node) => ({
+          ...node,
+          selected: false,
+        })),
+      });
       onClose();
     },
     [

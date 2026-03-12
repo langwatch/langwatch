@@ -10,6 +10,7 @@ import {
 } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import { DEFAULT_MAX_TOKENS, DEFAULT_MODEL } from "~/utils/constants";
+import { createLogger } from "~/utils/logger";
 import { LlmConfigInputTypes } from "../../types";
 import { snakeCaseToPascalCase } from "../../utils/stringCasing";
 import type {
@@ -21,6 +22,8 @@ import type {
 } from "../types/dsl";
 import { hasDSLChanged } from "../utils/dslUtils";
 import { findLowestAvailableName, nameToId } from "../utils/nodeUtils";
+
+const logger = createLogger("langwatch:studio:workflowStore");
 
 export type SocketStatus = "disconnected" | "connecting-python" | "connected";
 
@@ -166,6 +169,28 @@ export const getWorkflow = (state: State) => {
   };
 };
 
+/**
+ * Strips transient UI state (selected, dragging, execution_state) from the
+ * workflow before serialization (autosave, execution payloads). This prevents
+ * UI-only state from being persisted to the database.
+ */
+export const serializeWorkflow = <T extends { nodes: Node[]; edges: Edge[] }>(
+  workflow: T,
+): T => {
+  return {
+    ...workflow,
+    nodes: workflow.nodes.map((node) => {
+      const { selected, dragging, ...rest } = node;
+      const { execution_state, ...dataRest } = rest.data as Record<string, unknown>;
+      return { ...rest, data: dataRest };
+    }) as T["nodes"],
+    edges: workflow.edges.map((edge) => {
+      const { selected, ...rest } = edge;
+      return rest;
+    }) as T["edges"],
+  };
+};
+
 export const removeInvalidEdges = ({
   nodes,
   edges,
@@ -179,18 +204,62 @@ export const removeInvalidEdges = ({
       const source = nodes.find((node) => node.id === edge.source);
       const [sourceHandleGroup, sourceHandleIdentifier] =
         edge.sourceHandle?.split(".") ?? [null, null];
-      const sourceHandle = (
-        source?.data[sourceHandleGroup as any] as Field[]
-      )?.find((field) => field.identifier === sourceHandleIdentifier);
 
       const target = nodes.find((node) => node.id === edge.target);
       const [targetHandleGroup, targetHandleIdentifier] =
         edge.targetHandle?.split(".") ?? [null, null];
-      const targetHandle = (
-        target?.data[targetHandleGroup as any] as Field[]
-      )?.find((field) => field.identifier === targetHandleIdentifier);
 
-      return source && target && sourceHandle && targetHandle;
+      if (!source || !target) {
+        logger.warn(
+          {
+            edgeId: edge.id,
+            source: edge.source,
+            target: edge.target,
+            sourceHandle: edge.sourceHandle,
+            targetHandle: edge.targetHandle,
+            reason: !source ? "source node not found" : "target node not found",
+          },
+          "dropping edge: node missing",
+        );
+
+        return false;
+      }
+
+      const sourceHandles = (source.data as Record<string, unknown>)[
+        sourceHandleGroup as string
+      ] as Field[] | undefined;
+      const targetHandles = (target.data as Record<string, unknown>)[
+        targetHandleGroup as string
+      ] as Field[] | undefined;
+
+      // If the handle group doesn't exist as an array, preserve the edge
+      // (the group hasn't been loaded/set yet). Only drop if the group
+      // IS an array but the specific identifier is missing.
+      const sourceValid =
+        !Array.isArray(sourceHandles) ||
+        sourceHandles.some((f) => f.identifier === sourceHandleIdentifier);
+      const targetValid =
+        !Array.isArray(targetHandles) ||
+        targetHandles.some((f) => f.identifier === targetHandleIdentifier);
+
+      if (!sourceValid || !targetValid) {
+        logger.warn(
+          {
+            edgeId: edge.id,
+            source: edge.source,
+            target: edge.target,
+            sourceHandle: edge.sourceHandle,
+            targetHandle: edge.targetHandle,
+            reason: !sourceValid
+              ? `source handle identifier '${sourceHandleIdentifier}' not found in '${sourceHandleGroup}' array`
+              : `target handle identifier '${targetHandleIdentifier}' not found in '${targetHandleGroup}' array`,
+          },
+          "dropping edge: handle identifier missing",
+        );
+
+      }
+
+      return sourceValid && targetValid;
     }),
   };
 };
@@ -348,7 +417,32 @@ export const store = (
   setWorkflow: (
     workflow: Partial<Workflow> | ((current: Workflow) => Partial<Workflow>),
   ) => {
-    set(workflow);
+    const resolved =
+      typeof workflow === "function" ? workflow(get().getWorkflow()) : workflow;
+    const keys = Object.keys(resolved);
+    logger.debug({ keys }, "setWorkflow: updating workflow");
+    if ("edges" in resolved) {
+      const currentEdges = get().edges;
+      const newEdges = (resolved as { edges: Edge[] }).edges;
+      if (newEdges && newEdges.length < currentEdges.length) {
+        logger.warn(
+          {
+            before: currentEdges.length,
+            after: newEdges.length,
+            removed: currentEdges
+              .filter((e) => !newEdges.some((ne: Edge) => ne.id === e.id))
+              .map((e) => ({
+                id: e.id,
+                source: e.source,
+                target: e.target,
+              })),
+          },
+          "setWorkflow: edges count decreased",
+        );
+
+      }
+    }
+    set(resolved);
   },
   setPreviousWorkflow: (workflow: Workflow | undefined) => {
     set({ previousWorkflow: workflow });
@@ -362,6 +456,14 @@ export const store = (
     });
   },
   onNodesChange: (changes: NodeChange[]) => {
+    const removeChanges = changes.filter((c) => c.type === "remove");
+    if (removeChanges.length > 0) {
+      logger.warn(
+        { removeChanges },
+        "onNodesChange: REMOVING nodes",
+      );
+
+    }
     set({
       nodes: applyNodeChanges(changes, get().nodes),
     });
@@ -372,6 +474,17 @@ export const store = (
     });
   },
   onEdgesChange: (changes: EdgeChange[]) => {
+    const removeChanges = changes.filter((c) => c.type === "remove");
+    if (removeChanges.length > 0) {
+      logger.warn(
+        {
+          removeChanges,
+          totalChanges: changes.length,
+        },
+        "onEdgesChange: REMOVING edges",
+      );
+
+    }
     set({
       edges: applyEdgeChanges(changes, get().edges),
     });
@@ -399,6 +512,26 @@ export const store = (
     set({ nodes });
   },
   setEdges: (edges: Edge[]) => {
+    const currentEdges = get().edges;
+    if (edges.length < currentEdges.length) {
+      logger.warn(
+        {
+          before: currentEdges.length,
+          after: edges.length,
+          removed: currentEdges
+            .filter((e) => !edges.some((ne) => ne.id === e.id))
+            .map((e) => ({
+              id: e.id,
+              source: e.source,
+              target: e.target,
+              sourceHandle: e.sourceHandle,
+              targetHandle: e.targetHandle,
+            })),
+        },
+        "setEdges: edges count decreased",
+      );
+
+    }
     set({ edges });
   },
   edgeConnectToNewHandle: (
@@ -467,45 +600,68 @@ export const store = (
   },
   setNode: (node: Partial<Node> & { id: string }, newId?: string) => {
     const oldId = node.id;
-    const updatedNodes = get().nodes.map((n) =>
-      n.id === oldId
-        ? {
-            ...n,
-            ...node,
-            data: {
-              ...n.data,
-              ...node.data,
-              ...(newId && n.type === "code"
-                ? {
-                    parameters: updateCodeClassName(
-                      (node.data?.parameters as Field[]) ??
-                        n.data?.parameters ??
-                        [],
-                      n.id,
-                      newId,
-                    ),
-                  }
-                : {}),
-              ...((node.data?.inputs || node.data?.outputs) &&
-              n.type === "code"
-                ? {
-                    parameters: updateOutputFields(
-                      updateInputFields(
-                        (node.data?.parameters as Field[]) ??
-                          n.data?.parameters ??
-                          [],
-                        (node.data?.inputs ?? []) as Field[],
-                      ),
-                      n.data.outputs ?? [],
-                      (node.data?.outputs ?? []) as Field[],
-                    ),
-                  }
-                : {}),
-            },
-            id: newId ? newId : n.id,
-          }
-        : n,
+    const dataEntries = Object.entries(node.data ?? {});
+    logger.debug(
+      { nodeId: oldId, newId, dataKeys: dataEntries.map(([k]) => k) },
+      "setNode: updating node",
     );
+    const updatedNodes = get().nodes.map((n) => {
+      if (n.id !== oldId) return n;
+
+      // Only filter out undefined when the existing field is an Array, to
+      // prevent accidental overwrites of arrays (e.g., inputs/outputs).
+      // Non-array fields allow undefined through so callers can intentionally
+      // clear fields like localConfig and localPromptConfig.
+      const existingData = n.data as Record<string, unknown>;
+      const arrayPreservedKeys = dataEntries
+        .filter(([k, v]) => v === undefined && Array.isArray(existingData[k]))
+        .map(([k]) => k);
+      if (arrayPreservedKeys.length > 0) {
+        logger.warn(
+          { nodeId: oldId, arrayPreservedKeys },
+          "setNode: undefined values filtered to preserve existing arrays",
+        );
+      }
+      const filteredDataEntries = dataEntries.filter(
+        ([k, v]) => v !== undefined || !Array.isArray(existingData[k]),
+      );
+
+      return {
+        ...n,
+        ...node,
+        data: {
+          ...n.data,
+          ...Object.fromEntries(filteredDataEntries),
+          ...(newId && n.type === "code"
+            ? {
+                parameters: updateCodeClassName(
+                  (node.data?.parameters as Field[]) ??
+                    n.data?.parameters ??
+                    [],
+                  n.id,
+                  newId,
+                ),
+              }
+            : {}),
+          ...((node.data?.inputs || node.data?.outputs) &&
+          n.type === "code"
+            ? {
+                parameters: updateOutputFields(
+                  updateInputFields(
+                    (node.data?.parameters as Field[]) ??
+                      n.data?.parameters ??
+                      [],
+                    (node.data?.inputs ?? []) as Field[],
+                  ),
+                  n.data.outputs ?? [],
+                  (node.data?.outputs ?? []) as Field[],
+                ),
+              }
+            : {}),
+        },
+        id: newId ? newId : n.id,
+      };
+    });
 
     // When renaming, update edges and parameter refs that reference the old ID
     const updatedEdges = newId
@@ -575,6 +731,7 @@ export const store = (
     });
   },
   deleteNode: (id: string) => {
+    logger.info({ nodeId: id }, "deleteNode: deleting node");
     set(
       removeInvalidEdges({
         nodes: removeInvalidDecorations(
@@ -619,6 +776,10 @@ export const store = (
     id: string,
     executionState: BaseComponent["execution_state"],
   ) => {
+    logger.debug(
+      { componentId: id, status: executionState?.status },
+      "setComponentExecutionState: execution state changed",
+    );
     set({
       nodes: get().nodes.map((node) => {
         if (node.id === id) {

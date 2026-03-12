@@ -7,7 +7,7 @@ import { useShallow } from "zustand/react/shallow";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { useLoadWorkflow } from "../hooks/useLoadWorkflow";
-import { useWorkflowStore } from "../hooks/useWorkflowStore";
+import { useWorkflowStore, serializeWorkflow } from "../hooks/useWorkflowStore";
 import { hasDSLChanged } from "../utils/dslUtils";
 
 let saveTimeout: NodeJS.Timeout;
@@ -63,7 +63,7 @@ export function AutoSave() {
           {
             projectId: project.id,
             workflowId: workflow.data.id,
-            dsl: stateWorkflow,
+            dsl: serializeWorkflow(stateWorkflow),
             setAsLatestVersion,
           },
           {

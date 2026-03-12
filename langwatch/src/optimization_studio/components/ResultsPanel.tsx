@@ -151,6 +151,12 @@ export function EvaluationResults({
 
   const [keepFetching, setKeepFetching] = useState(false);
 
+  const hasEvaluationActivity =
+    !!experimentId ||
+    (!!evaluationState &&
+      evaluationState.status !== "idle" &&
+      evaluationState.status !== undefined);
+
   const experiment = api.experiments.getExperimentBySlugOrId.useQuery(
     {
       projectId: project?.id ?? "",
@@ -158,7 +164,7 @@ export function EvaluationResults({
       experimentSlug: experimentId ? undefined : slugify(workflowId ?? ""),
     },
     {
-      enabled: !!project && !!workflowId,
+      enabled: !!project && !!workflowId && hasEvaluationActivity,
       refetchOnWindowFocus: false,
       refetchInterval: keepFetching ? 1 : undefined,
     },
