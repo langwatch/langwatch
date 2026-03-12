@@ -32,12 +32,18 @@ vi.mock("../usePageVisibility", () => ({
   usePageVisibility: () => mockIsVisible,
 }));
 
+const mockInvalidateBatchHistory = vi.fn();
+const mockInvalidateSuiteRunData = vi.fn();
+
 vi.mock("../../utils/api", () => ({
   api: {
     useContext: () => ({
       scenarios: {
         getScenarioSetBatchHistory: {
-          invalidate: vi.fn(),
+          invalidate: mockInvalidateBatchHistory,
+        },
+        getSuiteRunData: {
+          invalidate: mockInvalidateSuiteRunData,
         },
       },
     }),
@@ -249,6 +255,38 @@ describe("useSimulationUpdateListener()", () => {
       });
 
       expect(refetchSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when an SSE event fires", () => {
+    it("invalidates getSuiteRunData so RunHistoryPanel refreshes", () => {
+      renderHook(() =>
+        useSimulationUpdateListener({
+          projectId: "proj_1",
+          refetch: refetchSpy,
+        }),
+      );
+
+      act(() => {
+        simulateSSEEvent({ event: "simulation_updated" });
+      });
+
+      expect(mockInvalidateSuiteRunData).toHaveBeenCalledTimes(1);
+    });
+
+    it("invalidates getScenarioSetBatchHistory for sidebar refresh", () => {
+      renderHook(() =>
+        useSimulationUpdateListener({
+          projectId: "proj_1",
+          refetch: refetchSpy,
+        }),
+      );
+
+      act(() => {
+        simulateSSEEvent({ event: "simulation_updated" });
+      });
+
+      expect(mockInvalidateBatchHistory).toHaveBeenCalledTimes(1);
     });
   });
 

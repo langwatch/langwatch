@@ -38,7 +38,7 @@ describe("<RunRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("passed (2/2)")).toBeInTheDocument();
+      expect(screen.getByText("passed")).toBeInTheDocument();
       expect(screen.queryByText("100%")).not.toBeInTheDocument();
     });
 
@@ -182,7 +182,7 @@ describe("<RunRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("failed (2/3)")).toBeInTheDocument();
+      expect(screen.getByText("failed")).toBeInTheDocument();
     });
   });
 
@@ -341,7 +341,7 @@ describe("<RunRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("failed (8/10)")).toBeInTheDocument();
+      expect(screen.getByText("failed")).toBeInTheDocument();
       expect(screen.getByText("8 passed")).toBeInTheDocument();
       expect(screen.getByText("2 failed")).toBeInTheDocument();
     });

@@ -95,17 +95,12 @@ export const evaluationsRouter = createTRPCRouter({
         void (async () => {
           try {
             const app = getApp();
-            await app.evaluations.startEvaluation({
+            await app.evaluations.reportEvaluation({
               tenantId: input.projectId,
               evaluationId,
               evaluatorId: input.evaluatorType,
               evaluatorType: input.evaluatorType,
               traceId: input.traceId,
-              occurredAt: Date.now(),
-            });
-            await app.evaluations.completeEvaluation({
-              tenantId: input.projectId,
-              evaluationId,
               status: result.status,
               score: result.status === "processed" && typeof result.score === 'number' ? result.score : undefined,
               passed: result.status === "processed" ? (result.passed ?? undefined) : undefined,

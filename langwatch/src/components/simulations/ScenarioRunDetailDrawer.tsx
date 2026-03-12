@@ -421,6 +421,7 @@ export function ScenarioRunDetailDrawer({
         onOpenChange={() => setTraceDrawerTraceId(null)}
         placement="end"
         size="xl"
+        modal={true}
       >
         <Drawer.Content paddingX={0} maxWidth="70%">
           <Drawer.CloseTrigger zIndex={10} />

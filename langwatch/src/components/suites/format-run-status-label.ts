@@ -1,9 +1,10 @@
 /**
- * Pure formatting function for scenario run status labels.
+ * Pure formatting functions for scenario run status labels.
  *
- * Converts raw status + evaluation results into a human-readable label
- * like "passed (4/5)" or "failed (3/5)". Non-terminal statuses return
- * their existing labels unchanged.
+ * Converts raw status + evaluation results into human-readable labels.
+ * Individual run labels include criteria counts (e.g. "passed (4/5)").
+ * Summary labels return simple "passed" or "failed" without counts,
+ * since counts are displayed separately by RunSummaryCounts.
  *
  * @see specs/features/suites/suite-list-view-status.feature
  */
@@ -67,11 +68,11 @@ export function formatRunStatusLabel({
 }
 
 /**
- * Formats a batch/group summary into a display label with scenario counts.
+ * Formats a batch/group summary into a simple status label.
  *
- * Shows "passed (4/5)" or "failed (3/5)" where the numbers represent
- * how many scenarios passed out of total finished scenarios.
+ * Returns "passed" or "failed" based on whether any scenarios failed.
  * Non-terminal summaries (all in-progress) return "running".
+ * Counts are displayed separately by RunSummaryCounts.
  */
 export function formatSummaryStatusLabel(summary: RunGroupSummary): string {
   const finishedCount =
@@ -85,6 +86,5 @@ export function formatSummaryStatusLabel(summary: RunGroupSummary): string {
     return "pending";
   }
 
-  const label = summary.failedCount > 0 ? "failed" : "passed";
-  return `${label} (${summary.passedCount}/${finishedCount})`;
+  return summary.failedCount > 0 ? "failed" : "passed";
 }

@@ -10,13 +10,14 @@
 
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 import {
   ScenarioEventType,
   ScenarioRunStatus,
   Verdict,
 } from "~/server/scenarios/scenario-event.enums";
 import { SimulationService } from "~/server/simulations/simulation.service";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { createLogger } from "~/utils/logger/server";
 
 const tracer = getLangWatchTracer("langwatch.scenarios.failure-handler");
@@ -28,6 +29,8 @@ export interface FailureEventParams {
   scenarioId: string;
   setId: string;
   batchRunId: string;
+  /** Pre-assigned scenario run ID from the job queue. Used to prevent duplicate run entries when ES hasn't indexed the SDK's RUN_STARTED event yet. */
+  scenarioRunId?: string;
   error?: string;
   /** Scenario name for display in UI */
   name?: string;
@@ -115,7 +118,7 @@ export class ScenarioFailureHandler {
         }
 
         const timestamp = Date.now();
-        const scenarioRunId = existingRun?.scenarioRunId ?? this.generateScenarioRunId();
+        const scenarioRunId = existingRun?.scenarioRunId ?? params.scenarioRunId ?? this.generateScenarioRunId();
         span.setAttribute("scenario.run.id", scenarioRunId);
 
         // If no RUN_STARTED event exists, emit one
@@ -164,9 +167,9 @@ export class ScenarioFailureHandler {
   }
 
   /**
-   * Generates a synthetic scenarioRunId in the format "scenariorun_{nanoid}".
+   * Generates a synthetic scenarioRunId using KSUID with the "scenariorun" resource prefix.
    */
   private generateScenarioRunId(): string {
-    return `scenariorun_${nanoid()}`;
+    return generate(KSUID_RESOURCES.SCENARIO_RUN).toString();
   }
 }

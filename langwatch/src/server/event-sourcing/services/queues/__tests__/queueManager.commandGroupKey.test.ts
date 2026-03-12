@@ -136,7 +136,7 @@ describe("QueueManager.initializeCommandQueues with getGroupKey", () => {
 
       const groupKey = entry?.groupKeyFn(payload);
       expect(groupKey).toBe(
-        `${tenantId}:${aggregateType}:exp1:run1:item:42`,
+        `${tenantId}/command/recordResult/${aggregateType}:exp1:run1:item:42`,
       );
     });
   });
@@ -174,7 +174,7 @@ describe("QueueManager.initializeCommandQueues with getGroupKey", () => {
       };
 
       const groupKey = entry?.groupKeyFn(payload);
-      expect(groupKey).toBe(`${tenantId}:${aggregateType}:exp1:run1`);
+      expect(groupKey).toBe(`${tenantId}/command/startRun/${aggregateType}:exp1:run1`);
     });
   });
 
@@ -220,7 +220,7 @@ describe("QueueManager.initializeCommandQueues with getGroupKey", () => {
       };
 
       const groupKey = entry?.groupKeyFn(payload);
-      expect(groupKey).toBe(`${tenantId}:${aggregateType}:custom:exp1:run1`);
+      expect(groupKey).toBe(`${tenantId}/command/recordResult/${aggregateType}:custom:exp1:run1`);
     });
   });
 });
@@ -281,7 +281,7 @@ describe("QueueManager.initializeHandlerQueues with groupKeyFn", () => {
       };
 
       const groupKey = entry?.groupKeyFn(event);
-      expect(groupKey).toBe(`${tenantId}:result:run1:item:5`);
+      expect(groupKey).toBe(`${tenantId}/map/resultStorage/result:run1:item:5`);
     });
   });
 
@@ -322,7 +322,7 @@ describe("QueueManager.initializeHandlerQueues with groupKeyFn", () => {
 
       const groupKey = entry?.groupKeyFn(event);
       expect(groupKey).toBe(
-        `${tenantId}:${aggregateType}:exp1:run1`,
+        `${tenantId}/map/resultStorage/${aggregateType}:exp1:run1`,
       );
     });
   });
