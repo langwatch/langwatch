@@ -127,16 +127,16 @@ if count > 0 then
   end
 end
 
--- Copy data (hash)
+-- Copy data (hash) - per-field to avoid unpack stack overflow
 local data = redis.call("HGETALL", srcDataKey)
-if #data > 0 then
-  redis.call("HMSET", dstDataKey, unpack(data))
+for i = 1, #data, 2 do
+  redis.call("HSET", dstDataKey, data[i], data[i+1])
 end
 
 -- Copy error info
 local errorData = redis.call("HGETALL", srcErrorKey)
-if #errorData > 0 then
-  redis.call("HMSET", dstErrorKey, unpack(errorData))
+for i = 1, #errorData, 2 do
+  redis.call("HSET", dstErrorKey, errorData[i], errorData[i+1])
 end
 
 -- Set TTL on DLQ keys
@@ -201,10 +201,10 @@ if count > 0 then
   end
 end
 
--- Copy data back
+-- Copy data back (batched to avoid unpack stack overflow)
 local data = redis.call("HGETALL", dlqDataKey)
-if #data > 0 then
-  redis.call("HMSET", dstDataKey, unpack(data))
+for i = 1, #data, 2 do
+  redis.call("HSET", dstDataKey, data[i], data[i+1])
 end
 
 -- Clean up DLQ keys

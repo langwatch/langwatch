@@ -24,6 +24,7 @@ export function GroupDetailPage() {
   const cancelRef = useRef<HTMLButtonElement>(null);
   const [draining, setDraining] = useState(false);
   const [retrying, setRetrying] = useState(false);
+  const [movingToDlq, setMovingToDlq] = useState(false);
 
   if (loading && !group) {
     return (
@@ -127,6 +128,19 @@ export function GroupDetailPage() {
       toast({ title: "Failed to retry", description: err instanceof Error ? err.message : "Unknown error", status: "error", duration: 4000, isClosable: true });
     } finally {
       setRetrying(false);
+    }
+  };
+
+  const handleMoveToDlq = async () => {
+    if (!queueName) return;
+    setMovingToDlq(true);
+    try {
+      await apiPost("/api/actions/move-to-dlq", { queueName, groupId });
+      toast({ title: "Group moved to DLQ", status: "success", duration: 2000, isClosable: true });
+    } catch (err) {
+      toast({ title: "Failed to move to DLQ", description: err instanceof Error ? err.message : "Unknown error", status: "error", duration: 4000, isClosable: true });
+    } finally {
+      setMovingToDlq(false);
     }
   };
 
@@ -285,6 +299,20 @@ export function GroupDetailPage() {
             onClick={handleUnblock}
           >
             Unblock
+          </Button>
+        )}
+        {group.isBlocked && (
+          <Button
+            size="sm"
+            variant="outline"
+            color="#ffaa00"
+            borderColor="rgba(255, 170, 0, 0.3)"
+            borderRadius="2px"
+            _hover={{ borderColor: "#ffaa00", boxShadow: "0 0 8px rgba(255, 170, 0, 0.3)" }}
+            onClick={handleMoveToDlq}
+            isLoading={movingToDlq}
+          >
+            Move to DLQ
           </Button>
         )}
         <Button

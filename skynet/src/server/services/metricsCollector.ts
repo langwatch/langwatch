@@ -234,18 +234,14 @@ export class MetricsCollector {
   }): Promise<{ newCompleted: number; newFailed: number }> {
     const phases = this.aggregatePhaseCounts(queues);
 
-    // Read BullMQ's completed/failed ZSET cardinalities as proxy counters.
-    // These ZSETs hold jobs currently in completed/failed state. Their count
-    // changes as jobs finish (increment) and get auto-cleaned (decrement).
-    // Delta between intervals approximates throughput; negative deltas
-    // (from cleanup) are clamped to 0.
+    // Read stats:completed and stats:failed counters from all group queues
     let newCompleted = 0;
     let newFailed = 0;
 
     const pipeline = this.redis.pipeline();
     for (const name of this.groupQueueNames) {
-      pipeline.zcard(`${name}:completed`);
-      pipeline.zcard(`${name}:failed`);
+      pipeline.get(`${name}:gq:stats:completed`);
+      pipeline.get(`${name}:gq:stats:failed`);
     }
     const results = await pipeline.exec();
 

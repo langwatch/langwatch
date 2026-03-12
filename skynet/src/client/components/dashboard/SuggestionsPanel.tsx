@@ -3,7 +3,7 @@ import { Box, Text, VStack, HStack, Badge, Button } from "@chakra-ui/react";
 import type { DashboardData } from "../../../shared/types.ts";
 import { apiPost } from "../../hooks/useApi.ts";
 
-type ActionType = "drain-all-blocked" | "unblock-all";
+type ActionType = "drain-all-blocked" | "move-to-dlq";
 
 interface Suggestion {
   message: string;
@@ -26,7 +26,7 @@ function deriveSuggestions(data: DashboardData): Suggestion[] {
     suggestions.push({
       message: `${data.blockedGroups.toLocaleString()} groups are blocked (${Math.round(blockedRatio * 100)}%). Monitor for further increase.`,
       severity: "warning",
-      action: { label: "Unblock All", type: "unblock-all" },
+      action: { label: "Add to DLQ", type: "move-to-dlq" },
     });
   }
 
@@ -80,7 +80,7 @@ export function SuggestionsPanel({ data }: { data: DashboardData }) {
     const confirmed = window.confirm(
       type === "drain-all-blocked"
         ? `Drain ALL blocked groups across ${queueNames.length} queue(s)? This removes their pending jobs permanently.`
-        : `Unblock ALL blocked groups across ${queueNames.length} queue(s)? They will be retried.`
+        : `Move ALL blocked groups across ${queueNames.length} queue(s) to DLQ? Jobs are preserved for redrive.`
     );
     if (!confirmed) return;
 
@@ -91,13 +91,13 @@ export function SuggestionsPanel({ data }: { data: DashboardData }) {
       for (const queueName of queueNames) {
         const endpoint = type === "drain-all-blocked"
           ? "/api/actions/drain-all-blocked"
-          : "/api/actions/unblock-all";
+          : "/api/actions/move-all-blocked-to-dlq";
         const res = await apiPost(endpoint, { queueName });
-        totalAffected += (res as { drainedCount?: number; unblockedCount?: number }).drainedCount
-          ?? (res as { unblockedCount?: number }).unblockedCount
+        totalAffected += (res as { drainedCount?: number; movedCount?: number }).drainedCount
+          ?? (res as { movedCount?: number }).movedCount
           ?? 0;
       }
-      setResult(`${type === "drain-all-blocked" ? "Drained" : "Unblocked"} ${totalAffected} groups`);
+      setResult(`${type === "drain-all-blocked" ? "Drained" : "Moved to DLQ"} ${totalAffected} groups`);
     } catch (err) {
       setResult(`Error: ${err instanceof Error ? err.message : "failed"}`);
     } finally {

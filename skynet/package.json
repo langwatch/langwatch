@@ -4,11 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n server,vite -c blue,green \"node --experimental-transform-types src/server/main.ts\" \"vite\"",
+    "dev": "concurrently -n server,vite -c blue,green \"tsx --tsconfig ../langwatch/tsconfig.json src/server/main.ts\" \"vite\"",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
     "test:unit": "vitest run",
-    "start": "node --experimental-transform-types src/server/main.ts"
+    "start": "tsx --tsconfig ../langwatch/tsconfig.json src/server/main.ts"
   },
   "dependencies": {
     "@chakra-ui/icons": "^2.2.4",
@@ -27,7 +27,8 @@
     "react-dom": "^19.0.0",
     "react-is": "^19.0.0",
     "react-router-dom": "^7.1.0",
-    "recharts": "^3.7.0"
+    "recharts": "^3.7.0",
+    "tsx": "^4.21.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",

@@ -11,7 +11,7 @@ import { apiPost } from "../hooks/useApi.ts";
 export interface UnblockSessionConfig {
   queueName: string;
   displayName: string;
-  totalBlocked: number;
+  dlqCount: number;
 }
 
 interface Props {
@@ -25,7 +25,7 @@ export function UnblockSession({ config, onClose }: Props) {
   const [state, setState] = useState<SessionState>("idle");
   const [batchSize, setBatchSize] = useState(10);
   const [delayMs, setDelayMs] = useState(2000);
-  const [unblocked, setUnblocked] = useState(0);
+  const [processed, setProcessed] = useState(0);
   const [lastBatchCount, setLastBatchCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef(false);
@@ -35,20 +35,21 @@ export function UnblockSession({ config, onClose }: Props) {
     if (runningRef.current) return;
     runningRef.current = true;
     abortRef.current = false;
+
     setState("running");
     setError(null);
 
     while (!abortRef.current) {
       try {
-        const res = await apiPost("/api/actions/canary-unblock", {
+        const res = await apiPost("/api/actions/canary-redrive", {
           queueName: config.queueName,
           count: batchSize,
-        }) as { unblockedCount: number; groupIds: string[] };
+        }) as { redrivenCount: number; groupIds: string[] };
 
-        setLastBatchCount(res.unblockedCount);
-        setUnblocked((prev) => prev + res.unblockedCount);
+        setLastBatchCount(res.redrivenCount);
+        setProcessed((prev) => prev + res.redrivenCount);
 
-        if (res.unblockedCount === 0) {
+        if (res.redrivenCount === 0) {
           setState("done");
           break;
         }
@@ -58,7 +59,6 @@ export function UnblockSession({ config, onClose }: Props) {
         break;
       }
 
-      // Wait between batches, checking abort flag periodically
       const start = Date.now();
       while (Date.now() - start < delayMs && !abortRef.current) {
         await new Promise((r) => setTimeout(r, 100));
@@ -77,19 +77,20 @@ export function UnblockSession({ config, onClose }: Props) {
   const handleStop = () => {
     abortRef.current = true;
     setState("idle");
-    setUnblocked(0);
+    setProcessed(0);
     setLastBatchCount(0);
     setError(null);
   };
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => { abortRef.current = true; };
   }, []);
 
-  const remaining = Math.max(0, config.totalBlocked - unblocked);
-  const progress = config.totalBlocked > 0
-    ? Math.min(100, (unblocked / config.totalBlocked) * 100)
+  // config.dlqCount may be stale (0) if scanner hasn't refreshed after Add to DLQ
+  const estimatedTotal = Math.max(config.dlqCount, processed);
+  const remaining = Math.max(0, estimatedTotal - processed);
+  const progress = estimatedTotal > 0
+    ? Math.min(100, (processed / estimatedTotal) * 100)
     : 0;
 
   return (
@@ -100,24 +101,23 @@ export function UnblockSession({ config, onClose }: Props) {
       w="480px"
       bg="#0a0e17"
       border="1px solid"
-      borderColor="rgba(255, 170, 0, 0.4)"
+      borderColor="rgba(0, 240, 255, 0.4)"
       borderRadius="4px"
-      boxShadow="0 0 20px rgba(255, 170, 0, 0.15), 0 4px 20px rgba(0,0,0,0.5)"
+      boxShadow="0 0 20px rgba(0, 240, 255, 0.15), 0 4px 20px rgba(0,0,0,0.5)"
       zIndex={1000}
       overflow="hidden"
     >
-      {/* Header */}
       <Flex
         px={5}
         py={3}
-        bg="rgba(255, 170, 0, 0.08)"
-        borderBottom="1px solid rgba(255, 170, 0, 0.2)"
+        bg="rgba(0, 240, 255, 0.08)"
+        borderBottom="1px solid rgba(0, 240, 255, 0.2)"
         align="center"
         justify="space-between"
       >
         <HStack spacing={3}>
-          <Text fontSize="sm" color="#ffaa00" fontWeight="600" textTransform="uppercase" letterSpacing="0.1em">
-            Unblock Session
+          <Text fontSize="sm" color="#00f0ff" fontWeight="600" textTransform="uppercase" letterSpacing="0.1em">
+            DLQ Redrive
           </Text>
           <Text fontSize="xs" color="#4a6a7a" isTruncated maxW="180px">
             {config.displayName}
@@ -135,11 +135,10 @@ export function UnblockSession({ config, onClose }: Props) {
       </Flex>
 
       <VStack spacing={4} p={5} align="stretch">
-        {/* Progress */}
         <Box>
           <Flex justify="space-between" mb={2}>
             <Text fontSize="sm" color="#b0c4d8" fontWeight="600" sx={{ fontVariantNumeric: "tabular-nums" }}>
-              {unblocked.toLocaleString()} unblocked
+              {processed.toLocaleString()} redriven
             </Text>
             <Text fontSize="sm" color="#4a6a7a" sx={{ fontVariantNumeric: "tabular-nums" }}>
               ~{remaining.toLocaleString()} remaining
@@ -149,8 +148,8 @@ export function UnblockSession({ config, onClose }: Props) {
             value={progress}
             size="sm"
             borderRadius="2px"
-            bg="rgba(255, 170, 0, 0.1)"
-            sx={{ "& > div": { bg: state === "done" ? "#00ff41" : "#ffaa00", transition: "width 0.3s" } }}
+            bg="rgba(0, 240, 255, 0.1)"
+            sx={{ "& > div": { bg: state === "done" ? "#00ff41" : "#00f0ff", transition: "width 0.3s" } }}
           />
           {lastBatchCount > 0 && state === "running" && (
             <Text fontSize="xs" color="#4a6a7a" mt={1}>
@@ -159,7 +158,6 @@ export function UnblockSession({ config, onClose }: Props) {
           )}
         </Box>
 
-        {/* Controls */}
         <Flex gap={4}>
           <Box flex="1">
             <Text fontSize="xs" color="#4a6a7a" textTransform="uppercase" mb={1.5}>
@@ -175,14 +173,14 @@ export function UnblockSession({ config, onClose }: Props) {
             >
               <NumberInputField
                 bg="#060a12"
-                border="1px solid rgba(255, 170, 0, 0.2)"
+                border="1px solid rgba(0, 240, 255, 0.2)"
                 color="#b0c4d8"
                 borderRadius="2px"
-                _focus={{ borderColor: "#ffaa00" }}
+                _focus={{ borderColor: "#00f0ff" }}
               />
               <NumberInputStepper>
-                <NumberIncrementStepper color="#4a6a7a" borderColor="rgba(255, 170, 0, 0.2)" />
-                <NumberDecrementStepper color="#4a6a7a" borderColor="rgba(255, 170, 0, 0.2)" />
+                <NumberIncrementStepper color="#4a6a7a" borderColor="rgba(0, 240, 255, 0.2)" />
+                <NumberDecrementStepper color="#4a6a7a" borderColor="rgba(0, 240, 255, 0.2)" />
               </NumberInputStepper>
             </NumberInput>
           </Box>
@@ -199,10 +197,10 @@ export function UnblockSession({ config, onClose }: Props) {
               isDisabled={state === "running"}
               mt={3}
             >
-              <SliderTrack bg="rgba(255, 170, 0, 0.1)" h="6px" borderRadius="2px">
-                <SliderFilledTrack bg="#ffaa00" />
+              <SliderTrack bg="rgba(0, 240, 255, 0.1)" h="6px" borderRadius="2px">
+                <SliderFilledTrack bg="#00f0ff" />
               </SliderTrack>
-              <SliderThumb boxSize="14px" bg="#ffaa00" />
+              <SliderThumb boxSize="14px" bg="#00f0ff" />
             </Slider>
           </Box>
         </Flex>
@@ -213,16 +211,15 @@ export function UnblockSession({ config, onClose }: Props) {
           </Text>
         )}
 
-        {/* Action buttons */}
         <HStack spacing={3} justify="flex-end">
           {state === "running" && (
             <Button
               size="md"
               variant="outline"
-              color="#ffaa00"
-              borderColor="rgba(255, 170, 0, 0.3)"
+              color="#00f0ff"
+              borderColor="rgba(0, 240, 255, 0.3)"
               borderRadius="2px"
-              _hover={{ borderColor: "#ffaa00", boxShadow: "0 0 8px rgba(255, 170, 0, 0.3)" }}
+              _hover={{ borderColor: "#00f0ff", boxShadow: "0 0 8px rgba(0, 240, 255, 0.3)" }}
               fontSize="sm"
               textTransform="uppercase"
               letterSpacing="0.05em"

@@ -269,6 +269,26 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
     }
   });
 
+  router.post("/api/actions/canary-redrive", async (req, res) => {
+    try {
+      const { queueName, count } = req.body as { queueName?: string; count?: number };
+      if (!queueName) {
+        res.status(400).json({ error: "queueName is required" });
+        return;
+      }
+      if (!service.isKnownQueue(queueName)) {
+        res.status(404).json({ error: "Unknown queue name" });
+        return;
+      }
+
+      const result = await service.canaryRedrive({ queueName, count: count ?? 5 });
+      res.json({ ok: true, redrivenCount: result.redrivenCount, groupIds: result.groupIds });
+    } catch (err) {
+      logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "canary-redrive error" });
+      res.status(500).json({ error: "Internal error" });
+    }
+  });
+
   router.post("/api/actions/move-to-dlq", async (req, res) => {
     try {
       const { queueName, groupId } = req.body as { queueName?: string; groupId?: string };

@@ -142,12 +142,19 @@ export function StatCards({ data }: { data: DashboardData }) {
 
   return (
     <Box mb={6}>
-      <SimpleGrid columns={{ base: 2, md: 6 }} spacing={3}>
+      <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3}>
         <StatCard label="Done/s" color={data.completedPerSec > 0 ? "#00ff41" : "#4a6a7a"}>
           <ValueWithPeak
             value={formatRate(data.completedPerSec)}
             peak={formatRate(data.peakCompletedPerSec)}
             color={data.completedPerSec > 0 ? "#00ff41" : "#4a6a7a"}
+          />
+        </StatCard>
+        <StatCard label="Failed/s" color={data.failedPerSec > 0 ? "#ff0033" : "#4a6a7a"}>
+          <ValueWithPeak
+            value={formatRate(data.failedPerSec)}
+            peak={formatRate(data.peakFailedPerSec)}
+            color={data.failedPerSec > 0 ? "#ff0033" : "#4a6a7a"}
           />
         </StatCard>
         <StatCard label="Latency p50 / p99" color={data.latencyP50Ms > 0 ? "#00f0ff" : "#4a6a7a"}>
@@ -159,19 +166,20 @@ export function StatCards({ data }: { data: DashboardData }) {
             </Text>
           )}
         </StatCard>
-        <StatCard label="Failed/s" color={data.failedPerSec > 0 ? "#ff0033" : "#4a6a7a"}>
-          <ValueWithPeak
-            value={formatRate(data.failedPerSec)}
-            peak={formatRate(data.peakFailedPerSec)}
-            color={data.failedPerSec > 0 ? "#ff0033" : "#4a6a7a"}
-          />
-        </StatCard>
         <StatCard label="Staged/s" color={data.throughputStagedPerSec > 0 ? "#00f0ff" : "#4a6a7a"}>
           <ValueWithPeak
             value={formatRate(data.throughputStagedPerSec)}
             peak={formatRate(data.peakStagedPerSec)}
             color={data.throughputStagedPerSec > 0 ? "#00f0ff" : "#4a6a7a"}
           />
+        </StatCard>
+      </SimpleGrid>
+      <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3} mt={3}>
+        <StatCard label="Total Completed" color={data.totalCompleted > 0 ? "#00ff41" : "#4a6a7a"}>
+          {data.totalCompleted.toLocaleString()}
+        </StatCard>
+        <StatCard label="Total Failed" color={data.totalFailed > 0 ? "#ff0033" : "#4a6a7a"}>
+          {data.totalFailed.toLocaleString()}
         </StatCard>
         <StatCard
           label="Redis Memory"

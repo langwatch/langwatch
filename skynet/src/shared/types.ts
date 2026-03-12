@@ -26,6 +26,7 @@ export interface QueueInfo {
   blockedGroupCount: number;
   activeGroupCount: number;
   totalPendingJobs: number;
+  dlqCount: number;
   groups: GroupInfo[];
 }
 
@@ -37,6 +38,7 @@ export interface QueueSummaryInfo {
   blockedGroupCount: number;
   activeGroupCount: number;
   totalPendingJobs: number;
+  dlqCount: number;
 }
 
 export interface ThroughputPoint {

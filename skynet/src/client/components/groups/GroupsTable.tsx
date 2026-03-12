@@ -99,6 +99,7 @@ function GroupDetailModal({ isOpen, onClose, group, queueName }: GroupDetailModa
   const drainCancelRef = useRef<HTMLButtonElement>(null);
   const [draining, setDraining] = useState(false);
   const [retrying, setRetrying] = useState(false);
+  const [movingToDlq, setMovingToDlq] = useState(false);
   const [blockDetail, setBlockDetail] = useState<GroupDetailData | null>(null);
 
   // Fetch block error details when a blocked group modal is opened
@@ -125,6 +126,19 @@ function GroupDetailModal({ isOpen, onClose, group, queueName }: GroupDetailModa
       onClose();
     } finally {
       setDraining(false);
+    }
+  };
+
+  const handleMoveToDlq = async () => {
+    setMovingToDlq(true);
+    try {
+      await apiPost("/api/actions/move-to-dlq", { queueName, groupId: group.groupId });
+      toast({ title: "Group moved to DLQ", status: "success", duration: 2000, isClosable: true });
+      onClose();
+    } catch (err) {
+      toast({ title: "Failed to move to DLQ", description: err instanceof Error ? err.message : "Unknown error", status: "error", duration: 4000, isClosable: true });
+    } finally {
+      setMovingToDlq(false);
     }
   };
 
@@ -314,6 +328,23 @@ function GroupDetailModal({ isOpen, onClose, group, queueName }: GroupDetailModa
                   isLoading={retrying}
                 >
                   Retry
+                </Button>
+              )}
+              {group.isBlocked && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  color="#ffaa00"
+                  borderColor="rgba(255, 170, 0, 0.3)"
+                  borderRadius="2px"
+                  _hover={{ borderColor: "#ffaa00", boxShadow: "0 0 12px rgba(255, 170, 0, 0.3)" }}
+                  textTransform="uppercase"
+                  letterSpacing="0.1em"
+                  fontSize="xs"
+                  onClick={handleMoveToDlq}
+                  isLoading={movingToDlq}
+                >
+                  Move to DLQ
                 </Button>
               )}
               <Button
@@ -756,23 +787,28 @@ function QueueSection({ queue, sortColumn, sortDir, cycleSort, onStartUnblockSes
     overscan: 10,
   });
 
-  const handleUnblockAll = async (e: React.MouseEvent) => {
+  const [movingToDlq, setMovingToDlq] = useState(false);
+
+  const handleMoveToDlq = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!window.confirm(`Unblock ALL ${queue.blockedGroupCount} blocked groups at once?`)) return;
+    if (!window.confirm(`Move ALL ${queue.blockedGroupCount} blocked groups to DLQ? Jobs are preserved and can be redriven later.`)) return;
+    setMovingToDlq(true);
     try {
-      await apiPost("/api/actions/unblock-all", { queueName: queue.name });
-      toast({ title: "All groups unblocked", status: "success", duration: 2000, isClosable: true });
+      const res = await apiPost("/api/actions/move-all-blocked-to-dlq", { queueName: queue.name }) as { movedCount: number; jobsMoved: number };
+      toast({ title: `Moved ${res.movedCount} groups (${res.jobsMoved} jobs) to DLQ`, status: "success", duration: 3000, isClosable: true });
     } catch (err) {
-      toast({ title: "Failed to unblock all", description: err instanceof Error ? err.message : "Unknown error", status: "error", duration: 4000, isClosable: true });
+      toast({ title: "Failed to move to DLQ", description: err instanceof Error ? err.message : "Unknown error", status: "error", duration: 4000, isClosable: true });
+    } finally {
+      setMovingToDlq(false);
     }
   };
 
-  const handleStartSession = (e: React.MouseEvent) => {
+  const handleStartRedrive = (e: React.MouseEvent) => {
     e.stopPropagation();
     onStartUnblockSession?.({
       queueName: queue.name,
       displayName: queue.displayName,
-      totalBlocked: queue.blockedGroupCount,
+      dlqCount: queue.dlqCount,
     });
   };
 
@@ -835,28 +871,29 @@ function QueueSection({ queue, sortColumn, sortDir, cycleSort, onStartUnblockSes
           <HStack spacing={2}>
             <QueueSummary queue={queue} />
             {queue.blockedGroupCount > 0 && (
-              <>
-                <Button
-                  size="xs"
-                  variant="outline"
-                  color="#ffaa00"
-                  borderColor="rgba(255, 170, 0, 0.3)"
-                  _hover={{ borderColor: "#ffaa00", boxShadow: "0 0 8px rgba(255, 170, 0, 0.3)" }}
-                  onClick={handleStartSession}
-                >
-                  Unblock Session
-                </Button>
-                <Button
-                  size="xs"
-                  variant="outline"
-                  color="#ff0033"
-                  borderColor="rgba(255, 0, 51, 0.3)"
-                  _hover={{ borderColor: "#ff0033", boxShadow: "0 0 8px rgba(255, 0, 51, 0.3)" }}
-                  onClick={handleUnblockAll}
-                >
-                  Unblock All
-                </Button>
-              </>
+              <Button
+                size="xs"
+                variant="outline"
+                color="#ffaa00"
+                borderColor="rgba(255, 170, 0, 0.3)"
+                _hover={{ borderColor: "#ffaa00", boxShadow: "0 0 8px rgba(255, 170, 0, 0.3)" }}
+                onClick={handleMoveToDlq}
+                isLoading={movingToDlq}
+              >
+                Add to DLQ ({queue.blockedGroupCount.toLocaleString()})
+              </Button>
+            )}
+            {(queue.dlqCount > 0 || queue.blockedGroupCount > 0) && (
+              <Button
+                size="xs"
+                variant="outline"
+                color="#00f0ff"
+                borderColor="rgba(0, 240, 255, 0.3)"
+                _hover={{ borderColor: "#00f0ff", boxShadow: "0 0 8px rgba(0, 240, 255, 0.3)" }}
+                onClick={handleStartRedrive}
+              >
+                DLQ Redrive{queue.dlqCount > 0 ? ` (${queue.dlqCount.toLocaleString()} in DLQ)` : ""}
+              </Button>
             )}
           </HStack>
         </Box>

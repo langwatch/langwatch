@@ -60,10 +60,13 @@ async function scanSingleQueue(
   const readyKey = `${prefix}ready`;
   const blockedKey = `${prefix}blocked`;
 
+  const dlqKey = `${prefix}dlq`;
+
   // O(1) counts + top N members by score
-  const [readyCount, blockedCount, topReadyMembers] = await Promise.all([
+  const [readyCount, blockedCount, dlqCount, topReadyMembers] = await Promise.all([
     redis.zcard(readyKey),
     redis.scard(blockedKey),
+    redis.scard(dlqKey),
     redis.zrevrange(readyKey, offset, offset + limit - 1, "WITHSCORES"),
   ]);
 
@@ -117,33 +120,37 @@ async function scanSingleQueue(
     });
   }
 
-  // Pipeline 2: Fetch metadata from first job's data hash + error info for blocked groups
-  const blockedGroupIndices: number[] = [];
+  // Pipeline 2a: Fetch metadata from first job's data hash
   const dataPipeline = redis.pipeline();
   let dataFetchCount = 0;
-  for (let i = 0; i < firstJobIds.length; i++) {
-    const { groupId, jobId } = firstJobIds[i]!;
+  for (const { groupId, jobId } of firstJobIds) {
     if (jobId) {
-      const dataKey = `${prefix}group:${groupId}:data`;
-      dataPipeline.hget(dataKey, jobId);
+      dataPipeline.hget(`${prefix}group:${groupId}:data`, jobId);
       dataFetchCount++;
     }
-    // Check if this group is blocked (from pipeline 1 results)
-    const base = i * CMDS_PER_GROUP;
-    const isBlocked = (pipelineResults?.[base + 4]?.[1] as number) === 1;
-    if (isBlocked) {
-      dataPipeline.hgetall(`${prefix}group:${groupId}:error`);
-      blockedGroupIndices.push(i);
-    }
   }
-  const dataResults = dataFetchCount > 0 || blockedGroupIndices.length > 0
+  const dataResults = dataFetchCount > 0
     ? await dataPipeline.exec()
     : [];
 
-  // Parse results: first dataFetchCount entries are job data, rest are error hashes
+  // Pipeline 2b: Fetch error info for blocked groups (separate to avoid index interleaving)
+  const blockedGroupIndices: number[] = [];
+  const errorPipeline = redis.pipeline();
+  for (let i = 0; i < allGroupIds.length; i++) {
+    const base = i * CMDS_PER_GROUP;
+    const isBlocked = (pipelineResults?.[base + 4]?.[1] as number) === 1;
+    if (isBlocked) {
+      errorPipeline.hgetall(`${prefix}group:${allGroupIds[i]!}:error`);
+      blockedGroupIndices.push(i);
+    }
+  }
+  const errorResults = blockedGroupIndices.length > 0
+    ? await errorPipeline.exec()
+    : [];
+
   const groupErrors = new Map<string, { message: string; stack: string; timestamp: string }>();
   for (let i = 0; i < blockedGroupIndices.length; i++) {
-    const errorHash = dataResults?.[dataFetchCount + i]?.[1] as Record<string, string> | null;
+    const errorHash = errorResults?.[i]?.[1] as Record<string, string> | null;
     if (errorHash && errorHash.message) {
       groupErrors.set(allGroupIds[blockedGroupIndices[i]!]!, {
         message: errorHash.message,
@@ -184,15 +191,8 @@ async function scanSingleQueue(
           pipelineName = parsed.__pipelineName ?? null;
           jobType = parsed.__jobType ?? null;
           jobName = parsed.__jobName ?? null;
-        } catch (err) {
-          console.warn(
-            JSON.stringify({
-              level: "warn",
-              msg: "Failed to parse job data",
-              groupId,
-              error: err instanceof Error ? err.message : "Parse error",
-            }),
-          );
+        } catch {
+          // Job data is not valid JSON (e.g. "[object Object]") — skip metadata extraction
         }
       }
     }
@@ -238,6 +238,7 @@ async function scanSingleQueue(
     blockedGroupCount: blockedCount,
     activeGroupCount,
     totalPendingJobs,
+    dlqCount,
     groups,
   };
 }

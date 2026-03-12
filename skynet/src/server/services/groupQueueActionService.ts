@@ -2,6 +2,9 @@ import type IORedis from "ioredis";
 import { DRAIN_GROUP_LUA, UNBLOCK_LUA, MOVE_TO_DLQ_LUA, REPLAY_FROM_DLQ_LUA } from "./luaScripts.ts";
 import { retryJob } from "./bullmqService.ts";
 import { isGroupQueue } from "./queueDiscovery.ts";
+import { createLogger } from "../logger.ts";
+
+const logger = createLogger("groupQueueActions");
 
 export class GroupQueueActionService {
   private readonly DLQ_TTL_SECONDS = 7 * 24 * 3600; // 7 days
@@ -603,6 +606,65 @@ export class GroupQueueActionService {
     } while (cursor !== "0");
 
     return { movedCount, jobsMoved };
+  }
+
+  async canaryRedrive({
+    queueName,
+    count = 5,
+  }: {
+    queueName: string;
+    count?: number;
+  }): Promise<{ redrivenCount: number; groupIds: string[] }> {
+    const prefix = `${queueName}:gq:`;
+    const dlqIndexKey = `${prefix}dlq`;
+
+    const dlqSize = await this.redis.scard(dlqIndexKey);
+    logger.info({ message: "canaryRedrive start", context: { dlqSize, requestedCount: count } });
+    if (dlqSize === 0) return { redrivenCount: 0, groupIds: [] };
+
+    const candidates = await this.redis.srandmember(dlqIndexKey, Math.min(count, dlqSize));
+    if (!candidates || candidates.length === 0) return { redrivenCount: 0, groupIds: [] };
+
+    const validCandidates = candidates.filter((id): id is string => id !== null);
+
+    const pipeline = this.redis.pipeline();
+    for (const groupId of validCandidates) {
+      pipeline.eval(
+        REPLAY_FROM_DLQ_LUA, 8,
+        `${prefix}dlq:${groupId}:jobs`,
+        `${prefix}dlq:${groupId}:data`,
+        `${prefix}dlq:${groupId}:error`,
+        `${prefix}group:${groupId}:jobs`,
+        `${prefix}group:${groupId}:data`,
+        `${prefix}ready`,
+        `${prefix}signal`,
+        `${prefix}dlq`,
+        groupId,
+      );
+    }
+    const results = await pipeline.exec();
+
+    let redrivenCount = 0;
+    let zeroJobCount = 0;
+    let errorCount = 0;
+    const redrivenIds: string[] = [];
+    if (results) {
+      for (let i = 0; i < results.length; i++) {
+        const [err, result] = results[i]!;
+        if (err) {
+          errorCount++;
+          logger.error({ message: "canaryRedrive REPLAY error", context: { groupId: validCandidates[i], error: err.message } });
+        } else if (Number(result) > 0) {
+          redrivenCount++;
+          redrivenIds.push(validCandidates[i]!);
+        } else {
+          zeroJobCount++;
+        }
+      }
+    }
+
+    logger.info({ message: "canaryRedrive done", context: { redrivenCount, zeroJobCount, errorCount, totalCandidates: validCandidates.length } });
+    return { redrivenCount, groupIds: redrivenIds };
   }
 
   async replayFromDlq({
