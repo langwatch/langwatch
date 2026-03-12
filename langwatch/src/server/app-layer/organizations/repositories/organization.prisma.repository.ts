@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { Currency, PrismaClient } from "@prisma/client";
 import type { OrganizationFeatureName } from "../organization.service";
 import type {
   OrganizationFeatureRow,
@@ -70,5 +70,52 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     });
+  }
+
+  async clearTrialLicense(organizationId: string): Promise<void> {
+    await this.prisma.organization.update({
+      where: { id: organizationId },
+      data: {
+        license: null,
+        licenseExpiresAt: null,
+        licenseLastValidatedAt: null,
+      },
+    });
+  }
+
+  async updateCurrency(input: {
+    organizationId: string;
+    currency: string;
+  }): Promise<void> {
+    await this.prisma.organization.update({
+      where: { id: input.organizationId },
+      data: { currency: input.currency as Currency },
+    });
+  }
+
+  async getPricingModel(organizationId: string): Promise<string | null> {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { pricingModel: true },
+    });
+    return org?.pricingModel ?? null;
+  }
+
+  async getStripeCustomerId(organizationId: string): Promise<string | null> {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { stripeCustomerId: true },
+    });
+    return org?.stripeCustomerId ?? null;
+  }
+
+  async findNameById(
+    organizationId: string,
+  ): Promise<{ id: string; name: string } | null> {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { id: true, name: true },
+    });
+    return org ?? null;
   }
 }

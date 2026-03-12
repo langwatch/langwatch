@@ -12,7 +12,7 @@ import {
 } from "./planTypes";
 import { billingErrorHandler } from "./middleware";
 import type { CustomerService } from "./services/customerService";
-import type { SubscriptionService } from "./services/subscriptionService";
+import type { SubscriptionService } from "../../src/server/app-layer/subscription/subscription.service";
 
 const subscriptionPlanEnum = z.enum(SUBSCRIBABLE_PLANS);
 

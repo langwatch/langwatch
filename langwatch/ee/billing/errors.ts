@@ -103,6 +103,16 @@ export class InvalidSeatCountError extends BillingError {
   }
 }
 
+export class SubscriptionCreationFailedError extends BillingError {
+  constructor() {
+    super({
+      message: "Failed to create pending subscription record",
+      trpcCode: "INTERNAL_SERVER_ERROR",
+    });
+    this.name = "SubscriptionCreationFailedError";
+  }
+}
+
 export class SubscriptionRecordNotFoundError extends BillingError {
   constructor(identifier: string) {
     super({
