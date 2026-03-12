@@ -28,6 +28,52 @@ Always use these credentials — they're shared across `/browser-test`, the stab
 
 Used by `scripts/verify-browser-test.js`, `agentic-e2e-tests/tests/auth.setup.ts`, and interactive `/browser-test` runs. One set of credentials means one test account and reusable auth state across all tools.
 
+## Data Seeding
+
+Many features require existing data to be testable. The sub-agent should create this data before verification begins.
+
+### General Principle
+
+Seed through the UI when possible — it exercises the same code paths a user would and catches form/validation bugs. Fall back to the API or SDK only for bulk data that would be impractical to click through (e.g., 50 traces for a pagination test).
+
+### Common Seeding Patterns
+
+**Creating a suite:**
+1. Navigate to the Suites page from the sidebar
+2. Click the "Create Suite" (or "New Suite") button
+3. Fill in the suite name (e.g., "Test Suite") and any required fields
+4. Save/submit the form
+5. Verify the suite appears in the list before proceeding
+
+**Triggering test runs / batch runs:**
+1. Open an existing suite
+2. Click "Run" or "Run All" to trigger execution
+3. Wait for the run status to change from "Running" to "Completed" — use `browser_wait_for` with a generous timeout (60-120s)
+4. Refresh or re-navigate if the status does not update automatically
+
+**Waiting for results to appear:**
+- After triggering runs or sending traces, data may take a few seconds to propagate
+- Use `browser_wait_for` with `text` matching (e.g., wait for "Completed" or a result count) rather than fixed sleeps
+- If results depend on background workers, allow up to 120s
+
+**Creating traces via the SDK or API:**
+- Use a quick Bash command to send traces when UI seeding is impractical:
+  ```bash
+  curl -X POST http://localhost:<port>/api/collector \
+    -H "X-Auth-Token: <project-api-key>" \
+    -H "Content-Type: application/json" \
+    -d '{"traces": [{"trace_id": "test-trace-001", "spans": [...]}]}'
+  ```
+- Find the project API key on the project settings page in the UI
+
+**Creating evaluations:**
+- Evaluations typically require traces to already exist
+- Navigate to the Evaluations section, configure an evaluator, and run it against existing traces
+
+### Keep It Minimal
+
+Only seed what the feature under test requires. A suites-page test needs one suite with one run — not ten suites with fifty runs each. Excessive seeding wastes tool calls and time.
+
 ## Chakra UI Gotchas
 
 - **Checkbox clicks get intercepted** by Chakra's overlay `<div>`. If clicking a checkbox times out with "intercepts pointer events", click the **label text** or the **adjacent img element** instead.

@@ -50,7 +50,22 @@ browser-tests/<feature-name>/<YYYY-MM-DD>/screenshots/
 
 Derive `<feature-name>` from: feature filename (without extension) > slugified description > branch name suffix.
 
-## Step 2: Spawn the browser agent
+## Step 2: Determine data seeding needs
+
+Before verification, decide what data the feature under test requires. Many features need pre-existing data to be meaningful (e.g., a suites page needs at least one suite with runs, a trace viewer needs traces, an evaluations dashboard needs completed evaluations).
+
+1. **Analyze the verification steps** from Step 1. For each step, ask: "What data must already exist for this to be testable?"
+2. **Build a seeding checklist** — the minimal set of entities needed. Examples:
+   - Suites page → create one suite with a name and at least one scenario
+   - Trace viewer → send at least one trace via the SDK or API
+   - Evaluation results → trigger a batch run and wait for results
+3. **Prefer seeding through the UI** — navigate to create forms, fill them in, submit. This exercises the same path a user would and is the most reliable approach in dev mode.
+4. **Fall back to API/SDK only for bulk data** that would be impractical to create through the UI (e.g., 50 traces for a pagination test).
+5. **Keep seeding MINIMAL** — only create what is strictly needed to verify the feature. Do not populate the app with extra data "just in case."
+
+Include the seeding instructions in the sub-agent prompt (Step 3) so the sub-agent creates the data before verifying.
+
+## Step 3: Spawn the browser agent
 
 Use the **Agent tool** to spawn a sub-agent. Give it everything it needs in the prompt — port, verification steps, credentials, artifact path. The sub-agent has access to Playwright MCP tools and Bash.
 
@@ -61,6 +76,15 @@ You are a browser test agent. Your ONLY job is to drive a browser and verify fea
 
 ## Your mission
 <paste the numbered verification steps here>
+
+## Data seeding
+Before verifying, create the minimal data the feature needs. Seed through the UI:
+<paste the seeding checklist from Step 2 here — e.g.:>
+- Navigate to Suites → click "Create Suite" → fill name "Test Suite" → save
+- Open the suite → add a scenario → run it once
+- Wait for the run to complete before proceeding to verification
+
+Only create what is listed above. Do not add extra data beyond what is needed.
 
 ## Connection
 - App URL: http://localhost:<port>
@@ -90,7 +114,7 @@ You are a browser test agent. Your ONLY job is to drive a browser and verify fea
 - When done, return a markdown summary table: | # | Step | Result | Screenshot |
 ```
 
-## Step 3: Collect results
+## Step 4: Collect results
 
 When the sub-agent returns:
 1. Parse its summary table
@@ -119,7 +143,7 @@ When the sub-agent returns:
 
 3. If you started the app (no `.dev-port` existed before), tear it down: `scripts/dev-down.sh`
 
-## Step 4: Upload screenshots and update the PR
+## Step 5: Upload screenshots and update the PR
 
 Screenshots are uploaded to **img402.dev** (free, no auth) instead of committed to git. This avoids binary bloat in the repo.
 
@@ -145,7 +169,7 @@ Screenshots are uploaded to **img402.dev** (free, no auth) instead of committed 
 
 3. **Do NOT commit `browser-tests/`** — it is gitignored. Screenshots are ephemeral local artifacts; the img402 URLs in the PR body are the permanent record.
 
-## Step 5: Report
+## Step 6: Report
 
 Return the summary to the user/orchestrator. Include:
 - The results table
