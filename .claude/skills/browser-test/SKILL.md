@@ -78,7 +78,8 @@ You are a browser test agent. Your ONLY job is to drive a browser and verify fea
 <paste the numbered verification steps here>
 
 ## Data seeding
-Before verifying, create the minimal data the feature needs. Seed through the UI:
+Before verifying, create the minimal data the feature needs. Follow the checklist below.
+Prefer seeding through the UI; use API/SDK only when the checklist explicitly calls for it:
 <paste the seeding checklist from Step 2 here — e.g.:>
 - Navigate to Suites → click "Create Suite" → fill name "Test Suite" → save
 - Open the suite → add a scenario → run it once
