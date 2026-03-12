@@ -11,6 +11,7 @@ dependencies = [
     "mcp[cli]>=1.13.1",
     "pandas>=2.3.2",
     "tenacity>=9.1.2",
+    "tornado>=6.5.5",  # security: CVE-2026-31958 (#555)
 ]
 
 [tool.uv.sources]
