@@ -34,8 +34,11 @@ export type State = Workflow & {
   propertiesExpanded: boolean;
   triggerValidation: boolean;
   workflowSelected: boolean;
+  /** The workflow state as of the last autosave. Used as the baseline for hasPendingChanges(). */
   autosavedWorkflow: Workflow | undefined;
+  /** The workflow state as of the last manual commit (or version restore/load). Used as the baseline for checkCanCommitNewVersion(). */
   lastCommittedWorkflow: Workflow | undefined;
+  /** The DB id of the current workflow version. Updated on load, autosave, commit, and restore. */
   currentVersionId: string | undefined;
   openResultsPanelRequest:
     | "evaluations"
@@ -55,10 +58,14 @@ export type WorkflowStore = State & {
       | (Partial<Workflow> & { workflow_id?: string })
       | ((current: Workflow) => Partial<Workflow> & { workflow_id?: string }),
   ) => void;
+  /** Update the autosave baseline. Called after each autosave completes. */
   setAutosavedWorkflow: (workflow: Workflow | undefined) => void;
+  /** Update the committed baseline. Called on load, manual commit, and version restore. */
   setLastCommittedWorkflow: (workflow: Workflow | undefined) => void;
+  /** Update the current version ID. Called on load, autosave, manual commit, and version restore. */
   setCurrentVersionId: (id: string | undefined) => void;
-  canCommitNewVersion: () => boolean;
+  /** Returns true if the current workflow differs from the last committed version. Synchronous — no DB query needed. */
+  checkCanCommitNewVersion: () => boolean;
   setSocketStatus: (
     status: SocketStatus | ((status: SocketStatus) => SocketStatus),
   ) => void;
@@ -460,7 +467,7 @@ export const store = (
   setCurrentVersionId: (id: string | undefined) => {
     set({ currentVersionId: id });
   },
-  canCommitNewVersion: () => {
+  checkCanCommitNewVersion: () => {
     const lastCommitted = get().lastCommittedWorkflow;
     const currentWorkflow = get().getWorkflow();
     if (!lastCommitted || !currentWorkflow) {

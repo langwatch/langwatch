@@ -103,7 +103,7 @@ export function EvaluateModalContent({
     evaluationState,
     deselectAllNodes,
     setOpenResultsPanelRequest,
-    canCommitNewVersion,
+    checkCanCommitNewVersion,
     setLastCommittedWorkflow,
     setCurrentVersionId,
     currentVersionId,
@@ -114,7 +114,7 @@ export function EvaluateModalContent({
       state,
       deselectAllNodes,
       setOpenResultsPanelRequest,
-      canCommitNewVersion,
+      checkCanCommitNewVersion,
       setLastCommittedWorkflow,
       setCurrentVersionId,
       currentVersionId,
@@ -124,7 +124,7 @@ export function EvaluateModalContent({
       evaluationState: state.evaluation,
       deselectAllNodes: deselectAllNodes,
       setOpenResultsPanelRequest: setOpenResultsPanelRequest,
-      canCommitNewVersion,
+      checkCanCommitNewVersion,
       setLastCommittedWorkflow,
       setCurrentVersionId,
       currentVersionId,
@@ -212,7 +212,7 @@ export function EvaluateModalContent({
     return 0;
   }, [evaluateOn, total, train.length, test.length]);
 
-  const canSave = canCommitNewVersion();
+  const canSave = checkCanCommitNewVersion();
   const trpc = api.useContext();
 
   const commitVersion = api.workflow.commitVersion.useMutation();

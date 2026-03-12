@@ -19,10 +19,10 @@ import type { Workflow } from "../types/dsl";
 import { useVersionState } from "./History";
 
 export const VersionToBeUsed = () => {
-  const { canCommitNewVersion } = useWorkflowStore(
-    ({ canCommitNewVersion }) => ({ canCommitNewVersion }),
+  const { checkCanCommitNewVersion } = useWorkflowStore(
+    ({ checkCanCommitNewVersion }) => ({ checkCanCommitNewVersion }),
   );
-  const canSave = canCommitNewVersion();
+  const canSave = checkCanCommitNewVersion();
 
   if (canSave) {
     return <NewVersionFields />;
@@ -62,13 +62,13 @@ function CurrentVersionDisplay() {
 function NewVersionFields() {
   const form = useFormContext<{ version: string; commitMessage: string }>();
   const { project } = useOrganizationTeamProject();
-  const { canCommitNewVersion, getWorkflow } = useWorkflowStore(
-    ({ canCommitNewVersion, getWorkflow }) => ({
-      canCommitNewVersion,
+  const { checkCanCommitNewVersion, getWorkflow } = useWorkflowStore(
+    ({ checkCanCommitNewVersion, getWorkflow }) => ({
+      checkCanCommitNewVersion,
       getWorkflow,
     }),
   );
-  const canSave = canCommitNewVersion();
+  const canSave = checkCanCommitNewVersion();
 
   const { previousVersion, nextVersion } = useVersionState({
     project,
