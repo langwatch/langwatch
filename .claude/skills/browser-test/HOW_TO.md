@@ -20,21 +20,11 @@ Lessons learned from running `/browser-test` against the LangWatch app.
 
 ### Standard Test Credentials
 
-Always use these credentials — they're shared across `/browser-test`, the stable E2E suite, and verification scripts:
-
-- **Email:** `browser-test@langwatch.ai`
-- **Password:** `BrowserTest123!`
-- **Org name (onboarding):** `Browser Test Org`
-
-Used by `scripts/verify-browser-test.js`, `agentic-e2e-tests/tests/auth.setup.ts`, and interactive `/browser-test` runs. One set of credentials means one test account and reusable auth state across all tools.
+See SKILL.md sub-agent template for current credentials. They're shared across `/browser-test`, `scripts/verify-browser-test.js`, `agentic-e2e-tests/tests/auth.setup.ts`, and interactive runs.
 
 ## Data Seeding
 
 Many features require existing data to be testable. The sub-agent should create this data before verification begins.
-
-### General Principle
-
-Seed through the UI when possible — it exercises the same code paths a user would and catches form/validation bugs. Fall back to the API or SDK only for bulk data that would be impractical to click through (e.g., 50 traces for a pagination test).
 
 ### Common Seeding Patterns
 
@@ -70,10 +60,6 @@ Seed through the UI when possible — it exercises the same code paths a user wo
 - Evaluations typically require traces to already exist
 - Navigate to the Evaluations section, configure an evaluator, and run it against existing traces
 
-### Keep It Minimal
-
-Only seed what the feature under test requires. A suites-page test needs one suite with one run — not ten suites with fifty runs each. Excessive seeding wastes tool calls and time.
-
 ## Chakra UI Gotchas
 
 - **Checkbox clicks get intercepted** by Chakra's overlay `<div>`. If clicking a checkbox times out with "intercepts pointer events", click the **label text** or the **adjacent img element** instead.
@@ -94,13 +80,7 @@ Save screenshots to the local artifact directory: `browser-tests/<feature-name>/
 browser_take_screenshot → filename: "browser-tests/plans-comparison/2026-03-11/screenshots/01-sign-in.png"
 ```
 
-Screenshots are **uploaded to img402.dev** (not committed to git). Upload via:
-```bash
-curl -s -F "image=@<path>" https://img402.dev/api/free
-# Returns: {"url":"https://i.img402.dev/abc123.jpg", ...}
-```
-
-Use the returned `https://i.img402.dev/...` URLs in PR descriptions. **Never commit `browser-tests/`** — it is gitignored. Free tier: 1MB max, 7-day retention.
+Screenshots are uploaded to img402.dev (not committed to git). See SKILL.md Step 5 for upload instructions. **Never commit `browser-tests/`** — it is gitignored.
 
 ## After Finishing
 
