@@ -72,9 +72,9 @@ describe("<GroupRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      // No standalone "passed" or "failed" text -- only compact icons
-      expect(screen.queryByText("passed")).not.toBeInTheDocument();
-      expect(screen.queryByText("failed")).not.toBeInTheDocument();
+      // No "passed" or "failed" text anywhere -- only compact icons
+      expect(screen.queryByText(/passed/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/failed/i)).not.toBeInTheDocument();
     });
   });
 

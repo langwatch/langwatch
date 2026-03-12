@@ -18,22 +18,22 @@ export function RunSummaryCounts({ summary, fontSize = "xs" }: RunSummaryCountsP
   return (
     <HStack gap={2} data-testid="run-summary-counts">
       {summary.passedCount > 0 && (
-        <Text fontSize={fontSize} color="green.600">
+        <Text fontSize={fontSize} color="green.600" aria-label={`${summary.passedCount} passed`}>
           {summary.passedCount} ✓
         </Text>
       )}
       {summary.failedCount > 0 && (
-        <Text fontSize={fontSize} color="red.600">
+        <Text fontSize={fontSize} color="red.600" aria-label={`${summary.failedCount} failed`}>
           {summary.failedCount} ✗
         </Text>
       )}
       {summary.stalledCount > 0 && (
-        <Text fontSize={fontSize} color="yellow.600">
+        <Text fontSize={fontSize} color="yellow.600" aria-label={`${summary.stalledCount} stalled`}>
           {summary.stalledCount} ⏸
         </Text>
       )}
       {summary.cancelledCount > 0 && (
-        <Text fontSize={fontSize} color="fg.muted">
+        <Text fontSize={fontSize} color="fg.muted" aria-label={`${summary.cancelledCount} cancelled`}>
           {summary.cancelledCount} ⊘
         </Text>
       )}

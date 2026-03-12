@@ -23,7 +23,7 @@ describe("<RunSummaryCounts/>", () => {
     cleanup();
   });
 
-  describe("when only passed counts are non-zero", () => {
+  describe("given a summary with only passed counts non-zero", () => {
     it("displays passed count with check icon and hides failed", () => {
       render(
         <RunSummaryCounts
@@ -37,7 +37,7 @@ describe("<RunSummaryCounts/>", () => {
     });
   });
 
-  describe("when passed and failed counts are non-zero", () => {
+  describe("given a summary with passed and failed counts non-zero", () => {
     it("displays both with compact icons", () => {
       render(
         <RunSummaryCounts
@@ -51,8 +51,8 @@ describe("<RunSummaryCounts/>", () => {
     });
   });
 
-  describe("when stalled and cancelled counts are non-zero", () => {
-    it("displays all non-zero statuses with icons", () => {
+  describe("given a summary with all status counts non-zero", () => {
+    it("displays all statuses with icons", () => {
       render(
         <RunSummaryCounts
           summary={makeSummary({
@@ -72,7 +72,7 @@ describe("<RunSummaryCounts/>", () => {
     });
   });
 
-  describe("when stalled and cancelled counts are zero", () => {
+  describe("given a summary with stalled and cancelled counts at zero", () => {
     it("does not display stalled or cancelled counts", () => {
       render(
         <RunSummaryCounts
@@ -91,7 +91,7 @@ describe("<RunSummaryCounts/>", () => {
     });
   });
 
-  describe("when all counts are zero", () => {
+  describe("given a summary with all counts at zero", () => {
     it("renders empty container with no status items", () => {
       const { container } = render(
         <RunSummaryCounts
@@ -111,6 +111,8 @@ describe("<RunSummaryCounts/>", () => {
       expect(countsEl).toBeInTheDocument();
       expect(screen.queryByText(/✓/)).not.toBeInTheDocument();
       expect(screen.queryByText(/✗/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/⏸/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/⊘/)).not.toBeInTheDocument();
     });
   });
 });
