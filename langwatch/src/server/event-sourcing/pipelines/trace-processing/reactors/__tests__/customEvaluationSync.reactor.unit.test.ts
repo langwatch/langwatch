@@ -62,7 +62,6 @@ function createFoldState(
     outputFromRootSpan: false,
     outputSpanEndTimeMs: 0,
     blockedByGuardrail: false,
-    satisfactionScore: null,
     topicId: null,
     subTopicId: null,
     hasAnnotation: null,
