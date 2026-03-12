@@ -4,6 +4,7 @@ import type { ReactorDefinition } from "../../reactors/reactor.types";
 import { DeleteRunCommand } from "./commands/deleteRun.command";
 import { FinishRunCommand } from "./commands/finishRun.command";
 import { MessageSnapshotCommand } from "./commands/messageSnapshot.command";
+import { QueueRunCommand } from "./commands/queueRun.command";
 import { StartRunCommand } from "./commands/startRun.command";
 import { TextMessageStartCommand } from "./commands/textMessageStart.command";
 import { TextMessageEndCommand } from "./commands/textMessageEnd.command";
@@ -41,6 +42,7 @@ export function createSimulationProcessingPipeline(deps: SimulationProcessingPip
       store: deps.simulationRunStore,
     }))
     .withReactor("simulationRunState", "snapshotUpdateBroadcast", deps.snapshotUpdateBroadcastReactor)
+    .withCommand("queueRun", QueueRunCommand)
     .withCommand("startRun", StartRunCommand)
     .withCommand("messageSnapshot", MessageSnapshotCommand)
     .withCommand("textMessageStart", TextMessageStartCommand)
