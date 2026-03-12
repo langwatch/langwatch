@@ -23,6 +23,7 @@ import {
 } from "./RunHistoryFilters";
 import { RunRow } from "./RunRow";
 import { GroupRow } from "./GroupRow";
+import { RunSummaryCounts } from "./RunSummaryCounts";
 import { useRunHistoryStore } from "./useRunHistoryStore";
 import {
   computeBatchRunSummary,
@@ -374,16 +375,19 @@ export function RunHistoryPanel({
                 : `${groups.length} ${groups.length === 1 ? "group" : "groups"} · `}
               {totals.runCount} {totals.runCount === 1 ? "run" : "runs"}
             </Text>
-            {totals.passedCount > 0 && (
-              <Text fontSize="sm" color="green.600">
-                {totals.passedCount} ✓
-              </Text>
-            )}
-            {totals.failedCount > 0 && (
-              <Text fontSize="sm" color="red.600">
-                {totals.failedCount} ✗
-              </Text>
-            )}
+            <RunSummaryCounts
+              fontSize="sm"
+              summary={{
+                passRate: 0,
+                passedCount: totals.passedCount,
+                failedCount: totals.failedCount,
+                stalledCount: 0,
+                cancelledCount: 0,
+                totalCount: totals.runCount,
+                inProgressCount: totals.pendingCount,
+                queuedCount: 0,
+              }}
+            />
           </HStack>
         </Box>
       )}
