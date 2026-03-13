@@ -535,7 +535,7 @@ function PublishModalContent({
     }) => {
       if (!project || !workflowId) return;
 
-      let versionId: string | undefined = canSave ? undefined : currentVersionId;
+      let versionId: string | undefined;
 
       if (canSave) {
         try {
@@ -562,11 +562,13 @@ function PublishModalContent({
           });
           throw error;
         }
+      } else {
+        versionId = currentVersionId;
       }
 
       if (!versionId) {
         toaster.create({
-          title: "Version ID not found for evaluation",
+          title: "Version ID not found for publishing",
           type: "error",
           duration: 5000,
           meta: {

@@ -226,8 +226,6 @@ export function OptimizeModalContent({
     async ({ version, commitMessage, optimizer, params }: OptimizeForm) => {
       if (!project || !workflowId) return;
 
-      let versionId: string | undefined = canSave ? undefined : currentVersionId;
-
       if (!train.length) {
         return;
       }
@@ -245,6 +243,8 @@ export function OptimizeModalContent({
         );
         return;
       }
+
+      let versionId: string | undefined;
 
       if (canSave) {
         try {
@@ -273,6 +273,8 @@ export function OptimizeModalContent({
           });
           throw error;
         }
+      } else {
+        versionId = currentVersionId;
       }
 
       if (!versionId) {

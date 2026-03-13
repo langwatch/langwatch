@@ -240,8 +240,6 @@ export function EvaluateModalContent({
     async ({ version, commitMessage, evaluateOn }: EvaluateForm) => {
       if (!project || !workflowId) return;
 
-      let versionId: string | undefined = canSave ? undefined : currentVersionId;
-
       if (!estimatedTotal) {
         return;
       }
@@ -263,6 +261,8 @@ export function EvaluateModalContent({
         );
         return;
       }
+
+      let versionId: string | undefined;
 
       if (canSave) {
         try {
@@ -287,6 +287,8 @@ export function EvaluateModalContent({
           });
           throw error;
         }
+      } else {
+        versionId = currentVersionId;
       }
 
       if (!versionId) {
