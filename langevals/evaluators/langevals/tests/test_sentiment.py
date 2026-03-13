@@ -46,9 +46,11 @@ def _evaluate_with_mock_embeddings(
         response.data = [{"embedding": embeddings_by_text.get(text, input_vec)}]
         return response
 
-    with patch("langevals_langevals.sentiment.litellm") as mock_litellm:
+    with patch("langevals_langevals.sentiment.litellm") as mock_litellm, \
+         patch("langevals_langevals.sentiment.get_max_tokens", return_value=8192):
         mock_litellm.embedding = mock_embedding
-        mock_litellm.encode = MagicMock(return_value=[1] * 10)
+        mock_litellm.encode = MagicMock(side_effect=lambda model, text: list(range(min(len(text.split()), 8192))))
+        mock_litellm.decode = MagicMock(side_effect=lambda model, tokens: " ".join(["word"] * len(tokens)))
         return evaluator.evaluate(entry)
 
 
@@ -96,18 +98,16 @@ class TestSentimentEvaluator:
             assert result.details == "No input text to evaluate"
 
     class TestWhenInputExceedsMaxTokens:
-        def test_returns_skipped(self):
-            evaluator = SentimentEvaluator(
-                settings=SentimentSettings(embeddings_model="openai/text-embedding-3-small")
+        def test_truncates_and_returns_result(self):
+            long_input = "lorem ipsum dolor " * 100000
+
+            result = _evaluate_with_mock_embeddings(
+                input_text=long_input,
+                input_vec=_normalize([0.7, 0.3, 0.0]),
             )
-            entry = SentimentEntry(input="lorem ipsum dolor " * 100000)
 
-            with patch("langevals_langevals.sentiment.litellm") as mock_litellm:
-                mock_litellm.encode = MagicMock(return_value=list(range(200000)))
-                result = evaluator.evaluate(entry)
-
-            assert result.status == "skipped"
-            assert "tokens" in result.details
+            assert result.status == "processed"
+            assert result.label == "positive"
 
     class TestWhenCustomReferencesAreProvided:
         def test_uses_custom_references(self):
