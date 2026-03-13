@@ -65,7 +65,7 @@ export function ProjectionRow({
           {projection.pipelineName}/{projection.projectionName}
         </Text>
 
-        {hasData && (
+        {hasData && snapshot && (
           <Badge fontSize="10px" bg="badge.neutral" color="badge.neutral.text" ml="auto">
             v{snapshot.version}
           </Badge>

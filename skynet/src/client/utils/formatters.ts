@@ -25,11 +25,11 @@ export function formatDuration(ms: number): string {
   if (ms < 60_000) return `${Math.round(ms / 1000)}s`;
   if (ms < 3_600_000) {
     const mins = Math.floor(ms / 60_000);
-    const secs = Math.round((ms % 60_000) / 1000);
+    const secs = Math.floor((ms % 60_000) / 1000);
     return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
   }
   const hours = Math.floor(ms / 3_600_000);
-  const mins = Math.round((ms % 3_600_000) / 60_000);
+  const mins = Math.floor((ms % 3_600_000) / 60_000);
   return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
 }
 

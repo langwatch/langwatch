@@ -174,11 +174,6 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
         return;
       }
 
-      if (!service.isKnownQueue(queueName)) {
-        res.status(404).json({ error: "Unknown queue name" });
-        return;
-      }
-
       const pausedKeys = await service.listPausedKeys({ queueName });
       res.json({ pausedKeys });
     } catch (err) {
@@ -189,18 +184,29 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
 
   router.post("/api/actions/drain-all-blocked", async (req, res) => {
     try {
-      const { queueName, pipelineFilter, errorFilter } = req.body as { queueName?: string; pipelineFilter?: string; errorFilter?: string };
-      if (!queueName) {
-        res.status(400).json({ error: "queueName is required" });
+      const { queueName, queueNames, pipelineFilter, errorFilter } = req.body as {
+        queueName?: string; queueNames?: string[]; pipelineFilter?: string; errorFilter?: string;
+      };
+      const names = queueNames ?? (queueName ? [queueName] : []);
+      if (names.length === 0) {
+        res.status(400).json({ error: "queueName or queueNames is required" });
         return;
       }
-      if (!service.isKnownQueue(queueName)) {
-        res.status(404).json({ error: "Unknown queue name" });
-        return;
+      for (const name of names) {
+        if (!service.isKnownQueue(name)) {
+          res.status(404).json({ error: `Unknown queue name: ${name}` });
+          return;
+        }
       }
 
-      const result = await service.drainAllBlocked({ queueName, pipelineFilter, errorFilter });
-      res.json({ ok: true, drainedCount: result.drainedCount, jobsRemoved: result.jobsRemoved });
+      let totalDrained = 0;
+      let totalJobsRemoved = 0;
+      for (const name of names) {
+        const result = await service.drainAllBlocked({ queueName: name, pipelineFilter, errorFilter });
+        totalDrained += result.drainedCount;
+        totalJobsRemoved += result.jobsRemoved;
+      }
+      res.json({ ok: true, drainedCount: totalDrained, jobsRemoved: totalJobsRemoved });
     } catch (err) {
       logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "drain-all-blocked error" });
       res.status(500).json({ error: "Internal error" });
@@ -241,7 +247,12 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
         return;
       }
 
-      const result = await service.canaryUnblock({ queueName, count: count ?? 5, pipelineFilter });
+      const parsedCount = count ?? 5;
+      if (!Number.isInteger(parsedCount) || parsedCount < 1) {
+        res.status(400).json({ error: "count must be a positive integer" });
+        return;
+      }
+      const result = await service.canaryUnblock({ queueName, count: parsedCount, pipelineFilter });
       res.json({ ok: true, unblockedCount: result.unblockedCount, groupIds: result.groupIds });
     } catch (err) {
       logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "canary-unblock error" });
@@ -261,6 +272,14 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
         return;
       }
 
+      if (batchSize !== undefined && (!Number.isInteger(batchSize) || batchSize < 1)) {
+        res.status(400).json({ error: "batchSize must be a positive integer" });
+        return;
+      }
+      if (delayMs !== undefined && (!Number.isInteger(delayMs) || delayMs < 0)) {
+        res.status(400).json({ error: "delayMs must be a non-negative integer" });
+        return;
+      }
       const result = await service.unblockAllBatched({ queueName, batchSize, delayMs });
       res.json({ ok: true, unblockedCount: result.unblockedCount });
     } catch (err) {
@@ -281,7 +300,12 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
         return;
       }
 
-      const result = await service.canaryRedrive({ queueName, count: count ?? 5 });
+      const parsedRedriveCount = count ?? 5;
+      if (!Number.isInteger(parsedRedriveCount) || parsedRedriveCount < 1) {
+        res.status(400).json({ error: "count must be a positive integer" });
+        return;
+      }
+      const result = await service.canaryRedrive({ queueName, count: parsedRedriveCount });
       res.json({ ok: true, redrivenCount: result.redrivenCount, groupIds: result.groupIds });
     } catch (err) {
       logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "canary-redrive error" });
@@ -315,18 +339,29 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
 
   router.post("/api/actions/move-all-blocked-to-dlq", async (req, res) => {
     try {
-      const { queueName, pipelineFilter, errorFilter } = req.body as { queueName?: string; pipelineFilter?: string; errorFilter?: string };
-      if (!queueName) {
-        res.status(400).json({ error: "queueName is required" });
+      const { queueName, queueNames, pipelineFilter, errorFilter } = req.body as {
+        queueName?: string; queueNames?: string[]; pipelineFilter?: string; errorFilter?: string;
+      };
+      const names = queueNames ?? (queueName ? [queueName] : []);
+      if (names.length === 0) {
+        res.status(400).json({ error: "queueName or queueNames is required" });
         return;
       }
-      if (!service.isKnownQueue(queueName)) {
-        res.status(404).json({ error: "Unknown queue name" });
-        return;
+      for (const name of names) {
+        if (!service.isKnownQueue(name)) {
+          res.status(404).json({ error: `Unknown queue name: ${name}` });
+          return;
+        }
       }
 
-      const result = await service.moveAllBlockedToDlq({ queueName, pipelineFilter, errorFilter });
-      res.json({ ok: true, movedCount: result.movedCount, jobsMoved: result.jobsMoved });
+      let totalMoved = 0;
+      let totalJobsMoved = 0;
+      for (const name of names) {
+        const result = await service.moveAllBlockedToDlq({ queueName: name, pipelineFilter, errorFilter });
+        totalMoved += result.movedCount;
+        totalJobsMoved += result.jobsMoved;
+      }
+      res.json({ ok: true, movedCount: totalMoved, jobsMoved: totalJobsMoved });
     } catch (err) {
       logger.error({ context: { err: err instanceof Error ? err.message : String(err) }, message: "move-all-blocked-to-dlq error" });
       res.status(500).json({ error: "Internal error" });
@@ -335,9 +370,13 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
 
   router.post("/api/actions/replay-from-dlq", async (req, res) => {
     try {
-      const { queueName, groupId, all } = req.body as { queueName?: string; groupId?: string; all?: boolean };
+      const { queueName, groupId, all } = req.body as { queueName?: string; groupId?: string; all?: unknown };
       if (!queueName) {
         res.status(400).json({ error: "queueName is required" });
+        return;
+      }
+      if (all !== undefined && typeof all !== "boolean") {
+        res.status(400).json({ error: "`all` must be a boolean" });
         return;
       }
       if (!service.isKnownQueue(queueName)) {
@@ -345,7 +384,7 @@ export function createActionsRouter(redis: IORedis, getGroupQueueNames: () => st
         return;
       }
 
-      if (all) {
+      if (all === true) {
         const result = await service.replayAllFromDlq({ queueName });
         res.json({ ok: true, replayedCount: result.replayedCount, jobsReplayed: result.jobsReplayed });
       } else {

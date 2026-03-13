@@ -41,6 +41,7 @@ export function useDejaViewData() {
   });
 
   const currentAggregateId = useRef<string | null>(null);
+  const currentTenantId = useRef<string | null>(null);
 
   const fetchAggregates = useCallback(async (query?: string) => {
     setState((s) => ({ ...s, aggregatesLoading: true, aggregatesError: null }));
@@ -61,8 +62,9 @@ export function useDejaViewData() {
     }
   }, []);
 
-  const loadReplay = useCallback(async (aggregateId: string) => {
+  const loadReplay = useCallback(async (aggregateId: string, tenantId: string, loadAll = false) => {
     currentAggregateId.current = aggregateId;
+    currentTenantId.current = tenantId;
     setState((s) => ({
       ...s,
       replayLoading: true,
@@ -75,8 +77,9 @@ export function useDejaViewData() {
       showEventDetail: false,
     }));
     try {
+      const allParam = loadAll ? "&all=true" : "";
       const data = await apiFetch<ReplayResponse>(
-        `/api/dejaview/replay/${encodeURIComponent(aggregateId)}`
+        `/api/dejaview/replay/${encodeURIComponent(aggregateId)}?tenantId=${encodeURIComponent(tenantId)}${allParam}`
       );
       setState((s) => ({ ...s, replay: data, replayLoading: false }));
     } catch (error) {
@@ -105,11 +108,11 @@ export function useDejaViewData() {
   }, []);
 
   // Fetch projection state when cursor or selection changes
-  const fetchProjectionState = useCallback(async (aggregateId: string, projectionId: string, cursor: number) => {
+  const fetchProjectionState = useCallback(async (aggregateId: string, tenantId: string, projectionId: string, cursor: number) => {
     setState((s) => ({ ...s, projectionStateLoading: true }));
     try {
       const data = await apiFetch<ProjectionStateResponse>(
-        `/api/dejaview/replay/${encodeURIComponent(aggregateId)}/projection/${encodeURIComponent(projectionId)}?cursor=${cursor}`
+        `/api/dejaview/replay/${encodeURIComponent(aggregateId)}/projection/${encodeURIComponent(projectionId)}?cursor=${cursor}&tenantId=${encodeURIComponent(tenantId)}`
       );
       setState((s) => ({
         ...s,
@@ -124,8 +127,9 @@ export function useDejaViewData() {
   // Auto-fetch projection state when cursor or selection changes
   useEffect(() => {
     const aggId = currentAggregateId.current;
-    if (aggId && state.selectedProjectionId) {
-      fetchProjectionState(aggId, state.selectedProjectionId, state.eventCursor);
+    const tenId = currentTenantId.current;
+    if (aggId && tenId && state.selectedProjectionId) {
+      fetchProjectionState(aggId, tenId, state.selectedProjectionId, state.eventCursor);
     }
   }, [state.eventCursor, state.selectedProjectionId, fetchProjectionState]);
 

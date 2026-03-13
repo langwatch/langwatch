@@ -93,9 +93,15 @@ export function createGroupsRouter(redis: IORedis, metrics: MetricsCollector, ge
       if (format === "csv") {
         res.setHeader("Content-Type", "text/csv");
         res.setHeader("Content-Disposition", "attachment; filename=blocked-groups.csv");
+        const sanitize = (val: string) => {
+          const escaped = val.replace(/"/g, '""');
+          // Prevent CSV injection: prefix formula-triggering chars with a single quote
+          if (/^[=+\-@\t\r]/.test(escaped)) return `'${escaped}`;
+          return escaped;
+        };
         const header = "groupId,pipelineName,errorMessage,errorTimestamp\n";
         const rows = groups.map((g) =>
-          `"${g.groupId}","${g.pipelineName ?? ""}","${g.errorMessage.replace(/"/g, '""')}","${g.errorTimestamp}"`
+          `"${sanitize(g.groupId)}","${sanitize(g.pipelineName ?? "")}","${sanitize(g.errorMessage)}","${sanitize(g.errorTimestamp)}"`
         ).join("\n");
         res.send(header + rows);
       } else {

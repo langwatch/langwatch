@@ -2,6 +2,7 @@ import "../services/dejaview/env-defaults.ts";
 import { Router } from "express";
 import {
   loadEvents,
+  countEvents,
   listRecentAggregates,
   searchAggregates,
   queryChildAggregates,
@@ -104,7 +105,7 @@ function computeProjectionAtCursor({
 export function createDejaViewRouter(): Router {
   const router = Router();
 
-  // List recent aggregates
+  // List recent aggregates (returns tenantId per row for disambiguation)
   router.get("/api/dejaview/aggregates", async (_req, res) => {
     try {
       const limit = parseInt(String(_req.query.limit ?? "50"), 10);
@@ -123,21 +124,30 @@ export function createDejaViewRouter(): Router {
 
   // Replay events for an aggregate — returns events + metadata (no heavy state computation)
   router.get("/api/dejaview/replay/:aggregateId", async (req, res) => {
+    const DEFAULT_EVENT_LIMIT = 300;
+
     try {
       const { aggregateId } = req.params;
-      if (!aggregateId) {
-        res.status(400).json({ error: "aggregateId is required" });
+      const tenantId = String(req.query.tenantId ?? "");
+      if (!aggregateId || !tenantId) {
+        res.status(400).json({ error: "aggregateId and tenantId are required" });
         return;
       }
+
+      const noLimit = req.query.all === "true";
+      const eventLimit = noLimit ? undefined : DEFAULT_EVENT_LIMIT;
 
       // Ensure pipeline discovery has been attempted
       await ensureDiscovery();
 
-      // Load events
-      let events = await loadEvents(aggregateId);
+      // Count total events and load (potentially limited)
+      const [totalEventCount, events] = await Promise.all([
+        countEvents({ aggregateId, tenantId }),
+        loadEvents({ aggregateId, tenantId, limit: eventLimit }),
+      ]);
 
       if (events.length === 0) {
-        res.json({ events: [], projections: [], handlers: [], pipelineAggregateTypes: {} });
+        res.json({ events: [], projections: [], handlers: [], pipelineAggregateTypes: {}, totalEventCount: 0, truncated: false });
         return;
       }
 
@@ -157,11 +167,12 @@ export function createDejaViewRouter(): Router {
                 const childIds = await queryChildAggregates({
                   parentId: aggregateId,
                   childAggregateType: childLink.toAggregateType,
+                  tenantId: tenantId,
                 });
                 childAggregateIds.push(...childIds);
 
                 const childEventArrays = await Promise.all(
-                  childIds.map((id) => loadEvents(id).catch(() => [] as DejaViewEvent[]))
+                  childIds.map((id) => loadEvents({ aggregateId: id, tenantId, limit: eventLimit }).catch(() => [] as DejaViewEvent[]))
                 );
                 for (const childEvents of childEventArrays) {
                   events.push(...childEvents);
@@ -179,12 +190,16 @@ export function createDejaViewRouter(): Router {
       // Sort all events by timestamp
       events.sort((a, b) => a.timestamp - b.timestamp);
 
+      const truncated = !noLimit && totalEventCount > DEFAULT_EVENT_LIMIT;
+
       res.json({
         events,
         projections: getProjectionMeta(),
         handlers: getHandlerMeta(),
         pipelineAggregateTypes,
         childAggregateIds,
+        totalEventCount,
+        truncated,
       });
     } catch (error) {
       console.error("Failed to replay aggregate:", error);
@@ -196,7 +211,13 @@ export function createDejaViewRouter(): Router {
   router.get("/api/dejaview/replay/:aggregateId/projection/:projectionId", async (req, res) => {
     try {
       const { aggregateId, projectionId } = req.params;
+      const tenantId = String(req.query.tenantId ?? "");
       const cursor = parseInt(String(req.query.cursor ?? "0"), 10);
+
+      if (!tenantId) {
+        res.status(400).json({ error: "tenantId query param is required" });
+        return;
+      }
 
       await ensureDiscovery();
 
@@ -206,7 +227,7 @@ export function createDejaViewRouter(): Router {
         return;
       }
 
-      const events = await loadEvents(aggregateId);
+      const events = await loadEvents({ aggregateId: aggregateId!, tenantId });
       events.sort((a, b) => a.timestamp - b.timestamp);
 
       const state = computeProjectionAtCursor({ events, projection, cursor });

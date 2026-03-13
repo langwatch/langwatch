@@ -30,9 +30,11 @@ export function UnblockSession({ config, onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef(false);
   const runningRef = useRef(false);
+  const runIdRef = useRef(0);
 
   const run = useCallback(async () => {
     if (runningRef.current) return;
+    const runId = ++runIdRef.current;
     runningRef.current = true;
     abortRef.current = false;
 
@@ -46,6 +48,8 @@ export function UnblockSession({ config, onClose }: Props) {
           count: batchSize,
         }) as { redrivenCount: number; groupIds: string[] };
 
+        if (abortRef.current || runId !== runIdRef.current) break;
+
         setLastBatchCount(res.redrivenCount);
         setProcessed((prev) => prev + res.redrivenCount);
 
@@ -54,6 +58,7 @@ export function UnblockSession({ config, onClose }: Props) {
           break;
         }
       } catch (err) {
+        if (runId !== runIdRef.current) break;
         setError(err instanceof Error ? err.message : "Request failed");
         setState("paused");
         break;
@@ -65,7 +70,7 @@ export function UnblockSession({ config, onClose }: Props) {
       }
     }
 
-    if (abortRef.current && state !== "done") {
+    if (abortRef.current && runId === runIdRef.current) {
       setState("paused");
     }
     runningRef.current = false;
@@ -75,6 +80,7 @@ export function UnblockSession({ config, onClose }: Props) {
   const handlePause = () => { abortRef.current = true; };
   const handleResume = () => run();
   const handleStop = () => {
+    runIdRef.current++;
     abortRef.current = true;
     setState("idle");
     setProcessed(0);
@@ -83,7 +89,10 @@ export function UnblockSession({ config, onClose }: Props) {
   };
 
   useEffect(() => {
-    return () => { abortRef.current = true; };
+    return () => {
+      runIdRef.current++;
+      abortRef.current = true;
+    };
   }, []);
 
   // config.dlqCount may be stale (0) if scanner hasn't refreshed after Add to DLQ

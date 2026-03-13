@@ -1,10 +1,11 @@
 import * as os from "node:os";
 import type IORedis from "ioredis";
 import type { DashboardData, PipelineNode, ThroughputPoint, QueueInfo, QueueSummaryInfo, JobNameMetrics } from "../../shared/types.ts";
-import { THROUGHPUT_BUFFER_SIZE, METRICS_COLLECT_INTERVAL_MS, REDIS_STATE_TTL_SECONDS } from "../../shared/constants.ts";
+import { THROUGHPUT_BUFFER_SIZE, METRICS_COLLECT_INTERVAL_MS, REDIS_STATE_TTL_SECONDS, AUTO_PAUSE_ERROR_THRESHOLD_PER_SEC, AUTO_PAUSE_CONSECUTIVE_INTERVALS } from "../../shared/constants.ts";
 
 import { scanGroupQueues } from "./groupQueueScanner.ts";
 import { getRedisInfo, type RedisInfo } from "./redis.ts";
+import { normalizeErrorMessage } from "./blockedGroupAnalyzer.ts";
 
 const REDIS_STATE_KEY = "skynet:state";
 const KNOWN_PIPELINES_KEY = "skynet:known-pipelines";
@@ -121,13 +122,7 @@ export class MetricsCollector {
     for (const q of fullQueues) {
       for (const g of q.groups) {
         if (!g.isBlocked || !g.errorMessage) continue;
-        const normalized = g.errorMessage
-          .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "<UUID>")
-          .replace(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g, "<IP>")
-          .replace(/:\d{2,5}\b/g, ":<PORT>")
-          .replace(/\b\d{10,}\b/g, "<ID>")
-          .replace(/\s+/g, " ")
-          .trim();
+        const normalized = normalizeErrorMessage(g.errorMessage);
         const key = `${g.pipelineName ?? ""}::${normalized}`;
         const existing = errorMap.get(key);
         if (existing) {
@@ -536,23 +531,21 @@ export class MetricsCollector {
       // Auto-pause: check if any pipeline's error rate exceeds threshold
       // We approximate per-pipeline error rate from blocked groups appearing in this interval
       // This is a simple heuristic, not exact per-pipeline failed/s
+      // TODO: Implement actual pause action when threshold is exceeded
       if (this.currentFailedPerSec > 0) {
-        const AUTO_THRESHOLD = 50; // AUTO_PAUSE_ERROR_THRESHOLD_PER_SEC
-        const AUTO_INTERVALS = 5;  // AUTO_PAUSE_CONSECUTIVE_INTERVALS
-
-        if (this.currentFailedPerSec >= AUTO_THRESHOLD) {
+        if (this.currentFailedPerSec >= AUTO_PAUSE_ERROR_THRESHOLD_PER_SEC) {
           const key = "__global__";
           const count = (this.autoPauseCounters.get(key) ?? 0) + 1;
           this.autoPauseCounters.set(key, count);
 
-          if (count >= AUTO_INTERVALS && !this.autoPausedPipelines.has(key)) {
+          if (count >= AUTO_PAUSE_CONSECUTIVE_INTERVALS && !this.autoPausedPipelines.has(key)) {
             this.autoPausedPipelines.add(key);
             console.warn(
               JSON.stringify({
                 level: "warn",
                 msg: "Auto-pause triggered: error rate exceeded threshold",
                 failedPerSec: this.currentFailedPerSec,
-                threshold: AUTO_THRESHOLD,
+                threshold: AUTO_PAUSE_ERROR_THRESHOLD_PER_SEC,
                 consecutiveIntervals: count,
               }),
             );

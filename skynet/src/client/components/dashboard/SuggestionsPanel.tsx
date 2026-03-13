@@ -87,16 +87,13 @@ export function SuggestionsPanel({ data }: { data: DashboardData }) {
     setLoading(type);
     setResult(null);
     try {
-      let totalAffected = 0;
-      for (const queueName of queueNames) {
-        const endpoint = type === "drain-all-blocked"
-          ? "/api/actions/drain-all-blocked"
-          : "/api/actions/move-all-blocked-to-dlq";
-        const res = await apiPost(endpoint, { queueName });
-        totalAffected += (res as { drainedCount?: number; movedCount?: number }).drainedCount
-          ?? (res as { movedCount?: number }).movedCount
-          ?? 0;
-      }
+      const endpoint = type === "drain-all-blocked"
+        ? "/api/actions/drain-all-blocked"
+        : "/api/actions/move-all-blocked-to-dlq";
+      const res = await apiPost(endpoint, { queueNames });
+      const totalAffected = (res as { drainedCount?: number; movedCount?: number }).drainedCount
+        ?? (res as { movedCount?: number }).movedCount
+        ?? 0;
       setResult(`${type === "drain-all-blocked" ? "Drained" : "Moved to DLQ"} ${totalAffected} groups`);
     } catch (err) {
       setResult(`Error: ${err instanceof Error ? err.message : "failed"}`);

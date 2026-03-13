@@ -99,7 +99,7 @@ export function ActiveJobsPanel({ queues }: { queues: QueueInfo[] }) {
           </Thead>
           <Tbody>
             {activeGroups.slice(0, 20).map(({ group, queueName }) => (
-              <ActiveRow key={group.groupId} group={group} queueName={queueName} />
+              <ActiveRow key={`${queueName}:${group.groupId}`} group={group} queueName={queueName} />
             ))}
           </Tbody>
         </Table>

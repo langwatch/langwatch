@@ -1,5 +1,6 @@
 import {
   Box,
+  Button,
   Flex,
   Text,
   Input,
@@ -17,8 +18,9 @@ import {
   IconButton,
   Tooltip,
 } from "@chakra-ui/react";
-import { SearchIcon, ArrowBackIcon } from "@chakra-ui/icons";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { SearchIcon, ArrowBackIcon, WarningIcon } from "@chakra-ui/icons";
+import { useState, useEffect, useCallback, useRef, type RefObject } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useDejaViewData } from "../hooks/useDejaViewData.ts";
 import { EventTimeline } from "../components/dejaview/EventTimeline.tsx";
 import { EventDetail } from "../components/dejaview/EventDetail.tsx";
@@ -37,24 +39,38 @@ export function DejaViewPage() {
     selectedProjectionId,
     projectionState,
     projectionStateLoading,
-    expandedItems,
     showEventDetail,
     fetchAggregates,
     loadReplay,
     setEventCursor,
     selectProjection,
-    toggleExpanded,
-    toggleEventDetail,
   } = useDejaViewData();
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedAggregateId, setSelectedAggregateId] = useState<string | null>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedAggregateId = searchParams.get("aggregateId");
+  const selectedTenantId = searchParams.get("tenantId");
 
-  // Initial load
+  const [searchQuery, setSearchQuery] = useState("");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const initialLoadDone = useRef(false);
+
+  // Initial load — fetch aggregates or auto-load replay from URL params
   useEffect(() => {
-    fetchAggregates(undefined);
-  }, [fetchAggregates]);
+    if (initialLoadDone.current) return;
+    initialLoadDone.current = true;
+
+    if (selectedAggregateId && selectedTenantId) {
+      loadReplay(selectedAggregateId, selectedTenantId);
+    } else {
+      fetchAggregates(undefined);
+    }
+  }, [selectedAggregateId, selectedTenantId, fetchAggregates, loadReplay]);
+
+  // Cleanup debounce on unmount
+  useEffect(() => {
+    const ref = debounceRef as RefObject<ReturnType<typeof setTimeout> | undefined>;
+    return () => clearTimeout(ref.current);
+  }, []);
 
   // Debounced search
   const handleSearchChange = useCallback(
@@ -69,16 +85,23 @@ export function DejaViewPage() {
   );
 
   const handleSelectAggregate = useCallback(
-    (aggregateId: string) => {
-      setSelectedAggregateId(aggregateId);
-      loadReplay(aggregateId);
+    (aggregateId: string, tenantId: string) => {
+      setSearchParams({ aggregateId, tenantId });
+      loadReplay(aggregateId, tenantId);
     },
-    [loadReplay]
+    [loadReplay, setSearchParams]
   );
 
+  const handleLoadAll = useCallback(() => {
+    if (selectedAggregateId && selectedTenantId) {
+      loadReplay(selectedAggregateId, selectedTenantId, true);
+    }
+  }, [selectedAggregateId, selectedTenantId, loadReplay]);
+
   const handleBack = useCallback(() => {
-    setSelectedAggregateId(null);
-  }, []);
+    setSearchParams({});
+    fetchAggregates(searchQuery || undefined);
+  }, [setSearchParams, fetchAggregates, searchQuery]);
 
   // Aggregate selection view
   if (!selectedAggregateId) {
@@ -132,6 +155,7 @@ export function DejaViewPage() {
               <Thead>
                 <Tr>
                   <Th>Aggregate ID</Th>
+                  <Th>Tenant</Th>
                   <Th>Type</Th>
                   <Th isNumeric>Events</Th>
                 </Tr>
@@ -139,14 +163,19 @@ export function DejaViewPage() {
               <Tbody>
                 {aggregates.map((agg) => (
                   <Tr
-                    key={agg.aggregateId}
+                    key={`${agg.tenantId}:${agg.aggregateId}`}
                     cursor="pointer"
                     _hover={{ bg: "row.hover" }}
-                    onClick={() => handleSelectAggregate(agg.aggregateId)}
+                    onClick={() => handleSelectAggregate(agg.aggregateId, agg.tenantId)}
                   >
                     <Td>
                       <Text fontSize="xs" color="text.primary" fontFamily="mono">
                         {agg.aggregateId}
+                      </Text>
+                    </Td>
+                    <Td>
+                      <Text fontSize="xs" color="text.muted" fontFamily="mono">
+                        {agg.tenantId}
                       </Text>
                     </Td>
                     <Td>
@@ -155,7 +184,14 @@ export function DejaViewPage() {
                       </Badge>
                     </Td>
                     <Td isNumeric>
-                      <Text fontSize="xs" color="text.secondary">{agg.eventCount}</Text>
+                      <Flex align="center" justify="flex-end" gap={1}>
+                        {agg.eventCount > 300 && (
+                          <Tooltip label="Large aggregate — may load slowly" fontSize="xs">
+                            <WarningIcon color="#ff9900" boxSize={3} />
+                          </Tooltip>
+                        )}
+                        <Text fontSize="xs" color="text.secondary">{agg.eventCount}</Text>
+                      </Flex>
                     </Td>
                   </Tr>
                 ))}
@@ -250,6 +286,11 @@ export function DejaViewPage() {
         <Text fontSize="xs" color="#00f0ff" fontFamily="mono" isTruncated>
           {selectedAggregateId}
         </Text>
+        {selectedTenantId && (
+          <Text fontSize="10px" color="text.muted" fontFamily="mono">
+            tenant: {selectedTenantId}
+          </Text>
+        )}
         {replay.childAggregateIds && replay.childAggregateIds.length > 0 && (
           <Badge fontSize="10px" bg="badge.ok" color="badge.ok.text">
             +{replay.childAggregateIds.length} children
@@ -262,6 +303,37 @@ export function DejaViewPage() {
           Arrow keys: events | e: detail panel
         </Text>
       </Flex>
+
+      {/* Truncation warning */}
+      {replay.truncated && (
+        <Flex
+          px={4}
+          py={2}
+          align="center"
+          gap={3}
+          bg="rgba(255, 153, 0, 0.08)"
+          borderBottom="1px solid"
+          borderColor="rgba(255, 153, 0, 0.2)"
+          flexShrink={0}
+        >
+          <WarningIcon color="#ff9900" boxSize={3} />
+          <Text fontSize="xs" color="#ff9900">
+            Showing {replay.events.length} of {replay.totalEventCount} events.
+            Large replays may be slow.
+          </Text>
+          <Button
+            size="xs"
+            variant="outline"
+            borderColor="rgba(255, 153, 0, 0.4)"
+            color="#ff9900"
+            _hover={{ bg: "rgba(255, 153, 0, 0.1)" }}
+            onClick={handleLoadAll}
+            isLoading={replayLoading}
+          >
+            Load all {replay.totalEventCount} events
+          </Button>
+        </Flex>
+      )}
 
       {/* Main content area */}
       <Flex flex="1" minH={0} overflow="hidden">

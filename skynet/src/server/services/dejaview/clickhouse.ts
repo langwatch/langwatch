@@ -6,6 +6,7 @@ export interface DejaViewEvent {
   aggregateType: string;
   tenantId: string;
   timestamp: number;
+  createdAt: string;
   type: string;
   data: unknown;
   metadata?: {
@@ -39,6 +40,7 @@ function rowToEvent(row: ClickHouseEventRow): DejaViewEvent {
     aggregateType: row.AggregateType,
     tenantId: row.TenantId,
     timestamp: row.EventTimestamp,
+    createdAt: row.CreatedAt ?? "",
     type: row.EventType,
     data,
     metadata: {
@@ -60,27 +62,38 @@ function getClient(): ClickHouseClient {
   return clientInstance;
 }
 
-export async function loadEvents(aggregateId: string): Promise<DejaViewEvent[]> {
+export async function countEvents({ aggregateId, tenantId }: { aggregateId: string; tenantId: string }): Promise<number> {
   const client = getClient();
 
   const result = await client.query({
     query: `
-      SELECT
-        TenantId,
-        IdempotencyKey,
-        AggregateType,
-        AggregateId,
-        EventId,
-        EventType,
-        EventTimestamp,
-        CreatedAt,
-        EventPayload,
-        ProcessingTraceparent
+      SELECT count() as cnt
       FROM event_log
-      WHERE AggregateId = {aggregateId:String}
-      ORDER BY EventTimestamp ASC
+      WHERE TenantId = {tenantId:String} AND AggregateId = {aggregateId:String}
     `,
-    query_params: { aggregateId },
+    query_params: { aggregateId, tenantId },
+    format: "JSONEachRow",
+  });
+
+  const rows = (await result.json()) as { cnt: string }[];
+  return parseInt(rows[0]?.cnt ?? "0", 10);
+}
+
+export async function loadEvents({ aggregateId, tenantId, limit }: { aggregateId: string; tenantId: string; limit?: number }): Promise<DejaViewEvent[]> {
+  const client = getClient();
+
+  const limitClause = limit ? `LIMIT {limit:UInt32}` : "";
+  const result = await client.query({
+    query: `
+      SELECT
+        TenantId, IdempotencyKey, AggregateType, AggregateId, EventId,
+        EventType, EventTimestamp, CreatedAt, EventPayload, ProcessingTraceparent
+      FROM event_log
+      WHERE TenantId = {tenantId:String} AND AggregateId = {aggregateId:String}
+      ORDER BY EventTimestamp ASC
+      ${limitClause}
+    `,
+    query_params: { aggregateId, tenantId, ...(limit ? { limit } : {}) },
     format: "JSONEachRow",
   });
 
@@ -89,7 +102,7 @@ export async function loadEvents(aggregateId: string): Promise<DejaViewEvent[]> 
 }
 
 export async function listRecentAggregates(limit = 50): Promise<
-  { aggregateId: string; aggregateType: string; eventCount: number }[]
+  { aggregateId: string; tenantId: string; aggregateType: string; eventCount: number }[]
 > {
   const client = getClient();
 
@@ -97,10 +110,11 @@ export async function listRecentAggregates(limit = 50): Promise<
     query: `
       SELECT
         AggregateId as aggregateId,
+        TenantId as tenantId,
         any(AggregateType) as aggregateType,
         count() as eventCount
       FROM event_log
-      GROUP BY AggregateId
+      GROUP BY AggregateId, TenantId
       ORDER BY max(EventTimestamp) DESC
       LIMIT {limit:UInt32}
     `,
@@ -112,7 +126,7 @@ export async function listRecentAggregates(limit = 50): Promise<
 }
 
 export async function searchAggregates(query: string, limit = 20): Promise<
-  { aggregateId: string; aggregateType: string; eventCount: number }[]
+  { aggregateId: string; tenantId: string; aggregateType: string; eventCount: number }[]
 > {
   const client = getClient();
 
@@ -120,11 +134,12 @@ export async function searchAggregates(query: string, limit = 20): Promise<
     query: `
       SELECT
         AggregateId as aggregateId,
+        TenantId as tenantId,
         any(AggregateType) as aggregateType,
         count() as eventCount
       FROM event_log
       WHERE AggregateId LIKE {query:String}
-      GROUP BY AggregateId
+      GROUP BY AggregateId, TenantId
       ORDER BY max(EventTimestamp) DESC
       LIMIT {limit:UInt32}
     `,
@@ -142,9 +157,10 @@ const CHILD_AGGREGATE_JSON_PATHS: Record<string, string> = {
 export async function queryChildAggregates(config: {
   parentId: string;
   childAggregateType: string;
+  tenantId: string;
   limit?: number;
 }): Promise<string[]> {
-  const { parentId, childAggregateType, limit = 100 } = config;
+  const { parentId, childAggregateType, tenantId, limit = 100 } = config;
 
   const jsonPath = CHILD_AGGREGATE_JSON_PATHS[childAggregateType];
   if (!jsonPath) return [];
@@ -157,11 +173,12 @@ export async function queryChildAggregates(config: {
     query: `
       SELECT DISTINCT AggregateId as aggregateId
       FROM event_log
-      WHERE AggregateType = {childAggregateType:String}
+      WHERE TenantId = {tenantId:String}
+        AND AggregateType = {childAggregateType:String}
         AND JSONExtractString(EventPayload, ${jsonExtractArgs}) = {parentId:String}
       LIMIT {limit:UInt32}
     `,
-    query_params: { parentId, childAggregateType, limit },
+    query_params: { parentId, childAggregateType, tenantId, limit },
     format: "JSONEachRow",
   });
 

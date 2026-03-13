@@ -146,11 +146,8 @@ if ttl > 0 then
   redis.call("EXPIRE", dstErrorKey, ttl)
 end
 
--- Add to DLQ index
+-- Add to DLQ index (no TTL on index — cleaned up on replay/drain)
 redis.call("SADD", dlqIndexKey, groupId)
-if ttl > 0 then
-  redis.call("EXPIRE", dlqIndexKey, ttl)
-end
 
 -- Clean up original group (same as drain)
 redis.call("DEL", srcJobsKey)

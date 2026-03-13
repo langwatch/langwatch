@@ -9,11 +9,17 @@ interface ShortcutHandlers {
 export function useKeyboardShortcuts(handlers: ShortcutHandlers): void {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      // Ignore IME composition and modifier-key combos
+      if (e.isComposing || e.ctrlKey || e.metaKey || e.altKey) {
+        return;
+      }
+
       // Don't trigger shortcuts when typing in inputs
-      const tag = (e.target as HTMLElement)?.tagName;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") {
         if (e.key === "Escape") {
-          (e.target as HTMLElement).blur();
+          target?.blur();
           handlers.onClearFilters?.();
         }
         return;

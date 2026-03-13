@@ -3,12 +3,11 @@ import { DRAIN_GROUP_LUA, UNBLOCK_LUA, MOVE_TO_DLQ_LUA, REPLAY_FROM_DLQ_LUA } fr
 import { retryJob } from "./bullmqService.ts";
 import { isGroupQueue } from "./queueDiscovery.ts";
 import { createLogger } from "../logger.ts";
+import { DLQ_TTL_SECONDS } from "../../shared/constants.ts";
 
 const logger = createLogger("groupQueueActions");
 
 export class GroupQueueActionService {
-  private readonly DLQ_TTL_SECONDS = 7 * 24 * 3600; // 7 days
-
   constructor(
     private readonly redis: IORedis,
     private readonly getGroupQueueNames: () => string[],
@@ -150,6 +149,60 @@ export class GroupQueueActionService {
     return this.redis.smembers(`${queueName}:gq:paused-jobs`);
   }
 
+  private async filterBlockedGroups({
+    prefix,
+    members,
+    pipelineFilter,
+    errorFilter,
+  }: {
+    prefix: string;
+    members: string[];
+    pipelineFilter?: string;
+    errorFilter?: string;
+  }): Promise<string[]> {
+    const filterPipeline = this.redis.pipeline();
+    for (const groupId of members) {
+      filterPipeline.hgetall(`${prefix}group:${groupId}:error`);
+      filterPipeline.zrange(`${prefix}group:${groupId}:jobs`, 0, 0);
+    }
+    const filterResults = await filterPipeline.exec();
+
+    const jobDataPipeline = this.redis.pipeline();
+    const jobDataMap = new Map<string, number>();
+    let jobFetchIdx = 0;
+    for (let i = 0; i < members.length; i++) {
+      const jobArr = (filterResults?.[i * 2 + 1]?.[1] as string[]) ?? [];
+      if (jobArr[0]) {
+        jobDataPipeline.hget(`${prefix}group:${members[i]!}:data`, jobArr[0]);
+        jobDataMap.set(members[i]!, jobFetchIdx++);
+      }
+    }
+    const jobDataResults = jobFetchIdx > 0 ? await jobDataPipeline.exec() : [];
+
+    return members.filter((groupId, i) => {
+      if (errorFilter) {
+        const errorHash = filterResults?.[i * 2]?.[1] as Record<string, string> | null;
+        const msg = errorHash?.message ?? "";
+        if (!msg.toLowerCase().includes(errorFilter.toLowerCase())) return false;
+      }
+      if (pipelineFilter) {
+        const fetchIdx = jobDataMap.get(groupId);
+        if (fetchIdx !== undefined) {
+          const raw = jobDataResults?.[fetchIdx]?.[1] as string | null;
+          if (raw) {
+            try {
+              const parsed = JSON.parse(raw);
+              if (parsed.__pipelineName !== pipelineFilter) return false;
+            } catch {
+              return false;
+            }
+          } else return false;
+        } else return false;
+      }
+      return true;
+    });
+  }
+
   async drainAllBlocked({
     queueName,
     pipelineFilter,
@@ -172,53 +225,9 @@ export class GroupQueueActionService {
 
       if (members.length === 0) continue;
 
-      let groupsToDrain = members;
-
-      if (hasFilters) {
-        // Fetch filter data
-        const filterPipeline = this.redis.pipeline();
-        for (const groupId of members) {
-          filterPipeline.hgetall(`${prefix}group:${groupId}:error`);
-          filterPipeline.zrange(`${prefix}group:${groupId}:jobs`, 0, 0);
-        }
-        const filterResults = await filterPipeline.exec();
-
-        // Fetch job data for pipeline name
-        const jobDataPipeline = this.redis.pipeline();
-        const jobDataMap = new Map<string, number>();
-        let jobFetchIdx = 0;
-        for (let i = 0; i < members.length; i++) {
-          const jobArr = (filterResults?.[i * 2 + 1]?.[1] as string[]) ?? [];
-          if (jobArr[0]) {
-            jobDataPipeline.hget(`${prefix}group:${members[i]!}:data`, jobArr[0]);
-            jobDataMap.set(members[i]!, jobFetchIdx++);
-          }
-        }
-        const jobDataResults = jobFetchIdx > 0 ? await jobDataPipeline.exec() : [];
-
-        groupsToDrain = members.filter((groupId, i) => {
-          if (errorFilter) {
-            const errorHash = filterResults?.[i * 2]?.[1] as Record<string, string> | null;
-            const msg = errorHash?.message ?? "";
-            if (!msg.toLowerCase().includes(errorFilter.toLowerCase())) return false;
-          }
-          if (pipelineFilter) {
-            const fetchIdx = jobDataMap.get(groupId);
-            if (fetchIdx !== undefined) {
-              const raw = jobDataResults?.[fetchIdx]?.[1] as string | null;
-              if (raw) {
-                try {
-                  const parsed = JSON.parse(raw);
-                  if (parsed.__pipelineName !== pipelineFilter) return false;
-                } catch {
-                  return false;
-                }
-              } else return false;
-            } else return false;
-          }
-          return true;
-        });
-      }
+      const groupsToDrain = hasFilters
+        ? await this.filterBlockedGroups({ prefix, members, pipelineFilter, errorFilter })
+        : members;
 
       if (groupsToDrain.length === 0) continue;
 
@@ -422,7 +431,7 @@ export class GroupQueueActionService {
   async unblockAllBatched({
     queueName,
     batchSize = 500,
-    delayMs = 100,
+    delayMs: rawDelayMs = 100,
     onProgress,
   }: {
     queueName: string;
@@ -430,6 +439,8 @@ export class GroupQueueActionService {
     delayMs?: number;
     onProgress?: (progress: { processed: number; total: number }) => void;
   }): Promise<{ unblockedCount: number }> {
+    const MAX_DELAY_MS = 30_000;
+    const delayMs = Math.min(Math.max(0, rawDelayMs), MAX_DELAY_MS);
     const prefix = `${queueName}:gq:`;
     const blockedKey = `${prefix}blocked`;
 
@@ -497,7 +508,7 @@ export class GroupQueueActionService {
       `${prefix}dlq:${groupId}:error`,
       `${prefix}dlq`,
       groupId,
-      String(this.DLQ_TTL_SECONDS),
+      String(DLQ_TTL_SECONDS),
     );
     return { jobsMoved: Number(result) };
   }
@@ -524,51 +535,9 @@ export class GroupQueueActionService {
 
       if (members.length === 0) continue;
 
-      let groupsToMove = members;
-
-      if (hasFilters) {
-        const filterPipeline = this.redis.pipeline();
-        for (const groupId of members) {
-          filterPipeline.hgetall(`${prefix}group:${groupId}:error`);
-          filterPipeline.zrange(`${prefix}group:${groupId}:jobs`, 0, 0);
-        }
-        const filterResults = await filterPipeline.exec();
-
-        const jobDataPipeline = this.redis.pipeline();
-        const jobDataMap = new Map<string, number>();
-        let jobFetchIdx = 0;
-        for (let i = 0; i < members.length; i++) {
-          const jobArr = (filterResults?.[i * 2 + 1]?.[1] as string[]) ?? [];
-          if (jobArr[0]) {
-            jobDataPipeline.hget(`${prefix}group:${members[i]!}:data`, jobArr[0]);
-            jobDataMap.set(members[i]!, jobFetchIdx++);
-          }
-        }
-        const jobDataResults = jobFetchIdx > 0 ? await jobDataPipeline.exec() : [];
-
-        groupsToMove = members.filter((groupId, i) => {
-          if (errorFilter) {
-            const errorHash = filterResults?.[i * 2]?.[1] as Record<string, string> | null;
-            const msg = errorHash?.message ?? "";
-            if (!msg.toLowerCase().includes(errorFilter.toLowerCase())) return false;
-          }
-          if (pipelineFilter) {
-            const fetchIdx = jobDataMap.get(groupId);
-            if (fetchIdx !== undefined) {
-              const raw = jobDataResults?.[fetchIdx]?.[1] as string | null;
-              if (raw) {
-                try {
-                  const parsed = JSON.parse(raw);
-                  if (parsed.__pipelineName !== pipelineFilter) return false;
-                } catch {
-                  return false;
-                }
-              } else return false;
-            } else return false;
-          }
-          return true;
-        });
-      }
+      const groupsToMove = hasFilters
+        ? await this.filterBlockedGroups({ prefix, members, pipelineFilter, errorFilter })
+        : members;
 
       if (groupsToMove.length === 0) continue;
 
@@ -588,7 +557,7 @@ export class GroupQueueActionService {
           `${prefix}dlq:${groupId}:error`,
           `${prefix}dlq`,
           groupId,
-          String(this.DLQ_TTL_SECONDS),
+          String(DLQ_TTL_SECONDS),
         );
       }
       const results = await pipeline.exec();
