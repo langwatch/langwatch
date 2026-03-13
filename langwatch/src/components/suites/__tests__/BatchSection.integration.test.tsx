@@ -77,7 +77,7 @@ describe("<BatchSection/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("passed")).toBeInTheDocument();
+      expect(screen.getByText("2 ✓")).toBeInTheDocument();
       expect(screen.queryByText("100%")).not.toBeInTheDocument();
     });
 

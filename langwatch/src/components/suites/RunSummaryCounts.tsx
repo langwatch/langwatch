@@ -1,9 +1,8 @@
 /**
- * Inline summary counts for run/group row headers.
+ * Compact inline summary counts for run/group row headers.
  *
- * Displays passed/failed counts and optionally stalled/cancelled
- * when non-zero. Designed to sit inside an HStack header alongside
- * existing pass rate percentage and status icon.
+ * Displays counts with status icons (✓ passed, ✗ failed, ⏸ stalled, ⊘ cancelled).
+ * Only renders statuses with non-zero counts to keep the display minimal.
  */
 
 import { HStack, Text } from "@chakra-ui/react";
@@ -11,25 +10,31 @@ import type { RunGroupSummary } from "./run-history-transforms";
 
 type RunSummaryCountsProps = {
   summary: RunGroupSummary;
+  /** Text size for count labels. Defaults to "xs". */
+  fontSize?: string;
 };
 
-export function RunSummaryCounts({ summary }: RunSummaryCountsProps) {
+export function RunSummaryCounts({ summary, fontSize = "xs" }: RunSummaryCountsProps) {
   return (
     <HStack gap={2} data-testid="run-summary-counts">
-      <Text fontSize="xs" color="green.600">
-        {summary.passedCount} passed
-      </Text>
-      <Text fontSize="xs" color="red.600">
-        {summary.failedCount} failed
-      </Text>
+      {summary.passedCount > 0 && (
+        <Text fontSize={fontSize} color="green.600" aria-label={`${summary.passedCount} passed`}>
+          {summary.passedCount} ✓
+        </Text>
+      )}
+      {summary.failedCount > 0 && (
+        <Text fontSize={fontSize} color="red.600" aria-label={`${summary.failedCount} failed`}>
+          {summary.failedCount} ✗
+        </Text>
+      )}
       {summary.stalledCount > 0 && (
-        <Text fontSize="xs" color="yellow.600">
-          {summary.stalledCount} stalled
+        <Text fontSize={fontSize} color="yellow.600" aria-label={`${summary.stalledCount} stalled`}>
+          {summary.stalledCount} ⏸
         </Text>
       )}
       {summary.cancelledCount > 0 && (
-        <Text fontSize="xs" color="fg.muted">
-          {summary.cancelledCount} cancelled
+        <Text fontSize={fontSize} color="fg.muted" aria-label={`${summary.cancelledCount} cancelled`}>
+          {summary.cancelledCount} ⊘
         </Text>
       )}
     </HStack>

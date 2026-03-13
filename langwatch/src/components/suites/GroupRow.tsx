@@ -2,7 +2,7 @@
  * Collapsible row for a grouped set of scenario runs.
  *
  * Used when group-by is set to "scenario" or "target".
- * Header: [chevron] [group_name (bold)] [status_icon] [pass_rate] ... [N runs] [N passed] [N failed]
+ * Header: [chevron] [group_name (bold)] [status_icon] [counts ✓✗⏸⊘] ... [N runs]
  * Expanded: sub-grouped by batch, each with a lightweight header showing
  * timestamp and pass rate, then ScenarioTargetRow (list) or ScenarioGridCard (grid).
  *
@@ -18,7 +18,6 @@ import type { RunGroup, RunGroupSummary } from "./run-history-transforms";
 import { groupRunsByBatchId } from "./run-history-transforms";
 import { BatchSection } from "./BatchSection";
 import { RunSummaryCounts } from "./RunSummaryCounts";
-import { formatSummaryStatusLabel } from "./format-run-status-label";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import type { ViewMode } from "./useRunHistoryStore";
 
@@ -84,18 +83,11 @@ export function GroupRow({
           &middot;
         </Text>
         <SummaryStatusIcon summary={summary} />
-        <Text
-          fontSize="sm"
-          fontWeight="medium"
-          color={summary.failedCount > 0 ? "red.600" : "green.600"}
-        >
-          {formatSummaryStatusLabel(summary)}
-        </Text>
+        <RunSummaryCounts summary={summary} />
         <Box flex={1} />
         <Text fontSize="xs" color="fg.muted">
           {runCount} {runCount === 1 ? "run" : "runs"}
         </Text>
-        <RunSummaryCounts summary={summary} />
       </HStack>
 
       {/* Expanded content - scenario runs sub-grouped by batch */}

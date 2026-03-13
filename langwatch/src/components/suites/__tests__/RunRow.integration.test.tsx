@@ -25,7 +25,7 @@ describe("<RunRow/>", () => {
   });
 
   describe("when collapsed", () => {
-    it("displays passed/failed status with scenario count", () => {
+    it("displays compact status counts with icons", () => {
       render(
         <RunRow
           batchRun={makeBatchRun()}
@@ -38,7 +38,7 @@ describe("<RunRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("passed")).toBeInTheDocument();
+      expect(screen.getByText("2 ✓")).toBeInTheDocument();
       expect(screen.queryByText("100%")).not.toBeInTheDocument();
     });
 
@@ -169,7 +169,7 @@ describe("<RunRow/>", () => {
   });
 
   describe("when summary shows failures", () => {
-    it("displays 'failed' with scenario count", () => {
+    it("displays failure count with icon", () => {
       render(
         <RunRow
           batchRun={makeBatchRun()}
@@ -182,7 +182,8 @@ describe("<RunRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("failed")).toBeInTheDocument();
+      expect(screen.getByText("1 ✗")).toBeInTheDocument();
+      expect(screen.getByText("2 ✓")).toBeInTheDocument();
     });
   });
 
@@ -328,7 +329,7 @@ describe("<RunRow/>", () => {
   });
 
   describe("when viewing summary counts in header", () => {
-    it("displays passed and failed counts alongside summary status label", () => {
+    it("displays compact counts with icons and no redundant label", () => {
       render(
         <RunRow
           batchRun={makeBatchRun()}
@@ -341,9 +342,11 @@ describe("<RunRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("failed")).toBeInTheDocument();
-      expect(screen.getByText("8 passed")).toBeInTheDocument();
-      expect(screen.getByText("2 failed")).toBeInTheDocument();
+      expect(screen.getByText("8 ✓")).toBeInTheDocument();
+      expect(screen.getByText("2 ✗")).toBeInTheDocument();
+      // No redundant standalone "passed" or "failed" text
+      expect(screen.queryByText("passed")).not.toBeInTheDocument();
+      expect(screen.queryByText("failed")).not.toBeInTheDocument();
     });
 
     it("renders RunSummaryCounts inside the header", () => {
