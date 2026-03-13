@@ -7,6 +7,7 @@
 
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import { isOnPlatformSet, ON_PLATFORM_DISPLAY_NAME } from "~/server/scenarios/internal-set-id";
 import { extractSuiteId, isSuiteSetId } from "~/server/suites/suite-set-id";
 
 export type SuiteRunSummary = {
@@ -415,6 +416,7 @@ export function buildDisplayTitle({
 /**
  * Resolves the origin label for a batch run in the All Runs panel.
  *
+ * - On-platform runs (matching __internal__<projectId>__on-platform-scenarios): returns friendly display name
  * - Suite runs (matching __internal__<suiteId>__suite pattern): returns the suite name from suiteNameMap
  * - External runs: returns the raw scenario set ID as the label
  * - No set ID: returns null
@@ -428,12 +430,15 @@ export function resolveOriginLabel({
 }): string | null {
   if (!scenarioSetId) return null;
 
-  if (!isSuiteSetId(scenarioSetId)) return scenarioSetId;
+  if (isOnPlatformSet(scenarioSetId)) return ON_PLATFORM_DISPLAY_NAME;
 
-  const suiteId = extractSuiteId(scenarioSetId);
-  if (!suiteId) return null;
+  if (isSuiteSetId(scenarioSetId)) {
+    const suiteId = extractSuiteId(scenarioSetId);
+    if (!suiteId) return null;
+    return suiteNameMap.get(suiteId) ?? null;
+  }
 
-  return suiteNameMap.get(suiteId) ?? null;
+  return scenarioSetId;
 }
 
 /**

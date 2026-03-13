@@ -88,13 +88,21 @@ describe("internal-set-id utilities", () => {
       });
     });
 
+    describe("given a user-created set ending in on-platform suffix", () => {
+      describe("when isOnPlatformSet is called", () => {
+        it("returns false because it lacks the internal prefix", () => {
+          expect(isOnPlatformSet("user-set__on-platform-scenarios")).toBe(false);
+        });
+      });
+    });
+
     describe("given edge cases", () => {
       it("returns false for empty string", () => {
         expect(isOnPlatformSet("")).toBe(false);
       });
 
-      it("returns true for suffix only", () => {
-        expect(isOnPlatformSet(ON_PLATFORM_SET_SUFFIX)).toBe(true);
+      it("returns false for suffix only (missing internal prefix)", () => {
+        expect(isOnPlatformSet(ON_PLATFORM_SET_SUFFIX)).toBe(false);
       });
     });
   });
