@@ -1,5 +1,5 @@
 import { Box, type BoxProps } from "@chakra-ui/react";
-import { CopilotKit, useCopilotChatInternal } from "@copilotkit/react-core";
+import { CopilotKit, useCopilotChat } from "@copilotkit/react-core";
 import {
   AssistantMessage,
   CopilotChat,
@@ -81,7 +81,7 @@ const PromptPlaygroundChatInner = forwardRef<PromptPlaygroundChatRef, object>(
     const { getTabById } = useDraggableTabsBrowserStore((state) => ({
       getTabById: state.getByTabId,
     }));
-    const { setMessages, visibleMessages } = useCopilotChatInternal();
+    const { setMessages, visibleMessages } = useCopilotChat();
     const { updateTabData } = useDraggableTabsBrowserStore((state) => ({
       updateTabData: state.updateTabData,
     }));

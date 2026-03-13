@@ -100,12 +100,6 @@ const config = {
     "@aws-sdk/client-ses",
   ],
 
-  transpilePackages: [
-    "@copilotkit/react-core",
-    "@copilotkit/react-ui",
-    "@copilotkitnext/react",
-  ],
-
   experimental: {
 		reactCompiler: true,
     scrollRestoration: true,
