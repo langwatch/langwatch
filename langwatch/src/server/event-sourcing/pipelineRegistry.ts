@@ -61,7 +61,13 @@ import { MetricRecordAppendStore } from "./pipelines/trace-processing/projection
 import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
 import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
 import { createCustomEvaluationSyncReactor } from "./pipelines/trace-processing/reactors/customEvaluationSync.reactor";
-import { createEvaluationTriggerReactor } from "./pipelines/trace-processing/reactors/evaluationTrigger.reactor";
+import {
+  createEvaluationTriggerReactor,
+  createDeferredEvaluationHandler,
+  makeDeferredJobId,
+  DEFERRED_CHECK_DELAY_MS,
+  type DeferredEvaluationPayload,
+} from "./pipelines/trace-processing/reactors/evaluationTrigger.reactor";
 import { createSpanStorageBroadcastReactor } from "./pipelines/trace-processing/reactors/spanStorageBroadcast.reactor";
 import { createTraceUpdateBroadcastReactor } from "./pipelines/trace-processing/reactors/traceUpdateBroadcast.reactor";
 
@@ -142,10 +148,45 @@ export class PipelineRegistry {
   ) {
     const evalCommands = mapCommands(evalPipeline.commands);
 
-    const evaluationTriggerReactor = createEvaluationTriggerReactor({
+    const traceSummaryStore = new TraceSummaryStore(
+      this.deps.traces.summary.repository,
+    );
+
+    // Deferred evaluation scheduling: uses a Map for dedup and setTimeout for delay.
+    // The deferred handler re-reads fold state from the projection store at execution time.
+    const pendingDeferredChecks = new Map<string, ReturnType<typeof setTimeout>>();
+
+    const evaluationTriggerReactorDeps = {
       monitors: this.deps.monitors,
       evaluation: evalCommands.executeEvaluation,
-    });
+      traceSummaryStore,
+      scheduleDeferred: async (payload: DeferredEvaluationPayload) => {
+        const dedupKey = makeDeferredJobId(payload);
+        if (pendingDeferredChecks.has(dedupKey)) return; // already scheduled
+
+        const handler = createDeferredEvaluationHandler(evaluationTriggerReactorDeps);
+        const timer = setTimeout(async () => {
+          pendingDeferredChecks.delete(dedupKey);
+          try {
+            await handler(payload);
+          } catch (error) {
+            logger.error(
+              { tenantId: payload.tenantId, traceId: payload.traceId, error },
+              "Deferred evaluation check failed",
+            );
+          }
+        }, DEFERRED_CHECK_DELAY_MS);
+
+        // Allow Node to exit even if the timer is pending
+        if (typeof timer === "object" && "unref" in timer) {
+          timer.unref();
+        }
+
+        pendingDeferredChecks.set(dedupKey, timer);
+      },
+    };
+
+    const evaluationTriggerReactor = createEvaluationTriggerReactor(evaluationTriggerReactorDeps);
 
     const customEvaluationSyncReactor = createCustomEvaluationSyncReactor({
       reportEvaluation: evalCommands.reportEvaluation,
@@ -179,9 +220,7 @@ export class PipelineRegistry {
         spanAppendStore: new SpanAppendStore(this.deps.traces.spans.repository),
         logRecordAppendStore: new LogRecordAppendStore(logRecordRepo),
         metricRecordAppendStore: new MetricRecordAppendStore(metricRecordRepo),
-        traceSummaryStore: new TraceSummaryStore(
-          this.deps.traces.summary.repository,
-        ),
+        traceSummaryStore,
         evaluationTriggerReactor,
         customEvaluationSyncReactor,
         traceUpdateBroadcastReactor,
