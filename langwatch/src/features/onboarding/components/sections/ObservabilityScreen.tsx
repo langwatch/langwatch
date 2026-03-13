@@ -124,13 +124,11 @@ export function ObservabilityScreen(): React.ReactElement {
               borderRadius="full"
               variant="ghost"
               colorPalette="gray"
-              bg="whiteAlpha.50"
-              _hover={{ bg: "whiteAlpha.100", transform: "translateY(-1px)" }}
+              bg="bg.panel"
+              _hover={{ bg: "bg.muted", transform: "translateY(-1px)" }}
               borderWidth="1px"
-              borderColor="whiteAlpha.200"
-              backdropFilter="blur(10px)"
-              style={{ WebkitBackdropFilter: "blur(10px)" }}
-              boxShadow="0 4px 18px rgba(2, 1, 1, 0.14), inset 0 1px 0 rgba(255,255,255,0.18)"
+              borderColor="border.muted"
+              boxShadow="md"
               px={{ base: 2, md: 4 }}
               py={2}
             >
