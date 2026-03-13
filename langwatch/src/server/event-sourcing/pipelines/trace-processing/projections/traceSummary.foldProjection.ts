@@ -26,6 +26,7 @@ import type {
 import {
   isLogRecordReceivedEvent,
   isMetricRecordReceivedEvent,
+  isOriginResolvedEvent,
   isSpanReceivedEvent,
   isTopicAssignedEvent,
 } from "../schemas/events";
@@ -962,6 +963,22 @@ export function createTraceSummaryFoldProjection({
           traceId: state.traceId || event.data.traceId,
           timeToFirstTokenMs,
           attributes: mergedAttributes,
+          updatedAt: Date.now(),
+        };
+      }
+
+      if (isOriginResolvedEvent(event)) {
+        const currentOrigin = state.attributes["langwatch.origin"];
+        if (currentOrigin) {
+          // Explicit origin already set — do not override
+          return state;
+        }
+        return {
+          ...state,
+          attributes: {
+            ...state.attributes,
+            "langwatch.origin": event.data.origin,
+          },
           updatedAt: Date.now(),
         };
       }

@@ -156,9 +156,20 @@ export class PipelineRegistry {
     // The deferred handler re-reads fold state from the projection store at execution time.
     const pendingDeferredChecks = new Map<string, ReturnType<typeof setTimeout>>();
 
+    // Late-bound reference to the trace pipeline's resolveOrigin command.
+    // The reactor deps closure captures this; the actual dispatcher is set
+    // after pipeline registration (same pattern as billing self-dispatch).
+    let resolveOriginDispatcher: ((data: any) => Promise<void>) | null = null;
+
     const evaluationTriggerReactorDeps = {
       monitors: this.deps.monitors,
       evaluation: evalCommands.executeEvaluation,
+      resolveOrigin: async (data: any) => {
+        if (!resolveOriginDispatcher) {
+          throw new Error("resolveOrigin dispatcher not yet initialized — pipeline registration order issue");
+        }
+        return resolveOriginDispatcher(data);
+      },
       traceSummaryStore,
       scheduleDeferred: async (payload: DeferredEvaluationPayload) => {
         const dedupKey = makeDeferredJobId(payload);
@@ -227,6 +238,10 @@ export class PipelineRegistry {
         spanStorageBroadcastReactor,
       }),
     );
+
+    // Wire the late-bound resolveOrigin dispatcher now that the pipeline is registered
+    const traceCommands = mapCommands(tracePipeline.commands);
+    resolveOriginDispatcher = traceCommands.resolveOrigin;
 
     return tracePipeline;
   }

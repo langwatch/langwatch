@@ -7,6 +7,7 @@ import { AssignTopicCommand } from "./commands/assignTopicCommand";
 import { RecordLogCommand } from "./commands/recordLogCommand";
 import { RecordMetricCommand } from "./commands/recordMetricCommand";
 import { RecordSpanCommand } from "./commands/recordSpanCommand";
+import { ResolveOriginCommand } from "./commands/resolveOriginCommand";
 import { createLogRecordStorageMapProjection } from "./projections/logRecordStorage.mapProjection";
 import { createMetricRecordStorageMapProjection } from "./projections/metricRecordStorage.mapProjection";
 import { createSpanStorageMapProjection } from "./projections/spanStorage.mapProjection";
@@ -58,5 +59,6 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
     .withCommand("assignTopic", AssignTopicCommand)
     .withCommand("recordLog", RecordLogCommand)
     .withCommand("recordMetric", RecordMetricCommand)
+    .withCommand("resolveOrigin", ResolveOriginCommand)
     .build();
 }

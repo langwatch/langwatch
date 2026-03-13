@@ -72,6 +72,7 @@ function createDeps(overrides: Partial<EvaluationTriggerReactorDeps> = {}): Eval
       getEnabledOnMessageMonitors: vi.fn().mockResolvedValue([]),
     } as any,
     evaluation: vi.fn().mockResolvedValue(undefined),
+    resolveOrigin: vi.fn().mockResolvedValue(undefined),
     traceSummaryStore: {
       get: vi.fn().mockResolvedValue(null),
       store: vi.fn().mockResolvedValue(undefined),

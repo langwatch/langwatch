@@ -83,6 +83,7 @@ function createDeps(
       ]),
     } as unknown as EvaluationTriggerReactorDeps["monitors"],
     evaluation: vi.fn().mockResolvedValue(undefined),
+    resolveOrigin: vi.fn().mockResolvedValue(undefined),
     traceSummaryStore: {
       get: vi.fn().mockResolvedValue(null),
       store: vi.fn().mockResolvedValue(undefined),
@@ -146,6 +147,18 @@ describe("evaluationTrigger reactor", () => {
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
       expect(deps.scheduleDeferred).not.toHaveBeenCalled();
     });
+
+    it("does not dispatch resolveOrigin command (origin is explicit)", async () => {
+      const deps = createDeps();
+      const reactor = createEvaluationTriggerReactor(deps);
+      const state = createFoldState({
+        attributes: { "langwatch.origin": "application" },
+      });
+
+      await reactor.handle(createEvent(), createContext(state));
+
+      expect(deps.resolveOrigin).not.toHaveBeenCalled();
+    });
   });
 
   describe("when trace has non-application origin", () => {
@@ -206,6 +219,24 @@ describe("evaluationTrigger reactor", () => {
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
       expect(deps.scheduleDeferred).not.toHaveBeenCalled();
     });
+
+    it("dispatches resolveOrigin command with reason 'sdk_heuristic'", async () => {
+      const deps = createDeps();
+      const reactor = createEvaluationTriggerReactor(deps);
+      const state = createFoldState({
+        attributes: { "sdk.name": "langwatch" },
+      });
+
+      await reactor.handle(createEvent(), createContext(state));
+
+      expect(deps.resolveOrigin).toHaveBeenCalledWith({
+        tenantId: "tenant-1",
+        traceId: "trace-1",
+        origin: "application",
+        reason: "sdk_heuristic",
+        occurredAt: expect.any(Number),
+      });
+    });
   });
 
   describe("when trace has no origin and no sdk.name (pure OTEL)", () => {
@@ -243,6 +274,21 @@ describe("evaluationTrigger reactor", () => {
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
       expect(deps.scheduleDeferred).not.toHaveBeenCalled();
     });
+
+    it("does not dispatch resolveOrigin command (origin is already explicit)", async () => {
+      const deps = createDeps();
+      const reactor = createEvaluationTriggerReactor(deps);
+      const state = createFoldState({
+        attributes: {
+          "sdk.name": "langwatch",
+          "langwatch.origin": "evaluation",
+        },
+      });
+
+      await reactor.handle(createEvent(), createContext(state));
+
+      expect(deps.resolveOrigin).not.toHaveBeenCalled();
+    });
   });
 });
 
@@ -257,7 +303,7 @@ describe("createDeferredEvaluationHandler()", () => {
   });
 
   describe("when fold state still has no origin after 5 minutes", () => {
-    it("stamps origin as 'application', persists to store, and dispatches evaluations", async () => {
+    it("dispatches resolveOrigin command with reason 'deferred_fallback' and dispatches evaluations", async () => {
       const deps = createDeps();
       const foldState = createFoldState({ attributes: {} });
       vi.mocked(deps.traceSummaryStore.get).mockResolvedValue(foldState);
@@ -275,13 +321,15 @@ describe("createDeferredEvaluationHandler()", () => {
         "trace-1",
         { tenantId: "tenant-1", aggregateId: "trace-1" },
       );
-      // Verify origin was persisted to the store
-      expect(deps.traceSummaryStore.store).toHaveBeenCalledWith(
-        expect.objectContaining({
-          attributes: expect.objectContaining({ "langwatch.origin": "application" }),
-        }),
-        { tenantId: "tenant-1", aggregateId: "trace-1" },
-      );
+      // Verify origin is persisted via event sourcing (not direct store)
+      expect(deps.resolveOrigin).toHaveBeenCalledWith({
+        tenantId: "tenant-1",
+        traceId: "trace-1",
+        origin: "application",
+        reason: "deferred_fallback",
+        occurredAt: expect.any(Number),
+      });
+      expect(deps.traceSummaryStore.store).not.toHaveBeenCalled();
       expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith("tenant-1");
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
       // Verify the evaluation payload has origin stamped as "application"
@@ -291,7 +339,7 @@ describe("createDeferredEvaluationHandler()", () => {
   });
 
   describe("when fold state acquired non-application origin", () => {
-    it("dispatches with the acquired origin (preconditions handle filtering)", async () => {
+    it("dispatches with the acquired origin and does not call resolveOrigin", async () => {
       const deps = createDeps();
       const foldState = createFoldState({
         attributes: { "langwatch.origin": "evaluation" },
@@ -308,8 +356,7 @@ describe("createDeferredEvaluationHandler()", () => {
       await handler(payload);
 
       expect(deps.traceSummaryStore.get).toHaveBeenCalled();
-      // Should NOT re-persist — origin was already set
-      expect(deps.traceSummaryStore.store).not.toHaveBeenCalled();
+      expect(deps.resolveOrigin).not.toHaveBeenCalled();
       expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith("tenant-1");
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
     });

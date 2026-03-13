@@ -3,6 +3,7 @@ import type { MonitorService } from "~/server/app-layer/monitors/monitor.service
 import type { QueueSendOptions } from "../../../queues";
 import { makeJobId } from "../../evaluation-processing/commands/executeEvaluation.command";
 import type { ExecuteEvaluationCommandData } from "../../evaluation-processing/schemas/commands";
+import type { ResolveOriginCommandData } from "../schemas/commands";
 import { KSUID_RESOURCES } from "../../../../../utils/constants";
 import { createLogger } from "../../../../../utils/logger/server";
 import type { ReactorContext, ReactorDefinition } from "../../../reactors/reactor.types";
@@ -27,6 +28,7 @@ export interface DeferredEvaluationPayload {
 export interface EvaluationTriggerReactorDeps {
   monitors: MonitorService;
   evaluation: (data: ExecuteEvaluationCommandData, options?: QueueSendOptions<ExecuteEvaluationCommandData>) => Promise<void>;
+  resolveOrigin: (data: ResolveOriginCommandData) => Promise<void>;
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
   scheduleDeferred: (payload: DeferredEvaluationPayload) => Promise<void>;
 }
@@ -98,8 +100,20 @@ export function createEvaluationTriggerReactor(
         return;
       }
 
+      // If origin was inferred (not explicitly set), persist it via event sourcing.
+      const explicitOrigin = attrs["langwatch.origin"];
+      if (!explicitOrigin) {
+        await deps.resolveOrigin({
+          tenantId,
+          traceId,
+          origin: resolvedOrigin,
+          reason: "sdk_heuristic",
+          occurredAt: event.occurredAt,
+        });
+      }
+
       // Origin is known (explicit or inferred via SDK heuristic).
-      // Dispatch to monitors — precondition matchers handle filtering by origin.
+      // Dispatch to monitors immediately — don't wait for the origin event to be processed.
       await dispatchEvaluations({ deps, tenantId, traceId, foldState, occurredAt: event.occurredAt });
     },
   };
@@ -130,21 +144,23 @@ export function createDeferredEvaluationHandler(deps: EvaluationTriggerReactorDe
     const attrs = foldState.attributes ?? {};
     const origin = attrs["langwatch.origin"];
 
-    // If origin is still empty after 5 min, stamp it as "application"
-    // and persist so it's queryable from the dashboard.
+    // If origin is still empty after 5 min, persist "application" via event sourcing.
     if (!origin) {
+      await deps.resolveOrigin({
+        tenantId,
+        traceId,
+        origin: "application",
+        reason: "deferred_fallback",
+        occurredAt,
+      });
+
+      // Update local copy so dispatchEvaluations sees the origin
       attrs["langwatch.origin"] = "application";
       foldState.attributes = attrs;
 
-      // Persist the stamped origin to ClickHouse
-      await deps.traceSummaryStore.store(foldState, {
-        tenantId: createTenantId(tenantId),
-        aggregateId: traceId,
-      });
-
       logger.debug(
         { tenantId, traceId },
-        "Deferred check: no origin after 5 min, stamped and persisted as application",
+        "Deferred check: no origin after 5 min, dispatched resolveOrigin command",
       );
     } else {
       logger.debug(
