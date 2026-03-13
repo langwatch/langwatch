@@ -59,7 +59,7 @@ function CurrentVersionDisplay() {
   );
 }
 
-function NewVersionFields() {
+export function NewVersionFields() {
   const form = useFormContext<{ version: string; commitMessage: string }>();
   const { project } = useOrganizationTeamProject();
   const { checkCanCommitNewVersion, getWorkflow } = useWorkflowStore(
