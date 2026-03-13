@@ -80,7 +80,7 @@ server.tool(
       if (!urlToFetch.startsWith("/")) {
         urlToFetch = "/" + urlToFetch;
       }
-      urlToFetch = "https://langwatch.ai/scenario" + urlToFetch;
+      urlToFetch = "https://langwatch.ai" + urlToFetch;
     }
     const response = await fetch(urlToFetch);
 
