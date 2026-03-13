@@ -25,7 +25,7 @@ def test_azure_evaluation_with_custom_deployment():
             model="azure/gpt-4-1106-preview",
             prompt="Is the recipe vegetarian?",
         ),
-        env={"AZURE_DEPLOYMENT_NAME": "gpt-5"},
+        env={"AZURE_DEPLOYMENT_NAME": "gpt-5-mini"},
     )
 
     expect(output="Feta Cheese and Spinach").to_pass(vegetarian_checker)
@@ -45,7 +45,7 @@ def test_azure_evaluation_with_custom_deployment():
 
 def test_ragas_azure_evaluation_with_custom_deployment():
     answer_relevancy_checker = RagasResponseRelevancyEvaluator(
-        settings=RagasSettings(model="azure/gpt-5"),
+        settings=RagasSettings(model="azure/gpt-5-mini"),
         env={"AZURE_DEPLOYMENT_NAME": "gpt-4-turbo-2024-04-09"},
     )
 
