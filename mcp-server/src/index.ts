@@ -239,6 +239,12 @@ server.tool(
 // These tools manage prompts on the LangWatch platform via API.
 // For code-based prompt management, see `fetch_langwatch_docs` for the CLI/SDK approach.
 
+const modelSchema = z
+  .string()
+  .describe(
+    'Model in "provider/model-name" format, e.g., "openai/gpt-4o", "anthropic/claude-sonnet-4-5-20250929"'
+  );
+
 server.tool(
   "platform_create_prompt",
   `Create a new prompt on the LangWatch platform.
@@ -267,11 +273,7 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
         })
       )
       .describe("Prompt messages"),
-    model: z
-      .string()
-      .describe(
-        'Model in "provider/model-name" format, e.g., "openai/gpt-4o", "anthropic/claude-sonnet-4-5-20250929"'
-      ),
+    model: modelSchema,
   },
   async (params) => {
     const { requireApiKey } = await import("./config.js");
@@ -331,12 +333,7 @@ server.tool(
       )
       .optional()
       .describe("Updated messages"),
-    model: z
-      .string()
-      .optional()
-      .describe(
-        'Updated model in "provider/model-name" format, e.g., "openai/gpt-4o"'
-      ),
+    model: modelSchema.optional(),
     commitMessage: z
       .string()
       .describe("Commit message describing the change"),
