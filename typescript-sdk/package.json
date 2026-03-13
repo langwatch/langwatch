@@ -1,6 +1,6 @@
 {
     "name": "langwatch",
-    "version": "0.18.0",
+    "version": "0.19.0",
     "description": "LangWatch TypeScript/JavaScript SDK. Interact with the full LangWatch API and use the LangWatch OpenTelemetry SDK to instrument your application. For more information, see https://docs.langwatch.ai/integration/typescript/guide",
     "main": "dist/index.js",
     "module": "dist/index.mjs",
@@ -131,15 +131,33 @@
         "langchain": ">=0.3.0 <2.0.0"
     },
     "peerDependenciesMeta": {
-        "@ai-sdk/openai": { "optional": true },
-        "@langchain/core": { "optional": true },
-        "@langchain/langgraph": { "optional": true },
-        "@langchain/openai": { "optional": true },
-        "@opentelemetry/context-async-hooks": { "optional": true },
-        "@opentelemetry/context-zone": { "optional": true },
-        "@opentelemetry/sdk-node": { "optional": true },
-        "@opentelemetry/sdk-trace-web": { "optional": true },
-        "langchain": { "optional": true }
+        "@ai-sdk/openai": {
+            "optional": true
+        },
+        "@langchain/core": {
+            "optional": true
+        },
+        "@langchain/langgraph": {
+            "optional": true
+        },
+        "@langchain/openai": {
+            "optional": true
+        },
+        "@opentelemetry/context-async-hooks": {
+            "optional": true
+        },
+        "@opentelemetry/context-zone": {
+            "optional": true
+        },
+        "@opentelemetry/sdk-node": {
+            "optional": true
+        },
+        "@opentelemetry/sdk-trace-web": {
+            "optional": true
+        },
+        "langchain": {
+            "optional": true
+        }
     },
     "pnpm": {
         "overrides": {
