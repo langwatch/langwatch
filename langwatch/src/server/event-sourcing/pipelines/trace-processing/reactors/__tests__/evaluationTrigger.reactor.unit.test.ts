@@ -257,7 +257,7 @@ describe("createDeferredEvaluationHandler()", () => {
   });
 
   describe("when fold state still has no origin after 5 minutes", () => {
-    it("stamps origin as 'application' and dispatches evaluations", async () => {
+    it("stamps origin as 'application', persists to store, and dispatches evaluations", async () => {
       const deps = createDeps();
       const foldState = createFoldState({ attributes: {} });
       vi.mocked(deps.traceSummaryStore.get).mockResolvedValue(foldState);
@@ -273,6 +273,13 @@ describe("createDeferredEvaluationHandler()", () => {
 
       expect(deps.traceSummaryStore.get).toHaveBeenCalledWith(
         "trace-1",
+        { tenantId: "tenant-1", aggregateId: "trace-1" },
+      );
+      // Verify origin was persisted to the store
+      expect(deps.traceSummaryStore.store).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attributes: expect.objectContaining({ "langwatch.origin": "application" }),
+        }),
         { tenantId: "tenant-1", aggregateId: "trace-1" },
       );
       expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith("tenant-1");
@@ -301,6 +308,8 @@ describe("createDeferredEvaluationHandler()", () => {
       await handler(payload);
 
       expect(deps.traceSummaryStore.get).toHaveBeenCalled();
+      // Should NOT re-persist — origin was already set
+      expect(deps.traceSummaryStore.store).not.toHaveBeenCalled();
       expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith("tenant-1");
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
     });

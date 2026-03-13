@@ -131,12 +131,20 @@ export function createDeferredEvaluationHandler(deps: EvaluationTriggerReactorDe
     const origin = attrs["langwatch.origin"];
 
     // If origin is still empty after 5 min, stamp it as "application"
-    // so precondition matchers see a concrete value.
+    // and persist so it's queryable from the dashboard.
     if (!origin) {
       attrs["langwatch.origin"] = "application";
+      foldState.attributes = attrs;
+
+      // Persist the stamped origin to ClickHouse
+      await deps.traceSummaryStore.store(foldState, {
+        tenantId: createTenantId(tenantId),
+        aggregateId: traceId,
+      });
+
       logger.debug(
         { tenantId, traceId },
-        "Deferred check: no origin after 5 min, treating as application",
+        "Deferred check: no origin after 5 min, stamped and persisted as application",
       );
     } else {
       logger.debug(
