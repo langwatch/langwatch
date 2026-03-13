@@ -78,9 +78,9 @@ async def test_example(example_file: str):
         pytest.skip(
             "langchain_rag_bot_vertex_ai.py is broken due to a bug in current langchain version of global state mutation when running together with other langchain"
         )
-    if example_file == "litellm_bot.py":
+    if example_file == "litellm_bot.py" and not os.getenv("CEREBRAS_API_KEY"):
         pytest.skip(
-            "litellm_bot.py skipped — Cerebras API is unreliable (frequent rate limiting)"
+            "litellm_bot.py requires CEREBRAS_API_KEY environment variable to be set"
         )
     if (
         example_file == "langgraph_rag_bot_with_threads.py"

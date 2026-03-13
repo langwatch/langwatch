@@ -55,14 +55,12 @@ Feature: Online Evaluation Preconditions Renewal
   # ────────────────────────────────────────────
 
   @unit
-  Scenario: Origin "is" application matches only explicit application origin
+  Scenario: Origin "is" application matches traces with empty or absent origin
     Given a precondition: traces.origin is "application"
-    When a trace arrives with langwatch.origin = "application"
-    Then the precondition passes
     When a trace arrives with no langwatch.origin attribute
-    Then the precondition fails
+    Then the precondition passes
     When a trace arrives with langwatch.origin = ""
-    Then the precondition fails
+    Then the precondition passes
     When a trace arrives with langwatch.origin = "evaluation"
     Then the precondition fails
 
@@ -140,10 +138,8 @@ Feature: Online Evaluation Preconditions Renewal
       | field         | rule     | value       |
       | traces.origin | is       | application |
       | input         | contains | help        |
-    When a trace arrives with origin "application" and input "I need help"
-    Then the evaluation runs
     When a trace arrives with no origin and input "I need help"
-    Then the evaluation is skipped
+    Then the evaluation runs
     When a trace arrives with origin "simulation" and input "I need help"
     Then the evaluation is skipped
 
