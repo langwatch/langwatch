@@ -25,7 +25,7 @@ function makeEvent(overrides: Partial<TraceProcessingEvent> = {}): TraceProcessi
 
 function makeContext(
   overrides: Partial<ReactorContext<TraceSummaryData>> = {},
-  attributeOverrides: Record<string, string> = { "langwatch.origin": "application" },
+  attributeOverrides: Record<string, string> = {},
 ): ReactorContext<TraceSummaryData> {
   return {
     tenantId: "project-1",
@@ -72,11 +72,6 @@ function createDeps(overrides: Partial<EvaluationTriggerReactorDeps> = {}): Eval
       getEnabledOnMessageMonitors: vi.fn().mockResolvedValue([]),
     } as any,
     evaluation: vi.fn().mockResolvedValue(undefined),
-    traceSummaryStore: {
-      get: vi.fn().mockResolvedValue(null),
-      store: vi.fn().mockResolvedValue(undefined),
-    },
-    scheduleDeferred: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }
@@ -108,7 +103,7 @@ describe("evaluationTrigger reactor", () => {
 
       const reactor = createEvaluationTriggerReactor(deps);
       const event = makeEvent();
-      const context = makeContext({}, { "langwatch.origin": "application", "gen_ai.conversation.id": "thread-abc" });
+      const context = makeContext({}, { "gen_ai.conversation.id": "thread-abc" });
 
       await reactor.handle(event, context);
 
@@ -153,7 +148,7 @@ describe("evaluationTrigger reactor", () => {
 
       const reactor = createEvaluationTriggerReactor(deps);
       const event = makeEvent();
-      const context = makeContext({}, { "langwatch.origin": "application", "gen_ai.conversation.id": "thread-abc" });
+      const context = makeContext({}, { "gen_ai.conversation.id": "thread-abc" });
 
       await reactor.handle(event, context);
 

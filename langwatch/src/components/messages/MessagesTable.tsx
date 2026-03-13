@@ -560,7 +560,8 @@ export function MessagesTable({
               const displayOrigin =
                 typeof rawOrigin === "string" && rawOrigin !== ""
                   ? rawOrigin
-                  : null;
+                  : "application";
+              const colors = getOriginColor(displayOrigin);
 
               return (
                 <Table.Cell
@@ -571,20 +572,15 @@ export function MessagesTable({
                     })
                   }
                 >
-                  {displayOrigin && (() => {
-                    const colors = getOriginColor(displayOrigin);
-                    return (
-                      <Badge
-                        size="sm"
-                        paddingX={2}
-                        background={colors.background}
-                        color={colors.color}
-                        fontSize="12px"
-                      >
-                        {getOriginLabel(displayOrigin)}
-                      </Badge>
-                    );
-                  })()}
+                  <Badge
+                    size="sm"
+                    paddingX={2}
+                    background={colors.background}
+                    color={colors.color}
+                    fontSize="12px"
+                  >
+                    {getOriginLabel(displayOrigin)}
+                  </Badge>
                 </Table.Cell>
               );
             },
@@ -592,7 +588,7 @@ export function MessagesTable({
               const rawOrigin = trace.metadata["langwatch.origin"];
               return typeof rawOrigin === "string" && rawOrigin !== ""
                 ? rawOrigin
-                : "";
+                : "application";
             },
           } satisfies HeaderColumn,
         }

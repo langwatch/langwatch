@@ -134,21 +134,22 @@ export function getLangWatchTracerFromProvider(
         case "startActiveSpan":
           return (...args: any[]) => {
             const spanArgs = normalizeSpanArgs(args);
-            const options = withDefaultOrigin(spanArgs.options);
 
             const wrappedFn = (span: Span, ...cbArgs: any[]) =>
               spanArgs.fn(createLangWatchSpan(span), ...cbArgs);
 
             if (spanArgs.context !== void 0)
-              return target.startActiveSpan(spanArgs.name, options, spanArgs.context, wrappedFn);
+              return target.startActiveSpan(spanArgs.name, spanArgs.options, spanArgs.context, wrappedFn);
 
-            return target.startActiveSpan(spanArgs.name, options, wrappedFn);
+            if (spanArgs.options !== void 0)
+              return target.startActiveSpan(spanArgs.name, spanArgs.options, wrappedFn);
+
+            return target.startActiveSpan(spanArgs.name, wrappedFn);
           };
 
         case "withActiveSpan":
           return (...args: any[]) => {
             const spanArgs = normalizeSpanArgs(args);
-            const optionsWithOrigin = withDefaultOrigin(spanArgs.options);
 
             const cb = (span: Span) => {
               const wrappedSpan = createLangWatchSpan(span);
@@ -197,14 +198,16 @@ export function getLangWatchTracerFromProvider(
 
             // Call target.startActiveSpan to avoid double-wrapping
             if (spanArgs.context !== void 0)
-              return target.startActiveSpan(spanArgs.name, optionsWithOrigin, spanArgs.context, cb);
+              return target.startActiveSpan(spanArgs.name, spanArgs.options, spanArgs.context, cb);
+            if (spanArgs.options !== void 0)
+              return target.startActiveSpan(spanArgs.name, spanArgs.options, cb);
 
-            return target.startActiveSpan(spanArgs.name, optionsWithOrigin, cb);
+            return target.startActiveSpan(spanArgs.name, cb);
           };
 
         case "startSpan":
           return (name: string, options?: SpanOptions, context?: Context) =>
-            createLangWatchSpan(target.startSpan(name, withDefaultOrigin(options), context));
+            createLangWatchSpan(target.startSpan(name, options, context));
 
         default: {
           const value = (target as any)[prop];
@@ -242,24 +245,4 @@ function normalizeSpanArgs(args: any[]) {
   if (typeof arg2 === "function") return { name, fn: arg2 };
 
   throw new Error("Expected a span callback as the last argument");
-}
-
-/**
- * Injects `langwatch.origin = "application"` into span options unless
- * the caller already provided a `langwatch.origin` attribute.
- *
- * This ensures regular application traces are explicitly tagged,
- * while experiments (which set `langwatch.origin = "evaluation"`) are not overridden.
- */
-function withDefaultOrigin(options?: SpanOptions): SpanOptions {
-  const existing = options?.attributes?.["langwatch.origin"];
-  if (existing) return options ?? {};
-
-  return {
-    ...options,
-    attributes: {
-      ...options?.attributes,
-      "langwatch.origin": "application",
-    },
-  };
 }

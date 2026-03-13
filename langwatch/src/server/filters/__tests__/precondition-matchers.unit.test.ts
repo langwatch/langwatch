@@ -68,22 +68,12 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
   describe("traces.origin matcher", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["traces.origin"]!;
 
-    it("returns null when origin is undefined", () => {
-      expect(matcher(makeTraceData({ origin: undefined }), "")).toBeNull();
-    });
-
-    it("returns null when origin is null", () => {
-      expect(matcher(makeTraceData({ origin: null }), "")).toBeNull();
-    });
-
-    it("returns empty string when origin is empty string", () => {
-      expect(matcher(makeTraceData({ origin: "" }), "")).toBe("");
-    });
-
-    it("returns 'application' when origin is explicitly 'application'", () => {
-      expect(matcher(makeTraceData({ origin: "application" }), "")).toBe(
+    it("returns 'application' when origin is falsy", () => {
+      expect(matcher(makeTraceData({ origin: undefined }), "")).toBe(
         "application",
       );
+      expect(matcher(makeTraceData({ origin: "" }), "")).toBe("application");
+      expect(matcher(makeTraceData({ origin: null }), "")).toBe("application");
     });
 
     it("returns the origin value when present", () => {
