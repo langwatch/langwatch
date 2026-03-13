@@ -51,7 +51,7 @@ const evaluatorCategoryMap: Record<
   "langevals/valid_format": "quality",
   "langevals/query_resolution": "quality",
   "ragas/sql_query_equivalence": "quality",
-  "ragas/rubrics_based_scoring": "quality",
+  "ragas/rubrics_based_scoring": "llm_judge",
 
   // Safety
   "presidio/pii_detection": "safety",
