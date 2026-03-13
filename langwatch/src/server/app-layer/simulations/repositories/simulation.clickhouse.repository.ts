@@ -89,6 +89,35 @@ const PREVIEW_COLUMNS = `
   arraySlice(\`Messages.Role\`, 1, 4) AS MessagePreviewRoles,
   arraySlice(\`Messages.Content\`, 1, 4) AS MessagePreviewContents` as const;
 
+/** Minimal columns for inner subquery in aggregation-only queries (count, max, group by) */
+const DEDUP_COLUMNS = `
+  TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, ScenarioId,
+  Status, UpdatedAt, CreatedAt, FinishedAt, ArchivedAt` as const;
+
+/** Inner subquery columns for preview queries (getBatchHistory items) */
+const DEDUP_PREVIEW_COLUMNS = `
+  TenantId, ScenarioSetId, BatchRunId, ScenarioRunId,
+  Status, Name, Description,
+  \`Messages.Role\`, \`Messages.Content\`,
+  DurationMs, UpdatedAt, CreatedAt, ArchivedAt` as const;
+
+/** Inner subquery columns for list-view queries (getRunsForBatchIds) */
+const DEDUP_LIST_COLUMNS = `
+  TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, ScenarioId,
+  Status, Name, Description,
+  \`Messages.Id\`, \`Messages.Role\`, \`Messages.Content\`,
+  TraceIds, Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
+  DurationMs, UpdatedAt, CreatedAt, FinishedAt, ArchivedAt` as const;
+
+/** Inner subquery columns for full-detail queries */
+const DEDUP_RUN_COLUMNS = `
+  TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, ScenarioId,
+  Status, Name, Description,
+  \`Messages.Id\`, \`Messages.Role\`, \`Messages.Content\`,
+  \`Messages.TraceId\`, \`Messages.Rest\`,
+  TraceIds, Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
+  DurationMs, UpdatedAt, CreatedAt, FinishedAt, ArchivedAt` as const;
+
 interface CursorPayload {
   ts: string;
   batchRunId: string;
@@ -124,7 +153,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         toString(count(*)) AS ScenarioCount,
         toString(toUnixTimestamp64Milli(max(UpdatedAt))) AS LastRunAt
        FROM (
-         SELECT *
+         SELECT ${DEDUP_COLUMNS}
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
          ORDER BY ScenarioRunId, UpdatedAt DESC
@@ -153,7 +182,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     const rows = await this.queryRows<ClickHouseSimulationRunRow>(
       `SELECT ${RUN_COLUMNS}
        FROM (
-         SELECT *
+         SELECT ${DEDUP_RUN_COLUMNS}
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String} AND ScenarioRunId = {scenarioRunId:String}
          ORDER BY UpdatedAt DESC
@@ -198,7 +227,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     const totalCountPromise = this.queryRows<{ TotalBatchCount: string }>(
       `SELECT toString(count(DISTINCT BatchRunId)) AS TotalBatchCount
        FROM (
-         SELECT *
+         SELECT ${DEDUP_COLUMNS}
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND ScenarioSetId = {scenarioSetId:String}
@@ -236,7 +265,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
           maxIf(UpdatedAt, Status NOT IN ('STALLED','IN_PROGRESS','PENDING'))
         )) AS AllCompletedAt
        FROM (
-         SELECT *
+         SELECT ${DEDUP_COLUMNS}
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND ScenarioSetId = {scenarioSetId:String}
@@ -286,7 +315,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     }>(
       `SELECT ${PREVIEW_COLUMNS}
        FROM (
-         SELECT *
+         SELECT ${DEDUP_PREVIEW_COLUMNS}
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND ScenarioSetId = {scenarioSetId:String}
@@ -393,7 +422,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     const rows = await this.queryRows<ClickHouseSimulationRunRow>(
       `SELECT ${RUN_COLUMNS}
        FROM (
-         SELECT *
+         SELECT ${DEDUP_RUN_COLUMNS}
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND ScenarioSetId = {scenarioSetId:String}
@@ -425,7 +454,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     const rows = await this.queryRows<{ BatchRunCount: string }>(
       `SELECT toString(count(DISTINCT BatchRunId)) AS BatchRunCount
        FROM (
-         SELECT *
+         SELECT ${DEDUP_COLUMNS}
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND ScenarioSetId = {scenarioSetId:String}
@@ -448,7 +477,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     const rows = await this.queryRows<ClickHouseSimulationRunRow>(
       `SELECT ${RUN_COLUMNS}
        FROM (
-         SELECT *
+         SELECT ${DEDUP_RUN_COLUMNS}
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND ScenarioId = {scenarioId:String}
@@ -456,7 +485,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE ArchivedAt IS NULL
-       ORDER BY CreatedAt DESC`,
+       ORDER BY CreatedAt DESC
+       LIMIT 1000`,
       { tenantId: projectId, scenarioId },
     );
 
@@ -476,7 +506,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     const rows = await this.queryRows<ClickHouseSimulationRunRow>(
       `SELECT ${RUN_COLUMNS}
        FROM (
-         SELECT *
+         SELECT ${DEDUP_RUN_COLUMNS}
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND ScenarioSetId = {scenarioSetId:String}
@@ -484,7 +514,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE ArchivedAt IS NULL
-       ORDER BY BatchRunId ASC, CreatedAt ASC`,
+       ORDER BY BatchRunId ASC, CreatedAt ASC
+       LIMIT 10000`,
       { tenantId: projectId, scenarioSetId },
     );
 
@@ -528,7 +559,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         BatchRunId,
         toString(toUnixTimestamp64Milli(max(CreatedAt))) AS MaxCreatedAt
        FROM (
-         SELECT *
+         SELECT ${DEDUP_COLUMNS}
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND ScenarioSetId = {scenarioSetId:String}
@@ -632,7 +663,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         toString(toUnixTimestamp64Milli(max(CreatedAt))) AS MaxCreatedAt,
         any(ScenarioSetId) AS ScenarioSetId
        FROM (
-         SELECT *
+         SELECT ${DEDUP_COLUMNS}
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND ScenarioSetId LIKE '__internal__%__suite'
@@ -701,7 +732,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
            max(CreatedAt) AS max_ts,
            toUnixTimestamp64Milli(max(CreatedAt)) AS max_ts_ms
          FROM (
-           SELECT *
+           SELECT ${DEDUP_COLUMNS}
            FROM ${TABLE_NAME}
            WHERE TenantId = {tenantId:String}
              AND NOT startsWith(ScenarioSetId, '__internal__')
@@ -732,7 +763,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         toString(count()) AS TotalCount,
         toString(countIf(Status = 'SUCCESS')) AS PassCount
        FROM (
-         SELECT *
+         SELECT ${DEDUP_COLUMNS}
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND BatchRunId IN ({batchRunIds:Array(String)})
@@ -810,7 +841,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     const rows = await this.queryRows<ClickHouseSimulationRunRow>(
       `SELECT ${LIST_COLUMNS}
        FROM (
-         SELECT *
+         SELECT ${DEDUP_LIST_COLUMNS}
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            AND BatchRunId IN ({batchRunIds:Array(String)})
@@ -818,7 +849,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
        )
        WHERE ArchivedAt IS NULL
-       ORDER BY CreatedAt ASC`,
+       ORDER BY CreatedAt ASC
+       LIMIT 5000`,
       { tenantId: projectId, batchRunIds },
     );
 

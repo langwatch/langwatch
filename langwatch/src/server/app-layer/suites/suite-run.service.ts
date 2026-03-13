@@ -191,11 +191,11 @@ export class SuiteRunService {
           projectId,
           scenarioId: item.scenarioId,
           scenarioName: scenarioNameMap.get(item.scenarioId) ?? item.scenarioId,
-          scenarioRunId: item.scenarioRunId,
           target: { type: item.target.type, referenceId: item.target.referenceId },
           setId,
           batchRunId,
           index: item.repeat,
+          scenarioRunId: item.scenarioRunId,
         }),
       );
     }

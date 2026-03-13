@@ -31,8 +31,6 @@ export const scenarioJobSchema = z.object({
   scenarioId: z.string(),
   /** Human-readable scenario name for display in queued job rows. */
   scenarioName: z.string().optional(),
-  /** Pre-generated scenario run ID for immediate PENDING entries in ClickHouse. */
-  scenarioRunId: z.string().optional(),
   target: z.object({
     type: z.enum(["prompt", "http", "code"]),
     referenceId: z.string(),
@@ -100,7 +98,7 @@ export function generateScenarioRunId(): string {
  * @param options - Optional job configuration (delay, priority, etc.)
  */
 export async function scheduleScenarioRun(
-  params: Omit<ScenarioJob, "scenarioRunId"> & { index: number },
+  params: Omit<ScenarioJob, "scenarioRunId"> & { index: number; scenarioRunId?: string },
   options?: { delay?: number; priority?: number },
 ): Promise<Job<ScenarioJob, ScenarioJobResult, string>> {
   const { projectId, scenarioId, batchRunId, target, index } = params;
@@ -132,7 +130,7 @@ export async function scheduleScenarioRun(
 
   const jobData: ScenarioJob = {
     ...params,
-    scenarioRunId: generateScenarioRunId(),
+    scenarioRunId: params.scenarioRunId ?? generateScenarioRunId(),
   };
 
   return await scenarioQueue.add(SCENARIO_QUEUE.JOB, jobData, {
