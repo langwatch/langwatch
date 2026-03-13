@@ -63,7 +63,6 @@ export function createEvaluationTriggerReactor(
       // Additional metadata for expanded precondition matching
       const topicId = foldState.topicId ?? undefined;
       const subTopicId = foldState.subTopicId ?? undefined;
-      const satisfactionScore = foldState.satisfactionScore ?? undefined;
       const spanModels = foldState.models.length > 0 ? foldState.models : undefined;
       const customMetadata = extractCustomMetadata(attrs);
       const computedInput = foldState.computedInput ?? undefined;
@@ -92,7 +91,6 @@ export function createEvaluationTriggerReactor(
             topicId,
             subTopicId,
             customMetadata,
-            satisfactionScore,
             spanModels,
             computedInput,
             computedOutput,

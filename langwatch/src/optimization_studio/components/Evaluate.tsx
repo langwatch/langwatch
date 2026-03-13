@@ -17,6 +17,7 @@ import {
   FormProvider,
   type UseFormReturn,
   useForm,
+  useWatch,
 } from "react-hook-form";
 import { SmallLabel } from "../../components/SmallLabel";
 import { Dialog } from "../../components/ui/dialog";
@@ -62,6 +63,7 @@ export function Evaluate() {
           size="sm"
           onClick={() => {
             trackEvent("evaluate_click", { project_id: project?.id });
+            form.reset({ version: "", commitMessage: "", evaluateOn: undefined });
             onToggle();
           }}
           disabled={isRunning}
@@ -140,13 +142,13 @@ export function EvaluateModalContent({
     | Node<Entry>
     | undefined;
 
-  const { total } = useGetDatasetData({
+  const { total, query: datasetQuery } = useGetDatasetData({
     dataset: entryNode?.data.dataset,
     preview: true,
   });
 
-  const evaluateOn = form.watch("evaluateOn");
-  const commitMessage = form.watch("commitMessage");
+  const evaluateOn = useWatch({ control: form.control, name: "evaluateOn" });
+  const commitMessage = useWatch({ control: form.control, name: "commitMessage" });
 
   useEffect(() => {
     if (!evaluateOn) {
@@ -330,13 +332,17 @@ export function EvaluateModalContent({
 
   const needsACommitMessage = canSave && !commitMessage;
 
+  const isDatasetLoading = total === undefined && datasetQuery.isFetching;
+
   const isDisabled = hasProvidersWithoutCustomKeys
     ? "Set up your API keys to run evaluations"
-    : !estimatedTotal || estimatedTotal < 1
-      ? "You need at least 1 dataset entry to run evaluations"
-      : needsACommitMessage
-        ? "You need to provide a version description"
-        : false;
+    : isDatasetLoading
+      ? false
+      : !estimatedTotal || estimatedTotal < 1
+        ? "You need at least 1 dataset entry to run evaluations"
+        : needsACommitMessage
+          ? "You need to provide a version description"
+          : false;
 
   return (
     <FormProvider {...form}>
@@ -382,7 +388,9 @@ export function EvaluateModalContent({
             />
           )}
           <HStack width="full">
-            <Text fontWeight={500}>{estimatedTotal} entries</Text>
+            <Text fontWeight={500}>
+              {isDatasetLoading ? "Loading dataset..." : `${estimatedTotal ?? 0} entries`}
+            </Text>
             <Spacer />
             <Tooltip content={isDisabled}>
               <Button
@@ -390,6 +398,7 @@ export function EvaluateModalContent({
                 type="submit"
                 disabled={!!isDisabled}
                 loading={
+                  isDatasetLoading ||
                   commitVersion.isLoading ||
                   evaluationState?.status === "waiting"
                 }
