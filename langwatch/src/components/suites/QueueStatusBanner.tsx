@@ -27,6 +27,9 @@ export function QueueStatusBanner({ queueStatus }: QueueStatusBannerProps) {
 
   return (
     <HStack
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
       paddingX={4}
       paddingY={2}
       borderRadius="md"
