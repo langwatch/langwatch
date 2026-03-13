@@ -172,7 +172,7 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
       <Select.Trigger
         className="fix-hidden-inputs"
         width={size === "full" ? "100%" : "auto"}
-        background="white"
+        background="bg.panel"
         padding={0}
       >
         <Select.ValueText placeholder={selectValueText}>
@@ -185,7 +185,7 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
             <InputGroup
               startElement={<Search size={16} />}
               startOffset="-4px"
-              background="white"
+              background="bg.panel"
               width="calc(100% - 9px)"
             >
               <Input

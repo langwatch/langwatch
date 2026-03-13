@@ -153,14 +153,28 @@ describe("ttlReconciler", () => {
 
     it("uses the ttlColumn from the config entry", () => {
       const entry: TableTTLEntry = {
+        table: "experiment_runs",
+        ttlColumn: "StartedAt",
+        envVar: "TIERED_BATCH_EVAL_RUNS_TABLE_HOT_DAYS",
+        hardcodedDefault: 30,
+      };
+      const result = buildDesiredTTLExpression({ config: entry, days: 7 });
+      expect(result).toBe(
+        "toDateTime(StartedAt) + INTERVAL 7 DAY TO VOLUME 'cold'",
+      );
+    });
+
+    it("uses ttlColumnExpression override when provided", () => {
+      const entry: TableTTLEntry = {
         table: "event_log",
-        ttlColumn: "CreatedAt",
+        ttlColumn: "EventOccurredAt",
+        ttlColumnExpression: "toDateTime(EventOccurredAt / 1000)",
         envVar: "TIERED_EVENT_LOG_TABLE_HOT_DAYS",
         hardcodedDefault: 30,
       };
       const result = buildDesiredTTLExpression({ config: entry, days: 7 });
       expect(result).toBe(
-        "toDateTime(CreatedAt) + INTERVAL 7 DAY TO VOLUME 'cold'",
+        "toDateTime(EventOccurredAt / 1000) + INTERVAL 7 DAY TO VOLUME 'cold'",
       );
     });
   });
@@ -238,12 +252,14 @@ describe("ttlReconciler", () => {
     it("covers all expected tables", () => {
       const tableNames = TABLE_TTL_CONFIG.map((c) => c.table);
       expect(tableNames).toEqual([
+        "billable_events",
+        "evaluation_runs",
         "event_log",
+        "experiment_run_items",
+        "experiment_runs",
+        "simulation_runs",
         "stored_spans",
         "trace_summaries",
-        "evaluation_runs",
-        "experiment_runs",
-        "experiment_run_items",
       ]);
     });
 

@@ -9,7 +9,7 @@ import type { Evaluator } from "@prisma/client";
 import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { AgentService } from "~/server/agents/agent.service";
-import { getFullDataset } from "~/server/api/routers/datasetRecord";
+import { getFullDataset } from "~/server/api/routers/datasetRecord.utils";
 import { prisma } from "~/server/db";
 import { EvaluatorService } from "~/server/evaluators/evaluator.service";
 import {

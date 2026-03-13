@@ -16,6 +16,7 @@ import "@ag-grid-community/styles/ag-theme-balham.css";
 import React from "react";
 import { Minus } from "react-feather";
 import { useDebounce } from "use-debounce";
+import { useColorMode } from "../ui/color-mode";
 import {
   type DatasetColumnType,
   datasetColumnTypeMapping,
@@ -201,27 +202,31 @@ export const DatasetGrid = React.memo(
 
     const [columnDefs_] = useDebounce(columnDefsMemo, 100);
 
+    const { colorMode } = useColorMode();
+    const themeClass =
+      colorMode === "dark" ? "ag-theme-balham-dark" : "ag-theme-balham";
+
     return (
-      <Box asChild className="ag-theme-balham" style={{ height: "100%" }}>
+      <Box asChild className={themeClass} style={{ height: "100%" }}>
         <div>
           <style>{`
           .ag-borderless .ag-root-wrapper {
             border: none;
           }
-          .ag-theme-balham .ag-cell {
-            white-space: pre-wrap; /* Enable word wrapping */
-            overflow: visible; /* Ensure the cell expands to fit content */
+          :is(.ag-theme-balham, .ag-theme-balham-dark) .ag-cell {
+            white-space: pre-wrap;
+            overflow: visible;
             line-height: 1.6em;
             border-right: var(--ag-borders-critical) var(--ag-row-border-color);
           }
-          .ag-theme-balham .ag-cell-value {
+          :is(.ag-theme-balham, .ag-theme-balham-dark) .ag-cell-value {
             max-height: 300px;
             overflow-y: auto;
           }
-          .dataset-preview .ag-theme-balham .ag-cell {
+          .dataset-preview :is(.ag-theme-balham, .ag-theme-balham-dark) .ag-cell {
             white-space: nowrap;
           }
-          .dataset-preview .ag-theme-balham .ag-cell-value {
+          .dataset-preview :is(.ag-theme-balham, .ag-theme-balham-dark) .ag-cell-value {
             overflow: hidden;
           }
           .ag-pinned-left-cols-container .ag-cell-value {
@@ -231,7 +236,7 @@ export const DatasetGrid = React.memo(
           .ag-pinned-left-cols-container .ag-cell {
             background-color: var(--ag-header-background-color);
           }
-          .ag-theme-balham .ag-cell .ag-cell-value {
+          :is(.ag-theme-balham, .ag-theme-balham-dark) .ag-cell .ag-cell-value {
             padding-top: 4px;
             padding-bottom: 4px;
             font-size: 13px;
@@ -239,7 +244,7 @@ export const DatasetGrid = React.memo(
           .ag-header-cell-label {
             font-size: 13px;
           }
-          .ag-theme-balham .ag-cell .chakra-textarea {
+          :is(.ag-theme-balham, .ag-theme-balham-dark) .ag-cell .chakra-textarea {
             height: 100%!important;
           }
           .ag-large-text, .ag-large-text-input, .ag-large-text-input > .ag-input-wrapper, .ag-input-wrapper > textarea {

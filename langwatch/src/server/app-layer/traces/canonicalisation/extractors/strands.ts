@@ -16,7 +16,6 @@
  * - gen_ai.output.messages (from gen_ai.choice events)
  */
 
-import { createLogger } from "~/utils/logger/server";
 import type { NormalizedEvent } from "../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
 import { ATTR_KEYS } from "./_constants";
 import {
@@ -27,8 +26,6 @@ import {
 import { safeJsonParse } from "./_guards";
 import { extractSystemInstructionFromMessages, stripSystemMessages } from "./_messages";
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
-
-const logger = createLogger("langwatch:trace-processing:strands-extractor");
 
 /**
  * Event names for role-based input messages.
@@ -158,29 +155,10 @@ export class StrandsExtractor implements CanonicalAttributesExtractor {
             unknown
           >;
 
-          // Debug: log event attributes to understand the structure
-          logger.debug(
-            {
-              eventName,
-              role,
-              eventAttrs: JSON.stringify(eventAttrs),
-              attrKeys: Object.keys(eventAttrs),
-            },
-            "Processing Strands input event",
-          );
-
           const content = extractStrandsContent(eventAttrs);
 
           if (content !== void 0) {
             inputMessages.push({ role, content });
-            logger.debug(
-              {
-                role,
-                contentType: typeof content,
-                contentPreview: JSON.stringify(content).slice(0, 100),
-              },
-              "Extracted Strands input message",
-            );
           }
         }
       }
@@ -222,15 +200,6 @@ export class StrandsExtractor implements CanonicalAttributesExtractor {
               string,
               unknown
             >;
-
-            // Debug: log event attributes
-            logger.debug(
-              {
-                eventAttrs: JSON.stringify(eventAttrs),
-                attrKeys: Object.keys(eventAttrs),
-              },
-              "Processing Strands output event",
-            );
 
             const content = extractStrandsContent(eventAttrs);
             const role = (eventAttrs.role as string | undefined) ?? "assistant";

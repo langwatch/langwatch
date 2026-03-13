@@ -216,7 +216,7 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("`1__performance_total_cost__sum`");
     });
 
-    it("uses standard query for pipeline metrics when timeScale is not 'full'", () => {
+    it("uses date-bucketed pipeline query for pipeline metrics with numeric timeScale", () => {
       const input = {
         ...baseInput,
         timeScale: 60,
@@ -230,9 +230,84 @@ describe("aggregation-builder", () => {
       };
       const result = buildTimeseriesQuery(input);
 
-      // Does NOT use CTEs for non-full timeScale (filters out pipeline metrics)
-      expect(result.sql).not.toContain("UNION ALL");
-      expect(result.sql).toContain("GROUP BY period, date");
+      expect(result.sql).toContain("pipeline_key");
+      expect(result.sql).toContain("inner_value");
+      expect(result.sql).toContain("AS period");
+      expect(result.sql).toContain("AS date");
+      expect(result.sql).toContain("avg(inner_value)");
+      expect(result.sql).toContain("GROUP BY");
+      expect(result.params.tenantId).toBe("test-project");
+      expect(result.sql).toContain("TenantId = {tenantId:String}");
+    });
+
+    it("builds date-bucketed pipeline query with evaluation groupBy", () => {
+      const input = {
+        ...baseInput,
+        timeScale: 1440,
+        series: [
+          {
+            metric: "evaluations.evaluation_runs" as FlattenAnalyticsMetricsEnum,
+            aggregation: "cardinality" as const,
+            pipeline: { field: "trace_id" as const, aggregation: "sum" as const },
+          },
+        ],
+        groupBy: "evaluations.evaluation_passed",
+        groupByKey: "my-evaluator",
+      };
+      const result = buildTimeseriesQuery(input);
+
+      expect(result.sql).toContain("pipeline_key");
+      expect(result.sql).toContain("group_key");
+      expect(result.sql).toContain("AS date");
+      expect(result.sql).toContain("AS period");
+      expect(result.sql).toContain("sum(inner_value)");
+      expect(result.params.tenantId).toBe("test-project");
+      expect(result.params).toHaveProperty("groupByKey", "my-evaluator");
+      expect(result.sql).toContain("TenantId = {tenantId:String}");
+    });
+
+    it("builds date-bucketed pipeline query for nested subquery metrics", () => {
+      const input = {
+        ...baseInput,
+        timeScale: 60,
+        series: [
+          {
+            metric: "threads.average_duration_per_thread" as FlattenAnalyticsMetricsEnum,
+            aggregation: "avg" as const,
+            pipeline: { field: "user_id" as const, aggregation: "avg" as const },
+          },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      expect(result.sql).toContain("thread_duration");
+      expect(result.sql).toContain("pipeline_key");
+      expect(result.sql).toContain("AS date");
+      expect(result.sql).toContain("AS period");
+      expect(result.params.tenantId).toBe("test-project");
+      expect(result.sql).toContain("TenantId = {tenantId:String}");
+    });
+
+    it("enforces tenant isolation in date-bucketed pipeline queries", () => {
+      const input = {
+        ...baseInput,
+        timeScale: 1440,
+        series: [
+          {
+            metric: "evaluations.evaluation_runs" as FlattenAnalyticsMetricsEnum,
+            aggregation: "cardinality" as const,
+            pipeline: { field: "trace_id" as const, aggregation: "sum" as const },
+          },
+        ],
+        groupBy: "evaluations.evaluation_passed",
+        groupByKey: "my-evaluator",
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // Tenant isolation in params
+      expect(result.params.tenantId).toBe("test-project");
+      // Tenant isolation in SQL (dedupedTraceSummaries + baseWhere)
+      expect(result.sql).toContain("TenantId = {tenantId:String}");
     });
   });
 
