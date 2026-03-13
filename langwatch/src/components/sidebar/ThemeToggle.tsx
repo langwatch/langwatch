@@ -28,6 +28,7 @@ export const ThemeToggle = ({ showLabel = true }: ThemeToggleProps) => {
     "release_ui_dark_mode_enabled", {
       organizationId: organization?.id,
       projectId: projectId,
+      enabled: !!organization?.id && !!projectId,
     },
   );
   const { theme, setTheme } = useTheme();

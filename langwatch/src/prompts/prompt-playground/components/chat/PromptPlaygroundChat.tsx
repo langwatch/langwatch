@@ -64,7 +64,7 @@ const PromptPlaygroundChat = forwardRef<
           // @ts-expect-error - Total hack to pass additional params to the service adapter
           model: additionalParams,
         }}
-        onError={(error) => {
+        onError={(error: unknown) => {
           console.error("CopilotKit error:", error);
         }}
         disableSystemMessage

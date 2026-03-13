@@ -436,7 +436,7 @@ describe("SuiteService", () => {
       describe("when the suite run is triggered", () => {
         it("passes only active refs and reports skipped archived", async () => {
           const archivedAt = new Date();
-          const { service, suiteRunService } = createService({
+          const { service } = createService({
             scenarioRepository: {
               findManyIncludingArchived: vi.fn(async ({ ids }: { ids: string[] }) =>
                 ids.map((id) => ({ id, archivedAt: id === "scen_archived" ? archivedAt : null })),
@@ -473,7 +473,7 @@ describe("SuiteService", () => {
     describe("given no scenarios or targets are archived", () => {
       describe("when the suite run is triggered", () => {
         it("returns empty skippedArchived", async () => {
-          const { service, suiteRunService } = createService();
+          const { service } = createService();
           const suite = makeSuite();
 
           const result = await service.run({
@@ -491,7 +491,7 @@ describe("SuiteService", () => {
     describe("given a suite with a target of unknown type", () => {
       describe("when the suite run is triggered", () => {
         it("throws during target parsing", async () => {
-          const { service, suiteRunService } = createService();
+          const { service } = createService();
           const suite = makeSuite({
             targets: [
               { type: "unknown", referenceId: "ref_1" },
@@ -508,7 +508,7 @@ describe("SuiteService", () => {
     describe("given a suite with an HTTP target referencing an existing agent", () => {
       describe("when the suite run is triggered", () => {
         it("resolves via agentRepository and delegates", async () => {
-          const { service, agentRepo, suiteRunService } = createService();
+          const { service, agentRepo } = createService();
           const suite = makeSuite({
             scenarioIds: ["scen_1"],
             targets: [
@@ -532,7 +532,7 @@ describe("SuiteService", () => {
     describe("given a suite with a prompt target referencing an existing config", () => {
       describe("when the suite run is triggered", () => {
         it("resolves via llmConfigRepository and delegates", async () => {
-          const { service, llmConfigRepo, suiteRunService } = createService();
+          const { service, llmConfigRepo } = createService();
           const suite = makeSuite({
             scenarioIds: ["scen_1"],
             targets: [
@@ -557,7 +557,7 @@ describe("SuiteService", () => {
     describe("given a suite with a deleted prompt target", () => {
       describe("when the suite run is triggered", () => {
         it("throws InvalidTargetReferencesError (not AllTargetsArchivedError)", async () => {
-          const { service, suiteRunService } = createService({
+          const { service } = createService({
             llmConfigRepository: {
               findExistingIds: vi.fn(async () => new Set<string>()),
             },
@@ -581,7 +581,7 @@ describe("SuiteService", () => {
     describe("given a suite with mixed HTTP and prompt targets", () => {
       describe("when the suite run is triggered", () => {
         it("batches each target type into a single query", async () => {
-          const { service, agentRepo, llmConfigRepo, suiteRunService } = createService();
+          const { service, agentRepo, llmConfigRepo } = createService();
           const suite = makeSuite({
             scenarioIds: ["scen_1"],
             targets: [

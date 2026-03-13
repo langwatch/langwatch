@@ -11,10 +11,7 @@ import {
   mapStatus,
   type ClickHouseSimulationRunRow,
 } from "~/server/simulations/simulation-run.mappers";
-import { createLogger } from "~/utils/logger/server";
 import type { SimulationRepository } from "./simulation.repository";
-
-const logger = createLogger("langwatch:app-layer:simulations:clickhouse-repository");
 
 const TABLE_NAME = "simulation_runs" as const;
 

@@ -82,7 +82,7 @@ export function InlineTagsInput({
       onClick={() => inputRef.current?.focus()}
       _focusWithin={{
         borderColor: "blue.subtle",
-        boxShadow: "0 0 0 1px var(--chakra-colors-blue-500)",
+        boxShadow: "0 0 0 1px var(--chakra-colors-blue-subtle)",
       }}
     >
       {/* Existing tags */}
@@ -110,13 +110,13 @@ export function InlineTagsInput({
               alignItems: "center",
               background: "transparent",
               border: "none",
-              color: "var(--chakra-colors-blue-500)",
+              color: "var(--chakra-colors-blue-fg)",
             }}
             onMouseOver={(e) =>
-              (e.currentTarget.style.color = "var(--chakra-colors-blue-700)")
+              (e.currentTarget.style.color = "var(--chakra-colors-blue-emphasized)")
             }
             onMouseOut={(e) =>
-              (e.currentTarget.style.color = "var(--chakra-colors-blue-500)")
+              (e.currentTarget.style.color = "var(--chakra-colors-blue-fg)")
             }
           >
             <X size={12} />

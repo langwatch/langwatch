@@ -15,7 +15,7 @@ import {
 } from "~/components/simulations";
 import "@copilotkit/react-ui/styles.css";
 import "~/pages/[project]/simulations/simulations.css";
-import { CustomCopilotKitChat } from "~/components/simulations/CustomCopilotKitChat";
+import { ScenarioMessageRenderer } from "~/components/simulations/ScenarioMessageRenderer";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useRunScenario } from "~/hooks/useRunScenario";
@@ -256,7 +256,7 @@ export default function IndividualScenarioRunPage() {
                     {/* Conversation Area - Scrollable */}
                     <Box w="100%" p={4} overflow="auto" maxHeight="100%">
                       <VStack>
-                        <CustomCopilotKitChat
+                        <ScenarioMessageRenderer
                           messages={scenarioState?.messages ?? []}
                           streamingMessages={streamingMessages}
                           variant="drawer"
