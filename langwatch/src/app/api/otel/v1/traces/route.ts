@@ -11,7 +11,7 @@ import {
   fetchExistingMD5s,
   scheduleTraceCollectionWithFallback,
 } from "../../../../../server/background/workers/collectorWorker";
-import { isElasticSearchWriteDisabled } from "../../../../../server/elasticsearch/isElasticSearchWriteDisabled";
+import { isElasticSearchWriteDisabledForProject } from "../../../../../server/elasticsearch/isElasticSearchWriteDisabled";
 import { prisma } from "../../../../../server/db";
 import { openTelemetryTraceRequestToTracesForCollection } from "../../../../../server/tracer/otel.traces";
 import { getApp } from "../../../../../server/app-layer/app";
@@ -193,7 +193,7 @@ async function handleTracesRequest(req: NextRequest) {
           project.piiRedactionLevel,
         );
       }
-      if (await isElasticSearchWriteDisabled(prisma, project.id, "traces")) {
+      if (isElasticSearchWriteDisabledForProject(project, project.id, "traces")) {
         return NextResponse.json({ message: "Trace received successfully." });
       }
 

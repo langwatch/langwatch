@@ -33,6 +33,46 @@ const FLAG_MAP = {
   },
 } as const;
 
+/** Union of all project flag names used across every domain. */
+type ProjectFlagKey =
+  | (typeof FLAG_MAP)[ElasticSearchWriteDomain]["disableFlag"]
+  | (typeof FLAG_MAP)[ElasticSearchWriteDomain]["chReadFlag"]
+  | (typeof FLAG_MAP)[ElasticSearchWriteDomain]["esWriteFlag"];
+
+/** Minimal project shape required by the sync write-disabled check. */
+type ProjectFlags = { [K in ProjectFlagKey]?: boolean | null };
+
+/**
+ * Synchronous variant — use when you already have the project record in hand.
+ * Avoids a redundant DB round-trip.
+ */
+export function isElasticSearchWriteDisabledForProject(
+  project: ProjectFlags,
+  projectId: string,
+  domain: ElasticSearchWriteDomain,
+): boolean {
+  const { disableFlag, chReadFlag, esWriteFlag } = FLAG_MAP[domain];
+
+  const disabled = Boolean(project[disableFlag]);
+
+  if (disabled) {
+    const chReadEnabled = Boolean(project[chReadFlag]);
+    const esWriteEnabled = Boolean(project[esWriteFlag]);
+    const warnKey = `${projectId}:${domain}`;
+
+    if ((!chReadEnabled || !esWriteEnabled) && !warnedProjects.has(warnKey)) {
+      warnedProjects.add(warnKey);
+      logger.warn(
+        { projectId, domain, chReadEnabled, esWriteEnabled },
+        `Elasticsearch ${domain} writes are disabled but ClickHouse read (${chReadFlag}=${String(chReadEnabled)}) ` +
+          `or event-sourcing write (${esWriteFlag}=${String(esWriteEnabled)}) is not enabled — data may be lost`,
+      );
+    }
+  }
+
+  return disabled;
+}
+
 /**
  * Check whether Elasticsearch writes are disabled for a given project and
  * data domain.
@@ -43,6 +83,9 @@ const FLAG_MAP = {
  * Logs a warning (once per project+domain) when ES writes are disabled but
  * the corresponding ClickHouse read flag or event-sourcing write flag is
  * not enabled -- this could mean data is being lost.
+ *
+ * Prefer `isElasticSearchWriteDisabledForProject` when you already have the
+ * project record fetched, to avoid an extra DB lookup.
  */
 export async function isElasticSearchWriteDisabled(
   prisma: PrismaClient,
@@ -64,22 +107,5 @@ export async function isElasticSearchWriteDisabled(
     return false;
   }
 
-  const disabled = Boolean(project[disableFlag]);
-
-  if (disabled) {
-    const chReadEnabled = Boolean(project[chReadFlag]);
-    const esWriteEnabled = Boolean(project[esWriteFlag]);
-    const warnKey = `${projectId}:${domain}`;
-
-    if ((!chReadEnabled || !esWriteEnabled) && !warnedProjects.has(warnKey)) {
-      warnedProjects.add(warnKey);
-      logger.warn(
-        { projectId, domain, chReadEnabled, esWriteEnabled },
-        `Elasticsearch ${domain} writes are disabled but ClickHouse read (${chReadFlag}=${String(chReadEnabled)}) ` +
-          `or event-sourcing write (${esWriteFlag}=${String(esWriteEnabled)}) is not enabled — data may be lost`,
-      );
-    }
-  }
-
-  return disabled;
+  return isElasticSearchWriteDisabledForProject(project, projectId, domain);
 }
