@@ -7,6 +7,7 @@
  */
 
 import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { toaster } from "~/components/ui/toaster";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
@@ -25,6 +26,7 @@ import { RunRow } from "./RunRow";
 import { GroupRow } from "./GroupRow";
 import { RunSummaryCounts } from "./RunSummaryCounts";
 import { useRunHistoryStore } from "./useRunHistoryStore";
+import { useCancelScenarioRun } from "./useCancelScenarioRun";
 import {
   computeBatchRunSummary,
   computeGroupSummary,
@@ -191,6 +193,46 @@ export function RunHistoryPanel({
     return scenarios.map((s) => ({ id: s.id, name: s.name }));
   }, [scenarios]);
 
+  // Track the specific job ID currently being cancelled for per-button loading state
+  const [cancellingJobId, setCancellingJobId] = useState<string | null>(null);
+
+  const utils = api.useContext();
+
+  const resetAndRefetch = useCallback(() => {
+    setCursor(undefined);
+    setPages([]);
+    prevCursorRef.current = undefined;
+    void utils.scenarios.getSuiteRunData.invalidate();
+    void utils.scenarios.getRunState.invalidate();
+  }, [utils]);
+
+  const { cancelJob, cancelBatchRun, isCancellingBatch } = useCancelScenarioRun({
+    onCancelJobSuccess: () => {
+      setCancellingJobId(null);
+      resetAndRefetch();
+      toaster.create({ title: "Job cancelled", type: "success" });
+    },
+    onCancelJobError: (error) => {
+      setCancellingJobId(null);
+      toaster.create({
+        title: "Failed to cancel job",
+        description: error.message,
+        type: "error",
+      });
+    },
+    onCancelBatchSuccess: () => {
+      resetAndRefetch();
+      toaster.create({ title: "Jobs cancelled", type: "success" });
+    },
+    onCancelBatchError: (error) => {
+      toaster.create({
+        title: "Failed to cancel jobs",
+        description: error.message,
+        type: "error",
+      });
+    },
+  });
+
   // Apply filters to raw runs
   const filteredRuns = useMemo(() => {
     if (allRuns.length === 0) return [];
@@ -312,6 +354,30 @@ export function RunHistoryPanel({
       return next;
     });
   }, []);
+
+  const createCancelRunHandler = useCallback(
+    (setId: string) => (scenarioRun: ScenarioRunData) => {
+      if (!project?.id) return;
+      setCancellingJobId(scenarioRun.scenarioRunId);
+      cancelJob({
+        projectId: project.id,
+        jobId: scenarioRun.scenarioRunId,
+        scenarioSetId: setId,
+        batchRunId: scenarioRun.batchRunId,
+        scenarioRunId: scenarioRun.scenarioRunId,
+        scenarioId: scenarioRun.scenarioId,
+      });
+    },
+    [project?.id, cancelJob],
+  );
+
+  const handleCancelAll = useCallback(
+    (batchRunId: string, batchRunScenarioSetId: string) => {
+      if (!project?.id) return;
+      cancelBatchRun({ projectId: project.id, scenarioSetId: batchRunScenarioSetId, batchRunId });
+    },
+    [project?.id, cancelBatchRun],
+  );
 
   const { openDrawer } = useDrawer();
 
@@ -444,6 +510,10 @@ export function RunHistoryPanel({
                       expectedJobCount={expectedJobCount}
                       suiteName={suiteName}
                       viewMode={viewMode}
+                      onCancelRun={createCancelRunHandler(batchRun.scenarioSetId ?? scenarioSetId ?? "")}
+                      onCancelAll={() => handleCancelAll(batchRun.batchRunId, batchRun.scenarioSetId ?? scenarioSetId ?? "")}
+                      isCancellingBatch={isCancellingBatch}
+                      cancellingJobId={cancellingJobId}
                     />
                   );
                 })

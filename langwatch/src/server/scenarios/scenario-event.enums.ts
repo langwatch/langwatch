@@ -27,3 +27,23 @@ export enum ScenarioRunStatus {
   /** BullMQ active state - job is being executed by a worker */
   RUNNING = "RUNNING",
 }
+
+/** Statuses that are eligible for cancellation (still in-flight). */
+export const CANCELLABLE_STATUSES = new Set<ScenarioRunStatus>([
+  ScenarioRunStatus.PENDING,
+  ScenarioRunStatus.IN_PROGRESS,
+  ScenarioRunStatus.STALLED,
+]);
+
+/**
+ * Determines whether a scenario run with the given status can be cancelled.
+ *
+ * Only in-flight statuses (PENDING, IN_PROGRESS, STALLED) are cancellable.
+ * Terminal statuses (SUCCESS, FAILED, ERROR, CANCELLED) are not.
+ *
+ * @param status - The current status of the scenario run
+ * @returns true if the run is eligible for cancellation
+ */
+export function isCancellableStatus(status: ScenarioRunStatus): boolean {
+  return CANCELLABLE_STATUSES.has(status);
+}
