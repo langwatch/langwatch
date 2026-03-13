@@ -99,11 +99,12 @@ Feature: Explicit application origin for race condition prevention
     Then evaluation commands are dispatched for matching monitors
 
   @unit
-  Scenario: Evaluation trigger skips traces with non-application origin
+  Scenario: Evaluation trigger dispatches for any known origin (preconditions filter)
     Given an online evaluation monitor is enabled for the project
     And a trace arrives where the fold state has langwatch.origin = "evaluation"
     When the evaluation trigger reactor fires at normal debounce
-    Then no evaluation commands are dispatched for this trace
+    Then evaluation commands are dispatched for matching monitors
+    Because origin filtering is handled by precondition matchers, not the reactor
 
   # --- SDK version heuristic for old SDK backward compat ---
 
@@ -117,13 +118,13 @@ Feature: Explicit application origin for race condition prevention
     Because the SDK presence + absence of origin means old SDK application trace
 
   @unit
-  Scenario: Old SDK evaluation traces are handled by legacy inference
+  Scenario: Old SDK evaluation traces are dispatched with evaluation origin
     Given a trace arrives from an old Python SDK running an experiment
     And the fold state has sdk.name = "langwatch"
     And legacy inference sets langwatch.origin = "evaluation" from instrumentationScope
     When the evaluation trigger reactor fires at normal debounce
-    Then no evaluation commands are dispatched
-    Because legacy inference correctly identified the origin
+    Then evaluation commands are dispatched with origin "evaluation"
+    And precondition matchers filter based on the monitor's configured origin
 
   # --- Precondition matcher changes ---
 
@@ -159,12 +160,13 @@ Feature: Explicit application origin for race condition prevention
     And dispatches evaluation commands for matching monitors
 
   @unit
-  Scenario: Deferred check skips traces that acquired a non-application origin
+  Scenario: Deferred check dispatches with acquired origin (preconditions filter)
     Given a trace initially had no langwatch.origin
     And a root span later arrived with langwatch.origin = "evaluation"
     When the deferred evaluation check fires
     And the fold state (re-read from store) now has langwatch.origin = "evaluation"
-    Then no evaluation commands are dispatched
+    Then evaluation commands are dispatched with origin "evaluation"
+    And precondition matchers filter based on the monitor's configured origin
 
   @unit
   Scenario: Deferred check runs evaluations for traces that acquired application origin

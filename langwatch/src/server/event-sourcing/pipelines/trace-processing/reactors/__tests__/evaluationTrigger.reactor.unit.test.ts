@@ -149,7 +149,7 @@ describe("evaluationTrigger reactor", () => {
   });
 
   describe("when trace has non-application origin", () => {
-    it("skips traces with origin 'simulation'", async () => {
+    it("dispatches for origin 'simulation' (preconditions handle filtering)", async () => {
       const deps = createDeps();
       const reactor = createEvaluationTriggerReactor(deps);
       const state = createFoldState({
@@ -158,11 +158,12 @@ describe("evaluationTrigger reactor", () => {
 
       await reactor.handle(createEvent(), createContext(state));
 
-      expect(deps.monitors.getEnabledOnMessageMonitors).not.toHaveBeenCalled();
-      expect(deps.evaluation).not.toHaveBeenCalled();
+      expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith("tenant-1");
+      expect(deps.evaluation).toHaveBeenCalledTimes(1);
+      expect(deps.scheduleDeferred).not.toHaveBeenCalled();
     });
 
-    it("skips traces with origin 'evaluation'", async () => {
+    it("dispatches for origin 'evaluation' (preconditions handle filtering)", async () => {
       const deps = createDeps();
       const reactor = createEvaluationTriggerReactor(deps);
       const state = createFoldState({
@@ -171,11 +172,12 @@ describe("evaluationTrigger reactor", () => {
 
       await reactor.handle(createEvent(), createContext(state));
 
-      expect(deps.monitors.getEnabledOnMessageMonitors).not.toHaveBeenCalled();
-      expect(deps.evaluation).not.toHaveBeenCalled();
+      expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith("tenant-1");
+      expect(deps.evaluation).toHaveBeenCalledTimes(1);
+      expect(deps.scheduleDeferred).not.toHaveBeenCalled();
     });
 
-    it("skips traces with origin 'workflow'", async () => {
+    it("dispatches for origin 'workflow' (preconditions handle filtering)", async () => {
       const deps = createDeps();
       const reactor = createEvaluationTriggerReactor(deps);
       const state = createFoldState({
@@ -184,8 +186,9 @@ describe("evaluationTrigger reactor", () => {
 
       await reactor.handle(createEvent(), createContext(state));
 
-      expect(deps.monitors.getEnabledOnMessageMonitors).not.toHaveBeenCalled();
-      expect(deps.evaluation).not.toHaveBeenCalled();
+      expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith("tenant-1");
+      expect(deps.evaluation).toHaveBeenCalledTimes(1);
+      expect(deps.scheduleDeferred).not.toHaveBeenCalled();
     });
   });
 
@@ -224,7 +227,7 @@ describe("evaluationTrigger reactor", () => {
   });
 
   describe("when old SDK evaluation trace is tagged by legacy inference", () => {
-    it("skips because legacy inference set origin to evaluation", async () => {
+    it("dispatches with evaluation origin (preconditions handle filtering)", async () => {
       const deps = createDeps();
       const reactor = createEvaluationTriggerReactor(deps);
       const state = createFoldState({
@@ -236,8 +239,9 @@ describe("evaluationTrigger reactor", () => {
 
       await reactor.handle(createEvent(), createContext(state));
 
-      expect(deps.monitors.getEnabledOnMessageMonitors).not.toHaveBeenCalled();
-      expect(deps.evaluation).not.toHaveBeenCalled();
+      expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith("tenant-1");
+      expect(deps.evaluation).toHaveBeenCalledTimes(1);
+      expect(deps.scheduleDeferred).not.toHaveBeenCalled();
     });
   });
 });
@@ -253,7 +257,7 @@ describe("createDeferredEvaluationHandler()", () => {
   });
 
   describe("when fold state still has no origin after 5 minutes", () => {
-    it("treats the trace as application and dispatches evaluations", async () => {
+    it("stamps origin as 'application' and dispatches evaluations", async () => {
       const deps = createDeps();
       const foldState = createFoldState({ attributes: {} });
       vi.mocked(deps.traceSummaryStore.get).mockResolvedValue(foldState);
@@ -273,11 +277,14 @@ describe("createDeferredEvaluationHandler()", () => {
       );
       expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith("tenant-1");
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
+      // Verify the evaluation payload has origin stamped as "application"
+      const callArgs = vi.mocked(deps.evaluation).mock.calls[0]!;
+      expect(callArgs[0]).toMatchObject({ origin: "application" });
     });
   });
 
   describe("when fold state acquired non-application origin", () => {
-    it("skips evaluation", async () => {
+    it("dispatches with the acquired origin (preconditions handle filtering)", async () => {
       const deps = createDeps();
       const foldState = createFoldState({
         attributes: { "langwatch.origin": "evaluation" },
@@ -294,8 +301,8 @@ describe("createDeferredEvaluationHandler()", () => {
       await handler(payload);
 
       expect(deps.traceSummaryStore.get).toHaveBeenCalled();
-      expect(deps.monitors.getEnabledOnMessageMonitors).not.toHaveBeenCalled();
-      expect(deps.evaluation).not.toHaveBeenCalled();
+      expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith("tenant-1");
+      expect(deps.evaluation).toHaveBeenCalledTimes(1);
     });
   });
 

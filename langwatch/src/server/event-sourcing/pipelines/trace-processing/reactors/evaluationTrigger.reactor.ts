@@ -83,7 +83,9 @@ export function createEvaluationTriggerReactor(
       const resolvedOrigin = resolveOrigin(attrs);
 
       if (resolvedOrigin === null) {
-        // No origin and no SDK info: schedule deferred check
+        // No origin and no SDK info: schedule deferred check.
+        // We can't dispatch yet because precondition matchers need
+        // a concrete origin value — empty means "pending".
         logger.debug(
           { tenantId, traceId },
           "No origin or SDK info, scheduling deferred evaluation check",
@@ -96,15 +98,8 @@ export function createEvaluationTriggerReactor(
         return;
       }
 
-      // Guard: skip non-application traces
-      if (resolvedOrigin !== "application") {
-        logger.debug(
-          { tenantId, traceId, origin: resolvedOrigin },
-          "Skipping non-application trace",
-        );
-        return;
-      }
-
+      // Origin is known (explicit or inferred via SDK heuristic).
+      // Dispatch to monitors — precondition matchers handle filtering by origin.
       await dispatchEvaluations({ deps, tenantId, traceId, foldState, occurredAt: event.occurredAt });
     },
   };
@@ -135,21 +130,22 @@ export function createDeferredEvaluationHandler(deps: EvaluationTriggerReactorDe
     const attrs = foldState.attributes ?? {};
     const origin = attrs["langwatch.origin"];
 
-    // If origin was set in the meantime, respect it
-    if (origin && origin !== "application") {
+    // If origin is still empty after 5 min, stamp it as "application"
+    // so precondition matchers see a concrete value.
+    if (!origin) {
+      attrs["langwatch.origin"] = "application";
+      logger.debug(
+        { tenantId, traceId },
+        "Deferred check: no origin after 5 min, treating as application",
+      );
+    } else {
       logger.debug(
         { tenantId, traceId, origin },
-        "Deferred check: non-application origin found, skipping",
+        "Deferred check: origin now set, dispatching with it",
       );
-      return;
     }
 
-    // If origin is explicitly "application" or still empty, treat as application
-    logger.debug(
-      { tenantId, traceId, origin: origin ?? "(empty, treating as application)" },
-      "Deferred check: dispatching evaluations",
-    );
-
+    // Dispatch — precondition matchers handle filtering by origin
     await dispatchEvaluations({ deps, tenantId, traceId, foldState, occurredAt });
   };
 }
