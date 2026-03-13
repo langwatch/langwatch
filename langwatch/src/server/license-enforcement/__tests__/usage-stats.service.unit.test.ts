@@ -37,6 +37,7 @@ describe("UsageStatsService", () => {
       getPromptCount: vi.fn().mockResolvedValue(0),
       getWorkflowCount: vi.fn().mockResolvedValue(0),
       getActiveScenarioCount: vi.fn().mockResolvedValue(0),
+      getScenarioSetCount: vi.fn().mockResolvedValue(0),
       getEvaluatorCount: vi.fn().mockResolvedValue(0),
       getAgentCount: vi.fn().mockResolvedValue(0),
       getExperimentCount: vi.fn().mockResolvedValue(0),

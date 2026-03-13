@@ -41,6 +41,7 @@ export function resolvePlanDefaults(plan: LicensePlanLimits): ResolvedPlanLimits
     maxPrompts: plan.maxPrompts ?? DEFAULT_LIMIT,
     maxEvaluators: plan.maxEvaluators ?? DEFAULT_LIMIT,
     maxScenarios: plan.maxScenarios ?? DEFAULT_LIMIT,
+    maxScenarioSets: plan.maxScenarioSets ?? DEFAULT_LIMIT,
     maxAgents: plan.maxAgents ?? DEFAULT_LIMIT,
     maxExperiments: plan.maxExperiments ?? DEFAULT_LIMIT,
     maxOnlineEvaluations: plan.maxOnlineEvaluations ?? DEFAULT_LIMIT,

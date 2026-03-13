@@ -34,6 +34,9 @@ const createMockPrisma = () => ({
   scenario: {
     count: vi.fn().mockResolvedValue(0),
   },
+  simulationSuite: {
+    count: vi.fn().mockResolvedValue(0),
+  },
   project: {
     count: vi.fn().mockResolvedValue(0),
     findMany: vi.fn().mockResolvedValue([]),
@@ -164,6 +167,27 @@ describe("LicenseEnforcementRepository", () => {
       mockPrisma.scenario.count.mockResolvedValue(0);
 
       const result = await repository.getActiveScenarioCount(organizationId);
+
+      expect(result).toBe(0);
+    });
+  });
+
+  describe("getScenarioSetCount", () => {
+    it("queries only active (non-archived) simulation suites with organization filter", async () => {
+      mockPrisma.simulationSuite.count.mockResolvedValue(4);
+
+      const result = await repository.getScenarioSetCount(organizationId);
+
+      expect(mockPrisma.simulationSuite.count).toHaveBeenCalledWith({
+        where: { project: { team: { organizationId } }, archivedAt: null },
+      });
+      expect(result).toBe(4);
+    });
+
+    it("returns zero when no simulation suites exist", async () => {
+      mockPrisma.simulationSuite.count.mockResolvedValue(0);
+
+      const result = await repository.getScenarioSetCount(organizationId);
 
       expect(result).toBe(0);
     });
@@ -686,6 +710,13 @@ describe("LicenseEnforcementRepository", () => {
       await repository.getActiveScenarioCount(organizationId);
 
       const call = mockPrisma.scenario.count.mock.calls[0]?.[0];
+      expect(call?.where).toHaveProperty("archivedAt", null);
+    });
+
+    it("simulation suite query excludes archived suites", async () => {
+      await repository.getScenarioSetCount(organizationId);
+
+      const call = mockPrisma.simulationSuite.count.mock.calls[0]?.[0];
       expect(call?.where).toHaveProperty("archivedAt", null);
     });
 
