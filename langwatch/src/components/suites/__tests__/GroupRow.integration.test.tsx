@@ -55,11 +55,11 @@ describe("<GroupRow/>", () => {
       );
 
       expect(screen.getByText("5 runs")).toBeInTheDocument();
-      expect(screen.getByText("4 ✓")).toBeInTheDocument();
-      expect(screen.getByText("1 ✗")).toBeInTheDocument();
+      expect(screen.getByText("4 passed")).toBeInTheDocument();
+      expect(screen.getByText("1 failed")).toBeInTheDocument();
     });
 
-    it("does not display redundant standalone status label", () => {
+    it("displays word labels for status counts", () => {
       render(
         <GroupRow
           group={makeGroup()}
@@ -72,9 +72,8 @@ describe("<GroupRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      // No "passed" or "failed" text anywhere -- only compact icons
-      expect(screen.queryByText(/passed/i)).not.toBeInTheDocument();
-      expect(screen.queryByText(/failed/i)).not.toBeInTheDocument();
+      expect(screen.getByText("4 passed")).toBeInTheDocument();
+      expect(screen.getByText("1 failed")).toBeInTheDocument();
     });
   });
 

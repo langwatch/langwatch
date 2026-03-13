@@ -203,7 +203,7 @@ describe("<GroupRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("1 ✗")).toBeInTheDocument();
+      expect(screen.getByText("1 failed")).toBeInTheDocument();
       expect(screen.getAllByText("2 runs").length).toBeGreaterThanOrEqual(1);
     });
 
@@ -223,8 +223,8 @@ describe("<GroupRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("1 ✓")).toBeInTheDocument();
-      expect(screen.getByText("1 ✗")).toBeInTheDocument();
+      expect(screen.getByText("1 passed")).toBeInTheDocument();
+      expect(screen.getByText("1 failed")).toBeInTheDocument();
     });
   });
 
@@ -286,7 +286,7 @@ describe("<GroupRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("1 ✗")).toBeInTheDocument();
+      expect(screen.getByText("1 failed")).toBeInTheDocument();
       expect(screen.getAllByText("3 runs").length).toBeGreaterThanOrEqual(1);
     });
   });
@@ -385,7 +385,7 @@ describe("<GroupRow/>", () => {
       );
 
       const batchHeader = screen.getByTestId("batch-sub-header");
-      expect(within(batchHeader).getByText("1 ✓")).toBeInTheDocument();
+      expect(within(batchHeader).getByText("1 passed")).toBeInTheDocument();
     });
   });
 

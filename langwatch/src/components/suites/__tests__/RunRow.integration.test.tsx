@@ -38,7 +38,7 @@ describe("<RunRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("2 ✓")).toBeInTheDocument();
+      expect(screen.getByText("2 passed")).toBeInTheDocument();
       expect(screen.queryByText("100%")).not.toBeInTheDocument();
     });
 
@@ -182,8 +182,8 @@ describe("<RunRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("1 ✗")).toBeInTheDocument();
-      expect(screen.getByText("2 ✓")).toBeInTheDocument();
+      expect(screen.getByText("1 failed")).toBeInTheDocument();
+      expect(screen.getByText("2 passed")).toBeInTheDocument();
     });
   });
 
@@ -342,8 +342,8 @@ describe("<RunRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("8 ✓")).toBeInTheDocument();
-      expect(screen.getByText("2 ✗")).toBeInTheDocument();
+      expect(screen.getByText("8 passed")).toBeInTheDocument();
+      expect(screen.getByText("2 failed")).toBeInTheDocument();
       // No redundant standalone "passed" or "failed" text
       expect(screen.queryByText("passed")).not.toBeInTheDocument();
       expect(screen.queryByText("failed")).not.toBeInTheDocument();
