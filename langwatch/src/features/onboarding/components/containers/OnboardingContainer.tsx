@@ -12,6 +12,7 @@ import { motion } from "motion/react";
 import { signOut } from "next-auth/react";
 import { useAnalytics } from "react-contextual-analytics";
 import { FullLogo } from "~/components/icons/FullLogo";
+import { LightMode } from "~/components/ui/color-mode";
 import { Tooltip } from "~/components/ui/tooltip";
 import SpookyScarySkeleton from "../SpookyScarySkeleton";
 
@@ -56,71 +57,84 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
   const containerWidthProps = isFullWidth
     ? {
         maxW: { base: "100%", "2xl": "1440px" },
-        px: { base: 4, md: 10 },
+        px: { base: 5, md: 10 },
       }
     : {
-        maxW: { base: "100%", md: "720px", xl: "840px" },
-        px: { base: 4, md: 8 },
+        w: { base: "100%", md: "480px" },
+        maxW: "480px",
+        px: 6,
       };
 
   return (
-    <Box w="full" minH="100dvh" background="bg.subtle">
+    <Box w="full" minH="100dvh" background="bg.page">
       {showBackButton && onBack && (
-        <HStack position="fixed" top={2} left={2} zIndex={99}>
+        <HStack position="fixed" top={3} left={3} zIndex={99}>
           <Tooltip content="Back">
             <IconButton
               variant="ghost"
-              _hover={{ bg: "bg.emphasized" }}
+              size="sm"
+              borderRadius="full"
+              _hover={{ bg: "bg.muted" }}
               onClick={onBack}
             >
-              <ArrowLeft />
+              <ArrowLeft size={18} />
             </IconButton>
           </Tooltip>
         </HStack>
       )}
 
-      <HStack position="fixed" top={2} right={2} zIndex={99}>
+      <HStack position="fixed" top={3} right={3} zIndex={99}>
         <Tooltip content="Sign out">
           <IconButton
             variant="ghost"
-            _hover={{ bg: "bg.emphasized" }}
+            size="sm"
+            borderRadius="full"
+            _hover={{ bg: "bg.muted" }}
             onClick={() => {
               emit("clicked", "sign_out");
               void signOut();
             }}
           >
-            <LogOut />
+            <LogOut size={18} />
           </IconButton>
         </Tooltip>
       </HStack>
 
       <MotionCenter
-        pt={compressedHeader ? "5vh" : "10vh"}
-        pb={compressedHeader ? "2.5vh" : "5vh"}
-        initial={{ opacity: 0, y: 8 }}
+        pt={compressedHeader ? "6vh" : "10vh"}
+        pb={compressedHeader ? "3vh" : "5vh"}
+        initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: "easeOut" }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
       >
-        <FullLogo width={175} />
+        <LightMode>
+          <FullLogo width={140} />
+        </LightMode>
       </MotionCenter>
 
       <MotionContainer
-        mt={"10"}
         width="full"
         mx="auto"
+        pb={16}
         {...containerWidthProps}
         {...(isFullWidth ? { fluid: true } : {})}
-        initial={{ opacity: 0, y: 8 }}
+        initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: "easeOut" }}
+        transition={{ duration: 0.5, ease: "easeOut", delay: 0.1 }}
       >
-        <VStack gap={4} align="stretch">
-          <VStack gap={0} align="start">
-            <Text textStyle={"2xl"} fontWeight={"bold"} color={"WindowText"}>
+        <VStack gap={8} align="stretch">
+          <VStack gap={1} align="center" textAlign="center">
+            <Text
+              textStyle={{ base: "2xl", md: "3xl" }}
+              fontWeight="bold"
+              color="fg.DEFAULT"
+              letterSpacing="-0.02em"
+              lineHeight="1.2"
+            >
               {title}
             </Text>
             {subTitle && (
-              <Text textStyle={"md"} color={"WindowText"}>
+              <Text textStyle="md" color="fg.muted" maxW="400px">
                 {subTitle}
               </Text>
             )}

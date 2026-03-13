@@ -118,21 +118,10 @@ export function WaitingForTracesChip(): React.ReactElement {
       <Box position="relative" display="inline-block">
         <HStack
           position="relative"
-          bg="transparent"
-          _before={{
-            content: '""',
-            position: "absolute",
-            inset: 0,
-            borderRadius: "full",
-            background:
-              "linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.02))",
-            pointerEvents: "none",
-          }}
-          backdropFilter="blur(10px)"
-          style={{ WebkitBackdropFilter: "blur(10px)" }}
+          bg="bg.panel"
           borderWidth="1px"
-          borderColor="whiteAlpha.200"
-          boxShadow="0 4px 18px rgba(2, 1, 1, 0.14), inset 0 1px 0 rgba(255,255,255,0.18)"
+          borderColor="border.muted"
+          boxShadow="md"
           borderRadius="full"
           px={4}
           py={2}
