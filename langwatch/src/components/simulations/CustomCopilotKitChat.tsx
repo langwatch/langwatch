@@ -1,9 +1,14 @@
 import { VStack } from "@chakra-ui/react";
 import { CopilotKit, useCopilotChatInternal } from "@copilotkit/react-core";
 import { CopilotChat } from "@copilotkit/react-ui";
-import { Role } from "@copilotkit/runtime-client-gql";
+import {
+  Role,
+  TextMessage as TextMessageClass,
+  type MessageRole,
+} from "@copilotkit/runtime-client-gql";
 import type { Message } from "@copilotkit/shared";
 import { useEffect, useMemo } from "react";
+import type { StreamingMessage } from "~/hooks/useSimulationStreamingState";
 import type { ScenarioMessageSnapshotEvent } from "~/server/scenarios/scenario-event.types";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { createLogger } from "~/utils/logger";
@@ -15,23 +20,13 @@ import { convertScenarioMessagesToCopilotKit } from "./utils/convert-scenario-me
 
 const logger = createLogger("CustomCopilotKitChat.tsx");
 
-type CustomCopilotKitChatProps = CustomCopilotKitChatInnerProps;
-
-interface CustomCopilotKitChatInnerProps {
+interface CustomCopilotKitChatProps {
   messages: ScenarioMessageSnapshotEvent["messages"];
-  smallerView?: boolean;
-  hideInput?: boolean;
+  streamingMessages?: StreamingMessage[];
+  variant: "grid" | "drawer";
 }
 
-/**
- * This is a wrapper around the CopilotKit component that allows us to use the CopilotKit chat without having to
- * worry about the runtime.
- * @param messages - The messages to display in the chat.
- * @returns A CopilotKit component with the chat history of the simulation.
- */
-export function CustomCopilotKitChat({
-  ...innerProps
-}: CustomCopilotKitChatProps) {
+export function CustomCopilotKitChat(props: CustomCopilotKitChatProps) {
   const { project } = useOrganizationTeamProject();
   return (
     <CopilotKit
@@ -40,7 +35,7 @@ export function CustomCopilotKitChat({
         "X-Auth-Token": project?.apiKey ?? "",
       }}
     >
-      <CustomCopilotKitChatInner {...innerProps} />
+      <CustomCopilotKitChatInner {...props} />
     </CopilotKit>
   );
 }
@@ -51,10 +46,13 @@ function isTextLike(msg: Message): msg is Message & { content: string } {
 
 function CustomCopilotKitChatInner({
   messages,
-  smallerView,
-  hideInput,
-}: CustomCopilotKitChatInnerProps) {
+  streamingMessages,
+  variant,
+}: CustomCopilotKitChatProps) {
   const { project } = useOrganizationTeamProject();
+  const smallerView = variant === "grid";
+  const hideInput = true;
+
   const { setMessages } = useCopilotChatInternal({
     headers: {
       "X-Auth-Token": project?.apiKey ?? "",
@@ -83,7 +81,28 @@ function CustomCopilotKitChatInner({
   useEffect(() => {
     try {
       const convertedMessages = convertScenarioMessagesToCopilotKit(messages);
-      setMessages(convertedMessages);
+
+      // Merge streaming messages that are not yet in server data
+      if (streamingMessages?.length) {
+        const serverIds = new Set(
+          messages.map((m) => m.id).filter(Boolean),
+        );
+
+        const toAppend = streamingMessages
+          .filter((sm) => !serverIds.has(sm.messageId))
+          .map(
+            (sm) =>
+              new TextMessageClass({
+                id: sm.messageId,
+                role: (sm.role === "user" ? Role.User : Role.Assistant) as MessageRole,
+                content: sm.content || "\u2026",
+              }),
+          );
+
+        setMessages([...convertedMessages, ...toAppend]);
+      } else {
+        setMessages(convertedMessages);
+      }
     } catch (error) {
       logger.error(
         {
@@ -92,7 +111,7 @@ function CustomCopilotKitChatInner({
         "Failed to convert scenario messages to CopilotKit messages",
       );
     }
-  }, [messages, setMessages]);
+  }, [messages, streamingMessages, setMessages]);
 
   const fadeInCss = {
     animation: "fadeIn 0.3s ease-in",
@@ -104,6 +123,7 @@ function CustomCopilotKitChatInner({
 
   return (
     <CopilotChat
+      className={smallerView ? "copilotKitGrid" : "copilotKitDrawer"}
       RenderMessage={({ message, UserMessage, ImageRenderer }) => {
         const traceId = traceIdMap.get(message.id);
 

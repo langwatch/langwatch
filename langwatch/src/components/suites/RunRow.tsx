@@ -17,7 +17,6 @@ import type { BatchRun, BatchRunSummary } from "./run-history-transforms";
 import { computeIterationMap, getScenarioDisplayNames } from "./run-history-transforms";
 import { ScenarioRunContent } from "./ScenarioRunContent";
 import { RunSummaryCounts } from "./RunSummaryCounts";
-import { formatSummaryStatusLabel } from "./format-run-status-label";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import type { ViewMode } from "./useRunHistoryStore";
 
@@ -73,7 +72,6 @@ export function RunRow({
         top={0}
         zIndex={20}
         bg="bg.muted"
-        backdropFilter="blur(12px)"
         borderBottom="1px solid"
         borderColor="border"
         data-testid="run-row-header"
@@ -113,13 +111,6 @@ export function RunRow({
         )}
         <Box flex={1} />
         <SummaryStatusIcon summary={summary} />
-        <Text
-          fontSize="sm"
-          fontWeight="medium"
-          color={summary.failedCount > 0 ? "red.fg" : "green.fg"}
-        >
-          {formatSummaryStatusLabel(summary)}
-        </Text>
         <RunSummaryCounts summary={summary} />
       </HStack>
 

@@ -9,6 +9,11 @@ import type { ScenarioEvent } from "~/server/scenarios/scenario-event.types";
 import { responseSchemas, scenarioEventSchema } from "~/server/scenarios/schemas";
 import { createLogger } from "~/utils/logger/server";
 import {
+  encodeContent,
+  encodeEnd,
+  encodeStart,
+} from "~/utils/streaming-event-codec";
+import {
   authMiddleware,
   blockTraceUsageExceededMiddleware,
   handleError,
@@ -267,10 +272,57 @@ async function archiveAllSimulationRuns(projectId: string): Promise<void> {
   logger.info({ projectId, count: runIds.length }, "Dispatched archive commands for all simulation runs");
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function broadcastStreamingEvent(
-  _projectId: string,
-  _event: ScenarioEvent,
+  projectId: string,
+  event: ScenarioEvent,
 ): Promise<void> {
-  // Broadcast infrastructure will be wired in a follow-up PR
+  try {
+    let payload: string;
+
+    if (event.type === ScenarioEventType.TEXT_MESSAGE_START) {
+      payload = encodeStart({
+        scenarioRunId: event.scenarioRunId,
+        batchRunId: event.batchRunId,
+        messageId: event.messageId,
+        role: event.role,
+        messageIndex: event.messageIndex,
+      });
+    } else if (event.type === ScenarioEventType.TEXT_MESSAGE_CONTENT) {
+      payload = encodeContent({
+        scenarioRunId: event.scenarioRunId,
+        batchRunId: event.batchRunId,
+        messageId: event.messageId,
+        delta: event.delta,
+      });
+    } else if (event.type === ScenarioEventType.TEXT_MESSAGE_END) {
+      payload = encodeEnd({
+        scenarioRunId: event.scenarioRunId,
+        batchRunId: event.batchRunId,
+        messageId: event.messageId,
+        content: event.content,
+      });
+    } else {
+      // Tool call events — full payload for now
+      payload = JSON.stringify({
+        e: event.type,
+        r: event.scenarioRunId,
+        b: event.batchRunId,
+      });
+    }
+
+    const tier =
+      event.type === ScenarioEventType.TEXT_MESSAGE_CONTENT ||
+      event.type === ScenarioEventType.TOOL_CALL_ARGS
+        ? ("delta" as const)
+        : ("structural" as const);
+
+    await getApp().broadcast.broadcastToTenantRateLimited(
+      projectId,
+      payload,
+      "simulation_updated",
+      tier,
+    );
+  } catch (err) {
+    logger.warn({ err, projectId }, "Failed to broadcast streaming event");
+  }
 }
