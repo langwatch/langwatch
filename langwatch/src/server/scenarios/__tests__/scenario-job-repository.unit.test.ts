@@ -10,6 +10,7 @@
 
 import { describe, it, expect } from "vitest";
 import { ScenarioRunStatus } from "../../scenarios/scenario-event.enums";
+import { STALL_THRESHOLD_MS } from "../stall-detection";
 import {
   mapBullMQStateToStatus,
   normalizeJob,
@@ -21,7 +22,7 @@ import type { ScenarioJob } from "../scenario.queue";
 function makeJob(overrides: Partial<MinimalJob> & { data: ScenarioJob }): MinimalJob {
   return {
     id: "job_1",
-    timestamp: 1700000000000,
+    timestamp: Date.now(),
     ...overrides,
   };
 }
@@ -49,6 +50,50 @@ describe("mapBullMQStateToStatus()", () => {
   describe("when state is 'active'", () => {
     it("returns RUNNING status", () => {
       expect(mapBullMQStateToStatus("active")).toBe(ScenarioRunStatus.RUNNING);
+    });
+
+    describe("when jobTimestamp is provided", () => {
+      it("returns RUNNING when within stall threshold", () => {
+        const now = Date.now();
+        const recentTimestamp = now - (STALL_THRESHOLD_MS - 1000);
+        expect(
+          mapBullMQStateToStatus("active", { jobTimestamp: recentTimestamp, now })
+        ).toBe(ScenarioRunStatus.RUNNING);
+      });
+
+      it("returns STALLED when exceeding stall threshold", () => {
+        const now = Date.now();
+        const staleTimestamp = now - (STALL_THRESHOLD_MS + 1000);
+        expect(
+          mapBullMQStateToStatus("active", { jobTimestamp: staleTimestamp, now })
+        ).toBe(ScenarioRunStatus.STALLED);
+      });
+
+      it("returns STALLED when exactly at stall threshold", () => {
+        const now = Date.now();
+        const exactTimestamp = now - STALL_THRESHOLD_MS;
+        expect(
+          mapBullMQStateToStatus("active", { jobTimestamp: exactTimestamp, now })
+        ).toBe(ScenarioRunStatus.STALLED);
+      });
+    });
+
+    describe("when jobTimestamp is not provided", () => {
+      it("returns RUNNING for backwards compatibility", () => {
+        expect(mapBullMQStateToStatus("active")).toBe(ScenarioRunStatus.RUNNING);
+      });
+    });
+  });
+
+  describe("when state is 'completed'", () => {
+    it("returns IN_PROGRESS status", () => {
+      expect(mapBullMQStateToStatus("completed")).toBe(ScenarioRunStatus.IN_PROGRESS);
+    });
+  });
+
+  describe("when state is 'failed'", () => {
+    it("returns ERROR status", () => {
+      expect(mapBullMQStateToStatus("failed")).toBe(ScenarioRunStatus.ERROR);
     });
   });
 
@@ -119,9 +164,20 @@ describe("normalizeJob()", () => {
     const data = makeJobData();
     const job = makeJob({ data });
 
-    it("returns RUNNING status", () => {
+    it("returns RUNNING status when job is recent", () => {
       const result = normalizeJob({ job, state: "active" });
       expect(result?.status).toBe(ScenarioRunStatus.RUNNING);
+    });
+  });
+
+  describe("given an active BullMQ job with a stale timestamp", () => {
+    const data = makeJobData();
+    const staleTimestamp = Date.now() - STALL_THRESHOLD_MS - 1000;
+    const job = makeJob({ data, timestamp: staleTimestamp });
+
+    it("returns STALLED status", () => {
+      const result = normalizeJob({ job, state: "active" });
+      expect(result?.status).toBe(ScenarioRunStatus.STALLED);
     });
   });
 
