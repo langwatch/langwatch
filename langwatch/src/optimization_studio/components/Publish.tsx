@@ -236,7 +236,11 @@ function PublishMenu({
     }),
   );
 
-  const { canSaveNewVersion, versionToBeEvaluated } = useVersionState({
+  const { checkCanCommitNewVersion } = useWorkflowStore(
+    ({ checkCanCommitNewVersion }) => ({ checkCanCommitNewVersion }),
+  );
+  const canSave = checkCanCommitNewVersion();
+  const { currentVersion } = useVersionState({
     project,
     allowSaveIfAutoSaveIsCurrentButNotLatest: false,
   });
@@ -297,9 +301,12 @@ function PublishMenu({
       },
     });
 
+  const currentVersionString = currentVersion?.autoSaved
+    ? currentVersion?.parent?.version
+    : currentVersion?.version;
   const canPublish =
-    !canSaveNewVersion &&
-    publishedWorkflow.data?.version === versionToBeEvaluated.version
+    !canSave &&
+    publishedWorkflow.data?.version === currentVersionString
       ? "Current version is already published"
       : undefined;
 
@@ -450,11 +457,31 @@ function PublishModalContent({
 }) {
   const { project } = useOrganizationTeamProject();
 
-  const { workflowId, getWorkflow, workflow_type } = useWorkflowStore(
-    ({ workflow_id: workflowId, getWorkflow, workflow_type }) => ({
+  const {
+    workflowId,
+    getWorkflow,
+    workflow_type,
+    checkCanCommitNewVersion,
+    setLastCommittedWorkflow,
+    setCurrentVersionId,
+    currentVersionId,
+  } = useWorkflowStore(
+    ({
+      workflow_id: workflowId,
+      getWorkflow,
+      workflow_type,
+      checkCanCommitNewVersion,
+      setLastCommittedWorkflow,
+      setCurrentVersionId,
+      currentVersionId,
+    }) => ({
       workflowId,
       getWorkflow,
       workflow_type,
+      checkCanCommitNewVersion,
+      setLastCommittedWorkflow,
+      setCurrentVersionId,
+      currentVersionId,
     }),
   );
 
@@ -474,8 +501,9 @@ function PublishModalContent({
   });
 
   const formVersion = form.watch("version");
+  const canSave = checkCanCommitNewVersion();
 
-  const { versions, versionToBeEvaluated, canSaveNewVersion } =
+  const { versions, currentVersion } =
     useVersionState({
       project,
       form,
@@ -507,9 +535,9 @@ function PublishModalContent({
     }) => {
       if (!project || !workflowId) return;
 
-      let versionId: string | undefined = versionToBeEvaluated.id;
+      let versionId: string | undefined = canSave ? undefined : currentVersionId;
 
-      if (canSaveNewVersion) {
+      if (canSave) {
         try {
           const versionResponse = await commitVersion.mutateAsync({
             projectId: project.id,
@@ -521,6 +549,8 @@ function PublishModalContent({
             },
           });
           versionId = versionResponse.id;
+          setLastCommittedWorkflow(getWorkflow());
+          setCurrentVersionId(versionId);
         } catch (error) {
           toaster.create({
             title: "Error saving version",
@@ -578,13 +608,15 @@ function PublishModalContent({
       );
     },
     [
-      canSaveNewVersion,
+      canSave,
       commitVersion,
+      currentVersionId,
       getWorkflow,
       project,
       publishWorkflow,
       publishedWorkflow,
-      versionToBeEvaluated.id,
+      setCurrentVersionId,
+      setLastCommittedWorkflow,
       versions,
       workflowId,
       workflow_type,
@@ -664,9 +696,11 @@ function PublishModalContent({
                   {isDisabled
                     ? "Publish"
                     : `Publish Version ${
-                        canSaveNewVersion
+                        canSave
                           ? formVersion
-                          : versionToBeEvaluated.version
+                          : (currentVersion?.autoSaved
+                              ? currentVersion?.parent?.version
+                              : currentVersion?.version) ?? ""
                       }`}
                 </Button>
               </HStack>
