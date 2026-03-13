@@ -2,7 +2,8 @@
  * Unit tests for OTel tracing on ScenarioEventRepository methods.
  *
  * Verifies that each previously-untraced public method emits an OTel span
- * with the correct name, kind, and attributes (db.system, db.operation, tenant.id).
+ * with the correct name, kind, and attributes (db.system, db.operation, tenant.id),
+ * and sets result attributes on the span after execution.
  *
  * @see specs/scenarios/scenario-event-repository-tracing.feature
  */
@@ -14,6 +15,7 @@ const { withActiveSpanCalls, mockSearch } = vi.hoisted(() => {
   const withActiveSpanCalls: Array<{
     name: string;
     options: { kind: number; attributes: Record<string, unknown> };
+    span: { setAttribute: ReturnType<typeof vi.fn> };
   }> = [];
 
   const mockSearch = vi.fn().mockResolvedValue({
@@ -36,8 +38,9 @@ vi.mock("langwatch", () => ({
       opts: { kind: number; attributes: Record<string, unknown> },
       fn: (span: { setAttribute: ReturnType<typeof vi.fn> }) => unknown
     ) => {
-      withActiveSpanCalls.push({ name, options: opts });
-      return fn({ setAttribute: vi.fn() });
+      const span = { setAttribute: vi.fn() };
+      withActiveSpanCalls.push({ name, options: opts, span });
+      return fn(span);
     },
   }),
 }));
@@ -65,7 +68,6 @@ vi.mock("~/server/tracer/types.generated", () => ({
   chatMessageSchema: vi.fn(),
 }));
 
-
 // Import AFTER mocks
 import { ScenarioEventRepository } from "../scenario-event.repository";
 
@@ -86,15 +88,16 @@ describe("ScenarioEventRepository OTel tracing", () => {
         limit: 10,
       });
 
-      const span = withActiveSpanCalls.find(
+      const call = withActiveSpanCalls.find(
         (c) => c.name === "ScenarioEventRepository.getBatchRunIdsForScenarioSet"
       );
-      expect(span).toBeDefined();
-      expect(span!.options.kind).toBe(SpanKind.CLIENT);
-      expect(span!.options.attributes["db.system"]).toBe("elasticsearch");
-      expect(span!.options.attributes["db.operation"]).toBe("SEARCH");
-      expect(span!.options.attributes["tenant.id"]).toBe("proj_1");
-      expect(span!.options.attributes["scenario.set.id"]).toBe("set_1");
+      expect(call).toBeDefined();
+      expect(call!.options.kind).toBe(SpanKind.CLIENT);
+      expect(call!.options.attributes["db.system"]).toBe("elasticsearch");
+      expect(call!.options.attributes["db.operation"]).toBe("SEARCH");
+      expect(call!.options.attributes["tenant.id"]).toBe("proj_1");
+      expect(call!.options.attributes["scenario.set.id"]).toBe("set_1");
+      expect(call!.span.setAttribute).toHaveBeenCalledWith("result.count", 0);
     });
   });
 
@@ -105,14 +108,15 @@ describe("ScenarioEventRepository OTel tracing", () => {
         limit: 10,
       });
 
-      const span = withActiveSpanCalls.find(
+      const call = withActiveSpanCalls.find(
         (c) => c.name === "ScenarioEventRepository.getBatchRunIdsForAllSuites"
       );
-      expect(span).toBeDefined();
-      expect(span!.options.kind).toBe(SpanKind.CLIENT);
-      expect(span!.options.attributes["db.system"]).toBe("elasticsearch");
-      expect(span!.options.attributes["db.operation"]).toBe("SEARCH");
-      expect(span!.options.attributes["tenant.id"]).toBe("proj_2");
+      expect(call).toBeDefined();
+      expect(call!.options.kind).toBe(SpanKind.CLIENT);
+      expect(call!.options.attributes["db.system"]).toBe("elasticsearch");
+      expect(call!.options.attributes["db.operation"]).toBe("SEARCH");
+      expect(call!.options.attributes["tenant.id"]).toBe("proj_2");
+      expect(call!.span.setAttribute).toHaveBeenCalledWith("result.count", 0);
     });
   });
 
@@ -123,15 +127,16 @@ describe("ScenarioEventRepository OTel tracing", () => {
         scenarioSetId: "set_3",
       });
 
-      const span = withActiveSpanCalls.find(
+      const call = withActiveSpanCalls.find(
         (c) => c.name === "ScenarioEventRepository.getBatchRunCountForScenarioSet"
       );
-      expect(span).toBeDefined();
-      expect(span!.options.kind).toBe(SpanKind.CLIENT);
-      expect(span!.options.attributes["db.system"]).toBe("elasticsearch");
-      expect(span!.options.attributes["db.operation"]).toBe("SEARCH");
-      expect(span!.options.attributes["tenant.id"]).toBe("proj_3");
-      expect(span!.options.attributes["scenario.set.id"]).toBe("set_3");
+      expect(call).toBeDefined();
+      expect(call!.options.kind).toBe(SpanKind.CLIENT);
+      expect(call!.options.attributes["db.system"]).toBe("elasticsearch");
+      expect(call!.options.attributes["db.operation"]).toBe("SEARCH");
+      expect(call!.options.attributes["tenant.id"]).toBe("proj_3");
+      expect(call!.options.attributes["scenario.set.id"]).toBe("set_3");
+      expect(call!.span.setAttribute).toHaveBeenCalledWith("result.count", 0);
     });
   });
 
@@ -143,16 +148,17 @@ describe("ScenarioEventRepository OTel tracing", () => {
         batchRunId: "batch_4",
       });
 
-      const span = withActiveSpanCalls.find(
+      const call = withActiveSpanCalls.find(
         (c) => c.name === "ScenarioEventRepository.getScenarioRunIdsForBatchRun"
       );
-      expect(span).toBeDefined();
-      expect(span!.options.kind).toBe(SpanKind.CLIENT);
-      expect(span!.options.attributes["db.system"]).toBe("elasticsearch");
-      expect(span!.options.attributes["db.operation"]).toBe("SEARCH");
-      expect(span!.options.attributes["tenant.id"]).toBe("proj_4");
-      expect(span!.options.attributes["scenario.set.id"]).toBe("set_4");
-      expect(span!.options.attributes["batch.run.id"]).toBe("batch_4");
+      expect(call).toBeDefined();
+      expect(call!.options.kind).toBe(SpanKind.CLIENT);
+      expect(call!.options.attributes["db.system"]).toBe("elasticsearch");
+      expect(call!.options.attributes["db.operation"]).toBe("SEARCH");
+      expect(call!.options.attributes["tenant.id"]).toBe("proj_4");
+      expect(call!.options.attributes["scenario.set.id"]).toBe("set_4");
+      expect(call!.options.attributes["batch.run.id"]).toBe("batch_4");
+      expect(call!.span.setAttribute).toHaveBeenCalledWith("result.count", 0);
     });
   });
 
@@ -163,15 +169,16 @@ describe("ScenarioEventRepository OTel tracing", () => {
         batchRunIds: ["batch_5a", "batch_5b"],
       });
 
-      const span = withActiveSpanCalls.find(
+      const call = withActiveSpanCalls.find(
         (c) => c.name === "ScenarioEventRepository.getScenarioRunIdsForBatchRuns"
       );
-      expect(span).toBeDefined();
-      expect(span!.options.kind).toBe(SpanKind.CLIENT);
-      expect(span!.options.attributes["db.system"]).toBe("elasticsearch");
-      expect(span!.options.attributes["db.operation"]).toBe("SEARCH");
-      expect(span!.options.attributes["tenant.id"]).toBe("proj_5");
-      expect(span!.options.attributes["batch.run.ids.count"]).toBe(2);
+      expect(call).toBeDefined();
+      expect(call!.options.kind).toBe(SpanKind.CLIENT);
+      expect(call!.options.attributes["db.system"]).toBe("elasticsearch");
+      expect(call!.options.attributes["db.operation"]).toBe("SEARCH");
+      expect(call!.options.attributes["tenant.id"]).toBe("proj_5");
+      expect(call!.options.attributes["batch.run.ids.count"]).toBe(2);
+      expect(call!.span.setAttribute).toHaveBeenCalledWith("result.count", 0);
     });
   });
 
@@ -182,15 +189,16 @@ describe("ScenarioEventRepository OTel tracing", () => {
         batchRunId: "batch_6",
       });
 
-      const span = withActiveSpanCalls.find(
+      const call = withActiveSpanCalls.find(
         (c) => c.name === "ScenarioEventRepository.getMaxTimestampForBatchRun"
       );
-      expect(span).toBeDefined();
-      expect(span!.options.kind).toBe(SpanKind.CLIENT);
-      expect(span!.options.attributes["db.system"]).toBe("elasticsearch");
-      expect(span!.options.attributes["db.operation"]).toBe("SEARCH");
-      expect(span!.options.attributes["tenant.id"]).toBe("proj_6");
-      expect(span!.options.attributes["batch.run.id"]).toBe("batch_6");
+      expect(call).toBeDefined();
+      expect(call!.options.kind).toBe(SpanKind.CLIENT);
+      expect(call!.options.attributes["db.system"]).toBe("elasticsearch");
+      expect(call!.options.attributes["db.operation"]).toBe("SEARCH");
+      expect(call!.options.attributes["tenant.id"]).toBe("proj_6");
+      expect(call!.options.attributes["batch.run.id"]).toBe("batch_6");
+      expect(call!.span.setAttribute).toHaveBeenCalledWith("result.timestamp", 0);
     });
   });
 });

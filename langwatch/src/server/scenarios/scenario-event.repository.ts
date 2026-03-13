@@ -534,10 +534,10 @@ export class ScenarioEventRepository {
           "scenario.set.id": scenarioSetId,
         },
       },
-      async () => {
+      async (span) => {
         const validatedScenarioSetId = scenarioIdSchema.parse(scenarioSetId);
 
-        return this.queryBatchRunIds({
+        const result = await this.queryBatchRunIds({
           projectId,
           limit,
           cursor,
@@ -545,6 +545,9 @@ export class ScenarioEventRepository {
           startDate,
           endDate,
         });
+
+        span.setAttribute("result.count", result.batchRunIds.length);
+        return result;
       },
     );
   }
@@ -582,8 +585,8 @@ export class ScenarioEventRepository {
           "tenant.id": projectId,
         },
       },
-      async () => {
-        return this.queryBatchRunIds({
+      async (span) => {
+        const result = await this.queryBatchRunIds({
           projectId,
           limit,
           cursor,
@@ -591,6 +594,9 @@ export class ScenarioEventRepository {
           endDate,
           trackScenarioSetIds: true,
         });
+
+        span.setAttribute("result.count", result.batchRunIds.length);
+        return result;
       },
     );
   }
@@ -773,7 +779,7 @@ export class ScenarioEventRepository {
           "scenario.set.id": scenarioSetId,
         },
       },
-      async () => {
+      async (span) => {
         const validatedProjectId = projectIdSchema.parse(projectId);
         const validatedScenarioSetId = scenarioIdSchema.parse(scenarioSetId);
         const client = await this.getClient();
@@ -803,6 +809,7 @@ export class ScenarioEventRepository {
 
         const count =
           (response.aggregations as any)?.unique_batch_run_count?.value ?? 0;
+        span.setAttribute("result.count", count);
         return count;
       },
     );
@@ -839,7 +846,7 @@ export class ScenarioEventRepository {
           "batch.run.id": batchRunId,
         },
       },
-      async () => {
+      async (span) => {
         const validatedProjectId = projectIdSchema.parse(projectId);
         const validatedScenarioSetId = scenarioIdSchema.parse(scenarioSetId);
         const validatedBatchRunId = batchRunIdSchema.parse(batchRunId);
@@ -863,12 +870,15 @@ export class ScenarioEventRepository {
         });
 
         const hits = response.hits?.hits ?? [];
-        return hits
+        const result = hits
           .map((hit) => {
             const source = hit._source as Record<string, any>;
             return source?.scenario_run_id as string;
           })
           .filter(Boolean);
+
+        span.setAttribute("result.count", result.length);
+        return result;
       },
     );
   }
@@ -900,8 +910,9 @@ export class ScenarioEventRepository {
           "batch.run.ids.count": batchRunIds.length,
         },
       },
-      async () => {
+      async (span) => {
         if (batchRunIds.length === 0) {
+          span.setAttribute("result.count", 0);
           return [];
         }
 
@@ -917,6 +928,7 @@ export class ScenarioEventRepository {
         }
 
         if (validBatchRunIds.length === 0) {
+          span.setAttribute("result.count", 0);
           return [];
         }
 
@@ -946,13 +958,16 @@ export class ScenarioEventRepository {
           },
         });
 
-        return (
+        const result = (
           (
             response.aggregations?.unique_scenario_runs as {
               buckets: Array<{ key: string }>;
             }
           )?.buckets ?? []
         ).map((bucket) => bucket.key);
+
+        span.setAttribute("result.count", result.length);
+        return result;
       },
     );
   }
@@ -1360,7 +1375,7 @@ export class ScenarioEventRepository {
           "batch.run.id": batchRunId,
         },
       },
-      async () => {
+      async (span) => {
         const validatedProjectId = projectIdSchema.parse(projectId);
         const validatedBatchRunId = batchRunIdSchema.parse(batchRunId);
         const client = await this.getClient();
@@ -1385,7 +1400,9 @@ export class ScenarioEventRepository {
           },
         });
 
-        return (response.aggregations as any)?.max_timestamp?.value ?? 0;
+        const timestamp = (response.aggregations as any)?.max_timestamp?.value ?? 0;
+        span.setAttribute("result.timestamp", timestamp);
+        return timestamp;
       },
     );
   }
