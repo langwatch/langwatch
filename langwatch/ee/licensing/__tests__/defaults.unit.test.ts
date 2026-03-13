@@ -185,7 +185,6 @@ describe("resolvePlanDefaults", () => {
       maxPrompts: resolved.maxPrompts,
       maxEvaluators: resolved.maxEvaluators,
       maxScenarios: resolved.maxScenarios,
-      maxScenarioSets: resolved.maxScenarioSets,
       maxAgents: resolved.maxAgents,
       maxExperiments: resolved.maxExperiments,
       maxOnlineEvaluations: resolved.maxOnlineEvaluations,

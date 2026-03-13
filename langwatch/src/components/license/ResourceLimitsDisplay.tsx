@@ -78,8 +78,6 @@ interface LicenseStatusWithPlan {
   maxWorkflows: number;
   currentScenarios: number;
   maxScenarios: number;
-  currentScenarioSets: number;
-  maxScenarioSets: number;
   currentEvaluators: number;
   maxEvaluators: number;
   currentAgents: number;

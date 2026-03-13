@@ -74,8 +74,6 @@ const FREE_TIER_LIMITS = {
   /** Minimal experimentation allowance */
   SCENARIOS: 3,
   /** Minimal experimentation allowance */
-  SCENARIO_SETS: 3,
-  /** Minimal experimentation allowance */
   AGENTS: 3,
   /** Minimal experimentation allowance */
   EXPERIMENTS: 3,
@@ -120,7 +118,6 @@ export const UNLIMITED_PLAN: PlanInfo = {
   maxPrompts: Number.MAX_SAFE_INTEGER,
   maxEvaluators: Number.MAX_SAFE_INTEGER,
   maxScenarios: Number.MAX_SAFE_INTEGER,
-  maxScenarioSets: Number.MAX_SAFE_INTEGER,
   maxAgents: Number.MAX_SAFE_INTEGER,
   maxExperiments: Number.MAX_SAFE_INTEGER,
   maxOnlineEvaluations: Number.MAX_SAFE_INTEGER,
@@ -159,7 +156,6 @@ export const FREE_PLAN: PlanInfo = {
   maxPrompts: FREE_TIER_LIMITS.PROMPTS,
   maxEvaluators: FREE_TIER_LIMITS.EVALUATORS,
   maxScenarios: FREE_TIER_LIMITS.SCENARIOS,
-  maxScenarioSets: FREE_TIER_LIMITS.SCENARIO_SETS,
   maxAgents: FREE_TIER_LIMITS.AGENTS,
   maxExperiments: FREE_TIER_LIMITS.EXPERIMENTS,
   maxOnlineEvaluations: FREE_TIER_LIMITS.ONLINE_EVALUATIONS,

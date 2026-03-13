@@ -31,8 +31,6 @@ const baseResourceFields = {
   maxWorkflows: 15,
   currentScenarios: 2,
   maxScenarios: 10,
-  currentScenarioSets: 1,
-  maxScenarioSets: 5,
   currentEvaluators: 3,
   maxEvaluators: 10,
   currentAgents: 2,
