@@ -885,12 +885,14 @@ export class ScenarioEventService {
         // ES path cannot resolve per-run pass/fail status; return zero counts
         // so the sidebar hides the summary line rather than showing misleading data.
         // ClickHouse is the primary backend for accurate pass/fail stats.
-        return externalSets.map((s) => ({
-          scenarioSetId: s.scenarioSetId,
-          passedCount: 0,
-          totalCount: 0,
-          lastRunTimestamp: s.lastRunAt,
-        }));
+        return externalSets
+          .map((s) => ({
+            scenarioSetId: s.scenarioSetId,
+            passedCount: 0,
+            totalCount: 0,
+            lastRunTimestamp: s.lastRunAt,
+          }))
+          .sort((a, b) => b.lastRunTimestamp - a.lastRunTimestamp);
       },
     );
   }
