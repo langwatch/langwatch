@@ -49,7 +49,7 @@ def _evaluate_with_mock_embeddings(
     with patch("langevals_langevals.sentiment.litellm") as mock_litellm, \
          patch("langevals_langevals.sentiment.get_max_tokens", return_value=8192):
         mock_litellm.embedding = mock_embedding
-        mock_litellm.encode = MagicMock(side_effect=lambda model, text: list(range(min(len(text.split()), 8192))))
+        mock_litellm.encode = MagicMock(side_effect=lambda model, text: list(range(len(text.split()))))
         mock_litellm.decode = MagicMock(side_effect=lambda model, tokens: " ".join(["word"] * len(tokens)))
         return evaluator.evaluate(entry)
 
@@ -100,11 +100,36 @@ class TestSentimentEvaluator:
     class TestWhenInputExceedsMaxTokens:
         def test_truncates_and_returns_result(self):
             long_input = "lorem ipsum dolor " * 100000
+            settings = SentimentSettings(embeddings_model="openai/text-embedding-3-small")
+            evaluator = SentimentEvaluator(settings=settings)
+            entry = SentimentEntry(input=long_input)
 
-            result = _evaluate_with_mock_embeddings(
-                input_text=long_input,
-                input_vec=_normalize([0.7, 0.3, 0.0]),
-            )
+            positive_ref = _normalize([1.0, 0.0, 0.0])
+            negative_ref = _normalize([0.0, 1.0, 0.0])
+            input_vec = _normalize([0.7, 0.3, 0.0])
+
+            embeddings_by_text = {
+                settings.negative_reference: negative_ref,
+                settings.positive_reference: positive_ref,
+            }
+
+            def mock_embedding(model, input, **kwargs):
+                text = input if isinstance(input, str) else input[0]
+                response = MagicMock()
+                response.data = [{"embedding": embeddings_by_text.get(text, input_vec)}]
+                return response
+
+            with patch("langevals_langevals.sentiment.litellm") as mock_litellm, \
+                 patch("langevals_langevals.sentiment.get_max_tokens", return_value=8192):
+                mock_litellm.embedding = mock_embedding
+                mock_litellm.encode = MagicMock(side_effect=lambda model, text: list(range(len(text.split()))))
+                mock_litellm.decode = MagicMock(side_effect=lambda model, tokens: " ".join(["word"] * len(tokens)))
+
+                result = evaluator.evaluate(entry)
+
+                mock_litellm.decode.assert_called_once()
+                truncated_tokens = mock_litellm.decode.call_args[1]["tokens"]
+                assert len(truncated_tokens) == 8192
 
             assert result.status == "processed"
             assert result.label == "positive"
