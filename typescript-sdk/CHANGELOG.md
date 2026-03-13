@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.18.0...typescript-sdk@v0.19.0) (2026-03-13)
+
+
+### Features
+
+* **tracing:** explicit application origin to prevent evaluation race condition ([#2325](https://github.com/langwatch/langwatch/issues/2325)) ([b11b499](https://github.com/langwatch/langwatch/commit/b11b49990bdb1ccf1bf302b9a54b442d3b6f3be3))
+
 ## [0.18.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.17.0...typescript-sdk@v0.18.0) (2026-03-11)
 
 
