@@ -14,45 +14,88 @@ export type EvaluatorTypeSelectorDrawerProps = {
 };
 
 /**
- * Mapping of category IDs to evaluator types
+ * Maps every evaluator to a UI category. TypeScript enforces exhaustiveness:
+ * adding a new evaluator to AVAILABLE_EVALUATORS without mapping it here
+ * causes a compile error.
+ *
+ * Use "ignored" for evaluators that should not appear in the selector
+ * (e.g. custom/basic, legacy, internal).
  */
-const categoryEvaluators: Record<
+const evaluatorCategoryMap: Record<
+  keyof typeof AVAILABLE_EVALUATORS,
+  EvaluatorCategoryId | "ignored"
+> = {
+  // Expected Answer
+  "langevals/exact_match": "expected_answer",
+  "langevals/llm_answer_match": "expected_answer",
+  "ragas/factual_correctness": "expected_answer",
+  "ragas/rouge_score": "expected_answer",
+  "ragas/bleu_score": "expected_answer",
+
+  // LLM Judge
+  "langevals/llm_boolean": "llm_judge",
+  "langevals/llm_score": "llm_judge",
+  "langevals/llm_category": "llm_judge",
+
+  // RAG
+  "ragas/faithfulness": "rag",
+  "ragas/response_relevancy": "rag",
+  "ragas/response_context_recall": "rag",
+  "ragas/response_context_precision": "rag",
+  "ragas/context_f1": "rag",
+
+  // Quality
+  "langevals/sentiment": "quality",
+  "lingua/language_detection": "quality",
+  "ragas/summarization_score": "quality",
+  "langevals/valid_format": "quality",
+  "langevals/query_resolution": "quality",
+  "ragas/sql_query_equivalence": "quality",
+  "ragas/rubrics_based_scoring": "quality",
+
+  // Safety
+  "presidio/pii_detection": "safety",
+  "azure/prompt_injection": "safety",
+  "azure/jailbreak": "safety",
+  "azure/content_safety": "safety",
+  "openai/moderation": "safety",
+  "langevals/competitor_blocklist": "safety",
+  "langevals/competitor_llm": "safety",
+  "langevals/competitor_llm_function_call": "safety",
+  "langevals/off_topic": "safety",
+
+  // Ignored — custom templates, legacy, or internal
+  "langevals/basic": "ignored",
+  "langevals/similarity": "ignored",
+  "legacy/ragas_answer_correctness": "ignored",
+  "legacy/ragas_answer_relevancy": "ignored",
+  "legacy/ragas_context_precision": "ignored",
+  "legacy/ragas_context_recall": "ignored",
+  "legacy/ragas_context_relevancy": "ignored",
+  "legacy/ragas_context_utilization": "ignored",
+  "legacy/ragas_faithfulness": "ignored",
+  "ragas/context_precision": "ignored",
+  "ragas/context_recall": "ignored",
+};
+
+function buildCategoryEvaluators(): Record<
   EvaluatorCategoryId,
   (keyof typeof AVAILABLE_EVALUATORS)[]
-> = {
-  expected_answer: [
-    "langevals/exact_match",
-    "langevals/llm_answer_match",
-    "ragas/factual_correctness",
-    "ragas/rouge_score",
-    "ragas/bleu_score",
-  ],
-  llm_judge: [
-    "langevals/llm_boolean",
-    "langevals/llm_score",
-    "langevals/llm_category",
-  ],
-  rag: [
-    "ragas/faithfulness",
-    "ragas/response_relevancy",
-    "ragas/response_context_recall",
-    "ragas/response_context_precision",
-    "ragas/context_f1",
-  ],
-  quality: [
-    "langevals/sentiment",
-    "lingua/language_detection",
-    "ragas/summarization_score",
-    "langevals/valid_format",
-  ],
-  safety: [
-    "presidio/pii_detection",
-    "azure/prompt_injection",
-    "azure/jailbreak",
-    "azure/content_safety",
-    "openai/moderation",
-  ],
-};
+> {
+  const result: Record<string, (keyof typeof AVAILABLE_EVALUATORS)[]> = {};
+  for (const [evaluator, category] of Object.entries(evaluatorCategoryMap)) {
+    if (category === "ignored") continue;
+    (result[category] ??= []).push(
+      evaluator as keyof typeof AVAILABLE_EVALUATORS,
+    );
+  }
+  return result as Record<
+    EvaluatorCategoryId,
+    (keyof typeof AVAILABLE_EVALUATORS)[]
+  >;
+}
+
+const categoryEvaluators = buildCategoryEvaluators();
 
 /**
  * Category display names
