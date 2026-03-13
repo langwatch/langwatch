@@ -42,6 +42,7 @@ export interface SimulationRunStateData {
   Status: string;
   Name: string | null;
   Description: string | null;
+  Metadata: string | null;
   Messages: SimulationMessageRow[];
   TraceIds: string[];
   Verdict: string | null;
@@ -71,6 +72,7 @@ function init(): SimulationRunStateData {
     Status: "PENDING",
     Name: null,
     Description: null,
+    Metadata: null,
     Messages: [],
     TraceIds: [],
     Verdict: null,
@@ -101,6 +103,7 @@ function apply(
       ScenarioSetId: event.data.scenarioSetId,
       Name: event.data.name ?? null,
       Description: event.data.description ?? null,
+      Metadata: event.data.metadata ? JSON.stringify(event.data.metadata) : null,
       Status: "IN_PROGRESS",
       StartedAt: event.occurredAt,
       UpdatedAt: Date.now(),

@@ -81,7 +81,7 @@ function buildStartedAtWhereFilter({
 
 const RUN_COLUMNS = `
   ScenarioRunId, ScenarioId, BatchRunId, ScenarioSetId,
-  Status, Name, Description,
+  Status, Name, Description, Metadata,
   \`Messages.Id\`, \`Messages.Role\`, \`Messages.Content\`,
   \`Messages.TraceId\`, \`Messages.Rest\`,
   TraceIds,

@@ -15,6 +15,7 @@ function makeRow(overrides: Partial<ClickHouseSimulationRunRow> = {}): ClickHous
     Status: "SUCCESS",
     Name: "Test run",
     Description: "A test",
+    Metadata: null,
     "Messages.Id": [],
     "Messages.Role": [],
     "Messages.Content": [],
@@ -164,6 +165,53 @@ describe("mapClickHouseRowToScenarioRunData()", () => {
       const result = mapClickHouseRowToScenarioRunData(row, Date.now());
 
       expect(result.messages).toEqual([]);
+    });
+  });
+
+  describe("when row has a Metadata JSON string", () => {
+    it("parses metadata back to an object", () => {
+      const metadataObj = {
+        name: "my-scenario",
+        langwatch: { targetReferenceId: "ref-1", simulationSuiteId: "suite-1" },
+      };
+      const row = makeRow({ Metadata: JSON.stringify(metadataObj) });
+      const result = mapClickHouseRowToScenarioRunData(row, Date.now());
+
+      expect(result.metadata).toEqual(metadataObj);
+    });
+  });
+
+  describe("when row has no Metadata", () => {
+    it("returns null metadata", () => {
+      const row = makeRow({ Metadata: null });
+      const result = mapClickHouseRowToScenarioRunData(row, Date.now());
+
+      expect(result.metadata).toBeNull();
+    });
+  });
+
+  describe("when Metadata contains invalid JSON", () => {
+    it("returns null metadata", () => {
+      const row = makeRow({ Metadata: "{not-valid-json" });
+      const result = mapClickHouseRowToScenarioRunData(row, Date.now());
+
+      expect(result.metadata).toBeNull();
+    });
+  });
+
+  describe("when metadata round-trips through JSON serialization", () => {
+    it("preserves the original structure", () => {
+      const original = {
+        name: "test",
+        description: "desc",
+        langwatch: { targetReferenceId: "ref-42", simulationSuiteId: "suite-7" },
+        custom: { nested: { key: "value" } },
+      };
+      const serialized = JSON.stringify(original);
+      const row = makeRow({ Metadata: serialized });
+      const result = mapClickHouseRowToScenarioRunData(row, Date.now());
+
+      expect(result.metadata).toEqual(original);
     });
   });
 
