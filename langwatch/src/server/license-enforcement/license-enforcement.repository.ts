@@ -88,7 +88,6 @@ export interface ILicenseEnforcementRepository {
   getPromptCount(organizationId: string): Promise<number>;
   getEvaluatorCount(organizationId: string): Promise<number>;
   getActiveScenarioCount(organizationId: string): Promise<number>;
-  getScenarioSetCount(organizationId: string): Promise<number>;
   getProjectCount(organizationId: string): Promise<number>;
   getTeamCount(organizationId: string): Promise<number>;
   getMemberCount(organizationId: string): Promise<number>;
@@ -155,19 +154,6 @@ export class LicenseEnforcementRepository
    */
   async getActiveScenarioCount(organizationId: string): Promise<number> {
     return this.prisma.scenario.count({
-      where: {
-        project: { team: { organizationId } },
-        archivedAt: null,
-      },
-    });
-  }
-
-  /**
-   * Counts active (non-archived) scenario sets (simulation suites) for license enforcement.
-   * Only active scenario sets count against the license limit.
-   */
-  async getScenarioSetCount(organizationId: string): Promise<number> {
-    return this.prisma.simulationSuite.count({
       where: {
         project: { team: { organizationId } },
         archivedAt: null,

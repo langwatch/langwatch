@@ -23,7 +23,6 @@ export type PlanInfo = {
   maxPrompts: number;
   maxEvaluators: number;
   maxScenarios: number;
-  maxScenarioSets: number;
   maxAgents: number;
   maxExperiments: number;
   maxOnlineEvaluations: number;
