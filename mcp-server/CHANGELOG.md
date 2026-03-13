@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.6.0](https://github.com/langwatch/langwatch/compare/mcp-server@v0.5.0...mcp-server@v0.6.0) (2026-03-13)
+
+
+### Features
+
+* add platform MCP tools for evaluators and model providers ([#1762](https://github.com/langwatch/langwatch/issues/1762)) ([6339001](https://github.com/langwatch/langwatch/commit/6339001ffae3c83f7c3ea0cdadf480f4ec47f3cc))
+* prefix platform MCP tools with `platform_` and add disambiguation notes ([#1760](https://github.com/langwatch/langwatch/issues/1760)) ([91851ee](https://github.com/langwatch/langwatch/commit/91851ee28aff1b3b75d92ce46aec6ae5072ff625))
+
+
+### Bug Fixes
+
+* **deps:** pin transitive npm deps for Dependabot high-severity alerts ([#2220](https://github.com/langwatch/langwatch/issues/2220)) ([a179da1](https://github.com/langwatch/langwatch/commit/a179da1d55859b8c9a476a6443dbfaf6bf632af3))
+* **mcp:** align prompt tool schemas with backend API ([#2326](https://github.com/langwatch/langwatch/issues/2326)) ([65279f3](https://github.com/langwatch/langwatch/commit/65279f38687bae5c7dc7a13db33dcb2f7d135397))
+* **mcp:** resolve get_trace 404 and search_traces metadata filter bugs ([#2214](https://github.com/langwatch/langwatch/issues/2214)) ([a0362e6](https://github.com/langwatch/langwatch/commit/a0362e60aa54e7c6e5dac9f241b206f4f4cd0b5f))
+* normalize defaultModel with provider prefix for litellm routing ([cc7798e](https://github.com/langwatch/langwatch/commit/cc7798ecb229654f371912e7863ca20364ceb7fa))
+
+
+### Miscellaneous
+
+* **deps:** batch safe JS dependency bumps (Tier 1a) ([#2169](https://github.com/langwatch/langwatch/issues/2169)) ([8b5b891](https://github.com/langwatch/langwatch/commit/8b5b8915941f19ca07019b330e276f01ae3bface))
+* **deps:** bump mcp-server zod to v4 ([#1977](https://github.com/langwatch/langwatch/issues/1977)) ([eb89188](https://github.com/langwatch/langwatch/commit/eb891883eb47db01bfee4d184b1c9b19e3cc60d7))
+* **deps:** bump Node.js dependencies - batch 2 ([#1947](https://github.com/langwatch/langwatch/issues/1947)) ([98d9f5c](https://github.com/langwatch/langwatch/commit/98d9f5cb53dc13051c500359def11b35762fd5e5))
+* **deps:** bump safe npm dependencies (19 dependabot PRs) ([#1931](https://github.com/langwatch/langwatch/issues/1931)) ([4d7607e](https://github.com/langwatch/langwatch/commit/4d7607e5d467749e2e47fc3b0b2b58c212bc8721))
+* **deps:** bump the npm_and_yarn group across 1 directory with 5 updates ([#1948](https://github.com/langwatch/langwatch/issues/1948)) ([9227fb4](https://github.com/langwatch/langwatch/commit/9227fb4b96184a82c87ab95f00fb985491df7224))
+
 ## [0.5.0](https://github.com/langwatch/langwatch/compare/mcp-server@v0.4.0...mcp-server@v0.5.0) (2026-02-20)
 
 
