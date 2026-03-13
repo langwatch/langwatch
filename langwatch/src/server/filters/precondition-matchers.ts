@@ -80,7 +80,7 @@ export const PRECONDITION_FIELD_MATCHERS: Record<
   output: (data) => data.output,
 
   // Trace fields
-  "traces.origin": (data) => data.origin || "application",
+  "traces.origin": (data) => data.origin ?? null,
   "traces.error": (data) =>
     data.hasError != null ? (data.hasError ? "true" : "false") : "false",
 
