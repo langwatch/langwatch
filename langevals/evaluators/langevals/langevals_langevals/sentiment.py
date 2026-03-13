@@ -31,6 +31,7 @@ class SentimentSettings(EvaluatorSettings):
     )
     normalization_factor: float = Field(
         default=0.10,
+        gt=0,
         description="Controls sentiment sensitivity. Decrease to make scores more extreme (fewer neutrals), increase to make scores more moderate (more neutrals)",
     )
 
