@@ -65,7 +65,7 @@ function buildMutationPayload(data: SuiteFormData, projectId: string) {
 
 export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
   const { project } = useOrganizationTeamProject();
-  const { closeDrawer, drawerOpen } = useDrawer();
+  const { closeDrawer, drawerOpen, openDrawer } = useDrawer();
   const [scenarioEditorOpen, setScenarioEditorOpen] = useState(false);
   const [agentHttpEditorOpen, setAgentHttpEditorOpen] = useState(false);
   const [idempotencyKey] = useState(() => crypto.randomUUID());

@@ -124,7 +124,7 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
   /** Execute the run after user confirms. */
   const confirmRun = useCallback(() => {
     if (!project || !pendingSuiteId || runMutation.isPending) return;
-    runMutation.mutate({ projectId: project.id, id: pendingSuiteId });
+    runMutation.mutate({ projectId: project.id, id: pendingSuiteId, idempotencyKey: crypto.randomUUID() });
   }, [project, pendingSuiteId, runMutation]);
 
   const closeConfirmation = useCallback(() => {
