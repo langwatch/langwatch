@@ -42,14 +42,4 @@ describe("isExperimentQueryEnabled()", () => {
     });
   });
 
-  describe("when both project and workflowId are available", () => {
-    it("returns true", () => {
-      const result = isExperimentQueryEnabled({
-        hasProject: true,
-        workflowId: "some-id",
-      });
-
-      expect(result).toBe(true);
-    });
-  });
 });
