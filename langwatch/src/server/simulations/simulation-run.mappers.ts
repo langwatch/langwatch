@@ -18,6 +18,7 @@ export interface ClickHouseSimulationRunRow {
   Status: string;
   Name: string | null;
   Description: string | null;
+  Metadata: string | null;
   "Messages.Id": string[];
   "Messages.Role": string[];
   "Messages.Content": string[];
@@ -123,12 +124,17 @@ export function mapClickHouseRowToScenarioRunData(
         }
       : null;
 
+  const metadata = row.Metadata
+    ? (() => { try { return JSON.parse(row.Metadata) as Record<string, unknown>; } catch { return null; } })()
+    : null;
+
   return {
     scenarioId: row.ScenarioId,
     batchRunId: row.BatchRunId,
     scenarioRunId: row.ScenarioRunId,
     name: row.Name,
     description: row.Description,
+    metadata,
     status: resolvedStatus,
     results,
     messages,
