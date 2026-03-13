@@ -236,11 +236,7 @@ function PublishMenu({
     }),
   );
 
-  const { checkCanCommitNewVersion } = useWorkflowStore(
-    ({ checkCanCommitNewVersion }) => ({ checkCanCommitNewVersion }),
-  );
-  const canSave = checkCanCommitNewVersion();
-  const { currentVersion } = useVersionState({
+  const { currentVersion, canSaveNewVersion } = useVersionState({
     project,
     allowSaveIfAutoSaveIsCurrentButNotLatest: false,
   });
@@ -305,7 +301,7 @@ function PublishMenu({
     ? currentVersion?.parent?.version
     : currentVersion?.version;
   const canPublish =
-    !canSave &&
+    !canSaveNewVersion &&
     publishedWorkflow.data?.version === currentVersionString
       ? "Current version is already published"
       : undefined;
@@ -461,7 +457,6 @@ function PublishModalContent({
     workflowId,
     getWorkflow,
     workflow_type,
-    checkCanCommitNewVersion,
     setLastCommittedWorkflow,
     setCurrentVersionId,
     currentVersionId,
@@ -470,7 +465,6 @@ function PublishModalContent({
       workflow_id: workflowId,
       getWorkflow,
       workflow_type,
-      checkCanCommitNewVersion,
       setLastCommittedWorkflow,
       setCurrentVersionId,
       currentVersionId,
@@ -478,7 +472,6 @@ function PublishModalContent({
       workflowId,
       getWorkflow,
       workflow_type,
-      checkCanCommitNewVersion,
       setLastCommittedWorkflow,
       setCurrentVersionId,
       currentVersionId,
@@ -501,9 +494,8 @@ function PublishModalContent({
   });
 
   const formVersion = form.watch("version");
-  const canSave = checkCanCommitNewVersion();
 
-  const { versions, currentVersion } =
+  const { versions, currentVersion, canSaveNewVersion: canSave } =
     useVersionState({
       project,
       form,

@@ -121,7 +121,6 @@ export function OptimizeModalContent({
     deselectAllNodes,
     setOpenResultsPanelRequest,
     default_llm,
-    checkCanCommitNewVersion,
     setLastCommittedWorkflow,
     setCurrentVersionId,
     currentVersionId,
@@ -134,7 +133,6 @@ export function OptimizeModalContent({
       deselectAllNodes,
       setOpenResultsPanelRequest,
       default_llm,
-      checkCanCommitNewVersion,
       setLastCommittedWorkflow,
       setCurrentVersionId,
       currentVersionId,
@@ -146,7 +144,6 @@ export function OptimizeModalContent({
       deselectAllNodes,
       setOpenResultsPanelRequest,
       default_llm,
-      checkCanCommitNewVersion,
       setLastCommittedWorkflow,
       setCurrentVersionId,
       currentVersionId,
@@ -192,8 +189,7 @@ export function OptimizeModalContent({
     },
   );
 
-  const canSave = checkCanCommitNewVersion();
-  const { versions } =
+  const { versions, canSaveNewVersion: canSave } =
     useVersionState({
       project,
       form: form as unknown as UseFormReturn<{
