@@ -8,14 +8,33 @@
 import { ScenarioRunStatus } from "./scenario-event.enums";
 import type { ScenarioRunData } from "./scenario-event.types";
 import type { ScenarioJob } from "./scenario.queue";
+import { STALL_THRESHOLD_MS } from "./stall-detection";
 
-/** Maps BullMQ job state to ScenarioRunStatus. */
-export function mapBullMQStateToStatus(
-  state: string,
-): ScenarioRunStatus {
+/**
+ * Maps BullMQ job state to ScenarioRunStatus.
+ *
+ * For active jobs, optionally checks whether the job has exceeded the stall
+ * threshold based on its timestamp. This catches workers that died before
+ * emitting a RUN_STARTED event.
+ */
+export function mapBullMQStateToStatus({
+  state,
+  jobTimestamp,
+  now = Date.now(),
+}: {
+  state: string;
+  jobTimestamp?: number;
+  now?: number;
+}): ScenarioRunStatus {
   switch (state) {
-    case "active":
+    case "active": {
+      if (jobTimestamp !== undefined) {
+        if (now - jobTimestamp >= STALL_THRESHOLD_MS) {
+          return ScenarioRunStatus.STALLED;
+        }
+      }
       return ScenarioRunStatus.RUNNING;
+    }
     case "completed":
       return ScenarioRunStatus.IN_PROGRESS;
     case "failed":
@@ -52,7 +71,10 @@ export function normalizeJob({ job, state }: NormalizeJobParams): ScenarioRunDat
     return null;
   }
 
-  const status = mapBullMQStateToStatus(state);
+  const status = mapBullMQStateToStatus({
+    state,
+    jobTimestamp: job.timestamp,
+  });
 
   return {
     scenarioId: data.scenarioId,
