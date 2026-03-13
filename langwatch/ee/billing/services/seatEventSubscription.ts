@@ -162,6 +162,7 @@ export const createSeatEventSubscriptionFns = ({
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       currency: currency.toLowerCase(),
+      adaptive_pricing: { enabled: false },
       customer: customerId,
       customer_update: {
         address: "auto",
