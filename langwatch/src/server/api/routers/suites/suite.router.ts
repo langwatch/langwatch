@@ -10,6 +10,7 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { SuiteService } from "~/server/suites/suite.service";
 import { SuiteDomainError } from "~/server/suites/errors";
 import { ProjectRepository } from "~/server/projects/project.repository";
+import { enforceLicenseLimit } from "~/server/license-enforcement";
 import { checkProjectPermission } from "../../rbac";
 import { createSuiteSchema, projectSchema, suiteTargetSchema, updateSuiteSchema } from "./schemas";
 
@@ -18,6 +19,9 @@ export const suiteRouter = createTRPCRouter({
     .input(createSuiteSchema)
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
+      // Enforce scenario set limit before creation
+      await enforceLicenseLimit(ctx, input.projectId, "scenarioSets");
+
       const service = SuiteService.create(ctx.prisma);
       return service.create(input);
     }),
