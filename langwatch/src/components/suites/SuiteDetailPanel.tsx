@@ -26,7 +26,8 @@ import {
   Repeat2,
   Target,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { TagList } from "~/components/ui/TagList";
+import { useState } from "react";
 import { parseSuiteTargets } from "~/server/suites/types";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
@@ -39,6 +40,8 @@ type SuiteDetailPanelProps = {
   onRun: () => void;
   isRunning?: boolean;
   period: Period;
+  onAddLabel?: (label: string) => void;
+  onRemoveLabel?: (label: string) => void;
 };
 
 export function SuiteDetailPanel({
@@ -47,6 +50,8 @@ export function SuiteDetailPanel({
   onRun,
   isRunning = false,
   period,
+  onAddLabel,
+  onRemoveLabel,
 }: SuiteDetailPanelProps) {
   const targets = (() => {
     try {
@@ -66,22 +71,15 @@ export function SuiteDetailPanel({
       <Box paddingX={6} paddingY={4}>
         <HStack justify="space-between" align="start">
           <VStack align="start" gap={1}>
-            <HStack gap={2}>
+            <HStack gap={2} flexWrap="wrap" alignItems="center">
               <Text fontSize="xl" fontWeight="bold">
                 {suite.name}
               </Text>
-              {suite.labels.map((label) => (
-                <Text
-                  key={label}
-                  fontSize="xs"
-                  bg="bg.muted"
-                  px={2}
-                  py={0.5}
-                  borderRadius="md"
-                >
-                  #{label}
-                </Text>
-              ))}
+              <TagList
+                labels={suite.labels}
+                onRemove={onRemoveLabel ? (label) => onRemoveLabel(label) : undefined}
+                onAdd={onAddLabel}
+              />
             </HStack>
             {suite.description && (
               <Text fontSize="sm" color="fg.muted">
@@ -202,16 +200,16 @@ function StatPill({
   label: string;
   colorScheme?: string;
 }) {
-  const colors = pillColors[colorScheme] ?? pillColors.gray;
+  const colors = pillColors[colorScheme] ?? pillColors["gray"]!;
   return (
     <HStack
       gap={1.5}
       paddingX={3}
       paddingY={1.5}
       borderRadius="full"
-      bg={colors!.bg}
+      bg={colors.bg}
     >
-      <Box color={colors!.color}>{icon}</Box>
+      <Box color={colors.color}>{icon}</Box>
       <Text fontSize="sm" fontWeight="semibold">
         {value}
       </Text>

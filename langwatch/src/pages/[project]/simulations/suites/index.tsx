@@ -234,6 +234,44 @@ function SuitesPageContent() {
     archiveMutation.mutate({ projectId: project.id, id: archiveConfirmId });
   }, [project, archiveConfirmId, archiveMutation]);
 
+  const updateLabelsMutation = api.suites.update.useMutation({
+    onSuccess: () => {
+      void utils.suites.getAll.invalidate();
+    },
+    onError: (err) => {
+      toaster.create({
+        title: "Failed to update labels",
+        description: err.message,
+        type: "error",
+        meta: { closable: true },
+      });
+    },
+  });
+
+  const handleAddLabel = useCallback(
+    (label: string) => {
+      if (!project || !selectedSuite || updateLabelsMutation.isPending) return;
+      updateLabelsMutation.mutate({
+        projectId: project.id,
+        id: selectedSuite.id,
+        labels: [...selectedSuite.labels, label],
+      });
+    },
+    [project, selectedSuite, updateLabelsMutation],
+  );
+
+  const handleRemoveLabel = useCallback(
+    (label: string) => {
+      if (!project || !selectedSuite || updateLabelsMutation.isPending) return;
+      updateLabelsMutation.mutate({
+        projectId: project.id,
+        id: selectedSuite.id,
+        labels: selectedSuite.labels.filter((l) => l !== label),
+      });
+    },
+    [project, selectedSuite, updateLabelsMutation],
+  );
+
   const handleContextMenu = useCallback(
     (e: React.MouseEvent, suiteId: string) => {
       e.preventDefault();
@@ -302,6 +340,8 @@ function SuitesPageContent() {
             isRunning={isRunPending}
             period={period}
             suiteNameMap={suiteNameMap}
+            onAddLabel={handleAddLabel}
+            onRemoveLabel={handleRemoveLabel}
           />
         </Box>
       </HStack>
@@ -345,6 +385,8 @@ function MainPanel({
   isRunning,
   period,
   suiteNameMap,
+  onAddLabel,
+  onRemoveLabel,
 }: {
   error: { message: string } | null;
   selectedSuiteSlug: string | typeof ALL_RUNS_ID | null;
@@ -357,6 +399,8 @@ function MainPanel({
   isRunning: boolean;
   period: Period;
   suiteNameMap: Map<string, string>;
+  onAddLabel: (label: string) => void;
+  onRemoveLabel: (label: string) => void;
 }) {
   if (isLoading) {
     return null;
@@ -393,6 +437,8 @@ function MainPanel({
         onRun={() => onRunSuite(selectedSuite.id)}
         isRunning={isRunning}
         period={period}
+        onAddLabel={onAddLabel}
+        onRemoveLabel={onRemoveLabel}
       />
     );
   }
