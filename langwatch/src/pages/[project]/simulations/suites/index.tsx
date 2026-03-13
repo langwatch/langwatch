@@ -194,19 +194,19 @@ function SuitesPageContent() {
     },
   });
 
-  // Handlers
-  // Use a ref to break the circular dependency:
-  // handleEditSuite → handleRunRequested → runMutation → onEditSuite → handleEditSuite
+  // Use a ref for handleEditSuite to break circular dependency:
+  // handleRunRequested → runMutation → useSuiteRunMutation({ onEditSuite }) → handleEditSuite → handleRunRequested
   const handleEditSuiteRef = useRef<(suiteId: string) => void>(() => {});
 
   const { runMutation } = useSuiteRunMutation({
-    onEditSuite: (suiteId) => handleEditSuiteRef.current(suiteId),
+    onEditSuite: (suiteId: string) => handleEditSuiteRef.current(suiteId),
     onSuccess: () => {
       setSuiteRunSinceTimestamp(undefined);
       void utils.scenarios.getSuiteRunData.invalidate();
     },
   });
 
+  // Handlers
   const handleSuiteSaved = useCallback(
     (suite: SimulationSuite) => {
       navigateToSuite(suite.slug);
@@ -222,6 +222,14 @@ function SuitesPageContent() {
     [navigateToSuite, runMutation, project?.id],
   );
 
+  const handleNewSuite = useCallback(() => {
+    setFlowCallbacks("suiteEditor", {
+      onSaved: handleSuiteSaved,
+      onRunRequested: handleRunRequested,
+    });
+    openDrawer("suiteEditor");
+  }, [openDrawer, setFlowCallbacks, handleSuiteSaved, handleRunRequested]);
+
   const handleEditSuite = useCallback(
     (suiteId: string) => {
       setFlowCallbacks("suiteEditor", {
@@ -232,15 +240,8 @@ function SuitesPageContent() {
     },
     [openDrawer, setFlowCallbacks, handleSuiteSaved, handleRunRequested],
   );
-  handleEditSuiteRef.current = handleEditSuite;
 
-  const handleNewSuite = useCallback(() => {
-    setFlowCallbacks("suiteEditor", {
-      onSaved: handleSuiteSaved,
-      onRunRequested: handleRunRequested,
-    });
-    openDrawer("suiteEditor");
-  }, [openDrawer, setFlowCallbacks, handleSuiteSaved, handleRunRequested]);
+  handleEditSuiteRef.current = handleEditSuite;
 
   const handleRunSuite = useCallback(
     (suiteId: string) => {
