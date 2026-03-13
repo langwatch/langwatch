@@ -89,14 +89,20 @@ async function handleTracesRequest(req: NextRequest) {
             const activePlan = await getApp().planProvider.getActivePlan({
               organizationId: project.team.organizationId,
             });
-            await getApp().usageLimits.notifyPlanLimitReached({
+
+            getApp().usageLimits.notifyPlanLimitReached({
               organizationId: project.team.organizationId,
               planName: activePlan.name ?? "free",
+            }).catch(error => {
+              logger.error(
+              { error, projectId: project.id },
+              "Error sending plan limit notification",
+            );
             });
           } catch (error) {
             logger.error(
               { error, projectId: project.id },
-              "Error sending plan limit notification",
+              "Error getting active plan information",
             );
           }
           logger.info(
@@ -192,8 +198,9 @@ async function handleTracesRequest(req: NextRequest) {
           project.piiRedactionLevel,
         );
       }
-      if (project.disableElasticSearchTraceWriting)
-        return;
+      if (project.disableElasticSearchTraceWriting) {
+        return NextResponse.json({ message: "Trace received successfully." });
+      }
 
       const tracesForCollection =
         await openTelemetryTraceRequestToTracesForCollection(traceRequest);
