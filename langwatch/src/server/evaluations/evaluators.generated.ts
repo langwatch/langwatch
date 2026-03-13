@@ -839,6 +839,21 @@ export type Evaluators = {
         * @default "openai/text-embedding-3-small"
         */
         embeddings_model: string;
+        /**
+        * @description Reference phrase representing the positive end of the sentiment scale
+        * @default "Comment of a very happy and satisfied user"
+        */
+        positive_reference: string;
+        /**
+        * @description Reference phrase representing the negative end of the sentiment scale
+        * @default "Comment of a user who is extremely dissatisfied"
+        */
+        negative_reference: string;
+        /**
+        * @description Expected range of (positive - negative) cosine similarity. Raw scores are divided by this to normalize to [-1, 1]
+        * @default 0.1
+        */
+        normalization_factor: number;
       };
   };
   "langevals/similarity": {
@@ -2078,6 +2093,18 @@ to 1.0 (very positive) and a corresponding label.
       "embeddings_model": {
             "description": "The embeddings model to use for sentiment analysis",
             "default": "openai/text-embedding-3-small"
+      },
+      "positive_reference": {
+            "description": "Reference phrase representing the positive end of the sentiment scale",
+            "default": "Comment of a very happy and satisfied user"
+      },
+      "negative_reference": {
+            "description": "Reference phrase representing the negative end of the sentiment scale",
+            "default": "Comment of a user who is extremely dissatisfied"
+      },
+      "normalization_factor": {
+            "description": "Expected range of (positive - negative) cosine similarity. Raw scores are divided by this to normalize to [-1, 1]",
+            "default": 0.1
       }
 },
     envVars: [],
