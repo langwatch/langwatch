@@ -762,6 +762,32 @@ describe("resolveOriginLabel()", () => {
       expect(result).toBeNull();
     });
   });
+
+  describe("when the scenario set ID is an on-platform set", () => {
+    it("returns the friendly on-platform display name", () => {
+      const suiteNameMap = new Map<string, string>();
+
+      const result = resolveOriginLabel({
+        scenarioSetId: "__internal__project_owUldAg3-Pmddu7CMcgeo__on-platform-scenarios",
+        suiteNameMap,
+      });
+
+      expect(result).toBe("On-Platform Scenarios");
+    });
+  });
+
+  describe("when the scenario set ID is an on-platform set with different project ID", () => {
+    it("returns the friendly on-platform display name regardless of project ID", () => {
+      const suiteNameMap = new Map<string, string>();
+
+      const result = resolveOriginLabel({
+        scenarioSetId: "__internal__proj_abc123__on-platform-scenarios",
+        suiteNameMap,
+      });
+
+      expect(result).toBe("On-Platform Scenarios");
+    });
+  });
 });
 
 describe("availableGroupByOptions()", () => {

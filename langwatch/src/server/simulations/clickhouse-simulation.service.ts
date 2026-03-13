@@ -6,6 +6,7 @@ import type {
   ScenarioRunData,
   ScenarioSetData,
 } from "../scenarios/scenario-event.types";
+import { INTERNAL_SET_PREFIX } from "../scenarios/internal-set-id";
 import { resolveRunStatus } from "../scenarios/stall-detection";
 import {
   mapClickHouseRowToScenarioRunData,
@@ -764,7 +765,8 @@ export class ClickHouseSimulationService {
          SELECT *
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
-           AND ScenarioSetId LIKE '__internal__%__suite'
+           AND startsWith(ScenarioSetId, '${INTERNAL_SET_PREFIX}')
+          AND endsWith(ScenarioSetId, '__suite')
            ${startedAtClause}
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
@@ -847,7 +849,7 @@ export class ClickHouseSimulationService {
            SELECT *
            FROM ${TABLE_NAME}
            WHERE TenantId = {tenantId:String}
-             AND NOT startsWith(ScenarioSetId, '__internal__')
+             AND NOT startsWith(ScenarioSetId, '${INTERNAL_SET_PREFIX}')
              ${startedAtClause}
            ORDER BY ScenarioRunId, UpdatedAt DESC
            LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId

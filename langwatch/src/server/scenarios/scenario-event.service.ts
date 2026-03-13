@@ -9,6 +9,7 @@ import type {
   ScenarioEvent,
   ScenarioRunData,
 } from "./scenario-event.types";
+import { isInternalSetId } from "./internal-set-id";
 import { resolveRunStatus } from "./stall-detection";
 
 const tracer = getLangWatchTracer("langwatch.scenario-events.service");
@@ -879,7 +880,7 @@ export class ScenarioEventService {
       async (span) => {
         const allSets = await this.eventRepository.getScenarioSetsDataForProject({ projectId });
         const externalSets = allSets.filter(
-          (s) => !s.scenarioSetId.startsWith("__internal__"),
+          (s) => !isInternalSetId(s.scenarioSetId),
         );
         span.setAttribute("result.count", externalSets.length);
         // ES path cannot resolve per-run pass/fail status; return zero counts
