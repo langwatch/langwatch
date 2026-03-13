@@ -1,6 +1,5 @@
 from typing import Optional
 from langevals_core.base_evaluator import (
-    DEFAULT_MAX_TOKENS,
     BaseEvaluator,
     EvaluatorEntry,
     EvaluationResult,
@@ -10,7 +9,10 @@ from langevals_core.base_evaluator import (
 )
 from pydantic import Field
 import litellm
+from litellm.utils import get_max_tokens
 import numpy as np
+
+EMBEDDING_MAX_TOKENS_FALLBACK = 8192
 
 class SentimentEntry(EvaluatorEntry):
     input: str
@@ -67,10 +69,12 @@ class SentimentEvaluator(
 
         model = self.settings.embeddings_model
 
+        max_tokens_retrieved = get_max_tokens(model)
+        max_tokens = int(max_tokens_retrieved) if max_tokens_retrieved else EMBEDDING_MAX_TOKENS_FALLBACK
         total_tokens = len(litellm.encode(model=model, text=entry.input))
-        if total_tokens > DEFAULT_MAX_TOKENS:
+        if total_tokens > max_tokens:
             return EvaluationResultSkipped(
-                details=f"Total tokens exceed the maximum of {DEFAULT_MAX_TOKENS} tokens: {total_tokens} tokens used"
+                details=f"Input exceeds embedding model limit of {max_tokens} tokens ({total_tokens} tokens used)"
             )
 
         input_embedding = self._get_embedding(entry.input)
