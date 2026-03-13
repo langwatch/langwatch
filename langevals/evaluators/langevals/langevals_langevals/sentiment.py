@@ -31,7 +31,6 @@ class SentimentSettings(EvaluatorSettings):
     )
     normalization_factor: float = Field(
         default=0.10,
-        gt=0,
         description="Controls sentiment sensitivity. Decrease to make scores more extreme (fewer neutrals), increase to make scores more moderate (more neutrals)",
     )
 
@@ -82,7 +81,8 @@ class SentimentEvaluator(
         negative_similarity = self._cosine_similarity(input_embedding, negative_embedding)
 
         raw_score = positive_similarity - negative_similarity
-        normalized_score = max(-1.0, min(1.0, raw_score / self.settings.normalization_factor))
+        factor = self.settings.normalization_factor if self.settings.normalization_factor != 0 else 1e-9
+        normalized_score = max(-1.0, min(1.0, raw_score / factor))
         label = "negative" if raw_score < 0 else "positive"
 
         return SentimentResult(
