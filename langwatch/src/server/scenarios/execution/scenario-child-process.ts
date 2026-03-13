@@ -137,7 +137,6 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
       name: scenario.name,
       description: scenario.situation,
       setId: context.setId,
-      __UNSAFE__scenarioRunId: scenarioRunId,
       agents: [
         adapter,
         ScenarioRunner.userSimulatorAgent({ model }),
@@ -153,7 +152,7 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
     },
     {
       batchRunId: context.batchRunId,
-      runId: context.scenarioRunId,
+      runId: scenarioRunId ?? context.scenarioRunId,
       langwatch: {
         endpoint: langwatchEndpoint,
         apiKey: langwatchApiKey,

@@ -18,7 +18,6 @@ import type { RunGroup, RunGroupSummary } from "./run-history-transforms";
 import { groupRunsByBatchId } from "./run-history-transforms";
 import { BatchSection } from "./BatchSection";
 import { RunSummaryCounts } from "./RunSummaryCounts";
-import { formatSummaryStatusLabel } from "./format-run-status-label";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import type { ViewMode } from "./useRunHistoryStore";
 
@@ -84,13 +83,6 @@ export function GroupRow({
           &middot;
         </Text>
         <SummaryStatusIcon summary={summary} />
-        <Text
-          fontSize="sm"
-          fontWeight="medium"
-          color={summary.failedCount > 0 ? "red.fg" : "green.fg"}
-        >
-          {formatSummaryStatusLabel(summary)}
-        </Text>
         <Box flex={1} />
         <Text fontSize="xs" color="fg.muted">
           {runCount} {runCount === 1 ? "run" : "runs"}
