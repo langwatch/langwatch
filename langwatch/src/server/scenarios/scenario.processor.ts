@@ -325,7 +325,7 @@ async function spawnScenarioChildProcess(
     });
 
     // Resolve spawn command: pre-compiled bundle in production, tsx in development
-    // Use __dirname to resolve cwd reliably - go up from src/server/scenarios to package root
+    // Use __dirname to resolve package root reliably (works from source and built output paths)
     const packageRoot = path.resolve(__dirname, "../../..");
     const { command, args } = resolveChildProcessSpawn({
       packageRoot,
