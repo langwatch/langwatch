@@ -195,6 +195,7 @@ export class SuiteRunService {
           setId,
           batchRunId,
           index: item.repeat,
+          scenarioRunId: item.scenarioRunId,
         }),
       );
     }
