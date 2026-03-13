@@ -125,7 +125,14 @@ export function mapClickHouseRowToScenarioRunData(
       : null;
 
   const metadata = row.Metadata
-    ? (() => { try { return JSON.parse(row.Metadata) as Record<string, unknown>; } catch { return null; } })()
+    ? (() => {
+        try {
+          const parsed: unknown = JSON.parse(row.Metadata);
+          return parsed != null && typeof parsed === "object" && !Array.isArray(parsed)
+            ? (parsed as Record<string, unknown>)
+            : null;
+        } catch { return null; }
+      })()
     : null;
 
   return {
