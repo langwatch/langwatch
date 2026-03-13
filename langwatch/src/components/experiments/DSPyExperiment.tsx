@@ -342,6 +342,18 @@ export function DSPyExperimentRunList({
     (run) => run.workflow_version,
   );
 
+  // Map real run IDs to their chronological index for stable "Run #N" numbering
+  const runIndexById = useMemo(
+    () =>
+      new Map(
+        (dspyRuns.data ?? []).map((realRun, realIndex) => [
+          realRun.runId,
+          realIndex,
+        ]),
+      ),
+    [dspyRuns.data],
+  );
+
   return (
     <VStack
       align="start"
@@ -379,13 +391,13 @@ export function DSPyExperimentRunList({
           Waiting for runs...
         </Text>
       ) : (
-        dspyRunsPlusIncoming?.slice(0, 21).map((run, index) => {
+        dspyRunsPlusIncoming?.slice(0, 21).map((run) => {
           const runCost = run.steps
             ?.map((step) => step.llm_calls_summary.total_cost)
             .reduce((acc, cost) => acc + cost, 0);
           const runName = getRunDisplayName({
             commitMessage: run.workflow_version?.commitMessage,
-            index,
+            index: runIndexById.get(run.runId) ?? 0,
           });
 
           return (

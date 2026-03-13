@@ -250,9 +250,13 @@ export function BatchEvaluationResults({
   const runIds = useMemo(() => sidebarRuns.map((r) => r.runId), [sidebarRuns]);
 
   // Map runId to human-readable name (commit message or "Run #N")
+  // Sort chronologically so fallback "Run #N" numbering is stable
   const runNameMap = useMemo(() => {
     const map: Record<string, string> = {};
-    sidebarRuns.forEach((run, index) => {
+    const sorted = [...sidebarRuns].sort(
+      (a, b) => a.timestamps.createdAt - b.timestamps.createdAt,
+    );
+    sorted.forEach((run, index) => {
       map[run.runId] = getRunDisplayName({
         commitMessage: run.workflowVersion?.commitMessage,
         index,
