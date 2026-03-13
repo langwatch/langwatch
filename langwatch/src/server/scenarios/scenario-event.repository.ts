@@ -911,6 +911,7 @@ export class ScenarioEventRepository {
         },
       },
       async (span) => {
+        const validatedProjectId = projectIdSchema.parse(projectId);
         if (batchRunIds.length === 0) {
           span.setAttribute("result.count", 0);
           return [];
@@ -940,7 +941,7 @@ export class ScenarioEventRepository {
             query: {
               bool: {
                 must: [
-                  { term: { [ES_FIELDS.projectId]: projectId } },
+                  { term: { [ES_FIELDS.projectId]: validatedProjectId } },
                   { terms: { [ES_FIELDS.batchRunId]: validBatchRunIds } },
                   { exists: { field: ES_FIELDS.scenarioRunId } },
                 ],
