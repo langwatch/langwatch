@@ -239,6 +239,12 @@ server.tool(
 // These tools manage prompts on the LangWatch platform via API.
 // For code-based prompt management, see `fetch_langwatch_docs` for the CLI/SDK approach.
 
+const modelSchema = z
+  .string()
+  .describe(
+    'Model in "provider/model-name" format, e.g., "openai/gpt-4o", "anthropic/claude-sonnet-4-5-20250929"'
+  );
+
 server.tool(
   "platform_create_prompt",
   `Create a new prompt on the LangWatch platform.
@@ -250,11 +256,13 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
 2. Platform-based (LangWatch UI): If the user wants to manage prompts directly on the LangWatch platform, use the \`platform_\` MCP tools (\`platform_create_prompt\`, \`platform_update_prompt\`, etc.).
 `,
   {
-    name: z.string().describe("Prompt name"),
+    name: z.string().describe("Prompt display name"),
     handle: z
       .string()
       .optional()
-      .describe("URL-friendly handle (auto-generated if omitted)"),
+      .describe(
+        "URL-friendly handle (auto-generated from name if omitted)"
+      ),
     messages: z
       .array(
         z.object({
@@ -265,13 +273,7 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
         })
       )
       .describe("Prompt messages"),
-    model: z
-      .string()
-      .describe('Model name, e.g., "gpt-4o", "claude-sonnet-4-5-20250929"'),
-    modelProvider: z
-      .string()
-      .describe('Provider name, e.g., "openai", "anthropic"'),
-    description: z.string().optional().describe("Prompt description"),
+    model: modelSchema,
   },
   async (params) => {
     const { requireApiKey } = await import("./config.js");
@@ -319,7 +321,7 @@ server.tool(
 
 server.tool(
   "platform_update_prompt",
-  "Update an existing prompt on the LangWatch platform or create a new version.",
+  "Update an existing prompt on the LangWatch platform. Every update creates a new version.",
   {
     idOrHandle: z.string().describe("Prompt ID or handle to update"),
     messages: z
@@ -331,18 +333,10 @@ server.tool(
       )
       .optional()
       .describe("Updated messages"),
-    model: z.string().optional().describe("Updated model name"),
-    modelProvider: z.string().optional().describe("Updated provider"),
+    model: modelSchema.optional(),
     commitMessage: z
       .string()
-      .optional()
-      .describe("Commit message for the change"),
-    createVersion: z
-      .boolean()
-      .optional()
-      .describe(
-        "If true, creates a new version instead of updating in place"
-      ),
+      .describe("Commit message describing the change"),
   },
   async (params) => {
     const { requireApiKey } = await import("./config.js");

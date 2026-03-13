@@ -49,14 +49,12 @@ const CANNED_PROMPTS_LIST = [
     id: "p1",
     handle: "greeting-bot",
     name: "Greeting Bot",
-    description: "A friendly greeting bot",
     latestVersionNumber: 3,
   },
   {
     id: "p2",
     handle: "qa-assistant",
     name: "QA Assistant",
-    description: null,
     latestVersionNumber: 1,
   },
 ];
@@ -65,14 +63,12 @@ const CANNED_PROMPT_DETAIL = {
   id: "p1",
   handle: "greeting-bot",
   name: "Greeting Bot",
-  description: "A friendly greeting bot",
   latestVersionNumber: 3,
   versions: [
     {
       version: 3,
       commitMessage: "Updated tone",
-      model: "gpt-4o",
-      modelProvider: "openai",
+      model: "openai/gpt-4o",
       messages: [{ role: "system", content: "You are a friendly bot." }],
     },
     { version: 2, commitMessage: "Added greeting" },
@@ -128,12 +124,6 @@ function createMockServer(): Server {
       } else if (url === "/api/prompts" && req.method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_PROMPTS_LIST));
-      } else if (
-        url.match(/^\/api\/prompts\/[^/]+\/versions/) &&
-        req.method === "POST"
-      ) {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_PROMPT_UPDATED));
       } else if (url.match(/^\/api\/prompts\/[^/]+$/) && req.method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_PROMPT_DETAIL));
@@ -142,7 +132,7 @@ function createMockServer(): Server {
         res.end(JSON.stringify(CANNED_PROMPT_CREATED));
       } else if (
         url.match(/^\/api\/prompts\/[^/]+$/) &&
-        req.method === "POST"
+        req.method === "PUT"
       ) {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_PROMPT_UPDATED));
@@ -251,8 +241,7 @@ describe("MCP tools integration", () => {
       const result = await handleCreatePrompt({
         name: "New Prompt",
         messages: [{ role: "system", content: "You are helpful." }],
-        model: "gpt-4o",
-        modelProvider: "openai",
+        model: "openai/gpt-4o",
       });
       expect(result).toContain("created successfully");
       expect(result).toContain("p-new");
@@ -260,31 +249,17 @@ describe("MCP tools integration", () => {
   });
 
   describe("platform_update_prompt", () => {
-    it("returns success message for in-place update from mock server", async () => {
+    it("returns success message from mock server", async () => {
       const { handleUpdatePrompt } = await import(
         "../tools/update-prompt.js"
       );
       const result = await handleUpdatePrompt({
         idOrHandle: "greeting-bot",
-        model: "gpt-4o-mini",
+        model: "openai/gpt-4o-mini",
         commitMessage: "Switch to mini",
       });
       expect(result).toContain("updated successfully");
       expect(result).toContain("Switch to mini");
-    });
-
-    it("returns success message for version creation from mock server", async () => {
-      const { handleUpdatePrompt } = await import(
-        "../tools/update-prompt.js"
-      );
-      const result = await handleUpdatePrompt({
-        idOrHandle: "greeting-bot",
-        messages: [{ role: "system", content: "Be concise." }],
-        createVersion: true,
-        commitMessage: "Make concise",
-      });
-      expect(result).toContain("version created");
-      expect(result).toContain("Make concise");
     });
   });
 
