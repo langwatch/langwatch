@@ -86,10 +86,11 @@ A shorter workflow for bug fixes. Skips planning, challenge, user approval, and 
 - If verification fails → invoke `/code` with findings, re-run `/browser-test`
   - Max 2 iterations, then escalate to user
 
-### 6. Commit and Draft PR
-- Invoke `/commit-push` to commit all remaining changes and push to remote
+### 6. Commit, PR, and Drive to Green
+- Create a conventional commit for all changes and push to remote
 - Create a **draft** PR using `gh pr create --draft` with a summary of the work done (browser-test screenshots are already in the PR body)
 - Include the issue number in the PR body for linking
+- Invoke `/drive-pr --once` to fix any CI failures and address review comments
 
 ### 7. Verify and Finish
 
@@ -210,10 +211,11 @@ If ANY check fails:
 
 This self-check exists because it's easy to rationalize skipping work. Don't.
 
-### 10. Commit and Draft PR
-- Invoke `/commit-push` to commit all remaining changes and push to remote
+### 10. Commit, PR, and Drive to Green
+- Create a conventional commit for all changes and push to remote
 - Create a **draft** PR using `gh pr create --draft` with a summary of the work done (browser-test screenshots are already in the PR body)
 - Include the issue number in the PR body for linking
+- Invoke `/drive-pr --once` to fix any CI failures and address review comments
 
 ### 11. Verify and Finish
 
@@ -251,6 +253,7 @@ You delegate, you don't implement:
 - `/code` writes code and runs tests
 - `/review` checks quality
 - `/browser-test` verifies features work in a real browser
+- `/drive-pr` fixes CI failures and addresses review comments
 
 You manage infra lifecycle:
 - `scripts/dev-up.sh` starts an isolated dev instance (writes `.dev-port`)
