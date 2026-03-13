@@ -117,7 +117,7 @@ type Workers = {
   scenarioWorker: Worker<ScenarioJob, ScenarioJobResult, string> | undefined;
 };
 
-export const start = (
+export const start = async (
   runEvaluationMock:
     | ((
         job: Job<EvaluationJob, any, EvaluatorTypes>,
@@ -143,7 +143,9 @@ export const start = (
     startStorageStatsCollection(clickHouseClient);
   }
 
-  return new Promise<Workers | undefined>(async (resolve, reject) => {
+  const scenarioWorker = await startScenarioProcessor();
+
+  return new Promise<Workers | undefined>((resolve, reject) => {
     const collectorWorker = startCollectorWorker();
     const evaluationsWorker = startEvaluationsWorker(
       runEvaluationMock ?? runEvaluationJob,
@@ -151,7 +153,6 @@ export const start = (
     const topicClusteringWorker = startTopicClusteringWorker();
     const trackEventsWorker = startTrackEventsWorker();
     const usageStatsWorker = startUsageStatsWorker();
-    const scenarioWorker = await startScenarioProcessor();
     const metricsServer = startMetricsServer();
 
     // Register all closeables for graceful shutdown
