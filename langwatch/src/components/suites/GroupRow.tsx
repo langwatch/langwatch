@@ -2,7 +2,7 @@
  * Collapsible row for a grouped set of scenario runs.
  *
  * Used when group-by is set to "scenario" or "target".
- * Header: [chevron] [group_name (bold)] [status_icon] [counts ✓✗⏸⊘] ... [N runs]
+ * Header: [chevron] [group_name (bold)] [counts (word labels)] ... [N runs]
  * Expanded: sub-grouped by batch, each with a lightweight header showing
  * timestamp and pass rate, then ScenarioTargetRow (list) or ScenarioGridCard (grid).
  *
@@ -13,7 +13,6 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useMemo } from "react";
-import { SummaryStatusIcon } from "./SummaryStatusIcon";
 import type { RunGroup, RunGroupSummary } from "./run-history-transforms";
 import { groupRunsByBatchId } from "./run-history-transforms";
 import { BatchSection } from "./BatchSection";
@@ -56,6 +55,7 @@ export function GroupRow({
         paddingX={4}
         paddingY={3}
         gap={3}
+        flexWrap="nowrap"
         _hover={{ bg: "bg.subtle" }}
         cursor="pointer"
         onClick={onToggle}
@@ -72,20 +72,21 @@ export function GroupRow({
         data-testid="group-row-header"
       >
         {isExpanded ? (
-          <ChevronDown size={14} />
+          <ChevronDown size={14} style={{ flexShrink: 0 }} />
         ) : (
-          <ChevronRight size={14} />
+          <ChevronRight size={14} style={{ flexShrink: 0 }} />
         )}
-        <Text fontSize="sm" fontWeight="bold" color="fg.default">
+        <Text fontSize="sm" fontWeight="bold" color="fg.default" truncate minWidth={0} flexShrink={1}>
           {group.groupLabel}
         </Text>
-        <Text fontSize="sm" color="fg.muted">
+        <Text fontSize="sm" color="fg.muted" flexShrink={0}>
           &middot;
         </Text>
-        <SummaryStatusIcon summary={summary} />
-        <RunSummaryCounts summary={summary} />
+        <Box flexShrink={0}>
+          <RunSummaryCounts summary={summary} />
+        </Box>
         <Box flex={1} />
-        <Text fontSize="xs" color="fg.muted">
+        <Text fontSize="xs" color="fg.muted" flexShrink={0}>
           {runCount} {runCount === 1 ? "run" : "runs"}
         </Text>
       </HStack>

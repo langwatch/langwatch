@@ -187,7 +187,7 @@ describe("<GroupRow/>", () => {
       expect(screen.getByText("Login")).toBeInTheDocument();
     });
 
-    it("displays pass rate and run count", () => {
+    it("displays status counts and run count", () => {
       const group = makeGroup();
       const summary = computeGroupSummary({ group });
 
@@ -203,11 +203,11 @@ describe("<GroupRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("1 ✗")).toBeInTheDocument();
+      expect(screen.getByText("1 failed")).toBeInTheDocument();
       expect(screen.getAllByText("2 runs").length).toBeGreaterThanOrEqual(1);
     });
 
-    it("displays compact counts with icons in header", () => {
+    it("displays word-label counts in header", () => {
       const group = makeGroup();
       const summary = computeGroupSummary({ group });
 
@@ -223,8 +223,8 @@ describe("<GroupRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("1 ✓")).toBeInTheDocument();
-      expect(screen.getByText("1 ✗")).toBeInTheDocument();
+      expect(screen.getByText("1 passed")).toBeInTheDocument();
+      expect(screen.getByText("1 failed")).toBeInTheDocument();
     });
   });
 
@@ -252,7 +252,7 @@ describe("<GroupRow/>", () => {
       expect(screen.getByText("My Agent")).toBeInTheDocument();
     });
 
-    it("displays pass rate and run count", () => {
+    it("displays status counts and run count", () => {
       const group = makeGroup({
         groupKey: "agent-1",
         groupLabel: "My Agent",
@@ -286,7 +286,7 @@ describe("<GroupRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("1 ✗")).toBeInTheDocument();
+      expect(screen.getByText("1 failed")).toBeInTheDocument();
       expect(screen.getAllByText("3 runs").length).toBeGreaterThanOrEqual(1);
     });
   });
@@ -354,7 +354,7 @@ describe("<GroupRow/>", () => {
       expect(batchHeaders).toHaveLength(2);
     });
 
-    it("displays pass rate in each batch sub-header", () => {
+    it("displays status counts in each batch sub-header", () => {
       const group: RunGroup = {
         groupKey: "s1",
         groupLabel: "Login",
@@ -385,7 +385,7 @@ describe("<GroupRow/>", () => {
       );
 
       const batchHeader = screen.getByTestId("batch-sub-header");
-      expect(within(batchHeader).getByText("1 ✓")).toBeInTheDocument();
+      expect(within(batchHeader).getByText("1 passed")).toBeInTheDocument();
     });
   });
 

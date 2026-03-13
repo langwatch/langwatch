@@ -32,13 +32,13 @@ describe("<RunSummaryCounts/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("8 ✓")).toBeInTheDocument();
-      expect(screen.queryByText(/✗/)).not.toBeInTheDocument();
+      expect(screen.getByText("8 passed")).toBeInTheDocument();
+      expect(screen.queryByText(/failed/)).not.toBeInTheDocument();
     });
   });
 
   describe("given a summary with passed and failed counts non-zero", () => {
-    it("displays both with compact icons", () => {
+    it("displays both as word labels", () => {
       render(
         <RunSummaryCounts
           summary={makeSummary({ passedCount: 8, failedCount: 2 })}
@@ -46,13 +46,13 @@ describe("<RunSummaryCounts/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("8 ✓")).toBeInTheDocument();
-      expect(screen.getByText("2 ✗")).toBeInTheDocument();
+      expect(screen.getByText("8 passed")).toBeInTheDocument();
+      expect(screen.getByText("2 failed")).toBeInTheDocument();
     });
   });
 
   describe("given a summary with all status counts non-zero", () => {
-    it("displays all statuses with icons", () => {
+    it("displays all statuses as word labels", () => {
       render(
         <RunSummaryCounts
           summary={makeSummary({
@@ -65,10 +65,10 @@ describe("<RunSummaryCounts/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("5 ✓")).toBeInTheDocument();
-      expect(screen.getByText("1 ✗")).toBeInTheDocument();
-      expect(screen.getByText("2 ⏸")).toBeInTheDocument();
-      expect(screen.getByText("1 ⊘")).toBeInTheDocument();
+      expect(screen.getByText("5 passed")).toBeInTheDocument();
+      expect(screen.getByText("1 failed")).toBeInTheDocument();
+      expect(screen.getByText("2 stalled")).toBeInTheDocument();
+      expect(screen.getByText("1 skipped")).toBeInTheDocument();
     });
   });
 
@@ -86,8 +86,8 @@ describe("<RunSummaryCounts/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.queryByText(/⏸/)).not.toBeInTheDocument();
-      expect(screen.queryByText(/⊘/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/stalled/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/skipped/)).not.toBeInTheDocument();
     });
   });
 
@@ -109,10 +109,10 @@ describe("<RunSummaryCounts/>", () => {
         '[data-testid="run-summary-counts"]',
       );
       expect(countsEl).toBeInTheDocument();
-      expect(screen.queryByText(/✓/)).not.toBeInTheDocument();
-      expect(screen.queryByText(/✗/)).not.toBeInTheDocument();
-      expect(screen.queryByText(/⏸/)).not.toBeInTheDocument();
-      expect(screen.queryByText(/⊘/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/passed/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/failed/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/stalled/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/skipped/)).not.toBeInTheDocument();
     });
   });
 });

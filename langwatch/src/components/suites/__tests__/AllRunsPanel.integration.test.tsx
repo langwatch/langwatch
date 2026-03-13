@@ -185,8 +185,8 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
 
       const headerTotals = screen.getByTestId("all-runs-header-totals");
       expect(headerTotals).toBeInTheDocument();
-      expect(within(headerTotals).getByText("1 ✓")).toBeInTheDocument();
-      expect(within(headerTotals).getByText("1 ✗")).toBeInTheDocument();
+      expect(within(headerTotals).getByText("1 passed")).toBeInTheDocument();
+      expect(within(headerTotals).getByText("1 failed")).toBeInTheDocument();
     });
 
     it("does not render a RunHistoryFooter", () => {
