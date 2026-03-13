@@ -16,12 +16,6 @@ import {
   type CreateSuiteInput,
   type UpdateSuiteInput,
 } from "./suite.repository";
-import { getSuiteSetId } from "./suite-set-id";
-import {
-  generateBatchRunId,
-  scheduleScenarioRun,
-  scenarioQueue,
-} from "../scenarios/scenario.queue";
 import { parseSuiteTargets, type SuiteTarget } from "./types";
 import {
   AllScenariosArchivedError,
@@ -36,23 +30,14 @@ import { slugify } from "~/utils/slugify";
 import { ScenarioRepository } from "../scenarios/scenario.repository";
 import { AgentRepository } from "../agents/agent.repository";
 import { LlmConfigRepository } from "../prompt-config/repositories/llm-config.repository";
+import type { SuiteRunResult, SuiteRunService } from "~/server/app-layer/suites/suite-run.service";
 
 const tracer = getLangWatchTracer("langwatch.suites.service");
 const logger = createLogger("langwatch:suites:service");
 
 // Re-export for consumers that need the type
 export type { SuiteTarget } from "./types";
-
-/** Result of scheduling a suite run */
-export type SuiteRunResult = {
-  batchRunId: string;
-  setId: string;
-  jobCount: number;
-  skippedArchived: {
-    scenarios: string[];
-    targets: string[];
-  };
-};
+export type { SuiteRunResult } from "~/server/app-layer/suites/suite-run.service";
 
 /** Result of resolving scenario references against the database */
 type ResolvedScenarioReferences = {
@@ -74,17 +59,22 @@ export class SuiteService {
     private readonly scenarioRepository: ScenarioRepository,
     private readonly agentRepository: AgentRepository,
     private readonly llmConfigRepository: LlmConfigRepository,
+    private readonly suiteRunService: SuiteRunService,
   ) {}
 
   /**
    * Static factory method for creating a SuiteService with proper DI.
    */
-  static create(prisma: PrismaClient): SuiteService {
+  static create(params: {
+    prisma: PrismaClient;
+    suiteRunService: SuiteRunService;
+  }): SuiteService {
     return new SuiteService(
-      new SuiteRepository(prisma),
-      new ScenarioRepository(prisma),
-      new AgentRepository(prisma),
-      new LlmConfigRepository(prisma),
+      new SuiteRepository(params.prisma),
+      new ScenarioRepository(params.prisma),
+      new AgentRepository(params.prisma),
+      new LlmConfigRepository(params.prisma),
+      params.suiteRunService,
     );
   }
 
@@ -281,6 +271,7 @@ export class SuiteService {
     suite: SimulationSuite;
     projectId: string;
     organizationId: string;
+    idempotencyKey: string;
   }): Promise<SuiteRunResult> {
     return tracer.withActiveSpan(
       "SuiteService.run",
@@ -300,48 +291,21 @@ export class SuiteService {
 
         const resolved = await this.resolveReferences({ suite, projectId, organizationId, targets });
 
-        const batchRunId = generateBatchRunId();
-        const setId = getSuiteSetId(suite.id);
-        span.setAttribute("suite.batch_run_id", batchRunId);
-
-        logger.info(
-          {
-            suiteId: suite.id,
-            projectId,
-            batchRunId,
-            activeScenarioCount: resolved.activeScenarioIds.length,
-            activeTargetCount: resolved.activeTargets.length,
-            skippedArchivedScenarios: resolved.skippedArchived.scenarios.length,
-            skippedArchivedTargets: resolved.skippedArchived.targets.length,
-            repeatCount: suite.repeatCount,
-          },
-          "Scheduling suite run",
-        );
-
-        const jobCount = await this.scheduleJobs({
-          scenarioIds: resolved.activeScenarioIds,
-          scenarioNameMap: resolved.scenarioNameMap,
-          targets: resolved.activeTargets,
+        const result = await this.suiteRunService.startRun({
           suiteId: suite.id,
           projectId,
-          setId,
-          batchRunId,
+          activeScenarioIds: resolved.activeScenarioIds,
+          scenarioNameMap: resolved.scenarioNameMap,
+          activeTargets: resolved.activeTargets,
           repeatCount: suite.repeatCount,
+          skippedArchived: resolved.skippedArchived,
+          idempotencyKey: params.idempotencyKey,
         });
 
-        span.setAttribute("suite.job_count", jobCount);
+        span.setAttribute("suite.batch_run_id", result.batchRunId);
+        span.setAttribute("suite.job_count", result.jobCount);
 
-        logger.info(
-          { suiteId: suite.id, batchRunId, jobCount },
-          "Suite run scheduled",
-        );
-
-        return {
-          batchRunId,
-          setId,
-          jobCount,
-          skippedArchived: resolved.skippedArchived,
-        };
+        return result;
       },
     );
   }
@@ -567,76 +531,4 @@ export class SuiteService {
     return { active, archived, missing };
   }
 
-  private async scheduleJobs(params: {
-    scenarioIds: string[];
-    scenarioNameMap: Map<string, string>;
-    targets: SuiteTarget[];
-    suiteId: string;
-    projectId: string;
-    setId: string;
-    batchRunId: string;
-    repeatCount: number;
-  }): Promise<number> {
-    const { scenarioIds, scenarioNameMap, targets, suiteId, projectId, setId, batchRunId, repeatCount } = params;
-
-    const jobPromises: Promise<{ id?: string | null }>[] = [];
-    for (const scenarioId of scenarioIds) {
-      for (const target of targets) {
-        for (let repeat = 0; repeat < repeatCount; repeat++) {
-          jobPromises.push(
-            scheduleScenarioRun({
-              projectId,
-              scenarioId,
-              scenarioName: scenarioNameMap.get(scenarioId) ?? scenarioId,
-              target: { type: target.type, referenceId: target.referenceId },
-              setId,
-              batchRunId,
-              index: repeat,
-            }),
-          );
-        }
-      }
-    }
-
-    const results = await Promise.allSettled(jobPromises);
-
-    const fulfilled = results.filter(
-      (r): r is PromiseSettledResult<{ id?: string | null }> & { status: "fulfilled" } =>
-        r.status === "fulfilled",
-    );
-    const rejected = results.filter(
-      (r): r is PromiseRejectedResult => r.status === "rejected",
-    );
-
-    if (rejected.length > 0) {
-      logger.error(
-        {
-          suiteId,
-          batchRunId,
-          totalJobs: results.length,
-          failedCount: rejected.length,
-          succeededCount: fulfilled.length,
-          errors: rejected.map((r) => String(r.reason)),
-        },
-        "Suite run scheduling partially failed, rolling back enqueued jobs",
-      );
-
-      // Roll back: remove all successfully enqueued jobs
-      await Promise.allSettled(
-        fulfilled.map(async (r) => {
-          const jobId = r.value.id;
-          if (jobId) {
-            const job = await scenarioQueue.getJob(jobId);
-            await job?.remove();
-          }
-        }),
-      );
-
-      throw new Error(
-        `Failed to schedule suite run: ${rejected.length} of ${results.length} jobs failed to enqueue`,
-      );
-    }
-
-    return fulfilled.length;
-  }
 }

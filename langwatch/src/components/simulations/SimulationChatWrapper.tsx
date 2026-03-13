@@ -43,7 +43,7 @@ export const SimulationChatWrapper: React.FC<
     },
     {
       enabled: !!project && !!scenarioRunId,
-      refetchInterval: 1000,
+      refetchInterval: 30_000,
     },
   );
 

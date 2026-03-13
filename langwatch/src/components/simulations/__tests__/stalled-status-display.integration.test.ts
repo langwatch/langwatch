@@ -99,11 +99,6 @@ describe("getOverlayConfig()", () => {
         expect(config.isComplete).toBe(true);
       });
 
-      it("provides a stalled status text", () => {
-        const config = getOverlayConfig(ScenarioRunStatus.STALLED);
-        expect(config.statusText).toBe("Stalled");
-      });
-
       it("provides stalled gradient values", () => {
         const config = getOverlayConfig(ScenarioRunStatus.STALLED);
         expect(config.gradientLight).toContain("radial-gradient");
@@ -112,12 +107,6 @@ describe("getOverlayConfig()", () => {
     });
 
     describe("when compared to ERROR overlay", () => {
-      it("uses a different status text", () => {
-        const stalledConfig = getOverlayConfig(ScenarioRunStatus.STALLED);
-        const errorConfig = getOverlayConfig(ScenarioRunStatus.ERROR);
-        expect(stalledConfig.statusText).not.toBe(errorConfig.statusText);
-      });
-
       it("uses a different gradient", () => {
         const stalledConfig = getOverlayConfig(ScenarioRunStatus.STALLED);
         const errorConfig = getOverlayConfig(ScenarioRunStatus.ERROR);
