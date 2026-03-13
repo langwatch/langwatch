@@ -41,7 +41,7 @@ describe("<GroupRow/>", () => {
   });
 
   describe("when viewing the header", () => {
-    it("displays compact counts with icons alongside run count", () => {
+    it("displays word-label counts alongside run count", () => {
       render(
         <GroupRow
           group={makeGroup()}

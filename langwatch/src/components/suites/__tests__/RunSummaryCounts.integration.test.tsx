@@ -38,7 +38,7 @@ describe("<RunSummaryCounts/>", () => {
   });
 
   describe("given a summary with passed and failed counts non-zero", () => {
-    it("displays both with compact icons", () => {
+    it("displays both as word labels", () => {
       render(
         <RunSummaryCounts
           summary={makeSummary({ passedCount: 8, failedCount: 2 })}
@@ -52,7 +52,7 @@ describe("<RunSummaryCounts/>", () => {
   });
 
   describe("given a summary with all status counts non-zero", () => {
-    it("displays all statuses with icons", () => {
+    it("displays all statuses as word labels", () => {
       render(
         <RunSummaryCounts
           summary={makeSummary({

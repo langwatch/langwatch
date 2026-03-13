@@ -76,13 +76,15 @@ export function GroupRow({
         ) : (
           <ChevronRight size={14} style={{ flexShrink: 0 }} />
         )}
-        <Text fontSize="sm" fontWeight="bold" color="fg.default" flexShrink={0}>
+        <Text fontSize="sm" fontWeight="bold" color="fg.default" truncate minWidth={0} flexShrink={1}>
           {group.groupLabel}
         </Text>
         <Text fontSize="sm" color="fg.muted" flexShrink={0}>
           &middot;
         </Text>
-        <RunSummaryCounts summary={summary} />
+        <Box flexShrink={0}>
+          <RunSummaryCounts summary={summary} />
+        </Box>
         <Box flex={1} />
         <Text fontSize="xs" color="fg.muted" flexShrink={0}>
           {runCount} {runCount === 1 ? "run" : "runs"}
