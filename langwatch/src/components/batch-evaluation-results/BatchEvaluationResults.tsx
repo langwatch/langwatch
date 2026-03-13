@@ -33,6 +33,7 @@ import {
 import { type BatchRunSummary, BatchRunsSidebar } from "./BatchRunsSidebar";
 import { ComparisonCharts, type XAxisOption } from "./ComparisonCharts";
 import { downloadCsv } from "./csvExport";
+import { getRunDisplayName } from "./getRunDisplayName";
 import { TableSkeleton } from "./TableSkeleton";
 import {
   type BatchEvaluationData,
@@ -248,12 +249,15 @@ export function BatchEvaluationResults({
   // Comparison mode
   const runIds = useMemo(() => sidebarRuns.map((r) => r.runId), [sidebarRuns]);
 
-  // Map runId to human-readable name (commit message or runId)
+  // Map runId to human-readable name (commit message or "Run #N")
   const runNameMap = useMemo(() => {
     const map: Record<string, string> = {};
-    for (const run of sidebarRuns) {
-      map[run.runId] = run.workflowVersion?.commitMessage ?? run.runId;
-    }
+    sidebarRuns.forEach((run, index) => {
+      map[run.runId] = getRunDisplayName({
+        commitMessage: run.workflowVersion?.commitMessage,
+        index,
+      });
+    });
     return map;
   }, [sidebarRuns]);
 
