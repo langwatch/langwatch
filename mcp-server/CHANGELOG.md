@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/langwatch/langwatch/compare/mcp-server@v0.6.0...mcp-server@v0.6.1) (2026-03-13)
+
+
+### Bug Fixes
+
+* fix scenario relative path solving for docs ([315abfd](https://github.com/langwatch/langwatch/commit/315abfd4c9d21641f0c1845fcf29b6337673ce6d))
+
 ## [0.6.0](https://github.com/langwatch/langwatch/compare/mcp-server@v0.5.0...mcp-server@v0.6.0) (2026-03-13)
 
 
