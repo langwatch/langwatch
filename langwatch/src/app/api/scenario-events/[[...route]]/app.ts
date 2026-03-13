@@ -169,6 +169,7 @@ async function dispatchSimulationEvent(
         scenarioSetId: event.scenarioSetId ?? "default",
         name: event.metadata?.name,
         description: event.metadata?.description,
+        metadata: event.metadata,
       });
     } else if (event.type === ScenarioEventType.MESSAGE_SNAPSHOT) {
       const messages = event.messages ?? [];

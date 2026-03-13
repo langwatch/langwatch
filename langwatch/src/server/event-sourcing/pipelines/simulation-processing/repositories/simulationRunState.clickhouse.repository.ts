@@ -36,6 +36,7 @@ interface ClickHouseSimulationRunRecord {
   Status: string;
   Name: string | null;
   Description: string | null;
+  Metadata: string | null;
   "Messages.Id": string[];
   "Messages.Role": string[];
   "Messages.Content": string[];
@@ -79,6 +80,7 @@ export class SimulationRunStateRepositoryClickHouse<
       Status: record.Status,
       Name: record.Name,
       Description: record.Description,
+      Metadata: record.Metadata,
       Messages: ids.map((Id, i) => ({
         Id,
         Role: record["Messages.Role"]?.[i] ?? "",
@@ -120,6 +122,7 @@ export class SimulationRunStateRepositoryClickHouse<
       Status: data.Status,
       Name: data.Name,
       Description: data.Description,
+      Metadata: data.Metadata,
       "Messages.Id": data.Messages.map((m) => m.Id),
       "Messages.Role": data.Messages.map((m) => m.Role),
       "Messages.Content": data.Messages.map((m) => m.Content),
@@ -157,7 +160,7 @@ export class SimulationRunStateRepositoryClickHouse<
         query: `
           SELECT
             ProjectionId, TenantId, ScenarioRunId, ScenarioId, BatchRunId, ScenarioSetId,
-            Version, Status, Name, Description,
+            Version, Status, Name, Description, Metadata,
             \`Messages.Id\`, \`Messages.Role\`, \`Messages.Content\`,
             \`Messages.TraceId\`, \`Messages.Rest\`,
             TraceIds,
