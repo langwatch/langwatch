@@ -103,16 +103,6 @@ export class InvalidSeatCountError extends BillingError {
   }
 }
 
-export class UnsupportedCurrencyError extends BillingError {
-  constructor(currency: string | undefined) {
-    super({
-      message: `Unsupported checkout currency: ${currency ?? "unknown"}`,
-      trpcCode: "INTERNAL_SERVER_ERROR",
-    });
-    this.name = "UnsupportedCurrencyError";
-  }
-}
-
 export class SubscriptionCreationFailedError extends BillingError {
   constructor() {
     super({

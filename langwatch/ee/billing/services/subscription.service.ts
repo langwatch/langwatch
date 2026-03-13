@@ -23,7 +23,6 @@ import {
   OrganizationNotFoundError,
   SeatBillingUnavailableError,
   SubscriptionCreationFailedError,
-  UnsupportedCurrencyError,
 } from "../errors";
 import { isGrowthSeatEventPlan, type BillingInterval } from "../utils/growthSeatEvent";
 import type { SeatEventSubscriptionFns } from "./seatEventSubscription";
@@ -514,17 +513,15 @@ export class EESubscriptionService implements SubscriptionService {
     // Stripe Adaptive Pricing from offering unsupported currencies.
     const SUPPORTED_CHECKOUT_CURRENCIES = ["usd", "eur"] as const;
     const basePriceId = this.itemCalculator.prices[plan as StripePriceName];
-    const checkoutCurrency =
+    const rawCurrency =
       stripePricesFile.prices[basePriceId]?.currency?.toLowerCase();
-
-    if (
-      !checkoutCurrency ||
-      !SUPPORTED_CHECKOUT_CURRENCIES.includes(
-        checkoutCurrency as (typeof SUPPORTED_CHECKOUT_CURRENCIES)[number],
+    const checkoutCurrency =
+      rawCurrency &&
+      SUPPORTED_CHECKOUT_CURRENCIES.includes(
+        rawCurrency as (typeof SUPPORTED_CHECKOUT_CURRENCIES)[number],
       )
-    ) {
-      throw new UnsupportedCurrencyError(checkoutCurrency);
-    }
+        ? rawCurrency
+        : "usd";
 
     const session = await this.stripe.checkout.sessions.create({
       mode: "subscription",

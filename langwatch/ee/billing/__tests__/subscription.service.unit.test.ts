@@ -10,20 +10,6 @@ vi.mock("../../../src/server/app-layer/app", () => ({
   }),
 }));
 
-vi.mock("../stripe/stripePriceCatalog", async (importOriginal) => {
-  const original = await importOriginal<typeof import("../stripe/stripePriceCatalog")>();
-  return {
-    ...original,
-    stripePricesFile: {
-      ...original.stripePricesFile,
-      prices: {
-        ...original.stripePricesFile.prices,
-        price_launch: { currency: "eur" },
-      },
-    },
-  };
-});
-
 import type { PrismaClient } from "@prisma/client";
 import type Stripe from "stripe";
 import { PlanTypes, SubscriptionStatus } from "../planTypes";
