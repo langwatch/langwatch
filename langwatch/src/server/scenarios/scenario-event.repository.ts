@@ -583,7 +583,7 @@ export class ScenarioEventRepository {
         },
       },
       async () => {
-        const result = await this.queryBatchRunIds({
+        return this.queryBatchRunIds({
           projectId,
           limit,
           cursor,
@@ -591,8 +591,6 @@ export class ScenarioEventRepository {
           endDate,
           trackScenarioSetIds: true,
         });
-
-        return result;
       },
     );
   }
