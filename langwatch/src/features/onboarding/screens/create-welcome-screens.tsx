@@ -40,18 +40,17 @@ const OrganizationScreen: React.FC = () => {
   const { emit } = useAnalytics();
 
   return (
-    <VStack gap={4} align="stretch">
-      <Field.Root colorPalette="orange">
+    <VStack gap={6} align="stretch" w="full" minW="0">
+      <Field.Root colorPalette="orange" w="full">
         <Input
           autoFocus
+          size="lg"
           variant="outline"
-          placeholder={"Company Name"}
+          placeholder="Company or your name"
+          borderRadius="xl"
           value={organizationName}
           onChange={(e) => setOrganizationName(e.target.value)}
         />
-        <Field.HelperText>
-          {"If you're using LangWatch for yourself, you can use your own name."}
-        </Field.HelperText>
         <Field.ErrorText />
       </Field.Root>
 
@@ -70,13 +69,13 @@ const OrganizationScreen: React.FC = () => {
           <Checkbox.Control>
             <Checkbox.Indicator />
           </Checkbox.Control>
-          <Checkbox.Label fontWeight={"normal"}>
+          <Checkbox.Label fontWeight="normal" fontSize="sm">
             {"I agree to the LangWatch "}
             <Link
               href="https://langwatch.ai/legal/terms-conditions"
               isExternal
-              fontWeight={"bold"}
-              variant={"underline"}
+              fontWeight="semibold"
+              variant="underline"
             >
               {"Terms of Service"}
               <Icon size="xs">
@@ -106,13 +105,8 @@ const BasicInfoScreen: React.FC = () => {
   const { emit } = useAnalytics();
 
   return (
-    <VStack gap={4} align="stretch">
-      {/* Usage style */}
-      <Field.Root colorPalette="orange" w="full" required>
-        <Field.Label>
-          {"Who are you building AI applications for?"}
-          <Field.RequiredIndicator />
-        </Field.Label>
+    <VStack gap={0} align="stretch" w="full" minW="0">
+      <Field.Root colorPalette="orange" w="full" minW="0" required>
         <IconRadioCardGroup<UsageStyle>
           items={usageStyleItems}
           value={usageStyle}
@@ -145,7 +139,6 @@ const DesiresScreen: React.FC = () => {
 
   return (
     <IconCheckboxCardGroup<DesireType>
-      label={"What brings you to LangWatch?"}
       items={desireItems}
       value={selectedDesires}
       onChange={(values) => {
@@ -161,8 +154,7 @@ const RoleScreen: React.FC = () => {
   const { emit } = useAnalytics();
 
   return (
-    <Field.Root colorPalette="orange" w="full">
-      <Field.Label>{"What best describes you?"}</Field.Label>
+    <Field.Root colorPalette="orange" w="full" minW="0">
       <IconRadioCardGroup<RoleType>
         items={roleItems}
         value={role}
@@ -188,7 +180,7 @@ export const useCreateWelcomeScreens = ({
       [OnboardingScreenIndex.ORGANIZATION]: {
         id: "organization",
         required: true,
-        heading: "Welcome aboard 👋",
+        heading: "Welcome aboard",
         subHeading: "Let's kick off by creating your organization",
         component: OrganizationScreen,
       },
@@ -196,18 +188,21 @@ export const useCreateWelcomeScreens = ({
         id: "basic-info",
         required: true,
         heading: "Let's tailor your experience",
+        subHeading: "Who are you building AI applications for?",
         component: BasicInfoScreen,
       },
       [OnboardingScreenIndex.DESIRES]: {
         id: "desires",
         required: false,
         heading: "Let's tailor your experience",
+        subHeading: "What brings you to LangWatch?",
         component: DesiresScreen,
       },
       [OnboardingScreenIndex.ROLE]: {
         id: "role",
         required: false,
         heading: "Let's tailor your experience",
+        subHeading: "What best describes you?",
         component: RoleScreen,
       },
     }),
