@@ -425,11 +425,11 @@ export const system = createSystem(defaultConfig, {
           panel: { value: { _light: "white", _dark: "{colors.gray.900}" } },
           // Muted background for hover states, selections
           muted: {
-            value: { _light: "{colors.gray.100}", _dark: "{colors.gray.800}" },
+            value: { _light: "{colors.gray.100}", _dark: "{colors.gray.700}" },
           },
           // Emphasized background for active states
           emphasized: {
-            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.700}" },
+            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.600}" },
           },
           // Subtle background for table headers, zebra rows
           subtle: {
@@ -437,10 +437,10 @@ export const system = createSystem(defaultConfig, {
           },
           // Form inputs - blend into container
           input: {
-            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.900}" },
+            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.800}" },
           },
           inputHover: {
-            value: { _light: "white", _dark: "{colors.gray.800}" },
+            value: { _light: "white", _dark: "{colors.gray.700}" },
           },
         },
 
@@ -453,24 +453,24 @@ export const system = createSystem(defaultConfig, {
             value: { _light: "{colors.gray.600}", _dark: "{colors.gray.400}" },
           },
           subtle: {
-            value: { _light: "{colors.gray.500}", _dark: "{colors.gray.500}" },
+            value: { _light: "{colors.gray.500}", _dark: "{colors.gray.400}" },
           },
           inverted: { value: { _light: "white", _dark: "{colors.gray.950}" } },
         },
 
-        // Border semantic tokens - barely visible in dark mode
+        // Border semantic tokens - visible in dark mode
         border: {
           DEFAULT: {
-            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.800}" },
+            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.700}" },
           },
           muted: {
-            value: { _light: "{colors.gray.100}", _dark: "{colors.gray.900}" },
+            value: { _light: "{colors.gray.100}", _dark: "{colors.gray.800}" },
           },
           subtle: {
-            value: { _light: "{colors.gray.100}", _dark: "{colors.gray.950}" },
+            value: { _light: "{colors.gray.100}", _dark: "{colors.gray.900}" },
           },
           emphasized: {
-            value: { _light: "{colors.gray.300}", _dark: "{colors.gray.700}" },
+            value: { _light: "{colors.gray.300}", _dark: "{colors.gray.600}" },
           },
         },
       },
