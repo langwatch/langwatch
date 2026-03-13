@@ -5,6 +5,7 @@ import type { ExecuteEvaluationCommandData } from "../../schemas/commands";
 const ExecuteEvaluationCommand = createExecuteEvaluationCommandClass({
   prisma: {} as any,
   spanStorage: {} as any,
+  traceEvents: {} as any,
   evaluationExecution: {} as any,
 });
 

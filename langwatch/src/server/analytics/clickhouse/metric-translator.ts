@@ -699,23 +699,9 @@ function translateSentimentMetric(
   alias: string,
   requiredJoins: CHTable[],
 ): MetricTranslation {
-  const ts = tableAliases.trace_summaries;
   const ss = tableAliases.stored_spans;
 
   switch (metric) {
-    case "sentiment.input_sentiment":
-      // Input sentiment score from attributes
-      return {
-        selectExpression: translateSimpleAggregation(
-          `toFloat64OrNull(${ts}.Attributes['langwatch.input.satisfaction_score'])`,
-          aggregation,
-          alias,
-        ),
-        alias,
-        requiredJoins,
-        params: {},
-      };
-
     case "sentiment.thumbs_up_down":
       // Thumbs up/down from events
       requiredJoins.push("stored_spans");

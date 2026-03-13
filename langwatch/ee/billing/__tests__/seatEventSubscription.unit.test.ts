@@ -374,7 +374,10 @@ describe("seatEventSubscription", () => {
         expect(result).toEqual({ success: true });
         expect(stripe.subscriptions.update).toHaveBeenCalledWith(
           "sub_stripe_1",
-          { items: [{ id: "si_seat", quantity: 10 }] },
+          {
+            items: [{ id: "si_seat", quantity: 10 }],
+            proration_behavior: "always_invoice",
+          },
         );
       });
 
@@ -425,6 +428,7 @@ describe("seatEventSubscription", () => {
           {
             cancel_at_period_end: false,
             items: [{ id: "si_seat", quantity: 5 }],
+            proration_behavior: "always_invoice",
           },
         );
       });

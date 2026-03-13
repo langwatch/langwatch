@@ -526,7 +526,6 @@ describe.skip("Collector API Endpoint", () => {
     expect(indexedTrace).toMatchObject({
       input: {
         value: "hey there, my email is [REDACTED], please check it for me",
-        // satisfaction_score: expect.any(Number), // Fails if langwatch_nlp is off
         embeddings: {
           embeddings: expect.any(Array),
           model: DEFAULT_EMBEDDINGS_MODEL,

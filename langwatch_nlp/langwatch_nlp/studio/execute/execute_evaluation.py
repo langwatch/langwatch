@@ -1,3 +1,4 @@
+import logging
 import time
 from typing import Optional, cast
 import dspy
@@ -32,6 +33,8 @@ from sklearn.model_selection import train_test_split
 
 import langwatch
 
+eval_logger = logging.getLogger(__name__)
+
 
 async def execute_evaluation(
     event: ExecuteEvaluationPayload, queue: "ServerEventQueue"
@@ -44,6 +47,11 @@ async def execute_evaluation(
         validate_workflow(workflow)
 
         disable_dsp_caching()
+
+        eval_logger.info(
+            "Starting evaluation: run_id=%s, workflow_id=%s, evaluate_on=%s",
+            run_id, workflow.workflow_id, event.evaluate_on,
+        )
 
         # TODO: handle workflow errors here throwing an special event showing the error was during the execution of the workflow?
         yield start_evaluation_event(run_id)
@@ -141,10 +149,24 @@ async def execute_evaluation(
                 queue=queue,
                 weighting="mean",
             )
+            eval_logger.info(
+                "Evaluation setup complete: run_id=%s, %d examples, "
+                "api_key=%s, endpoint=%s",
+                run_id, len(examples),
+                "set" if workflow.api_key else "MISSING",
+                langwatch.get_endpoint(),
+            )
             # Send initial empty batch to create the experiment in LangWatch
             reporting.send_batch()
             await asyncify(evaluator)(module, metric=reporting.evaluate_and_report)  # type: ignore
+            eval_logger.info(
+                "Evaluation execution complete, waiting for batch sends: run_id=%s",
+                run_id,
+            )
             await reporting.wait_for_completion()
+            eval_logger.info(
+                "All evaluation batches sent: run_id=%s", run_id
+            )
     except Exception as e:
         yield error_evaluation_event(run_id, str(e), stopped_at=int(time.time() * 1000))
         if valid:

@@ -24,7 +24,6 @@ const traces: { groups: Trace[][] } = {
         },
         input: {
           value: "I'm good, don't need any assistance, thanks!",
-          satisfaction_score: 1,
         },
         output: {
           value:
@@ -54,7 +53,6 @@ const traces: { groups: Trace[][] } = {
         },
         input: {
           value: "once again",
-          satisfaction_score: 0.5534973683536608,
         },
         output: {
           value: "Thank you for your kind words! How can I assist you today?",
@@ -83,7 +81,6 @@ const traces: { groups: Trace[][] } = {
         },
         input: {
           value: "ahoooy",
-          satisfaction_score: 0.8794623290453495,
         },
         output: {
           value: "Hello! How can I assist you today?",
@@ -112,7 +109,6 @@ const traces: { groups: Trace[][] } = {
         },
         input: {
           value: "ahoy captain",
-          satisfaction_score: 0.5796681572990974,
         },
         output: {
           value: "",
@@ -141,7 +137,6 @@ const traces: { groups: Trace[][] } = {
         },
         input: {
           value: "once again",
-          satisfaction_score: 0.5534973683536608,
         },
         output: {
           value: "",
@@ -170,7 +165,6 @@ const traces: { groups: Trace[][] } = {
         },
         input: {
           value: "all good?",
-          satisfaction_score: 1,
         },
         output: {
           value: "",
@@ -199,7 +193,6 @@ const traces: { groups: Trace[][] } = {
         },
         input: {
           value: "ahoy captain",
-          satisfaction_score: 0.5793251242223786,
         },
         output: {
           value: "",
@@ -228,7 +221,6 @@ const traces: { groups: Trace[][] } = {
         },
         input: {
           value: "help me with my emails, write a long text for it",
-          satisfaction_score: -0.10146824473126762,
         },
         output: {
           value: "",
@@ -257,7 +249,6 @@ const traces: { groups: Trace[][] } = {
         },
         input: {
           value: "help me with my emails, write a long text for it",
-          satisfaction_score: -0.10146824473126762,
         },
         output: {
           value: "",
@@ -286,7 +277,6 @@ const traces: { groups: Trace[][] } = {
         },
         input: {
           value: "help me with my emails, write a long text for it",
-          satisfaction_score: -0.10146824473126762,
         },
         output: {
           value: "",
@@ -315,7 +305,6 @@ const traces: { groups: Trace[][] } = {
         },
         input: {
           value: "write me a long poem about my emails",
-          satisfaction_score: -0.024726796491162113,
         },
         output: {
           value: "",
@@ -348,7 +337,6 @@ const traces: { groups: Trace[][] } = {
         },
         input: {
           value: "hi",
-          satisfaction_score: 0.8836860845329563,
         },
         output: {
           value: "👋 Hello! How can I help you today?",

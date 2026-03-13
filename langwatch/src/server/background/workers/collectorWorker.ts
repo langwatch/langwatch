@@ -57,7 +57,6 @@ import {
 } from "./collector/metrics";
 import { cleanupPIIs } from "./collector/piiCheck";
 import { addInputAndOutputForRAGs } from "./collector/rag";
-import { scoreSatisfactionFromInput } from "./collector/satisfaction";
 
 const logger = createLogger("langwatch:workers:collectorWorker");
 const tracer = trace.getTracer("langwatch:collector");
@@ -927,15 +926,6 @@ export const processCollectorCheckAndAdjustJob = async (
     await scheduleEvaluations(trace, spans);
   }
 
-  try {
-    await scoreSatisfactionFromInput({
-      traceId,
-      projectId,
-      input,
-    });
-  } catch {
-    logger.debug({ observedTraceId: traceId }, "failed to score satisfaction for");
-  }
 };
 
 export const startCollectorWorker = () => {

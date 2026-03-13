@@ -31,7 +31,7 @@ import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { DEFAULT_MODEL } from "../../utils/constants";
-import { useWorkflowStore } from "../hooks/useWorkflowStore";
+import { useWorkflowStore, serializeWorkflow } from "../hooks/useWorkflowStore";
 import type { Workflow } from "../types/dsl";
 import { hasDSLChanged } from "../utils/dslUtils";
 
@@ -57,20 +57,30 @@ export function History() {
 
 export function HistoryPopover({ onClose }: { onClose: () => void }) {
   const { project } = useOrganizationTeamProject();
-  const { workflowId, getWorkflow, setWorkflow, setPreviousWorkflow } =
-    useWorkflowStore(
-      ({
-        workflow_id: workflowId,
-        getWorkflow,
-        setWorkflow,
-        setPreviousWorkflow,
-      }) => ({
-        workflowId,
-        getWorkflow,
-        setWorkflow,
-        setPreviousWorkflow,
-      }),
-    );
+  const {
+    workflowId,
+    getWorkflow,
+    setWorkflow,
+    setAutosavedWorkflow,
+    setLastCommittedWorkflow,
+    setCurrentVersionId,
+  } = useWorkflowStore(
+    ({
+      workflow_id: workflowId,
+      getWorkflow,
+      setWorkflow,
+      setAutosavedWorkflow,
+      setLastCommittedWorkflow,
+      setCurrentVersionId,
+    }) => ({
+      workflowId,
+      getWorkflow,
+      setWorkflow,
+      setAutosavedWorkflow,
+      setLastCommittedWorkflow,
+      setCurrentVersionId,
+    }),
+  );
   const form = useForm<{ version: string; commitMessage: string }>({
     defaultValues: {
       version: "",
@@ -103,10 +113,10 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
         projectId: project.id,
         workflowId,
         commitMessage,
-        dsl: {
+        dsl: serializeWorkflow({
           ...getWorkflow(),
           version,
-        },
+        }),
       },
       {
         onSuccess: () => {
@@ -119,6 +129,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
           setWorkflow({
             version,
           });
+          setLastCommittedWorkflow(getWorkflow());
           void versions.refetch();
         },
         onError: () => {
@@ -153,8 +164,17 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
       });
 
       // Prevent autosave from triggering after restore
-      setPreviousWorkflow(undefined);
-      setWorkflow(version.dsl as unknown as Workflow);
+      setAutosavedWorkflow(undefined);
+      const dsl = version.dsl as unknown as Workflow;
+      setLastCommittedWorkflow(dsl);
+      setCurrentVersionId(version.id);
+      setWorkflow({
+        ...dsl,
+        nodes: (dsl.nodes ?? []).map((node) => ({
+          ...node,
+          selected: false,
+        })),
+      });
       onClose();
     },
     [
@@ -164,7 +184,9 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
       hasChanges,
       restoreVersion,
       setWorkflow,
-      setPreviousWorkflow,
+      setAutosavedWorkflow,
+      setLastCommittedWorkflow,
+      setCurrentVersionId,
       onClose,
     ],
   );
@@ -319,12 +341,12 @@ export const useVersionState = ({
   form?: UseFormReturn<{ version: string; commitMessage: string }>;
   allowSaveIfAutoSaveIsCurrentButNotLatest?: boolean;
 }) => {
-  const { workflowId, getWorkflow, previousWorkflow } = useWorkflowStore(
-    ({ workflow_id: workflowId, version, getWorkflow, previousWorkflow }) => ({
+  const { workflowId, getWorkflow, autosavedWorkflow } = useWorkflowStore(
+    ({ workflow_id: workflowId, version, getWorkflow, autosavedWorkflow }) => ({
       workflowId,
       version,
       getWorkflow,
-      previousWorkflow,
+      autosavedWorkflow,
     }),
   );
 
@@ -345,8 +367,8 @@ export const useVersionState = ({
   const latestVersion = versions.data?.find(
     (version) => version.isLatestVersion,
   );
-  const hasChanges = previousWorkflow
-    ? hasDSLChanged(getWorkflow(), previousWorkflow, false)
+  const hasChanges = autosavedWorkflow
+    ? hasDSLChanged(getWorkflow(), autosavedWorkflow, false)
     : false;
 
   const canSaveNewVersion =
@@ -454,7 +476,10 @@ export function NewVersionFields({
         {
           onSuccess: (data) => {
             if (data && !userEditedCommitMessage.current) {
-              form.setValue("commitMessage", data as string);
+              form.setValue("commitMessage", data as string, {
+                shouldDirty: true,
+                shouldValidate: true,
+              });
             }
           },
           onError: (e) => {
@@ -484,14 +509,17 @@ export function NewVersionFields({
     if (canSaveNewVersion && previousVersion?.dsl && !hasTriggeredGeneration.current) {
       hasTriggeredGeneration.current = true;
       userEditedCommitMessage.current = false;
-      form.setValue("commitMessage", "");
+      form.setValue("commitMessage", "", { shouldDirty: true, shouldValidate: true });
       setTimeout(() => {
         debouncedGenerateCommitMessage(previousVersion.dsl!, getWorkflow());
 
         // Seems like the mutation onSuccess does not work unless we send this call to the end of the callstack for some reason
       }, 0);
     } else if (canSaveNewVersion && !previousVersion) {
-      form.setValue("commitMessage", "First version");
+      form.setValue("commitMessage", "First version", {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canSaveNewVersion]);
@@ -548,41 +576,3 @@ export function NewVersionFields({
   );
 }
 
-export const VersionToBeUsed = ({
-  form,
-  nextVersion,
-  canSaveNewVersion,
-  versionToBeEvaluated,
-}: {
-  form: UseFormReturn<{ version: string; commitMessage: string }>;
-  nextVersion: string;
-  canSaveNewVersion: boolean;
-  versionToBeEvaluated: {
-    id: string | undefined;
-    version: string | undefined;
-    commitMessage: string | undefined;
-  };
-}) => {
-  if (canSaveNewVersion) {
-    return (
-      <NewVersionFields
-        form={form}
-        nextVersion={nextVersion}
-        canSaveNewVersion={canSaveNewVersion}
-      />
-    );
-  }
-
-  return (
-    <HStack width="full">
-      <VStack align="start">
-        <SmallLabel color="fg.muted">Version</SmallLabel>
-        <Text width="74px">{versionToBeEvaluated.version}</Text>
-      </VStack>
-      <VStack align="start" width="full">
-        <SmallLabel color="fg.muted">Description</SmallLabel>
-        <Text>{versionToBeEvaluated.commitMessage}</Text>
-      </VStack>
-    </HStack>
-  );
-};

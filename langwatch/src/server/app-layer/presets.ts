@@ -399,7 +399,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     notifications: NotificationService.createNull(),
     usageLimits: UsageLimitService.createNull(),
     commands: {
-      traces: { recordSpan: noop, assignTopic: noop, recordLog: noop, recordMetric: noop, assignSatisfactionScore: noop } satisfies AppCommands["traces"],
+      traces: { recordSpan: noop, assignTopic: noop, recordLog: noop, recordMetric: noop } satisfies AppCommands["traces"],
       evaluations: {
         executeEvaluation: noop,
         startEvaluation: noop,

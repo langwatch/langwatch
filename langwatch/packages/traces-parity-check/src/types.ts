@@ -21,7 +21,6 @@ export interface Config {
 // Trace types (matching the API response shape)
 export interface TraceInput {
   value: string;
-  satisfaction_score?: number;
 }
 
 export interface TraceOutput {

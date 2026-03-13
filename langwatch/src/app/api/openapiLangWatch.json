@@ -366,7 +366,7 @@
                       "properties": {
                         "value": {
                           "type": "string",
-                          "example": "Hey there! 👋😊"
+                          "example": "Hey there! \ud83d\udc4b\ud83d\ude0a"
                         }
                       }
                     },
@@ -585,14 +585,14 @@
                                     },
                                     "content": {
                                       "type": "string",
-                                      "example": "Hey there! 👋😊"
+                                      "example": "Hey there! \ud83d\udc4b\ud83d\ude0a"
                                     }
                                   }
                                 },
                                 "example": [
                                   {
                                     "role": "assistant",
-                                    "content": "Hey there! 👋😊"
+                                    "content": "Hey there! \ud83d\udc4b\ud83d\ude0a"
                                   }
                                 ]
                               }
@@ -8193,37 +8193,6 @@
                             }
                           }
                         ]
-                      },
-                      "sentiment.input_sentiment": {
-                        "anyOf": [
-                          {
-                            "type": "array",
-                            "items": {
-                              "type": "string"
-                            }
-                          },
-                          {
-                            "type": "object",
-                            "additionalProperties": {
-                              "type": "array",
-                              "items": {
-                                "type": "string"
-                              }
-                            }
-                          },
-                          {
-                            "type": "object",
-                            "additionalProperties": {
-                              "type": "object",
-                              "additionalProperties": {
-                                "type": "array",
-                                "items": {
-                                  "type": "string"
-                                }
-                              }
-                            }
-                          }
-                        ]
                       }
                     },
                     "additionalProperties": false,
@@ -8250,7 +8219,6 @@
                             "metadata.user_id",
                             "metadata.thread_id",
                             "metadata.span_type",
-                            "sentiment.input_sentiment",
                             "sentiment.thumbs_up_down",
                             "performance.completion_time",
                             "performance.first_token",
@@ -9062,37 +9030,6 @@
                                   }
                                 }
                               ]
-                            },
-                            "sentiment.input_sentiment": {
-                              "anyOf": [
-                                {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "string"
-                                  }
-                                },
-                                {
-                                  "type": "object",
-                                  "additionalProperties": {
-                                    "type": "array",
-                                    "items": {
-                                      "type": "string"
-                                    }
-                                  }
-                                },
-                                {
-                                  "type": "object",
-                                  "additionalProperties": {
-                                    "type": "object",
-                                    "additionalProperties": {
-                                      "type": "array",
-                                      "items": {
-                                        "type": "string"
-                                      }
-                                    }
-                                  }
-                                }
-                              ]
                             }
                           },
                           "additionalProperties": false
@@ -9117,7 +9054,6 @@
                       "metadata.labels",
                       "metadata.model",
                       "metadata.span_type",
-                      "sentiment.input_sentiment",
                       "sentiment.thumbs_up_down",
                       "events.event_type",
                       "evaluations.evaluation_passed",
@@ -10721,37 +10657,6 @@
                             }
                           }
                         ]
-                      },
-                      "sentiment.input_sentiment": {
-                        "anyOf": [
-                          {
-                            "type": "array",
-                            "items": {
-                              "type": "string"
-                            }
-                          },
-                          {
-                            "type": "object",
-                            "additionalProperties": {
-                              "type": "array",
-                              "items": {
-                                "type": "string"
-                              }
-                            }
-                          },
-                          {
-                            "type": "object",
-                            "additionalProperties": {
-                              "type": "object",
-                              "additionalProperties": {
-                                "type": "array",
-                                "items": {
-                                  "type": "string"
-                                }
-                              }
-                            }
-                          }
-                        ]
                       }
                     },
                     "additionalProperties": false,
@@ -11659,9 +11564,6 @@
         "properties": {
           "value": {
             "type": "string"
-          },
-          "satisfaction_score": {
-            "type": "number"
           }
         }
       },

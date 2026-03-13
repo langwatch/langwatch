@@ -52,7 +52,9 @@ Analyze `$ARGUMENTS` to determine the issue type. Use these heuristics:
 | **FEAT** | Words like "add", "new", "support", "implement", "enable", "introduce", "feature" |
 | **PROPOSAL** | Words like "proposal", "RFC", "suggest", "consider", "evaluate", "explore", "investigate" |
 | **EPIC** | Words like "epic", "initiative", "overhaul", "redesign", "migration" (large multi-issue efforts) |
-| **CHORE** | Words like "upgrade", "refactor", "cleanup", "migrate", "update dependency", "maintenance", "chore", "rename" |
+| **CHORE** | Words like "upgrade", "refactor", "cleanup", "migrate", "update dependency", "maintenance", "chore", "rename"; references to `.claude/`, agents, skills, `CLAUDE.md`, `AGENTS.md`; phrases like "browser-test skill", "coder agent", "orchestrator", "sub-agent" |
+
+If the description references internal Claude agent/skill infrastructure (`.claude/` directory, agents, skills, `CLAUDE.md`, `AGENTS.md`), default to **CHORE** regardless of other signals.
 
 If ambiguous, default to **FEAT**.
 

@@ -42,19 +42,9 @@ export function createEvaluationTriggerReactor(
       // Guard: skip traces blocked by guardrail with no output
       if (foldState.blockedByGuardrail && !foldState.computedOutput) return;
 
-      // Guard: skip non-application traces (evaluations, simulations, workflows, playground)
+      // Origin filtering is now handled by per-monitor preconditions.
+      // Extract trace attributes for command data.
       const attrs = foldState.attributes ?? {};
-      const scope = attrs["langwatch.origin"];
-      if (scope && scope !== "application") {
-        return;
-      }
-      // TODO(2027): remove legacy guard once all traces have langwatch.origin
-      if (
-        attrs["langwatch.platform"] === "optimization_studio" &&
-        attrs["langwatch.environment"] === "development"
-      ) {
-        return;
-      }
 
       // Read all enabled ON_MESSAGE monitors for this project
       const monitors = await deps.monitors.getEnabledOnMessageMonitors(tenantId);
@@ -66,6 +56,17 @@ export function createEvaluationTriggerReactor(
       const userId = attrs["langwatch.user_id"];
       const customerId = attrs["langwatch.customer_id"];
       const labels = parseLabels(attrs["langwatch.labels"]);
+      const origin = attrs["langwatch.origin"];
+      const hasError = foldState.containsErrorStatus;
+      const promptIds = parseLabels(attrs["langwatch.prompt_ids"]);
+
+      // Additional metadata for expanded precondition matching
+      const topicId = foldState.topicId ?? undefined;
+      const subTopicId = foldState.subTopicId ?? undefined;
+      const spanModels = foldState.models.length > 0 ? foldState.models : undefined;
+      const customMetadata = extractCustomMetadata(attrs);
+      const computedInput = foldState.computedInput ?? undefined;
+      const computedOutput = foldState.computedOutput ?? undefined;
 
       for (const monitor of monitors) {
         const evaluationId = generate(KSUID_RESOURCES.EVALUATION).toString();
@@ -84,6 +85,15 @@ export function createEvaluationTriggerReactor(
             userId,
             customerId,
             labels,
+            origin,
+            hasError,
+            promptIds,
+            topicId,
+            subTopicId,
+            customMetadata,
+            spanModels,
+            computedInput,
+            computedOutput,
           };
 
           const isThreadLevel =
@@ -136,4 +146,43 @@ function parseLabels(labelsJson: string | undefined): string[] | undefined {
     // Not valid JSON, ignore
   }
   return undefined;
+}
+
+/**
+ * Extract custom metadata from span attributes.
+ * Entries starting with "metadata." (excluding reserved keys) are treated
+ * as custom metadata key-value pairs.
+ */
+function extractCustomMetadata(
+  attrs: Record<string, string>,
+): Record<string, string> | undefined {
+  const RESERVED_PREFIXES = [
+    "langwatch.",
+    "gen_ai.",
+    "metadata.sdk_",
+    "metadata.telemetry_",
+  ];
+  const RESERVED_KEYS = new Set([
+    "metadata.thread_id",
+    "metadata.user_id",
+    "metadata.customer_id",
+    "metadata.labels",
+    "metadata.prompt_ids",
+    "metadata.topic_id",
+    "metadata.subtopic_id",
+  ]);
+
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(attrs)) {
+    if (!key.startsWith("metadata.")) continue;
+    if (RESERVED_KEYS.has(key)) continue;
+    if (RESERVED_PREFIXES.some((p) => key.startsWith(p))) continue;
+    // Strip "metadata." prefix for the custom key
+    const customKey = key.slice("metadata.".length);
+    if (customKey) {
+      result[customKey] = value;
+    }
+  }
+
+  return Object.keys(result).length > 0 ? result : undefined;
 }

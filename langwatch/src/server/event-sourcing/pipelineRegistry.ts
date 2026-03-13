@@ -108,6 +108,7 @@ export class PipelineRegistry {
     const ExecuteEvaluationCommand = createExecuteEvaluationCommandClass({
       prisma: this.deps.prisma,
       spanStorage: this.deps.traces.spans,
+      traceEvents: this.deps.traces.spans,
       evaluationExecution: this.deps.evaluations.execution,
     });
 
@@ -148,11 +149,6 @@ export class PipelineRegistry {
       hasRedis: !!this.deps.eventSourcing.redisConnection,
     });
 
-    // Mutable ref: the reactor closure captures this, we fill it after registration
-    const satisfactionCommandRef: {
-      dispatch: AppCommands["traces"]["assignSatisfactionScore"] | null;
-    } = { dispatch: null };
-
     if (!this.deps.clickhouse) {
       logger.warn(
         "ClickHouse client not provided, log and metric record writes will be no-ops using NullRepository implementations",
@@ -180,11 +176,6 @@ export class PipelineRegistry {
         spanStorageBroadcastReactor,
       }),
     );
-
-    // Complete the wiring now that the pipeline is registered
-    satisfactionCommandRef.dispatch = mapCommands(
-      tracePipeline.commands,
-    ).assignSatisfactionScore;
 
     return tracePipeline;
   }
