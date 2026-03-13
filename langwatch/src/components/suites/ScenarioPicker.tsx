@@ -128,7 +128,7 @@ export function ScenarioPicker({
                 )
               }
             >
-              #{label}
+              {label}
             </Badge>
           ))}
         </HStack>

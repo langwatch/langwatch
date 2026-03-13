@@ -126,7 +126,7 @@ describe("<SuiteDetailPanel/>", () => {
       expect(screen.getByText("Core test scenarios")).toBeInTheDocument();
     });
 
-    it("displays labels as tag pills with # prefix", () => {
+    it("displays labels as tag pills", () => {
       render(
         <SuiteDetailPanel
           suite={makeSuite({ labels: ["critical", "billing"] })}
@@ -137,8 +137,8 @@ describe("<SuiteDetailPanel/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("#critical")).toBeInTheDocument();
-      expect(screen.getByText("#billing")).toBeInTheDocument();
+      expect(screen.getByText("critical")).toBeInTheDocument();
+      expect(screen.getByText("billing")).toBeInTheDocument();
     });
   });
 

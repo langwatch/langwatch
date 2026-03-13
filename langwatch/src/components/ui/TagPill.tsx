@@ -1,7 +1,7 @@
 /**
  * Lovable-style tag pill components for displaying labels across surfaces.
  *
- * TagPill renders a single tag as a rounded pill with `#` prefix and optional
+ * TagPill renders a single tag as a rounded pill with optional
  * remove button. TagList renders a list of tags with optional add/remove actions.
  */
 
@@ -16,7 +16,7 @@ type TagPillProps = {
   onRemove?: () => void;
 };
 
-/** A single tag rendered as a rounded pill with `#` prefix. */
+/** A single tag rendered as a rounded pill. */
 export function TagPill({ label, onRemove }: TagPillProps) {
   return (
     <HStack
@@ -28,7 +28,7 @@ export function TagPill({ label, onRemove }: TagPillProps) {
       fontSize="xs"
       data-testid={`tag-pill-${label}`}
     >
-      <Text fontSize="xs">#{label}</Text>
+      <Text fontSize="xs">{label}</Text>
       {onRemove && (
         <StyledButton
           type="button"
@@ -55,7 +55,7 @@ export function TagPill({ label, onRemove }: TagPillProps) {
 
 type TagListProps = {
   labels: string[];
-  onRemove?: (label: string) => void;
+  onRemove?: (label: string, index: number) => void;
   onAdd?: (label: string) => void;
 };
 
@@ -72,21 +72,24 @@ export function TagList({ labels, onRemove, onAdd }: TagListProps) {
     return null;
   }
 
-  const handleSubmit = () => {
-    if (submittedRef.current) return;
-    submittedRef.current = true;
+  const addCurrentValue = () => {
     const trimmed = inputValue.trim();
-    if (trimmed && onAdd) {
+    if (trimmed && onAdd && !labels.includes(trimmed)) {
       onAdd(trimmed);
     }
     setInputValue("");
+  };
+
+  const handleBlur = () => {
+    if (submittedRef.current) return;
+    addCurrentValue();
     setIsAdding(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      handleSubmit();
+      addCurrentValue();
     }
     if (e.key === "Escape") {
       submittedRef.current = true;
@@ -97,11 +100,11 @@ export function TagList({ labels, onRemove, onAdd }: TagListProps) {
 
   return (
     <HStack gap={1} flexWrap="wrap">
-      {labels.map((label) => (
+      {labels.map((label, index) => (
         <TagPill
-          key={label}
+          key={`${label}-${index}`}
           label={label}
-          onRemove={onRemove ? () => onRemove(label) : undefined}
+          onRemove={onRemove ? () => onRemove(label, index) : undefined}
         />
       ))}
       {onAdd && !isAdding && (
@@ -133,7 +136,7 @@ export function TagList({ labels, onRemove, onAdd }: TagListProps) {
           value={inputValue}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          onBlur={handleSubmit}
+          onBlur={handleBlur}
           width="100px"
           borderRadius="full"
           autoFocus

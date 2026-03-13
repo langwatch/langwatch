@@ -38,7 +38,7 @@ import { ScenarioFormDrawer } from "../scenarios/ScenarioFormDrawer";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
 import { useSuiteForm, type SuiteFormData } from "./useSuiteForm";
-import { InlineTagsInput } from "../scenarios/ui/InlineTagsInput";
+import { TagList } from "../ui/TagPill";
 import { ScenarioPicker } from "./ScenarioPicker";
 import { TargetPicker } from "./TargetPicker";
 
@@ -356,10 +356,17 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
               <Text fontSize="sm" fontWeight="medium">
                 Labels
               </Text>
-              <InlineTagsInput
-                value={suiteForm.labels}
-                onChange={(newLabels) => form.setValue("labels", newLabels)}
-                placeholder="Add label..."
+              <TagList
+                labels={suiteForm.labels}
+                onRemove={(_label, index) =>
+                  form.setValue(
+                    "labels",
+                    suiteForm.labels.filter((_, i) => i !== index)
+                  )
+                }
+                onAdd={(label) =>
+                  form.setValue("labels", [...suiteForm.labels, label])
+                }
               />
             </VStack>
 

@@ -77,7 +77,7 @@ export function SuiteDetailPanel({
               </Text>
               <TagList
                 labels={suite.labels}
-                onRemove={onRemoveLabel}
+                onRemove={onRemoveLabel ? (label) => onRemoveLabel(label) : undefined}
                 onAdd={onAddLabel}
               />
             </HStack>

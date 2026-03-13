@@ -232,8 +232,8 @@ describe("<SuiteSidebar/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("#nightly")).toBeInTheDocument();
-      expect(screen.getByText("#regression")).toBeInTheDocument();
+      expect(screen.getByText("nightly")).toBeInTheDocument();
+      expect(screen.getByText("regression")).toBeInTheDocument();
     });
   });
 

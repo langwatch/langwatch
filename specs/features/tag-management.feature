@@ -9,9 +9,9 @@ Feature: Tag display for suites and scenarios
   # --- Tag rendering ---
 
   @integration
-  Scenario: Tags display with hash prefix
+  Scenario: Tags display as pills
     Given I open a suite that has the label "critical"
-    Then I see the tag "#critical"
+    Then I see the tag "critical"
 
   @integration
   Scenario: Tags can be removed

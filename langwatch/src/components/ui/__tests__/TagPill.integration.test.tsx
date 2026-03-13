@@ -19,10 +19,10 @@ describe("<TagPill/>", () => {
   afterEach(cleanup);
 
   describe("given a label", () => {
-    it("displays the label with # prefix", () => {
+    it("displays the label text", () => {
       render(<TagPill label="critical" />, { wrapper: Wrapper });
 
-      expect(screen.getByText("#critical")).toBeInTheDocument();
+      expect(screen.getByText("critical")).toBeInTheDocument();
     });
   });
 
@@ -72,8 +72,8 @@ describe("<TagList/>", () => {
         wrapper: Wrapper,
       });
 
-      expect(screen.getByText("#nightly")).toBeInTheDocument();
-      expect(screen.getByText("#regression")).toBeInTheDocument();
+      expect(screen.getByText("nightly")).toBeInTheDocument();
+      expect(screen.getByText("regression")).toBeInTheDocument();
     });
   });
 
@@ -114,7 +114,7 @@ describe("<TagList/>", () => {
       expect(onAdd).toHaveBeenCalledWith("new-tag");
     });
 
-    it("hides the input after pressing Enter", async () => {
+    it("keeps the input open after pressing Enter for rapid entry", async () => {
       const user = userEvent.setup();
 
       render(
@@ -126,8 +126,8 @@ describe("<TagList/>", () => {
       const input = screen.getByPlaceholderText("Add label...");
       await user.type(input, "new-tag{enter}");
       expect(
-        screen.queryByPlaceholderText("Add label..."),
-      ).not.toBeInTheDocument();
+        screen.getByPlaceholderText("Add label..."),
+      ).toBeInTheDocument();
     });
 
     it("hides the input on Escape", async () => {
@@ -185,7 +185,7 @@ describe("<TagList/>", () => {
       await user.click(
         screen.getByRole("button", { name: "Remove alpha tag" }),
       );
-      expect(onRemove).toHaveBeenCalledWith("alpha");
+      expect(onRemove).toHaveBeenCalledWith("alpha", 0);
     });
   });
 

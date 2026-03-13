@@ -96,12 +96,12 @@ describe("<ScenarioTable/>", () => {
   // --------------------------------------------------------------------------
 
   describe("given scenarios with labels", () => {
-    it("displays labels as tag pills with # prefix", () => {
+    it("displays labels as tag pills", () => {
       renderTable();
 
-      expect(screen.getByText("#doc-qa")).toBeInTheDocument();
-      expect(screen.getByText("#saas")).toBeInTheDocument();
-      expect(screen.getByText("#billing")).toBeInTheDocument();
+      expect(screen.getByText("doc-qa")).toBeInTheDocument();
+      expect(screen.getByText("saas")).toBeInTheDocument();
+      expect(screen.getByText("billing")).toBeInTheDocument();
     });
   });
 
