@@ -526,7 +526,7 @@ export class EESubscriptionService implements SubscriptionService {
     const session = await this.stripe.checkout.sessions.create({
       mode: "subscription",
       currency: checkoutCurrency,
-      adaptive_pricing: { enabled: false },
+      ...({ adaptive_pricing: { enabled: false } } as Record<string, unknown>),
       customer: customerId,
       customer_update: {
         address: "auto",
