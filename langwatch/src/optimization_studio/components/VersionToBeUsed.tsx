@@ -59,7 +59,11 @@ function CurrentVersionDisplay() {
   );
 }
 
-export function NewVersionFields() {
+export function NewVersionFields({
+  canSaveOverride,
+}: {
+  canSaveOverride?: boolean;
+} = {}) {
   const form = useFormContext<{ version: string; commitMessage: string }>();
   const { project } = useOrganizationTeamProject();
   const { checkCanCommitNewVersion, getWorkflow } = useWorkflowStore(
@@ -68,7 +72,7 @@ export function NewVersionFields() {
       getWorkflow,
     }),
   );
-  const canSave = checkCanCommitNewVersion();
+  const canSave = canSaveOverride ?? checkCanCommitNewVersion();
 
   const { previousVersion, nextVersion } = useVersionState({
     project,

@@ -194,7 +194,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
             style={{ width: "100%", padding: "20px" }}
           >
             <VStack align="start" width="full">
-              <NewVersionFields />
+              <NewVersionFields canSaveOverride={canSaveNewVersion} />
               <Tooltip
                 content={!canSaveNewVersion ? "No changes to save" : ""}
                 positioning={{ placement: "top" }}
