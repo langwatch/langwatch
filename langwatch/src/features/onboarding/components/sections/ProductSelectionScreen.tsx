@@ -7,50 +7,42 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Gavel, GraduationCap, HatGlasses, Telescope } from "lucide-react";
+import { Code, MessageSquare, Monitor, Terminal } from "lucide-react";
 import type React from "react";
 import type { ProductSelection } from "../../types/types";
 
-type ProductOption =
-  | {
-      key: ProductSelection;
-      title: string;
-      description: string;
-      icon: typeof Telescope;
-    }
-  | {
-      key: "agent-simulations";
-      title: string;
-      description: string;
-      icon: typeof HatGlasses;
-      url: string;
-    };
+interface ProductOption {
+  key: ProductSelection;
+  title: string;
+  description: string;
+  icon: typeof Terminal;
+}
 
 const productOptions: ProductOption[] = [
   {
-    key: "observability",
-    title: "Observability",
-    description: "Set up SDKs and start seeing traces and analytics.",
-    icon: Telescope,
+    key: "via-claude-code",
+    title: "Via Claude Code",
+    description:
+      "Set up LangWatch using Claude Code CLI with prompts, skills, or MCP",
+    icon: Terminal,
   },
   {
-    key: "evaluations",
-    title: "Evaluations",
-    description: "Create and run evaluations to measure quality.",
-    icon: Gavel,
+    key: "via-platform",
+    title: "Via the Platform",
+    description: "Configure directly through the LangWatch dashboard",
+    icon: Monitor,
   },
   {
-    key: "prompt-management",
-    title: "Prompt Management",
-    description: "Organize, version, iterate, and optimize your prompts.",
-    icon: GraduationCap,
+    key: "via-claude-desktop",
+    title: "Via Claude Desktop",
+    description: "Connect via MCP server in Claude Desktop",
+    icon: MessageSquare,
   },
   {
-    key: "agent-simulations",
-    title: "Agent Simulations",
-    description: "Simulate scenarios and test agent behavior.",
-    icon: HatGlasses,
-    url: "/@project/simulations",
+    key: "manually",
+    title: "Manually",
+    description: "Integrate LangWatch SDK into your codebase manually",
+    icon: Code,
   },
 ];
 
@@ -88,21 +80,10 @@ export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
               }}
               role="button"
               tabIndex={0}
-              onClick={() => {
-                if (opt.key === "agent-simulations") {
-                  window.location.href = opt.url;
-                  return;
-                }
-
-                onSelectProduct(opt.key);
-              }}
+              onClick={() => onSelectProduct(opt.key)}
             >
               <VStack gap={4} align="center" h="full">
-                <Box
-                  p={3}
-                  borderRadius="xl"
-                  bg="orange.50"
-                >
+                <Box p={3} borderRadius="xl" bg="orange.50">
                   <Icon color="orange.500" boxSize={6}>
                     <opt.icon strokeWidth={1.75} />
                   </Icon>
