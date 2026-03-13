@@ -765,7 +765,8 @@ export class ClickHouseSimulationService {
          SELECT *
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
-           AND ScenarioSetId LIKE '${INTERNAL_SET_PREFIX}%__suite'
+           AND startsWith(ScenarioSetId, '${INTERNAL_SET_PREFIX}')
+          AND endsWith(ScenarioSetId, '__suite')
            ${startedAtClause}
          ORDER BY ScenarioRunId, UpdatedAt DESC
          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
