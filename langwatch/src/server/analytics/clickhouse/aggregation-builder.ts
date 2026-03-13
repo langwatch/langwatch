@@ -107,6 +107,7 @@ export type GroupByField =
   | "evaluations.evaluation_label"
   | "evaluations.evaluation_processing_state"
   | "events.event_type"
+  | "sentiment.input_sentiment"
   | "sentiment.thumbs_up_down"
   | "error.has_error";
 
@@ -184,8 +185,13 @@ const groupByExpressions: Partial<
   }),
 
   "evaluations.evaluation_passed": (groupByKey) => ({
-    column: `${tableAliases.evaluation_runs}.Passed`,
+    column: `CASE
+      WHEN ${tableAliases.evaluation_runs}.Passed = 1 THEN 'passed'
+      WHEN ${tableAliases.evaluation_runs}.Passed = 0 THEN 'failed'
+      ELSE 'unknown'
+    END`,
     requiredJoins: ["evaluation_runs"],
+    handlesUnknown: true,
     additionalWhere: groupByKey
       ? `${tableAliases.evaluation_runs}.EvaluatorId = {groupByKey:String}`
       : undefined,
@@ -205,6 +211,15 @@ const groupByExpressions: Partial<
     column: `arrayJoin(${tableAliases.stored_spans}."Events.Name")`,
     requiredJoins: ["stored_spans"],
     usesArrayJoin: true,
+  }),
+
+  "sentiment.input_sentiment": () => ({
+    column: `multiIf(
+      toFloat64OrNull(${tableAliases.trace_summaries}.Attributes['langwatch.input.satisfaction_score']) >= 0.1, 'positive',
+      toFloat64OrNull(${tableAliases.trace_summaries}.Attributes['langwatch.input.satisfaction_score']) <= -0.1, 'negative',
+      'neutral'
+    )`,
+    requiredJoins: [],
   }),
 
   "sentiment.thumbs_up_down": () => ({

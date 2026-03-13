@@ -308,6 +308,14 @@ export const fieldMappings: Record<string, FieldMapping> = {
     isArray: true,
   },
 
+  // ===== Input/Output Sentiment =====
+  "input.satisfaction_score": {
+    table: "trace_summaries",
+    column: "Attributes['langwatch.input.satisfaction_score']",
+    description: "Input sentiment satisfaction score",
+    mapValueType: "number",
+  },
+
   // ===== Annotation Fields =====
   annotations: {
     table: "trace_summaries",
@@ -396,7 +404,12 @@ export function buildJoinClause(table: CHTable): string {
     case "stored_spans":
       return `JOIN stored_spans ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
     case "evaluation_runs":
-      return `JOIN evaluation_runs ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
+      return `JOIN (
+        SELECT * FROM evaluation_runs
+        WHERE TenantId = {tenantId:String}
+        ORDER BY EvaluationId, UpdatedAt DESC
+        LIMIT 1 BY TenantId, EvaluationId
+      ) ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
     default:
       return "";
   }
