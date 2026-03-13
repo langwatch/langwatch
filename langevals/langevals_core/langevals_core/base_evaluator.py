@@ -48,7 +48,7 @@ MAX_TOKENS_HARD_LIMIT = 1_048_576
 
 class LLMEvaluatorSettings(EvaluatorSettings):
     model: str = Field(
-        default="openai/gpt-5",
+        default="openai/gpt-5-mini",
         description="The model to use for evaluation",
     )
     max_tokens: int = Field(
