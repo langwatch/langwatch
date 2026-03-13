@@ -72,7 +72,6 @@ export function RunRow({
         top={0}
         zIndex={20}
         bg="bg.muted"
-        backdropFilter="blur(12px)"
         borderBottom="1px solid"
         borderColor="border"
         data-testid="run-row-header"

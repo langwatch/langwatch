@@ -36,9 +36,21 @@ export function TraceMessage({ traceId, ...props }: TraceMessageProps) {
     },
   );
 
-  // Split rendering logic into separate functions
-  if (traceQuery.isLoading || traceQuery.isError || !traceQuery.data) {
-    return null;
+  if (traceQuery.isLoading) {
+    return (
+      <HStack gap={2} paddingBottom={4} {...props}>
+        <Spinner size="xs" />
+        <Text fontSize="xs" color="fg.muted">Loading trace...</Text>
+      </HStack>
+    );
+  }
+
+  if (traceQuery.isError || !traceQuery.data) {
+    return (
+      <HStack gap={2} paddingBottom={4} {...props}>
+        <Text fontSize="xs" color="fg.subtle">No trace info available</Text>
+      </HStack>
+    );
   }
 
   return <TraceSuccessState {...props} traceId={traceId} />;

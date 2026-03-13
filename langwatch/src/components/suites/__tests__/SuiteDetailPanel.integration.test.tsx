@@ -38,7 +38,9 @@ vi.mock("@prisma/client", () => ({}));
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({}),
+    useContext: () => ({
+      scenarios: { getScenarioSetBatchHistory: { invalidate: vi.fn() } },
+    }),
     scenarios: {
       getSuiteRunData: { useQuery: mockUseQuery },
       getAll: { useQuery: vi.fn(() => ({ data: [] })) },
@@ -71,6 +73,20 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
   }),
+}));
+
+vi.mock("~/hooks/useDrawer", () => ({
+  useDrawer: () => ({
+    openDrawer: vi.fn(),
+  }),
+}));
+
+vi.mock("~/hooks/useSSESubscription", () => ({
+  useSSESubscription: vi.fn(),
+}));
+
+vi.mock("~/hooks/usePageVisibility", () => ({
+  usePageVisibility: () => true,
 }));
 
 vi.mock("~/utils/formatTimeAgo", () => ({
@@ -123,7 +139,7 @@ describe("<SuiteDetailPanel/>", () => {
   beforeEach(() => {
     // Default: no run data (getSuiteRunData returns paginated result)
     mockUseQuery.mockReturnValue({
-      data: { runs: [], scenarioSetIds: {}, hasMore: false },
+      data: { runs: [], scenarioSetIds: {}, hasMore: false, changed: true },
       isLoading: false,
       error: null,
     });

@@ -16,7 +16,7 @@ import {
   ScenarioRunStatus,
   Verdict,
 } from "~/server/scenarios/scenario-event.enums";
-import { SimulationService } from "~/server/simulations/simulation.service";
+import { SimulationFacade } from "~/server/simulations/simulation.facade";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { createLogger } from "~/utils/logger/server";
 
@@ -55,13 +55,13 @@ const TERMINAL_STATUSES = new Set([
  * instead of timing out.
  */
 export class ScenarioFailureHandler {
-  constructor(private readonly service: SimulationService) {}
+  constructor(private readonly service: SimulationFacade) {}
 
   /**
    * Creates a new instance with default dependencies.
    */
   static create(): ScenarioFailureHandler {
-    return new ScenarioFailureHandler(SimulationService.create());
+    return new ScenarioFailureHandler(SimulationFacade.create());
   }
 
   /**
@@ -92,13 +92,10 @@ export class ScenarioFailureHandler {
         );
 
         // Check for existing events for this specific scenario
-        // Use wide date range — failure handler must find the batch regardless of age
         const batchRunResult = await this.service.getRunDataForBatchRun({
           projectId,
           scenarioSetId: setId,
           batchRunId,
-          startDate: 0,
-          endDate: Date.now(),
         });
 
         // Filter by scenarioId to get the correct run for this scenario
