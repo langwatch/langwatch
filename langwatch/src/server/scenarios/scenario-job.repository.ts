@@ -17,15 +17,19 @@ import { STALL_THRESHOLD_MS } from "./stall-detection";
  * threshold based on its timestamp. This catches workers that died before
  * emitting a RUN_STARTED event.
  */
-export function mapBullMQStateToStatus(
-  state: string,
-  options?: { jobTimestamp: number; now?: number },
-): ScenarioRunStatus {
+export function mapBullMQStateToStatus({
+  state,
+  jobTimestamp,
+  now = Date.now(),
+}: {
+  state: string;
+  jobTimestamp?: number;
+  now?: number;
+}): ScenarioRunStatus {
   switch (state) {
     case "active": {
-      if (options?.jobTimestamp !== undefined) {
-        const now = options.now ?? Date.now();
-        if (now - options.jobTimestamp >= STALL_THRESHOLD_MS) {
+      if (jobTimestamp !== undefined) {
+        if (now - jobTimestamp >= STALL_THRESHOLD_MS) {
           return ScenarioRunStatus.STALLED;
         }
       }
@@ -67,10 +71,10 @@ export function normalizeJob({ job, state }: NormalizeJobParams): ScenarioRunDat
     return null;
   }
 
-  const status = mapBullMQStateToStatus(
+  const status = mapBullMQStateToStatus({
     state,
-    job.timestamp !== undefined ? { jobTimestamp: job.timestamp } : undefined,
-  );
+    jobTimestamp: job.timestamp,
+  });
 
   return {
     scenarioId: data.scenarioId,

@@ -43,13 +43,13 @@ function makeJobData(overrides: Partial<ScenarioJob> = {}): ScenarioJob {
 describe("mapBullMQStateToStatus()", () => {
   describe("when state is 'waiting'", () => {
     it("returns QUEUED status", () => {
-      expect(mapBullMQStateToStatus("waiting")).toBe(ScenarioRunStatus.QUEUED);
+      expect(mapBullMQStateToStatus({ state: "waiting" })).toBe(ScenarioRunStatus.QUEUED);
     });
   });
 
   describe("when state is 'active'", () => {
     it("returns RUNNING status", () => {
-      expect(mapBullMQStateToStatus("active")).toBe(ScenarioRunStatus.RUNNING);
+      expect(mapBullMQStateToStatus({ state: "active" })).toBe(ScenarioRunStatus.RUNNING);
     });
 
     describe("when jobTimestamp is provided", () => {
@@ -57,7 +57,7 @@ describe("mapBullMQStateToStatus()", () => {
         const now = Date.now();
         const recentTimestamp = now - (STALL_THRESHOLD_MS - 1000);
         expect(
-          mapBullMQStateToStatus("active", { jobTimestamp: recentTimestamp, now })
+          mapBullMQStateToStatus({ state: "active", jobTimestamp: recentTimestamp, now })
         ).toBe(ScenarioRunStatus.RUNNING);
       });
 
@@ -65,7 +65,7 @@ describe("mapBullMQStateToStatus()", () => {
         const now = Date.now();
         const staleTimestamp = now - (STALL_THRESHOLD_MS + 1000);
         expect(
-          mapBullMQStateToStatus("active", { jobTimestamp: staleTimestamp, now })
+          mapBullMQStateToStatus({ state: "active", jobTimestamp: staleTimestamp, now })
         ).toBe(ScenarioRunStatus.STALLED);
       });
 
@@ -73,33 +73,33 @@ describe("mapBullMQStateToStatus()", () => {
         const now = Date.now();
         const exactTimestamp = now - STALL_THRESHOLD_MS;
         expect(
-          mapBullMQStateToStatus("active", { jobTimestamp: exactTimestamp, now })
+          mapBullMQStateToStatus({ state: "active", jobTimestamp: exactTimestamp, now })
         ).toBe(ScenarioRunStatus.STALLED);
       });
     });
 
     describe("when jobTimestamp is not provided", () => {
       it("returns RUNNING for backwards compatibility", () => {
-        expect(mapBullMQStateToStatus("active")).toBe(ScenarioRunStatus.RUNNING);
+        expect(mapBullMQStateToStatus({ state: "active" })).toBe(ScenarioRunStatus.RUNNING);
       });
     });
   });
 
   describe("when state is 'completed'", () => {
     it("returns IN_PROGRESS status", () => {
-      expect(mapBullMQStateToStatus("completed")).toBe(ScenarioRunStatus.IN_PROGRESS);
+      expect(mapBullMQStateToStatus({ state: "completed" })).toBe(ScenarioRunStatus.IN_PROGRESS);
     });
   });
 
   describe("when state is 'failed'", () => {
     it("returns ERROR status", () => {
-      expect(mapBullMQStateToStatus("failed")).toBe(ScenarioRunStatus.ERROR);
+      expect(mapBullMQStateToStatus({ state: "failed" })).toBe(ScenarioRunStatus.ERROR);
     });
   });
 
   describe("when state is unknown", () => {
     it("defaults to QUEUED status", () => {
-      expect(mapBullMQStateToStatus("delayed")).toBe(ScenarioRunStatus.QUEUED);
+      expect(mapBullMQStateToStatus({ state: "delayed" })).toBe(ScenarioRunStatus.QUEUED);
     });
   });
 });
