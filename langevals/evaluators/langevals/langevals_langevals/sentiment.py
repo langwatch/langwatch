@@ -31,7 +31,7 @@ class SentimentSettings(EvaluatorSettings):
     )
     normalization_factor: float = Field(
         default=0.10,
-        description="Expected range of (positive - negative) cosine similarity. Raw scores are divided by this to normalize to [-1, 1]",
+        description="Controls sentiment sensitivity. Decrease to make scores more extreme (fewer neutrals), increase to make scores more moderate (more neutrals)",
     )
 
 
