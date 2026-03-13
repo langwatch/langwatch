@@ -29,7 +29,7 @@ import {
 import type React from "react";
 import { useMemo, useState } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
-import { TagList } from "~/components/ui/TagPill";
+import { TagList } from "~/components/ui/TagList";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { SuiteRunSummary } from "./run-history-transforms";
 import type { ExternalSetSummary } from "~/server/scenarios/scenario-event.types";

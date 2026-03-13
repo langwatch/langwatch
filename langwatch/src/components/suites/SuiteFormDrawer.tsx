@@ -38,7 +38,7 @@ import { ScenarioFormDrawer } from "../scenarios/ScenarioFormDrawer";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
 import { useSuiteForm, type SuiteFormData } from "./useSuiteForm";
-import { TagList } from "../ui/TagPill";
+import { TagList } from "../ui/TagList";
 import { ScenarioPicker } from "./ScenarioPicker";
 import { TargetPicker } from "./TargetPicker";
 

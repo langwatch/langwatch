@@ -18,7 +18,7 @@ import { AlertTriangle, Plus, X } from "lucide-react";
 import { Checkbox } from "../ui/checkbox";
 import { Tooltip } from "../ui/tooltip";
 import { SearchInput } from "../ui/SearchInput";
-import { TagList } from "../ui/TagPill";
+import { TagList } from "../ui/TagList";
 
 interface Scenario {
   id: string;

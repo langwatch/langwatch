@@ -17,7 +17,7 @@ import { useMemo, useState } from "react";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { Checkbox } from "../ui/checkbox";
 import { Menu } from "../ui/menu";
-import { TagList } from "../ui/TagPill";
+import { TagList } from "../ui/TagList";
 
 export type ScenarioTableProps = {
   scenarios: Scenario[];

@@ -26,7 +26,7 @@ import {
   Repeat2,
   Target,
 } from "lucide-react";
-import { TagList } from "~/components/ui/TagPill";
+import { TagList } from "~/components/ui/TagList";
 import { useState } from "react";
 import { parseSuiteTargets } from "~/server/suites/types";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
