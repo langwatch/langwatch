@@ -6,7 +6,8 @@
  * card previews — the full SimulationChat is used in detail views.
  */
 
-import { Box, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Settings } from "react-feather";
 import type { StreamingMessage } from "~/hooks/useSimulationStreamingState";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 
@@ -151,6 +152,54 @@ export function MessagePreview({
       justifyContent="flex-end"
     >
       {(messages ?? []).map((message, index) => {
+        // Tool call indicators (assistant messages with tool_calls or toolCalls)
+        const toolCalls = ("tool_calls" in message && message.tool_calls)
+          ? message.tool_calls
+          : ("toolCalls" in message && (message as Record<string, unknown>).toolCalls)
+            ? (message as Record<string, unknown>).toolCalls as Array<{ function?: { name?: string } }>
+            : null;
+        if (toolCalls) {
+          return toolCalls.map((tc: { function?: { name?: string } }, tcIdx: number) => (
+            <HStack
+              key={`${message.id ?? index}-tc-${tcIdx}`}
+              alignSelf="flex-start"
+              gap={1}
+            >
+              <Box color="orange.fg">
+                <Settings size={10} />
+              </Box>
+              <Text fontSize="2xs" color="orange.fg" fontWeight="medium" lineClamp={1}>
+                {tc.function?.name ?? "tool"}
+              </Text>
+            </HStack>
+          ));
+        }
+
+        // Tool results
+        if (message.role === "tool") {
+          const resultText = textContent(message.content);
+          if (!resultText) return null;
+          return (
+            <Box
+              key={message.id ?? index}
+              alignSelf="flex-start"
+              maxWidth="85%"
+            >
+              <Box
+                bg="bg.subtle"
+                borderRadius="lg"
+                paddingX={2.5}
+                paddingY={1.5}
+                fontSize="xs"
+                color="fg.muted"
+                lineClamp={2}
+              >
+                {resultText}
+              </Box>
+            </Box>
+          );
+        }
+
         const text = textContent(message.content);
         if (!text || text === "None") return null;
 

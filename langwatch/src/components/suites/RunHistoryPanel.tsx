@@ -8,7 +8,7 @@
 
 import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { useTargetNameMap } from "~/hooks/useTargetNameMap";
@@ -23,6 +23,7 @@ import {
 } from "./RunHistoryFilters";
 import { RunRow } from "./RunRow";
 import { GroupRow } from "./GroupRow";
+import { RunSummaryCounts } from "./RunSummaryCounts";
 import { useRunHistoryStore } from "./useRunHistoryStore";
 import { useRunHistoryPagination } from "./useRunHistoryPagination";
 import { useAutoExpansion } from "./useAutoExpansion";
@@ -233,18 +234,21 @@ export function RunHistoryPanel({
     [setFilters],
   );
 
-  // Keep initializing placeholder until actual data arrives (prevents pop)
-  const [showInitPlaceholder, setShowInitPlaceholder] = useState(false);
-  useEffect(() => {
-    if (isRunStarting) {
-      setShowInitPlaceholder(true);
+  // Keep initializing placeholder until a NEW batch run appears.
+  // Uses useMemo so the placeholder hides in the same render that
+  // adds the new batch row — no flicker gap.
+  const batchCountAtStartRef = useRef<number | null>(null);
+  if (isRunStarting && batchCountAtStartRef.current === null) {
+    batchCountAtStartRef.current = batchRuns.length;
+  }
+  const showInitPlaceholder = useMemo(() => {
+    if (batchCountAtStartRef.current === null) return false;
+    if (batchRuns.length > batchCountAtStartRef.current) {
+      batchCountAtStartRef.current = null;
+      return false;
     }
-  }, [isRunStarting]);
-  useEffect(() => {
-    if (showInitPlaceholder && batchRuns.length > 0 && !isRunStarting) {
-      setShowInitPlaceholder(false);
-    }
-  }, [showInitPlaceholder, batchRuns.length, isRunStarting]);
+    return true;
+  }, [batchRuns.length]);
 
   // --- Render ---
 
@@ -269,40 +273,44 @@ export function RunHistoryPanel({
   const hasFiltersApplied = !!(filters.scenarioId || filters.passFailStatus);
 
   return (
-    <VStack align="stretch" gap={0} height="100%" overflow={isSingleSuiteView ? undefined : "auto"}>
+    <VStack align="stretch" gap={0} height="100%">
       {/* Header: only shown in all-runs view */}
       {!isSingleSuiteView && (
         <Box paddingX={6} paddingY={4}>
           <Text fontSize="xl" fontWeight="bold">
             All Runs
           </Text>
-          <HStack gap={3} data-testid="all-runs-header-totals">
+          <HStack gap={2} data-testid="all-runs-header-totals">
             <Text fontSize="sm" color="fg.muted">
               {groupBy === "none"
                 ? `${batchRuns.length} ${batchRuns.length === 1 ? "execution" : "executions"} · `
                 : `${groups.length} ${groups.length === 1 ? "group" : "groups"} · `}
               {totals.runCount} {totals.runCount === 1 ? "run" : "runs"}
             </Text>
-            <Text fontSize="sm" color="green.fg">
-              {totals.passedCount} passed
-            </Text>
-            <Text fontSize="sm" color="red.fg">
-              {totals.failedCount} failed
-            </Text>
+            <RunSummaryCounts
+              summary={{
+                passedCount: totals.passedCount,
+                failedCount: totals.failedCount,
+                stalledCount: 0,
+                cancelledCount: 0,
+                inProgressCount: totals.pendingCount,
+                queuedCount: 0,
+                passRate: 0,
+                totalCount: totals.runCount,
+              }}
+            />
           </HStack>
         </Box>
       )}
 
-      {/* Filters — sticky so cards don't scroll behind it */}
+      {/* Filters — fixed above the scrollable run list */}
       <Box
         paddingX={6}
         paddingY={4}
-        position="sticky"
-        top={0}
-        zIndex={30}
         bg="bg"
         borderBottom="1px solid"
         borderColor="border"
+        flexShrink={0}
       >
         <RunHistoryFilters
           scenarioOptions={scenarioOptions}
@@ -315,7 +323,7 @@ export function RunHistoryPanel({
         />
       </Box>
 
-      {/* Run list */}
+      {/* Run list — own scroll container so RunRow sticky headers don't clash with filters */}
       {itemCount === 0 && !showInitPlaceholder ? (
         <Box paddingX={6} paddingY={8} textAlign="center">
           <Text color="fg.muted">
@@ -327,61 +335,59 @@ export function RunHistoryPanel({
           </Text>
         </Box>
       ) : (
-        <>
-          <VStack align="stretch" gap={0} flex={isSingleSuiteView ? 1 : undefined}>
-            {showInitPlaceholder && (
-              <RunInitializingPlaceholder />
-            )}
-            {groupBy === "none"
-              ? batchRuns.map((batchRun) => {
-                  const summary = computeBatchRunSummary({ batchRun });
-                  const isExpanded = expandedIds.has(batchRun.batchRunId);
+        <VStack align="stretch" gap={0} flex={1} minH={0} overflow="auto">
+          {showInitPlaceholder && (
+            <RunInitializingPlaceholder />
+          )}
+          {groupBy === "none"
+            ? batchRuns.map((batchRun) => {
+                const summary = computeBatchRunSummary({ batchRun });
+                const isExpanded = expandedIds.has(batchRun.batchRunId);
 
-                  // Resolve suite/external-set name for all-runs view
-                  const suiteName = suiteNameMap
-                    ? (resolveOriginLabel({
-                        scenarioSetId: batchRun.scenarioSetId,
-                        suiteNameMap,
-                      }) ?? undefined)
-                    : undefined;
+                // Resolve suite/external-set name for all-runs view
+                const suiteName = suiteNameMap
+                  ? (resolveOriginLabel({
+                      scenarioSetId: batchRun.scenarioSetId,
+                      suiteNameMap,
+                    }) ?? undefined)
+                  : undefined;
 
-                  return (
-                    <RunRow
-                      key={batchRun.batchRunId}
-                      batchRun={batchRun}
-                      summary={summary}
-                      isExpanded={isExpanded}
-                      onToggle={() => toggleExpanded(batchRun.batchRunId)}
-                      resolveTargetName={resolveTargetName}
-                      onScenarioRunClick={handleScenarioRunClick}
-                      expectedJobCount={expectedJobCount}
-                      suiteName={suiteName}
-                      viewMode={viewMode}
-                    />
-                  );
-                })
-              : groups.map((group) => {
-                  const summary = computeGroupSummary({ group });
-                  return (
-                    <GroupRow
-                      key={group.groupKey}
-                      group={group}
-                      summary={summary}
-                      isExpanded={expandedIds.has(group.groupKey)}
-                      onToggle={() => toggleExpanded(group.groupKey)}
-                      onScenarioRunClick={handleScenarioRunClick}
-                      resolveTargetName={resolveTargetName}
-                      viewMode={viewMode}
-                    />
-                  );
-                })}
-          </VStack>
+                return (
+                  <RunRow
+                    key={batchRun.batchRunId}
+                    batchRun={batchRun}
+                    summary={summary}
+                    isExpanded={isExpanded}
+                    onToggle={() => toggleExpanded(batchRun.batchRunId)}
+                    resolveTargetName={resolveTargetName}
+                    onScenarioRunClick={handleScenarioRunClick}
+                    expectedJobCount={expectedJobCount}
+                    suiteName={suiteName}
+                    viewMode={viewMode}
+                  />
+                );
+              })
+            : groups.map((group) => {
+                const summary = computeGroupSummary({ group });
+                return (
+                  <GroupRow
+                    key={group.groupKey}
+                    group={group}
+                    summary={summary}
+                    isExpanded={expandedIds.has(group.groupKey)}
+                    onToggle={() => toggleExpanded(group.groupKey)}
+                    onScenarioRunClick={handleScenarioRunClick}
+                    resolveTargetName={resolveTargetName}
+                    viewMode={viewMode}
+                  />
+                );
+              })}
 
           {/* Load More button */}
           {hasMore && (
             <Box
               paddingX={6}
-              paddingTop={4}
+              paddingY={6}
               display="flex"
               justifyContent="center"
             >
@@ -390,7 +396,7 @@ export function RunHistoryPanel({
               </Button>
             </Box>
           )}
-        </>
+        </VStack>
       )}
     </VStack>
   );

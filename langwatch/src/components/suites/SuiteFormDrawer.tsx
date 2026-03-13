@@ -199,8 +199,11 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
 
       const onSuccess = (saved: SimulationSuite) => {
         closeDrawer();
-        runMutation.mutate({ projectId: payload.projectId, id: saved.id, idempotencyKey });
-        onRunRequested?.(saved);
+        if (onRunRequested) {
+          onRunRequested(saved);
+        } else {
+          runMutation.mutate({ projectId: payload.projectId, id: saved.id, idempotencyKey });
+        }
       };
 
       if (isEditMode && suite) {

@@ -32,6 +32,35 @@ type ScenarioRunContentProps = {
   iterationMap: Map<string, number>;
 };
 
+/**
+ * Wraps ScenarioGridCard so that onClick is derived from the scenarioRun ref
+ * itself rather than a new closure per card. This lets memo() actually work.
+ */
+const StableGridCard = memo(function StableGridCard({
+  scenarioRun,
+  targetName,
+  onScenarioRunClick,
+  iteration,
+}: {
+  scenarioRun: ScenarioRunData;
+  targetName: string | null;
+  onScenarioRunClick: (scenarioRun: ScenarioRunData) => void;
+  iteration?: number;
+}) {
+  const handleClick = useCallback(
+    () => onScenarioRunClick(scenarioRun),
+    [onScenarioRunClick, scenarioRun],
+  );
+  return (
+    <ScenarioGridCard
+      scenarioRun={scenarioRun}
+      targetName={targetName}
+      onClick={handleClick}
+      iteration={iteration}
+    />
+  );
+});
+
 export function ScenarioRunContent(props: ScenarioRunContentProps) {
   if (props.scenarioRuns.length > VIRTUALIZE_THRESHOLD) {
     return <VirtualizedContent {...props} />;
@@ -59,11 +88,11 @@ function PlainContent({
         data-testid="scenario-grid"
       >
         {scenarioRuns.map((scenarioRun) => (
-          <ScenarioGridCard
+          <StableGridCard
             key={scenarioRun.scenarioRunId}
             scenarioRun={scenarioRun}
             targetName={resolveTargetName(scenarioRun)}
-            onClick={() => onScenarioRunClick(scenarioRun)}
+            onScenarioRunClick={onScenarioRunClick}
             iteration={iterationMap.get(scenarioRun.scenarioRunId)}
           />
         ))}
@@ -171,9 +200,8 @@ function VirtualizedContent({
   });
 
   const virtualItems = virtualizer.getVirtualItems();
-  const totalSize = virtualizer.getTotalSize();
-  // Container height = total content minus the scroll margin (external offset)
-  const contentHeight = totalSize - scrollMargin;
+  // getTotalSize() already excludes scrollMargin — it returns the pure content height.
+  const contentHeight = virtualizer.getTotalSize();
 
   if (isGrid) {
     return (
@@ -183,6 +211,7 @@ function VirtualizedContent({
           height: contentHeight + GRID_PADDING * 2,
           width: "100%",
           position: "relative",
+          flexShrink: 0,
         }}
         data-testid="scenario-grid"
       >
@@ -205,11 +234,11 @@ function VirtualizedContent({
               }}
             >
               {rowItems.map((scenarioRun) => (
-                <MemoizedGridCard
+                <StableGridCard
                   key={scenarioRun.scenarioRunId}
                   scenarioRun={scenarioRun}
                   targetName={resolveTargetName(scenarioRun)}
-                  onClick={() => onScenarioRunClick(scenarioRun)}
+                  onScenarioRunClick={onScenarioRunClick}
                   iteration={iterationMap.get(scenarioRun.scenarioRunId)}
                 />
               ))}
@@ -228,6 +257,7 @@ function VirtualizedContent({
         height: contentHeight,
         width: "100%",
         position: "relative",
+        flexShrink: 0,
       }}
       data-testid="scenario-list"
     >
@@ -259,4 +289,3 @@ function VirtualizedContent({
   );
 }
 
-const MemoizedGridCard = memo(ScenarioGridCard);

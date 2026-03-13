@@ -5,24 +5,28 @@ import { useColorModeValue } from "../ui/color-mode";
 
 const GRADIENT_LIGHT = {
   pass: `
-    radial-gradient(ellipse at 0% 100%, rgba(134, 239, 172, 0.75) 0%, transparent 55%),
-    radial-gradient(ellipse at 100% 50%, rgba(72, 187, 120, 0.6) 0%, transparent 50%),
-    linear-gradient(160deg, rgba(56, 161, 105, 0.5) 0%, rgba(104, 211, 145, 0.35) 100%)
+    radial-gradient(ellipse at 0% 100%, rgba(134, 239, 172, 0.55) 0%, transparent 50%),
+    radial-gradient(ellipse at 100% 50%, rgba(72, 187, 120, 0.5) 0%, transparent 45%),
+    radial-gradient(ellipse at 70% 0%, rgba(56, 161, 105, 0.55) 0%, transparent 50%),
+    linear-gradient(160deg, rgba(56, 161, 105, 0.58) 0%, rgba(104, 211, 145, 0.52) 100%)
   `,
   cancelled: `
-    radial-gradient(ellipse at 0% 100%, rgba(226, 232, 240, 0.6) 0%, transparent 55%),
-    radial-gradient(ellipse at 100% 50%, rgba(160, 174, 192, 0.48) 0%, transparent 50%),
-    linear-gradient(160deg, rgba(113, 128, 150, 0.38) 0%, rgba(160, 174, 192, 0.28) 100%)
+    radial-gradient(ellipse at 0% 100%, rgba(226, 232, 240, 0.55) 0%, transparent 50%),
+    radial-gradient(ellipse at 100% 50%, rgba(160, 174, 192, 0.5) 0%, transparent 45%),
+    radial-gradient(ellipse at 70% 0%, rgba(113, 128, 150, 0.55) 0%, transparent 50%),
+    linear-gradient(160deg, rgba(113, 128, 150, 0.58) 0%, rgba(160, 174, 192, 0.52) 100%)
   `,
   fail: `
-    radial-gradient(ellipse at 0% 100%, rgba(254, 178, 178, 0.75) 0%, transparent 55%),
-    radial-gradient(ellipse at 100% 50%, rgba(245, 101, 101, 0.6) 0%, transparent 50%),
-    linear-gradient(160deg, rgba(229, 62, 62, 0.5) 0%, rgba(252, 129, 129, 0.35) 100%)
+    radial-gradient(ellipse at 0% 100%, rgba(254, 178, 178, 0.55) 0%, transparent 50%),
+    radial-gradient(ellipse at 100% 50%, rgba(245, 101, 101, 0.5) 0%, transparent 45%),
+    radial-gradient(ellipse at 70% 0%, rgba(229, 62, 62, 0.55) 0%, transparent 50%),
+    linear-gradient(160deg, rgba(229, 62, 62, 0.58) 0%, rgba(252, 129, 129, 0.52) 100%)
   `,
   stalled: `
-    radial-gradient(ellipse at 0% 100%, rgba(251, 211, 141, 0.75) 0%, transparent 55%),
-    radial-gradient(ellipse at 100% 50%, rgba(236, 201, 75, 0.6) 0%, transparent 50%),
-    linear-gradient(160deg, rgba(214, 158, 46, 0.5) 0%, rgba(236, 201, 75, 0.35) 100%)
+    radial-gradient(ellipse at 0% 100%, rgba(251, 211, 141, 0.55) 0%, transparent 50%),
+    radial-gradient(ellipse at 100% 50%, rgba(236, 201, 75, 0.5) 0%, transparent 45%),
+    radial-gradient(ellipse at 70% 0%, rgba(214, 158, 46, 0.55) 0%, transparent 50%),
+    linear-gradient(160deg, rgba(214, 158, 46, 0.58) 0%, rgba(236, 201, 75, 0.52) 100%)
   `,
 } as const;
 

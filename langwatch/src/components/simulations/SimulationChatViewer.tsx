@@ -7,9 +7,7 @@ import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { api } from "~/utils/api";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
-import "@copilotkit/react-ui/styles.css";
-import "~/pages/[project]/simulations/simulations.css";
-import { CustomCopilotKitChat } from "./CustomCopilotKitChat";
+import { ScenarioMessageRenderer } from "./ScenarioMessageRenderer";
 import { SimulationCard } from "./SimulationCard";
 
 const AWAITING_MESSAGES_STATUSES = new Set([
@@ -84,7 +82,7 @@ export function SimulationChatViewer({
       isLoading={isLoading}
       isAwaitingMessages={isAwaitingMessages}
     >
-      <CustomCopilotKitChat
+      <ScenarioMessageRenderer
         messages={data?.messages ?? []}
         streamingMessages={streamingMessages}
         variant="grid"

@@ -28,9 +28,7 @@ import { api } from "~/utils/api";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { TraceDetails } from "../traces/TraceDetails";
 import { Drawer } from "../ui/drawer";
-import "@copilotkit/react-ui/styles.css";
-import "~/pages/[project]/simulations/simulations.css";
-import { CustomCopilotKitChat } from "./CustomCopilotKitChat";
+import { ScenarioMessageRenderer } from "./ScenarioMessageRenderer";
 import { ScenarioRunActions } from "./ScenarioRunActions";
 import { ScenarioRunStatusIcon } from "./ScenarioRunStatusIcon";
 import { SimulationConsole } from "./simulation-console/SimulationConsole";
@@ -375,7 +373,7 @@ export function ScenarioRunDetailDrawer({
                     background="bg.muted"
                   >
                     <Box borderRadius="md" overflow="hidden">
-                      <CustomCopilotKitChat
+                      <ScenarioMessageRenderer
                         messages={scenarioState.messages ?? []}
                         streamingMessages={streamingMessages}
                         variant="drawer"
