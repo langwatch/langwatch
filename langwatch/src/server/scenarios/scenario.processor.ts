@@ -35,6 +35,7 @@ import { CHILD_PROCESS, SCENARIO_QUEUE, SCENARIO_WORKER } from "./scenario.const
 import type { ScenarioJob, ScenarioJobResult } from "./scenario.queue";
 import { ScenarioFailureHandler, type FailureEventParams } from "./scenario-failure-handler";
 import { ScenarioService } from "./scenario.service";
+import { resolveChildProcessSpawn } from "./execution/child-process-spawn";
 
 // ============================================================================
 // Dependency Interfaces (Dependency Inversion Principle)
@@ -316,10 +317,6 @@ async function spawnScenarioChildProcess(
       void job.log(`[${level.toUpperCase()}] ${message}`);
     };
 
-    // Use tsx to run the TypeScript file directly, avoiding Next.js bundling issues
-    // Use __dirname instead of process.cwd() for reliable path resolution in Docker
-    const childPath = path.join(__dirname, "execution/scenario-child-process.ts");
-
     // Build OTEL resource attributes including scenario labels
     const otelResourceAttrs = buildOtelResourceAttributes(childProcessData.scenario.labels);
 
@@ -333,10 +330,14 @@ async function spawnScenarioChildProcess(
       OTEL_RESOURCE_ATTRIBUTES: otelResourceAttrs,
     });
 
-    // tsx is available since the worker runs via tsx
-    // Use __dirname to resolve cwd reliably - go up from src/server/scenarios to package root
+    // Resolve spawn command: pre-compiled bundle in production, tsx in development
+    // Use __dirname to resolve package root reliably (works from source and built output paths)
     const packageRoot = path.resolve(__dirname, "../../..");
-    const child: ChildProcess = spawn("pnpm", ["exec", "tsx", childPath], {
+    const { command, args } = resolveChildProcessSpawn({
+      packageRoot,
+      nodeEnv: process.env.NODE_ENV,
+    });
+    const child: ChildProcess = spawn(command, args, {
       env: childEnv,
       stdio: ["pipe", "pipe", "pipe"],
       cwd: packageRoot,
