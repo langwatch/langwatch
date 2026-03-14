@@ -49,6 +49,7 @@ import { api } from "../../utils/api";
 import { formatMoney } from "../../utils/formatMoney";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
 import { getColorForString } from "../../utils/rotatingColors";
+import { getRunDisplayName } from "../batch-evaluation-results/getRunDisplayName";
 import { titleCase } from "../../utils/stringCasing";
 import { FeedbackLink } from "../FeedbackLink";
 import { LLMIcon } from "../icons/LLMIcon";
@@ -341,6 +342,18 @@ export function DSPyExperimentRunList({
     (run) => run.workflow_version,
   );
 
+  // Map real run IDs to their chronological index for stable "Run #N" numbering
+  const runIndexById = useMemo(
+    () =>
+      new Map(
+        (dspyRuns.data ?? []).map((realRun, realIndex) => [
+          realRun.runId,
+          realIndex,
+        ]),
+      ),
+    [dspyRuns.data],
+  );
+
   return (
     <VStack
       align="start"
@@ -382,7 +395,10 @@ export function DSPyExperimentRunList({
           const runCost = run.steps
             ?.map((step) => step.llm_calls_summary.total_cost)
             .reduce((acc, cost) => acc + cost, 0);
-          const runName = run.workflow_version?.commitMessage ?? run.runId;
+          const runName = getRunDisplayName({
+            commitMessage: run.workflow_version?.commitMessage,
+            index: runIndexById.get(run.runId) ?? 0,
+          });
 
           return (
             <HStack
