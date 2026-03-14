@@ -1,0 +1,137 @@
+import scenario from "@langwatch/scenario";
+import fs from "fs";
+import { execSync } from "child_process";
+import { describe, it, expect } from "vitest";
+import dotenv from "dotenv";
+import os from "os";
+import path from "path";
+import { fileURLToPath } from "url";
+import { openai } from "@ai-sdk/openai";
+import {
+  createClaudeCodeAgent,
+  toolCallFix,
+} from "./helpers/claude-code-adapter";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
+
+const isCI = !!process.env.CI;
+
+const judgeModel = openai("gpt-4.1-mini");
+
+function copySkillToWorkDir(tempFolder: string) {
+  const skillDir = path.join(tempFolder, ".skills", "instrument");
+  fs.mkdirSync(skillDir, { recursive: true });
+  fs.copyFileSync(
+    path.resolve(__dirname, "../instrument/SKILL.md"),
+    path.join(skillDir, "SKILL.md")
+  );
+  const sharedDir = path.join(skillDir, "_shared");
+  fs.mkdirSync(sharedDir, { recursive: true });
+  execSync(
+    `cp -r ${path.resolve(__dirname, "../_shared")}/* ${sharedDir}/`
+  );
+}
+
+describe("Instrument Skill", () => {
+  it.skipIf(isCI)(
+    "instruments a Python OpenAI bot with LangWatch",
+    async () => {
+      const tempFolder = fs.mkdtempSync(
+        path.join(os.tmpdir(), "langwatch-skill-instrument-py-")
+      );
+
+      execSync(
+        `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`
+      );
+      copySkillToWorkDir(tempFolder);
+
+      const result = await scenario.run({
+        name: "Python OpenAI instrumentation",
+        description:
+          "Implementing LangWatch instrumentation in a Python OpenAI bot project.",
+        agents: [
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          scenario.userSimulatorAgent({ model: judgeModel }),
+          scenario.judgeAgent({
+            model: judgeModel,
+            criteria: [
+              "Agent should edit the main.py file to add LangWatch instrumentation",
+              "Agent should use the LangWatch MCP to check documentation",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "please instrument my code with langwatch, short and sweet, no need to test the changes"
+          ),
+          scenario.agent(),
+          (state) => {
+            toolCallFix(state);
+            const resultFile = fs.readFileSync(
+              `${tempFolder}/main.py`,
+              "utf8"
+            );
+            expect(resultFile).toContain("langwatch");
+            expect(resultFile).toContain("trace");
+          },
+          scenario.judge(),
+        ],
+      });
+
+      expect(result.success).toBe(true);
+    },
+    600_000
+  );
+
+  it.skipIf(isCI)(
+    "instruments a TypeScript Vercel AI bot with LangWatch",
+    async () => {
+      const tempFolder = fs.mkdtempSync(
+        path.join(os.tmpdir(), "langwatch-skill-instrument-ts-")
+      );
+
+      execSync(
+        `cp -r ${path.resolve(__dirname, "fixtures/typescript-vercel")}/* ${tempFolder}/`
+      );
+      copySkillToWorkDir(tempFolder);
+
+      const result = await scenario.run({
+        name: "TypeScript Vercel AI instrumentation",
+        description:
+          "Implementing LangWatch instrumentation in a TypeScript Vercel AI bot project.",
+        agents: [
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          scenario.userSimulatorAgent({ model: judgeModel }),
+          scenario.judgeAgent({
+            model: judgeModel,
+            criteria: [
+              "Agent should edit the TypeScript file to add LangWatch instrumentation",
+              "Agent should use the LangWatch MCP to check documentation",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "please instrument my code with langwatch, short and sweet, no need to test the changes"
+          ),
+          scenario.agent(),
+          (state) => {
+            toolCallFix(state);
+            const resultFile = fs.readFileSync(
+              `${tempFolder}/index.ts`,
+              "utf8"
+            );
+            expect(resultFile).toContain("langwatch");
+          },
+          scenario.judge(),
+        ],
+      });
+
+      expect(result.success).toBe(true);
+    },
+    600_000
+  );
+});
