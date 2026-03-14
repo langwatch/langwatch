@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.17.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.16.0...python-sdk@v0.17.0) (2026-03-14)
+
+
+### Features
+
+* **tracing:** explicit application origin to prevent evaluation race condition ([#2346](https://github.com/langwatch/langwatch/issues/2346)) ([348874e](https://github.com/langwatch/langwatch/commit/348874e48ce79537596d28887c6ed9c719200b29))
+
+
+### Bug Fixes
+
+* skip litellm_bot test on RateLimitError from Cerebras ([#2355](https://github.com/langwatch/langwatch/issues/2355)) ([76bf87f](https://github.com/langwatch/langwatch/commit/76bf87f1db51b0fab681c593cd5515c66d0908f1))
+
 ## [0.16.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.15.0...python-sdk@v0.16.0) (2026-03-13)
 
 
