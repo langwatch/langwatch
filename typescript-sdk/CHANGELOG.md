@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.20.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.19.0...typescript-sdk@v0.20.0) (2026-03-14)
+
+
+### Features
+
+* **tracing:** explicit application origin to prevent evaluation race condition ([#2346](https://github.com/langwatch/langwatch/issues/2346)) ([348874e](https://github.com/langwatch/langwatch/commit/348874e48ce79537596d28887c6ed9c719200b29))
+
+
+### Bug Fixes
+
+* **typescript-sdk:** handle Zod-first evaluations.ts and filter types import ([#2352](https://github.com/langwatch/langwatch/issues/2352)) ([516d4e8](https://github.com/langwatch/langwatch/commit/516d4e839388ae954b42ba5f742ef6b96c0beacf))
+
 ## [0.19.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.18.0...typescript-sdk@v0.19.0) (2026-03-13)
 
 
