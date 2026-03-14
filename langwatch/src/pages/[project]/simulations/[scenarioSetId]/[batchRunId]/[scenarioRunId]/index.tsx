@@ -1,26 +1,28 @@
 import { Box, Button, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { ArrowLeft, Clock } from "lucide-react";
 import { useRouter } from "next/router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePeriodSelector } from "~/components/PeriodSelector";
 import { RunScenarioModal } from "~/components/scenarios/RunScenarioModal";
 import { ScenarioFormDrawerFromUrl } from "~/components/scenarios/ScenarioFormDrawer";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
 import {
-  CustomCopilotKitChat,
   PreviousRunsList,
   ScenarioRunActions,
   ScenarioRunHeader,
   SimulationConsole,
   SimulationLayout,
 } from "~/components/simulations";
+import "@copilotkit/react-ui/styles.css";
+import "~/pages/[project]/simulations/simulations.css";
+import { ScenarioMessageRenderer } from "~/components/simulations/ScenarioMessageRenderer";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useRunScenario } from "~/hooks/useRunScenario";
 import { useScenarioTarget } from "~/hooks/useScenarioTarget";
-import "@copilotkit/react-ui/styles.css";
-import "../../../simulations.css";
 import { useSimulationRouter } from "~/hooks/simulations";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useSimulationStreamingState } from "~/hooks/useSimulationStreamingState";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
 import { api } from "~/utils/api";
 import { buildRoutePath } from "~/utils/routes";
@@ -31,6 +33,7 @@ export default function IndividualScenarioRunPage() {
   const [runModalOpen, setRunModalOpen] = useState(false);
   const { goToSimulationBatchRuns, scenarioRunId, scenarioSetId, batchRunId } = useSimulationRouter();
   const { project } = useOrganizationTeamProject();
+  const { period, setPeriod } = usePeriodSelector(30);
   const router = useRouter();
   const { openDrawer, drawerOpen } = useDrawer();
 
@@ -59,12 +62,28 @@ export default function IndividualScenarioRunPage() {
     {
       scenarioRunId: scenarioRunId ?? "",
       projectId: project?.id ?? "",
+      startDate: period.startDate.getTime(),
+      endDate: period.endDate.getTime(),
     },
     {
       enabled: !!project?.id && !!scenarioRunId,
-      refetchInterval: 10_000,
+      refetchInterval: 30_000,
     },
   );
+
+  const { streamingMessages, handleStreamingEvent, clearCompleted } =
+    useSimulationStreamingState(scenarioRunId ?? undefined);
+
+  // Clear streaming messages once server data includes them
+  useEffect(() => {
+    if (scenarioState?.messages) {
+      clearCompleted(
+        scenarioState.messages
+          .map((m: { id?: string }) => m.id)
+          .filter((id): id is string => !!id),
+      );
+    }
+  }, [scenarioState?.messages, clearCompleted]);
 
   useSimulationUpdateListener({
     projectId: project?.id ?? "",
@@ -72,6 +91,7 @@ export default function IndividualScenarioRunPage() {
     enabled: !!project?.id && !!scenarioRunId,
     debounceMs: 300,
     filter: scenarioRunId ? { scenarioRunId } : undefined,
+    onStreamingEvent: handleStreamingEvent,
   });
 
   const results = scenarioState?.results;
@@ -137,7 +157,7 @@ export default function IndividualScenarioRunPage() {
   }
 
   return (
-    <SimulationLayout>
+    <SimulationLayout period={period} setPeriod={setPeriod}>
       <PageLayout.Container
         w="full"
         padding={6}
@@ -192,7 +212,7 @@ export default function IndividualScenarioRunPage() {
           </Box>
           {/* Single Card Container */}
           <Box
-            bg="white"
+            bg="bg.panel"
             borderRadius="lg"
             boxShadow="sm"
             border="1px"
@@ -236,9 +256,10 @@ export default function IndividualScenarioRunPage() {
                     {/* Conversation Area - Scrollable */}
                     <Box w="100%" p={4} overflow="auto" maxHeight="100%">
                       <VStack>
-                        <CustomCopilotKitChat
+                        <ScenarioMessageRenderer
                           messages={scenarioState?.messages ?? []}
-                          hideInput
+                          streamingMessages={streamingMessages}
+                          variant="drawer"
                         />
                         {/* Console Area */}
                         <Box

@@ -28,6 +28,18 @@ export const usePromptConfigForm = ({
   const disableNodeSyncRef = useRef(false);
   const disableFormSyncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Track whether we've received meaningful config values (not just empty defaults).
+  // The forward sync must not push default form values onto a form that has already
+  // been reset with real data by PromptEditorDrawer's init effect.
+  const hasReceivedConfigRef = useRef(
+    Object.keys(initialConfigValues).length > 0,
+  );
+  useEffect(() => {
+    if (Object.keys(initialConfigValues).length > 0) {
+      hasReceivedConfigRef.current = true;
+    }
+  }, [initialConfigValues]);
+
   // Store schema in ref so resolver can access it
   const schemaRef = useRef(formSchema);
   /**
@@ -46,9 +58,9 @@ export const usePromptConfigForm = ({
      * @see https://react-hook-form.com/docs/useform#defaultValues
      */
     defaultValues: parsedInitialValues,
-    resolver: (data, ...args) => {
+    resolver: (data, context, options) => {
       // Use ref to get current schema (updated by useEffect)
-      return zodResolver(schemaRef.current)(data, ...args);
+      return zodResolver(schemaRef.current)(data, context, options);
     },
   });
 
@@ -150,6 +162,11 @@ export const usePromptConfigForm = ({
   // Provides forward sync of parent component to form values
   useEffect(() => {
     if (disableNodeSyncRef.current) return;
+    // Don't forward-sync until we've received real config values.
+    // Without this guard, the forward sync can push default placeholder
+    // values (e.g. "input") onto a form that PromptEditorDrawer has
+    // already reset with the real config (e.g. "llm_output").
+    if (!hasReceivedConfigRef.current) return;
 
     const newVersion = parsedInitialValues?.versionMetadata?.versionNumber;
     const currentVersion = currentVersionRef.current;

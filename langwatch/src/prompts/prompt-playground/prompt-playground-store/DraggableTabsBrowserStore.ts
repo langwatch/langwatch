@@ -18,6 +18,8 @@ const logger = createLogger("DraggableTabsBrowserStore");
  * Single Responsibility: Represents the state and metadata for a prompt tab.
  */
 export const TabDataSchema = z.object({
+  /** When true, the tab is still fetching its data and should show a loading skeleton. */
+  loading: z.boolean().optional(),
   chat: z
     .object({
       /**
@@ -38,6 +40,8 @@ export const TabDataSchema = z.object({
       title: z.string().nullable(),
       versionNumber: z.number().optional(),
       scope: z.enum(["PROJECT", "ORGANIZATION"]).optional(),
+      /** When true the version history panel opens automatically when the tab mounts. */
+      openHistoryOnLoad: z.boolean().optional(),
     })
     .default({
       title: null,
@@ -83,8 +87,8 @@ export interface DraggableTabsBrowserState {
   /** ID of the currently active tabbedWindow, null if no windows */
   activeWindowId: string | null;
 
-  /** Add a new tab to the active tabbedWindow (or create a new tabbedWindow if none exists) */
-  addTab: (params: { data: TabData }) => void;
+  /** Add a new tab to the active tabbedWindow (or create a new tabbedWindow if none exists). Returns the new tab's ID. */
+  addTab: (params: { data: TabData }) => string;
   /** Remove a tab by its ID, cleaning up empty windows */
   removeTab: (params: { tabId: string }) => void;
   /** Split a tab into a new tabbedWindow */
@@ -175,8 +179,8 @@ function createDraggableTabsBrowserStore(projectId: string) {
          * Single Responsibility: Creates and adds a new tab with the provided data.
          */
         addTab: ({ data }) => {
+          const tabId = createTabId();
           set((state) => {
-            const tabId = createTabId();
             const newTab: Tab = { id: tabId, data };
 
             let activeWindow = state.windows.find(
@@ -193,6 +197,7 @@ function createDraggableTabsBrowserStore(projectId: string) {
             activeWindow.tabs.push(newTab);
             activeWindow.activeTabId = tabId;
           });
+          return tabId;
         },
 
         /**
@@ -481,6 +486,25 @@ function createDraggableTabsBrowserStore(projectId: string) {
       {
         name: storageKey,
         storage: createJSONStorage(() => localStorage),
+
+        // Strip transient UI flags before writing to localStorage so they
+        // don't re-trigger on page reload.
+        partialize: (state) => ({
+          ...state,
+          windows: state.windows.map((w) => ({
+            ...w,
+            tabs: w.tabs.map((t) => ({
+              ...t,
+              data: {
+                ...t.data,
+                meta: {
+                  ...t.data.meta,
+                  openHistoryOnLoad: undefined,
+                },
+              },
+            })),
+          })),
+        }),
 
         // Validate and handle corrupted data during rehydration
         onRehydrateStorage: () => (state, error) => {

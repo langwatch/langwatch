@@ -11,7 +11,7 @@ import {
   RefreshCw,
   Workflow,
 } from "lucide-react";
-import { LuPencil, LuTrash2 } from "react-icons/lu";
+import { LuClock, LuPencil, LuTrash2 } from "react-icons/lu";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { Menu } from "../ui/menu";
@@ -85,6 +85,7 @@ export type AgentCardProps = {
   onReplicate?: () => void;
   onPushToCopies?: () => void;
   onSyncFromSource?: () => void;
+  onViewHistory?: () => void;
   hasEvaluationsManagePermission?: boolean;
 };
 
@@ -97,6 +98,7 @@ export function AgentCard({
   onReplicate,
   onPushToCopies,
   onSyncFromSource,
+  onViewHistory,
   hasEvaluationsManagePermission = false,
 }: AgentCardProps) {
   const Icon = agentTypeIcons[agent.type] ?? Bot;
@@ -192,6 +194,18 @@ export function AgentCard({
                       hasPermission={hasEvaluationsManagePermission}
                       onAction={onReplicate}
                     />
+                  )}
+                  {onViewHistory && (
+                    <Menu.Item
+                      value="view-history"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onViewHistory();
+                      }}
+                    >
+                      <LuClock size={14} />
+                      View history
+                    </Menu.Item>
                   )}
                   {onDelete && (
                     <Menu.Item

@@ -18,12 +18,15 @@ import type {
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { generateClickHouseFilterConditions } from "~/server/filters/clickhouse";
 import type { Span, Trace } from "~/server/tracer/types";
+import { LLM_PARAMETER_MAP } from "~/prompts/prompt-playground/llmParameterMap";
 import { createLogger } from "~/utils/logger/server";
 import {
   applyTraceProtections,
   mapNormalizedSpansToSpans,
   mapTraceSummaryToTrace,
 } from "./mappers";
+import { findPromptReferenceInAncestors } from "./findPromptReferenceInAncestors";
+import { parsePromptReference } from "./parsePromptReference";
 import type {
   AggregationFiltersInput,
   CustomersAndLabelsResult,
@@ -369,6 +372,7 @@ export class ClickHouseTraceService {
   async getAllTracesForProject(
     input: GetAllTracesForProjectInput,
     protections: Protections,
+    options: { includeSpans?: boolean } = {},
   ): Promise<TracesForProjectResult | null> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getAllTracesForProject",
@@ -455,7 +459,7 @@ export class ClickHouseTraceService {
           }
 
           // Build the query with keyset pagination
-          const { traces, totalHits, lastTrace } =
+          let { traces, totalHits, lastTrace } =
             await this.fetchTracesWithPagination(
               input.projectId,
               pageSize,
@@ -466,7 +470,17 @@ export class ClickHouseTraceService {
               input.endDate,
               filterConditions,
               filterParams,
+              input.updatedAt,
             );
+
+          // When includeSpans is requested, fetch and attach actual spans
+          if (options.includeSpans && traces.length > 0) {
+            traces = await this.enrichTracesWithSpans(
+              traces,
+              input.projectId,
+              protections,
+            );
+          }
 
           // Generate new scrollId from last trace
           let newScrollId: string | undefined;
@@ -823,23 +837,29 @@ export class ClickHouseTraceService {
         }
 
         try {
-          // Query for the span
-          const result = await this.clickHouseClient.query({
+          // Fetch ALL spans in the trace in a single query so we can
+          // both extract LLM data and walk ancestors for prompt reference.
+          const queryResult = await this.clickHouseClient.query({
             query: `
               SELECT
-                ss.SpanId,
-                ss.TraceId,
-                ss.SpanName,
-                ss.SpanAttributes,
-                ss.StartTime,
-                ss.EndTime,
-                ss.DurationMs,
-                ss.StatusCode,
-                ss.StatusMessage
-              FROM stored_spans ss
-              WHERE ss.TenantId = {tenantId:String}
-                AND ss.SpanId = {spanId:String}
-              LIMIT 1
+                SpanId,
+                TraceId,
+                ParentSpanId,
+                SpanName,
+                SpanAttributes,
+                StartTime,
+                EndTime,
+                DurationMs,
+                StatusCode,
+                StatusMessage
+              FROM stored_spans
+              WHERE TenantId = {tenantId:String}
+                AND TraceId = (
+                  SELECT TraceId FROM stored_spans
+                  WHERE TenantId = {tenantId:String}
+                    AND SpanId = {spanId:String}
+                  LIMIT 1
+                )
             `,
             query_params: {
               tenantId: projectId,
@@ -848,9 +868,10 @@ export class ClickHouseTraceService {
             format: "JSONEachRow",
           });
 
-          const rows = (await result.json()) as Array<{
+          const allRows = (await queryResult.json()) as Array<{
             SpanId: string;
             TraceId: string;
+            ParentSpanId: string | null;
             SpanName: string;
             SpanAttributes: Record<string, unknown>;
             StartTime: number;
@@ -860,7 +881,7 @@ export class ClickHouseTraceService {
             StatusMessage: string | null;
           }>;
 
-          const row = rows[0];
+          const row = allRows.find((r) => r.SpanId === spanId);
           if (!row) {
             return null;
           }
@@ -874,7 +895,47 @@ export class ClickHouseTraceService {
           }
 
           // Extract span data from attributes
-          return this.extractPromptStudioDataFromClickHouse(row, protections);
+          const result = this.extractPromptStudioDataFromClickHouse(
+            row,
+            protections,
+          );
+
+          // If the LLM span itself doesn't have a prompt reference,
+          // walk up ancestor spans to find it (SDK sets it on the parent span)
+          if (!result.promptHandle) {
+            const ancestorSpans = allRows.map((r) => {
+              const attributes: Record<string, unknown> = {};
+              const promptId = r.SpanAttributes["langwatch.prompt.id"];
+              if (promptId) attributes["langwatch.prompt.id"] = promptId;
+              const promptVars = r.SpanAttributes["langwatch.prompt.variables"];
+              if (promptVars)
+                attributes["langwatch.prompt.variables"] = promptVars;
+              const promptHandle = r.SpanAttributes["langwatch.prompt.handle"];
+              if (promptHandle)
+                attributes["langwatch.prompt.handle"] = promptHandle;
+              const promptVersion =
+                r.SpanAttributes["langwatch.prompt.version.number"];
+              if (promptVersion)
+                attributes["langwatch.prompt.version.number"] = promptVersion;
+              return {
+                spanId: r.SpanId,
+                parentSpanId: r.ParentSpanId ?? null,
+                attributes,
+              };
+            });
+
+            const ancestorRef = findPromptReferenceInAncestors({
+              targetSpanId: spanId,
+              spans: ancestorSpans,
+            });
+            if (ancestorRef?.promptHandle) {
+              result.promptHandle = ancestorRef.promptHandle;
+              result.promptVersionNumber = ancestorRef.promptVersionNumber;
+              result.promptVariables = ancestorRef.promptVariables;
+            }
+          }
+
+          return result;
         } catch (error) {
           this.logger.error(
             {
@@ -912,6 +973,7 @@ export class ClickHouseTraceService {
     const messages: PromptStudioSpanResult["messages"] = [];
 
     // Extract input messages from gen_ai.prompt or langwatch.input
+    // Note: langwatch.input includes system messages; gen_ai.input.messages does not
     const inputStr =
       (attrs["gen_ai.prompt"] as string) ??
       (attrs["langwatch.input"] as string);
@@ -920,6 +982,13 @@ export class ClickHouseTraceService {
         const parsed = JSON.parse(inputStr);
         if (parsed.type === "chat_messages" && Array.isArray(parsed.value)) {
           messages.push(...parsed.value);
+        } else if (Array.isArray(parsed)) {
+          // Raw array of message objects (without TypedValueJson wrapper)
+          for (const item of parsed) {
+            if (item && typeof item === "object" && typeof item.content === "string") {
+              messages.push({ role: item.role ?? "user", content: item.content });
+            }
+          }
         } else if (typeof parsed.value === "string") {
           messages.push({ role: "user", content: parsed.value });
         } else if (typeof parsed === "string") {
@@ -930,15 +999,23 @@ export class ClickHouseTraceService {
       }
     }
 
-    // Extract output messages from gen_ai.completion or langwatch.output
+    // Extract output messages from gen_ai.completion, gen_ai.output.messages, or langwatch.output
     const outputStr =
       (attrs["gen_ai.completion"] as string) ??
+      (attrs["gen_ai.output.messages"] as string) ??
       (attrs["langwatch.output"] as string);
     if (outputStr) {
       try {
         const parsed = JSON.parse(outputStr);
         if (parsed.type === "chat_messages" && Array.isArray(parsed.value)) {
           messages.push(...parsed.value);
+        } else if (Array.isArray(parsed)) {
+          // Raw array of message objects (without TypedValueJson wrapper)
+          for (const item of parsed) {
+            if (item && typeof item === "object" && typeof item.content === "string") {
+              messages.push({ role: item.role ?? "assistant", content: item.content });
+            }
+          }
         } else if (typeof parsed.value === "string") {
           messages.push({ role: "assistant", content: parsed.value });
         } else if (typeof parsed === "string") {
@@ -955,12 +1032,33 @@ export class ClickHouseTraceService {
       (attrs["gen_ai.request.model"] as string) ??
       (attrs["llm.model"] as string) ??
       null;
-    const temperature = (attrs["gen_ai.request.temperature"] as number) ?? null;
-    const maxTokens = (attrs["gen_ai.request.max_tokens"] as number) ?? null;
-    const topP = (attrs["gen_ai.request.top_p"] as number) ?? null;
     const vendor = (attrs["gen_ai.system"] as string) ?? null;
 
-    const systemPrompt = messages.find((m) => m.role === "system")?.content;
+    // Build llmConfig dynamically from the parameter map
+    const llmConfig: PromptStudioSpanResult["llmConfig"] = {
+      model,
+      systemPrompt: messages.find((m) => m.role === "system")?.content,
+      temperature: null,
+      maxTokens: null,
+      topP: null,
+      frequencyPenalty: null,
+      presencePenalty: null,
+      seed: null,
+      topK: null,
+      minP: null,
+      repetitionPenalty: null,
+      reasoning: null,
+      verbosity: null,
+      litellmParams: {},
+    };
+
+    for (const param of LLM_PARAMETER_MAP) {
+      if (param.otelAttr === null) continue;
+      const raw = attrs[param.otelAttr];
+      if (raw != null) {
+        (llmConfig as Record<string, unknown>)[param.formField] = raw;
+      }
+    }
 
     // Extract metrics
     const promptTokens = attrs["gen_ai.usage.prompt_tokens"] as
@@ -980,19 +1078,15 @@ export class ClickHouseTraceService {
       };
     }
 
+    // Extract prompt reference from attributes
+    const promptRef = parsePromptReference(attrs);
+
     return {
       spanId: row.SpanId,
       traceId: row.TraceId,
       spanName: row.SpanName ?? null,
       messages,
-      llmConfig: {
-        model,
-        systemPrompt,
-        temperature,
-        maxTokens,
-        topP,
-        litellmParams: {},
-      },
+      llmConfig,
       vendor,
       error,
       timestamps: {
@@ -1006,6 +1100,9 @@ export class ClickHouseTraceService {
               completion_tokens: completionTokens,
             }
           : null,
+      promptHandle: promptRef.promptHandle,
+      promptVersionNumber: promptRef.promptVersionNumber,
+      promptVariables: promptRef.promptVariables,
     };
   }
 
@@ -1113,6 +1210,7 @@ export class ClickHouseTraceService {
     endDate?: number,
     filterConditions?: string[],
     filterParams?: Record<string, unknown>,
+    updatedAt?: number,
   ): Promise<{ traces: Trace[]; totalHits: number; lastTrace: Trace | null }> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.fetchTracesWithPagination",
@@ -1130,6 +1228,12 @@ export class ClickHouseTraceService {
             ? " AND " + filterConditions.join(" AND ")
             : "";
 
+        // Filter by updatedAt to only return traces modified since a given timestamp
+        const updatedAtFilter =
+          updatedAt !== undefined && updatedAt > 0
+            ? " AND ts.UpdatedAt >= fromUnixTimestamp64Milli({updatedAtFilter:UInt64})"
+            : "";
+
         // Keyset cursor condition — only for the data query
         let cursorCondition = "";
         if (cursor) {
@@ -1145,6 +1249,9 @@ export class ClickHouseTraceService {
           tenantId: projectId,
           startDate: startDate ?? 0,
           endDate: endDate ?? Date.now(),
+          ...(updatedAt !== undefined && updatedAt > 0
+            ? { updatedAtFilter: updatedAt }
+            : {}),
           ...filterParams,
         };
 
@@ -1161,6 +1268,7 @@ export class ClickHouseTraceService {
               WHERE ts.TenantId = {tenantId:String}
                 AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
                 AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
+                ${updatedAtFilter}
                 ${extraFilters}
             `,
             query_params: sharedParams,
@@ -1197,6 +1305,7 @@ export class ClickHouseTraceService {
               WHERE ts.TenantId = {tenantId:String}
                 AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
                 AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
+                ${updatedAtFilter}
                 ${extraFilters}
                 ${cursorCondition}
               ORDER BY ts.OccurredAt ${orderDirection}, ts.TraceId ${orderDirection}, ts.UpdatedAt DESC
@@ -1264,7 +1373,6 @@ export class ClickHouseTraceService {
       outputFromRootSpan: row.ts_OutputFromRootSpan ?? false,
       outputSpanEndTimeMs: row.ts_OutputSpanEndTimeMs ?? 0,
       blockedByGuardrail: false,
-      satisfactionScore: null,
       topicId: row.ts_TopicId,
       subTopicId: row.ts_SubTopicId,
       hasAnnotation: row.ts_HasAnnotation,
@@ -1306,6 +1414,39 @@ export class ClickHouseTraceService {
     }
 
     return Array.from(groups.values());
+  }
+
+  /**
+   * Enrich traces (which have empty spans) with actual span data from ClickHouse.
+   *
+   * Fetches spans via fetchTracesWithSpansJoined and replaces the empty span
+   * arrays on each trace with the real spans. Traces whose spans are not found
+   * are returned unchanged (with empty spans).
+   *
+   * @internal
+   */
+  private async enrichTracesWithSpans(
+    traces: Trace[],
+    projectId: string,
+    protections: Protections,
+  ): Promise<Trace[]> {
+    const traceIds = traces.map((t) => t.trace_id);
+    const tracesWithSpans = await this.fetchTracesWithSpansJoined(
+      projectId,
+      traceIds,
+    );
+
+    return traces.map((trace) => {
+      const data = tracesWithSpans.get(trace.trace_id);
+      if (!data || data.spans.length === 0) {
+        return trace;
+      }
+      const mappedSpans = mapNormalizedSpansToSpans(data.spans);
+      return applyTraceProtections(
+        mapTraceSummaryToTrace(data.summary, mappedSpans, projectId),
+        protections,
+      );
+    });
   }
 
   /**
@@ -1502,7 +1643,6 @@ export class ClickHouseTraceService {
       outputFromRootSpan: row.ts_OutputFromRootSpan ?? false,
       outputSpanEndTimeMs: row.ts_OutputSpanEndTimeMs ?? 0,
       blockedByGuardrail: false,
-      satisfactionScore: null,
       topicId: row.ts_TopicId,
       subTopicId: row.ts_SubTopicId,
       hasAnnotation: row.ts_HasAnnotation,

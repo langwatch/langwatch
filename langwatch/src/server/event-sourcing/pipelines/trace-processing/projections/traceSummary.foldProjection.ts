@@ -1,4 +1,5 @@
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
+import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
 import {
   enrichRagContextIds,
   SpanNormalizationPipelineService,
@@ -25,7 +26,6 @@ import type {
 import {
   isLogRecordReceivedEvent,
   isMetricRecordReceivedEvent,
-  isSatisfactionScoreAssignedEvent,
   isSpanReceivedEvent,
   isTopicAssignedEvent,
 } from "../schemas/events";
@@ -334,6 +334,11 @@ function extractAttributes(span: NormalizedSpan): Record<string, string> {
   if (typeof labels === "string") result["langwatch.labels"] = labels;
   else if (Array.isArray(labels))
     result["langwatch.labels"] = JSON.stringify(labels);
+
+  const promptId = stringAttr(spanAttrs, "langwatch.prompt.id");
+  if (promptId && promptId.includes(":")) {
+    result["langwatch.prompt.id"] = promptId;
+  }
 
   for (const [key, value] of Object.entries(spanAttrs)) {
     if (!key.startsWith("metadata.")) continue;
@@ -693,6 +698,22 @@ function accumulateAttributes({
     if (union.length > 0) merged["langwatch.labels"] = JSON.stringify(union);
   }
 
+  // Prompt IDs: union across spans
+  const existingPromptIds = state.attributes["langwatch.prompt_ids"];
+  const newPromptId = spanAttrs["langwatch.prompt.id"];
+  if (existingPromptIds || newPromptId) {
+    const union = [
+      ...new Set([
+        ...parseJsonStringArray(existingPromptIds),
+        ...(newPromptId ? [newPromptId] : []),
+      ]),
+    ];
+    if (union.length > 0)
+      merged["langwatch.prompt_ids"] = JSON.stringify(union);
+  }
+  // Remove the per-span key so it doesn't leak into trace-level attributes
+  delete merged["langwatch.prompt.id"];
+
   // Metadata: deep-merge JSON objects, first-wins for primitives
   for (const key of Object.keys(merged)) {
     if (!key.startsWith("metadata.")) continue;
@@ -741,9 +762,10 @@ function accumulateAttributes({
 
 // ─── Main composition ───────────────────────────────────────────────
 
-const spanNormalizationPipelineService =
-  SpanNormalizationPipelineService.create();
-const traceIOExtractionService = TraceIOExtractionService.create();
+const spanNormalizationPipelineService = new SpanNormalizationPipelineService(
+  new CanonicalizeSpanAttributesService(),
+);
+const traceIOExtractionService = new TraceIOExtractionService();
 
 /** @internal Exported for unit testing */
 export function applySpanToSummary({
@@ -824,7 +846,6 @@ export function createTraceSummaryFoldProjection({
         outputFromRootSpan: false,
         outputSpanEndTimeMs: 0,
         blockedByGuardrail: false,
-        satisfactionScore: null,
         topicId: null,
         subTopicId: null,
         hasAnnotation: null,
@@ -861,14 +882,6 @@ export function createTraceSummaryFoldProjection({
           ...state,
           topicId: event.data.topicId ?? state.topicId,
           subTopicId: event.data.subtopicId ?? state.subTopicId,
-          updatedAt: Date.now(),
-        };
-      }
-
-      if (isSatisfactionScoreAssignedEvent(event)) {
-        return {
-          ...state,
-          satisfactionScore: event.data.satisfactionScore,
           updatedAt: Date.now(),
         };
       }

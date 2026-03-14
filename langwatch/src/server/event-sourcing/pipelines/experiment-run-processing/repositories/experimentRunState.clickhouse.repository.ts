@@ -168,6 +168,7 @@ export class ExperimentRunStateRepositoryClickHouse<
         `,
         query_params: { tenantId: context.tenantId, runId, experimentId },
         format: "JSONEachRow",
+        clickhouse_settings: { select_sequential_consistency: "1" },
       });
 
       const rows = await result.json<ClickHouseExperimentRunRecord>();

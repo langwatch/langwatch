@@ -84,7 +84,7 @@ async function readJobDataFromStdin(): Promise<ChildProcessJobData> {
 }
 
 async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
-  const { context, scenario, adapterData, modelParams, nlpServiceUrl, target } = jobData;
+  const { context, scenario, scenarioRunId, adapterData, modelParams, nlpServiceUrl, target } = jobData;
 
   const langwatchEndpoint = process.env.LANGWATCH_ENDPOINT;
   const langwatchApiKey = process.env.LANGWATCH_API_KEY;
@@ -152,6 +152,7 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
     },
     {
       batchRunId: context.batchRunId,
+      runId: scenarioRunId ?? context.scenarioRunId,
       langwatch: {
         endpoint: langwatchEndpoint,
         apiKey: langwatchApiKey,

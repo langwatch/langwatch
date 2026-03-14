@@ -119,6 +119,7 @@ export async function handleFailedJobResult(
     scenarioId: jobData.scenarioId,
     setId: jobData.setId,
     batchRunId: jobData.batchRunId,
+    scenarioRunId: jobData.scenarioRunId,
     error,
     name: scenario?.name,
     description: scenario?.situation,
@@ -204,7 +205,7 @@ export async function processScenarioJob(
 
   recordJobWaitDuration(job, "scenario");
 
-  const { projectId, scenarioId, target, setId, batchRunId } = jobData;
+  const { projectId, scenarioId, target, setId, batchRunId, scenarioRunId } = jobData;
 
   // Ensure projectId is set in context metadata (may come from job data)
   const enrichedContextMetadata: JobContextMetadata = {
@@ -227,7 +228,7 @@ export async function processScenarioJob(
     // Pre-fetch all data needed for child process
     const deps = createDataPrefetcherDependencies();
     const prefetchResult = await prefetchScenarioData(
-      { projectId, scenarioId, setId, batchRunId },
+      { projectId, scenarioId, setId, batchRunId, scenarioRunId },
       target,
       deps,
     );
@@ -245,12 +246,17 @@ export async function processScenarioJob(
       "Scenario data prefetched",
     );
 
+    // Inject pre-generated scenarioRunId if present in job data
+    const childProcessData = jobData.scenarioRunId
+      ? { ...prefetchResult.data, scenarioRunId: jobData.scenarioRunId }
+      : prefetchResult.data;
+
     // Spawn child process with isolated OTEL context
     const childStartTime = Date.now();
     const result = await spawnScenarioChildProcess(
       job,
       jobData,
-      prefetchResult.data,
+      childProcessData,
       prefetchResult.telemetry,
     );
 

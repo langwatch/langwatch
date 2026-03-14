@@ -4,7 +4,6 @@ import {
   CustomGraph,
   type CustomGraphInput,
 } from "~/components/analytics/CustomGraph";
-import { SatisfactionGraphs } from "~/components/analytics/SatisfactionGraph";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import GraphsLayout from "~/components/GraphsLayout";
 import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
@@ -77,27 +76,6 @@ const dailyActiveThreads = {
     },
   ],
   includePrevious: true,
-  timeScale: ONE_DAY,
-  height: 300,
-};
-
-const messageSentiment = {
-  graphId: "custom",
-  graphType: "stacked_bar",
-  series: [
-    {
-      name: "Average traces count per user",
-      colorSet: "positiveNegativeNeutral",
-      metric: "metadata.trace_id",
-      aggregation: "cardinality",
-      pipeline: {
-        field: "user_id",
-        aggregation: "avg",
-      },
-    },
-  ],
-  groupBy: "sentiment.input_sentiment",
-  includePrevious: false,
   timeScale: ONE_DAY,
   height: 300,
 };
@@ -239,20 +217,6 @@ function UsersContent() {
               <Card.Header>
                 <HStack>
                   <BarChart2 color="orange" />
-                  <Heading size="sm">User Satisfaction</Heading>
-                </HStack>
-              </Card.Header>
-              <Card.Body>
-                <CustomGraph input={messageSentiment as CustomGraphInput} />
-              </Card.Body>
-            </Card.Root>
-          </GridItem>
-
-          <GridItem colSpan={2} display="inline-grid">
-            <Card.Root>
-              <Card.Header>
-                <HStack>
-                  <BarChart2 color="orange" />
                   <Heading size="sm">Max Traces Per Thread</Heading>
                 </HStack>
               </Card.Header>
@@ -273,9 +237,6 @@ function UsersContent() {
                 <CustomGraph input={powerUsers as CustomGraphInput} />
               </Card.Body>
             </Card.Root>
-          </GridItem>
-          <GridItem colSpan={2} display="inline-grid">
-            <SatisfactionGraphs />
           </GridItem>
           <GridItem colSpan={4} display="inline-grid">
             <Card.Root>

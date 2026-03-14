@@ -37,14 +37,11 @@ async def main(message: cl.Message):
             full_response += token
             await msg.stream_token(token)
 
-    answer_relevancy = langwatch.get_current_span().evaluate(
-        "ragas/answer_relevancy",
-        name="Manually Called Answer Relevancy",
+    pii_detection = langwatch.get_current_span().evaluate(
+        "presidio/pii_detection",
+        name="Manually Called PII Detection",
         input=message.content,
         output=full_response,
-        settings={
-            "max_tokens": 512,
-        },
     )
 
     langwatch.get_current_span().add_evaluation(
@@ -55,7 +52,7 @@ async def main(message: cl.Message):
     )
 
     await msg.stream_token(
-        f"Answer Relevancy: {answer_relevancy.score} {answer_relevancy.details if answer_relevancy.details else ''}"
+        f"\n\nPII Detection: passed={pii_detection.passed} {pii_detection.details if pii_detection.details else ''}"
     )
 
     await msg.update()

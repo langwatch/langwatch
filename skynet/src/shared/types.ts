@@ -14,6 +14,9 @@ export interface GroupInfo {
   errorMessage: string | null;
   errorStack: string | null;
   errorTimestamp: number | null;
+  retryCount: number | null;
+  activeKeyTtlSec: number | null;
+  processingDurationMs: number | null;
 }
 
 export interface QueueInfo {
@@ -23,7 +26,19 @@ export interface QueueInfo {
   blockedGroupCount: number;
   activeGroupCount: number;
   totalPendingJobs: number;
+  dlqCount: number;
   groups: GroupInfo[];
+}
+
+/** Queue info without the groups array — used in SSE broadcasts to avoid serializing all groups every 2s */
+export interface QueueSummaryInfo {
+  name: string;
+  displayName: string;
+  pendingGroupCount: number;
+  blockedGroupCount: number;
+  activeGroupCount: number;
+  totalPendingJobs: number;
+  dlqCount: number;
 }
 
 export interface ThroughputPoint {
@@ -31,6 +46,8 @@ export interface ThroughputPoint {
   stagedPerSec: number;
   completedPerSec: number;
   failedPerSec: number;
+  pendingCount: number;
+  blockedCount: number;
 }
 
 export interface PhaseMetrics {
@@ -93,7 +110,7 @@ export interface DashboardData {
   processMemoryTotalMb: number;
   throughputHistory: ThroughputPoint[];
   pipelineTree: PipelineNode[];
-  queues: QueueInfo[];
+  queues: QueueSummaryInfo[];
   latencyP50Ms: number;
   latencyP99Ms: number;
   peakLatencyP50Ms: number;
@@ -105,6 +122,7 @@ export interface DashboardData {
   };
   jobNameMetrics: JobNameMetrics[];
   pausedKeys: string[];
+  topErrors: ErrorCluster[];
 }
 
 export interface JobInfo {
@@ -128,6 +146,7 @@ export interface GroupDetailData {
   errorMessage: string | null;
   errorStack: string | null;
   errorTimestamp: number | null;
+  retryCount: number | null;
 }
 
 export interface FailedJob {
@@ -184,6 +203,27 @@ export interface BullMQQueueInfo {
   completed: number;
   failed: number;
   delayed: number;
+}
+
+export interface ErrorCluster {
+  normalizedMessage: string;
+  sampleMessage: string;
+  sampleStack: string | null;
+  count: number;
+  pipelineName: string | null;
+  sampleGroupIds: string[];
+}
+
+export interface BlockedSummary {
+  totalBlocked: number;
+  clusters: ErrorCluster[];
+}
+
+export interface BatchProgress {
+  operation: string;
+  processed: number;
+  total: number;
+  status: "running" | "completed" | "failed";
 }
 
 export type SSEEvent =

@@ -13,29 +13,8 @@ import type { SuiteRepository } from "../suite.repository";
 import type { ScenarioRepository } from "../../scenarios/scenario.repository";
 import type { AgentRepository } from "../../agents/agent.repository";
 import type { LlmConfigRepository } from "../../prompt-config/repositories/llm-config.repository";
+import type { SuiteRunService } from "../../app-layer/suites/suite-run.service";
 import type { SimulationSuite } from "@prisma/client";
-
-// Mock the scenario queue module
-const { mockRemove, mockGetJob } = vi.hoisted(() => ({
-  mockRemove: vi.fn(() => Promise.resolve()),
-  mockGetJob: vi.fn(() => Promise.resolve({ remove: vi.fn(() => Promise.resolve()) })),
-}));
-
-vi.mock("../../scenarios/scenario.queue", () => ({
-  generateBatchRunId: vi.fn(() => "batch_test_123"),
-  scheduleScenarioRun: vi.fn(() =>
-    Promise.resolve({ id: "job_1", data: {} }),
-  ),
-  scenarioQueue: { getJob: mockGetJob },
-}));
-
-import {
-  generateBatchRunId,
-  scheduleScenarioRun,
-} from "../../scenarios/scenario.queue";
-
-const mockScheduleScenarioRun = vi.mocked(scheduleScenarioRun);
-const mockGenerateBatchRunId = vi.mocked(generateBatchRunId);
 
 function makeSuite(
   overrides: Partial<SimulationSuite> = {},
@@ -127,6 +106,18 @@ function makeMockLlmConfigRepository(
   };
 }
 
+function createMockSuiteRunService() {
+  const startRun = vi.fn().mockImplementation(async (params: Record<string, unknown>) => ({
+    batchRunId: "batch_test_123",
+    setId: `__internal__${String(params.suiteId)}__suite`,
+    jobCount: (params.activeScenarioIds as string[]).length
+      * (params.activeTargets as unknown[]).length
+      * (params.repeatCount as number),
+    skippedArchived: params.skippedArchived,
+  }));
+  return { startRun } as unknown as SuiteRunService & { startRun: ReturnType<typeof vi.fn> };
+}
+
 function createService(overrides?: {
   suiteRepository?: Partial<MockSuiteRepository>;
   scenarioRepository?: Partial<MockScenarioRepository>;
@@ -137,16 +128,24 @@ function createService(overrides?: {
   const scenarioRepo = makeMockScenarioRepository(overrides?.scenarioRepository);
   const agentRepo = makeMockAgentRepository(overrides?.agentRepository);
   const llmConfigRepo = makeMockLlmConfigRepository(overrides?.llmConfigRepository);
+  const suiteRunService = createMockSuiteRunService();
 
   const service = new SuiteService(
     suiteRepo as unknown as SuiteRepository,
     scenarioRepo as unknown as ScenarioRepository,
     agentRepo as unknown as AgentRepository,
     llmConfigRepo as unknown as LlmConfigRepository,
+    suiteRunService,
   );
 
-  return { service, suiteRepo, scenarioRepo, agentRepo, llmConfigRepo };
+  return { service, suiteRepo, scenarioRepo, agentRepo, llmConfigRepo, suiteRunService };
 }
+
+const RUN_DEFAULTS = {
+  projectId: "proj_1",
+  organizationId: "org_1",
+  idempotencyKey: "test-key",
+} as const;
 
 describe("SuiteService", () => {
   beforeEach(() => {
@@ -191,26 +190,33 @@ describe("SuiteService", () => {
   describe("run()", () => {
     describe("given a suite with 3 scenarios, 2 targets, and repeat count 1", () => {
       describe("when the suite run is triggered", () => {
-        it("schedules 6 jobs", async () => {
-          const { service } = createService();
+        it("delegates to suiteRunService with 3 active scenarios and 2 active targets", async () => {
+          const { service, suiteRunService } = createService();
           const suite = makeSuite();
 
           const result = await service.run({
-            suite,
-            projectId: "proj_1",
-            organizationId: "org_1",
+            suite, ...RUN_DEFAULTS,
           });
 
           expect(result.jobCount).toBe(6);
-          expect(mockScheduleScenarioRun).toHaveBeenCalledTimes(6);
+          expect(suiteRunService.startRun).toHaveBeenCalledWith(
+            expect.objectContaining({
+              activeScenarioIds: ["scen_1", "scen_2", "scen_3"],
+              activeTargets: [
+                { type: "http", referenceId: "agent_1" },
+                { type: "prompt", referenceId: "prompt_1" },
+              ],
+              repeatCount: 1,
+            }),
+          );
         });
       });
     });
 
     describe("given a suite with 2 scenarios, 1 target, and repeat count 3", () => {
       describe("when the suite run is triggered", () => {
-        it("schedules 6 jobs", async () => {
-          const { service } = createService();
+        it("delegates with correct repeat count", async () => {
+          const { service, suiteRunService } = createService();
           const suite = makeSuite({
             scenarioIds: ["scen_1", "scen_2"],
             targets: [
@@ -220,97 +226,21 @@ describe("SuiteService", () => {
           });
 
           const result = await service.run({
-            suite,
-            projectId: "proj_1",
-            organizationId: "org_1",
+            suite, ...RUN_DEFAULTS,
           });
 
           expect(result.jobCount).toBe(6);
-          expect(mockScheduleScenarioRun).toHaveBeenCalledTimes(6);
-        });
-      });
-    });
-
-    describe("given a suite with id 'suite_abc123'", () => {
-      describe("when the suite run is triggered", () => {
-        it("uses the suite ID as setId", async () => {
-          const { service } = createService();
-          const suite = makeSuite({ id: "suite_abc123" });
-
-          const result = await service.run({
-            suite,
-            projectId: "proj_1",
-            organizationId: "org_1",
-          });
-
-          expect(result.setId).toBe("__internal__suite_abc123__suite");
-          for (const call of mockScheduleScenarioRun.mock.calls) {
-            expect(call[0]?.setId).toBe("__internal__suite_abc123__suite");
-          }
-        });
-      });
-    });
-
-    describe("given a suite with a unique batchRunId", () => {
-      describe("when the suite run is triggered", () => {
-        it("all jobs share the same batchRunId", async () => {
-          mockGenerateBatchRunId.mockReturnValue("batch_unique_456");
-          const { service } = createService();
-          const suite = makeSuite();
-
-          const result = await service.run({
-            suite,
-            projectId: "proj_1",
-            organizationId: "org_1",
-          });
-
-          expect(result.batchRunId).toBe("batch_unique_456");
-          for (const call of mockScheduleScenarioRun.mock.calls) {
-            expect(call[0]?.batchRunId).toBe("batch_unique_456");
-          }
-        });
-      });
-    });
-
-    describe("given some jobs fail to enqueue", () => {
-      describe("when the suite run is triggered", () => {
-        it("rolls back all enqueued jobs and throws", async () => {
-          let callCount = 0;
-          mockScheduleScenarioRun.mockImplementation(() => {
-            callCount++;
-            if (callCount === 2) {
-              return Promise.reject(new Error("Redis connection lost"));
-            }
-            return Promise.resolve({ id: `job_${callCount}`, data: {} } as never);
-          });
-
-          mockGetJob.mockImplementation(() =>
-            Promise.resolve({ remove: mockRemove }),
+          expect(suiteRunService.startRun).toHaveBeenCalledWith(
+            expect.objectContaining({ repeatCount: 3 }),
           );
-
-          const { service } = createService();
-          const suite = makeSuite({
-            scenarioIds: ["scen_1"],
-            targets: [
-              { type: "http", referenceId: "agent_1" },
-            ] as SuiteTarget[],
-            repeatCount: 3,
-          });
-
-          await expect(
-            service.run({ suite, projectId: "proj_1", organizationId: "org_1" }),
-          ).rejects.toThrow("Failed to schedule suite run: 1 of 3 jobs failed to enqueue");
-
-          expect(mockGetJob).toHaveBeenCalledTimes(2);
-          expect(mockRemove).toHaveBeenCalledTimes(2);
         });
       });
     });
 
     describe("given a suite references a deleted scenario", () => {
       describe("when the suite run is triggered", () => {
-        it("throws InvalidScenarioReferencesError with the invalid IDs", async () => {
-          const { service } = createService({
+        it("throws InvalidScenarioReferencesError before reaching suiteRunService", async () => {
+          const { service, suiteRunService } = createService({
             scenarioRepository: {
               findManyIncludingArchived: vi.fn(async ({ ids }: { ids: string[] }) =>
                 ids.filter((id) => id !== "deleted-scenario").map((id) => ({ id, archivedAt: null })),
@@ -322,21 +252,21 @@ describe("SuiteService", () => {
           });
 
           const error = await service
-            .run({ suite, projectId: "proj_1", organizationId: "org_1" })
+            .run({ suite, ...RUN_DEFAULTS })
             .catch((e: unknown) => e);
           expect(error).toBeInstanceOf(InvalidScenarioReferencesError);
           expect((error as Error).message).toBe(
             "Invalid scenario references: deleted-scenario",
           );
-          expect(mockScheduleScenarioRun).not.toHaveBeenCalled();
+          expect(suiteRunService.startRun).not.toHaveBeenCalled();
         });
       });
     });
 
     describe("given a suite references a removed HTTP target", () => {
       describe("when the suite run is triggered", () => {
-        it("throws InvalidTargetReferencesError with the invalid IDs", async () => {
-          const { service } = createService({
+        it("throws InvalidTargetReferencesError before reaching suiteRunService", async () => {
+          const { service, suiteRunService } = createService({
             agentRepository: {
               findManyIncludingArchived: vi.fn(async ({ ids }: { ids: string[] }) =>
                 ids.filter((id) => id !== "removed-target").map((id) => ({ id, archivedAt: null })),
@@ -350,21 +280,21 @@ describe("SuiteService", () => {
           });
 
           const error = await service
-            .run({ suite, projectId: "proj_1", organizationId: "org_1" })
+            .run({ suite, ...RUN_DEFAULTS })
             .catch((e: unknown) => e);
           expect(error).toBeInstanceOf(InvalidTargetReferencesError);
           expect((error as Error).message).toBe(
             "Invalid target references: removed-target",
           );
-          expect(mockScheduleScenarioRun).not.toHaveBeenCalled();
+          expect(suiteRunService.startRun).not.toHaveBeenCalled();
         });
       });
     });
 
     describe("given a suite references a removed prompt target", () => {
       describe("when the suite run is triggered", () => {
-        it("throws InvalidTargetReferencesError with the invalid IDs", async () => {
-          const { service } = createService({
+        it("throws InvalidTargetReferencesError before reaching suiteRunService", async () => {
+          const { service, suiteRunService } = createService({
             llmConfigRepository: {
               findExistingIds: vi.fn(async () => new Set<string>()),
             },
@@ -376,22 +306,22 @@ describe("SuiteService", () => {
           });
 
           const error = await service
-            .run({ suite, projectId: "proj_1", organizationId: "org_1" })
+            .run({ suite, ...RUN_DEFAULTS })
             .catch((e: unknown) => e);
           expect(error).toBeInstanceOf(InvalidTargetReferencesError);
           expect((error as Error).message).toBe(
             "Invalid target references: deleted-prompt",
           );
-          expect(mockScheduleScenarioRun).not.toHaveBeenCalled();
+          expect(suiteRunService.startRun).not.toHaveBeenCalled();
         });
       });
     });
 
     describe("given a suite with mixed active and archived scenarios", () => {
       describe("when the suite run is triggered", () => {
-        it("schedules jobs only for active scenarios", async () => {
+        it("passes only active scenario IDs to suiteRunService", async () => {
           const archivedAt = new Date();
-          const { service } = createService({
+          const { service, suiteRunService } = createService({
             scenarioRepository: {
               findManyIncludingArchived: vi.fn(async ({ ids }: { ids: string[] }) =>
                 ids.map((id) => ({ id, archivedAt: id === "scen_archived" ? archivedAt : null })),
@@ -406,50 +336,25 @@ describe("SuiteService", () => {
           });
 
           const result = await service.run({
-            suite, projectId: "proj_1", organizationId: "org_1",
+            suite, ...RUN_DEFAULTS,
           });
 
           expect(result.jobCount).toBe(2);
-          expect(mockScheduleScenarioRun).toHaveBeenCalledTimes(2);
-          const scheduledScenarioIds = mockScheduleScenarioRun.mock.calls.map(
-            (call) => call[0]?.scenarioId,
+          expect(suiteRunService.startRun).toHaveBeenCalledWith(
+            expect.objectContaining({
+              activeScenarioIds: ["scen_1", "scen_2"],
+              skippedArchived: { scenarios: ["scen_archived"], targets: [] },
+            }),
           );
-          expect(scheduledScenarioIds).toContain("scen_1");
-          expect(scheduledScenarioIds).toContain("scen_2");
-          expect(scheduledScenarioIds).not.toContain("scen_archived");
-        });
-
-        it("returns skipped archived scenarios in the result", async () => {
-          const archivedAt = new Date();
-          const { service } = createService({
-            scenarioRepository: {
-              findManyIncludingArchived: vi.fn(async ({ ids }: { ids: string[] }) =>
-                ids.map((id) => ({ id, archivedAt: id === "scen_archived" ? archivedAt : null })),
-              ),
-            },
-          });
-          const suite = makeSuite({
-            scenarioIds: ["scen_1", "scen_archived"],
-            targets: [
-              { type: "http", referenceId: "agent_1" },
-            ] as SuiteTarget[],
-          });
-
-          const result = await service.run({
-            suite, projectId: "proj_1", organizationId: "org_1",
-          });
-
-          expect(result.skippedArchived.scenarios).toEqual(["scen_archived"]);
-          expect(result.skippedArchived.targets).toEqual([]);
         });
       });
     });
 
     describe("given a suite with mixed active and archived targets", () => {
       describe("when the suite run is triggered", () => {
-        it("schedules jobs only against active targets", async () => {
+        it("passes only active targets to suiteRunService", async () => {
           const archivedAt = new Date();
-          const { service } = createService({
+          const { service, suiteRunService } = createService({
             agentRepository: {
               findManyIncludingArchived: vi.fn(async ({ ids }: { ids: string[] }) =>
                 ids.map((id) => ({ id, archivedAt: id === "agent_archived" ? archivedAt : null })),
@@ -465,39 +370,16 @@ describe("SuiteService", () => {
           });
 
           const result = await service.run({
-            suite, projectId: "proj_1", organizationId: "org_1",
+            suite, ...RUN_DEFAULTS,
           });
 
           expect(result.jobCount).toBe(1);
-          const scheduledTargetIds = mockScheduleScenarioRun.mock.calls.map(
-            (call) => call[0]?.target.referenceId,
+          expect(suiteRunService.startRun).toHaveBeenCalledWith(
+            expect.objectContaining({
+              activeTargets: [{ type: "http", referenceId: "agent_1" }],
+              skippedArchived: { scenarios: [], targets: ["agent_archived"] },
+            }),
           );
-          expect(scheduledTargetIds).toContain("agent_1");
-          expect(scheduledTargetIds).not.toContain("agent_archived");
-        });
-
-        it("returns skipped archived targets in the result", async () => {
-          const archivedAt = new Date();
-          const { service } = createService({
-            agentRepository: {
-              findManyIncludingArchived: vi.fn(async ({ ids }: { ids: string[] }) =>
-                ids.map((id) => ({ id, archivedAt: id === "agent_archived" ? archivedAt : null })),
-              ),
-            },
-          });
-          const suite = makeSuite({
-            scenarioIds: ["scen_1"],
-            targets: [
-              { type: "http", referenceId: "agent_1" },
-              { type: "http", referenceId: "agent_archived" },
-            ] as SuiteTarget[],
-          });
-
-          const result = await service.run({
-            suite, projectId: "proj_1", organizationId: "org_1",
-          });
-
-          expect(result.skippedArchived.targets).toEqual(["agent_archived"]);
         });
       });
     });
@@ -506,7 +388,7 @@ describe("SuiteService", () => {
       describe("when the suite run is triggered", () => {
         it("throws AllScenariosArchivedError", async () => {
           const archivedAt = new Date();
-          const { service } = createService({
+          const { service, suiteRunService } = createService({
             scenarioRepository: {
               findManyIncludingArchived: vi.fn(async ({ ids }: { ids: string[] }) =>
                 ids.map((id) => ({ id, archivedAt })),
@@ -518,9 +400,9 @@ describe("SuiteService", () => {
           });
 
           await expect(
-            service.run({ suite, projectId: "proj_1", organizationId: "org_1" }),
+            service.run({ suite, ...RUN_DEFAULTS }),
           ).rejects.toThrow(AllScenariosArchivedError);
-          expect(mockScheduleScenarioRun).not.toHaveBeenCalled();
+          expect(suiteRunService.startRun).not.toHaveBeenCalled();
         });
       });
     });
@@ -529,7 +411,7 @@ describe("SuiteService", () => {
       describe("when the suite run is triggered", () => {
         it("throws AllTargetsArchivedError", async () => {
           const archivedAt = new Date();
-          const { service } = createService({
+          const { service, suiteRunService } = createService({
             agentRepository: {
               findManyIncludingArchived: vi.fn(async ({ ids }: { ids: string[] }) =>
                 ids.map((id) => ({ id, archivedAt })),
@@ -543,16 +425,16 @@ describe("SuiteService", () => {
           });
 
           await expect(
-            service.run({ suite, projectId: "proj_1", organizationId: "org_1" }),
+            service.run({ suite, ...RUN_DEFAULTS }),
           ).rejects.toThrow(AllTargetsArchivedError);
-          expect(mockScheduleScenarioRun).not.toHaveBeenCalled();
+          expect(suiteRunService.startRun).not.toHaveBeenCalled();
         });
       });
     });
 
-    describe("given 3 scenario refs, 2 target refs, 1 scenario archived, 1 target archived, repeat count 1", () => {
+    describe("given 3 scenario refs, 2 target refs, 1 scenario archived, 1 target archived", () => {
       describe("when the suite run is triggered", () => {
-        it("schedules 2 jobs (2 active scenarios x 1 active target)", async () => {
+        it("passes only active refs and reports skipped archived", async () => {
           const archivedAt = new Date();
           const { service } = createService({
             scenarioRepository: {
@@ -576,7 +458,7 @@ describe("SuiteService", () => {
           });
 
           const result = await service.run({
-            suite, projectId: "proj_1", organizationId: "org_1",
+            suite, ...RUN_DEFAULTS,
           });
 
           expect(result.jobCount).toBe(2);
@@ -595,7 +477,7 @@ describe("SuiteService", () => {
           const suite = makeSuite();
 
           const result = await service.run({
-            suite, projectId: "proj_1", organizationId: "org_1",
+            suite, ...RUN_DEFAULTS,
           });
 
           expect(result.skippedArchived).toEqual({
@@ -617,7 +499,7 @@ describe("SuiteService", () => {
           });
 
           await expect(
-            service.run({ suite, projectId: "proj_1", organizationId: "org_1" }),
+            service.run({ suite, ...RUN_DEFAULTS }),
           ).rejects.toThrow();
         });
       });
@@ -625,7 +507,7 @@ describe("SuiteService", () => {
 
     describe("given a suite with an HTTP target referencing an existing agent", () => {
       describe("when the suite run is triggered", () => {
-        it("schedules jobs successfully", async () => {
+        it("resolves via agentRepository and delegates", async () => {
           const { service, agentRepo } = createService();
           const suite = makeSuite({
             scenarioIds: ["scen_1"],
@@ -635,9 +517,7 @@ describe("SuiteService", () => {
           });
 
           const result = await service.run({
-            suite,
-            projectId: "proj_1",
-            organizationId: "org_1",
+            suite, ...RUN_DEFAULTS,
           });
 
           expect(result.jobCount).toBe(1);
@@ -651,7 +531,7 @@ describe("SuiteService", () => {
 
     describe("given a suite with a prompt target referencing an existing config", () => {
       describe("when the suite run is triggered", () => {
-        it("schedules jobs successfully", async () => {
+        it("resolves via llmConfigRepository and delegates", async () => {
           const { service, llmConfigRepo } = createService();
           const suite = makeSuite({
             scenarioIds: ["scen_1"],
@@ -661,9 +541,7 @@ describe("SuiteService", () => {
           });
 
           const result = await service.run({
-            suite,
-            projectId: "proj_1",
-            organizationId: "org_1",
+            suite, ...RUN_DEFAULTS,
           });
 
           expect(result.jobCount).toBe(1);
@@ -692,7 +570,7 @@ describe("SuiteService", () => {
           });
 
           const error = await service
-            .run({ suite, projectId: "proj_1", organizationId: "org_1" })
+            .run({ suite, ...RUN_DEFAULTS })
             .catch((e: unknown) => e);
           expect(error).toBeInstanceOf(InvalidTargetReferencesError);
           expect(error).not.toBeInstanceOf(AllTargetsArchivedError);
@@ -715,9 +593,7 @@ describe("SuiteService", () => {
           });
 
           await service.run({
-            suite,
-            projectId: "proj_1",
-            organizationId: "org_1",
+            suite, ...RUN_DEFAULTS,
           });
 
           expect(agentRepo.findManyIncludingArchived).toHaveBeenCalledTimes(1);
@@ -731,6 +607,24 @@ describe("SuiteService", () => {
             projectId: "proj_1",
             organizationId: "org_1",
           });
+        });
+      });
+    });
+
+    describe("given idempotencyKey is provided", () => {
+      describe("when the suite run is triggered", () => {
+        it("passes idempotencyKey through to suiteRunService", async () => {
+          const { service, suiteRunService } = createService();
+          const suite = makeSuite();
+
+          await service.run({
+            suite, projectId: "proj_1", organizationId: "org_1",
+            idempotencyKey: "user-provided-key",
+          });
+
+          expect(suiteRunService.startRun).toHaveBeenCalledWith(
+            expect.objectContaining({ idempotencyKey: "user-provided-key" }),
+          );
         });
       });
     });

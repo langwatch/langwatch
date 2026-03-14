@@ -13,24 +13,24 @@ import { createLogger } from "../../../../../utils/logger/server";
 import type { EvaluationExecutionService } from "../../../../app-layer/evaluations/evaluation-execution.service";
 import {
   evaluatePreconditions,
-  type PreconditionTrace,
+  buildPreconditionTraceDataFromCommand,
+  checkEvaluatorRequiredFields,
+  preconditionsNeedEvents,
 } from "../../../../evaluations/preconditions";
+import type { PreconditionTraceData } from "../../../../filters/precondition-matchers";
 import type { CheckPreconditions } from "../../../../evaluations/types";
 import type { MappingState } from "../../../../tracer/tracesMapping";
-import type { Span } from "../../../../tracer/types";
+import type { ElasticSearchEvent, Span } from "../../../../tracer/types";
 import type { ExecuteEvaluationCommandData } from "../schemas/commands";
 import { executeEvaluationCommandDataSchema } from "../schemas/commands";
 import {
-  EVALUATION_COMPLETED_EVENT_TYPE,
-  EVALUATION_COMPLETED_EVENT_VERSION_LATEST,
-  EVALUATION_SCHEDULED_EVENT_TYPE,
-  EVALUATION_SCHEDULED_EVENT_VERSION_LATEST,
+  EVALUATION_REPORTED_EVENT_TYPE,
+  EVALUATION_REPORTED_EVENT_VERSION_LATEST,
   EXECUTE_EVALUATION_COMMAND_TYPE,
 } from "../schemas/constants";
 import type {
-  EvaluationCompletedEvent,
   EvaluationProcessingEvent,
-  EvaluationScheduledEvent,
+  EvaluationReportedEvent,
 } from "../schemas/events";
 
 const logger = createLogger(
@@ -40,6 +40,7 @@ const logger = createLogger(
 export interface ExecuteEvaluationCommandDeps {
   prisma: PrismaClient;
   spanStorage: { getSpansByTraceId(params: { tenantId: string; traceId: string }): Promise<Span[]> };
+  traceEvents: { getEventsByTraceId(params: { tenantId: string; traceId: string }): Promise<ElasticSearchEvent[]> };
   evaluationExecution: EvaluationExecutionService;
 }
 
@@ -81,7 +82,7 @@ export function makeJobId(payload: ExecuteEvaluationCommandData): string {
  * The returned class closes over deps so the framework can instantiate it
  * with `new ()` (zero-arg constructor) as required by `withCommand`.
  *
- * Sampling + preconditions + execution -> emits [ScheduledEvent, CompletedEvent].
+ * Sampling + preconditions + execution -> emits a single EvaluationReportedEvent.
  * Results are persisted to CH via the evaluationRun fold projection.
  * Deduped by traceId + evaluatorId (makeJobId), delayed 30s.
  */
@@ -120,7 +121,7 @@ export function createExecuteEvaluationCommandClass(deps: ExecuteEvaluationComma
           { tenantId: tenantId, evaluatorId: data.evaluatorId },
           "Monitor not found — skipping evaluation",
         );
-        return emitScheduledAndCompleted(data, tenantId, {
+        return emitReported(data, tenantId, {
           status: "skipped",
           details: "Monitor not found",
         });
@@ -139,28 +140,48 @@ export function createExecuteEvaluationCommandClass(deps: ExecuteEvaluationComma
         return [];
       }
 
-      // 3. Read spans from CH, check preconditions
+      // 3. Read spans from CH, check evaluator required fields + preconditions
       const spans = await deps.spanStorage.getSpansByTraceId({ tenantId, traceId: data.traceId });
 
-      const preconditionTrace: PreconditionTrace = {
-        input: { value: "" },
-        output: { value: "" },
-        metadata: {
-          labels: data.labels ?? [],
-          thread_id: data.threadId,
-          user_id: data.userId,
-          customer_id: data.customerId,
-        },
-        expected_output: undefined,
-      };
-
-      const preconditions = (monitor.preconditions ?? []) as CheckPreconditions;
-      const preconditionsMet = evaluatePreconditions(
-        monitor.checkType,
-        preconditionTrace,
+      // Check evaluator required fields first
+      const requiredFieldsMet = checkEvaluatorRequiredFields({
+        evaluatorType: monitor.checkType,
         spans,
+      });
+      if (!requiredFieldsMet) {
+        logger.debug(
+          {
+            tenantId: tenantId,
+            evaluatorId: data.evaluatorId,
+            traceId: data.traceId,
+          },
+          "Evaluator required fields not met — skipping evaluation",
+        );
+        return [];
+      }
+
+      // Then check user-configured preconditions
+      const preconditions = (monitor.preconditions ?? []) as CheckPreconditions;
+
+      // Fetch events on demand if any preconditions reference event fields
+      let events: PreconditionTraceData["events"] = null;
+      if (preconditionsNeedEvents(preconditions)) {
+        const traceEvents = await deps.traceEvents.getEventsByTraceId({
+          tenantId,
+          traceId: data.traceId,
+        });
+        events = traceEvents.map((e) => ({
+          event_type: e.event_type,
+          metrics: e.metrics ?? [],
+          event_details: e.event_details ?? [],
+        }));
+      }
+
+      const traceData = buildPreconditionTraceDataFromCommand({ data, spans, events });
+      const preconditionsMet = evaluatePreconditions({
+        traceData,
         preconditions,
-      );
+      });
 
       if (!preconditionsMet) {
         logger.debug(
@@ -197,10 +218,12 @@ export function createExecuteEvaluationCommandClass(deps: ExecuteEvaluationComma
         });
 
         // 5. Create cost row
+        let costId: string | null = null;
         if (result.status === "processed" && result.cost) {
+          costId = generate(KSUID_RESOURCES.COST).toString();
           await deps.prisma.cost.create({
             data: {
-              id: generate(KSUID_RESOURCES.COST).toString(),
+              id: costId,
               projectId: tenantId,
               costType: data.isGuardrail ? CostType.GUARDRAIL : CostType.TRACE_CHECK,
               costName: data.evaluatorName ?? data.evaluatorType,
@@ -213,13 +236,14 @@ export function createExecuteEvaluationCommandClass(deps: ExecuteEvaluationComma
           });
         }
 
-        // 6. Emit events — fold projection persists to CH
-        return emitScheduledAndCompleted(data, tenantId, {
+        // 6. Emit single reported event — fold projection persists to CH
+        return emitReported(data, tenantId, {
           status: result.status,
           score: result.score,
           passed: result.passed,
           label: result.label,
           details: result.details,
+          costId,
         });
       } catch (error) {
         logger.error(
@@ -233,7 +257,7 @@ export function createExecuteEvaluationCommandClass(deps: ExecuteEvaluationComma
           "Evaluation execution failed",
         );
 
-        return emitScheduledAndCompleted(data, tenantId, {
+        return emitReported(data, tenantId, {
           status: "error",
           error: extractErrorMessage(error),
           errorDetails: error instanceof Error ? error.stack ?? null : null,
@@ -243,7 +267,7 @@ export function createExecuteEvaluationCommandClass(deps: ExecuteEvaluationComma
   };
 }
 
-function emitScheduledAndCompleted(
+function emitReported(
   data: ExecuteEvaluationCommandData,
   tenantId: ReturnType<typeof createTenantId>,
   result: {
@@ -254,14 +278,15 @@ function emitScheduledAndCompleted(
     details?: string;
     error?: string;
     errorDetails?: string | null;
+    costId?: string | null;
   },
 ): EvaluationProcessingEvent[] {
-  const scheduledEvent = EventUtils.createEvent<EvaluationScheduledEvent>({
+  const event = EventUtils.createEvent<EvaluationReportedEvent>({
     aggregateType: "evaluation",
     aggregateId: data.evaluationId,
     tenantId,
-    type: EVALUATION_SCHEDULED_EVENT_TYPE,
-    version: EVALUATION_SCHEDULED_EVENT_VERSION_LATEST,
+    type: EVALUATION_REPORTED_EVENT_TYPE,
+    version: EVALUATION_REPORTED_EVENT_VERSION_LATEST,
     data: {
       evaluationId: data.evaluationId,
       evaluatorId: data.evaluatorId,
@@ -269,19 +294,6 @@ function emitScheduledAndCompleted(
       evaluatorName: data.evaluatorName,
       traceId: data.traceId,
       isGuardrail: data.isGuardrail,
-    },
-    occurredAt: data.occurredAt,
-    idempotencyKey: `${data.tenantId}:${data.evaluationId}:scheduled`,
-  });
-
-  const completedEvent = EventUtils.createEvent<EvaluationCompletedEvent>({
-    aggregateType: "evaluation",
-    aggregateId: data.evaluationId,
-    tenantId,
-    type: EVALUATION_COMPLETED_EVENT_TYPE,
-    version: EVALUATION_COMPLETED_EVENT_VERSION_LATEST,
-    data: {
-      evaluationId: data.evaluationId,
       status: result.status,
       score: result.score ?? null,
       passed: result.passed ?? null,
@@ -289,10 +301,11 @@ function emitScheduledAndCompleted(
       details: result.details ?? null,
       error: result.error ?? null,
       errorDetails: result.errorDetails ?? null,
+      costId: result.costId ?? null,
     },
-    occurredAt: Date.now(),
-    idempotencyKey: `${data.tenantId}:${data.evaluationId}:completed`,
+    occurredAt: data.occurredAt,
+    idempotencyKey: `${data.tenantId}:${data.evaluationId}:reported`,
   });
 
-  return [scheduledEvent, completedEvent];
+  return [event];
 }

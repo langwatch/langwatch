@@ -4,8 +4,17 @@ import type {
     SimulationProcessingEvent,
     SimulationRunDeletedEvent,
     SimulationRunFinishedEvent,
+    SimulationRunQueuedEvent,
     SimulationRunStartedEvent,
+    SimulationTextMessageEndEvent,
+    SimulationTextMessageStartEvent,
 } from "./events";
+
+export function isSimulationRunQueuedEvent(
+  event: SimulationProcessingEvent,
+): event is SimulationRunQueuedEvent {
+  return event.type === SIMULATION_RUN_EVENT_TYPES.QUEUED;
+}
 
 export function isSimulationRunStartedEvent(
   event: SimulationProcessingEvent,
@@ -23,6 +32,18 @@ export function isSimulationRunFinishedEvent(
   event: SimulationProcessingEvent,
 ): event is SimulationRunFinishedEvent {
   return event.type === SIMULATION_RUN_EVENT_TYPES.FINISHED;
+}
+
+export function isSimulationTextMessageStartEvent(
+  event: SimulationProcessingEvent,
+): event is SimulationTextMessageStartEvent {
+  return event.type === SIMULATION_RUN_EVENT_TYPES.TEXT_MESSAGE_START;
+}
+
+export function isSimulationTextMessageEndEvent(
+  event: SimulationProcessingEvent,
+): event is SimulationTextMessageEndEvent {
+  return event.type === SIMULATION_RUN_EVENT_TYPES.TEXT_MESSAGE_END;
 }
 
 export function isSimulationRunDeletedEvent(

@@ -37,7 +37,7 @@ export interface RecordLogCommandDependencies {
 
 function createDefaultDependencies(): RecordLogCommandDependencies {
   return {
-    piiRedactionService: OtlpSpanPiiRedactionService.create(),
+    piiRedactionService: new OtlpSpanPiiRedactionService(),
   };
 }
 

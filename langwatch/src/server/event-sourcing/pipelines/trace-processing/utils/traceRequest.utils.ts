@@ -465,6 +465,20 @@ const reconstructFlattenedArrays = (
 const MAX_JSON_PARSE_SIZE = 2_000_000;
 
 /**
+ * Fixes invalid JSON escape sequences introduced by PII redaction.
+ * PII redaction replaces content with `<PII_TYPE>` tokens (e.g. `<US_DRIVER_LICENSE>`).
+ * When this happens inside a JSON string value, it can create invalid escapes
+ * like `\<` if the replacement lands right after a backslash.
+ *
+ * Specifically targets `\<` and `\>` which are the known invalid escapes
+ * from PII redaction tokens like `<US_DRIVER_LICENSE>`.
+ */
+/** @internal Exported for unit testing */
+export function sanitizeInvalidJsonEscapes(json: string): string {
+  return json.replace(/\\([<>])/g, "$1");
+}
+
+/**
  * Parses string values that look like JSON into their parsed form.
  * Scalars and already-parsed values pass through unchanged.
  *
@@ -500,6 +514,18 @@ export const parseJsonStringValues = (
     try {
       result[key] = JSON.parse(trimmed);
     } catch {
+      // PII redaction can introduce invalid JSON escapes like \<US_DRIVER_LICENSE>
+      // because it replaces content with <PII_TYPE> tokens inside JSON strings.
+      // Try to fix known invalid escapes before giving up.
+      const sanitized = sanitizeInvalidJsonEscapes(trimmed);
+      if (sanitized !== trimmed) {
+        try {
+          result[key] = JSON.parse(sanitized);
+          continue;
+        } catch {
+          // still broken, fall through
+        }
+      }
       result[key] = value;
     }
   }

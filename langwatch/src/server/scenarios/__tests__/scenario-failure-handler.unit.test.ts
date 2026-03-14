@@ -4,7 +4,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { SimulationService } from "~/server/simulations/simulation.service";
+import type { SimulationFacade } from "~/server/simulations/simulation.facade";
 import {
   ScenarioEventType,
   ScenarioRunStatus,
@@ -32,7 +32,7 @@ describe("ScenarioFailureHandler", () => {
       saveScenarioEvent: vi.fn(),
     };
     handler = new ScenarioFailureHandler(
-      mockService as unknown as SimulationService,
+      mockService as unknown as SimulationFacade,
     );
   });
 
@@ -117,6 +117,28 @@ describe("ScenarioFailureHandler", () => {
           expect(runFinishedCall.scenarioId).toBe("scen_456");
           expect(runFinishedCall.scenarioSetId).toBe("set_789");
           expect(runFinishedCall.batchRunId).toBe("batch_abc");
+        });
+      });
+    });
+
+    describe("given no events exist but scenarioRunId is pre-assigned", () => {
+      beforeEach(() => {
+        mockService.getRunDataForBatchRun.mockResolvedValue({ changed: true, runs: [] });
+      });
+
+      describe("when called with a pre-assigned scenarioRunId", () => {
+        it("uses the pre-assigned scenarioRunId instead of generating a new one", async () => {
+          await handler.ensureFailureEventsEmitted({
+            ...baseJobData,
+            scenarioRunId: "scenariorun_preassigned123",
+            error: "Child process exited with code 1",
+          });
+
+          const runStartedCall = mockService.saveScenarioEvent.mock.calls[0]?.[0] as Record<string, unknown>;
+          expect(runStartedCall.scenarioRunId).toBe("scenariorun_preassigned123");
+
+          const runFinishedCall = mockService.saveScenarioEvent.mock.calls[1]?.[0] as Record<string, unknown>;
+          expect(runFinishedCall.scenarioRunId).toBe("scenariorun_preassigned123");
         });
       });
     });

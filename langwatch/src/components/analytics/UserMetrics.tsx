@@ -1,9 +1,8 @@
-import { Card, Grid, GridItem, Heading, Tabs, VStack } from "@chakra-ui/react";
+import { Card, Grid, GridItem, Heading, Tabs } from "@chakra-ui/react";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { analyticsMetrics } from "../../server/analytics/registry";
 import { TopicsSelector } from "../filters/TopicsSelector";
 import { CustomGraph, type CustomGraphInput } from "./CustomGraph";
-import { SatisfactionGraphs } from "./SatisfactionGraph";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
@@ -188,17 +187,14 @@ export function UserMetrics() {
         </Card.Root>
       </GridItem>
       <GridItem rowSpan={2}>
-        <VStack gap={6}>
-          <Card.Root width="100%" minHeight={isNotQuickwit ? "300px" : "528px"}>
-            <Card.Header paddingBottom={4}>
-              <Heading size="sm">Top Topics</Heading>
-            </Card.Header>
-            <Card.Body maxHeight="240px" overflowY="auto">
-              <TopicsSelector showTitle={false} />
-            </Card.Body>
-          </Card.Root>
-          {isNotQuickwit && <SatisfactionGraphs />}
-        </VStack>
+        <Card.Root width="100%" height="100%">
+          <Card.Header paddingBottom={4}>
+            <Heading size="sm">Top Topics</Heading>
+          </Card.Header>
+          <Card.Body overflowY="auto">
+            <TopicsSelector showTitle={false} />
+          </Card.Body>
+        </Card.Root>
       </GridItem>
       {isNotQuickwit && (
         <GridItem>

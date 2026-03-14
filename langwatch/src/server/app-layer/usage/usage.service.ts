@@ -1,5 +1,3 @@
-import type { PrismaClient } from "@prisma/client";
-import { getApp } from "~/server/app-layer/app";
 import { TraceUsageService } from "../../traces/trace-usage.service";
 import { EventUsageService } from "../../traces/event-usage.service";
 import type { PlanResolver } from "../subscription/plan-provider";
@@ -37,7 +35,7 @@ export class UsageService {
   private readonly cache: TtlCache<number>;
   private readonly decisionCache: TtlCache<MeterDecision>;
 
-  private constructor(
+  constructor(
     private readonly organizationService: OrganizationService,
     private readonly traceUsageService: TraceUsageService,
     private readonly eventUsageService: EventUsageService,
@@ -46,33 +44,6 @@ export class UsageService {
   ) {
     this.cache = new TtlCache<number>(CACHE_TTL_MS);
     this.decisionCache = new TtlCache<MeterDecision>(CACHE_TTL_MS);
-  }
-
-  static create({
-    prisma,
-    organizationService,
-    planResolver,
-  }: {
-    prisma: PrismaClient | null;
-    organizationService: OrganizationService;
-    planResolver?: PlanResolver;
-  }): UsageService {
-    const traceUsageService = prisma
-      ? TraceUsageService.create(prisma)
-      : TraceUsageService.create();
-    const eventUsageService = new EventUsageService();
-    const resolver: PlanResolver =
-      planResolver ??
-      ((organizationId) =>
-        getApp().planProvider.getActivePlan({ organizationId }));
-    const orgRepo = prisma ? new OrganizationRepository(prisma) : null;
-    return new UsageService(
-      organizationService,
-      traceUsageService,
-      eventUsageService,
-      resolver,
-      orgRepo,
-    );
   }
 
   async checkLimit({ teamId }: { teamId: string }): Promise<UsageLimitResult> {

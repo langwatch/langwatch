@@ -7,7 +7,7 @@ import { useShallow } from "zustand/react/shallow";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { useLoadWorkflow } from "../hooks/useLoadWorkflow";
-import { useWorkflowStore } from "../hooks/useWorkflowStore";
+import { useWorkflowStore, serializeWorkflow } from "../hooks/useWorkflowStore";
 import { hasDSLChanged } from "../utils/dslUtils";
 
 let saveTimeout: NodeJS.Timeout;
@@ -20,23 +20,26 @@ export function AutoSave() {
 
   const {
     setWorkflow,
-    setPreviousWorkflow,
+    setAutosavedWorkflow,
     hasPendingChanges,
     getWorkflow,
-    getPreviousWorkflow,
+    getAutosavedWorkflow,
+    setCurrentVersionId,
   } = useWorkflowStore(
     ({
       setWorkflow,
-      setPreviousWorkflow,
+      setAutosavedWorkflow,
       hasPendingChanges,
       getWorkflow,
-      getPreviousWorkflow,
+      getAutosavedWorkflow,
+      setCurrentVersionId,
     }) => ({
       setWorkflow,
-      setPreviousWorkflow,
+      setAutosavedWorkflow,
       hasPendingChanges,
       getWorkflow,
-      getPreviousWorkflow,
+      getAutosavedWorkflow,
+      setCurrentVersionId,
     }),
   );
   const stateWorkflow = useWorkflowStore(
@@ -52,10 +55,10 @@ export function AutoSave() {
 
       const stateWorkflow = getWorkflow();
       if (hasPendingChanges()) {
-        const previousWorkflow = getPreviousWorkflow()!;
+        const autosavedWorkflow = getAutosavedWorkflow()!;
 
         const setAsLatestVersion = hasDSLChanged(
-          previousWorkflow,
+          autosavedWorkflow,
           stateWorkflow,
           false,
         );
@@ -63,7 +66,7 @@ export function AutoSave() {
           {
             projectId: project.id,
             workflowId: workflow.data.id,
-            dsl: stateWorkflow,
+            dsl: serializeWorkflow(stateWorkflow),
             setAsLatestVersion,
           },
           {
@@ -71,6 +74,7 @@ export function AutoSave() {
               if (data.version !== stateWorkflow.version) {
                 setWorkflow({ version: data.version });
               }
+              setCurrentVersionId(data.id);
               setRecentlySaved(true);
               clearTimeout(saveTimeout);
               saveTimeout = setTimeout(() => {
@@ -82,13 +86,13 @@ export function AutoSave() {
                   projectId: project.id,
                   returnDSL: "previousVersion",
                 });
-                setPreviousWorkflow(stateWorkflow);
+                setAutosavedWorkflow(stateWorkflow);
               })();
             },
           },
         );
       } else {
-        setPreviousWorkflow(stateWorkflow);
+        setAutosavedWorkflow(stateWorkflow);
       }
     },
     1000,

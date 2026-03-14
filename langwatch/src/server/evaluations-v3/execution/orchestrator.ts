@@ -97,6 +97,41 @@ export const generateCells = (
   const datasetId =
     state.datasets[0]?.id ?? state.activeDatasetId ?? "dataset-1";
 
+  // Handle evaluator-all-rows scope - run one evaluator across all rows with existing target outputs
+  if (scope.type === "evaluator-all-rows") {
+    const targetConfig = state.targets.find(
+      (t: TargetConfig) => t.id === scope.targetId,
+    );
+    const evaluatorConfig = state.evaluators.find(
+      (e) => e.id === scope.evaluatorId,
+    );
+
+    if (!targetConfig || !evaluatorConfig) return cells;
+
+    for (const [rowIndexStr, targetOutput] of Object.entries(
+      scope.precomputedTargetOutputs,
+    )) {
+      const rowIndex = Number(rowIndexStr);
+      const datasetEntry = datasetRows[rowIndex];
+      if (!datasetEntry) continue;
+
+      cells.push({
+        rowIndex,
+        targetId: scope.targetId,
+        targetConfig,
+        evaluatorConfigs: [evaluatorConfig],
+        datasetEntry: {
+          _datasetId: datasetId,
+          ...datasetEntry,
+        },
+        skipTarget: true,
+        precomputedTargetOutput: targetOutput,
+        traceId: scope.traceIds[rowIndex],
+      });
+    }
+    return cells;
+  }
+
   // Handle evaluator scope specially - single evaluator re-run with pre-computed target output
   if (scope.type === "evaluator") {
     const targetConfig = state.targets.find(
@@ -688,18 +723,13 @@ export async function* runOrchestrator(
       const evaluationId = generate(KSUID_RESOURCES.EVALUATION).toString();
       try {
         const app = getApp();
-        await app.evaluations.startEvaluation({
+        await app.evaluations.reportEvaluation({
           tenantId: projectId,
           evaluationId,
           evaluatorId: event.evaluatorId,
           evaluatorType: evaluatorConfig?.evaluatorType ?? "unknown",
           evaluatorName: dbEvaluator?.name,
           traceId,
-          occurredAt: Date.now(),
-        });
-        await app.evaluations.completeEvaluation({
-          tenantId: projectId,
-          evaluationId,
           status: evalResult.status,
           score: evalResult.status === "processed" ? (evalResult.score ?? undefined) : undefined,
           passed: evalResult.status === "processed" ? (evalResult.passed ?? undefined) : undefined,

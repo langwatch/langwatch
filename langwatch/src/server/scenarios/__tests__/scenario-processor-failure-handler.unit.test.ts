@@ -15,6 +15,7 @@ describe("handleFailedJobResult", () => {
     scenarioId: "scen_456",
     setId: "set_789",
     batchRunId: "batch_abc",
+    scenarioRunId: "scenariorun_test123",
     target: { type: "http", referenceId: "agent_123" },
   };
 
@@ -61,6 +62,7 @@ describe("handleFailedJobResult", () => {
         scenarioId: "scen_456",
         setId: "set_789",
         batchRunId: "batch_abc",
+        scenarioRunId: "scenariorun_test123",
         error: "Prefetch failed: Scenario not found",
         name: "Test Scenario",
         description: "Test description for the scenario",

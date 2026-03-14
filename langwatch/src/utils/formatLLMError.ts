@@ -36,8 +36,11 @@ export function parseLLMError(raw: string): ParsedLLMError {
     let unescapedMessage = message;
     try {
       if (message) {
+        // Unescape Python repr escapes (\\ → \, \' → ', \" → ") in one pass,
+        // then JSON-encode so JSON.parse can safely reconstruct the string.
+        const pyUnescaped = message.replace(/\\([\\'"])/g, (_, c: string) => c);
         unescapedMessage = JSON.parse(
-          `"${message.replace(/"/g, '\\"').replace(/\\'/g, "'")}"`,
+          `"${pyUnescaped.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`,
         );
       }
     } catch {}

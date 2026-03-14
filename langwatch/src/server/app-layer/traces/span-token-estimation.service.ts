@@ -1,6 +1,5 @@
 import type { OtlpSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import type { TokenizerClient } from "../clients/tokenizer/tokenizer.client";
-import { TiktokenClient } from "../clients/tokenizer/tiktoken.client";
 import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
 
 /**
@@ -59,15 +58,6 @@ export class OtlpSpanTokenEstimationService {
 
   constructor(deps: OtlpSpanTokenEstimationServiceDependencies) {
     this.deps = deps;
-  }
-
-  static create(
-    deps?: Partial<OtlpSpanTokenEstimationServiceDependencies>,
-  ): OtlpSpanTokenEstimationService {
-    return new OtlpSpanTokenEstimationService({
-      tokenizer: deps?.tokenizer ?? new TiktokenClient(),
-      featureFlagService: deps?.featureFlagService,
-    });
   }
 
   /**

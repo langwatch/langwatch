@@ -64,7 +64,7 @@ describe("QueueManager.initializeProjectionQueues with groupKeyFn", () => {
         tenantId,
       );
       const groupKey = entry?.groupKeyFn(event);
-      expect(groupKey).toBe(`${tenantId}:by-tenant:${tenantId}`);
+      expect(groupKey).toBe(`${tenantId}/fold/myProjection/by-tenant:${tenantId}`);
     });
   });
 
@@ -104,7 +104,7 @@ describe("QueueManager.initializeProjectionQueues with groupKeyFn", () => {
       );
       const groupKey = entry?.groupKeyFn(event);
       expect(groupKey).toBe(
-        `${tenantId}:${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,
+        `${tenantId}/fold/myProjection/${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,
       );
     });
   });
@@ -154,13 +154,13 @@ describe("QueueManager.initializeProjectionQueues with groupKeyFn", () => {
       // Custom projection uses its custom groupKeyFn
       const customEntry = globalJobRegistry.get("test-pipeline:projection:customProjection");
       const customGroupKey = customEntry?.groupKeyFn(event);
-      expect(customGroupKey).toBe(`${tenantId}:custom:${event.id}`);
+      expect(customGroupKey).toBe(`${tenantId}/fold/customProjection/custom:${event.id}`);
 
       // Default projection uses aggregate-based groupKey
       const defaultEntry = globalJobRegistry.get("test-pipeline:projection:defaultProjection");
       const defaultGroupKey = defaultEntry?.groupKeyFn(event);
       expect(defaultGroupKey).toBe(
-        `${tenantId}:${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,
+        `${tenantId}/fold/defaultProjection/${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,
       );
     });
   });

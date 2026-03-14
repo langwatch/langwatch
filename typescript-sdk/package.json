@@ -1,6 +1,6 @@
 {
     "name": "langwatch",
-    "version": "0.17.0",
+    "version": "0.19.0",
     "description": "LangWatch TypeScript/JavaScript SDK. Interact with the full LangWatch API and use the LangWatch OpenTelemetry SDK to instrument your application. For more information, see https://docs.langwatch.ai/integration/typescript/guide",
     "main": "dist/index.js",
     "module": "dist/index.mjs",
@@ -130,6 +130,35 @@
         "@opentelemetry/sdk-trace-web": ">=1.19.0 <3.0.0",
         "langchain": ">=0.3.0 <2.0.0"
     },
+    "peerDependenciesMeta": {
+        "@ai-sdk/openai": {
+            "optional": true
+        },
+        "@langchain/core": {
+            "optional": true
+        },
+        "@langchain/langgraph": {
+            "optional": true
+        },
+        "@langchain/openai": {
+            "optional": true
+        },
+        "@opentelemetry/context-async-hooks": {
+            "optional": true
+        },
+        "@opentelemetry/context-zone": {
+            "optional": true
+        },
+        "@opentelemetry/sdk-node": {
+            "optional": true
+        },
+        "@opentelemetry/sdk-trace-web": {
+            "optional": true
+        },
+        "langchain": {
+            "optional": true
+        }
+    },
     "pnpm": {
         "overrides": {
             "@opentelemetry/api": "^1.9.0",
@@ -143,7 +172,9 @@
             "@opentelemetry/sdk-logs": "0.205.0",
             "@opentelemetry/exporter-logs-otlp-http": "0.205.0",
             "@opentelemetry/exporter-trace-otlp-http": "0.205.0",
-            "zod": "^4.0.14"
+            "zod": "^4.0.14",
+            "langchain@<0.3.37": "0.3.37",
+            "@langchain/core@<0.3.80": "0.3.80"
         }
     }
 }

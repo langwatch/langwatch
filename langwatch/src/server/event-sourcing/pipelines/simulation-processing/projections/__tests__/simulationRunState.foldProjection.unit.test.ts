@@ -11,6 +11,8 @@ import type {
     SimulationRunDeletedEvent,
     SimulationRunFinishedEvent,
     SimulationRunStartedEvent,
+    SimulationTextMessageEndEvent,
+    SimulationTextMessageStartEvent,
 } from "../../schemas/events";
 import {
     createSimulationRunStateFoldProjection,
@@ -109,6 +111,53 @@ function createRunDeletedEvent(
     version: SIMULATION_EVENT_VERSIONS.DELETED,
     data: {
       scenarioRunId: "scenario-run-1",
+      ...overrides,
+    },
+    ...eventOverrides,
+  };
+}
+
+function createTextMessageStartEvent(
+  overrides: Partial<SimulationTextMessageStartEvent["data"]> = {},
+  eventOverrides: Partial<SimulationTextMessageStartEvent> = {},
+): SimulationTextMessageStartEvent {
+  return {
+    id: "event-tms-1",
+    aggregateId: "scenario-run-1",
+    aggregateType: "simulation_run",
+    tenantId: TEST_TENANT_ID,
+    createdAt: 1500,
+    occurredAt: 1500,
+    type: SIMULATION_RUN_EVENT_TYPES.TEXT_MESSAGE_START,
+    version: SIMULATION_EVENT_VERSIONS.TEXT_MESSAGE_START,
+    data: {
+      scenarioRunId: "scenario-run-1",
+      messageId: "msg-1",
+      role: "user",
+      ...overrides,
+    },
+    ...eventOverrides,
+  };
+}
+
+function createTextMessageEndEvent(
+  overrides: Partial<SimulationTextMessageEndEvent["data"]> = {},
+  eventOverrides: Partial<SimulationTextMessageEndEvent> = {},
+): SimulationTextMessageEndEvent {
+  return {
+    id: "event-tme-1",
+    aggregateId: "scenario-run-1",
+    aggregateType: "simulation_run",
+    tenantId: TEST_TENANT_ID,
+    createdAt: 2000,
+    occurredAt: 2000,
+    type: SIMULATION_RUN_EVENT_TYPES.TEXT_MESSAGE_END,
+    version: SIMULATION_EVENT_VERSIONS.TEXT_MESSAGE_END,
+    data: {
+      scenarioRunId: "scenario-run-1",
+      messageId: "msg-1",
+      role: "user",
+      content: "hello",
       ...overrides,
     },
     ...eventOverrides,
@@ -324,6 +373,205 @@ describe("simulationRunStateFoldProjection", () => {
 
       expect(state.ArchivedAt).toBe(FAKE_NOW);
       expect(state.UpdatedAt).toBe(FAKE_NOW);
+    });
+  });
+
+  describe("when TextMessageStart event is applied", () => {
+    it("creates a placeholder message row", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createTextMessageStartEvent({ messageId: "msg-1", role: "user" }),
+      ]);
+
+      expect(state.Messages).toEqual([
+        { Id: "msg-1", Role: "user", Content: "", TraceId: "", Rest: "" },
+      ]);
+      expect(state.UpdatedAt).toBe(FAKE_NOW);
+    });
+
+    it("transitions PENDING to IN_PROGRESS", () => {
+      const state = foldEvents([
+        createTextMessageStartEvent({ messageId: "msg-1", role: "user" }),
+      ]);
+
+      expect(state.Status).toBe("IN_PROGRESS");
+      expect(state.StartedAt).toBe(1500);
+    });
+
+    it("deduplicates by messageId", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createTextMessageStartEvent({ messageId: "msg-1", role: "user" }),
+        createTextMessageStartEvent(
+          { messageId: "msg-1", role: "user" },
+          { id: "event-tms-dup" },
+        ),
+      ]);
+
+      expect(state.Messages).toHaveLength(1);
+    });
+
+    it("accumulates multiple messages in order", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createTextMessageStartEvent(
+          { messageId: "msg-1", role: "user" },
+          { id: "event-tms-1", occurredAt: 1500 },
+        ),
+        createTextMessageStartEvent(
+          { messageId: "msg-2", role: "assistant" },
+          { id: "event-tms-2", occurredAt: 1600 },
+        ),
+      ]);
+
+      expect(state.Messages).toHaveLength(2);
+      expect(state.Messages[0]!.Id).toBe("msg-1");
+      expect(state.Messages[1]!.Id).toBe("msg-2");
+    });
+  });
+
+  describe("when TextMessageEnd event is applied", () => {
+    it("completes a placeholder from START", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createTextMessageStartEvent({ messageId: "msg-1", role: "user" }),
+        createTextMessageEndEvent({
+          messageId: "msg-1",
+          role: "user",
+          content: "hello world",
+          traceId: "trace-abc",
+        }),
+      ]);
+
+      expect(state.Messages).toEqual([
+        { Id: "msg-1", Role: "user", Content: "hello world", TraceId: "trace-abc", Rest: "" },
+      ]);
+      expect(state.TraceIds).toEqual(["trace-abc"]);
+    });
+
+    it("handles missing START (out-of-order) by appending directly", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createTextMessageEndEvent({
+          messageId: "msg-1",
+          role: "user",
+          content: "hello",
+        }),
+      ]);
+
+      expect(state.Messages).toHaveLength(1);
+      expect(state.Messages[0]!.Content).toBe("hello");
+    });
+
+    it("accumulates traceId without duplicates", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createTextMessageEndEvent(
+          { messageId: "msg-1", role: "user", content: "hello", traceId: "trace-1" },
+          { id: "event-tme-1", occurredAt: 1500 },
+        ),
+        createTextMessageEndEvent(
+          { messageId: "msg-2", role: "assistant", content: "hi", traceId: "trace-1" },
+          { id: "event-tme-2", occurredAt: 1600 },
+        ),
+      ]);
+
+      // trace-1 should not be duplicated
+      expect(state.TraceIds).toEqual(["trace-1"]);
+    });
+
+    it("replaces message content when same messageId arrives twice", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createTextMessageStartEvent({ messageId: "msg-1", role: "assistant" }),
+        createTextMessageEndEvent(
+          { messageId: "msg-1", role: "assistant", content: "first" },
+          { id: "event-tme-1", occurredAt: 2000 },
+        ),
+        createTextMessageEndEvent(
+          { messageId: "msg-1", role: "assistant", content: "second" },
+          { id: "event-tme-2", occurredAt: 2500 },
+        ),
+      ]);
+
+      expect(state.Messages).toHaveLength(1);
+      expect(state.Messages[0]!.Content).toBe("second");
+    });
+
+    it("builds Rest from extra message fields", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createTextMessageEndEvent({
+          messageId: "msg-1",
+          role: "assistant",
+          content: "hi",
+          message: { id: "msg-1", role: "assistant", content: "hi", toolCalls: [{ id: "tc1" }] },
+        }),
+      ]);
+
+      expect(state.Messages[0]!.Rest).toContain("toolCalls");
+    });
+  });
+
+  describe("when START→END lifecycle", () => {
+    it("tracks a full message lifecycle", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createTextMessageStartEvent(
+          { messageId: "msg-1", role: "user" },
+          { id: "e1", occurredAt: 1500 },
+        ),
+        createTextMessageEndEvent(
+          { messageId: "msg-1", role: "user", content: "hello", traceId: "t1" },
+          { id: "e2", occurredAt: 2000 },
+        ),
+        createTextMessageStartEvent(
+          { messageId: "msg-2", role: "assistant" },
+          { id: "e3", occurredAt: 2100 },
+        ),
+        createTextMessageEndEvent(
+          { messageId: "msg-2", role: "assistant", content: "hi back", traceId: "t2" },
+          { id: "e4", occurredAt: 2500 },
+        ),
+      ]);
+
+      expect(state.Messages).toHaveLength(2);
+      expect(state.Messages[0]).toEqual({ Id: "msg-1", Role: "user", Content: "hello", TraceId: "t1", Rest: "" });
+      expect(state.Messages[1]).toEqual({ Id: "msg-2", Role: "assistant", Content: "hi back", TraceId: "t2", Rest: "" });
+      expect(state.TraceIds).toEqual(["t1", "t2"]);
+    });
+  });
+
+  describe("when snapshot arrives after START/END", () => {
+    it("snapshot overwrites all messages (snapshot wins)", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createTextMessageStartEvent(
+          { messageId: "msg-1", role: "user" },
+          { id: "e1", occurredAt: 1500 },
+        ),
+        createTextMessageEndEvent(
+          { messageId: "msg-1", role: "user", content: "hello" },
+          { id: "e2", occurredAt: 2000 },
+        ),
+        createMessageSnapshotEvent(
+          {
+            messages: [
+              { role: "user", content: "snapshot-msg" },
+              { role: "assistant", content: "snapshot-reply" },
+            ],
+            traceIds: ["snap-trace"],
+          },
+          { id: "e3", occurredAt: 3000, createdAt: 3000 },
+        ),
+      ]);
+
+      // Snapshot replaces everything
+      expect(state.Messages).toEqual([
+        { Id: "", Role: "user", Content: "snapshot-msg", TraceId: "", Rest: "" },
+        { Id: "", Role: "assistant", Content: "snapshot-reply", TraceId: "", Rest: "" },
+      ]);
+      expect(state.TraceIds).toEqual(["snap-trace"]);
     });
   });
 

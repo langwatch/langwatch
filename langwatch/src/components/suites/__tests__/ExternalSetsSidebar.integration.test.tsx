@@ -126,7 +126,7 @@ describe("<SuiteSidebar/> External Sets", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText(/15\/20 passed/)).toBeInTheDocument();
+      expect(screen.getByText(/15 passed/)).toBeInTheDocument();
     });
 
     it("does not display a Run button on external set items", () => {
@@ -308,6 +308,77 @@ describe("<SuiteSidebar/> External Sets", () => {
         ).not.toBeInTheDocument();
         expect(screen.getByText("No matching suites")).toBeInTheDocument();
       });
+    });
+  });
+
+  describe("given an external set with no runs", () => {
+    it("displays only the name with no summary line", () => {
+      render(
+        <SuiteSidebar
+          {...defaultProps}
+          externalSets={[
+            makeExternalSet({
+              scenarioSetId: "New Set",
+              passedCount: 0,
+              totalCount: 0,
+              lastRunTimestamp: 0,
+            }),
+          ]}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByText("New Set")).toBeInTheDocument();
+      expect(screen.queryByText(/passed/)).not.toBeInTheDocument();
+      expect(screen.queryByTestId("status-icon-pass")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("status-icon-fail")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given an external set with runs", () => {
+    it("displays recency indicator alongside pass count", () => {
+      vi.useFakeTimers();
+      const now = new Date("2025-01-15T12:00:00Z").getTime();
+      vi.setSystemTime(now);
+
+      try {
+        render(
+          <SuiteSidebar
+            {...defaultProps}
+            externalSets={[
+              makeExternalSet({
+                scenarioSetId: "ci-smoke-tests",
+                passedCount: 15,
+                totalCount: 20,
+                lastRunTimestamp: now - 30 * 60 * 1000,
+              }),
+            ]}
+          />,
+          { wrapper: Wrapper },
+        );
+
+        expect(screen.getByText(/15 passed/)).toBeInTheDocument();
+        expect(screen.getByText(/30m ago/)).toBeInTheDocument();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("does not show a three-dot menu button", () => {
+      render(
+        <SuiteSidebar
+          {...defaultProps}
+          externalSets={[
+            makeExternalSet({ scenarioSetId: "ci-smoke-tests" }),
+          ]}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const items = screen.getAllByTestId("external-set-list-item");
+      expect(
+        within(items[0]!).queryByTestId("suite-menu-button"),
+      ).not.toBeInTheDocument();
     });
   });
 

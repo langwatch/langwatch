@@ -64,10 +64,6 @@ export class OtlpSpanCostEnrichmentService {
     this.deps = deps;
   }
 
-  static create(deps: OtlpSpanCostEnrichmentServiceDependencies): OtlpSpanCostEnrichmentService {
-    return new OtlpSpanCostEnrichmentService(deps);
-  }
-
   /**
    * Enriches span with custom cost rates if a matching custom model cost exists.
    * Mutates the span in place (pushes new attributes).

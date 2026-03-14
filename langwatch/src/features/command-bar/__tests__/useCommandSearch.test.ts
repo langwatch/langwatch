@@ -34,6 +34,7 @@ describe("detectEntityId", () => {
       ["experiment_exp1", "entity"],
       ["prompt_p1", "entity"],
       ["workflow_w1", "entity"],
+      ["scenario_s1", "entity"],
       ["scen_s1", "entity"],
       ["monitor_m1", "entity"],
     ])("detects %s as %s", (input, expected) => {

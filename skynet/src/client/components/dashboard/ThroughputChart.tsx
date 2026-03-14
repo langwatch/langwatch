@@ -26,6 +26,8 @@ const SERIES = [
   { key: "stagedPerSec", label: "Staged/s", color: "#00f0ff", gradientId: "stagedGrad" },
   { key: "completedPerSec", label: "Completed/s", color: "#00ff41", gradientId: "completedGrad" },
   { key: "failedPerSec", label: "Failed/s", color: "#ff0033", gradientId: "failedGrad" },
+  { key: "pendingCount", label: "Pending", color: "#8866ff", gradientId: "pendingGrad" },
+  { key: "blockedCount", label: "Blocked", color: "#ff6688", gradientId: "blockedGrad" },
 ] as const;
 
 /**
@@ -164,7 +166,7 @@ export function ThroughputChart({ data }: { data: ThroughputPoint[] }) {
   const tooltipBorder = "rgba(0, 240, 255, 0.3)";
 
   // Series visibility toggle
-  const [hidden, setHidden] = useState<Set<string>>(() => new Set());
+  const [hidden, setHidden] = useState<Set<string>>(() => new Set(["pendingCount", "blockedCount"]));
 
   // Drag-to-zoom state
   const [dragStart, setDragStart] = useState<number | null>(null);
@@ -309,7 +311,12 @@ export function ThroughputChart({ data }: { data: ThroughputPoint[] }) {
           <defs>
             {SERIES.map((s) => (
               <linearGradient key={s.gradientId} id={s.gradientId} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={s.color} stopOpacity={s.key === "failedPerSec" ? 0.25 : s.key === "completedPerSec" ? 0.25 : 0.3} />
+                <stop offset="5%" stopColor={s.color} stopOpacity={
+                s.key === "failedPerSec" ? 0.25
+                : s.key === "completedPerSec" ? 0.25
+                : s.key === "pendingCount" || s.key === "blockedCount" ? 0.15
+                : 0.3
+              } />
                 <stop offset="95%" stopColor={s.color} stopOpacity={0} />
               </linearGradient>
             ))}
@@ -325,10 +332,19 @@ export function ThroughputChart({ data }: { data: ThroughputPoint[] }) {
             scale="time"
           />
           <YAxis
+            yAxisId="rate"
             tick={{ fill: TICK_COLOR, fontSize: 10 }}
             axisLine={false}
             tickLine={false}
             width={40}
+          />
+          <YAxis
+            yAxisId="count"
+            orientation="right"
+            tick={{ fill: TICK_COLOR, fontSize: 10 }}
+            axisLine={false}
+            tickLine={false}
+            width={50}
           />
           <Tooltip
             contentStyle={{
@@ -351,7 +367,8 @@ export function ThroughputChart({ data }: { data: ThroughputPoint[] }) {
                 name={s.label}
                 stroke={s.color}
                 fill={`url(#${s.gradientId})`}
-                strokeWidth={s.key === "failedPerSec" ? 1.5 : 2}
+                strokeWidth={s.key === "failedPerSec" ? 1.5 : s.key === "pendingCount" || s.key === "blockedCount" ? 1 : 2}
+                yAxisId={s.key === "pendingCount" || s.key === "blockedCount" ? "count" : "rate"}
                 isAnimationActive={false}
               />
             ),
@@ -360,6 +377,7 @@ export function ThroughputChart({ data }: { data: ThroughputPoint[] }) {
             <ReferenceArea
               x1={dragStart}
               x2={dragEnd}
+              yAxisId="rate"
               fill="rgba(0, 240, 255, 0.08)"
               stroke="rgba(0, 240, 255, 0.3)"
               strokeDasharray="3 3"

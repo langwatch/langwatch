@@ -18,7 +18,7 @@ def test_custom_llm_boolean_evaluator():
         contexts=["London is the capital of France."],
     )
     settings = CustomLLMBooleanSettings(
-        model="openai/gpt-5",
+        model="openai/gpt-5-mini",
         prompt="You are an LLM evaluator. We need the guarantee that the output is using the provided context and not it's own brain, please evaluate as False if is not.",
     )
 
@@ -39,7 +39,7 @@ def test_custom_llm_boolean_evaluator_skips_if_context_is_too_large():
         contexts=["London is the capital of France."] * 300,
     )
     settings = CustomLLMBooleanSettings(
-        model="openai/gpt-5",
+        model="openai/gpt-5-mini",
         prompt="You are an LLM evaluator. We need the guarantee that the output is using the provided context and not it's own brain, please evaluate as False if is not.",
         max_tokens=2048,
     )

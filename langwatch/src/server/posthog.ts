@@ -20,6 +20,33 @@ export function getPostHogInstance(): PostHog | null {
 }
 
 /**
+ * Fire-and-forget server-side event tracking.
+ * Silently no-ops when POSTHOG_KEY is not set (self-hosted without PostHog).
+ */
+export function trackServerEvent({
+  userId,
+  event,
+  properties,
+  projectId,
+}: {
+  userId: string;
+  event: string;
+  properties?: Record<string, unknown>;
+  projectId?: string;
+}) {
+  const posthog = getPostHogInstance();
+  if (!posthog) return;
+  posthog.capture({
+    distinctId: userId,
+    event,
+    properties: {
+      ...properties,
+      ...(projectId ? { projectId } : {}),
+    },
+  });
+}
+
+/**
  * Shuts down the PostHog client, flushing pending events.
  * Called by the main shutdown handler in start.ts — no separate signal handlers
  * to avoid competing with the graceful shutdown sequence.

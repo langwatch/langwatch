@@ -48,6 +48,11 @@ export type UseExecuteEvaluationReturn = {
     targetId: string,
     evaluatorId: string,
   ) => Promise<void>;
+  /** Run an evaluator on all rows that have existing target outputs */
+  runEvaluatorOnAllRows: (
+    targetId: string,
+    evaluatorId: string,
+  ) => Promise<void>;
   /** Request abort of current execution */
   abort: () => Promise<void>;
   /** Reset state to idle */
@@ -403,11 +408,12 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           errors: {},
         });
       } else {
-        // Partial execution: clear ALL data for cells being executed
-        // This ensures the correct loading sequence:
-        // 1. Gray (pending) - no data at all
-        // 2. Spinner (running) - target output arrives, evaluators pending
-        // 3. Final result - evaluator results arrive
+        // Partial execution: clear data for cells being executed.
+        // For evaluator-only scopes, preserve target data and only clear the
+        // specific evaluator's results. For other scopes, clear everything.
+        const isEvaluatorOnlyScope =
+          scope.type === "evaluator-all-rows" || scope.type === "evaluator";
+
         useEvaluationsV3Store.setState((state) => {
           const existingCells = state.results.executingCells;
           const mergedCells = existingCells
@@ -432,38 +438,61 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           let newErrors = { ...state.results.errors };
           let newEvaluatorResults = { ...state.results.evaluatorResults };
 
-          const evaluatorIds = state.evaluators.map((e) => e.id);
+          // For evaluator-only scopes, determine which single evaluator to clear
+          const specificEvaluatorId =
+            isEvaluatorOnlyScope && "evaluatorId" in scope
+              ? scope.evaluatorId
+              : undefined;
+
+          const evaluatorIds = specificEvaluatorId
+            ? [specificEvaluatorId]
+            : state.evaluators.map((e) => e.id);
 
           for (const cell of executionCells) {
-            // Clear target output
-            newTargetOutputs = clearCellFromArrayRecord(
-              newTargetOutputs,
-              cell.targetId,
-              cell.rowIndex,
-            );
+            // Only clear target data for non-evaluator scopes
+            // (evaluator scopes reuse existing target outputs)
+            if (!isEvaluatorOnlyScope) {
+              // Clear target output
+              newTargetOutputs = clearCellFromArrayRecord(
+                newTargetOutputs,
+                cell.targetId,
+                cell.rowIndex,
+              );
 
-            // Clear target metadata
-            newTargetMetadata = clearCellFromArrayRecord(
-              newTargetMetadata,
-              cell.targetId,
-              cell.rowIndex,
-            );
+              // Clear target metadata
+              newTargetMetadata = clearCellFromArrayRecord(
+                newTargetMetadata,
+                cell.targetId,
+                cell.rowIndex,
+              );
 
-            // Clear errors (also array-based with holes)
-            newErrors = clearCellFromArrayRecord(
-              newErrors,
-              cell.targetId,
-              cell.rowIndex,
-            );
+              // Clear errors (also array-based with holes)
+              newErrors = clearCellFromArrayRecord(
+                newErrors,
+                cell.targetId,
+                cell.rowIndex,
+              );
+            }
 
-            // Clear evaluator results for ALL evaluators
+            // Clear evaluator results (only specific evaluator for evaluator scopes)
+            // For evaluator-only scopes, set to "running" for UI feedback;
+            // for other scopes, clear to undefined
             if (!newEvaluatorResults[cell.targetId]) {
               newEvaluatorResults[cell.targetId] = {};
             }
             const newTargetResults = { ...newEvaluatorResults[cell.targetId] };
             for (const evaluatorId of evaluatorIds) {
               const evalResults = newTargetResults[evaluatorId];
-              if (evalResults && evalResults[cell.rowIndex] !== undefined) {
+              if (isEvaluatorOnlyScope) {
+                // Always set to "running" for evaluator scopes, even if no
+                // prior results exist (freshly added evaluator)
+                const newEvalResults = evalResults ? [...evalResults] : [];
+                newEvalResults[cell.rowIndex] = { status: "running" };
+                newTargetResults[evaluatorId] = newEvalResults;
+              } else if (
+                evalResults &&
+                evalResults[cell.rowIndex] !== undefined
+              ) {
                 const newEvalResults = [...evalResults];
                 newEvalResults[cell.rowIndex] = undefined;
                 newTargetResults[evaluatorId] = newEvalResults;
@@ -719,6 +748,44 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
     [execute, updateEvaluatorResult],
   );
 
+  /**
+   * Run an evaluator on all rows that have existing target outputs.
+   * Builds a map of pre-computed outputs and trace IDs, then executes via
+   * the evaluator-all-rows scope.
+   */
+  const runEvaluatorOnAllRows = useCallback(
+    async (targetId: string, evaluatorId: string) => {
+      const state = useEvaluationsV3Store.getState();
+      const targetOutputs = state.results.targetOutputs[targetId] ?? [];
+      const targetMetadata = state.results.targetMetadata[targetId] ?? [];
+
+      // Build maps of only rows that have target outputs
+      const precomputedTargetOutputs: Record<number, unknown> = {};
+      const traceIds: Record<number, string | undefined> = {};
+
+      for (let i = 0; i < targetOutputs.length; i++) {
+        if (targetOutputs[i] !== undefined && targetOutputs[i] !== null) {
+          precomputedTargetOutputs[i] = targetOutputs[i];
+          traceIds[i] = targetMetadata[i]?.traceId;
+        }
+      }
+
+      // Nothing to run if no rows have outputs
+      if (Object.keys(precomputedTargetOutputs).length === 0) return;
+
+      const scope: ExecutionScope = {
+        type: "evaluator-all-rows",
+        targetId,
+        evaluatorId,
+        precomputedTargetOutputs,
+        traceIds,
+      };
+
+      await execute(scope);
+    },
+    [execute, updateEvaluatorResult],
+  );
+
   return {
     status,
     runId,
@@ -728,6 +795,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
     isAborting,
     execute,
     rerunEvaluator,
+    runEvaluatorOnAllRows,
     abort,
     reset,
   };

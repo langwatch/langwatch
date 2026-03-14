@@ -336,7 +336,13 @@ export function SpanTree(props: SpanTreeProps) {
           flexDirection={{ base: "column", xl: "row" }}
         >
           <TreeRenderer spans={spans.data} />
-          {project && span && <SpanDetails project={project} span={span} />}
+          {project && span && (
+            <SpanDetails
+              project={project}
+              span={span}
+              allSpans={spans.data}
+            />
+          )}
         </HStack>
       ) : spans.isError ? (
         <Alert.Root status="error">

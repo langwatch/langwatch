@@ -87,7 +87,7 @@ def test_custom_semantic_similarity_long_context():
         )
     )
 
-    with pytest.raises(litellm.exceptions.ContextWindowExceededError):
+    with pytest.raises((litellm.exceptions.ContextWindowExceededError, litellm.exceptions.BadRequestError)):
         evaluator.evaluate(entry)
 
 

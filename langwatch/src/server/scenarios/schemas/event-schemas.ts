@@ -123,6 +123,68 @@ export const scenarioMessageSnapshotSchema = MessagesSnapshotEventSchema.merge(
 );
 
 /**
+ * Scenario Text Message Start Event Schema
+ * Emitted when a message begins (placeholder). Persisted via event-sourcing.
+ */
+export const scenarioTextMessageStartSchema = baseScenarioEventSchema.extend({
+  type: z.literal(ScenarioEventType.TEXT_MESSAGE_START),
+  messageId: z.string(),
+  role: z.string(),
+  messageIndex: z.number().optional(),
+});
+
+/**
+ * Scenario Text Message End Event Schema
+ * Emitted when a message is complete with full content. Persisted via event-sourcing.
+ */
+export const scenarioTextMessageEndSchema = baseScenarioEventSchema.extend({
+  type: z.literal(ScenarioEventType.TEXT_MESSAGE_END),
+  messageId: z.string(),
+  role: z.string(),
+  content: z.string().optional(),
+  message: z.record(z.unknown()).optional(),
+  traceId: z.string().optional(),
+  messageIndex: z.number().optional(),
+});
+
+/**
+ * Scenario Text Message Content Event Schema (broadcast only)
+ * Streaming delta for real-time UX, not persisted.
+ */
+export const scenarioTextMessageContentSchema = baseScenarioEventSchema.extend({
+  type: z.literal(ScenarioEventType.TEXT_MESSAGE_CONTENT),
+  messageId: z.string(),
+  delta: z.string(),
+});
+
+/**
+ * Scenario Tool Call Start Event Schema (broadcast only)
+ */
+export const scenarioToolCallStartSchema = baseScenarioEventSchema.extend({
+  type: z.literal(ScenarioEventType.TOOL_CALL_START),
+  toolCallId: z.string(),
+  toolCallName: z.string(),
+  parentMessageId: z.string().optional(),
+});
+
+/**
+ * Scenario Tool Call Args Event Schema (broadcast only)
+ */
+export const scenarioToolCallArgsSchema = baseScenarioEventSchema.extend({
+  type: z.literal(ScenarioEventType.TOOL_CALL_ARGS),
+  toolCallId: z.string(),
+  delta: z.string(),
+});
+
+/**
+ * Scenario Tool Call End Event Schema (broadcast only)
+ */
+export const scenarioToolCallEndSchema = baseScenarioEventSchema.extend({
+  type: z.literal(ScenarioEventType.TOOL_CALL_END),
+  toolCallId: z.string(),
+});
+
+/**
  * Scenario Event Union Schema
  * Discriminated union of all possible scenario event types.
  * Enables type-safe handling of different event types based on the 'type' field.
@@ -131,4 +193,10 @@ export const scenarioEventSchema = z.discriminatedUnion("type", [
   scenarioRunStartedSchema,
   scenarioRunFinishedSchema,
   scenarioMessageSnapshotSchema,
+  scenarioTextMessageStartSchema,
+  scenarioTextMessageEndSchema,
+  scenarioTextMessageContentSchema,
+  scenarioToolCallStartSchema,
+  scenarioToolCallArgsSchema,
+  scenarioToolCallEndSchema,
 ]);

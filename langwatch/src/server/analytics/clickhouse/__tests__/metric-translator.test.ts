@@ -208,13 +208,6 @@ describe("metric-translator", () => {
     });
 
     describe("sentiment metrics", () => {
-      it("translates sentiment.input_sentiment", () => {
-        const result = translateMetric("sentiment.input_sentiment", "avg", 0);
-        expect(result.selectExpression).toContain(
-          "langwatch.input.satisfaction_score"
-        );
-      });
-
       it("translates sentiment.thumbs_up_down", () => {
         const result = translateMetric("sentiment.thumbs_up_down", "sum", 0);
         expect(result.selectExpression).toContain("thumbs_up_down");

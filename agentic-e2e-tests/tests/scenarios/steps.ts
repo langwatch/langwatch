@@ -55,21 +55,18 @@ export async function givenIAmOnTheScenariosListPage(page: Page) {
 export async function givenIAmOnTheSimulationsPage(page: Page) {
   await page.goto("/");
 
-  // Wait for dashboard to load
-  await expect(
-    page.getByRole("heading", { name: /hello/i })
-  ).toBeVisible({ timeout: 15000 });
+  // Wait for the sidebar Home link to appear (indicates app is loaded)
+  const homeLink = page.getByRole("link", { name: "Home", exact: true });
+  await expect(homeLink).toBeVisible({ timeout: 30000 });
 
-  // Expand simulations submenu
-  const simulationsButton = page.getByRole("button", { name: /expand simulations/i });
-  await expect(simulationsButton).toBeVisible({ timeout: 5000 });
-  await simulationsButton.click();
+  const href = await homeLink.getAttribute("href");
+  const projectSlug = href?.replace(/^\//, "") || "";
 
-  // Click "Runs" link
-  const runsLink = page.getByRole("link", { name: "Runs", exact: true });
-  await expect(runsLink).toBeVisible({ timeout: 5000 });
-  await runsLink.click();
+  if (!projectSlug) {
+    throw new Error("Could not extract project slug from Home link");
+  }
 
+  await page.goto(`/${projectSlug}/simulations`);
   await expect(page).toHaveURL(/simulations/, { timeout: 10000 });
 }
 

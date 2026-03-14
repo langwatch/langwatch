@@ -122,7 +122,7 @@ export const usePostEvent = () => {
         // Process each event
         onEvent: (serverEvent) => {
           // Log the event
-          logger.info({ serverEvent, event }, "received message");
+          logger.debug({ serverEvent, event }, "received message");
 
           // Handle the event with the workflow store
           handleServerMessage(serverEvent);
@@ -182,10 +182,7 @@ export const useHandleServerMessage = ({
     setOptimizationState,
     checkIfUnreachableErrorMessage,
     stopWorkflowIfRunning,
-    setSelectedNode,
-    setPropertiesExpanded,
     setOpenResultsPanelRequest,
-    playgroundOpen,
   } = workflowStore;
 
   const alertOnError = useCallback((message: string | undefined) => {
@@ -223,13 +220,17 @@ export const useHandleServerMessage = ({
             clearTimeout(pythonDisconnectedTimeout);
             pythonDisconnectedTimeout = null;
           }
-          logger.info("python is alive, setting status to connected");
+          logger.debug("python is alive, setting status to connected");
           setSocketStatus("connected");
           break;
         case "component_state_change":
-          const currentComponentState = getWorkflow().nodes.find(
-            (node) => node.id === message.payload.component_id,
-          )?.data.execution_state;
+          logger.debug(
+            {
+              componentId: message.payload.component_id,
+              status: message.payload.execution_state?.status,
+            },
+            "component_state_change received",
+          );
           setComponentExecutionState(
             message.payload.component_id,
             message.payload.execution_state,
@@ -245,38 +246,45 @@ export const useHandleServerMessage = ({
             });
           }
 
-          if (
-            !playgroundOpen &&
-            message.payload.execution_state?.status !== "running" &&
-            currentComponentState?.status !== "success" &&
-            ((getWorkflow().state.execution?.status === "running" &&
-              getWorkflow().state.execution?.until_node_id ===
-                message.payload.component_id) ||
-              getWorkflow().state.execution?.status !== "running")
-          ) {
-            setSelectedNode(message.payload.component_id);
-            setPropertiesExpanded(true);
-          }
+          // Don't auto-open the drawer when execution completes —
+          // let the user open it themselves if they want to inspect results
           break;
         case "execution_state_change":
+          logger.debug(
+            { status: message.payload.execution_state?.status },
+            "execution_state_change received",
+          );
           setWorkflowExecutionState(message.payload.execution_state);
           if (message.payload.execution_state?.status === "error") {
             alertOnError(message.payload.execution_state.error);
             stopWorkflowIfRunning(message.payload.execution_state.error);
           }
           break;
-        case "evaluation_run_change":
-          const currentEvaluationRun = getWorkflow().state.evaluation;
-          setEvaluationState(message.payload.evaluation_run);
-          if (message.payload.evaluation_run?.status === "error") {
-            alertOnError(message.payload.evaluation_run.error);
-            if (currentEvaluationRun?.status !== "waiting") {
+        case "evaluation_state_change":
+        case "evaluation_run_change": {
+          const evaluationState =
+            message.type === "evaluation_state_change"
+              ? message.payload.evaluation_state
+              : message.payload.evaluation_run;
+          logger.debug(
+            {
+              status: evaluationState?.status,
+              progress: evaluationState?.progress,
+            },
+            `${message.type} received`,
+          );
+          const currentEvaluationState = getWorkflow().state.evaluation;
+          setEvaluationState(evaluationState);
+          if (evaluationState?.status === "error") {
+            alertOnError(evaluationState.error);
+            if (currentEvaluationState?.status !== "waiting") {
               setTimeout(() => {
                 setOpenResultsPanelRequest("evaluations");
               }, 500);
             }
           }
           break;
+        }
         case "optimization_state_change":
           const currentOptimizationState = getWorkflow().state.optimization;
           setOptimizationState(message.payload.optimization_state);
@@ -290,6 +298,10 @@ export const useHandleServerMessage = ({
           }
           break;
         case "error":
+          logger.error(
+            { message: message.payload.message },
+            "error event received from server",
+          );
           checkIfUnreachableErrorMessage(message.payload.message);
           stopWorkflowIfRunning(message.payload.message);
           alertOnError(message.payload.message);
@@ -297,6 +309,7 @@ export const useHandleServerMessage = ({
         case "debug":
           break;
         case "done":
+          logger.debug("stream completed (done event received)");
           break;
         default:
           toaster.create({
@@ -317,13 +330,10 @@ export const useHandleServerMessage = ({
       alertOnError,
       checkIfUnreachableErrorMessage,
       getWorkflow,
-      playgroundOpen,
       setComponentExecutionState,
       setEvaluationState,
       setOpenResultsPanelRequest,
       setOptimizationState,
-      setPropertiesExpanded,
-      setSelectedNode,
       setSocketStatus,
       setWorkflowExecutionState,
       stopWorkflowIfRunning,

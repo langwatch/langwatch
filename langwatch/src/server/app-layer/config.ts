@@ -14,6 +14,13 @@ export interface AppConfig {
 
   // Services
   langevalsEndpoint?: string;
+  baseHost?: string;
+  slackPlanLimitChannel?: string;
+  slackSignupsChannel?: string;
+  slackSubscriptionsChannel?: string;
+  hubspotPortalId?: string;
+  hubspotReachedLimitFormId?: string;
+  hubspotFormId?: string;
 
   // Event sourcing
   enableEventSourcing?: boolean;
@@ -49,6 +56,13 @@ export function createAppConfigFromEnv(overrides?: {
     redisUrl: env.REDIS_URL,
     redisClusterEndpoints: env.REDIS_CLUSTER_ENDPOINTS,
     langevalsEndpoint: env.LANGEVALS_ENDPOINT,
+    baseHost: env.BASE_HOST,
+    slackPlanLimitChannel: env.SLACK_PLAN_LIMIT_CHANNEL,
+    slackSignupsChannel: env.SLACK_CHANNEL_SIGNUPS,
+    slackSubscriptionsChannel: env.SLACK_CHANNEL_SUBSCRIPTIONS,
+    hubspotPortalId: env.HUBSPOT_PORTAL_ID,
+    hubspotReachedLimitFormId: env.HUBSPOT_REACHED_LIMIT_FORM_ID,
+    hubspotFormId: env.HUBSPOT_FORM_ID,
     enableEventSourcing: env.ENABLE_EVENT_SOURCING,
     processRole: overrides?.processRole,
     isSaas: env.IS_SAAS,

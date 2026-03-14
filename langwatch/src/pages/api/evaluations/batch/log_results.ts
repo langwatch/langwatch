@@ -511,17 +511,12 @@ const dispatchToClickHouse = async (
       const targetId = evaluation.target_id ?? "";
       const evaluationId = `local_eval_${runId}_${evaluation.evaluator}_${evaluation.index}_${targetId}`;
       try {
-        await app.evaluations.startEvaluation({
+        await app.evaluations.reportEvaluation({
           tenantId: project.id,
           evaluationId,
           evaluatorId: evaluation.evaluator,
           evaluatorType: evaluation.evaluator,
           evaluatorName: evaluation.name ?? undefined,
-          occurredAt: Date.now(),
-        });
-        await app.evaluations.completeEvaluation({
-          tenantId: project.id,
-          evaluationId,
           status: evaluation.status,
           score: typeof evaluation.score === 'number' ? evaluation.score : undefined,
           passed: evaluation.passed ?? undefined,

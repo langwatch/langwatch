@@ -56,7 +56,7 @@ export function LabelFilterDropdown({
                   onClick={() => onToggle(label)}
                 >
                   <Checkbox checked={activeLabels.includes(label)} />
-                  <Text fontSize="sm">#{label}</Text>
+                  <Text fontSize="sm">{label}</Text>
                 </HStack>
               ))}
             </VStack>

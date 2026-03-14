@@ -4,7 +4,6 @@ import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
 import { getLangWatchTracer } from "langwatch";
 import { type NextRequest, NextResponse } from "next/server";
-import { notifyPlanLimitReached } from "../../../../../../ee/billing";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
 import { withAppRouterTracer } from "../../../../../middleware/app-router-tracer";
@@ -90,14 +89,20 @@ async function handleTracesRequest(req: NextRequest) {
             const activePlan = await getApp().planProvider.getActivePlan({
               organizationId: project.team.organizationId,
             });
-            await notifyPlanLimitReached({
+
+            getApp().usageLimits.notifyPlanLimitReached({
               organizationId: project.team.organizationId,
               planName: activePlan.name ?? "free",
+            }).catch(error => {
+              logger.error(
+              { error, projectId: project.id },
+              "Error sending plan limit notification",
+            );
             });
           } catch (error) {
             logger.error(
               { error, projectId: project.id },
-              "Error sending plan limit notification",
+              "Error getting active plan information",
             );
           }
           logger.info(
@@ -186,13 +191,15 @@ async function handleTracesRequest(req: NextRequest) {
       }
 
       // For ClickHouse, ingest raw OTEL spans directly (bypasses otel.traces.ts transformation)
-      let clickHouseTask: Promise<void> | null = null;
       if (project.featureEventSourcingTraceIngestion) {
-        clickHouseTask = getApp().traces.collection.handleOtlpTraceRequest(
+        await getApp().traces.collection.handleOtlpTraceRequest(
           project.id,
           traceRequest,
           project.piiRedactionLevel,
         );
+      }
+      if (project.disableElasticSearchTraceWriting) {
+        return NextResponse.json({ message: "Trace received successfully." });
       }
 
       const tracesForCollection =
@@ -265,13 +272,6 @@ async function handleTracesRequest(req: NextRequest) {
       );
 
       if (promises.length === 0) {
-        if (clickHouseTask) {
-          try {
-            await clickHouseTask;
-          } catch {
-            /* ignore, errors non-blocking and caught by tracing layer */
-          }
-        }
         return NextResponse.json({ message: "No changes" });
       }
 
@@ -282,14 +282,6 @@ async function handleTracesRequest(req: NextRequest) {
           await Promise.all(promises);
         },
       );
-
-      if (clickHouseTask) {
-        try {
-          await clickHouseTask;
-        } catch {
-          /* ignore, errors non-blocking and caught by tracing layer */
-        }
-      }
 
       return NextResponse.json({ message: "Trace received successfully." });
     },

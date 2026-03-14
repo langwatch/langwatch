@@ -41,7 +41,7 @@ describe("<GroupRow/>", () => {
   });
 
   describe("when viewing the header", () => {
-    it("displays passed and failed counts alongside run count", () => {
+    it("displays word-label counts alongside run count", () => {
       render(
         <GroupRow
           group={makeGroup()}
@@ -59,7 +59,7 @@ describe("<GroupRow/>", () => {
       expect(screen.getByText("1 failed")).toBeInTheDocument();
     });
 
-    it("displays summary status label with scenario count", () => {
+    it("displays word labels for status counts", () => {
       render(
         <GroupRow
           group={makeGroup()}
@@ -72,7 +72,8 @@ describe("<GroupRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("failed (4/5)")).toBeInTheDocument();
+      expect(screen.getByText("4 passed")).toBeInTheDocument();
+      expect(screen.getByText("1 failed")).toBeInTheDocument();
     });
   });
 

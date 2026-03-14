@@ -9,10 +9,10 @@
   "dependencies": {
     "@bull-board/api": "^6.20.2",
     "@bull-board/hono": "^6.20.2",
-    "@hono/node-server": "^1.19.9",
+    "@hono/node-server": "^1.19.11",
     "bullmq": "^5.70.1",
     "dotenv": "^17.3.1",
-    "hono": "^4.12.2",
+    "hono": "^4.12.7",
     "ioredis": "^5.9.3"
   },
   "devDependencies": {

@@ -138,12 +138,7 @@ services:
     command: >
       sh -c "
         corepack enable &&
-        if [ ! -f /usr/local/bin/goose ]; then
-          ARCH=$$(uname -m | sed 's/aarch64/arm64/' | sed 's/x86_64/amd64/') &&
-          curl -fsSL https://github.com/pressly/goose/releases/download/v3.24.1/goose_linux_$${ARCH} -o /usr/local/bin/goose &&
-          chmod +x /usr/local/bin/goose;
-        fi &&
-        pnpm run start:prepare:db &&
+        SKIP_CLICKHOUSE_MIGRATE=true SKIP_ELASTIC_MIGRATE=true pnpm run start:prepare:db &&
         pnpm run start:app
       "
     ports:
@@ -305,14 +300,14 @@ services:
 
 volumes:
   db-data:
-    name: langwatch-db-data # Shared across all worktrees
+    name: ${VOLUME_PREFIX:-langwatch}-db-data
   redis-data:
-    name: langwatch-redis-data # Shared across all worktrees
+    name: ${VOLUME_PREFIX:-langwatch}-redis-data
   opensearch-data:
-    name: langwatch-opensearch-data # Shared across all worktrees
+    name: ${VOLUME_PREFIX:-langwatch}-opensearch-data
   app_modules:
-    name: langwatch-app-modules # Shared across all worktrees
+    name: ${VOLUME_PREFIX:-langwatch}-app-modules
   pnpm_store:
-    name: langwatch-pnpm-store # Shared across all worktrees
+    name: langwatch-pnpm-store # Always shared (cache only)
   bullboard_modules:
-    name: langwatch-bullboard-modules # Shared across all worktrees
+    name: ${VOLUME_PREFIX:-langwatch}-bullboard-modules

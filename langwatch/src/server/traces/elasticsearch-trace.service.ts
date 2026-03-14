@@ -22,6 +22,10 @@ import type {
   LLMSpan,
   Trace,
 } from "~/server/tracer/types";
+import {
+  LLM_PARAMETER_MAP,
+  KNOWN_PARAM_ALIASES,
+} from "~/prompts/prompt-playground/llmParameterMap";
 import type {
   AggregationFiltersInput,
   CustomersAndLabelsResult,
@@ -31,6 +35,7 @@ import type {
   TopicCountsResult,
   TracesForProjectResult,
 } from "./types";
+import { parsePromptReference } from "./parsePromptReference";
 
 /**
  * Service for fetching traces from Elasticsearch.
@@ -171,6 +176,19 @@ export class ElasticsearchTraceService {
     const { pivotIndexConditions } = generateTracesPivotQueryConditions({
       ...input,
     });
+
+    // Add updatedAt filter to only return traces modified since a given timestamp
+    if (input.updatedAt !== undefined && input.updatedAt > 0) {
+      const must = (pivotIndexConditions.bool as { must: unknown[] }).must;
+      must.push({
+        range: {
+          "timestamps.updated_at": {
+            gte: input.updatedAt,
+            format: "epoch_millis",
+          },
+        },
+      });
+    }
 
     let pageSize = input.pageSize ?? 25;
     const pageOffset = input.pageOffset ?? 0;
@@ -478,7 +496,50 @@ export class ElasticsearchTraceService {
       return null;
     }
 
-    return this.extractPromptStudioData(trace, span as LLMSpan);
+    const result = this.extractPromptStudioData(trace, span as LLMSpan);
+
+    // If the LLM span itself doesn't have a prompt reference,
+    // walk up ancestor spans to find it (SDK sets it on the parent span)
+    if (!result.promptHandle) {
+      const ancestorRef = this.findPromptRefFromTraceAncestors(trace, spanId);
+      if (ancestorRef) {
+        result.promptHandle = ancestorRef.promptHandle;
+        result.promptVersionNumber = ancestorRef.promptVersionNumber;
+        result.promptVariables = ancestorRef.promptVariables;
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Walk up parent spans in an ES trace to find the nearest ancestor
+   * with a prompt reference. Used when the LLM span itself doesn't have one.
+   */
+  private findPromptRefFromTraceAncestors(
+    trace: Trace,
+    spanId: string,
+  ): ReturnType<typeof parsePromptReference> | null {
+    const allSpans = trace.spans ?? [];
+    const spanMap = new Map(allSpans.map((s) => [s.span_id, s]));
+    const target = spanMap.get(spanId);
+    if (!target) return null;
+
+    const visited = new Set<string>([spanId]);
+    let currentId: string | null | undefined = target.parent_id;
+    while (currentId) {
+      if (visited.has(currentId)) break;
+      visited.add(currentId);
+
+      const parent = spanMap.get(currentId);
+      if (!parent) break;
+
+      const ref = parsePromptReference(parent.params ?? {});
+      if (ref.promptHandle) return ref;
+
+      currentId = parent.parent_id;
+    }
+    return null;
   }
 
   /**
@@ -530,42 +591,63 @@ export class ElasticsearchTraceService {
       messages.push({ role: "assistant", content });
     }
 
-    // Extract LLM config
+    // Extract LLM config dynamically from the parameter map
     const params = span.params ?? {};
     const systemPrompt = messages.find((m) => m.role === "system")?.content;
-    const litellmParams: Record<string, unknown> = {};
 
-    const excludeKeys = new Set([
-      "temperature",
-      "max_tokens",
-      "maxTokens",
-      "top_p",
-      "topP",
-      "_keys",
-    ]);
-    for (const [key, value] of Object.entries(params)) {
-      if (!excludeKeys.has(key)) {
-        litellmParams[key] = value;
+    const llmConfig: PromptStudioSpanResult["llmConfig"] = {
+      model: span.model ?? null,
+      systemPrompt,
+      temperature: null,
+      maxTokens: null,
+      topP: null,
+      frequencyPenalty: null,
+      presencePenalty: null,
+      seed: null,
+      topK: null,
+      minP: null,
+      repetitionPenalty: null,
+      reasoning: null,
+      verbosity: null,
+      litellmParams: {},
+    };
+
+    for (const param of LLM_PARAMETER_MAP) {
+      // First matching alias wins
+      for (const alias of param.traceAliases) {
+        if (alias in params && params[alias] != null) {
+          (llmConfig as Record<string, unknown>)[param.formField] =
+            params[alias];
+          break;
+        }
       }
     }
+
+    // Collect unknown params into litellmParams
+    const excludeKeys = new Set([...KNOWN_PARAM_ALIASES, "_keys"]);
+    for (const [key, value] of Object.entries(params)) {
+      if (!excludeKeys.has(key)) {
+        llmConfig.litellmParams[key] = value;
+      }
+    }
+
+    // ES legacy format does not carry OTel attributes for prompt reference;
+    // parsePromptReference on params gives best-effort extraction from params
+    const promptRef = parsePromptReference(params);
 
     return {
       spanId: span.span_id,
       traceId: trace.trace_id,
       spanName: span.name ?? null,
       messages,
-      llmConfig: {
-        model: span.model ?? null,
-        systemPrompt,
-        temperature: (params.temperature as number) ?? null,
-        maxTokens: ((params.max_tokens ?? params.maxTokens) as number) ?? null,
-        topP: ((params.top_p ?? params.topP) as number) ?? null,
-        litellmParams,
-      },
+      llmConfig,
       vendor: span.vendor ?? null,
       error: span.error ?? null,
       timestamps: span.timestamps,
       metrics: span.metrics ?? null,
+      promptHandle: promptRef.promptHandle,
+      promptVersionNumber: promptRef.promptVersionNumber,
+      promptVariables: promptRef.promptVariables,
     };
   }
 

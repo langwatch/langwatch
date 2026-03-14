@@ -10,10 +10,10 @@ Specialized Claude personas with defined workflows. Agents run in isolated conte
 | `repo-sherpa` | Documentation, DX, meta-layer ownership | `/sherpa` skill |
 | `uncle-bob-reviewer` | SOLID/Clean Code review | `/review` skill |
 | `devils-advocate` | Stress-test proposals, plans, and architecture decisions | `/challenge` skill |
-| `playwright-test-planner` | Creates test plans by exploring the live app | `/e2e` skill (via Task) |
-| `playwright-test-generator` | Generates Playwright tests from plans | `/e2e` skill (via Task) |
-| `playwright-test-healer` | Debugs and fixes failing tests | `/e2e` skill (via Task) |
-| `test-reviewer` | Reviews tests for quality, pyramid placement, and maintainability | `/e2e` skill (via Task) |
+| `playwright-test-planner` | Creates test plans by exploring the live app | Ad-hoc (via Task) |
+| `playwright-test-generator` | Generates Playwright tests from plans | Ad-hoc (via Task) |
+| `playwright-test-healer` | Debugs and fixes failing tests | Ad-hoc (via Task) |
+| `test-reviewer` | Reviews tests for quality, pyramid placement, and maintainability | `/review` skill |
 
 ## How Agents Are Invoked
 
@@ -42,6 +42,6 @@ Do not explain standard concepts - agents already know them.
 
 ## Related
 
-- `.claude/skills/` - Skills that invoke agents (`code`, `review`, `sherpa`, `challenge`, `e2e`)
+- `.claude/skills/` - Skills that invoke agents (`code`, `review`, `sherpa`, `challenge`, `browser-test`)
 - `.claude/README.md` - Full orchestration system documentation
-- `agentic-e2e-tests/README.md` - E2E test conventions and setup
+- `docs/adr/010-e2e-testing-strategy.md` - Why browser verification replaced E2E test generation

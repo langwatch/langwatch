@@ -8,6 +8,8 @@ import type { OrganizationService } from "./organizations/organization.service";
 import type { ProjectService } from "./projects/project.service";
 import type { LogRecordStorageService } from "./traces/log-record-storage.service";
 import type { MetricRecordStorageService } from "./traces/metric-record-storage.service";
+import type { SimulationRunService } from "./simulations/simulation-run.service";
+import type { SuiteRunService } from "./suites/suite-run.service";
 import type { SpanStorageService } from "./traces/span-storage.service";
 import type { TokenizerService } from "./traces/tokenizer.service";
 import type { LogRequestCollectionService } from "./traces/log-request-collection.service";
@@ -16,6 +18,8 @@ import type { TraceRequestCollectionService } from "./traces/trace-request-colle
 import type { TraceSummaryService } from "./traces/trace-summary.service";
 import type { PlanProvider } from "./subscription/plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
+import type { NotificationService } from "../../../ee/billing/notifications/notification.service";
+import type { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
 import type { UsageService } from "./usage/usage.service";
 
 export interface AppDependencies {
@@ -36,12 +40,20 @@ export interface AppDependencies {
     runs: EvaluationRunService;
     execution: EvaluationExecutionService;
   };
+  simulations: {
+    runs: SimulationRunService;
+  };
+  suiteRuns: {
+    runs: SuiteRunService;
+  };
   organizations: OrganizationService;
   projects: ProjectService;
   tokenizer: TokenizerService;
   usage: UsageService;
   planProvider: PlanProvider;
   subscription?: SubscriptionService;
+  notifications: NotificationService;
+  usageLimits: UsageLimitService;
   commands: AppCommands;
 
   /** Internal — keeps EventSourcing infrastructure alive for GC. */

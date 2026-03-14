@@ -27,7 +27,11 @@ import {
   LATEST_SCHEMA_VERSION,
   type LatestConfigVersionSchema,
 } from "./repositories/llm-config-version-schema";
-import { transformCamelToSnake } from "./transformToDbFormat";
+import { mergeAutoDetectedInputs } from "./mergeAutoDetectedInputs";
+import {
+  transformCamelToSnake,
+  transformSnakeToCamel,
+} from "./transformToDbFormat";
 
 // Extract the configData type from the schema
 type ConfigData = z.infer<
@@ -636,6 +640,16 @@ export class PromptService {
       commitMessage,
     } = params;
 
+    // Must run before comparison/creation so both code paths use the merged inputs.
+    const resolvedConfigData = {
+      ...localConfigData,
+      inputs: mergeAutoDetectedInputs({
+        prompt: localConfigData.prompt,
+        messages: localConfigData.messages ?? [],
+        inputs: localConfigData.inputs ?? [],
+      }),
+    };
+
     // Check if prompt exists on server
     const existingPrompt = await this.getPromptByIdOrHandle({
       idOrHandle,
@@ -645,6 +659,14 @@ export class PromptService {
 
     // Case 1: Prompt doesn't exist on server - create new
     if (!existingPrompt) {
+      // Convert snake_case resolvedConfigData to camelCase for createPrompt,
+      // which internally calls transformToDbFormat. Without this conversion,
+      // snake_case keys like max_tokens would be invisible to createPrompt's
+      // named params (maxTokens), causing data loss.
+      const camelCaseData = transformSnakeToCamel(
+        resolvedConfigData as unknown as Record<string, unknown>,
+      );
+
       const createdPrompt = await this.createPrompt({
         handle: idOrHandle,
         projectId,
@@ -652,7 +674,7 @@ export class PromptService {
         scope: "PROJECT" as PromptScope,
         authorId,
         commitMessage: commitMessage ?? "Synced from local file",
-        ...this.transformToDbFormat(localConfigData),
+        ...camelCaseData,
       });
 
       return {
@@ -669,20 +691,61 @@ export class PromptService {
     });
 
     const remoteVersion = existingPrompt.version;
+
+    // Build remoteConfigData with ALL fields the schema expects.
+    // Only include optional sampling parameters when they are defined
+    // to avoid introducing false diffs from undefined values.
     const remoteConfigData: LatestConfigVersionSchema["configData"] = {
       model: existingPrompt.model,
-      temperature: existingPrompt.temperature,
       prompt: existingPrompt.prompt,
       messages: existingPrompt.messages.filter((msg) => msg.role !== "system"),
-      inputs: existingPrompt.inputs,
+      inputs: [...existingPrompt.inputs].sort((a, b) => {
+        if (a.identifier === "input") return -1;
+        if (b.identifier === "input") return 1;
+        return a.identifier.localeCompare(b.identifier);
+      }),
       outputs: existingPrompt.outputs,
       // response_format is derived from outputs, not stored separately
+      // Include all sampling parameters only when defined
+      ...(existingPrompt.temperature !== undefined && {
+        temperature: existingPrompt.temperature,
+      }),
+      ...(existingPrompt.maxTokens !== undefined && {
+        max_tokens: existingPrompt.maxTokens,
+      }),
+      ...(existingPrompt.topP !== undefined && {
+        top_p: existingPrompt.topP,
+      }),
+      ...(existingPrompt.frequencyPenalty !== undefined && {
+        frequency_penalty: existingPrompt.frequencyPenalty,
+      }),
+      ...(existingPrompt.presencePenalty !== undefined && {
+        presence_penalty: existingPrompt.presencePenalty,
+      }),
+      ...(existingPrompt.seed !== undefined && {
+        seed: existingPrompt.seed,
+      }),
+      ...(existingPrompt.topK !== undefined && {
+        top_k: existingPrompt.topK,
+      }),
+      ...(existingPrompt.minP !== undefined && {
+        min_p: existingPrompt.minP,
+      }),
+      ...(existingPrompt.repetitionPenalty !== undefined && {
+        repetition_penalty: existingPrompt.repetitionPenalty,
+      }),
+      ...(existingPrompt.reasoning !== undefined && {
+        reasoning: existingPrompt.reasoning,
+      }),
+      ...(existingPrompt.verbosity !== undefined && {
+        verbosity: existingPrompt.verbosity,
+      }),
     };
 
     // Case 2: Same version - check content
     if (localVersion === remoteVersion) {
       const comparison = this.repository.compareConfigContent(
-        localConfigData,
+        resolvedConfigData,
         remoteConfigData,
       );
 
@@ -697,7 +760,7 @@ export class PromptService {
           data: {
             authorId,
             commitMessage: commitMessage ?? "Updated from local file",
-            ...this.transformToDbFormat(localConfigData),
+            ...this.transformToDbFormat(resolvedConfigData),
             schemaVersion: SchemaVersion.V1_0,
           },
         });
@@ -721,7 +784,7 @@ export class PromptService {
 
       if (localBaseVersion) {
         const baseComparison = this.repository.compareConfigContent(
-          localConfigData,
+          resolvedConfigData,
           localBaseVersion.configData as Record<string, unknown>,
         );
 
@@ -739,7 +802,7 @@ export class PromptService {
           remoteVersion,
           differences:
             this.repository.compareConfigContent(
-              localConfigData,
+              resolvedConfigData,
               remoteConfigData,
             ).differences ?? [],
           remoteConfigData,
@@ -755,7 +818,7 @@ export class PromptService {
         remoteVersion,
         differences:
           this.repository.compareConfigContent(
-            localConfigData,
+            resolvedConfigData,
             remoteConfigData,
           ).differences ?? [],
         remoteConfigData,
