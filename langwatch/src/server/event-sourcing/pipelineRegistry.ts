@@ -152,14 +152,14 @@ export class PipelineRegistry {
       this.deps.traces.summary.repository,
     );
 
-    // Deferred evaluation scheduling: uses a Map for dedup and setTimeout for delay.
-    // The deferred handler re-reads fold state from the projection store at execution time.
-    const pendingDeferredChecks = new Map<string, ReturnType<typeof setTimeout>>();
-
     // Late-bound reference to the trace pipeline's resolveOrigin command.
     // The reactor deps closure captures this; the actual dispatcher is set
     // after pipeline registration (same pattern as billing self-dispatch).
     let resolveOriginDispatcher: ((data: any) => Promise<void>) | null = null;
+
+    // Late-bound reference to the deferred evaluation queue.
+    // Set after pipeline registration, same pattern as resolveOriginDispatcher.
+    let scheduleDeferredDispatcher: ((payload: DeferredEvaluationPayload) => Promise<void>) | null = null;
 
     const evaluationTriggerReactorDeps = {
       monitors: this.deps.monitors,
@@ -172,28 +172,10 @@ export class PipelineRegistry {
       },
       traceSummaryStore,
       scheduleDeferred: async (payload: DeferredEvaluationPayload) => {
-        const dedupKey = makeDeferredJobId(payload);
-        if (pendingDeferredChecks.has(dedupKey)) return; // already scheduled
-
-        const handler = createDeferredEvaluationHandler(evaluationTriggerReactorDeps);
-        const timer = setTimeout(async () => {
-          pendingDeferredChecks.delete(dedupKey);
-          try {
-            await handler(payload);
-          } catch (error) {
-            logger.error(
-              { tenantId: payload.tenantId, traceId: payload.traceId, error },
-              "Deferred evaluation check failed",
-            );
-          }
-        }, DEFERRED_CHECK_DELAY_MS);
-
-        // Allow Node to exit even if the timer is pending
-        if (typeof timer === "object" && "unref" in timer) {
-          timer.unref();
+        if (!scheduleDeferredDispatcher) {
+          throw new Error("scheduleDeferred dispatcher not yet initialized — pipeline registration order issue");
         }
-
-        pendingDeferredChecks.set(dedupKey, timer);
+        return scheduleDeferredDispatcher(payload);
       },
     };
 
@@ -242,6 +224,50 @@ export class PipelineRegistry {
     // Wire the late-bound resolveOrigin dispatcher now that the pipeline is registered
     const traceCommands = mapCommands(tracePipeline.commands);
     resolveOriginDispatcher = traceCommands.resolveOrigin;
+
+    // Wire the deferred evaluation queue (BullMQ-backed, survives process restart)
+    const deferredHandler = createDeferredEvaluationHandler(evaluationTriggerReactorDeps);
+    const deferredEvalQueue = tracePipeline.service.registerJob<DeferredEvaluationPayload>({
+      name: "deferredEvaluation",
+      process: deferredHandler,
+      delay: DEFERRED_CHECK_DELAY_MS,
+      deduplication: {
+        makeId: makeDeferredJobId,
+        extend: false,  // Don't reset the 5-min timer on new spans
+        replace: false,
+      },
+      spanAttributes: (payload) => ({
+        "deferred.tenant_id": payload.tenantId,
+        "deferred.trace_id": payload.traceId,
+      }),
+    });
+
+    if (deferredEvalQueue) {
+      scheduleDeferredDispatcher = (payload) => deferredEvalQueue.send(payload);
+    } else {
+      // Fallback: event sourcing disabled, use in-memory setTimeout (best-effort)
+      const pendingDeferredChecks = new Map<string, ReturnType<typeof setTimeout>>();
+      scheduleDeferredDispatcher = async (payload: DeferredEvaluationPayload) => {
+        const dedupKey = makeDeferredJobId(payload);
+        if (pendingDeferredChecks.has(dedupKey)) return;
+        const handler = createDeferredEvaluationHandler(evaluationTriggerReactorDeps);
+        const timer = setTimeout(async () => {
+          pendingDeferredChecks.delete(dedupKey);
+          try {
+            await handler(payload);
+          } catch (error) {
+            logger.error(
+              { tenantId: payload.tenantId, traceId: payload.traceId, error },
+              "Deferred evaluation check failed",
+            );
+          }
+        }, DEFERRED_CHECK_DELAY_MS);
+        if (typeof timer === "object" && "unref" in timer) {
+          timer.unref();
+        }
+        pendingDeferredChecks.set(dedupKey, timer);
+      };
+    }
 
     return tracePipeline;
   }

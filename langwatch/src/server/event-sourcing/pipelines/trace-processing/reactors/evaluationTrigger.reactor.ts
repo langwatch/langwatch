@@ -19,11 +19,11 @@ const logger = createLogger(
 /** Delay (ms) before the deferred evaluation check fires */
 const DEFERRED_CHECK_DELAY_MS = 5 * 60 * 1000; // 5 minutes
 
-export interface DeferredEvaluationPayload {
+export type DeferredEvaluationPayload = {
   tenantId: string;
   traceId: string;
   occurredAt: number;
-}
+};
 
 export interface EvaluationTriggerReactorDeps {
   monitors: MonitorService;
@@ -34,25 +34,19 @@ export interface EvaluationTriggerReactorDeps {
 }
 
 /**
- * Resolves the origin of a trace from its fold state attributes.
+ * Reads the resolved origin from the fold state attributes.
+ *
+ * By the time the reactor fires, the fold projection has already resolved
+ * origin from: explicit span attributes → legacy markers → SDK heuristic.
+ * The only case where origin is still absent is pure OTEL traces with no
+ * LangWatch SDK info — those need a 5-min deferred check.
  *
  * Returns:
- * - The explicit origin string when `langwatch.origin` is set
- * - `"application"` when no origin but `sdk.name` is present (old SDK heuristic)
- * - `null` when no origin and no SDK info (needs deferred check)
+ * - The origin string when `langwatch.origin` is set (explicit or inferred by fold)
+ * - `null` when no origin could be determined (needs deferred check)
  */
 export function resolveOrigin(attrs: Record<string, string>): string | null {
-  const origin = attrs["langwatch.origin"];
-  if (origin) return origin;
-
-  // SDK heuristic: if sdk.name is present, this is an old SDK trace
-  // that doesn't set explicit origin. Old SDK evaluations/simulations
-  // are already tagged via legacy inference, so untagged = application.
-  const sdkName = attrs["sdk.name"];
-  if (sdkName) return "application";
-
-  // No origin and no SDK info: cannot determine yet
-  return null;
+  return attrs["langwatch.origin"] ?? null;
 }
 
 export function createEvaluationTriggerReactor(
@@ -85,12 +79,12 @@ export function createEvaluationTriggerReactor(
       const resolvedOrigin = resolveOrigin(attrs);
 
       if (resolvedOrigin === null) {
-        // No origin and no SDK info: schedule deferred check.
-        // We can't dispatch yet because precondition matchers need
-        // a concrete origin value — empty means "pending".
+        // No origin even after fold projection ran all heuristics (explicit,
+        // legacy markers, SDK heuristic). This is a pure OTEL trace with no
+        // LangWatch SDK info — schedule a deferred check.
         logger.debug(
           { tenantId, traceId },
-          "No origin or SDK info, scheduling deferred evaluation check",
+          "No origin resolved, scheduling deferred evaluation check",
         );
         await deps.scheduleDeferred({
           tenantId,
@@ -100,20 +94,7 @@ export function createEvaluationTriggerReactor(
         return;
       }
 
-      // If origin was inferred (not explicitly set), persist it via event sourcing.
-      const explicitOrigin = attrs["langwatch.origin"];
-      if (!explicitOrigin) {
-        await deps.resolveOrigin({
-          tenantId,
-          traceId,
-          origin: resolvedOrigin,
-          reason: "sdk_heuristic",
-          occurredAt: event.occurredAt,
-        });
-      }
-
-      // Origin is known (explicit or inferred via SDK heuristic).
-      // Dispatch to monitors immediately — don't wait for the origin event to be processed.
+      // Origin is known — dispatch to monitors, precondition matchers filter by origin.
       await dispatchEvaluations({ deps, tenantId, traceId, foldState, occurredAt: event.occurredAt });
     },
   };

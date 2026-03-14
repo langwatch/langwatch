@@ -95,30 +95,17 @@ function createDeps(
 
 describe("resolveOrigin()", () => {
   describe("when langwatch.origin is set", () => {
-    it("returns the explicit origin", () => {
+    it("returns the origin", () => {
       expect(resolveOrigin({ "langwatch.origin": "application" })).toBe("application");
       expect(resolveOrigin({ "langwatch.origin": "evaluation" })).toBe("evaluation");
       expect(resolveOrigin({ "langwatch.origin": "simulation" })).toBe("simulation");
     });
   });
 
-  describe("when langwatch.origin is absent but sdk.name is present", () => {
-    it("infers 'application' from old SDK heuristic", () => {
-      expect(resolveOrigin({ "sdk.name": "langwatch" })).toBe("application");
-    });
-  });
-
-  describe("when both langwatch.origin and sdk.name are absent", () => {
-    it("returns null (undetermined)", () => {
+  describe("when langwatch.origin is absent", () => {
+    it("returns null (fold projection handles all heuristics before reactor)", () => {
       expect(resolveOrigin({})).toBeNull();
-    });
-  });
-
-  describe("when langwatch.origin is set and sdk.name is also present", () => {
-    it("returns the explicit origin (origin takes precedence)", () => {
-      expect(
-        resolveOrigin({ "langwatch.origin": "evaluation", "sdk.name": "langwatch" }),
-      ).toBe("evaluation");
+      expect(resolveOrigin({ "sdk.name": "langwatch" })).toBeNull();
     });
   });
 });
@@ -205,12 +192,13 @@ describe("evaluationTrigger reactor", () => {
     });
   });
 
-  describe("when trace has no origin but sdk.name is present (old SDK)", () => {
-    it("infers application and dispatches evaluation commands", async () => {
+  describe("when old SDK trace has origin inferred by fold projection", () => {
+    it("dispatches evaluation commands (fold projection already set origin)", async () => {
       const deps = createDeps();
       const reactor = createEvaluationTriggerReactor(deps);
+      // Fold projection already set langwatch.origin = "application" from sdk.name heuristic
       const state = createFoldState({
-        attributes: { "sdk.name": "langwatch" },
+        attributes: { "sdk.name": "langwatch", "langwatch.origin": "application" },
       });
 
       await reactor.handle(createEvent(), createContext(state));
@@ -220,22 +208,16 @@ describe("evaluationTrigger reactor", () => {
       expect(deps.scheduleDeferred).not.toHaveBeenCalled();
     });
 
-    it("dispatches resolveOrigin command with reason 'sdk_heuristic'", async () => {
+    it("does not dispatch resolveOrigin command (fold projection handled it)", async () => {
       const deps = createDeps();
       const reactor = createEvaluationTriggerReactor(deps);
       const state = createFoldState({
-        attributes: { "sdk.name": "langwatch" },
+        attributes: { "sdk.name": "langwatch", "langwatch.origin": "application" },
       });
 
       await reactor.handle(createEvent(), createContext(state));
 
-      expect(deps.resolveOrigin).toHaveBeenCalledWith({
-        tenantId: "tenant-1",
-        traceId: "trace-1",
-        origin: "application",
-        reason: "sdk_heuristic",
-        occurredAt: expect.any(Number),
-      });
+      expect(deps.resolveOrigin).not.toHaveBeenCalled();
     });
   });
 

@@ -11,7 +11,7 @@ import type { AggregateType } from "../domain/aggregateType";
 import type { Event, Projection } from "../domain/types";
 import type { ProjectionRegistry } from "../projections/projectionRegistry";
 import { ProjectionRouter } from "../projections/projectionRouter";
-import type { EventSourcedQueueProcessor } from "../queues";
+import type { DeduplicationConfig, EventSourcedQueueProcessor } from "../queues";
 import type { JobRegistryEntry } from "./queues/queueManager";
 import type {
   EventStore,
@@ -334,6 +334,23 @@ export class EventSourcingService<
    */
   getCommandQueues(): Map<string, EventSourcedQueueProcessor<any>> {
     return this.queueManager.getCommandQueues();
+  }
+
+  /**
+   * Registers a standalone job in the global queue.
+   *
+   * Returns `null` when the global queue is not available (event sourcing disabled).
+   */
+  registerJob<P extends Record<string, unknown>>(config: {
+    name: string;
+    process: (payload: P) => Promise<void>;
+    delay?: number;
+    deduplication?: DeduplicationConfig<P>;
+    groupKeyFn?: (payload: P) => string;
+    scoreFn?: (payload: P) => number;
+    spanAttributes?: (payload: P) => Record<string, string | number | boolean>;
+  }): EventSourcedQueueProcessor<P> | null {
+    return this.queueManager.registerJob<P>(config);
   }
 
   /**

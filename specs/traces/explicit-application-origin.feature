@@ -19,12 +19,14 @@ Feature: Explicit application origin for race condition prevention
   #      for regular traces (NOT experiments), making 95%+ unambiguous
   #   2. Empty origin = pending (not application) — the reactor and
   #      precondition matcher stop treating empty as "application"
-  #   3. Smart deferred evaluation via single reactor with two phases:
-  #      - Phase 1 (normal debounce): if origin is set, proceed. If empty
-  #        but SDK info is present → infer "application" (old SDK). If empty
-  #        and no SDK info → schedule deferred check.
-  #      - Phase 2 (5-min deferred): re-read fold state from store, then
-  #        apply the same logic. Handles pure OTEL exporters.
+  #   3. Origin inference in the fold projection:
+  #      - Explicit langwatch.origin attribute → use it (new SDK)
+  #      - Legacy markers (instrumentationScope, metadata.platform, etc.) → infer
+  #      - SDK heuristic: sdk.name present but no origin → "application" (old SDK)
+  #      All three run on every span arrival, no delay needed.
+  #   4. Deferred fallback for pure OTEL traces (no SDK info, no origin):
+  #      The reactor schedules a 5-min deferred check. On fire, re-read fold
+  #      state from projection store. If still empty → "application".
   #
   # SDK version heuristic:
   #   All spans from a LangWatch SDK carry telemetry.sdk.name in resource
@@ -107,15 +109,18 @@ Feature: Explicit application origin for race condition prevention
     Because origin filtering is handled by precondition matchers, not the reactor
 
   # --- SDK version heuristic for old SDK backward compat ---
+  # The fold projection infers origin = "application" when sdk.name is present
+  # but no explicit origin or legacy markers exist. By the time the reactor
+  # fires, the fold state already has langwatch.origin set.
 
   @unit
-  Scenario: Evaluation trigger infers application for old SDK traces
+  Scenario: Fold projection infers application origin for old SDK traces
     Given an online evaluation monitor is enabled for the project
-    And a trace arrives where the fold state has no langwatch.origin
-    And the fold state has sdk.name = "langwatch" (old SDK without explicit origin)
-    When the evaluation trigger reactor fires at normal debounce
+    And a trace arrives from an old SDK (sdk.name present, no langwatch.origin)
+    When the fold projection processes the span
+    Then it sets langwatch.origin = "application" in the fold state
+    And when the evaluation trigger reactor fires at normal debounce
     Then evaluation commands are dispatched for matching monitors
-    Because the SDK presence + absence of origin means old SDK application trace
 
   @unit
   Scenario: Old SDK evaluation traces are dispatched with evaluation origin
@@ -227,12 +232,14 @@ Feature: Explicit application origin for race condition prevention
     Given an online evaluation monitor is enabled for the project
     And a trace's child spans arrive first without langwatch.origin
     And the child spans carry sdk.name = "langwatch" in resource attributes
-    When the evaluation trigger reactor fires at normal debounce
-    Then evaluation commands are dispatched (SDK heuristic infers "application")
-    # This is correct! Old SDK child spans carry SDK info → fast path
-    # If the root span arrives later with origin = "evaluation", the evaluation
-    # was already dispatched — but this is acceptable because old SDKs are
-    # the transitional case and the evaluation dedup handles re-fires
+    When the fold projection processes the child spans
+    Then it infers langwatch.origin = "application" (SDK heuristic)
+    And when the evaluation trigger reactor fires at normal debounce
+    Then evaluation commands are dispatched for matching monitors
+    # Old SDK child spans carry SDK info → fold projection infers immediately
+    # If the root span arrives later with origin = "evaluation", the fold
+    # projection updates the origin but the evaluation was already dispatched —
+    # acceptable for the transitional case, evaluation dedup handles re-fires
 
   @integration
   Scenario: New SDK child spans before root span are handled correctly
