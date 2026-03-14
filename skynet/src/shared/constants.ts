@@ -13,3 +13,6 @@ export const SSE_RECYCLE_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes — prevents 
 export const SEARCH_DEBOUNCE_MS = 250;
 export const GROUPS_POLL_INTERVAL_MS = 2_000;
 export const REDIS_STATE_TTL_SECONDS = 3600;
+export const AUTO_PAUSE_ERROR_THRESHOLD_PER_SEC = 50;
+export const AUTO_PAUSE_CONSECUTIVE_INTERVALS = 5;
+export const DLQ_TTL_SECONDS = 7 * 24 * 3600; // 7 days

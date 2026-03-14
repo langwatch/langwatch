@@ -37,6 +37,7 @@ const INITIAL: DashboardData = {
   },
   jobNameMetrics: [],
   pausedKeys: [],
+  topErrors: [],
 };
 
 export function useDashboardData(pausedRef: React.RefObject<boolean>): {

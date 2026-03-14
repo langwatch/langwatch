@@ -19,6 +19,9 @@ function makeGroup(overrides: Partial<GroupInfo> = {}): GroupInfo {
     errorMessage: null,
     errorStack: null,
     errorTimestamp: null,
+    retryCount: null,
+    activeKeyTtlSec: null,
+    processingDurationMs: null,
     ...overrides,
   };
 }
@@ -31,6 +34,7 @@ function makeQueue(overrides: Partial<QueueInfo> = {}): QueueInfo {
     blockedGroupCount: 0,
     activeGroupCount: 0,
     totalPendingJobs: 0,
+    dlqCount: 0,
     groups: [],
     ...overrides,
   };
