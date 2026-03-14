@@ -290,7 +290,7 @@ export function buildPreconditionTraceDataFromTrace({
   events,
 }: {
   trace: {
-    input?: { value: string; satisfaction_score?: number } | null;
+    input?: { value: string } | null;
     output?: { value: string } | null;
     metadata?: ElasticSearchTrace["metadata"];
     expected_output?: { value: string } | null;
@@ -324,7 +324,6 @@ export function buildPreconditionTraceDataFromTrace({
       .map((span) => (span as LLMSpan).model)
       .filter((model): model is string => typeof model === "string" && model !== ""),
     customMetadata: Object.keys(customMetadata).length > 0 ? customMetadata : null,
-    satisfactionScore: trace.input?.satisfaction_score ?? null,
     hasAnnotation: null, // Not available in legacy collector path
     events: events?.map((e) => ({
       event_type: e.event_type,
@@ -368,7 +367,6 @@ export function buildPreconditionTraceDataFromCommand({
             typeof model === "string" && model !== "",
         ),
     customMetadata: data.customMetadata ?? null,
-    satisfactionScore: data.satisfactionScore ?? null,
     hasAnnotation: null, // Not available at command time
     events: events ?? null,
   };

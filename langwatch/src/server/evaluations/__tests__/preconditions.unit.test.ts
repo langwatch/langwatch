@@ -32,7 +32,6 @@ function makeTraceData(
     spanTypes: undefined,
     spanModels: undefined,
     customMetadata: undefined,
-    satisfactionScore: undefined,
     hasAnnotation: undefined,
     ...overrides,
   };
@@ -1454,7 +1453,6 @@ describe("buildPreconditionTraceDataFromCommand()", () => {
         topicId: "topic_1",
         subTopicId: "sub_1",
         customMetadata: { env: "staging" },
-        satisfactionScore: 0.8,
         spanTypes: ["llm"],
         spanModels: ["gpt-4"],
       });
@@ -1469,7 +1467,6 @@ describe("buildPreconditionTraceDataFromCommand()", () => {
       expect(result.topicId).toBe("topic_1");
       expect(result.subTopicId).toBe("sub_1");
       expect(result.customMetadata).toEqual({ env: "staging" });
-      expect(result.satisfactionScore).toBe(0.8);
       expect(result.spanTypes).toEqual(["llm"]);
       expect(result.spanModels).toEqual(["gpt-4"]);
     });

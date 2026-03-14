@@ -26,7 +26,6 @@ export interface PreconditionTraceData {
   spanTypes?: string[] | null;
   spanModels?: string[] | null;
   customMetadata?: Record<string, string | null> | null;
-  satisfactionScore?: number | null;
   hasAnnotation?: boolean | null;
   events?: Array<{
     event_type: string;
