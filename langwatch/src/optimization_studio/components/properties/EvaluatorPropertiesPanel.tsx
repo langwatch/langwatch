@@ -1,6 +1,6 @@
 import { Button, HStack, Spacer, Spinner, VStack } from "@chakra-ui/react";
 import { type Node, useUpdateNodeInternals } from "@xyflow/react";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
 import { useShallow } from "zustand/react/shallow";
@@ -128,6 +128,47 @@ function DbEvaluatorPanel({
     }
     return evaluatorDef;
   }, [evaluatorQuery.data?.fields, evaluatorDef]);
+
+  // Sync node inputs/outputs with evaluator fields when API data arrives.
+  // This prevents stale template inputs from persisting after reload
+  // (e.g., evaluator created via onCreateNew without evaluatorType).
+  const hasSyncedFieldsRef = useRef(false);
+  useEffect(() => {
+    const apiFields = evaluatorQuery.data?.fields;
+    const apiOutputFields = evaluatorQuery.data?.outputFields;
+    if (!apiFields || apiFields.length === 0 || hasSyncedFieldsRef.current)
+      return;
+
+    const currentInputIds = (node.data.inputs ?? [])
+      .map((f) => f.identifier)
+      .sort()
+      .join(",");
+    const apiInputIds = apiFields
+      .map((f) => f.identifier)
+      .sort()
+      .join(",");
+
+    if (currentInputIds !== apiInputIds) {
+      const inputs: Field[] = apiFields.map((f) => ({
+        identifier: f.identifier,
+        type: f.type as Field["type"],
+        ...(f.optional ? { optional: true } : {}),
+      }));
+      const outputs: Field[] | undefined = apiOutputFields?.map((f) => ({
+        identifier: f.identifier,
+        type: f.type as Field["type"],
+      }));
+      setNode({
+        id: node.id,
+        data: {
+          inputs,
+          ...(outputs ? { outputs } : {}),
+        },
+      });
+      updateNodeInternals(node.id);
+    }
+    hasSyncedFieldsRef.current = true;
+  }, [evaluatorQuery.data, node.id, node.data.inputs, setNode, updateNodeInternals]);
 
   const isWorkflowEvaluator = evaluatorQuery.data?.type === "workflow";
 
