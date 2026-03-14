@@ -159,14 +159,14 @@ function SuitesPageContent() {
       }
       setArchiveConfirmId(null);
       toaster.create({
-        title: "Suite archived",
+        title: "Run plan archived",
         type: "success",
         meta: { closable: true },
       });
     },
     onError: (err) => {
       toaster.create({
-        title: "Failed to archive suite",
+        title: "Failed to archive run plan",
         description: err.message,
         type: "error",
         meta: { closable: true },
@@ -179,14 +179,14 @@ function SuitesPageContent() {
       void utils.suites.getAll.invalidate();
       navigateToSuite(data.slug);
       toaster.create({
-        title: "Suite duplicated",
+        title: "Run plan duplicated",
         type: "success",
         meta: { closable: true },
       });
     },
     onError: (err) => {
       toaster.create({
-        title: "Failed to duplicate suite",
+        title: "Failed to duplicate run plan",
         description: err.message,
         type: "error",
         meta: { closable: true },
@@ -323,11 +323,11 @@ function SuitesPageContent() {
     <DashboardLayout>
       <PageLayout.Header>
         <HStack justify="space-between" align="center" w="full">
-          <PageLayout.Heading>Suites</PageLayout.Heading>
+          <PageLayout.Heading>Run Plans</PageLayout.Heading>
           <Spacer />
           <PeriodSelector period={period} setPeriod={setPeriod} />
           <PageLayout.HeaderButton onClick={handleNewSuite}>
-            <Plus size={16} /> New Suite
+            <Plus size={16} /> New Run Plan
           </PageLayout.HeaderButton>
         </HStack>
       </PageLayout.Header>

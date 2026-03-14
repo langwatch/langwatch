@@ -129,7 +129,7 @@ describe("Suites Page Layout (Issue #1671)", () => {
   });
 
   describe("when rendering the suites page", () => {
-    it("renders PageLayout.Header with a 'Suites' heading", async () => {
+    it("renders PageLayout.Header with a 'Run Plans' heading", async () => {
       // Dynamic import to ensure mocks are applied
       const { default: SuitesPage } = await import(
         "~/pages/[project]/simulations/suites/index"
@@ -137,7 +137,7 @@ describe("Suites Page Layout (Issue #1671)", () => {
 
       render(<SuitesPage />, { wrapper: Wrapper });
 
-      const heading = screen.getByRole("heading", { name: "Suites" });
+      const heading = screen.getByRole("heading", { name: "Run Plans" });
       expect(heading).toBeInTheDocument();
     });
 
