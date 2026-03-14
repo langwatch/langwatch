@@ -26,6 +26,7 @@ import type {
 import {
   isLogRecordReceivedEvent,
   isMetricRecordReceivedEvent,
+  isOriginResolvedEvent,
   isSpanReceivedEvent,
   isTopicAssignedEvent,
 } from "../schemas/events";
@@ -466,6 +467,12 @@ function hoistOrigin(
       }
     } else if (state.attributes["langwatch.origin"]) {
       mergedAttributes["langwatch.origin"] = state.attributes["langwatch.origin"];
+    } else if (mergedAttributes["sdk.name"]) {
+      // SDK heuristic: sdk.name present but no explicit origin and no
+      // legacy markers → old SDK that doesn't tag origin. Old SDK
+      // evaluations/simulations are already caught by legacy rules above,
+      // so what's left must be a regular application trace.
+      mergedAttributes["langwatch.origin"] = "application";
     }
   }
 }
@@ -850,7 +857,7 @@ export function createTraceSummaryFoldProjection({
         subTopicId: null,
         hasAnnotation: null,
         attributes: {},
-        occurredAt: Date.now(),
+        occurredAt: 0,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
@@ -962,6 +969,22 @@ export function createTraceSummaryFoldProjection({
           traceId: state.traceId || event.data.traceId,
           timeToFirstTokenMs,
           attributes: mergedAttributes,
+          updatedAt: Date.now(),
+        };
+      }
+
+      if (isOriginResolvedEvent(event)) {
+        const currentOrigin = state.attributes["langwatch.origin"];
+        if (currentOrigin) {
+          // Explicit origin already set — do not override
+          return state;
+        }
+        return {
+          ...state,
+          attributes: {
+            ...state.attributes,
+            "langwatch.origin": event.data.origin,
+          },
           updatedAt: Date.now(),
         };
       }

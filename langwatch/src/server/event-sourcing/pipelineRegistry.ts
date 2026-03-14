@@ -61,7 +61,13 @@ import { MetricRecordAppendStore } from "./pipelines/trace-processing/projection
 import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
 import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
 import { createCustomEvaluationSyncReactor } from "./pipelines/trace-processing/reactors/customEvaluationSync.reactor";
-import { createEvaluationTriggerReactor } from "./pipelines/trace-processing/reactors/evaluationTrigger.reactor";
+import {
+  createEvaluationTriggerReactor,
+  createDeferredEvaluationHandler,
+  makeDeferredJobId,
+  DEFERRED_CHECK_DELAY_MS,
+  type DeferredEvaluationPayload,
+} from "./pipelines/trace-processing/reactors/evaluationTrigger.reactor";
 import { createSpanStorageBroadcastReactor } from "./pipelines/trace-processing/reactors/spanStorageBroadcast.reactor";
 import { createTraceUpdateBroadcastReactor } from "./pipelines/trace-processing/reactors/traceUpdateBroadcast.reactor";
 
@@ -142,10 +148,38 @@ export class PipelineRegistry {
   ) {
     const evalCommands = mapCommands(evalPipeline.commands);
 
-    const evaluationTriggerReactor = createEvaluationTriggerReactor({
+    const traceSummaryStore = new TraceSummaryStore(
+      this.deps.traces.summary.repository,
+    );
+
+    // Late-bound reference to the trace pipeline's resolveOrigin command.
+    // The reactor deps closure captures this; the actual dispatcher is set
+    // after pipeline registration (same pattern as billing self-dispatch).
+    let resolveOriginDispatcher: ((data: any) => Promise<void>) | null = null;
+
+    // Late-bound reference to the deferred evaluation queue.
+    // Set after pipeline registration, same pattern as resolveOriginDispatcher.
+    let scheduleDeferredDispatcher: ((payload: DeferredEvaluationPayload) => Promise<void>) | null = null;
+
+    const evaluationTriggerReactorDeps = {
       monitors: this.deps.monitors,
       evaluation: evalCommands.executeEvaluation,
-    });
+      resolveOrigin: async (data: any) => {
+        if (!resolveOriginDispatcher) {
+          throw new Error("resolveOrigin dispatcher not yet initialized — pipeline registration order issue");
+        }
+        return resolveOriginDispatcher(data);
+      },
+      traceSummaryStore,
+      scheduleDeferred: async (payload: DeferredEvaluationPayload) => {
+        if (!scheduleDeferredDispatcher) {
+          throw new Error("scheduleDeferred dispatcher not yet initialized — pipeline registration order issue");
+        }
+        return scheduleDeferredDispatcher(payload);
+      },
+    };
+
+    const evaluationTriggerReactor = createEvaluationTriggerReactor(evaluationTriggerReactorDeps);
 
     const customEvaluationSyncReactor = createCustomEvaluationSyncReactor({
       reportEvaluation: evalCommands.reportEvaluation,
@@ -179,15 +213,61 @@ export class PipelineRegistry {
         spanAppendStore: new SpanAppendStore(this.deps.traces.spans.repository),
         logRecordAppendStore: new LogRecordAppendStore(logRecordRepo),
         metricRecordAppendStore: new MetricRecordAppendStore(metricRecordRepo),
-        traceSummaryStore: new TraceSummaryStore(
-          this.deps.traces.summary.repository,
-        ),
+        traceSummaryStore,
         evaluationTriggerReactor,
         customEvaluationSyncReactor,
         traceUpdateBroadcastReactor,
         spanStorageBroadcastReactor,
       }),
     );
+
+    // Wire the late-bound resolveOrigin dispatcher now that the pipeline is registered
+    const traceCommands = mapCommands(tracePipeline.commands);
+    resolveOriginDispatcher = traceCommands.resolveOrigin;
+
+    // Wire the deferred evaluation queue (BullMQ-backed, survives process restart)
+    const deferredHandler = createDeferredEvaluationHandler(evaluationTriggerReactorDeps);
+    const deferredEvalQueue = tracePipeline.service.registerJob<DeferredEvaluationPayload>({
+      name: "deferredEvaluation",
+      process: deferredHandler,
+      delay: DEFERRED_CHECK_DELAY_MS,
+      deduplication: {
+        makeId: makeDeferredJobId,
+        extend: false,  // Don't reset the 5-min timer on new spans
+        replace: false,
+      },
+      spanAttributes: (payload) => ({
+        "deferred.tenant_id": payload.tenantId,
+        "deferred.trace_id": payload.traceId,
+      }),
+    });
+
+    if (deferredEvalQueue) {
+      scheduleDeferredDispatcher = (payload) => deferredEvalQueue.send(payload);
+    } else {
+      // Fallback: event sourcing disabled, use in-memory setTimeout (best-effort)
+      const pendingDeferredChecks = new Map<string, ReturnType<typeof setTimeout>>();
+      scheduleDeferredDispatcher = async (payload: DeferredEvaluationPayload) => {
+        const dedupKey = makeDeferredJobId(payload);
+        if (pendingDeferredChecks.has(dedupKey)) return;
+        const handler = createDeferredEvaluationHandler(evaluationTriggerReactorDeps);
+        const timer = setTimeout(async () => {
+          pendingDeferredChecks.delete(dedupKey);
+          try {
+            await handler(payload);
+          } catch (error) {
+            logger.error(
+              { tenantId: payload.tenantId, traceId: payload.traceId, error },
+              "Deferred evaluation check failed",
+            );
+          }
+        }, DEFERRED_CHECK_DELAY_MS);
+        if (typeof timer === "object" && "unref" in timer) {
+          timer.unref();
+        }
+        pendingDeferredChecks.set(dedupKey, timer);
+      };
+    }
 
     return tracePipeline;
   }

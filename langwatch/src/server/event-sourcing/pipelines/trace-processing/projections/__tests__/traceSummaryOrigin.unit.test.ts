@@ -364,6 +364,61 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
       expect(state.attributes["langwatch.origin"]).toBeUndefined();
     });
   });
+
+  describe("when sdk.name is present but no explicit origin or legacy markers (old SDK heuristic)", () => {
+    it("infers langwatch.origin = 'application'", () => {
+      const span = createTestSpan({
+        resourceAttributes: {
+          "telemetry.sdk.name": "langwatch",
+        },
+        spanAttributes: {},
+      });
+
+      const state = applySpanToSummary({ state: createInitState(), span: span });
+
+      expect(state.attributes["langwatch.origin"]).toBe("application");
+    });
+
+    it("does not override legacy-inferred origin with SDK heuristic", () => {
+      const span = createTestSpan({
+        resourceAttributes: {
+          "telemetry.sdk.name": "langwatch",
+        },
+        instrumentationScope: { name: "langwatch-evaluation", version: null },
+        spanAttributes: {},
+      });
+
+      const state = applySpanToSummary({ state: createInitState(), span: span });
+
+      expect(state.attributes["langwatch.origin"]).toBe("evaluation");
+    });
+
+    it("does not override explicit origin with SDK heuristic", () => {
+      const span = createTestSpan({
+        resourceAttributes: {
+          "telemetry.sdk.name": "langwatch",
+        },
+        spanAttributes: {
+          "langwatch.origin": "simulation",
+        },
+      });
+
+      const state = applySpanToSummary({ state: createInitState(), span: span });
+
+      expect(state.attributes["langwatch.origin"]).toBe("simulation");
+    });
+
+    it("does not infer origin when sdk.name is absent (pure OTEL)", () => {
+      const span = createTestSpan({
+        resourceAttributes: {},
+        spanAttributes: {},
+      });
+
+      const state = applySpanToSummary({ state: createInitState(), span: span });
+
+      expect(state.attributes["langwatch.origin"]).toBeUndefined();
+    });
+  });
 });
 
 describe("applySpanToSummary() langwatch.source hoisting", () => {
