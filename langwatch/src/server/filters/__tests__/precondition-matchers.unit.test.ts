@@ -30,7 +30,6 @@ function makeTraceData(
     spanTypes: undefined,
     spanModels: undefined,
     customMetadata: undefined,
-    satisfactionScore: undefined,
     hasAnnotation: undefined,
     ...overrides,
   };

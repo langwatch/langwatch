@@ -470,6 +470,7 @@ export class ClickHouseTraceService {
               input.endDate,
               filterConditions,
               filterParams,
+              input.updatedAt,
             );
 
           // When includeSpans is requested, fetch and attach actual spans
@@ -1209,6 +1210,7 @@ export class ClickHouseTraceService {
     endDate?: number,
     filterConditions?: string[],
     filterParams?: Record<string, unknown>,
+    updatedAt?: number,
   ): Promise<{ traces: Trace[]; totalHits: number; lastTrace: Trace | null }> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.fetchTracesWithPagination",
@@ -1226,6 +1228,12 @@ export class ClickHouseTraceService {
             ? " AND " + filterConditions.join(" AND ")
             : "";
 
+        // Filter by updatedAt to only return traces modified since a given timestamp
+        const updatedAtFilter =
+          updatedAt !== undefined && updatedAt > 0
+            ? " AND ts.UpdatedAt >= fromUnixTimestamp64Milli({updatedAtFilter:UInt64})"
+            : "";
+
         // Keyset cursor condition — only for the data query
         let cursorCondition = "";
         if (cursor) {
@@ -1241,6 +1249,9 @@ export class ClickHouseTraceService {
           tenantId: projectId,
           startDate: startDate ?? 0,
           endDate: endDate ?? Date.now(),
+          ...(updatedAt !== undefined && updatedAt > 0
+            ? { updatedAtFilter: updatedAt }
+            : {}),
           ...filterParams,
         };
 
@@ -1257,6 +1268,7 @@ export class ClickHouseTraceService {
               WHERE ts.TenantId = {tenantId:String}
                 AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
                 AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
+                ${updatedAtFilter}
                 ${extraFilters}
             `,
             query_params: sharedParams,
@@ -1293,6 +1305,7 @@ export class ClickHouseTraceService {
               WHERE ts.TenantId = {tenantId:String}
                 AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
                 AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
+                ${updatedAtFilter}
                 ${extraFilters}
                 ${cursorCondition}
               ORDER BY ts.OccurredAt ${orderDirection}, ts.TraceId ${orderDirection}, ts.UpdatedAt DESC

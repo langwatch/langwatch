@@ -218,11 +218,6 @@ describe.skipIf(!hasTestcontainers)(
           noopReactor as any,
         )
         .withReactor(
-          "traceSummary",
-          "satisfactionScore",
-          noopReactor as any,
-        )
-        .withReactor(
           "spanStorage",
           "spanStorageBroadcast",
           noopReactor as any,
