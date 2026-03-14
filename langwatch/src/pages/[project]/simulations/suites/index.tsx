@@ -17,6 +17,7 @@ import { PeriodSelector, usePeriodSelector, type Period } from "~/components/Per
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { RunHistoryPanel } from "~/components/suites/RunHistoryPanel";
 import { SuiteArchiveDialog } from "~/components/suites/SuiteArchiveDialog";
+import { SuiteRunConfirmationDialog } from "~/components/suites/SuiteRunConfirmationDialog";
 import { SuiteContextMenu } from "~/components/suites/SuiteContextMenu";
 import {
   SuiteDetailPanel,
@@ -33,6 +34,7 @@ import {
   isExternalSetSelection,
   useSuiteRouting,
 } from "~/components/suites/useSuiteRouting";
+import { parseSuiteTargets } from "~/server/suites/types";
 import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useDrawer } from "~/hooks/useDrawer";
@@ -55,6 +57,7 @@ function SuitesPageContent() {
     suiteId: string;
   } | null>(null);
   const [archiveConfirmId, setArchiveConfirmId] = useState<string | null>(null);
+  const [runConfirmId, setRunConfirmId] = useState<string | null>(null);
 
   // Queries
   const {
@@ -149,6 +152,15 @@ function SuitesPageContent() {
     ? suites?.find((s) => s.id === archiveConfirmId)
     : null;
 
+  const runConfirmSuite = runConfirmId
+    ? suites?.find((s) => s.id === runConfirmId)
+    : null;
+
+  const runConfirmTargetCount = useMemo(() => {
+    if (!runConfirmSuite) return 0;
+    return parseSuiteTargets(runConfirmSuite.targets).length;
+  }, [runConfirmSuite]);
+
   // Mutations
   const archiveMutation = api.suites.archive.useMutation({
     onSuccess: () => {
@@ -203,6 +215,7 @@ function SuitesPageContent() {
     onSuccess: () => {
       setSuiteRunSinceTimestamp(undefined);
       void utils.scenarios.getSuiteRunData.invalidate();
+      setRunConfirmId(null);
     },
   });
 
@@ -245,12 +258,18 @@ function SuitesPageContent() {
 
   const handleRunSuite = useCallback(
     (suiteId: string) => {
-      const suite = suites?.find((s) => s.id === suiteId);
-      if (suite) navigateToSuite(suite.slug);
-      runMutation.mutate({ projectId: project?.id ?? "", id: suiteId, idempotencyKey: crypto.randomUUID() });
+      if (!project || runMutation.isPending) return;
+      setRunConfirmId(suiteId);
     },
-    [suites, navigateToSuite, runMutation, project?.id],
+    [project, runMutation.isPending],
   );
+
+  const confirmRun = useCallback(() => {
+    if (!project || !runConfirmId || runMutation.isPending) return;
+    const suite = suites?.find((s) => s.id === runConfirmId);
+    if (suite) navigateToSuite(suite.slug);
+    runMutation.mutate({ projectId: project.id, id: runConfirmId, idempotencyKey: crypto.randomUUID() });
+  }, [project, runConfirmId, runMutation, navigateToSuite, suites]);
 
   const handleDuplicateSuite = useCallback(
     (suiteId: string) => {
@@ -406,6 +425,16 @@ function SuitesPageContent() {
         isLoading={archiveMutation.isPending}
       />
 
+      {/* Run confirmation dialog */}
+      <SuiteRunConfirmationDialog
+        open={!!runConfirmId}
+        onClose={() => setRunConfirmId(null)}
+        onConfirm={confirmRun}
+        suiteName={runConfirmSuite?.name ?? ""}
+        scenarioCount={runConfirmSuite?.scenarioIds.length ?? 0}
+        targetCount={runConfirmTargetCount}
+        isLoading={runMutation.isPending}
+      />
     </DashboardLayout>
   );
 }
