@@ -7,50 +7,42 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Gavel, GraduationCap, HatGlasses, Telescope } from "lucide-react";
+import { Code, MessageSquare, Monitor, Terminal } from "lucide-react";
 import type React from "react";
 import type { ProductSelection } from "../../types/types";
 
-type ProductOption =
-  | {
-      key: ProductSelection;
-      title: string;
-      description: string;
-      icon: typeof Telescope;
-    }
-  | {
-      key: "agent-simulations";
-      title: string;
-      description: string;
-      icon: typeof HatGlasses;
-      url: string;
-    };
+interface ProductOption {
+  key: ProductSelection;
+  title: string;
+  description: string;
+  icon: typeof Terminal;
+}
 
 const productOptions: ProductOption[] = [
   {
-    key: "observability",
-    title: "Observability",
-    description: "Set up SDKs and start seeing traces and analytics.",
-    icon: Telescope,
+    key: "via-claude-code",
+    title: "Via Claude Code",
+    description:
+      "Set up LangWatch using Claude Code CLI with prompts, skills, or MCP",
+    icon: Terminal,
   },
   {
-    key: "evaluations",
-    title: "Evaluations",
-    description: "Create and run evaluations to measure quality.",
-    icon: Gavel,
+    key: "via-platform",
+    title: "Via the Platform",
+    description: "Configure directly through the LangWatch dashboard",
+    icon: Monitor,
   },
   {
-    key: "prompt-management",
-    title: "Prompt Management",
-    description: "Organize, version, iterate, and optimize your prompts.",
-    icon: GraduationCap,
+    key: "via-claude-desktop",
+    title: "Via Claude Desktop",
+    description: "Connect via MCP server in Claude Desktop",
+    icon: MessageSquare,
   },
   {
-    key: "agent-simulations",
-    title: "Agent Simulations",
-    description: "Simulate scenarios and test agent behavior.",
-    icon: HatGlasses,
-    url: "/@project/simulations",
+    key: "manually",
+    title: "Manually",
+    description: "Integrate LangWatch SDK into your codebase manually",
+    icon: Code,
   },
 ];
 
@@ -62,74 +54,63 @@ export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
   onSelectProduct,
 }) => {
   return (
-    <Box position="relative" minH="60vh">
-      <Grid
-        pt={4}
-        templateColumns={{ base: "repeat(1, 1fr)", lg: "repeat(2, 1fr)" }}
-        gap={4}
-        position="relative"
-        zIndex={1}
-      >
-        {productOptions.map((opt) => (
-          <GridItem key={opt.key}>
-            <Card.Root asChild h="full">
-              <Box
-                as="button"
-                w="full"
-                h="full"
-                borderWidth="1px"
-                borderColor="border.emphasized/40"
-                borderRadius="md"
-                p={6}
-                bg="bg.subtle/30"
-                backdropFilter="blur(10px)"
-                cursor="pointer"
-                transition="all 0.2s"
-                position="relative"
-                willChange="transform, background-color"
-                _hover={{
-                  transform: "translateY(-4px)",
-                }}
-                role="button"
-                tabIndex={0}
-                onClick={() => {
-                  if (opt.key === "agent-simulations") {
-                    window.location.href = opt.url;
-                    return;
-                  }
-
-                  onSelectProduct(opt.key);
-                }}
-              >
-                <VStack gap={3} align="center" h="full">
-                  <Icon color="orange.500" size="2xl">
+    <Grid
+      templateColumns={{ base: "repeat(1, 1fr)", md: "repeat(2, 1fr)" }}
+      gap={4}
+    >
+      {productOptions.map((opt) => (
+        <GridItem key={opt.key}>
+          <Card.Root asChild h="full">
+            <Box
+              as="button"
+              w="full"
+              h="full"
+              borderRadius="2xl"
+              bg="bg.panel"
+              border="1px solid"
+              borderColor="border.muted"
+              boxShadow="xs"
+              p={8}
+              cursor="pointer"
+              transition="all 0.2s ease-in-out"
+              _hover={{
+                boxShadow: "sm",
+                transform: "translateY(-2px)",
+                borderColor: "border.emphasized",
+              }}
+              role="button"
+              tabIndex={0}
+              onClick={() => onSelectProduct(opt.key)}
+            >
+              <VStack gap={4} align="center" h="full">
+                <Box p={3} borderRadius="xl" bg="orange.50">
+                  <Icon color="orange.500" boxSize={6}>
                     <opt.icon strokeWidth={1.75} />
                   </Icon>
-                  <VStack gap={1}>
-                    <Text
-                      textStyle="lg"
-                      fontWeight="semibold"
-                      color="fg.emphasized"
-                      textAlign="center"
-                    >
-                      {opt.title}
-                    </Text>
-                    <Text
-                      fontSize="xs"
-                      color="fg.muted"
-                      textAlign="center"
-                      alignSelf="stretch"
-                      flex={1}
-                    >
-                      {opt.description}
-                    </Text>
-                  </VStack>
+                </Box>
+                <VStack gap={1}>
+                  <Text
+                    textStyle="md"
+                    fontWeight="semibold"
+                    color="fg.DEFAULT"
+                    textAlign="center"
+                  >
+                    {opt.title}
+                  </Text>
+                  <Text
+                    fontSize="sm"
+                    color="fg.muted"
+                    textAlign="center"
+                    lineHeight="tall"
+                  >
+                    {opt.description}
+                  </Text>
                 </VStack>
-              </Box>
-            </Card.Root>
-          </GridItem>
-        ))}
-      </Grid>
-    </Box>
+              </VStack>
+            </Box>
+          </Card.Root>
+        </GridItem>
+      ))}
+    </Grid>
   );
 };

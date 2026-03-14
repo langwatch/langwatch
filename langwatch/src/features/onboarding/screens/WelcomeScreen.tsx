@@ -1,5 +1,4 @@
-import { VStack } from "@chakra-ui/react";
-import { AnimatePresence, motion } from "motion/react";
+import { Box, HStack, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import type React from "react";
 import { useEffect, useState } from "react";
@@ -12,7 +11,6 @@ import { trackEventOnce } from "~/utils/tracking";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { OnboardingContainer } from "../components/containers/OnboardingContainer";
 import { OnboardingNavigation } from "../components/navigation/OnboardingNavigation";
-import { slideVariants, transition } from "../constants/onboarding-data";
 import { OnboardingFormProvider } from "../contexts/form-context";
 import { useOnboardingFlow } from "../hooks/use-onboarding-flow";
 import { useCreateWelcomeScreens } from "./create-welcome-screens";
@@ -33,7 +31,6 @@ export const WelcomeScreen: React.FC = () => {
 
   const {
     currentScreenIndex,
-    direction,
     flow,
     navigation,
     getFormData,
@@ -136,42 +133,33 @@ export const WelcomeScreen: React.FC = () => {
   return (
     <AnalyticsBoundary name="onboarding_welcome" sendViewedEvent>
       <OnboardingContainer
-        title={currentScreen?.heading ?? "Welcome aboard 👋"}
+        title={currentScreen?.heading ?? "Welcome aboard"}
         subTitle={currentScreen?.subHeading}
       >
-        <VStack gap={4} align="stretch" position="relative" minH="400px">
-          <AnimatePresence initial={false} custom={direction} mode="popLayout">
-            <motion.div
-              key={currentScreenIndex}
-              custom={direction}
-              variants={slideVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={transition}
-              style={{ width: "100%" }}
-            >
-              <AnalyticsBoundary
-                name={currentScreen?.id ?? "unknown"}
-                attributes={{
-                  screenIndex: currentVisibleIndex,
-                  variant: flow.variant,
-                  total: flow.total,
-                  isFirst: isFirstScreen,
-                  isLast: isLastScreen,
-                }}
-                sendViewedEvent
+        <VStack gap={6} align="stretch" position="relative" minH="360px" w="full" minW="0">
+          <AnalyticsBoundary
+            key={currentScreenIndex}
+            name={currentScreen?.id ?? "unknown"}
+            attributes={{
+              screenIndex: currentVisibleIndex,
+              variant: flow.variant,
+              total: flow.total,
+              isFirst: isFirstScreen,
+              isLast: isLastScreen,
+            }}
+            sendViewedEvent
+          >
+            <OnboardingFormProvider value={formContextValue}>
+              <fieldset
+                disabled={pendingOrSuccessful}
+                style={{ width: "100%", minWidth: 0 }}
               >
-                <OnboardingFormProvider value={formContextValue}>
-                  <fieldset disabled={pendingOrSuccessful}>
-                    {currentScreen?.component ? (
-                      <currentScreen.component />
-                    ) : null}
-                  </fieldset>
-                </OnboardingFormProvider>
-              </AnalyticsBoundary>
-            </motion.div>
-          </AnimatePresence>
+                {currentScreen?.component ? (
+                  <currentScreen.component />
+                ) : null}
+              </fieldset>
+            </OnboardingFormProvider>
+          </AnalyticsBoundary>
 
           <OnboardingNavigation
             currentScreenIndex={currentScreenIndex}
@@ -185,6 +173,31 @@ export const WelcomeScreen: React.FC = () => {
             isFirstScreen={isFirstScreen}
             isLastScreen={isLastScreen}
           />
+
+          <HStack justify="center" gap={1}>
+            {flow.visibleScreens.map((_, idx) => (
+              <Box
+                key={idx}
+                w="20px"
+                display="flex"
+                justifyContent="center"
+              >
+                <Box
+                  w={currentVisibleIndex === idx ? "20px" : "6px"}
+                  h="6px"
+                  borderRadius="full"
+                  bg={
+                    currentVisibleIndex === idx
+                      ? "orange.400"
+                      : idx < currentVisibleIndex
+                        ? "orange.300"
+                        : "gray.200"
+                  }
+                  transition="all 0.3s ease"
+                />
+              </Box>
+            ))}
+          </HStack>
         </VStack>
       </OnboardingContainer>
     </AnalyticsBoundary>

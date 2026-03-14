@@ -1,9 +1,9 @@
-import { Text, VStack } from "@chakra-ui/react";
-import type React from "react";
 import { useMemo } from "react";
-import { ModelProviderScreen } from "../components/sections/ModelProviderScreen";
 import { ObservabilityScreen } from "../components/sections/ObservabilityScreen";
 import { ProductSelectionScreen } from "../components/sections/ProductSelectionScreen";
+import { ViaClaudeCodeScreen } from "../components/sections/ViaClaudeCodeScreen";
+import { ViaClaudeDesktopScreen } from "../components/sections/ViaClaudeDesktopScreen";
+import { ViaPlatformScreen } from "../components/sections/ViaPlatformScreen";
 import type { ProductFlowConfig } from "../types/types";
 import {
   type OnboardingScreen,
@@ -34,24 +34,37 @@ export const useCreateProductScreens = ({
           "Choose a starting point. You can explore the rest anytime.",
         component: ProductSelectionScreenWrapped,
       },
-      [ProductScreenIndex.OBSERVABILITY]: {
-        id: "observability",
+      [ProductScreenIndex.VIA_CLAUDE_CODE]: {
+        id: "via-claude-code",
         required: false,
-        heading: "With Great Power, Comes Great Observability",
+        heading: "Via Claude Code",
+        subHeading: "Set up LangWatch with Claude Code",
+        widthVariant: "full",
+        component: ViaClaudeCodeScreen,
+      },
+      [ProductScreenIndex.VIA_PLATFORM]: {
+        id: "via-platform",
+        required: false,
+        heading: "Via the Platform",
+        subHeading: "Configure through the dashboard",
+        widthVariant: "full",
+        component: ViaPlatformScreen,
+      },
+      [ProductScreenIndex.VIA_CLAUDE_DESKTOP]: {
+        id: "via-claude-desktop",
+        required: false,
+        heading: "Via Claude Desktop",
+        subHeading: "Connect via Claude Desktop",
+        widthVariant: "full",
+        component: ViaClaudeDesktopScreen,
+      },
+      [ProductScreenIndex.MANUALLY]: {
+        id: "manually",
+        required: false,
+        heading: "Manual Setup",
+        subHeading: "Integrate the SDK manually",
         widthVariant: "full",
         component: ObservabilityScreen,
-      },
-      [ProductScreenIndex.EVALUATIONS]: {
-        id: "evaluations",
-        required: false,
-        heading: "Eval yourself before you wreck yourself",
-        component: ModelProviderScreen,
-      },
-      [ProductScreenIndex.PROMPT_MANAGEMENT]: {
-        id: "prompt-management",
-        required: false,
-        heading: "With great prompts comes great responses",
-        component: ModelProviderScreen,
       },
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps

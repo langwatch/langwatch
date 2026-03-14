@@ -1,7 +1,6 @@
 import {
   Box,
   Card,
-  type CardRootProps,
   Icon,
   type IconProps,
   Text,
@@ -43,10 +42,7 @@ export function SelectableIconCard(
     actualIcon?.type === "themed" ? actualIcon.lightSrc : "",
     actualIcon?.type === "themed" ? actualIcon.darkSrc : "",
   );
-  const borderColor = useColorModeValue<CardRootProps["borderColor"]>(
-    "border.inverted/10",
-    "border.inverted/30",
-  );
+  const borderColor = "border.muted";
   const selectedBorderColor = useColorModeValue("orange.400", "orange.300");
   const selectedBg = useColorModeValue("orange.50", "orange.950/30");
 
@@ -67,9 +63,10 @@ export function SelectableIconCard(
         aria-pressed={selected}
         onClick={onClick}
         cursor="pointer"
-        borderWidth={selected ? "2px" : size === "sm" ? "1px" : "2px"}
+        borderWidth={selected ? "2px" : "1px"}
         borderColor={selected ? selectedBorderColor : borderColor}
-        bg={selected ? selectedBg : "bg.subtle/30"}
+        bg={selected ? selectedBg : "bg.panel"}
+        boxShadow={selected ? undefined : "2xs"}
         transition="all 0.2s ease"
         aspectRatio="1 / 1"
         display="flex"
@@ -107,7 +104,7 @@ export function SelectableIconCard(
             <Text
               textStyle="sm"
               fontWeight="normal"
-              color="CaptionText"
+              color="fg.muted"
               textAlign="center"
             >
               {label}
