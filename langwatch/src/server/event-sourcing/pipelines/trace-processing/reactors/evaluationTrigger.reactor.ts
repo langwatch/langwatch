@@ -199,7 +199,6 @@ async function dispatchEvaluations({
   // Additional metadata for expanded precondition matching
   const topicId = foldState.topicId ?? undefined;
   const subTopicId = foldState.subTopicId ?? undefined;
-  const satisfactionScore = (foldState as Record<string, unknown>).satisfactionScore as number | undefined;
   const spanModels = foldState.models.length > 0 ? foldState.models : undefined;
   const customMetadata = extractCustomMetadata(attrs);
   const computedInput = foldState.computedInput ?? undefined;
@@ -228,7 +227,6 @@ async function dispatchEvaluations({
         topicId,
         subTopicId,
         customMetadata,
-        satisfactionScore,
         spanModels,
         computedInput,
         computedOutput,
