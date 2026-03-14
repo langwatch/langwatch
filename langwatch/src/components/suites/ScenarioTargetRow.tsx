@@ -63,7 +63,7 @@ export function ScenarioTargetRow({
       paddingX={4}
       paddingY={2}
       gap={3}
-      _hover={{ bg: "bg.subtle" }}
+      _hover={{ bg: "bg.muted" }}
       cursor="pointer"
       onClick={onClick}
       borderBottom="1px solid"

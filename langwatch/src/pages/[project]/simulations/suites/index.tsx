@@ -11,7 +11,7 @@
 import { Box, HStack, Skeleton, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 import type { SimulationSuite } from "@prisma/client";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { PeriodSelector, usePeriodSelector, type Period } from "~/components/PeriodSelector";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -25,13 +25,14 @@ import {
 import { ExternalSetDetailPanel } from "~/components/suites/ExternalSetDetailPanel";
 import { SuiteSidebar } from "~/components/suites/SuiteSidebar";
 import { computeSuiteRunSummaries } from "~/components/suites/run-history-transforms";
+import { useSuiteRunMutation } from "~/components/suites/useSuiteRunMutation";
+import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import {
   ALL_RUNS_ID,
   extractExternalSetId,
   isExternalSetSelection,
   useSuiteRouting,
 } from "~/components/suites/useSuiteRouting";
-import { useRunSuite } from "~/components/suites/useRunSuite";
 import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useDrawer } from "~/hooks/useDrawer";
@@ -74,23 +75,52 @@ function SuitesPageContent() {
     { enabled: !!project, refetchInterval: 15000 },
   );
 
-  const { data: allRunData } = api.scenarios.getSuiteRunData.useQuery(
+  const [suiteRunSinceTimestamp, setSuiteRunSinceTimestamp] = useState<number | undefined>(undefined);
+  const [cachedRunData, setCachedRunData] = useState<{
+    runs: ScenarioRunData[];
+    scenarioSetIds: Record<string, string>;
+  } | undefined>(undefined);
+
+  // Reset sinceTimestamp when period changes
+  const periodKeyRef = useRef(period.startDate.getTime());
+  useEffect(() => {
+    const key = period.startDate.getTime();
+    if (key !== periodKeyRef.current) {
+      periodKeyRef.current = key;
+      setSuiteRunSinceTimestamp(undefined);
+      setCachedRunData(undefined);
+    }
+  }, [period]);
+
+  const { data: allRunDataRaw } = api.scenarios.getSuiteRunData.useQuery(
     {
       projectId: project?.id ?? "",
       limit: 100,
       startDate: period.startDate.getTime(),
-      endDate: period.endDate.getTime(),
+      sinceTimestamp: suiteRunSinceTimestamp,
     },
-    { enabled: !!project, refetchInterval: 5000 },
+    { enabled: !!project, refetchInterval: 30_000 },
   );
 
+  // Update cached data only when server reports changes
+  useEffect(() => {
+    if (!allRunDataRaw) return;
+    if (allRunDataRaw.changed) {
+      setCachedRunData({
+        runs: allRunDataRaw.runs,
+        scenarioSetIds: allRunDataRaw.scenarioSetIds,
+      });
+      setSuiteRunSinceTimestamp(allRunDataRaw.lastUpdatedAt);
+    }
+  }, [allRunDataRaw]);
+
   const runSummaries = useMemo(() => {
-    if (!allRunData) return undefined;
+    if (!cachedRunData) return undefined;
     return computeSuiteRunSummaries({
-      runs: allRunData.runs,
-      scenarioSetIds: allRunData.scenarioSetIds,
+      runs: cachedRunData.runs,
+      scenarioSetIds: cachedRunData.scenarioSetIds,
     });
-  }, [allRunData]);
+  }, [cachedRunData]);
 
   // Build suiteId -> suite name map for AllRuns view
   const suiteNameMap = useMemo(() => {
@@ -164,10 +194,15 @@ function SuitesPageContent() {
     },
   });
 
-  const { requestRun, isPending: isRunPending, confirmationDialog } = useRunSuite({
-    onRunScheduled: (suiteId) => {
-      const suite = suites?.find((s) => s.id === suiteId);
-      if (suite) navigateToSuite(suite.slug);
+  // Use a ref for handleEditSuite to break circular dependency:
+  // handleRunRequested → runMutation → useSuiteRunMutation({ onEditSuite }) → handleEditSuite → handleRunRequested
+  const handleEditSuiteRef = useRef<(suiteId: string) => void>(() => {});
+
+  const { runMutation } = useSuiteRunMutation({
+    onEditSuite: (suiteId: string) => handleEditSuiteRef.current(suiteId),
+    onSuccess: () => {
+      setSuiteRunSinceTimestamp(undefined);
+      void utils.scenarios.getSuiteRunData.invalidate();
     },
   });
 
@@ -181,9 +216,10 @@ function SuitesPageContent() {
 
   const handleRunRequested = useCallback(
     (suite: SimulationSuite) => {
-      requestRun(suite);
+      navigateToSuite(suite.slug);
+      runMutation.mutate({ projectId: project?.id ?? "", id: suite.id, idempotencyKey: crypto.randomUUID() });
     },
-    [requestRun],
+    [navigateToSuite, runMutation, project?.id],
   );
 
   const handleNewSuite = useCallback(() => {
@@ -205,12 +241,15 @@ function SuitesPageContent() {
     [openDrawer, setFlowCallbacks, handleSuiteSaved, handleRunRequested],
   );
 
+  handleEditSuiteRef.current = handleEditSuite;
+
   const handleRunSuite = useCallback(
     (suiteId: string) => {
       const suite = suites?.find((s) => s.id === suiteId);
-      if (suite) requestRun(suite);
+      if (suite) navigateToSuite(suite.slug);
+      runMutation.mutate({ projectId: project?.id ?? "", id: suiteId, idempotencyKey: crypto.randomUUID() });
     },
-    [suites, requestRun],
+    [suites, navigateToSuite, runMutation, project?.id],
   );
 
   const handleDuplicateSuite = useCallback(
@@ -337,7 +376,7 @@ function SuitesPageContent() {
             onNewSuite={handleNewSuite}
             onEditSuite={handleEditSuite}
             onRunSuite={handleRunSuite}
-            isRunning={isRunPending}
+            isRunning={runMutation.isPending}
             period={period}
             suiteNameMap={suiteNameMap}
             onAddLabel={handleAddLabel}
@@ -367,8 +406,6 @@ function SuitesPageContent() {
         isLoading={archiveMutation.isPending}
       />
 
-      {/* Run confirmation dialog */}
-      {confirmationDialog}
     </DashboardLayout>
   );
 }

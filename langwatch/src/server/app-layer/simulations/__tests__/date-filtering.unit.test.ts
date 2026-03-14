@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
-import { ClickHouseSimulationService } from "../clickhouse-simulation.service";
+import { SimulationClickHouseRepository } from "../repositories/simulation.clickhouse.repository";
 
 function makeRunRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -48,13 +48,13 @@ function setQueryResults(
   }
 }
 
-describe("ClickHouseSimulationService date filtering", () => {
+describe("SimulationClickHouseRepository date filtering", () => {
   let clickhouse: ClickHouseClient;
-  let service: ClickHouseSimulationService;
+  let repo: SimulationClickHouseRepository;
 
   beforeEach(() => {
     clickhouse = createMockClickHouse();
-    service = new ClickHouseSimulationService(clickhouse);
+    repo = new SimulationClickHouseRepository(clickhouse);
   });
 
   describe("getRunDataForAllSuites()", () => {
@@ -62,7 +62,7 @@ describe("ClickHouseSimulationService date filtering", () => {
       it("includes date range parameters in the query", async () => {
         setQueryResults(clickhouse, [[]]);
 
-        await service.getRunDataForAllSuites({
+        await repo.getRunDataForAllSuites({
           projectId: "proj-1",
           startDate: 1700000000000,
           endDate: 1700100000000,
@@ -78,7 +78,7 @@ describe("ClickHouseSimulationService date filtering", () => {
       it("includes HAVING clause with date bounds", async () => {
         setQueryResults(clickhouse, [[]]);
 
-        await service.getRunDataForAllSuites({
+        await repo.getRunDataForAllSuites({
           projectId: "proj-1",
           startDate: 1700000000000,
           endDate: 1700100000000,
@@ -91,6 +91,39 @@ describe("ClickHouseSimulationService date filtering", () => {
         expect(call.query).toContain("endDateMs");
       });
     });
+
+    describe("when no dates are provided", () => {
+      it("does not include date parameters in the query", async () => {
+        setQueryResults(clickhouse, [[]]);
+
+        await repo.getRunDataForAllSuites({
+          projectId: "proj-1",
+        });
+
+        const call = (clickhouse.query as ReturnType<typeof vi.fn>).mock
+          .calls[0]![0] as { query_params: Record<string, string> };
+
+        expect(call.query_params.startDateMs).toBeUndefined();
+        expect(call.query_params.endDateMs).toBeUndefined();
+      });
+    });
+
+    describe("when only startDate is provided", () => {
+      it("includes only the start date parameter", async () => {
+        setQueryResults(clickhouse, [[]]);
+
+        await repo.getRunDataForAllSuites({
+          projectId: "proj-1",
+          startDate: 1700000000000,
+        });
+
+        const call = (clickhouse.query as ReturnType<typeof vi.fn>).mock
+          .calls[0]![0] as { query_params: Record<string, string> };
+
+        expect(call.query_params.startDateMs).toBe("1700000000000");
+        expect(call.query_params.endDateMs).toBeUndefined();
+      });
+    });
   });
 
   describe("getRunDataForScenarioSet()", () => {
@@ -98,7 +131,7 @@ describe("ClickHouseSimulationService date filtering", () => {
       it("includes date range parameters in the query", async () => {
         setQueryResults(clickhouse, [[]]);
 
-        await service.getRunDataForScenarioSet({
+        await repo.getRunDataForScenarioSet({
           projectId: "proj-1",
           scenarioSetId: "set-1",
           startDate: 1700000000000,
@@ -113,6 +146,23 @@ describe("ClickHouseSimulationService date filtering", () => {
       });
     });
 
+    describe("when no dates are provided", () => {
+      it("does not include date parameters in the query", async () => {
+        setQueryResults(clickhouse, [[]]);
+
+        await repo.getRunDataForScenarioSet({
+          projectId: "proj-1",
+          scenarioSetId: "set-1",
+        });
+
+        const call = (clickhouse.query as ReturnType<typeof vi.fn>).mock
+          .calls[0]![0] as { query_params: Record<string, string> };
+
+        expect(call.query_params.startDateMs).toBeUndefined();
+        expect(call.query_params.endDateMs).toBeUndefined();
+      });
+    });
+
     describe("when dates are combined with cursor", () => {
       it("includes both cursor and date parameters", async () => {
         const cursor = Buffer.from(
@@ -124,7 +174,7 @@ describe("ClickHouseSimulationService date filtering", () => {
           [makeRunRow({ ScenarioRunId: "run-6", BatchRunId: "batch-6" })],
         ]);
 
-        await service.getRunDataForScenarioSet({
+        await repo.getRunDataForScenarioSet({
           projectId: "proj-1",
           scenarioSetId: "set-1",
           cursor,

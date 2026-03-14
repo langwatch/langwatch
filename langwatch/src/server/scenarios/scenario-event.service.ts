@@ -834,6 +834,8 @@ export class ScenarioEventService {
         if (result.batchRunIds.length === 0) {
           span.setAttribute("result.count", 0);
           return {
+            changed: true as const,
+            lastUpdatedAt: 0,
             runs: [],
             scenarioSetIds: {},
             nextCursor: undefined,
@@ -849,7 +851,14 @@ export class ScenarioEventService {
         span.setAttribute("result.count", runs.length);
         span.setAttribute("result.has_more", result.hasMore);
 
+        const lastUpdatedAt = runs.reduce(
+          (max, r) => Math.max(max, r.timestamp),
+          0,
+        );
+
         return {
+          changed: true as const,
+          lastUpdatedAt,
           runs,
           scenarioSetIds: result.scenarioSetIds,
           nextCursor: result.nextCursor,

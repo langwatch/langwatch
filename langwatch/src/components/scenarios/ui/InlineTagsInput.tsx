@@ -81,16 +81,16 @@ export function InlineTagsInput({
       cursor="text"
       onClick={() => inputRef.current?.focus()}
       _focusWithin={{
-        borderColor: "blue.500",
-        boxShadow: "0 0 0 1px var(--chakra-colors-blue-500)",
+        borderColor: "blue.subtle",
+        boxShadow: "0 0 0 1px var(--chakra-colors-blue-subtle)",
       }}
     >
       {/* Existing tags */}
       {value.map((tag, index) => (
         <HStack
           key={index}
-          bg="blue.50"
-          color="blue.700"
+          bg="blue.subtle"
+          color="blue.fg"
           px={2}
           py={0.5}
           borderRadius="md"
@@ -110,13 +110,13 @@ export function InlineTagsInput({
               alignItems: "center",
               background: "transparent",
               border: "none",
-              color: "var(--chakra-colors-blue-500)",
+              color: "var(--chakra-colors-blue-fg)",
             }}
             onMouseOver={(e) =>
-              (e.currentTarget.style.color = "var(--chakra-colors-blue-700)")
+              (e.currentTarget.style.color = "var(--chakra-colors-blue-emphasized)")
             }
             onMouseOut={(e) =>
-              (e.currentTarget.style.color = "var(--chakra-colors-blue-500)")
+              (e.currentTarget.style.color = "var(--chakra-colors-blue-fg)")
             }
           >
             <X size={12} />
@@ -138,7 +138,7 @@ export function InlineTagsInput({
         onKeyDown={handleKeyDown}
         onBlur={handleBlur}
         placeholder={value.length === 0 ? placeholder : ""}
-        _placeholder={{ color: "gray.400" }}
+        _placeholder={{ color: "fg.subtle" }}
         _focus={{ boxShadow: "none" }}
       />
     </HStack>

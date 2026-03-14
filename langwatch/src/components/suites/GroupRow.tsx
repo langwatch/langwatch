@@ -65,7 +65,7 @@ export function GroupRow({
         position="sticky"
         top={0}
         zIndex={20}
-        bg="bg.panel/85"
+        bg="bg.muted"
         backdropFilter="blur(12px)"
         borderBottom="1px solid"
         borderColor="border"

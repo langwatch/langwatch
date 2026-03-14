@@ -177,16 +177,17 @@ export function SuiteDetailPanel({
         onStatsReady={setLiveStats}
         period={period}
         expectedJobCount={jobCount}
+        isRunStarting={isRunning}
       />
     </VStack>
   );
 }
 
 const pillColors: Record<string, { bg: string; color: string }> = {
-  gray: { bg: "gray.50", color: "fg.muted" },
-  purple: { bg: "purple.50", color: "purple.600" },
-  blue: { bg: "blue.50", color: "blue.600" },
-  orange: { bg: "orange.50", color: "orange.600" },
+  gray: { bg: "bg.muted", color: "fg.muted" },
+  purple: { bg: "bg.muted", color: "purple.fg" },
+  blue: { bg: "bg.muted", color: "blue.fg" },
+  orange: { bg: "bg.muted", color: "orange.fg" },
 };
 
 function StatPill({

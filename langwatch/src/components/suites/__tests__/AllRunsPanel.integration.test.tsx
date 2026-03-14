@@ -51,7 +51,9 @@ vi.mock("next/router", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({}),
+    useContext: () => ({
+      scenarios: { getScenarioSetBatchHistory: { invalidate: vi.fn() } },
+    }),
     scenarios: {
       getSuiteRunData: {
         useQuery: mockRunDataQuery,
@@ -165,7 +167,7 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
         data: {
           runs,
           scenarioSetIds: { batch_1: "__internal__suite_1__suite" },
-          hasMore: false,
+          hasMore: false, changed: true,
         },
         isLoading: false,
         error: null,
@@ -199,14 +201,14 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
   });
 
   describe("when the period changes", () => {
-    it("passes startDate and endDate to the query", () => {
+    it("passes startDate to the query", () => {
       const period = {
         startDate: new Date("2024-06-01T00:00:00Z"),
         endDate: new Date("2024-06-30T23:59:59Z"),
       };
 
       mockRunDataQuery.mockReturnValue({
-        data: { runs: [], scenarioSetIds: {}, hasMore: false },
+        data: { runs: [], scenarioSetIds: {}, hasMore: false, changed: true },
         isLoading: false,
         error: null,
       });
@@ -217,7 +219,6 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
       expect(mockRunDataQuery).toHaveBeenCalledWith(
         expect.objectContaining({
           startDate: period.startDate.getTime(),
-          endDate: period.endDate.getTime(),
         }),
         expect.anything(),
       );
@@ -254,8 +255,6 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
       expect(lastCall).toBeDefined();
       expect(lastCall![0]).toMatchObject({
         startDate: period2.startDate.getTime(),
-        endDate: period2.endDate.getTime(),
-        cursor: undefined,
       });
     });
   });
@@ -295,7 +294,7 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
         data: {
           runs: runsFromTwoScenarios,
           scenarioSetIds: { batch_1: "__internal__suite_1__suite" },
-          hasMore: false,
+          hasMore: false, changed: true,
         },
         isLoading: false,
         error: null,
@@ -386,7 +385,7 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
               batch_suite_a: "__internal__suite_a__suite",
               batch_suite_b: "__internal__suite_b__suite",
             },
-            hasMore: false,
+            hasMore: false, changed: true,
           },
           isLoading: false,
           error: null,
@@ -443,7 +442,7 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
           data: {
             runs: runsSameScenarioDifferentTargets,
             scenarioSetIds: { batch_1: "__internal__suite_1__suite" },
-            hasMore: false,
+            hasMore: false, changed: true,
           },
           isLoading: false,
           error: null,
