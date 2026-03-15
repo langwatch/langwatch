@@ -24,7 +24,9 @@ const handleConflict = async (
     remoteVersion: number;
     differences: string[];
     remoteConfigData: any;
-  }
+  },
+
+  forceResolution?: "local" | "remote"
 ): Promise<"local" | "remote" | "abort"> => {
   console.log(
     chalk.yellow(`\n⚠ Conflict detected for prompt: ${chalk.cyan(promptName)}`)
@@ -40,6 +42,12 @@ const handleConflict = async (
     conflictInfo.differences.forEach((diff) => {
       console.log(chalk.gray(`  • ${diff}`));
     });
+  }
+
+  // Auto-resolve if --force-local or --force-remote was passed
+  if (forceResolution) {
+    console.log(chalk.yellow(`\nAuto-resolving conflict: using ${forceResolution} version (--force-${forceResolution})`));
+    return forceResolution;
   }
 
   console.log(chalk.yellow("\nOptions:"));
@@ -76,11 +84,13 @@ export const pushPrompts = async ({
   lock,
   promptsApiService,
   result,
+  nonInteractive,
 }: {
   config: PromptsConfig;
   lock: PromptsLock;
   promptsApiService: PromptsApiService;
   result: SyncResult;
+  forceResolution?: "local" | "remote";
 }): Promise<void> => {
   const localFileRefs = Object.entries(config.prompts).filter(
     ([, dependency]) => {
@@ -144,7 +154,8 @@ export const pushPrompts = async ({
           pushSpinner.stop();
           conflictResolution = await handleConflict(
             promptName,
-            syncResult.conflictInfo!
+            syncResult.conflictInfo!,
+            forceResolution
           );
           if (conflictResolution === "abort") {
             result.errors.push({
@@ -357,7 +368,7 @@ const printPushResults = ({
   }
 };
 
-export const pushCommand = async (): Promise<void> => {
+export const pushCommand = async (options?: { forceLocal?: boolean; forceRemote?: boolean }): Promise<void> => {
   console.log("⬆️  Pushing local prompts...");
 
   const startTime = Date.now();
@@ -380,7 +391,7 @@ export const pushCommand = async (): Promise<void> => {
       errors: [],
     };
 
-    await pushPrompts({ config, lock, promptsApiService, result });
+    await pushPrompts({ config, lock, promptsApiService, result, forceResolution: options?.forceLocal ? "local" : options?.forceRemote ? "remote" : undefined });
 
     FileManager.savePromptsLock(lock);
 
