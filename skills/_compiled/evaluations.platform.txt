@@ -1,0 +1,265 @@
+You are helping the user set up LangWatch for their AI agent project. Follow these instructions carefully.
+
+First, try to install the LangWatch MCP server for access to documentation and platform tools. If installation fails, you can fetch docs directly via the URLs provided below.
+
+# Set Up Evaluations for Your Agent
+
+LangWatch Evaluations is a comprehensive quality assurance system. Understand which part the user needs:
+
+| User says... | They need... | Go to... |
+|---|---|---|
+| "test my agent", "benchmark", "compare models" | **Experiments** | Step A |
+| "monitor production", "track quality", "block harmful content", "safety" | **Online Evaluation** (includes guardrails) | Step B |
+| "create an evaluator", "scoring function" | **Evaluators** | Step C |
+| "create a dataset", "test data" | **Datasets** | Step D |
+| "evaluate" (ambiguous) | Ask: "batch test or production monitoring?" | - |
+
+## Determine Scope
+
+If the user's request is **general** ("set up evaluations", "evaluate my agent"):
+- Read the full codebase to understand the agent's architecture
+- Study git log to understand what changed and why
+- Set up comprehensive evaluation coverage (experiment + evaluators + dataset)
+
+If the user's request is **specific** ("add a faithfulness evaluator", "create a dataset for RAG testing"):
+- Focus on the specific evaluation need
+- Create the targeted evaluator, dataset, or experiment
+- Verify it works in context
+
+## Detect Context
+
+1. Check if you're in a codebase (look for `package.json`, `pyproject.toml`, `requirements.txt`, etc.)
+2. If **YES** → use the **Code approach** for experiments (SDK) and guardrails (code integration)
+3. If **NO** → use the **Platform approach** for evaluators (MCP tools) and monitors (UI guidance)
+4. If ambiguous → ask the user: "Do you want to write evaluation code or set things up on the platform?"
+
+Some features are code-only (experiments, guardrails) and some are platform-only (monitors). Evaluators work on both surfaces.
+
+## Prerequisites
+
+Set up the LangWatch MCP for documentation access:
+
+# Installing the LangWatch MCP
+
+## For Claude Code
+Run:
+```bash
+claude mcp add langwatch -- npx -y @langwatch/mcp-server --apiKey {{LANGWATCH_API_KEY}}
+```
+
+Or add to `~/.claude.json` or `.mcp.json` in the project:
+```json
+{
+  "mcpServers": {
+    "langwatch": {
+      "command": "npx",
+      "args": ["-y", "@langwatch/mcp-server"],
+      "env": {
+        "LANGWATCH_API_KEY": "{{LANGWATCH_API_KEY}}"
+      }
+    }
+  }
+}
+```
+
+## For other editors
+Add to your editor's MCP settings file using the JSON config above.
+
+If MCP installation fails, see # Fetching LangWatch Docs Without MCP
+
+If the LangWatch MCP cannot be installed, you can fetch docs directly:
+
+1. Fetch the index: https://langwatch.ai/docs/llms.txt
+2. Follow links to specific pages, appending `.md` extension
+3. For Scenario docs: https://langwatch.ai/scenario/llms.txt
+
+Example flow:
+1. Fetch https://langwatch.ai/docs/llms.txt to see available topics
+2. Fetch https://langwatch.ai/docs/integration/python/guide.md for Python instrumentation
+3. Fetch https://langwatch.ai/docs/integration/typescript/guide.md for TypeScript instrumentation.
+
+Read the evaluations overview first: call `fetch_langwatch_docs` with url `https://langwatch.ai/docs/evaluations/overview.md`
+
+## Step A: Experiments (Batch Testing) — Code Approach
+
+Create a script or notebook that runs your agent against a dataset and measures quality.
+
+1. Read the SDK docs: call `fetch_langwatch_docs` with url `https://langwatch.ai/docs/evaluations/experiments/sdk.md`
+2. Analyze the agent's code to understand what it does
+3. Generate a dataset of 10-20 examples **tailored to the agent's actual domain** (see dataset guidance below)
+4. Create the experiment file:
+
+**Python — Jupyter Notebook (.ipynb):**
+```python
+import langwatch
+import pandas as pd
+
+# Dataset tailored to the agent's domain
+data = {
+    "input": ["domain-specific question 1", "domain-specific question 2"],
+    "expected_output": ["expected answer 1", "expected answer 2"],
+}
+df = pd.DataFrame(data)
+
+evaluation = langwatch.experiment.init("agent-evaluation")
+
+for index, row in evaluation.loop(df.iterrows()):
+    response = my_agent(row["input"])
+    evaluation.evaluate(
+        "ragas/answer_relevancy",
+        index=index,
+        data={"input": row["input"], "output": response},
+        settings={"model": "openai/gpt-4.1-mini", "max_tokens": 2048},
+    )
+```
+
+**TypeScript — Script (.ts):**
+```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+const dataset = [
+  { input: "domain-specific question", expectedOutput: "expected answer" },
+];
+
+const evaluation = await langwatch.experiments.init("agent-evaluation");
+
+await evaluation.run(dataset, async ({ item, index }) => {
+  const response = await myAgent(item.input);
+  await evaluation.evaluate("ragas/answer_relevancy", {
+    index,
+    data: { input: item.input, output: response },
+    settings: { model: "openai/gpt-4.1-mini", max_tokens: 2048 },
+  });
+});
+```
+
+5. Run the experiment to verify it works
+
+## Step B: Online Evaluation (Production Monitoring & Guardrails)
+
+Online evaluation has two modes:
+
+### Platform mode: Monitors
+Set up monitors that continuously score production traffic.
+
+1. Read the docs: call `fetch_langwatch_docs` with url `https://langwatch.ai/docs/evaluations/online-evaluation/overview.md`
+2. Configure via the platform UI:
+   - Go to https://app.langwatch.ai → Evaluations → Monitors
+   - Create a new monitor with "When a message arrives" trigger
+   - Select evaluators (e.g., PII Detection, Faithfulness)
+   - Enable monitoring
+
+### Code mode: Guardrails
+Add code to block harmful content before it reaches users (synchronous, real-time).
+
+1. Read the docs: call `fetch_langwatch_docs` with url `https://langwatch.ai/docs/evaluations/guardrails/code-integration.md`
+2. Add guardrail checks in your agent code:
+
+```python
+import langwatch
+
+@langwatch.trace()
+def my_agent(user_input):
+    guardrail = langwatch.evaluation.evaluate(
+        "azure/jailbreak",
+        name="Jailbreak Detection",
+        as_guardrail=True,
+        data={"input": user_input},
+    )
+    if not guardrail.passed:
+        return "I can't help with that request."
+    # Continue with normal processing...
+```
+
+Key distinction: Monitors **measure** (async, observability). Guardrails **act** (sync, enforcement via code with `as_guardrail=True`).
+
+## Step C: Evaluators (Scoring Functions)
+
+Create or configure evaluators — the functions that score your agent's outputs.
+
+### Code Approach
+1. Read the docs: call `fetch_langwatch_docs` with url `https://langwatch.ai/docs/evaluations/evaluators/overview.md`
+2. Browse available evaluators: `https://langwatch.ai/docs/evaluations/evaluators/list.md`
+3. Use evaluators in experiments via the SDK:
+   ```python
+   evaluation.evaluate("ragas/faithfulness", index=idx, data={...})
+   ```
+
+### Platform Approach
+1. Call `discover_schema` with category "evaluators" to see available types
+2. Use `platform_create_evaluator` to create an evaluator on the platform
+3. Use `platform_list_evaluators` to see existing evaluators
+4. Use `platform_get_evaluator` and `platform_update_evaluator` to review and modify
+
+This is useful for setting up LLM-as-judge evaluators, custom evaluators, or configuring evaluators that will be used in platform experiments and monitors.
+
+## Step D: Datasets
+
+Create test datasets for experiments.
+
+1. Read the docs: call `fetch_langwatch_docs` with url `https://langwatch.ai/docs/datasets/overview.md`
+2. Generate a dataset tailored to your agent:
+
+| Agent type | Dataset examples |
+|---|---|
+| Chatbot | Realistic user questions matching the bot's persona |
+| RAG pipeline | Questions with expected answers testing retrieval quality |
+| Classifier | Inputs with expected category labels |
+| Code assistant | Coding tasks with expected outputs |
+| Customer support | Support tickets and customer questions |
+| Summarizer | Documents with expected summaries |
+
+CRITICAL: The dataset must be specific to what the agent ACTUALLY does. Do NOT use generic examples like "What is 2+2?". Study the system prompt, function signatures, and domain context.
+
+3. For programmatic dataset access: `https://langwatch.ai/docs/datasets/programmatic-access.md`
+4. For AI-generated datasets: `https://langwatch.ai/docs/datasets/ai-dataset-generation.md`
+
+---
+
+## Platform Approach: Prompts + Evaluators (No Code)
+
+When the user has no codebase and wants to set up evaluation building blocks on the platform:
+
+NOTE: Full UI experiments and dataset creation are not yet available via MCP. This approach sets up the building blocks (prompts + evaluators) that can then be used in the platform UI.
+
+### Create or Update a Prompt
+
+Use the `platform_create_prompt` MCP tool to create a new prompt:
+- Provide a name, model, and messages (system + user)
+- The prompt will appear in your LangWatch project's Prompts section
+
+Or use `platform_list_prompts` to find existing prompts and `platform_update_prompt` to modify them.
+
+### Create an Evaluator
+
+Use the `platform_create_evaluator` MCP tool to set up evaluation criteria:
+- First call `discover_schema` with category "evaluators" to see available evaluator types
+- Create an LLM-as-judge evaluator for quality assessment
+- Or create a specific evaluator type matching your use case
+
+### Test in the Platform
+
+Go to https://app.langwatch.ai and:
+1. Navigate to your project's Prompts section
+2. Open the prompt you created
+3. Use the Prompt Playground to test variations
+4. Set up an experiment in the Experiments section using your prompt and evaluator
+
+### Current Limitations
+
+- UI experiments cannot be created via MCP yet — use the platform UI
+- Datasets cannot be created via MCP yet — use the platform UI or SDK
+- The MCP can create prompts and evaluators, which are the building blocks for experiments
+
+## Common Mistakes
+
+- Do NOT say "run an evaluation" — be specific: experiment, monitor, or guardrail
+- Do NOT use generic/placeholder datasets — generate domain-specific examples
+- Do NOT use `platform_` MCP tools for code-based features (experiments, guardrails) — write code
+- Do use `platform_` MCP tools for platform-based features (evaluators, monitors) when the user wants no-code
+- Do NOT skip running the experiment to verify it works
+- Monitors **measure** (async), guardrails **act** (sync, via code with `as_guardrail=True`) — both are online evaluation
+- Always set up `LANGWATCH_API_KEY` in `.env`
+- Always call `discover_schema` before creating evaluators via MCP to understand available types
+- Do NOT create prompts with `langwatch prompt create` CLI when using the platform approach — that's for code-based projects
