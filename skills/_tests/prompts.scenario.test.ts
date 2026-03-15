@@ -19,7 +19,7 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const isCI = !!process.env.CI;
 
-const judgeModel = openai("gpt-4.1-mini");
+const judgeModel = openai("gpt-5-mini");
 
 function copySkillToWorkDir(tempFolder: string) {
   const skillDir = path.join(tempFolder, ".skills", "prompts");
