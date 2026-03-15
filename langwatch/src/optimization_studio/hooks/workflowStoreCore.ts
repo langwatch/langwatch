@@ -422,11 +422,15 @@ export const store = (
   },
   hasPendingChanges: () => {
     const autosavedWorkflow = get().autosavedWorkflow;
+    const lastCommittedWorkflow = get().lastCommittedWorkflow;
     const currentWorkflow = get().getWorkflow();
-    if (!autosavedWorkflow || !currentWorkflow) {
+    // Use autosavedWorkflow as baseline if available, otherwise fall back to lastCommittedWorkflow
+    // This ensures dirty-state tracking works correctly after loading from DB (where autosavedWorkflow is undefined)
+    const baselineWorkflow = autosavedWorkflow ?? lastCommittedWorkflow;
+    if (!baselineWorkflow || !currentWorkflow) {
       return false;
     }
-    return hasDSLChanged(autosavedWorkflow, currentWorkflow, true);
+    return hasDSLChanged(baselineWorkflow, currentWorkflow, true);
   },
   setWorkflow: (
     workflow: Partial<Workflow> | ((current: Workflow) => Partial<Workflow>),
