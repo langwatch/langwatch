@@ -1,11 +1,12 @@
 Feature: Lite member access restrictions
   As a LangWatch platform owner
-  I want lite members (EXTERNAL org role) restricted to observability and execution
-  So that leadership and support users can monitor and trigger runs
-  without accessing engineering-level debugging or configuration tools
+  I want lite members (EXTERNAL org role) to browse freely but with targeted action restrictions
+  So that leadership and support users can monitor platform activity
+  without accessing trace debugging or modifying configuration
 
   Lite members are non-technical users (leadership, customers, support).
-  Engineers are full members. Both contribute data visible in the platform.
+  They can see everything a regular viewer sees but cannot create/edit
+  certain resources or debug individual traces.
 
   Background:
     Given an organization "acme" with a project "chatbot"
@@ -13,128 +14,249 @@ Feature: Lite member access restrictions
     And a full member "dev" in organization "acme"
 
   # ============================================================================
-  # What lite members CAN see
+  # R1: Full UI Navigation
   # ============================================================================
 
-  Scenario: Lite member views analytics dashboards
-    When sarah opens the analytics page
-    Then she sees the full analytics dashboard
+  @integration
+  Scenario: Lite member navigates to all platform pages without restriction
+    When sarah visits each page in the platform
+    Then every page loads without overlays, redirects, or access-denied screens
+    And the URL is never rewritten based on her role
 
-  Scenario: Lite member views the traces list
-    When sarah opens the messages page
-    Then she sees the list of traces
-
-  Scenario: Lite member views scenario results
-    When sarah opens the simulations page
-    Then she sees scenario results and run history
-
-  Scenario: Lite member views evaluation outcomes
-    When sarah opens the evaluations page
-    Then she sees evaluation results and scores
-
-  Scenario: Lite member views experiment results
-    When sarah opens the experiments page
-    Then she sees experiment results and graphs
-
-  Scenario: Lite member browses the full sidebar
+  @integration
+  Scenario: Lite member sees all sidebar items
     When sarah logs in to the platform
     Then she sees all sidebar items
     And no items are hidden or grayed out
+    And every sidebar item is clickable
+
+  @integration
+  Scenario: Lite member accesses pages beyond core observability
+    When sarah navigates to prompts, datasets, workflows, annotations, and settings
+    Then each page loads fully with read-only content visible
 
   # ============================================================================
-  # What lite members CAN do
+  # R2: Trace List Viewing
   # ============================================================================
 
-  Scenario: Lite member runs an existing scenario against a connected agent
-    Given a scenario "happy-path" exists in project "chatbot"
-    And an agent is connected to the project
-    When sarah runs scenario "happy-path"
-    Then the scenario executes against the agent
-    And sarah sees the results
+  @integration
+  Scenario: Lite member views the full trace list on the messages page
+    When sarah opens the messages page
+    Then she sees the list of traces with summary information
+    And filtering, sorting, and pagination work normally
 
   # ============================================================================
-  # What lite members CANNOT do — trace debugging
+  # R3: Trace Detail Restriction
   # ============================================================================
 
-  Scenario: Lite member cannot debug individual traces
-    When sarah tries to open a trace detail view to inspect spans
-    Then she sees a restriction modal explaining the limitation
+  @integration
+  Scenario: Lite member cannot open trace details from the messages page
+    Given sarah is viewing the trace list on the messages page
+    When she clicks a trace row
+    Then a restriction modal appears instead of the trace detail drawer
     And no trace debug data is shown
 
-  # ============================================================================
-  # What lite members CANNOT do — create or edit from the platform
-  # ============================================================================
+  @integration
+  Scenario: Trace detail restriction applies regardless of entry point
+    When sarah tries to open a trace detail from any entry point
+      | entry point              |
+      | trace row click          |
+      | command bar              |
+      | deep link URL            |
+      | feedback table link      |
+      | experiment result link   |
+      | annotation table link    |
+    Then the trace detail drawer does not open
+    And a restriction modal appears each time
 
-  Scenario: Lite member cannot create a scenario
-    When sarah tries to create a new scenario
-    Then she sees a restriction modal explaining the limitation
-
-  Scenario: Lite member cannot edit a scenario
-    Given a scenario "happy-path" exists
-    When sarah tries to edit scenario "happy-path"
-    Then she sees a restriction modal explaining the limitation
-
-  Scenario: Lite member cannot create an evaluation
-    When sarah tries to create a new evaluation
-    Then she sees a restriction modal explaining the limitation
-
-  Scenario: Lite member cannot create an experiment
-    When sarah tries to create a new experiment
-    Then she sees a restriction modal explaining the limitation
-
-  Scenario: Lite member cannot create or edit prompts
-    When sarah tries to create a new prompt
-    Then she sees a restriction modal explaining the limitation
-
-  Scenario: Lite member cannot create or edit datasets
-    When sarah tries to create a new dataset
-    Then she sees a restriction modal explaining the limitation
-
-  Scenario: Lite member cannot create or edit workflows
-    When sarah tries to create a new workflow
-    Then she sees a restriction modal explaining the limitation
-
-  Scenario: Lite member cannot manage team settings
-    When sarah tries to modify team settings
-    Then she sees a restriction modal explaining the limitation
+  @integration
+  Scenario: Direct URL to a trace shows restriction instead of trace data
+    When sarah navigates directly to a trace detail URL
+    Then she sees a restriction modal
+    And no trace debug data is rendered
 
   # ============================================================================
-  # Restriction UX
+  # R4: Scenario and Run Viewing
   # ============================================================================
 
-  Scenario: Restriction modal explains the limitation clearly
-    When sarah triggers any restricted action
-    Then a modal appears with title "Feature Not Available"
-    And the modal explains the action is not available for her role
-    And the modal offers a path to upgrade or contact an admin
+  @integration
+  Scenario: Lite member views scenario list and run results
+    When sarah opens the simulations page
+    Then she sees the list of all scenarios
+    And she can view individual scenario details and configuration
+    And scenario run history and results are visible
 
-  Scenario: Restricted action preserves the current page URL
-    Given sarah is on the scenarios page viewing results
-    When she tries to create a new scenario
-    Then the restriction modal appears
-    And the URL does not change
-    And she can dismiss the modal and continue browsing results
+  @integration
+  Scenario: Lite member views suite results
+    When sarah opens a suite view
+    Then she sees grouped scenario results
+    And simulation run outcome data is displayed
+
+  # ============================================================================
+  # R5: Scenario Create/Edit Restriction
+  # ============================================================================
+
+  @integration
+  Scenario: Lite member clicks create scenario and sees restriction modal
+    When sarah opens the simulations page
+    And she clicks the "Create Scenario" button
+    Then she sees a restriction modal explaining the limitation
+
+  @integration
+  Scenario: Lite member clicks edit or delete on a scenario and sees restriction modal
+    Given a scenario "happy-path" exists in project "chatbot"
+    When sarah views scenario "happy-path"
+    And she clicks an edit or delete action
+    Then she sees a restriction modal explaining the limitation
+
+  # ============================================================================
+  # R6: Evaluation Outcome Viewing
+  # ============================================================================
+
+  @integration
+  Scenario: Lite member views evaluation results
+    When sarah opens the evaluations page
+    Then she sees evaluation results, scores, and outcome summaries
+    And historical evaluation data is accessible
+
+  # ============================================================================
+  # R7: Evaluation Create/Edit Restriction
+  # ============================================================================
+
+  @integration
+  Scenario: Lite member clicks create evaluation and sees restriction modal
+    When sarah opens the evaluations page
+    And she clicks the create evaluation button
+    Then she sees a restriction modal explaining the limitation
+
+  @integration
+  Scenario: Lite member clicks edit or delete on an evaluation and sees restriction modal
+    Given an evaluation exists in project "chatbot"
+    When sarah views the evaluation
+    And she clicks an edit or delete action
+    Then she sees a restriction modal explaining the limitation
+
+  # ============================================================================
+  # R8: Experiment Create/Edit Restriction
+  # ============================================================================
+
+  @integration
+  Scenario: Lite member views experiment results and graphs
+    When sarah opens the experiments page
+    Then she sees experiment results and graphs
+
+  @integration
+  Scenario: Lite member clicks create experiment and sees restriction modal
+    When sarah opens the experiments page
+    And she clicks the create experiment button
+    Then she sees a restriction modal explaining the limitation
+
+  @integration
+  Scenario: Lite member clicks edit or delete on an experiment and sees restriction modal
+    Given an experiment exists in project "chatbot"
+    When sarah views the experiment
+    And she clicks an edit or delete action
+    Then she sees a restriction modal explaining the limitation
+
+  # ============================================================================
+  # R9: Restriction Modal Content
+  # ============================================================================
+
+  @unit
+  Scenario: Restriction modal uses role-based messaging
+    When a restriction modal appears for sarah
+    Then the title is "Feature Not Available"
+    And the body explains the restriction is based on her role
+    And the modal does not reference billing, plans, or pricing
+
+  @unit
+  Scenario: Restriction modal offers "Contact Admin" not "Upgrade your plan"
+    When a restriction modal appears for sarah
+    Then the available actions are "Contact Admin" and "Dismiss"
+    And there is no "Upgrade your plan" call to action
+
+  # ============================================================================
+  # R10: Consistent Restriction UX Pattern
+  # ============================================================================
+
+  @integration
+  Scenario: All create/edit actions trigger restriction modal on click
+    When sarah clicks a create or edit action on any restricted page
+      | page                |
+      | simulations         |
+      | evaluations         |
+      | experiments         |
+    Then the restriction modal appears each time
+    And the page never shows an empty or broken state
+    And she can dismiss the modal and continue browsing
+
+  @integration
+  Scenario: Backend serves as safety net for bypassed mutations
+    When a restricted mutation reaches the backend from sarah's session
+    Then the server returns an UNAUTHORIZED error with a LiteMemberRestrictedError cause
+    And the global error handler opens the restriction modal
+
+  # ============================================================================
+  # Command bar restrictions
+  # ============================================================================
+
+  @integration
+  Scenario: Command bar hides create actions for lite members
+    When sarah opens the command bar
+    Then create actions like "New Scenario" and "New Dataset" are not available
+    And navigation actions to existing pages remain available
+
+  # ============================================================================
+  # Other restricted actions trigger the same restriction modal
+  # ============================================================================
+
+  @integration
+  Scenario: Lite member clicks create on prompts or datasets and sees restriction modal
+    When sarah navigates to prompts or datasets
+    And she clicks a create button
+    Then she sees a restriction modal explaining the limitation
+    And existing prompts and datasets are fully viewable
+
+  @integration
+  Scenario: Lite member clicks edit on settings and sees restriction modal
+    When sarah opens the settings page
+    And she clicks a save or edit control
+    Then she sees a restriction modal explaining the limitation
 
   # ============================================================================
   # Full members are unaffected
   # ============================================================================
 
+  @integration
   Scenario: Full member retains all capabilities
     When dev logs in to the platform
     Then dev can view, create, edit, and delete all resources
     And dev can debug individual traces
-    And dev experiences no restriction modals
+    And dev experiences no restriction modals or disabled buttons
 
   # ============================================================================
   # Code-created resources are visible to lite members
   # ============================================================================
 
+  @integration
   Scenario: Scenarios created via SDK are visible to lite members
     Given dev creates a scenario via the Python SDK
     When sarah opens the simulations page
     Then she sees the SDK-created scenario and its results
 
+  @integration
   Scenario: Evaluations run via SDK are visible to lite members
     Given dev runs an evaluation via the SDK
     When sarah opens the evaluations page
     Then she sees the SDK-created evaluation results
+
+  # ============================================================================
+  # No regression in license enforcement
+  # ============================================================================
+
+  @integration
+  Scenario: License limit enforcement is unaffected by lite member changes
+    Given the organization has reached a plan limit
+    When a full member triggers the limit
+    Then they see the standard upgrade modal with plan/billing information
+    And the lite member restriction modal is not shown
