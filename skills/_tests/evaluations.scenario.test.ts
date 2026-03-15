@@ -115,4 +115,62 @@ describe("Evaluations Skill", () => {
     },
     600_000
   );
+
+  it.skipIf(isCI)(
+    "creates an evaluation experiment for a TypeScript Vercel AI bot",
+    async () => {
+      const tempFolder = fs.mkdtempSync(
+        path.join(os.tmpdir(), "langwatch-skill-evaluations-ts-")
+      );
+
+      execSync(
+        `cp -r ${path.resolve(__dirname, "fixtures/typescript-vercel")}/* ${tempFolder}/`
+      );
+      copySkillToWorkDir(tempFolder);
+
+      const result = await scenario.run({
+        name: "TypeScript Vercel AI evaluation experiment",
+        description:
+          "Creating an evaluation experiment for a TypeScript Vercel AI chatbot.",
+        agents: [
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          scenario.userSimulatorAgent({ model: judgeModel }),
+          scenario.judgeAgent({
+            model: judgeModel,
+            criteria: [
+              "Agent created an evaluation experiment file (script or test)",
+              "Agent generated a dataset relevant to the agent's functionality",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "create a batch evaluation experiment for my agent using langwatch experiments SDK, short and sweet, no need to run it"
+          ),
+          scenario.agent(),
+          (state) => {
+            toolCallFix(state);
+            // Find new TypeScript files (not index.ts)
+            const files = fs
+              .readdirSync(tempFolder)
+              .filter((f) => f.endsWith(".ts") && f !== "index.ts");
+            expect(
+              files.length,
+              "Expected at least one new .ts file"
+            ).toBeGreaterThan(0);
+            const content = files
+              .map((f) =>
+                fs.readFileSync(path.join(tempFolder, f), "utf8")
+              )
+              .join("\n");
+            expect(content).toContain("langwatch");
+          },
+          scenario.judge(),
+        ],
+      });
+
+      expect(result.success).toBe(true);
+    },
+    600_000
+  );
 });

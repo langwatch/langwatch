@@ -183,4 +183,53 @@ describe("Tracing Skill", () => {
     },
     600_000
   );
+
+  it.skipIf(isCI)(
+    "instruments a TypeScript Mastra agent with LangWatch",
+    async () => {
+      const tempFolder = fs.mkdtempSync(
+        path.join(os.tmpdir(), "langwatch-skill-tracing-mastra-")
+      );
+
+      execSync(
+        `cp -r ${path.resolve(__dirname, "fixtures/typescript-mastra")}/* ${tempFolder}/`
+      );
+      copySkillToWorkDir(tempFolder);
+
+      const result = await scenario.run({
+        name: "TypeScript Mastra instrumentation",
+        description:
+          "Implementing LangWatch instrumentation in a TypeScript Mastra agent project.",
+        agents: [
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          scenario.userSimulatorAgent({ model: judgeModel }),
+          scenario.judgeAgent({
+            model: judgeModel,
+            criteria: [
+              "Agent should modify the TypeScript file to add LangWatch tracing",
+              "Agent should use the LangWatch MCP to check Mastra integration docs",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "please instrument my code with langwatch, short and sweet, no need to test"
+          ),
+          scenario.agent(),
+          (state) => {
+            toolCallFix(state);
+            const resultFile = fs.readFileSync(
+              `${tempFolder}/index.ts`,
+              "utf8"
+            );
+            expect(resultFile).toContain("langwatch");
+          },
+          scenario.judge(),
+        ],
+      });
+
+      expect(result.success).toBe(true);
+    },
+    600_000
+  );
 });
