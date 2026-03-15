@@ -224,4 +224,52 @@ describe("Evaluations Skill", () => {
     },
     600_000
   );
+
+  it.skipIf(isCI)(
+    "creates a targeted evaluation for RAG faithfulness",
+    async () => {
+      const tempFolder = fs.mkdtempSync(
+        path.join(os.tmpdir(), "langwatch-skill-evaluations-targeted-")
+      );
+      execSync(
+        `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`
+      );
+      copySkillToWorkDir(tempFolder);
+
+      const result = await scenario.run({
+        name: "Targeted RAG faithfulness evaluation",
+        description:
+          "Adding a specific evaluation for checking if the agent's responses are faithful to the context provided.",
+        agents: [
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          scenario.userSimulatorAgent({ model: judgeModel }),
+          scenario.judgeAgent({
+            model: judgeModel,
+            criteria: [
+              "Agent created an evaluation focused specifically on faithfulness or hallucination detection",
+              "The evaluation is targeted, not a generic test suite",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "create an evaluation that checks if my agent hallucinates or makes up information, use langwatch experiments SDK with a faithfulness evaluator, short and sweet, no need to run it"
+          ),
+          scenario.agent(),
+          (state) => {
+            toolCallFix(state);
+            const newFiles = findNewPythonFiles(tempFolder);
+            expect(newFiles.length).toBeGreaterThan(0);
+            const content = newFiles
+              .map((f) => fs.readFileSync(f, "utf8"))
+              .join("\n");
+            expect(content).toContain("langwatch");
+          },
+          scenario.judge(),
+        ],
+      });
+      expect(result.success).toBe(true);
+    },
+    600_000
+  );
 });

@@ -134,4 +134,98 @@ describe("Level-up Skill", () => {
     },
     900_000
   );
+
+  it.skipIf(isCI)(
+    "orchestrates all sub-skills for a Python LangGraph agent",
+    async () => {
+      const tempFolder = fs.mkdtempSync(
+        path.join(os.tmpdir(), "langwatch-skill-level-up-langgraph-")
+      );
+      execSync(
+        `cp -r ${path.resolve(__dirname, "fixtures/python-langgraph")}/* ${tempFolder}/`
+      );
+      copySkillToWorkDir(tempFolder);
+
+      const result = await scenario.run({
+        name: "Python LangGraph level-up",
+        description:
+          "Taking a Python LangGraph agent to the next level with full LangWatch integration.",
+        agents: [
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          scenario.userSimulatorAgent({ model: judgeModel }),
+          scenario.judgeAgent({
+            model: judgeModel,
+            criteria: [
+              "Agent should have added LangWatch tracing",
+              "Agent should have set up some form of evaluation or testing",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "take my agent to the next level with langwatch — add tracing, set up evaluations, and add scenario tests. Be concise, no need to run anything."
+          ),
+          scenario.agent(),
+          (state) => {
+            toolCallFix(state);
+            const mainPy = fs.readFileSync(
+              `${tempFolder}/main.py`,
+              "utf8"
+            );
+            expect(mainPy).toContain("langwatch");
+          },
+          scenario.judge(),
+        ],
+      });
+      expect(result.success).toBe(true);
+    },
+    900_000
+  );
+
+  it.skipIf(isCI)(
+    "orchestrates all sub-skills for a TypeScript Mastra agent",
+    async () => {
+      const tempFolder = fs.mkdtempSync(
+        path.join(os.tmpdir(), "langwatch-skill-level-up-mastra-")
+      );
+      execSync(
+        `cp -r ${path.resolve(__dirname, "fixtures/typescript-mastra")}/* ${tempFolder}/`
+      );
+      copySkillToWorkDir(tempFolder);
+
+      const result = await scenario.run({
+        name: "TypeScript Mastra level-up",
+        description:
+          "Taking a TypeScript Mastra agent to the next level with full LangWatch integration.",
+        agents: [
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          scenario.userSimulatorAgent({ model: judgeModel }),
+          scenario.judgeAgent({
+            model: judgeModel,
+            criteria: [
+              "Agent should have added LangWatch tracing",
+              "Agent should have set up some form of evaluation or testing",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "take my agent to the next level with langwatch — add tracing, set up evaluations, and add scenario tests. Be concise, no need to run anything."
+          ),
+          scenario.agent(),
+          (state) => {
+            toolCallFix(state);
+            const indexTs = fs.readFileSync(
+              `${tempFolder}/index.ts`,
+              "utf8"
+            );
+            expect(indexTs).toContain("langwatch");
+          },
+          scenario.judge(),
+        ],
+      });
+      expect(result.success).toBe(true);
+    },
+    900_000
+  );
 });
