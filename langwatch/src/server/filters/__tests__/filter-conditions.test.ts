@@ -118,17 +118,82 @@ describe("clickHouseFilterConditions", () => {
     });
   });
 
-  describe("unsupported filters", () => {
-    it("returns null for metadata.key filter", () => {
-      expect(clickHouseFilterConditions["metadata.key"]).toBeNull();
+  describe("metadata.key", () => {
+    it("checks all three key formats for existence", () => {
+      const builder = clickHouseFilterConditions["metadata.key"];
+      expect(builder).not.toBeNull();
+      const result = builder!(["canary"], "f0");
+      expect(result.sql).toContain("f0_k0_canonical");
+      expect(result.sql).toContain("f0_k0_lw");
+      expect(result.sql).toContain("f0_k0_bare");
+      expect(result.params).toEqual({
+        f0_k0_canonical: "metadata.canary",
+        f0_k0_lw: "langwatch.metadata.canary",
+        f0_k0_bare: "canary",
+      });
     });
 
-    it("returns null for metadata.value filter", () => {
-      expect(clickHouseFilterConditions["metadata.value"]).toBeNull();
+    it("generates OR conditions for multiple keys", () => {
+      const builder = clickHouseFilterConditions["metadata.key"];
+      const result = builder!(["canary", "environment"], "f0");
+      expect(result.sql).toContain(" OR ");
+      expect(result.params).toHaveProperty("f0_k0_canonical", "metadata.canary");
+      expect(result.params).toHaveProperty("f0_k1_canonical", "metadata.environment");
     });
 
-    it("returns null for spans.type filter (requires join)", () => {
-      expect(clickHouseFilterConditions["spans.type"]).toBeNull();
+    it("converts dot-encoded keys back to dots", () => {
+      const builder = clickHouseFilterConditions["metadata.key"];
+      const result = builder!(["nested·key"], "f0");
+      expect(result.params).toHaveProperty("f0_k0_canonical", "metadata.nested.key");
+      expect(result.params).toHaveProperty("f0_k0_bare", "nested.key");
+    });
+
+    it("returns 1=0 when no values", () => {
+      const builder = clickHouseFilterConditions["metadata.key"];
+      const result = builder!([], "f0");
+      expect(result.sql).toBe("1=0");
+    });
+  });
+
+  describe("metadata.value", () => {
+    it("checks all three key formats for value match", () => {
+      const builder = clickHouseFilterConditions["metadata.value"];
+      expect(builder).not.toBeNull();
+      const result = builder!(["true"], "f0", "canary");
+      expect(result.sql).toContain("f0_canonical");
+      expect(result.sql).toContain("f0_lw");
+      expect(result.sql).toContain("f0_bare");
+      expect(result.params).toEqual({
+        f0_canonical: "metadata.canary",
+        f0_lw: "langwatch.metadata.canary",
+        f0_bare: "canary",
+        f0_values: ["true"],
+      });
+    });
+
+    it("returns 1=0 when key is missing", () => {
+      const builder = clickHouseFilterConditions["metadata.value"];
+      const result = builder!(["true"], "f0");
+      expect(result.sql).toBe("1=0");
+    });
+
+    it("converts dot-encoded keys back to dots", () => {
+      const builder = clickHouseFilterConditions["metadata.value"];
+      const result = builder!(["val"], "f0", "nested·key");
+      expect(result.params).toHaveProperty("f0_canonical", "metadata.nested.key");
+      expect(result.params).toHaveProperty("f0_bare", "nested.key");
+    });
+  });
+
+  describe("spans.type", () => {
+    it("generates EXISTS subquery on stored_spans", () => {
+      const builder = clickHouseFilterConditions["spans.type"];
+      expect(builder).not.toBeNull();
+      const result = builder!(["llm", "tool"], "f0");
+      expect(result.sql).toContain("EXISTS (");
+      expect(result.sql).toContain("stored_spans sp");
+      expect(result.sql).toContain("sp.SpanAttributes['langwatch.span.type']");
+      expect(result.params).toEqual({ f0_values: ["llm", "tool"] });
     });
   });
 
@@ -220,13 +285,13 @@ describe("generateClickHouseFilterConditions", () => {
     expect(result.hasUnsupportedFilters).toBe(false);
   });
 
-  it("sets hasUnsupportedFilters when unsupported filter is included", () => {
+  it("generates conditions for metadata.key filter", () => {
     const filters: Partial<Record<FilterField, FilterParam>> = {
       "metadata.key": ["some-key"],
     };
     const result = generateClickHouseFilterConditions(filters);
-    expect(result.hasUnsupportedFilters).toBe(true);
-    expect(result.conditions).toEqual([]);
+    expect(result.hasUnsupportedFilters).toBe(false);
+    expect(result.conditions.length).toBe(1);
   });
 
   it("skips empty array filters", () => {

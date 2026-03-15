@@ -42,8 +42,44 @@ export const clickHouseFilterConditions: Record<
     sql: `hasAny(JSONExtractArrayRaw(ts.Attributes['langwatch.labels']), arrayMap(x -> concat('"', x, '"'), {${paramId}_values:Array(String)}))`,
     params: { [`${paramId}_values`]: values },
   }),
-  "metadata.key": null, // Complex nested filter, not supported
-  "metadata.value": null, // Complex nested filter, not supported
+  "metadata.key": (values, paramId) => {
+    if (values.length === 0) return { sql: "1=0", params: {} };
+    // Check all three legacy key formats for each metadata key:
+    // - metadata.{key} (canonical, from Python SDK canonicalization)
+    // - langwatch.metadata.{key} (legacy REST collector)
+    // - {key} (legacy bare OTEL resource attribute)
+    const conditions = values.map((_v, i) => {
+      return `(ts.Attributes[{${paramId}_k${i}_canonical:String}] != '' OR ts.Attributes[{${paramId}_k${i}_lw:String}] != '' OR ts.Attributes[{${paramId}_k${i}_bare:String}] != '')`;
+    });
+    const params: Record<string, unknown> = {};
+    values.forEach((v, i) => {
+      const rawKey = v.replaceAll("·", ".");
+      params[`${paramId}_k${i}_canonical`] = `metadata.${rawKey}`;
+      params[`${paramId}_k${i}_lw`] = `langwatch.metadata.${rawKey}`;
+      params[`${paramId}_k${i}_bare`] = rawKey;
+    });
+    return {
+      sql: conditions.length === 1 ? conditions[0]! : `(${conditions.join(" OR ")})`,
+      params,
+    };
+  },
+  "metadata.value": (values, paramId, key) => {
+    if (!key) return { sql: "1=0", params: {} };
+    const rawKey = key.replaceAll("·", ".");
+    // Match all three legacy key formats for existing data:
+    // - metadata.{key} (canonical, from Python SDK canonicalization)
+    // - langwatch.metadata.{key} (legacy REST collector)
+    // - {key} (legacy bare OTEL resource attribute)
+    return {
+      sql: `(ts.Attributes[{${paramId}_canonical:String}] IN ({${paramId}_values:Array(String)}) OR ts.Attributes[{${paramId}_lw:String}] IN ({${paramId}_values:Array(String)}) OR ts.Attributes[{${paramId}_bare:String}] IN ({${paramId}_values:Array(String)}))`,
+      params: {
+        [`${paramId}_canonical`]: `metadata.${rawKey}`,
+        [`${paramId}_lw`]: `langwatch.metadata.${rawKey}`,
+        [`${paramId}_bare`]: rawKey,
+        [`${paramId}_values`]: values,
+      },
+    };
+  },
   "metadata.prompt_ids": (values, paramId) => ({
     sql: `hasAny(JSONExtractArrayRaw(ts.Attributes['langwatch.prompt_ids']), arrayMap(x -> concat('"', x, '"'), {${paramId}_values:Array(String)}))`,
     params: { [`${paramId}_values`]: values },
@@ -73,7 +109,15 @@ export const clickHouseFilterConditions: Record<
   },
 
   // Spans
-  "spans.type": null, // Requires join with stored_spans, handled separately
+  "spans.type": (values, paramId) => ({
+    sql: `EXISTS (
+      SELECT 1 FROM stored_spans sp
+      WHERE sp.TenantId = ts.TenantId
+        AND sp.TraceId = ts.TraceId
+        AND sp.SpanAttributes['langwatch.span.type'] IN ({${paramId}_values:Array(String)})
+    )`,
+    params: { [`${paramId}_values`]: values },
+  }),
   "spans.model": (values, paramId) => ({
     sql: `hasAny(ts.Models, {${paramId}_values:Array(String)})`,
     params: { [`${paramId}_values`]: values },
