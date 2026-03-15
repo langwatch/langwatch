@@ -52,6 +52,7 @@ export type WorkflowStore = State & {
   reset: () => void;
   getWorkflow: () => Workflow;
   getAutosavedWorkflow: () => Workflow | undefined;
+  getLastCommittedWorkflow: () => Workflow | undefined;
   hasPendingChanges: () => boolean;
   setWorkflow: (
     workflow:
@@ -419,6 +420,9 @@ export const store = (
   },
   getAutosavedWorkflow: () => {
     return get().autosavedWorkflow;
+  },
+  getLastCommittedWorkflow: () => {
+    return get().lastCommittedWorkflow;
   },
   hasPendingChanges: () => {
     const autosavedWorkflow = get().autosavedWorkflow;
