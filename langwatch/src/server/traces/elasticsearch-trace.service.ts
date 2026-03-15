@@ -177,19 +177,6 @@ export class ElasticsearchTraceService {
       ...input,
     });
 
-    // Add updatedAt filter to only return traces modified since a given timestamp
-    if (input.updatedAt !== undefined && input.updatedAt > 0) {
-      const must = (pivotIndexConditions.bool as { must: unknown[] }).must;
-      must.push({
-        range: {
-          "timestamps.updated_at": {
-            gte: input.updatedAt,
-            format: "epoch_millis",
-          },
-        },
-      });
-    }
-
     let pageSize = input.pageSize ?? 25;
     const pageOffset = input.pageOffset ?? 0;
 
