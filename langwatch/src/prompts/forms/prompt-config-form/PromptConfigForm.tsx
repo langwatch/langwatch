@@ -7,6 +7,7 @@ import {
   useFormContext,
 } from "react-hook-form";
 import { toaster } from "~/components/ui/toaster";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { FormVariablesSection } from "~/components/variables";
 import type { PromptConfigFormValues } from "~/prompts";
 import { usePromptConfigContext } from "~/prompts/providers/PromptConfigProvider";
@@ -81,6 +82,7 @@ function InnerPromptConfigForm() {
     };
 
     const onError = (error: Error) => {
+      if (isHandledByGlobalHandler(error)) return;
       console.error(error);
       toaster.create({
         title: "Error saving version",

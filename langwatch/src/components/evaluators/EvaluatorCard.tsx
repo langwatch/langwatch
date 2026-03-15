@@ -5,7 +5,6 @@ import { useState } from "react";
 import { LuPencil, LuTrash2 } from "react-icons/lu";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { Menu } from "../ui/menu";
-import { Tooltip } from "../ui/tooltip";
 import { EvaluatorApiUsageDialog } from "./EvaluatorApiUsageDialog";
 
 const evaluatorTypeIcons: Record<string, typeof CheckSquare> = {
@@ -31,7 +30,6 @@ export type EvaluatorCardProps = {
   onReplicate?: () => void;
   onPushToCopies?: () => void;
   onSyncFromSource?: () => void;
-  hasEvaluationsManagePermission?: boolean;
 };
 
 export function EvaluatorCard({
@@ -43,7 +41,6 @@ export function EvaluatorCard({
   onReplicate,
   onPushToCopies,
   onSyncFromSource,
-  hasEvaluationsManagePermission = false,
 }: EvaluatorCardProps) {
   const Icon = evaluatorTypeIcons[evaluator.type] ?? CheckSquare;
   const typeLabel = evaluatorTypeLabels[evaluator.type] ?? evaluator.type;
@@ -116,85 +113,37 @@ export function EvaluatorCard({
                     Use via API
                   </Menu.Item>
                   {isCopiedEvaluator && onSyncFromSource && (
-                    <Tooltip
-                      content={
-                        !hasEvaluationsManagePermission
-                          ? "You need evaluations:manage permission to sync from source"
-                          : undefined
-                      }
-                      disabled={hasEvaluationsManagePermission}
-                      positioning={{ placement: "right" }}
-                      showArrow
-                    >
                       <Menu.Item
                         value="sync"
-                        onClick={
-                          hasEvaluationsManagePermission
-                            ? (e) => {
-                                e.stopPropagation();
-                                onSyncFromSource();
-                              }
-                            : undefined
-                        }
-                        disabled={!hasEvaluationsManagePermission}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSyncFromSource();
+                        }}
                       >
                         <RefreshCw size={16} /> Update from source
                       </Menu.Item>
-                    </Tooltip>
                   )}
                   {hasCopies && onPushToCopies && (
-                    <Tooltip
-                      content={
-                        !hasEvaluationsManagePermission
-                          ? "You need evaluations:manage permission to push to replicas"
-                          : undefined
-                      }
-                      disabled={hasEvaluationsManagePermission}
-                      positioning={{ placement: "right" }}
-                      showArrow
-                    >
                       <Menu.Item
                         value="push"
-                        onClick={
-                          hasEvaluationsManagePermission
-                            ? (e) => {
-                                e.stopPropagation();
-                                onPushToCopies();
-                              }
-                            : undefined
-                        }
-                        disabled={!hasEvaluationsManagePermission}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onPushToCopies();
+                        }}
                       >
                         <ArrowUp size={16} /> Push to replicas
                       </Menu.Item>
-                    </Tooltip>
                   )}
                   {onReplicate && (
-                    <Tooltip
-                      content={
-                        !hasEvaluationsManagePermission
-                          ? "You need evaluations:manage permission to replicate evaluators"
-                          : undefined
-                      }
-                      disabled={hasEvaluationsManagePermission}
-                      positioning={{ placement: "right" }}
-                      showArrow
-                    >
                       <Menu.Item
                         value="replicate"
-                        onClick={
-                          hasEvaluationsManagePermission
-                            ? (e) => {
-                                e.stopPropagation();
-                                onReplicate();
-                              }
-                            : undefined
-                        }
-                        disabled={!hasEvaluationsManagePermission}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onReplicate();
+                        }}
                       >
                         <Copy size={16} /> Replicate to another project
                       </Menu.Item>
-                    </Tooltip>
                   )}
                   {onDelete && (
                     <Menu.Item

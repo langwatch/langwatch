@@ -4,6 +4,7 @@ import { useDrawer } from "../../hooks/useDrawer";
 import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
+import { isHandledByGlobalHandler } from "../../utils/trpcError";
 import { trackEvent } from "../../utils/tracking";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
@@ -88,6 +89,7 @@ export function CreateProjectDrawer({
             handleClose();
           },
           onError: (error) => {
+            if (isHandledByGlobalHandler(error)) return;
             toaster.create({
               title: "Error creating project",
               description: error.message,

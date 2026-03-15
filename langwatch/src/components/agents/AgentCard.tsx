@@ -15,7 +15,7 @@ import { LuPencil, LuTrash2 } from "react-icons/lu";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { Menu } from "../ui/menu";
-import { Tooltip } from "../ui/tooltip";
+
 
 const agentTypeIcons: Record<string, typeof MessageSquare> = {
   signature: MessageSquare,
@@ -31,51 +31,6 @@ const agentTypeLabels: Record<string, string> = {
   workflow: "Workflow",
 };
 
-/**
- * Menu item that is either clickable (when permitted) or disabled with an
- * explanatory tooltip. Use for actions that require evaluations:manage.
- */
-function PermissionGuardedMenuItem({
-  value,
-  icon: Icon,
-  label,
-  permissionMessage,
-  hasPermission,
-  onAction,
-}: {
-  value: string;
-  icon: React.ComponentType<{ size?: number }>;
-  label: string;
-  permissionMessage: string;
-  hasPermission: boolean;
-  onAction: () => void;
-}) {
-  if (hasPermission) {
-    return (
-      <Menu.Item
-        value={value}
-        onClick={(e) => {
-          e.stopPropagation();
-          onAction();
-        }}
-      >
-        <Icon size={16} /> {label}
-      </Menu.Item>
-    );
-  }
-  return (
-    <Tooltip
-      content={permissionMessage}
-      positioning={{ placement: "right" }}
-      showArrow
-    >
-      <Menu.Item value={value} disabled>
-        <Icon size={16} /> {label}
-      </Menu.Item>
-    </Tooltip>
-  );
-}
-
 export type AgentCardProps = {
   agent: TypedAgent;
   onClick?: () => void;
@@ -85,7 +40,6 @@ export type AgentCardProps = {
   onReplicate?: () => void;
   onPushToCopies?: () => void;
   onSyncFromSource?: () => void;
-  hasEvaluationsManagePermission?: boolean;
 };
 
 export function AgentCard({
@@ -97,7 +51,6 @@ export function AgentCard({
   onReplicate,
   onPushToCopies,
   onSyncFromSource,
-  hasEvaluationsManagePermission = false,
 }: AgentCardProps) {
   const Icon = agentTypeIcons[agent.type] ?? Bot;
   const typeLabel = agentTypeLabels[agent.type] ?? agent.type;
@@ -164,34 +117,37 @@ export function AgentCard({
                     </Menu.Item>
                   )}
                   {isCopiedAgent && onSyncFromSource && (
-                    <PermissionGuardedMenuItem
+                    <Menu.Item
                       value="sync"
-                      icon={RefreshCw}
-                      label="Update from source"
-                      permissionMessage="You need evaluations:manage permission to sync from source"
-                      hasPermission={hasEvaluationsManagePermission}
-                      onAction={onSyncFromSource}
-                    />
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSyncFromSource();
+                      }}
+                    >
+                      <RefreshCw size={14} /> Update from source
+                    </Menu.Item>
                   )}
                   {hasCopies && onPushToCopies && (
-                    <PermissionGuardedMenuItem
+                    <Menu.Item
                       value="push"
-                      icon={ArrowUp}
-                      label="Push to replicas"
-                      permissionMessage="You need evaluations:manage permission to push to replicas"
-                      hasPermission={hasEvaluationsManagePermission}
-                      onAction={onPushToCopies}
-                    />
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onPushToCopies();
+                      }}
+                    >
+                      <ArrowUp size={14} /> Push to replicas
+                    </Menu.Item>
                   )}
                   {onReplicate && (
-                    <PermissionGuardedMenuItem
+                    <Menu.Item
                       value="replicate"
-                      icon={Copy}
-                      label="Replicate to another project"
-                      permissionMessage="You need evaluations:manage permission to replicate agents"
-                      hasPermission={hasEvaluationsManagePermission}
-                      onAction={onReplicate}
-                    />
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onReplicate();
+                      }}
+                    >
+                      <Copy size={14} /> Replicate to another project
+                    </Menu.Item>
                   )}
                   {onDelete && (
                     <Menu.Item
