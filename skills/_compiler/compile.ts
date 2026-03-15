@@ -3,8 +3,8 @@
  * Prompt compiler — generates self-contained copy-paste prompts from AgentSkills.
  *
  * Usage:
- *   npx tsx skills/_compiler/compile.ts --skills instrument --mode platform
- *   npx tsx skills/_compiler/compile.ts --skills instrument,experiment --mode docs
+ *   npx tsx skills/_compiler/compile.ts --skills tracing --mode platform
+ *   npx tsx skills/_compiler/compile.ts --skills tracing,evaluations --mode docs
  *   npx tsx skills/_compiler/compile.ts --skills level-up --mode platform --api-key sk-lw-xxx
  */
 
@@ -189,7 +189,7 @@ function deduplicateSharedContent(sections: string[]): string {
 // Level-up composition
 // ──────────────────────────────────────────────────
 
-const LEVEL_UP_SKILLS = ["instrument", "prompt-versioning", "experiment", "scenario-test"];
+const LEVEL_UP_SKILLS = ["tracing", "prompts", "evaluations", "scenarios"];
 
 function isComposedSkill(skillName: string): boolean {
   return skillName === "level-up";
@@ -276,18 +276,17 @@ function parseArgs(): CompileOptions {
         console.log(`Usage: compile.ts --skills <skill1,skill2> --mode <platform|docs> [--api-key <key>]
 
 Options:
-  --skills    Comma-separated skill names (e.g., instrument,experiment)
+  --skills    Comma-separated skill names (e.g., tracing,evaluations)
   --mode      Output mode: "platform" (injects API key) or "docs" (asks for API key)
   --api-key   API key to inject (platform mode only; defaults to {{LANGWATCH_API_KEY}})
 
 Available skills:
-  instrument, experiment, scenario-test, prompt-versioning, red-team, level-up,
-  platform-experiment, platform-scenario, analytics
+  tracing, evaluations, scenarios, prompts, analytics, level-up
 
 Examples:
-  npx tsx compile.ts --skills instrument --mode platform --api-key sk-lw-xxx
+  npx tsx compile.ts --skills tracing --mode platform --api-key sk-lw-xxx
   npx tsx compile.ts --skills level-up --mode docs
-  npx tsx compile.ts --skills instrument,scenario-test --mode platform`);
+  npx tsx compile.ts --skills tracing,scenarios --mode platform`);
         process.exit(0);
     }
   }

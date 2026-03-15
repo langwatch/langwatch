@@ -34,44 +34,44 @@ Feature: Scenario tests for skills quality assurance
     And each fixture has no LangWatch instrumentation
 
   # ──────────────────────────────────────────────────
-  # Instrument skill tests
+  # Tracing skill tests
   # ──────────────────────────────────────────────────
 
-  @instrument @integration
-  Scenario: Instrument skill works for Python + OpenAI
+  @tracing @integration
+  Scenario: Tracing skill works for Python + OpenAI
     Given the fixture "python-openai" is copied to a temp directory
-    And the skill "instrument" is loaded
+    And the skill "tracing" is loaded
     When Claude Code receives "instrument my code with LangWatch"
     Then the agent modifies the Python file to add LangWatch tracing
     And the file contains "@langwatch.trace()" or "langwatch.trace()" decorator
     And the file contains "autotrack_openai_calls" or equivalent
     And the agent used the LangWatch MCP to read documentation
 
-  @instrument @integration
-  Scenario: Instrument skill works for TypeScript + Vercel AI
+  @tracing @integration
+  Scenario: Tracing skill works for TypeScript + Vercel AI
     Given the fixture "typescript-vercel" is copied to a temp directory
-    And the skill "instrument" is loaded
+    And the skill "tracing" is loaded
     When Claude Code receives "instrument my code with LangWatch"
     Then the agent modifies the TypeScript file to add LangWatch tracing
     And the file imports from "langwatch"
     And the agent used the LangWatch MCP to read documentation
 
-  @instrument @integration
-  Scenario: Instrument skill works for Python + LangGraph
+  @tracing @integration
+  Scenario: Tracing skill works for Python + LangGraph
     Given the fixture "python-langgraph" is copied to a temp directory
-    And the skill "instrument" is loaded
+    And the skill "tracing" is loaded
     When Claude Code receives "instrument my code with LangWatch"
     Then the agent modifies the Python file to add LangWatch tracing
     And the agent used the LangWatch MCP to read LangGraph integration docs
 
   # ──────────────────────────────────────────────────
-  # Experiment skill tests
+  # Evaluations skill tests
   # ──────────────────────────────────────────────────
 
-  @experiment @integration
-  Scenario: Experiment skill creates a Jupyter notebook for Python
+  @evaluations @integration
+  Scenario: Evaluations skill creates a Jupyter notebook for Python
     Given the fixture "python-openai" is copied to a temp directory
-    And the skill "experiment" is loaded
+    And the skill "evaluations" is loaded
     When Claude Code receives "create an evaluation experiment for my agent"
     Then the agent creates a Jupyter notebook (.ipynb) file
     And the notebook imports langwatch
@@ -79,46 +79,70 @@ Feature: Scenario tests for skills quality assurance
     And the agent generates a dataset tailored to the fixture's domain
     And the notebook includes at least one evaluator
 
-  @experiment @integration
-  Scenario: Experiment skill creates a script for TypeScript
+  @evaluations @integration
+  Scenario: Evaluations skill creates a script for TypeScript
     Given the fixture "typescript-vercel" is copied to a temp directory
-    And the skill "experiment" is loaded
+    And the skill "evaluations" is loaded
     When Claude Code receives "create an evaluation experiment for my agent"
     Then the agent creates a TypeScript script file
     And the script imports from "langwatch"
     And the script uses langwatch.experiments.init()
 
   # ──────────────────────────────────────────────────
-  # Scenario-test skill tests
+  # Scenarios skill tests
   # ──────────────────────────────────────────────────
 
-  @scenario-test @integration
-  Scenario: Scenario-test skill creates tests without hallucinating a framework
+  @scenarios @integration
+  Scenario: Scenarios skill creates tests without hallucinating a framework
     Given the fixture "python-openai" is copied to a temp directory
-    And the skill "scenario-test" is loaded
+    And the skill "scenarios" is loaded
     When Claude Code receives "add agent simulation tests for my agent"
     Then the agent creates scenario test files using @langwatch/scenario or langwatch-scenario
     And the test files import from the real scenario package
     And the agent did NOT invent its own testing framework
     And the agent used the LangWatch MCP to read Scenario docs
 
-  @scenario-test @integration
-  Scenario: Scenario-test skill creates TypeScript tests with vitest
+  @scenarios @integration
+  Scenario: Scenarios skill creates TypeScript tests with vitest
     Given the fixture "typescript-vercel" is copied to a temp directory
-    And the skill "scenario-test" is loaded
+    And the skill "scenarios" is loaded
     When Claude Code receives "add agent simulation tests for my agent"
     Then the agent creates a .test.ts file
     And the file imports from "@langwatch/scenario"
     And the file uses vitest (describe, it, expect)
 
+  @scenarios @integration
+  Scenario: Scenarios skill creates red team tests for Python
+    Given the fixture "python-openai" is copied to a temp directory
+    And the skill "scenarios" is loaded
+    When Claude Code receives "red team my agent for vulnerabilities"
+    Then the agent creates scenario test files using RedTeamAgent
+    And the agent used the LangWatch MCP to read Scenario red teaming docs
+
+  @scenarios @integration
+  Scenario: Scenarios skill creates red team tests for TypeScript
+    Given the fixture "typescript-vercel" is copied to a temp directory
+    And the skill "scenarios" is loaded
+    When Claude Code receives "red team my agent for vulnerabilities"
+    Then the agent creates scenario test files using RedTeamAgent
+
+  @scenarios @platform @integration
+  Scenario: Scenarios skill creates scenarios via platform tools when no codebase
+    Given an empty temporary directory (no codebase)
+    And the skill "scenarios" is loaded
+    And the LangWatch MCP is configured with an API key
+    When the agent receives "write scenario simulation tests for my agent"
+    Then the agent uses platform_create_scenario to create scenarios
+    And the agent does NOT try to write code files
+
   # ──────────────────────────────────────────────────
-  # Prompt-versioning skill tests
+  # Prompts skill tests
   # ──────────────────────────────────────────────────
 
-  @prompt-versioning @integration
-  Scenario: Prompt-versioning skill uses CLI, not hardcoded prompts
+  @prompts @integration
+  Scenario: Prompts skill uses CLI, not hardcoded prompts
     Given the fixture "python-openai" is copied to a temp directory
-    And the skill "prompt-versioning" is loaded
+    And the skill "prompts" is loaded
     When Claude Code receives "version my agent prompts"
     Then the agent runs "langwatch prompt init"
     And the agent runs "langwatch prompt create" for each prompt
@@ -136,7 +160,7 @@ Feature: Scenario tests for skills quality assurance
     Given the fixture "python-openai" is copied to a temp directory
     And the skill "level-up" is loaded
     When Claude Code receives "take my agent to the next level"
-    Then the agent instruments the code with LangWatch tracing
+    Then the agent adds tracing to the code
     And the agent sets up prompt versioning
     And the agent creates an evaluation experiment
     And the agent creates scenario tests
@@ -147,29 +171,10 @@ Feature: Scenario tests for skills quality assurance
     Given the fixture "typescript-vercel" is copied to a temp directory
     And the skill "level-up" is loaded
     When Claude Code receives "take my agent to the next level"
-    Then the agent instruments the code with LangWatch tracing
+    Then the agent adds tracing to the code
     And the agent sets up prompt versioning
     And the agent creates an evaluation experiment
     And the agent creates scenario tests
-
-  # ──────────────────────────────────────────────────
-  # Red-team skill tests
-  # ──────────────────────────────────────────────────
-
-  @red-team @integration
-  Scenario: Red-team skill creates adversarial tests for Python
-    Given the fixture "python-openai" is copied to a temp directory
-    And the skill "red-team" is loaded
-    When Claude Code receives "red team my agent for vulnerabilities"
-    Then the agent creates scenario test files using RedTeamAgent
-    And the agent used the LangWatch MCP to read Scenario red teaming docs
-
-  @red-team @integration
-  Scenario: Red-team skill creates adversarial tests for TypeScript
-    Given the fixture "typescript-vercel" is copied to a temp directory
-    And the skill "red-team" is loaded
-    When Claude Code receives "red team my agent for vulnerabilities"
-    Then the agent creates scenario test files using RedTeamAgent
 
   # ──────────────────────────────────────────────────
   # Platform skill tests (no codebase — simulating claude web)
@@ -184,12 +189,3 @@ Feature: Scenario tests for skills quality assurance
     Then the agent uses discover_schema to learn available metrics
     And the agent uses get_analytics or search_traces to query data
     And the agent provides a summary of performance trends
-
-  @platform @platform-scenario @integration
-  Scenario: Platform-scenario skill creates scenarios via platform tools
-    Given an empty temporary directory (no codebase)
-    And the skill "platform-scenario" is loaded
-    And the LangWatch MCP is configured with an API key
-    When the agent receives "write scenario simulation tests for my agent"
-    Then the agent uses platform_create_scenario to create scenarios
-    And the agent does NOT try to write code files

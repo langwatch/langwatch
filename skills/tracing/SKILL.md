@@ -1,11 +1,27 @@
 ---
-name: instrument
-description: Instrument your code with LangWatch tracing and observability. Use when the user wants to add LangWatch to their existing codebase for monitoring LLM calls, tracking costs, and debugging agent behavior. Supports Python and TypeScript with all major frameworks.
+name: tracing
+description: Add LangWatch tracing and observability to your code. Use for both onboarding (instrument an entire codebase) and targeted operations (add tracing to a specific function or module). Supports Python and TypeScript with all major frameworks.
 license: MIT
 compatibility: Requires Node.js for MCP setup. Works with Claude Code and similar coding agents.
 ---
 
-# Instrument Your Code with LangWatch
+# Add LangWatch Tracing to Your Code
+
+## Determine Scope
+
+If the user's request is **general** ("instrument my code", "add tracing", "set up observability"):
+- Read the full codebase to understand the agent's architecture
+- Study git log to understand what changed and why
+- Add comprehensive tracing across all LLM call sites
+
+If the user's request is **specific** ("add tracing to the payment function", "trace this endpoint"):
+- Focus on the specific function or module
+- Add tracing only where requested
+- Verify the instrumentation works in context
+
+## Detect Context
+
+This skill is code-only — there is no platform path for tracing. If the user has no codebase, explain that tracing requires code instrumentation and point them to the LangWatch docs.
 
 ## Step 1: Set up the LangWatch MCP
 

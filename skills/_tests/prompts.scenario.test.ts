@@ -22,10 +22,10 @@ const isCI = !!process.env.CI;
 const judgeModel = openai("gpt-4.1-mini");
 
 function copySkillToWorkDir(tempFolder: string) {
-  const skillDir = path.join(tempFolder, ".skills", "prompt-versioning");
+  const skillDir = path.join(tempFolder, ".skills", "prompts");
   fs.mkdirSync(skillDir, { recursive: true });
   fs.copyFileSync(
-    path.resolve(__dirname, "../prompt-versioning/SKILL.md"),
+    path.resolve(__dirname, "../prompts/SKILL.md"),
     path.join(skillDir, "SKILL.md")
   );
   const sharedDir = path.join(skillDir, "_shared");
@@ -54,7 +54,7 @@ function findFiles(dir: string, pattern: RegExp): string[] {
   return results;
 }
 
-describe("Prompt Versioning Skill", () => {
+describe("Prompts Skill", () => {
   it.skipIf(isCI)(
     "versions prompts in a Python OpenAI bot with LangWatch Prompts CLI",
     async () => {

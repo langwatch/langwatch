@@ -86,7 +86,7 @@ Feature: Skills integration across all platform touchpoints
   Scenario: Docs integration pages link back to skills
     Given the LangWatch documentation site
     When a user visits a framework integration page (e.g. OpenAI, LangGraph)
-    Then the page links to the "instrument" skill/prompt as an alternative
+    Then the page links to the "tracing" skill/prompt as an alternative
     And explains they can paste a single prompt instead of following manual steps
 
   # ──────────────────────────────────────────────────

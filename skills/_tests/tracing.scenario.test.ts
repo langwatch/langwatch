@@ -22,10 +22,10 @@ const isCI = !!process.env.CI;
 const judgeModel = openai("gpt-4.1-mini");
 
 function copySkillToWorkDir(tempFolder: string) {
-  const skillDir = path.join(tempFolder, ".skills", "instrument");
+  const skillDir = path.join(tempFolder, ".skills", "tracing");
   fs.mkdirSync(skillDir, { recursive: true });
   fs.copyFileSync(
-    path.resolve(__dirname, "../instrument/SKILL.md"),
+    path.resolve(__dirname, "../tracing/SKILL.md"),
     path.join(skillDir, "SKILL.md")
   );
   const sharedDir = path.join(skillDir, "_shared");
@@ -35,7 +35,7 @@ function copySkillToWorkDir(tempFolder: string) {
   );
 }
 
-describe("Instrument Skill", () => {
+describe("Tracing Skill", () => {
   it.skipIf(isCI)(
     "instruments a Python OpenAI bot with LangWatch",
     async () => {

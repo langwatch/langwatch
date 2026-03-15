@@ -13,81 +13,66 @@ Feature: Skills-based onboarding architecture
     And agent bias corrections are embedded directly in each skill's SKILL.md
 
   # ──────────────────────────────────────────────────
-  # Skill catalog — dev path (claude code)
+  # Feature skills (handle both code and platform approaches)
   # ──────────────────────────────────────────────────
 
-  @dev @instrument
-  Scenario: Skill catalog includes "instrument" for code instrumentation
-    Given a skill exists at skills/instrument/SKILL.md
-    Then the skill name is "instrument"
-    And the description mentions instrumenting code with LangWatch tracing
+  @dev @tracing
+  Scenario: Skill catalog includes "tracing" for code instrumentation
+    Given a skill exists at skills/tracing/SKILL.md
+    Then the skill name is "tracing"
+    And the description mentions adding LangWatch tracing and observability
     And the skill references the LangWatch MCP for framework-specific docs
     And the skill includes fallback instructions if MCP is unavailable
     And the skill covers Python and TypeScript
     And the skill handles multiple frameworks via MCP doc lookup
+    And the skill supports both onboarding and targeted modes
 
-  @dev @experiment
-  Scenario: Skill catalog includes "experiment" for evaluation experiments
-    Given a skill exists at skills/experiment/SKILL.md
-    Then the skill name is "experiment"
-    And the description mentions creating evaluation experiments
-    And the skill creates a Jupyter notebook when the project is Python
-    And the skill creates a script when the project is TypeScript
-    And the agent generates a dataset tailored to the user's application
-    And the skill sets up evaluators and LangWatch experiment tracking
+  @dev @evaluations
+  Scenario: Skill catalog includes "evaluations" for comprehensive evaluations
+    Given a skill exists at skills/evaluations/SKILL.md
+    Then the skill name is "evaluations"
+    And the description covers experiments, evaluators, datasets, online evaluation, and guardrails
+    And the skill disambiguates what the user needs based on their request
+    And the skill creates experiments (notebooks/scripts) for batch testing
+    And the skill guides guardrail setup for real-time blocking
+    And the skill explains how to set up online evaluation via the platform
+    And the agent generates datasets tailored to the user's application
+    And the skill auto-detects code vs platform context
+    And the skill supports both onboarding and targeted modes
 
-  @dev @scenario-test
-  Scenario: Skill catalog includes "scenario-test" for agent simulation tests
-    Given a skill exists at skills/scenario-test/SKILL.md
-    Then the skill name is "scenario-test"
-    And the description mentions adding agent simulation tests
+  @dev @scenarios
+  Scenario: Skill catalog includes "scenarios" for agent simulation tests
+    Given a skill exists at skills/scenarios/SKILL.md
+    Then the skill name is "scenarios"
+    And the description mentions testing agents with simulation-based scenarios
     And the skill uses the LangWatch MCP to read Scenario docs
     And the skill creates scenario test files appropriate to the project language
     And the skill explicitly warns against inventing testing frameworks
+    And the skill auto-detects code vs platform context
+    And the skill supports red teaming via RedTeamAgent
+    And the skill supports both onboarding and targeted modes
 
-  @dev @prompt-versioning
-  Scenario: Skill catalog includes "prompt-versioning" for prompt management
-    Given a skill exists at skills/prompt-versioning/SKILL.md
-    Then the skill name is "prompt-versioning"
-    And the description mentions versioning agent prompts with LangWatch
+  @dev @prompts
+  Scenario: Skill catalog includes "prompts" for prompt management
+    Given a skill exists at skills/prompts/SKILL.md
+    Then the skill name is "prompts"
+    And the description mentions versioning and managing agent prompts
     And the skill runs "langwatch prompt init" and "langwatch prompt create"
     And the skill updates application code to fetch prompts from LangWatch
     And the skill includes explicit BAD vs GOOD code examples inline
-
-  @dev @red-team
-  Scenario: Skill catalog includes "red-team" for vulnerability testing
-    Given a skill exists at skills/red-team/SKILL.md
-    Then the skill name is "red-team"
-    And the description mentions red teaming agents for vulnerabilities
-    And the skill uses the LangWatch MCP to read Scenario red teaming docs
-    And the skill uses Scenario's RedTeamAgent for adversarial testing
+    And the skill supports both onboarding and targeted modes
 
   @dev @level-up
   Scenario: Skill catalog includes "level-up" as a meta-skill
     Given a skill exists at skills/level-up/SKILL.md
     Then the skill name is "level-up"
     And the description mentions taking an agent to the next level
-    And the skill orchestrates instrument, experiment, scenario-test, and prompt-versioning
+    And the skill orchestrates tracing, prompts, evaluations, and scenarios
     And the skill runs each sub-skill in sequence with verification steps
 
   # ──────────────────────────────────────────────────
-  # Skill catalog — platform path (claude web / no codebase)
+  # Cross-cutting skills
   # ──────────────────────────────────────────────────
-
-  @platform @platform-experiment
-  Scenario: Skill catalog includes "platform-experiment" for prompt testing
-    Given a skill exists at skills/platform-experiment/SKILL.md
-    Then the skill name is "platform-experiment"
-    And the description mentions creating experiments to test prompts
-    And the skill uses MCP platform_ tools to create prompts and evaluators
-    And the skill explains current limitations around UI experiments and datasets
-
-  @platform @platform-scenario
-  Scenario: Skill catalog includes "platform-scenario" for scenario creation
-    Given a skill exists at skills/platform-scenario/SKILL.md
-    Then the skill name is "platform-scenario"
-    And the description mentions writing scenario simulation tests
-    And the skill uses MCP platform_ tools to create scenarios on the platform
 
   @platform @analytics
   Scenario: Skill catalog includes "analytics" for performance insights

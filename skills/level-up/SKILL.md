@@ -1,13 +1,13 @@
 ---
 name: level-up
-description: Take your AI agent to the next level with full LangWatch integration. Adds instrumentation, prompt versioning, evaluation experiments, and simulation tests in one go. Use when the user wants comprehensive observability, testing, and prompt management for their agent.
+description: Take your AI agent to the next level with full LangWatch integration. Adds tracing, prompt versioning, evaluation experiments, and simulation tests in one go. Use when the user wants comprehensive observability, testing, and prompt management for their agent.
 license: MIT
 compatibility: Requires Node.js for MCP setup. Works with Claude Code and similar coding agents.
 ---
 
 # Take Your Agent to the Next Level
 
-This skill sets up your agent with the full LangWatch stack: instrumentation, prompt versioning, evaluation experiments, and agent simulation tests. Each step builds on the previous one.
+This skill sets up your agent with the full LangWatch stack: tracing, prompt versioning, evaluation experiments, and agent simulation tests. Each step builds on the previous one.
 
 ## Prerequisites
 
@@ -17,7 +17,7 @@ See [MCP Setup](_shared/mcp-setup.md) for installation instructions.
 
 If MCP installation fails, see [docs fallback](_shared/llms-txt-fallback.md) to fetch docs directly.
 
-## Step 1: Instrument Your Code
+## Step 1: Add Tracing
 
 Add LangWatch tracing to capture all LLM calls, costs, and latency.
 
@@ -72,9 +72,9 @@ NEVER invent your own testing framework. Use `@langwatch/scenario` / `langwatch-
 
 ## Common Mistakes
 
-- Do NOT skip any step — each builds on the previous
-- Do NOT use generic datasets in the experiment — tailor them to the agent's domain
-- Do NOT hardcode prompts — use the Prompts CLI
-- Do NOT invent testing frameworks — use Scenario
-- Do NOT use `platform_` MCP tools — this skill writes code in the project
-- Do NOT skip verification steps — run the application/experiment/tests after each step
+- Do NOT skip any step -- each builds on the previous
+- Do NOT use generic datasets in the experiment -- tailor them to the agent's domain
+- Do NOT hardcode prompts -- use the Prompts CLI
+- Do NOT invent testing frameworks -- use Scenario
+- Do NOT use `platform_` MCP tools -- this skill writes code in the project
+- Do NOT skip verification steps -- run the application/experiment/tests after each step

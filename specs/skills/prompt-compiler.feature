@@ -13,15 +13,15 @@ Feature: Prompt compilation pipeline
   # ──────────────────────────────────────────────────
 
   Scenario: Compiler generates a prompt from a single skill
-    Given the skill "instrument" exists at skills/instrument/SKILL.md
-    When the compiler runs for skill "instrument"
+    Given the skill "tracing" exists at skills/tracing/SKILL.md
+    When the compiler runs for skill "tracing"
     Then it produces a self-contained prompt text
     And the prompt includes the skill instructions inlined
     And the prompt includes MCP installation steps
     And the prompt includes a placeholder for the LangWatch API key
 
   Scenario: Compiler generates a prompt from composed skills
-    Given the skills "instrument", "experiment", "scenario-test", and "prompt-versioning" exist
+    Given the skills "tracing", "prompts", "evaluations", and "scenarios" exist
     When the compiler runs for the "level-up" composition
     Then it produces a single prompt that orchestrates all skills
     And each skill's instructions are included in sequence
@@ -44,12 +44,12 @@ Feature: Prompt compilation pipeline
   # ──────────────────────────────────────────────────
 
   Scenario: Compiler produces prompt output
-    Given the compiler runs for skill "instrument"
+    Given the compiler runs for skill "tracing"
     When the output format is "prompt"
     Then it generates a plain text prompt ready to copy-paste
 
   Scenario: Compiler produces skill installation output
-    Given the compiler runs for skill "instrument"
+    Given the compiler runs for skill "tracing"
     When the output format is "skill"
     Then it generates instructions for installing the skill via npx skills-add
 

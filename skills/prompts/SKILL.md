@@ -1,11 +1,28 @@
 ---
-name: prompt-versioning
-description: Version and manage your agent's prompts with LangWatch Prompts CLI. Use when the user wants to track, version-control, and manage their AI prompts as code with A/B testing support.
+name: prompts
+description: Version and manage your agent's prompts with LangWatch Prompts CLI. Use for both onboarding (set up prompt versioning for an entire codebase) and targeted operations (version a specific prompt, create a new prompt version). Supports Python and TypeScript.
 license: MIT
 compatibility: Requires Node.js for MCP setup. Works with Claude Code and similar coding agents.
 ---
 
 # Version Your Prompts with LangWatch Prompts CLI
+
+## Determine Scope
+
+If the user's request is **general** ("set up prompt versioning", "version my prompts"):
+- Read the full codebase to find all hardcoded prompt strings
+- Study git log to understand prompt evolution
+- Set up the Prompts CLI and create managed prompts for each hardcoded prompt
+- Update all application code to use `langwatch.prompts.get()`
+
+If the user's request is **specific** ("version this prompt", "create a new prompt version"):
+- Focus on the specific prompt
+- Create or update the managed prompt
+- Update the relevant code to use `langwatch.prompts.get()`
+
+## Detect Context
+
+This skill is primarily code-path (CLI + SDK). Platform MCP tools exist for prompt management (`platform_create_prompt`, `platform_update_prompt`, etc.) but users typically manage prompts directly in the UI. If the user has no codebase and wants to create prompts on the platform, use the `platform_create_prompt` MCP tool instead.
 
 ## Step 1: Set up the LangWatch MCP
 
@@ -95,5 +112,4 @@ Check that your prompts appear on https://app.langwatch.ai in the Prompts sectio
 - Do NOT hardcode prompts in application code — always use `langwatch.prompts.get()` to fetch managed prompts
 - Do NOT duplicate prompt text as a fallback (no try/catch around `prompts.get` with a hardcoded string) — this silently defeats versioning
 - Do NOT manually edit `prompts.json` — use the CLI commands (`langwatch prompt init`, `langwatch prompt create`, `langwatch prompt sync`)
-- Do NOT use `platform_` MCP tools — this skill writes code and uses the CLI, not platform resources
 - Do NOT skip `langwatch prompt sync` — prompts must be synced to the platform after creation
