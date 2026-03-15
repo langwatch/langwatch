@@ -12,6 +12,7 @@ describe("generateScenarioWithAI()", () => {
     name: "Test Scenario",
     situation: "Test situation",
     criteria: ["criterion 1"],
+    labels: [],
   };
 
   beforeEach(() => {
@@ -67,6 +68,7 @@ describe("generateScenarioWithAI()", () => {
         name: "Current",
         situation: "Current situation",
         criteria: ["existing"],
+        labels: [],
       };
 
       await generateScenarioWithAI(

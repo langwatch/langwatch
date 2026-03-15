@@ -117,6 +117,7 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
       name: "",
       situation: "",
       criteria: [],
+      labels: [],
     });
   }, [openEditorWithData]);
 

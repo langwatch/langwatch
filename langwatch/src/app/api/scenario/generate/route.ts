@@ -33,6 +33,7 @@ const requestSchema = z.object({
       name: z.string(),
       situation: z.string(),
       criteria: z.array(z.string()),
+      labels: z.array(z.string()).optional(),
     })
     .nullable(),
   projectId: z.string().min(1, "Project ID is required"),
@@ -114,7 +115,9 @@ export async function POST(req: NextRequest) {
       prompt: userPrompt,
     });
 
-    return NextResponse.json({ scenario: result.object });
+    // Ensure the generated scenario includes labels (defaulting to empty array)
+    // to match the ScenarioConfig schema expected by the scenario runner
+    return NextResponse.json({ scenario: { ...result.object, labels: [] } });
   } catch (error) {
     logger.error({ error }, "Error generating scenario");
 
