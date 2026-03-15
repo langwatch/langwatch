@@ -19,6 +19,7 @@ import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 
 /**
  * Evaluators management page
@@ -31,7 +32,6 @@ function Page() {
   const { openDrawer, closeDrawer } = useDrawer();
   const utils = api.useContext();
 
-  const hasEvaluationsManagePermission = hasPermission("evaluations:manage");
 
   // State for tracking which evaluator is being deleted
   const [evaluatorToDelete, setEvaluatorToDelete] = useState<{
@@ -62,6 +62,7 @@ function Page() {
       });
     },
     onError: (error) => {
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Error updating evaluator",
         description: error.message ?? "Please try again later.",
@@ -257,7 +258,6 @@ function Page() {
                     urlParams: { evaluatorId: evaluator.id, evaluatorName: evaluator.name },
                   })
                 }
-                hasEvaluationsManagePermission={hasEvaluationsManagePermission}
               />
             ))}
           </Grid>

@@ -11,6 +11,7 @@ import { useOrganizationTeamProject } from "../../../../../hooks/useOrganization
 import { AddModelProviderKey } from "../../../../../optimization_studio/components/AddModelProviderKey";
 import type { DatasetColumns } from "../../../../../server/datasets/types";
 import { api } from "../../../../../utils/api";
+import { isHandledByGlobalHandler } from "../../../../../utils/trpcError";
 import { DEFAULT_MODEL } from "../../../../../utils/constants";
 import { datasetValueToGridValue } from "../../../../datasets/DatasetGrid";
 import { AISparklesLoader } from "../../../../icons/AISparklesLoader";
@@ -81,6 +82,7 @@ export function DatasetGeneration() {
       api: "/api/dataset/generate",
     }),
     onError: (error) => {
+      if (isHandledByGlobalHandler(error)) return;
       console.error("Error in useChat", error);
       toaster.create({
         title: "Error",
@@ -340,6 +342,7 @@ export function DatasetGeneration() {
                 resolve();
               },
               onError: (error) => {
+                if (isHandledByGlobalHandler(error)) { resolve(); return; }
                 // Don't show error toast for unique constraint violations as they're expected
                 if (error?.message?.includes("Unique constraint failed")) {
                   console.warn("Record already exists, skipping:", update.id);

@@ -13,6 +13,7 @@ import {
 } from "@chakra-ui/react";
 import { Upload, X } from "lucide-react";
 import { api } from "~/utils/api";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { toaster } from "../ui/toaster";
 import { Radio, RadioGroup } from "~/components/ui/radio";
 import { Select } from "~/components/ui/select";
@@ -156,6 +157,7 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
         });
       },
       onError: (error) => {
+        if (isHandledByGlobalHandler(error)) return;
         toaster.create({
           title: "Failed to generate license",
           description: error.message,

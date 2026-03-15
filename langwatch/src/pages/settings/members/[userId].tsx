@@ -44,7 +44,7 @@ import {
   getTeamRoleUpdates,
   hasPendingRoleChanges,
 } from "../../../utils/memberRoleState";
-import { isHandledByGlobalLicenseHandler } from "../../../utils/trpcError";
+import { isHandledByGlobalHandler } from "../../../utils/trpcError";
 import { api } from "../../../utils/api";
 
 export default function UserDetailsPage() {
@@ -231,7 +231,7 @@ export default function UserDetailsPage() {
       await apiContext.organization.getMemberById.invalidate();
       await apiContext.organization.getAll.invalidate();
     } catch (error) {
-      if (isHandledByGlobalLicenseHandler(error)) return;
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Failed to update member",
         description:

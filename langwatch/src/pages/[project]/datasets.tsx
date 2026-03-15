@@ -32,7 +32,6 @@ import { UploadCSVModal } from "../../components/datasets/UploadCSVModal";
 import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
 import { toaster } from "../../components/ui/toaster";
-import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { AppRouter } from "../../server/api/root";
 import type { DatasetColumns } from "../../server/datasets/types";
@@ -41,10 +40,7 @@ import { api } from "../../utils/api";
 function DatasetsPage() {
   const addEditDatasetDrawer = useDisclosure();
   const uploadCSVModal = useDisclosure();
-  const { project, hasPermission } = useOrganizationTeamProject();
-  const hasDatasetsCreatePermission = hasPermission("datasets:create");
-  const hasDatasetsUpdatePermission = hasPermission("datasets:update");
-  const hasDatasetsDeletePermission = hasPermission("datasets:delete");
+  const { project } = useOrganizationTeamProject();
   const router = useRouter();
   const { openDrawer } = useDrawer();
   const queryClient = api.useContext();
@@ -166,24 +162,12 @@ function DatasetsPage() {
         >
           <Play height={16} /> Batch Evaluation
         </PageLayout.HeaderButton>
-        <Tooltip
-          content={
-            !hasDatasetsCreatePermission
-              ? "You need datasets:create permission to create datasets"
-              : undefined
-          }
-          disabled={hasDatasetsCreatePermission}
-          positioning={{ placement: "bottom" }}
-          showArrow
+        <PageLayout.HeaderButton
+          onClick={() => uploadCSVModal.onOpen()}
         >
-          <PageLayout.HeaderButton
-            onClick={() => uploadCSVModal.onOpen()}
-            disabled={!hasDatasetsCreatePermission}
-          >
-            <Upload height={17} width={17} strokeWidth={2.5} /> Upload or Create
-            Dataset
-          </PageLayout.HeaderButton>
-        </Tooltip>
+          <Upload height={17} width={17} strokeWidth={2.5} /> Upload or Create
+          Dataset
+        </PageLayout.HeaderButton>
       </PageLayout.Header>
       <PageLayout.Container maxW={"calc(100vw - 200px)"}>
         <PageLayout.Content>
@@ -270,89 +254,47 @@ function DatasetsPage() {
                                 </Button>
                               </Menu.Trigger>
                               <Menu.Content>
-                                <Tooltip
-                                  content={
-                                    !hasDatasetsCreatePermission
-                                      ? "You need datasets:create permission to replicate datasets"
-                                      : undefined
-                                  }
-                                  disabled={hasDatasetsCreatePermission}
-                                  positioning={{ placement: "right" }}
-                                  showArrow
-                                >
                                   <Menu.Item
                                     value="copy"
                                     onClick={(event) => {
                                       event.stopPropagation();
-                                      if (hasDatasetsCreatePermission) {
-                                        setCopyDataset({
-                                          datasetId: dataset.id,
-                                          datasetName: dataset.name,
-                                        });
-                                      }
+                                      setCopyDataset({
+                                        datasetId: dataset.id,
+                                        datasetName: dataset.name,
+                                      });
                                     }}
-                                    disabled={!hasDatasetsCreatePermission}
                                   >
                                     <Copy size={16} /> Replicate to another
                                     project
                                   </Menu.Item>
-                                </Tooltip>
-                                <Tooltip
-                                  content={
-                                    !hasDatasetsUpdatePermission
-                                      ? "You need datasets:update permission to edit datasets"
-                                      : undefined
-                                  }
-                                  disabled={hasDatasetsUpdatePermission}
-                                  positioning={{ placement: "right" }}
-                                  showArrow
-                                >
                                   <Menu.Item
                                     value="edit"
                                     onClick={(event) => {
                                       event.stopPropagation();
-                                      if (hasDatasetsUpdatePermission) {
-                                        setEditDataset({
-                                          datasetId: dataset.id,
-                                          name: dataset.name,
-                                          columnTypes:
-                                            dataset.columnTypes as DatasetColumns,
-                                        });
-                                        addEditDatasetDrawer.onOpen();
-                                      }
+                                      setEditDataset({
+                                        datasetId: dataset.id,
+                                        name: dataset.name,
+                                        columnTypes:
+                                          dataset.columnTypes as DatasetColumns,
+                                      });
+                                      addEditDatasetDrawer.onOpen();
                                     }}
-                                    disabled={!hasDatasetsUpdatePermission}
                                   >
                                     <Edit size={16} /> Edit dataset
                                   </Menu.Item>
-                                </Tooltip>
-                                <Tooltip
-                                  content={
-                                    !hasDatasetsDeletePermission
-                                      ? "You need datasets:delete permission to delete datasets"
-                                      : undefined
-                                  }
-                                  disabled={hasDatasetsDeletePermission}
-                                  positioning={{ placement: "right" }}
-                                  showArrow
-                                >
                                   <Menu.Item
                                     value="delete"
                                     color="red.600"
                                     onClick={(event) => {
                                       event.stopPropagation();
-                                      if (hasDatasetsDeletePermission) {
-                                        showDeleteDialog({
-                                          id: dataset.id,
-                                          name: dataset.name,
-                                        });
-                                      }
+                                      showDeleteDialog({
+                                        id: dataset.id,
+                                        name: dataset.name,
+                                      });
                                     }}
-                                    disabled={!hasDatasetsDeletePermission}
                                   >
                                     <Trash2 size={16} /> Delete dataset
                                   </Menu.Item>
-                                </Tooltip>
                               </Menu.Content>
                             </Menu.Root>
                           </Table.Cell>

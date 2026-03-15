@@ -186,42 +186,27 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
                           Edit
                         </Menu.Item>
                         {monitor.experimentId && (
-                          <Tooltip
-                            content={
-                              !hasPermission("evaluations:manage")
-                                ? "You need evaluations:manage permission to replicate evaluations"
-                                : undefined
-                            }
-                            disabled={hasPermission("evaluations:manage")}
-                            positioning={{ placement: "right" }}
-                            showArrow
-                          >
                             <Menu.Item
                               value="copy"
                               onClick={() => {
                                 if (!project || !monitor.experimentId) return;
-
-                                if (hasPermission("evaluations:manage")) {
-                                  const experiment =
-                                    experiments.data?.experiments?.find(
-                                      (e) => e.id === monitor.experimentId,
-                                    );
-                                  if (experiment) {
-                                    setCopyDialogState({
-                                      open: true,
-                                      experimentId: experiment.id,
-                                      evaluationName:
-                                        experiment.name ?? experiment.slug,
-                                    });
-                                  }
+                                const experiment =
+                                  experiments.data?.experiments?.find(
+                                    (e) => e.id === monitor.experimentId,
+                                  );
+                                if (experiment) {
+                                  setCopyDialogState({
+                                    open: true,
+                                    experimentId: experiment.id,
+                                    evaluationName:
+                                      experiment.name ?? experiment.slug,
+                                  });
                                 }
                               }}
-                              disabled={!hasPermission("evaluations:manage")}
                             >
                               <CopyIcon size={16} /> Replicate to another
                               project
                             </Menu.Item>
-                          </Tooltip>
                         )}
                         <Menu.Item
                           value="toggle"

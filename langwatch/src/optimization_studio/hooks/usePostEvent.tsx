@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { fetchSSE } from "~/utils/sse/fetchSSE";
 import { toaster } from "../../components/ui/toaster";
+import { isHandledByGlobalHandler } from "../../utils/trpcError";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { createLogger } from "../../utils/logger";
 import type { BaseComponent } from "../types/dsl";
@@ -86,6 +87,7 @@ export const usePostEvent = () => {
       setIsLoading(true);
 
       const onError = (error: Error) => {
+        if (isHandledByGlobalHandler(error)) return;
         // Show error to user
         toaster.create({
           title: "Failed to post message",
