@@ -11,7 +11,7 @@ skills/
 ├── instrument/                     # "Instrument my code with LangWatch"
 │   └── SKILL.md                    # AgentSkills-compliant skill file
 │
-├── experiment/                     # "Create an evaluation experiment"
+├── evaluation/                     # "Create an evaluation experiment"
 │   └── SKILL.md
 │
 ├── scenario-test/                  # "Add agent simulation tests"
@@ -26,7 +26,7 @@ skills/
 ├── level-up/                       # Meta-skill: all of the above
 │   └── SKILL.md
 │
-├── platform-experiment/            # Platform: "Create an experiment to test my prompt"
+├── platform-evaluation/            # Platform: "Create an experiment to test my prompt"
 │   └── SKILL.md
 │
 ├── platform-scenario/              # Platform: "Write scenario simulation tests"
@@ -125,7 +125,7 @@ Each skill is tested against relevant fixture combinations:
 | Skill              | python-openai | python-langgraph | python-agno | ts-vercel | ts-mastra |
 |--------------------|:---:|:---:|:---:|:---:|:---:|
 | instrument         | ✓ | ✓ | ✓ | ✓ | ✓ |
-| experiment         | ✓ | - | - | ✓ | - |
+| evaluation         | ✓ | - | - | ✓ | - |
 | scenario-test      | ✓ | - | - | ✓ | - |
 | prompt-versioning  | ✓ | - | - | ✓ | - |
 | red-team           | ✓ | - | - | ✓ | - |
