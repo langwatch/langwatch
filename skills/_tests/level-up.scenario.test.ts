@@ -86,4 +86,52 @@ describe("Level-up Skill", () => {
     },
     900_000 // 15 min timeout for meta-skill
   );
+
+  it.skipIf(isCI)(
+    "orchestrates all sub-skills for a TypeScript Vercel AI bot",
+    async () => {
+      const tempFolder = fs.mkdtempSync(
+        path.join(os.tmpdir(), "langwatch-skill-level-up-ts-")
+      );
+      execSync(
+        `cp -r ${path.resolve(__dirname, "fixtures/typescript-vercel")}/* ${tempFolder}/`
+      );
+      copySkillToWorkDir(tempFolder);
+
+      const result = await scenario.run({
+        name: "TypeScript Vercel AI level-up",
+        description:
+          "Taking a TypeScript Vercel AI bot to the next level with full LangWatch integration.",
+        agents: [
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          scenario.userSimulatorAgent({ model: judgeModel }),
+          scenario.judgeAgent({
+            model: judgeModel,
+            criteria: [
+              "Agent should have added LangWatch tracing to the code",
+              "Agent should have set up some form of evaluation or testing",
+              "Agent should have used the LangWatch MCP to check documentation",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "take my agent to the next level with langwatch — add tracing, set up evaluations, and add scenario tests. Be concise, no need to run anything."
+          ),
+          scenario.agent(),
+          (state) => {
+            toolCallFix(state);
+            const indexTs = fs.readFileSync(
+              `${tempFolder}/index.ts`,
+              "utf8"
+            );
+            expect(indexTs).toContain("langwatch");
+          },
+          scenario.judge(),
+        ],
+      });
+      expect(result.success).toBe(true);
+    },
+    900_000
+  );
 });

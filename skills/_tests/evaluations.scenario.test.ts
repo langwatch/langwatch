@@ -173,4 +173,55 @@ describe("Evaluations Skill", () => {
     },
     600_000
   );
+
+  it.skipIf(isCI)(
+    "creates an evaluation experiment for a Python LangGraph agent",
+    async () => {
+      const tempFolder = fs.mkdtempSync(
+        path.join(os.tmpdir(), "langwatch-skill-evaluations-langgraph-")
+      );
+      execSync(
+        `cp -r ${path.resolve(__dirname, "fixtures/python-langgraph")}/* ${tempFolder}/`
+      );
+      copySkillToWorkDir(tempFolder);
+
+      const result = await scenario.run({
+        name: "Python LangGraph evaluation experiment",
+        description:
+          "Creating an evaluation experiment for a Python LangGraph agent.",
+        agents: [
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          scenario.userSimulatorAgent({ model: judgeModel }),
+          scenario.judgeAgent({
+            model: judgeModel,
+            criteria: [
+              "Agent created an evaluation experiment file",
+              "Agent generated a dataset relevant to the LangGraph agent functionality",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "create a batch evaluation experiment for my agent using langwatch.experiment SDK, short and sweet, no need to run it"
+          ),
+          scenario.agent(),
+          (state) => {
+            toolCallFix(state);
+            const newFiles = findNewPythonFiles(tempFolder);
+            expect(
+              newFiles.length,
+              "Expected at least one new .py file"
+            ).toBeGreaterThan(0);
+            const content = newFiles
+              .map((f) => fs.readFileSync(f, "utf8"))
+              .join("\n");
+            expect(content).toContain("langwatch");
+          },
+          scenario.judge(),
+        ],
+      });
+      expect(result.success).toBe(true);
+    },
+    600_000
+  );
 });

@@ -177,6 +177,54 @@ describe("Scenarios Skill", () => {
   );
 
   it.skipIf(isCI)(
+    "creates scenario tests for a Python LangGraph agent",
+    async () => {
+      const tempFolder = fs.mkdtempSync(
+        path.join(os.tmpdir(), "langwatch-skill-scenarios-langgraph-")
+      );
+      execSync(
+        `cp -r ${path.resolve(__dirname, "fixtures/python-langgraph")}/* ${tempFolder}/`
+      );
+      copySkillToWorkDir(tempFolder);
+
+      const result = await scenario.run({
+        name: "Python LangGraph scenario tests",
+        description:
+          "Adding scenario tests to a Python LangGraph agent project.",
+        agents: [
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          scenario.userSimulatorAgent({ model: judgeModel }),
+          scenario.judgeAgent({
+            model: judgeModel,
+            criteria: [
+              "Agent created scenario test files using the LangWatch Scenario framework",
+              "Agent should use the LangWatch MCP to check Scenario documentation",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "add agent simulation tests for my agent, short and sweet, no need to run the tests"
+          ),
+          scenario.agent(),
+          (state) => {
+            toolCallFix(state);
+            const testFiles = findTestFiles(tempFolder, /^test_.*\.py$/);
+            expect(testFiles.length).toBeGreaterThan(0);
+            const testContent = testFiles
+              .map((f) => fs.readFileSync(f, "utf8"))
+              .join("\n");
+            expect(testContent).toContain("scenario");
+          },
+          scenario.judge(),
+        ],
+      });
+      expect(result.success).toBe(true);
+    },
+    600_000
+  );
+
+  it.skipIf(isCI)(
     "creates red team tests for a Python OpenAI bot",
     async () => {
       const tempFolder = fs.mkdtempSync(
@@ -392,6 +440,53 @@ describe("Scenarios Skill", () => {
         ],
       });
 
+      expect(result.success).toBe(true);
+    },
+    600_000
+  );
+
+  it.skipIf(isCI)(
+    "creates scenario tests for a TypeScript Mastra agent",
+    async () => {
+      const tempFolder = fs.mkdtempSync(
+        path.join(os.tmpdir(), "langwatch-skill-scenarios-mastra-")
+      );
+      execSync(
+        `cp -r ${path.resolve(__dirname, "fixtures/typescript-mastra")}/* ${tempFolder}/`
+      );
+      copySkillToWorkDir(tempFolder);
+
+      const result = await scenario.run({
+        name: "TypeScript Mastra scenario tests",
+        description:
+          "Adding scenario tests to a TypeScript Mastra agent project.",
+        agents: [
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          scenario.userSimulatorAgent({ model: judgeModel }),
+          scenario.judgeAgent({
+            model: judgeModel,
+            criteria: [
+              "Agent created scenario test files using the LangWatch Scenario framework",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "add agent simulation tests for my agent, short and sweet, no need to run the tests"
+          ),
+          scenario.agent(),
+          (state) => {
+            toolCallFix(state);
+            const testFiles = findTestFiles(tempFolder, /\.(test|spec)\.ts$/);
+            expect(testFiles.length).toBeGreaterThan(0);
+            const content = testFiles
+              .map((f) => fs.readFileSync(f, "utf8"))
+              .join("\n");
+            expect(content).toContain("@langwatch/scenario");
+          },
+          scenario.judge(),
+        ],
+      });
       expect(result.success).toBe(true);
     },
     600_000

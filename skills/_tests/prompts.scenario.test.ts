@@ -118,4 +118,65 @@ describe("Prompts Skill", () => {
     },
     600_000
   );
+
+  it.skipIf(isCI)(
+    "versions prompts in a TypeScript Vercel AI bot",
+    async () => {
+      const tempFolder = fs.mkdtempSync(
+        path.join(os.tmpdir(), "langwatch-skill-prompts-ts-")
+      );
+      execSync(
+        `cp -r ${path.resolve(__dirname, "fixtures/typescript-vercel")}/* ${tempFolder}/`
+      );
+      copySkillToWorkDir(tempFolder);
+
+      const result = await scenario.run({
+        name: "TypeScript Vercel AI prompt versioning",
+        description:
+          "Setting up prompt versioning in a TypeScript Vercel AI bot project.",
+        agents: [
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          scenario.userSimulatorAgent({ model: judgeModel }),
+          scenario.judgeAgent({
+            model: judgeModel,
+            criteria: [
+              "Agent set up prompt versioning using the LangWatch Prompts CLI or SDK",
+              "Agent should use the LangWatch MCP to check documentation",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "version my agent prompts with langwatch, short and sweet, no need to test the changes"
+          ),
+          scenario.agent(),
+          (state) => {
+            toolCallFix(state);
+            const indexTs = fs.readFileSync(
+              `${tempFolder}/index.ts`,
+              "utf8"
+            );
+            expect(indexTs).toContain("langwatch");
+            // Check for prompt management setup
+            const hasPromptsJson = fs.existsSync(
+              path.join(tempFolder, "prompts.json")
+            );
+            const hasPromptsDir = fs.existsSync(
+              path.join(tempFolder, "prompts")
+            );
+            const codeUsesPrompts = /prompts?\.(get|pull|compile)/.test(
+              indexTs
+            );
+            expect(
+              hasPromptsJson || hasPromptsDir || codeUsesPrompts,
+              "Expected prompt management setup"
+            ).toBe(true);
+          },
+          scenario.judge(),
+        ],
+      });
+      expect(result.success).toBe(true);
+    },
+    600_000
+  );
 });
