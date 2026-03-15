@@ -279,7 +279,6 @@ export function MessagesTable({
             onClick={() =>
               openTraceDetailsDrawer({
                 traceId,
-                selectedTab: "messages",
               })
             }
           >
