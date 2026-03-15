@@ -9,6 +9,7 @@ export type GeneratedScenario = {
   name: string;
   situation: string;
   criteria: string[];
+  labels: string[];
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
