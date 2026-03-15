@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 import { Edit, Italic, Search } from "react-feather";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useTraceDetailsDrawer } from "~/hooks/useTraceDetailsDrawer";
 import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { Trace } from "../../server/tracer/types";
@@ -120,7 +121,8 @@ export const MessageHoverActions = ({
 
   const { setCommentState } = useAnnotationCommentStore();
 
-  const { openDrawer, drawerOpen } = useDrawer();
+  const { drawerOpen } = useDrawer();
+  const { openTraceDetailsDrawer } = useTraceDetailsDrawer();
 
   return (
     <VStack
@@ -134,12 +136,12 @@ export const MessageHoverActions = ({
         onClick={() => {
           if (!trace) return;
           if (drawerOpen("traceDetails")) {
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
               selectedTab: "traceDetails",
             });
           } else {
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             });
           }

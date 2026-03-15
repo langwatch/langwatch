@@ -18,7 +18,7 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import { signIn, signOut } from "next-auth/react";
 import numeral from "numeral";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useDrawer } from "../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { useUpgradeModalStore } from "../stores/upgradeModalStore";
@@ -675,6 +675,7 @@ export const DashboardLayout = ({
     </Box>
   );
 };
+
 
 function GlobalUpgradeModal() {
   const { isOpen, variant, close } = useUpgradeModalStore();
