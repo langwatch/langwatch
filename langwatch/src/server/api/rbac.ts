@@ -214,17 +214,26 @@ const ORGANIZATION_ROLE_PERMISSIONS: Record<
 };
 
 /**
- * Restricted permission set for EXTERNAL (lite member) users.
- * These users can view observability data but cannot create, edit, or manage resources.
- * Custom roles (when allowed in the future) override these defaults.
+ * Default permission set for EXTERNAL (lite member) users.
+ * Currently identical to VIEWER — lite members can view all resources but
+ * cannot create, edit, or manage them. Maintained as a separate constant so
+ * it can diverge from VIEWER independently if needed.
+ *
+ * Custom roles, when assigned to EXTERNAL users, override these defaults
+ * (see resolveProjectPermission).
  */
 export const EXTERNAL_MEMBER_PERMISSIONS: Permission[] = [
   "project:view",
   "analytics:view",
   "traces:view",
-  "scenarios:view",
+  "annotations:view",
   "evaluations:view",
-  "workflows:view", // Experiments use workflows:view internally
+  "datasets:view",
+  "workflows:view",
+  "prompts:view",
+  "scenarios:view",
+  "secrets:view",
+  "team:view",
 ];
 
 // ============================================================================

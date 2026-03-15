@@ -919,7 +919,7 @@ describe("RBAC Integration Tests", () => {
         expect(result.organizationRole).toBe(OrganizationUserRole.EXTERNAL);
       });
 
-      it("denies restricted permission and returns EXTERNAL org role", async () => {
+      it("denies manage permission and returns EXTERNAL org role", async () => {
         setupTeamMocks({
           orgRole: OrganizationUserRole.EXTERNAL,
           teamRole: TeamUserRole.VIEWER,
@@ -928,7 +928,7 @@ describe("RBAC Integration Tests", () => {
         const result = await resolveTeamPermission(
           { prisma: mockPrisma, session: mockSession },
           "team-1",
-          "team:view" as Permission,
+          "team:manage" as Permission,
         );
 
         expect(result.permitted).toBe(false);
@@ -1291,15 +1291,21 @@ describe("RBAC Integration Tests", () => {
       });
     }
 
-    describe("when EXTERNAL user requests a restricted permission via project", () => {
+    describe("when EXTERNAL user requests a mutate permission via project", () => {
       it.each([
-        "datasets:view",
-        "prompts:view",
-        "annotations:view",
-        "secrets:view",
-        "team:view",
-        "cost:view",
-        "triggers:view",
+        "datasets:manage",
+        "prompts:manage",
+        "annotations:manage",
+        "evaluations:manage",
+        "workflows:manage",
+        "scenarios:manage",
+        "secrets:manage",
+        "team:manage",
+        "project:manage",
+        "project:create",
+        "project:update",
+        "project:delete",
+        "triggers:manage",
       ] as Permission[])(
         "denies %s",
         async (permission) => {
@@ -1317,14 +1323,19 @@ describe("RBAC Integration Tests", () => {
       );
     });
 
-    describe("when EXTERNAL user requests an allowed permission via project", () => {
+    describe("when EXTERNAL user requests an allowed view permission via project", () => {
       it.each([
         "project:view",
         "analytics:view",
         "traces:view",
-        "scenarios:view",
+        "annotations:view",
         "evaluations:view",
+        "datasets:view",
         "workflows:view",
+        "prompts:view",
+        "scenarios:view",
+        "secrets:view",
+        "team:view",
       ] as Permission[])(
         "grants %s",
         async (permission) => {
@@ -1342,13 +1353,16 @@ describe("RBAC Integration Tests", () => {
       );
     });
 
-    describe("when EXTERNAL user requests a restricted permission via team", () => {
+    describe("when EXTERNAL user requests a mutate permission via team", () => {
       it.each([
-        "datasets:view",
-        "prompts:view",
-        "annotations:view",
-        "secrets:view",
-        "team:view",
+        "datasets:manage",
+        "prompts:manage",
+        "annotations:manage",
+        "evaluations:manage",
+        "workflows:manage",
+        "scenarios:manage",
+        "secrets:manage",
+        "team:manage",
       ] as Permission[])(
         "denies %s",
         async (permission) => {
@@ -1366,14 +1380,19 @@ describe("RBAC Integration Tests", () => {
       );
     });
 
-    describe("when EXTERNAL user requests an allowed permission via team", () => {
+    describe("when EXTERNAL user requests an allowed view permission via team", () => {
       it.each([
         "project:view",
         "analytics:view",
         "traces:view",
-        "scenarios:view",
+        "annotations:view",
         "evaluations:view",
+        "datasets:view",
         "workflows:view",
+        "prompts:view",
+        "scenarios:view",
+        "secrets:view",
+        "team:view",
       ] as Permission[])(
         "grants %s",
         async (permission) => {
@@ -1504,7 +1523,7 @@ describe("RBAC Integration Tests", () => {
         };
 
         const mockNext = vi.fn().mockResolvedValue("success");
-        const middleware = checkProjectPermission("datasets:view" as Permission);
+        const middleware = checkProjectPermission("datasets:manage" as Permission);
 
         try {
           await middleware({
@@ -1537,7 +1556,7 @@ describe("RBAC Integration Tests", () => {
         };
 
         const mockNext = vi.fn().mockResolvedValue("success");
-        const middleware = checkTeamPermission("datasets:view" as Permission);
+        const middleware = checkTeamPermission("datasets:manage" as Permission);
 
         try {
           await middleware({
@@ -1599,14 +1618,19 @@ describe("RBAC Integration Tests", () => {
     });
 
     describe("when EXTERNAL_MEMBER_PERMISSIONS constant is defined", () => {
-      it("contains exactly the expected permissions", () => {
+      it("matches the VIEWER role permission set exactly", () => {
         expect(EXTERNAL_MEMBER_PERMISSIONS).toEqual([
           "project:view",
           "analytics:view",
           "traces:view",
-          "scenarios:view",
+          "annotations:view",
           "evaluations:view",
+          "datasets:view",
           "workflows:view",
+          "prompts:view",
+          "scenarios:view",
+          "secrets:view",
+          "team:view",
         ]);
       });
     });
