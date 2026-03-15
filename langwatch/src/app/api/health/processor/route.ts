@@ -68,14 +68,14 @@ export async function GET(req: NextRequest) {
     },
   };
 
-  const otelTraceId = crypto.randomBytes(16).toString("hex");
+  const otelTraceIdBase64 = crypto.randomBytes(16).toString("base64");
   const otelParams: DeepPartial<IExportTraceServiceRequest> = {
     resourceSpans: [
       {
         resource: {
           attributes: [
             {
-              key: "canary",
+              key: "metadata.canary",
               value: {
                 stringValue: "true",
               },
@@ -89,7 +89,7 @@ export async function GET(req: NextRequest) {
             },
             spans: [
               {
-                traceId: Buffer.from(otelTraceId, "hex").toString("base64"),
+                traceId: otelTraceIdBase64,
                 spanId: Buffer.from(
                   crypto.randomBytes(8).toString("hex"),
                   "hex",
@@ -174,7 +174,7 @@ export async function GET(req: NextRequest) {
       checkTraceWithRetry(restTraceId, authToken).catch((error) => {
         throw new Error("Failed to get REST trace after multiple retries");
       }),
-      checkTraceWithRetry(otelTraceId, authToken).catch((error) => {
+      checkTraceWithRetry(otelTraceIdBase64, authToken).catch((error) => {
         throw new Error("Failed to get OTLP trace after multiple retries");
       }),
     ]);

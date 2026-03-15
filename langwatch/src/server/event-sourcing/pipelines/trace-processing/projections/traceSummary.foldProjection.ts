@@ -318,9 +318,13 @@ function extractAttributes(span: NormalizedSpan): Record<string, string> {
 
   for (const [key, value] of Object.entries(resourceAttrs)) {
     if (STANDARD_RESOURCE_PREFIXES.some((p) => key.startsWith(p))) continue;
-    if (typeof value === "string") result[key] = value;
+    // Normalize langwatch.metadata.* resource attributes to metadata.* canonical form
+    const normalizedKey = key.startsWith("langwatch.metadata.")
+      ? key.replace("langwatch.metadata.", "metadata.")
+      : key;
+    if (typeof value === "string") result[normalizedKey] = value;
     else if (typeof value === "number" || typeof value === "boolean")
-      result[key] = String(value);
+      result[normalizedKey] = String(value);
   }
 
   for (const [source, dest] of SPAN_ATTR_MAPPINGS) {
