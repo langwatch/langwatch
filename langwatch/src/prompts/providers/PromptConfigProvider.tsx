@@ -6,7 +6,10 @@ import {
   useState,
 } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { extractLimitExceededInfo } from "~/utils/trpcError";
+import {
+  extractLimitExceededInfo,
+  extractLiteMemberRestrictionInfo,
+} from "~/utils/trpcError";
 import { ChangeHandleDialog } from "../forms/ChangeHandleDialog";
 import {
   type SaveDialogFormValues,
@@ -92,8 +95,8 @@ export function PromptConfigProvider({
             setSaveVersionDialogProps(null);
           } catch (error) {
             onError?.(error as Error);
-            // Don't close the dialog if it's a license error - the UpgradeModal will be shown
-            if (!extractLimitExceededInfo(error)) {
+            // Don't close the dialog if a global handler will show a modal
+            if (!extractLimitExceededInfo(error) && !extractLiteMemberRestrictionInfo(error)) {
               setSaveVersionDialogProps(null);
             }
           }
@@ -127,8 +130,8 @@ export function PromptConfigProvider({
             setCreatePromptDialogProps(null);
           } catch (error) {
             onError?.(error as Error);
-            // Don't close the dialog if it's a license error - the UpgradeModal will be shown
-            if (!extractLimitExceededInfo(error)) {
+            // Don't close the dialog if a global handler will show a modal
+            if (!extractLimitExceededInfo(error) && !extractLiteMemberRestrictionInfo(error)) {
               setCreatePromptDialogProps(null);
             }
           }
@@ -165,8 +168,8 @@ export function PromptConfigProvider({
                 setChangeHandleDialogProps(null);
               } catch (error) {
                 onError?.(error as Error);
-                // Don't close the dialog if it's a license error - the UpgradeModal will be shown
-                if (!extractLimitExceededInfo(error)) {
+                // Don't close the dialog if a global handler will show a modal
+                if (!extractLimitExceededInfo(error) && !extractLiteMemberRestrictionInfo(error)) {
                   setChangeHandleDialogProps(null);
                 }
               }

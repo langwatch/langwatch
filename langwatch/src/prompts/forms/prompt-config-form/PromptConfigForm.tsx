@@ -82,6 +82,7 @@ function InnerPromptConfigForm() {
     };
 
     const onError = (error: Error) => {
+      setIsSaving(false);
       if (isHandledByGlobalHandler(error)) return;
       console.error(error);
       toaster.create({
@@ -89,7 +90,6 @@ function InnerPromptConfigForm() {
         description: "Failed to save version",
         type: "error",
       });
-      setIsSaving(false);
     };
 
     if (configId) {

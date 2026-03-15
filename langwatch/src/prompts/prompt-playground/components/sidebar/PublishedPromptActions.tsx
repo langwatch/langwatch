@@ -15,6 +15,7 @@ import { computeInitialFormValuesForPrompt } from "~/prompts/utils/computeInitia
 import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { api } from "~/utils/api";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { getDisplayHandle } from "./PublishedPromptsList";
 
 interface PublishedPromptActionsProps {
@@ -71,6 +72,7 @@ export function PublishedPromptActions({
         },
       });
     } catch (error) {
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Error updating prompt",
         description:
@@ -109,6 +111,7 @@ export function PublishedPromptActions({
         type: "success",
       });
     } catch (error) {
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Failed to delete prompt",
         description:
