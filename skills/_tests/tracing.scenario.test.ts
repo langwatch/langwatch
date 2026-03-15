@@ -134,4 +134,53 @@ describe("Tracing Skill", () => {
     },
     600_000
   );
+
+  it.skipIf(isCI)(
+    "instruments a Python LangGraph agent with LangWatch",
+    async () => {
+      const tempFolder = fs.mkdtempSync(
+        path.join(os.tmpdir(), "langwatch-skill-tracing-langgraph-")
+      );
+
+      execSync(
+        `cp -r ${path.resolve(__dirname, "fixtures/python-langgraph")}/* ${tempFolder}/`
+      );
+      copySkillToWorkDir(tempFolder);
+
+      const result = await scenario.run({
+        name: "Python LangGraph instrumentation",
+        description:
+          "Implementing LangWatch instrumentation in a Python LangGraph agent project.",
+        agents: [
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          scenario.userSimulatorAgent({ model: judgeModel }),
+          scenario.judgeAgent({
+            model: judgeModel,
+            criteria: [
+              "Agent should modify the Python file to add LangWatch tracing",
+              "Agent should use the LangWatch MCP to check LangGraph integration docs",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "please instrument my code with langwatch, short and sweet, no need to test the changes"
+          ),
+          scenario.agent(),
+          (state) => {
+            toolCallFix(state);
+            const resultFile = fs.readFileSync(
+              `${tempFolder}/main.py`,
+              "utf8"
+            );
+            expect(resultFile).toContain("langwatch");
+          },
+          scenario.judge(),
+        ],
+      });
+
+      expect(result.success).toBe(true);
+    },
+    600_000
+  );
 });

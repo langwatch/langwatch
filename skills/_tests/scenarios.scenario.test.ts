@@ -302,4 +302,98 @@ describe("Scenarios Skill", () => {
     },
     600_000
   );
+
+  it.skipIf(isCI)(
+    "creates a targeted scenario for a specific behavior",
+    async () => {
+      const tempFolder = fs.mkdtempSync(
+        path.join(os.tmpdir(), "langwatch-skill-scenarios-targeted-")
+      );
+
+      execSync(
+        `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`
+      );
+      copySkillToWorkDir(tempFolder);
+
+      const result = await scenario.run({
+        name: "Targeted scenario for emoji handling",
+        description:
+          "Adding a specific scenario test for the tweet-like bot to verify it uses emojis correctly.",
+        agents: [
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          scenario.userSimulatorAgent({ model: judgeModel }),
+          scenario.judgeAgent({
+            model: judgeModel,
+            criteria: [
+              "Agent created a scenario test specifically about emoji usage",
+              "The test is focused on a specific behavior, not a general test suite",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "write a scenario test that verifies my bot always includes emojis in its responses when asked about technology topics"
+          ),
+          scenario.agent(),
+          (state) => {
+            toolCallFix(state);
+            const testFiles = findTestFiles(tempFolder, /^test_.*\.py$/);
+            expect(testFiles.length).toBeGreaterThan(0);
+            const testContent = testFiles
+              .map((f) => fs.readFileSync(f, "utf8"))
+              .join("\n");
+            expect(testContent).toContain("scenario");
+          },
+          scenario.judge(),
+        ],
+      });
+
+      expect(result.success).toBe(true);
+    },
+    600_000
+  );
+
+  it.skipIf(isCI)(
+    "uses platform MCP tools when no codebase is present",
+    async () => {
+      const tempFolder = fs.mkdtempSync(
+        path.join(os.tmpdir(), "langwatch-skill-scenarios-platform-")
+      );
+
+      // No fixture copied — empty directory
+      copySkillToWorkDir(tempFolder);
+
+      const result = await scenario.run({
+        name: "Platform scenario creation",
+        description:
+          "Creating scenarios on the LangWatch platform when there is no codebase.",
+        agents: [
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          scenario.userSimulatorAgent({ model: judgeModel }),
+          scenario.judgeAgent({
+            model: judgeModel,
+            criteria: [
+              "Agent used platform MCP tools (platform_create_scenario or similar) to create scenarios",
+              "Agent did NOT try to write code files",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "create a test scenario for a customer support agent that handles refund requests"
+          ),
+          scenario.agent(),
+          (state) => {
+            toolCallFix(state);
+            // In platform mode, no test files should be created
+            // The agent should use MCP tools instead
+          },
+          scenario.judge(),
+        ],
+      });
+
+      expect(result.success).toBe(true);
+    },
+    600_000
+  );
 });
