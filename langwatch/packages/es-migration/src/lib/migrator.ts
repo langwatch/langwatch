@@ -221,6 +221,8 @@ export class Migrator {
 							batchInsertFailed = true;
 						}
 					}
+					// Release event records for GC before executing projection writes
+					allEventRecords.length = 0;
 
 					// Execute projection writes only if event insert succeeded
 					if (!batchInsertFailed && allProjectionWrites.length > 0) {
@@ -496,6 +498,7 @@ export class Migrator {
 							stats.errors++;
 						}
 					}
+					allEventRecords.length = 0;
 
 					if (!config.dryRun && allProjectionWrites.length > 0) {
 						await Promise.all(allProjectionWrites.map((fn) => fn()));

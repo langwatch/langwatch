@@ -139,8 +139,6 @@ export class DiscoveryMigrator {
       let windowFailed = false;
 
       if (newAggregates.length > 0) {
-        const allEventRecords: EventRecord[] = [];
-        const allProjectionWrites: Array<() => Promise<void>> = [];
         const processedKeys: string[] = [];
         let windowSkipped = 0;
 
@@ -152,6 +150,9 @@ export class DiscoveryMigrator {
           { from: windowStart, to: windowEnd },
         );
         const fetchMs = Date.now() - fetchStart;
+
+        const allEventRecords: EventRecord[] = [];
+        const allProjectionWrites: Array<() => Promise<void>> = [];
 
         const processStart = Date.now();
         for (const { tenantId, aggregateId } of newAggregates) {
@@ -200,7 +201,7 @@ export class DiscoveryMigrator {
             continue;
           }
 
-          // Live mode: process and collect for bulk write
+          // Live mode: process and accumulate
           let result: DirectWriteResult;
           try {
             result = definition.processAggregate(events, aggregateId);
@@ -228,17 +229,13 @@ export class DiscoveryMigrator {
         }
         const processMs = Date.now() - processStart;
 
-        // Bulk-insert event records to event_log
+        // Bulk-insert event records
         const writeStart = Date.now();
-        if (
-          !config.dryRun &&
-          allEventRecords.length > 0 &&
-          this.deps.insertEventRecords
-        ) {
+        if (!config.dryRun && !windowFailed && allEventRecords.length > 0 && this.deps.insertEventRecords) {
           try {
             await this.deps.insertEventRecords(allEventRecords);
           } catch (err) {
-            logger.error("Failed to bulk-insert event records — skipping projection writes and cursor", {
+            logger.error("Failed to bulk-insert event records", {
               count: allEventRecords.length,
               error: err instanceof Error ? err.message : String(err),
             });
@@ -246,6 +243,8 @@ export class DiscoveryMigrator {
             windowFailed = true;
           }
         }
+        // Release event records for GC before executing projection writes
+        allEventRecords.length = 0;
 
         // Execute projection writes only if event insert succeeded
         if (!config.dryRun && !windowFailed && allProjectionWrites.length > 0) {
