@@ -243,6 +243,7 @@ export function createExecuteEvaluationCommandClass(deps: ExecuteEvaluationComma
           passed: result.passed,
           label: result.label,
           details: result.details,
+          inputs: result.inputs ?? null,
           costId,
         });
       } catch (error) {
@@ -276,6 +277,7 @@ function emitReported(
     passed?: boolean;
     label?: string;
     details?: string;
+    inputs?: Record<string, unknown> | null;
     error?: string;
     errorDetails?: string | null;
     costId?: string | null;
@@ -299,6 +301,7 @@ function emitReported(
       passed: result.passed ?? null,
       label: result.label ?? null,
       details: result.details ?? null,
+      inputs: result.inputs ?? null,
       error: result.error ?? null,
       errorDetails: result.errorDetails ?? null,
       costId: result.costId ?? null,
