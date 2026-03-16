@@ -22,6 +22,8 @@ export interface MigrationConfig {
   maxEvents?: number;
   maxBatches?: number;
   dryRunOutputFile?: string;
+  /** Max aggregates to process before flushing event records + projection writes (bounds peak memory). */
+  subBatchSize: number;
 }
 
 export interface MigrationStats {
