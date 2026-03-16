@@ -193,7 +193,6 @@ export const userRouter = createTRPCRouter({
     .input(z.object({ userId: z.string() }))
     .use(skipPermissionCheck)
     .mutation(async ({ ctx, input }) => {
-      assertPlatformAdmin(ctx.session.user.email);
       await UserService.create(ctx.prisma).deactivate({ id: input.userId });
       return { success: true };
     }),
@@ -201,23 +200,7 @@ export const userRouter = createTRPCRouter({
     .input(z.object({ userId: z.string() }))
     .use(skipPermissionCheck)
     .mutation(async ({ ctx, input }) => {
-      assertPlatformAdmin(ctx.session.user.email);
       await UserService.create(ctx.prisma).reactivate({ id: input.userId });
       return { success: true };
     }),
 });
-
-/** Throws FORBIDDEN if the caller's email is not in the ADMIN_EMAILS list. */
-function assertPlatformAdmin(email: string | null | undefined): void {
-  const adminEmails = (env.ADMIN_EMAILS ?? "")
-    .split(",")
-    .map((entry: string) => entry.trim().toLowerCase())
-    .filter(Boolean);
-
-  if (!email || !adminEmails.includes(email.toLowerCase())) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "Only platform admins can perform this action",
-    });
-  }
-}
