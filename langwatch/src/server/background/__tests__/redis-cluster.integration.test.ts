@@ -17,7 +17,6 @@ import { Cluster } from "ioredis";
 import type { StartedTestContainer } from "testcontainers";
 import { GenericContainer, Wait } from "testcontainers";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { SCENARIO_QUEUE } from "../../scenarios/scenario.constants";
 import {
   COLLECTOR_QUEUE,
   EVALUATIONS_QUEUE,
@@ -68,11 +67,6 @@ describe("BullMQ Redis Cluster Compatibility", () => {
     });
   });
 
-  describe("when checking scenario queue name", () => {
-    it("SCENARIO_QUEUE contains a hash tag", () => {
-      expect(hasHashTag(SCENARIO_QUEUE.NAME)).toBe(true);
-    });
-  });
 });
 
 // ---------------------------------------------------------------------------
