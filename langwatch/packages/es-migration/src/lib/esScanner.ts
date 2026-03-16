@@ -1,7 +1,7 @@
 import type { Client as ElasticClient } from "@elastic/elasticsearch";
 import type { Cursor, EsBatch, EsHit, EsStats, Logger, MigrationConfig } from "./types.js";
 
-const FALLBACK_BATCH_SIZES = [500, 250, 100, 50, 1] as const;
+const FALLBACK_BATCH_SIZES = [2000, 1000, 750, 500, 250, 100, 50, 1] as const;
 
 /** No data before 2020-01-01 should ever be queried — guard against corrupt timestamps. */
 const MIN_TIMESTAMP_MS = new Date("2020-01-01T00:00:00Z").getTime();
@@ -372,11 +372,13 @@ export class EsScanner {
 
   private buildQuery(rangeFrom?: number): Record<string, unknown> {
     const filters: Record<string, unknown>[] = [];
-    const floor = rangeFrom !== undefined ? Math.max(rangeFrom, MIN_TIMESTAMP_MS) : MIN_TIMESTAMP_MS;
-    filters.push({ range: { [this.timestampField]: { gte: floor } } });
+    if (rangeFrom !== undefined) {
+      filters.push({ range: { [this.timestampField]: { gte: rangeFrom } } });
+    }
     if (this.options.query) {
       filters.push(this.options.query);
     }
+    if (filters.length === 0) return { match_all: {} };
     if (filters.length === 1) return filters[0]!;
     return { bool: { must: filters } };
   }

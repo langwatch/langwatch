@@ -11,6 +11,7 @@ export function loadConfig(overrides?: Partial<MigrationConfig>): MigrationConfi
     maxEvents: maxEvents > 0 ? maxEvents : undefined,
     maxBatches: maxBatches > 0 ? maxBatches : undefined,
     dryRunOutputFile: overrides?.dryRunOutputFile ?? process.env.DRY_RUN_OUTPUT,
+    subBatchSize: overrides?.subBatchSize ?? intEnv("SUB_BATCH_SIZE", 200),
   };
 }
 
