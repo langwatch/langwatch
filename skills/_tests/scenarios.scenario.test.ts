@@ -66,7 +66,7 @@ describe("Scenarios Skill", () => {
       const result = await scenario.run({
         name: "Python OpenAI scenario tests",
         description:
-          "Adding agent simulation tests to a Python OpenAI bot project using the LangWatch Scenario framework.",
+          "Adding agent simulation tests to a Python OpenAI conversational bot project using the LangWatch Scenario framework.",
         agents: [
           createClaudeCodeAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
@@ -74,13 +74,14 @@ describe("Scenarios Skill", () => {
             model: judgeModel,
             criteria: [
               "Agent created scenario test files using the LangWatch Scenario framework",
-              "Agent should use the LangWatch MCP to check Scenario documentation",
+              "Agent should have included at least one multi-turn scenario testing conversation flow",
+              "Agent should have attempted to run the tests after writing them",
             ],
           }),
         ],
         script: [
           scenario.user(
-            "add agent simulation tests for my agent, short and sweet, no need to run the tests"
+            "add agent simulation tests for my agent. This is a conversational bot, so include multi-turn tests. Run them after writing to verify they work."
           ),
           scenario.agent(),
           (state) => {
@@ -99,9 +100,28 @@ describe("Scenarios Skill", () => {
             expect(testContent).toContain("import scenario");
             expect(testContent).toMatch(/scenario\.run\(/);
 
+            // Verify at least one multi-turn scenario exists
+            expect(
+              testContent.includes("max_turns") ||
+              testContent.includes("scenario.user(") ||
+              testContent.includes("script="),
+              "Expected at least one multi-turn scenario (max_turns, scripted user/agent turns)"
+            ).toBe(true);
+
             expect(testContent).not.toMatch(
               /from\s+(agent_tester|simulation_framework|langwatch\.testing|test_framework)/
             );
+
+            // Verify the agent attempted to run the tests (look for pytest cache or execution evidence)
+            const ranTests = fs.existsSync(path.join(tempFolder, ".pytest_cache")) ||
+              state.messages.some(m => {
+                const text = typeof m.content === "string" ? m.content : JSON.stringify(m.content);
+                return /pytest|uv run pytest|python -m pytest/.test(text);
+              });
+            expect(
+              ranTests,
+              "Expected the agent to run the scenario tests after writing them"
+            ).toBe(true);
           },
           scenario.judge(),
         ],
