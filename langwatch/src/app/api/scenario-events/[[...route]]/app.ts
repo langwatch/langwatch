@@ -21,6 +21,8 @@ import {
   tracerMiddleware,
 } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
+import { checkScenarioSetLimitForRunStarted } from "./scenario-set-limit";
+import { ScenarioSetLimitExceededError } from "~/server/app-layer/usage/errors";
 
 const logger = createLogger("langwatch:api:scenario-events");
 
@@ -77,6 +79,25 @@ app.post(
       },
       "Received scenario event",
     );
+
+    // Enforce scenario set limit on RUN_STARTED events
+    try {
+      await checkScenarioSetLimitForRunStarted({ project, event });
+    } catch (error) {
+      if (error instanceof ScenarioSetLimitExceededError) {
+        return c.json(
+          {
+            error: error.kind,
+            message: error.message,
+            limitType: error.meta.limitType,
+            current: error.meta.current,
+            max: error.meta.max,
+          },
+          403,
+        );
+      }
+      throw error;
+    }
 
     // Dual-write to ClickHouse via event-sourcing
     if (project.featureEventSourcingSimulationIngestion) {
@@ -234,15 +255,6 @@ async function dispatchSimulationEvent(
       status: event.status,
     });
   }
-}
-
-/** Event types that exist in the legacy ES path */
-function isLegacyEvent(type: string): boolean {
-  return (
-    type === ScenarioEventType.RUN_STARTED ||
-    type === ScenarioEventType.RUN_FINISHED ||
-    type === ScenarioEventType.MESSAGE_SNAPSHOT
-  );
 }
 
 /** Streaming events are broadcast-only, not persisted via event-sourcing */

@@ -11,9 +11,12 @@ import {
 } from "./usage-meter-policy";
 import { OrganizationRepository } from "../../repositories/organization.repository";
 import { getClickHouseClient } from "../../clickhouse/client";
+import { INTERNAL_SET_PREFIX } from "../../scenarios/internal-set-id";
 import { env } from "~/env.mjs";
+import { ScenarioSetLimitExceededError } from "./errors";
 
 const CACHE_TTL_MS = 30_000; // 30 seconds
+const MAX_FREE_SCENARIO_SETS = 3;
 
 export interface UsageLimitResult {
   exceeded: boolean;
@@ -34,6 +37,7 @@ export interface UsageLimitResult {
 export class UsageService {
   private readonly cache: TtlCache<number>;
   private readonly decisionCache: TtlCache<MeterDecision>;
+  private readonly scenarioSetCache: TtlCache<Set<string>>;
 
   constructor(
     private readonly organizationService: OrganizationService,
@@ -44,6 +48,7 @@ export class UsageService {
   ) {
     this.cache = new TtlCache<number>(CACHE_TTL_MS);
     this.decisionCache = new TtlCache<MeterDecision>(CACHE_TTL_MS);
+    this.scenarioSetCache = new TtlCache<Set<string>>(CACHE_TTL_MS);
   }
 
   async checkLimit({ teamId }: { teamId: string }): Promise<UsageLimitResult> {
@@ -74,6 +79,98 @@ export class UsageService {
       };
     }
     return { exceeded: false };
+  }
+
+  /**
+   * Checks whether the organization may use the given scenario set ID.
+   *
+   * Known sets (cached) are allowed immediately. Unknown sets trigger a
+   * ClickHouse query to count distinct external scenario sets across all
+   * org projects. If the count is at or above the plan limit and the set
+   * is new, throws ScenarioSetLimitExceededError.
+   */
+  async checkScenarioSetLimit({
+    organizationId,
+    scenarioSetId,
+  }: {
+    organizationId: string;
+    scenarioSetId: string;
+  }): Promise<void> {
+    // Fast path: set is already known from a recent check
+    const cached = this.scenarioSetCache.get(organizationId);
+    if (cached?.has(scenarioSetId)) {
+      return;
+    }
+
+    const plan = await this.planResolver(organizationId);
+    const maxScenarioSets =
+      plan.free && !plan.overrideAddingLimitations
+        ? MAX_FREE_SCENARIO_SETS
+        : Infinity;
+
+    // If no cache, query ClickHouse for distinct external sets
+    const projectIds =
+      await this.organizationService.getProjectIds(organizationId);
+    if (projectIds.length === 0) {
+      // No projects means no existing sets -- allow and warm cache
+      const newSet = new Set([scenarioSetId]);
+      this.scenarioSetCache.set(organizationId, newSet);
+      return;
+    }
+
+    const existingSets =
+      await this.queryDistinctExternalScenarioSets(projectIds);
+
+    // Populate cache with the fetched sets
+    this.scenarioSetCache.set(organizationId, existingSets);
+
+    // If this set already exists in ClickHouse, allow
+    if (existingSets.has(scenarioSetId)) {
+      return;
+    }
+
+    // This is a new set -- check against limit
+    if (existingSets.size >= maxScenarioSets) {
+      throw new ScenarioSetLimitExceededError(existingSets.size, maxScenarioSets);
+    }
+
+    // Allowed: record the new set in the cache
+    existingSets.add(scenarioSetId);
+  }
+
+  /**
+   * Queries ClickHouse for distinct external (non-internal) scenario set IDs
+   * across the given project IDs.
+   *
+   * Overridable for testing via Object.assign on the prototype.
+   */
+  protected async queryDistinctExternalScenarioSets(
+    projectIds: string[],
+  ): Promise<Set<string>> {
+    const client = getClickHouseClient();
+    if (!client) {
+      return new Set();
+    }
+
+    const result = await client.query({
+      query: `
+        SELECT DISTINCT ScenarioSetId
+        FROM (
+          SELECT ScenarioSetId, ArchivedAt
+          FROM simulation_runs
+          WHERE TenantId IN ({projectIds:Array(String)})
+            AND NOT startsWith(ScenarioSetId, '${INTERNAL_SET_PREFIX}')
+          ORDER BY ScenarioRunId, UpdatedAt DESC
+          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+        )
+        WHERE ArchivedAt IS NULL
+      `,
+      query_params: { projectIds },
+      format: "JSONEachRow",
+    });
+
+    const rows = await result.json<{ ScenarioSetId: string }>();
+    return new Set(rows.map((r) => r.ScenarioSetId));
   }
 
   /**
@@ -191,6 +288,7 @@ export class UsageService {
   clearCache(): void {
     this.cache.clear();
     this.decisionCache.clear();
+    this.scenarioSetCache.clear();
   }
 }
 
