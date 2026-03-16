@@ -33,6 +33,7 @@ function createFoldState(overrides: Partial<SimulationRunStateData> = {}): Simul
     Status: "IN_PROGRESS",
     Name: null,
     Description: null,
+    Metadata: null,
     Messages: [],
     TraceIds: [],
     Verdict: null,

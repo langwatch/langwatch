@@ -14,6 +14,7 @@ const simulationRunQueuedEventDataSchema = z.object({
   scenarioSetId: z.string(),
   name: z.string().optional(),
   description: z.string().optional(),
+  metadata: z.record(z.unknown()).optional(),
 });
 export type SimulationRunQueuedEventData = z.infer<typeof simulationRunQueuedEventDataSchema>;
 
@@ -34,6 +35,7 @@ const simulationRunStartedEventDataSchema = z.object({
   scenarioSetId: z.string(),
   name: z.string().optional(),
   description: z.string().optional(),
+  metadata: z.record(z.unknown()).optional(),
 });
 export type SimulationRunStartedEventData = z.infer<typeof simulationRunStartedEventDataSchema>;
 

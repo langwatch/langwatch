@@ -9,6 +9,7 @@ export const queueRunCommandDataSchema = z.object({
   scenarioSetId: z.string(),
   name: z.string().optional(),
   description: z.string().optional(),
+  metadata: z.record(z.unknown()).optional(),
   occurredAt: z.number(),
 });
 export type QueueRunCommandData = z.infer<typeof queueRunCommandDataSchema>;
@@ -21,6 +22,7 @@ export const startRunCommandDataSchema = z.object({
   scenarioSetId: z.string(),
   name: z.string().optional(),
   description: z.string().optional(),
+  metadata: z.record(z.unknown()).optional(),
   occurredAt: z.number(),
 });
 export type StartRunCommandData = z.infer<typeof startRunCommandDataSchema>;
