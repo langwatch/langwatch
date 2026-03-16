@@ -55,6 +55,10 @@ If the user's request is **specific** ("add a faithfulness evaluator", "create a
 
 Some features are code-only (experiments, guardrails) and some are platform-only (monitors). Evaluators work on both surfaces.
 
+## Plan Limits
+
+See [Plan Limits](_shared/plan-limits.md) for how to handle free plan limits gracefully. Focus on delivering value within the limits — create 1-2 high-quality experiments with domain-realistic data rather than many shallow ones. Do NOT try to work around limits by deleting existing resources. Show the user the value of what you created before suggesting an upgrade.
+
 ## Prerequisites
 
 Set up the LangWatch MCP for documentation access:

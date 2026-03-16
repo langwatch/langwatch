@@ -24,6 +24,10 @@ If the user's request is **specific** ("version this prompt", "create a new prom
 
 This skill is primarily code-path (CLI + SDK). Platform MCP tools exist for prompt management (`platform_create_prompt`, `platform_update_prompt`, etc.) but users typically manage prompts directly in the UI. If the user has no codebase and wants to create prompts on the platform, use the `platform_create_prompt` MCP tool instead.
 
+## Plan Limits
+
+See [Plan Limits](_shared/plan-limits.md) for how to handle free plan limits gracefully. The free plan has a limited number of prompts. Work within the limits and show value before suggesting an upgrade. Do NOT try to work around limits.
+
 ## Step 1: Set up the LangWatch MCP
 
 First, install the LangWatch MCP server so you have access to Prompts CLI documentation:

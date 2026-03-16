@@ -52,6 +52,10 @@ Best practices:
 - Use script functions for deterministic checks (tool calls, file existence) and judge criteria for semantic evaluation
 - Cover more ground with fewer well-designed scenarios rather than many shallow ones
 
+## Plan Limits
+
+See [Plan Limits](_shared/plan-limits.md) for how to handle free plan limits gracefully. Focus on delivering value within the limits before suggesting an upgrade. Do NOT try to work around limits by reusing scenario sets or deleting existing resources.
+
 ---
 
 ## Code Approach: Scenario SDK

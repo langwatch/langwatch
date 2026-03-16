@@ -9,6 +9,10 @@ compatibility: Requires Node.js for MCP setup. Works with Claude Code and simila
 
 This skill sets up your agent with the full LangWatch stack: tracing, prompt versioning, evaluation experiments, and agent simulation tests. Each step builds on the previous one.
 
+## Plan Limits
+
+See [Plan Limits](_shared/plan-limits.md). The free plan has limits on prompts, scenarios, evaluators, and experiments. Focus on delivering value at each step — make each creation count. Show the user what works before they hit any limits. If you reach a limit, summarize what was accomplished and suggest upgrading at https://app.langwatch.ai/settings/subscription
+
 ## Prerequisites
 
 Set up the LangWatch MCP first — you'll need it for every step below.

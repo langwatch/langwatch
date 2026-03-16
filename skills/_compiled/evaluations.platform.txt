@@ -14,6 +14,23 @@ LangWatch Evaluations is a comprehensive quality assurance system. Understand wh
 | "create a dataset", "test data" | **Datasets** | Step D |
 | "evaluate" (ambiguous) | Ask: "batch test or production monitoring?" | - |
 
+## Where Evaluations Fit
+
+Evaluations sit at the **component level of the testing pyramid** — they test specific aspects of your agent with many input/output examples. This is different from scenarios (end-to-end multi-turn conversation testing).
+
+Use evaluations when:
+- You have many examples with clear correct/incorrect answers
+- Testing RAG retrieval accuracy
+- Benchmarking classification, routing, or detection tasks
+- Running CI/CD quality gates
+
+Use scenarios instead when:
+- Testing multi-turn agent conversation behavior
+- Validating complex tool-calling sequences
+- Checking agent decision-making in realistic situations
+
+For onboarding, create 1-2 Jupyter notebooks (or scripts) maximum. Focus on generating domain-realistic data that's as close to real-world inputs as possible.
+
 ## Determine Scope
 
 If the user's request is **general** ("set up evaluations", "evaluate my agent"):
@@ -34,6 +51,47 @@ If the user's request is **specific** ("add a faithfulness evaluator", "create a
 4. If ambiguous → ask the user: "Do you want to write evaluation code or set things up on the platform?"
 
 Some features are code-only (experiments, guardrails) and some are platform-only (monitors). Evaluators work on both surfaces.
+
+## Plan Limits
+
+# Handling LangWatch Plan Limits
+
+LangWatch has usage limits on the free plan (e.g., limited number of prompts, scenarios, evaluators, experiments, datasets). When you hit a limit, the API returns an error like:
+
+> "Free plan limit of 3 scenarios reached. To increase your limits, upgrade your plan at https://app.langwatch.ai/settings/subscription"
+
+## How to Handle Limits
+
+### During Onboarding / Initial Setup
+
+When setting up LangWatch for the first time, focus on delivering VALUE before the user hits limits:
+
+1. **Work within the limits.** If the free plan allows 3 scenario sets, create up to 3 meaningful ones — don't try to create 10.
+2. **Make every creation count.** Each prompt, scenario, or evaluator you create should demonstrate clear value.
+3. **Show the user what works FIRST.** Run the tests, show the results, let them see the value before they encounter any limits.
+4. **Stop gracefully at the limit.** When you've used the available slots, tell the user what you accomplished and what they can do next.
+
+### When You Hit a Limit
+
+If you get a "plan limit reached" error:
+
+1. **Do NOT try to work around the limit.** Do not reuse scenario sets to stuff more tests in, do not delete existing resources to make room, do not hack around it.
+2. **Tell the user what happened clearly.** Explain that they've reached their free plan limit.
+3. **Show the value you already delivered.** Summarize what was created and how it helps them.
+4. **Suggest upgrading.** Direct them to upgrade at: https://app.langwatch.ai/settings/subscription
+5. **Frame it positively.** "You've set up [X, Y, Z] which gives you [value]. To add more, you can upgrade your plan."
+
+### Example Response When Hitting a Limit
+
+Good:
+> "I've created 3 scenario tests covering your agent's core flows: customer greeting, refund handling, and escalation. These are running and you can see results in your LangWatch dashboard. To add more scenarios (like edge cases and red teaming), you can upgrade your plan at https://app.langwatch.ai/settings/subscription"
+
+Bad:
+> "Error: limit reached. Let me try reusing an existing scenario set to add more tests..."
+
+Bad:
+> "You need to upgrade to continue. Visit https://app.langwatch.ai/settings/subscription"
+> (No value shown first) Focus on delivering value within the limits — create 1-2 high-quality experiments with domain-realistic data rather than many shallow ones. Do NOT try to work around limits by deleting existing resources. Show the user the value of what you created before suggesting an upgrade.
 
 ## Prerequisites
 
@@ -86,7 +144,7 @@ Create a script or notebook that runs your agent against a dataset and measures 
 
 1. Read the SDK docs: call `fetch_langwatch_docs` with url `https://langwatch.ai/docs/evaluations/experiments/sdk.md`
 2. Analyze the agent's code to understand what it does
-3. Generate a dataset of 10-20 examples **tailored to the agent's actual domain** (see dataset guidance below)
+3. Create a dataset with representative examples that are as close to real-world inputs as possible. Focus on domain realism — the dataset should look like actual production data the agent would encounter.
 4. Create the experiment file:
 
 **Python — Jupyter Notebook (.ipynb):**
@@ -135,6 +193,21 @@ await evaluation.run(dataset, async ({ item, index }) => {
 ```
 
 5. Run the experiment to verify it works
+
+### Verify by Running
+
+ALWAYS run the experiment after creating it. If it fails, fix it. An experiment that isn't executed is useless.
+
+For Python notebooks: Create an accompanying script to run it:
+```python
+# run_experiment.py
+import subprocess
+subprocess.run(["jupyter", "nbconvert", "--to", "notebook", "--execute", "experiment.ipynb"], check=True)
+```
+
+Or simply run the cells in order via the notebook interface.
+
+For TypeScript: `npx tsx experiment.ts`
 
 ## Step B: Online Evaluation (Production Monitoring & Guardrails)
 
@@ -210,7 +283,17 @@ Create test datasets for experiments.
 | Customer support | Support tickets and customer questions |
 | Summarizer | Documents with expected summaries |
 
-CRITICAL: The dataset must be specific to what the agent ACTUALLY does. Do NOT use generic examples like "What is 2+2?". Study the system prompt, function signatures, and domain context.
+CRITICAL: The dataset MUST be specific to what the agent ACTUALLY does. Before generating any data:
+1. Read the agent's system prompt word by word
+2. Read the agent's function signatures and tool definitions
+3. Understand the agent's domain, persona, and constraints
+
+Then generate data that reflects EXACTLY this agent's real-world usage. For example:
+- If the system prompt says "respond in tweet-like format with emojis" → your dataset inputs should be things users would ask this specific bot, and expected outputs should be short emoji-laden responses
+- If the agent is a SQL assistant → your dataset should have natural language queries with expected SQL
+- If the agent handles refunds → your dataset should have refund scenarios
+
+NEVER use generic examples like "What is 2+2?", "What is the capital of France?", or "Explain quantum computing". These are useless for evaluating the specific agent. Every single example must be something a real user of THIS specific agent would actually say.
 
 3. For programmatic dataset access: `https://langwatch.ai/docs/datasets/programmatic-access.md`
 4. For AI-generated datasets: `https://langwatch.ai/docs/datasets/ai-dataset-generation.md`
@@ -230,6 +313,14 @@ Use the `platform_create_prompt` MCP tool to create a new prompt:
 - The prompt will appear in your LangWatch project's Prompts section
 
 Or use `platform_list_prompts` to find existing prompts and `platform_update_prompt` to modify them.
+
+### Check Model Providers
+
+Before creating evaluators on the platform, verify model providers are configured:
+
+1. Call `platform_list_model_providers` to check existing providers
+2. If no providers are configured, ask the user if they have an LLM API key (OpenAI, Anthropic, etc.)
+3. If they do, set it up with `platform_set_model_provider` so evaluators can run
 
 ### Create an Evaluator
 
