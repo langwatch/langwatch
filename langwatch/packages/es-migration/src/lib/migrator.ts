@@ -180,53 +180,64 @@ export class Migrator {
 						}
 					}
 				} else if (newEvents.length > 0) {
-					const allEventRecords: EventRecord[] = [];
-					const allProjectionWrites: Array<() => Promise<void>> = [];
+					// Process aggregates in sub-batches to bound peak memory.
+					// Each aggregate (especially traces-combined) expands into many
+					// EventRecord objects + projection closures; processing all at
+					// once can OOM on large batches.
+					const aggregateEntries = [...aggregates.entries()];
 					const aggregatesWithoutCommands: string[] = [];
 
-					for (const [aggregateId, document] of aggregates) {
-						let result: DirectWriteResult;
-						try {
-							result = definition.processAggregate!(document, aggregateId);
-						} catch (err) {
-							logger.warn("processAggregate failed", {
-								aggregateId,
-								error: err instanceof Error ? err.message : String(err),
-							});
-							stats.errors++;
-							continue;
+					for (let subIdx = 0; subIdx < aggregateEntries.length; subIdx += config.subBatchSize) {
+						if (batchInsertFailed) break;
+
+						const chunk = aggregateEntries.slice(subIdx, subIdx + config.subBatchSize);
+						const chunkEventRecords: EventRecord[] = [];
+						const chunkProjectionWrites: Array<() => Promise<void>> = [];
+
+						for (const [aggregateId, document] of chunk) {
+							let result: DirectWriteResult;
+							try {
+								result = definition.processAggregate!(document, aggregateId);
+							} catch (err) {
+								logger.warn("processAggregate failed", {
+									aggregateId,
+									error: err instanceof Error ? err.message : String(err),
+								});
+								stats.errors++;
+								continue;
+							}
+
+							if (result.commandCount === 0) {
+								aggregatesWithoutCommands.push(aggregateId);
+								stats.skipped++;
+								continue;
+							}
+
+							chunkEventRecords.push(...result.eventRecords);
+							chunkProjectionWrites.push(...result.projectionWrites);
+							stats.dispatched += result.commandCount;
 						}
 
-						if (result.commandCount === 0) {
-							aggregatesWithoutCommands.push(aggregateId);
-							stats.skipped++;
-							continue;
+						// Bulk-insert this sub-batch's event records
+						if (chunkEventRecords.length > 0 && this.deps.insertEventRecords) {
+							try {
+								await this.deps.insertEventRecords(chunkEventRecords);
+							} catch (err) {
+								logger.error("Failed to bulk-insert event records — skipping remaining sub-batches", {
+									count: chunkEventRecords.length,
+									error: err instanceof Error ? err.message : String(err),
+								});
+								stats.errors++;
+								batchInsertFailed = true;
+								break;
+							}
 						}
 
-						allEventRecords.push(...result.eventRecords);
-						allProjectionWrites.push(...result.projectionWrites);
-						stats.dispatched += result.commandCount;
-					}
-
-					// Bulk-insert event records to event_log
-					if (allEventRecords.length > 0 && this.deps.insertEventRecords) {
-						try {
-							await this.deps.insertEventRecords(allEventRecords);
-						} catch (err) {
-							logger.error("Failed to bulk-insert event records — skipping projection writes", {
-								count: allEventRecords.length,
-								error: err instanceof Error ? err.message : String(err),
-							});
-							stats.errors++;
-							batchInsertFailed = true;
+						// Execute this sub-batch's projection writes
+						if (chunkProjectionWrites.length > 0) {
+							await Promise.all(chunkProjectionWrites.map((fn) => fn()));
 						}
-					}
-					// Release event records for GC before executing projection writes
-					allEventRecords.length = 0;
-
-					// Execute projection writes only if event insert succeeded
-					if (!batchInsertFailed && allProjectionWrites.length > 0) {
-						await Promise.all(allProjectionWrites.map((fn) => fn()));
+						// chunkEventRecords + chunkProjectionWrites go out of scope → GC
 					}
 
 					if (aggregatesWithoutCommands.length > 0) {
@@ -456,52 +467,56 @@ export class Migrator {
 				});
 
 				if (definition.processAggregate) {
-					// Direct-write flush: same as main loop
-					const allEventRecords: EventRecord[] = [];
-					const allProjectionWrites: Array<() => Promise<void>> = [];
+					// Direct-write flush: sub-batched like the main loop
+					const remainingEntries = [...remaining.entries()];
 
-					for (const [aggregateId, document] of remaining) {
-						let result: DirectWriteResult;
-						try {
-							result = definition.processAggregate!(document, aggregateId);
-						} catch (err) {
-							logger.warn("processAggregate failed (flush)", {
-								aggregateId,
-								error: err instanceof Error ? err.message : String(err),
-							});
-							stats.errors++;
-							continue;
+					for (let subIdx = 0; subIdx < remainingEntries.length; subIdx += config.subBatchSize) {
+						const chunk = remainingEntries.slice(subIdx, subIdx + config.subBatchSize);
+						const chunkEventRecords: EventRecord[] = [];
+						const chunkProjectionWrites: Array<() => Promise<void>> = [];
+
+						for (const [aggregateId, document] of chunk) {
+							let result: DirectWriteResult;
+							try {
+								result = definition.processAggregate!(document, aggregateId);
+							} catch (err) {
+								logger.warn("processAggregate failed (flush)", {
+									aggregateId,
+									error: err instanceof Error ? err.message : String(err),
+								});
+								stats.errors++;
+								continue;
+							}
+
+							if (result.commandCount === 0) {
+								stats.skipped++;
+								continue;
+							}
+
+							chunkEventRecords.push(...result.eventRecords);
+							chunkProjectionWrites.push(...result.projectionWrites);
+							stats.dispatched += result.commandCount;
 						}
 
-						if (result.commandCount === 0) {
-							stats.skipped++;
-							continue;
+						if (
+							!config.dryRun &&
+							chunkEventRecords.length > 0 &&
+							this.deps.insertEventRecords
+						) {
+							try {
+								await this.deps.insertEventRecords(chunkEventRecords);
+							} catch (err) {
+								logger.error("Failed to bulk-insert event records (flush)", {
+									count: chunkEventRecords.length,
+									error: err instanceof Error ? err.message : String(err),
+								});
+								stats.errors++;
+							}
 						}
 
-						allEventRecords.push(...result.eventRecords);
-						allProjectionWrites.push(...result.projectionWrites);
-						stats.dispatched += result.commandCount;
-					}
-
-					if (
-						!config.dryRun &&
-						allEventRecords.length > 0 &&
-						this.deps.insertEventRecords
-					) {
-						try {
-							await this.deps.insertEventRecords(allEventRecords);
-						} catch (err) {
-							logger.error("Failed to bulk-insert event records (flush)", {
-								count: allEventRecords.length,
-								error: err instanceof Error ? err.message : String(err),
-							});
-							stats.errors++;
+						if (!config.dryRun && chunkProjectionWrites.length > 0) {
+							await Promise.all(chunkProjectionWrites.map((fn) => fn()));
 						}
-					}
-					allEventRecords.length = 0;
-
-					if (!config.dryRun && allProjectionWrites.length > 0) {
-						await Promise.all(allProjectionWrites.map((fn) => fn()));
 					}
 				} else {
 					// Command-based flush

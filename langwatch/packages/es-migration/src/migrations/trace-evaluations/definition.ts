@@ -1,19 +1,12 @@
-import type { Event } from "~/server/event-sourcing/domain/types.js";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types.js";
 import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types.js";
 import type {
-  EvaluationScheduledEvent,
-  EvaluationStartedEvent,
-  EvaluationCompletedEvent,
+  EvaluationReportedEvent,
   EvaluationProcessingEvent,
 } from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/events.js";
 import {
-  EVALUATION_SCHEDULED_EVENT_TYPE,
-  EVALUATION_STARTED_EVENT_TYPE,
-  EVALUATION_COMPLETED_EVENT_TYPE,
-  EVALUATION_SCHEDULED_EVENT_VERSION_LATEST,
-  EVALUATION_STARTED_EVENT_VERSION_LATEST,
-  EVALUATION_COMPLETED_EVENT_VERSION_LATEST,
+  EVALUATION_REPORTED_EVENT_TYPE,
+  EVALUATION_REPORTED_EVENT_VERSION_LATEST,
 } from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/constants.js";
 import { createEvaluationRunFoldProjection } from "~/server/event-sourcing/pipelines/evaluation-processing/projections/evaluationRun.foldProjection.js";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils.js";
@@ -128,60 +121,23 @@ export function createTraceEvaluationMigrationDefinition(
 
       // Use the evaluation's own timestamp, falling back to the trace's business timestamp — never Date.now()
       const occurredAt = evaluation.timestamps.started_at ?? evaluation.timestamps.inserted_at ?? traceStartedAt;
-      const allEvents: Event[] = [];
-
-      // 1. EvaluationScheduledEvent
-      const scheduledEvent = EventUtils.createEvent<EvaluationScheduledEvent>({
-        aggregateType: "evaluation" as any,
-        aggregateId: evaluationId,
-        tenantId: tenantId as any,
-        type: EVALUATION_SCHEDULED_EVENT_TYPE,
-        version: EVALUATION_SCHEDULED_EVENT_VERSION_LATEST,
-        data: {
-          evaluationId,
-          evaluatorId: evaluation.evaluator_id,
-          evaluatorType: evaluation.type ?? "unknown",
-          evaluatorName: evaluation.name,
-          traceId,
-          isGuardrail: evaluation.is_guardrail ?? false,
-        },
-        occurredAt,
-        idempotencyKey: `${tenantId}:${evaluationId}:scheduled`,
-      });
-      allEvents.push(scheduledEvent);
-
-      // 2. EvaluationStartedEvent
-      const startedEvent = EventUtils.createEvent<EvaluationStartedEvent>({
-        aggregateType: "evaluation" as any,
-        aggregateId: evaluationId,
-        tenantId: tenantId as any,
-        type: EVALUATION_STARTED_EVENT_TYPE,
-        version: EVALUATION_STARTED_EVENT_VERSION_LATEST,
-        data: {
-          evaluationId,
-          evaluatorId: evaluation.evaluator_id,
-          evaluatorType: evaluation.type ?? "unknown",
-          evaluatorName: evaluation.name,
-          traceId,
-          isGuardrail: evaluation.is_guardrail ?? false,
-        },
-        occurredAt,
-        idempotencyKey: `${tenantId}:${evaluationId}:started`,
-      });
-      allEvents.push(startedEvent);
-
-      // 3. EvaluationCompletedEvent
-      const completedOccurredAt = evaluation.timestamps.finished_at ?? occurredAt;
       const errorMessage = evaluation.error?.message ?? null;
       const errorDetails = evaluation.error?.stacktrace?.join("\n") ?? null;
-      const completedEvent = EventUtils.createEvent<EvaluationCompletedEvent>({
+
+      // Single EvaluationReportedEvent carries both identity + results
+      const reportedEvent = EventUtils.createEvent<EvaluationReportedEvent>({
         aggregateType: "evaluation" as any,
         aggregateId: evaluationId,
         tenantId: tenantId as any,
-        type: EVALUATION_COMPLETED_EVENT_TYPE,
-        version: EVALUATION_COMPLETED_EVENT_VERSION_LATEST,
+        type: EVALUATION_REPORTED_EVENT_TYPE,
+        version: EVALUATION_REPORTED_EVENT_VERSION_LATEST,
         data: {
           evaluationId,
+          evaluatorId: evaluation.evaluator_id,
+          evaluatorType: evaluation.type ?? "unknown",
+          evaluatorName: evaluation.name,
+          traceId,
+          isGuardrail: evaluation.is_guardrail ?? false,
           status: evaluation.status as "processed" | "error" | "skipped",
           score: typeof evaluation.score === "number" ? evaluation.score : null,
           passed: evaluation.passed ?? null,
@@ -190,22 +146,19 @@ export function createTraceEvaluationMigrationDefinition(
           error: errorMessage,
           errorDetails,
         },
-        occurredAt: completedOccurredAt,
-        idempotencyKey: `${tenantId}:${evaluationId}:completed`,
+        occurredAt,
+        idempotencyKey: `${tenantId}:${evaluationId}:reported`,
       });
-      allEvents.push(completedEvent);
 
       // Compute fold projection (EvaluationRun) in memory
       let evalRunState = foldProjection.init();
-      for (const event of allEvents) {
-        evalRunState = foldProjection.apply(
-          evalRunState,
-          event as EvaluationProcessingEvent,
-        );
-      }
+      evalRunState = foldProjection.apply(
+        evalRunState,
+        reportedEvent as EvaluationProcessingEvent,
+      );
 
       // Convert to event records
-      const eventRecords = allEvents.map(eventToRecord);
+      const eventRecords = [eventToRecord(reportedEvent)];
 
       // Build projection write
       const storeContext = { aggregateId: evaluationId, tenantId: tenantId as any };
@@ -216,7 +169,7 @@ export function createTraceEvaluationMigrationDefinition(
       return {
         eventRecords,
         projectionWrites,
-        commandCount: 3,
+        commandCount: 1,
         projectionState: evalRunState,
       };
     },
