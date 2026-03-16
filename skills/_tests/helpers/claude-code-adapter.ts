@@ -94,15 +94,18 @@ export function createClaudeCodeAgent({
         .map((message) => `${message.role}: ${message.content}`)
         .join("\n\n");
 
+      const apiKey = process.env.LANGWATCH_API_KEY;
+      if (!apiKey) {
+        throw new Error(
+          "LANGWATCH_API_KEY environment variable is required. Set it in skills/.env"
+        );
+      }
+
       const mcpConfig = {
         mcpServers: {
           LangWatch: {
             command: "node",
-            args: [
-              mcpServerDistPath,
-              "--apiKey",
-              process.env.LANGWATCH_API_KEY!,
-            ],
+            args: [mcpServerDistPath, "--apiKey", apiKey],
           },
         },
       };
@@ -110,7 +113,7 @@ export function createClaudeCodeAgent({
       const mcpConfigPath = path.join(workingDirectory, ".mcp-test-config.json");
       fs.writeFileSync(mcpConfigPath, JSON.stringify(mcpConfig));
 
-      return new Promise<string>((resolve, reject) => {
+      return new Promise<any>((resolve, reject) => {
         const claudeBin =
           process.env.CLAUDE_BIN ||
           execSync("which claude", { encoding: "utf8" }).trim();

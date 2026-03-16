@@ -157,7 +157,7 @@ describe("applyApiKeyMode()", () => {
 describe("wrapInEnvelope()", () => {
   describe("when mode is platform", () => {
     it("adds a system instruction header", () => {
-      const result = wrapInEnvelope({ content: "body content", mode: "platform", skillName: "create-agent" });
+      const result = wrapInEnvelope({ content: "body content", mode: "platform" });
 
       expect(result).toContain("body content");
       expect(result).toMatch(/^You are/); // starts with system instruction
@@ -166,7 +166,7 @@ describe("wrapInEnvelope()", () => {
 
   describe("when mode is docs", () => {
     it("includes an instruction to ask for the API key", () => {
-      const result = wrapInEnvelope({ content: "body content", mode: "docs", skillName: "create-agent" });
+      const result = wrapInEnvelope({ content: "body content", mode: "docs" });
 
       expect(result).toContain("https://app.langwatch.ai/authorize");
       expect(result).toContain("body content");

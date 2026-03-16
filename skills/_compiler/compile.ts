@@ -57,8 +57,14 @@ export function parseFrontmatter(content: string): ParsedSkill {
     }
   }
 
+  if (!frontmatter.name || !frontmatter.description) {
+    throw new Error(
+      "Invalid SKILL.md frontmatter: 'name' and 'description' are required"
+    );
+  }
+
   return {
-    frontmatter: frontmatter as unknown as SkillFrontmatter,
+    frontmatter: frontmatter as SkillFrontmatter,
     body,
   };
 }
@@ -204,11 +210,9 @@ export function applyApiKeyMode({
 export function wrapInEnvelope({
   content,
   mode,
-  skillName,
 }: {
   content: string;
   mode: CompileMode;
-  skillName: string;
 }): string {
   const header =
     mode === "platform"
@@ -259,7 +263,7 @@ export function compileSkill({
   body = applyApiKeyMode({ content: body, mode });
 
   // Wrap in envelope
-  return wrapInEnvelope({ content: body, mode, skillName });
+  return wrapInEnvelope({ content: body, mode });
 }
 
 // ──────────────────────────────────────────────────
@@ -297,9 +301,15 @@ function parseArgs(): CliOptions {
       case "--skills":
         skills = args[++i]!.split(",");
         break;
-      case "--mode":
-        mode = args[++i] as CompileMode;
+      case "--mode": {
+        const modeArg = args[++i];
+        if (modeArg !== "platform" && modeArg !== "docs") {
+          console.error(`Error: --mode must be "platform" or "docs", got "${modeArg}"`);
+          process.exit(1);
+        }
+        mode = modeArg;
         break;
+      }
       case "--help":
         console.log(
           `Usage: compile.ts --skills <skill1,skill2> --mode <platform|docs>
