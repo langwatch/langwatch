@@ -57,7 +57,7 @@ export function createClaudeCodeAgent({
         .map((message) => `${message.role}: ${message.content}`)
         .join("\n\n");
 
-      const mcpConfigPath = path.join(__dirname, ".mcp-config.json");
+      const mcpConfigPath = path.join(workingDirectory, ".mcp-config.json");
 
       if (!skipMcp) {
         const mcpConfig = {
