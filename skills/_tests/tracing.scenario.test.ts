@@ -291,4 +291,119 @@ describe("Tracing Skill", () => {
     },
     600_000
   );
+
+  it.skipIf(isCI)(
+    "instruments code without MCP — uses llms.txt fallback for docs",
+    async () => {
+      const tempFolder = fs.mkdtempSync(
+        path.join(os.tmpdir(), "langwatch-skill-tracing-nomcp-")
+      );
+      execSync(
+        `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`
+      );
+      copySkillToWorkDir(tempFolder);
+
+      // Write .env with API key
+      fs.writeFileSync(
+        path.join(tempFolder, ".env"),
+        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n`
+      );
+
+      const result = await scenario.run({
+        name: "Tracing without MCP — llms.txt fallback",
+        description:
+          "Agent instruments code without MCP access, using direct URL fetching for docs.",
+        agents: [
+          createClaudeCodeAgent({
+            workingDirectory: tempFolder,
+            skipMcp: true,
+          }),
+          scenario.userSimulatorAgent({ model: judgeModel }),
+          scenario.judgeAgent({
+            model: judgeModel,
+            criteria: [
+              "Agent should have added LangWatch tracing to the code",
+              "Agent should have fetched documentation via URLs since MCP is not available",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "please instrument my code with langwatch. The LangWatch MCP is not installed, but you can fetch docs directly from https://langwatch.ai/docs/llms.txt. My API key is in the .env file. Short and sweet, no need to test."
+          ),
+          scenario.agent(),
+          (state) => {
+            toolCallFix(state);
+            const mainPy = fs.readFileSync(`${tempFolder}/main.py`, "utf8");
+            expect(mainPy).toContain("langwatch");
+            expect(mainPy).toContain("trace");
+          },
+          scenario.judge(),
+        ],
+      });
+      expect(result.success).toBe(true);
+    },
+    600_000
+  );
+
+  it.skipIf(isCI)(
+    "asks user for API key when not found in environment or .env",
+    async () => {
+      const tempFolder = fs.mkdtempSync(
+        path.join(os.tmpdir(), "langwatch-skill-tracing-nokey-")
+      );
+      execSync(
+        `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`
+      );
+      copySkillToWorkDir(tempFolder);
+
+      // NO .env file — agent must ask user for the key
+
+      const result = await scenario.run({
+        name: "Tracing — agent asks for API key",
+        description:
+          "Agent instruments code but has no API key available. Must ask the user.",
+        agents: [
+          createClaudeCodeAgent({
+            workingDirectory: tempFolder,
+            cleanEnv: true,
+          }),
+          scenario.userSimulatorAgent({ model: judgeModel }),
+          scenario.judgeAgent({
+            model: judgeModel,
+            criteria: [
+              "Agent should have asked the user for a LangWatch API key or directed them to get one",
+              "Agent should have added LangWatch tracing to the code after receiving the key",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "please instrument my code with langwatch, short and sweet, no need to test"
+          ),
+          scenario.agent(),
+          // Agent should ask for API key — we provide it
+          scenario.user(
+            `Here is my LangWatch API key: ${process.env.LANGWATCH_API_KEY}. Please save it to .env and continue with the instrumentation.`
+          ),
+          scenario.agent(),
+          (state) => {
+            toolCallFix(state);
+            const mainPy = fs.readFileSync(`${tempFolder}/main.py`, "utf8");
+            expect(mainPy).toContain("langwatch");
+
+            // Verify .env was created with the key
+            const envFile = path.join(tempFolder, ".env");
+            if (fs.existsSync(envFile)) {
+              const envContent = fs.readFileSync(envFile, "utf8");
+              expect(envContent).toContain("LANGWATCH_API_KEY");
+            }
+          },
+          scenario.judge(),
+        ],
+      });
+      expect(result.success).toBe(true);
+    },
+    900_000 // longer timeout for multi-turn
+  );
 });

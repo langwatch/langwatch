@@ -394,6 +394,9 @@
     "meta_skills": {
       "level-up": "Orchestrates tracing + prompts + evaluations + scenarios",
       "analytics": "Cross-cutting skill for querying performance (works for both code and platform users)"
+    },
+    "recipes": {
+      "test-cli-usability": "Write scenario tests to ensure your CLI is usable by AI agents"
     }
   }
 }

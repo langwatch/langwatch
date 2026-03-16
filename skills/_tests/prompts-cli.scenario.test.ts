@@ -178,4 +178,70 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
     },
     600_000
   );
+
+  it.skipIf(isCI)(
+    "agent uses push --force-local to resolve conflicts non-interactively",
+    async () => {
+      const tempFolder = fs.mkdtempSync(
+        path.join(os.tmpdir(), "langwatch-cli-prompts-push-")
+      );
+
+      // Set up a project with a prompt that exists both locally and remotely (simulate conflict scenario)
+      fs.writeFileSync(
+        path.join(tempFolder, ".env"),
+        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n`
+      );
+      fs.writeFileSync(
+        path.join(tempFolder, "prompts.json"),
+        JSON.stringify({ prompts: {} })
+      );
+      fs.writeFileSync(
+        path.join(tempFolder, "prompts-lock.json"),
+        JSON.stringify({ lockfileVersion: 1, prompts: {} })
+      );
+      fs.mkdirSync(path.join(tempFolder, "prompts"), { recursive: true });
+
+      const result = await scenario.run({
+        name: "CLI push with force-local flag",
+        description:
+          "Agent creates a prompt and pushes it to the platform. If there are conflicts, it should use --force-local to resolve them automatically.",
+        agents: [
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          scenario.userSimulatorAgent({ model: judgeModel }),
+          scenario.judgeAgent({
+            model: judgeModel,
+            criteria: [
+              "Agent created a prompt using the langwatch CLI",
+              "Agent pushed the prompt to the platform (using langwatch prompt push or langwatch prompt sync)",
+              "If conflicts occurred, agent used --force-local or --force-remote flag instead of getting stuck on interactive prompts",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "create a new prompt called greeting-bot using the langwatch prompt cli, then push it to the platform. If there are any conflicts during push, use the --force-local flag. The cli is already installed globally."
+          ),
+          scenario.agent(),
+          (state) => {
+            toolCallFix(state);
+
+            // Verify prompt was created
+            const promptsDir = path.join(tempFolder, "prompts");
+            const yamlFiles = fs.existsSync(promptsDir)
+              ? fs
+                  .readdirSync(promptsDir)
+                  .filter((f) => f.endsWith(".prompt.yaml"))
+              : [];
+            expect(yamlFiles.length).toBeGreaterThan(0);
+
+            // Verify no interactive workarounds
+            assertNoInteractiveWorkarounds(state);
+          },
+          scenario.judge(),
+        ],
+      });
+      expect(result.success).toBe(true);
+    },
+    600_000
+  );
 });

@@ -29,15 +29,19 @@ const mcpServerDistPath = path.resolve(
  * @param cleanEnv - When true, strips LANGWATCH_API_KEY, OPENAI_API_KEY, and
  *   ANTHROPIC_API_KEY from the spawned process environment. Use this to test
  *   cold-start flows where the agent must discover keys from .env files.
+ * @param skipMcp - When true, omits the MCP config entirely. Use this to test
+ *   flows where the agent must discover docs via llms.txt fallback URLs.
  */
 export function createClaudeCodeAgent({
   workingDirectory,
   skillPath,
   cleanEnv,
+  skipMcp,
 }: {
   workingDirectory: string;
   skillPath?: string;
   cleanEnv?: boolean;
+  skipMcp?: boolean;
 }): AgentAdapter {
   if (skillPath) {
     const skillName = path.basename(path.dirname(skillPath));
@@ -53,21 +57,23 @@ export function createClaudeCodeAgent({
         .map((message) => `${message.role}: ${message.content}`)
         .join("\n\n");
 
-      const mcpConfig = {
-        mcpServers: {
-          LangWatch: {
-            command: "node",
-            args: [
-              mcpServerDistPath,
-              "--apiKey",
-              process.env.LANGWATCH_API_KEY!,
-            ],
-          },
-        },
-      };
-
       const mcpConfigPath = path.join(__dirname, ".mcp-config.json");
-      fs.writeFileSync(mcpConfigPath, JSON.stringify(mcpConfig));
+
+      if (!skipMcp) {
+        const mcpConfig = {
+          mcpServers: {
+            LangWatch: {
+              command: "node",
+              args: [
+                mcpServerDistPath,
+                "--apiKey",
+                process.env.LANGWATCH_API_KEY!,
+              ],
+            },
+          },
+        };
+        fs.writeFileSync(mcpConfigPath, JSON.stringify(mcpConfig));
+      }
 
       return new Promise<string>((resolve, reject) => {
         const claudeBin =
@@ -78,8 +84,7 @@ export function createClaudeCodeAgent({
           "--output-format",
           "stream-json",
           "-p",
-          "--mcp-config",
-          mcpConfigPath,
+          ...(skipMcp ? [] : ["--mcp-config", mcpConfigPath]),
           "--dangerously-skip-permissions",
           "--verbose",
           formattedMessages,
