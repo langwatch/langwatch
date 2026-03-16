@@ -1450,9 +1450,10 @@ export function MessagesTable({
       {selectedTraceIds.length > 0 && (
         <Box
           position="fixed"
-          bottom={10}
+          bottom={16}
           left="50%"
           transform="translateX(-50%)"
+          zIndex={20}
           backgroundColor="#ffffff"
           padding="8px"
           paddingX="16px"
