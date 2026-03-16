@@ -1,4 +1,4 @@
-# ADR-013: Workflow-Based Onboarding (Coding Assistant / Chat Assistant)
+# ADR-013: Workflow-Based Onboarding with Skills and Recipes
 
 **Date:** 2026-03-16
 
@@ -47,6 +47,20 @@ LangWatch Skills/
 
 "Manual Setup" moves out of Skills into the Integrations section (it's only about instrumentation).
 
+### Two categories of skills
+
+Two categories of skills emerged:
+1. **Feature skills** -- map 1:1 to platform features (tracing, evaluations, scenarios, prompts)
+2. **Recipes** -- domain-specific, use-case-specific actionable guides (test-compliance, generate-rag-dataset, debug-instrumentation)
+
+We will organize skills into feature skills and recipes:
+- Feature skills handle both code and platform approaches with disambiguation
+- Recipes solve specific domain problems and are the 2026 evolution of cookbooks
+- Both are AgentSkills-compliant and publishable to the skills directory
+- Both compile into copy-paste prompts via the same compiler
+
+Recipes live under `skills/recipes/{name}/` to distinguish them from feature skills at `skills/{name}/`.
+
 ### Language rules
 
 - Never say "For Developers" or "For Teams" in navigation or page titles
@@ -70,8 +84,12 @@ The role-based framing was instantly recognizable ("I'm a developer, that's my s
 1. All skills documentation uses workflow language, not role language
 2. Cross-link callout tips on 24+ pages need updating
 3. The "For Every Role" section on the introduction page is removed
-4. Future skills and recipes follow the same pattern — defined by what the tool can do, not who uses it
+4. Future skills and recipes follow the same pattern -- defined by what the tool can do, not who uses it
 5. The feature-map.json `code.skill` / `platform.skill` split maps naturally to this (code = coding assistant, platform = chat assistant)
+6. The skills directory grows organically as new recipes are added for customer requests
+7. Every recipe should have scenario tests proving it works
+8. Recipes reference feature skills when needed (e.g., test-compliance references the scenarios skill's Scenario SDK)
+9. The docs site has a dedicated recipes page for browsing
 
 ## References
 
