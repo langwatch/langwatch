@@ -6,7 +6,7 @@ import {
   UserMessage,
 } from "@copilotkit/react-ui";
 import clsx from "clsx";
-import { forwardRef, useEffect, useImperativeHandle, useMemo } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from "react";
 import type { z } from "zod";
 import { TraceMessage } from "~/components/copilot-kit/TraceMessage";
 import { convertScenarioMessagesToCopilotKit } from "~/components/simulations/utils/convert-scenario-messages";
@@ -120,7 +120,13 @@ const PromptPlaygroundChatInner = forwardRef<PromptPlaygroundChatRef, object>(
     /**
      * Sync the visible messages to the tab data.
      */
+    const prevMessageIdsRef = useRef("");
     useEffect(() => {
+      if (!visibleMessages) return;
+      const messageIds = visibleMessages.map((m) => m.id).join(",");
+      if (messageIds === prevMessageIdsRef.current) return;
+      prevMessageIdsRef.current = messageIds;
+
       const tab = getTabById(tabId);
       if (tab) {
         updateTabData({
