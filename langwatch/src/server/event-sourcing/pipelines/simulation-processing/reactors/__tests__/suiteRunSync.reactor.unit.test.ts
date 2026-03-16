@@ -34,6 +34,8 @@ function createFoldState(overrides: Partial<SimulationRunStateData> = {}): Simul
     Name: null,
     Description: null,
     Metadata: null,
+    Target: null,
+    Attempts: 0,
     Messages: [],
     TraceIds: [],
     Verdict: null,
@@ -50,7 +52,7 @@ function createFoldState(overrides: Partial<SimulationRunStateData> = {}): Simul
     ArchivedAt: null,
     LastSnapshotOccurredAt: 0,
     ...overrides,
-  };
+  } as SimulationRunStateData;
 }
 
 function createStartedEvent(): SimulationRunStartedEvent {

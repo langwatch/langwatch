@@ -53,6 +53,8 @@ export interface SimulationRunStateData {
   Name: string | null;
   Description: string | null;
   Metadata: string | null;
+  Target: { Type: string; ReferenceId: string } | null;
+  Attempts: number;
   Messages: SimulationMessageRow[];
   TraceIds: string[];
   Verdict: string | null;
@@ -84,6 +86,8 @@ function init(): SimulationRunStateData {
     Name: null,
     Description: null,
     Metadata: null,
+    Target: null,
+    Attempts: 0,
     Messages: [],
     TraceIds: [],
     Verdict: null,
@@ -117,6 +121,9 @@ function apply(
       Status: "QUEUED",
       Description: event.data.description ?? null,
       Metadata: event.data.metadata ? JSON.stringify(event.data.metadata) : null,
+      Target: event.data.target
+        ? { Type: event.data.target.type, ReferenceId: event.data.target.referenceId }
+        : null,
       QueuedAt: event.occurredAt,
       UpdatedAt: Date.now(),
     };
@@ -133,6 +140,7 @@ function apply(
       Description: state.Description ?? event.data.description ?? null,
       Metadata: state.Metadata ?? (event.data.metadata ? JSON.stringify(event.data.metadata) : null),
       Status: "IN_PROGRESS",
+      Attempts: state.Attempts + 1,
       StartedAt: event.occurredAt,
       UpdatedAt: Date.now(),
     };

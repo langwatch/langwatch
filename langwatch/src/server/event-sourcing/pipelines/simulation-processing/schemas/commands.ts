@@ -10,6 +10,10 @@ export const queueRunCommandDataSchema = z.object({
   name: z.string().optional(),
   description: z.string().optional(),
   metadata: z.record(z.unknown()).optional(),
+  target: z.object({
+    type: z.enum(["prompt", "http", "code"]),
+    referenceId: z.string(),
+  }).optional(),
   occurredAt: z.number(),
 });
 export type QueueRunCommandData = z.infer<typeof queueRunCommandDataSchema>;

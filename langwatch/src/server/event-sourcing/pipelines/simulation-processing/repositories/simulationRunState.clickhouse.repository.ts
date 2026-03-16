@@ -42,6 +42,9 @@ interface ClickHouseSimulationRunRecord {
   "Messages.Content": string[];
   "Messages.TraceId": string[];
   "Messages.Rest": string[];
+  "Target.Type": string | null;
+  "Target.ReferenceId": string | null;
+  Attempts: number;
   TraceIds: string[];
   Verdict: string | null;
   Reasoning: string | null;
@@ -82,6 +85,10 @@ export class SimulationRunStateRepositoryClickHouse<
       Name: record.Name,
       Description: record.Description,
       Metadata: record.Metadata,
+      Target: record["Target.Type"]
+        ? { Type: record["Target.Type"], ReferenceId: String(record["Target.ReferenceId"]) }
+        : null,
+      Attempts: record.Attempts ?? 0,
       Messages: ids.map((Id, i) => ({
         Id,
         Role: record["Messages.Role"]?.[i] ?? "",
@@ -130,6 +137,9 @@ export class SimulationRunStateRepositoryClickHouse<
       "Messages.Content": data.Messages.map((m) => m.Content),
       "Messages.TraceId": data.Messages.map((m) => m.TraceId),
       "Messages.Rest": data.Messages.map((m) => m.Rest),
+      "Target.Type": data.Target?.Type ?? null,
+      "Target.ReferenceId": data.Target?.ReferenceId ?? null,
+      Attempts: data.Attempts ?? 0,
       TraceIds: data.TraceIds,
       Verdict: data.Verdict,
       Reasoning: data.Reasoning,

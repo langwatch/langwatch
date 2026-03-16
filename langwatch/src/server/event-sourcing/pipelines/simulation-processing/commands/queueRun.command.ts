@@ -39,6 +39,7 @@ const config: SimulationCommandConfig<
     name: commandData.name,
     description: commandData.description,
     metadata: commandData.metadata,
+    target: commandData.target,
   }),
   getLogContext: (commandData) => ({
     scenarioId: commandData.scenarioId,
