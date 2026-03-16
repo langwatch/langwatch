@@ -94,7 +94,7 @@ export const PLAN_LIMITS: Record<PlanType, PlanInfo> = {
     name: "Free",
     free: true,
     maxMembers: 2,
-    maxProjects: 1,
+    maxProjects: 2,
     maxMessagesPerMonth: 50_000,
     maxWorkflows: 3,
     maxPrompts: 3,

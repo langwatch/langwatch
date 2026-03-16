@@ -220,7 +220,7 @@ describe("mapUsageToLimits", () => {
       maxMembers: 1,
       maxMembersLite: 0,
       maxTeams: 1,
-      maxProjects: 1,
+      maxProjects: 2,
       maxPrompts: 1,
       maxWorkflows: 1,
       maxScenarios: 1,
@@ -241,7 +241,7 @@ describe("mapUsageToLimits", () => {
     const result = mapUsageToLimits(baseUsage, freePlan);
 
     expect(result.members.max).toBe(1);
-    expect(result.projects.max).toBe(1);
+    expect(result.projects.max).toBe(2);
     expect(result.messagesPerMonth.max).toBe(1000);
     expect(result.evaluationsCredit.max).toBe(10);
   });
