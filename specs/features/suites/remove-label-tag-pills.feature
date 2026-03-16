@@ -3,9 +3,8 @@ Feature: Remove label tag pills from suites UI
   I want the suites UI to not display label tag pills
   So that the interface is simpler with less visual noise
 
-  # Labels exist in the data model and can still be managed via the edit form,
-  # but the TagList rendering is removed from both the sidebar cards and the
-  # detail panel header.
+  # Labels are removed from all UI surfaces: sidebar cards, detail panel,
+  # and the edit form. The data model is not modified.
 
   @integration
   Scenario: Suite sidebar cards do not display label tag pills
@@ -20,7 +19,7 @@ Feature: Remove label tag pills from suites UI
     Then the detail panel header does not show label tag pills
 
   @integration
-  Scenario: Suite edit form still allows managing labels
+  Scenario: Suite edit form does not display labels field
     Given a suite exists with labels "nightly" and "regression"
     When I open the suite edit form
-    Then the labels field is available for editing
+    Then the labels field is not visible

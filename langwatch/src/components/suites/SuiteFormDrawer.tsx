@@ -38,7 +38,6 @@ import { ScenarioFormDrawer } from "../scenarios/ScenarioFormDrawer";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
 import { useSuiteForm, type SuiteFormData } from "./useSuiteForm";
-import { TagList } from "../ui/TagList";
 import { useArchivedItemsResolution } from "./useArchivedItemsResolution";
 import { useSuiteRunMutation } from "./useSuiteRunMutation";
 import { ScenarioPicker } from "./ScenarioPicker";
@@ -277,25 +276,6 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                 placeholder="Core journeys that must pass before deploy"
                 {...form.register("description")}
                 rows={2}
-              />
-            </VStack>
-
-            {/* Labels */}
-            <VStack align="start" gap={1}>
-              <Text fontSize="sm" fontWeight="medium">
-                Labels
-              </Text>
-              <TagList
-                labels={suiteForm.labels}
-                onRemove={(_label, index) =>
-                  form.setValue(
-                    "labels",
-                    suiteForm.labels.filter((_, i) => i !== index)
-                  )
-                }
-                onAdd={(label) =>
-                  form.setValue("labels", [...suiteForm.labels, label])
-                }
               />
             </VStack>
 
