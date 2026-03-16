@@ -277,7 +277,7 @@ export function RunHistoryPanel({
       {/* Header: only shown in all-runs view */}
       {!isSingleSuiteView && (
         <Box paddingX={6} paddingY={4}>
-          <Text fontSize="xl" fontWeight="bold">
+          <Text fontSize="xl" fontWeight="semibold">
             All Runs
           </Text>
           <HStack gap={2} data-testid="all-runs-header-totals">
@@ -308,9 +308,17 @@ export function RunHistoryPanel({
         paddingX={6}
         paddingY={4}
         bg="bg"
-        borderBottom="1px solid"
-        borderColor="border"
-        flexShrink={0}
+        _after={{
+          content: '""',
+          position: "absolute",
+          bottom: "-5px",
+          left: 0,
+          right: 0,
+          height: "5px",
+          borderTop: "1px solid var(--chakra-colors-border-muted)",
+          background: "linear-gradient(to bottom, color-mix(in srgb, var(--chakra-colors-border-muted) 40%, transparent), transparent)",
+          pointerEvents: "none",
+        }}
       >
         <RunHistoryFilters
           scenarioOptions={scenarioOptions}

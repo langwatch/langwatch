@@ -5,11 +5,9 @@
  * Display-only when neither onRemove nor onAdd are provided.
  */
 
-import { HStack, Input, chakra } from "@chakra-ui/react";
+import { Button, HStack, Input } from "@chakra-ui/react";
 import { useRef, useState } from "react";
 import { TagPill } from "./TagPill";
-
-const StyledButton = chakra("button");
 
 type TagListProps = {
   labels: string[];
@@ -62,26 +60,20 @@ export function TagList({ labels, onRemove, onAdd }: TagListProps) {
         />
       ))}
       {onAdd && !isAdding && (
-        <StyledButton
+        <Button
           type="button"
-          onClick={(e: React.MouseEvent) => {
+          size="xs"
+          variant="outline"
+          borderRadius="full"
+          borderColor="border"
+          onClick={(e) => {
             e.stopPropagation();
             submittedRef.current = false;
             setIsAdding(true);
           }}
-          px={2}
-          py={0.5}
-          borderRadius="full"
-          border="1px dashed"
-          borderColor="border"
-          fontSize="xs"
-          color="fg.muted"
-          cursor="pointer"
-          background="transparent"
-          _hover={{ borderColor: "fg.muted", color: "fg" }}
         >
           + add
-        </StyledButton>
+        </Button>
       )}
       {onAdd && isAdding && (
         <Input
