@@ -107,6 +107,10 @@ export const authOptions = (
         where: { email: user.email },
       });
 
+      if (existingUser?.deactivatedAt) {
+        return false;
+      }
+
       const domain = user.email.split("@")[1];
       const orgWithSsoDomain = await prisma.organization.findFirst({
         where: {

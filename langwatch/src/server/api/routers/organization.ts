@@ -633,6 +633,7 @@ export const organizationRouter = createTRPCRouter({
     .input(
       z.object({
         organizationId: z.string(),
+        includeDeactivated: z.boolean().optional(),
       }),
     )
     .use(checkOrganizationPermission("organization:view"))
@@ -651,6 +652,9 @@ export const organizationRouter = createTRPCRouter({
         },
         include: {
           members: {
+            ...(!input.includeDeactivated
+              ? { where: { user: { deactivatedAt: null } } }
+              : {}),
             include: {
               user: {
                 include: {
@@ -1828,6 +1832,7 @@ export const organizationRouter = createTRPCRouter({
 
       const users = await prisma.user.findMany({
         where: {
+          deactivatedAt: null,
           orgMemberships: {
             some: {
               organizationId: input.organizationId,
