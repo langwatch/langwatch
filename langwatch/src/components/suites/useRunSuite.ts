@@ -1,10 +1,9 @@
 /**
- * Centralized hook for running a suite with confirmation dialog.
+ * Headless hook for running a suite with confirmation state management.
  *
- * Encapsulates: confirmation modal state, the run mutation,
- * and all success/error toast handling. Every UI trigger for
- * running a suite should go through this hook so the confirmation
- * dialog is always shown.
+ * Manages: confirmation dialog state, the run mutation, and toast handling.
+ * The consumer is responsible for rendering the confirmation dialog using
+ * the returned state props.
  */
 
 import type { SimulationSuite } from "@prisma/client";
@@ -14,12 +13,10 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { parseSuiteTargets } from "~/server/suites/types";
 import { api } from "~/utils/api";
 import { toaster } from "../ui/toaster";
-import { SuiteRunConfirmationDialog } from "./SuiteRunConfirmationDialog";
 
-type UseRunSuiteOptions = {
-  /** Called after a successful run is scheduled (e.g. to navigate). */
+interface UseRunSuiteOptions {
   onRunScheduled?: (suiteId: string) => void;
-};
+}
 
 export function useRunSuite(options: UseRunSuiteOptions = {}) {
   const { project } = useOrganizationTeamProject();
@@ -28,15 +25,11 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
   const optionsRef = useRef(options);
   optionsRef.current = options;
 
-  const [pendingSuiteId, setPendingSuiteId] = useState<string | null>(null);
-  const [pendingSuite, setPendingSuite] = useState<SimulationSuite | null>(
-    null,
-  );
+  const [pendingSuite, setPendingSuite] = useState<SimulationSuite | null>(null);
 
   const runMutation = api.suites.run.useMutation({
     onSuccess: (result, variables) => {
       void utils.scenarios.getSuiteRunData.invalidate();
-      setPendingSuiteId(null);
       setPendingSuite(null);
 
       const archivedCount =
@@ -56,7 +49,6 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
           );
         }
 
-        const suiteIdForEdit = variables.id;
         toaster.create({
           title: `Run plan scheduled (${result.jobCount} jobs)`,
           description: `${parts.join(" and ")} skipped.`,
@@ -66,7 +58,7 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
             label: "Edit Run Plan",
             onClick: () => {
               openDrawer("suiteEditor", {
-                urlParams: { suiteId: suiteIdForEdit },
+                urlParams: { suiteId: variables.id },
               });
             },
           },
@@ -82,10 +74,8 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
       optionsRef.current.onRunScheduled?.(variables.id);
     },
     onError: (err, variables) => {
-      setPendingSuiteId(null);
       setPendingSuite(null);
 
-      const suiteIdForToast = variables.id;
       const isAllArchived =
         err.data?.code === "BAD_REQUEST" &&
         (err.message.includes("All scenarios") ||
@@ -101,7 +91,7 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
                 label: "Edit Run Plan",
                 onClick: () => {
                   openDrawer("suiteEditor", {
-                    urlParams: { suiteId: suiteIdForToast },
+                    urlParams: { suiteId: variables.id },
                   });
                 },
               },
@@ -111,25 +101,25 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
     },
   });
 
-  /** Open the confirmation dialog for a suite. */
   const requestRun = useCallback(
     (suite: SimulationSuite) => {
       if (!project || runMutation.isPending) return;
-      setPendingSuiteId(suite.id);
       setPendingSuite(suite);
     },
     [project, runMutation.isPending],
   );
 
-  /** Execute the run after user confirms. */
   const confirmRun = useCallback(() => {
-    if (!project || !pendingSuiteId || runMutation.isPending) return;
-    runMutation.mutate({ projectId: project.id, id: pendingSuiteId, idempotencyKey: crypto.randomUUID() });
-  }, [project, pendingSuiteId, runMutation]);
+    if (!project || !pendingSuite || runMutation.isPending) return;
+    runMutation.mutate({
+      projectId: project.id,
+      id: pendingSuite.id,
+      idempotencyKey: crypto.randomUUID(),
+    });
+  }, [project, pendingSuite, runMutation]);
 
-  const closeConfirmation = useCallback(() => {
+  const cancelRun = useCallback(() => {
     if (runMutation.isPending) return;
-    setPendingSuiteId(null);
     setPendingSuite(null);
   }, [runMutation.isPending]);
 
@@ -138,23 +128,21 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
     return parseSuiteTargets(pendingSuite.targets).length;
   }, [pendingSuite]);
 
-  /** Render this in the component tree to show the confirmation dialog. */
-  const confirmationDialog = (
-    <SuiteRunConfirmationDialog
-      open={!!pendingSuiteId}
-      onClose={closeConfirmation}
-      onConfirm={confirmRun}
-      suiteName={pendingSuite?.name ?? ""}
-      scenarioCount={pendingSuite?.scenarioIds.length ?? 0}
-      targetCount={targetCount}
-      repeatCount={pendingSuite?.repeatCount ?? 1}
-      isLoading={runMutation.isPending}
-    />
-  );
-
   return {
     requestRun,
+    confirmRun,
+    cancelRun,
     isPending: runMutation.isPending,
-    confirmationDialog,
+    /** Props to spread onto SuiteRunConfirmationDialog */
+    dialogProps: {
+      open: !!pendingSuite,
+      onClose: cancelRun,
+      onConfirm: confirmRun,
+      suiteName: pendingSuite?.name ?? "",
+      scenarioCount: pendingSuite?.scenarioIds.length ?? 0,
+      targetCount,
+      repeatCount: pendingSuite?.repeatCount ?? 1,
+      isLoading: runMutation.isPending,
+    },
   };
 }

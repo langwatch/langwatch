@@ -26,6 +26,7 @@ import { ExternalSetDetailPanel } from "~/components/suites/ExternalSetDetailPan
 import { SuiteSidebar } from "~/components/suites/SuiteSidebar";
 import { computeSuiteRunSummaries } from "~/components/suites/run-history-transforms";
 import { useRunSuite } from "~/components/suites/useRunSuite";
+import { SuiteRunConfirmationDialog } from "~/components/suites/SuiteRunConfirmationDialog";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import {
   ALL_RUNS_ID,
@@ -194,7 +195,7 @@ function SuitesPageContent() {
     },
   });
 
-  const { requestRun, isPending: isRunPending, confirmationDialog } = useRunSuite({
+  const { requestRun, isPending: isRunPending, dialogProps: runDialogProps } = useRunSuite({
     onRunScheduled: () => {
       setSuiteRunSinceTimestamp(undefined);
       void utils.scenarios.getSuiteRunData.invalidate();
@@ -385,7 +386,7 @@ function SuitesPageContent() {
       />
 
       {/* Run confirmation dialog */}
-      {confirmationDialog}
+      <SuiteRunConfirmationDialog {...runDialogProps} />
 
     </DashboardLayout>
   );
