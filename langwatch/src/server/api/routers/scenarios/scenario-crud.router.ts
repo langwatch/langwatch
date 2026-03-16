@@ -45,12 +45,7 @@ export const scenarioCrudRouter = createTRPCRouter({
         lastUpdatedById: ctx.session.user.id,
       });
 
-      trackServerEvent({
-        userId: ctx.session.user.id,
-        event: "scenario_created",
-        projectId: input.projectId,
-        session: ctx.session,
-      });
+      trackServerEvent({ userId: ctx.session.user.id, event: "scenario_created", projectId: input.projectId });
 
       logger.info({ projectId: input.projectId, scenarioId: result.id }, "Scenario created");
       return result;
