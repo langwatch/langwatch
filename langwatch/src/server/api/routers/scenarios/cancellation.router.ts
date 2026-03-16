@@ -15,6 +15,7 @@ import { publishCancellation } from "~/server/scenarios/cancellation-channel";
 import { scenarioQueue } from "~/server/scenarios/scenario.queue";
 import { connection } from "~/server/redis";
 import { SimulationFacade } from "~/server/simulations/simulation.facade";
+import { getApp } from "~/server/app-layer/app";
 import { createLogger } from "~/utils/logger/server";
 import { checkProjectPermission } from "../../rbac";
 import { projectSchema } from "./schemas";
@@ -70,6 +71,23 @@ function createService() {
   });
 }
 
+async function broadcastCancellation(
+  projectId: string,
+  scenarioRunId?: string,
+  batchRunId?: string,
+) {
+  try {
+    const payload = JSON.stringify({
+      event: "simulation_updated",
+      scenarioRunId,
+      batchRunId,
+    });
+    await getApp().broadcast.broadcastToTenant(projectId, payload, "simulation_updated");
+  } catch (err) {
+    logger.warn({ err, projectId }, "Failed to broadcast cancellation event");
+  }
+}
+
 export const cancellationRouter = createTRPCRouter({
   cancelJob: protectedProcedure
     .input(cancelJobSchema)
@@ -80,7 +98,13 @@ export const cancellationRouter = createTRPCRouter({
         "Cancel job request received",
       );
 
-      return createService().cancelJob(input);
+      const result = await createService().cancelJob(input);
+
+      if (result.cancelled) {
+        await broadcastCancellation(input.projectId, input.scenarioRunId, input.batchRunId);
+      }
+
+      return result;
     }),
 
   cancelBatchRun: protectedProcedure
@@ -92,6 +116,12 @@ export const cancellationRouter = createTRPCRouter({
         "Cancel batch run request received",
       );
 
-      return createService().cancelBatchRun(input);
+      const result = await createService().cancelBatchRun(input);
+
+      if (result.cancelledCount > 0) {
+        await broadcastCancellation(input.projectId, undefined, input.batchRunId);
+      }
+
+      return result;
     }),
 });
