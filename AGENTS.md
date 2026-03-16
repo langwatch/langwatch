@@ -82,6 +82,7 @@ specs/               # BDD feature specs
 | Writing comments describing behavior that the code doesn't actually implement | If you write a comment like "extracts X from Y", the code must actually do that. Delete misleading comments, or implement what they promise |
 | Re-exporting from a module for "backwards compatibility" | Never re-export — update the existing consumers to import from the new location directly |
 | Using `gh api graphql -f`/`-F` variable parameters for GraphQL queries | Inline the values directly in the query string (replace `OWNER`, `REPO`, `NUMBER` literals). The `-f`/`-F` flags cause escaping issues with multiline queries and special characters |
+| Skipping browser re-verification after UI fixes | After fixing UI code based on feedback, always re-run `/browser-test` to verify the fix visually. Unit/integration tests alone are not sufficient for UI changes |
 
 ## TypeScript
 
