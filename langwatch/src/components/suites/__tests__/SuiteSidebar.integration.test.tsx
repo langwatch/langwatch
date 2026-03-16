@@ -226,14 +226,14 @@ describe("<SuiteSidebar/>", () => {
       }),
     ];
 
-    it("displays suite labels as tag pills", () => {
+    it("does not display suite labels as tag pills", () => {
       render(
         <SuiteSidebar {...defaultProps} suites={suitesWithLabels} />,
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("nightly")).toBeInTheDocument();
-      expect(screen.getByText("regression")).toBeInTheDocument();
+      expect(screen.queryByText("nightly")).not.toBeInTheDocument();
+      expect(screen.queryByText("regression")).not.toBeInTheDocument();
     });
   });
 

@@ -1,23 +1,26 @@
-Feature: Remove redundant SUITES label from sidebar
+Feature: Remove label tag pills from suites UI
   As a LangWatch user
-  I want the sidebar to avoid repeating "SUITES" when the page header already says "Suites"
-  So that there is less visual noise and a cleaner layout
+  I want the suites UI to not display label tag pills
+  So that the interface is simpler with less visual noise
 
-  # The sidebar currently displays a "SUITES" section header above the suite list.
-  # This is redundant because the top-level page header already reads "Suites".
-  # Removing it reduces visual clutter while preserving the sidebar's hierarchy
-  # (search box, action buttons, and suite cards remain unchanged).
-
-  @integration
-  Scenario: Sidebar does not display a redundant SUITES label
-    Given the suite sidebar contains suites
-    When I view the suites sidebar in expanded mode
-    Then there is no "SUITES" section header above the suite list
+  # Labels exist in the data model and can still be managed via the edit form,
+  # but the TagList rendering is removed from both the sidebar cards and the
+  # detail panel header.
 
   @integration
-  Scenario: Sidebar still shows suite names and action buttons after label removal
-    Given the suite sidebar contains suites
-    When I view the suites sidebar in expanded mode
-    Then suite names are visible
-    And the search box is visible
-    And the collapse button is visible
+  Scenario: Suite sidebar cards do not display label tag pills
+    Given a suite exists with labels "nightly" and "regression"
+    When I view the suites sidebar
+    Then the sidebar card for that suite does not show label tag pills
+
+  @integration
+  Scenario: Suite detail panel header does not display label tag pills
+    Given a suite exists with labels "nightly" and "regression"
+    When I open the suite detail panel
+    Then the detail panel header does not show label tag pills
+
+  @integration
+  Scenario: Suite edit form still allows managing labels
+    Given a suite exists with labels "nightly" and "regression"
+    When I open the suite edit form
+    Then the labels field is available for editing
