@@ -40,25 +40,16 @@ function determineErrorResponse(
   },
 ): { statusCode: ContentfulStatusCode; response: object } {
   // DomainErrors are handled first — normalize to client-safe shape.
-  // Use both instanceof and duck-type check (isHandled + kind) to handle
+  // Use kind + httpStatus check instead of instanceof to handle
   // module-boundary class identity mismatches in Next.js/turbopack.
-  const isDomainError = DomainError.is(error) || (
-    error instanceof Error &&
-    "isHandled" in error &&
-    (error as { isHandled: unknown }).isHandled === true &&
-    "kind" in error
-  );
-
-  if (isDomainError) {
-    const domainError = error as DomainError;
+  // See domain-error.ts: "use kind instead of instanceof in cross-process cases"
+  if (DomainError.is(error) || ("kind" in error && "httpStatus" in error)) {
+    const { kind, message, httpStatus, meta } = error as DomainError;
     return {
-      statusCode: (domainError.httpStatus ?? 500) as ContentfulStatusCode,
+      statusCode: (httpStatus ?? 500) as ContentfulStatusCode,
       response: {
-        ...errorSchema.parse({
-          error: domainError.kind,
-          message: domainError.message,
-        }),
-        ...(domainError.meta ?? {}),
+        ...errorSchema.parse({ error: kind, message }),
+        ...(meta ?? {}),
       },
     };
   }
