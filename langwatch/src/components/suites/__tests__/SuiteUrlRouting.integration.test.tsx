@@ -106,6 +106,12 @@ vi.mock("~/utils/api", () => ({
       getAll: {
         useQuery: () => ({ data: [], isLoading: false, error: null }),
       },
+      cancelJob: {
+        useMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+      },
+      cancelBatchRun: {
+        useMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+      },
     },
   },
 }));

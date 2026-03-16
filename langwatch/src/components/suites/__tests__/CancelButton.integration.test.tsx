@@ -298,6 +298,8 @@ describe("<RunRow/> cancel all button", () => {
       );
 
       await user.click(screen.getByTestId("cancel-all-button"));
+      // Cancel All opens a confirmation dialog — confirm to trigger the callback
+      await user.click(screen.getByTestId("confirm-cancel-all-button"));
       expect(onCancelAll).toHaveBeenCalledOnce();
       expect(onToggle).not.toHaveBeenCalled();
     });

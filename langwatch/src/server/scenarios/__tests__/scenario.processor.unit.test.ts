@@ -51,6 +51,7 @@ describe("handleCancelledJobResult", () => {
     scenarioId: "scen_456",
     setId: "set_789",
     batchRunId: "batch_abc",
+    scenarioRunId: "run_001",
     target: { type: "prompt", referenceId: "ref_1" },
   };
 
@@ -100,6 +101,7 @@ describe("handleFailedJobResult", () => {
     scenarioId: "scen_456",
     setId: "set_789",
     batchRunId: "batch_abc",
+    scenarioRunId: "run_001",
     target: { type: "prompt", referenceId: "ref_1" },
   };
 

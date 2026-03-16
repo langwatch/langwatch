@@ -11,7 +11,6 @@ import { getApp } from "~/server/app-layer/app";
 import { SuiteService } from "~/server/suites/suite.service";
 import { SuiteDomainError } from "~/server/suites/errors";
 import { ProjectRepository } from "~/server/projects/project.repository";
-import { scenarioQueue } from "~/server/scenarios/scenario.queue";
 import { checkProjectPermission } from "../../rbac";
 import { createSuiteSchema, projectSchema, suiteTargetSchema, updateSuiteSchema } from "./schemas";
 
@@ -169,22 +168,5 @@ export const suiteRouter = createTRPCRouter({
           message,
         });
       }
-    }),
-
-  /**
-   * Get queue status for a suite's scenario jobs.
-   *
-   * Returns waiting and active job counts for the scenario queue.
-   * Used by the frontend to show a banner when jobs are pending.
-   */
-  getQueueStatus: protectedProcedure
-    .input(projectSchema.extend({ suiteId: z.string() }))
-    .use(checkProjectPermission("scenarios:view"))
-    .query(async () => {
-      const [waiting, active] = await Promise.all([
-        scenarioQueue.getWaitingCount(),
-        scenarioQueue.getActiveCount(),
-      ]);
-      return { waiting, active };
     }),
 });

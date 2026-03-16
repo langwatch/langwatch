@@ -103,6 +103,7 @@ function createMockJob(overrides: Partial<ScenarioJob> = {}): Job<ScenarioJob, S
     scenarioId: "test-scenario",
     setId: "test-set",
     batchRunId: "test-batch",
+    scenarioRunId: "run-1",
     target: { type: "http", referenceId: "agent-1" },
     ...overrides,
   };

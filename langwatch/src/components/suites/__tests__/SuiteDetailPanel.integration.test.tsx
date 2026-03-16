@@ -44,6 +44,12 @@ vi.mock("~/utils/api", () => ({
     scenarios: {
       getSuiteRunData: { useQuery: mockUseQuery },
       getAll: { useQuery: vi.fn(() => ({ data: [] })) },
+      cancelJob: {
+        useMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+      },
+      cancelBatchRun: {
+        useMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+      },
     },
     agents: {
       getAll: { useQuery: vi.fn(() => ({ data: [] })) },

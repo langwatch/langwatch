@@ -446,6 +446,8 @@ export function RunHistoryPanel({
                     onScenarioRunClick={handleScenarioRunClick}
                     resolveTargetName={resolveTargetName}
                     viewMode={viewMode}
+                    onCancelRun={createCancelRunHandler(scenarioSetId ?? "")}
+                    cancellingJobId={cancellingJobId}
                   />
                 );
               })}
