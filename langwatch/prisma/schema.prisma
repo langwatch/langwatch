@@ -77,8 +77,7 @@ model User {
     secretsCreated          ProjectSecret[]          @relation("secretCreatedBy")
     secretsUpdated          ProjectSecret[]          @relation("secretUpdatedBy")
     savedViews              SavedView[]
-    externalId              String?
-    scimProvisioned         Boolean                  @default(false)
+
 }
 
 model VerificationToken {

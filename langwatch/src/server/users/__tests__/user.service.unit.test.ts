@@ -5,7 +5,6 @@ function createMockPrisma() {
   return {
     user: {
       findUnique: vi.fn(),
-      findFirst: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
     },
@@ -64,9 +63,7 @@ describe("UserService", () => {
         const result = await service.findByEmail({ email: "alice@acme.com" });
 
         expect(result).toEqual(mockUser);
-        expect(prisma.user.findUnique).toHaveBeenCalledWith({
-          where: { email: "alice@acme.com" },
-        });
+        expect(prisma.user.findUnique).toHaveBeenCalledWith({ where: { email: "alice@acme.com" } });
       });
     });
 
@@ -81,78 +78,18 @@ describe("UserService", () => {
     });
   });
 
-  describe("findByExternalId()", () => {
-    describe("when the external id exists in the organization", () => {
-      it("returns the user", async () => {
-        const mockUser = { id: "user-1", externalId: "ext-123" };
-        (prisma.user.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser);
-
-        const result = await service.findByExternalId({
-          externalId: "ext-123",
-          organizationId: "org-1",
-        });
-
-        expect(result).toEqual(mockUser);
-        expect(prisma.user.findFirst).toHaveBeenCalledWith({
-          where: {
-            externalId: "ext-123",
-            orgMemberships: { some: { organizationId: "org-1" } },
-          },
-        });
-      });
-    });
-  });
-
   describe("create()", () => {
-    describe("when externalId is provided", () => {
-      it("creates user with scimProvisioned true", async () => {
-        const mockUser = { id: "user-1", name: "Alice", email: "alice@acme.com", scimProvisioned: true };
+    describe("when called with name and email", () => {
+      it("creates the user", async () => {
+        const mockUser = { id: "user-1", name: "Alice", email: "alice@acme.com" };
         (prisma.user.create as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser);
 
-        await service.create({ name: "Alice", email: "alice@acme.com", externalId: "ext-1" });
+        const result = await service.create({ name: "Alice", email: "alice@acme.com" });
 
         expect(prisma.user.create).toHaveBeenCalledWith({
-          data: {
-            name: "Alice",
-            email: "alice@acme.com",
-            externalId: "ext-1",
-            scimProvisioned: true,
-          },
+          data: { name: "Alice", email: "alice@acme.com" },
         });
-      });
-    });
-
-    describe("when externalId is not provided", () => {
-      it("creates user with scimProvisioned false", async () => {
-        const mockUser = { id: "user-1", scimProvisioned: false };
-        (prisma.user.create as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser);
-
-        await service.create({ name: "Bob", email: "bob@acme.com" });
-
-        expect(prisma.user.create).toHaveBeenCalledWith({
-          data: {
-            name: "Bob",
-            email: "bob@acme.com",
-            externalId: undefined,
-            scimProvisioned: false,
-          },
-        });
-      });
-    });
-  });
-
-  describe("setExternalId()", () => {
-    describe("when called", () => {
-      it("updates externalId and sets scimProvisioned", async () => {
-        const mockUser = { id: "user-1", externalId: "ext-new", scimProvisioned: true };
-        (prisma.user.update as ReturnType<typeof vi.fn>).mockResolvedValue(mockUser);
-
-        await service.setExternalId({ id: "user-1", externalId: "ext-new" });
-
-        expect(prisma.user.update).toHaveBeenCalledWith({
-          where: { id: "user-1" },
-          data: { externalId: "ext-new", scimProvisioned: true },
-        });
+        expect(result).toEqual(mockUser);
       });
     });
   });
