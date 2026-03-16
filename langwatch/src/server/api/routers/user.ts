@@ -5,6 +5,7 @@ import { env } from "../../../env.mjs";
 
 import { skipPermissionCheck } from "../rbac";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
+import { UserService } from "~/server/users/user.service";
 
 export const userRouter = createTRPCRouter({
   register: publicProcedure
@@ -193,12 +194,7 @@ export const userRouter = createTRPCRouter({
     .use(skipPermissionCheck)
     .mutation(async ({ ctx, input }) => {
       assertPlatformAdmin(ctx.session.user.email);
-
-      await ctx.prisma.user.update({
-        where: { id: input.userId },
-        data: { deactivatedAt: new Date() },
-      });
-
+      await UserService.create(ctx.prisma).deactivate({ id: input.userId });
       return { success: true };
     }),
   reactivate: protectedProcedure
@@ -206,12 +202,7 @@ export const userRouter = createTRPCRouter({
     .use(skipPermissionCheck)
     .mutation(async ({ ctx, input }) => {
       assertPlatformAdmin(ctx.session.user.email);
-
-      await ctx.prisma.user.update({
-        where: { id: input.userId },
-        data: { deactivatedAt: null },
-      });
-
+      await UserService.create(ctx.prisma).reactivate({ id: input.userId });
       return { success: true };
     }),
 });
