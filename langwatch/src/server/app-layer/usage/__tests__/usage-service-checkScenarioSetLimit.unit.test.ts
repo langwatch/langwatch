@@ -78,6 +78,7 @@ describe("UsageService.checkScenarioSetLimit", () => {
       mockPlanResolver,
       mockOrgRepo as never,
       mockSimulationRunService,
+      false,
     );
   });
 

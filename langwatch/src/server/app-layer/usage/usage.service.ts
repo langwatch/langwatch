@@ -10,7 +10,6 @@ import {
   type UsageUnit,
 } from "./usage-meter-policy";
 import { OrganizationRepository } from "../../repositories/organization.repository";
-import { getClickHouseClient } from "../../clickhouse/client";
 import { env } from "~/env.mjs";
 import { ScenarioSetLimitExceededError } from "./errors";
 import type { SimulationRunService } from "../simulations/simulation-run.service";
@@ -49,6 +48,7 @@ export class UsageService {
     private readonly planResolver: PlanResolver,
     private readonly organizationRepository: OrganizationRepository | null,
     private readonly simulationRunService: Pick<SimulationRunService, "getDistinctExternalSetIds">,
+    private readonly clickhouseAvailable: boolean,
   ) {
     this.cache = new TtlCache<number>(CACHE_TTL_MS);
     this.decisionCache = new TtlCache<MeterDecision>(CACHE_TTL_MS);
@@ -252,7 +252,7 @@ export class UsageService {
       licenseUsageUnit: plan.usageUnit,
       hasValidLicenseOverride,
       isFree: plan.free,
-      clickhouseAvailable: !!getClickHouseClient(),
+      clickhouseAvailable: this.clickhouseAvailable,
     });
 
     return decision;
