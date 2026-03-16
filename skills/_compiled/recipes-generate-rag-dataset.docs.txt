@@ -1,0 +1,102 @@
+You are helping the user set up LangWatch for their AI agent project. Follow these instructions carefully.
+
+IMPORTANT: You will need the user's LangWatch API key. Ask them for it and direct them to https://app.langwatch.ai/authorize if they don't have one.
+
+First, try to install the LangWatch MCP server for access to documentation and platform tools. If installation fails, you can fetch docs directly via the URLs provided below.
+
+# Generate a RAG Evaluation Dataset
+
+This recipe analyzes your RAG knowledge base and generates a comprehensive Q&A evaluation dataset.
+
+## Step 1: Analyze the Knowledge Base
+
+Read the codebase to find the knowledge base:
+- Document files (PDFs, markdown, text files)
+- Database schemas (if documents are stored in a DB)
+- Vector store configuration (what's being embedded)
+- Chunking strategy (how documents are split)
+
+Read every document you can access. Understand:
+- What topics does the knowledge base cover?
+- What's the depth of information?
+- What terminology is used?
+- What are the boundaries (what's NOT covered)?
+
+## Step 2: Generate Diverse Question Types
+
+Create questions across these categories:
+
+### Factual Recall
+Direct questions answerable from a single passage:
+- "What is the recommended threshold for X?"
+- "When should Y be applied?"
+
+### Multi-Hop Reasoning
+Questions requiring information from multiple passages:
+- "Given condition A and condition B, what should be done?"
+- "How do X and Y interact when Z occurs?"
+
+### Comparison
+Questions comparing concepts within the knowledge base:
+- "What's the difference between approach A and approach B?"
+- "When should you use X instead of Y?"
+
+### Edge Cases
+Questions about boundary conditions or unusual scenarios:
+- "What happens if the measurement is outside normal range?"
+- "What if two recommendations conflict?"
+
+### Negative Cases
+Questions about topics NOT covered by the knowledge base:
+- "Does the system support Z?" (when it doesn't)
+- Questions requiring external knowledge the KB doesn't have
+
+These help test that the agent correctly says "I don't know" rather than hallucinating.
+
+## Step 3: Include Context Per Row
+
+For each Q&A pair, include the relevant document chunk(s) that contain the answer. This enables:
+- Platform experiments without the full RAG pipeline
+- Evaluating answer quality independent of retrieval quality
+- Testing with different prompts using the same retrieved context
+
+Format:
+```python
+{
+    "input": "When should I irrigate apple orchards?",
+    "expected_output": "Irrigate when soil moisture exceeds 35 kPa...",
+    "context": "## Irrigation Management\nSoil moisture threshold for apple orchards: maintain between 25-35 kPa...",
+    "question_type": "factual_recall"
+}
+```
+
+## Step 4: Export Formats
+
+Create both:
+
+### Python DataFrame (for SDK experiments)
+```python
+import pandas as pd
+df = pd.DataFrame(dataset)
+df.to_csv("rag_evaluation_dataset.csv", index=False)
+```
+
+### Platform-Ready CSV
+Export with columns: `input`, `expected_output`, `context`, `question_type`
+This can be imported directly into LangWatch platform datasets.
+
+## Step 5: Validate Dataset Quality
+
+Before using the dataset:
+1. Check topic coverage — are all knowledge base topics represented?
+2. Verify answers are actually in the context — no hallucinated expected outputs
+3. Check question diversity — not all the same type
+4. Verify negative cases have appropriate "I don't know" expected outputs
+5. Run a quick experiment to baseline accuracy
+
+## Common Mistakes
+- Do NOT generate questions without reading the actual knowledge base first
+- Do NOT skip negative cases — testing "I don't know" is crucial for RAG
+- Do NOT use the same question pattern for every entry — diversify types
+- Do NOT forget to include the relevant context per row
+- Do NOT generate expected outputs that aren't actually in the knowledge base

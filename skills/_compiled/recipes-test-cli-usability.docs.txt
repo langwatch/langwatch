@@ -1,0 +1,97 @@
+You are helping the user set up LangWatch for their AI agent project. Follow these instructions carefully.
+
+IMPORTANT: You will need the user's LangWatch API key. Ask them for it and direct them to https://app.langwatch.ai/authorize if they don't have one.
+
+First, try to install the LangWatch MCP server for access to documentation and platform tools. If installation fails, you can fetch docs directly via the URLs provided below.
+
+# Test Your CLI's Agent Usability
+
+This recipe helps you write scenario tests that verify your CLI tool works well when operated by AI agents (Claude Code, Cursor, Codex, etc.). A CLI that's agent-friendly means:
+
+- All commands can run non-interactively (no stdin prompts that hang)
+- Output is parseable and informative
+- Error messages are clear enough for an agent to self-correct
+- Help text enables discovery (`--help` works on every subcommand)
+
+## Prerequisites
+
+Install the Scenario SDK:
+```bash
+npm install @langwatch/scenario vitest @ai-sdk/openai
+# or: pip install langwatch-scenario pytest
+```
+
+## Step 1: Identify Your CLI Commands
+
+List every command your CLI supports. For each, note:
+- Does it require interactive input? (MUST have a non-interactive alternative)
+- What flags/options does it accept?
+- What does it output on success/failure?
+
+## Step 2: Write Scenario Tests
+
+For each command, write a scenario test where an AI agent discovers and uses it:
+
+```typescript
+import scenario, { type AgentAdapter, AgentRole } from "@langwatch/scenario";
+import { openai } from "@ai-sdk/openai";
+
+const myAgent: AgentAdapter = {
+  role: AgentRole.AGENT,
+  call: async (input) => {
+    // Your Claude Code adapter here
+  },
+};
+
+const result = await scenario.run({
+  name: "CLI command discovery",
+  description: "Agent discovers and uses the CLI to accomplish a task",
+  agents: [
+    myAgent,
+    scenario.userSimulatorAgent({ model: openai("gpt-5-mini") }),
+    scenario.judgeAgent({
+      model: openai("gpt-5-mini"),
+      criteria: [
+        "Agent used the CLI command correctly",
+        "Agent did not get stuck on interactive prompts",
+        "Agent did not need to pipe 'yes' or use 'expect' scripting",
+      ],
+    }),
+  ],
+});
+```
+
+## Step 3: Assert No Interactive Workarounds
+
+Add this assertion to every test:
+
+```typescript
+function assertNoInteractiveWorkarounds(state) {
+  const output = state.messages.map(m =>
+    typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
+  ).join('\n');
+
+  expect(output).not.toMatch(/echo\s+["']?[yY](?:es)?["']?\s*\|/);
+  expect(output).not.toMatch(/\byes\s*\|/);
+  expect(output).not.toMatch(/expect\s+-c/);
+  expect(output).not.toMatch(/printf\s+["']\\n["']\s*\|/);
+}
+```
+
+If this assertion fails, your CLI has an interactivity bug -- add `--yes`, `--force`, or `--non-interactive` flags to the offending commands.
+
+## Step 4: Test Error Recovery
+
+Write scenarios where the agent makes a mistake and must recover:
+- Wrong command name -> agent reads `--help` and self-corrects
+- Missing required argument -> agent reads error message and retries
+- Authentication failure -> agent follows instructions in error output
+
+## Common Mistakes
+
+- Do NOT make commands that require stdin for essential operations -- always provide flag alternatives
+- Do NOT use interactive prompts for confirmation without a `--yes` or `--force` flag
+- Do NOT output errors without actionable guidance (the agent needs to know how to fix it)
+- DO make `--help` comprehensive on every subcommand
+- DO use non-zero exit codes for failures (agents check exit codes)
+- DO output structured information (the agent can parse it)
