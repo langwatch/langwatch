@@ -60,11 +60,7 @@ describe("checkScenarioSetLimitForRunStarted()", () => {
       project,
       event: {
         type: ScenarioEventType.RUN_STARTED,
-        scenarioRunId: "run-1",
-        scenarioId: "scenario-1",
-        batchRunId: "batch-1",
         scenarioSetId: "my-set",
-        timestamp: Date.now(),
       },
     };
   });
