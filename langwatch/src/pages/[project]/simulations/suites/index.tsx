@@ -25,7 +25,7 @@ import {
 import { ExternalSetDetailPanel } from "~/components/suites/ExternalSetDetailPanel";
 import { SuiteSidebar } from "~/components/suites/SuiteSidebar";
 import { computeSuiteRunSummaries } from "~/components/suites/run-history-transforms";
-import { useSuiteRunMutation } from "~/components/suites/useSuiteRunMutation";
+import { useRunSuite } from "~/components/suites/useRunSuite";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import {
   ALL_RUNS_ID,
@@ -194,13 +194,8 @@ function SuitesPageContent() {
     },
   });
 
-  // Use a ref for handleEditSuite to break circular dependency:
-  // handleRunRequested → runMutation → useSuiteRunMutation({ onEditSuite }) → handleEditSuite → handleRunRequested
-  const handleEditSuiteRef = useRef<(suiteId: string) => void>(() => {});
-
-  const { runMutation } = useSuiteRunMutation({
-    onEditSuite: (suiteId: string) => handleEditSuiteRef.current(suiteId),
-    onSuccess: () => {
+  const { requestRun, isPending: isRunPending, confirmationDialog } = useRunSuite({
+    onRunScheduled: () => {
       setSuiteRunSinceTimestamp(undefined);
       void utils.scenarios.getSuiteRunData.invalidate();
     },
@@ -217,9 +212,9 @@ function SuitesPageContent() {
   const handleRunRequested = useCallback(
     (suite: SimulationSuite) => {
       navigateToSuite(suite.slug);
-      runMutation.mutate({ projectId: project?.id ?? "", id: suite.id, idempotencyKey: crypto.randomUUID() });
+      requestRun(suite);
     },
-    [navigateToSuite, runMutation, project?.id],
+    [navigateToSuite, requestRun],
   );
 
   const handleNewSuite = useCallback(() => {
@@ -241,15 +236,14 @@ function SuitesPageContent() {
     [openDrawer, setFlowCallbacks, handleSuiteSaved, handleRunRequested],
   );
 
-  handleEditSuiteRef.current = handleEditSuite;
-
   const handleRunSuite = useCallback(
     (suiteId: string) => {
       const suite = suites?.find((s) => s.id === suiteId);
-      if (suite) navigateToSuite(suite.slug);
-      runMutation.mutate({ projectId: project?.id ?? "", id: suiteId, idempotencyKey: crypto.randomUUID() });
+      if (!suite) return;
+      navigateToSuite(suite.slug);
+      requestRun(suite);
     },
-    [suites, navigateToSuite, runMutation, project?.id],
+    [suites, navigateToSuite, requestRun],
   );
 
   const handleDuplicateSuite = useCallback(
@@ -360,7 +354,7 @@ function SuitesPageContent() {
                 onNewSuite={handleNewSuite}
                 onEditSuite={handleEditSuite}
                 onRunSuite={handleRunSuite}
-                isRunning={runMutation.isPending}
+                isRunning={isRunPending}
                 period={period}
                 suiteNameMap={suiteNameMap}
               />
@@ -389,6 +383,9 @@ function SuitesPageContent() {
         suiteName={archiveTargetSuite?.name ?? ""}
         isLoading={archiveMutation.isPending}
       />
+
+      {/* Run confirmation dialog */}
+      {confirmationDialog}
 
     </DashboardLayout>
   );
