@@ -14,6 +14,9 @@ import { getClickHouseClient } from "../../clickhouse/client";
 import { env } from "~/env.mjs";
 import { ScenarioSetLimitExceededError } from "./errors";
 import type { SimulationRunService } from "../simulations/simulation-run.service";
+import { createLogger } from "~/utils/logger/server";
+
+const logger = createLogger("langwatch:usage:scenario-set-limit");
 
 const CACHE_TTL_MS = 30_000; // 30 seconds
 const MAX_FREE_SCENARIO_SETS = 3;
@@ -109,34 +112,39 @@ export class UsageService {
         ? MAX_FREE_SCENARIO_SETS
         : Infinity;
 
-    // If no cache, query for distinct external sets via the simulation service
-    const projectIds =
-      await this.organizationService.getProjectIds(organizationId);
-    if (projectIds.length === 0) {
-      // No projects means no existing sets -- allow and warm cache
-      const newSet = new Set([scenarioSetId]);
-      this.scenarioSetCache.set(organizationId, newSet);
-      return;
+    // Use cached set for counting if available; only query ClickHouse on cold start.
+    // This prevents the async event-sourcing delay from resetting the count:
+    // events are written to ClickHouse asynchronously, so a fresh query may
+    // return stale data and overwrite sets we already know about.
+    let knownSets: Set<string>;
+    if (cached) {
+      knownSets = cached;
+    } else {
+      const projectIds =
+        await this.organizationService.getProjectIds(organizationId);
+      if (projectIds.length === 0) {
+        const newSet = new Set([scenarioSetId]);
+        this.scenarioSetCache.set(organizationId, newSet);
+        return;
+      }
+
+      knownSets =
+        await this.simulationRunService.getDistinctExternalSetIds({ projectIds });
+      this.scenarioSetCache.set(organizationId, knownSets);
     }
 
-    const existingSets =
-      await this.simulationRunService.getDistinctExternalSetIds({ projectIds });
-
-    // Populate cache with the fetched sets
-    this.scenarioSetCache.set(organizationId, existingSets);
-
     // If this set already exists, allow
-    if (existingSets.has(scenarioSetId)) {
+    if (knownSets.has(scenarioSetId)) {
       return;
     }
 
     // This is a new set -- check against limit
-    if (existingSets.size >= maxScenarioSets) {
-      throw new ScenarioSetLimitExceededError(existingSets.size, maxScenarioSets);
+    if (knownSets.size >= maxScenarioSets) {
+      throw new ScenarioSetLimitExceededError(knownSets.size, maxScenarioSets);
     }
 
     // Allowed: record the new set in the cache
-    existingSets.add(scenarioSetId);
+    knownSets.add(scenarioSetId);
   }
 
   /**
