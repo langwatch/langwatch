@@ -42,6 +42,9 @@ import { EvaluationRunClickHouseRepository } from "~/server/app-layer/evaluation
 import { EvaluationRunStore } from "~/server/event-sourcing/pipelines/evaluation-processing/projections/evaluationRun.store.js";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types.js";
 
+// DSPy step repository (direct-write for dspy-steps migration)
+import { DspyStepClickHouseRepository } from "~/server/app-layer/dspy-steps/repositories/dspy-step.clickhouse.repository.js";
+
 // Event repository (for direct-write bulk inserts)
 import { EventRepositoryClickHouse } from "~/server/event-sourcing/stores/repositories/eventRepositoryClickHouse.js";
 import type { EventRecord } from "~/server/event-sourcing/stores/repositories/eventRepository.types.js";
@@ -113,6 +116,8 @@ export interface AppDependencies {
   experimentRunStateFoldStore: FoldProjectionStore<ExperimentRunStateData>;
   /** Experiment run item append store (for direct-write batch-evaluations migration). */
   experimentRunItemAppendStore: AppendStore<ClickHouseExperimentRunResultRecord>;
+  /** DSPy step repository (for direct-write dspy-steps migration). */
+  dspyStepRepository: DspyStepClickHouseRepository;
   /** Bulk-insert event records directly to event_log (for direct-write migrations). */
   insertEventRecords(records: EventRecord[]): Promise<void>;
   /** Flush buffered ClickHouse inserts — call at batch boundaries. */
@@ -246,6 +251,9 @@ export async function createApp(
   const experimentRunStateBatchingStore = createExperimentRunStateFoldStore(expBatchingRepo);
   const experimentRunItemBatchingStore = createExperimentRunItemAppendStore(clickhouse);
 
+  // --- DSPy step repository (direct-write for dspy-steps migration) ---
+  const dspyStepRepository = new DspyStepClickHouseRepository(clickhouse);
+
   // --- Event repository (direct bulk-insert to event_log) ---
   const eventRepository = new EventRepositoryClickHouse(clickhouse);
   const insertEventRecords = eventRepository.insertEventRecords.bind(eventRepository);
@@ -263,6 +271,7 @@ export async function createApp(
     evaluationRunStore,
     experimentRunStateFoldStore: experimentRunStateBatchingStore,
     experimentRunItemAppendStore: experimentRunItemBatchingStore,
+    dspyStepRepository,
     insertEventRecords,
     flushClickHouse,
     close: async () => {
