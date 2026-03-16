@@ -51,6 +51,7 @@ function Members() {
     api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
       {
         organizationId: organization?.id ?? "",
+        includeDeactivated: true,
       },
       { enabled: !!organization },
     );
@@ -279,9 +280,16 @@ function MembersList({
                         />
                       </Table.Cell>
                       <Table.Cell>
-                        <Link href={`/settings/members/${member.userId}`}>
-                          {member.user.name}
-                        </Link>
+                        <HStack>
+                          <Link href={`/settings/members/${member.userId}`}>
+                            {member.user.name}
+                          </Link>
+                          {(member.user as any).deactivatedAt && (
+                            <Badge colorPalette="red" size="sm">
+                              Deactivated
+                            </Badge>
+                          )}
+                        </HStack>
                       </Table.Cell>
                       <Table.Cell>{member.user.email}</Table.Cell>
                       <Table.Cell>{roleLabel}</Table.Cell>
