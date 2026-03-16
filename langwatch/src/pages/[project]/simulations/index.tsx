@@ -1,5 +1,4 @@
 import { Grid, HStack, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
-import { useRouter } from "next/router";
 import React, { useMemo } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { PeriodSelector, usePeriodSelector } from "~/components/PeriodSelector";
@@ -9,11 +8,12 @@ import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
+import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
 import { api } from "~/utils/api";
 import { sortScenarioSets } from "~/features/simulations/sort-scenario-sets";
 
 function SimulationsPageContent() {
-  const router = useRouter();
+  const { goToSimulationSet } = useSimulationRouter();
   const { project } = useOrganizationTeamProject();
   const { period, setPeriod } = usePeriodSelector(30);
 
@@ -49,8 +49,7 @@ function SimulationsPageContent() {
   }, [scenarioSetsData]);
 
   const handleSetClick = (scenarioSetId: string) => {
-    // Navigate to the specific set page using the catch-all route
-    void router.push(`${router.asPath}/${scenarioSetId}`);
+    goToSimulationSet(scenarioSetId);
   };
 
   return (

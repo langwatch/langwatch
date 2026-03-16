@@ -6,6 +6,7 @@ import { OPENAI_EMBEDDING_DIMENSION } from "~/utils/constants";
 import { createLogger } from "~/utils/logger/server";
 import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
 import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";
+
 import type { BroadcastService } from "../app-layer/broadcast/broadcast.service";
 import type { EvaluationExecutionService } from "../app-layer/evaluations/evaluation-execution.service";
 import type { EvaluationRunService } from "../app-layer/evaluations/evaluation-run.service";
@@ -17,6 +18,26 @@ import { MetricRecordStorageClickHouseRepository } from "../app-layer/traces/rep
 import { NullMetricRecordStorageRepository } from "../app-layer/traces/repositories/metric-record-storage.repository";
 import type { SpanStorageService } from "../app-layer/traces/span-storage.service";
 import type { TraceSummaryService } from "../app-layer/traces/trace-summary.service";
+
+import { createEvaluationProcessingPipeline } from "./pipelines/evaluation-processing/pipeline";
+import { createExperimentRunProcessingPipeline } from "./pipelines/experiment-run-processing/pipeline";
+import { createExperimentRunEsSyncReactor } from "./pipelines/experiment-run-processing/reactors/experimentRunEsSync.reactor";
+import { createSimulationProcessingPipeline } from "./pipelines/simulation-processing/pipeline";
+import { createSimulationRunStateFoldStore } from "./pipelines/simulation-processing/projections/simulationRunState.store";
+import { createSnapshotUpdateBroadcastReactor } from "./pipelines/simulation-processing/reactors/snapshotUpdateBroadcast";
+import { createSuiteRunSyncReactor } from "./pipelines/simulation-processing/reactors/suiteRunSync.reactor";
+import {
+  SimulationRunStateRepositoryClickHouse,
+  SimulationRunStateRepositoryMemory,
+} from "./pipelines/simulation-processing/repositories";
+import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
+import { createSuiteRunStateFoldStore } from "./pipelines/suite-run-processing/projections/suiteRunState.store";
+import {
+  SuiteRunStateRepositoryClickHouse,
+  SuiteRunStateRepositoryMemory,
+} from "./pipelines/suite-run-processing/repositories";
+import { createTraceProcessingPipeline } from "./pipelines/trace-processing/pipeline";
+
 import { createElasticsearchBatchEvaluationRepository } from "../evaluations-v3/repositories/elasticsearchBatchEvaluation.repository";
 import type { EventSourcing } from "./eventSourcing";
 import { mapCommands } from "./mapCommands";
@@ -26,32 +47,27 @@ import {
   createBillingReportingPipeline,
 } from "./pipelines/billing-reporting/pipeline";
 import { createExecuteEvaluationCommandClass } from "./pipelines/evaluation-processing/commands/executeEvaluation.command";
-import { createEvaluationProcessingPipeline } from "./pipelines/evaluation-processing/pipeline";
 import { EvaluationRunStore } from "./pipelines/evaluation-processing/projections/evaluationRun.store";
 import type { EvaluationEsSyncReactorDeps } from "./pipelines/evaluation-processing/reactors/evaluationEsSync.reactor";
 import { createEvaluationEsSyncReactor } from "./pipelines/evaluation-processing/reactors/evaluationEsSync.reactor";
-import { createExperimentRunProcessingPipeline } from "./pipelines/experiment-run-processing/pipeline";
 import { createExperimentRunItemAppendStore } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
 import { createExperimentRunStateFoldStore } from "./pipelines/experiment-run-processing/projections/experimentRunState.store";
-import { createExperimentRunEsSyncReactor } from "./pipelines/experiment-run-processing/reactors/experimentRunEsSync.reactor";
 import {
   ExperimentRunStateRepositoryClickHouse,
   ExperimentRunStateRepositoryMemory,
 } from "./pipelines/experiment-run-processing/repositories";
-import { createSimulationProcessingPipeline } from "./pipelines/simulation-processing/pipeline";
-import { createSimulationRunStateFoldStore } from "./pipelines/simulation-processing/projections/simulationRunState.store";
-import { createSnapshotUpdateBroadcastReactor } from "./pipelines/simulation-processing/reactors/snapshotUpdateBroadcast";
-import {
-  SimulationRunStateRepositoryClickHouse,
-  SimulationRunStateRepositoryMemory,
-} from "./pipelines/simulation-processing/repositories";
-import { createTraceProcessingPipeline } from "./pipelines/trace-processing/pipeline";
 import { LogRecordAppendStore } from "./pipelines/trace-processing/projections/logRecordStorage.store";
 import { MetricRecordAppendStore } from "./pipelines/trace-processing/projections/metricRecordStorage.store";
 import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
 import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
 import { createCustomEvaluationSyncReactor } from "./pipelines/trace-processing/reactors/customEvaluationSync.reactor";
-import { createEvaluationTriggerReactor } from "./pipelines/trace-processing/reactors/evaluationTrigger.reactor";
+import {
+  createEvaluationTriggerReactor,
+  createDeferredEvaluationHandler,
+  makeDeferredJobId,
+  DEFERRED_CHECK_DELAY_MS,
+  type DeferredEvaluationPayload,
+} from "./pipelines/trace-processing/reactors/evaluationTrigger.reactor";
 import { createSpanStorageBroadcastReactor } from "./pipelines/trace-processing/reactors/spanStorageBroadcast.reactor";
 import { createTraceUpdateBroadcastReactor } from "./pipelines/trace-processing/reactors/traceUpdateBroadcast.reactor";
 
@@ -89,8 +105,9 @@ export class PipelineRegistry {
   registerAll() {
     const evalPipeline = this.registerEvaluationPipeline();
     const tracePipeline = this.registerTracePipeline(evalPipeline);
+    const suiteRunPipeline = this.registerSuiteRunPipeline();
+    const simulationPipeline = this.registerSimulationPipeline(suiteRunPipeline);
     const experimentRunPipeline = this.registerExperimentRunPipeline();
-    const simulationPipeline = this.registerSimulationPipeline();
     const billingPipeline = this.registerBillingReportingPipeline();
 
     logger.info("All pipelines registered");
@@ -100,6 +117,7 @@ export class PipelineRegistry {
       evaluations: mapCommands(evalPipeline.commands),
       experimentRuns: mapCommands(experimentRunPipeline.commands),
       simulations: mapCommands(simulationPipeline.commands),
+      suiteRuns: mapCommands(suiteRunPipeline.commands),
       billing: mapCommands(billingPipeline.commands),
     };
   }
@@ -130,10 +148,38 @@ export class PipelineRegistry {
   ) {
     const evalCommands = mapCommands(evalPipeline.commands);
 
-    const evaluationTriggerReactor = createEvaluationTriggerReactor({
+    const traceSummaryStore = new TraceSummaryStore(
+      this.deps.traces.summary.repository,
+    );
+
+    // Late-bound reference to the trace pipeline's resolveOrigin command.
+    // The reactor deps closure captures this; the actual dispatcher is set
+    // after pipeline registration (same pattern as billing self-dispatch).
+    let resolveOriginDispatcher: ((data: any) => Promise<void>) | null = null;
+
+    // Late-bound reference to the deferred evaluation queue.
+    // Set after pipeline registration, same pattern as resolveOriginDispatcher.
+    let scheduleDeferredDispatcher: ((payload: DeferredEvaluationPayload) => Promise<void>) | null = null;
+
+    const evaluationTriggerReactorDeps = {
       monitors: this.deps.monitors,
       evaluation: evalCommands.executeEvaluation,
-    });
+      resolveOrigin: async (data: any) => {
+        if (!resolveOriginDispatcher) {
+          throw new Error("resolveOrigin dispatcher not yet initialized — pipeline registration order issue");
+        }
+        return resolveOriginDispatcher(data);
+      },
+      traceSummaryStore,
+      scheduleDeferred: async (payload: DeferredEvaluationPayload) => {
+        if (!scheduleDeferredDispatcher) {
+          throw new Error("scheduleDeferred dispatcher not yet initialized — pipeline registration order issue");
+        }
+        return scheduleDeferredDispatcher(payload);
+      },
+    };
+
+    const evaluationTriggerReactor = createEvaluationTriggerReactor(evaluationTriggerReactorDeps);
 
     const customEvaluationSyncReactor = createCustomEvaluationSyncReactor({
       reportEvaluation: evalCommands.reportEvaluation,
@@ -167,9 +213,7 @@ export class PipelineRegistry {
         spanAppendStore: new SpanAppendStore(this.deps.traces.spans.repository),
         logRecordAppendStore: new LogRecordAppendStore(logRecordRepo),
         metricRecordAppendStore: new MetricRecordAppendStore(metricRecordRepo),
-        traceSummaryStore: new TraceSummaryStore(
-          this.deps.traces.summary.repository,
-        ),
+        traceSummaryStore,
         evaluationTriggerReactor,
         customEvaluationSyncReactor,
         traceUpdateBroadcastReactor,
@@ -177,10 +221,70 @@ export class PipelineRegistry {
       }),
     );
 
+    // Wire the late-bound resolveOrigin dispatcher now that the pipeline is registered
+    const traceCommands = mapCommands(tracePipeline.commands);
+    resolveOriginDispatcher = traceCommands.resolveOrigin;
+
+    // Wire the deferred evaluation queue (BullMQ-backed, survives process restart)
+    const deferredHandler = createDeferredEvaluationHandler(evaluationTriggerReactorDeps);
+    const deferredEvalQueue = tracePipeline.service.registerJob<DeferredEvaluationPayload>({
+      name: "deferredEvaluation",
+      process: deferredHandler,
+      delay: DEFERRED_CHECK_DELAY_MS,
+      deduplication: {
+        makeId: makeDeferredJobId,
+        extend: false,  // Don't reset the 5-min timer on new spans
+        replace: false,
+      },
+      spanAttributes: (payload) => ({
+        "deferred.tenant_id": payload.tenantId,
+        "deferred.trace_id": payload.traceId,
+      }),
+    });
+
+    if (deferredEvalQueue) {
+      scheduleDeferredDispatcher = (payload) => deferredEvalQueue.send(payload);
+    } else {
+      // Fallback: event sourcing disabled, use in-memory setTimeout (best-effort)
+      const pendingDeferredChecks = new Map<string, ReturnType<typeof setTimeout>>();
+      scheduleDeferredDispatcher = async (payload: DeferredEvaluationPayload) => {
+        const dedupKey = makeDeferredJobId(payload);
+        if (pendingDeferredChecks.has(dedupKey)) return;
+        const handler = createDeferredEvaluationHandler(evaluationTriggerReactorDeps);
+        const timer = setTimeout(async () => {
+          pendingDeferredChecks.delete(dedupKey);
+          try {
+            await handler(payload);
+          } catch (error) {
+            logger.error(
+              { tenantId: payload.tenantId, traceId: payload.traceId, error },
+              "Deferred evaluation check failed",
+            );
+          }
+        }, DEFERRED_CHECK_DELAY_MS);
+        if (typeof timer === "object" && "unref" in timer) {
+          timer.unref();
+        }
+        pendingDeferredChecks.set(dedupKey, timer);
+      };
+    }
+
     return tracePipeline;
   }
 
-  private registerSimulationPipeline() {
+  private registerSuiteRunPipeline() {
+    const repository = this.deps.clickhouse
+      ? new SuiteRunStateRepositoryClickHouse(this.deps.clickhouse)
+      : new SuiteRunStateRepositoryMemory();
+
+    return this.deps.eventSourcing.register(
+      createSuiteRunProcessingPipeline({
+        suiteRunStateFoldStore: createSuiteRunStateFoldStore(repository),
+      }),
+    );
+  }
+
+  private registerSimulationPipeline(suiteRunPipeline: ReturnType<PipelineRegistry["registerSuiteRunPipeline"]>) {
     const repository = this.deps.clickhouse
       ? new SimulationRunStateRepositoryClickHouse(this.deps.clickhouse)
       : new SimulationRunStateRepositoryMemory();
@@ -192,10 +296,17 @@ export class PipelineRegistry {
       },
     );
 
+    const suiteRunCommands = mapCommands(suiteRunPipeline.commands);
+    const suiteRunSyncReactor = createSuiteRunSyncReactor({
+      recordSuiteRunItemStarted: suiteRunCommands.recordSuiteRunItemStarted,
+      completeSuiteRunItem: suiteRunCommands.completeSuiteRunItem,
+    });
+
     return this.deps.eventSourcing.register(
       createSimulationProcessingPipeline({
         simulationRunStore,
         snapshotUpdateBroadcastReactor,
+        suiteRunSyncReactor,
       }),
     );
   }

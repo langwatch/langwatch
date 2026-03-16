@@ -12,7 +12,7 @@ def test_llm_answer_match():
         expected_output="rock",
     )
     evaluator = LLMAnswerMatchEvaluator(
-        settings=LLMAnswerMatchSettings(model="openai/gpt-5")
+        settings=LLMAnswerMatchSettings(model="openai/gpt-5-mini")
     )
     result = evaluator.evaluate(entry)
 
@@ -28,7 +28,7 @@ def test_llm_answer_match_without_question():
         expected_output="rock",
     )
     evaluator = LLMAnswerMatchEvaluator(
-        settings=LLMAnswerMatchSettings(model="openai/gpt-5")
+        settings=LLMAnswerMatchSettings(model="openai/gpt-5-mini")
     )
     result = evaluator.evaluate(entry)
 
@@ -44,7 +44,7 @@ def test_llm_answer_does_not_match_match():
         expected_output="pop",
     )
     evaluator = LLMAnswerMatchEvaluator(
-        settings=LLMAnswerMatchSettings(model="openai/gpt-5")
+        settings=LLMAnswerMatchSettings(model="openai/gpt-5-mini")
     )
     result = evaluator.evaluate(entry)
 

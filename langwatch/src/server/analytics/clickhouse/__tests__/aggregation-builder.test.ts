@@ -93,7 +93,8 @@ describe("aggregation-builder", () => {
       };
       const result = buildTimeseriesQuery(input);
 
-      expect(result.sql).toContain("JOIN evaluation_runs");
+      expect(result.sql).toContain("FROM evaluation_runs");
+      expect(result.sql).toContain("LIMIT 1 BY TenantId, EvaluationId");
     });
 
     it("adds filters to WHERE clause with parameterized values", () => {
@@ -396,7 +397,8 @@ describe("aggregation-builder", () => {
         endDate
       );
 
-      expect(result.sql).toContain("JOIN evaluation_runs");
+      expect(result.sql).toContain("FROM evaluation_runs");
+      expect(result.sql).toContain("LIMIT 1 BY TenantId, EvaluationId");
       expect(result.sql).toContain("es.EvaluatorId AS field");
     });
 

@@ -17,7 +17,7 @@ import type {
   getItemsToUpdate,
   prices,
 } from "./subscriptionItemCalculator";
-import { isStripePriceName } from "../stripe/stripePriceCatalog";
+import { isStripePriceName, stripePricesFile } from "../stripe/stripePriceCatalog";
 import {
   InvalidPlanError,
   OrganizationNotFoundError,
@@ -509,8 +509,24 @@ export class EESubscriptionService implements SubscriptionService {
       throw new SubscriptionCreationFailedError();
     }
 
+    // Resolve the checkout currency from the base plan price to prevent
+    // Stripe Adaptive Pricing from offering unsupported currencies.
+    const SUPPORTED_CHECKOUT_CURRENCIES = ["usd", "eur"] as const;
+    const basePriceId = this.itemCalculator.prices[plan as StripePriceName];
+    const rawCurrency =
+      stripePricesFile.prices[basePriceId]?.currency?.toLowerCase();
+    const checkoutCurrency =
+      rawCurrency &&
+      SUPPORTED_CHECKOUT_CURRENCIES.includes(
+        rawCurrency as (typeof SUPPORTED_CHECKOUT_CURRENCIES)[number],
+      )
+        ? rawCurrency
+        : "usd";
+
     const session = await this.stripe.checkout.sessions.create({
       mode: "subscription",
+      currency: checkoutCurrency,
+      ...({ adaptive_pricing: { enabled: false } } as Record<string, unknown>),
       customer: customerId,
       customer_update: {
         address: "auto",

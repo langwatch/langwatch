@@ -37,7 +37,8 @@ export function ScenarioGridCard({
       height="200px"
       textAlign="left"
       aria-label={`View details for ${title}`}
-      _hover={{ transform: "translateY(-2px)", transition: "transform 0.15s" }}
+      transition="transform 0.15s"
+      _hover={{ transform: "translateY(-2px)" }}
     >
       <SimulationCard title={title} status={scenarioRun.status}>
         <MessagePreview messages={scenarioRun.messages} />

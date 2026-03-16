@@ -7,6 +7,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { getApp } from "~/server/app-layer/app";
 import { SuiteService } from "~/server/suites/suite.service";
 import { SuiteDomainError } from "~/server/suites/errors";
 import { ProjectRepository } from "~/server/projects/project.repository";
@@ -18,7 +19,7 @@ export const suiteRouter = createTRPCRouter({
     .input(createSuiteSchema)
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
-      const service = SuiteService.create(ctx.prisma);
+      const service = SuiteService.create({ prisma: ctx.prisma, suiteRunService: getApp().suiteRuns.runs });
       return service.create(input);
     }),
 
@@ -26,7 +27,7 @@ export const suiteRouter = createTRPCRouter({
     .input(projectSchema)
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ ctx, input }) => {
-      const service = SuiteService.create(ctx.prisma);
+      const service = SuiteService.create({ prisma: ctx.prisma, suiteRunService: getApp().suiteRuns.runs });
       return service.getAll(input);
     }),
 
@@ -34,7 +35,7 @@ export const suiteRouter = createTRPCRouter({
     .input(projectSchema.extend({ id: z.string() }))
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ ctx, input }) => {
-      const service = SuiteService.create(ctx.prisma);
+      const service = SuiteService.create({ prisma: ctx.prisma, suiteRunService: getApp().suiteRuns.runs });
       const suite = await service.getById(input);
       if (!suite) {
         throw new TRPCError({
@@ -50,7 +51,7 @@ export const suiteRouter = createTRPCRouter({
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
       const { id, projectId, ...data } = input;
-      const service = SuiteService.create(ctx.prisma);
+      const service = SuiteService.create({ prisma: ctx.prisma, suiteRunService: getApp().suiteRuns.runs });
       return service.update({ id, projectId, data });
     }),
 
@@ -58,7 +59,7 @@ export const suiteRouter = createTRPCRouter({
     .input(projectSchema.extend({ id: z.string() }))
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
-      const service = SuiteService.create(ctx.prisma);
+      const service = SuiteService.create({ prisma: ctx.prisma, suiteRunService: getApp().suiteRuns.runs });
       try {
         return await service.duplicate(input);
       } catch (error) {
@@ -76,7 +77,7 @@ export const suiteRouter = createTRPCRouter({
     .input(projectSchema.extend({ id: z.string() }))
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
-      const service = SuiteService.create(ctx.prisma);
+      const service = SuiteService.create({ prisma: ctx.prisma, suiteRunService: getApp().suiteRuns.runs });
       const result = await service.archive(input);
       if (!result) {
         throw new TRPCError({
@@ -107,7 +108,7 @@ export const suiteRouter = createTRPCRouter({
           message: "Organization not found for project",
         });
       }
-      const service = SuiteService.create(ctx.prisma);
+      const service = SuiteService.create({ prisma: ctx.prisma, suiteRunService: getApp().suiteRuns.runs });
       return service.resolveArchivedNames({
         ...input,
         organizationId,
@@ -115,10 +116,13 @@ export const suiteRouter = createTRPCRouter({
     }),
 
   run: protectedProcedure
-    .input(projectSchema.extend({ id: z.string() }))
+    .input(projectSchema.extend({
+      id: z.string(),
+      idempotencyKey: z.string(),
+    }))
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
-      const service = SuiteService.create(ctx.prisma);
+      const service = SuiteService.create({ prisma: ctx.prisma, suiteRunService: getApp().suiteRuns.runs });
       const suite = await service.getById(input);
       if (!suite) {
         throw new TRPCError({
@@ -143,6 +147,7 @@ export const suiteRouter = createTRPCRouter({
           suite,
           projectId: input.projectId,
           organizationId,
+          idempotencyKey: input.idempotencyKey,
         });
 
         return {

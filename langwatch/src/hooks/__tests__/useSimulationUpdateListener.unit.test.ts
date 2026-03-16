@@ -345,5 +345,43 @@ describe("useSimulationUpdateListener()", () => {
 
       expect(onNewBatchRun).toHaveBeenCalledTimes(1);
     });
+
+    describe("when knownBatchRunIds exceeds 500 entries", () => {
+      it("evicts old IDs so onNewBatchRun fires again for them", () => {
+        const onNewBatchRun = vi.fn();
+
+        renderHook(() =>
+          useSimulationUpdateListener({
+            projectId: "proj_1",
+            refetch: refetchSpy,
+            onNewBatchRun,
+            debounceMs: 0,
+          }),
+        );
+
+        // Send 501 unique batch run IDs to exceed the 500 cap
+        for (let i = 0; i < 501; i++) {
+          act(() => {
+            simulateSSEEvent({
+              event: "simulation_updated",
+              batchRunId: `batch_${i}`,
+            });
+          });
+        }
+
+        expect(onNewBatchRun).toHaveBeenCalledTimes(501);
+
+        // The first ID was evicted when the set exceeded 500,
+        // so sending it again triggers onNewBatchRun
+        act(() => {
+          simulateSSEEvent({
+            event: "simulation_updated",
+            batchRunId: "batch_0",
+          });
+        });
+
+        expect(onNewBatchRun).toHaveBeenCalledTimes(502);
+      });
+    });
   });
 });

@@ -98,7 +98,7 @@ export function generateScenarioRunId(): string {
  * @param options - Optional job configuration (delay, priority, etc.)
  */
 export async function scheduleScenarioRun(
-  params: Omit<ScenarioJob, "scenarioRunId"> & { index: number },
+  params: Omit<ScenarioJob, "scenarioRunId"> & { index: number; scenarioRunId?: string },
   options?: { delay?: number; priority?: number },
 ): Promise<Job<ScenarioJob, ScenarioJobResult, string>> {
   const { projectId, scenarioId, batchRunId, target, index } = params;
@@ -130,7 +130,7 @@ export async function scheduleScenarioRun(
 
   const jobData: ScenarioJob = {
     ...params,
-    scenarioRunId: generateScenarioRunId(),
+    scenarioRunId: params.scenarioRunId ?? generateScenarioRunId(),
   };
 
   return await scenarioQueue.add(SCENARIO_QUEUE.JOB, jobData, {

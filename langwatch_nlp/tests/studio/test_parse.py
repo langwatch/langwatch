@@ -41,7 +41,7 @@ llm_field = Field(
     type=FieldType.llm,
     optional=None,
     value=LLMConfig(
-        model="gpt-5",
+        model="gpt-5-mini",
         temperature=0.0,
         max_tokens=100,
     ),

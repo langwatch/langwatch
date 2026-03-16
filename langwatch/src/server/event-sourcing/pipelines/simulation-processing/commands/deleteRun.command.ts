@@ -37,6 +37,8 @@ const config: SimulationCommandConfig<
   getLogContext: (commandData) => ({
     scenarioRunId: commandData.scenarioRunId,
   }),
+  makeIdempotencyKey: (commandData) =>
+    `${commandData.tenantId}:${commandData.scenarioRunId}:deleteRun`,
 };
 
 /**

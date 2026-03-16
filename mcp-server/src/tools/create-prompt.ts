@@ -1,5 +1,21 @@
 import { createPrompt as apiCreatePrompt } from "../langwatch-api.js";
 
+const HANDLE_PATTERN = /^[a-z0-9_-]+(?:\/[a-z0-9_-]+)?$/;
+
+/**
+ * Converts a human-readable name into a URL-friendly handle.
+ *
+ * Lowercases the input, replaces non-alphanumeric runs with hyphens,
+ * and strips leading/trailing hyphens. May return an empty string
+ * for inputs with no alphanumeric characters — callers must validate.
+ */
+function toHandle(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
 /**
  * Handles the platform_create_prompt MCP tool invocation.
  *
@@ -11,17 +27,26 @@ export async function handleCreatePrompt(params: {
   handle?: string;
   messages: Array<{ role: string; content: string }>;
   model: string;
-  modelProvider: string;
-  description?: string;
 }): Promise<string> {
-  const result = await apiCreatePrompt(params);
+  const handle = params.handle?.trim() || toHandle(params.name);
+  if (!handle || !HANDLE_PATTERN.test(handle)) {
+    throw new Error(
+      `Invalid prompt handle "${handle || ""}". Handle must match ${HANDLE_PATTERN}. Provide a valid \`handle\` explicitly.`
+    );
+  }
+
+  const result = await apiCreatePrompt({
+    handle,
+    messages: params.messages,
+    model: params.model,
+  });
 
   const lines: string[] = [];
   lines.push("Prompt created successfully!\n");
   if (result.id) lines.push(`**ID**: ${result.id}`);
   if (result.handle) lines.push(`**Handle**: ${result.handle}`);
   lines.push(`**Name**: ${result.name || params.name}`);
-  lines.push(`**Model**: ${params.model} (${params.modelProvider})`);
+  lines.push(`**Model**: ${params.model}`);
   if (result.latestVersionNumber != null)
     lines.push(`**Version**: v${result.latestVersionNumber}`);
 
