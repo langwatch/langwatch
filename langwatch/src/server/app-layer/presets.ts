@@ -25,6 +25,9 @@ import { NullOrganizationRepository } from "./organizations/repositories/organiz
 import { ProjectService } from "./projects/project.service";
 import { PrismaProjectRepository } from "./projects/repositories/project.prisma.repository";
 import { NullProjectRepository } from "./projects/repositories/project.repository";
+import { DspyStepService } from "./dspy-steps/dspy-step.service";
+import { DspyStepClickHouseRepository } from "./dspy-steps/repositories/dspy-step.clickhouse.repository";
+import { NullDspyStepRepository } from "./dspy-steps/repositories/dspy-step.repository";
 import { SimulationRunService } from "./simulations/simulation-run.service";
 import { SuiteRunService } from "./suites/suite-run.service";
 import { createSpanDedupeService } from "./traces/span-dedupe.service";
@@ -151,6 +154,12 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     "EvaluationExecutionService",
   );
 
+  const dspySteps = traced(
+    new DspyStepService(
+      clickhouse ? new DspyStepClickHouseRepository(clickhouse) : new NullDspyStepRepository(),
+    ),
+    "DspyStepService",
+  );
   const simulationReads = SimulationRunService.create(clickhouse);
   // SuiteRunService is created after pipeline registration (needs startSuiteRun command)
 
@@ -329,6 +338,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     broadcast,
     traces,
     evaluations,
+    dspySteps: { steps: dspySteps },
     simulations: { runs: simulationReads },
     suiteRuns: { runs: suiteRunService },
     organizations,
@@ -395,6 +405,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       runs: traced(new EvaluationRunService(new NullEvaluationRunRepository()), "EvaluationRunService"),
       execution: void 0 as unknown as AppDependencies["evaluations"]["execution"],
     },
+    dspySteps: { steps: new DspyStepService(new NullDspyStepRepository()) },
     simulations: { runs: SimulationRunService.create(null) },
     suiteRuns: { runs: SuiteRunService.create({ clickhouse: null, startSuiteRun: noop, queueSimulationRun: noop }) },
     organizations: nullOrganizations,

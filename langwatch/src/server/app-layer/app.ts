@@ -14,6 +14,7 @@ export class App {
   readonly evaluations: AppDependencies["evaluations"] &
     AppCommands["evaluations"];
   readonly experimentRuns: AppCommands["experimentRuns"];
+  readonly dspySteps: AppDependencies["dspySteps"];
   readonly simulations: AppDependencies["simulations"] & AppCommands["simulations"];
   readonly suiteRuns: AppDependencies["suiteRuns"] & AppCommands["suiteRuns"];
   readonly organizations: AppDependencies["organizations"];
@@ -46,6 +47,7 @@ export class App {
     this.traces = { ...deps.traces, ...deps.commands.traces };
     this.evaluations = { ...deps.evaluations, ...deps.commands.evaluations };
     this.experimentRuns = deps.commands.experimentRuns;
+    this.dspySteps = deps.dspySteps;
     this.simulations = { ...deps.simulations, ...deps.commands.simulations };
     this.suiteRuns = { ...deps.suiteRuns, ...deps.commands.suiteRuns };
     this._eventSourcing = deps._eventSourcing;

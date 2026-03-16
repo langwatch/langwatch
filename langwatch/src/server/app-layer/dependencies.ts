@@ -8,6 +8,7 @@ import type { OrganizationService } from "./organizations/organization.service";
 import type { ProjectService } from "./projects/project.service";
 import type { LogRecordStorageService } from "./traces/log-record-storage.service";
 import type { MetricRecordStorageService } from "./traces/metric-record-storage.service";
+import type { DspyStepService } from "./dspy-steps/dspy-step.service";
 import type { SimulationRunService } from "./simulations/simulation-run.service";
 import type { SuiteRunService } from "./suites/suite-run.service";
 import type { SpanStorageService } from "./traces/span-storage.service";
@@ -39,6 +40,9 @@ export interface AppDependencies {
   evaluations: {
     runs: EvaluationRunService;
     execution: EvaluationExecutionService;
+  };
+  dspySteps: {
+    steps: DspyStepService;
   };
   simulations: {
     runs: SimulationRunService;
