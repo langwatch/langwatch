@@ -31,7 +31,6 @@ import { projectRouter } from "./routers/project";
 import { promptsRouter } from "./routers/prompts";
 import { publicEnvRouter } from "./routers/publicEnv";
 import { roleRouter } from "./routers/role";
-import { scimRouter } from "./routers/scim";
 import { subscriptionRouter } from "./routers/subscription";
 import { savedViewsRouter } from "./routers/savedViews";
 import { scenarioRouter } from "./routers/scenarios";
@@ -88,7 +87,6 @@ const coreRouters = {
   scenarios: scenarioRouter,
   suites: suiteRouter,
   role: roleRouter,
-  scim: scimRouter,
   prompts: promptsRouter,
   savedViews: savedViewsRouter,
   sdkRadar: sdkRadarRouter,

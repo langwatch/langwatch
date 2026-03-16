@@ -79,8 +79,6 @@ model User {
     savedViews              SavedView[]
     externalId              String?
     scimProvisioned         Boolean                  @default(false)
-    deactivatedAt           DateTime?
-    createdScimTokens       ScimToken[]
 }
 
 model VerificationToken {
@@ -183,8 +181,6 @@ model Organization {
     CustomRoles   CustomRole[]
     notifications Notification[]
     subscriptions Subscription[]
-    scimTokens    ScimToken[]
-
     // License enforcement fields (COSS-0226)
     license                String?   @db.Text
     licenseExpiresAt       DateTime?
@@ -194,20 +190,6 @@ model Organization {
     @@index([ssoProvider])
 }
 
-model ScimToken {
-    id             String        @id @default(cuid())
-    organizationId String
-    tokenHash      String        @unique
-    tokenPrefix    String
-    createdById    String
-    createdAt      DateTime      @default(now())
-    expiresAt      DateTime?
-    organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-    createdBy      User          @relation(fields: [createdById], references: [id])
-
-    @@index([organizationId])
-    @@index([tokenPrefix])
-}
 
 enum PlanTypes {
     FREE

@@ -1,51 +1,35 @@
 import type { NextApiRequest } from "next";
-import { prisma } from "~/server/db";
-import { verifyScimToken } from "./scim-token";
+import { env } from "~/env.mjs";
 
 /**
- * Extracts Bearer token from Authorization header, looks up the matching
- * ScimToken by prefix, then bcrypt-compares to verify.
+ * Authenticates a SCIM request using a static bearer token from env.
  *
- * Uses prefix-based fast lookup: index on tokenPrefix narrows candidates
- * before expensive bcrypt compare.
+ * Expects: Authorization: Bearer <SCIM_TOKEN>
+ * Expects: x-organization-id: <organizationId> header
  *
- * @returns organizationId if valid, throws otherwise
+ * Simple env-var based auth for now — token management UI is a follow-up.
  */
-export async function getScimOrganization({
+export function getScimOrganization({
   req,
 }: {
   req: NextApiRequest;
-}): Promise<string> {
+}): string {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) {
     throw new ScimAuthError("Missing or invalid Authorization header");
   }
 
-  const plainToken = authHeader.slice(7);
-  if (!plainToken) {
-    throw new ScimAuthError("Empty bearer token");
+  const token = authHeader.slice(7);
+  if (!env.SCIM_TOKEN || token !== env.SCIM_TOKEN) {
+    throw new ScimAuthError("Invalid bearer token");
   }
 
-  const tokenPrefix = plainToken.substring(0, 8);
-
-  const candidates = await prisma.scimToken.findMany({
-    where: {
-      tokenPrefix,
-      OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-    },
-  });
-
-  for (const candidate of candidates) {
-    const isValid = await verifyScimToken({
-      plainToken,
-      tokenHash: candidate.tokenHash,
-    });
-    if (isValid) {
-      return candidate.organizationId;
-    }
+  const organizationId = req.headers["x-organization-id"] as string | undefined;
+  if (!organizationId) {
+    throw new ScimAuthError("Missing x-organization-id header");
   }
 
-  throw new ScimAuthError("Invalid bearer token");
+  return organizationId;
 }
 
 export class ScimAuthError extends Error {
