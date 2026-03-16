@@ -103,7 +103,7 @@ export default function IndividualScenarioRunPage() {
     if (scenarioId) ids.push({ label: "Scenario ID", value: scenarioId });
     if (batchRunId) ids.push({ label: "Batch Run ID", value: batchRunId });
     if (scenarioRunId) ids.push({ label: "Run ID", value: scenarioRunId });
-    if (suiteId) ids.push({ label: "Suite ID", value: suiteId });
+    if (suiteId) ids.push({ label: "Run Plan ID", value: suiteId });
     return ids;
   }, [scenarioId, batchRunId, scenarioRunId, suiteId]);
 
