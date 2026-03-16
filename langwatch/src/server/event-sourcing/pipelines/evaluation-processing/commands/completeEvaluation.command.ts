@@ -38,6 +38,7 @@ const config: EvaluationCommandConfig<
     passed: commandData.passed,
     label: commandData.label,
     details: commandData.details,
+    inputs: commandData.inputs ?? null,
     error: commandData.error,
     errorDetails: commandData.errorDetails ?? null,
     costId: commandData.costId ?? null,
