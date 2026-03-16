@@ -65,9 +65,9 @@ Feature: User Deactivation
   # ─── Organization member queries ────────────────────────────────────────────
 
   @unit
-  Scenario: getAllOrganizationMembers excludes deactivated users by default
+  Scenario: getAllOrganizationMembers excludes deactivated users
     Given an organization has two members, one of whom is deactivated
-    When getAllOrganizationMembers is called without an includeDeactivated flag
+    When getAllOrganizationMembers is called
     Then only the active member is returned
 
   @unit

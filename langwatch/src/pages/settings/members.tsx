@@ -284,7 +284,7 @@ function MembersList({
                           <Link href={`/settings/members/${member.userId}`}>
                             {member.user.name}
                           </Link>
-                          {(member.user as any).deactivatedAt && (
+                          {member.user.deactivatedAt && (
                             <Badge colorPalette="red" size="sm">
                               Deactivated
                             </Badge>

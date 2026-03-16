@@ -220,10 +220,10 @@ export const userRouter = createTRPCRouter({
 function assertPlatformAdmin(email: string | null | undefined): void {
   const adminEmails = (env.ADMIN_EMAILS ?? "")
     .split(",")
-    .map((entry: string) => entry.trim())
+    .map((entry: string) => entry.trim().toLowerCase())
     .filter(Boolean);
 
-  if (!email || !adminEmails.includes(email)) {
+  if (!email || !adminEmails.includes(email.toLowerCase())) {
     throw new TRPCError({
       code: "FORBIDDEN",
       message: "Only platform admins can perform this action",
