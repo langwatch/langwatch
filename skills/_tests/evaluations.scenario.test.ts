@@ -279,4 +279,69 @@ describe("Evaluations Skill", () => {
     },
     600_000
   );
+
+  it.skipIf(isCI)(
+    "creates domain-specific evaluation for a RAG agent",
+    async () => {
+      const tempFolder = fs.mkdtempSync(
+        path.join(os.tmpdir(), "langwatch-skill-evaluations-rag-")
+      );
+      execSync(
+        `cp -r ${path.resolve(__dirname, "fixtures/python-rag-agent")}/* ${tempFolder}/`
+      );
+      copySkillToWorkDir(tempFolder);
+
+      const result = await scenario.run({
+        name: "RAG agent domain-specific evaluation",
+        description:
+          "Creating an evaluation experiment for a TerraVerde farm advisory RAG agent.",
+        agents: [
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          scenario.userSimulatorAgent({ model: judgeModel }),
+          scenario.judgeAgent({
+            model: judgeModel,
+            criteria: [
+              "Agent created an evaluation experiment with domain-specific data about agriculture, irrigation, frost protection, or pest management",
+              "Dataset does NOT contain generic trivia — it has realistic agronomic questions",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "create a batch evaluation experiment for my farm advisory RAG agent. Read the codebase to understand the knowledge base and domain. Generate a dataset with realistic agronomic questions. Use langwatch.experiment SDK, no need to run it."
+          ),
+          scenario.agent(),
+          (state) => {
+            toolCallFix(state);
+            const newFiles = findNewPythonFiles(tempFolder);
+            expect(newFiles.length).toBeGreaterThan(0);
+            const content = newFiles
+              .map((f) => fs.readFileSync(f, "utf8"))
+              .join("\n")
+              .toLowerCase();
+            expect(content).toContain("langwatch");
+
+            // Verify domain specificity
+            const hasDomainTerms =
+              content.includes("irrigation") ||
+              content.includes("frost") ||
+              content.includes("pest") ||
+              content.includes("soil") ||
+              content.includes("crop");
+            expect(
+              hasDomainTerms,
+              "Expected dataset to contain agricultural domain terms"
+            ).toBe(true);
+
+            expect(content).not.toMatch(
+              /capital of france|what is 2 ?\+ ?2|quantum computing/
+            );
+          },
+          scenario.judge(),
+        ],
+      });
+      expect(result.success).toBe(true);
+    },
+    600_000
+  );
 });

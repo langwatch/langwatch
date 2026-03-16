@@ -21,6 +21,10 @@ See [MCP Setup](_shared/mcp-setup.md) for installation instructions.
 
 If MCP installation fails, see [docs fallback](_shared/llms-txt-fallback.md) to fetch docs directly.
 
+## Consultant Mode
+
+After completing all steps, don't just stop. See [Consultant Mode](_shared/consultant-mode.md) — summarize everything you set up, then suggest 2-3 ways to go deeper based on what you learned about the codebase.
+
 ## Step 1: Add Tracing
 
 Add LangWatch tracing to capture all LLM calls, costs, and latency.

@@ -527,4 +527,141 @@ describe("Scenarios Skill", () => {
     },
     600_000
   );
+
+  it.skipIf(isCI)(
+    "creates domain-specific scenarios for a RAG agent",
+    async () => {
+      const tempFolder = fs.mkdtempSync(
+        path.join(os.tmpdir(), "langwatch-skill-scenarios-rag-")
+      );
+      execSync(
+        `cp -r ${path.resolve(__dirname, "fixtures/python-rag-agent")}/* ${tempFolder}/`
+      );
+      copySkillToWorkDir(tempFolder);
+
+      const result = await scenario.run({
+        name: "RAG agent domain-specific scenarios",
+        description:
+          "Adding scenario tests to a TerraVerde farm advisory RAG agent that handles irrigation, frost protection, and pest management.",
+        agents: [
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          scenario.userSimulatorAgent({ model: judgeModel }),
+          scenario.judgeAgent({
+            model: judgeModel,
+            criteria: [
+              "Agent created scenario tests that are specific to the agricultural domain (irrigation, frost, pest management, soil moisture)",
+              "Scenarios test the agent's actual knowledge base and advisory capabilities, not generic Q&A",
+              "Agent included at least one multi-turn scenario",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "add agent simulation tests for my farm advisory agent. Read the codebase to understand what it does. Include multi-turn tests. Run the tests after writing them."
+          ),
+          scenario.agent(),
+          (state) => {
+            toolCallFix(state);
+            const testFiles = findTestFiles(tempFolder, /^test_.*\.py$/);
+            expect(testFiles.length).toBeGreaterThan(0);
+            const content = testFiles
+              .map((f) => fs.readFileSync(f, "utf8"))
+              .join("\n")
+              .toLowerCase();
+            expect(content).toContain("scenario");
+
+            // Verify domain specificity — should reference agriculture concepts, NOT generic trivia
+            const hasDomainTerms =
+              content.includes("irrigation") ||
+              content.includes("frost") ||
+              content.includes("pest") ||
+              content.includes("soil") ||
+              content.includes("crop") ||
+              content.includes("harvest");
+            expect(
+              hasDomainTerms,
+              "Expected scenarios to reference agricultural domain concepts"
+            ).toBe(true);
+
+            expect(content).not.toMatch(
+              /capital of france|what is 2 ?\+ ?2|quantum computing/
+            );
+          },
+          scenario.judge(),
+        ],
+      });
+      expect(result.success).toBe(true);
+    },
+    600_000
+  );
+
+  it.skipIf(isCI)(
+    "suggests domain-specific improvements after delivering initial scenarios",
+    async () => {
+      const tempFolder = fs.mkdtempSync(
+        path.join(os.tmpdir(), "langwatch-skill-scenarios-consultant-")
+      );
+      execSync(
+        `cp -r ${path.resolve(__dirname, "fixtures/python-rag-agent")}/* ${tempFolder}/`
+      );
+      copySkillToWorkDir(tempFolder);
+
+      const result = await scenario.run({
+        name: "Consultant mode — deeper suggestions",
+        description:
+          "Agent sets up scenarios for a farm advisory agent, then suggests domain-specific improvements.",
+        agents: [
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          scenario.userSimulatorAgent({ model: judgeModel }),
+          scenario.judgeAgent({
+            model: judgeModel,
+            criteria: [
+              "Agent delivered working scenario tests",
+              "Agent suggested specific domain improvements (e.g., testing frost edge cases, sensor failures, drought conditions, or specific crop types)",
+              "Agent did NOT just say 'done' — it offered to go deeper with concrete suggestions",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "add scenario tests for my farm advisory agent. After you're done and tests pass, suggest how to make them even better — be specific about what domain edge cases I should cover."
+          ),
+          scenario.agent(),
+          (state) => {
+            toolCallFix(state);
+
+            // Verify test files were created
+            const testFiles = findTestFiles(tempFolder, /^test_.*\.py$/);
+            expect(testFiles.length).toBeGreaterThan(0);
+
+            // Verify agent's response includes consultant-style suggestions
+            const agentMessages = state.messages
+              .filter((m) => m.role === "assistant")
+              .map((m) =>
+                typeof m.content === "string"
+                  ? m.content
+                  : JSON.stringify(m.content)
+              )
+              .join("\n")
+              .toLowerCase();
+
+            const hasDeepSuggestions =
+              agentMessages.includes("suggest") ||
+              agentMessages.includes("could also") ||
+              agentMessages.includes("would you like") ||
+              agentMessages.includes("go deeper") ||
+              agentMessages.includes("edge case") ||
+              agentMessages.includes("improve");
+            expect(
+              hasDeepSuggestions,
+              "Expected agent to suggest domain-specific improvements"
+            ).toBe(true);
+          },
+          scenario.judge(),
+        ],
+      });
+      expect(result.success).toBe(true);
+    },
+    900_000 // longer timeout — agent needs to run tests + generate suggestions
+  );
 });

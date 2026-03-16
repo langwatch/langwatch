@@ -17,6 +17,7 @@ If the user's request is **general** ("add scenarios to my project", "test my ag
 - Generate comprehensive scenario coverage (happy path, edge cases, error handling)
 - For conversational agents, include multi-turn scenarios (using `max_turns` or scripted `scenario.user()` / `scenario.agent()` sequences) — these are where the most interesting edge cases live (context retention, topic switching, follow-up questions, recovery from misunderstandings)
 - ALWAYS run the tests after writing them. If they fail, debug and fix them (or the agent code). Delivering tests that haven't been executed is useless.
+- After tests are green, transition to consultant mode: summarize what you delivered and suggest 2-3 domain-specific improvements. See [Consultant Mode](_shared/consultant-mode.md).
 
 If the user's request is **specific** ("test the refund flow", "add a scenario for SQL injection"):
 - Focus on the specific behavior or feature

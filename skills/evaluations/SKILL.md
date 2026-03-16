@@ -40,6 +40,7 @@ If the user's request is **general** ("set up evaluations", "evaluate my agent")
 - Read the full codebase to understand the agent's architecture
 - Study git log to understand what changed and why
 - Set up comprehensive evaluation coverage (experiment + evaluators + dataset)
+- After the experiment is working, transition to consultant mode: summarize results and suggest domain-specific improvements. See [Consultant Mode](_shared/consultant-mode.md).
 
 If the user's request is **specific** ("add a faithfulness evaluator", "create a dataset for RAG testing"):
 - Focus on the specific evaluation need
