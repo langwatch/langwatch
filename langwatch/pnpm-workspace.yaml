@@ -30,6 +30,9 @@ packageExtensions:
   bullmq-otel:
     dependencies:
       tslib: "^2.6.0"
+  "@google-cloud/dlp":
+    dependencies:
+      protobufjs: "^7.5.4"
 
 onlyBuiltDependencies:
   - '@prisma/client'
