@@ -396,7 +396,12 @@
       "analytics": "Cross-cutting skill for querying performance (works for both code and platform users)"
     },
     "recipes": {
-      "test-cli-usability": "Write scenario tests to ensure your CLI is usable by AI agents"
+      "test-cli-usability": "Write scenario tests to ensure your CLI is usable by AI agents",
+      "debug-instrumentation": "Debug and improve your LangWatch traces",
+      "improve-setup": "Expert AI engineering consultant for your LangWatch setup",
+      "evaluate-multimodal": "Evaluate multimodal agents (images, audio, PDFs)",
+      "generate-rag-dataset": "Generate synthetic evaluation dataset from your RAG knowledge base",
+      "test-compliance": "Test that your agent stays observational in regulated domains"
     }
   }
 }
