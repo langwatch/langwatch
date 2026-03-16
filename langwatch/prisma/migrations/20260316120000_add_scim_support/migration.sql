@@ -1,1 +1,0 @@
--- intentionally empty: SCIM-specific user fields removed
