@@ -1,5 +1,5 @@
 import { Box, HStack } from "@chakra-ui/react";
-import React, { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import { ChevronDown } from "react-feather";
 import {
   Controller,
@@ -33,6 +33,7 @@ type ModelSelectFieldMiniProps = {
 export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
   showStructuredOutputs = true,
 }: ModelSelectFieldMiniProps) {
+  const [popoverOpen, setPopoverOpen] = useState(false);
   const { control, formState, trigger } =
     useFormContext<PromptConfigFormValues>();
 
@@ -77,7 +78,12 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
       render={({ field }) => {
         const llmErrors = formState.errors.version?.configData?.llm;
         return (
-          <Popover.Root positioning={{ placement: "bottom-start" }} closeOnInteractOutside={false}>
+          <Popover.Root
+            positioning={{ placement: "bottom-start" }}
+            closeOnInteractOutside={false}
+            open={popoverOpen}
+            onOpenChange={({ open }) => setPopoverOpen(open)}
+          >
             <Popover.Trigger asChild>
               <HStack
                 paddingY={2}
@@ -89,6 +95,7 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
                 _hover={{ bg: "bg.subtle" }}
                 transition="background 0.15s"
                 justify="space-between"
+                onClick={() => setPopoverOpen((prev) => !prev)}
               >
                 <LLMModelDisplay model={field.value?.model ?? ""} />
                 <Box color="fg.muted">
