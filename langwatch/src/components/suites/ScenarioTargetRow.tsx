@@ -9,7 +9,7 @@
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
 
-import { HStack, Spinner, Text } from "@chakra-ui/react";
+import { Box, HStack, Spinner, Text } from "@chakra-ui/react";
 import { X } from "lucide-react";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
@@ -64,72 +64,77 @@ export function ScenarioTargetRow({
 
   const config = SCENARIO_RUN_STATUS_CONFIG[scenarioRun.status];
 
+  const hasCancelButton = onCancel && isCancellableStatus(scenarioRun.status);
+
   return (
-    <HStack
-      as="button"
-      width="full"
-      paddingX={4}
-      paddingY={2}
-      gap={3}
-      _hover={{ bg: "bg.muted" }}
-      cursor="pointer"
-      onClick={onClick}
-      borderBottom="1px solid"
-      borderColor="border.subtle"
-      role="button"
-      tabIndex={0}
-      aria-label={`View details for ${displayName}`}
-    >
-      <StatusIcon status={scenarioRun.status} />
-      <Text fontSize="sm" flex={1} textAlign="left" truncate>
-        {displayName}
-      </Text>
-      <HStack gap={2} flexShrink={0}>
-        <Text fontSize="xs" color={config.fgColor}>
-          {formatRunStatusLabel({
-            status: scenarioRun.status,
-            results: scenarioRun.results ?? undefined,
-          })}
+    <Box position="relative" borderBottom="1px solid" borderColor="border.subtle">
+      <HStack
+        as="button"
+        width="full"
+        paddingX={4}
+        paddingY={2}
+        paddingRight={hasCancelButton ? 20 : 4}
+        gap={3}
+        _hover={{ bg: "bg.muted" }}
+        cursor="pointer"
+        onClick={onClick}
+        tabIndex={0}
+        aria-label={`View details for ${displayName}`}
+      >
+        <StatusIcon status={scenarioRun.status} />
+        <Text fontSize="sm" flex={1} textAlign="left" truncate>
+          {displayName}
         </Text>
-        {scenarioRun.durationInMs > 0 && (
-          <Text fontSize="xs" color="fg.muted">
-            {formatDuration(scenarioRun.durationInMs)}
+        <HStack gap={2} flexShrink={0}>
+          <Text fontSize="xs" color={config.fgColor}>
+            {formatRunStatusLabel({
+              status: scenarioRun.status,
+              results: scenarioRun.results ?? undefined,
+            })}
           </Text>
-        )}
-        {onCancel && isCancellableStatus(scenarioRun.status) && (
-          <HStack
-            as="span"
-            role="button"
-            tabIndex={isCancelling ? -1 : 0}
-            gap={1}
-            paddingX={2}
-            paddingY={0.5}
-            borderRadius="sm"
-            fontSize="xs"
-            color="red.500"
-            cursor={isCancelling ? "default" : "pointer"}
-            opacity={isCancelling ? 0.6 : 1}
-            _hover={isCancelling ? undefined : { bg: "red.50" }}
-            onClick={(e: React.MouseEvent) => {
-              e.stopPropagation();
-              if (!isCancelling) onCancel();
-            }}
-            onKeyDown={(e: React.KeyboardEvent) => {
-              if (!isCancelling && (e.key === "Enter" || e.key === " ")) {
-                e.stopPropagation();
-                e.preventDefault();
-                onCancel();
-              }
-            }}
-            aria-label="Cancel run"
-            aria-disabled={isCancelling}
-            data-testid="cancel-run-button"
-          >
-            {isCancelling ? <Spinner size="xs" /> : <X size={12} />}
-            <Text fontSize="xs">Cancel</Text>
-          </HStack>
-        )}
+          {scenarioRun.durationInMs > 0 && (
+            <Text fontSize="xs" color="fg.muted">
+              {formatDuration(scenarioRun.durationInMs)}
+            </Text>
+          )}
+        </HStack>
       </HStack>
-    </HStack>
+      {hasCancelButton && (
+        <HStack
+          as="button"
+          tabIndex={isCancelling ? -1 : 0}
+          gap={1}
+          paddingX={2}
+          paddingY={0.5}
+          borderRadius="sm"
+          fontSize="xs"
+          color="red.500"
+          cursor={isCancelling ? "default" : "pointer"}
+          opacity={isCancelling ? 0.6 : 1}
+          _hover={isCancelling ? undefined : { bg: "red.50" }}
+          position="absolute"
+          top="50%"
+          right={4}
+          transform="translateY(-50%)"
+          onClick={(e: React.MouseEvent) => {
+            e.stopPropagation();
+            if (!isCancelling) onCancel!();
+          }}
+          onKeyDown={(e: React.KeyboardEvent) => {
+            if (!isCancelling && (e.key === "Enter" || e.key === " ")) {
+              e.stopPropagation();
+              e.preventDefault();
+              onCancel!();
+            }
+          }}
+          aria-label="Cancel run"
+          aria-disabled={isCancelling}
+          data-testid="cancel-run-button"
+        >
+          {isCancelling ? <Spinner size="xs" /> : <X size={12} />}
+          <Text fontSize="xs">Cancel</Text>
+        </HStack>
+      )}
+    </Box>
   );
 }

@@ -36,24 +36,25 @@ export function ScenarioGridCard({
   const title = buildDisplayTitle({ scenarioName, targetName, iteration });
 
   return (
-    <Box
-      as="button"
-      onClick={onClick}
-      cursor="pointer"
-      height="200px"
-      textAlign="left"
-      position="relative"
-      aria-label={`View details for ${title}`}
-      transition="transform 0.15s"
-      _hover={{ transform: "translateY(-2px)" }}
-    >
-      <SimulationCard title={title} status={scenarioRun.status}>
-        <MessagePreview messages={scenarioRun.messages} />
-      </SimulationCard>
+    <Box position="relative">
+      <Box
+        as="button"
+        onClick={onClick}
+        cursor="pointer"
+        height="200px"
+        textAlign="left"
+        width="full"
+        aria-label={`View details for ${title}`}
+        transition="transform 0.15s"
+        _hover={{ transform: "translateY(-2px)" }}
+      >
+        <SimulationCard title={title} status={scenarioRun.status}>
+          <MessagePreview messages={scenarioRun.messages} />
+        </SimulationCard>
+      </Box>
       {onCancel && isCancellableStatus(scenarioRun.status) && (
         <HStack
-          as="span"
-          role="button"
+          as="button"
           tabIndex={isCancelling ? -1 : 0}
           gap={1}
           paddingX={2}
