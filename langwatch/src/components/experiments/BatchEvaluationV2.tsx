@@ -27,6 +27,7 @@ import type { AppRouter } from "../../server/api/root";
 import { api } from "../../utils/api";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
 import { getColorForString } from "../../utils/rotatingColors";
+import { getRunDisplayName } from "../batch-evaluation-results/getRunDisplayName";
 import { OverflownTextWithTooltip } from "../OverflownText";
 import {
   BatchEvaluationV2EvaluationSummary,
@@ -335,11 +336,14 @@ export function BatchEvaluationV2RunList({
               </VStack>
             </HStack>
           )}
-          {batchEvaluationRuns.data?.runs.map((run) => {
+          {batchEvaluationRuns.data?.runs.map((run, index) => {
             const runCost =
               (run.summary.datasetCost ?? 0) +
               (run.summary.evaluationsCost ?? 0);
-            const runName = run.workflowVersion?.commitMessage ?? run.runId;
+            const runName = getRunDisplayName({
+              commitMessage: run.workflowVersion?.commitMessage,
+              index,
+            });
 
             return (
               <HStack
