@@ -132,7 +132,7 @@
     "@trpc/react-query": "^10.34.0",
     "@trpc/server": "^10.45.3",
     "@xyflow/react": "^12.1.0",
-    "ai": "^5.0.154",
+    "ai": "^6.0.116",
     "ajv": "^8.18.0",
     "bcrypt": "^6.0.0",
     "bullmq": "^5.71.0",
@@ -307,7 +307,8 @@
   "pnpm": {
     "overrides": {
       "@aws-sdk/xml-builder>fast-xml-parser": "^5.5.1",
-      "@langchain/community>fast-xml-parser": "^5.5.1"
+      "@langchain/community>fast-xml-parser": "^5.5.1",
+      "ioredis": "^5.10.0"
     }
   },
   "ct3aMetadata": {

@@ -83,8 +83,40 @@ const messageSnapshotMapping: ElasticSearchMappingFrom<
       id: { type: "keyword" },
       role: { type: "keyword" },
       content: { type: "text" }, // maybe we need to json stringify when content is a json
+      parts: {
+        properties: {
+          type: { type: "keyword" },
+          text: { type: "text" },
+          content: { type: "text" },
+          image_url: {
+            properties: {
+              url: { type: "text" },
+              detail: { type: "keyword" },
+            },
+          },
+        },
+      },
+      function_call: {
+        properties: {
+          arguments: { type: "text" },
+          name: { type: "text" },
+        },
+      },
+      tool_calls: {
+        properties: {
+          id: { type: "keyword" },
+          type: { type: "keyword" },
+          function: {
+            properties: {
+              name: { type: "text" },
+              arguments: { type: "text" },
+            },
+          },
+        },
+      },
       tool_call_id: { type: "keyword" },
       name: { type: "text" },
+      reasoning_content: { type: "text" },
       trace_id: { type: "keyword" },
     },
   },
