@@ -17,6 +17,23 @@ LangWatch Evaluations is a comprehensive quality assurance system. Understand wh
 | "create a dataset", "test data" | **Datasets** | Step D |
 | "evaluate" (ambiguous) | Ask: "batch test or production monitoring?" | - |
 
+## Where Evaluations Fit
+
+Evaluations sit at the **component level of the testing pyramid** — they test specific aspects of your agent with many input/output examples. This is different from scenarios (end-to-end multi-turn conversation testing).
+
+Use evaluations when:
+- You have many examples with clear correct/incorrect answers
+- Testing RAG retrieval accuracy
+- Benchmarking classification, routing, or detection tasks
+- Running CI/CD quality gates
+
+Use scenarios instead when:
+- Testing multi-turn agent conversation behavior
+- Validating complex tool-calling sequences
+- Checking agent decision-making in realistic situations
+
+For onboarding, create 1-2 Jupyter notebooks (or scripts) maximum. Focus on generating domain-realistic data that's as close to real-world inputs as possible.
+
 ## Determine Scope
 
 If the user's request is **general** ("set up evaluations", "evaluate my agent"):
@@ -54,7 +71,7 @@ Create a script or notebook that runs your agent against a dataset and measures 
 
 1. Read the SDK docs: call `fetch_langwatch_docs` with url `https://langwatch.ai/docs/evaluations/experiments/sdk.md`
 2. Analyze the agent's code to understand what it does
-3. Generate a dataset of 10-20 examples **tailored to the agent's actual domain** (see dataset guidance below)
+3. Create a dataset with representative examples that are as close to real-world inputs as possible. Focus on domain realism — the dataset should look like actual production data the agent would encounter.
 4. Create the experiment file:
 
 **Python — Jupyter Notebook (.ipynb):**
@@ -103,6 +120,21 @@ await evaluation.run(dataset, async ({ item, index }) => {
 ```
 
 5. Run the experiment to verify it works
+
+### Verify by Running
+
+ALWAYS run the experiment after creating it. If it fails, fix it. An experiment that isn't executed is useless.
+
+For Python notebooks: Create an accompanying script to run it:
+```python
+# run_experiment.py
+import subprocess
+subprocess.run(["jupyter", "nbconvert", "--to", "notebook", "--execute", "experiment.ipynb"], check=True)
+```
+
+Or simply run the cells in order via the notebook interface.
+
+For TypeScript: `npx tsx experiment.ts`
 
 ## Step B: Online Evaluation (Production Monitoring & Guardrails)
 
@@ -198,6 +230,14 @@ Use the `platform_create_prompt` MCP tool to create a new prompt:
 - The prompt will appear in your LangWatch project's Prompts section
 
 Or use `platform_list_prompts` to find existing prompts and `platform_update_prompt` to modify them.
+
+### Check Model Providers
+
+Before creating evaluators on the platform, verify model providers are configured:
+
+1. Call `platform_list_model_providers` to check existing providers
+2. If no providers are configured, ask the user if they have an LLM API key (OpenAI, Anthropic, etc.)
+3. If they do, set it up with `platform_set_model_provider` so evaluators can run
 
 ### Create an Evaluator
 

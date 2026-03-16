@@ -435,6 +435,22 @@ describe("Scenarios Skill", () => {
             toolCallFix(state);
             // In platform mode, no test files should be created
             // The agent should use MCP tools instead
+
+            // Verify the agent actually used MCP platform tools
+            const allContent = state.messages
+              .map((m) =>
+                typeof m.content === "string"
+                  ? m.content
+                  : JSON.stringify(m.content)
+              )
+              .join("\n");
+
+            expect(
+              allContent.includes("platform_create_scenario") ||
+                allContent.includes("platform_list_scenarios") ||
+                allContent.includes("discover_schema"),
+              "Expected agent to use platform MCP tools (platform_create_scenario, platform_list_scenarios, or discover_schema)"
+            ).toBe(true);
           },
           scenario.judge(),
         ],

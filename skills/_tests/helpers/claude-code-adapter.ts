@@ -23,13 +23,21 @@ const mcpServerDistPath = path.resolve(
  * Spawns Claude Code via child_process.spawn with MCP config pointing to the
  * LangWatch MCP server. Optionally copies a SKILL.md into the working directory
  * so Claude Code auto-discovers it.
+ *
+ * @param workingDirectory - The directory to run Claude Code in
+ * @param skillPath - Optional path to a SKILL.md to copy into the working directory
+ * @param cleanEnv - When true, strips LANGWATCH_API_KEY, OPENAI_API_KEY, and
+ *   ANTHROPIC_API_KEY from the spawned process environment. Use this to test
+ *   cold-start flows where the agent must discover keys from .env files.
  */
 export function createClaudeCodeAgent({
   workingDirectory,
   skillPath,
+  cleanEnv,
 }: {
   workingDirectory: string;
   skillPath?: string;
+  cleanEnv?: boolean;
 }): AgentAdapter {
   if (skillPath) {
     const skillName = path.basename(path.dirname(skillPath));
@@ -82,9 +90,18 @@ export function createClaudeCodeAgent({
           workingDirectory
         );
 
+        const envVars = cleanEnv
+          ? Object.fromEntries(
+              Object.entries(process.env).filter(
+                ([key]) =>
+                  !["LANGWATCH_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"].includes(key)
+              )
+            )
+          : process.env;
+
         const child = spawn(claudeBin, args, {
           cwd: workingDirectory,
-          env: { ...process.env, FORCE_COLOR: "0" },
+          env: { ...envVars, FORCE_COLOR: "0" },
           stdio: ["ignore", "pipe", "pipe"],
         });
 

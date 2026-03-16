@@ -232,4 +232,63 @@ describe("Tracing Skill", () => {
     },
     600_000
   );
+
+  it.skipIf(isCI)(
+    "instruments code without env API key — discovers from .env file",
+    async () => {
+      const tempFolder = fs.mkdtempSync(
+        path.join(os.tmpdir(), "langwatch-skill-tracing-coldstart-")
+      );
+
+      execSync(
+        `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`
+      );
+      copySkillToWorkDir(tempFolder);
+
+      // Write .env with API key — agent must discover this
+      fs.writeFileSync(
+        path.join(tempFolder, ".env"),
+        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\nOPENAI_API_KEY=${process.env.OPENAI_API_KEY}\n`
+      );
+
+      const result = await scenario.run({
+        name: "Cold start tracing — no env API key",
+        description:
+          "Developer instruments code without LANGWATCH_API_KEY in environment. API key is in the project .env file.",
+        agents: [
+          createClaudeCodeAgent({
+            workingDirectory: tempFolder,
+            cleanEnv: true,
+          }),
+          scenario.userSimulatorAgent({ model: judgeModel }),
+          scenario.judgeAgent({
+            model: judgeModel,
+            criteria: [
+              "Agent should have added LangWatch tracing to the code",
+              "Agent should have found or used the API key from the .env file",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "please instrument my code with langwatch. My API key should be in the .env file. Short and sweet, no need to test."
+          ),
+          scenario.agent(),
+          (state) => {
+            toolCallFix(state);
+            const mainPy = fs.readFileSync(
+              `${tempFolder}/main.py`,
+              "utf8"
+            );
+            expect(mainPy).toContain("langwatch");
+            expect(mainPy).toContain("trace");
+          },
+          scenario.judge(),
+        ],
+      });
+
+      expect(result.success).toBe(true);
+    },
+    600_000
+  );
 });

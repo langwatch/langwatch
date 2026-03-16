@@ -32,6 +32,26 @@ If the user's request is about **red teaming** ("red team my agent", "find vulne
 3. If **NO** → use the **Platform approach** (MCP tools — no files needed)
 4. If ambiguous → ask the user: "Do you want to write scenario test code or create scenarios on the platform?"
 
+## The Agent Testing Pyramid
+
+Scenarios sit at the **top of the testing pyramid** — they test your agent as a complete system through realistic multi-turn conversations. This is different from evaluations (component-level, single input → output comparisons with many examples).
+
+Use scenarios when:
+- Testing multi-turn conversation behavior
+- Validating tool calling sequences
+- Checking edge cases in agent decision-making
+- Red teaming for security vulnerabilities
+
+Use evaluations instead when:
+- Comparing many input/output pairs (RAG accuracy, classification)
+- Benchmarking model performance on a dataset
+- Running CI/CD quality gates on specific metrics
+
+Best practices:
+- NEVER check for regex or word matches in the agent's response — use JudgeAgent criteria instead
+- Use script functions for deterministic checks (tool calls, file existence) and judge criteria for semantic evaluation
+- Cover more ground with fewer well-designed scenarios rather than many shallow ones
+
 ---
 
 ## Code Approach: Scenario SDK
@@ -171,6 +191,13 @@ For TypeScript:
 npx vitest run my-agent.test.ts
 # or: pnpm vitest run my-agent.test.ts
 ```
+
+### Verify by Running
+
+ALWAYS run the scenario tests you create. If they fail, debug and fix them. A scenario test that isn't executed is useless.
+
+For Python: `pytest -s tests/test_scenarios.py`
+For TypeScript: `npx vitest run`
 
 ---
 
@@ -313,6 +340,13 @@ Use `platform_list_scenarios` to see all your scenarios and `platform_get_scenar
 ### Step 5: Run Simulations
 
 Go to https://app.langwatch.ai and navigate to your project's Simulations section to run the scenarios you created.
+
+### Verify by Running
+
+ALWAYS run the scenario tests you create. If they fail, debug and fix them. A scenario test that isn't executed is useless.
+
+For Python: `pytest -s tests/test_scenarios.py`
+For TypeScript: `npx vitest run`
 
 ---
 
