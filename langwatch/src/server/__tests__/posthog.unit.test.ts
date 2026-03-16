@@ -48,6 +48,7 @@ describe("trackServerEvent", () => {
       trackServerEvent({
         userId: "user-123",
         event: "limit_blocked",
+        session: null,
       });
 
       expect(mockCapture).toHaveBeenCalledWith({
@@ -62,6 +63,7 @@ describe("trackServerEvent", () => {
         userId: "user-123",
         event: "limit_blocked",
         properties: { limitType: "workflows", current: 5, max: 5 },
+        session: null,
       });
 
       expect(mockCapture).toHaveBeenCalledWith({
@@ -76,6 +78,7 @@ describe("trackServerEvent", () => {
         userId: "user-123",
         event: "scenario_created",
         projectId: "proj-456",
+        session: null,
       });
 
       expect(mockCapture).toHaveBeenCalledWith({
@@ -91,6 +94,7 @@ describe("trackServerEvent", () => {
         event: "team_member_invited",
         projectId: "proj-456",
         properties: { inviteCount: 3 },
+        session: null,
       });
 
       expect(mockCapture).toHaveBeenCalledWith({
@@ -105,12 +109,66 @@ describe("trackServerEvent", () => {
         userId: "user-123",
         event: "team_member_invited",
         properties: { inviteCount: 3 },
+        session: null,
       });
 
       expect(mockCapture).toHaveBeenCalledWith({
         distinctId: "user-123",
         event: "team_member_invited",
         properties: { inviteCount: 3 },
+      });
+    });
+
+    describe("when session has an impersonator", () => {
+      it("skips server event capture", () => {
+        trackServerEvent({
+          userId: "user-123",
+          event: "scenario_created",
+          projectId: "proj-456",
+          session: {
+            user: {
+              impersonator: { email: "admin@example.com" },
+            },
+          },
+        });
+
+        expect(mockCapture).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when session has no impersonator", () => {
+      it("captures server event normally", () => {
+        trackServerEvent({
+          userId: "user-123",
+          event: "scenario_created",
+          projectId: "proj-456",
+          session: {
+            user: {},
+          },
+        });
+
+        expect(mockCapture).toHaveBeenCalledWith({
+          distinctId: "user-123",
+          event: "scenario_created",
+          properties: { projectId: "proj-456" },
+        });
+      });
+    });
+
+    describe("when no session is provided", () => {
+      it("captures server event normally", () => {
+        trackServerEvent({
+          userId: "user-123",
+          event: "evaluation_ran",
+          projectId: "proj-789",
+          session: null,
+        });
+
+        expect(mockCapture).toHaveBeenCalledWith({
+          distinctId: "user-123",
+          event: "evaluation_ran",
+          properties: { projectId: "proj-789" },
+        });
       });
     });
   });
