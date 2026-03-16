@@ -83,13 +83,13 @@ describe("Evaluations Skill", () => {
             model: judgeModel,
             criteria: [
               "Agent created an evaluation experiment file (notebook or script)",
-              "Agent generated a dataset relevant to the agent's functionality",
+              "Agent generated a dataset that is specific to the agent's domain — for this tweet-like emoji bot, the dataset should contain inputs that real users would send to this bot, NOT generic trivia like 'What is 2+2?' or 'Capital of France'",
             ],
           }),
         ],
         script: [
           scenario.user(
-            "create a batch evaluation experiment for my agent using langwatch.experiment SDK (not scenario tests), short and sweet, no need to run it"
+            "create a batch evaluation experiment for my agent using langwatch.experiment SDK (not scenario tests), short and sweet, no need to run it. IMPORTANT: read my agent code first to understand what it does and generate a dataset that matches its actual purpose."
           ),
           scenario.agent(),
           (state) => {
@@ -103,9 +103,16 @@ describe("Evaluations Skill", () => {
 
             const fileContents = newFiles
               .map((f) => fs.readFileSync(f, "utf8"))
-              .join("\n");
+              .join("\n")
+              .toLowerCase();
 
             expect(fileContents).toContain("langwatch");
+
+            // Verify the dataset is NOT generic — should NOT have trivia-style examples
+            expect(
+              fileContents,
+              "Dataset should not contain generic trivia like 'capital of france' — it should be specific to the tweet-like emoji bot"
+            ).not.toMatch(/capital of france|what is 2 ?\+ ?2|quantum computing|photosynthesis/);
           },
           scenario.judge(),
         ],

@@ -210,7 +210,17 @@ Create test datasets for experiments.
 | Customer support | Support tickets and customer questions |
 | Summarizer | Documents with expected summaries |
 
-CRITICAL: The dataset must be specific to what the agent ACTUALLY does. Do NOT use generic examples like "What is 2+2?". Study the system prompt, function signatures, and domain context.
+CRITICAL: The dataset MUST be specific to what the agent ACTUALLY does. Before generating any data:
+1. Read the agent's system prompt word by word
+2. Read the agent's function signatures and tool definitions
+3. Understand the agent's domain, persona, and constraints
+
+Then generate data that reflects EXACTLY this agent's real-world usage. For example:
+- If the system prompt says "respond in tweet-like format with emojis" → your dataset inputs should be things users would ask this specific bot, and expected outputs should be short emoji-laden responses
+- If the agent is a SQL assistant → your dataset should have natural language queries with expected SQL
+- If the agent handles refunds → your dataset should have refund scenarios
+
+NEVER use generic examples like "What is 2+2?", "What is the capital of France?", or "Explain quantum computing". These are useless for evaluating the specific agent. Every single example must be something a real user of THIS specific agent would actually say.
 
 3. For programmatic dataset access: `https://langwatch.ai/docs/datasets/programmatic-access.md`
 4. For AI-generated datasets: `https://langwatch.ai/docs/datasets/ai-dataset-generation.md`
