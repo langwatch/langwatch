@@ -25,7 +25,13 @@ import { createExperimentRunEsSyncReactor } from "./pipelines/experiment-run-pro
 import { createSimulationProcessingPipeline } from "./pipelines/simulation-processing/pipeline";
 import { createSimulationRunStateFoldStore } from "./pipelines/simulation-processing/projections/simulationRunState.store";
 import { createSnapshotUpdateBroadcastReactor } from "./pipelines/simulation-processing/reactors/snapshotUpdateBroadcast";
+import { createScenarioExecutionReactor } from "./pipelines/simulation-processing/reactors/scenarioExecution.reactor";
 import { createSuiteRunSyncReactor } from "./pipelines/simulation-processing/reactors/suiteRunSync.reactor";
+import { createScenarioExecutionQueue, type ScenarioExecutionQueueProcessor } from "../scenarios/execution/scenario-execution.queue";
+import { createScenarioExecutionHandler } from "../scenarios/execution/scenario-execution.handler";
+import { ScenarioExecutor } from "../scenarios/execution/scenario-executor";
+import { startStallDetection } from "../scenarios/execution/stall-detection";
+import { createTenantId } from "./domain/tenantId";
 import {
   SimulationRunStateRepositoryClickHouse,
   SimulationRunStateRepositoryMemory,
@@ -302,14 +308,80 @@ export class PipelineRegistry {
       completeSuiteRunItem: suiteRunCommands.completeSuiteRunItem,
     });
 
-    return this.deps.eventSourcing.register(
+    // Create scenario execution queue + reactor (requires Redis)
+    let scenarioExecutionReactor: ReturnType<typeof createScenarioExecutionReactor> | undefined;
+    const redis = this.deps.eventSourcing.redisConnection;
+    if (redis) {
+      // Late-bound finishRun dispatcher — set after pipeline registration
+      let finishRunDispatcher: ((data: any) => Promise<void>) | null = null;
+
+      const executor = new ScenarioExecutor();
+      const handler = createScenarioExecutionHandler({
+        executor,
+        getFoldState: async ({ tenantId, scenarioRunId }) => {
+          const projection = await repository.getProjection(scenarioRunId, { tenantId: createTenantId(tenantId) });
+          return projection?.data as import("./pipelines/simulation-processing/projections/simulationRunState.foldProjection").SimulationRunStateData | null ?? null;
+        },
+        dispatchFinishRun: async (data) => {
+          if (!finishRunDispatcher) {
+            throw new Error("finishRun dispatcher not yet initialized — pipeline registration order issue");
+          }
+          return finishRunDispatcher(data);
+        },
+      });
+
+      const executionQueue = createScenarioExecutionQueue({
+        redis,
+        handler,
+        consumerEnabled: this.deps.eventSourcing.redisConnection != null,
+      });
+
+      // Register for graceful shutdown
+      this._scenarioExecutionQueue = executionQueue;
+      this._scenarioExecutor = executor;
+
+      scenarioExecutionReactor = createScenarioExecutionReactor({
+        executionQueue,
+      });
+
+      // Wire finishRun dispatcher after pipeline registration (see below)
+      this._finishRunDispatcherSetter = (dispatch: (data: any) => Promise<void>) => {
+        finishRunDispatcher = dispatch;
+      };
+    }
+
+    const pipeline = this.deps.eventSourcing.register(
       createSimulationProcessingPipeline({
         simulationRunStore,
         snapshotUpdateBroadcastReactor,
         suiteRunSyncReactor,
+        scenarioExecutionReactor,
       }),
     );
+
+    // Wire the late-bound finishRun dispatcher
+    if (this._finishRunDispatcherSetter) {
+      const simCommands = mapCommands(pipeline.commands);
+      this._finishRunDispatcherSetter(simCommands.finishRun);
+      this._finishRunDispatcherSetter = undefined;
+
+      // Start stall detection (worker-only, needs ClickHouse)
+      if (this.deps.clickhouse) {
+        this._stallDetection = startStallDetection({
+          clickhouse: this.deps.clickhouse,
+          dispatchFinishRun: simCommands.finishRun,
+        });
+      }
+    }
+
+    return pipeline;
   }
+
+  // Internal state for scenario execution wiring
+  private _scenarioExecutionQueue?: ScenarioExecutionQueueProcessor;
+  private _scenarioExecutor?: ScenarioExecutor;
+  private _stallDetection?: { close: () => void };
+  private _finishRunDispatcherSetter?: (dispatch: (data: any) => Promise<void>) => void;
 
   private registerBillingReportingPipeline() {
     const ReportUsageForMonthCommand = createReportUsageForMonthCommandClass({
@@ -349,6 +421,32 @@ export class PipelineRegistry {
         }),
       }),
     );
+  }
+
+  /**
+   * Returns closeables for graceful shutdown of scenario execution infrastructure.
+   */
+  getScenarioExecutionCloseables(): Array<{ name: string; close: () => Promise<void> }> {
+    const closeables: Array<{ name: string; close: () => Promise<void> }> = [];
+    if (this._scenarioExecutionQueue) {
+      closeables.push({
+        name: "scenarioExecutionQueue",
+        close: () => this._scenarioExecutionQueue!.close(),
+      });
+    }
+    if (this._scenarioExecutor) {
+      closeables.push({
+        name: "scenarioExecutor",
+        close: () => this._scenarioExecutor!.shutdown(),
+      });
+    }
+    if (this._stallDetection) {
+      closeables.push({
+        name: "stallDetection",
+        close: async () => this._stallDetection!.close(),
+      });
+    }
+    return closeables;
   }
 }
 

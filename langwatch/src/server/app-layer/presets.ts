@@ -313,6 +313,11 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     close: () => prisma.$disconnect(),
   });
 
+  // Register scenario execution closeables for graceful shutdown
+  for (const closeable of registry.getScenarioExecutionCloseables()) {
+    gracefulCloseables.push(closeable);
+  }
+
   const notifications = NotificationService.create({
     config: {
       baseHost: config.baseHost,
