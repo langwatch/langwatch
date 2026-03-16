@@ -2,14 +2,18 @@
  * Router for cancelling scenario jobs and batch runs.
  *
  * Active jobs: cancel signal via Redis pub/sub → worker handles via AbortSignal.
- * Queued jobs: removed from BullMQ + cancellation event written to ES
- * (since no worker will ever process them).
+ * Queued jobs: removed from BullMQ + cancellation event written to both ES
+ * and ClickHouse (via event-sourcing finishRun command).
+ *
+ * The event-sourcing reactor handles SSE broadcast automatically,
+ * so cancelled status appears in the UI without a page refresh.
  *
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
 
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import type { CancellationServiceDeps } from "~/server/scenarios/cancellation";
 import { ScenarioCancellationService } from "~/server/scenarios/cancellation";
 import { publishCancellation } from "~/server/scenarios/cancellation-channel";
 import { scenarioQueue } from "~/server/scenarios/scenario.queue";
@@ -61,31 +65,45 @@ function createPublishCancellation() {
     : () => Promise.resolve();
 }
 
-function createService() {
+/**
+ * Saves cancellation event to both ES (legacy) and ClickHouse (event-sourcing).
+ *
+ * The event-sourcing finishRun command triggers a reactor that broadcasts
+ * an SSE event, so the UI updates without a page refresh.
+ */
+function createSaveScenarioEvent(): CancellationServiceDeps["saveScenarioEvent"] {
   const facade = SimulationFacade.create();
+
+  return async (event) => {
+    // Write to ES for backwards compatibility
+    await facade.saveScenarioEvent(event);
+
+    // Dispatch to event-sourcing so ClickHouse gets the CANCELLED status
+    // and the reactor broadcasts an SSE update to connected clients.
+    try {
+      await getApp().simulations.finishRun({
+        tenantId: event.projectId,
+        scenarioRunId: event.scenarioRunId,
+        status: event.status,
+        results: undefined,
+        occurredAt: event.timestamp,
+      });
+    } catch (err) {
+      logger.warn(
+        { err, scenarioRunId: event.scenarioRunId },
+        "Failed to dispatch finishRun to event-sourcing (ES write succeeded)",
+      );
+    }
+  };
+}
+
+function createService() {
   return new ScenarioCancellationService({
     queue: scenarioQueue,
     publishCancellation: createPublishCancellation(),
     getQueuedJobs,
-    saveScenarioEvent: (event) => facade.saveScenarioEvent(event),
+    saveScenarioEvent: createSaveScenarioEvent(),
   });
-}
-
-async function broadcastCancellation(
-  projectId: string,
-  scenarioRunId?: string,
-  batchRunId?: string,
-) {
-  try {
-    const payload = JSON.stringify({
-      event: "simulation_updated",
-      scenarioRunId,
-      batchRunId,
-    });
-    await getApp().broadcast.broadcastToTenant(projectId, payload, "simulation_updated");
-  } catch (err) {
-    logger.warn({ err, projectId }, "Failed to broadcast cancellation event");
-  }
 }
 
 export const cancellationRouter = createTRPCRouter({
@@ -98,13 +116,7 @@ export const cancellationRouter = createTRPCRouter({
         "Cancel job request received",
       );
 
-      const result = await createService().cancelJob(input);
-
-      if (result.cancelled) {
-        await broadcastCancellation(input.projectId, input.scenarioRunId, input.batchRunId);
-      }
-
-      return result;
+      return createService().cancelJob(input);
     }),
 
   cancelBatchRun: protectedProcedure
@@ -116,12 +128,6 @@ export const cancellationRouter = createTRPCRouter({
         "Cancel batch run request received",
       );
 
-      const result = await createService().cancelBatchRun(input);
-
-      if (result.cancelledCount > 0) {
-        await broadcastCancellation(input.projectId, undefined, input.batchRunId);
-      }
-
-      return result;
+      return createService().cancelBatchRun(input);
     }),
 });
