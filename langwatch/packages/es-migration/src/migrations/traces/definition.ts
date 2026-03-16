@@ -12,8 +12,6 @@ import {
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
   TOPIC_ASSIGNED_EVENT_TYPE,
   TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
-  SATISFACTION_SCORE_ASSIGNED_EVENT_TYPE,
-  SATISFACTION_SCORE_ASSIGNED_EVENT_VERSION_LATEST,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants.js";
 import { createTraceSummaryFoldProjection } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection.js";
 import { createSpanStorageMapProjection } from "~/server/event-sourcing/pipelines/trace-processing/projections/spanStorage.mapProjection.js";
@@ -25,7 +23,7 @@ import type {
   ElasticSearchEvent,
 } from "~/server/tracer/types.js";
 import type { EsHit, MigrationDefinition, DirectWriteResult } from "../../lib/types.js";
-import { esSpanToOtlp, esEventToOtlpSpan } from "./esSpanToOtlp.js";
+import { esSpanToOtlp, esEventToOtlpEvent } from "./esSpanToOtlp.js";
 
 type EsTraceDoc = ElasticSearchTrace & EsHit;
 
@@ -135,30 +133,19 @@ export function createTraceMigrationDefinition(
         allEvents.push(event);
       }
 
-      // 2. Convert ES events → SpanReceivedEvents (as OTLP spans)
+      // 2. Attach ES trace-level events to the first span
+      // ES events (thumbs_up_down, add_to_cart, etc.) are trace-scoped and have
+      // no span_id. In OTLP, events belong to spans, so we attach them to the
+      // first span. If there are no spans, we skip them.
       const esEvents = doc.events ?? [];
-      for (const esEvent of esEvents) {
-        const otlpSpan = esEventToOtlpSpan(esEvent as ElasticSearchEvent, traceId);
-        const event = EventUtils.createEvent<SpanReceivedEvent>({
-          aggregateType: "trace" as any,
-          aggregateId: traceId,
-          tenantId: tenantId as any,
-          type: SPAN_RECEIVED_EVENT_TYPE,
-          version: SPAN_RECEIVED_EVENT_VERSION_LATEST,
-          data: {
-            span: otlpSpan,
-            resource,
-            instrumentationScope: null,
-            piiRedactionLevel: "DISABLED",
-          },
-          metadata: {
-            spanId: (esEvent as ElasticSearchEvent).event_id,
-            traceId,
-          },
-          occurredAt,
-          idempotencyKey: `${tenantId}:${traceId}:${(esEvent as ElasticSearchEvent).event_id}`,
-        });
-        allEvents.push(event);
+      if (esEvents.length > 0 && allEvents.length > 0) {
+        const firstSpanEvent = allEvents[0]! as SpanReceivedEvent;
+        const firstOtlpSpan = firstSpanEvent.data.span;
+        for (const esEvent of esEvents) {
+          firstOtlpSpan.events.push(
+            esEventToOtlpEvent(esEvent as ElasticSearchEvent),
+          );
+        }
       }
 
       // 3. Topic assignment event (if present in metadata)
@@ -180,23 +167,6 @@ export function createTraceMigrationDefinition(
           idempotencyKey: `${tenantId}:${traceId}:topic`,
         });
         allEvents.push(topicEvent);
-      }
-
-      // 4. Satisfaction score event (if present in input)
-      if (doc.input?.satisfaction_score != null) {
-        const satisfactionEvent = EventUtils.createEvent({
-          aggregateType: "trace" as any,
-          aggregateId: traceId,
-          tenantId: tenantId as any,
-          type: SATISFACTION_SCORE_ASSIGNED_EVENT_TYPE,
-          version: SATISFACTION_SCORE_ASSIGNED_EVENT_VERSION_LATEST,
-          data: {
-            satisfactionScore: doc.input.satisfaction_score,
-          },
-          occurredAt,
-          idempotencyKey: `${tenantId}:${traceId}:satisfaction`,
-        });
-        allEvents.push(satisfactionEvent);
       }
 
       // Compute fold projection (TraceSummary) in memory

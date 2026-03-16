@@ -13,8 +13,6 @@ import {
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
   TOPIC_ASSIGNED_EVENT_TYPE,
   TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
-  SATISFACTION_SCORE_ASSIGNED_EVENT_TYPE,
-  SATISFACTION_SCORE_ASSIGNED_EVENT_VERSION_LATEST,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants.js";
 import { createTraceSummaryFoldProjection } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection.js";
 import { createSpanStorageMapProjection } from "~/server/event-sourcing/pipelines/trace-processing/projections/spanStorage.mapProjection.js";
@@ -41,7 +39,7 @@ import type {
   ElasticSearchEvent,
 } from "~/server/tracer/types.js";
 import type { EsHit, MigrationDefinition, DirectWriteResult } from "../../lib/types.js";
-import { esSpanToOtlp, esEventToOtlpSpan } from "../traces/esSpanToOtlp.js";
+import { esSpanToOtlp, esEventToOtlpEvent } from "../traces/esSpanToOtlp.js";
 
 type EsTraceDoc = ElasticSearchTrace & EsHit;
 
@@ -155,30 +153,19 @@ export function createCombinedTraceMigrationDefinition(
         traceEvents.push(event);
       }
 
-      // ── 2. Convert ES events → SpanReceivedEvents (as OTLP spans) ──
+      // ── 2. Attach ES trace-level events to the first span ──
+      // ES events (thumbs_up_down, add_to_cart, etc.) are trace-scoped and have
+      // no span_id. In OTLP, events belong to spans, so we attach them to the
+      // first span. If there are no spans, we skip them.
       const esEvents = doc.events ?? [];
-      for (const esEvent of esEvents) {
-        const otlpSpan = esEventToOtlpSpan(esEvent as ElasticSearchEvent, traceId);
-        const event = EventUtils.createEvent<SpanReceivedEvent>({
-          aggregateType: "trace" as any,
-          aggregateId: traceId,
-          tenantId: tenantId as any,
-          type: SPAN_RECEIVED_EVENT_TYPE,
-          version: SPAN_RECEIVED_EVENT_VERSION_LATEST,
-          data: {
-            span: otlpSpan,
-            resource,
-            instrumentationScope: null,
-            piiRedactionLevel: "DISABLED",
-          },
-          metadata: {
-            spanId: (esEvent as ElasticSearchEvent).event_id,
-            traceId,
-          },
-          occurredAt,
-          idempotencyKey: `${tenantId}:${traceId}:${(esEvent as ElasticSearchEvent).event_id}`,
-        });
-        traceEvents.push(event);
+      if (esEvents.length > 0 && traceEvents.length > 0) {
+        const firstSpanEvent = traceEvents[0]! as SpanReceivedEvent;
+        const firstOtlpSpan = firstSpanEvent.data.span;
+        for (const esEvent of esEvents) {
+          firstOtlpSpan.events.push(
+            esEventToOtlpEvent(esEvent as ElasticSearchEvent),
+          );
+        }
       }
 
       // ── 3. Topic assignment event ──
@@ -202,24 +189,7 @@ export function createCombinedTraceMigrationDefinition(
         traceEvents.push(topicEvent);
       }
 
-      // ── 4. Satisfaction score event ──
-      if (doc.input?.satisfaction_score != null) {
-        const satisfactionEvent = EventUtils.createEvent({
-          aggregateType: "trace" as any,
-          aggregateId: traceId,
-          tenantId: tenantId as any,
-          type: SATISFACTION_SCORE_ASSIGNED_EVENT_TYPE,
-          version: SATISFACTION_SCORE_ASSIGNED_EVENT_VERSION_LATEST,
-          data: {
-            satisfactionScore: doc.input.satisfaction_score,
-          },
-          occurredAt,
-          idempotencyKey: `${tenantId}:${traceId}:satisfaction`,
-        });
-        traceEvents.push(satisfactionEvent);
-      }
-
-      // ── 5. Compute trace fold projection (TraceSummary) ──
+      // ── 4. Compute trace fold projection (TraceSummary) ──
       let traceSummaryState = traceFoldProjection.init();
       traceSummaryState = {
         ...traceSummaryState,
@@ -232,7 +202,7 @@ export function createCombinedTraceMigrationDefinition(
         );
       }
 
-      // ── 6. Compute map projection (NormalizedSpan) ──
+      // ── 5. Compute map projection (NormalizedSpan) ──
       const normalizedSpans: NormalizedSpan[] = [];
       for (const event of traceEvents) {
         if (event.type === SPAN_RECEIVED_EVENT_TYPE) {
@@ -243,7 +213,7 @@ export function createCombinedTraceMigrationDefinition(
         }
       }
 
-      // ── 7. Process evaluations ──
+      // ── 6. Process evaluations ──
       const evalEvents: Event[] = [];
       const evalProjectionWrites: Array<() => Promise<void>> = [];
 
@@ -340,7 +310,7 @@ export function createCombinedTraceMigrationDefinition(
         evalEvents.push(...evalEventsForThis);
       }
 
-      // ── 8. Build combined results ──
+      // ── 7. Build combined results ──
       const allEvents = [...traceEvents, ...evalEvents];
       const eventRecords = allEvents.map(eventToRecord);
 

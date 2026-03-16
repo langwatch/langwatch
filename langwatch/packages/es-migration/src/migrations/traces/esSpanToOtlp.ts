@@ -145,15 +145,16 @@ export function esSpanToOtlp(
   };
 }
 
-// ----------- ES event → OTLP span -----------
+// ----------- ES event → OTLP span event -----------
 
-export function esEventToOtlpSpan(
+/**
+ * Convert an ES trace-level event into an OTLP span event.
+ * These get attached to an existing span (typically the first span)
+ * rather than creating a standalone span.
+ */
+export function esEventToOtlpEvent(
   event: ElasticSearchEvent,
-  traceId: string,
-): OtlpSpan {
-  const startNano = msToNano(event.timestamps.started_at);
-
-  // Build attributes from metrics and event_details
+): OtlpSpan["events"][number] {
   const attrs: OtlpKeyValue[] = [];
   if (event.metrics) {
     for (const { key, value } of event.metrics) {
@@ -166,25 +167,9 @@ export function esEventToOtlpSpan(
     }
   }
 
-  // Mark this as an event span
-  attrs.push({ key: "langwatch.span.type", value: { stringValue: "event" } });
-
   return {
-    traceId,
-    spanId: event.event_id,
-    traceState: null,
-    parentSpanId: null,
+    timeUnixNano: msToNano(event.timestamps.started_at),
     name: event.event_type,
-    kind: ESpanKind.SPAN_KIND_INTERNAL,
-    startTimeUnixNano: startNano,
-    endTimeUnixNano: startNano, // Instant span
     attributes: attrs,
-    events: [],
-    links: [],
-    status: { code: 0, message: null },
-    flags: null,
-    droppedAttributesCount: 0,
-    droppedEventsCount: 0,
-    droppedLinksCount: 0,
   };
 }
