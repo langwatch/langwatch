@@ -82,7 +82,7 @@ describe("<ExportProgress/>", () => {
       );
 
       expect(
-        screen.getByText("Exported 500 of 500 traces...")
+        screen.getByText("Exported 500 traces")
       ).toBeInTheDocument();
     });
   });

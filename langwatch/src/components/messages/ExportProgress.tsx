@@ -1,5 +1,5 @@
 import { Box, Button, HStack, Progress, Text, VStack } from "@chakra-ui/react";
-import { X } from "lucide-react";
+import { Check, X } from "lucide-react";
 
 interface ExportProgressProps {
   exported: number;
@@ -19,28 +19,44 @@ export function ExportProgress({
   }
 
   const percentage = total > 0 ? Math.round((exported / total) * 100) : 0;
+  const isDone = total > 0 && exported >= total;
 
   return (
     <Box
       padding={4}
       borderRadius="lg"
       border="1px solid"
-      borderColor="gray.200"
+      borderColor={isDone ? "green.200" : "gray.200"}
       background="bg.panel"
+      boxShadow="lg"
     >
       <VStack align="stretch" gap={2}>
         <HStack justify="space-between">
-          <Text fontSize="sm">
-            Exported {exported} of {total} traces...
-          </Text>
-          {onCancel && (
+          {isDone ? (
+            <HStack gap={2}>
+              <Check size={14} color="green" />
+              <Text fontSize="sm" color="green.600">
+                Exported {total} traces
+              </Text>
+            </HStack>
+          ) : (
+            <Text fontSize="sm">
+              {total > 0
+                ? `Exported ${exported} of ${total} traces...`
+                : "Preparing export..."}
+            </Text>
+          )}
+          {!isDone && onCancel && (
             <Button variant="ghost" size="xs" onClick={onCancel}>
               <X size={14} />
               Cancel
             </Button>
           )}
         </HStack>
-        <Progress.Root value={percentage}>
+        <Progress.Root
+          value={percentage}
+          colorPalette={isDone ? "green" : "orange"}
+        >
           <Progress.Track>
             <Progress.Range />
           </Progress.Track>

@@ -287,13 +287,9 @@ export function useExportTraces({
 
           triggerBlobDownload({ blob, filename });
 
-          // If SSE never connected or finished early, set exported = total
-          setProgress((prev) => ({ ...prev, exported: prev.total }));
-
-          // Wait for SSE to finish as well (non-blocking, already caught)
-          if (progressPromise) {
-            await progressPromise;
-          }
+          // Download complete — abort SSE (fire-and-forget, don't wait)
+          // The SSE may have already finished or may hang if it missed "done"
+          abortController.abort();
         })
         .catch((error: unknown) => {
           if (error instanceof Error && error.name === "AbortError") {
@@ -308,11 +304,14 @@ export function useExportTraces({
           });
         });
 
-      // When complete, clean up
+      // When download completes, show "done" state briefly then hide
       void exportPromise.then(() => {
-        if (!abortController.signal.aborted) {
+        setProgress((prev) => ({ ...prev, exported: prev.total }));
+        // Brief flash of "complete" state before hiding
+        setTimeout(() => {
           setIsExporting(false);
-        }
+          setProgress({ exported: 0, total: 0 });
+        }, 1500);
       });
     },
     [projectId, filters, startDate, endDate, query, selectedTraceIds]
