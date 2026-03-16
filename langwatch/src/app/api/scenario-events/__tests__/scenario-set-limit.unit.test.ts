@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
-import { Hono } from "hono";
 import { ScenarioSetLimitExceededError } from "~/server/app-layer/usage/errors";
 import { ScenarioEventType } from "~/server/scenarios/scenario-event.enums";
 
