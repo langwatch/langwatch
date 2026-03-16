@@ -10,10 +10,8 @@ import {
   prefetchScenarioData,
 } from "~/server/scenarios/execution/data-prefetcher";
 import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
-import {
-  generateBatchRunId,
-  scheduleScenarioRun,
-} from "~/server/scenarios/scenario.queue";
+import { generateBatchRunId, generateScenarioRunId } from "~/server/scenarios/scenario.queue";
+import { getApp } from "~/server/app-layer/app";
 import { createLogger } from "~/utils/logger/server";
 import { checkProjectPermission } from "../../rbac";
 import { projectSchema } from "./schemas";
@@ -84,30 +82,34 @@ export const simulationRunnerRouter = createTRPCRouter({
         });
       }
 
+      const scenarioRunId = generateScenarioRunId();
+
       logger.info(
         {
           projectId: input.projectId,
           scenarioId: input.scenarioId,
           batchRunId,
+          scenarioRunId,
         },
-        "Scheduling scenario execution",
+        "Dispatching scenario execution via ES",
       );
 
-      const job = await scheduleScenarioRun({
-        projectId: input.projectId,
+      await getApp().simulations.queueRun({
+        tenantId: input.projectId,
+        scenarioRunId,
         scenarioId: input.scenarioId,
-        target: input.target,
-        setId,
         batchRunId,
-        index: 0,
+        scenarioSetId: setId,
+        target: input.target,
+        occurredAt: Date.now(),
       });
 
-      logger.info({ jobId: job.id, batchRunId }, "Scenario scheduled");
+      logger.info({ scenarioRunId, batchRunId }, "Scenario queued");
 
       // Return honest response: job was scheduled, not executed
       return {
         scheduled: true,
-        jobId: job.id,
+        jobId: scenarioRunId,
         setId,
         batchRunId,
       };

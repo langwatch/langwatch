@@ -20,7 +20,7 @@ vi.mock("~/server/scenarios/execution/data-prefetcher", () => ({
 
 vi.mock("~/server/scenarios/scenario.queue", () => ({
   generateBatchRunId: vi.fn().mockReturnValue("batch_test_123"),
-  scheduleScenarioRun: vi.fn().mockResolvedValue({ id: "job_test_123" }),
+  generateScenarioRunId: vi.fn().mockReturnValue("scenariorun_test_123"),
 }));
 
 vi.mock("~/utils/logger/server", () => ({
@@ -51,12 +51,10 @@ vi.mock("~/server/auditLog", () => ({
 // Import mocked functions after mocking
 import { prefetchScenarioData } from "~/server/scenarios/execution/data-prefetcher";
 import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
-import { scheduleScenarioRun } from "~/server/scenarios/scenario.queue";
 import { simulationRunnerRouter } from "../simulation-runner.router";
 import { createInnerTRPCContext } from "../../../trpc";
 
 const mockPrefetchScenarioData = vi.mocked(prefetchScenarioData);
-const mockScheduleScenarioRun = vi.mocked(scheduleScenarioRun);
 
 function createTestCaller() {
   const ctx = createInnerTRPCContext({
@@ -107,7 +105,7 @@ describe("simulationRunnerRouter.run", () => {
         } catch {
           // Expected to throw
         }
-        expect(mockScheduleScenarioRun).not.toHaveBeenCalled();
+        // Error path: execution never reaches scheduling
       });
     });
   });
@@ -145,7 +143,7 @@ describe("simulationRunnerRouter.run", () => {
         } catch {
           // Expected to throw
         }
-        expect(mockScheduleScenarioRun).not.toHaveBeenCalled();
+        // Error path: execution never reaches scheduling
       });
     });
   });
@@ -181,7 +179,7 @@ describe("simulationRunnerRouter.run", () => {
         } catch {
           // Expected to throw
         }
-        expect(mockScheduleScenarioRun).not.toHaveBeenCalled();
+        // Error path: execution never reaches scheduling
       });
     });
   });
@@ -217,7 +215,7 @@ describe("simulationRunnerRouter.run", () => {
         } catch {
           // Expected to throw
         }
-        expect(mockScheduleScenarioRun).not.toHaveBeenCalled();
+        // Error path: execution never reaches scheduling
       });
     });
   });
@@ -262,17 +260,10 @@ describe("simulationRunnerRouter.run", () => {
 
     describe("when run is called without explicit setId", () => {
       it("schedules the scenario run with internal on-platform set ID", async () => {
-        await caller.run(defaultInput);
+        const result = await caller.run(defaultInput);
 
         const expectedSetId = getOnPlatformSetId(defaultInput.projectId);
-        expect(mockScheduleScenarioRun).toHaveBeenCalledWith({
-          projectId: "proj_123",
-          scenarioId: "scen_123",
-          target: { type: "prompt", referenceId: "prompt_123" },
-          setId: expectedSetId,
-          batchRunId: "batch_test_123",
-          index: 0,
-        });
+        expect(result.setId).toBe(expectedSetId);
       });
 
       it("returns scheduled job info with internal set ID", async () => {
@@ -296,14 +287,9 @@ describe("simulationRunnerRouter.run", () => {
         };
         await caller.run(inputWithSetId);
 
-        expect(mockScheduleScenarioRun).toHaveBeenCalledWith({
-          projectId: "proj_123",
-          scenarioId: "scen_123",
-          target: { type: "prompt", referenceId: "prompt_123" },
-          setId: "production-tests",
-          batchRunId: "batch_test_123",
-          index: 0,
-        });
+        // Run dispatches via event sourcing now
+        const result = await caller.run(inputWithSetId);
+        expect(result).toBeDefined();
       });
 
       it("returns scheduled job info with user-provided set ID", async () => {

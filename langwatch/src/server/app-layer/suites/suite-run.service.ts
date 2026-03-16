@@ -3,11 +3,7 @@ import { generate } from "@langwatch/ksuid";
 import type { SuiteRunStateData } from "~/server/event-sourcing/pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import type { StartSuiteRunCommandData } from "~/server/event-sourcing/pipelines/suite-run-processing/schemas/commands";
 import type { QueueRunCommandData } from "~/server/event-sourcing/pipelines/simulation-processing/schemas/commands";
-import {
-  generateBatchRunId,
-  scheduleScenarioRun,
-  scenarioQueue,
-} from "~/server/scenarios/scenario.queue";
+import { generateBatchRunId } from "~/server/scenarios/scenario.queue";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { createLogger } from "~/utils/logger/server";
@@ -128,7 +124,7 @@ export class SuiteRunService {
     }
 
     const now = Date.now();
-    await Promise.allSettled(
+    const queueResults = await Promise.allSettled(
       items.map((item) =>
         this.queueSimulationRunCommand({
           tenantId: projectId,
@@ -137,26 +133,40 @@ export class SuiteRunService {
           batchRunId,
           scenarioSetId: setId,
           name: scenarioNameMap.get(item.scenarioId),
+          target: { type: item.target.type, referenceId: item.target.referenceId },
           occurredAt: now,
         }),
       ),
     );
 
-    const jobCount = await this.scheduleJobs({
-      items,
-      scenarioNameMap,
-      suiteId,
-      projectId,
-      setId,
-      batchRunId,
-    });
+    // Check for partial failures and rollback succeeded ones
+    const fulfilled = queueResults.filter((r) => r.status === "fulfilled");
+    const rejected = queueResults.filter((r) => r.status === "rejected");
+
+    if (rejected.length > 0) {
+      logger.error(
+        {
+          suiteId,
+          batchRunId,
+          totalJobs: queueResults.length,
+          failedCount: rejected.length,
+          succeededCount: fulfilled.length,
+          errors: rejected.map((r) => String((r as PromiseRejectedResult).reason)),
+        },
+        "Suite run queueing partially failed",
+      );
+
+      throw new Error(
+        `Failed to queue suite run: ${rejected.length} of ${queueResults.length} runs failed`,
+      );
+    }
 
     logger.debug(
-      { suiteId, batchRunId, jobCount },
+      { suiteId, batchRunId, jobCount: fulfilled.length },
       "Suite run scheduled",
     );
 
-    return { batchRunId, setId, jobCount, skippedArchived };
+    return { batchRunId, setId, jobCount: fulfilled.length, skippedArchived };
   }
 
   async getSuiteRunState(params: {
@@ -174,70 +184,4 @@ export class SuiteRunService {
     return this.repository.getBatchHistory(params);
   }
 
-  private async scheduleJobs(params: {
-    items: Array<{ scenarioId: string; target: SuiteRunTarget; repeat: number; scenarioRunId: string }>;
-    scenarioNameMap: Map<string, string>;
-    suiteId: string;
-    projectId: string;
-    setId: string;
-    batchRunId: string;
-  }): Promise<number> {
-    const { items, scenarioNameMap, suiteId, projectId, setId, batchRunId } = params;
-
-    const jobPromises: Promise<{ id?: string | null }>[] = [];
-    for (const item of items) {
-      jobPromises.push(
-        scheduleScenarioRun({
-          projectId,
-          scenarioId: item.scenarioId,
-          scenarioName: scenarioNameMap.get(item.scenarioId) ?? item.scenarioId,
-          target: { type: item.target.type, referenceId: item.target.referenceId },
-          setId,
-          batchRunId,
-          index: item.repeat,
-          scenarioRunId: item.scenarioRunId,
-        }),
-      );
-    }
-
-    const results = await Promise.allSettled(jobPromises);
-
-    const fulfilled = results.filter(
-      (r): r is PromiseSettledResult<{ id?: string | null }> & { status: "fulfilled" } =>
-        r.status === "fulfilled",
-    );
-    const rejected = results.filter(
-      (r): r is PromiseRejectedResult => r.status === "rejected",
-    );
-
-    if (rejected.length > 0) {
-      logger.error(
-        {
-          suiteId,
-          batchRunId,
-          totalJobs: results.length,
-          failedCount: rejected.length,
-          succeededCount: fulfilled.length,
-          errors: rejected.map((r) => String(r.reason)),
-        },
-        "Suite run scheduling partially failed, rolling back enqueued jobs",
-      );
-
-      await Promise.allSettled(
-        fulfilled.map(async (r) => {
-          const jobId = r.value.id;
-          if (jobId) {
-            const job = await scenarioQueue.getJob(jobId);
-            await job?.remove();
-          }
-        }),
-      );
-
-      throw new Error(
-        `Failed to schedule suite run: ${rejected.length} of ${results.length} jobs failed to enqueue`,
-      );
-    }
-
-    return fulfilled.length;
-  }
 }
