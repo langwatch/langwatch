@@ -48,7 +48,7 @@ export class InMemoryDspyStepRepository implements DspyStepRepository {
   private readonly store = new Map<string, DspyStepData>();
 
   async upsertStep(data: DspyStepData): Promise<void> {
-    const key = `${data.tenantId}/${data.runId}/${data.stepIndex}`;
+    const key = `${data.tenantId}/${data.experimentId}/${data.runId}/${data.stepIndex}`;
     const existing = this.store.get(key);
 
     if (existing) {
@@ -99,11 +99,11 @@ export class InMemoryDspyStepRepository implements DspyStepRepository {
 
   async getStep(
     tenantId: string,
-    _experimentId: string,
+    experimentId: string,
     runId: string,
     stepIndex: string,
   ): Promise<DspyStepData | null> {
-    return this.store.get(`${tenantId}/${runId}/${stepIndex}`) ?? null;
+    return this.store.get(`${tenantId}/${experimentId}/${runId}/${stepIndex}`) ?? null;
   }
 
   async deleteByExperiment(

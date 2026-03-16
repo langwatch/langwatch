@@ -22,7 +22,7 @@ function makeStep(overrides: Partial<DspyStepData> = {}): DspyStepData {
   };
 }
 
-describe("InMemoryDspyStepRepository", () => {
+describe("given InMemoryDspyStepRepository", () => {
   let repo: InMemoryDspyStepRepository;
 
   beforeEach(() => {

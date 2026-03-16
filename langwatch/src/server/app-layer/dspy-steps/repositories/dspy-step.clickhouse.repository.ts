@@ -245,6 +245,7 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
             AND ExperimentId = {experimentId:String}
             AND RunId = {runId:String}
             AND StepIndex = {stepIndex:String}
+          ORDER BY UpdatedAt DESC
           LIMIT 1
         `,
         query_params: { tenantId, experimentId, runId, stepIndex },
