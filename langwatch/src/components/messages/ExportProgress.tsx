@@ -1,5 +1,13 @@
-import { Box, Button, HStack, Progress, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  HStack,
+  Progress,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { Check, X } from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface ExportProgressProps {
   exported: number;
@@ -14,6 +22,18 @@ export function ExportProgress({
   isExporting,
   onCancel,
 }: ExportProgressProps) {
+  // Animate mount/unmount with a slight delay
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (isExporting) {
+      // Trigger slide-in on next frame so transition applies
+      requestAnimationFrame(() => setVisible(true));
+    } else {
+      setVisible(false);
+    }
+  }, [isExporting]);
+
   if (!isExporting) {
     return null;
   }
@@ -29,6 +49,11 @@ export function ExportProgress({
       borderColor={isDone ? "green.200" : "gray.200"}
       background="bg.panel"
       boxShadow="lg"
+      css={{
+        opacity: visible ? 1 : 0,
+        transform: visible ? "translateY(0)" : "translateY(20px)",
+        transition: "opacity 0.3s ease-out, transform 0.3s ease-out, border-color 0.3s ease",
+      }}
     >
       <VStack align="stretch" gap={2}>
         <HStack justify="space-between">
@@ -56,9 +81,16 @@ export function ExportProgress({
         <Progress.Root
           value={percentage}
           colorPalette={isDone ? "green" : "orange"}
+          css={{
+            transition: "all 0.3s ease",
+          }}
         >
           <Progress.Track>
-            <Progress.Range />
+            <Progress.Range
+              css={{
+                transition: "width 0.5s ease-in-out",
+              }}
+            />
           </Progress.Track>
         </Progress.Root>
       </VStack>
