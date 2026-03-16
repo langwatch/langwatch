@@ -10,10 +10,7 @@ import { DomainError } from "../domain-error";
 export class ScenarioSetLimitExceededError extends DomainError {
   declare readonly kind: "scenario_set_limit_exceeded";
 
-  constructor(
-    public readonly current: number,
-    public readonly max: number,
-  ) {
+  constructor(current: number, max: number) {
     super(
       "scenario_set_limit_exceeded",
       "You have reached the maximum number of scenario sets",

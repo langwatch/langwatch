@@ -191,8 +191,8 @@ describe("scenario-events endpoint integration with scenario set limit", () => {
 
       expect(error.httpStatus).toBe(403);
       expect(error.kind).toBe("scenario_set_limit_exceeded");
-      expect(error.current).toBe(3);
-      expect(error.max).toBe(3);
+      expect(error.meta.current).toBe(3);
+      expect(error.meta.max).toBe(3);
       expect(error.message).toContain("maximum number of scenario sets");
     });
   });

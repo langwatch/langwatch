@@ -287,8 +287,8 @@ describe("UsageService.checkScenarioSetLimit", () => {
       } catch (error) {
         expect(error).toBeInstanceOf(ScenarioSetLimitExceededError);
         const limitError = error as ScenarioSetLimitExceededError;
-        expect(limitError.current).toBe(3);
-        expect(limitError.max).toBe(3);
+        expect(limitError.meta.current).toBe(3);
+        expect(limitError.meta.max).toBe(3);
         expect(limitError.httpStatus).toBe(403);
       }
     });

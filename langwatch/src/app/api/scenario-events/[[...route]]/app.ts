@@ -89,9 +89,9 @@ app.post(
           {
             error: error.kind,
             message: error.message,
-            limitType: "scenarioSets",
-            current: error.current,
-            max: error.max,
+            limitType: error.meta.limitType,
+            current: error.meta.current,
+            max: error.meta.max,
           },
           403,
         );
