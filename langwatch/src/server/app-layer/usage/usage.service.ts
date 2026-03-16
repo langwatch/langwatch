@@ -13,9 +13,6 @@ import { OrganizationRepository } from "../../repositories/organization.reposito
 import { env } from "~/env.mjs";
 import { ScenarioSetLimitExceededError } from "./errors";
 import type { SimulationRunService } from "../simulations/simulation-run.service";
-import { createLogger } from "~/utils/logger/server";
-
-const logger = createLogger("langwatch:usage:scenario-set-limit");
 
 const CACHE_TTL_MS = 30_000; // 30 seconds
 const MAX_FREE_SCENARIO_SETS = 3;
