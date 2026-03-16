@@ -8,7 +8,7 @@
  * Layout: sidebar (search, +New Suite, All Runs, suite list) + main panel.
  */
 
-import { Box, HStack, Skeleton, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 import type { SimulationSuite } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -283,67 +283,91 @@ function SuitesPageContent() {
 
   return (
     <DashboardLayout>
-      <PageLayout.Header>
-        <HStack justify="space-between" align="center" w="full">
-          <PageLayout.Heading>Run Plans</PageLayout.Heading>
-          <Spacer />
-          <PeriodSelector period={period} setPeriod={setPeriod} />
-          <PageLayout.HeaderButton onClick={handleNewSuite}>
-            <Plus size={16} /> New Run Plan
-          </PageLayout.HeaderButton>
-        </HStack>
-      </PageLayout.Header>
-      <HStack w="full" flex={1} alignItems="stretch" gap={0} overflow="hidden">
-        {/* Sidebar */}
-        {isLoading ? (
-          <VStack
-            width="280px"
-            minWidth="280px"
-            padding={4}
-            gap={3}
-            align="stretch"
-          >
-            {Array.from({ length: SKELETON_PLACEHOLDER_COUNT }).map((_, index) => (
-              <Box key={index} data-testid="suite-sidebar-skeleton">
-                <Skeleton height="20px" width="70%" borderRadius="md" />
-                <Skeleton
-                  height="16px"
-                  width="40%"
-                  borderRadius="md"
-                  marginTop={2}
-                />
-              </Box>
-            ))}
-          </VStack>
-        ) : (
-          <SuiteSidebar
-            suites={suites ?? []}
-            selectedSuiteSlug={selectedSuiteSlug}
-            runSummaries={runSummaries}
-            externalSets={externalSets ?? []}
-            onSelectSuite={navigateToSuite}
-            onRunSuite={handleRunSuite}
-            onContextMenu={handleContextMenu}
-          />
-        )}
+      <VStack width="full" height="full" gap={0}>
+        {/* Top row: heading + buttons */}
+        <PageLayout.Header withBorder={false}>
+          <HStack justify="space-between" align="center" w="full">
+            <PageLayout.Heading>Run Plans</PageLayout.Heading>
+            <HStack>
+              <PeriodSelector period={period} setPeriod={setPeriod} />
+              <PageLayout.HeaderButton onClick={handleNewSuite}>
+                <Plus size={16} /> New Run Plan
+              </PageLayout.HeaderButton>
+            </HStack>
+          </HStack>
+        </PageLayout.Header>
 
-        {/* Main Panel */}
-        <Box flex={1} overflow="auto">
-          <MainPanel
-            error={error ?? null}
-            selectedSuiteSlug={selectedSuiteSlug}
-            selectedSuite={selectedSuite}
-            selectedExternalSetId={selectedExternalSetId}
-            isLoading={isLoading}
-            onNewSuite={handleNewSuite}
-            onEditSuite={handleEditSuite}
-            onRunSuite={handleRunSuite}
-            isRunning={runMutation.isPending}
-            period={period}
-            suiteNameMap={suiteNameMap}
-          />
-        </Box>
-      </HStack>
+        {/* Second row: sidebar + content box */}
+        <HStack flex={1} width="full" gap={0} overflow="hidden" minHeight={0}>
+          {/* Sidebar */}
+          {isLoading ? (
+            <VStack
+              width="280px"
+              flexShrink={0}
+              padding={4}
+              gap={3}
+              align="stretch"
+              height="full"
+            >
+              {Array.from({ length: SKELETON_PLACEHOLDER_COUNT }).map((_, index) => (
+                <Box key={index} data-testid="suite-sidebar-skeleton">
+                  <Skeleton height="20px" width="70%" borderRadius="md" />
+                  <Skeleton
+                    height="16px"
+                    width="40%"
+                    borderRadius="md"
+                    marginTop={2}
+                  />
+                </Box>
+              ))}
+            </VStack>
+          ) : (
+            <SuiteSidebar
+              suites={suites ?? []}
+              selectedSuiteSlug={selectedSuiteSlug}
+              runSummaries={runSummaries}
+              externalSets={externalSets ?? []}
+              onSelectSuite={navigateToSuite}
+              onRunSuite={handleRunSuite}
+              onContextMenu={handleContextMenu}
+            />
+          )}
+
+          {/* Content box */}
+          <Box
+            flex={1}
+            height="full"
+            minWidth={0}
+            paddingBottom={3}
+            paddingRight={4}
+          >
+            <Box
+              height="full"
+              width="full"
+              borderRadius="lg"
+              boxShadow="0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1), 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1)"
+              border="1px solid"
+              borderColor="border.muted"
+              background="bg.panel"
+              overflow="auto"
+            >
+              <MainPanel
+                error={error ?? null}
+                selectedSuiteSlug={selectedSuiteSlug}
+                selectedSuite={selectedSuite}
+                selectedExternalSetId={selectedExternalSetId}
+                isLoading={isLoading}
+                onNewSuite={handleNewSuite}
+                onEditSuite={handleEditSuite}
+                onRunSuite={handleRunSuite}
+                isRunning={runMutation.isPending}
+                period={period}
+                suiteNameMap={suiteNameMap}
+              />
+            </Box>
+          </Box>
+        </HStack>
+      </VStack>
 
       {/* Context menu */}
       {contextMenu && (
