@@ -11,6 +11,7 @@ import {
   mapStatus,
   type ClickHouseSimulationRunRow,
 } from "~/server/simulations/simulation-run.mappers";
+import { INTERNAL_SET_PREFIX } from "~/server/scenarios/internal-set-id";
 import type { SimulationRepository } from "./simulation.repository";
 
 const TABLE_NAME = "simulation_runs" as const;
@@ -802,6 +803,32 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     });
     const rows = await result.json<{ ScenarioRunId: string }>();
     return rows.map((r) => r.ScenarioRunId);
+  }
+
+  async getDistinctExternalSetIds({
+    projectIds,
+  }: {
+    projectIds: string[];
+  }): Promise<Set<string>> {
+    if (projectIds.length === 0) {
+      return new Set();
+    }
+
+    const rows = await this.queryRows<{ ScenarioSetId: string }>(
+      `SELECT DISTINCT ScenarioSetId
+       FROM (
+         SELECT ScenarioSetId, ArchivedAt
+         FROM ${TABLE_NAME}
+         WHERE TenantId IN ({projectIds:Array(String)})
+           AND NOT startsWith(ScenarioSetId, '${INTERNAL_SET_PREFIX}')
+         ORDER BY ScenarioRunId, UpdatedAt DESC
+         LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+       )
+       WHERE ArchivedAt IS NULL`,
+      { projectIds },
+    );
+
+    return new Set(rows.map((r) => r.ScenarioSetId));
   }
 
   // ---- Cursor helpers ----

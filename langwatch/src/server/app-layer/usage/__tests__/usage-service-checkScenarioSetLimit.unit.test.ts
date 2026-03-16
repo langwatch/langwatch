@@ -6,6 +6,7 @@ import { UsageService } from "../usage.service";
 import { ScenarioSetLimitExceededError } from "../errors";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
+import type { SimulationRunService } from "../../simulations/simulation-run.service";
 
 vi.mock("../../tracing", () => ({
   traced: <T>(instance: T) => instance,
@@ -55,7 +56,10 @@ describe("UsageService.checkScenarioSetLimit", () => {
 
   const mockPlanResolver = vi.fn() as unknown as PlanResolver;
 
-  const mockScenarioSetQuery = vi.fn();
+  const mockGetDistinctExternalSetIds = vi.fn();
+  const mockSimulationRunService: Pick<SimulationRunService, "getDistinctExternalSetIds"> = {
+    getDistinctExternalSetIds: mockGetDistinctExternalSetIds,
+  };
 
   let service: UsageService;
 
@@ -66,21 +70,21 @@ describe("UsageService.checkScenarioSetLimit", () => {
     }
     mockOrgRepo.getPricingModel.mockResolvedValue(null);
     (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue(FREE_PLAN);
-    mockScenarioSetQuery.mockResolvedValue(new Set<string>());
+    mockGetDistinctExternalSetIds.mockResolvedValue(new Set<string>());
     service = new UsageService(
       mockOrgService,
       mockTraceUsageService as never,
       mockEventUsageService as never,
       mockPlanResolver,
       mockOrgRepo as never,
+      mockSimulationRunService,
     );
-    service["queryDistinctExternalScenarioSets"] = mockScenarioSetQuery;
   });
 
   describe("when organization has no existing scenario sets", () => {
     it("allows the first scenario set", async () => {
       vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
-      mockScenarioSetQuery.mockResolvedValue(new Set<string>());
+      mockGetDistinctExternalSetIds.mockResolvedValue(new Set<string>());
 
       await expect(
         service.checkScenarioSetLimit({
@@ -94,7 +98,7 @@ describe("UsageService.checkScenarioSetLimit", () => {
   describe("when organization has 2 existing scenario sets", () => {
     it("allows a third scenario set", async () => {
       vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
-      mockScenarioSetQuery.mockResolvedValue(
+      mockGetDistinctExternalSetIds.mockResolvedValue(
         new Set(["set-a", "set-b"]),
       );
 
@@ -110,7 +114,7 @@ describe("UsageService.checkScenarioSetLimit", () => {
   describe("when organization has 3 existing scenario sets (at limit)", () => {
     beforeEach(() => {
       vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
-      mockScenarioSetQuery.mockResolvedValue(
+      mockGetDistinctExternalSetIds.mockResolvedValue(
         new Set(["set-a", "set-b", "set-c"]),
       );
     });
@@ -137,7 +141,7 @@ describe("UsageService.checkScenarioSetLimit", () => {
   describe("when organization has 4 existing sets from before enforcement", () => {
     it("blocks a new fifth set", async () => {
       vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
-      mockScenarioSetQuery.mockResolvedValue(
+      mockGetDistinctExternalSetIds.mockResolvedValue(
         new Set(["set-a", "set-b", "set-c", "set-d"]),
       );
 
@@ -156,7 +160,7 @@ describe("UsageService.checkScenarioSetLimit", () => {
         PAID_PLAN,
       );
       vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
-      mockScenarioSetQuery.mockResolvedValue(
+      mockGetDistinctExternalSetIds.mockResolvedValue(
         new Set(Array.from({ length: 10 }, (_, i) => `set-${i}`)),
       );
 
@@ -176,7 +180,7 @@ describe("UsageService.checkScenarioSetLimit", () => {
         overrideAddingLimitations: true,
       });
       vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
-      mockScenarioSetQuery.mockResolvedValue(
+      mockGetDistinctExternalSetIds.mockResolvedValue(
         new Set(Array.from({ length: 10 }, (_, i) => `set-${i}`)),
       );
 
@@ -203,7 +207,7 @@ describe("UsageService.checkScenarioSetLimit", () => {
           scenarioSetId: "my-set",
         });
 
-        expect(mockScenarioSetQuery).not.toHaveBeenCalled();
+        expect(mockGetDistinctExternalSetIds).not.toHaveBeenCalled();
         expect(mockOrgService.getProjectIds).not.toHaveBeenCalled();
       });
     });
@@ -211,7 +215,7 @@ describe("UsageService.checkScenarioSetLimit", () => {
     describe("when scenario set is not in cache", () => {
       it("queries the database and caches the result", async () => {
         vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
-        mockScenarioSetQuery.mockResolvedValue(
+        mockGetDistinctExternalSetIds.mockResolvedValue(
           new Set(["existing-set"]),
         );
 
@@ -220,7 +224,7 @@ describe("UsageService.checkScenarioSetLimit", () => {
           scenarioSetId: "new-set",
         });
 
-        expect(mockScenarioSetQuery).toHaveBeenCalledTimes(1);
+        expect(mockGetDistinctExternalSetIds).toHaveBeenCalledTimes(1);
 
         // Second call for same org with now-known set should use cache
         await service.checkScenarioSetLimit({
@@ -229,14 +233,14 @@ describe("UsageService.checkScenarioSetLimit", () => {
         });
 
         // Should NOT query again
-        expect(mockScenarioSetQuery).toHaveBeenCalledTimes(1);
+        expect(mockGetDistinctExternalSetIds).toHaveBeenCalledTimes(1);
       });
     });
 
     describe("when a new set is allowed", () => {
       it("adds the new set ID to the cached set", async () => {
         vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
-        mockScenarioSetQuery.mockResolvedValue(
+        mockGetDistinctExternalSetIds.mockResolvedValue(
           new Set(["existing-set"]),
         );
 
@@ -267,14 +271,14 @@ describe("UsageService.checkScenarioSetLimit", () => {
         }),
       ).resolves.toBeUndefined();
 
-      expect(mockScenarioSetQuery).not.toHaveBeenCalled();
+      expect(mockGetDistinctExternalSetIds).not.toHaveBeenCalled();
     });
   });
 
   describe("when limit is exceeded", () => {
     it("throws ScenarioSetLimitExceededError with correct details", async () => {
       vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
-      mockScenarioSetQuery.mockResolvedValue(
+      mockGetDistinctExternalSetIds.mockResolvedValue(
         new Set(["set-a", "set-b", "set-c"]),
       );
 

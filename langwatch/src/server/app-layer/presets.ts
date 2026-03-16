@@ -179,6 +179,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     eventUsageService,
     planResolver,
     orgRepo,
+    simulationReads,
   );
 
   const planProvider = config.isSaas
@@ -417,6 +418,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       new EventUsageService(),
       async () => FREE_PLAN,
       null,
+      SimulationRunService.create(null),
     ),
     planProvider: PlanProviderService.create({
       getActivePlan: async () => FREE_PLAN,

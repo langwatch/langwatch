@@ -11,9 +11,9 @@ import {
 } from "./usage-meter-policy";
 import { OrganizationRepository } from "../../repositories/organization.repository";
 import { getClickHouseClient } from "../../clickhouse/client";
-import { INTERNAL_SET_PREFIX } from "../../scenarios/internal-set-id";
 import { env } from "~/env.mjs";
 import { ScenarioSetLimitExceededError } from "./errors";
+import type { SimulationRunService } from "../simulations/simulation-run.service";
 
 const CACHE_TTL_MS = 30_000; // 30 seconds
 const MAX_FREE_SCENARIO_SETS = 3;
@@ -45,6 +45,7 @@ export class UsageService {
     private readonly eventUsageService: EventUsageService,
     private readonly planResolver: PlanResolver,
     private readonly organizationRepository: OrganizationRepository | null,
+    private readonly simulationRunService: Pick<SimulationRunService, "getDistinctExternalSetIds">,
   ) {
     this.cache = new TtlCache<number>(CACHE_TTL_MS);
     this.decisionCache = new TtlCache<MeterDecision>(CACHE_TTL_MS);
@@ -85,9 +86,9 @@ export class UsageService {
    * Checks whether the organization may use the given scenario set ID.
    *
    * Known sets (cached) are allowed immediately. Unknown sets trigger a
-   * ClickHouse query to count distinct external scenario sets across all
-   * org projects. If the count is at or above the plan limit and the set
-   * is new, throws ScenarioSetLimitExceededError.
+   * query via the simulation service to count distinct external scenario
+   * sets across all org projects. If the count is at or above the plan
+   * limit and the set is new, throws ScenarioSetLimitExceededError.
    */
   async checkScenarioSetLimit({
     organizationId,
@@ -108,7 +109,7 @@ export class UsageService {
         ? MAX_FREE_SCENARIO_SETS
         : Infinity;
 
-    // If no cache, query ClickHouse for distinct external sets
+    // If no cache, query for distinct external sets via the simulation service
     const projectIds =
       await this.organizationService.getProjectIds(organizationId);
     if (projectIds.length === 0) {
@@ -119,12 +120,12 @@ export class UsageService {
     }
 
     const existingSets =
-      await this.queryDistinctExternalScenarioSets(projectIds);
+      await this.simulationRunService.getDistinctExternalSetIds({ projectIds });
 
     // Populate cache with the fetched sets
     this.scenarioSetCache.set(organizationId, existingSets);
 
-    // If this set already exists in ClickHouse, allow
+    // If this set already exists, allow
     if (existingSets.has(scenarioSetId)) {
       return;
     }
@@ -136,41 +137,6 @@ export class UsageService {
 
     // Allowed: record the new set in the cache
     existingSets.add(scenarioSetId);
-  }
-
-  /**
-   * Queries ClickHouse for distinct external (non-internal) scenario set IDs
-   * across the given project IDs.
-   *
-   * Overridable for testing via Object.assign on the prototype.
-   */
-  protected async queryDistinctExternalScenarioSets(
-    projectIds: string[],
-  ): Promise<Set<string>> {
-    const client = getClickHouseClient();
-    if (!client) {
-      return new Set();
-    }
-
-    const result = await client.query({
-      query: `
-        SELECT DISTINCT ScenarioSetId
-        FROM (
-          SELECT ScenarioSetId, ArchivedAt
-          FROM simulation_runs
-          WHERE TenantId IN ({projectIds:Array(String)})
-            AND NOT startsWith(ScenarioSetId, '${INTERNAL_SET_PREFIX}')
-          ORDER BY ScenarioRunId, UpdatedAt DESC
-          LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
-        )
-        WHERE ArchivedAt IS NULL
-      `,
-      query_params: { projectIds },
-      format: "JSONEachRow",
-    });
-
-    const rows = await result.json<{ ScenarioSetId: string }>();
-    return new Set(rows.map((r) => r.ScenarioSetId));
   }
 
   /**
