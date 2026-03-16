@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { TRPCError } from "@trpc/server";
 import { userRouter } from "../user";
 import { createInnerTRPCContext } from "../../trpc";
 
@@ -74,9 +73,7 @@ describe("userRouter", () => {
 
         await expect(
           caller.deactivate({ userId: "user-1" }),
-        ).rejects.toThrowError(
-          expect.objectContaining({ code: "FORBIDDEN" }),
-        );
+        ).rejects.toThrowError(expect.objectContaining({ code: "FORBIDDEN" }));
       });
     });
   });
@@ -101,9 +98,7 @@ describe("userRouter", () => {
 
         await expect(
           caller.reactivate({ userId: "user-1" }),
-        ).rejects.toThrowError(
-          expect.objectContaining({ code: "FORBIDDEN" }),
-        );
+        ).rejects.toThrowError(expect.objectContaining({ code: "FORBIDDEN" }));
       });
     });
   });
