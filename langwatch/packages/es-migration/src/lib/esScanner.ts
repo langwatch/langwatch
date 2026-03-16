@@ -338,7 +338,8 @@ export class EsScanner {
       }
 
       if (hits.length < PAGE_SIZE) break;
-      searchAfter = hits[hits.length - 1]!.sort as unknown[];
+      // Shallow-copy to break reference chain to full ES response
+      searchAfter = [...(hits[hits.length - 1]!.sort as unknown[])];
     }
 
     // Group by "tenantId:aggregateId"
@@ -472,7 +473,10 @@ export class EsScanner {
     }));
 
     const lastHit = hits[hits.length - 1]!;
-    const sortValues = lastHit.sort as unknown[];
+    // Shallow-copy sort values to break the reference chain back to the
+    // full ES response object — prevents the entire response from being
+    // retained in memory via sortValues.
+    const sortValues = [...(lastHit.sort as unknown[])];
 
     return { events, sortValues, requestedSize: size };
   }

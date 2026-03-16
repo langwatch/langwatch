@@ -14,7 +14,7 @@ process.env.PINO_LOG_LEVEL = "warn";
 process.env.OTEL_SDK_DISABLED = "true";
 delete process.env.LANGWATCH_API_KEY;
 
-type MigrationTarget = "simulations" | "batch-evaluations" | "traces" | "trace-evaluations" | "traces-cold" | "trace-evaluations-cold" | "traces-combined" | "traces-combined-cold" | "all";
+type MigrationTarget = "simulations" | "batch-evaluations" | "dspy-steps" | "traces" | "trace-evaluations" | "traces-cold" | "trace-evaluations-cold" | "traces-combined" | "traces-combined-cold" | "all";
 
 interface CliOptions {
   target: MigrationTarget;
@@ -28,7 +28,7 @@ function parseArgs(): CliOptions {
   let dryRun = false;
   let singleBatch = false;
 
-  const validTargets: MigrationTarget[] = ["simulations", "batch-evaluations", "traces", "trace-evaluations", "traces-cold", "trace-evaluations-cold", "traces-combined", "traces-combined-cold", "all"];
+  const validTargets: MigrationTarget[] = ["simulations", "batch-evaluations", "dspy-steps", "traces", "trace-evaluations", "traces-cold", "trace-evaluations-cold", "traces-combined", "traces-combined-cold", "all"];
 
   for (const arg of args) {
     if (arg === "--dry-run" || arg === "-n") {
@@ -61,6 +61,7 @@ function printUsage(): void {
       `Targets:\n` +
       `  simulations             Migrate simulation events only\n` +
       `  batch-evaluations       Migrate batch evaluation data only\n` +
+      `  dspy-steps              Migrate DSPy optimization steps only\n` +
       `  traces                  Migrate traces (hot storage)\n` +
       `  trace-evaluations       Migrate trace evaluations (hot storage)\n` +
       `  traces-cold             Migrate traces from cold storage\n` +
@@ -151,6 +152,9 @@ async function main(): Promise<void> {
   const { createCombinedTraceMigrationDefinition } = await import(
     "./migrations/traces-combined/definition.js"
   );
+  const { createDspyStepMigrationDefinition } = await import(
+    "./migrations/dspy-steps/definition.js"
+  );
 
   // Build config with CLI overrides
   const configOverrides: Record<string, unknown> = {};
@@ -159,7 +163,7 @@ async function main(): Promise<void> {
 
   // Default dry-run output files per target (overridable via DRY_RUN_OUTPUT env)
   const allTargets: Exclude<MigrationTarget, "all">[] = [
-    "simulations", "batch-evaluations", "traces-combined", "traces-combined-cold",
+    "simulations", "batch-evaluations", "dspy-steps", "traces-combined", "traces-combined-cold",
   ];
   const dryRunOutputFiles: Record<string, string> = {};
   if (cli.dryRun && !process.env.DRY_RUN_OUTPUT) {
@@ -281,6 +285,10 @@ async function main(): Promise<void> {
               return createEvaluationMigrationDefinition({
                 experimentRunStateFoldStore: app.experimentRunStateFoldStore,
                 experimentRunItemAppendStore: app.experimentRunItemAppendStore,
+              });
+            case "dspy-steps":
+              return createDspyStepMigrationDefinition({
+                dspyStepRepository: app.dspyStepRepository,
               });
             case "traces":
               return createTraceMigrationDefinition({
