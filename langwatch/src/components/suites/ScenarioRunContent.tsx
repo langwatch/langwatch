@@ -43,11 +43,15 @@ const StableGridCard = memo(function StableGridCard({
   targetName,
   onScenarioRunClick,
   iteration,
+  onCancel,
+  isCancelling,
 }: {
   scenarioRun: ScenarioRunData;
   targetName: string | null;
   onScenarioRunClick: (scenarioRun: ScenarioRunData) => void;
   iteration?: number;
+  onCancel?: () => void;
+  isCancelling?: boolean;
 }) {
   const handleClick = useCallback(
     () => onScenarioRunClick(scenarioRun),
@@ -59,6 +63,8 @@ const StableGridCard = memo(function StableGridCard({
       targetName={targetName}
       onClick={handleClick}
       iteration={iteration}
+      onCancel={onCancel}
+      isCancelling={isCancelling}
     />
   );
 });

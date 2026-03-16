@@ -12,10 +12,9 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { ScenarioCancellationService } from "~/server/scenarios/cancellation";
 import { publishCancellation } from "~/server/scenarios/cancellation-channel";
-import { ScenarioJobRepository } from "~/server/scenarios/scenario-job.repository";
 import { scenarioQueue } from "~/server/scenarios/scenario.queue";
 import { connection } from "~/server/redis";
-import { SimulationService } from "~/server/simulations/simulation.service";
+import { SimulationFacade } from "~/server/simulations/simulation.facade";
 import { createLogger } from "~/utils/logger/server";
 import { checkProjectPermission } from "../../rbac";
 import { projectSchema } from "./schemas";
@@ -35,17 +34,22 @@ const cancelBatchRunSchema = projectSchema.extend({
   batchRunId: z.string(),
 });
 
-function createGetQueuedJobs() {
-  const jobRepo = new ScenarioJobRepository(scenarioQueue);
-  return (params: { setId: string; projectId: string }) =>
-    jobRepo.getQueuedAndActiveJobs(params).then((runs) =>
-      runs.map((r) => ({
-        scenarioRunId: r.scenarioRunId,
-        scenarioId: r.scenarioId,
-        batchRunId: r.batchRunId,
-        status: r.status,
-      })),
-    );
+async function getQueuedJobs(params: { setId: string; projectId: string }) {
+  const jobs = await scenarioQueue.getJobs(["waiting", "active", "delayed"]);
+  return jobs
+    .filter((job) => {
+      const data = job.data as Record<string, unknown> | undefined;
+      return data && data.projectId === params.projectId;
+    })
+    .map((job) => {
+      const data = job.data as Record<string, unknown> | undefined;
+      return {
+        scenarioRunId: (data?.scenarioRunId as string) ?? job.id ?? "",
+        scenarioId: (data?.scenarioId as string) ?? "",
+        batchRunId: (data?.batchRunId as string) ?? "",
+        status: "waiting" as const,
+      };
+    });
 }
 
 function createPublishCancellation() {
@@ -56,44 +60,38 @@ function createPublishCancellation() {
     : () => Promise.resolve();
 }
 
+function createService() {
+  const facade = SimulationFacade.create();
+  return new ScenarioCancellationService({
+    queue: scenarioQueue,
+    publishCancellation: createPublishCancellation(),
+    getQueuedJobs,
+    saveScenarioEvent: (event) => facade.saveScenarioEvent(event),
+  });
+}
+
 export const cancellationRouter = createTRPCRouter({
   cancelJob: protectedProcedure
     .input(cancelJobSchema)
     .use(checkProjectPermission("scenarios:manage"))
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ input }) => {
       logger.info(
         { projectId: input.projectId, jobId: input.jobId, batchRunId: input.batchRunId },
         "Cancel job request received",
       );
 
-      const simulationService = SimulationService.create(ctx.prisma);
-      const service = new ScenarioCancellationService({
-        queue: scenarioQueue,
-        publishCancellation: createPublishCancellation(),
-        getQueuedJobs: createGetQueuedJobs(),
-        saveScenarioEvent: (event) => simulationService.saveScenarioEvent(event),
-      });
-
-      return service.cancelJob(input);
+      return createService().cancelJob(input);
     }),
 
   cancelBatchRun: protectedProcedure
     .input(cancelBatchRunSchema)
     .use(checkProjectPermission("scenarios:manage"))
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ input }) => {
       logger.info(
         { projectId: input.projectId, scenarioSetId: input.scenarioSetId, batchRunId: input.batchRunId },
         "Cancel batch run request received",
       );
 
-      const simulationService = SimulationService.create(ctx.prisma);
-      const service = new ScenarioCancellationService({
-        queue: scenarioQueue,
-        publishCancellation: createPublishCancellation(),
-        getQueuedJobs: createGetQueuedJobs(),
-        saveScenarioEvent: (event) => simulationService.saveScenarioEvent(event),
-      });
-
-      return service.cancelBatchRun(input);
+      return createService().cancelBatchRun(input);
     }),
 });
