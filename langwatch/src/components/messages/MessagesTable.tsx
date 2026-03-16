@@ -24,7 +24,9 @@ import { ChevronDown, ChevronUp, Download, Edit, Shield } from "react-feather";
 import { LuChevronsUpDown, LuList, LuRefreshCw } from "react-icons/lu";
 import { useLocalStorage } from "usehooks-ts";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useUpgradeModalStore } from "~/stores/upgradeModalStore";
 import { useTraceDetailsDrawer } from "~/hooks/useTraceDetailsDrawer";
 import { useTraceUpdateListener } from "~/hooks/useTraceUpdateListener";
 import { getEvaluatorDefinitions } from "~/server/evaluations/getEvaluator";
@@ -79,6 +81,10 @@ export function MessagesTable({
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
   const { openTraceDetailsDrawer } = useTraceDetailsDrawer();
+  const { isLiteMember } = useLiteMemberGuard();
+  const openLiteMemberRestriction = useUpgradeModalStore(
+    (s) => s.openLiteMemberRestriction,
+  );
   const queryClient = api.useContext();
 
   const { filterParams, queryOpts } = useFilterParams();
@@ -1055,7 +1061,7 @@ export function MessagesTable({
           </Button>
         )}
         <Spacer />
-        {!hideExport && (
+        {!hideExport && !isLiteMember && (
           <Tooltip
             disabled={navigationFooter.totalHits < 10_000}
             content={
@@ -1320,9 +1326,13 @@ export function MessagesTable({
                   colorPalette="black"
                   minWidth="fit-content"
                   variant="outline"
-                  onClick={() =>
-                    openExportDialog({ selectedTraceIds })
-                  }
+                  onClick={() => {
+                    if (isLiteMember) {
+                      openLiteMemberRestriction({ resource: "traces" });
+                      return;
+                    }
+                    openExportDialog({ selectedTraceIds });
+                  }}
                 >
                   Export <Download size={16} style={{ marginLeft: 8 }} />
                 </Button>
@@ -1336,6 +1346,10 @@ export function MessagesTable({
               variant="outline"
               minWidth="fit-content"
               onClick={() => {
+                if (isLiteMember) {
+                  openLiteMemberRestriction({ resource: "datasets" });
+                  return;
+                }
                 openDrawer("addDatasetRecord", {
                   selectedTraceIds,
                 });
@@ -1346,16 +1360,16 @@ export function MessagesTable({
             {!hideAddToQueue && (
               <Dialog.Root
                 open={dialog.open}
-                onOpenChange={(e) =>
-                  e.open ? dialog.onOpen() : dialog.onClose()
-                }
+                onOpenChange={(e) => {
+                  if (e.open && isLiteMember) {
+                    openLiteMemberRestriction({ resource: "annotations" });
+                    return;
+                  }
+                  e.open ? dialog.onOpen() : dialog.onClose();
+                }}
               >
                 <Dialog.Trigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => dialog.onOpen()}
-                  >
+                  <Button variant="outline" size="sm">
                     Add to Queue
                   </Button>
                 </Dialog.Trigger>

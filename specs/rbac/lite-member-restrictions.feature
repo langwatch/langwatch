@@ -76,6 +76,49 @@ Feature: Lite member access restrictions
     And no trace debug data is rendered
 
   # ============================================================================
+  # R3b: Trace Export Restriction
+  # ============================================================================
+
+  @integration
+  Scenario: Lite member does not see the "Export all" button on messages page
+    Given sarah is viewing the trace list on the messages page
+    Then the "Export all" button is not visible
+
+  @integration
+  Scenario: Lite member clicks Export on selected traces and sees restriction modal
+    Given sarah is viewing the trace list on the messages page
+    And she has selected one or more traces
+    When she clicks the "Export" button in the selection bar
+    Then a restriction modal appears
+    And no CSV download is triggered
+
+  @integration
+  Scenario: Lite member clicks "Add to Dataset" on selected traces and sees restriction modal
+    Given sarah is viewing the trace list on the messages page
+    And she has selected one or more traces
+    When she clicks the "Add to Dataset" button in the selection bar
+    Then a restriction modal appears
+    And the add-to-dataset drawer does not open
+
+  @integration
+  Scenario: Lite member clicks "Add to Queue" on selected traces and sees restriction modal
+    Given sarah is viewing the trace list on the messages page
+    And she has selected one or more traces
+    When she clicks the "Add to Queue" button in the selection bar
+    Then a restriction modal appears
+
+  @integration
+  Scenario: Add-to-dataset drawer is blocked for lite members regardless of entry point
+    When sarah tries to open the add-to-dataset drawer from any entry point
+    Then the drawer does not open
+    And a restriction modal appears
+
+  @integration
+  Scenario: Lite member does not see the "Export to CSV" button on batch evaluation results
+    Given sarah is viewing batch evaluation results for an experiment
+    Then the "Export to CSV" button is not visible
+
+  # ============================================================================
   # R4: Scenario and Run Viewing
   # ============================================================================
 
