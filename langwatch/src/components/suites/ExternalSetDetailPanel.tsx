@@ -96,7 +96,7 @@ export function ExternalSetDetailPanel({
     },
   );
 
-  const runData = runDataResult?.runs;
+  const runData = runDataResult && "runs" in runDataResult ? runDataResult.runs : undefined;
 
   // Fetch scenarios for filter options
   const { data: scenarios } = api.scenarios.getAll.useQuery(
@@ -232,8 +232,31 @@ export function ExternalSetDetailPanel({
         </VStack>
       </HStack>
 
-      {/* Content */}
-      <Box flex={1} overflow="auto" paddingY={2}>
+      {/* Filter bar — fixed above the scrollable run list */}
+      {!isLoading && !error && runData && runData.length > 0 && (
+        <Box
+          paddingX={6}
+          paddingY={4}
+          bg="bg"
+          borderBottom="1px solid"
+          borderColor="border"
+          flexShrink={0}
+        >
+          <RunHistoryFilters
+            scenarioOptions={scenarioOptions}
+            filters={filters}
+            onFiltersChange={handleFiltersChange}
+            groupBy={effectiveGroupBy}
+            onGroupByChange={setGroupBy}
+            groupByOptions={EXTERNAL_GROUP_BY_OPTIONS}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+          />
+        </Box>
+      )}
+
+      {/* Content — scrollable */}
+      <VStack align="stretch" gap={0} flex={1} overflow="auto">
         {isLoading && (
           <VStack paddingY={8}>
             <Spinner />
@@ -254,20 +277,6 @@ export function ExternalSetDetailPanel({
 
         {!isLoading && !error && runData && runData.length > 0 && (
           <>
-            {/* Filter bar with group-by selector and view toggle */}
-            <Box paddingX={6} paddingY={4}>
-              <RunHistoryFilters
-                scenarioOptions={scenarioOptions}
-                filters={filters}
-                onFiltersChange={handleFiltersChange}
-                groupBy={effectiveGroupBy}
-                onGroupByChange={setGroupBy}
-                groupByOptions={EXTERNAL_GROUP_BY_OPTIONS}
-                viewMode={viewMode}
-                onViewModeChange={setViewMode}
-              />
-            </Box>
-
             {/* Run rows */}
             {!hasData && hasActiveFilters ? (
               <Box paddingX={6} paddingY={8} textAlign="center">
@@ -276,7 +285,7 @@ export function ExternalSetDetailPanel({
                 </Text>
               </Box>
             ) : (
-              <VStack align="stretch" gap={0} flex={1}>
+              <>
                 {effectiveGroupBy === "none"
                   ? batchRuns.map((batchRun) => {
                       const summary = computeBatchRunSummary({
@@ -310,9 +319,8 @@ export function ExternalSetDetailPanel({
                         />
                       );
                     })}
-              </VStack>
+              </>
             )}
-
           </>
         )}
 
@@ -323,7 +331,7 @@ export function ExternalSetDetailPanel({
             </Text>
           </VStack>
         )}
-      </Box>
+      </VStack>
     </VStack>
   );
 }

@@ -1,6 +1,5 @@
 from typing import Optional
 from langevals_core.base_evaluator import (
-    DEFAULT_MAX_TOKENS,
     BaseEvaluator,
     EvaluatorEntry,
     EvaluationResult,
@@ -10,15 +9,10 @@ from langevals_core.base_evaluator import (
 )
 from pydantic import Field
 import litellm
+from litellm.utils import get_max_tokens
 import numpy as np
 
-NEGATIVE_REFERENCE = "Comment of a user who is extremely dissatisfied"
-POSITIVE_REFERENCE = "Comment of a very happy and satisfied user"
-
-# Normalization constant: the typical range of (positive - negative) cosine similarity
-# scores observed with embedding models. This maps the raw difference to a [-1, 1] scale.
-NORMALIZATION_FACTOR = 0.83 - 0.73
-
+EMBEDDING_MAX_TOKENS_FALLBACK = 8192
 
 class SentimentEntry(EvaluatorEntry):
     input: str
@@ -28,6 +22,18 @@ class SentimentSettings(EvaluatorSettings):
     embeddings_model: str = Field(
         default="openai/text-embedding-3-small",
         description="The embeddings model to use for sentiment analysis",
+    )
+    positive_reference: str = Field(
+        default="Comment of a very happy and satisfied user",
+        description="Reference phrase representing the positive end of the sentiment scale",
+    )
+    negative_reference: str = Field(
+        default="Comment of a user who is extremely dissatisfied",
+        description="Reference phrase representing the negative end of the sentiment scale",
+    )
+    normalization_factor: float = Field(
+        default=0.10,
+        description="Controls sentiment sensitivity. Decrease to make scores more extreme (fewer neutrals), increase to make scores more moderate (more neutrals)",
     )
 
 
@@ -63,21 +69,24 @@ class SentimentEvaluator(
 
         model = self.settings.embeddings_model
 
+        max_tokens_retrieved = get_max_tokens(model)
+        max_tokens = int(max_tokens_retrieved) if max_tokens_retrieved else EMBEDDING_MAX_TOKENS_FALLBACK
         total_tokens = len(litellm.encode(model=model, text=entry.input))
-        if total_tokens > DEFAULT_MAX_TOKENS:
+        if total_tokens > max_tokens:
             return EvaluationResultSkipped(
-                details=f"Total tokens exceed the maximum of {DEFAULT_MAX_TOKENS} tokens: {total_tokens} tokens used"
+                details=f"Input exceeds embedding model limit of {max_tokens} tokens ({total_tokens} tokens used)"
             )
 
         input_embedding = self._get_embedding(entry.input)
-        negative_embedding = self._get_embedding(NEGATIVE_REFERENCE)
-        positive_embedding = self._get_embedding(POSITIVE_REFERENCE)
+        negative_embedding = self._get_embedding(self.settings.negative_reference)
+        positive_embedding = self._get_embedding(self.settings.positive_reference)
 
         positive_similarity = self._cosine_similarity(input_embedding, positive_embedding)
         negative_similarity = self._cosine_similarity(input_embedding, negative_embedding)
 
         raw_score = positive_similarity - negative_similarity
-        normalized_score = max(-1.0, min(1.0, raw_score / NORMALIZATION_FACTOR))
+        factor = self.settings.normalization_factor if self.settings.normalization_factor != 0 else 1e-9
+        normalized_score = max(-1.0, min(1.0, raw_score / factor))
         label = "negative" if raw_score < 0 else "positive"
 
         return SentimentResult(

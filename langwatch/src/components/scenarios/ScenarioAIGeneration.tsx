@@ -252,7 +252,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
         <Card.Body>
           <VStack align="stretch" gap={3}>
             <HStack gap={3}>
-              <Box p={2} bg="blue.50" borderRadius="md" color="blue.500">
+              <Box p={2} bg="blue.subtle" borderRadius="md" color="blue.500">
                 <Icon as={Sparkles} boxSize={4} />
               </Box>
               <Text fontWeight="semibold" fontSize="sm">

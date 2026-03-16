@@ -41,6 +41,8 @@ const config: SimulationCommandConfig<
     messageCount: commandData.messages.length,
     traceIdCount: commandData.traceIds.length,
   }),
+  makeIdempotencyKey: (commandData) =>
+    `${commandData.tenantId}:${commandData.scenarioRunId}:snapshot`,
 };
 
 /**

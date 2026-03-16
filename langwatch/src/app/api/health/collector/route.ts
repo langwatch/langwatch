@@ -73,7 +73,7 @@ export async function GET(req: NextRequest) {
         resource: {
           attributes: [
             {
-              key: "canary",
+              key: "metadata.canary",
               value: {
                 stringValue: "true",
               },

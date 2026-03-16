@@ -29,7 +29,6 @@ export const executeEvaluationCommandDataSchema = z.object({
   topicId: z.string().optional(),
   subTopicId: z.string().optional(),
   customMetadata: z.record(z.string()).optional(),
-  satisfactionScore: z.number().optional(),
   spanTypes: z.array(z.string()).optional(),
   spanModels: z.array(z.string()).optional(),
   computedInput: z.string().nullable().optional(),

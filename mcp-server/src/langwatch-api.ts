@@ -78,7 +78,6 @@ export interface PromptSummary {
   id?: string;
   handle?: string;
   name?: string;
-  description?: string | null;
   latestVersionNumber?: number;
   version?: number;
 }
@@ -87,14 +86,12 @@ export interface PromptVersion {
   version?: number;
   commitMessage?: string;
   model?: string;
-  modelProvider?: string;
   messages?: Array<{ role: string; content: string }>;
 }
 
 export interface PromptDetailResponse extends PromptSummary {
   versions?: PromptVersion[];
   model?: string;
-  modelProvider?: string;
   messages?: Array<{ role: string; content: string }>;
   prompt?: Array<{ role: string; content: string }>;
 }
@@ -216,12 +213,9 @@ export async function getPrompt(
 
 /** Creates a new prompt. */
 export async function createPrompt(data: {
-  name: string;
-  handle?: string;
+  handle: string;
   messages: Array<{ role: string; content: string }>;
   model: string;
-  modelProvider: string;
-  description?: string;
 }): Promise<PromptMutationResponse> {
   return makeRequest(
     "POST",
@@ -236,31 +230,12 @@ export async function updatePrompt(
   data: {
     messages?: Array<{ role: string; content: string }>;
     model?: string;
-    modelProvider?: string;
-    commitMessage?: string;
+    commitMessage: string;
   }
 ): Promise<PromptMutationResponse> {
   return makeRequest(
-    "POST",
+    "PUT",
     `/api/prompts/${encodeURIComponent(idOrHandle)}`,
     data
   ) as Promise<PromptMutationResponse>;
 }
-
-/** Creates a new version of an existing prompt. */
-export async function createPromptVersion(
-  idOrHandle: string,
-  data: {
-    messages?: Array<{ role: string; content: string }>;
-    model?: string;
-    modelProvider?: string;
-    commitMessage?: string;
-  }
-): Promise<PromptMutationResponse> {
-  return makeRequest(
-    "POST",
-    `/api/prompts/${encodeURIComponent(idOrHandle)}/versions`,
-    data
-  ) as Promise<PromptMutationResponse>;
-}
-

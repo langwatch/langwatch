@@ -5,6 +5,7 @@ import { metricTypeSchema, piiRedactionLevelSchema } from "./commands";
 import {
   LOG_RECORD_RECEIVED_EVENT_TYPE,
   METRIC_RECORD_RECEIVED_EVENT_TYPE,
+  ORIGIN_RESOLVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
   TOPIC_ASSIGNED_EVENT_TYPE,
 } from "./constants";
@@ -179,10 +180,48 @@ export function isMetricRecordReceivedEvent(
 }
 
 /**
+ * Zod schema for OriginResolvedEvent metadata.
+ */
+export const originResolvedEventMetadataSchema = z
+  .object({
+    processingTraceparent: z.string().optional(),
+  })
+  .passthrough();
+
+/**
+ * Zod schema for OriginResolvedEvent data.
+ */
+export const originResolvedEventDataSchema = z.object({
+  origin: z.string(),
+  reason: z.string(),
+});
+
+export const originResolvedEventSchema = EventSchema.extend({
+  type: z.literal(ORIGIN_RESOLVED_EVENT_TYPE),
+  data: originResolvedEventDataSchema,
+  metadata: originResolvedEventMetadataSchema,
+});
+
+export type OriginResolvedEventData = z.infer<
+  typeof originResolvedEventDataSchema
+>;
+export type OriginResolvedEvent = z.infer<typeof originResolvedEventSchema>;
+
+/**
+ * Type guard for OriginResolvedEvent.
+ */
+export function isOriginResolvedEvent(
+  event: TraceProcessingEvent,
+): event is OriginResolvedEvent {
+  return event.type === ORIGIN_RESOLVED_EVENT_TYPE;
+}
+
+/**
  * Union of all trace processing event types.
  */
 export type TraceProcessingEvent =
   | SpanReceivedEvent
   | TopicAssignedEvent
   | LogRecordReceivedEvent
-  | MetricRecordReceivedEvent;
+  | MetricRecordReceivedEvent
+  | OriginResolvedEvent;

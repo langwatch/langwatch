@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import { formatRunStatusLabel, formatSummaryStatusLabel } from "../format-run-status-label";
+import { formatRunStatusLabel } from "../format-run-status-label";
 
 describe("formatRunStatusLabel()", () => {
   describe("when status is success", () => {
@@ -144,82 +144,6 @@ describe("formatRunStatusLabel()", () => {
         results: undefined,
       });
       expect(result).toBe("cancelled");
-    });
-  });
-});
-
-describe("formatSummaryStatusLabel()", () => {
-  const makeSummary = (overrides: Partial<Parameters<typeof formatSummaryStatusLabel>[0]> = {}) => ({
-    passRate: 0,
-    passedCount: 0,
-    failedCount: 0,
-    stalledCount: 0,
-    cancelledCount: 0,
-    totalCount: 0,
-    inProgressCount: 0,
-    queuedCount: 0,
-    ...overrides,
-  });
-
-  describe("when all scenarios passed", () => {
-    it("returns 'passed' without x/n count", () => {
-      const result = formatSummaryStatusLabel(makeSummary({
-        passedCount: 5,
-        totalCount: 5,
-      }));
-      expect(result).toBe("passed");
-    });
-  });
-
-  describe("when some scenarios failed", () => {
-    it("returns 'failed' without x/n count", () => {
-      const result = formatSummaryStatusLabel(makeSummary({
-        passedCount: 3,
-        failedCount: 2,
-        totalCount: 5,
-      }));
-      expect(result).toBe("failed");
-    });
-  });
-
-  describe("when all scenarios are in progress", () => {
-    it("returns 'running'", () => {
-      const result = formatSummaryStatusLabel(makeSummary({
-        inProgressCount: 3,
-        totalCount: 3,
-      }));
-      expect(result).toBe("running");
-    });
-  });
-
-  describe("when no scenarios exist", () => {
-    it("returns 'pending'", () => {
-      const result = formatSummaryStatusLabel(makeSummary());
-      expect(result).toBe("pending");
-    });
-  });
-
-  describe("when some scenarios are stalled", () => {
-    it("returns 'failed' without x/n count", () => {
-      const result = formatSummaryStatusLabel(makeSummary({
-        passedCount: 2,
-        failedCount: 1,
-        stalledCount: 1,
-        totalCount: 4,
-      }));
-      expect(result).toBe("failed");
-    });
-  });
-
-  describe("when some are finished and some still running", () => {
-    it("returns 'passed' without x/n count", () => {
-      const result = formatSummaryStatusLabel(makeSummary({
-        passedCount: 3,
-        failedCount: 0,
-        inProgressCount: 2,
-        totalCount: 5,
-      }));
-      expect(result).toBe("passed");
     });
   });
 });

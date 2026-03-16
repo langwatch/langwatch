@@ -18,3 +18,23 @@ export function formatLatency(ms: number): string {
 export function formatRate(value: number): string {
   return `${value}/s`;
 }
+
+export function formatDuration(ms: number): string {
+  if (ms <= 0 || !Number.isFinite(ms)) return "N/A";
+  if (ms < 1000) return "< 1s";
+  if (ms < 60_000) return `${Math.round(ms / 1000)}s`;
+  if (ms < 3_600_000) {
+    const mins = Math.floor(ms / 60_000);
+    const secs = Math.floor((ms % 60_000) / 1000);
+    return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
+  }
+  const hours = Math.floor(ms / 3_600_000);
+  const mins = Math.floor((ms % 3_600_000) / 60_000);
+  return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+}
+
+export function formatEta(totalPending: number, completedPerSec: number): string {
+  if (completedPerSec <= 0) return "N/A";
+  const etaMs = (totalPending / completedPerSec) * 1000;
+  return formatDuration(etaMs);
+}

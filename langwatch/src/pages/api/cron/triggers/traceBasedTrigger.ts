@@ -57,6 +57,7 @@ export const processTraceBasedTrigger = async (
     projectId,
     filters: parsedFilters,
     updatedAt: lastRunAt,
+    pageSize: 10_000,
     startDate: Date.now() - 1000 * 60 * 60 * 24,
     endDate: Date.now(),
   };

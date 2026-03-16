@@ -2,13 +2,17 @@ import { useState, useCallback, useMemo } from "react";
 import { Box, Text, Grid, GridItem } from "@chakra-ui/react";
 import type { DashboardData, QueueInfo } from "../../shared/types.ts";
 import type { SortColumn, SortDir } from "../hooks/useGroupsData.ts";
+import type { UnblockSessionConfig } from "../components/UnblockSession.tsx";
 import { apiPost } from "../hooks/useApi.ts";
 import { StatCards } from "../components/dashboard/StatCards.tsx";
 import { ThroughputChart } from "../components/dashboard/ThroughputChart.tsx";
 import { PipelineTree } from "../components/dashboard/PipelineTree.tsx";
 import { RedisStats } from "../components/dashboard/RedisStats.tsx";
 import { GroupsTable } from "../components/groups/GroupsTable.tsx";
-import { QueueOverview } from "../components/dashboard/QueueOverview.tsx";
+import { TopErrorsPanel } from "../components/dashboard/TopErrorsPanel.tsx";
+import { AgeHistogram } from "../components/dashboard/AgeHistogram.tsx";
+import { ActiveJobsPanel } from "../components/dashboard/ActiveJobsPanel.tsx";
+import { SuggestionsPanel } from "../components/dashboard/SuggestionsPanel.tsx";
 
 interface Props {
   data: DashboardData;
@@ -18,9 +22,10 @@ interface Props {
   sortColumn: SortColumn;
   sortDir: SortDir;
   cycleSort: (col: SortColumn) => void;
+  onStartUnblockSession: (config: UnblockSessionConfig) => void;
 }
 
-export function DashboardPage({ data, queues, onPause, onResume, sortColumn, sortDir, cycleSort }: Props) {
+export function DashboardPage({ data, queues, onPause, onResume, sortColumn, sortDir, cycleSort, onStartUnblockSession }: Props) {
   const [pipelineFilter, setPipelineFilter] = useState<string | null>(null);
 
   const queueNames = useMemo(() => data.queues.map((q) => q.name), [data.queues]);
@@ -70,6 +75,7 @@ export function DashboardPage({ data, queues, onPause, onResume, sortColumn, sor
       </Text>
       <RedisStats data={data} />
       <StatCards data={data} />
+      <SuggestionsPanel data={data} />
       <Grid templateColumns={{ base: "1fr", lg: "3fr 2fr" }} gap={4} mb={6}>
         <GridItem>
           <ThroughputChart data={data.throughputHistory} />
@@ -85,6 +91,16 @@ export function DashboardPage({ data, queues, onPause, onResume, sortColumn, sor
           />
         </GridItem>
       </Grid>
+      {data.topErrors.length > 0 && (
+        <Box mb={6}>
+          <TopErrorsPanel
+            errors={data.topErrors}
+            queueName={data.queues[0]?.name ?? null}
+            onPause={onPause}
+            onResume={onResume}
+          />
+        </Box>
+      )}
       <Text
         fontSize="sm"
         fontWeight="600"
@@ -103,8 +119,16 @@ export function DashboardPage({ data, queues, onPause, onResume, sortColumn, sor
         sortDir={sortDir}
         cycleSort={cycleSort}
         pipelineFilter={pipelineFilter}
+        onStartUnblockSession={onStartUnblockSession}
       />
-      <QueueOverview />
+      <Grid templateColumns={{ base: "1fr", lg: "1fr 1fr" }} gap={4} mb={6} mt={6}>
+        <GridItem>
+          <AgeHistogram queues={queues} />
+        </GridItem>
+        <GridItem>
+          <ActiveJobsPanel queues={queues} />
+        </GridItem>
+      </Grid>
     </Box>
   );
 }

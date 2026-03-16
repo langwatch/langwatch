@@ -43,6 +43,8 @@ const config: SimulationCommandConfig<
     scenarioId: commandData.scenarioId,
     batchRunId: commandData.batchRunId,
   }),
+  makeIdempotencyKey: (commandData) =>
+    `${commandData.tenantId}:${commandData.scenarioRunId}:startRun`,
 };
 
 /**
