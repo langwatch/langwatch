@@ -81,7 +81,7 @@ export function serializeTraceToFullJson({
     topic: trace.metadata.topic_id ?? null,
     subtopic: trace.metadata.subtopic_id ?? null,
     error: trace.error ? trace.error.message : null,
-    spans: trace.spans.map(serializeSpanForJson),
+    spans: (trace.spans ?? []).map(serializeSpanForJson),
     evaluations: (trace.evaluations ?? []).map(serializeEvaluation),
   };
 

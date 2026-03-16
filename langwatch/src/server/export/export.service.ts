@@ -120,7 +120,12 @@ export class ExportService {
     let exported = 0;
     let total = 0;
     let isFirstBatch = true;
-    let evaluatorNames: string[] = [];
+    // Accumulate evaluator names across all batches.
+    // NOTE: For CSV, the header is written from batch 1's evaluator names. Evaluators
+    // appearing only in later batches will not have columns in the header. This is a
+    // known limitation of streaming CSV where the header must be emitted before all
+    // data is known. In practice, evaluators are consistent across a project's traces.
+    const evaluatorNameSet = new Set<string>();
 
     // Fetch batches until no more data
     while (true) {
@@ -146,19 +151,22 @@ export class ExportService {
       // Flatten groups into traces
       const traces: Trace[] = result.groups.flat();
 
-      // On first batch, capture total and collect evaluator names
+      // On first batch, capture total
       if (isFirstBatch) {
         total = result.totalHits;
-        evaluatorNames = collectEvaluatorNames({
-          traces,
-          traceChecks: result.traceChecks,
-        });
 
         if (total === 0 || traces.length === 0) {
           logger.info({ projectId: request.projectId }, "No traces to export");
           return;
         }
       }
+
+      // Merge evaluator names from every batch
+      const batchNames = collectEvaluatorNames({
+        traces,
+        traceChecks: result.traceChecks,
+      });
+      for (const name of batchNames) evaluatorNameSet.add(name);
 
       // Merge evaluations from traceChecks into trace objects
       const enrichedTraces = enrichTracesWithEvaluations({
@@ -169,6 +177,7 @@ export class ExportService {
       exported += enrichedTraces.length;
       const progress: ExportProgress = { exported, total };
 
+      const evaluatorNames = Array.from(evaluatorNameSet).sort();
       const chunk = serializeBatch({
         traces: enrichedTraces,
         request,

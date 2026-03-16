@@ -6,7 +6,7 @@
  * yields correct chunks with progress.
  */
 
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Protections } from "~/server/elasticsearch/protections";
 import type { TraceService } from "~/server/traces/trace.service";
 import type { Trace, LLMSpan, Evaluation } from "~/server/tracer/types";

@@ -168,7 +168,7 @@ export function serializeTracesToFullCsv({
   const rows: string[][] = [];
 
   for (const trace of traces) {
-    for (const span of trace.spans) {
+    for (const span of trace.spans ?? []) {
       rows.push(buildFullRow({ trace, span, evaluatorNames }));
     }
   }
@@ -251,7 +251,11 @@ function buildFullRow({
     ragSpan?.contexts ? JSON.stringify(ragSpan.contexts) : "",
   ];
 
-  row.push(...buildEvaluationColumns({ evaluations: trace.evaluations, evaluatorNames }));
+  // Include trace-level evaluations (no span_id) and span-specific evaluations
+  const spanEvaluations = (trace.evaluations ?? []).filter(
+    (e) => !e.span_id || e.span_id === span.span_id
+  );
+  row.push(...buildEvaluationColumns({ evaluations: spanEvaluations, evaluatorNames }));
 
   return row;
 }

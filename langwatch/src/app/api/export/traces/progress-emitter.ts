@@ -32,6 +32,13 @@ export function createProgressEmitter({
   userId: string;
   projectId: string;
 }): EventEmitter {
+  // Clean up any existing emitter for this exportId to prevent leaks
+  const existing = emitters.get(exportId);
+  if (existing) {
+    existing.emitter.removeAllListeners();
+    emitters.delete(exportId);
+  }
+
   const emitter = new EventEmitter();
   emitters.set(exportId, { emitter, userId, projectId });
   return emitter;

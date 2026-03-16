@@ -24,7 +24,6 @@ const {
   mockCancelExport,
   mockUseExportTraces,
   stableSetFn,
-  stableRefetch,
   stableTraceGroupsResult,
   stableTopicsResult,
 } = vi.hoisted(() => {
@@ -86,7 +85,6 @@ const {
     mockCancelExport,
     mockUseExportTraces,
     stableSetFn,
-    stableRefetch,
     stableTraceGroupsResult,
     stableTopicsResult,
   };

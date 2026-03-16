@@ -175,6 +175,9 @@ export function useExportTraces({
   >();
 
   const abortControllerRef = useRef<AbortController | null>(null);
+  const completionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
 
   const openExportDialog = useCallback(
     (options?: { selectedTraceIds?: string[] }) => {
@@ -190,6 +193,10 @@ export function useExportTraces({
   }, []);
 
   const cancelExport = useCallback(() => {
+    if (completionTimeoutRef.current) {
+      clearTimeout(completionTimeoutRef.current);
+      completionTimeoutRef.current = null;
+    }
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
     setIsExporting(false);
@@ -205,6 +212,12 @@ export function useExportTraces({
           type: "error",
         });
         return;
+      }
+
+      // Cancel any stale completion timeout from a previous export
+      if (completionTimeoutRef.current) {
+        clearTimeout(completionTimeoutRef.current);
+        completionTimeoutRef.current = null;
       }
 
       // Close the dialog when export starts
@@ -256,9 +269,8 @@ export function useExportTraces({
 
           // Start SSE progress listener for real-time exported count
           const exportId = response.headers.get("X-Export-Id");
-          let progressPromise: Promise<void> | undefined;
           if (exportId) {
-            progressPromise = connectProgressSSE({
+            void connectProgressSSE({
               exportId,
               signal: abortController.signal,
               onEvent: (event) => {
@@ -290,10 +302,12 @@ export function useExportTraces({
           // Download complete — abort SSE (fire-and-forget, don't wait)
           // The SSE may have already finished or may hang if it missed "done"
           abortController.abort();
+
+          return true;
         })
         .catch((error: unknown) => {
           if (error instanceof Error && error.name === "AbortError") {
-            return; // User cancelled, not an error
+            return false; // User cancelled, not an error
           }
           const message =
             error instanceof Error ? error.message : "Unknown error";
@@ -302,13 +316,19 @@ export function useExportTraces({
             description: message,
             type: "error",
           });
+          return false;
         });
 
       // When download completes, show "done" state briefly then hide
-      void exportPromise.then(() => {
+      void exportPromise.then((completed) => {
+        if (!completed) {
+          setIsExporting(false);
+          setProgress({ exported: 0, total: 0 });
+          return;
+        }
         setProgress((prev) => ({ ...prev, exported: prev.total }));
         // Brief flash of "complete" state before hiding
-        setTimeout(() => {
+        completionTimeoutRef.current = setTimeout(() => {
           setIsExporting(false);
           setProgress({ exported: 0, total: 0 });
         }, 1500);

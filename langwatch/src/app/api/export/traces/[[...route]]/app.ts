@@ -109,10 +109,15 @@ app.post("/download", zValidator("json", exportRequestSchema), async (c) => {
       ? "text/csv; charset=utf-8"
       : "application/x-ndjson";
 
-  const exportService = await ExportService.create();
-
-  // Get total count first so we can send it in headers (avoids SSE race condition)
-  const totalCount = await exportService.getTotalCount({ request, protections });
+  let exportService: Awaited<ReturnType<typeof ExportService.create>>;
+  let totalCount: number;
+  try {
+    exportService = await ExportService.create();
+    totalCount = await exportService.getTotalCount({ request, protections });
+  } catch (error) {
+    removeProgressEmitter(exportId);
+    throw error;
+  }
 
   const headers = new Headers({
     "Content-Type": contentType,
@@ -138,7 +143,9 @@ app.post("/download", zValidator("json", exportRequestSchema), async (c) => {
           { error, projectId: request.projectId },
           "Export stream error",
         );
-        progressEmitter.emit("error", error);
+        if (progressEmitter.listenerCount("error") > 0) {
+          progressEmitter.emit("error", error);
+        }
         controller.error(error);
       } finally {
         // Clean up after a short delay to allow SSE clients to receive final events
