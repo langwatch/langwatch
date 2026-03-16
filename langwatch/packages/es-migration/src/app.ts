@@ -140,7 +140,7 @@ export async function createApp(
   });
 
   // --- ClickHouse (event store target) ---
-  const chFlushSize = parseInt(process.env.CH_BATCH_SIZE ?? "500", 10);
+  const chFlushSize = parseInt(process.env.CH_BATCH_SIZE ?? "5000", 10);
   const rawClickhouse = createClickHouseClient({
     url: new URL(requireEnv("CLICKHOUSE_URL")),
     clickhouse_settings: { date_time_input_format: "best_effort" },
