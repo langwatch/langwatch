@@ -1,5 +1,6 @@
 import { useRouter } from "next/router";
 import qs from "qs";
+import { createContext, createElement, useContext, type ReactNode } from "react";
 import { usePeriodSelector } from "../components/PeriodSelector";
 import { filterOutEmptyFilters } from "../server/analytics/utils";
 import { availableFilters } from "../server/filters/registry";
@@ -11,9 +12,35 @@ export type FilterParam =
   | Record<string, string[]>
   | Record<string, Record<string, string[]>>;
 
+/**
+ * Context for providing default filter values to `useFilterParams`.
+ * When a filter key is not present in the URL or localStorage, the default
+ * from this context is used instead. This allows pages like the analytics
+ * overview to inject `traces.origin: ["application"]` without modifying
+ * every child component.
+ */
+const FilterDefaultsContext = createContext<
+  Partial<Record<FilterField, FilterParam>>
+>({});
+
+/**
+ * Provides default filter values to all `useFilterParams` calls in the
+ * subtree. Filters in the URL or localStorage take precedence over defaults.
+ */
+export function FilterDefaultsProvider({
+  defaults,
+  children,
+}: {
+  defaults: Partial<Record<FilterField, FilterParam>>;
+  children: ReactNode;
+}) {
+  return createElement(FilterDefaultsContext.Provider, { value: defaults }, children);
+}
+
 export const useFilterParams = () => {
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
+  const defaultFilters = useContext(FilterDefaultsContext);
 
   const {
     period: { startDate, endDate },
@@ -114,6 +141,15 @@ export const useFilterParams = () => {
       }
     } catch {
       // localStorage unavailable or corrupt — ignore
+    }
+  }
+
+  // Apply default filters from FilterDefaultsProvider for any keys not
+  // already set by URL or localStorage. This allows pages like analytics
+  // to default to origin=application without modifying child components.
+  for (const [key, value] of Object.entries(defaultFilters)) {
+    if (filters[key as FilterField] === undefined) {
+      filters[key as FilterField] = value;
     }
   }
 
