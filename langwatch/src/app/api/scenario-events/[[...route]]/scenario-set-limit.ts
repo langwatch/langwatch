@@ -30,6 +30,11 @@ export async function checkScenarioSetLimitForRunStarted(
     return;
   }
 
+  // Internal suite runs use a known set ID — not subject to external set limits
+  if (scenarioSetId.startsWith("__internal__") && scenarioSetId.endsWith("__suite")) {
+    return;
+  }
+
   const organizationId = await resolveOrganizationId(ctx.project.id);
   if (!organizationId) {
     logger.warn(

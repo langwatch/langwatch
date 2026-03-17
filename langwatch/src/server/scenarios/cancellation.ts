@@ -97,18 +97,26 @@ export class ScenarioCancellationService {
   /**
    * Cancel a single scenario job.
    *
-   * Uses a "try remove, then signal" strategy that avoids querying job state:
-   * 1. Try removing from queue — if it succeeds, the job was queued
-   * 2. If removal fails, signal cancel — the job is likely active
-   * 3. If both fail, the job is terminal or not found
+   * 1. Check fold projection — if already terminal, return early (no false positive)
+   * 2. Try removing from queue — if it succeeds, the job was queued
+   * 3. If removal fails, signal cancel — the job is likely active
+   * 4. If both fail, the job is not found
    *
    * Only writes a CANCELLED event for removed (queued) jobs. Active jobs
    * have their status written by the worker's failure handler.
    */
   async cancelJob(params: CancelJobParams): Promise<CancelJobResult> {
-    const { projectId, scenarioRunId, batchRunId } = params;
+    const { projectId, scenarioRunId, batchRunId, scenarioSetId } = params;
 
     logger.info({ projectId, scenarioRunId, batchRunId }, "Cancelling scenario job");
+
+    // Check current status from fold projection — if already terminal, skip
+    const runs = await this.getRunsForBatch({ projectId, scenarioSetId, batchRunId });
+    const run = runs.find((r) => r.scenarioRunId === scenarioRunId);
+    if (run && !isCancellableStatus(run.status)) {
+      logger.debug({ scenarioRunId, status: run.status }, "Run already terminal, nothing to cancel");
+      return { cancelled: false };
+    }
 
     // Try removing from queue (works for QUEUED/WAITING jobs)
     const removed = await this.removeQueuedJob({ projectId, scenarioRunId });

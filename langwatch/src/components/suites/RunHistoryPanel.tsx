@@ -158,6 +158,7 @@ export function RunHistoryPanel({
     },
     onCancelJobError: (error) => {
       setCancellingJobId(null);
+      void refetch();
       toaster.create({
         title: "Failed to cancel job",
         description: error.message,

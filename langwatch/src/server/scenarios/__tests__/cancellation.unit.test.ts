@@ -47,15 +47,48 @@ const defaultJobParams = {
 
 describe("ScenarioCancellationService", () => {
   describe("cancelJob()", () => {
+    /** Helper: make getRunsForBatch return a single run with the given status */
+    function stubRunStatus(mock: ReturnType<typeof vi.fn>, status: ScenarioRunStatus) {
+      mock.mockResolvedValue([
+        { scenarioRunId: "run1", scenarioId: "sc1", batchRunId: "batch1", status },
+      ]);
+    }
+
+    describe("when the run is already terminal (e.g. SUCCESS)", () => {
+      let result: { cancelled: boolean };
+      let mockRemoveQueuedJob: ReturnType<typeof vi.fn>;
+      let mockSignalCancel: ReturnType<typeof vi.fn>;
+
+      beforeEach(async () => {
+        const { deps, mockGetRunsForBatch, mockRemoveQueuedJob: removeFn, mockSignalCancel: signalFn } = createMockDeps();
+        mockRemoveQueuedJob = removeFn;
+        mockSignalCancel = signalFn;
+        stubRunStatus(mockGetRunsForBatch, ScenarioRunStatus.SUCCESS);
+
+        const service = new ScenarioCancellationService(deps);
+        result = await service.cancelJob(defaultJobParams);
+      });
+
+      it("returns cancelled: false", () => {
+        expect(result).toEqual({ cancelled: false });
+      });
+
+      it("does not attempt to remove or signal", () => {
+        expect(mockRemoveQueuedJob).not.toHaveBeenCalled();
+        expect(mockSignalCancel).not.toHaveBeenCalled();
+      });
+    });
+
     describe("when the job is queued (removeQueuedJob succeeds)", () => {
       let result: { cancelled: boolean };
       let mockSaveScenarioEvent: ReturnType<typeof vi.fn>;
       let mockSignalCancel: ReturnType<typeof vi.fn>;
 
       beforeEach(async () => {
-        const { deps, mockRemoveQueuedJob, mockSaveScenarioEvent: saveFn, mockSignalCancel: signalFn } = createMockDeps();
+        const { deps, mockGetRunsForBatch, mockRemoveQueuedJob, mockSaveScenarioEvent: saveFn, mockSignalCancel: signalFn } = createMockDeps();
         mockSaveScenarioEvent = saveFn;
         mockSignalCancel = signalFn;
+        stubRunStatus(mockGetRunsForBatch, ScenarioRunStatus.PENDING);
         mockRemoveQueuedJob.mockResolvedValue(true);
 
         const service = new ScenarioCancellationService(deps);
@@ -86,9 +119,10 @@ describe("ScenarioCancellationService", () => {
       let mockSaveScenarioEvent: ReturnType<typeof vi.fn>;
 
       beforeEach(async () => {
-        const { deps, mockRemoveQueuedJob, mockSignalCancel: signalFn, mockSaveScenarioEvent: saveFn } = createMockDeps();
+        const { deps, mockGetRunsForBatch, mockRemoveQueuedJob, mockSignalCancel: signalFn, mockSaveScenarioEvent: saveFn } = createMockDeps();
         mockSignalCancel = signalFn;
         mockSaveScenarioEvent = saveFn;
+        stubRunStatus(mockGetRunsForBatch, ScenarioRunStatus.IN_PROGRESS);
         mockRemoveQueuedJob.mockResolvedValue(false);
         mockSignalCancel.mockResolvedValue(true);
 
@@ -119,7 +153,8 @@ describe("ScenarioCancellationService", () => {
       let result: { cancelled: boolean };
 
       beforeEach(async () => {
-        const { deps, mockRemoveQueuedJob, mockSignalCancel } = createMockDeps();
+        const { deps, mockGetRunsForBatch, mockRemoveQueuedJob, mockSignalCancel } = createMockDeps();
+        stubRunStatus(mockGetRunsForBatch, ScenarioRunStatus.IN_PROGRESS);
         mockRemoveQueuedJob.mockResolvedValue(false);
         mockSignalCancel.mockResolvedValue(false);
 
@@ -132,11 +167,13 @@ describe("ScenarioCancellationService", () => {
       });
     });
 
-    describe("when neither remove nor signal succeeds (terminal or not found)", () => {
+    describe("when neither remove nor signal succeeds (run not found in projection)", () => {
       let result: { cancelled: boolean };
 
       beforeEach(async () => {
-        const { deps, mockRemoveQueuedJob, mockSignalCancel } = createMockDeps();
+        const { deps, mockGetRunsForBatch, mockRemoveQueuedJob, mockSignalCancel } = createMockDeps();
+        // Run not found — getRunsForBatch returns empty, so we fall through to remove/signal
+        mockGetRunsForBatch.mockResolvedValue([]);
         mockRemoveQueuedJob.mockResolvedValue(false);
         mockSignalCancel.mockResolvedValue(false);
 
