@@ -35,7 +35,6 @@ import { SpanAppendStore } from "~/server/event-sourcing/pipelines/trace-process
 import type { TraceSummaryData } from "~/server/app-layer/traces/types.js";
 import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types.js";
 import type { AppendStore } from "~/server/event-sourcing/projections/mapProjection.types.js";
-import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans.js";
 
 // Evaluation pipeline stores
 import { EvaluationRunClickHouseRepository } from "~/server/app-layer/evaluations/repositories/evaluation-run.clickhouse.repository.js";
@@ -109,7 +108,7 @@ export interface AppDependencies {
   /** Trace summary fold store (for direct-write trace migration). */
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
   /** Span append store (for direct-write trace migration). */
-  spanAppendStore: AppendStore<NormalizedSpan>;
+  spanAppendStore: SpanAppendStore;
   /** Evaluation run fold store (for direct-write trace-evaluation migration). */
   evaluationRunStore: FoldProjectionStore<EvaluationRunData>;
   /** Experiment run state fold store (for direct-write batch-evaluations migration). */
