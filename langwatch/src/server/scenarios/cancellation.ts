@@ -13,7 +13,6 @@
 
 import { createLogger } from "~/utils/logger/server";
 import { ScenarioEventType, ScenarioRunStatus, isCancellableStatus } from "./scenario-event.enums";
-export { isCancellableStatus };
 import type { ScenarioRunData } from "./scenario-event.types";
 
 const logger = createLogger("langwatch:scenarios:cancellation");

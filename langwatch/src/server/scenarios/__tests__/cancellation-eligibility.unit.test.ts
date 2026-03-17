@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { ScenarioRunStatus } from "../scenario-event.enums";
-import { isCancellableStatus } from "../cancellation";
+import { isCancellableStatus } from "../scenario-event.enums";
 
 describe("isCancellableStatus()", () => {
   describe("when status is PENDING", () => {

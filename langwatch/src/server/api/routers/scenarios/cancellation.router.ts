@@ -49,11 +49,11 @@ function createGetRunsForBatch(): CancellationServiceDeps["getRunsForBatch"] {
 }
 
 function createRemoveQueuedJob(): CancellationServiceDeps["removeQueuedJob"] {
-  return async ({ scenarioRunId }) => {
+  return async ({ projectId, scenarioRunId }) => {
     const jobs = await scenarioQueue.getJobs(["waiting", "delayed"]);
     const job = jobs.find((j) => {
       const data = j.data as Record<string, unknown> | undefined;
-      return data?.scenarioRunId === scenarioRunId;
+      return data?.scenarioRunId === scenarioRunId && data?.projectId === projectId;
     });
     if (!job) return false;
     try {
@@ -78,7 +78,7 @@ function createSignalCancel(): CancellationServiceDeps["signalCancel"] {
     const activeJobs = await scenarioQueue.getJobs(["active"]);
     const job = activeJobs.find((j) => {
       const data = j.data as Record<string, unknown> | undefined;
-      return data?.scenarioRunId === scenarioRunId;
+      return data?.scenarioRunId === scenarioRunId && data?.projectId === projectId;
     });
     const bullmqJobId = job?.id ?? scenarioRunId;
 

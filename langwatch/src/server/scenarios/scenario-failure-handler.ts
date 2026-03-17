@@ -41,6 +41,24 @@ export interface FailureEventParams {
   cancelled?: boolean;
 }
 
+function buildFailureResults(params: { cancelled: boolean; error?: string }) {
+  return params.cancelled
+    ? {
+        verdict: Verdict.INCONCLUSIVE,
+        reasoning: "Cancelled by user",
+        metCriteria: [],
+        unmetCriteria: [],
+        error: params.error ?? "Cancelled by user",
+      }
+    : {
+        verdict: Verdict.FAILURE,
+        reasoning: params.error ?? "Job failed without error message",
+        metCriteria: [],
+        unmetCriteria: [],
+        error: params.error ?? "Job failed",
+      };
+}
+
 /** Terminal statuses that indicate a run has already finished */
 const TERMINAL_STATUSES = new Set([
   ScenarioRunStatus.SUCCESS,
@@ -183,21 +201,7 @@ export class ScenarioFailureHandler {
           scenarioSetId: setId,
           timestamp: timestamp + 1, // Ensure RUN_FINISHED is after RUN_STARTED
           status,
-          results: cancelled
-            ? {
-                verdict: Verdict.INCONCLUSIVE,
-                reasoning: "Cancelled by user",
-                metCriteria: [],
-                unmetCriteria: [],
-                error: error ?? "Cancelled by user",
-              }
-            : {
-                verdict: Verdict.FAILURE,
-                reasoning: error ?? "Job failed without error message",
-                metCriteria: [],
-                unmetCriteria: [],
-                error: error ?? "Job failed",
-              },
+          results: buildFailureResults({ cancelled: cancelled ?? false, error }),
         });
         span.setAttribute("result.emitted_run_finished", true);
 
@@ -208,21 +212,7 @@ export class ScenarioFailureHandler {
             scenarioRunId,
             occurredAt: timestamp + 1,
             status,
-            results: cancelled
-              ? {
-                  verdict: Verdict.INCONCLUSIVE,
-                  reasoning: "Cancelled by user",
-                  metCriteria: [],
-                  unmetCriteria: [],
-                  error: error ?? "Cancelled by user",
-                }
-              : {
-                  verdict: Verdict.FAILURE,
-                  reasoning: error ?? "Job failed without error message",
-                  metCriteria: [],
-                  unmetCriteria: [],
-                  error: error ?? "Job failed",
-                },
+            results: buildFailureResults({ cancelled: cancelled ?? false, error }),
           });
         } catch (err) {
           logger.warn({ err, scenarioRunId }, "CH finishRun dispatch failed (non-fatal)");
