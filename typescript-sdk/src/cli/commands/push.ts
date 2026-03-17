@@ -84,7 +84,7 @@ export const pushPrompts = async ({
   lock,
   promptsApiService,
   result,
-  nonInteractive,
+  forceResolution,
 }: {
   config: PromptsConfig;
   lock: PromptsLock;
