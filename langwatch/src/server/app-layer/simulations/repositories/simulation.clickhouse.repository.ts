@@ -110,7 +110,7 @@ const DEDUP_LIST_COLUMNS = `
 /** Inner subquery columns for full-detail queries */
 const DEDUP_RUN_COLUMNS = `
   TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, ScenarioId,
-  Status, Name, Description,
+  Status, Name, Description, Metadata,
   \`Messages.Id\`, \`Messages.Role\`, \`Messages.Content\`,
   \`Messages.TraceId\`, \`Messages.Rest\`,
   TraceIds, Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
