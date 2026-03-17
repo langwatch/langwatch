@@ -2,7 +2,7 @@ import type { Event } from "~/server/event-sourcing/domain/types.js";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types.js";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types.js";
 import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types.js";
-import type { AppendStore } from "~/server/event-sourcing/projections/mapProjection.types.js";
+import type { SpanAppendStore } from "~/server/event-sourcing/pipelines/trace-processing/projections/spanStorage.store.js";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans.js";
 import type {
   SpanReceivedEvent,
@@ -39,7 +39,7 @@ type EsTraceDoc = ElasticSearchTrace & EsHit;
 
 interface CombinedTraceMigrationDeps {
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
-  spanAppendStore: AppendStore<NormalizedSpan>;
+  spanAppendStore: SpanAppendStore;
   evaluationRunStore: FoldProjectionStore<EvaluationRunData>;
 }
 
@@ -278,13 +278,11 @@ export function createCombinedTraceMigrationDefinition(
         );
       }
 
-      // SpanStorage append writes — batch all spans for a trace into one closure
+      // SpanStorage append writes — bulk insert all spans for a trace at once
       if (normalizedSpans.length > 0) {
-        projectionWrites.push(async () => {
-          for (const span of normalizedSpans) {
-            await deps.spanAppendStore.append(span, storeContext);
-          }
-        });
+        projectionWrites.push(() =>
+          deps.spanAppendStore.bulkAppend(normalizedSpans, storeContext),
+        );
       }
 
       // Evaluation projection writes
