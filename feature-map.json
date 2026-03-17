@@ -16,7 +16,10 @@
           "description": "Capture LLM calls, spans, inputs/outputs, costs, and latency",
           "surfaces": {
             "code": {
-              "sdk": { "python": "langwatch.trace", "typescript": "langwatch" },
+              "sdk": {
+                "python": "langwatch.trace",
+                "typescript": "langwatch"
+              },
               "cli": null,
               "skill": "tracing",
               "docs": "https://langwatch.ai/docs/integration/overview.md"
@@ -35,7 +38,7 @@
         {
           "id": "observability.analytics",
           "name": "Analytics",
-          "description": "Query timeseries analytics — costs, latency, token usage, error rates",
+          "description": "Query timeseries analytics \u2014 costs, latency, token usage, error rates",
           "surfaces": {
             "code": {
               "sdk": null,
@@ -45,7 +48,12 @@
             },
             "platform": {
               "ui": "/analytics",
-              "mcp": ["get_analytics", "search_traces", "get_trace", "discover_schema"],
+              "mcp": [
+                "get_analytics",
+                "search_traces",
+                "get_trace",
+                "discover_schema"
+              ],
               "skill": "analytics",
               "docs": "https://langwatch.ai/docs/features/embedded-analytics.md"
             },
@@ -57,10 +65,13 @@
         {
           "id": "observability.user-events",
           "name": "User Events",
-          "description": "Track user interactions — thumbs up/down, selected text, custom events",
+          "description": "Track user interactions \u2014 thumbs up/down, selected text, custom events",
           "surfaces": {
             "code": {
-              "sdk": { "python": "langwatch.track_event", "typescript": null },
+              "sdk": {
+                "python": "langwatch.track_event",
+                "typescript": null
+              },
               "cli": null,
               "skill": null,
               "docs": "https://langwatch.ai/docs/user-events/overview.md"
@@ -114,7 +125,10 @@
           "description": "Batch test prompts, models, and agents on datasets before deploying",
           "surfaces": {
             "code": {
-              "sdk": { "python": "langwatch.experiment", "typescript": "langwatch.experiments" },
+              "sdk": {
+                "python": "langwatch.experiment",
+                "typescript": "langwatch.experiments"
+              },
               "cli": null,
               "skill": "evaluations",
               "docs": "https://langwatch.ai/docs/evaluations/experiments/sdk.md"
@@ -136,7 +150,10 @@
           "description": "Continuously score production traffic and block harmful content in real-time (guardrails via code)",
           "surfaces": {
             "code": {
-              "sdk": { "python": "langwatch.evaluation", "typescript": null },
+              "sdk": {
+                "python": "langwatch.evaluation",
+                "typescript": null
+              },
               "cli": null,
               "skill": "evaluations",
               "docs": "https://langwatch.ai/docs/evaluations/guardrails/code-integration.md"
@@ -169,14 +186,23 @@
           "description": "Define test cases with situations, criteria, and simulated user behavior",
           "surfaces": {
             "code": {
-              "sdk": { "python": "langwatch-scenario", "typescript": "@langwatch/scenario" },
+              "sdk": {
+                "python": "langwatch-scenario",
+                "typescript": "@langwatch/scenario"
+              },
               "cli": null,
               "skill": "scenarios",
               "docs": "https://langwatch.ai/scenario/introduction/getting-started.md"
             },
             "platform": {
               "ui": "/simulations/scenarios",
-              "mcp": ["platform_create_scenario", "platform_list_scenarios", "platform_get_scenario", "platform_update_scenario", "platform_archive_scenario"],
+              "mcp": [
+                "platform_create_scenario",
+                "platform_list_scenarios",
+                "platform_get_scenario",
+                "platform_update_scenario",
+                "platform_archive_scenario"
+              ],
               "skill": "scenarios",
               "docs": "https://langwatch.ai/scenario/basics/no-code-scenario.md"
             },
@@ -224,14 +250,31 @@
           "description": "Create, version, sync, and use prompts across code and platform",
           "surfaces": {
             "code": {
-              "sdk": { "python": "langwatch.prompts", "typescript": "langwatch.prompts" },
-              "cli": ["prompt init", "prompt create", "prompt add", "prompt remove", "prompt list", "prompt sync", "prompt pull", "prompt push"],
+              "sdk": {
+                "python": "langwatch.prompts",
+                "typescript": "langwatch.prompts"
+              },
+              "cli": [
+                "prompt init",
+                "prompt create",
+                "prompt add",
+                "prompt remove",
+                "prompt list",
+                "prompt sync",
+                "prompt pull",
+                "prompt push"
+              ],
               "skill": "prompts",
               "docs": "https://langwatch.ai/docs/prompt-management/cli.md"
             },
             "platform": {
               "ui": "/prompts",
-              "mcp": ["platform_create_prompt", "platform_list_prompts", "platform_get_prompt", "platform_update_prompt"],
+              "mcp": [
+                "platform_create_prompt",
+                "platform_list_prompts",
+                "platform_get_prompt",
+                "platform_update_prompt"
+              ],
               "skill": null,
               "docs": "https://langwatch.ai/docs/prompt-management/getting-started.md"
             },
@@ -267,7 +310,7 @@
     {
       "id": "library",
       "name": "Library",
-      "description": "Reusable components — agents, workflows, evaluators, and datasets",
+      "description": "Reusable components \u2014 agents, workflows, evaluators, and datasets",
       "children": [
         {
           "id": "library.agents",
@@ -316,17 +359,25 @@
         {
           "id": "library.evaluators",
           "name": "Evaluators",
-          "description": "Scoring functions — built-in library and custom configurations",
+          "description": "Scoring functions \u2014 built-in library and custom configurations",
           "surfaces": {
             "code": {
-              "sdk": { "python": "langwatch.evaluators", "typescript": "langwatch.evaluators" },
+              "sdk": {
+                "python": "langwatch.evaluators",
+                "typescript": "langwatch.evaluators"
+              },
               "cli": null,
               "skill": "evaluations",
               "docs": "https://langwatch.ai/docs/evaluations/evaluators/built-in-evaluators.md"
             },
             "platform": {
               "ui": "/evaluators",
-              "mcp": ["platform_create_evaluator", "platform_list_evaluators", "platform_get_evaluator", "platform_update_evaluator"],
+              "mcp": [
+                "platform_create_evaluator",
+                "platform_list_evaluators",
+                "platform_get_evaluator",
+                "platform_update_evaluator"
+              ],
               "skill": "evaluations",
               "docs": "https://langwatch.ai/docs/evaluations/evaluators/overview.md"
             },
@@ -341,7 +392,10 @@
           "description": "Collections of test cases with inputs and optional expected outputs",
           "surfaces": {
             "code": {
-              "sdk": { "python": "langwatch.dataset", "typescript": null },
+              "sdk": {
+                "python": "langwatch.dataset",
+                "typescript": null
+              },
               "cli": null,
               "skill": "evaluations",
               "docs": "https://langwatch.ai/docs/datasets/programmatic-access.md"
@@ -357,7 +411,10 @@
           },
           "sync": null
         }
-      ]
+      ],
+      "surfaces": {
+        "docs": null
+      }
     },
     {
       "id": "settings",
@@ -377,7 +434,10 @@
             },
             "platform": {
               "ui": "/settings",
-              "mcp": ["platform_set_model_provider", "platform_list_model_providers"],
+              "mcp": [
+                "platform_set_model_provider",
+                "platform_list_model_providers"
+              ],
               "skill": null,
               "docs": "https://langwatch.ai/docs/integration/custom-models.md"
             },
@@ -386,11 +446,17 @@
           },
           "sync": null
         }
-      ]
+      ],
+      "surfaces": {
+        "docs": null
+      }
     }
   ],
   "meta": {
-    "mcp_docs_tools": ["fetch_langwatch_docs", "fetch_scenario_docs"],
+    "mcp_docs_tools": [
+      "fetch_langwatch_docs",
+      "fetch_scenario_docs"
+    ],
     "meta_skills": {
       "level-up": "Orchestrates tracing + prompts + evaluations + scenarios",
       "analytics": "Cross-cutting skill for querying performance (works for both code and platform users)"
