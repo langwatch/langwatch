@@ -47,7 +47,7 @@ export function useCancelScenarioRun({
   onCancelBatchSuccess,
   onCancelBatchError,
 }: {
-  onCancelJobSuccess?: () => void;
+  onCancelJobSuccess?: (method?: "removed" | "signalled") => void;
   onCancelJobError?: (error: { message: string }) => void;
   onCancelBatchSuccess?: () => void;
   onCancelBatchError?: (error: { message: string }) => void;
@@ -55,9 +55,9 @@ export function useCancelScenarioRun({
   const cancelJobMutation = api.scenarios.cancelJob.useMutation({
     onSuccess: (result) => {
       if (result.cancelled) {
-        onCancelJobSuccess?.();
+        onCancelJobSuccess?.(result.method);
       } else {
-        onCancelJobError?.({ message: "Job could not be cancelled" });
+        onCancelJobError?.({ message: "Job could not be cancelled — it may have already completed" });
       }
     },
     onError: (error) => {

@@ -37,6 +37,10 @@ export interface CancelBatchRunParams {
 /** Result of cancelling a single job. */
 export interface CancelJobResult {
   cancelled: boolean;
+  /** "removed" = confirmed cancelled (queued job removed from queue).
+   *  "signalled" = cancellation requested (active job, async — may not take effect if already completed).
+   *  undefined when cancelled is false. */
+  method?: "removed" | "signalled";
 }
 
 /** Result of cancelling a batch run. */
@@ -124,14 +128,14 @@ export class ScenarioCancellationService {
         results: null,
       });
 
-      return { cancelled: true };
+      return { cancelled: true, method: "removed" };
     }
 
     // Try signaling cancel (works for ACTIVE/RUNNING jobs)
     const signalled = await this.signalCancel({ projectId, scenarioRunId, batchRunId });
     if (signalled) {
       logger.info({ scenarioRunId }, "Cancellation signal published for active job");
-      return { cancelled: true };
+      return { cancelled: true, method: "signalled" };
     }
 
     // Neither worked — job is terminal or not found
