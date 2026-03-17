@@ -39,8 +39,6 @@ import type { AppendStore } from "~/server/event-sourcing/projections/mapProject
 // Evaluation pipeline stores
 import { EvaluationRunClickHouseRepository } from "~/server/app-layer/evaluations/repositories/evaluation-run.clickhouse.repository.js";
 import { EvaluationRunStore } from "~/server/event-sourcing/pipelines/evaluation-processing/projections/evaluationRun.store.js";
-import type { EvaluationRunData } from "~/server/app-layer/evaluations/types.js";
-
 // DSPy step repository (direct-write for dspy-steps migration)
 import { DspyStepClickHouseRepository } from "~/server/app-layer/dspy-steps/repositories/dspy-step.clickhouse.repository.js";
 
@@ -109,8 +107,8 @@ export interface AppDependencies {
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
   /** Span append store (for direct-write trace migration). */
   spanAppendStore: SpanAppendStore;
-  /** Evaluation run fold store (for direct-write trace-evaluation migration). */
-  evaluationRunStore: FoldProjectionStore<EvaluationRunData>;
+  /** Evaluation run store (for direct-write trace-evaluation migration). */
+  evaluationRunStore: EvaluationRunStore;
   /** Experiment run state fold store (for direct-write batch-evaluations migration). */
   experimentRunStateFoldStore: FoldProjectionStore<ExperimentRunStateData>;
   /** Experiment run item append store (for direct-write batch-evaluations migration). */
