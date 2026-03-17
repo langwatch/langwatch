@@ -54,8 +54,12 @@ export function useCancelScenarioRun({
   onCancelBatchError?: (error: { message: string }) => void;
 } = {}) {
   const cancelJobMutation = api.scenarios.cancelJob.useMutation({
-    onSuccess: () => {
-      onCancelJobSuccess?.();
+    onSuccess: (result) => {
+      if (result.cancelled) {
+        onCancelJobSuccess?.();
+      } else {
+        onCancelJobError?.({ message: "Job could not be cancelled" });
+      }
     },
     onError: (error) => {
       onCancelJobError?.(error);

@@ -18,6 +18,7 @@ import {
   Collapsible,
   HStack,
   Input,
+  Skeleton,
   Text,
   Textarea,
   VStack,
@@ -80,7 +81,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
   const onRunRequested = callbacks?.onRunRequested;
 
   // Fetch suite data when editing
-  const { data: suite } = api.suites.getById.useQuery(
+  const { data: suite, isLoading: isSuiteLoading } = api.suites.getById.useQuery(
     { projectId: project?.id ?? "", id: suiteId ?? "" },
     { enabled: !!project && !!suiteId && isOpen },
   );
@@ -249,6 +250,18 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
         </Drawer.Header>
 
         <Drawer.Body>
+          {isEditMode && isSuiteLoading ? (
+            <VStack gap={4} align="stretch">
+              <Skeleton height="20px" width="60px" />
+              <Skeleton height="40px" />
+              <Skeleton height="20px" width="80px" />
+              <Skeleton height="80px" />
+              <Skeleton height="20px" width="70px" />
+              <Skeleton height="120px" />
+              <Skeleton height="20px" width="60px" />
+              <Skeleton height="120px" />
+            </VStack>
+          ) : (
           <VStack gap={4} align="stretch">
             {/* Name */}
             <VStack align="start" gap={1}>
@@ -390,6 +403,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
               </Collapsible.Content>
             </Collapsible.Root>
           </VStack>
+          )}
         </Drawer.Body>
 
         <Drawer.Footer>

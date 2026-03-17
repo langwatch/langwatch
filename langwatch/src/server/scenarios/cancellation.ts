@@ -63,7 +63,7 @@ interface CancellationEventParams {
 
 /** Dependencies injected into the cancellation service. */
 export interface CancellationServiceDeps {
-  queue: Pick<Queue, "getJob">;
+  queue: Pick<Queue, "getJob" | "getJobs">;
   /** Publishes a cancel signal to all worker instances via Redis pub/sub. Returns false when Redis is unavailable. */
   publishCancellation: (message: CancellationMessage) => Promise<boolean>;
   /** Fetches queued/active jobs from BullMQ for a given set + project. */
@@ -105,12 +105,23 @@ export class ScenarioCancellationService {
   async cancelJob(params: CancelJobParams): Promise<CancelJobResult> {
     const { projectId, jobId, batchRunId, scenarioRunId } = params;
 
-    logger.info({ projectId, jobId, batchRunId }, "Cancelling scenario job");
+    logger.info({ projectId, jobId, scenarioRunId, batchRunId }, "Cancelling scenario job");
 
-    const bullmqJob = await this.queue.getJob(jobId);
+    // Try direct lookup first, then search by scenarioRunId in job data.
+    // The jobId from the frontend may be a scenarioRunId (not the BullMQ job ID).
+    let bullmqJob = await this.queue.getJob(jobId);
 
     if (!bullmqJob) {
-      logger.debug({ jobId }, "BullMQ job not found, nothing to cancel");
+      // Search active/waiting/delayed jobs for matching scenarioRunId
+      const allJobs = await this.queue.getJobs(["waiting", "active", "delayed"]);
+      bullmqJob = allJobs.find((j) => {
+        const data = j.data as Record<string, unknown> | undefined;
+        return data?.scenarioRunId === scenarioRunId;
+      }) ?? null;
+    }
+
+    if (!bullmqJob) {
+      logger.debug({ jobId, scenarioRunId }, "BullMQ job not found, nothing to cancel");
       return { cancelled: false };
     }
 

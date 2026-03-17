@@ -17,8 +17,10 @@ function createMockDeps() {
   const mockGetQueuedJobs = vi.fn().mockResolvedValue([]);
   const mockSaveScenarioEvent = vi.fn().mockResolvedValue(undefined);
 
+  const mockGetJobs = vi.fn().mockResolvedValue([]);
+
   const deps: CancellationServiceDeps = {
-    queue: { getJob: mockGetJob },
+    queue: { getJob: mockGetJob, getJobs: mockGetJobs },
     publishCancellation: mockPublishCancellation,
     getQueuedJobs: mockGetQueuedJobs,
     saveScenarioEvent: mockSaveScenarioEvent,
