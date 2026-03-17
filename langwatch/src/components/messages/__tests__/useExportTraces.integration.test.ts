@@ -199,6 +199,100 @@ describe("useExportTraces()", () => {
     });
   });
 
+  describe("when a second export starts while the first is in-flight", () => {
+    it("aborts the first export's fetch request", () => {
+      const abortSpy = vi.fn();
+      let callCount = 0;
+
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+          callCount++;
+          if (callCount === 1) {
+            // First export: spy on its signal
+            init.signal?.addEventListener("abort", abortSpy);
+          }
+          // Return a promise that never resolves so the export stays in-flight
+          return new Promise(() => {});
+        })
+      );
+
+      const { result } = renderHook(() =>
+        useExportTraces({ projectId: "proj-1" })
+      );
+
+      act(() => {
+        result.current.startExport({ mode: "summary", format: "csv" });
+      });
+
+      expect(result.current.isExporting).toBe(true);
+      expect(abortSpy).not.toHaveBeenCalled();
+
+      // Start a second export
+      act(() => {
+        result.current.startExport({ mode: "full", format: "json" });
+      });
+
+      expect(abortSpy).toHaveBeenCalledTimes(1);
+      // Still exporting (now export B is active)
+      expect(result.current.isExporting).toBe(true);
+    });
+
+    it("prevents the first export's completion handler from mutating state", async () => {
+      let firstFetchResolve: ((value: Response) => void) | null = null;
+      let callCount = 0;
+
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockImplementation(() => {
+          callCount++;
+          if (callCount === 1) {
+            // First export: return a controllable promise
+            return new Promise<Response>((resolve) => {
+              firstFetchResolve = resolve;
+            });
+          }
+          // Second export: never resolves
+          return new Promise(() => {});
+        })
+      );
+
+      const { result } = renderHook(() =>
+        useExportTraces({ projectId: "proj-1" })
+      );
+
+      // Start first export
+      act(() => {
+        result.current.startExport({ mode: "summary", format: "csv" });
+      });
+
+      // Start second export (replaces the active controller)
+      act(() => {
+        result.current.startExport({ mode: "full", format: "json" });
+      });
+
+      expect(result.current.isExporting).toBe(true);
+
+      // Now resolve first export (it was aborted, but let's simulate the .catch path)
+      // The abort would cause an AbortError, returning false from catch.
+      // Resolve with an error response to trigger the catch path with a non-abort error.
+      await act(async () => {
+        firstFetchResolve!({
+          ok: false,
+          status: 500,
+          statusText: "Internal Server Error",
+          headers: new Headers(),
+        } as unknown as Response);
+        // Allow microtasks to flush
+        await new Promise((r) => setTimeout(r, 0));
+      });
+
+      // isExporting should still be true because the stale guard prevents
+      // the first export's handler from resetting state
+      expect(result.current.isExporting).toBe(true);
+    });
+  });
+
   describe("when projectId is undefined", () => {
     it("does not start export and shows error toast", () => {
       const { result } = renderHook(() =>

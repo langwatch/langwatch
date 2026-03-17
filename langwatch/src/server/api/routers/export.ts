@@ -48,7 +48,14 @@ export const exportRouter = createTRPCRouter({
           signal: opts.signal,
         })) {
           const event = eventArgs[0] as { event: string; timestamp: number };
-          const parsed = JSON.parse(event.event) as ExportProgressEvent;
+
+          let parsed: ExportProgressEvent;
+          try {
+            parsed = JSON.parse(event.event) as ExportProgressEvent;
+          } catch {
+            logger.warn({ projectId, exportId }, "Ignoring invalid export progress event");
+            continue;
+          }
 
           // Only yield events for this specific export
           if (parsed.exportId !== exportId) continue;

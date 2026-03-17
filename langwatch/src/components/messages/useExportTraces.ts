@@ -184,6 +184,9 @@ export function useExportTraces({
         completionTimeoutRef.current = null;
       }
 
+      // Abort any in-flight export
+      abortControllerRef.current?.abort();
+
       // Close the dialog when export starts
       setIsDialogOpen(false);
       setIsExporting(true);
@@ -206,6 +209,11 @@ export function useExportTraces({
       const fileExtension = config.format === "json" ? "jsonl" : "csv";
       const today = new Date().toISOString().split("T")[0];
       const fallbackFilename = `${projectId} - Traces - ${today} - ${config.mode}.${fileExtension}`;
+
+      // Capture this controller to detect staleness in async handlers.
+      // If a new export starts, abortControllerRef.current will change,
+      // so comparing against thisController tells us this export is stale.
+      const thisController = abortController;
 
       // Start the file download stream and track progress from both:
       // 1. X-Total-Traces header (immediate total count)
@@ -260,8 +268,12 @@ export function useExportTraces({
           return false;
         });
 
-      // When download completes, show "done" state briefly then hide
+      // When download completes, show "done" state briefly then hide.
+      // Only update state if this export is still the active one —
+      // a newer export will have replaced abortControllerRef.current.
       void exportPromise.then((completed) => {
+        if (abortControllerRef.current !== thisController) return;
+
         if (!completed) {
           setIsExporting(false);
           setProgress({ exported: 0, total: 0 });
