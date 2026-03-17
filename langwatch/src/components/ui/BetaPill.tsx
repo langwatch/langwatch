@@ -1,5 +1,5 @@
 import { Badge, HStack } from "@chakra-ui/react";
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   PopoverAnchor,
@@ -82,7 +82,10 @@ export function BetaPill({
           onMouseLeave={handleClose}
           onFocus={handleOpen}
           onBlur={handleClose}
-          onClick={() => setOpen((prev) => !prev)}
+          onClick={(e: MouseEvent) => {
+            e.stopPropagation();
+            setOpen((prev) => !prev);
+          }}
         >
           Beta
         </Badge>
