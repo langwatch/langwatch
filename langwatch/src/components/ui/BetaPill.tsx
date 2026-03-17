@@ -1,19 +1,20 @@
 import { Badge, HStack } from "@chakra-ui/react";
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  PopoverAnchor,
   PopoverBody,
   PopoverContent,
   PopoverRoot,
-  PopoverTrigger,
 } from "./popover";
 
 /**
  * BetaPill indicates a feature is in beta.
  *
- * Displays a small "Beta" pill badge. On hover or keyboard focus,
+ * Displays a small "Beta" pill badge. On hover, keyboard focus, or click,
  * a popover appears with a customizable message that supports
- * rich content (styled text, clickable links, etc.).
+ * rich content (styled text, clickable links, etc.). Clicking the pill
+ * toggles the popover open/closed.
  *
  * Can optionally wrap content (children) to place the badge alongside it,
  * or be used standalone (e.g. as a rightElement in a menu item).
@@ -70,7 +71,7 @@ export function BetaPill({
       onOpenChange={({ open: isOpen }) => setOpen(isOpen)}
       positioning={{ placement: "bottom-start" }}
     >
-      <PopoverTrigger asChild>
+      <PopoverAnchor asChild>
         <Badge
           size="sm"
           variant="subtle"
@@ -81,10 +82,14 @@ export function BetaPill({
           onMouseLeave={handleClose}
           onFocus={handleOpen}
           onBlur={handleClose}
+          onClick={(e: MouseEvent) => {
+            e.stopPropagation();
+            setOpen((prev) => !prev);
+          }}
         >
           Beta
         </Badge>
-      </PopoverTrigger>
+      </PopoverAnchor>
       <PopoverContent
         onMouseEnter={handlePopoverEnter}
         onMouseLeave={handlePopoverLeave}
