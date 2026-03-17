@@ -20,6 +20,12 @@ export enum ScenarioEventType {
   TOOL_CALL_END = "SCENARIO_TOOL_CALL_END",
 }
 
+/**
+ * Domain-level statuses persisted in ES/ClickHouse (PENDING, IN_PROGRESS, …) are
+ * distinct from the transient BullMQ queue states surfaced in the UI (QUEUED,
+ * RUNNING). QUEUED maps to BullMQ "waiting/delayed" and RUNNING maps to BullMQ
+ * "active" — they are UI-only overlays that are never written to the database.
+ */
 export enum ScenarioRunStatus {
   SUCCESS = "SUCCESS",
   ERROR = "ERROR",

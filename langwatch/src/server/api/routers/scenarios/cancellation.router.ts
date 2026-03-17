@@ -44,7 +44,11 @@ async function getQueuedJobs(params: { setId: string; projectId: string }) {
   return jobs
     .filter((job) => {
       const data = job.data as Record<string, unknown> | undefined;
-      return data && data.projectId === params.projectId;
+      return (
+        data &&
+        data.projectId === params.projectId &&
+        data.setId === params.setId
+      );
     })
     .map((job) => {
       const data = job.data as Record<string, unknown> | undefined;
@@ -57,12 +61,15 @@ async function getQueuedJobs(params: { setId: string; projectId: string }) {
     });
 }
 
-function createPublishCancellation() {
+function createPublishCancellation(): CancellationServiceDeps["publishCancellation"] {
   const publisher = connection;
-  return publisher
-    ? (message: Parameters<typeof publishCancellation>[0]["message"]) =>
-        publishCancellation({ publisher, message })
-    : () => Promise.resolve();
+  if (!publisher) {
+    return (_message) => {
+      logger.warn("Redis unavailable: cannot publish cancellation signal for active jobs");
+      return Promise.resolve(false);
+    };
+  }
+  return (message) => publishCancellation({ publisher, message });
 }
 
 /**
@@ -75,8 +82,11 @@ function createSaveScenarioEvent(): CancellationServiceDeps["saveScenarioEvent"]
   const facade = SimulationFacade.create();
 
   return async (event) => {
-    // Write to ES for backwards compatibility
-    await facade.saveScenarioEvent(event);
+    // Write to ES for backwards compatibility (skip when ES writes are disabled)
+    const project = await getApp().projects.repo.getById(event.projectId);
+    if (!project?.disableElasticSearchSimulationWriting) {
+      await facade.saveScenarioEvent(event);
+    }
 
     // Dispatch to event-sourcing so ClickHouse gets the CANCELLED status
     // and the reactor broadcasts an SSE update to connected clients.
@@ -97,13 +107,17 @@ function createSaveScenarioEvent(): CancellationServiceDeps["saveScenarioEvent"]
   };
 }
 
-function createService() {
-  return new ScenarioCancellationService({
-    queue: scenarioQueue,
-    publishCancellation: createPublishCancellation(),
-    getQueuedJobs,
-    saveScenarioEvent: createSaveScenarioEvent(),
-  });
+let _service: ScenarioCancellationService | null = null;
+function getService(): ScenarioCancellationService {
+  if (!_service) {
+    _service = new ScenarioCancellationService({
+      queue: scenarioQueue,
+      publishCancellation: createPublishCancellation(),
+      getQueuedJobs,
+      saveScenarioEvent: createSaveScenarioEvent(),
+    });
+  }
+  return _service;
 }
 
 export const cancellationRouter = createTRPCRouter({
@@ -116,7 +130,7 @@ export const cancellationRouter = createTRPCRouter({
         "Cancel job request received",
       );
 
-      return createService().cancelJob(input);
+      return getService().cancelJob(input);
     }),
 
   cancelBatchRun: protectedProcedure
@@ -128,6 +142,6 @@ export const cancellationRouter = createTRPCRouter({
         "Cancel batch run request received",
       );
 
-      return createService().cancelBatchRun(input);
+      return getService().cancelBatchRun(input);
     }),
 });

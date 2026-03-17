@@ -13,7 +13,7 @@ import type { CancellationServiceDeps } from "../cancellation";
 
 function createMockDeps() {
   const mockGetJob = vi.fn();
-  const mockPublishCancellation = vi.fn().mockResolvedValue(undefined);
+  const mockPublishCancellation = vi.fn().mockResolvedValue(true);
   const mockGetQueuedJobs = vi.fn().mockResolvedValue([]);
   const mockSaveScenarioEvent = vi.fn().mockResolvedValue(undefined);
 
@@ -103,6 +103,28 @@ describe("ScenarioCancellationService", () => {
 
       it("returns cancelled: true", () => {
         expect(result).toEqual({ cancelled: true });
+      });
+    });
+
+    describe("when the job is actively running and Redis is unavailable", () => {
+      let result: { cancelled: boolean };
+
+      beforeEach(async () => {
+        const { deps, mockGetJob } = createMockDeps();
+        mockGetJob.mockResolvedValue({
+          getState: vi.fn().mockResolvedValue("active"),
+        });
+        const depsWithNoRedis: typeof deps = {
+          ...deps,
+          publishCancellation: vi.fn().mockResolvedValue(false),
+        };
+
+        const service = new ScenarioCancellationService(depsWithNoRedis);
+        result = await service.cancelJob(defaultJobParams);
+      });
+
+      it("returns cancelled: false", () => {
+        expect(result).toEqual({ cancelled: false });
       });
     });
 

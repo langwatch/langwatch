@@ -161,6 +161,47 @@ describe("SimulationFacade", () => {
     });
   });
 
+  describe("isClickHouseReadEnabled()", () => {
+    it("returns true when chService is present and feature flag is enabled", async () => {
+      const mockProjects: MockProjectService = { isFeatureEnabled: vi.fn().mockResolvedValue(true) };
+      const facade = new SimulationFacade({
+        projects: mockProjects as unknown as ProjectService,
+        chService: makeMockChService() as unknown as SimulationRunService,
+        esService: makeMockEsService() as unknown as ScenarioEventService,
+      });
+
+      const result = await facade.isClickHouseReadEnabled(projectId);
+
+      expect(result).toBe(true);
+    });
+
+    it("returns false when chService is null", async () => {
+      const mockProjects: MockProjectService = { isFeatureEnabled: vi.fn().mockResolvedValue(true) };
+      const facade = new SimulationFacade({
+        projects: mockProjects as unknown as ProjectService,
+        chService: null,
+        esService: makeMockEsService() as unknown as ScenarioEventService,
+      });
+
+      const result = await facade.isClickHouseReadEnabled(projectId);
+
+      expect(result).toBe(false);
+    });
+
+    it("returns false when feature flag is disabled", async () => {
+      const mockProjects: MockProjectService = { isFeatureEnabled: vi.fn().mockResolvedValue(false) };
+      const facade = new SimulationFacade({
+        projects: mockProjects as unknown as ProjectService,
+        chService: makeMockChService() as unknown as SimulationRunService,
+        esService: makeMockEsService() as unknown as ScenarioEventService,
+      });
+
+      const result = await facade.isClickHouseReadEnabled(projectId);
+
+      expect(result).toBe(false);
+    });
+  });
+
   describe("saveScenarioEvent", () => {
     it("always delegates to Elasticsearch regardless of flag", async () => {
       const mockProjects: MockProjectService = {

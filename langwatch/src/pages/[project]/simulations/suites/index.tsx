@@ -36,6 +36,7 @@ import {
 } from "~/components/suites/useSuiteRouting";
 import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -102,6 +103,19 @@ function SuitesPageContent() {
     },
     { enabled: !!project, refetchInterval: 30_000 },
   );
+
+  // Connect the sidebar-level query to SSE events so new runs appear without
+  // waiting for the 30s poll interval. Without this, the SSE listener only
+  // lives inside RunHistoryPanel, leaving the sidebar query unreachable.
+  useSimulationUpdateListener({
+    projectId: project?.id ?? "",
+    refetch: () => {
+      setSuiteRunSinceTimestamp(undefined);
+      void utils.scenarios.getSuiteRunData.invalidate();
+    },
+    enabled: !!project?.id,
+    debounceMs: 500,
+  });
 
   // Update cached data only when server reports changes
   useEffect(() => {
@@ -195,10 +209,33 @@ function SuitesPageContent() {
     },
   });
 
+  const retryTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  useEffect(() => {
+    return () => {
+      retryTimersRef.current.forEach(clearTimeout);
+    };
+  }, []);
+
   const { requestRun, isPending: isRunPending, dialogProps: runDialogProps } = useRunSuite({
     onRunScheduled: () => {
       setSuiteRunSinceTimestamp(undefined);
       void utils.scenarios.getSuiteRunData.invalidate();
+
+      // The queue processor stages commands to Redis and processes them async.
+      // Schedule follow-up invalidations to catch ClickHouse data once the
+      // event-sourcing pipeline settles, as a safety net alongside SSE.
+      retryTimersRef.current.forEach(clearTimeout);
+      retryTimersRef.current = [
+        setTimeout(() => {
+          setSuiteRunSinceTimestamp(undefined);
+          void utils.scenarios.getSuiteRunData.invalidate();
+        }, 1000),
+        setTimeout(() => {
+          setSuiteRunSinceTimestamp(undefined);
+          void utils.scenarios.getSuiteRunData.invalidate();
+        }, 3000),
+      ];
     },
   });
 

@@ -12,6 +12,18 @@ import {
 } from "~/server/scenarios/scenario-event.enums";
 import { ScenarioFailureHandler } from "../scenario-failure-handler";
 
+const mockStartRun = vi.fn().mockResolvedValue(undefined);
+const mockFinishRun = vi.fn().mockResolvedValue(undefined);
+
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({
+    simulations: {
+      startRun: mockStartRun,
+      finishRun: mockFinishRun,
+    },
+  }),
+}));
+
 describe("ScenarioFailureHandler", () => {
   let handler: ScenarioFailureHandler;
   let mockService: {
@@ -31,6 +43,8 @@ describe("ScenarioFailureHandler", () => {
       getRunDataForBatchRun: vi.fn(),
       saveScenarioEvent: vi.fn(),
     };
+    mockStartRun.mockClear();
+    mockFinishRun.mockClear();
     handler = new ScenarioFailureHandler(
       mockService as unknown as SimulationFacade,
     );
@@ -330,6 +344,157 @@ describe("ScenarioFailureHandler", () => {
           });
 
           expect(mockService.saveScenarioEvent).not.toHaveBeenCalled();
+        });
+      });
+    });
+
+    describe("ClickHouse dual-write via event-sourcing", () => {
+      describe("given no events exist for the batch run", () => {
+        beforeEach(() => {
+          mockService.getRunDataForBatchRun.mockResolvedValue({ changed: true, runs: [] });
+        });
+
+        describe("when called with an error", () => {
+          it("dispatches startRun to event-sourcing", async () => {
+            await handler.ensureFailureEventsEmitted({
+              ...baseJobData,
+              error: "Child process exited with code 1",
+            });
+
+            expect(mockStartRun).toHaveBeenCalledTimes(1);
+            expect(mockStartRun).toHaveBeenCalledWith(
+              expect.objectContaining({
+                tenantId: "proj_123",
+                scenarioId: "scen_456",
+                batchRunId: "batch_abc",
+                scenarioSetId: "set_789",
+              }),
+            );
+          });
+
+          it("dispatches finishRun to event-sourcing with ERROR status", async () => {
+            await handler.ensureFailureEventsEmitted({
+              ...baseJobData,
+              error: "Child process exited with code 1",
+            });
+
+            expect(mockFinishRun).toHaveBeenCalledTimes(1);
+            expect(mockFinishRun).toHaveBeenCalledWith(
+              expect.objectContaining({
+                tenantId: "proj_123",
+                status: ScenarioRunStatus.ERROR,
+                results: expect.objectContaining({
+                  verdict: Verdict.FAILURE,
+                  error: "Child process exited with code 1",
+                }),
+              }),
+            );
+          });
+        });
+
+        describe("when called with cancelled: true", () => {
+          it("dispatches finishRun with CANCELLED status", async () => {
+            await handler.ensureFailureEventsEmitted({
+              ...baseJobData,
+              error: "Cancelled by user",
+              cancelled: true,
+            });
+
+            expect(mockFinishRun).toHaveBeenCalledWith(
+              expect.objectContaining({
+                status: ScenarioRunStatus.CANCELLED,
+                results: expect.objectContaining({
+                  verdict: Verdict.INCONCLUSIVE,
+                }),
+              }),
+            );
+          });
+        });
+      });
+
+      describe("given RUN_STARTED event already exists", () => {
+        beforeEach(() => {
+          mockService.getRunDataForBatchRun.mockResolvedValue({
+            changed: true,
+            runs: [
+              {
+                scenarioRunId: "scenariorun_existing123",
+                scenarioId: "scen_456",
+                batchRunId: "batch_abc",
+                status: ScenarioRunStatus.IN_PROGRESS,
+                results: null,
+                messages: [],
+                timestamp: Date.now(),
+              },
+            ],
+          });
+        });
+
+        describe("when called with an error", () => {
+          it("does not dispatch startRun (only finishRun)", async () => {
+            await handler.ensureFailureEventsEmitted({
+              ...baseJobData,
+              error: "Scenario execution timed out",
+            });
+
+            expect(mockStartRun).not.toHaveBeenCalled();
+            expect(mockFinishRun).toHaveBeenCalledTimes(1);
+          });
+        });
+      });
+
+      describe("given run already has terminal status", () => {
+        beforeEach(() => {
+          mockService.getRunDataForBatchRun.mockResolvedValue({
+            changed: true,
+            runs: [
+              {
+                scenarioRunId: "scenariorun_existing123",
+                scenarioId: "scen_456",
+                batchRunId: "batch_abc",
+                status: ScenarioRunStatus.ERROR,
+                results: { verdict: Verdict.FAILURE, error: "Previous error" },
+                messages: [],
+                timestamp: Date.now(),
+              },
+            ],
+          });
+        });
+
+        it("does not dispatch any event-sourcing commands", async () => {
+          await handler.ensureFailureEventsEmitted({
+            ...baseJobData,
+            error: "This error should be ignored",
+          });
+
+          expect(mockStartRun).not.toHaveBeenCalled();
+          expect(mockFinishRun).not.toHaveBeenCalled();
+        });
+      });
+
+      describe("when CH dispatch fails", () => {
+        beforeEach(() => {
+          mockService.getRunDataForBatchRun.mockResolvedValue({ changed: true, runs: [] });
+          mockStartRun.mockRejectedValue(new Error("CH unavailable"));
+          mockFinishRun.mockRejectedValue(new Error("CH unavailable"));
+        });
+
+        it("does not throw (failures are non-fatal)", async () => {
+          await expect(
+            handler.ensureFailureEventsEmitted({
+              ...baseJobData,
+              error: "Child process exited with code 1",
+            }),
+          ).resolves.toBeUndefined();
+        });
+
+        it("still writes ES events even when CH fails", async () => {
+          await handler.ensureFailureEventsEmitted({
+            ...baseJobData,
+            error: "Child process exited with code 1",
+          });
+
+          expect(mockService.saveScenarioEvent).toHaveBeenCalledTimes(2);
         });
       });
     });

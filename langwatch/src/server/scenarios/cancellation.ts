@@ -64,8 +64,8 @@ interface CancellationEventParams {
 /** Dependencies injected into the cancellation service. */
 export interface CancellationServiceDeps {
   queue: Pick<Queue, "getJob">;
-  /** Publishes a cancel signal to all worker instances via Redis pub/sub. */
-  publishCancellation: (message: CancellationMessage) => Promise<void>;
+  /** Publishes a cancel signal to all worker instances via Redis pub/sub. Returns false when Redis is unavailable. */
+  publishCancellation: (message: CancellationMessage) => Promise<boolean>;
   /** Fetches queued/active jobs from BullMQ for a given set + project. */
   getQueuedJobs: (params: { setId: string; projectId: string }) => Promise<Array<{ scenarioRunId: string; scenarioId: string; batchRunId: string; status: string }>>;
   /** Writes a scenario event to ES. Only used for queued jobs that will never be processed by a worker. */
@@ -81,7 +81,7 @@ export interface CancellationServiceDeps {
  */
 export class ScenarioCancellationService {
   private readonly queue: Pick<Queue, "getJob">;
-  private readonly publishCancellation: (message: CancellationMessage) => Promise<void>;
+  private readonly publishCancellation: (message: CancellationMessage) => Promise<boolean>;
   private readonly getQueuedJobs: CancellationServiceDeps["getQueuedJobs"];
   private readonly saveScenarioEvent: CancellationServiceDeps["saveScenarioEvent"];
 
@@ -122,7 +122,11 @@ export class ScenarioCancellationService {
     }
 
     if (state === "active") {
-      await this.publishCancellation({ jobId, projectId, scenarioRunId, batchRunId });
+      const published = await this.publishCancellation({ jobId, projectId, scenarioRunId, batchRunId });
+      if (!published) {
+        logger.warn({ jobId }, "Cannot cancel active job: Redis unavailable");
+        return { cancelled: false };
+      }
       logger.info({ jobId }, "Cancellation signal published for active job");
       return { cancelled: true };
     }

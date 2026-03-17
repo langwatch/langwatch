@@ -123,6 +123,18 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
     setPendingSuite(null);
   }, [runMutation.isPending]);
 
+  // Fetch active scenarios to exclude archived ones from the confirmation count
+  const { data: allScenarios } = api.scenarios.getAll.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project && !!pendingSuite },
+  );
+
+  const activeScenarioCount = useMemo(() => {
+    if (!pendingSuite || !allScenarios) return pendingSuite?.scenarioIds.length ?? 0;
+    const activeIds = new Set(allScenarios.map((s) => s.id));
+    return pendingSuite.scenarioIds.filter((id) => activeIds.has(id)).length;
+  }, [pendingSuite, allScenarios]);
+
   const targetCount = useMemo(() => {
     if (!pendingSuite) return 0;
     return parseSuiteTargets(pendingSuite.targets).length;
@@ -139,7 +151,7 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
       onClose: cancelRun,
       onConfirm: confirmRun,
       suiteName: pendingSuite?.name ?? "",
-      scenarioCount: pendingSuite?.scenarioIds.length ?? 0,
+      scenarioCount: activeScenarioCount,
       targetCount,
       repeatCount: pendingSuite?.repeatCount ?? 1,
       isLoading: runMutation.isPending,

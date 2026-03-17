@@ -118,13 +118,13 @@ export function ScenarioTargetRow({
           transform="translateY(-50%)"
           onClick={(e: React.MouseEvent) => {
             e.stopPropagation();
-            if (!isCancelling) onCancel!();
+            if (!isCancelling) onCancel?.();
           }}
           onKeyDown={(e: React.KeyboardEvent) => {
             if (!isCancelling && (e.key === "Enter" || e.key === " ")) {
               e.stopPropagation();
               e.preventDefault();
-              onCancel!();
+              onCancel?.();
             }
           }}
           aria-label="Cancel run"

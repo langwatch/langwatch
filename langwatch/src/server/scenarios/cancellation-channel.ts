@@ -58,10 +58,11 @@ export async function publishCancellation({
 }: {
   publisher: CancellationPublisher;
   message: CancellationMessage;
-}): Promise<void> {
+}): Promise<boolean> {
   const payload = JSON.stringify(message);
   await publisher.publish(CANCELLATION_CHANNEL, payload);
   logger.debug({ jobId: message.jobId, batchRunId: message.batchRunId }, "Cancellation published");
+  return true;
 }
 
 /**
