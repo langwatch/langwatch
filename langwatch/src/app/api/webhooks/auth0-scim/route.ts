@@ -1,9 +1,7 @@
-import { timingSafeEqual } from "crypto";
 import { type NextRequest, NextResponse } from "next/server";
 import { env } from "~/env.mjs";
 import { prisma } from "~/server/db";
 import { ScimService } from "~/server/scim/scim.service";
-import { captureException } from "~/utils/posthogErrorCapture";
 
 /**
  * Receives Auth0 Log Stream webhook events for SCIM provisioning.
@@ -22,17 +20,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const authHeader = request.headers.get("authorization") ?? "";
-  if (!constantTimeEqual(authHeader, secret)) {
+  const authHeader = request.headers.get("authorization");
+  if (authHeader !== secret) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
+  const body = await request.json();
   const events = Array.isArray(body) ? body : [body];
 
   const scimService = ScimService.create(prisma);
@@ -46,37 +39,31 @@ export async function POST(request: NextRequest) {
     const domain = email.split("@")[1];
     if (!domain) continue;
 
-    const org = await prisma.organization.findUnique({
+    const org = await prisma.organization.findFirst({
       where: { ssoDomain: domain },
     });
     if (!org) continue;
 
     const action = extractAction(event);
 
-    try {
-      if (action === "create") {
-        const name = extractName(event) ?? email.split("@")[0] ?? email;
-        await scimService.createUser({
-          request: {
-            schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
-            userName: email,
-            name: parseName(name),
-          },
+    if (action === "create") {
+      const name = extractName(event) ?? email.split("@")[0] ?? email;
+      await scimService.createUser({
+        request: {
+          schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
+          userName: email,
+          name: parseName(name),
+        },
+        organizationId: org.id,
+      });
+    } else if (action === "deactivate") {
+      const user = await prisma.user.findUnique({ where: { email } });
+      if (user) {
+        await scimService.deleteUser({
+          id: user.id,
           organizationId: org.id,
         });
-      } else if (action === "deactivate") {
-        const user = await prisma.user.findUnique({ where: { email } });
-        if (user) {
-          await scimService.deleteUser({
-            id: user.id,
-            organizationId: org.id,
-          });
-        }
       }
-    } catch (e) {
-      captureException(new Error("Auth0 SCIM webhook event processing failed"), {
-        extra: { email, action, organizationId: org.id, error: e },
-      });
     }
   }
 
@@ -162,14 +149,4 @@ function parseName(
     givenName: fullName.substring(0, spaceIndex),
     familyName: fullName.substring(spaceIndex + 1),
   };
-}
-
-function constantTimeEqual(a: string, b: string): boolean {
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  if (bufA.length !== bufB.length) {
-    timingSafeEqual(bufA, bufA);
-    return false;
-  }
-  return timingSafeEqual(bufA, bufB);
 }
