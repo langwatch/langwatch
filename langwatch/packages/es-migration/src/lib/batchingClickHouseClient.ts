@@ -70,9 +70,9 @@ export function createBatchingClickHouseClient(
   }
 
   async function flushAll(): Promise<void> {
-    for (const table of buffers.keys()) {
-      await flushTable(table);
-    }
+    await Promise.all(
+      [...buffers.keys()].map((table) => flushTable(table)),
+    );
   }
 
   const handler: ProxyHandler<ClickHouseClient> = {

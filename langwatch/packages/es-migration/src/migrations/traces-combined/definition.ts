@@ -3,6 +3,7 @@ import type { TraceSummaryData } from "~/server/app-layer/traces/types.js";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types.js";
 import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types.js";
 import type { SpanAppendStore } from "~/server/event-sourcing/pipelines/trace-processing/projections/spanStorage.store.js";
+import type { EvaluationRunStore } from "~/server/event-sourcing/pipelines/evaluation-processing/projections/evaluationRun.store.js";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans.js";
 import type {
   SpanReceivedEvent,
@@ -40,7 +41,7 @@ type EsTraceDoc = ElasticSearchTrace & EsHit;
 interface CombinedTraceMigrationDeps {
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
   spanAppendStore: SpanAppendStore;
-  evaluationRunStore: FoldProjectionStore<EvaluationRunData>;
+  evaluationRunStore: EvaluationRunStore;
 }
 
 export function createCombinedTraceMigrationDefinition(
@@ -209,7 +210,7 @@ export function createCombinedTraceMigrationDefinition(
 
       // ── 6. Process evaluations ──
       const evalEvents: Event[] = [];
-      const evalProjectionWrites: Array<() => Promise<void>> = [];
+      const evalBulkEntries: Array<{ state: EvaluationRunData; context: { aggregateId: string; tenantId: any } }> = [];
 
       for (const evaluation of doc.evaluations ?? []) {
         // Skip incomplete evaluations
@@ -255,11 +256,11 @@ export function createCombinedTraceMigrationDefinition(
           reportedEvent as EvaluationProcessingEvent,
         );
 
-        // Evaluation projection write
-        const evalStoreContext = { aggregateId: evaluationId, tenantId: tenantId as any };
-        evalProjectionWrites.push(() =>
-          deps.evaluationRunStore.store(evalRunState, evalStoreContext),
-        );
+        // Collect for bulk write
+        evalBulkEntries.push({
+          state: evalRunState,
+          context: { aggregateId: evaluationId, tenantId: tenantId as any },
+        });
 
         evalEvents.push(reportedEvent);
       }
@@ -285,8 +286,12 @@ export function createCombinedTraceMigrationDefinition(
         );
       }
 
-      // Evaluation projection writes
-      projectionWrites.push(...evalProjectionWrites);
+      // Evaluation projection writes — bulk insert all evaluations for this trace
+      if (evalBulkEntries.length > 0) {
+        projectionWrites.push(() =>
+          deps.evaluationRunStore.bulkStore(evalBulkEntries),
+        );
+      }
 
       return {
         eventRecords,

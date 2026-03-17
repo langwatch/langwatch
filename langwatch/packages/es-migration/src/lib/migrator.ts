@@ -113,14 +113,20 @@ export class Migrator {
 				await existenceChecker.findExisting(tenantAggregates);
 			const chQueryMs = Date.now() - chQueryStart;
 
+			// Build a flat lookup set of "tenantId:aggregateId" for O(1) duplicate check
+			const existingKeys = new Set<string>();
+			for (const [tenantId, aggIds] of existingByTenant) {
+				for (const aggId of aggIds) {
+					existingKeys.add(`${tenantId}\0${aggId}`);
+				}
+			}
+
 			// Helper: check if a single event's aggregate exists (tenant-scoped)
 			const isExisting = (e: EsHit): boolean => {
 				const perEvent = definition.getTenantAggregates([e]);
 				for (const [tenantId, aggIds] of perEvent) {
-					const tenantExisting = existingByTenant.get(tenantId);
-					if (!tenantExisting) return false;
 					for (const aggId of aggIds) {
-						if (!tenantExisting.has(aggId)) return false;
+						if (!existingKeys.has(`${tenantId}\0${aggId}`)) return false;
 					}
 				}
 				return true;
