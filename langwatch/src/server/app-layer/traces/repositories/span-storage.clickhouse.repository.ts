@@ -208,6 +208,36 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     }
   }
 
+  async insertSpans(spans: SpanInsertData[]): Promise<void> {
+    if (spans.length === 0) return;
+
+    for (const span of spans) {
+      EventUtils.validateTenantId(
+        { tenantId: span.tenantId },
+        "SpanStorageClickHouseRepository.insertSpans",
+      );
+    }
+
+    try {
+      const records = spans.map((span) => this.toClickHouseRecord(span));
+      await this.clickHouseClient.insert({
+        table: TABLE_NAME,
+        values: records,
+        format: "JSONEachRow",
+        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+      });
+    } catch (error) {
+      logger.error(
+        {
+          count: spans.length,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Failed to bulk insert spans into ClickHouse",
+      );
+      throw error;
+    }
+  }
+
   async getSpansByTraceId({ tenantId, traceId }: { tenantId: string; traceId: string }): Promise<Span[]> {
     EventUtils.validateTenantId(
       { tenantId },
