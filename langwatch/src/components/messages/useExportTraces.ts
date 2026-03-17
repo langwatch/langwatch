@@ -1,18 +1,12 @@
 import { useCallback, useRef, useState } from "react";
 import { toaster } from "~/components/ui/toaster";
 import type { ExportMode, ExportFormat, ExportProgress } from "~/server/export/types";
+import type { ExportProgressEvent } from "~/server/api/routers/export";
+import { api } from "~/utils/api";
 
 interface ExportConfig {
   mode: ExportMode;
   format: ExportFormat;
-}
-
-/** SSE progress event shape from the export API */
-interface ExportProgressEvent {
-  type: "progress" | "done" | "error";
-  exported?: number;
-  total?: number;
-  message?: string;
 }
 
 interface UseExportTracesOptions {
@@ -91,68 +85,14 @@ function extractFilename({
 }
 
 /**
- * Connect to the SSE progress endpoint for the given exportId.
- * Uses a GET fetch with streaming reader since the endpoint is GET-based.
- */
-function connectProgressSSE({
-  exportId,
-  signal,
-  onEvent,
-}: {
-  exportId: string;
-  signal: AbortSignal;
-  onEvent: (event: ExportProgressEvent) => void;
-}): Promise<void> {
-  return fetch(`/api/export/traces/progress/${exportId}`, {
-    method: "GET",
-    headers: { Accept: "text/event-stream" },
-    signal,
-  }).then(async (response) => {
-    if (!response.ok || !response.body) return;
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-
-      for (const line of lines) {
-        if (line.startsWith("data:")) {
-          const dataStr = line.slice("data:".length).trim();
-          if (!dataStr) continue;
-          try {
-            const event = JSON.parse(dataStr) as ExportProgressEvent;
-            onEvent(event);
-            if (event.type === "done" || event.type === "error") {
-              reader.cancel().catch(() => {});
-              return;
-            }
-          } catch {
-            // Ignore malformed data lines
-          }
-        }
-      }
-    }
-  }).catch(() => {
-    // Progress SSE errors are non-fatal; the download may still complete
-  });
-}
-
-/**
  * Hook that orchestrates the trace export flow:
- * dialog state, file download streaming, SSE progress updates, and cancellation.
+ * dialog state, file download streaming, tRPC subscription progress updates, and cancellation.
  *
  * The export uses two connections:
  * 1. A POST to `/api/export/traces/download` that streams the file data
- * 2. A GET SSE connection to `/api/export/traces/progress/:exportId` for real-time progress
+ * 2. A tRPC subscription via BroadcastService for real-time progress (works across K8s pods)
  *
- * The SSE connection starts after the download response headers arrive,
+ * The tRPC subscription is activated when the download response headers arrive,
  * providing the exportId via the X-Export-Id header.
  *
  * @see specs/traces/trace-export.feature
@@ -173,10 +113,33 @@ export function useExportTraces({
   const [selectedTraceIds, setSelectedTraceIds] = useState<
     string[] | undefined
   >();
+  const [currentExportId, setCurrentExportId] = useState<string | null>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const completionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
+  );
+
+  // tRPC subscription for export progress via BroadcastService (Redis pub/sub)
+  api.export.onExportProgress.useSubscription(
+    { projectId: projectId!, exportId: currentExportId! },
+    {
+      enabled: isExporting && !!currentExportId && !!projectId,
+      onData: (event: ExportProgressEvent) => {
+        if (event.exported !== undefined) {
+          setProgress({
+            exported: event.exported,
+            total: event.total ?? progress.total,
+          });
+        }
+        if (event.type === "done") {
+          setProgress((prev) => ({
+            ...prev,
+            exported: prev.total,
+          }));
+        }
+      },
+    }
   );
 
   const openExportDialog = useCallback(
@@ -201,6 +164,7 @@ export function useExportTraces({
     abortControllerRef.current = null;
     setIsExporting(false);
     setProgress({ exported: 0, total: 0 });
+    setCurrentExportId(null);
   }, []);
 
   const startExport = useCallback(
@@ -245,8 +209,7 @@ export function useExportTraces({
 
       // Start the file download stream and track progress from both:
       // 1. X-Total-Traces header (immediate total count)
-      // 2. SSE sideband (real-time exported count)
-      // 3. Chunk-based tracking as fallback (count chunks * batch size)
+      // 2. tRPC subscription via BroadcastService (real-time exported count)
       const exportPromise = fetch("/api/export/traces/download", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -260,35 +223,17 @@ export function useExportTraces({
             );
           }
 
-          // Read total from header immediately (no SSE race condition)
+          // Read total from header immediately
           const totalTraces = parseInt(
             response.headers.get("X-Total-Traces") ?? "0",
             10
           );
           setProgress((prev) => ({ ...prev, total: totalTraces }));
 
-          // Start SSE progress listener for real-time exported count
+          // Activate tRPC subscription for real-time progress
           const exportId = response.headers.get("X-Export-Id");
           if (exportId) {
-            void connectProgressSSE({
-              exportId,
-              signal: abortController.signal,
-              onEvent: (event) => {
-                // Progress events have {exported, total} — no type field
-                if (event.exported !== undefined) {
-                  setProgress({
-                    exported: event.exported,
-                    total: event.total ?? totalTraces,
-                  });
-                }
-                if (event.type === "done") {
-                  setProgress((prev) => ({
-                    ...prev,
-                    exported: prev.total,
-                  }));
-                }
-              },
-            });
+            setCurrentExportId(exportId);
           }
 
           const blob = await response.blob();
@@ -298,10 +243,6 @@ export function useExportTraces({
           });
 
           triggerBlobDownload({ blob, filename });
-
-          // Download complete — abort SSE (fire-and-forget, don't wait)
-          // The SSE may have already finished or may hang if it missed "done"
-          abortController.abort();
 
           return true;
         })
@@ -324,6 +265,7 @@ export function useExportTraces({
         if (!completed) {
           setIsExporting(false);
           setProgress({ exported: 0, total: 0 });
+          setCurrentExportId(null);
           return;
         }
         setProgress((prev) => ({ ...prev, exported: prev.total }));
@@ -331,6 +273,7 @@ export function useExportTraces({
         completionTimeoutRef.current = setTimeout(() => {
           setIsExporting(false);
           setProgress({ exported: 0, total: 0 });
+          setCurrentExportId(null);
         }, 1500);
       });
     },

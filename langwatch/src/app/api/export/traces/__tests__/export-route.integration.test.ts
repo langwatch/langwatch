@@ -1,9 +1,13 @@
 /**
  * Integration tests for the Hono trace export endpoints.
- * Tests authentication, authorization, streaming download, SSE progress, and file naming.
+ * Tests authentication, authorization, streaming download, and file naming.
  *
  * ExportService is mocked to return controlled async generator output,
  * isolating the HTTP layer from the domain layer.
+ *
+ * Progress is now broadcast via BroadcastService (Redis pub/sub) instead
+ * of in-memory EventEmitters. The GET /progress/:exportId endpoint has
+ * been removed in favor of tRPC subscriptions.
  */
 
 import type { Project } from "@prisma/client";
@@ -28,6 +32,16 @@ vi.mock("~/server/export/export.service", () => {
     },
   };
 });
+
+// Mock getApp to provide a fake BroadcastService
+const mockBroadcastToTenant = vi.fn().mockResolvedValue(undefined);
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({
+    broadcast: {
+      broadcastToTenant: mockBroadcastToTenant,
+    },
+  }),
+}));
 
 import { getServerSession } from "next-auth";
 import { ExportService } from "~/server/export/export.service";
@@ -276,6 +290,37 @@ describe("Export Traces Route", () => {
         expect(body).toContain("header1,header2");
         expect(body).toContain("val1,val2");
       });
+
+      it("broadcasts progress events via BroadcastService", async () => {
+        const { POST } = await importRouteHandler();
+
+        const request = new Request(
+          "http://localhost:5560/api/export/traces/download",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(
+              buildExportRequestBody({ projectId: project.id }),
+            ),
+          },
+        );
+
+        const response = await POST(request);
+        // Consume the stream to trigger all broadcasts
+        await response.text();
+
+        // Should have broadcast progress events + done event
+        expect(mockBroadcastToTenant).toHaveBeenCalledWith(
+          project.id,
+          expect.stringContaining('"type":"progress"'),
+          "export_progress",
+        );
+        expect(mockBroadcastToTenant).toHaveBeenCalledWith(
+          project.id,
+          expect.stringContaining('"type":"done"'),
+          "export_progress",
+        );
+      });
     });
 
     describe("when user exports JSON format", () => {
@@ -327,82 +372,6 @@ describe("Export Traces Route", () => {
         const response = await POST(request);
         const disposition = response.headers.get("Content-Disposition");
         expect(disposition).toContain(`${project.id} - Traces - ${today} - summary.jsonl`);
-      });
-    });
-  });
-
-  describe("GET /api/export/traces/progress/:exportId", () => {
-    describe("when user is not authenticated", () => {
-      it("returns 401", async () => {
-        mockGetServerSession.mockResolvedValue(null);
-        const { GET } = await importRouteHandler();
-
-        const request = new Request(
-          "http://localhost:5560/api/export/traces/progress/some-export-id",
-          { method: "GET" },
-        );
-
-        const response = await GET(request);
-        expect(response.status).toBe(401);
-      });
-    });
-
-    describe("when export ID does not exist", () => {
-      it("returns 404", async () => {
-        mockGetServerSession.mockResolvedValue({
-          user: { id: userId, email: "test@example.com" },
-          expires: new Date(Date.now() + 86400000).toISOString(),
-        });
-        const { GET } = await importRouteHandler();
-
-        const request = new Request(
-          "http://localhost:5560/api/export/traces/progress/nonexistent-id",
-          { method: "GET" },
-        );
-
-        const response = await GET(request);
-        expect(response.status).toBe(404);
-      });
-    });
-
-    describe("when export is in progress", () => {
-      it("returns SSE stream with progress events", async () => {
-        mockGetServerSession.mockResolvedValue({
-          user: { id: userId, email: "test@example.com" },
-          expires: new Date(Date.now() + 86400000).toISOString(),
-        });
-
-        // Set up a progress emitter before requesting the SSE endpoint
-        const { createProgressEmitter, removeProgressEmitter } = await import("../progress-emitter");
-        const emitter = createProgressEmitter({
-          exportId: "test-progress-id",
-          userId,
-          projectId: project.id,
-        });
-
-        const { GET } = await importRouteHandler();
-
-        const request = new Request(
-          "http://localhost:5560/api/export/traces/progress/test-progress-id",
-          { method: "GET" },
-        );
-
-        // Emit progress events after a small delay to simulate async behavior
-        setTimeout(() => {
-          emitter.emit("progress", { exported: 50, total: 100 });
-          emitter.emit("done");
-        }, 10);
-
-        const response = await GET(request);
-        expect(response.status).toBe(200);
-        expect(response.headers.get("Content-Type")).toContain("text/event-stream");
-
-        const body = await response.text();
-        expect(body).toContain('"exported":50');
-        expect(body).toContain('"total":100');
-        expect(body).toContain('"type":"done"');
-
-        removeProgressEmitter("test-progress-id");
       });
     });
   });

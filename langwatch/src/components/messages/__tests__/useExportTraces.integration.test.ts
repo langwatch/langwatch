@@ -5,6 +5,7 @@
  *
  * Tests dialog state management and export trigger behavior.
  * Network calls (fetch) are mocked at external boundaries.
+ * tRPC subscription for progress is mocked via the api module.
  *
  * @see specs/traces/trace-export.feature
  */
@@ -19,6 +20,17 @@ const { mockToasterCreate } = vi.hoisted(() => ({
 // Mock toaster
 vi.mock("~/components/ui/toaster", () => ({
   toaster: { create: mockToasterCreate },
+}));
+
+// Mock tRPC api — the subscription is a no-op in tests
+vi.mock("~/utils/api", () => ({
+  api: {
+    export: {
+      onExportProgress: {
+        useSubscription: vi.fn(),
+      },
+    },
+  },
 }));
 
 describe("useExportTraces()", () => {
