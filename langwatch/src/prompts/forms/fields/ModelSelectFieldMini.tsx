@@ -1,4 +1,4 @@
-import { Box, HStack } from "@chakra-ui/react";
+import { Box, HStack, Popover as ChakraPopover } from "@chakra-ui/react";
 import React, { useCallback, useState } from "react";
 import { ChevronDown } from "react-feather";
 import {
@@ -25,10 +25,13 @@ type ModelSelectFieldMiniProps = {
 /**
  * Model Select Field Mini
  *
- * Single Responsibility: Renders a compact LLM model selector field integrated with react-hook-form
+ * Renders a compact LLM model selector field integrated with react-hook-form
  * that displays the current model and opens a configuration popover on click.
  *
- * Can be used within a FormProvider context (uses react-hook-form Controller)
+ * Uses Popover.Anchor instead of Popover.Trigger to avoid Zag.js's internal
+ * onClick handler that conflicts with the Drawer's dismissable layer.
+ * The onClick toggle is handled manually via controlled state.
+ * See: https://github.com/langwatch/langwatch/issues/2390
  */
 export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
   showStructuredOutputs = true,
@@ -37,26 +40,22 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
   const { control, formState, trigger } =
     useFormContext<PromptConfigFormValues>();
 
-  // Outputs field array for structured outputs
   const outputsFieldArray = useFieldArray({
     control,
     name: "version.configData.outputs",
   });
 
-  // Watch outputs for the popover
   const watchedOutputs = useWatch({
     control,
     name: "version.configData.outputs",
   });
 
-  // Convert watched outputs to Output[] for LLMConfigPopover
   const outputs: Output[] = (watchedOutputs ?? []).map((output) => ({
     identifier: output.identifier,
     type: output.type as OutputType,
     json_schema: output.json_schema,
   }));
 
-  // Handle outputs change from LLMConfigPopover
   const handleOutputsChange = useCallback(
     (newOutputs: Output[]) => {
       outputsFieldArray.replace(
@@ -84,7 +83,7 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
             open={popoverOpen}
             onOpenChange={({ open }) => setPopoverOpen(open)}
           >
-            <Popover.Trigger asChild>
+            <ChakraPopover.Anchor asChild>
               <HStack
                 paddingY={2}
                 paddingX={3}
@@ -102,7 +101,7 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
                   <ChevronDown size={16} />
                 </Box>
               </HStack>
-            </Popover.Trigger>
+            </ChakraPopover.Anchor>
             <LLMConfigPopover
               values={field.value}
               onChange={(values) => {

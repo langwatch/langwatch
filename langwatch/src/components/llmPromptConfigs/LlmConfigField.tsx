@@ -1,5 +1,6 @@
-import { Box, HStack } from "@chakra-ui/react";
+import { Box, HStack, Popover as ChakraPopover } from "@chakra-ui/react";
 import { ChevronDown } from "lucide-react";
+import { useState } from "react";
 
 import {
   LLMConfigPopover,
@@ -42,6 +43,7 @@ export function LLMConfigField({
   onOutputsChange,
   showStructuredOutputs = false,
 }: LLMConfigFieldProps) {
+  const [popoverOpen, setPopoverOpen] = useState(false);
   const { model } = llmConfig ?? {};
 
   // Check if the model is disabled (has line-through styling)
@@ -49,8 +51,16 @@ export function LLMConfigField({
 
   return (
     <>
-      <Popover.Root positioning={{ placement: "bottom-start" }} closeOnInteractOutside={false}>
-        <Popover.Trigger asChild>
+      <Popover.Root
+        positioning={{ placement: "bottom-start" }}
+        closeOnInteractOutside={false}
+        open={popoverOpen}
+        onOpenChange={({ open }) => setPopoverOpen(open)}
+      >
+        {/* Use Anchor (not Trigger) for positioning only — avoids Zag.js
+            installing an onClick handler that fights with the Drawer's
+            dismissable layer. See #2390. */}
+        <ChakraPopover.Anchor asChild>
           <HStack
             width="full"
             paddingY={2}
@@ -63,13 +73,14 @@ export function LLMConfigField({
             transition="background 0.15s"
             justify="space-between"
             opacity={modelOption?.isDisabled ? 0.5 : 1}
+            onClick={() => setPopoverOpen((prev) => !prev)}
           >
             <LLMModelDisplay model={model ?? ""} />
             <Box color="fg.muted">
               <ChevronDown size={16} />
             </Box>
           </HStack>
-        </Popover.Trigger>
+        </ChakraPopover.Anchor>
 
         <LLMConfigPopover
           values={llmConfig}
