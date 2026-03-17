@@ -1,0 +1,22 @@
+{
+  "name": "@langwatch/skills-tests",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest",
+    "test:run": "vitest run"
+  },
+  "devDependencies": {
+    "@langwatch/scenario": "^0.4.6",
+    "@types/node": "^22.0.0",
+    "chalk": "^5.6.2",
+    "dotenv": "^17.2.2",
+    "tsx": "^4.19.0",
+    "typescript": "^5.0.0",
+    "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^3.0.41"
+  }
+}

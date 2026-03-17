@@ -1,0 +1,894 @@
+You are helping the user set up a new AI agent project with LangWatch instrumentation. Follow these instructions carefully.
+
+# Create an AI Agent Project from Scratch
+
+This skill scaffolds a complete agent project in an empty directory, fully instrumented with LangWatch. You get tracing, versioned prompts, evaluation experiments, and scenario tests from the start.
+
+## Interactive Discovery
+
+Before scaffolding, gather the following from the user. If any is missing, ask.
+
+**Framework** (pick one):
+
+| Framework | Language | Source Dir |
+|-----------|----------|------------|
+| Agno | Python | `app/` |
+| LangGraph (Python) | Python | `app/` |
+| Google ADK | Python | `app/` |
+| Mastra | TypeScript | `src/` |
+| LangGraph (TypeScript) | TypeScript | `src/` |
+| Vercel AI SDK | TypeScript | `src/` |
+
+**LLM Provider** (pick one): OpenAI, Anthropic, Gemini, Bedrock, OpenRouter, Grok
+
+**Project goal**: What does the agent do? (e.g., "customer support agent that answers billing questions")
+
+## Detect Context
+
+Before proceeding, check the target directory:
+
+- **Empty or near-empty** (only README, .git, LICENSE, etc.): Proceed with scaffolding.
+- **Contains source code** (`.py`, `.ts`, `.tsx`, `.js` files, `package.json` with dependencies, `pyproject.toml` with dependencies): STOP. Warn the user that this directory already has a project. Suggest using the **tracing** or **level-up** skills instead to add LangWatch to an existing codebase.
+
+## Kickoff Sequence
+
+Execute these 9 steps in order. Do not skip or reorder them.
+
+### Step 1: Read Documentation via MCP
+
+Set up the LangWatch MCP server first so you have access to documentation throughout the process.
+
+# Installing the LangWatch MCP Server
+
+## Claude Code
+
+Run:
+```bash
+claude mcp add langwatch -- npx -y @langwatch/mcp-server --apiKey {{LANGWATCH_API_KEY}}
+```
+
+Or add to `.mcp.json` (project-level) or `~/.claude.json` (global):
+```json
+{
+  "mcpServers": {
+    "langwatch": {
+      "command": "npx",
+      "args": ["-y", "@langwatch/mcp-server"],
+      "env": {
+        "LANGWATCH_API_KEY": "{{LANGWATCH_API_KEY}}"
+      }
+    }
+  }
+}
+```
+
+## Other Editors
+
+Add the JSON config above to your editor's MCP settings file.
+
+The API key can be set via `LANGWATCH_API_KEY` env var or `--apiKey` flag.
+Use `LANGWATCH_ENDPOINT` / `--endpoint` to override the default endpoint (`https://app.langwatch.ai`). If MCP installation fails, see # Fetching LangWatch Docs Without MCP
+
+If the MCP server cannot be installed, fetch documentation directly via HTTP.
+
+## Integration Docs
+
+1. Fetch the index: `https://langwatch.ai/docs/llms.txt`
+2. Pick a topic from the listing
+3. Fetch the page by appending `.md` (e.g., `https://langwatch.ai/docs/integration/python/guide.md`)
+
+## Scenario (Agent Testing) Docs
+
+1. Fetch the index: `https://langwatch.ai/scenario/llms.txt`
+2. Follow the same pattern for individual pages
+
+## Notes
+
+- The MCP server is always preferred -- it provides richer tools beyond docs.
+- Use `WebFetch` or `curl` to retrieve these URLs. to fetch docs via URLs.
+
+Once MCP is available:
+
+1. Call `fetch_langwatch_docs` (no args) to see the docs index
+2. Read the integration guide for the selected framework
+3. Call `fetch_scenario_docs` (no args) to read the Scenario SDK docs
+4. Read the Prompts CLI docs at `https://langwatch.ai/docs/prompt-management/cli.md`
+
+Then read the framework reference for the selected framework ONLY:
+
+| Framework | Reference File |
+|-----------|----------------|
+| Agno | # Agno Framework Reference
+
+## Language & Package Manager
+
+- **Language:** Python
+- **Package manager:** uv
+- **Source extensions:** `.py`
+
+## How to Scaffold
+
+```bash
+uv init
+uv add agno openai duckduckgo-search
+```
+
+No dedicated CLI scaffolder. Use `uv init` then add agno dependencies.
+
+## Source Directory Convention
+
+`app/` for main application code.
+
+## Test Runner
+
+pytest
+
+```bash
+uv run pytest
+```
+
+## LangWatch Integration
+
+Use the LangWatch Python SDK. Agno integrates via the standard Python tracing pattern.
+
+## Framework MCP Config
+
+Add to `.mcp.json` to get Agno documentation in your coding assistant:
+
+```json
+{
+  "agno": {
+    "type": "stdio",
+    "command": "npx",
+    "args": ["-y", "mcp-remote", "https://docs.agno.com/mcp"]
+  }
+}
+```
+
+## Core Patterns
+
+**Basic Agent:**
+```python
+from agno.agent import Agent
+from agno.models.openai import OpenAIChat
+
+agent = Agent(
+    model=OpenAIChat(id="gpt-4o"),
+    instructions="You are a helpful assistant",
+    markdown=True,
+)
+agent.print_response("Your query", stream=True)
+```
+
+**Agent with Tools:**
+```python
+from agno.tools.duckduckgo import DuckDuckGoTools
+
+agent = Agent(
+    model=OpenAIChat(id="gpt-4o"),
+    tools=[DuckDuckGoTools()],
+    instructions="Search the web for information",
+)
+```
+
+**Structured Output:**
+```python
+from pydantic import BaseModel
+
+class Result(BaseModel):
+    summary: str
+    findings: list[str]
+
+agent = Agent(model=OpenAIChat(id="gpt-4o"), output_schema=Result)
+result: Result = agent.run(query).content
+```
+
+## Known Pitfalls
+
+- **NEVER create agents in loops** -- reuse agent instances for performance (significant overhead otherwise)
+- Always use `output_schema` for structured responses
+- PostgreSQL in production, SQLite for dev only
+- Start with single agent (covers 90% of use cases), scale to Team/Workflow only when needed
+- Do not forget `search_knowledge=True` when using knowledge bases
+
+## Resources
+
+- https://docs.agno.com/ |
+| Mastra | # Mastra Framework Reference
+
+## Language & Package Manager
+
+- **Language:** TypeScript
+- **Package manager:** pnpm
+- **Source extensions:** `.ts`, `.tsx`
+
+## How to Scaffold
+
+```bash
+pnpm init
+pnpx mastra init --default
+```
+
+Run `mastra init` right after `pnpm init`, before setting up the rest of the project. Then explore the generated structure and remove what is not needed.
+
+## Source Directory Convention
+
+`src/` for main application code.
+
+## Test Runner
+
+vitest
+
+```bash
+pnpm vitest run
+```
+
+## LangWatch Integration
+
+Use the LangWatch TypeScript SDK. Mastra integrates via the standard TypeScript tracing pattern.
+
+## Framework MCP Config
+
+Add to `.mcp.json` to get Mastra documentation in your coding assistant:
+
+```json
+{
+  "mastra": {
+    "type": "stdio",
+    "command": "npx",
+    "args": ["-y", "@mastra/mcp-docs-server"]
+  }
+}
+```
+
+## Initial Setup Steps
+
+1. `pnpm init`
+2. `pnpx mastra init --default` (creates project structure)
+3. Explore the generated folders, remove what is not needed
+4. Implement the agent per user requirements
+5. Open the UI with `pnpx mastra dev`
+
+## Core Patterns
+
+- Use the Mastra MCP server to learn about Mastra APIs and best practices
+- Follow Mastra's TypeScript patterns and conventions
+- Leverage Mastra's integration ecosystem
+- Consult the MCP: "How do I [do X] in Mastra?"
+
+## Known Pitfalls
+
+- Always run `mastra init --default` before adding other project setup
+- Use the Mastra MCP for documentation rather than relying on stale examples
+
+## Resources
+
+- Use the Mastra MCP for up-to-date documentation |
+| LangGraph (Python) | # LangGraph Python Framework Reference
+
+## Language & Package Manager
+
+- **Language:** Python
+- **Package manager:** uv
+- **Source extensions:** `.py`
+
+## How to Scaffold
+
+```bash
+uv init
+uv add langgraph langchain-core langchain-openai
+```
+
+No dedicated CLI scaffolder. Use `uv init` then add LangGraph dependencies.
+
+## Source Directory Convention
+
+`app/` for main application code.
+
+## Test Runner
+
+pytest
+
+```bash
+uv run pytest
+```
+
+## LangWatch Integration
+
+Use the LangWatch Python SDK. LangGraph/LangChain integrates via LangChain's callback pattern for tracing.
+
+## Framework MCP Config
+
+Add to `.mcp.json` to get LangGraph and LangChain documentation:
+
+```json
+{
+  "langgraph-py": {
+    "type": "stdio",
+    "command": "uvx",
+    "args": [
+      "--from", "mcpdoc", "mcpdoc",
+      "--urls", "LangGraph:https://langchain-ai.github.io/langgraph/llms.txt LangChain:https://python.langchain.com/llms.txt",
+      "--transport", "stdio"
+    ]
+  }
+}
+```
+
+## Initial Setup Steps
+
+1. `uv init` to create a new project
+2. Add dependencies: `uv add langgraph langchain-core langchain-openai`
+3. Implement the requested agent logic and write tests
+4. Run with `uv run app.py` to validate behaviour
+
+## Core Patterns
+
+- Use the LangGraph MCP for learning about LangGraph and LangChain
+- Use LangChain's Python integrations for tools, memory, and models
+- Follow LangGraph's node/state patterns when structuring agents
+- Leverage LangChain's ecosystem for additional capabilities
+
+## Known Pitfalls
+
+- Always consult the LangGraph MCP for up-to-date API patterns
+- Follow LangGraph's node/state architecture rather than freestyle code
+- Use LangChain integrations for tools and models rather than raw API calls
+
+## Resources
+
+- Use the LangGraph MCP for up-to-date LangGraph and LangChain documentation |
+| LangGraph (TypeScript) | # LangGraph TypeScript Framework Reference
+
+## Language & Package Manager
+
+- **Language:** TypeScript
+- **Package manager:** pnpm
+- **Source extensions:** `.ts`, `.tsx`
+
+## How to Scaffold
+
+```bash
+pnpm init
+pnpm add @langchain/langgraph @langchain/core @langchain/openai
+```
+
+No dedicated CLI scaffolder. Use `pnpm init` then add LangGraph dependencies and set up TypeScript configuration.
+
+## Source Directory Convention
+
+`src/` for main application code.
+
+## Test Runner
+
+vitest
+
+```bash
+pnpm vitest run
+```
+
+## LangWatch Integration
+
+Use the LangWatch TypeScript SDK. LangGraph.js integrates via LangChain.js callback pattern for tracing.
+
+## Framework MCP Config
+
+Add to `.mcp.json` to get LangGraph.js and LangChain.js documentation:
+
+```json
+{
+  "langgraph-ts": {
+    "type": "stdio",
+    "command": "npx",
+    "args": [
+      "-y", "mcpdoc",
+      "--urls", "LangGraphJS:https://langchain-ai.github.io/langgraphjs/llms.txt LangChainJS:https://js.langchain.com/llms.txt",
+      "--transport", "stdio"
+    ]
+  }
+}
+```
+
+## Initial Setup Steps
+
+1. `pnpm init` to create a new project
+2. `pnpm add @langchain/langgraph @langchain/core @langchain/openai`
+3. Set up TypeScript configuration
+4. Implement the agent per user requirements
+5. Run with `pnpm tsx src/index.ts`
+
+## Key Concepts
+
+- **StateGraph**: Define your agent's state and transitions
+- **Nodes**: Functions that process state and return updates
+- **Edges**: Define flow between nodes (conditional or direct)
+- **Checkpointer**: Enable conversation memory and state persistence
+
+## Core Patterns
+
+- Use the LangGraph MCP for learning about LangGraph.js
+- Use LangGraph's built-in agent capabilities (StateGraph, nodes, edges)
+- Follow LangGraph's TypeScript patterns and conventions
+- Leverage LangChain.js integration ecosystem
+
+## Known Pitfalls
+
+- Always set up TypeScript configuration before implementing
+- Use StateGraph patterns for agent architecture, not freestyle code
+- Consult the LangGraph MCP for up-to-date API patterns
+
+## Resources
+
+- Use the LangGraph MCP for up-to-date LangGraph.js documentation |
+| Google ADK | # Google ADK Framework Reference
+
+## Language & Package Manager
+
+- **Language:** Python
+- **Package manager:** uv
+- **Source extensions:** `.py`
+
+## How to Scaffold
+
+```bash
+uv init
+uv add google-adk
+```
+
+No dedicated CLI scaffolder. Use `uv init` then add Google ADK dependencies.
+
+## Source Directory Convention
+
+`app/` for main application code.
+
+## Test Runner
+
+pytest
+
+```bash
+uv run pytest
+```
+
+## LangWatch Integration
+
+Use the LangWatch Python SDK. Google ADK integrates via the standard Python tracing pattern.
+
+## Framework MCP Config
+
+Add to `.mcp.json` to get Google ADK documentation:
+
+```json
+{
+  "google-adk": {
+    "type": "stdio",
+    "command": "uvx",
+    "args": [
+      "--from", "mcpdoc", "mcpdoc",
+      "--urls", "Google-Adk:https://github.com/google/adk-python/blob/main/llms.txt",
+      "--transport", "stdio"
+    ]
+  }
+}
+```
+
+## Initial Setup Steps
+
+1. `uv init` to create a new project
+2. `uv add google-adk` (plus `litellm` if using non-Google models)
+3. Set up API key in `.env` (check which env var is needed in app.py)
+4. Implement agent logic following Google ADK patterns
+5. Run with `uv run app.py` to validate behaviour
+
+## Core Patterns
+
+**Gemini (native):** `Agent(name="my_agent", model="gemini-2.0-flash-exp", ...)`
+
+**Non-Google models (LiteLLM):**
+```python
+from google.adk.agents import Agent
+from google.adk.models.lite_llm import LiteLlm
+
+agent = Agent(name="my_agent", model=LiteLlm(model="openai/gpt-4.1"), ...)
+```
+
+## LLM Provider Configuration
+
+- **Gemini:** Uses Google AI SDK + ADK's native integrations
+- **Other providers (OpenAI, Anthropic, etc.):** Uses LiteLLM wrapper inside a Google ADK Agent
+- The framework is always Google ADK regardless of model provider -- NEVER switch frameworks
+- Use the `.env` file to set the right keys for the chosen provider
+
+## Known Pitfalls
+
+- Google ADK is the framework; the LLM provider is just the model backend -- do not confuse them
+- When using non-Google models, always use the LiteLLM wrapper inside ADK Agent
+- Never switch to a different agent framework when a non-Google model is selected
+- Always consult the Google ADK MCP for up-to-date API patterns
+
+## Resources
+
+- Use the Google ADK MCP for up-to-date documentation |
+| Vercel AI SDK | # Vercel AI SDK Framework Reference
+
+## Language & Package Manager
+
+- **Language:** TypeScript
+- **Package manager:** pnpm
+- **Source extensions:** `.ts`, `.tsx`
+
+## How to Scaffold
+
+```bash
+pnpm init
+pnpm add ai @ai-sdk/openai
+```
+
+For other model providers, install the corresponding package (e.g., `@ai-sdk/anthropic`, `@ai-sdk/google`).
+
+## Source Directory Convention
+
+`src/` for main application code.
+
+## Test Runner
+
+vitest
+
+```bash
+pnpm vitest run
+```
+
+## LangWatch Integration
+
+Use the LangWatch TypeScript SDK. Vercel AI SDK integrates via the standard TypeScript tracing pattern.
+
+## Framework MCP Config
+
+Add to `.mcp.json` to get Vercel AI SDK documentation:
+
+```json
+{
+  "vercel-ai": {
+    "type": "stdio",
+    "command": "uvx",
+    "args": [
+      "--from", "mcpdoc", "mcpdoc",
+      "--urls", "Vercel:https://ai-sdk.dev/docs/introduction",
+      "--transport", "stdio"
+    ]
+  }
+}
+```
+
+## Initial Setup Steps
+
+1. `pnpm init` to create a new project
+2. `pnpm add ai @ai-sdk/openai` (or other provider packages)
+3. Set up TypeScript configuration
+4. Implement the agent per user requirements
+5. Run with `pnpm tsx src/index.ts` or integrate with your chosen web framework
+
+## Key Concepts
+
+- **Unified Provider Architecture**: Consistent interface across multiple AI model providers
+- **generateText**: Generate text using any supported model
+- **streamText**: Stream text responses for real-time interactions
+- **Framework Integration**: Works with Next.js, React, Svelte, Vue, and Node.js
+
+## Core Patterns
+
+- Use the Vercel AI SDK MCP for learning about the SDK
+- Use Vercel AI SDK's unified provider architecture
+- Follow Vercel AI SDK's TypeScript patterns and conventions
+- Leverage framework integrations (Next.js, React, Svelte, Vue, Node.js)
+
+## Known Pitfalls
+
+- Always set up TypeScript configuration before implementing
+- Use the correct provider package for your chosen model (`@ai-sdk/openai`, `@ai-sdk/anthropic`, etc.)
+- Consult the Vercel AI SDK MCP for up-to-date API patterns
+
+## Resources
+
+- Use the AI SDK MCP for up-to-date documentation
+- https://ai-sdk.dev/docs/introduction |
+
+Do NOT read references for frameworks the user did not select.
+
+### Step 2: Scaffold Project Structure
+
+Create the full directory tree before writing any application code:
+
+```
+my-agent/
+├── <app/ or src/>         # Python: app/  |  TypeScript: src/
+├── prompts/
+├── tests/
+│   ├── evaluations/
+│   └── scenarios/
+├── .env
+├── .env.example
+├── .mcp.json
+├── .mcp.json.example
+├── .cursor/mcp.json       # Symlink → ../.mcp.json
+├── .gitignore
+├── AGENTS.md
+├── CLAUDE.md              # Contains: @AGENTS.md
+└── pyproject.toml / package.json
+```
+
+**`.env.example`** -- committed, placeholder values only:
+```
+LANGWATCH_API_KEY={{LANGWATCH_API_KEY}}
+OPENAI_API_KEY=your-openai-api-key
+# Adjust provider key to match the selected LLM provider
+```
+
+**`.env`** -- gitignored, real keys from user's environment:
+```
+LANGWATCH_API_KEY=<actual key if available>
+```
+
+**`.mcp.json`** -- gitignored, contains both LangWatch and framework-specific MCP servers. See the framework reference for the framework MCP config. Combine with the LangWatch MCP:
+```json
+{
+  "mcpServers": {
+    "langwatch": {
+      "command": "npx",
+      "args": ["-y", "@langwatch/mcp-server"],
+      "env": {
+        "LANGWATCH_API_KEY": "<key>"
+      }
+    }
+  }
+}
+```
+
+**`.mcp.json.example`** -- committed, same structure with placeholder keys.
+
+**`.cursor/mcp.json`** -- create as a symlink to `../.mcp.json` for Cursor compatibility.
+
+**`.gitignore`** -- must include:
+```
+.env
+.mcp.json
+.cursor/
+__pycache__/
+node_modules/
+.venv/
+```
+
+**`CLAUDE.md`**:
+```
+@AGENTS.md
+```
+
+**`AGENTS.md`** -- see the AGENTS.md Template section below for what to include.
+
+### Step 3: Set Up Language Environment and Install Dependencies
+
+Follow the framework reference for scaffolding commands.
+
+**Python frameworks** (Agno, LangGraph Python, Google ADK):
+1. Verify Python is installed: `python3 --version`. If missing, report the error and provide installation guidance. Do not leave a half-scaffolded project.
+2. Run the setup commands from the framework reference (e.g., `uv init`, `uv add ...`)
+3. Add LangWatch: `uv add langwatch`
+4. Add test dependencies: `uv add --dev pytest langwatch-scenario`
+
+**TypeScript frameworks** (Mastra, LangGraph TS, Vercel AI SDK):
+1. Verify Node.js is installed: `node --version`. If missing, report the error and provide installation guidance.
+2. Run the setup commands from the framework reference (e.g., `pnpm init`, `pnpm add ...`)
+3. Add LangWatch: `pnpm add langwatch`
+4. Add test dependencies: `pnpm add -D @langwatch/scenario vitest`
+5. Set up `tsconfig.json` if not already created by the framework scaffolder
+
+If dependency installation fails, report the error clearly and provide manual installation instructions. Leave the project structure intact so the user can recover.
+
+### Step 4: Instrument with LangWatch Tracing
+
+Follow the integration guide you read in Step 1 for the specific framework. The general patterns are:
+
+**Python:**
+```python
+import langwatch
+langwatch.setup()
+
+@langwatch.trace()
+def run_agent(user_input: str):
+    # agent logic here
+    pass
+```
+
+**TypeScript:**
+```typescript
+import { LangWatch } from "langwatch";
+const langwatch = new LangWatch();
+```
+
+IMPORTANT: The exact pattern depends on the framework. Follow the docs you read, not these examples.
+
+### Step 5: Create Versioned Prompts via Prompt CLI
+
+1. Install the CLI: `npm install -g langwatch` (or `npx langwatch`)
+2. Initialize: `langwatch prompt init`
+3. Get the API key: see # LangWatch API Key Setup
+
+1. Check if `LANGWATCH_API_KEY` is already set in your environment or `.env` file.
+2. If missing, get one at: https://app.langwatch.ai/authorize
+3. Add it to your project's `.env` file (check for duplicates first):
+```
+LANGWATCH_API_KEY=sk-lw-...
+```
+4. The MCP server also needs the key -- pass it via `--apiKey` flag or `LANGWATCH_API_KEY` env var.
+
+MCP Setup (see above)
+4. Create the main prompt: `langwatch prompt create main-prompt`
+5. Edit `prompts/main-prompt.yaml` with content tailored to the user's agent goal:
+   ```yaml
+   model: gpt-4o  # or the selected provider's model
+   temperature: 0.7
+   messages:
+     - role: system
+       content: |
+         <system prompt tailored to the agent's goal>
+     - role: user
+       content: |
+         {{ user_input }}
+   ```
+6. Sync: `langwatch prompt sync`
+7. Update the agent code to load the prompt via `langwatch.prompts.get("main-prompt")` instead of hardcoding it
+
+Do NOT hardcode prompts in application code. Do NOT add try/catch fallbacks around prompt fetching.
+
+### Step 6: Write Evaluation Experiment
+
+**Python projects** -- create a Jupyter notebook at `tests/evaluations/evaluation.ipynb`:
+- Use `langwatch.experiment.init()` to set up the experiment
+- Generate a CSV dataset of 10-20 examples tailored to the agent's domain
+- Include at least one evaluator (LLM-as-judge for quality is a good default)
+- Run the notebook to verify it produces results
+
+**TypeScript projects** -- create a script at `tests/evaluations/evaluation.ts`:
+- Use the LangWatch experiments SDK
+- Generate a dataset tailored to the agent's domain
+- Include at least one evaluator
+- Make it runnable with `npx tsx tests/evaluations/evaluation.ts`
+
+Evaluations are for batch metrics on single input/output pairs (RAG accuracy, classification, etc.). Do NOT use evaluations for multi-turn agent testing -- that is what scenarios are for.
+
+### Step 7: Write Scenario Simulation Tests
+
+Use `@langwatch/scenario` (TypeScript) or `langwatch-scenario` (Python) -- NEVER invent a custom testing framework.
+
+1. Read the Scenario docs via MCP: call `fetch_scenario_docs`
+2. Create test files in `tests/scenarios/`
+3. Write at least one scenario that validates the agent's core behavior:
+   - Define an `AgentAdapter` that connects to your agent
+   - Use `UserSimulatorAgent` to simulate realistic user messages
+   - Use `JudgeAgent` with natural language criteria (NOT regex or string matching)
+4. Test multi-turn conversations that verify the agent achieves its goal
+
+### Step 8: Run Tests to Verify
+
+Run the scenario tests:
+- Python: `uv run pytest tests/scenarios/`
+- TypeScript: `pnpm vitest run tests/scenarios/`
+
+If tests fail, fix the issues and re-run. Do NOT declare the project complete until tests pass. "It should work" is not verification.
+
+### Step 9: Tell the User How to Start
+
+Tell the user the command to start their agent or dev server. Do NOT start it yourself -- long-running processes block the agent.
+
+Examples:
+- Agno: `uv run python app/main.py`
+- Mastra: `pnpx mastra dev`
+- LangGraph Python: `uv run python app/main.py`
+- Vercel AI SDK: `pnpm tsx src/index.ts`
+
+Include the URL they can visit if the framework provides a web UI.
+
+## AGENTS.md Template
+
+The generated `AGENTS.md` must include these sections:
+
+```markdown
+# <Project Name>
+
+<Brief description of the agent and its goal>
+
+## Development
+
+### Running
+<command to start the agent>
+
+### Testing
+<command to run scenario tests>
+
+## Principles
+
+### 1. Agent Testing with Scenarios
+- Use `@langwatch/scenario` (TS) or `langwatch-scenario` (Python) for testing
+- Test multi-turn conversations, not just single exchanges
+- Use natural language judge criteria, not regex or string matching
+- Run scenarios before considering any change complete
+
+### 2. Prompt Management
+- Use LangWatch Prompt CLI: `langwatch prompt create <name>`
+- Store prompts in `prompts/*.yaml`, never hardcode in code
+- Run `langwatch prompt sync` after changes
+
+### 3. Evaluations vs. Scenarios
+- Evaluations: batch metrics for single input/output pairs (RAG, classification)
+- Scenarios: multi-turn agent conversation testing
+- When in doubt, use scenarios
+
+### 4. Observability
+- All LLM calls are traced via LangWatch
+- Check traces at https://app.langwatch.ai
+```
+
+## Guard Rails
+
+Read # Guard Rails -- Known Agent Failure Modes
+
+## Testing
+
+- DO NOT invent custom testing frameworks (e.g. `agent_tester`, `simulation_framework`, `langwatch.testing`). Use `@langwatch/scenario` (TS) or `langwatch-scenario` (Python). The Scenario SDK already handles user simulation, judging, multi-turn conversations, and tool call verification.
+- DO NOT use regex or word matching in scenario judge criteria. Use natural language criteria with `JudgeAgent` -- it is more robust and meaningful than brittle pattern matching.
+- DO NOT use evaluations for multi-turn agent testing. Evaluations are for single input/output metrics (RAG accuracy, classification). Use Scenario tests for multi-turn agent flows.
+- DO NOT skip running tests after implementation. Always run scenarios and verify they pass before considering work done. "It should work" is not verification.
+
+## Prompts
+
+- NEVER hardcode prompts in application code or inline strings. Store all prompts in `prompts/*.yaml` files managed by LangWatch Prompt CLI (`langwatch prompt create <name>`, `langwatch prompt sync`).
+- DO NOT add try/catch around prompt fetching or duplicate prompts as fallbacks. Prompt CLI files are local and reliable.
+
+## Notebooks
+
+- DO NOT just write Jupyter notebooks without executing them. Evaluation notebooks under `tests/evaluations/` must be run to verify they produce correct results. Writing a notebook is not the same as running it.
+
+## Environment
+
+- DO NOT start long-running dev servers yourself. They block the agent process. Instead, tell the user how to start the server and give them the URL. Let the user run it themselves.
+- DO NOT commit `.mcp.json` with real API keys. The `.mcp.json` file contains secrets. Use `.mcp.json.example` with placeholder values for git, and add `.mcp.json` to `.gitignore`.
+- DO NOT commit `.env` files. Use `.env.example` for templates. API keys are already in `.env` -- do not re-set them.
+
+## Agent Construction
+
+- DO NOT create agent instances inside loops (especially Agno). Agent construction has significant overhead. Create the agent once, reuse it for multiple queries.
+
+## Documentation
+
+- ALWAYS use the LangWatch MCP (`fetch_langwatch_docs`, `fetch_scenario_docs`) to access documentation. DO NOT fetch docs from random URLs, hallucinate API signatures, or guess framework patterns. Read the actual docs for the specific framework.
+- DO NOT use `platform_*` MCP tools when writing code. The `platform_create_scenario`, `platform_create_evaluator`, etc. tools are for no-code platform operations. When you have a codebase, write test files and code instead.
+
+## Workflow
+
+- DO NOT mix kickoff/setup steps with reference documentation. Kickoff instructions (numbered steps the agent executes once) must be clearly separated from ongoing reference material (patterns, rules, examples).
+- DO NOT skip verification. After implementation: run scenario tests, check they pass, instrument with LangWatch, confirm traces appear. Only then is the work done. The critical rules:
+
+- **Testing**: Use `@langwatch/scenario` / `langwatch-scenario`. Never invent custom test frameworks. Never use regex in judge criteria. Use natural language criteria with `JudgeAgent`.
+- **Prompts**: Use Prompt CLI (`langwatch prompt create`, `langwatch prompt sync`). Never hardcode in code. No try/catch fallbacks.
+- **Documentation**: Use MCP (`fetch_langwatch_docs`, `fetch_scenario_docs`) for docs. Never guess URLs or API signatures.
+- **Environment**: Never start long-running dev servers. Never commit `.env` or `.mcp.json` with real keys. Use `.example` files for git.
+- **MCP tools**: Never use `platform_*` MCP tools (platform_create_scenario, etc.) when writing code. Those are for no-code platform operations.
+- **Agent construction**: Never create agent instances inside loops (especially Agno). Create once, reuse.
+- **Notebooks**: Always run evaluation notebooks, not just write them. Writing is not verification.
+- **Workflow**: Read docs first (Step 1), scaffold second (Step 2), verify last (Step 8). Never skip verification.
+
+## Common Mistakes
+
+| Mistake | Correct Approach |
+|---------|-----------------|
+| Hardcoding prompts in agent code | Use `langwatch prompt create` and load via `langwatch.prompts.get()` |
+| Inventing a custom test framework | Use `@langwatch/scenario` or `langwatch-scenario` |
+| Using regex/string matching in scenario judges | Use natural language criteria with `JudgeAgent` |
+| Skipping MCP docs and guessing APIs | Call `fetch_langwatch_docs` and `fetch_scenario_docs` first |
+| Starting the dev server for the user | Tell the user the command and URL, let them run it |
+| Committing `.env` or `.mcp.json` with real keys | Use `.env.example` and `.mcp.json.example` for git |
+| Using `platform_*` MCP tools to create scenarios | Write test files in `tests/scenarios/` instead |
+| Creating agents inside loops (Agno) | Create the agent instance once, reuse it |
+| Writing evaluation notebook without running it | Execute the notebook to verify it produces results |
+| Mixing evaluations and scenarios | Evaluations = batch metrics. Scenarios = multi-turn agent tests |
+| Reading all framework references | Read ONLY the reference for the selected framework |
+| Scaffolding before reading docs | Step 1 is always reading docs via MCP |
