@@ -8,7 +8,6 @@ export async function GET() {
     startIndex: 1,
     Resources: [
       {
-        schemas: ["urn:ietf:params:scim:schemas:core:2.0:Schema"],
         id: "urn:ietf:params:scim:schemas:core:2.0:User",
         name: "User",
         description: "User Account",
@@ -68,7 +67,7 @@ export async function GET() {
         ],
         meta: {
           resourceType: "Schema",
-          location: "/api/scim/v2/Schemas/urn:ietf:params:scim:schemas:core:2.0:User",
+          location: "/scim/v2/Schemas/urn:ietf:params:scim:schemas:core:2.0:User",
         },
       },
     ],

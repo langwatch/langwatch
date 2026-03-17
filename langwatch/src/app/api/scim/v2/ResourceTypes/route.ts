@@ -11,11 +11,11 @@ export async function GET() {
         schemas: ["urn:ietf:params:scim:schemas:core:2.0:ResourceType"],
         id: "User",
         name: "User",
-        endpoint: "/api/scim/v2/Users",
+        endpoint: "/scim/v2/Users",
         schema: "urn:ietf:params:scim:schemas:core:2.0:User",
         meta: {
           resourceType: "ResourceType",
-          location: "/api/scim/v2/ResourceTypes/User",
+          location: "/scim/v2/ResourceTypes/User",
         },
       },
     ],

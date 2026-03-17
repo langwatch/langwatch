@@ -1,5 +1,3 @@
-import { z } from "zod";
-
 export interface ScimUser {
   schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"];
   id: string;
@@ -35,40 +33,28 @@ export interface ScimError {
   detail: string;
 }
 
-export const scimPatchOperationSchema = z.object({
-  op: z.enum(["replace", "add", "remove"]),
-  path: z.string().optional(),
-  value: z.unknown().optional(),
-});
+export interface ScimPatchOperation {
+  op: "replace" | "add" | "remove";
+  path?: string;
+  value?: Record<string, unknown>;
+}
 
-export type ScimPatchOperation = z.infer<typeof scimPatchOperationSchema>;
+export interface ScimPatchRequest {
+  schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"];
+  Operations: ScimPatchOperation[];
+}
 
-export const scimPatchRequestSchema = z.object({
-  schemas: z.array(z.string()),
-  Operations: z.array(scimPatchOperationSchema),
-});
-
-export type ScimPatchRequest = z.infer<typeof scimPatchRequestSchema>;
-
-export const scimCreateUserRequestSchema = z.object({
-  schemas: z.array(z.string()),
-  userName: z.string().email(),
-  name: z
-    .object({
-      givenName: z.string().optional(),
-      familyName: z.string().optional(),
-    })
-    .optional(),
-  emails: z
-    .array(
-      z.object({
-        primary: z.boolean().optional(),
-        value: z.string(),
-        type: z.string().optional(),
-      })
-    )
-    .optional(),
-  active: z.boolean().optional(),
-});
-
-export type ScimCreateUserRequest = z.infer<typeof scimCreateUserRequestSchema>;
+export interface ScimCreateUserRequest {
+  schemas: string[];
+  userName: string;
+  name?: {
+    givenName?: string;
+    familyName?: string;
+  };
+  emails?: Array<{
+    primary?: boolean;
+    value: string;
+    type?: string;
+  }>;
+  active?: boolean;
+}

@@ -1,12 +1,10 @@
 import type { PrismaClient, User } from "@prisma/client";
-import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { UserService } from "../users/user.service";
 import type {
   ScimUser,
   ScimListResponse,
   ScimError,
   ScimCreateUserRequest,
-  ScimPatchOperation,
   ScimPatchRequest,
 } from "./scim.types";
 
@@ -52,48 +50,31 @@ export class ScimService {
         return this.scimError({ status: "409", detail: "User already exists in this organization" });
       }
 
-      try {
-        await this.prisma.organizationUser.create({
-          data: {
-            userId: existingUser.id,
-            organizationId,
-            role: "MEMBER",
-          },
-        });
-      } catch (e) {
-        if (e instanceof PrismaClientKnownRequestError && e.code === "P2002") {
-          return this.scimError({ status: "409", detail: "User already exists in this organization" });
-        }
-        throw e;
-      }
+      await this.prisma.organizationUser.create({
+        data: {
+          userId: existingUser.id,
+          organizationId,
+          role: "MEMBER",
+        },
+      });
 
       if (existingUser.deactivatedAt) {
         await this.userService.reactivate({ id: existingUser.id });
       }
 
       const reloadedUser = await this.userService.findById({ id: existingUser.id });
-      if (!reloadedUser) {
-        return this.scimError({ status: "404", detail: "User not found" });
-      }
-      return this.toScimUser(reloadedUser);
+      return this.toScimUser(reloadedUser!);
     }
 
     const newUser = await this.userService.create({ name, email });
 
-    try {
-      await this.prisma.organizationUser.create({
-        data: {
-          userId: newUser.id,
-          organizationId,
-          role: "MEMBER",
-        },
-      });
-    } catch (e) {
-      if (e instanceof PrismaClientKnownRequestError && e.code === "P2002") {
-        return this.scimError({ status: "409", detail: "User already exists in this organization" });
-      }
-      throw e;
-    }
+    await this.prisma.organizationUser.create({
+      data: {
+        userId: newUser.id,
+        organizationId,
+        role: "MEMBER",
+      },
+    });
 
     return this.toScimUser(newUser);
   }
@@ -200,10 +181,7 @@ export class ScimService {
     }
 
     const reloadedUser = await this.userService.findById({ id });
-    if (!reloadedUser) {
-      return this.scimError({ status: "404", detail: "User not found" });
-    }
-    return this.toScimUser(reloadedUser);
+    return this.toScimUser(reloadedUser!);
   }
 
   async updateUser({
@@ -229,16 +207,37 @@ export class ScimService {
     }
 
     for (const operation of patchRequest.Operations) {
-      if (operation.op === "replace") {
-        await this.applyReplaceOperation({ id, operation });
+      if (operation.op === "replace" && operation.value) {
+        const updates: { name?: string; email?: string } = {};
+
+        if ("active" in operation.value) {
+          if (operation.value.active === false) {
+            await this.userService.deactivate({ id });
+          } else {
+            await this.userService.reactivate({ id });
+          }
+        }
+
+        if ("userName" in operation.value && typeof operation.value.userName === "string") {
+          updates.email = operation.value.userName;
+        }
+
+        if ("name" in operation.value && typeof operation.value.name === "object") {
+          const nameObj = operation.value.name as Record<string, string>;
+          const parts = [nameObj.givenName, nameObj.familyName].filter(Boolean);
+          if (parts.length > 0) {
+            updates.name = parts.join(" ");
+          }
+        }
+
+        if (Object.keys(updates).length > 0) {
+          await this.userService.updateProfile({ id, ...updates });
+        }
       }
     }
 
     const reloadedUser = await this.userService.findById({ id });
-    if (!reloadedUser) {
-      return this.scimError({ status: "404", detail: "User not found" });
-    }
-    return this.toScimUser(reloadedUser);
+    return this.toScimUser(reloadedUser!);
   }
 
   async deleteUser({
@@ -290,56 +289,6 @@ export class ScimService {
         lastModified: user.updatedAt.toISOString(),
       },
     };
-  }
-
-  private async applyReplaceOperation({
-    id,
-    operation,
-  }: {
-    id: string;
-    operation: ScimPatchOperation;
-  }): Promise<void> {
-    // Path-based replace with primitive value, e.g. { op: "replace", path: "active", value: false }
-    if (operation.path && typeof operation.value !== "object") {
-      if (operation.path === "active") {
-        if (operation.value === false) {
-          await this.userService.deactivate({ id });
-        } else {
-          await this.userService.reactivate({ id });
-        }
-      }
-      return;
-    }
-
-    // Object-based replace, e.g. { op: "replace", value: { active: false, userName: "..." } }
-    if (operation.value != null && typeof operation.value === "object") {
-      const value = operation.value as Record<string, unknown>;
-      const updates: { name?: string; email?: string } = {};
-
-      if ("active" in value) {
-        if (value.active === false) {
-          await this.userService.deactivate({ id });
-        } else {
-          await this.userService.reactivate({ id });
-        }
-      }
-
-      if ("userName" in value && typeof value.userName === "string") {
-        updates.email = value.userName;
-      }
-
-      if ("name" in value && typeof value.name === "object") {
-        const nameObj = value.name as Record<string, string>;
-        const parts = [nameObj.givenName, nameObj.familyName].filter(Boolean);
-        if (parts.length > 0) {
-          updates.name = parts.join(" ");
-        }
-      }
-
-      if (Object.keys(updates).length > 0) {
-        await this.userService.updateProfile({ id, ...updates });
-      }
-    }
   }
 
   private buildNameFromRequest(request: ScimCreateUserRequest): string {

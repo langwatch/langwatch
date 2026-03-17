@@ -169,7 +169,7 @@ model Organization {
     s3Bucket               String?
     useCustomS3            Boolean              @default(false)
     sentPlanLimitAlert     DateTime?
-    ssoDomain              String?              @unique
+    ssoDomain              String?
     ssoProvider            String?
 
     promoCode     String?
@@ -186,13 +186,14 @@ model Organization {
     licenseExpiresAt       DateTime?
     licenseLastValidatedAt DateTime?
 
+    @@index([ssoDomain])
     @@index([ssoProvider])
 }
 
 model ScimToken {
     id             String       @id @default(nanoid())
     organizationId String
-    organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+    organization   Organization @relation(fields: [organizationId], references: [id])
     hashedToken    String
     description    String?
     createdAt      DateTime     @default(now())
