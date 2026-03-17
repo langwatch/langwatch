@@ -34,7 +34,7 @@ export function EvaluatorHistoryDrawer({
   evaluatorName,
 }: {
   evaluatorId: string;
-  evaluatorName?: string;
+  evaluatorName: string;
 }) {
   const { closeDrawer } = useDrawer();
   const { project } = useOrganizationTeamProject();
@@ -49,7 +49,7 @@ export function EvaluatorHistoryDrawer({
       <Drawer.Content>
         <Drawer.Header>
           <Text fontWeight="semibold" fontSize="lg">
-            {evaluatorName ? `${evaluatorName} history` : "Evaluator history"}
+            {`${evaluatorName} history`}
           </Text>
           <Drawer.CloseTrigger />
         </Drawer.Header>
@@ -60,7 +60,7 @@ export function EvaluatorHistoryDrawer({
             </HStack>
           )}
           {isError && (
-            <Text color="red.fg" textAlign="center" paddingY={8}>
+            <Text role="alert" color="red.fg" textAlign="center" paddingY={8}>
               Failed to load history.
             </Text>
           )}

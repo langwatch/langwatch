@@ -34,7 +34,7 @@ export function AgentHistoryDrawer({
   agentName,
 }: {
   agentId: string;
-  agentName?: string;
+  agentName: string;
 }) {
   const { closeDrawer } = useDrawer();
   const { project } = useOrganizationTeamProject();
@@ -49,7 +49,7 @@ export function AgentHistoryDrawer({
       <Drawer.Content>
         <Drawer.Header>
           <Text fontWeight="semibold" fontSize="lg">
-            {agentName ? `${agentName} history` : "Agent history"}
+            {`${agentName} history`}
           </Text>
           <Drawer.CloseTrigger />
         </Drawer.Header>
@@ -60,7 +60,7 @@ export function AgentHistoryDrawer({
             </HStack>
           )}
           {isError && (
-            <Text color="red.fg" textAlign="center" paddingY={8}>
+            <Text role="alert" color="red.fg" textAlign="center" paddingY={8}>
               Failed to load history.
             </Text>
           )}

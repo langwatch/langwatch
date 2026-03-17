@@ -8,10 +8,7 @@ import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
 } from "~/server/evaluations/evaluators.generated";
-import {
-  type CreateEvaluatorInput,
-  EvaluatorRepository,
-} from "./evaluator.repository";
+import { EvaluatorRepository } from "./evaluator.repository";
 
 // ============================================================================
 // Types
@@ -292,25 +289,14 @@ export class EvaluatorService {
       user: { id: string; name: string | null; email: string | null } | null;
     }[]
   > {
-    const logs = await this.prisma.auditLog.findMany({
-      where: {
-        projectId,
-        action: { startsWith: "evaluators." },
-        OR: [
-          { args: { path: ["id"], equals: evaluatorId } },
-          { args: { path: ["evaluatorId"], equals: evaluatorId } },
-          { args: { path: ["newEvaluatorId"], equals: evaluatorId } },
-        ],
-      },
-      orderBy: { createdAt: "desc" },
-      take: 100,
+    const logs = await this.repository.findAuditLogs({
+      evaluatorId,
+      projectId,
+      limit: 100,
     });
 
     const userIds = [...new Set(logs.map((l) => l.userId))];
-    const users = await this.prisma.user.findMany({
-      where: { id: { in: userIds } },
-      select: { id: true, name: true, email: true },
-    });
+    const users = await this.repository.findUsersByIds(userIds);
     const usersById = Object.fromEntries(users.map((u) => [u.id, u]));
 
     return logs.map((log) => ({
