@@ -8,13 +8,43 @@ const MCP_POST_HEADERS = {
   Accept: "application/json, text/event-stream",
 };
 
+const BEARER_TOKEN = "test-session-key";
+
+/** Helper to create auth + MCP headers */
+function mcpHeaders({
+  sessionId,
+  apiKey,
+}: { sessionId?: string; apiKey?: string } = {}) {
+  const headers: Record<string, string> = {
+    ...MCP_POST_HEADERS,
+    Authorization: `Bearer ${apiKey ?? BEARER_TOKEN}`,
+  };
+  if (sessionId) {
+    headers["mcp-session-id"] = sessionId;
+  }
+  return headers;
+}
+
+function initializeBody() {
+  return JSON.stringify({
+    jsonrpc: "2.0",
+    method: "initialize",
+    params: {
+      protocolVersion: "2025-03-26",
+      capabilities: {},
+      clientInfo: { name: "test-client", version: "1.0.0" },
+    },
+    id: 1,
+  });
+}
+
 describe("HTTP transport", () => {
   let httpServer: Server;
   let port: number;
 
   beforeAll(async () => {
+    // Initialize with no API key -- HTTP mode relies on per-session Bearer tokens
     initConfig({
-      apiKey: "test-key",
       endpoint: "https://app.langwatch.ai",
     });
 
@@ -31,7 +61,7 @@ describe("HTTP transport", () => {
   });
 
   describe("/health endpoint", () => {
-    it("returns ok status", async () => {
+    it("returns ok status without authentication", async () => {
       const response = await fetch(`http://localhost:${port}/health`);
       const body = await response.json();
 
@@ -60,13 +90,40 @@ describe("HTTP transport", () => {
         "mcp-session-id"
       );
     });
+
+    it("includes Authorization in allowed headers for CORS", async () => {
+      const response = await fetch(`http://localhost:${port}/mcp`, {
+        method: "OPTIONS",
+      });
+
+      expect(response.headers.get("access-control-allow-headers")).toContain(
+        "Authorization"
+      );
+    });
   });
 
   describe("/mcp endpoint (Streamable HTTP)", () => {
+    describe("when no Bearer token is provided", () => {
+      it("returns 401 on initialize request", async () => {
+        const response = await fetch(`http://localhost:${port}/mcp`, {
+          method: "POST",
+          headers: MCP_POST_HEADERS,
+          body: initializeBody(),
+        });
+
+        expect(response.status).toBe(401);
+        const body = await response.json();
+        expect(body.error).toContain("Authorization");
+      });
+    });
+
     it("rejects non-initialize POST without session ID", async () => {
       const response = await fetch(`http://localhost:${port}/mcp`, {
         method: "POST",
-        headers: MCP_POST_HEADERS,
+        headers: {
+          ...MCP_POST_HEADERS,
+          Authorization: `Bearer ${BEARER_TOKEN}`,
+        },
         body: JSON.stringify({
           jsonrpc: "2.0",
           method: "tools/list",
@@ -77,20 +134,11 @@ describe("HTTP transport", () => {
       expect(response.status).toBe(400);
     });
 
-    it("accepts initialize request and returns session ID", async () => {
+    it("accepts initialize request with Bearer token and returns session ID", async () => {
       const response = await fetch(`http://localhost:${port}/mcp`, {
         method: "POST",
-        headers: MCP_POST_HEADERS,
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          method: "initialize",
-          params: {
-            protocolVersion: "2025-03-26",
-            capabilities: {},
-            clientInfo: { name: "test-client", version: "1.0.0" },
-          },
-          id: 1,
-        }),
+        headers: mcpHeaders(),
+        body: initializeBody(),
       });
 
       expect(response.status).toBe(200);
@@ -99,44 +147,28 @@ describe("HTTP transport", () => {
     });
 
     it("lists all tools after initialization", async () => {
-      // Step 1: Initialize to get session ID
       const initResponse = await fetch(`http://localhost:${port}/mcp`, {
         method: "POST",
-        headers: MCP_POST_HEADERS,
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          method: "initialize",
-          params: {
-            protocolVersion: "2025-03-26",
-            capabilities: {},
-            clientInfo: { name: "test-client", version: "1.0.0" },
-          },
-          id: 1,
-        }),
+        headers: mcpHeaders(),
+        body: initializeBody(),
       });
 
       const sessionId = initResponse.headers.get("mcp-session-id")!;
 
-      // Step 2: Send initialized notification
+      // Send initialized notification
       await fetch(`http://localhost:${port}/mcp`, {
         method: "POST",
-        headers: {
-          ...MCP_POST_HEADERS,
-          "mcp-session-id": sessionId,
-        },
+        headers: mcpHeaders({ sessionId }),
         body: JSON.stringify({
           jsonrpc: "2.0",
           method: "notifications/initialized",
         }),
       });
 
-      // Step 3: List tools
+      // List tools
       const toolsResponse = await fetch(`http://localhost:${port}/mcp`, {
         method: "POST",
-        headers: {
-          ...MCP_POST_HEADERS,
-          "mcp-session-id": sessionId,
-        },
+        headers: mcpHeaders({ sessionId }),
         body: JSON.stringify({
           jsonrpc: "2.0",
           method: "tools/list",
@@ -146,7 +178,6 @@ describe("HTTP transport", () => {
 
       expect(toolsResponse.status).toBe(200);
       const text = await toolsResponse.text();
-      // The response may be SSE or JSON depending on transport
       expect(text).toContain("fetch_langwatch_docs");
       expect(text).toContain("discover_schema");
       expect(text).toContain("search_traces");
@@ -156,25 +187,14 @@ describe("HTTP transport", () => {
 
   describe("DELETE /mcp", () => {
     it("closes an existing session", async () => {
-      // Initialize
       const initResponse = await fetch(`http://localhost:${port}/mcp`, {
         method: "POST",
-        headers: MCP_POST_HEADERS,
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          method: "initialize",
-          params: {
-            protocolVersion: "2025-03-26",
-            capabilities: {},
-            clientInfo: { name: "test-client", version: "1.0.0" },
-          },
-          id: 1,
-        }),
+        headers: mcpHeaders(),
+        body: initializeBody(),
       });
 
       const sessionId = initResponse.headers.get("mcp-session-id")!;
 
-      // Delete session
       const deleteResponse = await fetch(`http://localhost:${port}/mcp`, {
         method: "DELETE",
         headers: { "mcp-session-id": sessionId },
@@ -194,11 +214,23 @@ describe("HTTP transport", () => {
   });
 
   describe("/sse endpoint (legacy SSE)", () => {
-    it("establishes SSE connection and sends endpoint event", async () => {
+    it("returns 401 without authorization", async () => {
       const controller = new AbortController();
 
       const response = await fetch(`http://localhost:${port}/sse`, {
         signal: controller.signal,
+      });
+
+      expect(response.status).toBe(401);
+      controller.abort();
+    });
+
+    it("establishes SSE connection with Bearer token in header", async () => {
+      const controller = new AbortController();
+
+      const response = await fetch(`http://localhost:${port}/sse`, {
+        signal: controller.signal,
+        headers: { Authorization: `Bearer ${BEARER_TOKEN}` },
       });
 
       expect(response.status).toBe(200);
@@ -206,7 +238,6 @@ describe("HTTP transport", () => {
         "text/event-stream"
       );
 
-      // Read the first event from the SSE stream
       const reader = response.body!.getReader();
       const decoder = new TextDecoder();
       const { value } = await reader.read();
@@ -214,6 +245,29 @@ describe("HTTP transport", () => {
 
       expect(text).toContain("event: endpoint");
       expect(text).toContain("/messages?sessionId=");
+
+      controller.abort();
+    });
+
+    it("establishes SSE connection with apiKey query parameter", async () => {
+      const controller = new AbortController();
+
+      const response = await fetch(
+        `http://localhost:${port}/sse?apiKey=${BEARER_TOKEN}`,
+        { signal: controller.signal }
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-type")).toContain(
+        "text/event-stream"
+      );
+
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      const { value } = await reader.read();
+      const text = decoder.decode(value);
+
+      expect(text).toContain("event: endpoint");
 
       controller.abort();
     });

@@ -4,7 +4,7 @@ import { execSync } from "child_process";
 const IMAGE_NAME = "langwatch-mcp-server-test";
 const CONTAINER_NAME = "langwatch-mcp-server-test-container";
 const HOST_PORT = 13099; // unlikely to conflict
-const API_KEY = "test-docker-api-key";
+const BEARER_TOKEN = "test-docker-api-key";
 
 /** Standard headers required by the MCP Streamable HTTP protocol */
 const MCP_POST_HEADERS = {
@@ -33,9 +33,9 @@ describe("Docker container", () => {
         stdio: "pipe",
       });
 
-      // Start the container
+      // Start the container WITHOUT LANGWATCH_API_KEY -- clients bring their own
       execSync(
-        `docker run -d --name ${CONTAINER_NAME} -p ${HOST_PORT}:3000 -e LANGWATCH_API_KEY=${API_KEY} ${IMAGE_NAME}`,
+        `docker run -d --name ${CONTAINER_NAME} -p ${HOST_PORT}:3000 ${IMAGE_NAME}`,
         { stdio: "pipe" }
       );
 
@@ -76,7 +76,7 @@ describe("Docker container", () => {
     });
   });
 
-  it("health endpoint responds", async () => {
+  it("health endpoint responds without authentication", async () => {
     if (!containerRunning) return;
 
     const res = await fetch(`http://localhost:${HOST_PORT}/health`);
@@ -92,12 +92,38 @@ describe("Docker container", () => {
     expect(res.headers.get("access-control-allow-origin")).toBe("*");
   });
 
-  it("MCP initialize works via Streamable HTTP", async () => {
+  it("returns 401 on initialize without Bearer token", async () => {
     if (!containerRunning) return;
 
     const res = await fetch(`http://localhost:${HOST_PORT}/mcp`, {
       method: "POST",
       headers: MCP_POST_HEADERS,
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: {
+          protocolVersion: "2025-03-26",
+          capabilities: {},
+          clientInfo: { name: "docker-test", version: "1.0.0" },
+        },
+      }),
+    });
+
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toContain("Authorization");
+  });
+
+  it("MCP initialize works with Bearer token", async () => {
+    if (!containerRunning) return;
+
+    const res = await fetch(`http://localhost:${HOST_PORT}/mcp`, {
+      method: "POST",
+      headers: {
+        ...MCP_POST_HEADERS,
+        Authorization: `Bearer ${BEARER_TOKEN}`,
+      },
       body: JSON.stringify({
         jsonrpc: "2.0",
         id: 1,
@@ -119,33 +145,16 @@ describe("Docker container", () => {
     expect(text).toContain("serverInfo");
   });
 
-  it("legacy SSE endpoint responds", async () => {
-    if (!containerRunning) return;
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-
-    try {
-      const res = await fetch(`http://localhost:${HOST_PORT}/sse`, {
-        signal: controller.signal,
-      });
-      expect(res.status).toBe(200);
-      expect(res.headers.get("content-type")).toContain("text/event-stream");
-    } catch (error: any) {
-      if (error.name !== "AbortError") throw error;
-      // AbortError is expected — SSE stays open
-    } finally {
-      clearTimeout(timeout);
-    }
-  });
-
-  it("API key is configured from environment variable", async () => {
+  it("lists tools after initialization with Bearer token", async () => {
     if (!containerRunning) return;
 
     // Initialize a session
     const initRes = await fetch(`http://localhost:${HOST_PORT}/mcp`, {
       method: "POST",
-      headers: MCP_POST_HEADERS,
+      headers: {
+        ...MCP_POST_HEADERS,
+        Authorization: `Bearer ${BEARER_TOKEN}`,
+      },
       body: JSON.stringify({
         jsonrpc: "2.0",
         id: 1,
@@ -166,6 +175,7 @@ describe("Docker container", () => {
       headers: {
         ...MCP_POST_HEADERS,
         "mcp-session-id": sessionId!,
+        Authorization: `Bearer ${BEARER_TOKEN}`,
       },
       body: JSON.stringify({
         jsonrpc: "2.0",
@@ -173,12 +183,13 @@ describe("Docker container", () => {
       }),
     });
 
-    // List tools — this should work because API key is set
+    // List tools
     const toolsRes = await fetch(`http://localhost:${HOST_PORT}/mcp`, {
       method: "POST",
       headers: {
         ...MCP_POST_HEADERS,
         "mcp-session-id": sessionId!,
+        Authorization: `Bearer ${BEARER_TOKEN}`,
       },
       body: JSON.stringify({
         jsonrpc: "2.0",
@@ -189,8 +200,35 @@ describe("Docker container", () => {
 
     expect(toolsRes.status).toBe(200);
     const toolsText = await toolsRes.text();
-    // Should contain our tool names
     expect(toolsText).toContain("fetch_langwatch_docs");
     expect(toolsText).toContain("search_traces");
+  });
+
+  it("legacy SSE endpoint responds with Bearer token", async () => {
+    if (!containerRunning) return;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+
+    try {
+      const res = await fetch(`http://localhost:${HOST_PORT}/sse`, {
+        signal: controller.signal,
+        headers: { Authorization: `Bearer ${BEARER_TOKEN}` },
+      });
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toContain("text/event-stream");
+    } catch (error: any) {
+      if (error.name !== "AbortError") throw error;
+      // AbortError is expected -- SSE stays open
+    } finally {
+      clearTimeout(timeout);
+    }
+  });
+
+  it("legacy SSE endpoint returns 401 without token", async () => {
+    if (!containerRunning) return;
+
+    const res = await fetch(`http://localhost:${HOST_PORT}/sse`);
+    expect(res.status).toBe(401);
   });
 });

@@ -36,6 +36,9 @@ if (argv.http) {
   const { startHttpServer } = await import("./http-server.js");
   const { port } = await startHttpServer({ port: argv.port });
   console.log(`LangWatch MCP server listening on http://0.0.0.0:${port}/mcp`);
+  console.log(
+    "Clients must provide their API key via Authorization: Bearer <key> header"
+  );
 } else {
   const transport = new StdioServerTransport();
   const server = createMcpServer();
