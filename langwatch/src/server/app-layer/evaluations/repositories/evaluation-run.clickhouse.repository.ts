@@ -90,6 +90,52 @@ export class EvaluationRunClickHouseRepository
     }
   }
 
+  async bulkUpsert(entries: Array<{ data: EvaluationRunData; tenantId: string }>): Promise<void> {
+    if (entries.length === 0) return;
+
+    for (const { tenantId } of entries) {
+      EventUtils.validateTenantId(
+        { tenantId },
+        "EvaluationRunClickHouseRepository.bulkUpsert",
+      );
+    }
+
+    try {
+      const records = entries.map(({ data, tenantId }) => {
+        const projectionId = data.scheduledAt
+          ? IdUtils.generateDeterministicEvaluationRunId(
+              tenantId,
+              data.evaluationId,
+              data.scheduledAt,
+            )
+          : data.evaluationId;
+
+        return this.toClickHouseRecord(
+          data,
+          tenantId,
+          projectionId,
+          EVALUATION_PROJECTION_VERSIONS.STATE,
+        );
+      });
+
+      await this.clickHouseClient.insert({
+        table: TABLE_NAME,
+        values: records,
+        format: "JSONEachRow",
+        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+      });
+    } catch (error) {
+      logger.error(
+        {
+          count: entries.length,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Failed to bulk upsert evaluation runs in ClickHouse",
+      );
+      throw error;
+    }
+  }
+
   async getByEvaluationId(
     tenantId: string,
     evaluationId: string,
