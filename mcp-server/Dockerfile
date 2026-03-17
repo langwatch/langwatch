@@ -7,12 +7,16 @@ RUN corepack enable && corepack prepare pnpm@10 --activate
 
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# Build from repo root: docker build -t langwatch-mcp -f mcp-server/Dockerfile .
+COPY mcp-server/package.json mcp-server/pnpm-lock.yaml mcp-server/pnpm-workspace.yaml ./mcp-server/
+WORKDIR /app/mcp-server
 RUN pnpm install --frozen-lockfile
 
-COPY . ./
-RUN pnpm run build
+WORKDIR /app
+COPY mcp-server/ ./mcp-server/
+COPY langevals/ ./langevals/
 
 EXPOSE 3000
 
-CMD ["node", "dist/index.js", "--http", "--port", "3000"]
+WORKDIR /app/mcp-server
+CMD ["node", "--import", "tsx/esm", "src/index.ts", "--http", "--port", "3000"]
