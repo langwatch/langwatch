@@ -1,7 +1,7 @@
 import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import {
   ArrowUp,
-  Bot,
+  CheckSquare,
   Copy,
   Edit,
   type LucideIcon,
@@ -16,32 +16,32 @@ import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { Drawer } from "../ui/drawer";
 
 const ACTION_META = {
-  "agents.create": { label: "Created", icon: Bot },
-  "agents.update": { label: "Updated", icon: Edit },
-  "agents.delete": { label: "Deleted", icon: Trash2 },
-  "agents.cascadeArchive": { label: "Archived", icon: Trash2 },
-  "agents.copy": { label: "Replicated", icon: Copy },
-  "agents.pushToCopies": { label: "Pushed to replicas", icon: ArrowUp },
-  "agents.syncFromSource": { label: "Synced from source", icon: RefreshCw },
+  "evaluators.create": { label: "Created", icon: CheckSquare },
+  "evaluators.update": { label: "Updated", icon: Edit },
+  "evaluators.delete": { label: "Deleted", icon: Trash2 },
+  "evaluators.cascadeArchive": { label: "Archived", icon: Trash2 },
+  "evaluators.copy": { label: "Replicated", icon: Copy },
+  "evaluators.pushToCopies": { label: "Pushed to replicas", icon: ArrowUp },
+  "evaluators.syncFromSource": { label: "Synced from source", icon: RefreshCw },
 } as const satisfies Record<string, { label: string; icon: LucideIcon }>;
 
 function actionMeta(action: string) {
   return (ACTION_META as Record<string, { label: string; icon: LucideIcon }>)[action] ?? { label: action, icon: X };
 }
 
-export function AgentHistoryDrawer({
-  agentId,
-  agentName,
+export function EvaluatorHistoryDrawer({
+  evaluatorId,
+  evaluatorName,
 }: {
-  agentId: string;
-  agentName: string;
+  evaluatorId: string;
+  evaluatorName: string;
 }) {
   const { closeDrawer } = useDrawer();
   const { project } = useOrganizationTeamProject();
 
-  const { data, isLoading, isError } = api.agents.getHistory.useQuery(
-    { agentId, projectId: project?.id ?? "" },
-    { enabled: !!project?.id && !!agentId },
+  const { data, isLoading, isError } = api.evaluators.getHistory.useQuery(
+    { evaluatorId, projectId: project?.id ?? "" },
+    { enabled: !!project?.id && !!evaluatorId },
   );
 
   return (
@@ -49,7 +49,7 @@ export function AgentHistoryDrawer({
       <Drawer.Content>
         <Drawer.Header>
           <Text fontWeight="semibold" fontSize="lg">
-            {`${agentName} history`}
+            {`${evaluatorName} history`}
           </Text>
           <Drawer.CloseTrigger />
         </Drawer.Header>

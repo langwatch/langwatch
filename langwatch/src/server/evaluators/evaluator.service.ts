@@ -8,10 +8,7 @@ import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
 } from "~/server/evaluations/evaluators.generated";
-import {
-  type CreateEvaluatorInput,
-  EvaluatorRepository,
-} from "./evaluator.repository";
+import { EvaluatorRepository } from "./evaluator.repository";
 
 // ============================================================================
 // Types
@@ -274,5 +271,40 @@ export class EvaluatorService {
    */
   get softDelete() {
     return this.repository.softDelete.bind(this.repository);
+  }
+
+  /**
+   * Returns recent audit log history for a specific evaluator, enriched with user info.
+   * Capped at the 100 most recent entries.
+   */
+  async getHistory(
+    evaluatorId: string,
+    projectId: string,
+  ): Promise<
+    {
+      id: string;
+      action: string;
+      createdAt: Date;
+      args: unknown;
+      user: { id: string; name: string | null; email: string | null } | null;
+    }[]
+  > {
+    const logs = await this.repository.findAuditLogs({
+      evaluatorId,
+      projectId,
+      limit: 100,
+    });
+
+    const userIds = [...new Set(logs.map((l) => l.userId))];
+    const users = await this.repository.findUsersByIds(userIds);
+    const usersById = Object.fromEntries(users.map((u) => [u.id, u]));
+
+    return logs.map((log) => ({
+      id: log.id,
+      action: log.action,
+      createdAt: log.createdAt,
+      args: log.args,
+      user: usersById[log.userId] ?? null,
+    }));
   }
 }
