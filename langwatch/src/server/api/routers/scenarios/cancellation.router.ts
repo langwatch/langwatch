@@ -73,11 +73,20 @@ function createSignalCancel(): CancellationServiceDeps["signalCancel"] {
       return Promise.resolve(false);
     };
   }
-  return ({ projectId, scenarioRunId, batchRunId }) =>
-    publishCancellation({
-      publisher,
-      message: { jobId: scenarioRunId, projectId, scenarioRunId, batchRunId },
+  return async ({ projectId, scenarioRunId, batchRunId }) => {
+    // Find the actual BullMQ job ID — worker.cancelJob() needs it, not scenarioRunId
+    const activeJobs = await scenarioQueue.getJobs(["active"]);
+    const job = activeJobs.find((j) => {
+      const data = j.data as Record<string, unknown> | undefined;
+      return data?.scenarioRunId === scenarioRunId;
     });
+    const bullmqJobId = job?.id ?? scenarioRunId;
+
+    return publishCancellation({
+      publisher,
+      message: { jobId: bullmqJobId, projectId, scenarioRunId, batchRunId },
+    });
+  };
 }
 
 /**
