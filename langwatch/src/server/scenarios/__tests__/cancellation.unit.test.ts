@@ -75,8 +75,8 @@ describe("ScenarioCancellationService", () => {
         expect(mockSignalCancel).not.toHaveBeenCalled();
       });
 
-      it("returns cancelled: true", () => {
-        expect(result).toEqual({ cancelled: true });
+      it("returns cancelled with method removed", () => {
+        expect(result).toEqual({ cancelled: true, method: "removed" });
       });
     });
 
@@ -110,8 +110,8 @@ describe("ScenarioCancellationService", () => {
         expect(mockSaveScenarioEvent).not.toHaveBeenCalled();
       });
 
-      it("returns cancelled: true", () => {
-        expect(result).toEqual({ cancelled: true });
+      it("returns cancelled with method signalled", () => {
+        expect(result).toEqual({ cancelled: true, method: "signalled" });
       });
     });
 
