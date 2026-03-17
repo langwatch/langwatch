@@ -241,14 +241,21 @@ function compile(options: CompileOptions): string {
   // Apply API key handling
   combined = handleApiKey(combined, mode, apiKey);
 
-  // Wrap in a prompt envelope
-  const header = mode === "platform"
-    ? `You are helping the user set up LangWatch for their AI agent project. Follow these instructions carefully.`
-    : `You are helping the user set up LangWatch for their AI agent project. Follow these instructions carefully.\n\nIMPORTANT: You will need the user's LangWatch API key. Ask them for it and direct them to https://app.langwatch.ai/authorize if they don't have one.`;
+  // Extract title from first # heading in the compiled content
+  const titleMatch = combined.match(/^# (.+)$/m);
+  const title = titleMatch ? titleMatch[1] : "";
+
+  const header = title
+    ? `${title}\n\nYou are using LangWatch for your AI agent project. Follow these instructions.`
+    : `You are using LangWatch for your AI agent project. Follow these instructions.`;
+
+  const apiKeyNote = mode === "platform"
+    ? ``
+    : `\n\nIMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.`;
 
   const mcpNote = `\nFirst, try to install the LangWatch MCP server for access to documentation and platform tools. If installation fails, you can fetch docs directly via the URLs provided below.\n`;
 
-  return `${header}\n${mcpNote}\n${combined}`;
+  return `${header}${apiKeyNote}${mcpNote}\n${combined}`;
 }
 
 // ──────────────────────────────────────────────────

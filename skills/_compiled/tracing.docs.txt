@@ -1,7 +1,8 @@
-You are helping the user set up LangWatch for their AI agent project. Follow these instructions carefully.
+Add LangWatch Tracing to Your Code
 
-IMPORTANT: You will need the user's LangWatch API key. Ask them for it and direct them to https://app.langwatch.ai/authorize if they don't have one.
+You are using LangWatch for your AI agent project. Follow these instructions.
 
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
 First, try to install the LangWatch MCP server for access to documentation and platform tools. If installation fails, you can fetch docs directly via the URLs provided below.
 
 # Add LangWatch Tracing to Your Code
@@ -10,7 +11,7 @@ First, try to install the LangWatch MCP server for access to documentation and p
 
 If the user's request is **general** ("instrument my code", "add tracing", "set up observability"):
 - Read the full codebase to understand the agent's architecture
-- Study git log to understand what changed and why
+- Study git history to understand what changed and why — focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
 - Add comprehensive tracing across all LLM call sites
 
 If the user's request is **specific** ("add tracing to the payment function", "trace this endpoint"):
@@ -51,6 +52,8 @@ Or add to `~/.claude.json` or `.mcp.json` in the project:
 
 ## For other editors
 Add to your editor's MCP settings file using the JSON config above.
+
+**Tip:** If `LANGWATCH_API_KEY` is already in the project's `.env` file, use that same key for the MCP configuration.
 
 If MCP installation fails, see # Fetching LangWatch Docs Without MCP
 

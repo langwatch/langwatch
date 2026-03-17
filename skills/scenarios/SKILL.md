@@ -13,7 +13,7 @@ NEVER invent your own agent testing framework. Use `@langwatch/scenario` (Python
 
 If the user's request is **general** ("add scenarios to my project", "test my agent"):
 - Read the full codebase to understand the agent's architecture and capabilities
-- Study git log to understand what changed and why
+- Study git history to understand what changed and why — focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
 - Generate comprehensive scenario coverage (happy path, edge cases, error handling)
 - For conversational agents, include multi-turn scenarios (using `max_turns` or scripted `scenario.user()` / `scenario.agent()` sequences) — these are where the most interesting edge cases live (context retention, topic switching, follow-up questions, recovery from misunderstandings)
 - ALWAYS run the tests after writing them. If they fail, debug and fix them (or the agent code). Delivering tests that haven't been executed is useless.

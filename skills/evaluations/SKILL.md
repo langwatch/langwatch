@@ -38,7 +38,7 @@ For onboarding, create 1-2 Jupyter notebooks (or scripts) maximum. Focus on gene
 
 If the user's request is **general** ("set up evaluations", "evaluate my agent"):
 - Read the full codebase to understand the agent's architecture
-- Study git log to understand what changed and why
+- Study git history to understand what changed and why — focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
 - Set up comprehensive evaluation coverage (experiment + evaluators + dataset)
 - After the experiment is working, transition to consultant mode: summarize results and suggest domain-specific improvements. See [Consultant Mode](_shared/consultant-mode.md).
 

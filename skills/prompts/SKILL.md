@@ -11,7 +11,7 @@ compatibility: Requires Node.js for MCP setup. Works with Claude Code and simila
 
 If the user's request is **general** ("set up prompt versioning", "version my prompts"):
 - Read the full codebase to find all hardcoded prompt strings
-- Study git log to understand prompt evolution
+- Study git history to understand what changed and why — focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
 - Set up the Prompts CLI and create managed prompts for each hardcoded prompt
 - Update all application code to use `langwatch.prompts.get()`
 

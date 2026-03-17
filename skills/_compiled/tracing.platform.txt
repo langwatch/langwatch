@@ -1,5 +1,6 @@
-You are helping the user set up LangWatch for their AI agent project. Follow these instructions carefully.
+Add LangWatch Tracing to Your Code
 
+You are using LangWatch for your AI agent project. Follow these instructions.
 First, try to install the LangWatch MCP server for access to documentation and platform tools. If installation fails, you can fetch docs directly via the URLs provided below.
 
 # Add LangWatch Tracing to Your Code
@@ -8,7 +9,7 @@ First, try to install the LangWatch MCP server for access to documentation and p
 
 If the user's request is **general** ("instrument my code", "add tracing", "set up observability"):
 - Read the full codebase to understand the agent's architecture
-- Study git log to understand what changed and why
+- Study git history to understand what changed and why — focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
 - Add comprehensive tracing across all LLM call sites
 
 If the user's request is **specific** ("add tracing to the payment function", "trace this endpoint"):
@@ -50,6 +51,8 @@ Or add to `~/.claude.json` or `.mcp.json` in the project:
 ## For other editors
 Add to your editor's MCP settings file using the JSON config above.
 
+**Tip:** If `LANGWATCH_API_KEY` is already in the project's `.env` file, use that same key for the MCP configuration.
+
 If MCP installation fails, see # Fetching LangWatch Docs Without MCP
 
 If the LangWatch MCP cannot be installed, you can fetch docs directly:
@@ -67,12 +70,13 @@ Example flow:
 
 # LangWatch API Key Setup
 
-1. Get your API key from https://app.langwatch.ai/authorize
-2. Add to your project's `.env` file:
+1. First, check if `LANGWATCH_API_KEY` is already in the project's `.env` file
+2. If not found, ask the user for their API key — they can get one at https://app.langwatch.ai/authorize
+3. Save to the project's `.env` file:
 ```
 LANGWATCH_API_KEY={{LANGWATCH_API_KEY}}
 ```
-3. The MCP server also needs the API key — see mcp-setup.md.
+4. If `LANGWATCH_ENDPOINT` is set in `.env`, the user is on a self-hosted instance — use that endpoint for all LangWatch URLs instead of `app.langwatch.ai`.
 
 Add the API key to the project's `.env` file:
 ```

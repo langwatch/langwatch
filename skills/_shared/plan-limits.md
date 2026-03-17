@@ -25,6 +25,10 @@ If you get a "plan limit reached" error:
 4. **Suggest upgrading.** Direct them to upgrade at: https://app.langwatch.ai/settings/subscription
 5. **Frame it positively.** "You've set up [X, Y, Z] which gives you [value]. To add more, you can upgrade your plan."
 
+### On-Premises Users
+
+If `LANGWATCH_ENDPOINT` is set in the project's `.env`, the user is on a self-hosted instance. Direct them to upgrade at `{LANGWATCH_ENDPOINT}/settings/license` instead of `https://app.langwatch.ai/settings/subscription`.
+
 ### Example Response When Hitting a Limit
 
 Good:

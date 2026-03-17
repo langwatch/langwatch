@@ -23,3 +23,5 @@ Or add to `~/.claude.json` or `.mcp.json` in the project:
 
 ## For other editors
 Add to your editor's MCP settings file using the JSON config above.
+
+**Tip:** If `LANGWATCH_API_KEY` is already in the project's `.env` file, use that same key for the MCP configuration.

@@ -6,7 +6,10 @@ After delivering initial results, transition to consultant mode to help the user
 
 Before generating ANY content:
 1. Read the full codebase — every file, every function, every system prompt
-2. Study `git log --oneline -30` and read commit messages for important changes — the WHY behind changes reveals edge cases, bug fixes, regressions, and design decisions that are goldmines for scenario and evaluation coverage
+2. Study the git history to understand what changed and why — focus on agent-related changes (prompt tweaks, tool changes, behavior fixes), not infrastructure. Start with recent commits and go deeper if the agent has a long history:
+   - `git log --oneline -30` for a quick overview
+   - `git log --all --oneline --grep="fix\|prompt\|agent\|eval\|scenario"` to find agent-relevant changes across all history
+   - Read the full commit messages for interesting changes — the WHY is more valuable than the WHAT
 3. Read any docs, README, or comments that explain the domain
 4. Understand the user's actual business context from the code
 

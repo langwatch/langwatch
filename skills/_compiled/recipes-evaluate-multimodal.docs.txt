@@ -1,7 +1,8 @@
-You are helping the user set up LangWatch for their AI agent project. Follow these instructions carefully.
+Evaluate Your Multimodal Agent
 
-IMPORTANT: You will need the user's LangWatch API key. Ask them for it and direct them to https://app.langwatch.ai/authorize if they don't have one.
+You are using LangWatch for your AI agent project. Follow these instructions.
 
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
 First, try to install the LangWatch MCP server for access to documentation and platform tools. If installation fails, you can fetch docs directly via the URLs provided below.
 
 # Evaluate Your Multimodal Agent
