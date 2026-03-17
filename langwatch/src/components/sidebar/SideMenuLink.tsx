@@ -1,4 +1,4 @@
-import { Badge, Box, HStack, Spacer, Text } from "@chakra-ui/react";
+import { Badge, Box, HStack, Text } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import type React from "react";
 import { trackEvent } from "../../utils/tracking";
@@ -104,10 +104,12 @@ export const SideMenuItem = ({
             fontWeight="normal"
             color="nav.fg"
             whiteSpace="nowrap"
+            flex={1}
+            overflow="hidden"
+            textOverflow="ellipsis"
           >
             {label}
           </Text>
-          {(badge ?? rightElement ?? betaPill) && <Spacer />}
           {badge}
           {betaPill}
           {rightElement}

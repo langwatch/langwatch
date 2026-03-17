@@ -96,6 +96,40 @@ describe("<BetaPill />", () => {
     });
   });
 
+  describe("when the user hovers, unhovers, then hovers again", () => {
+    it("reopens the popover on the second hover (regression: #2411)", async () => {
+      const user = userEvent.setup();
+      renderBetaPill({
+        message: <span>Hover reopen message</span>,
+      });
+
+      const pill = screen.getByText("Beta");
+
+      // First hover — popover opens
+      await user.hover(pill);
+      await waitFor(() => {
+        expect(screen.getByText("Hover reopen message")).toBeVisible();
+      });
+
+      // Unhover and wait for close delay (150ms)
+      await user.unhover(pill);
+      await waitFor(
+        () => {
+          expect(
+            screen.getByText("Hover reopen message"),
+          ).not.toBeVisible();
+        },
+        { timeout: 1000 },
+      );
+
+      // Second hover — popover must reopen
+      await user.hover(pill);
+      await waitFor(() => {
+        expect(screen.getByText("Hover reopen message")).toBeVisible();
+      });
+    });
+  });
+
   describe("when the user focuses the beta pill with the keyboard", () => {
     it("shows the popover with the message content", async () => {
       const user = userEvent.setup();
