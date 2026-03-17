@@ -27,4 +27,8 @@ for recipe in skills/recipes/*/SKILL.md; do
   echo "  ✓ recipes/$name"
 done
 
+# Version file
+cp "skills/version.txt" "$TARGET_DIR/version.txt"
+echo "  ✓ version.txt"
+
 echo "Done."
