@@ -1,5 +1,6 @@
 ---
 name: tracing
+user-prompt: "Instrument my code with LangWatch"
 description: Add LangWatch tracing and observability to your code. Use for both onboarding (instrument an entire codebase) and targeted operations (add tracing to a specific function or module). Supports Python and TypeScript with all major frameworks.
 license: MIT
 compatibility: Requires Node.js for MCP setup. Works with Claude Code and similar coding agents.

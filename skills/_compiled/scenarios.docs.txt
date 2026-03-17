@@ -1,4 +1,4 @@
-Test Your Agent with Scenarios
+Add scenario tests for my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 

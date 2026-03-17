@@ -1,4 +1,4 @@
-Version Your Prompts with LangWatch Prompts CLI
+Version my prompts with LangWatch
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 

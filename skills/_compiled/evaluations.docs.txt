@@ -1,4 +1,4 @@
-Set Up Evaluations for Your Agent
+Set up evaluations for my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 

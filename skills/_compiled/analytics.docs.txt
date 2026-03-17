@@ -1,4 +1,4 @@
-Analyze Agent Performance with LangWatch
+How is my agent performing?
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 

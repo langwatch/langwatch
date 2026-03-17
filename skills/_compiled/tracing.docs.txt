@@ -1,4 +1,4 @@
-Add LangWatch Tracing to Your Code
+Instrument my code with LangWatch
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 

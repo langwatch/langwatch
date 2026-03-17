@@ -23,6 +23,7 @@ const skillsRoot = path.resolve(__dirname, "..");
 interface SkillFrontmatter {
   name: string;
   description: string;
+  "user-prompt"?: string;
   license?: string;
   compatibility?: string;
   metadata?: Record<string, string>;
@@ -204,7 +205,7 @@ function getComposedSkillNames(skillName: string): string[] {
 // Compilation
 // ──────────────────────────────────────────────────
 
-function compileSkill(skillName: string): string {
+function compileSkill(skillName: string): { body: string; userPrompt?: string } {
   const skillDir = path.join(skillsRoot, skillName);
   const skillMdPath = path.join(skillDir, "SKILL.md");
 
@@ -213,7 +214,8 @@ function compileSkill(skillName: string): string {
   }
 
   const parsed = parseSkillMd(skillMdPath);
-  return resolveReferences(parsed.body, skillDir);
+  const userPrompt = parsed.frontmatter["user-prompt"]?.replace(/^["']|["']$/g, "");
+  return { body: resolveReferences(parsed.body, skillDir), userPrompt };
 }
 
 function compile(options: CompileOptions): string {
@@ -227,8 +229,17 @@ function compile(options: CompileOptions): string {
   // Remove duplicates while preserving order
   const uniqueSkills = [...new Set(expandedSkills)];
 
-  // Compile each skill
-  const compiledSections = uniqueSkills.map(compileSkill);
+  // For composed skills, get the user-prompt from the original (not expanded) skill
+  const originalUserPrompt = skills.length === 1
+    ? compileSkill(skills[0]).userPrompt
+    : undefined;
+
+  // Compile each expanded skill
+  const compiledResults = uniqueSkills.map(compileSkill);
+  const compiledSections = compiledResults.map((r) => r.body);
+
+  // Use user-prompt from the original skill, falling back to first expanded
+  const userPrompt = originalUserPrompt || compiledResults[0]?.userPrompt;
 
   // Deduplicate shared content
   let combined: string;
@@ -241,12 +252,8 @@ function compile(options: CompileOptions): string {
   // Apply API key handling
   combined = handleApiKey(combined, mode, apiKey);
 
-  // Extract title from first # heading in the compiled content
-  const titleMatch = combined.match(/^# (.+)$/m);
-  const title = titleMatch ? titleMatch[1] : "";
-
-  const header = title
-    ? `${title}\n\nYou are using LangWatch for your AI agent project. Follow these instructions.`
+  const header = userPrompt
+    ? `${userPrompt}\n\nYou are using LangWatch for your AI agent project. Follow these instructions.`
     : `You are using LangWatch for your AI agent project. Follow these instructions.`;
 
   const apiKeyNote = mode === "platform"

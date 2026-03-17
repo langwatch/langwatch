@@ -1,4 +1,4 @@
-Analyze Agent Performance with LangWatch
+How is my agent performing?
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 First, try to install the LangWatch MCP server for access to documentation and platform tools. If installation fails, you can fetch docs directly via the URLs provided below.

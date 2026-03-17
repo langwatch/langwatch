@@ -1,5 +1,6 @@
 ---
 name: evaluations
+user-prompt: "Set up evaluations for my agent"
 description: Set up comprehensive evaluations for your AI agent with LangWatch — experiments (batch testing), evaluators (scoring functions), datasets, online evaluation (production monitoring), and guardrails (real-time blocking). Supports both code (SDK) and platform (MCP) approaches. Use when the user wants to evaluate, test, benchmark, monitor, or safeguard their agent.
 license: MIT
 compatibility: Requires Node.js for MCP setup. Works with Claude Code, Claude Web, and similar AI assistants.

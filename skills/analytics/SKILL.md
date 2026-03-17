@@ -1,5 +1,6 @@
 ---
 name: analytics
+user-prompt: "How is my agent performing?"
 description: Analyze your AI agent's performance using LangWatch analytics. Use when the user wants to understand costs, latency, error rates, usage trends, or debug specific traces. Works with any LangWatch-instrumented agent.
 license: MIT
 compatibility: Requires Node.js for MCP setup. Works with Claude Code, Claude Web, and similar AI assistants.

@@ -1,5 +1,6 @@
 ---
 name: prompts
+user-prompt: "Version my prompts with LangWatch"
 description: Version and manage your agent's prompts with LangWatch Prompts CLI. Use for both onboarding (set up prompt versioning for an entire codebase) and targeted operations (version a specific prompt, create a new prompt version). Supports Python and TypeScript.
 license: MIT
 compatibility: Requires Node.js for MCP setup. Works with Claude Code and similar coding agents.

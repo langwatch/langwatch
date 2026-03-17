@@ -1,5 +1,6 @@
 ---
 name: scenarios
+user-prompt: "Add scenario tests for my agent"
 description: Test your AI agent with simulation-based scenarios. Covers writing scenario test code (Scenario SDK), creating platform scenarios (MCP), and red teaming for security vulnerabilities. Auto-detects whether to use code or platform approach based on context.
 license: MIT
 compatibility: Requires Node.js for MCP setup. Works with Claude Code, Claude Web, and similar AI assistants.
