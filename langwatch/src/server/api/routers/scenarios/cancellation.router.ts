@@ -12,6 +12,7 @@
  */
 
 import { z } from "zod";
+import type { Job } from "bullmq";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import type { CancellationServiceDeps } from "~/server/scenarios/cancellation";
 import { ScenarioCancellationService } from "~/server/scenarios/cancellation";
@@ -27,7 +28,6 @@ import { projectSchema } from "./schemas";
 const logger = createLogger("langwatch:api:scenarios:cancellation");
 
 const cancelJobSchema = projectSchema.extend({
-  jobId: z.string(),
   scenarioSetId: z.string(),
   batchRunId: z.string(),
   scenarioRunId: z.string(),
@@ -39,37 +39,45 @@ const cancelBatchRunSchema = projectSchema.extend({
   batchRunId: z.string(),
 });
 
-async function getQueuedJobs(params: { setId: string; projectId: string }) {
-  const jobs = await scenarioQueue.getJobs(["waiting", "active", "delayed"]);
-  return jobs
-    .filter((job) => {
-      const data = job.data as Record<string, unknown> | undefined;
-      return (
-        data &&
-        data.projectId === params.projectId &&
-        data.setId === params.setId
-      );
-    })
-    .map((job) => {
-      const data = job.data as Record<string, unknown> | undefined;
-      return {
-        scenarioRunId: (data?.scenarioRunId as string) ?? job.id ?? "",
-        scenarioId: (data?.scenarioId as string) ?? "",
-        batchRunId: (data?.batchRunId as string) ?? "",
-        status: "waiting" as const,
-      };
-    });
+function createGetRunsForBatch(): CancellationServiceDeps["getRunsForBatch"] {
+  const facade = SimulationFacade.create();
+
+  return async (params) => {
+    const result = await facade.getRunDataForBatchRun(params);
+    return result.changed ? result.runs : [];
+  };
 }
 
-function createPublishCancellation(): CancellationServiceDeps["publishCancellation"] {
+function createRemoveQueuedJob(): CancellationServiceDeps["removeQueuedJob"] {
+  return async ({ scenarioRunId }) => {
+    const jobs = await scenarioQueue.getJobs(["waiting", "delayed"]);
+    const job = jobs.find((j) => {
+      const data = j.data as Record<string, unknown> | undefined;
+      return data?.scenarioRunId === scenarioRunId;
+    });
+    if (!job) return false;
+    try {
+      await (job as Job).remove();
+      return true;
+    } catch {
+      return false;
+    }
+  };
+}
+
+function createSignalCancel(): CancellationServiceDeps["signalCancel"] {
   const publisher = connection;
   if (!publisher) {
-    return (_message) => {
+    return (_params) => {
       logger.warn("Redis unavailable: cannot publish cancellation signal for active jobs");
       return Promise.resolve(false);
     };
   }
-  return (message) => publishCancellation({ publisher, message });
+  return ({ projectId, scenarioRunId, batchRunId }) =>
+    publishCancellation({
+      publisher,
+      message: { jobId: scenarioRunId, projectId, scenarioRunId, batchRunId },
+    });
 }
 
 /**
@@ -111,9 +119,9 @@ let _service: ScenarioCancellationService | null = null;
 function getService(): ScenarioCancellationService {
   if (!_service) {
     _service = new ScenarioCancellationService({
-      queue: scenarioQueue,
-      publishCancellation: createPublishCancellation(),
-      getQueuedJobs,
+      getRunsForBatch: createGetRunsForBatch(),
+      removeQueuedJob: createRemoveQueuedJob(),
+      signalCancel: createSignalCancel(),
       saveScenarioEvent: createSaveScenarioEvent(),
     });
   }
@@ -126,7 +134,7 @@ export const cancellationRouter = createTRPCRouter({
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ input }) => {
       logger.info(
-        { projectId: input.projectId, jobId: input.jobId, batchRunId: input.batchRunId },
+        { projectId: input.projectId, scenarioRunId: input.scenarioRunId, batchRunId: input.batchRunId },
         "Cancel job request received",
       );
 

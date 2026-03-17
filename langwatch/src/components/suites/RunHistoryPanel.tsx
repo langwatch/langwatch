@@ -254,7 +254,6 @@ export function RunHistoryPanel({
       setCancellingJobId(scenarioRun.scenarioRunId);
       cancelJob({
         projectId: project.id,
-        jobId: scenarioRun.scenarioRunId,
         scenarioSetId: setId,
         batchRunId: scenarioRun.batchRunId,
         scenarioRunId: scenarioRun.scenarioRunId,

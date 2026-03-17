@@ -17,7 +17,6 @@ export { isCancellableStatus };
 /** Parameters for cancelling a single scenario run. */
 export interface CancelRunParams {
   projectId: string;
-  jobId: string;
   scenarioSetId: string;
   batchRunId: string;
   scenarioRunId: string;
