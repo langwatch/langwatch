@@ -2,13 +2,16 @@ import type { Project, Team } from "@prisma/client";
 
 export type ProjectWithTeam = Project & { team: Team };
 
+export interface ProjectWithOrgAdmin {
+  firstMessage: boolean;
+  organizationId: string | null;
+  adminUserId: string | null;
+}
+
 export interface ProjectRepository {
   getById(id: string): Promise<Project | null>;
   getWithTeam(id: string): Promise<ProjectWithTeam | null>;
-  updateMetadata(
-    id: string,
-    data: { firstMessage: boolean; integrated: boolean; language: string },
-  ): Promise<void>;
+  getWithOrgAdmin(id: string): Promise<ProjectWithOrgAdmin | null>;
 }
 
 export class NullProjectRepository implements ProjectRepository {
@@ -20,10 +23,7 @@ export class NullProjectRepository implements ProjectRepository {
     return null;
   }
 
-  async updateMetadata(
-    _id: string,
-    _data: { firstMessage: boolean; integrated: boolean; language: string },
-  ): Promise<void> {
-    // no-op
+  async getWithOrgAdmin(_id: string): Promise<ProjectWithOrgAdmin | null> {
+    return null;
   }
 }
