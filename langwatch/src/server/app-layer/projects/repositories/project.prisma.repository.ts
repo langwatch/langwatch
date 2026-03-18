@@ -1,5 +1,5 @@
 import type { PrismaClient, Project } from "@prisma/client";
-import type { ProjectRepository, ProjectWithTeam } from "./project.repository";
+import type { ProjectRepository, ProjectWithTeam, UpdateProjectMetadataInput } from "./project.repository";
 
 export class PrismaProjectRepository implements ProjectRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -15,10 +15,7 @@ export class PrismaProjectRepository implements ProjectRepository {
     });
   }
 
-  async updateMetadata(
-    id: string,
-    data: { firstMessage: boolean; integrated: boolean; language: string },
-  ): Promise<void> {
+  async updateMetadata({ id, data }: UpdateProjectMetadataInput): Promise<void> {
     await this.prisma.project.update({ where: { id }, data });
   }
 }

@@ -66,10 +66,13 @@ export function createProjectMetadataReactor(
                 ? "typescript"
                 : "other";
 
-        await deps.projects.updateMetadata(tenantId, {
-          firstMessage: true,
-          integrated: isOptimizationStudio ? project.integrated : true,
-          language,
+        await deps.projects.updateMetadata({
+          id: tenantId,
+          data: {
+            firstMessage: true,
+            integrated: isOptimizationStudio ? project.integrated : true,
+            language,
+          },
         });
 
       } catch (error) {
