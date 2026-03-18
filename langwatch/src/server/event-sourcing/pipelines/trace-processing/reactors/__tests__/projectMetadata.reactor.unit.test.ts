@@ -7,6 +7,7 @@ import {
   type ProjectMetadataReactorDeps,
 } from "../projectMetadata.reactor";
 
+
 function createFoldState(
   overrides: Partial<TraceSummaryData> = {},
 ): TraceSummaryData {
@@ -73,29 +74,36 @@ function createContext(
   };
 }
 
+function createMockProjectService() {
+  return {
+    getById: vi.fn(),
+    getWithTeam: vi.fn(),
+    updateMetadata: vi.fn(),
+    isFeatureEnabled: vi.fn(),
+    repo: {} as any,
+  };
+}
+
 describe("createProjectMetadataReactor()", () => {
   let deps: ProjectMetadataReactorDeps;
+  let mockProjects: ReturnType<typeof createMockProjectService>;
   const tenantId = "project-123";
 
   beforeEach(() => {
+    mockProjects = createMockProjectService();
     deps = {
-      prisma: {
-        project: {
-          findUnique: vi.fn(),
-          update: vi.fn(),
-        },
-      } as any,
+      projects: mockProjects as any,
     };
   });
 
   describe("when project has not received first message", () => {
     beforeEach(() => {
-      vi.mocked(deps.prisma.project.findUnique).mockResolvedValue({
+      mockProjects.getById.mockResolvedValue({
         id: tenantId,
         firstMessage: false,
         integrated: false,
-      } as any);
-      vi.mocked(deps.prisma.project.update).mockResolvedValue({} as any);
+      });
+      mockProjects.updateMetadata.mockResolvedValue(undefined);
     });
 
     it("sets firstMessage to true", async () => {
@@ -105,11 +113,9 @@ describe("createProjectMetadataReactor()", () => {
 
       await reactor.handle(event, context);
 
-      expect(deps.prisma.project.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: tenantId },
-          data: expect.objectContaining({ firstMessage: true }),
-        }),
+      expect(mockProjects.updateMetadata).toHaveBeenCalledWith(
+        tenantId,
+        expect.objectContaining({ firstMessage: true }),
       );
     });
 
@@ -120,22 +126,21 @@ describe("createProjectMetadataReactor()", () => {
 
       await reactor.handle(event, context);
 
-      expect(deps.prisma.project.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ integrated: true }),
-        }),
+      expect(mockProjects.updateMetadata).toHaveBeenCalledWith(
+        tenantId,
+        expect.objectContaining({ integrated: true }),
       );
     });
   });
 
   describe("when sdk.language is python", () => {
     beforeEach(() => {
-      vi.mocked(deps.prisma.project.findUnique).mockResolvedValue({
+      mockProjects.getById.mockResolvedValue({
         id: tenantId,
         firstMessage: false,
         integrated: false,
-      } as any);
-      vi.mocked(deps.prisma.project.update).mockResolvedValue({} as any);
+      });
+      mockProjects.updateMetadata.mockResolvedValue(undefined);
     });
 
     it("detects language as python from foldState attributes", async () => {
@@ -148,22 +153,21 @@ describe("createProjectMetadataReactor()", () => {
 
       await reactor.handle(event, context);
 
-      expect(deps.prisma.project.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ language: "python" }),
-        }),
+      expect(mockProjects.updateMetadata).toHaveBeenCalledWith(
+        tenantId,
+        expect.objectContaining({ language: "python" }),
       );
     });
   });
 
   describe("when sdk.language is typescript", () => {
     beforeEach(() => {
-      vi.mocked(deps.prisma.project.findUnique).mockResolvedValue({
+      mockProjects.getById.mockResolvedValue({
         id: tenantId,
         firstMessage: false,
         integrated: false,
-      } as any);
-      vi.mocked(deps.prisma.project.update).mockResolvedValue({} as any);
+      });
+      mockProjects.updateMetadata.mockResolvedValue(undefined);
     });
 
     it("detects language as typescript from foldState attributes", async () => {
@@ -176,22 +180,21 @@ describe("createProjectMetadataReactor()", () => {
 
       await reactor.handle(event, context);
 
-      expect(deps.prisma.project.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ language: "typescript" }),
-        }),
+      expect(mockProjects.updateMetadata).toHaveBeenCalledWith(
+        tenantId,
+        expect.objectContaining({ language: "typescript" }),
       );
     });
   });
 
   describe("when sdk.language is not recognized", () => {
     beforeEach(() => {
-      vi.mocked(deps.prisma.project.findUnique).mockResolvedValue({
+      mockProjects.getById.mockResolvedValue({
         id: tenantId,
         firstMessage: false,
         integrated: false,
-      } as any);
-      vi.mocked(deps.prisma.project.update).mockResolvedValue({} as any);
+      });
+      mockProjects.updateMetadata.mockResolvedValue(undefined);
     });
 
     it("falls back to 'other'", async () => {
@@ -204,21 +207,20 @@ describe("createProjectMetadataReactor()", () => {
 
       await reactor.handle(event, context);
 
-      expect(deps.prisma.project.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ language: "other" }),
-        }),
+      expect(mockProjects.updateMetadata).toHaveBeenCalledWith(
+        tenantId,
+        expect.objectContaining({ language: "other" }),
       );
     });
   });
 
   describe("when project is already fully integrated", () => {
     beforeEach(() => {
-      vi.mocked(deps.prisma.project.findUnique).mockResolvedValue({
+      mockProjects.getById.mockResolvedValue({
         id: tenantId,
         firstMessage: true,
         integrated: true,
-      } as any);
+      });
     });
 
     it("does not update the project", async () => {
@@ -228,13 +230,13 @@ describe("createProjectMetadataReactor()", () => {
 
       await reactor.handle(event, context);
 
-      expect(deps.prisma.project.update).not.toHaveBeenCalled();
+      expect(mockProjects.updateMetadata).not.toHaveBeenCalled();
     });
   });
 
   describe("when project is not found", () => {
     beforeEach(() => {
-      vi.mocked(deps.prisma.project.findUnique).mockResolvedValue(null);
+      mockProjects.getById.mockResolvedValue(null);
     });
 
     it("does not update the project", async () => {
@@ -244,18 +246,18 @@ describe("createProjectMetadataReactor()", () => {
 
       await reactor.handle(event, context);
 
-      expect(deps.prisma.project.update).not.toHaveBeenCalled();
+      expect(mockProjects.updateMetadata).not.toHaveBeenCalled();
     });
   });
 
   describe("when platform is optimization_studio", () => {
     beforeEach(() => {
-      vi.mocked(deps.prisma.project.findUnique).mockResolvedValue({
+      mockProjects.getById.mockResolvedValue({
         id: tenantId,
         firstMessage: false,
         integrated: false,
-      } as any);
-      vi.mocked(deps.prisma.project.update).mockResolvedValue({} as any);
+      });
+      mockProjects.updateMetadata.mockResolvedValue(undefined);
     });
 
     it("does not set integrated to true", async () => {
@@ -268,10 +270,9 @@ describe("createProjectMetadataReactor()", () => {
 
       await reactor.handle(event, context);
 
-      expect(deps.prisma.project.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ integrated: false }),
-        }),
+      expect(mockProjects.updateMetadata).toHaveBeenCalledWith(
+        tenantId,
+        expect.objectContaining({ integrated: false }),
       );
     });
 
@@ -285,22 +286,21 @@ describe("createProjectMetadataReactor()", () => {
 
       await reactor.handle(event, context);
 
-      expect(deps.prisma.project.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ language: "other" }),
-        }),
+      expect(mockProjects.updateMetadata).toHaveBeenCalledWith(
+        tenantId,
+        expect.objectContaining({ language: "other" }),
       );
     });
   });
 
-  describe("when Prisma update throws", () => {
+  describe("when updateMetadata throws", () => {
     beforeEach(() => {
-      vi.mocked(deps.prisma.project.findUnique).mockResolvedValue({
+      mockProjects.getById.mockResolvedValue({
         id: tenantId,
         firstMessage: false,
         integrated: false,
-      } as any);
-      vi.mocked(deps.prisma.project.update).mockRejectedValue(
+      });
+      mockProjects.updateMetadata.mockRejectedValue(
         new Error("database error"),
       );
     });
@@ -313,6 +313,8 @@ describe("createProjectMetadataReactor()", () => {
       // Must not throw
       await expect(reactor.handle(event, context)).resolves.toBeUndefined();
     });
+
+
   });
 
   it("uses dedup makeJobId based on tenantId", () => {
@@ -331,5 +333,11 @@ describe("createProjectMetadataReactor()", () => {
     const reactor = createProjectMetadataReactor(deps);
 
     expect(reactor.options!.ttl).toBe(60_000);
+  });
+
+  it("runs only in worker", () => {
+    const reactor = createProjectMetadataReactor(deps);
+
+    expect(reactor.options!.runIn).toEqual(["worker"]);
   });
 });

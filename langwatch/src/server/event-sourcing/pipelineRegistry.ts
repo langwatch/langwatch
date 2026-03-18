@@ -197,7 +197,7 @@ export class PipelineRegistry {
     });
 
     const projectMetadataReactor = createProjectMetadataReactor({
-      prisma: this.deps.prisma,
+      projects: this.deps.projects,
     });
 
     if (!this.deps.clickhouse) {

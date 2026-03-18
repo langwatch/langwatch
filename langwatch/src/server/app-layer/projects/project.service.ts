@@ -18,6 +18,13 @@ export class ProjectService {
     return this.repo.getWithTeam(id);
   }
 
+  async updateMetadata(
+    id: string,
+    data: { firstMessage: boolean; integrated: boolean; language: string },
+  ): Promise<void> {
+    return this.repo.updateMetadata(id, data);
+  }
+
   async isFeatureEnabled(
     projectId: string,
     flag: ProjectFeatureFlag,
