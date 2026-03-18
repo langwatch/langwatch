@@ -2,6 +2,7 @@ import type { Project } from "@prisma/client";
 import type {
   ProjectRepository,
   ProjectWithTeam,
+  UpdateProjectMetadataInput,
 } from "./repositories/project.repository";
 
 /** All boolean fields on Project whose name starts with "feature". */
@@ -18,11 +19,8 @@ export class ProjectService {
     return this.repo.getWithTeam(id);
   }
 
-  async updateMetadata(
-    id: string,
-    data: { firstMessage: boolean; integrated: boolean; language: string },
-  ): Promise<void> {
-    return this.repo.updateMetadata(id, data);
+  async updateMetadata(input: UpdateProjectMetadataInput): Promise<void> {
+    return this.repo.updateMetadata(input);
   }
 
   async isFeatureEnabled(
