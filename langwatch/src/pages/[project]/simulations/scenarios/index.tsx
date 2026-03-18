@@ -107,7 +107,7 @@ function ScenarioLibraryPage() {
     handleNewScenario,
     handleWelcomeProceed,
     handleCloseCreateModal,
-  } = useNewScenarioFlow({ scenarioCount: scenarios?.length ?? 0 });
+  } = useNewScenarioFlow({ scenarioCount: scenarios?.length ?? 0, isLoading });
 
   const handleRowClick = (scenarioId: string) => {
     openDrawer("scenarioEditor", { urlParams: { scenarioId } });
