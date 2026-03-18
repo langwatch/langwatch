@@ -36,7 +36,7 @@ export function ScenarioGridCard({
   const title = buildDisplayTitle({ scenarioName, targetName, iteration });
 
   return (
-    <Box position="relative">
+    <Box position="relative" className="group">
       <Box
         as="button"
         onClick={onClick}
@@ -63,7 +63,9 @@ export function ScenarioGridCard({
           fontSize="xs"
           color="red.500"
           cursor={isCancelling ? "default" : "pointer"}
-          opacity={isCancelling ? 0.6 : 1}
+          opacity={isCancelling ? 0.6 : 0}
+          transition="opacity 0.15s"
+          _groupHover={{ opacity: isCancelling ? 0.6 : 1 }}
           _hover={isCancelling ? undefined : { bg: "red.50" }}
           position="absolute"
           top={2}

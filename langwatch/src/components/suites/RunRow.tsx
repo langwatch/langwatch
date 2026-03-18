@@ -82,7 +82,7 @@ export function RunRow({
         _hover={{ bg: "bg.subtle" }}
         cursor="pointer"
         onClick={onToggle}
-        role="button"
+        className="group"
         aria-expanded={isExpanded}
         aria-label={`Run from ${timeAgo ?? "unknown time"}`}
         position="sticky"
@@ -139,7 +139,10 @@ export function RunRow({
             fontSize="xs"
             color="red.500"
             cursor={isCancellingBatch ? "default" : "pointer"}
-            opacity={isCancellingBatch ? 0.6 : 1}
+            flexShrink={0}
+            opacity={isCancellingBatch ? 0.6 : 0}
+            transition="opacity 0.15s"
+            _groupHover={{ opacity: isCancellingBatch ? 0.6 : 1 }}
             _hover={isCancellingBatch ? undefined : { bg: "red.50" }}
             onClick={(e: React.MouseEvent) => {
               e.stopPropagation();
