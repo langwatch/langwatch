@@ -60,7 +60,7 @@ export function ObservabilityScreen(): React.ReactElement {
         alignItems="start"
         mb={20}
       >
-        <VStack align="stretch" gap={6}>
+        <VStack align="stretch" gap={8} overflow="visible">
           <PlatformGrid
             selectedLanguage={selectedPlatform}
             onSelectLanguage={handleSelectLanguage}
@@ -124,11 +124,15 @@ export function ObservabilityScreen(): React.ReactElement {
               borderRadius="full"
               variant="ghost"
               colorPalette="gray"
-              bg="bg.panel"
-              _hover={{ bg: "bg.muted", transform: "translateY(-1px)" }}
+              bg="rgba(255,255,255,0.08)"
+              backdropFilter="blur(20px) saturate(1.3)"
+              _hover={{
+                bg: "rgba(255,255,255,0.14)",
+                transform: "translateY(-1px)",
+              }}
               borderWidth="1px"
-              borderColor="border.muted"
-              boxShadow="md"
+              borderColor="rgba(255,255,255,0.18)"
+              boxShadow="0 4px 24px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.10)"
               px={{ base: 2, md: 4 }}
               py={2}
             >
