@@ -34,6 +34,7 @@ import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Entry } from "../types/dsl";
 import { trainTestSplit } from "../utils/datasetUtils";
 import { AddModelProviderKey } from "./AddModelProviderKey";
+import { useVersionState } from "./History";
 import { VersionToBeUsed } from "./VersionToBeUsed";
 
 export function Evaluate() {
@@ -105,7 +106,6 @@ export function EvaluateModalContent({
     evaluationState,
     deselectAllNodes,
     setOpenResultsPanelRequest,
-    checkCanCommitNewVersion,
     setLastCommittedWorkflow,
     setCurrentVersionId,
     currentVersionId,
@@ -116,7 +116,6 @@ export function EvaluateModalContent({
       state,
       deselectAllNodes,
       setOpenResultsPanelRequest,
-      checkCanCommitNewVersion,
       setLastCommittedWorkflow,
       setCurrentVersionId,
       currentVersionId,
@@ -126,7 +125,6 @@ export function EvaluateModalContent({
       evaluationState: state.evaluation,
       deselectAllNodes: deselectAllNodes,
       setOpenResultsPanelRequest: setOpenResultsPanelRequest,
-      checkCanCommitNewVersion,
       setLastCommittedWorkflow,
       setCurrentVersionId,
       currentVersionId,
@@ -214,7 +212,7 @@ export function EvaluateModalContent({
     return 0;
   }, [evaluateOn, total, train.length, test.length]);
 
-  const canSave = checkCanCommitNewVersion();
+  const { canSaveNewVersion: canSave } = useVersionState({ project });
   const trpc = api.useContext();
 
   const commitVersion = api.workflow.commitVersion.useMutation();

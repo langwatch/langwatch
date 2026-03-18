@@ -236,10 +236,11 @@ function PublishMenu({
     }),
   );
 
-  const { currentVersion, canSaveNewVersion } = useVersionState({
-    project,
-    allowSaveIfAutoSaveIsCurrentButNotLatest: false,
-  });
+  const { currentVersion, canSaveNewVersion, versionToBeEvaluated } =
+    useVersionState({
+      project,
+      allowSaveIfAutoSaveIsCurrentButNotLatest: false,
+    });
   const router = useRouter();
   const trpc = api.useContext();
 
@@ -297,12 +298,9 @@ function PublishMenu({
       },
     });
 
-  const currentVersionString = currentVersion?.autoSaved
-    ? currentVersion?.parent?.version
-    : currentVersion?.version;
   const canPublish =
     !canSaveNewVersion &&
-    publishedWorkflow.data?.version === currentVersionString
+    publishedWorkflow.data?.version === versionToBeEvaluated.version
       ? "Current version is already published"
       : undefined;
 
@@ -495,12 +493,16 @@ function PublishModalContent({
 
   const formVersion = form.watch("version");
 
-  const { versions, currentVersion, canSaveNewVersion: canSave } =
-    useVersionState({
-      project,
-      form,
-      allowSaveIfAutoSaveIsCurrentButNotLatest: false,
-    });
+  const {
+    versions,
+    currentVersion,
+    canSaveNewVersion: canSave,
+    versionToBeEvaluated,
+  } = useVersionState({
+    project,
+    form,
+    allowSaveIfAutoSaveIsCurrentButNotLatest: false,
+  });
 
   const publishWorkflow = api.workflow.publish.useMutation();
 
@@ -692,9 +694,7 @@ function PublishModalContent({
                     : `Publish Version ${
                         canSave
                           ? formVersion
-                          : (currentVersion?.autoSaved
-                              ? currentVersion?.parent?.version
-                              : currentVersion?.version) ?? ""
+                          : versionToBeEvaluated.version ?? ""
                       }`}
                 </Button>
               </HStack>
