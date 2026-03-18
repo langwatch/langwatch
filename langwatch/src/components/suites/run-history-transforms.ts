@@ -386,8 +386,11 @@ export function computeIterationMap({
   const iterationMap = new Map<string, number>();
   for (const ids of keyCounters.values()) {
     if (ids.length > 1) {
-      for (let i = 0; i < ids.length; i++) {
-        iterationMap.set(ids[i]!, i + 1);
+      // Sort by scenarioRunId (KSUID) for stable ordering — iteration numbers
+      // won't shift when runs are cancelled/filtered from the array.
+      const sorted = [...ids].sort((a, b) => a.localeCompare(b));
+      for (let i = 0; i < sorted.length; i++) {
+        iterationMap.set(sorted[i]!, i + 1);
       }
     }
   }

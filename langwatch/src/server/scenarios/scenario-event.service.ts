@@ -11,6 +11,7 @@ import type {
 } from "./scenario-event.types";
 import { isInternalSetId } from "./internal-set-id";
 import { resolveRunStatus } from "./stall-detection";
+import { ScenarioEventType, ScenarioRunStatus, Verdict } from "./scenario-event.enums";
 
 const tracer = getLangWatchTracer("langwatch.scenario-events.service");
 const logger = createLogger("langwatch:scenario-events:service");
@@ -46,6 +47,13 @@ export class ScenarioEventService {
 
   /**
    * Saves a scenario event to the repository.
+   *
+   * Race guard for RUN_FINISHED events: if the run is already CANCELLED and
+   * the incoming event carries real (non-INCONCLUSIVE) results, the results
+   * data is stored but the status is kept as CANCELLED.  If the incoming
+   * event is also INCONCLUSIVE (duplicate cancellation), the write is skipped
+   * entirely (idempotent).
+   *
    * @param {Object} params - The parameters for saving the event
    * @param {string} params.projectId - The ID of the project
    * @param {string} params.type - The type of event
@@ -73,12 +81,64 @@ export class ScenarioEventService {
           { projectId, scenarioId: event.scenarioId, scenarioRunId: event.scenarioRunId, type: event.type },
           "Saving scenario event",
         );
+
+        // Race guard: protect cancelled jobs from late-arriving result events
+        if (event.type === ScenarioEventType.RUN_FINISHED) {
+          const resolvedEvent = await this.applyLateResultGuard({ projectId, event });
+          if (!resolvedEvent) return; // skip — idempotent duplicate on cancelled run
+          await this.eventRepository.saveEvent({ projectId, ...resolvedEvent });
+          return;
+        }
+
         await this.eventRepository.saveEvent({
           projectId,
           ...event,
         });
       },
     );
+  }
+
+  /**
+   * Applies the late-result race guard for RUN_FINISHED events.
+   *
+   * Returns the (possibly mutated) event to save, or null if the event
+   * should be skipped entirely.
+   */
+  private async applyLateResultGuard({
+    projectId,
+    event,
+  }: {
+    projectId: string;
+    event: ScenarioEvent;
+  }): Promise<ScenarioEvent | null> {
+    if (event.type !== ScenarioEventType.RUN_FINISHED) return event;
+
+    const existing = await this.eventRepository.getLatestRunFinishedEventByScenarioRunId({
+      projectId,
+      scenarioRunId: event.scenarioRunId,
+    });
+
+    if (existing?.status !== ScenarioRunStatus.CANCELLED) {
+      // No cancellation in place — save normally
+      return event;
+    }
+
+    const incomingVerdict = event.results?.verdict;
+    if (!incomingVerdict || incomingVerdict === Verdict.INCONCLUSIVE) {
+      // Duplicate cancellation or another INCONCLUSIVE — skip (idempotent)
+      logger.debug(
+        { projectId, scenarioRunId: event.scenarioRunId },
+        "Skipping duplicate INCONCLUSIVE event on already-cancelled run",
+      );
+      return null;
+    }
+
+    // Real results arrived after cancellation — store results but preserve CANCELLED status
+    logger.debug(
+      { projectId, scenarioRunId: event.scenarioRunId, incomingVerdict },
+      "Storing late real results on cancelled run — keeping CANCELLED status",
+    );
+    return { ...event, status: ScenarioRunStatus.CANCELLED };
   }
 
   /**

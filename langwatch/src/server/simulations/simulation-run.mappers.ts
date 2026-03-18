@@ -52,6 +52,10 @@ export function mapStatus(status: string): ScenarioRunStatus {
       return ScenarioRunStatus.IN_PROGRESS;
     case "PENDING":
       return ScenarioRunStatus.PENDING;
+    case "QUEUED":
+      return ScenarioRunStatus.QUEUED;
+    case "STALLED":
+      return ScenarioRunStatus.STALLED;
     default:
       return ScenarioRunStatus.IN_PROGRESS;
   }

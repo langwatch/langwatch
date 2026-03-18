@@ -22,6 +22,8 @@ type BatchSectionProps = {
   resolveTargetName: (scenarioRun: ScenarioRunData) => string | null;
   onScenarioRunClick: (scenarioRun: ScenarioRunData) => void;
   viewMode: ViewMode;
+  onCancelRun?: (scenarioRun: ScenarioRunData) => void;
+  cancellingJobId?: string | null;
 };
 
 export function BatchSection({
@@ -29,6 +31,8 @@ export function BatchSection({
   resolveTargetName,
   onScenarioRunClick,
   viewMode,
+  onCancelRun,
+  cancellingJobId,
 }: BatchSectionProps) {
   const batchSummary = useMemo(
     () => computeBatchRunSummary({ batchRun: batch }),
@@ -68,6 +72,8 @@ export function BatchSection({
         resolveTargetName={resolveTargetName}
         onScenarioRunClick={onScenarioRunClick}
         iterationMap={iterationMap}
+        onCancelRun={onCancelRun}
+        cancellingJobId={cancellingJobId}
       />
     </VStack>
   );

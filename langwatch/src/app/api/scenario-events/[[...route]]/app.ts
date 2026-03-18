@@ -118,6 +118,32 @@ app.post(
       }
     }
 
+    // Broadcast non-streaming events for ES-only projects.
+    // When event-sourcing is ON, the snapshotUpdateBroadcast reactor handles this.
+    if (!project.featureEventSourcingSimulationIngestion) {
+      if (
+        event.type === ScenarioEventType.RUN_STARTED ||
+        event.type === ScenarioEventType.MESSAGE_SNAPSHOT ||
+        event.type === ScenarioEventType.RUN_FINISHED
+      ) {
+        try {
+          const payload = JSON.stringify({
+            event: "simulation_updated",
+            scenarioRunId: event.scenarioRunId,
+            batchRunId: event.batchRunId,
+            scenarioSetId: event.scenarioSetId,
+          });
+          await getApp().broadcast.broadcastToTenant(
+            project.id,
+            payload,
+            "simulation_updated",
+          );
+        } catch (err) {
+          logger.warn({ err, projectId: project.id }, "Failed to broadcast non-streaming event");
+        }
+      }
+    }
+
     const path = `/${project.slug}/simulations/${
       event.scenarioSetId ?? "default"
     }`;

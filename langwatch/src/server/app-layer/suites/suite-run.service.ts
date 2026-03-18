@@ -20,6 +20,14 @@ import {
 
 const logger = createLogger("langwatch:suite-run:service");
 
+/** One scheduled item returned by startRun for ES dual-write. */
+export type SuiteRunItem = {
+  scenarioRunId: string;
+  scenarioId: string;
+  target: SuiteRunTarget;
+  name: string | undefined;
+};
+
 /** Result of scheduling a suite run */
 export type SuiteRunResult = {
   batchRunId: string;
@@ -29,6 +37,8 @@ export type SuiteRunResult = {
     scenarios: string[];
     targets: string[];
   };
+  /** Items scheduled; used by the router to dual-write RUN_STARTED events to ES. */
+  items: SuiteRunItem[];
 };
 
 /** Target reference for scheduling */
@@ -111,8 +121,10 @@ export class SuiteRunService {
       occurredAt: Date.now(),
     });
 
-    // Pre-generate scenarioRunIds and dispatch queueRun for each
-    // so PENDING entries appear in ClickHouse immediately
+    // Pre-generate scenarioRunIds and dispatch queueRun for each so QUEUED
+    // entries appear in ClickHouse immediately. The same IDs are passed to the
+    // SDK via RunOptions.runId (see scenario-child-process.ts), ensuring the
+    // SDK's events use matching aggregate IDs.
     const items: Array<{ scenarioId: string; target: SuiteRunTarget; repeat: number; scenarioRunId: string }> = [];
     for (const scenarioId of activeScenarioIds) {
       for (const target of activeTargets) {
@@ -156,7 +168,18 @@ export class SuiteRunService {
       "Suite run scheduled",
     );
 
-    return { batchRunId, setId, jobCount, skippedArchived };
+    return {
+      batchRunId,
+      setId,
+      jobCount,
+      skippedArchived,
+      items: items.map((item) => ({
+        scenarioRunId: item.scenarioRunId,
+        scenarioId: item.scenarioId,
+        target: item.target,
+        name: scenarioNameMap.get(item.scenarioId),
+      })),
+    };
   }
 
   async getSuiteRunState(params: {

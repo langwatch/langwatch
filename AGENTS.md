@@ -85,6 +85,7 @@ specs/               # BDD feature specs
 | Skipping browser re-verification after UI fixes | After fixing UI code based on feedback, always re-run `/browser-test` to verify the fix visually. Unit/integration tests alone are not sufficient for UI changes |
 | Using gpt-4o or gpt-4.1-mini in tests, scenarios, or fixtures | Always use `gpt-5-mini` — it's the cheapest and most capable model. Default to `openai("gpt-5-mini")` for scenario judges, user simulators, and test fixtures |
 | Only verifying tests parse (CI=1) without running them end-to-end | Always run scenario tests end-to-end locally (`npx vitest run file.test.ts` without CI flag) to verify they actually pass with Claude Code |
+| Returning JSX from hooks | Hooks return state and callbacks, never JSX. If a hook needs to "render" something (dialog, tooltip), return props/state and let the consumer render the component explicitly. Use `.ts` for hooks, `.tsx` for components |
 
 ## TypeScript
 

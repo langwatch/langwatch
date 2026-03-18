@@ -28,6 +28,8 @@ type GroupRowProps = {
   onScenarioRunClick: (scenarioRun: ScenarioRunData) => void;
   resolveTargetName: (scenarioRun: ScenarioRunData) => string | null;
   viewMode?: ViewMode;
+  onCancelRun?: (scenarioRun: ScenarioRunData) => void;
+  cancellingJobId?: string | null;
 };
 
 export function GroupRow({
@@ -38,6 +40,8 @@ export function GroupRow({
   onScenarioRunClick,
   resolveTargetName,
   viewMode = "grid",
+  onCancelRun,
+  cancellingJobId,
 }: GroupRowProps) {
   const runCount = group.scenarioRuns.length;
 
@@ -101,6 +105,8 @@ export function GroupRow({
               resolveTargetName={resolveTargetName}
               onScenarioRunClick={onScenarioRunClick}
               viewMode={viewMode}
+              onCancelRun={onCancelRun}
+              cancellingJobId={cancellingJobId}
             />
           ))}
           {group.scenarioRuns.length === 0 && (

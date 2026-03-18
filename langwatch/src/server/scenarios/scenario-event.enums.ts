@@ -20,6 +20,12 @@ export enum ScenarioEventType {
   TOOL_CALL_END = "SCENARIO_TOOL_CALL_END",
 }
 
+/**
+ * Domain-level statuses persisted in ES/ClickHouse (PENDING, IN_PROGRESS, …) are
+ * distinct from the transient BullMQ queue states surfaced in the UI (QUEUED,
+ * RUNNING). QUEUED maps to BullMQ "waiting/delayed" and RUNNING maps to BullMQ
+ * "active" — they are UI-only overlays that are never written to the database.
+ */
 export enum ScenarioRunStatus {
   SUCCESS = "SUCCESS",
   ERROR = "ERROR",
@@ -32,4 +38,24 @@ export enum ScenarioRunStatus {
   QUEUED = "QUEUED",
   /** BullMQ active state - job is being executed by a worker */
   RUNNING = "RUNNING",
+}
+
+/** Statuses that are eligible for cancellation (still in-flight). */
+export const CANCELLABLE_STATUSES = new Set<ScenarioRunStatus>([
+  ScenarioRunStatus.PENDING,
+  ScenarioRunStatus.IN_PROGRESS,
+  ScenarioRunStatus.STALLED,
+]);
+
+/**
+ * Determines whether a scenario run with the given status can be cancelled.
+ *
+ * Only in-flight statuses (PENDING, IN_PROGRESS, STALLED) are cancellable.
+ * Terminal statuses (SUCCESS, FAILED, ERROR, CANCELLED) are not.
+ *
+ * @param status - The current status of the scenario run
+ * @returns true if the run is eligible for cancellation
+ */
+export function isCancellableStatus(status: ScenarioRunStatus): boolean {
+  return CANCELLABLE_STATUSES.has(status);
 }
