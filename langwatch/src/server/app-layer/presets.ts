@@ -64,6 +64,7 @@ import { OrganizationRepository } from "../repositories/organization.repository"
 import { StripeUsageReportingService } from "../../../ee/billing/services/usageReportingService";
 import { meters } from "../../../ee/billing/stripe/stripePriceCatalog";
 import { NotificationService } from "../../../ee/billing/notifications/notification.service";
+import { NurturingService } from "../../../ee/billing/nurturing/nurturing.service";
 import { NotificationRepository } from "../../../ee/billing/notifications/repositories/notification.repository";
 import { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
 import { traced } from "./tracing";
@@ -225,6 +226,15 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     config.disableTokenization ? new NullTokenizerClient() : new TiktokenClient(),
   );
 
+  const nurturing = config.customerIoApiKey
+    ? NurturingService.create({
+        config: {
+          customerIoApiKey: config.customerIoApiKey,
+          customerIoRegion: config.customerIoRegion,
+        },
+      })
+    : undefined;
+
   const es = new EventSourcing({
     clickhouse: clickhouse ?? void 0,
     redis,
@@ -244,6 +254,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     evaluations: { runs: evaluations.runs, execution: evaluations.execution },
     esSync: { esClient, traceIndex: TRACE_INDEX, traceIndexId, prisma },
     usageReportingService,
+    nurturing,
   });
   const commands = registry.registerAll();
 
@@ -350,6 +361,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     planProvider,
     subscription,
     notifications,
+    nurturing,
     usageLimits,
     commands,
     _eventSourcing: es,
@@ -427,6 +439,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     }),
     subscription: undefined,
     notifications: NotificationService.createNull(),
+    nurturing: undefined,
     usageLimits: UsageLimitService.createNull(),
     commands: {
       traces: { recordSpan: noop, assignTopic: noop, recordLog: noop, recordMetric: noop, resolveOrigin: noop } satisfies AppCommands["traces"],
