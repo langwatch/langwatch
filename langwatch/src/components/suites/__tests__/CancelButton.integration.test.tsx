@@ -143,7 +143,9 @@ describe("<ScenarioTargetRow/> cancel button", () => {
 
   describe("when the cancel button is clicked", () => {
     it("calls onCancel and does not propagate to row onClick", async () => {
-      const user = userEvent.setup();
+      // pointerEventsCheck disabled because the cancel button uses CSS
+      // _groupHover to toggle pointer-events, which jsdom cannot simulate
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
       const onCancel = vi.fn();
       const onClick = vi.fn();
 
@@ -274,7 +276,9 @@ describe("<RunRow/> cancel all button", () => {
 
   describe("when Cancel All button is clicked", () => {
     it("calls onCancelAll and does not toggle the row", async () => {
-      const user = userEvent.setup();
+      // pointerEventsCheck disabled because the cancel button uses CSS
+      // _groupHover to toggle pointer-events, which jsdom cannot simulate
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
       const onCancelAll = vi.fn();
       const onToggle = vi.fn();
 
