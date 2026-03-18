@@ -50,7 +50,7 @@ function createGetRunsForBatch(): CancellationServiceDeps["getRunsForBatch"] {
 
 function createRemoveQueuedJob(): CancellationServiceDeps["removeQueuedJob"] {
   return async ({ projectId, scenarioRunId }) => {
-    const jobs = await scenarioQueue.getJobs(["waiting", "delayed"]);
+    const jobs = await scenarioQueue.getJobs(["waiting", "delayed", "prioritized"]);
     const job = jobs.find((j) => {
       const data = j.data as Record<string, unknown> | undefined;
       return data?.scenarioRunId === scenarioRunId && data?.projectId === projectId;

@@ -145,8 +145,25 @@ export class ScenarioCancellationService {
       return { cancelled: true, method: "signalled" };
     }
 
-    // Neither worked — job is terminal or not found
-    logger.debug({ scenarioRunId }, "Job not cancellable (terminal or not found)");
+    // Neither worked — job may be orphaned (exists in data store but not in BullMQ).
+    // If fold projection says it's still cancellable, force-cancel via event write.
+    if (run) {
+      logger.info({ scenarioRunId }, "Force-cancelling orphaned job via event write");
+      await this.saveScenarioEvent({
+        projectId: params.projectId,
+        type: ScenarioEventType.RUN_FINISHED,
+        scenarioId: params.scenarioId,
+        scenarioRunId: params.scenarioRunId,
+        batchRunId: params.batchRunId,
+        scenarioSetId: params.scenarioSetId,
+        timestamp: Date.now(),
+        status: ScenarioRunStatus.CANCELLED,
+        results: null,
+      });
+      return { cancelled: true, method: "removed" };
+    }
+
+    logger.debug({ scenarioRunId }, "Job not found in data store, nothing to cancel");
     return { cancelled: false };
   }
 
