@@ -188,7 +188,7 @@ export function ViaClaudeDesktopScreen(): React.ReactElement {
             </Box>
           </Step>
 
-          <Step number={2} title="Open Claude Desktop settings">
+          <Step number={2} title="Open your desktop app settings">
             <Text fontSize="xs" color="fg.muted">
               Go to{" "}
               <Text as="span" fontWeight="medium" color="fg.DEFAULT">
@@ -202,11 +202,11 @@ export function ViaClaudeDesktopScreen(): React.ReactElement {
             </Text>
           </Step>
 
-          <Step number={3} title="Paste, save, and restart Claude Desktop">
+          <Step number={3} title="Paste, save, and restart your desktop app">
             <Text fontSize="xs" color="fg.muted">
               Merge the config above into your existing file. If you don&apos;t
               have other MCP servers, you can replace the entire file contents.
-              Then restart Claude Desktop.
+              Then restart your desktop app.
             </Text>
           </Step>
         </VStack>
@@ -221,49 +221,13 @@ export function ViaClaudeDesktopScreen(): React.ReactElement {
           p={5}
         >
           <Text fontSize="xs" color="fg.muted" lineHeight="tall">
-            Once connected, Claude Desktop will have access to LangWatch tools
+            Once connected, your desktop app will have access to LangWatch tools
             — search traces, manage prompts, run scenarios, configure
             evaluators, and more.
           </Text>
         </Box>
       </VStack>
 
-      {project?.slug && (
-        <Box position="fixed" right="24px" bottom="24px" zIndex={11}>
-          <Tooltip
-            content="Continue to LangWatch — skip onboarding"
-            positioning={{ placement: "left" }}
-            showArrow
-            openDelay={0}
-          >
-            <Button
-              onClick={() => void router.push(`/${project.slug}`)}
-              aria-label="Continue to LangWatch"
-              borderRadius="full"
-              variant="ghost"
-              colorPalette="gray"
-              bg="white/50"
-              backdropFilter="blur(20px) saturate(1.3)"
-              _hover={{
-                bg: "white/70",
-                transform: "translateY(-1px)",
-              }}
-              borderWidth="1px"
-              borderColor="gray.200"
-              boxShadow="0 4px 24px rgba(0,0,0,0.06), inset 0 1px 0 white"
-              px={{ base: 2, md: 4 }}
-              py={2}
-            >
-              <HStack gap={{ base: 0, md: 2 }}>
-                <Text display={{ base: "none", md: "inline" }}>
-                  Continue to LangWatch
-                </Text>
-                <ArrowRight size={16} />
-              </HStack>
-            </Button>
-          </Tooltip>
-        </Box>
-      )}
     </>
   );
 }
