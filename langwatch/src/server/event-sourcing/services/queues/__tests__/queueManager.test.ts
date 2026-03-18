@@ -68,9 +68,15 @@ function createMockReactorDefinition(
     delay?: number;
     deduplication?: DeduplicationStrategy<{ event: Event; foldState: unknown }>;
   },
+  parent?: {
+    parentProjection: string;
+    parentType: "fold" | "map";
+  },
 ) {
   return {
     name,
+    parentProjection: parent?.parentProjection ?? "defaultFold",
+    parentType: parent?.parentType ?? ("fold" as const),
     handler: {
       handle: vi.fn().mockResolvedValue(void 0),
     },
@@ -225,18 +231,18 @@ describe("QueueManager", () => {
         tenantId,
       );
 
-      // Handler job groupKey
+      // Handler job groupKey — hierarchical: tenantId/map/name/domainKey
       const handlerEntry = globalJobRegistry.get("test-pipeline:handler:h1");
       const handlerGroupKey = handlerEntry?.groupKeyFn(event);
       expect(handlerGroupKey).toBe(
-        `${tenantId}:${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,
+        `${tenantId}/map/h1/${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,
       );
 
-      // Projection job groupKey
+      // Projection job groupKey — hierarchical: tenantId/fold/name/domainKey
       const projectionEntry = globalJobRegistry.get("test-pipeline:projection:p1");
       const projectionGroupKey = projectionEntry?.groupKeyFn(event);
       expect(projectionGroupKey).toBe(
-        `${tenantId}:${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,
+        `${tenantId}/fold/p1/${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,
       );
     });
 
@@ -700,7 +706,7 @@ describe("QueueManager", () => {
       );
     });
 
-    it("uses default groupKey based on aggregate for projections", () => {
+    it("uses hierarchical groupKey based on aggregate for projections", () => {
       const mockQueueProcessor = createMockSharedQueue();
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
@@ -726,7 +732,7 @@ describe("QueueManager", () => {
       );
       const groupKey = entry?.groupKeyFn(event);
       expect(groupKey).toBe(
-        `${tenantId}:${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,
+        `${tenantId}/fold/projection1/${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,
       );
     });
   });
@@ -999,7 +1005,7 @@ describe("QueueManager", () => {
       );
     });
 
-    it("reactor groupKey uses event fields", () => {
+    it("reactor groupKey uses hierarchical format with parent projection", () => {
       const mockQueueProcessor = createMockSharedQueue();
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
@@ -1011,7 +1017,7 @@ describe("QueueManager", () => {
       });
 
       manager.initializeReactorQueues(
-        { reactor1: createMockReactorDefinition("reactor1") },
+        { reactor1: createMockReactorDefinition("reactor1", undefined, { parentProjection: "traceSummary", parentType: "fold" }) },
         vi.fn(),
       );
 
@@ -1027,7 +1033,7 @@ describe("QueueManager", () => {
         foldState: {},
       });
       expect(groupKey).toBe(
-        `${tenantId}:${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,
+        `${tenantId}/fold/traceSummary/reactor/reactor1/${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,
       );
     });
 

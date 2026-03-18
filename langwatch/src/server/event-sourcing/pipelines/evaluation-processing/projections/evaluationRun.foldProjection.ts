@@ -5,6 +5,7 @@ import { EVALUATION_PROCESSING_EVENT_TYPES, EVALUATION_PROJECTION_VERSIONS } fro
 import type { EvaluationProcessingEvent } from "../schemas/events";
 import {
   isEvaluationCompletedEvent,
+  isEvaluationReportedEvent,
   isEvaluationScheduledEvent,
   isEvaluationStartedEvent,
 } from "../schemas/events";
@@ -26,6 +27,7 @@ export interface EvaluationRun extends Projection<EvaluationRunData> {
  * - EvaluationScheduledEvent -> status: "scheduled"
  * - EvaluationStartedEvent -> status: "in_progress"
  * - EvaluationCompletedEvent -> status: "processed" | "error" | "skipped"
+ * - EvaluationReportedEvent -> sets all fields in one shot (evaluator identity + results)
  */
 export function createEvaluationRunFoldProjection({
   store,
@@ -50,6 +52,7 @@ export function createEvaluationRunFoldProjection({
         passed: null,
         label: null,
         details: null,
+        inputs: null,
         error: null,
         errorDetails: null,
         createdAt: Date.now(),
@@ -97,6 +100,11 @@ export function createEvaluationRunFoldProjection({
       }
 
       if (isEvaluationCompletedEvent(event)) {
+        if (!state.evaluationId) {
+          throw new Error(
+            `Received EvaluationCompletedEvent for evaluation ${event.data.evaluationId} but state has no evaluationId — likely a replica lag issue, retrying`,
+          );
+        }
         return {
           ...state,
           status: event.data.status,
@@ -104,10 +112,35 @@ export function createEvaluationRunFoldProjection({
           passed: event.data.passed ?? null,
           label: event.data.label ?? null,
           details: event.data.details ?? null,
+          inputs: event.data.inputs ?? null,
           error: event.data.error ?? null,
           errorDetails: event.data.errorDetails ?? null,
           completedAt: event.occurredAt,
           costId: event.data.costId ?? null,
+          updatedAt: Date.now(),
+        };
+      }
+
+      if (isEvaluationReportedEvent(event)) {
+        return {
+          ...state,
+          evaluationId: event.data.evaluationId,
+          evaluatorId: event.data.evaluatorId,
+          evaluatorType: event.data.evaluatorType,
+          evaluatorName: event.data.evaluatorName ?? null,
+          traceId: event.data.traceId ?? null,
+          isGuardrail: event.data.isGuardrail ?? false,
+          status: event.data.status,
+          score: typeof event.data.score === "number" ? event.data.score : null,
+          passed: event.data.passed ?? null,
+          label: event.data.label ?? null,
+          details: event.data.details ?? null,
+          inputs: event.data.inputs ?? null,
+          error: event.data.error ?? null,
+          errorDetails: event.data.errorDetails ?? null,
+          costId: event.data.costId ?? null,
+          startedAt: event.occurredAt,
+          completedAt: event.occurredAt,
           updatedAt: Date.now(),
         };
       }

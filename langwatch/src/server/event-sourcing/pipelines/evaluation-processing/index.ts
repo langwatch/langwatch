@@ -6,6 +6,7 @@ export { createExecuteEvaluationCommandClass } from "./commands/executeEvaluatio
 export type { ExecuteEvaluationCommandDeps } from "./commands/executeEvaluation.command";
 export { StartEvaluationCommand } from "./commands/startEvaluation.command";
 export { CompleteEvaluationCommand } from "./commands/completeEvaluation.command";
+export { ReportEvaluationCommand } from "./commands/reportEvaluation.command";
 // Projections
 export * from "./projections";
 // Repositories

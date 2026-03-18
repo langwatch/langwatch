@@ -32,12 +32,18 @@ vi.mock("../usePageVisibility", () => ({
   usePageVisibility: () => mockIsVisible,
 }));
 
+const mockInvalidateBatchHistory = vi.fn();
+const mockInvalidateSuiteRunData = vi.fn();
+
 vi.mock("../../utils/api", () => ({
   api: {
     useContext: () => ({
       scenarios: {
         getScenarioSetBatchHistory: {
-          invalidate: vi.fn(),
+          invalidate: mockInvalidateBatchHistory,
+        },
+        getSuiteRunData: {
+          invalidate: mockInvalidateSuiteRunData,
         },
       },
     }),
@@ -252,6 +258,38 @@ describe("useSimulationUpdateListener()", () => {
     });
   });
 
+  describe("when an SSE event fires", () => {
+    it("invalidates getSuiteRunData so RunHistoryPanel refreshes", () => {
+      renderHook(() =>
+        useSimulationUpdateListener({
+          projectId: "proj_1",
+          refetch: refetchSpy,
+        }),
+      );
+
+      act(() => {
+        simulateSSEEvent({ event: "simulation_updated" });
+      });
+
+      expect(mockInvalidateSuiteRunData).toHaveBeenCalledTimes(1);
+    });
+
+    it("invalidates getScenarioSetBatchHistory for sidebar refresh", () => {
+      renderHook(() =>
+        useSimulationUpdateListener({
+          projectId: "proj_1",
+          refetch: refetchSpy,
+        }),
+      );
+
+      act(() => {
+        simulateSSEEvent({ event: "simulation_updated" });
+      });
+
+      expect(mockInvalidateBatchHistory).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("when onNewBatchRun callback is provided", () => {
     it("calls onNewBatchRun for new batch run IDs", () => {
       const onNewBatchRun = vi.fn();
@@ -306,6 +344,44 @@ describe("useSimulationUpdateListener()", () => {
       });
 
       expect(onNewBatchRun).toHaveBeenCalledTimes(1);
+    });
+
+    describe("when knownBatchRunIds exceeds 500 entries", () => {
+      it("evicts old IDs so onNewBatchRun fires again for them", () => {
+        const onNewBatchRun = vi.fn();
+
+        renderHook(() =>
+          useSimulationUpdateListener({
+            projectId: "proj_1",
+            refetch: refetchSpy,
+            onNewBatchRun,
+            debounceMs: 0,
+          }),
+        );
+
+        // Send 501 unique batch run IDs to exceed the 500 cap
+        for (let i = 0; i < 501; i++) {
+          act(() => {
+            simulateSSEEvent({
+              event: "simulation_updated",
+              batchRunId: `batch_${i}`,
+            });
+          });
+        }
+
+        expect(onNewBatchRun).toHaveBeenCalledTimes(501);
+
+        // The first ID was evicted when the set exceeded 500,
+        // so sending it again triggers onNewBatchRun
+        act(() => {
+          simulateSSEEvent({
+            event: "simulation_updated",
+            batchRunId: "batch_0",
+          });
+        });
+
+        expect(onNewBatchRun).toHaveBeenCalledTimes(502);
+      });
     });
   });
 });

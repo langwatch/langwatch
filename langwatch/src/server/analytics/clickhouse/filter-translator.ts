@@ -111,9 +111,6 @@ const filterHandlers: Record<FilterField, FilterHandler | null> = {
 
   // Annotation Filters
   "annotations.hasAnnotation": (values) => translateAnnotationFilter(values),
-
-  // Not applicable to analytics pipeline
-  "sentiment.input_sentiment": null,
 };
 
 /**

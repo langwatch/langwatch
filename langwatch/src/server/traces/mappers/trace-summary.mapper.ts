@@ -405,7 +405,7 @@ export function mapTraceSummaryToTrace(
     project_id: projectId,
     metadata,
     timestamps: {
-      started_at: summary.createdAt,
+      started_at: summary.occurredAt,
       inserted_at: summary.createdAt,
       updated_at: summary.updatedAt,
     },

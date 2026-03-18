@@ -12,8 +12,6 @@ import {
   TraceRequestUtils,
   normalizeOtlpAttributeMap,
 } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
-import { traced } from "../tracing";
-
 export interface LogRequestCollectionDeps {
   recordLog: (data: RecordLogCommandData) => Promise<void>;
 }
@@ -27,13 +25,6 @@ export class LogRequestCollectionService {
   );
 
   constructor(private readonly deps: LogRequestCollectionDeps) {}
-
-  static create(deps: LogRequestCollectionDeps): LogRequestCollectionService {
-    return traced(
-      new LogRequestCollectionService(deps),
-      "LogRequestCollectionService",
-    );
-  }
 
   async handleOtlpLogRequest({
     tenantId,

@@ -1,6 +1,7 @@
-import { SimpleGrid, Box, Text, Stat, StatLabel, StatNumber, Heading, HStack, VStack } from "@chakra-ui/react";
-import type { DashboardData, PhaseMetrics, QueueInfo } from "../../../shared/types.ts";
-import { formatNumber, formatLatency, formatRate } from "../../utils/formatters.ts";
+import { SimpleGrid, Box, Text, Stat, StatLabel, StatNumber } from "@chakra-ui/react";
+import { TriangleUpIcon, TriangleDownIcon } from "@chakra-ui/icons";
+import type { DashboardData } from "../../../shared/types.ts";
+import { formatLatency, formatRate, formatEta } from "../../utils/formatters.ts";
 
 /** Interpolate hue from 120 (green) → 0 (red) based on fill ratio 0–1 */
 function fillColor(ratio: number): string {
@@ -111,106 +112,23 @@ function StatCard({ label, children, color, gauge }: {
   );
 }
 
-const EMPTY_PHASE: PhaseMetrics = { pending: 0, active: 0, completedPerSec: 0, failedPerSec: 0, latencyP50Ms: 0, latencyP99Ms: 0, peakCompletedPerSec: 0, peakFailedPerSec: 0, peakLatencyP50Ms: 0, peakLatencyP99Ms: 0 };
+function BacklogTrend({ history }: { history: DashboardData["throughputHistory"] }) {
+  if (history.length < 16) return null;
+  const recent = history[history.length - 1];
+  const older = history[history.length - 16]; // ~30s ago at 2s intervals
+  if (!recent || !older || recent.pendingCount === undefined || older.pendingCount === undefined) return null;
 
-function PhaseCard({ title, metrics }: { title: string; metrics: PhaseMetrics }) {
-  return (
-    <Box flex="1" minW="160px">
-      <Heading
-        size="xs"
-        fontSize="10px"
-        color="#4a6a7a"
-        textTransform="uppercase"
-        letterSpacing="0.15em"
-        mb={2}
-      >
-        {title}
-      </Heading>
-      <VStack spacing={2} align="stretch">
-        <Box
-          bg="#0a0e17"
-          px={3}
-          py={2}
-          borderRadius="2px"
-          border="1px solid"
-          borderColor="rgba(0, 240, 255, 0.15)"
-        >
-          <HStack justify="space-between">
-            <Box>
-              <Text fontSize="9px" color="#4a6a7a" textTransform="uppercase" letterSpacing="0.1em">Pending</Text>
-              <Text fontSize="md" color="#00f0ff" sx={{ fontVariantNumeric: "tabular-nums" }}>
-                {formatNumber(metrics.pending)}
-              </Text>
-            </Box>
-            <Box textAlign="right">
-              <Text fontSize="9px" color="#4a6a7a" textTransform="uppercase" letterSpacing="0.1em">Active</Text>
-              <Text fontSize="md" color={metrics.active > 0 ? "#00ff41" : "#4a6a7a"} sx={{ fontVariantNumeric: "tabular-nums" }}>
-                {metrics.active}
-              </Text>
-            </Box>
-          </HStack>
-        </Box>
-        <Box
-          bg="#0a0e17"
-          px={3}
-          py={2}
-          borderRadius="2px"
-          border="1px solid"
-          borderColor="rgba(0, 240, 255, 0.15)"
-        >
-          <HStack justify="space-between">
-            <Box>
-              <Text fontSize="9px" color="#4a6a7a" textTransform="uppercase" letterSpacing="0.1em">Done/s</Text>
-              <ValueWithPeak
-                value={formatRate(metrics.completedPerSec)}
-                peak={formatRate(metrics.peakCompletedPerSec)}
-                color={metrics.completedPerSec > 0 ? "#00ff41" : "#4a6a7a"}
-              />
-            </Box>
-            <Box textAlign="center">
-              <Text fontSize="9px" color="#4a6a7a" textTransform="uppercase" letterSpacing="0.1em">p50 / p99</Text>
-              <Text fontSize="md" color={metrics.latencyP50Ms > 0 ? "#00f0ff" : "#4a6a7a"} sx={{ fontVariantNumeric: "tabular-nums" }}>
-                {formatLatency(metrics.latencyP50Ms)}
-                <Text as="span" fontSize="xs" color="#4a6a7a"> / {formatLatency(metrics.latencyP99Ms)}</Text>
-                {metrics.peakLatencyP50Ms > 0 && metrics.peakLatencyP50Ms > metrics.latencyP50Ms && (
-                  <Text as="span" fontSize="9px" color="#4a6a7a" ml={1}>
-                    pk {formatLatency(metrics.peakLatencyP50Ms)}
-                  </Text>
-                )}
-              </Text>
-            </Box>
-            <Box textAlign="right">
-              <Text fontSize="9px" color="#4a6a7a" textTransform="uppercase" letterSpacing="0.1em">Failed/s</Text>
-              <ValueWithPeak
-                value={formatRate(metrics.failedPerSec)}
-                peak={formatRate(metrics.peakFailedPerSec)}
-                color={metrics.failedPerSec > 0 ? "#ff0033" : "#4a6a7a"}
-              />
-            </Box>
-          </HStack>
-        </Box>
-      </VStack>
-    </Box>
+  const diff = recent.pendingCount - older.pendingCount;
+  if (diff === 0) return null;
+
+  return diff > 0 ? (
+    <TriangleUpIcon color="#ff0033" boxSize="10px" ml={1} />
+  ) : (
+    <TriangleDownIcon color="#00ff41" boxSize="10px" ml={1} />
   );
 }
 
-export function StatCards({ data, queues }: { data: DashboardData; queues?: QueueInfo[] }) {
-  // Derive group counts from queues prop (which includes draining groups) when available,
-  // so stat cards stay in sync with the groups table below.
-  let totalGroups = data.totalGroups;
-  let blockedGroups = data.blockedGroups;
-  let totalPendingJobs = data.totalPendingJobs;
-  if (queues && queues.length > 0) {
-    totalGroups = 0;
-    blockedGroups = 0;
-    totalPendingJobs = 0;
-    for (const q of queues) {
-      totalGroups += q.groups.length;
-      blockedGroups += q.blockedGroupCount;
-      totalPendingJobs += q.totalPendingJobs;
-    }
-  }
-
+export function StatCards({ data }: { data: DashboardData }) {
   const hasMaxMemory = data.redisMemoryMaxBytes > 0;
   const peakBytes = data.redisMemoryPeakBytes ?? 0;
   const redisCeiling = hasMaxMemory
@@ -222,16 +140,21 @@ export function StatCards({ data, queues }: { data: DashboardData; queues?: Queu
     ? data.redisMemoryUsedBytes / redisCeiling
     : 0;
 
-  const phases = data.phases;
-
   return (
     <Box mb={6}>
-      <SimpleGrid columns={{ base: 2, md: 5 }} spacing={3} mb={4}>
+      <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3}>
         <StatCard label="Done/s" color={data.completedPerSec > 0 ? "#00ff41" : "#4a6a7a"}>
           <ValueWithPeak
             value={formatRate(data.completedPerSec)}
             peak={formatRate(data.peakCompletedPerSec)}
             color={data.completedPerSec > 0 ? "#00ff41" : "#4a6a7a"}
+          />
+        </StatCard>
+        <StatCard label="Failed/s" color={data.failedPerSec > 0 ? "#ff0033" : "#4a6a7a"}>
+          <ValueWithPeak
+            value={formatRate(data.failedPerSec)}
+            peak={formatRate(data.peakFailedPerSec)}
+            color={data.failedPerSec > 0 ? "#ff0033" : "#4a6a7a"}
           />
         </StatCard>
         <StatCard label="Latency p50 / p99" color={data.latencyP50Ms > 0 ? "#00f0ff" : "#4a6a7a"}>
@@ -243,19 +166,20 @@ export function StatCards({ data, queues }: { data: DashboardData; queues?: Queu
             </Text>
           )}
         </StatCard>
-        <StatCard label="Failed/s" color={data.failedPerSec > 0 ? "#ff0033" : "#4a6a7a"}>
-          <ValueWithPeak
-            value={formatRate(data.failedPerSec)}
-            peak={formatRate(data.peakFailedPerSec)}
-            color={data.failedPerSec > 0 ? "#ff0033" : "#4a6a7a"}
-          />
-        </StatCard>
         <StatCard label="Staged/s" color={data.throughputStagedPerSec > 0 ? "#00f0ff" : "#4a6a7a"}>
           <ValueWithPeak
             value={formatRate(data.throughputStagedPerSec)}
             peak={formatRate(data.peakStagedPerSec)}
             color={data.throughputStagedPerSec > 0 ? "#00f0ff" : "#4a6a7a"}
           />
+        </StatCard>
+      </SimpleGrid>
+      <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3} mt={3}>
+        <StatCard label="Total Completed" color={data.totalCompleted > 0 ? "#00ff41" : "#4a6a7a"}>
+          {data.totalCompleted.toLocaleString()}
+        </StatCard>
+        <StatCard label="Total Failed" color={data.totalFailed > 0 ? "#ff0033" : "#4a6a7a"}>
+          {data.totalFailed.toLocaleString()}
         </StatCard>
         <StatCard
           label="Redis Memory"
@@ -271,13 +195,22 @@ export function StatCards({ data, queues }: { data: DashboardData; queues?: Queu
         >
           {data.redisMemoryUsed}
         </StatCard>
+        <StatCard
+          label="ETA to Drain"
+          color={
+            data.completedPerSec <= 0
+              ? "#4a6a7a"
+              : (data.totalPendingJobs / data.completedPerSec) * 1000 < 300_000
+                ? "#00ff41"
+                : (data.totalPendingJobs / data.completedPerSec) * 1000 < 1_800_000
+                  ? "#ffaa00"
+                  : "#ff0033"
+          }
+        >
+          {formatEta(data.totalPendingJobs, data.completedPerSec)}
+          <BacklogTrend history={data.throughputHistory} />
+        </StatCard>
       </SimpleGrid>
-
-      <HStack spacing={4} align="start">
-        <PhaseCard title="Commands" metrics={phases?.commands ?? EMPTY_PHASE} />
-        <PhaseCard title="Projections" metrics={phases?.projections ?? EMPTY_PHASE} />
-        <PhaseCard title="Reactions" metrics={phases?.reactions ?? EMPTY_PHASE} />
-      </HStack>
     </Box>
   );
 }

@@ -38,11 +38,14 @@ const config: SimulationCommandConfig<
     scenarioSetId: commandData.scenarioSetId,
     name: commandData.name,
     description: commandData.description,
+    metadata: commandData.metadata,
   }),
   getLogContext: (commandData) => ({
     scenarioId: commandData.scenarioId,
     batchRunId: commandData.batchRunId,
   }),
+  makeIdempotencyKey: (commandData) =>
+    `${commandData.tenantId}:${commandData.scenarioRunId}:startRun`,
 };
 
 /**

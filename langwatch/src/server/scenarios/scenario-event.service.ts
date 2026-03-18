@@ -9,7 +9,9 @@ import type {
   ScenarioEvent,
   ScenarioRunData,
 } from "./scenario-event.types";
+import { isInternalSetId } from "./internal-set-id";
 import { resolveRunStatus } from "./stall-detection";
+
 
 const tracer = getLangWatchTracer("langwatch.scenario-events.service");
 const logger = createLogger("langwatch:scenario-events:service");
@@ -45,6 +47,7 @@ export class ScenarioEventService {
 
   /**
    * Saves a scenario event to the repository.
+   *
    * @param {Object} params - The parameters for saving the event
    * @param {string} params.projectId - The ID of the project
    * @param {string} params.type - The type of event
@@ -72,6 +75,7 @@ export class ScenarioEventService {
           { projectId, scenarioId: event.scenarioId, scenarioRunId: event.scenarioRunId, type: event.type },
           "Saving scenario event",
         );
+
         await this.eventRepository.saveEvent({
           projectId,
           ...event,
@@ -79,6 +83,7 @@ export class ScenarioEventService {
       },
     );
   }
+
 
   /**
    * Retrieves the complete run data for a specific scenario run.
@@ -833,6 +838,8 @@ export class ScenarioEventService {
         if (result.batchRunIds.length === 0) {
           span.setAttribute("result.count", 0);
           return {
+            changed: true as const,
+            lastUpdatedAt: 0,
             runs: [],
             scenarioSetIds: {},
             nextCursor: undefined,
@@ -848,7 +855,14 @@ export class ScenarioEventService {
         span.setAttribute("result.count", runs.length);
         span.setAttribute("result.has_more", result.hasMore);
 
+        const lastUpdatedAt = runs.reduce(
+          (max, r) => Math.max(max, r.timestamp),
+          0,
+        );
+
         return {
+          changed: true as const,
+          lastUpdatedAt,
           runs,
           scenarioSetIds: result.scenarioSetIds,
           nextCursor: result.nextCursor,
@@ -879,18 +893,20 @@ export class ScenarioEventService {
       async (span) => {
         const allSets = await this.eventRepository.getScenarioSetsDataForProject({ projectId });
         const externalSets = allSets.filter(
-          (s) => !s.scenarioSetId.startsWith("__internal__"),
+          (s) => !isInternalSetId(s.scenarioSetId),
         );
         span.setAttribute("result.count", externalSets.length);
         // ES path cannot resolve per-run pass/fail status; return zero counts
         // so the sidebar hides the summary line rather than showing misleading data.
         // ClickHouse is the primary backend for accurate pass/fail stats.
-        return externalSets.map((s) => ({
-          scenarioSetId: s.scenarioSetId,
-          passedCount: 0,
-          totalCount: 0,
-          lastRunTimestamp: s.lastRunAt,
-        }));
+        return externalSets
+          .map((s) => ({
+            scenarioSetId: s.scenarioSetId,
+            passedCount: 0,
+            totalCount: 0,
+            lastRunTimestamp: s.lastRunAt,
+          }))
+          .sort((a, b) => b.lastRunTimestamp - a.lastRunTimestamp);
       },
     );
   }

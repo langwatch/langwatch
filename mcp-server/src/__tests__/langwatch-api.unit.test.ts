@@ -208,10 +208,9 @@ describe("langwatch-api", () => {
     it("sends POST to /api/prompts with body", async () => {
       const { createPrompt } = await import("../langwatch-api.js");
       const data = {
-        name: "Test Prompt",
+        handle: "test-prompt",
         messages: [{ role: "system", content: "You are helpful." }],
-        model: "gpt-4o",
-        modelProvider: "openai",
+        model: "openai/gpt-4o",
       };
       const responseData = { id: "new-id", ...data };
       mockJsonResponse(responseData);
@@ -234,7 +233,7 @@ describe("langwatch-api", () => {
   });
 
   describe("updatePrompt()", () => {
-    it("sends POST to /api/prompts/{id} with body", async () => {
+    it("sends PUT to /api/prompts/{id} with body", async () => {
       const { updatePrompt } = await import("../langwatch-api.js");
       const data = {
         messages: [{ role: "system", content: "Updated" }],
@@ -248,34 +247,7 @@ describe("langwatch-api", () => {
       expect(mockFetch).toHaveBeenCalledWith(
         `${TEST_ENDPOINT}/api/prompts/${encodeURIComponent("p1")}`,
         expect.objectContaining({
-          method: "POST",
-          headers: expect.objectContaining({
-            "X-Auth-Token": TEST_API_KEY,
-            "Content-Type": "application/json",
-          }),
-          body: JSON.stringify(data),
-        })
-      );
-      expect(result).toEqual(responseData);
-    });
-  });
-
-  describe("createPromptVersion()", () => {
-    it("sends POST to /api/prompts/{id}/versions with body", async () => {
-      const { createPromptVersion } = await import("../langwatch-api.js");
-      const data = {
-        messages: [{ role: "user", content: "new version" }],
-        commitMessage: "v2",
-      };
-      const responseData = { version: 2 };
-      mockJsonResponse(responseData);
-
-      const result = await createPromptVersion("p1", data);
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        `${TEST_ENDPOINT}/api/prompts/${encodeURIComponent("p1")}/versions`,
-        expect.objectContaining({
-          method: "POST",
+          method: "PUT",
           headers: expect.objectContaining({
             "X-Auth-Token": TEST_API_KEY,
             "Content-Type": "application/json",

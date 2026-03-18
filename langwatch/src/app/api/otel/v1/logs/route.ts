@@ -11,7 +11,6 @@ import {
 } from "~/server/background/workers/collectorWorker";
 import { openTelemetryLogsRequestToTracesForCollection } from "~/server/tracer/otel.logs";
 import { captureException } from "~/utils/posthogErrorCapture";
-import { notifyPlanLimitReached } from "../../../../../../ee/billing";
 import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
 import { withAppRouterTracer } from "../../../../../middleware/app-router-tracer";
 import { getApp } from "../../../../../server/app-layer/app";
@@ -91,7 +90,7 @@ async function handleLogsRequest(req: NextRequest) {
             const activePlan = await getApp().planProvider.getActivePlan({
               organizationId: project.team.organizationId,
             });
-            await notifyPlanLimitReached({
+            await getApp().usageLimits.notifyPlanLimitReached({
               organizationId: project.team.organizationId,
               planName: activePlan.name ?? "free",
             });

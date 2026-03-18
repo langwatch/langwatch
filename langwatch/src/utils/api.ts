@@ -79,7 +79,6 @@ export const api = createTRPCNext<AppRouter>({
             // when condition is false, use batching
             false: httpBatchLink({
               url: `${getBaseUrl()}/api/trpc`,
-              // Split batches if URL would exceed this length to avoid 431 errors
               maxURLLength: 4000,
             }),
           }),

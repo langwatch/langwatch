@@ -27,23 +27,59 @@ export const clickHouseFilterConditions: Record<
 
   // Metadata
   "metadata.user_id": (values, paramId) => ({
-    sql: `ts.Attributes['user.id'] IN ({${paramId}_values:Array(String)})`,
+    sql: `ts.Attributes['langwatch.user_id'] IN ({${paramId}_values:Array(String)})`,
     params: { [`${paramId}_values`]: values },
   }),
   "metadata.thread_id": (values, paramId) => ({
-    sql: `ts.Attributes['thread.id'] IN ({${paramId}_values:Array(String)})`,
+    sql: `ts.Attributes['gen_ai.conversation.id'] IN ({${paramId}_values:Array(String)})`,
     params: { [`${paramId}_values`]: values },
   }),
   "metadata.customer_id": (values, paramId) => ({
-    sql: `ts.Attributes['customer.id'] IN ({${paramId}_values:Array(String)})`,
+    sql: `ts.Attributes['langwatch.customer_id'] IN ({${paramId}_values:Array(String)})`,
     params: { [`${paramId}_values`]: values },
   }),
   "metadata.labels": (values, paramId) => ({
     sql: `hasAny(JSONExtractArrayRaw(ts.Attributes['langwatch.labels']), arrayMap(x -> concat('"', x, '"'), {${paramId}_values:Array(String)}))`,
     params: { [`${paramId}_values`]: values },
   }),
-  "metadata.key": null, // Complex nested filter, not supported
-  "metadata.value": null, // Complex nested filter, not supported
+  "metadata.key": (values, paramId) => {
+    if (values.length === 0) return { sql: "1=0", params: {} };
+    // Check all three legacy key formats for each metadata key:
+    // - metadata.{key} (canonical, from Python SDK canonicalization)
+    // - langwatch.metadata.{key} (legacy REST collector)
+    // - {key} (legacy bare OTEL resource attribute)
+    const conditions = values.map((_v, i) => {
+      return `(ts.Attributes[{${paramId}_k${i}_canonical:String}] != '' OR ts.Attributes[{${paramId}_k${i}_lw:String}] != '' OR ts.Attributes[{${paramId}_k${i}_bare:String}] != '')`;
+    });
+    const params: Record<string, unknown> = {};
+    values.forEach((v, i) => {
+      const rawKey = v.replaceAll("·", ".");
+      params[`${paramId}_k${i}_canonical`] = `metadata.${rawKey}`;
+      params[`${paramId}_k${i}_lw`] = `langwatch.metadata.${rawKey}`;
+      params[`${paramId}_k${i}_bare`] = rawKey;
+    });
+    return {
+      sql: conditions.length === 1 ? conditions[0]! : `(${conditions.join(" OR ")})`,
+      params,
+    };
+  },
+  "metadata.value": (values, paramId, key) => {
+    if (!key) return { sql: "1=0", params: {} };
+    const rawKey = key.replaceAll("·", ".");
+    // Match all three legacy key formats for existing data:
+    // - metadata.{key} (canonical, from Python SDK canonicalization)
+    // - langwatch.metadata.{key} (legacy REST collector)
+    // - {key} (legacy bare OTEL resource attribute)
+    return {
+      sql: `(ts.Attributes[{${paramId}_canonical:String}] IN ({${paramId}_values:Array(String)}) OR ts.Attributes[{${paramId}_lw:String}] IN ({${paramId}_values:Array(String)}) OR ts.Attributes[{${paramId}_bare:String}] IN ({${paramId}_values:Array(String)}))`,
+      params: {
+        [`${paramId}_canonical`]: `metadata.${rawKey}`,
+        [`${paramId}_lw`]: `langwatch.metadata.${rawKey}`,
+        [`${paramId}_bare`]: rawKey,
+        [`${paramId}_values`]: values,
+      },
+    };
+  },
   "metadata.prompt_ids": (values, paramId) => ({
     sql: `hasAny(JSONExtractArrayRaw(ts.Attributes['langwatch.prompt_ids']), arrayMap(x -> concat('"', x, '"'), {${paramId}_values:Array(String)}))`,
     params: { [`${paramId}_values`]: values },
@@ -51,35 +87,15 @@ export const clickHouseFilterConditions: Record<
 
   // Traces
   "traces.origin": (values, paramId) => {
-    const hasApplication = values.includes("application");
-    const otherValues = values.filter((v) => v !== "application");
-
-    const parts: string[] = [];
-
-    if (hasApplication) {
-      parts.push(
-        "(ts.Attributes['langwatch.origin'] = '' OR ts.Attributes['langwatch.origin'] IS NULL)",
-      );
-    }
-
-    if (otherValues.length > 0) {
-      parts.push(
-        `ts.Attributes['langwatch.origin'] IN ({${paramId}_values:Array(String)})`,
-      );
-    }
-
-    if (parts.length === 0) {
+    if (values.length === 0) {
       return { sql: "1=0", params: {} };
     }
 
-    const params: Record<string, unknown> = {};
-    if (otherValues.length > 0) {
-      params[`${paramId}_values`] = otherValues;
-    }
-
+    // All origin values (including "application") are matched by exact value.
+    // Empty/NULL no longer implies "application".
     return {
-      sql: parts.length === 1 ? parts[0]! : `(${parts.join(" OR ")})`,
-      params,
+      sql: `ts.Attributes['langwatch.origin'] IN ({${paramId}_values:Array(String)})`,
+      params: { [`${paramId}_values`]: values },
     };
   },
 
@@ -93,14 +109,19 @@ export const clickHouseFilterConditions: Record<
   },
 
   // Spans
-  "spans.type": null, // Requires join with stored_spans, handled separately
+  "spans.type": (values, paramId) => ({
+    sql: `EXISTS (
+      SELECT 1 FROM stored_spans sp
+      WHERE sp.TenantId = ts.TenantId
+        AND sp.TraceId = ts.TraceId
+        AND sp.SpanAttributes['langwatch.span.type'] IN ({${paramId}_values:Array(String)})
+    )`,
+    params: { [`${paramId}_values`]: values },
+  }),
   "spans.model": (values, paramId) => ({
     sql: `hasAny(ts.Models, {${paramId}_values:Array(String)})`,
     params: { [`${paramId}_values`]: values },
   }),
-
-  // Sentiment - input satisfaction score not exposed as filterable column in ClickHouse
-  "sentiment.input_sentiment": null,
 
   // Annotations
   "annotations.hasAnnotation": (values, _paramId) => {

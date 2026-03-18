@@ -16,6 +16,7 @@ import { Worker as BullMQWorker } from "bullmq";
 import { createLogger } from "~/utils/logger/server";
 import { prisma } from "../db";
 import { connection } from "../redis";
+import { subscribeToCancellations } from "./cancellation-channel";
 import {
   type JobContextMetadata,
   createContextFromJobData,
@@ -119,9 +120,42 @@ export async function handleFailedJobResult(
     scenarioId: jobData.scenarioId,
     setId: jobData.setId,
     batchRunId: jobData.batchRunId,
+    scenarioRunId: jobData.scenarioRunId,
     error,
     name: scenario?.name,
     description: scenario?.situation,
+  });
+}
+
+/**
+ * Handle a cancelled job result by emitting cancellation events to Elasticsearch.
+ *
+ * Similar to handleFailedJobResult but writes CANCELLED status instead of ERROR.
+ *
+ * @param jobData - The job data containing project/scenario identifiers
+ * @param error - Optional error message
+ * @param deps - Injected dependencies for scenario lookup and failure emission
+ * @internal Exported for testing
+ */
+export async function handleCancelledJobResult(
+  jobData: ScenarioJob,
+  error: string | undefined,
+  deps: ProcessorDependencies,
+): Promise<void> {
+  const scenario = await deps.scenarioLookup.getById({
+    projectId: jobData.projectId,
+    id: jobData.scenarioId,
+  });
+
+  await deps.failureEmitter.ensureFailureEventsEmitted({
+    projectId: jobData.projectId,
+    scenarioId: jobData.scenarioId,
+    setId: jobData.setId,
+    batchRunId: jobData.batchRunId,
+    error: error ?? "Cancelled by user",
+    name: scenario?.name,
+    description: scenario?.situation,
+    cancelled: true,
   });
 }
 
@@ -193,10 +227,19 @@ export function buildChildProcessEnv(
 
 /**
  * Process a scenario job by spawning an isolated child process.
+ *
+ * @param signal - BullMQ's native AbortSignal, fired when the job is cancelled.
+ *   When provided and already aborted, processing is skipped immediately.
+ *   When fired mid-execution, the spawned child process receives SIGTERM.
  */
 export async function processScenarioJob(
   job: Job<ScenarioJob, ScenarioJobResult, string>,
+  _token?: string,
+  signal?: AbortSignal,
 ): Promise<ScenarioJobResult> {
+  if (signal?.aborted) {
+    return { success: false, error: "Job was cancelled before processing started", cancelled: true };
+  }
   // Extract context metadata propagated from the queue (flat format: { ...payload, __context })
   const { __context: contextMetadata, ...jobData } = job.data as ScenarioJob & {
     __context?: JobContextMetadata;
@@ -204,7 +247,7 @@ export async function processScenarioJob(
 
   recordJobWaitDuration(job, "scenario");
 
-  const { projectId, scenarioId, target, setId, batchRunId } = jobData;
+  const { projectId, scenarioId, target, setId, batchRunId, scenarioRunId } = jobData;
 
   // Ensure projectId is set in context metadata (may come from job data)
   const enrichedContextMetadata: JobContextMetadata = {
@@ -227,7 +270,7 @@ export async function processScenarioJob(
     // Pre-fetch all data needed for child process
     const deps = createDataPrefetcherDependencies();
     const prefetchResult = await prefetchScenarioData(
-      { projectId, scenarioId, setId, batchRunId },
+      { projectId, scenarioId, setId, batchRunId, scenarioRunId },
       target,
       deps,
     );
@@ -245,13 +288,19 @@ export async function processScenarioJob(
       "Scenario data prefetched",
     );
 
+    // Inject pre-generated scenarioRunId if present in job data
+    const childProcessData = jobData.scenarioRunId
+      ? { ...prefetchResult.data, scenarioRunId: jobData.scenarioRunId }
+      : prefetchResult.data;
+
     // Spawn child process with isolated OTEL context
     const childStartTime = Date.now();
     const result = await spawnScenarioChildProcess(
       job,
       jobData,
-      prefetchResult.data,
+      childProcessData,
       prefetchResult.telemetry,
+      signal,
     );
 
     const totalDurationMs = Date.now() - startTime;
@@ -287,6 +336,7 @@ async function spawnScenarioChildProcess(
   jobData: ScenarioJob,
   childProcessData: ChildProcessJobData,
   telemetry: { endpoint: string; apiKey: string },
+  signal?: AbortSignal,
 ): Promise<ScenarioExecutionResult> {
   return new Promise((resolve) => {
     const { scenarioId, projectId, batchRunId, setId } = jobData;
@@ -336,6 +386,11 @@ async function spawnScenarioChildProcess(
       cwd: packageRoot,
     });
 
+    // Kill the child process when the BullMQ abort signal fires (job cancelled)
+    signal?.addEventListener("abort", () => {
+      child.kill("SIGTERM");
+    });
+
     let stderr = "";
     let resolved = false;
 
@@ -375,6 +430,12 @@ async function spawnScenarioChildProcess(
       clearTimeout(timeout);
       if (resolved) return;
       resolved = true;
+
+      if (signal?.aborted) {
+        log("info", "Job cancelled via AbortSignal");
+        resolve({ success: false, error: "Job was cancelled", cancelled: true });
+        return;
+      }
 
       if (code !== 0) {
         log("error", `Child process exited with code ${code}`, { exitCode: code, stderr });
@@ -429,9 +490,9 @@ async function spawnScenarioChildProcess(
  *
  * @param deps - Optional injected dependencies (defaults to production implementations)
  */
-export function startScenarioProcessor(
+export async function startScenarioProcessor(
   deps: ProcessorDependencies = createProcessorDependencies(),
-): Worker<ScenarioJob, ScenarioJobResult, string> | undefined {
+): Promise<Worker<ScenarioJob, ScenarioJobResult, string> | undefined> {
   if (!connection) {
     logger.info("No Redis connection, skipping scenario processor");
     return undefined;
@@ -439,7 +500,7 @@ export function startScenarioProcessor(
 
   const worker = new BullMQWorker<ScenarioJob, ScenarioJobResult, string>(
     SCENARIO_QUEUE.NAME,
-    processScenarioJob,
+    (job, token, signal) => processScenarioJob(job, token, signal),
     {
       connection,
       concurrency: SCENARIO_WORKER.CONCURRENCY,
@@ -475,19 +536,38 @@ export function startScenarioProcessor(
         })
       : logger;
 
-    eventLogger.error(
-      { error: error?.message, errorStack: error?.stack },
-      "Scenario job failed unexpectedly",
-    );
+    // Check if this was a cancellation (BullMQ throws AbortError when job is cancelled)
+    const isCancellation = error?.name === "AbortError" || error?.message?.includes("cancelled");
 
-    // Emit failure events for unexpected errors (e.g., exceptions in processScenarioJob)
-    if (job && jobData) {
-      void handleFailedJobResult(jobData, error?.message, deps).catch((emitError) =>
-        eventLogger.error(
-          { emitError },
-          "Failed to emit failure events from failed handler",
-        ),
+    if (isCancellation) {
+      eventLogger.info(
+        { error: error?.message },
+        "Scenario job cancelled",
       );
+    } else {
+      eventLogger.error(
+        { error: error?.message, errorStack: error?.stack },
+        "Scenario job failed unexpectedly",
+      );
+    }
+
+    // Emit appropriate events for the failure/cancellation
+    if (job && jobData) {
+      if (isCancellation) {
+        void handleCancelledJobResult(jobData, error?.message, deps).catch((emitError) =>
+          eventLogger.error(
+            { emitError },
+            "Failed to emit cancellation events from failed handler",
+          ),
+        );
+      } else {
+        void handleFailedJobResult(jobData, error?.message, deps).catch((emitError) =>
+          eventLogger.error(
+            { emitError },
+            "Failed to emit failure events from failed handler",
+          ),
+        );
+      }
     }
   });
 
@@ -508,6 +588,18 @@ export function startScenarioProcessor(
       return;
     }
 
+    // Job was cancelled by user — write CANCELLED event, not ERROR
+    if (result?.cancelled) {
+      eventLogger.info("Scenario job cancelled by user");
+      try {
+        await handleCancelledJobResult(jobData, result.error, deps);
+        eventLogger.debug("Cancellation events emitted to Elasticsearch");
+      } catch (emitError) {
+        eventLogger.error({ emitError }, "Failed to emit cancellation events");
+      }
+      return;
+    }
+
     // Job completed but with a failure result - ensure failure events are emitted
     // to Elasticsearch so the frontend can show the error instead of timing out
     eventLogger.warn(
@@ -522,6 +614,19 @@ export function startScenarioProcessor(
       // Log but don't crash the worker - failure handler errors shouldn't affect other jobs
       eventLogger.error({ emitError }, "Failed to emit failure events");
     }
+  });
+
+  // Subscribe to cancellation signals from the web server.
+  // Redis pub/sub requires a dedicated connection — use duplicate() so the
+  // subscriber doesn't interfere with BullMQ's command connection.
+  const subscriber = connection.duplicate();
+  const unsubscribe = await subscribeToCancellations({ worker, subscriber });
+
+  // Clean up the subscriber connection when the worker shuts down
+  worker.on("closing", () => {
+    void unsubscribe().catch((err: unknown) =>
+      logger.warn({ err }, "Error closing cancellation subscriber"),
+    );
   });
 
   logger.info(

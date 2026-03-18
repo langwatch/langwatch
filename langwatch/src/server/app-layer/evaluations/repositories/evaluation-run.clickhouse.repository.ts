@@ -28,6 +28,7 @@ interface ClickHouseEvaluationRunRecord {
   Passed: number | null;
   Label: string | null;
   Details: string | null;
+  Inputs: string | null;
   Error: string | null;
   ErrorDetails: string | null;
   CreatedAt: number;
@@ -117,6 +118,7 @@ export class EvaluationRunClickHouseRepository
             Passed,
             Label,
             Details,
+            Inputs,
             Error,
             ErrorDetails,
             toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
@@ -135,6 +137,7 @@ export class EvaluationRunClickHouseRepository
         `,
         query_params: { tenantId, evaluationId },
         format: "JSONEachRow",
+        clickhouse_settings: { select_sequential_consistency: "1" },
       });
 
       const rows = await result.json<ClickHouseEvaluationRunRecord>();
@@ -168,6 +171,9 @@ export class EvaluationRunClickHouseRepository
       passed: record.Passed === null ? null : record.Passed === 1,
       label: record.Label,
       details: record.Details,
+      inputs: record.Inputs
+        ? (JSON.parse(record.Inputs) as Record<string, unknown>)
+        : null,
       error: record.Error,
       errorDetails: record.ErrorDetails,
       createdAt: Number(record.CreatedAt),
@@ -203,6 +209,7 @@ export class EvaluationRunClickHouseRepository
       Passed: data.passed === null ? null : data.passed ? 1 : 0,
       Label: data.label,
       Details: data.details,
+      Inputs: data.inputs ? JSON.stringify(data.inputs) : null,
       Error: data.error,
       ErrorDetails: data.errorDetails,
       CreatedAt: new Date(data.createdAt),

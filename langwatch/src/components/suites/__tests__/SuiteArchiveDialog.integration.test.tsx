@@ -33,10 +33,10 @@ describe("<SuiteArchiveDialog/>", () => {
   });
 
   describe("given the dialog is open", () => {
-    it("displays 'Archive suite?' as the title", () => {
+    it("displays 'Archive run plan?' as the title", () => {
       render(<SuiteArchiveDialog {...defaultProps} />, { wrapper: Wrapper });
 
-      expect(screen.getByText("Archive suite?")).toBeInTheDocument();
+      expect(screen.getByText("Archive run plan?")).toBeInTheDocument();
     });
 
     it("displays the suite name", () => {
@@ -49,7 +49,7 @@ describe("<SuiteArchiveDialog/>", () => {
       render(<SuiteArchiveDialog {...defaultProps} />, { wrapper: Wrapper });
 
       expect(
-        screen.getByText("Archived suites will no longer appear in the sidebar. Test runs are preserved."),
+        screen.getByText("Archived run plans will no longer appear in the sidebar. Test runs are preserved."),
       ).toBeInTheDocument();
     });
 

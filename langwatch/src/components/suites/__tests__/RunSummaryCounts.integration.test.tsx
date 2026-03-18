@@ -1,9 +1,10 @@
 /**
  * @vitest-environment jsdom
  *
- * Unit tests for RunSummaryCounts component.
+ * Integration tests for RunSummaryCounts component.
  *
- * Tests conditional display of stalled and cancelled counts.
+ * Tests compact icon-based display of status counts.
+ * Only non-zero statuses are rendered.
  *
  * @see specs/features/suites/footer-to-header-migration.feature
  */
@@ -22,8 +23,22 @@ describe("<RunSummaryCounts/>", () => {
     cleanup();
   });
 
-  describe("when passed and failed counts are provided", () => {
-    it("displays passed and failed counts", () => {
+  describe("given a summary with only passed counts non-zero", () => {
+    it("displays passed count with check icon and hides failed", () => {
+      render(
+        <RunSummaryCounts
+          summary={makeSummary({ passedCount: 8, failedCount: 0 })}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByText("8 passed")).toBeInTheDocument();
+      expect(screen.queryByText(/failed/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a summary with passed and failed counts non-zero", () => {
+    it("displays both as word labels", () => {
       render(
         <RunSummaryCounts
           summary={makeSummary({ passedCount: 8, failedCount: 2 })}
@@ -36,8 +51,8 @@ describe("<RunSummaryCounts/>", () => {
     });
   });
 
-  describe("when stalled and cancelled counts are non-zero", () => {
-    it("displays stalled and cancelled counts", () => {
+  describe("given a summary with all status counts non-zero", () => {
+    it("displays all statuses as word labels", () => {
       render(
         <RunSummaryCounts
           summary={makeSummary({
@@ -50,12 +65,14 @@ describe("<RunSummaryCounts/>", () => {
         { wrapper: Wrapper },
       );
 
+      expect(screen.getByText("5 passed")).toBeInTheDocument();
+      expect(screen.getByText("1 failed")).toBeInTheDocument();
       expect(screen.getByText("2 stalled")).toBeInTheDocument();
       expect(screen.getByText("1 cancelled")).toBeInTheDocument();
     });
   });
 
-  describe("when stalled and cancelled counts are zero", () => {
+  describe("given a summary with stalled and cancelled counts at zero", () => {
     it("does not display stalled or cancelled counts", () => {
       render(
         <RunSummaryCounts
@@ -69,6 +86,31 @@ describe("<RunSummaryCounts/>", () => {
         { wrapper: Wrapper },
       );
 
+      expect(screen.queryByText(/stalled/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/cancelled/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a summary with all counts at zero", () => {
+    it("renders empty container with no status items", () => {
+      const { container } = render(
+        <RunSummaryCounts
+          summary={makeSummary({
+            passedCount: 0,
+            failedCount: 0,
+            stalledCount: 0,
+            cancelledCount: 0,
+          })}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const countsEl = container.querySelector(
+        '[data-testid="run-summary-counts"]',
+      );
+      expect(countsEl).toBeInTheDocument();
+      expect(screen.queryByText(/passed/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/failed/)).not.toBeInTheDocument();
       expect(screen.queryByText(/stalled/)).not.toBeInTheDocument();
       expect(screen.queryByText(/cancelled/)).not.toBeInTheDocument();
     });

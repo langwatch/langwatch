@@ -88,7 +88,7 @@ describe("<ExternalSetDetailPanel/>", () => {
         error: null,
       });
 
-      render(<ExternalSetDetailPanel scenarioSetId="ext-set-1" />, { wrapper: Wrapper });
+      render(<ExternalSetDetailPanel scenarioSetId="ext-set-1" period={{ startDate: new Date("2025-01-01"), endDate: new Date("2025-01-31") }} />, { wrapper: Wrapper });
 
       // Row is auto-expanded, so click the scenario run card directly
       const scenarioCard = screen.getByLabelText(/View details for/);
@@ -109,7 +109,7 @@ describe("<ExternalSetDetailPanel/>", () => {
         error: null,
       });
 
-      const { container } = render(<ExternalSetDetailPanel scenarioSetId="ext-set-1" />, {
+      const { container } = render(<ExternalSetDetailPanel scenarioSetId="ext-set-1" period={{ startDate: new Date("2025-01-01"), endDate: new Date("2025-01-31") }} />, {
         wrapper: Wrapper,
       });
 

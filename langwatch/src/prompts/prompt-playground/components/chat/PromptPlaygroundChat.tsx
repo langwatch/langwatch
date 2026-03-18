@@ -6,7 +6,7 @@ import {
   UserMessage,
 } from "@copilotkit/react-ui";
 import clsx from "clsx";
-import { forwardRef, useEffect, useImperativeHandle, useMemo } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from "react";
 import type { z } from "zod";
 import { TraceMessage } from "~/components/copilot-kit/TraceMessage";
 import { convertScenarioMessagesToCopilotKit } from "~/components/simulations/utils/convert-scenario-messages";
@@ -64,7 +64,7 @@ const PromptPlaygroundChat = forwardRef<
           // @ts-expect-error - Total hack to pass additional params to the service adapter
           model: additionalParams,
         }}
-        onError={(error: Error) => {
+        onError={(error: unknown) => {
           console.error("CopilotKit error:", error);
         }}
         disableSystemMessage
@@ -81,7 +81,7 @@ const PromptPlaygroundChatInner = forwardRef<PromptPlaygroundChatRef, object>(
     const { getTabById } = useDraggableTabsBrowserStore((state) => ({
       getTabById: state.getByTabId,
     }));
-    const { setMessages, visibleMessages } = useCopilotChat();
+    const { setMessages, visibleMessages = [] } = useCopilotChat();
     const { updateTabData } = useDraggableTabsBrowserStore((state) => ({
       updateTabData: state.updateTabData,
     }));
@@ -120,7 +120,13 @@ const PromptPlaygroundChatInner = forwardRef<PromptPlaygroundChatRef, object>(
     /**
      * Sync the visible messages to the tab data.
      */
+    const prevMessageIdsRef = useRef("");
     useEffect(() => {
+      if (!visibleMessages) return;
+      const messageIds = visibleMessages.map((m) => m.id).join(",");
+      if (messageIds === prevMessageIdsRef.current) return;
+      prevMessageIdsRef.current = messageIds;
+
       const tab = getTabById(tabId);
       if (tab) {
         updateTabData({

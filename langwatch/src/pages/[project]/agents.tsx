@@ -251,6 +251,11 @@ function Page() {
                   setAgentForPush({ id: agent.id, name: agent.name })
                 }
                 onSyncFromSource={() => handleSyncFromSource(agent.id)}
+                onViewHistory={() =>
+                  openDrawer("agentHistory", {
+                    urlParams: { agentId: agent.id, agentName: agent.name },
+                  })
+                }
                 hasEvaluationsManagePermission={hasEvaluationsManagePermission}
               />
             ))}

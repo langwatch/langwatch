@@ -29,7 +29,7 @@ export function isInternalSetId(setId: string): boolean {
  * Checks if a set ID is specifically the on-platform scenarios set.
  */
 export function isOnPlatformSet(setId: string): boolean {
-  return setId.endsWith(ON_PLATFORM_SET_SUFFIX);
+  return setId.startsWith(INTERNAL_SET_PREFIX) && setId.endsWith(ON_PLATFORM_SET_SUFFIX);
 }
 
 /**

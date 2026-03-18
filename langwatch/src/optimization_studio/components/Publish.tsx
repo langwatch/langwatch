@@ -26,7 +26,7 @@ import {
   Share2,
   XCircle,
 } from "react-feather";
-import { useForm } from "react-hook-form";
+import { FormProvider, useForm } from "react-hook-form";
 import { RenderCode } from "~/components/code/RenderCode";
 import { langwatchEndpoint } from "../../components/code/langwatchEndpointEnv";
 import { SmallLabel } from "../../components/SmallLabel";
@@ -48,7 +48,8 @@ import {
 } from "../utils/datasetUtils";
 import { getEntryInputs } from "../utils/nodeUtils";
 import { AddModelProviderKey } from "./AddModelProviderKey";
-import { useVersionState, VersionToBeUsed } from "./History";
+import { useVersionState } from "./History";
+import { VersionToBeUsed } from "./VersionToBeUsed";
 
 // Type with dataset property
 interface NodeDataWithDataset {
@@ -449,11 +450,28 @@ function PublishModalContent({
 }) {
   const { project } = useOrganizationTeamProject();
 
-  const { workflowId, getWorkflow, workflow_type } = useWorkflowStore(
-    ({ workflow_id: workflowId, getWorkflow, workflow_type }) => ({
+  const {
+    workflowId,
+    getWorkflow,
+    workflow_type,
+    setLastCommittedWorkflow,
+    setCurrentVersionId,
+    currentVersionId,
+  } = useWorkflowStore(
+    ({
+      workflow_id: workflowId,
+      getWorkflow,
+      workflow_type,
+      setLastCommittedWorkflow,
+      setCurrentVersionId,
+      currentVersionId,
+    }) => ({
       workflowId,
       getWorkflow,
       workflow_type,
+      setLastCommittedWorkflow,
+      setCurrentVersionId,
+      currentVersionId,
     }),
   );
 
@@ -474,12 +492,15 @@ function PublishModalContent({
 
   const formVersion = form.watch("version");
 
-  const { versions, versionToBeEvaluated, nextVersion, canSaveNewVersion } =
-    useVersionState({
-      project,
-      form,
-      allowSaveIfAutoSaveIsCurrentButNotLatest: false,
-    });
+  const {
+    versions,
+    canSaveNewVersion: canSave,
+    versionToBeEvaluated,
+  } = useVersionState({
+    project,
+    form,
+    allowSaveIfAutoSaveIsCurrentButNotLatest: false,
+  });
 
   const publishWorkflow = api.workflow.publish.useMutation();
 
@@ -506,9 +527,9 @@ function PublishModalContent({
     }) => {
       if (!project || !workflowId) return;
 
-      let versionId: string | undefined = versionToBeEvaluated.id;
+      let versionId: string | undefined;
 
-      if (canSaveNewVersion) {
+      if (canSave) {
         try {
           const versionResponse = await commitVersion.mutateAsync({
             projectId: project.id,
@@ -520,6 +541,8 @@ function PublishModalContent({
             },
           });
           versionId = versionResponse.id;
+          setLastCommittedWorkflow(getWorkflow());
+          setCurrentVersionId(versionId);
         } catch (error) {
           toaster.create({
             title: "Error saving version",
@@ -531,11 +554,13 @@ function PublishModalContent({
           });
           throw error;
         }
+      } else {
+        versionId = currentVersionId;
       }
 
       if (!versionId) {
         toaster.create({
-          title: "Version ID not found for evaluation",
+          title: "Version ID not found for publishing",
           type: "error",
           duration: 5000,
           meta: {
@@ -577,13 +602,15 @@ function PublishModalContent({
       );
     },
     [
-      canSaveNewVersion,
+      canSave,
       commitVersion,
+      currentVersionId,
       getWorkflow,
       project,
       publishWorkflow,
       publishedWorkflow,
-      versionToBeEvaluated.id,
+      setCurrentVersionId,
+      setLastCommittedWorkflow,
       versions,
       workflowId,
       workflow_type,
@@ -620,6 +647,7 @@ function PublishModalContent({
     : false;
 
   return (
+    <FormProvider {...form}>
     <Dialog.Content
       as="form"
       // eslint-disable-next-line @typescript-eslint/no-misused-promises
@@ -637,14 +665,7 @@ function PublishModalContent({
             Publish your workflow to make it available via API, as a component
             to other workflows, or as a custom evaluator.
           </Text>
-          {versionToBeEvaluated && (
-            <VersionToBeUsed
-              form={form}
-              nextVersion={nextVersion}
-              canSaveNewVersion={canSaveNewVersion}
-              versionToBeEvaluated={versionToBeEvaluated}
-            />
-          )}
+          <VersionToBeUsed />
         </VStack>
       </Dialog.Body>
       <Dialog.Footer borderTop="1px solid" borderColor="border" marginTop={4}>
@@ -669,9 +690,9 @@ function PublishModalContent({
                   {isDisabled
                     ? "Publish"
                     : `Publish Version ${
-                        canSaveNewVersion
+                        canSave
                           ? formVersion
-                          : versionToBeEvaluated.version
+                          : versionToBeEvaluated.version ?? ""
                       }`}
                 </Button>
               </HStack>
@@ -699,6 +720,7 @@ function PublishModalContent({
         </VStack>
       </Dialog.Footer>
     </Dialog.Content>
+    </FormProvider>
   );
 }
 

@@ -25,6 +25,7 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { FormatMoney } from "~/optimization_studio/components/FormatMoney";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { getColorForString } from "~/utils/rotatingColors";
+import { getRunDisplayName } from "./getRunDisplayName";
 import { INTERRUPTED_THRESHOLD_MS, isRunFinished } from "./isRunFinished";
 
 /**
@@ -270,17 +271,17 @@ export function BatchRunsSidebar({
       <VStack gap={0.5} align="stretch" paddingX={2}>
         {!isLoading &&
           !error &&
-          runs.map((run) => {
+          runs.map((run, index) => {
             const isSelected = selectedRunId === run.runId;
             const isFinished = isRunFinished(run.timestamps);
             const _runCost =
               (run.summary.datasetCost ?? 0) +
               (run.summary.evaluationsCost ?? 0);
 
-            // Build the name - prefer commit message, then just run ID
-            const runName = run.workflowVersion?.commitMessage
-              ? run.workflowVersion.commitMessage
-              : run.runId;
+            const runName = getRunDisplayName({
+              commitMessage: run.workflowVersion?.commitMessage,
+              index,
+            });
 
             // Build summary line: evaluator scores + cost (filter out "-" values)
             const summaryParts: string[] = [];

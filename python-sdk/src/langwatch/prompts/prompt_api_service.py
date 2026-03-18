@@ -185,6 +185,7 @@ class PromptApiService:
         self,
         prompt_id_or_handle: str,
         scope: Literal["PROJECT", "ORGANIZATION"],
+        commit_message: str,
         handle: Optional[str] = None,
         prompt: Optional[str] = None,
         messages: Optional[List[MessageDict]] = None,
@@ -197,6 +198,7 @@ class PromptApiService:
         Args:
             prompt_id_or_handle: ID or handle of the prompt to update
             scope: Scope of the prompt
+            commit_message: Commit message describing the change (required, creates a new version)
             handle: New handle for the prompt
             prompt: New prompt text content
             messages: New list of message dicts
@@ -231,6 +233,7 @@ class PromptApiService:
             id=prompt_id_or_handle,
             client=self._client,
             body=PutApiPromptsByIdBody(
+                commit_message=commit_message,
                 handle=handle or UNSET,
                 scope=PutApiPromptsByIdBodyScope[scope],
                 prompt=prompt or UNSET,

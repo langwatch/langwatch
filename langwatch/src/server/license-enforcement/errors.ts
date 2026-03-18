@@ -1,3 +1,4 @@
+import { DomainError } from "~/server/app-layer/domain-error";
 import { LIMIT_TYPE_LABELS } from "./constants";
 import type { LimitType } from "./types";
 
@@ -6,15 +7,23 @@ import type { LimitType } from "./types";
  * This error is framework-agnostic and should be caught and mapped to
  * HTTP/tRPC errors by the router layer.
  */
-export class LimitExceededError extends Error {
-  public readonly name = "LimitExceededError";
+export class LimitExceededError extends DomainError {
+  declare readonly kind: "resource_limit_exceeded";
 
   constructor(
     public readonly limitType: LimitType,
     public readonly current: number,
     public readonly max: number,
   ) {
-    super(`You have reached the maximum number of ${LIMIT_TYPE_LABELS[limitType]}`);
+    super(
+      "resource_limit_exceeded",
+      `You have reached the maximum number of ${LIMIT_TYPE_LABELS[limitType]}`,
+      {
+        meta: { limitType, current, max },
+        httpStatus: 403,
+      },
+    );
+    this.name = "LimitExceededError";
   }
 }
 

@@ -103,7 +103,7 @@ export const system = createSystem(defaultConfig, {
           fg: {
             value: { _light: "{colors.gray.700}", _dark: "{colors.gray.200}" },
           },
-          focusRing: { value: "rgb(59, 130, 246)" },
+          focusRing: { value: "rgb(49, 130, 206)" },
         },
         orange: {
           solid: { value: "#ED8926" },
@@ -137,7 +137,7 @@ export const system = createSystem(defaultConfig, {
               _dark: "{colors.orange.200}",
             },
           },
-          focusRing: { value: "rgb(59, 130, 246)" },
+          focusRing: { value: "rgb(49, 130, 206)" },
         },
         green: {
           solid: {
@@ -173,7 +173,7 @@ export const system = createSystem(defaultConfig, {
               _dark: "{colors.green.200}",
             },
           },
-          focusRing: { value: "rgb(59, 130, 246)" },
+          focusRing: { value: "rgb(49, 130, 206)" },
         },
         blue: {
           solid: {
@@ -194,7 +194,7 @@ export const system = createSystem(defaultConfig, {
           fg: {
             value: { _light: "{colors.blue.700}", _dark: "{colors.blue.300}" },
           },
-          focusRing: { value: "rgb(59, 130, 246)" },
+          focusRing: { value: "rgb(49, 130, 206)" },
         },
         yellow: {
           solid: {
@@ -233,7 +233,7 @@ export const system = createSystem(defaultConfig, {
               _dark: "{colors.yellow.200}",
             },
           },
-          focusRing: { value: "rgb(59, 130, 246)" },
+          focusRing: { value: "rgb(49, 130, 206)" },
         },
         red: {
           solid: {
@@ -254,7 +254,7 @@ export const system = createSystem(defaultConfig, {
           fg: {
             value: { _light: "{colors.red.700}", _dark: "{colors.red.200}" },
           },
-          focusRing: { value: "rgb(59, 130, 246)" },
+          focusRing: { value: "rgb(49, 130, 206)" },
         },
         pink: {
           solid: {
@@ -275,7 +275,7 @@ export const system = createSystem(defaultConfig, {
           fg: {
             value: { _light: "{colors.pink.700}", _dark: "{colors.pink.200}" },
           },
-          focusRing: { value: "rgb(59, 130, 246)" },
+          focusRing: { value: "rgb(49, 130, 206)" },
         },
         purple: {
           solid: {
@@ -314,7 +314,7 @@ export const system = createSystem(defaultConfig, {
               _dark: "{colors.purple.200}",
             },
           },
-          focusRing: { value: "rgb(59, 130, 246)" },
+          focusRing: { value: "rgb(49, 130, 206)" },
         },
         teal: {
           solid: {
@@ -335,7 +335,7 @@ export const system = createSystem(defaultConfig, {
           fg: {
             value: { _light: "{colors.teal.700}", _dark: "{colors.teal.200}" },
           },
-          focusRing: { value: "rgb(59, 130, 246)" },
+          focusRing: { value: "rgb(49, 130, 206)" },
         },
         cyan: {
           solid: {
@@ -356,7 +356,7 @@ export const system = createSystem(defaultConfig, {
           fg: {
             value: { _light: "{colors.cyan.700}", _dark: "{colors.cyan.200}" },
           },
-          focusRing: { value: "rgb(59, 130, 246)" },
+          focusRing: { value: "rgb(49, 130, 206)" },
         },
 
         // Status semantic tokens - for evaluation results, pass/fail states, etc.
@@ -425,11 +425,11 @@ export const system = createSystem(defaultConfig, {
           panel: { value: { _light: "white", _dark: "{colors.gray.900}" } },
           // Muted background for hover states, selections
           muted: {
-            value: { _light: "{colors.gray.100}", _dark: "{colors.gray.800}" },
+            value: { _light: "{colors.gray.100}", _dark: "{colors.gray.700}" },
           },
           // Emphasized background for active states
           emphasized: {
-            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.700}" },
+            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.600}" },
           },
           // Subtle background for table headers, zebra rows
           subtle: {
@@ -437,10 +437,10 @@ export const system = createSystem(defaultConfig, {
           },
           // Form inputs - blend into container
           input: {
-            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.900}" },
+            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.800}" },
           },
           inputHover: {
-            value: { _light: "white", _dark: "{colors.gray.800}" },
+            value: { _light: "white", _dark: "{colors.gray.700}" },
           },
         },
 
@@ -453,24 +453,24 @@ export const system = createSystem(defaultConfig, {
             value: { _light: "{colors.gray.600}", _dark: "{colors.gray.400}" },
           },
           subtle: {
-            value: { _light: "{colors.gray.500}", _dark: "{colors.gray.500}" },
+            value: { _light: "{colors.gray.500}", _dark: "{colors.gray.400}" },
           },
           inverted: { value: { _light: "white", _dark: "{colors.gray.950}" } },
         },
 
-        // Border semantic tokens - barely visible in dark mode
+        // Border semantic tokens - visible in dark mode
         border: {
           DEFAULT: {
-            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.800}" },
+            value: { _light: "{colors.gray.200}", _dark: "{colors.gray.700}" },
           },
           muted: {
-            value: { _light: "{colors.gray.100}", _dark: "{colors.gray.900}" },
+            value: { _light: "{colors.gray.100}", _dark: "{colors.gray.800}" },
           },
           subtle: {
-            value: { _light: "{colors.gray.100}", _dark: "{colors.gray.950}" },
+            value: { _light: "{colors.gray.100}", _dark: "{colors.gray.900}" },
           },
           emphasized: {
-            value: { _light: "{colors.gray.300}", _dark: "{colors.gray.700}" },
+            value: { _light: "{colors.gray.300}", _dark: "{colors.gray.600}" },
           },
         },
       },
@@ -1127,11 +1127,11 @@ export const system = createSystem(defaultConfig, {
             boxShadow: "lg",
             "&[data-type=info]": {
               bg: {
-                _light: "rgba(59, 130, 246, 0.85)",
+                _light: "rgba(49, 130, 206, 0.85)",
                 _dark: "rgba(37, 99, 235, 0.8)",
               },
               borderColor: {
-                _light: "rgba(59, 130, 246, 0.3)",
+                _light: "rgba(49, 130, 206, 0.3)",
                 _dark: "rgba(96, 165, 250, 0.25)",
               },
               color: "white",

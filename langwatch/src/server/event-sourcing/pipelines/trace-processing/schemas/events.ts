@@ -5,7 +5,7 @@ import { metricTypeSchema, piiRedactionLevelSchema } from "./commands";
 import {
   LOG_RECORD_RECEIVED_EVENT_TYPE,
   METRIC_RECORD_RECEIVED_EVENT_TYPE,
-  SATISFACTION_SCORE_ASSIGNED_EVENT_TYPE,
+  ORIGIN_RESOLVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
   TOPIC_ASSIGNED_EVENT_TYPE,
 } from "./constants";
@@ -98,44 +98,6 @@ export function isTopicAssignedEvent(
 }
 
 /**
- * Zod schema for SatisfactionScoreAssignedEvent metadata.
- */
-export const satisfactionScoreAssignedEventMetadataSchema = z
-  .object({
-    processingTraceparent: z.string().optional(),
-  })
-  .passthrough();
-
-/**
- * Zod schema for SatisfactionScoreAssignedEvent data.
- */
-export const satisfactionScoreAssignedEventDataSchema = z.object({
-  satisfactionScore: z.number(),
-});
-
-export const satisfactionScoreAssignedEventSchema = EventSchema.extend({
-  type: z.literal(SATISFACTION_SCORE_ASSIGNED_EVENT_TYPE),
-  data: satisfactionScoreAssignedEventDataSchema,
-  metadata: satisfactionScoreAssignedEventMetadataSchema,
-});
-
-export type SatisfactionScoreAssignedEventData = z.infer<
-  typeof satisfactionScoreAssignedEventDataSchema
->;
-export type SatisfactionScoreAssignedEvent = z.infer<
-  typeof satisfactionScoreAssignedEventSchema
->;
-
-/**
- * Type guard for SatisfactionScoreAssignedEvent.
- */
-export function isSatisfactionScoreAssignedEvent(
-  event: TraceProcessingEvent,
-): event is SatisfactionScoreAssignedEvent {
-  return event.type === SATISFACTION_SCORE_ASSIGNED_EVENT_TYPE;
-}
-
-/**
  * Zod schema for LogRecordReceivedEvent metadata.
  */
 export const logRecordReceivedEventMetadataSchema = z
@@ -218,11 +180,48 @@ export function isMetricRecordReceivedEvent(
 }
 
 /**
+ * Zod schema for OriginResolvedEvent metadata.
+ */
+export const originResolvedEventMetadataSchema = z
+  .object({
+    processingTraceparent: z.string().optional(),
+  })
+  .passthrough();
+
+/**
+ * Zod schema for OriginResolvedEvent data.
+ */
+export const originResolvedEventDataSchema = z.object({
+  origin: z.string(),
+  reason: z.string(),
+});
+
+export const originResolvedEventSchema = EventSchema.extend({
+  type: z.literal(ORIGIN_RESOLVED_EVENT_TYPE),
+  data: originResolvedEventDataSchema,
+  metadata: originResolvedEventMetadataSchema,
+});
+
+export type OriginResolvedEventData = z.infer<
+  typeof originResolvedEventDataSchema
+>;
+export type OriginResolvedEvent = z.infer<typeof originResolvedEventSchema>;
+
+/**
+ * Type guard for OriginResolvedEvent.
+ */
+export function isOriginResolvedEvent(
+  event: TraceProcessingEvent,
+): event is OriginResolvedEvent {
+  return event.type === ORIGIN_RESOLVED_EVENT_TYPE;
+}
+
+/**
  * Union of all trace processing event types.
  */
 export type TraceProcessingEvent =
   | SpanReceivedEvent
   | TopicAssignedEvent
-  | SatisfactionScoreAssignedEvent
   | LogRecordReceivedEvent
-  | MetricRecordReceivedEvent;
+  | MetricRecordReceivedEvent
+  | OriginResolvedEvent;

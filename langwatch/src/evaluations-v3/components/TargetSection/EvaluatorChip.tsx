@@ -14,7 +14,9 @@ import {
   LuCircleAlert,
   LuCircleX,
   LuPencil,
+  LuPlay,
   LuRefreshCw,
+  LuListRestart,
   LuTrash2,
 } from "react-icons/lu";
 
@@ -42,10 +44,18 @@ type EvaluatorChipProps = {
   hasMissingMappings?: boolean;
   /** Whether this specific evaluator is currently running (from runningEvaluators state) */
   isRunning?: boolean;
+  /** Whether the current row has a target output (enables "Run" for pending evaluators) */
+  hasTargetOutput?: boolean;
+  /** Whether any row has a target output for this target (enables "Run on all rows") */
+  hasAnyTargetOutputs?: boolean;
+  /** The type of the target (prompt, agent, evaluator) — used for tooltip copy */
+  targetType?: "prompt" | "agent" | "evaluator";
   onEdit: () => void;
   onRemove: () => void;
-  /** Called when user wants to re-run this evaluator */
+  /** Called when user wants to run or re-run this evaluator on the current row */
   onRerun?: () => void;
+  /** Called when user wants to run this evaluator on all rows with target outputs */
+  onRunOnAllRows?: () => void;
 };
 
 export function EvaluatorChip({
@@ -53,9 +63,13 @@ export function EvaluatorChip({
   result,
   hasMissingMappings = false,
   isRunning = false,
+  hasTargetOutput = false,
+  hasAnyTargetOutputs = false,
+  targetType = "prompt",
   onEdit,
   onRemove,
   onRerun,
+  onRunOnAllRows,
 }: EvaluatorChipProps) {
   const evaluatorName = useEvaluatorName(evaluator);
   const parsed = parseEvaluationResult(result);
@@ -237,14 +251,57 @@ export function EvaluatorChip({
             <Box borderTopWidth="1px" borderColor="border" />
           </>
         )}
-        {/* Show Rerun option only if evaluator has been run (not pending) and not currently running */}
+        {/* "Run" for pending evaluators */}
+        {status === "pending" && onRerun && (
+          <Tooltip
+            content={`Run the ${targetType} first to generate output`}
+            disabled={hasTargetOutput}
+            positioning={{ placement: "left" }}
+            openDelay={0}
+          >
+            <Menu.Item
+              value="run"
+              disabled={!hasTargetOutput}
+              onClick={hasMissingMappings ? onEdit : onRerun}
+            >
+              <HStack gap={2}>
+                <LuPlay size={14} />
+                <Text>Run</Text>
+              </HStack>
+            </Menu.Item>
+          </Tooltip>
+        )}
+        {/* "Rerun" for completed/error evaluators (not pending, not running) */}
         {status !== "pending" && status !== "running" && onRerun && (
-          <Menu.Item value="rerun" onClick={onRerun}>
+          <Menu.Item
+            value="rerun"
+            onClick={hasMissingMappings ? onEdit : onRerun}
+          >
             <HStack gap={2}>
               <LuRefreshCw size={14} />
               <Text>Rerun</Text>
             </HStack>
           </Menu.Item>
+        )}
+        {/* "Run on all rows" - always shown when not running, disabled when no outputs */}
+        {status !== "running" && onRunOnAllRows && (
+          <Tooltip
+            content={`Run the ${targetType} first to generate outputs`}
+            disabled={hasAnyTargetOutputs}
+            positioning={{ placement: "left" }}
+            openDelay={0}
+          >
+            <Menu.Item
+              value="run-all-rows"
+              disabled={!hasAnyTargetOutputs}
+              onClick={hasMissingMappings ? onEdit : onRunOnAllRows}
+            >
+              <HStack gap={2}>
+                <LuListRestart size={14} />
+                <Text>Run on all rows</Text>
+              </HStack>
+            </Menu.Item>
+          </Tooltip>
         )}
         <Menu.Item value="edit" onClick={onEdit}>
           <HStack gap={2}>

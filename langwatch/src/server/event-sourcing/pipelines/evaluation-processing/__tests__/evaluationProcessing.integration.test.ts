@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
+import { EvaluationRunClickHouseRepository } from "~/server/app-layer/evaluations/repositories/evaluation-run.clickhouse.repository";
 import { createLogger } from "~/utils/logger/server";
 import type {
   CompleteEvaluationCommandData,
@@ -156,7 +157,7 @@ function createEvaluationTestPipeline(): PipelineWithCommandHandlers<
 
   // Build pipeline using static definition with definePipeline + register
   const evalRunStore = new EvaluationRunStore(
-    EvaluationRunService.create(clickHouseClient).repository,
+    new EvaluationRunService(new EvaluationRunClickHouseRepository(clickHouseClient)).repository,
   );
 
   const pipelineDefinition = definePipeline<EvaluationProcessingEvent>()

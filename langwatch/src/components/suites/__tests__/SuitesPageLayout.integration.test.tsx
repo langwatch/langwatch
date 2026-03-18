@@ -49,6 +49,12 @@ vi.mock("~/utils/api", () => ({
       getAll: {
         useQuery: () => ({ data: [], isLoading: false, error: null }),
       },
+      cancelJob: {
+        useMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+      },
+      cancelBatchRun: {
+        useMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+      },
     },
   },
 }));
@@ -129,7 +135,7 @@ describe("Suites Page Layout (Issue #1671)", () => {
   });
 
   describe("when rendering the suites page", () => {
-    it("renders PageLayout.Header with a 'Suites' heading", async () => {
+    it("renders PageLayout.Header with a 'Run Plans' heading", async () => {
       // Dynamic import to ensure mocks are applied
       const { default: SuitesPage } = await import(
         "~/pages/[project]/simulations/suites/index"
@@ -137,7 +143,7 @@ describe("Suites Page Layout (Issue #1671)", () => {
 
       render(<SuitesPage />, { wrapper: Wrapper });
 
-      const heading = screen.getByRole("heading", { name: "Suites" });
+      const heading = screen.getByRole("heading", { name: "Run Plans" });
       expect(heading).toBeInTheDocument();
     });
 
@@ -151,7 +157,8 @@ describe("Suites Page Layout (Issue #1671)", () => {
 
       expect(dashboardLayoutRenderCount).toBe(1);
     });
-  });
+
+});
 
   describe("when rendering the SuiteSidebar", () => {
     it("does not render a 'SUITES' section header in the sidebar", () => {

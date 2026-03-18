@@ -63,7 +63,7 @@ describe("<SuiteSidebar/>", () => {
         wrapper: Wrapper,
       });
 
-      expect(screen.getByText("No suites yet")).toBeInTheDocument();
+      expect(screen.getByText("No run plans yet")).toBeInTheDocument();
     });
 
     it("displays the All Runs link", () => {
@@ -211,8 +211,29 @@ describe("<SuiteSidebar/>", () => {
         const searchInput = screen.getByPlaceholderText("Search...");
         await user.type(searchInput, "nonexistent");
 
-        expect(screen.getByText("No matching suites")).toBeInTheDocument();
+        expect(screen.getByText("No matching run plans")).toBeInTheDocument();
       });
+    });
+  });
+
+  describe("given suites with labels", () => {
+    const suitesWithLabels = [
+      makeSuite({
+        id: "suite_1",
+        name: "Nightly Suite",
+        slug: "nightly-suite",
+        labels: ["nightly", "regression"],
+      }),
+    ];
+
+    it("does not display suite labels as tag pills", () => {
+      render(
+        <SuiteSidebar {...defaultProps} suites={suitesWithLabels} />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.queryByText("nightly")).not.toBeInTheDocument();
+      expect(screen.queryByText("regression")).not.toBeInTheDocument();
     });
   });
 
@@ -235,7 +256,7 @@ describe("<SuiteSidebar/>", () => {
         ],
       ]);
 
-      it("displays pass count and total", () => {
+      it("displays pass count", () => {
         render(
           <SuiteSidebar
             {...defaultProps}
@@ -245,7 +266,7 @@ describe("<SuiteSidebar/>", () => {
           { wrapper: Wrapper },
         );
 
-        expect(screen.getByText(/8\/8 passed/)).toBeInTheDocument();
+        expect(screen.getByText(/8 passed/)).toBeInTheDocument();
       });
 
       it("displays a checkmark status icon", () => {
@@ -287,7 +308,7 @@ describe("<SuiteSidebar/>", () => {
         ],
       ]);
 
-      it("displays pass count and total showing the gap", () => {
+      it("displays pass count", () => {
         render(
           <SuiteSidebar
             {...defaultProps}
@@ -297,7 +318,7 @@ describe("<SuiteSidebar/>", () => {
           { wrapper: Wrapper },
         );
 
-        expect(screen.getByText(/9\/12 passed/)).toBeInTheDocument();
+        expect(screen.getByText(/9 passed/)).toBeInTheDocument();
       });
 
       it("displays an error status icon", () => {
@@ -363,7 +384,7 @@ describe("<SuiteSidebar/>", () => {
           { wrapper: Wrapper },
         );
 
-        expect(screen.getByText(/7\/8 passed/)).toBeInTheDocument();
+        expect(screen.getByText(/7 passed/)).toBeInTheDocument();
 
         const updatedSummaries = new Map([
           [
@@ -386,8 +407,8 @@ describe("<SuiteSidebar/>", () => {
           </Wrapper>,
         );
 
-        expect(screen.getByText(/8\/8 passed/)).toBeInTheDocument();
-        expect(screen.queryByText(/7\/8 passed/)).not.toBeInTheDocument();
+        expect(screen.getByText(/8 passed/)).toBeInTheDocument();
+        expect(screen.queryByText(/7 passed/)).not.toBeInTheDocument();
       });
     });
   });
@@ -692,6 +713,33 @@ describe("<SuiteSidebar/>", () => {
           screen.getByRole("button", { name: "Expand sidebar" }),
         ).toBeInTheDocument();
         expect(screen.queryByPlaceholderText("Search...")).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("given external sets with different timestamps", () => {
+    const externalSets = [
+      { scenarioSetId: "oldest-set", passedCount: 3, totalCount: 5, lastRunTimestamp: 1000 },
+      { scenarioSetId: "newest-set", passedCount: 5, totalCount: 5, lastRunTimestamp: 3000 },
+      { scenarioSetId: "middle-set", passedCount: 4, totalCount: 5, lastRunTimestamp: 2000 },
+    ];
+
+    describe("when rendered in the expanded sidebar", () => {
+      it("sorts external sets by most recent run first", () => {
+        render(
+          <SuiteSidebar
+            {...defaultProps}
+            externalSets={externalSets}
+          />,
+          { wrapper: Wrapper },
+        );
+
+        const items = screen.getAllByTestId("external-set-list-item");
+        const labels = items.map((el) => el.textContent);
+
+        expect(labels[0]).toContain("newest-set");
+        expect(labels[1]).toContain("middle-set");
+        expect(labels[2]).toContain("oldest-set");
       });
     });
   });

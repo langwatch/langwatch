@@ -1,5 +1,3 @@
-import "@copilotkit/react-ui/styles.css";
-import "~/pages/[project]/simulations/simulations.css";
 import {
   Box,
   Button,
@@ -22,13 +20,15 @@ import { useDrawerRunCallbacks } from "~/hooks/useDrawerRunCallbacks";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRunScenario } from "~/hooks/useRunScenario";
 import { useScenarioTarget } from "~/hooks/useScenarioTarget";
+import { useSimulationStreamingState } from "~/hooks/useSimulationStreamingState";
+import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
 import { useTargetNameMap } from "~/hooks/useTargetNameMap";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { api } from "~/utils/api";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { TraceDetails } from "../traces/TraceDetails";
 import { Drawer } from "../ui/drawer";
-import { CustomCopilotKitChat } from "./CustomCopilotKitChat";
+import { ScenarioMessageRenderer } from "./ScenarioMessageRenderer";
 import { ScenarioRunActions } from "./ScenarioRunActions";
 import { ScenarioRunStatusIcon } from "./ScenarioRunStatusIcon";
 import { SimulationConsole } from "./simulation-console/SimulationConsole";
@@ -67,15 +67,39 @@ export function ScenarioRunDetailDrawer({
 
   const scenarioRunId = params.scenarioRunId;
 
-  const { data: scenarioState, error: runStateError } = api.scenarios.getRunState.useQuery(
+  const { data: scenarioState, error: runStateError, refetch } = api.scenarios.getRunState.useQuery(
     {
       scenarioRunId: scenarioRunId ?? "",
       projectId: project?.id ?? "",
     },
     {
       enabled: !!project?.id && !!scenarioRunId && !!open,
+      refetchInterval: 3000,
     },
   );
+
+  const { streamingMessages, handleStreamingEvent, clearCompleted } =
+    useSimulationStreamingState(scenarioRunId ?? undefined);
+
+  useSimulationUpdateListener({
+    projectId: project?.id ?? "",
+    refetch,
+    enabled: !!project?.id && !!scenarioRunId && !!open,
+    debounceMs: 300,
+    filter: scenarioRunId ? { scenarioRunId } : undefined,
+    onStreamingEvent: handleStreamingEvent,
+  });
+
+  // Clear streaming messages once server data includes them
+  useEffect(() => {
+    if (scenarioState?.messages) {
+      clearCompleted(
+        scenarioState.messages
+          .map((m: { id?: string }) => m.id)
+          .filter((id): id is string => !!id),
+      );
+    }
+  }, [scenarioState?.messages, clearCompleted]);
 
   const scenarioId = scenarioState?.scenarioId;
   const batchRunId = scenarioState?.batchRunId;
@@ -168,7 +192,7 @@ export function ScenarioRunDetailDrawer({
       { label: "Scenario ID", value: scenarioId },
       { label: "Batch Run ID", value: batchRunId },
       { label: "Run ID", value: scenarioRunId },
-      ...(suiteId ? [{ label: "Suite ID", value: suiteId }] : []),
+      ...(suiteId ? [{ label: "Run Plan ID", value: suiteId }] : []),
     ];
   }, [scenarioId, batchRunId, scenarioRunId, suiteId]);
 
@@ -184,11 +208,19 @@ export function ScenarioRunDetailDrawer({
           {!scenarioState && open && (
             <Drawer.Body>
               {runStateError ? (
-                <VStack gap={2} align="start" w="100%" pt={4}>
-                  <Drawer.CloseTrigger />
-                  <Heading size="md" color="red.500">Failed to load run</Heading>
-                  <Text color="fg.muted" fontSize="sm">{runStateError.message}</Text>
-                </VStack>
+                runStateError.data?.code === "NOT_FOUND" ? (
+                  <VStack gap={2} align="start" w="100%" pt={4}>
+                    <Drawer.CloseTrigger />
+                    <Heading size="md">Run details not available yet</Heading>
+                    <Text color="fg.muted" fontSize="sm">This run may be queued, in progress, or recently cancelled. Details will appear once available.</Text>
+                  </VStack>
+                ) : (
+                  <VStack gap={2} align="start" w="100%" pt={4}>
+                    <Drawer.CloseTrigger />
+                    <Heading size="md" color="red.500">Failed to load run</Heading>
+                    <Text color="fg.muted" fontSize="sm">{runStateError.message}</Text>
+                  </VStack>
+                )
               ) : (
                 <VStack gap={4} align="start" w="100%" pt={4}>
                   <Skeleton height="32px" width="60%" />
@@ -342,17 +374,17 @@ export function ScenarioRunDetailDrawer({
                 width="full"
               >
                 {/* Conversation — hidden when empty (e.g. stalled runs) */}
-                {(scenarioState.messages ?? []).length > 0 && (
+                {((scenarioState.messages ?? []).length > 0 || (streamingMessages ?? []).length > 0) && (
                   <Box
                     paddingX={6}
                     paddingY={6}
                     background="bg.muted"
                   >
                     <Box borderRadius="md" overflow="hidden">
-                      <CustomCopilotKitChat
+                      <ScenarioMessageRenderer
                         messages={scenarioState.messages ?? []}
-                        hideInput
-                        smallerView={false}
+                        streamingMessages={streamingMessages}
+                        variant="drawer"
                       />
                     </Box>
                   </Box>
@@ -362,7 +394,7 @@ export function ScenarioRunDetailDrawer({
                 <Box
                   flex={1}
                   width="full"
-                  borderTop={(scenarioState.messages ?? []).length > 0 ? "1px" : undefined}
+                  borderTop={((scenarioState.messages ?? []).length > 0 || (streamingMessages ?? []).length > 0) ? "1px" : undefined}
                   borderColor="border.muted"
                   position="relative"
                   className="group"
@@ -421,6 +453,7 @@ export function ScenarioRunDetailDrawer({
         onOpenChange={() => setTraceDrawerTraceId(null)}
         placement="end"
         size="xl"
+        modal={true}
       >
         <Drawer.Content paddingX={0} maxWidth="70%">
           <Drawer.CloseTrigger zIndex={10} />

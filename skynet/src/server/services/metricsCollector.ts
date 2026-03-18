@@ -1,16 +1,17 @@
 import * as os from "node:os";
 import type IORedis from "ioredis";
-import type { DashboardData, PipelineNode, ThroughputPoint, QueueInfo, JobNameMetrics } from "../../shared/types.ts";
-import { THROUGHPUT_BUFFER_SIZE, METRICS_COLLECT_INTERVAL_MS, REDIS_STATE_TTL_SECONDS } from "../../shared/constants.ts";
+import type { DashboardData, PipelineNode, ThroughputPoint, QueueInfo, QueueSummaryInfo, JobNameMetrics } from "../../shared/types.ts";
+import { THROUGHPUT_BUFFER_SIZE, METRICS_COLLECT_INTERVAL_MS, REDIS_STATE_TTL_SECONDS, AUTO_PAUSE_ERROR_THRESHOLD_PER_SEC, AUTO_PAUSE_CONSECUTIVE_INTERVALS } from "../../shared/constants.ts";
 
 import { scanGroupQueues } from "./groupQueueScanner.ts";
 import { getRedisInfo, type RedisInfo } from "./redis.ts";
+import { normalizeErrorMessage } from "./blockedGroupAnalyzer.ts";
 
 const REDIS_STATE_KEY = "skynet:state";
 const KNOWN_PIPELINES_KEY = "skynet:known-pipelines";
 
 interface PersistedMetricsState {
-  version: 1;
+  version: 2;
   savedAt: number;
   peakCompletedPerSec: number;
   peakFailedPerSec: number;
@@ -70,6 +71,8 @@ export class MetricsCollector {
   /** Previous counter values for delta computation */
   private prevCompleted = new Map<string, number>();
   private prevFailed = new Map<string, number>();
+  private autoPauseCounters = new Map<string, number>(); // pipelineName -> consecutive intervals above threshold
+  private autoPausedPipelines = new Set<string>();
 
   constructor(redis: IORedis, groupQueueNames: string[]) {
     this.redis = redis;
@@ -98,21 +101,50 @@ export class MetricsCollector {
   }
 
   getDashboardData(): DashboardData {
-    const queues = this.latestQueues;
+    const fullQueues = this.latestQueues;
     const redisInfo = this.latestRedisInfo;
 
     let totalGroups = 0;
     let blockedGroups = 0;
     let totalPendingJobs = 0;
 
-    for (const q of queues) {
+    for (const q of fullQueues) {
       totalGroups += q.groups.length;
       blockedGroups += q.blockedGroupCount;
       totalPendingJobs += q.totalPendingJobs;
     }
 
     const treeSeedKeys = [...new Set([...this.currentPausedKeys, ...this.knownPipelinePaths])];
-    const pipelineTree = buildPipelineTree({ queues, seedKeys: treeSeedKeys });
+    const pipelineTree = buildPipelineTree({ queues: fullQueues, seedKeys: treeSeedKeys });
+
+    // Aggregate top errors from cached groups (approximate - only from top 200)
+    const errorMap = new Map<string, { normalizedMessage: string; sampleMessage: string; sampleStack: string | null; count: number; pipelineName: string | null; sampleGroupIds: string[] }>();
+    for (const q of fullQueues) {
+      for (const g of q.groups) {
+        if (!g.isBlocked || !g.errorMessage) continue;
+        const normalized = normalizeErrorMessage(g.errorMessage);
+        const key = `${g.pipelineName ?? ""}::${normalized}`;
+        const existing = errorMap.get(key);
+        if (existing) {
+          existing.count++;
+          if (existing.sampleGroupIds.length < 5) existing.sampleGroupIds.push(g.groupId);
+        } else {
+          errorMap.set(key, {
+            normalizedMessage: normalized,
+            sampleMessage: g.errorMessage,
+            sampleStack: g.errorStack,
+            count: 1,
+            pipelineName: g.pipelineName,
+            sampleGroupIds: [g.groupId],
+          });
+        }
+      }
+    }
+    const topErrors = Array.from(errorMap.values()).sort((a, b) => b.count - a.count).slice(0, 10);
+
+    // Strip groups from queues — individual group data is served via /api/groups on demand.
+    // This avoids serializing potentially millions of GroupInfo objects in every SSE broadcast.
+    const queues: QueueSummaryInfo[] = fullQueues.map(({ groups: _groups, ...summary }) => summary);
 
     const mem = process.memoryUsage();
 
@@ -147,6 +179,7 @@ export class MetricsCollector {
       phases: this.currentPhases,
       jobNameMetrics: this.currentJobNameMetrics,
       pausedKeys: this.currentPausedKeys,
+      topErrors,
     };
   }
 
@@ -227,6 +260,54 @@ export class MetricsCollector {
       }
     }
 
+    // Sample recent completed jobs for latency (p50/p99).
+    // Read the 50 most recently completed job IDs, then fetch their timestamps.
+    const latencies: number[] = [];
+    if (newCompleted > 0 || !this.hasBaseline) {
+      const latencyPipeline = this.redis.pipeline();
+      for (const name of this.groupQueueNames) {
+        // ZRANGE with REV + LIMIT gives us newest completed job IDs
+        latencyPipeline.zrange(`${name}:completed`, 0, 24, "REV");
+      }
+      const latencyResults = await latencyPipeline.exec();
+
+      if (latencyResults) {
+        const jobIdPipeline = this.redis.pipeline();
+        const jobKeys: string[] = [];
+        for (let i = 0; i < this.groupQueueNames.length; i++) {
+          const jobIds = (latencyResults[i]?.[1] as string[]) ?? [];
+          const name = this.groupQueueNames[i]!;
+          for (const jobId of jobIds) {
+            jobIdPipeline.hmget(`${name}:${jobId}`, "processedOn", "finishedOn");
+            jobKeys.push(`${name}:${jobId}`);
+          }
+        }
+        if (jobKeys.length > 0) {
+          const jobResults = await jobIdPipeline.exec();
+          if (jobResults) {
+            for (const [, result] of jobResults) {
+              const fields = result as [string | null, string | null];
+              const processedOn = fields?.[0] ? Number(fields[0]) : 0;
+              const finishedOn = fields?.[1] ? Number(fields[1]) : 0;
+              if (processedOn > 0 && finishedOn > processedOn) {
+                latencies.push(finishedOn - processedOn);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (latencies.length > 0) {
+      latencies.sort((a, b) => a - b);
+      const p50Idx = Math.floor(latencies.length * 0.5);
+      const p99Idx = Math.min(latencies.length - 1, Math.floor(latencies.length * 0.99));
+      this.currentLatencyP50Ms = latencies[p50Idx]!;
+      this.currentLatencyP99Ms = latencies[p99Idx]!;
+      this.peakLatencyP50Ms = Math.max(this.peakLatencyP50Ms, this.currentLatencyP50Ms);
+      this.peakLatencyP99Ms = Math.max(this.peakLatencyP99Ms, this.currentLatencyP99Ms);
+    }
+
     // Phase throughput: we don't have per-phase completed/failed from counters,
     // so we leave throughput at the aggregate level. Per-phase pending/active
     // is already populated from the group scan.
@@ -277,7 +358,10 @@ export class MetricsCollector {
       if (!raw) return;
 
       const state: PersistedMetricsState = JSON.parse(raw);
-      if (state.version !== 1) return;
+      if (state.version !== 2) {
+        console.log("Discarding stale metrics state (version mismatch), starting fresh");
+        return;
+      }
 
       this.peakCompletedPerSec = state.peakCompletedPerSec;
       this.peakFailedPerSec = state.peakFailedPerSec;
@@ -310,7 +394,7 @@ export class MetricsCollector {
 
   private async persistState(): Promise<void> {
     const state: PersistedMetricsState = {
-      version: 1,
+      version: 2,
       savedAt: Date.now(),
       peakCompletedPerSec: this.peakCompletedPerSec,
       peakFailedPerSec: this.peakFailedPerSec,
@@ -337,25 +421,34 @@ export class MetricsCollector {
       this.latestQueues = queues;
       this.latestRedisInfo = redisInfo;
 
-      // Collect paused keys from all group queues
-      const pausedKeySets = await Promise.all(
-        this.groupQueueNames.map((name) =>
-          this.redis.smembers(`${name}:gq:paused-jobs`),
-        ),
-      );
-      this.currentPausedKeys = [...new Set(pausedKeySets.flat())];
+      // Collect paused keys from all group queues (single pipeline instead of N parallel calls)
+      const pausedPipeline = this.redis.pipeline();
+      for (const name of this.groupQueueNames) {
+        pausedPipeline.smembers(`${name}:gq:paused-jobs`);
+      }
+      const pausedResults = await pausedPipeline.exec();
+      const pausedKeysSet = new Set<string>();
+      if (pausedResults) {
+        for (const [, result] of pausedResults) {
+          if (Array.isArray(result)) {
+            for (const key of result) pausedKeysSet.add(key as string);
+          }
+        }
+      }
+      this.currentPausedKeys = Array.from(pausedKeysSet);
 
-      // Track known pipeline paths so the tree stays stable
-      const discoveredPaths: string[] = [];
+      // Track known pipeline paths so the tree stays stable.
+      // Deduplicate paths before ZADD — many groups share the same pipeline/type/name combo.
+      const discoveredPaths = new Set<string>();
       for (const q of queues) {
         for (const g of q.groups) {
           const p = g.pipelineName ?? q.displayName;
           const t = g.jobType ?? "default";
           const n = g.jobName ?? "default";
-          discoveredPaths.push(`${p}/${t}/${n}`);
+          discoveredPaths.add(`${p}/${t}/${n}`);
         }
       }
-      if (discoveredPaths.length > 0) {
+      if (discoveredPaths.size > 0) {
         const timestamp = Date.now();
         const pipeline = this.redis.pipeline();
         for (const path of discoveredPaths) {
@@ -365,7 +458,8 @@ export class MetricsCollector {
         pipeline.zremrangebyscore(KNOWN_PIPELINES_KEY, 0, timestamp - 86400 * 1000);
         await pipeline.exec();
       }
-      const knownPaths = await this.redis.zrange(KNOWN_PIPELINES_KEY, 0, -1);
+      // Cap at 10K paths to prevent unbounded memory growth
+      const knownPaths = await this.redis.zrange(KNOWN_PIPELINES_KEY, 0, 9999);
       this.knownPipelinePaths = knownPaths;
 
       // totalInFlight from the staging layer (pending + active from scanGroupQueues)
@@ -404,11 +498,18 @@ export class MetricsCollector {
       this.lastTimestamp = now;
       this.hasBaseline = true;
 
+      let totalBlockedCount = 0;
+      for (const q of queues) {
+        totalBlockedCount += q.blockedGroupCount;
+      }
+
       this.throughputBuffer.push({
         timestamp: now,
         stagedPerSec: this.currentStagedPerSec,
         completedPerSec: this.currentCompletedPerSec,
         failedPerSec: this.currentFailedPerSec,
+        pendingCount: totalPending,
+        blockedCount: totalBlockedCount,
       });
 
       if (this.throughputBuffer.length > THROUGHPUT_BUFFER_SIZE) {
@@ -426,6 +527,33 @@ export class MetricsCollector {
       this.lastCpuTime = now;
 
       this.persistState().catch((err) => console.warn("Failed to persist metrics state:", err));
+
+      // Auto-pause: check if any pipeline's error rate exceeds threshold
+      // We approximate per-pipeline error rate from blocked groups appearing in this interval
+      // This is a simple heuristic, not exact per-pipeline failed/s
+      // TODO: Implement actual pause action when threshold is exceeded
+      if (this.currentFailedPerSec > 0) {
+        if (this.currentFailedPerSec >= AUTO_PAUSE_ERROR_THRESHOLD_PER_SEC) {
+          const key = "__global__";
+          const count = (this.autoPauseCounters.get(key) ?? 0) + 1;
+          this.autoPauseCounters.set(key, count);
+
+          if (count >= AUTO_PAUSE_CONSECUTIVE_INTERVALS && !this.autoPausedPipelines.has(key)) {
+            this.autoPausedPipelines.add(key);
+            console.warn(
+              JSON.stringify({
+                level: "warn",
+                msg: "Auto-pause triggered: error rate exceeded threshold",
+                failedPerSec: this.currentFailedPerSec,
+                threshold: AUTO_PAUSE_ERROR_THRESHOLD_PER_SEC,
+                consecutiveIntervals: count,
+              }),
+            );
+          }
+        } else {
+          this.autoPauseCounters.delete("__global__");
+        }
+      }
     } catch (err) {
       console.error("Metrics collection error:", err);
     } finally {

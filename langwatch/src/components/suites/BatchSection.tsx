@@ -12,7 +12,7 @@ import {
   computeIterationMap,
 } from "./run-history-transforms";
 import { ScenarioRunContent } from "./ScenarioRunContent";
-import { formatSummaryStatusLabel } from "./format-run-status-label";
+import { RunSummaryCounts } from "./RunSummaryCounts";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import type { ViewMode } from "./useRunHistoryStore";
@@ -22,6 +22,8 @@ type BatchSectionProps = {
   resolveTargetName: (scenarioRun: ScenarioRunData) => string | null;
   onScenarioRunClick: (scenarioRun: ScenarioRunData) => void;
   viewMode: ViewMode;
+  onCancelRun?: (scenarioRun: ScenarioRunData) => void;
+  cancellingJobId?: string | null;
 };
 
 export function BatchSection({
@@ -29,6 +31,8 @@ export function BatchSection({
   resolveTargetName,
   onScenarioRunClick,
   viewMode,
+  onCancelRun,
+  cancellingJobId,
 }: BatchSectionProps) {
   const batchSummary = useMemo(
     () => computeBatchRunSummary({ batchRun: batch }),
@@ -59,13 +63,7 @@ export function BatchSection({
         </Text>
         <Box flex={1} />
         <SummaryStatusIcon summary={batchSummary} />
-        <Text
-          fontSize="xs"
-          fontWeight="medium"
-          color={batchSummary.failedCount > 0 ? "red.600" : "green.600"}
-        >
-          {formatSummaryStatusLabel(batchSummary)}
-        </Text>
+        <RunSummaryCounts summary={batchSummary} />
       </HStack>
 
       <ScenarioRunContent
@@ -74,6 +72,8 @@ export function BatchSection({
         resolveTargetName={resolveTargetName}
         onScenarioRunClick={onScenarioRunClick}
         iterationMap={iterationMap}
+        onCancelRun={onCancelRun}
+        cancellingJobId={cancellingJobId}
       />
     </VStack>
   );

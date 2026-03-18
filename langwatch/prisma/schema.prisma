@@ -63,6 +63,7 @@ model User {
     createdAt               DateTime                 @default(now())
     updatedAt               DateTime                 @default(now()) @updatedAt
     lastLoginAt             DateTime?
+    deactivatedAt           DateTime?
     Annotation              Annotation[]
     publicShares            PublicShare[]
     Workflow                Workflow[]
@@ -76,6 +77,7 @@ model User {
     secretsCreated          ProjectSecret[]          @relation("secretCreatedBy")
     secretsUpdated          ProjectSecret[]          @relation("secretUpdatedBy")
     savedViews              SavedView[]
+
 }
 
 model VerificationToken {
@@ -178,7 +180,6 @@ model Organization {
     CustomRoles   CustomRole[]
     notifications Notification[]
     subscriptions Subscription[]
-
     // License enforcement fields (COSS-0226)
     license                String?   @db.Text
     licenseExpiresAt       DateTime?
@@ -187,6 +188,7 @@ model Organization {
     @@index([ssoDomain])
     @@index([ssoProvider])
 }
+
 
 enum PlanTypes {
     FREE

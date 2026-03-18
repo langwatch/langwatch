@@ -1,9 +1,9 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { getApp } from "~/server/app-layer/app";
 import { captureException } from "~/utils/posthogErrorCapture";
 
-import { dependencies } from "../../../../injection/dependencies.server";
 import { skipPermissionCheck } from "../../rbac";
 import { organizationRouter } from "../organization";
 import { projectRouter } from "../project";
@@ -70,23 +70,24 @@ export const onboardingRouter = createTRPCRouter({
           });
         }
 
-        // Execute post-registration callback if defined
-        if (dependencies.postRegistrationCallback) {
-          try {
-            await dependencies.postRegistrationCallback(
-              {
-                name: ctx.session.user.name,
-                email: ctx.session.user.email,
-              },
-              {
-                orgName: orgResult.organization.name,
-                phoneNumber: input.phoneNumber,
-                signUpData: input.signUpData,
-              },
-            );
-          } catch (err) {
-            captureException(err);
-          }
+        try {
+          const signupPayload = {
+            userName: ctx.session.user.name,
+            userEmail: ctx.session.user.email,
+            organizationName: orgResult.organization.name,
+            phoneNumber: input.phoneNumber,
+            signUpData: input.signUpData,
+          };
+
+          await Promise.all([
+            getApp().notifications.sendSlackSignupEvent({
+              ...signupPayload,
+              utmCampaign: input.signUpData?.utmCampaign,
+            }),
+            getApp().notifications.sendHubspotSignupForm(signupPayload),
+          ]);
+        } catch (error) {
+          captureException(error);
         }
 
         // Return success response with team and project slugs

@@ -5,10 +5,9 @@ import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { prisma } from "~/server/db";
-import { getTraceById } from "~/server/elasticsearch/traces";
 import type { Span, Trace } from "~/server/tracer/types";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
-import { generateAsciiTree } from "~/server/traces/trace-formatting";
+import { generateAsciiTree, formatTraceSummaryDigest } from "~/server/traces/trace-formatting";
 import { TraceService } from "~/server/traces/trace.service";
 import { createLogger } from "~/utils/logger/server";
 import type { AuthMiddlewareVariables } from "../../middleware";
@@ -45,6 +44,12 @@ const traceSearchBodySchema = getAllForProjectInput
       .describe(
         "Output format: 'digest' (AI-readable trace digest) or 'json' (full raw data)"
       ),
+    includeSpans: z
+      .boolean()
+      .optional()
+      .describe(
+        "When true, fetches full span data for each trace. Useful for bulk export. Default false."
+      ),
     llmMode: z.boolean().optional(),
   });
 
@@ -79,6 +84,7 @@ app.post(
     const params = c.req.valid("json");
     const {
       format: formatParam,
+      includeSpans,
       llmMode,
       scrollId,
       ...searchFields
@@ -103,24 +109,24 @@ app.post(
       protections,
       {
         downloadMode: true,
-        includeSpans: format === "digest",
+        includeSpans: includeSpans ?? false,
         scrollId: scrollId ?? undefined,
       },
     );
 
-    const rawTraces = results.groups.flat() as (Trace & { spans?: Span[] })[];
+    const rawTraces = results.groups.flat() as Trace[];
 
     let traces: unknown[];
     if (format === "digest") {
-      traces = await Promise.all(rawTraces.map(async (trace) => ({
+      traces = rawTraces.map((trace) => ({
         trace_id: trace.trace_id,
-        formatted_trace: await formatSpansDigest(trace.spans ?? []),
+        formatted_trace: formatTraceSummaryDigest(trace),
         input: trace.input,
         output: trace.output,
         timestamps: trace.timestamps,
         metadata: trace.metadata,
         error: trace.error,
-      })));
+      }));
     } else {
       traces = rawTraces;
     }
@@ -203,13 +209,8 @@ app.get(
     const protections = await getProtectionsForProject(prisma, {
       projectId: project.id,
     });
-    const trace = await getTraceById({
-      connConfig: { projectId: project.id },
-      traceId,
-      protections,
-      includeSpans: true,
-      includeEvaluations: true,
-    });
+    const traceService = TraceService.create(prisma);
+    const trace = await traceService.getById(project.id, traceId, protections);
 
     if (!trace) {
       throw new HTTPException(404, {
@@ -217,19 +218,27 @@ app.get(
       });
     }
 
+    const evaluationsMap = await traceService.getEvaluationsMultiple(
+      project.id,
+      [traceId],
+      protections,
+    );
+    const evaluations = evaluationsMap[traceId] ?? [];
+
     if (format === "digest") {
       return c.json({
         trace_id: traceId,
         formatted_trace: await formatSpansDigest(trace.spans ?? []),
         timestamps: trace.timestamps,
         metadata: trace.metadata,
-        evaluations: trace.evaluations,
+        evaluations,
       });
     }
 
     const asciiTree = generateAsciiTree(trace.spans);
     return c.json({
       ...trace,
+      evaluations,
       ascii_tree: asciiTree,
     });
   },

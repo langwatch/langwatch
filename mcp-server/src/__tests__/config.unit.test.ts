@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { initConfig, getConfig, requireApiKey } from "../config.js";
+import {
+  initConfig,
+  getConfig,
+  requireApiKey,
+  runWithConfig,
+} from "../config.js";
 
 describe("config", () => {
   let originalApiKey: string | undefined;
@@ -84,6 +89,78 @@ describe("config", () => {
       vi.resetModules();
       const freshConfig = await import("../config.js");
       expect(() => freshConfig.getConfig()).toThrow("Config not initialized");
+    });
+  });
+
+  describe("runWithConfig()", () => {
+    it("overrides global config within the callback", () => {
+      initConfig({ apiKey: "global-key" });
+
+      runWithConfig(
+        { apiKey: "session-key", endpoint: "https://session.example.com" },
+        () => {
+          expect(getConfig().apiKey).toBe("session-key");
+          expect(getConfig().endpoint).toBe("https://session.example.com");
+        }
+      );
+    });
+
+    it("restores global config after the callback completes", () => {
+      initConfig({ apiKey: "global-key" });
+
+      runWithConfig(
+        { apiKey: "session-key", endpoint: "https://session.example.com" },
+        () => {
+          // inside: session config
+        }
+      );
+
+      expect(getConfig().apiKey).toBe("global-key");
+    });
+
+    it("isolates concurrent async contexts", async () => {
+      initConfig({ apiKey: "global-key" });
+
+      const results: string[] = [];
+
+      await Promise.all([
+        runWithConfig(
+          { apiKey: "key-a", endpoint: "https://a.example.com" },
+          async () => {
+            await new Promise((r) => setTimeout(r, 10));
+            results.push(requireApiKey());
+          }
+        ),
+        runWithConfig(
+          { apiKey: "key-b", endpoint: "https://b.example.com" },
+          async () => {
+            await new Promise((r) => setTimeout(r, 5));
+            results.push(requireApiKey());
+          }
+        ),
+      ]);
+
+      expect(results).toContain("key-a");
+      expect(results).toContain("key-b");
+    });
+
+    it("returns the callback result", () => {
+      initConfig({});
+      const result = runWithConfig(
+        { apiKey: "key", endpoint: "https://example.com" },
+        () => 42
+      );
+      expect(result).toBe(42);
+    });
+
+    it("makes requireApiKey() use the scoped key", () => {
+      initConfig({});
+      runWithConfig(
+        { apiKey: "scoped-key", endpoint: "https://example.com" },
+        () => {
+          expect(requireApiKey()).toBe("scoped-key");
+        }
+      );
     });
   });
 });

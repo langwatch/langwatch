@@ -8,7 +8,6 @@ vi.mock("../langwatch-api.js", () => ({
   getPrompt: vi.fn(),
   createPrompt: vi.fn(),
   updatePrompt: vi.fn(),
-  createPromptVersion: vi.fn(),
 }));
 
 import {
@@ -19,7 +18,6 @@ import {
   getPrompt,
   createPrompt,
   updatePrompt,
-  createPromptVersion,
   type PromptSummary,
 } from "../langwatch-api.js";
 
@@ -38,7 +36,6 @@ const mockListPrompts = vi.mocked(listPrompts);
 const mockGetPrompt = vi.mocked(getPrompt);
 const mockCreatePrompt = vi.mocked(createPrompt);
 const mockUpdatePrompt = vi.mocked(updatePrompt);
-const mockCreatePromptVersion = vi.mocked(createPromptVersion);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -449,22 +446,20 @@ describe("handleListPrompts()", () => {
           handle: "greeting",
           name: "Greeting Prompt",
           latestVersionNumber: 3,
-          description: "A friendly greeting prompt",
         },
         {
           id: "p2",
           name: "Summary",
           version: 1,
-          description: "",
         },
       ]);
 
       const result = await handleListPrompts();
 
       expect(result).toContain("# Prompts (2 total)");
-      expect(result).toContain("| Handle | Name | Latest Version | Description |");
-      expect(result).toContain("| greeting | Greeting Prompt | v3 | A friendly greeting prompt |");
-      expect(result).toContain("| p2 | Summary | v1 |  |");
+      expect(result).toContain("| Handle | Name | Latest Version |");
+      expect(result).toContain("| greeting | Greeting Prompt | v3 |");
+      expect(result).toContain("| p2 | Summary | v1 |");
     });
   });
 
@@ -506,13 +501,11 @@ describe("handleGetPrompt()", () => {
         id: "p1",
         handle: "greeting",
         name: "Greeting Prompt",
-        description: "A greeting",
         latestVersionNumber: 2,
         versions: [
           {
             version: 2,
-            model: "gpt-4o",
-            modelProvider: "openai",
+            model: "openai/gpt-4o",
             messages: [
               { role: "system", content: "You are a greeter." },
               { role: "user", content: "Hello!" },
@@ -531,10 +524,9 @@ describe("handleGetPrompt()", () => {
       expect(result).toContain("# Prompt: Greeting Prompt");
       expect(result).toContain("**Handle**: greeting");
       expect(result).toContain("**ID**: p1");
-      expect(result).toContain("**Description**: A greeting");
       expect(result).toContain("**Latest Version**: v2");
-      expect(result).toContain("**Model**: gpt-4o");
-      expect(result).toContain("**Provider**: openai");
+      expect(result).toContain("**Model**: openai/gpt-4o");
+      expect(result).not.toContain("**Provider**");
     });
 
     it("formats messages", async () => {
@@ -598,15 +590,14 @@ describe("handleGetPrompt()", () => {
     it("uses prompt-level model config", async () => {
       mockGetPrompt.mockResolvedValue({
         name: "Simple",
-        model: "gpt-3.5-turbo",
-        modelProvider: "openai",
+        model: "openai/gpt-3.5-turbo",
         messages: [{ role: "system", content: "Be brief." }],
       });
 
       const result = await handleGetPrompt({ idOrHandle: "simple" });
 
-      expect(result).toContain("**Model**: gpt-3.5-turbo");
-      expect(result).toContain("**Provider**: openai");
+      expect(result).toContain("**Model**: openai/gpt-3.5-turbo");
+      expect(result).not.toContain("**Provider**");
       expect(result).toContain("### system\nBe brief.");
     });
   });
@@ -626,16 +617,54 @@ describe("handleCreatePrompt()", () => {
         name: "My Prompt",
         handle: "my-prompt",
         messages: [{ role: "system", content: "You are helpful." }],
-        model: "gpt-4o",
-        modelProvider: "openai",
+        model: "openai/gpt-4o",
       });
 
       expect(result).toContain("Prompt created successfully!");
       expect(result).toContain("**ID**: new-id-123");
       expect(result).toContain("**Handle**: my-prompt");
       expect(result).toContain("**Name**: My Prompt");
-      expect(result).toContain("**Model**: gpt-4o (openai)");
+      expect(result).toContain("**Model**: openai/gpt-4o");
       expect(result).toContain("**Version**: v1");
+    });
+
+    it("generates handle from name when handle is not provided", async () => {
+      mockCreatePrompt.mockResolvedValue({
+        id: "new-id",
+        handle: "my-prompt",
+      });
+
+      await handleCreatePrompt({
+        name: "My Prompt!",
+        messages: [{ role: "system", content: "test" }],
+        model: "openai/gpt-4o",
+      });
+
+      expect(mockCreatePrompt).toHaveBeenCalledWith({
+        handle: "my-prompt",
+        messages: [{ role: "system", content: "test" }],
+        model: "openai/gpt-4o",
+      });
+    });
+
+    it("uses provided handle instead of generating one", async () => {
+      mockCreatePrompt.mockResolvedValue({
+        id: "new-id",
+        handle: "custom-handle",
+      });
+
+      await handleCreatePrompt({
+        name: "My Prompt",
+        handle: "custom-handle",
+        messages: [{ role: "system", content: "test" }],
+        model: "openai/gpt-4o",
+      });
+
+      expect(mockCreatePrompt).toHaveBeenCalledWith({
+        handle: "custom-handle",
+        messages: [{ role: "system", content: "test" }],
+        model: "openai/gpt-4o",
+      });
     });
   });
 
@@ -646,8 +675,7 @@ describe("handleCreatePrompt()", () => {
       const result = await handleCreatePrompt({
         name: "Fallback Name",
         messages: [{ role: "system", content: "test" }],
-        model: "gpt-4o",
-        modelProvider: "openai",
+        model: "openai/gpt-4o",
       });
 
       expect(result).toContain("**Name**: Fallback Name");
@@ -656,7 +684,7 @@ describe("handleCreatePrompt()", () => {
 });
 
 describe("handleUpdatePrompt()", () => {
-  describe("when updating in place", () => {
+  describe("when updating a prompt", () => {
     it("formats an update success message", async () => {
       mockUpdatePrompt.mockResolvedValue({
         id: "p1",
@@ -677,53 +705,19 @@ describe("handleUpdatePrompt()", () => {
       expect(result).toContain("**Commit**: Update system prompt");
     });
 
-    it("calls updatePrompt API", async () => {
+    it("calls updatePrompt API with correct params", async () => {
       mockUpdatePrompt.mockResolvedValue({});
 
       await handleUpdatePrompt({
         idOrHandle: "greeting",
-        model: "gpt-4o",
+        model: "openai/gpt-4o",
+        commitMessage: "Switch model",
       });
 
       expect(mockUpdatePrompt).toHaveBeenCalledWith("greeting", {
-        model: "gpt-4o",
+        model: "openai/gpt-4o",
+        commitMessage: "Switch model",
       });
-      expect(mockCreatePromptVersion).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("when creating a new version", () => {
-    it("formats a version creation success message", async () => {
-      mockCreatePromptVersion.mockResolvedValue({
-        id: "p1",
-        latestVersionNumber: 3,
-      });
-
-      const result = await handleUpdatePrompt({
-        idOrHandle: "greeting",
-        messages: [{ role: "system", content: "New version" }],
-        createVersion: true,
-        commitMessage: "v3",
-      });
-
-      expect(result).toContain("New version created successfully!");
-      expect(result).toContain("**Version**: v3");
-      expect(result).toContain("**Commit**: v3");
-    });
-
-    it("calls createPromptVersion API", async () => {
-      mockCreatePromptVersion.mockResolvedValue({});
-
-      await handleUpdatePrompt({
-        idOrHandle: "greeting",
-        messages: [{ role: "system", content: "New" }],
-        createVersion: true,
-      });
-
-      expect(mockCreatePromptVersion).toHaveBeenCalledWith("greeting", {
-        messages: [{ role: "system", content: "New" }],
-      });
-      expect(mockUpdatePrompt).not.toHaveBeenCalled();
     });
   });
 });

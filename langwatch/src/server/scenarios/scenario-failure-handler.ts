@@ -10,13 +10,15 @@
 
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 import {
   ScenarioEventType,
   ScenarioRunStatus,
   Verdict,
 } from "~/server/scenarios/scenario-event.enums";
-import { SimulationService } from "~/server/simulations/simulation.service";
+import { getApp } from "~/server/app-layer/app";
+import { SimulationFacade } from "~/server/simulations/simulation.facade";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { createLogger } from "~/utils/logger/server";
 
 const tracer = getLangWatchTracer("langwatch.scenarios.failure-handler");
@@ -28,11 +30,33 @@ export interface FailureEventParams {
   scenarioId: string;
   setId: string;
   batchRunId: string;
+  /** Pre-assigned scenario run ID from the job queue. Used to prevent duplicate run entries when ES hasn't indexed the SDK's RUN_STARTED event yet. */
+  scenarioRunId?: string;
   error?: string;
   /** Scenario name for display in UI */
   name?: string;
   /** Scenario description/situation for display in UI */
   description?: string;
+  /** When true, writes CANCELLED status instead of ERROR */
+  cancelled?: boolean;
+}
+
+function buildFailureResults(params: { cancelled: boolean; error?: string }) {
+  return params.cancelled
+    ? {
+        verdict: Verdict.INCONCLUSIVE,
+        reasoning: "Cancelled by user",
+        metCriteria: [],
+        unmetCriteria: [],
+        error: params.error ?? "Cancelled by user",
+      }
+    : {
+        verdict: Verdict.FAILURE,
+        reasoning: params.error ?? "Job failed without error message",
+        metCriteria: [],
+        unmetCriteria: [],
+        error: params.error ?? "Job failed",
+      };
 }
 
 /** Terminal statuses that indicate a run has already finished */
@@ -52,13 +76,13 @@ const TERMINAL_STATUSES = new Set([
  * instead of timing out.
  */
 export class ScenarioFailureHandler {
-  constructor(private readonly service: SimulationService) {}
+  constructor(private readonly service: SimulationFacade) {}
 
   /**
    * Creates a new instance with default dependencies.
    */
   static create(): ScenarioFailureHandler {
-    return new ScenarioFailureHandler(SimulationService.create());
+    return new ScenarioFailureHandler(SimulationFacade.create());
   }
 
   /**
@@ -81,42 +105,54 @@ export class ScenarioFailureHandler {
         },
       },
       async (span) => {
-        const { projectId, scenarioId, setId, batchRunId, error, name, description } = params;
+        const { projectId, scenarioId, setId, batchRunId, error, name, description, cancelled } = params;
+        const status = cancelled ? ScenarioRunStatus.CANCELLED : ScenarioRunStatus.ERROR;
 
         logger.info(
           { projectId, scenarioId, setId, batchRunId, error: error?.substring(0, 100) },
           "Ensuring failure events emitted",
         );
 
-        // Check for existing events for this specific scenario
-        const batchRunResult = await this.service.getRunDataForBatchRun({
-          projectId,
-          scenarioSetId: setId,
-          batchRunId,
-        });
+        const timestamp = Date.now();
 
-        // Filter by scenarioId to get the correct run for this scenario
-        const existingRun = batchRunResult.changed
-          ? batchRunResult.runs.find((run) => run.scenarioId === scenarioId)
-          : undefined;
+        // Fast path: when we already have a scenarioRunId from the job queue,
+        // skip the potentially slow ClickHouse read and write directly.
+        // The event-sourcing finishRun command is idempotent, so duplicate
+        // writes are safe.
+        let existingRun: { scenarioRunId: string; status: string } | undefined;
+        if (params.scenarioRunId) {
+          existingRun = { scenarioRunId: params.scenarioRunId, status: "" };
+        } else {
+          // Slow path: query for existing run data (needed when scenarioRunId
+          // is unknown, e.g. external SDK runs without pre-assigned IDs)
+          const batchRunResult = await this.service.getRunDataForBatchRun({
+            projectId,
+            scenarioSetId: setId,
+            batchRunId,
+          });
 
-        // If run already has a terminal status, do nothing (idempotent)
-        if (existingRun && TERMINAL_STATUSES.has(existingRun.status as ScenarioRunStatus)) {
-          logger.debug(
-            { projectId, scenarioId, batchRunId, status: existingRun.status },
-            "Run already in terminal status, skipping",
-          );
-          span.setAttribute("result.skipped", true);
-          span.setAttribute("result.existing_status", existingRun.status);
-          return;
+          const found = batchRunResult.changed
+            ? batchRunResult.runs.find((run) => run.scenarioId === scenarioId)
+            : undefined;
+
+          if (found && TERMINAL_STATUSES.has(found.status as ScenarioRunStatus)) {
+            logger.debug(
+              { projectId, scenarioId, batchRunId, status: found.status },
+              "Run already in terminal status, skipping",
+            );
+            span.setAttribute("result.skipped", true);
+            span.setAttribute("result.existing_status", found.status);
+            return;
+          }
+
+          existingRun = found;
         }
 
-        const timestamp = Date.now();
         const scenarioRunId = existingRun?.scenarioRunId ?? this.generateScenarioRunId();
         span.setAttribute("scenario.run.id", scenarioRunId);
 
         // If no RUN_STARTED event exists, emit one
-        if (!existingRun) {
+        if (!existingRun || !existingRun.status) {
           logger.debug({ projectId, scenarioId, scenarioRunId }, "Emitting RUN_STARTED event");
           await this.service.saveScenarioEvent({
             projectId,
@@ -132,10 +168,30 @@ export class ScenarioFailureHandler {
             },
           });
           span.setAttribute("result.emitted_run_started", true);
+
+          // Dual-write to ClickHouse via event-sourcing (best-effort)
+          try {
+            await getApp().simulations.startRun({
+              tenantId: projectId,
+              scenarioRunId,
+              scenarioId,
+              batchRunId,
+              scenarioSetId: setId,
+              occurredAt: timestamp,
+              name: name ?? "Unknown Scenario",
+              description: description ?? undefined,
+              metadata: {
+                name: name ?? "Unknown Scenario",
+                description: description ?? undefined,
+              },
+            });
+          } catch (err) {
+            logger.warn({ err, scenarioRunId }, "CH startRun dispatch failed (non-fatal)");
+          }
         }
 
-        // Emit RUN_FINISHED with ERROR status
-        logger.debug({ projectId, scenarioId, scenarioRunId }, "Emitting RUN_FINISHED event with ERROR status");
+        // Emit RUN_FINISHED with appropriate status
+        logger.debug({ projectId, scenarioId, scenarioRunId, status }, "Emitting RUN_FINISHED event");
         await this.service.saveScenarioEvent({
           projectId,
           type: ScenarioEventType.RUN_FINISHED,
@@ -144,16 +200,23 @@ export class ScenarioFailureHandler {
           batchRunId,
           scenarioSetId: setId,
           timestamp: timestamp + 1, // Ensure RUN_FINISHED is after RUN_STARTED
-          status: ScenarioRunStatus.ERROR,
-          results: {
-            verdict: Verdict.FAILURE,
-            reasoning: error ?? "Job failed without error message",
-            metCriteria: [],
-            unmetCriteria: [],
-            error: error ?? "Job failed",
-          },
+          status,
+          results: buildFailureResults({ cancelled: cancelled ?? false, error }),
         });
         span.setAttribute("result.emitted_run_finished", true);
+
+        // Dual-write to ClickHouse via event-sourcing (best-effort)
+        try {
+          await getApp().simulations.finishRun({
+            tenantId: projectId,
+            scenarioRunId,
+            occurredAt: timestamp + 1,
+            status,
+            results: buildFailureResults({ cancelled: cancelled ?? false, error }),
+          });
+        } catch (err) {
+          logger.warn({ err, scenarioRunId }, "CH finishRun dispatch failed (non-fatal)");
+        }
 
         logger.info({ projectId, scenarioId, scenarioRunId, batchRunId }, "Failure events emitted");
       },
@@ -161,9 +224,9 @@ export class ScenarioFailureHandler {
   }
 
   /**
-   * Generates a synthetic scenarioRunId in the format "scenariorun_{nanoid}".
+   * Generates a synthetic scenarioRunId using KSUID with the "scenariorun" resource prefix.
    */
   private generateScenarioRunId(): string {
-    return `scenariorun_${nanoid()}`;
+    return generate(KSUID_RESOURCES.SCENARIO_RUN).toString();
   }
 }

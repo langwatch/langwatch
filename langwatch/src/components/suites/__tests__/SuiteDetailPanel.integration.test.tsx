@@ -3,7 +3,7 @@
  *
  * Integration tests for SuiteDetailPanel and SuiteEmptyState components.
  *
- * Tests the suite header (name, labels, description), stats bar (scenario count,
+ * Tests the suite header (name, description), stats bar (scenario count,
  * target count, repeat count, executions), and empty state display.
  *
  * @see specs/suites/suite-workflow.feature - "Repeat count appears in suite stats bar"
@@ -11,19 +11,45 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { SimulationSuite } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+/** Local type standing in for Prisma's SimulationSuite (avoids generated-client dependency). */
+type SimulationSuite = {
+  id: string;
+  projectId: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  scenarioIds: string[];
+  targets: Array<{ type: string; referenceId: string }>;
+  repeatCount: number;
+  labels: string[];
+  archivedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
 import { SuiteDetailPanel, SuiteEmptyState } from "../SuiteDetailPanel";
 
 // Hoisted mocks
 const mockUseQuery = vi.hoisted(() => vi.fn());
 const mockRouterPush = vi.hoisted(() => vi.fn());
 
+vi.mock("@prisma/client", () => ({}));
+
 vi.mock("~/utils/api", () => ({
   api: {
+    useContext: () => ({
+      scenarios: { getScenarioSetBatchHistory: { invalidate: vi.fn() } },
+    }),
     scenarios: {
       getSuiteRunData: { useQuery: mockUseQuery },
       getAll: { useQuery: vi.fn(() => ({ data: [] })) },
+      cancelJob: {
+        useMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+      },
+      cancelBatchRun: {
+        useMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+      },
     },
     agents: {
       getAll: { useQuery: vi.fn(() => ({ data: [] })) },
@@ -41,16 +67,22 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
-vi.mock("~/utils/formatTimeAgo", () => ({
-  formatTimeAgoCompact: (ts: number) => "2h ago",
+vi.mock("~/hooks/useDrawer", () => ({
+  useDrawer: () => ({
+    openDrawer: vi.fn(),
+  }),
 }));
 
-vi.mock("next/router", () => ({
-  useRouter: () => ({
-    query: {},
-    push: mockRouterPush,
-    isReady: true,
-  }),
+vi.mock("~/hooks/useSSESubscription", () => ({
+  useSSESubscription: vi.fn(),
+}));
+
+vi.mock("~/hooks/usePageVisibility", () => ({
+  usePageVisibility: () => true,
+}));
+
+vi.mock("~/utils/formatTimeAgo", () => ({
+  formatTimeAgoCompact: (ts: number) => "2h ago",
 }));
 
 vi.mock("next/router", () => ({
@@ -99,7 +131,7 @@ describe("<SuiteDetailPanel/>", () => {
   beforeEach(() => {
     // Default: no run data (getSuiteRunData returns paginated result)
     mockUseQuery.mockReturnValue({
-      data: { runs: [], scenarioSetIds: {}, hasMore: false },
+      data: { runs: [], scenarioSetIds: {}, hasMore: false, changed: true },
       isLoading: false,
       error: null,
     });
@@ -134,10 +166,10 @@ describe("<SuiteDetailPanel/>", () => {
       expect(screen.getByText("Core test scenarios")).toBeInTheDocument();
     });
 
-    it("displays the label", () => {
+    it("does not display labels as tag pills", () => {
       render(
         <SuiteDetailPanel
-          suite={makeSuite()}
+          suite={makeSuite({ labels: ["critical", "billing"] })}
           onEdit={vi.fn()}
           onRun={vi.fn()}
           period={defaultPeriod}
@@ -145,7 +177,8 @@ describe("<SuiteDetailPanel/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("#regression")).toBeInTheDocument();
+      expect(screen.queryByText("critical")).not.toBeInTheDocument();
+      expect(screen.queryByText("billing")).not.toBeInTheDocument();
     });
   });
 
@@ -292,11 +325,11 @@ describe("<SuiteEmptyState/>", () => {
     );
 
     expect(
-      screen.getByText("Select a suite from the sidebar or create a new one"),
+      screen.getByText("Select a run plan from the sidebar or create a new one"),
     ).toBeInTheDocument();
   });
 
-  describe("when New Suite button is clicked", () => {
+  describe("when New Run Plan button is clicked", () => {
     it("calls onNewSuite", async () => {
       const user = userEvent.setup();
       const onNewSuite = vi.fn();
@@ -310,7 +343,7 @@ describe("<SuiteEmptyState/>", () => {
         },
       );
 
-      await user.click(screen.getByText("New Suite"));
+      await user.click(screen.getByText("New Run Plan"));
       expect(onNewSuite).toHaveBeenCalledOnce();
     });
   });

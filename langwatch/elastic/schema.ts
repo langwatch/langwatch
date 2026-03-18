@@ -231,7 +231,6 @@ export const traceMapping: ElasticSearchMappingFrom<ElasticSearchTrace> = {
   input: {
     properties: {
       value: { type: "text" },
-      satisfaction_score: { type: "float" },
     },
   },
   output: {

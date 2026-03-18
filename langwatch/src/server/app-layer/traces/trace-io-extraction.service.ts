@@ -27,10 +27,6 @@ export class TraceIOExtractionService {
     "langwatch.trace-processing.io-extraction",
   );
 
-  static create(): TraceIOExtractionService {
-    return new TraceIOExtractionService();
-  }
-
   /**
    * Extracts the first meaningful input from the trace with rich JSON data.
    * Uses span tree traversal to find the topmost input, filtering out

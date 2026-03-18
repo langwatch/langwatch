@@ -19,6 +19,7 @@ import { CheckSquare, Info, TrendingUp } from "react-feather";
 import {
   Controller,
   type ControllerRenderProps,
+  FormProvider,
   type UseFormReturn,
   useForm,
 } from "react-hook-form";
@@ -41,7 +42,8 @@ import { trainTestSplit } from "../utils/datasetUtils";
 import { checkIsEvaluator } from "../utils/nodeUtils";
 
 import { AddModelProviderKey } from "./AddModelProviderKey";
-import { useVersionState, VersionToBeUsed } from "./History";
+import { useVersionState } from "./History";
+import { VersionToBeUsed } from "./VersionToBeUsed";
 import { OptimizationStudioLLMConfigField } from "./properties/llm-configs/OptimizationStudioLLMConfigField";
 
 const optimizerOptions: {
@@ -119,6 +121,9 @@ export function OptimizeModalContent({
     deselectAllNodes,
     setOpenResultsPanelRequest,
     default_llm,
+    setLastCommittedWorkflow,
+    setCurrentVersionId,
+    currentVersionId,
   } = useWorkflowStore(
     ({
       workflow_id: workflowId,
@@ -128,6 +133,9 @@ export function OptimizeModalContent({
       deselectAllNodes,
       setOpenResultsPanelRequest,
       default_llm,
+      setLastCommittedWorkflow,
+      setCurrentVersionId,
+      currentVersionId,
     }) => ({
       workflowId,
       getWorkflow,
@@ -136,6 +144,9 @@ export function OptimizeModalContent({
       deselectAllNodes,
       setOpenResultsPanelRequest,
       default_llm,
+      setLastCommittedWorkflow,
+      setCurrentVersionId,
+      currentVersionId,
     }),
   );
 
@@ -178,7 +189,7 @@ export function OptimizeModalContent({
     },
   );
 
-  const { versions, canSaveNewVersion, nextVersion, versionToBeEvaluated } =
+  const { versions, canSaveNewVersion: canSave } =
     useVersionState({
       project,
       form: form as unknown as UseFormReturn<{
@@ -211,8 +222,6 @@ export function OptimizeModalContent({
     async ({ version, commitMessage, optimizer, params }: OptimizeForm) => {
       if (!project || !workflowId) return;
 
-      let versionId: string | undefined = versionToBeEvaluated.id;
-
       if (!train.length) {
         return;
       }
@@ -231,7 +240,9 @@ export function OptimizeModalContent({
         return;
       }
 
-      if (canSaveNewVersion) {
+      let versionId: string | undefined;
+
+      if (canSave) {
         try {
           const versionResponse = await commitVersion.mutateAsync({
             projectId: project.id,
@@ -243,6 +254,8 @@ export function OptimizeModalContent({
             },
           });
           versionId = versionResponse.id;
+          setLastCommittedWorkflow(getWorkflow());
+          setCurrentVersionId(versionId);
           toaster.create({
             title: "Version saved",
             description: "New version has been saved successfully",
@@ -256,6 +269,8 @@ export function OptimizeModalContent({
           });
           throw error;
         }
+      } else {
+        versionId = currentVersionId;
       }
 
       if (!versionId) {
@@ -277,13 +292,15 @@ export function OptimizeModalContent({
       setHasStarted(true);
     },
     [
-      canSaveNewVersion,
+      canSave,
       commitVersion,
+      currentVersionId,
       getWorkflow,
       project,
+      setCurrentVersionId,
+      setLastCommittedWorkflow,
       startOptimizationExecution,
       train.length,
-      versionToBeEvaluated.id,
       versions,
       workflowId,
     ],
@@ -333,6 +350,7 @@ export function OptimizeModalContent({
   const llmConfig = form.watch("params.llm");
 
   return (
+    <FormProvider {...form}>
     <Dialog.Content
       as="form"
       // eslint-disable-next-line @typescript-eslint/no-misused-promises
@@ -345,17 +363,7 @@ export function OptimizeModalContent({
       <Dialog.Body display="flex" flexDirection="column" gap={4}>
         <VStack align="start" width="full" gap={4}>
           <VStack align="start" width="full">
-            <VersionToBeUsed
-              form={
-                form as unknown as UseFormReturn<{
-                  version: string;
-                  commitMessage: string;
-                }>
-              }
-              nextVersion={nextVersion}
-              canSaveNewVersion={canSaveNewVersion}
-              versionToBeEvaluated={versionToBeEvaluated}
-            />
+            <VersionToBeUsed />
           </VStack>
           <VStack align="start" width="full" gap={2}>
             <SmallLabel>Optimizer</SmallLabel>
@@ -496,7 +504,7 @@ export function OptimizeModalContent({
                 disabled={!!isDisabled}
               >
                 <CheckSquare size={16} />
-                {canSaveNewVersion
+                {canSave
                   ? "Save & Run Optimization"
                   : "Run Optimization"}
               </Button>
@@ -505,6 +513,7 @@ export function OptimizeModalContent({
         </VStack>
       </Dialog.Footer>
     </Dialog.Content>
+    </FormProvider>
   );
 }
 

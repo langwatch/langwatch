@@ -24,6 +24,7 @@ import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject"
 import { useUpgradeModalStore } from "../stores/upgradeModalStore";
 import { UpgradeModal } from "./UpgradeModal";
 import { usePlanManagementUrl } from "../hooks/usePlanManagementUrl";
+import { usePostHogIdentify } from "../hooks/usePostHogIdentify";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import { useRequiredSession } from "../hooks/useRequiredSession";
 import { dependencies } from "../injection/dependencies.client";
@@ -294,6 +295,12 @@ export const DashboardLayout = ({
   );
   const publicEnv = usePublicEnv();
   const { url: planManagementUrl } = usePlanManagementUrl();
+
+  usePostHogIdentify({
+    session: session ?? null,
+    organization,
+    planType: usage.data?.activePlan?.type,
+  });
 
   if (typeof router.query.project === "string" && !isLoading && !project) {
     return <ErrorPage statusCode={404} />;

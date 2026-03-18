@@ -161,6 +161,8 @@ export const createSeatEventSubscriptionFns = ({
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
+      currency: currency.toLowerCase(),
+      ...({ adaptive_pricing: { enabled: false } } as Record<string, unknown>),
       customer: customerId,
       customer_update: {
         address: "auto",
@@ -226,6 +228,7 @@ export const createSeatEventSubscriptionFns = ({
         ? { cancel_at_period_end: false }
         : {}),
       items: [{ id: seatItem.id, quantity: totalMembers }],
+      proration_behavior: "always_invoice",
     });
 
     // Restore DB record to ACTIVE with updated seat count

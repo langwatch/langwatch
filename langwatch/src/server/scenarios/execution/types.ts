@@ -154,6 +154,9 @@ export const ExecutionContextSchema = z.object({
   scenarioId: z.string(),
   setId: z.string(),
   batchRunId: z.string(),
+  /** Pre-assigned scenario run ID passed through to the SDK to prevent duplicate entries.
+   *  Optional during validation prefetch; required at execution time. */
+  scenarioRunId: z.string().optional(),
 });
 export type ExecutionContext = z.infer<typeof ExecutionContextSchema>;
 
@@ -199,6 +202,8 @@ export const ScenarioExecutionResultSchema = z.object({
   runId: z.string().optional(),
   reasoning: z.string().optional(),
   error: z.string().optional(),
+  /** When true, the job was cancelled by user (not a crash/error). */
+  cancelled: z.boolean().optional(),
 });
 export type ScenarioExecutionResult = z.infer<
   typeof ScenarioExecutionResultSchema
@@ -215,6 +220,8 @@ export type ScenarioExecutionResult = z.infer<
 export const ChildProcessJobDataSchema = z.object({
   context: ExecutionContextSchema,
   scenario: ScenarioConfigSchema,
+  /** Pre-generated scenario run ID so the SDK uses the same aggregate ID. */
+  scenarioRunId: z.string().optional(),
   adapterData: TargetAdapterDataSchema,
   modelParams: LiteLLMParamsSchema,
   nlpServiceUrl: z.string(),

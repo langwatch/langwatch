@@ -62,7 +62,7 @@ export const RenderInputOutput = React.memo(function RenderInputOutput(
                       : value
                         ? typeof value === "string"
                           ? value
-                          : (value as any).toString()
+                          : JSON.stringify(value, null, 2)
                         : `${value}`,
                   );
                   toaster.create({
@@ -171,7 +171,7 @@ export const RenderInputOutput = React.memo(function RenderInputOutput(
             {value
               ? typeof value === "string"
                 ? value
-                : (value as any).toString()
+                : JSON.stringify(value, null, 2)
               : `${value}`}
           </Text>
         </>

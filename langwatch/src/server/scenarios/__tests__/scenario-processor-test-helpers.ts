@@ -209,6 +209,7 @@ export function createTestJobData(
       scenarioId: "test-scenario-123",
       setId: "test-set",
       batchRunId: "test-batch-run-456",
+      scenarioRunId: "scenariorun_test123",
     },
     scenario: {
       id: "test-scenario-123",

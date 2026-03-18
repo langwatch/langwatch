@@ -68,6 +68,10 @@ class DisabledEventSourcingService {
   getCommandQueues() {
     return new Map();
   }
+
+  registerJob(): null {
+    return null;
+  }
 }
 
 /**

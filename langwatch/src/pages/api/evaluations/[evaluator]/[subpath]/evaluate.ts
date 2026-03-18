@@ -11,7 +11,7 @@ import type { Workflow } from "../../../../../optimization_studio/types/dsl";
 import { getWorkflowEntryOutputs } from "../../../../../optimization_studio/utils/workflowFields";
 import { getApp } from "../../../../../server/app-layer/app";
 import { updateEvaluationStatusInES } from "../../../../../server/background/queues/evaluationsQueue";
-import { evaluationNameAutoslug } from "../../../../../server/background/workers/collector/evaluations";
+import { evaluationNameAutoslug } from "../../../../../server/background/workers/collector/evaluationNameAutoslug";
 import {
   type DataForEvaluation,
   runEvaluation,
@@ -354,37 +354,6 @@ export async function handleEvaluatorCall(
       settings,
     });
 
-  // Emit evaluation started event
-  // Note: Event sourcing errors are logged but not re-thrown because the evaluation
-  // should proceed even if event tracking fails. Errors are captured for monitoring.
-  if (project.featureEventSourcingEvaluationIngestion) {
-    try {
-      await getApp().evaluations.startEvaluation({
-        tenantId: project.id,
-        evaluationId,
-        evaluatorId,
-        evaluatorType: checkType,
-        evaluatorName:
-          evaluatorName ?? monitor?.name ?? params.name ?? undefined,
-        traceId: params.trace_id ?? undefined,
-        isGuardrail: isGuardrail ?? undefined,
-        occurredAt: Date.now(),
-      });
-    } catch (eventError) {
-      captureException(eventError, {
-        extra: { projectId: project.id, evaluationId, event: "started" },
-      });
-      logger.error(
-        {
-          err: eventError,
-          projectId: project.id,
-          evaluationId,
-        },
-        "Failed to emit evaluation started event",
-      );
-    }
-  }
-
   try {
     result = await runEval();
 
@@ -435,14 +404,20 @@ export async function handleEvaluatorCall(
       traceback: [],
     };
   } finally {
-    // Emit evaluation completed event — always fires even if cost creation threw
+    // Emit evaluation reported event — single atomic event for the fold projection
     // Note: Event sourcing errors are logged but not re-thrown because the evaluation
     // result should be returned even if event tracking fails. Errors are captured for monitoring.
     if (project.featureEventSourcingEvaluationIngestion) {
       await getApp()
-        .evaluations.completeEvaluation({
+        .evaluations.reportEvaluation({
           tenantId: project.id,
           evaluationId,
+          evaluatorId,
+          evaluatorType: checkType,
+          evaluatorName:
+            evaluatorName ?? monitor?.name ?? params.name ?? undefined,
+          traceId: params.trace_id ?? undefined,
+          isGuardrail: isGuardrail ?? undefined,
           status: result!.status,
           score: "score" in result! ? result!.score : undefined,
           passed: "passed" in result! ? result!.passed : undefined,
@@ -459,7 +434,7 @@ export async function handleEvaluatorCall(
         })
         .catch((eventError: unknown) => {
           captureException(eventError, {
-            extra: { projectId: project.id, evaluationId, event: "completed" },
+            extra: { projectId: project.id, evaluationId, event: "reported" },
           });
           logger.error(
             {
@@ -467,7 +442,7 @@ export async function handleEvaluatorCall(
               projectId: project.id,
               evaluationId,
             },
-            "Failed to emit evaluation completed event",
+            "Failed to emit evaluation reported event",
           );
         });
     }

@@ -46,14 +46,14 @@ describe("clickHouseFilterConditions", () => {
   });
 
   describe("traces.origin", () => {
-    it("checks for empty or null origin when filtering for application", () => {
+    it("matches only explicit 'application' value (not empty/NULL)", () => {
       const builder = clickHouseFilterConditions["traces.origin"];
       expect(builder).not.toBeNull();
       const result = builder!(["application"], "f0");
       expect(result.sql).toBe(
-        "(ts.Attributes['langwatch.origin'] = '' OR ts.Attributes['langwatch.origin'] IS NULL)",
+        "ts.Attributes['langwatch.origin'] IN ({f0_values:Array(String)})",
       );
-      expect(result.params).toEqual({});
+      expect(result.params).toEqual({ f0_values: ["application"] });
     });
 
     it("uses IN clause for specific non-application values", () => {
@@ -65,13 +65,13 @@ describe("clickHouseFilterConditions", () => {
       expect(result.params).toEqual({ f0_values: ["evaluation"] });
     });
 
-    it("combines absence check and IN clause for mixed values", () => {
+    it("uses IN clause for mixed values including application", () => {
       const builder = clickHouseFilterConditions["traces.origin"];
       const result = builder!(["application", "evaluation"], "f0");
       expect(result.sql).toBe(
-        "((ts.Attributes['langwatch.origin'] = '' OR ts.Attributes['langwatch.origin'] IS NULL) OR ts.Attributes['langwatch.origin'] IN ({f0_values:Array(String)}))",
+        "ts.Attributes['langwatch.origin'] IN ({f0_values:Array(String)})",
       );
-      expect(result.params).toEqual({ f0_values: ["evaluation"] });
+      expect(result.params).toEqual({ f0_values: ["application", "evaluation"] });
     });
 
     it("handles multiple non-application values", () => {
@@ -93,34 +93,107 @@ describe("clickHouseFilterConditions", () => {
   });
 
   describe("metadata filters", () => {
-    it("generates user_id filter with correct attribute path", () => {
+    it("generates user_id filter with langwatch.user_id attribute key", () => {
       const builder = clickHouseFilterConditions["metadata.user_id"];
       const result = builder!(["user1"], "f0");
       expect(result.sql).toBe(
-        "ts.Attributes['user.id'] IN ({f0_values:Array(String)})"
+        "ts.Attributes['langwatch.user_id'] IN ({f0_values:Array(String)})"
       );
     });
 
-    it("generates thread_id filter with correct attribute path", () => {
+    it("generates thread_id filter with gen_ai.conversation.id attribute key", () => {
       const builder = clickHouseFilterConditions["metadata.thread_id"];
       const result = builder!(["thread1"], "f0");
       expect(result.sql).toBe(
-        "ts.Attributes['thread.id'] IN ({f0_values:Array(String)})"
+        "ts.Attributes['gen_ai.conversation.id'] IN ({f0_values:Array(String)})"
+      );
+    });
+
+    it("generates customer_id filter with langwatch.customer_id attribute key", () => {
+      const builder = clickHouseFilterConditions["metadata.customer_id"];
+      const result = builder!(["cust1"], "f0");
+      expect(result.sql).toBe(
+        "ts.Attributes['langwatch.customer_id'] IN ({f0_values:Array(String)})"
       );
     });
   });
 
-  describe("unsupported filters", () => {
-    it("returns null for metadata.key filter", () => {
-      expect(clickHouseFilterConditions["metadata.key"]).toBeNull();
+  describe("metadata.key", () => {
+    it("checks all three key formats for existence", () => {
+      const builder = clickHouseFilterConditions["metadata.key"];
+      expect(builder).not.toBeNull();
+      const result = builder!(["canary"], "f0");
+      expect(result.sql).toContain("f0_k0_canonical");
+      expect(result.sql).toContain("f0_k0_lw");
+      expect(result.sql).toContain("f0_k0_bare");
+      expect(result.params).toEqual({
+        f0_k0_canonical: "metadata.canary",
+        f0_k0_lw: "langwatch.metadata.canary",
+        f0_k0_bare: "canary",
+      });
     });
 
-    it("returns null for metadata.value filter", () => {
-      expect(clickHouseFilterConditions["metadata.value"]).toBeNull();
+    it("generates OR conditions for multiple keys", () => {
+      const builder = clickHouseFilterConditions["metadata.key"];
+      const result = builder!(["canary", "environment"], "f0");
+      expect(result.sql).toContain(" OR ");
+      expect(result.params).toHaveProperty("f0_k0_canonical", "metadata.canary");
+      expect(result.params).toHaveProperty("f0_k1_canonical", "metadata.environment");
     });
 
-    it("returns null for spans.type filter (requires join)", () => {
-      expect(clickHouseFilterConditions["spans.type"]).toBeNull();
+    it("converts dot-encoded keys back to dots", () => {
+      const builder = clickHouseFilterConditions["metadata.key"];
+      const result = builder!(["nested·key"], "f0");
+      expect(result.params).toHaveProperty("f0_k0_canonical", "metadata.nested.key");
+      expect(result.params).toHaveProperty("f0_k0_bare", "nested.key");
+    });
+
+    it("returns 1=0 when no values", () => {
+      const builder = clickHouseFilterConditions["metadata.key"];
+      const result = builder!([], "f0");
+      expect(result.sql).toBe("1=0");
+    });
+  });
+
+  describe("metadata.value", () => {
+    it("checks all three key formats for value match", () => {
+      const builder = clickHouseFilterConditions["metadata.value"];
+      expect(builder).not.toBeNull();
+      const result = builder!(["true"], "f0", "canary");
+      expect(result.sql).toContain("f0_canonical");
+      expect(result.sql).toContain("f0_lw");
+      expect(result.sql).toContain("f0_bare");
+      expect(result.params).toEqual({
+        f0_canonical: "metadata.canary",
+        f0_lw: "langwatch.metadata.canary",
+        f0_bare: "canary",
+        f0_values: ["true"],
+      });
+    });
+
+    it("returns 1=0 when key is missing", () => {
+      const builder = clickHouseFilterConditions["metadata.value"];
+      const result = builder!(["true"], "f0");
+      expect(result.sql).toBe("1=0");
+    });
+
+    it("converts dot-encoded keys back to dots", () => {
+      const builder = clickHouseFilterConditions["metadata.value"];
+      const result = builder!(["val"], "f0", "nested·key");
+      expect(result.params).toHaveProperty("f0_canonical", "metadata.nested.key");
+      expect(result.params).toHaveProperty("f0_bare", "nested.key");
+    });
+  });
+
+  describe("spans.type", () => {
+    it("generates EXISTS subquery on stored_spans", () => {
+      const builder = clickHouseFilterConditions["spans.type"];
+      expect(builder).not.toBeNull();
+      const result = builder!(["llm", "tool"], "f0");
+      expect(result.sql).toContain("EXISTS (");
+      expect(result.sql).toContain("stored_spans sp");
+      expect(result.sql).toContain("sp.SpanAttributes['langwatch.span.type']");
+      expect(result.params).toEqual({ f0_values: ["llm", "tool"] });
     });
   });
 
@@ -212,13 +285,13 @@ describe("generateClickHouseFilterConditions", () => {
     expect(result.hasUnsupportedFilters).toBe(false);
   });
 
-  it("sets hasUnsupportedFilters when unsupported filter is included", () => {
+  it("generates conditions for metadata.key filter", () => {
     const filters: Partial<Record<FilterField, FilterParam>> = {
       "metadata.key": ["some-key"],
     };
     const result = generateClickHouseFilterConditions(filters);
-    expect(result.hasUnsupportedFilters).toBe(true);
-    expect(result.conditions).toEqual([]);
+    expect(result.hasUnsupportedFilters).toBe(false);
+    expect(result.conditions.length).toBe(1);
   });
 
   it("skips empty array filters", () => {

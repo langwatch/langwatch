@@ -26,10 +26,12 @@ import { CurrentDrawer } from "~/components/CurrentDrawer";
 import {
   clearDrawerStack,
   clearFlowCallbacks,
+  getDrawerStack,
   getFlowCallbacks,
 } from "~/hooks/useDrawer";
 import {
   clearOnlineEvaluationDrawerState,
+  setOnlineEvaluationDrawerState,
   OnlineEvaluationDrawer,
 } from "../OnlineEvaluationDrawer";
 import {
@@ -176,6 +178,46 @@ describe("OnlineEvaluationDrawer + EvaluatorListDrawer Integration", () => {
       // Should show "PII Check" in the selection box (not "Select Evaluator")
       expect(screen.getByText("PII Check")).toBeInTheDocument();
       // Name should be auto-filled
+      const nameInput = screen.getByPlaceholderText(
+        "Enter evaluation name",
+      ) as HTMLInputElement;
+      expect(nameInput.value).toBe("PII Check");
+    });
+  });
+
+  it("CRITICAL: new evaluator creation selects the evaluator when returning", async () => {
+    // This test simulates returning from the new evaluator creation flow.
+    // The flow (onlineEval → evaluatorList → categorySelector → typeSelector → evaluatorEditor)
+    // ends with the onSave callback setting pendingEvaluatorId in module-level state
+    // and navigating back to onlineEvaluation. We simulate that end state directly.
+
+    // Simulate the state set by the onSave callback in setupNewEvaluatorCallback():
+    // The callback stores form values + pendingEvaluatorId, then navigates to onlineEvaluation
+    setOnlineEvaluationDrawerState({
+      level: "trace",
+      name: "",
+      selectedEvaluator: null,
+      sample: 1.0,
+      mappings: {},
+      preconditions: [{ field: "input", rule: "contains", value: "" }],
+      threadIdleTimeout: 300,
+      pendingEvaluatorId: "evaluator-1", // The newly created evaluator
+    });
+
+    // Open the online evaluation drawer (as navigateToDrawer would do)
+    state.mockQuery = { "drawer.open": "onlineEvaluation" };
+    render(
+      <Wrapper>
+        <CurrentDrawer />
+      </Wrapper>,
+    );
+    await vi.advanceTimersByTimeAsync(200);
+
+    // CRITICAL - The pending evaluator should be loaded and selected
+    await waitFor(() => {
+      // Should show "PII Check" as the selected evaluator
+      expect(screen.getByText("PII Check")).toBeInTheDocument();
+      // Name should be auto-filled from the evaluator
       const nameInput = screen.getByPlaceholderText(
         "Enter evaluation name",
       ) as HTMLInputElement;

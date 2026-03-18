@@ -1,7 +1,11 @@
 Feature: Proration Preview Before Seat Update
   As a Growth plan (SEAT_EVENT) administrator
   I want to see the prorated charges before confirming a seat update
-  So that I understand exactly what I'll be charged before committing
+  So that I understand exactly what I'll be charged immediately before committing
+
+  Seat upgrades are charged immediately (not deferred to the next invoice).
+  The proration preview shows the exact amount that will be invoiced at the
+  moment the update is confirmed.
 
   Background:
     Given I am logged in as an organization administrator on LangWatch Cloud
@@ -51,13 +55,13 @@ Feature: Proration Preview Before Seat Update
   # ============================================================================
 
   @integration
-  Scenario: Seats mode modal shows proration preview
+  Scenario: Seats mode modal shows proration preview with immediate charge
     Given I have triggered a seat update from 5 to 7 seats
     When the proration preview modal opens
     Then I see "Confirm Seat Update" title
     And I see current seats as 5 and seats available as 7
     And I see line items showing credits and charges
-    And I see the prorated amount due now
+    And I see the prorated amount to be charged immediately
     And I see the new recurring price per billing period
 
   @integration
@@ -76,11 +80,12 @@ Feature: Proration Preview Before Seat Update
     And the "Confirm & Update" button is disabled
 
   @integration
-  Scenario: Confirming seat update executes the update
+  Scenario: Confirming seat update executes the update and charges immediately
     Given I have triggered a seat update from 5 to 7 seats
     And the proration preview modal is open with preview data
     When I click "Confirm & Update"
     Then the seat update is executed
+    And the prorated amount is charged immediately via Stripe
     And the modal closes
     And I see a success toast "Seats updated successfully"
 

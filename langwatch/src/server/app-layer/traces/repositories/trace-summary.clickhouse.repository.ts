@@ -46,7 +46,6 @@ interface ClickHouseSummaryRecord {
   OutputFromRootSpan: number;
   OutputSpanEndTimeMs: number;
   BlockedByGuardrail: number;
-  SatisfactionScore: number | null;
   TopicId: string | null;
   SubTopicId: string | null;
   HasAnnotation: number | null;
@@ -133,7 +132,6 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
             OutputFromRootSpan,
             OutputSpanEndTimeMs,
             BlockedByGuardrail,
-            SatisfactionScore,
             TopicId,
             SubTopicId,
             HasAnnotation
@@ -145,6 +143,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
         `,
         query_params: { tenantId, traceId },
         format: "JSONEachRow",
+        clickhouse_settings: { select_sequential_consistency: "1" },
       });
 
       const rows = await result.json<ClickHouseSummaryRecord>();
@@ -187,7 +186,6 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       outputFromRootSpan: record.OutputFromRootSpan === 1,
       outputSpanEndTimeMs: Number(record.OutputSpanEndTimeMs),
       blockedByGuardrail: record.BlockedByGuardrail === 1,
-      satisfactionScore: record.SatisfactionScore,
       topicId: record.TopicId,
       subTopicId: record.SubTopicId,
       hasAnnotation:
@@ -233,7 +231,6 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       OutputFromRootSpan: data.outputFromRootSpan ? 1 : 0,
       OutputSpanEndTimeMs: data.outputSpanEndTimeMs,
       BlockedByGuardrail: data.blockedByGuardrail ? 1 : 0,
-      SatisfactionScore: data.satisfactionScore,
       TopicId: data.topicId,
       SubTopicId: data.subTopicId,
       HasAnnotation:

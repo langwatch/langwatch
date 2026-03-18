@@ -6,7 +6,10 @@ import { prisma } from "~/server/db";
 import { ScenarioNotFoundError } from "~/server/scenarios/errors";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
 import { createLogger } from "~/utils/logger/server";
-import type { AuthMiddlewareVariables } from "../../middleware";
+import {
+  type AuthMiddlewareVariables,
+  resourceLimitMiddleware,
+} from "../../middleware";
 
 const logger = createLogger("langwatch:api:scenarios");
 
@@ -65,7 +68,7 @@ app.get("/:id", async (c) => {
   return c.json(toScenarioResponse(scenario));
 });
 
-app.post("/", zValidator("json", createScenarioSchema), async (c) => {
+app.post("/", resourceLimitMiddleware("scenarios"), zValidator("json", createScenarioSchema), async (c) => {
   const project = c.get("project");
   const body = c.req.valid("json");
 

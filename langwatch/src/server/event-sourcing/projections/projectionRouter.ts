@@ -116,7 +116,10 @@ export class ProjectionRouter<
 
     const reactorDefs: Record<string, {
       name: string;
+      parentProjection: string;
+      parentType: "fold" | "map";
       handler: { handle: (payload: { event: EventType; foldState: unknown }) => Promise<void> };
+      groupKeyFn?: (payload: { event: EventType; foldState: unknown }) => string;
       options?: {
         killSwitch?: KillSwitchOptions;
         disabled?: boolean;
@@ -125,11 +128,13 @@ export class ProjectionRouter<
       };
     }> = {};
 
-    for (const [_foldName, reactors] of this.reactorsForFold) {
+    for (const [foldName, reactors] of this.reactorsForFold) {
       for (const reactor of reactors) {
         if (this.isReactorExcluded(reactor)) continue;
         reactorDefs[reactor.name] = {
           name: reactor.name,
+          parentProjection: foldName,
+          parentType: "fold" as const,
           handler: {
             handle: async (payload: { event: EventType; foldState: unknown }) => {
               await reactor.handle(payload.event, {
@@ -139,6 +144,7 @@ export class ProjectionRouter<
               });
             },
           },
+          groupKeyFn: reactor.options?.groupKeyFn,
           options: {
             killSwitch: reactor.options?.killSwitch,
             disabled: reactor.options?.disabled,
@@ -151,11 +157,13 @@ export class ProjectionRouter<
       }
     }
 
-    for (const [_mapName, reactors] of this.reactorsForMap) {
+    for (const [mapName, reactors] of this.reactorsForMap) {
       for (const reactor of reactors) {
         if (this.isReactorExcluded(reactor)) continue;
         reactorDefs[reactor.name] = {
           name: reactor.name,
+          parentProjection: mapName,
+          parentType: "map" as const,
           handler: {
             handle: async (payload: { event: EventType; foldState: unknown }) => {
               await reactor.handle(payload.event, {
@@ -165,6 +173,7 @@ export class ProjectionRouter<
               });
             },
           },
+          groupKeyFn: reactor.options?.groupKeyFn,
           options: {
             killSwitch: reactor.options?.killSwitch,
             disabled: reactor.options?.disabled,

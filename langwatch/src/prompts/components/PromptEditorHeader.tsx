@@ -27,6 +27,8 @@ export type PromptEditorHeaderProps = {
    * - "model-only": only the model selector (for use in drawers where buttons move to a footer)
    */
   variant?: "full" | "model-only";
+  /** When true the version history panel opens automatically on mount. */
+  openHistoryOnLoad?: boolean;
 };
 
 /**
@@ -46,6 +48,7 @@ export function PromptEditorHeader({
   isSaving = false,
   onVersionRestore,
   variant = "full",
+  openHistoryOnLoad,
 }: PromptEditorHeaderProps) {
   const { project } = useOrganizationTeamProject();
   const formMethods = useFormContext<PromptConfigFormValues>();
@@ -65,6 +68,7 @@ export function PromptEditorHeader({
               }
               onRestoreSuccess={onVersionRestore}
               hasUnsavedChanges={hasUnsavedChanges}
+              initialOpen={openHistoryOnLoad}
             />
           )}
           <GeneratePromptApiSnippetDialog

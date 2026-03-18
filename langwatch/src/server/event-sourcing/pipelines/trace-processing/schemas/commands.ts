@@ -34,17 +34,6 @@ export const assignTopicCommandDataSchema = z.object({
 
 export type AssignTopicCommandData = z.infer<typeof assignTopicCommandDataSchema>;
 
-export const assignSatisfactionScoreCommandDataSchema = z.object({
-  tenantId: z.string(),
-  traceId: z.string(),
-  satisfactionScore: z.number(),
-  occurredAt: z.number(),
-});
-
-export type AssignSatisfactionScoreCommandData = z.infer<
-  typeof assignSatisfactionScoreCommandDataSchema
->;
-
 export const recordLogCommandDataSchema = z.object({
   tenantId: z.string(),
   traceId: z.string(),
@@ -83,4 +72,16 @@ export const recordMetricCommandDataSchema = z.object({
 
 export type RecordMetricCommandData = z.infer<
   typeof recordMetricCommandDataSchema
+>;
+
+export const resolveOriginCommandDataSchema = z.object({
+  tenantId: z.string(),
+  traceId: z.string(),
+  origin: z.string(),
+  reason: z.string(),
+  occurredAt: z.number(),
+});
+
+export type ResolveOriginCommandData = z.infer<
+  typeof resolveOriginCommandDataSchema
 >;

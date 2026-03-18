@@ -2,7 +2,7 @@
  * Collapsible row for a grouped set of scenario runs.
  *
  * Used when group-by is set to "scenario" or "target".
- * Header: [chevron] [group_name (bold)] [status_icon] [pass_rate] ... [N runs] [N passed] [N failed]
+ * Header: [chevron] [group_name (bold)] [counts (word labels)] ... [N runs]
  * Expanded: sub-grouped by batch, each with a lightweight header showing
  * timestamp and pass rate, then ScenarioTargetRow (list) or ScenarioGridCard (grid).
  *
@@ -13,12 +13,10 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useMemo } from "react";
-import { SummaryStatusIcon } from "./SummaryStatusIcon";
 import type { RunGroup, RunGroupSummary } from "./run-history-transforms";
 import { groupRunsByBatchId } from "./run-history-transforms";
 import { BatchSection } from "./BatchSection";
 import { RunSummaryCounts } from "./RunSummaryCounts";
-import { formatSummaryStatusLabel } from "./format-run-status-label";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import type { ViewMode } from "./useRunHistoryStore";
 
@@ -30,6 +28,8 @@ type GroupRowProps = {
   onScenarioRunClick: (scenarioRun: ScenarioRunData) => void;
   resolveTargetName: (scenarioRun: ScenarioRunData) => string | null;
   viewMode?: ViewMode;
+  onCancelRun?: (scenarioRun: ScenarioRunData) => void;
+  cancellingJobId?: string | null;
 };
 
 export function GroupRow({
@@ -40,6 +40,8 @@ export function GroupRow({
   onScenarioRunClick,
   resolveTargetName,
   viewMode = "grid",
+  onCancelRun,
+  cancellingJobId,
 }: GroupRowProps) {
   const runCount = group.scenarioRuns.length;
 
@@ -57,6 +59,7 @@ export function GroupRow({
         paddingX={4}
         paddingY={3}
         gap={3}
+        flexWrap="nowrap"
         _hover={{ bg: "bg.subtle" }}
         cursor="pointer"
         onClick={onToggle}
@@ -66,36 +69,30 @@ export function GroupRow({
         position="sticky"
         top={0}
         zIndex={20}
-        bg="bg.panel/85"
+        bg="bg.muted"
         backdropFilter="blur(12px)"
         borderBottom="1px solid"
         borderColor="border"
         data-testid="group-row-header"
       >
         {isExpanded ? (
-          <ChevronDown size={14} />
+          <ChevronDown size={14} style={{ flexShrink: 0 }} />
         ) : (
-          <ChevronRight size={14} />
+          <ChevronRight size={14} style={{ flexShrink: 0 }} />
         )}
-        <Text fontSize="sm" fontWeight="bold" color="fg.default">
+        <Text fontSize="sm" fontWeight="bold" color="fg.default" truncate minWidth={0} flexShrink={1}>
           {group.groupLabel}
         </Text>
-        <Text fontSize="sm" color="fg.muted">
+        <Text fontSize="sm" color="fg.muted" flexShrink={0}>
           &middot;
         </Text>
-        <SummaryStatusIcon summary={summary} />
-        <Text
-          fontSize="sm"
-          fontWeight="medium"
-          color={summary.failedCount > 0 ? "red.600" : "green.600"}
-        >
-          {formatSummaryStatusLabel(summary)}
-        </Text>
+        <Box flexShrink={0}>
+          <RunSummaryCounts summary={summary} />
+        </Box>
         <Box flex={1} />
-        <Text fontSize="xs" color="fg.muted">
+        <Text fontSize="xs" color="fg.muted" flexShrink={0}>
           {runCount} {runCount === 1 ? "run" : "runs"}
         </Text>
-        <RunSummaryCounts summary={summary} />
       </HStack>
 
       {/* Expanded content - scenario runs sub-grouped by batch */}
@@ -108,6 +105,8 @@ export function GroupRow({
               resolveTargetName={resolveTargetName}
               onScenarioRunClick={onScenarioRunClick}
               viewMode={viewMode}
+              onCancelRun={onCancelRun}
+              cancellingJobId={cancellingJobId}
             />
           ))}
           {group.scenarioRuns.length === 0 && (

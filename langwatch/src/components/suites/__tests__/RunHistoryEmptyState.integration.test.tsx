@@ -15,9 +15,18 @@ const mockGetSuiteRunData = vi.hoisted(() => vi.fn());
 
 vi.mock("~/utils/api", () => ({
   api: {
+    useContext: () => ({
+      scenarios: { getScenarioSetBatchHistory: { invalidate: vi.fn() } },
+    }),
     scenarios: {
       getSuiteRunData: { useQuery: mockGetSuiteRunData },
       getAll: { useQuery: vi.fn(() => ({ data: [] })) },
+      cancelJob: {
+        useMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+      },
+      cancelBatchRun: {
+        useMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+      },
     },
     agents: {
       getAll: { useQuery: vi.fn(() => ({ data: [] })) },
@@ -26,6 +35,14 @@ vi.mock("~/utils/api", () => ({
       getAllPromptsForProject: { useQuery: vi.fn(() => ({ data: [] })) },
     },
   },
+}));
+
+vi.mock("~/hooks/useSSESubscription", () => ({
+  useSSESubscription: vi.fn(),
+}));
+
+vi.mock("~/hooks/usePageVisibility", () => ({
+  usePageVisibility: () => true,
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -48,6 +65,14 @@ vi.mock("~/hooks/useDrawer", () => ({
   }),
 }));
 
+vi.mock("~/hooks/useSSESubscription", () => ({
+  useSSESubscription: vi.fn(),
+}));
+
+vi.mock("~/hooks/usePageVisibility", () => ({
+  usePageVisibility: () => true,
+}));
+
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
@@ -68,7 +93,7 @@ describe("<RunHistoryPanel/>", () => {
   describe("given a suite with no runs", () => {
     beforeEach(() => {
       mockGetSuiteRunData.mockReturnValue({
-        data: { runs: [], scenarioSetIds: {}, hasMore: false },
+        data: { runs: [], scenarioSetIds: {}, hasMore: false, changed: true },
         isLoading: false,
         error: null,
       });
@@ -110,6 +135,7 @@ describe("<RunHistoryPanel/>", () => {
           ],
           scenarioSetIds: { batch_1: scenarioSetId },
           hasMore: false,
+          changed: true,
         },
         isLoading: false,
         error: null,
@@ -135,7 +161,7 @@ describe("<RunHistoryPanel/>", () => {
   describe("given a suite with runs outside the selected time period", () => {
     beforeEach(() => {
       mockGetSuiteRunData.mockReturnValue({
-        data: { runs: [], scenarioSetIds: {}, hasMore: false },
+        data: { runs: [], scenarioSetIds: {}, hasMore: false, changed: true },
         isLoading: false,
         error: null,
       });

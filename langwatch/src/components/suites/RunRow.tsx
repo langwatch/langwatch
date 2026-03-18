@@ -8,16 +8,16 @@
  * so that `position: sticky` works correctly within the scrollport.
  */
 
-import { Box, HStack, Text } from "@chakra-ui/react";
-import { ChevronDown, ChevronRight } from "lucide-react";
-import { useMemo } from "react";
-import { SummaryStatusIcon } from "./SummaryStatusIcon";
+import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
+import { Dialog } from "~/components/ui/dialog";
+import { ChevronDown, ChevronRight, X } from "lucide-react";
+import { useMemo, useState } from "react";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { BatchRun, BatchRunSummary } from "./run-history-transforms";
 import { computeIterationMap, getScenarioDisplayNames } from "./run-history-transforms";
 import { ScenarioRunContent } from "./ScenarioRunContent";
 import { RunSummaryCounts } from "./RunSummaryCounts";
-import { formatSummaryStatusLabel } from "./format-run-status-label";
+import { isCancellableStatus } from "./useCancelScenarioRun";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import type { ViewMode } from "./useRunHistoryStore";
 
@@ -31,6 +31,10 @@ type RunRowProps = {
   expectedJobCount?: number;
   suiteName?: string;
   viewMode?: ViewMode;
+  onCancelRun?: (scenarioRun: ScenarioRunData) => void;
+  onCancelAll?: () => void;
+  isCancellingBatch?: boolean;
+  cancellingJobId?: string | null;
 };
 
 export function RunRow({
@@ -43,7 +47,12 @@ export function RunRow({
   expectedJobCount,
   suiteName,
   viewMode = "grid",
+  onCancelRun,
+  onCancelAll,
+  isCancellingBatch = false,
+  cancellingJobId,
 }: RunRowProps) {
+  const [isCancelAllDialogOpen, setIsCancelAllDialogOpen] = useState(false);
   const timeAgo = formatTimeAgoCompact(batchRun.timestamp);
   const scenarioNames = suiteName
     ? getScenarioDisplayNames({ scenarioRuns: batchRun.scenarioRuns })
@@ -54,6 +63,12 @@ export function RunRow({
     [batchRun.scenarioRuns],
   );
 
+  const cancellableCount = useMemo(
+    () => batchRun.scenarioRuns.filter((run) => isCancellableStatus(run.status)).length,
+    [batchRun.scenarioRuns],
+  );
+  const hasCancellableRuns = cancellableCount > 0;
+
   return (
     <>
       {/* Run header - clickable to expand/collapse, sticky within scroll container */}
@@ -63,6 +78,7 @@ export function RunRow({
         paddingX={4}
         paddingY={3}
         gap={3}
+        flexWrap="nowrap"
         _hover={{ bg: "bg.subtle" }}
         cursor="pointer"
         onClick={onToggle}
@@ -72,54 +88,78 @@ export function RunRow({
         position="sticky"
         top={0}
         zIndex={20}
-        bg="bg.panel/85"
-        backdropFilter="blur(12px)"
+        bg="bg.muted"
         borderBottom="1px solid"
         borderColor="border"
         data-testid="run-row-header"
       >
         {isExpanded ? (
-          <ChevronDown size={14} />
+          <ChevronDown size={14} style={{ flexShrink: 0 }} />
         ) : (
-          <ChevronRight size={14} />
+          <ChevronRight size={14} style={{ flexShrink: 0 }} />
         )}
         {suiteName && (
           <>
-            <Text fontSize="sm" fontWeight="medium" color="fg.default">
+            <Text fontSize="sm" fontWeight="medium" color="fg.default" flexShrink={0}>
               {suiteName}
             </Text>
-            <Text fontSize="sm" color="fg.muted">
+            <Text fontSize="sm" color="fg.muted" flexShrink={0}>
               &middot;
             </Text>
           </>
         )}
         {scenarioNames && (
           <>
-            <Text fontSize="sm" color="fg.muted" truncate minWidth={0}>
+            <Text fontSize="sm" color="fg.muted" truncate minWidth={0} flexShrink={1}>
               {scenarioNames}
             </Text>
-            <Text fontSize="sm" color="fg.muted">
+            <Text fontSize="sm" color="fg.muted" flexShrink={0}>
               &middot;
             </Text>
           </>
         )}
-        <Text fontSize="xs" color="fg.subtle">
+        <Text fontSize="xs" color="fg.subtle" flexShrink={0}>
           {timeAgo}
         </Text>
         {expectedJobCount != null && summary.totalCount < expectedJobCount && (
-          <Text fontSize="xs" color="fg.muted">
+          <Text fontSize="xs" color="fg.muted" flexShrink={0}>
             {summary.totalCount} of {expectedJobCount}
           </Text>
         )}
         <Box flex={1} />
-        <SummaryStatusIcon summary={summary} />
-        <Text
-          fontSize="sm"
-          fontWeight="medium"
-          color={summary.failedCount > 0 ? "red.600" : "green.600"}
-        >
-          {formatSummaryStatusLabel(summary)}
-        </Text>
+        {onCancelAll && hasCancellableRuns && (
+          <HStack
+            as="span"
+            role="button"
+            tabIndex={isCancellingBatch ? -1 : 0}
+            gap={1}
+            paddingX={2}
+            paddingY={0.5}
+            borderRadius="sm"
+            fontSize="xs"
+            color="red.500"
+            cursor={isCancellingBatch ? "default" : "pointer"}
+            opacity={isCancellingBatch ? 0.6 : 1}
+            _hover={isCancellingBatch ? undefined : { bg: "red.50" }}
+            onClick={(e: React.MouseEvent) => {
+              e.stopPropagation();
+              if (!isCancellingBatch) setIsCancelAllDialogOpen(true);
+            }}
+            onKeyDown={(e: React.KeyboardEvent) => {
+              if (!isCancellingBatch && (e.key === "Enter" || e.key === " ")) {
+                e.stopPropagation();
+                e.preventDefault();
+                setIsCancelAllDialogOpen(true);
+              }
+            }}
+            aria-label="Cancel all remaining runs"
+            aria-disabled={isCancellingBatch}
+            data-testid="cancel-all-button"
+          >
+            {isCancellingBatch ? <Spinner size="xs" /> : <X size={12} />}
+            <Text fontSize="xs">Cancel All</Text>
+          </HStack>
+        )}
         <RunSummaryCounts summary={summary} />
       </HStack>
 
@@ -132,6 +172,8 @@ export function RunRow({
             resolveTargetName={resolveTargetName}
             onScenarioRunClick={onScenarioRunClick}
             iterationMap={iterationMap}
+            onCancelRun={onCancelRun}
+            cancellingJobId={cancellingJobId}
           />
           {batchRun.scenarioRuns.length === 0 && (
             <Text fontSize="sm" color="fg.muted" paddingX={4} paddingY={3}>
@@ -141,6 +183,44 @@ export function RunRow({
         </>
       )}
 
+      {/* Confirmation dialog for cancelling all remaining jobs */}
+      {onCancelAll && (
+        <Dialog.Root
+          open={isCancelAllDialogOpen}
+          onOpenChange={({ open }) => setIsCancelAllDialogOpen(open)}
+        >
+          <Dialog.Content maxWidth="sm">
+            <Dialog.Header>
+              <Dialog.Title>Cancel remaining jobs?</Dialog.Title>
+            </Dialog.Header>
+            <Dialog.Body>
+              <Text fontSize="sm" color="fg.muted">
+                This will cancel {cancellableCount} remaining{" "}
+                {cancellableCount === 1 ? "job" : "jobs"} in this batch run.
+                This action cannot be undone.
+              </Text>
+            </Dialog.Body>
+            <Dialog.Footer>
+              <Button
+                variant="outline"
+                onClick={() => setIsCancelAllDialogOpen(false)}
+              >
+                Keep running
+              </Button>
+              <Button
+                colorPalette="red"
+                onClick={() => {
+                  setIsCancelAllDialogOpen(false);
+                  onCancelAll();
+                }}
+                data-testid="confirm-cancel-all-button"
+              >
+                Cancel {cancellableCount} {cancellableCount === 1 ? "job" : "jobs"}
+              </Button>
+            </Dialog.Footer>
+          </Dialog.Content>
+        </Dialog.Root>
+      )}
     </>
   );
 }

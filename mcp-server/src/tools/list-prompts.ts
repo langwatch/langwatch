@@ -15,16 +15,15 @@ export async function handleListPrompts(): Promise<string> {
 
   const lines: string[] = [];
   lines.push(`# Prompts (${prompts.length} total)\n`);
-  lines.push("| Handle | Name | Latest Version | Description |");
-  lines.push("|--------|------|----------------|-------------|");
+  lines.push("| Handle | Name | Latest Version |");
+  lines.push("|--------|------|----------------|");
 
   for (const p of prompts) {
     const handle = p.handle || p.id || "N/A";
     const name = p.name || "Untitled";
     const versionNum = p.latestVersionNumber ?? p.version;
     const version = versionNum != null ? `v${versionNum}` : "N/A";
-    const desc = (p.description || "").slice(0, 60);
-    lines.push(`| ${handle} | ${name} | ${version} | ${desc} |`);
+    lines.push(`| ${handle} | ${name} | ${version} |`);
   }
 
   lines.push(

@@ -24,15 +24,13 @@ import {
   LicenseEnforcementRepository,
 } from "../../license-enforcement/license-enforcement.repository";
 import { getRoleChangeType } from "../../license-enforcement/member-classification";
-import {
-  assertMemberTypeLimitNotExceeded,
-  LICENSE_LIMIT_ERRORS,
-} from "../../license-enforcement/license-limit-guard";
+import { assertMemberTypeLimitNotExceeded } from "../../license-enforcement/license-limit-guard";
 import { scheduleUsageStatsForOrganization } from "~/server/background/queues/usageStatsQueue";
 import { decrypt, encrypt } from "~/utils/encryption";
 import { isTeamRoleAllowedForOrganizationRole, type TeamRoleValue } from "~/utils/memberRoleConstraints";
 import { slugify } from "~/utils/slugify";
 import { getApp } from "~/server/app-layer/app";
+import { trackServerEvent } from "~/server/posthog";
 import { elasticsearchMigrate } from "../../../tasks/elasticMigrate";
 import {
   INVITE_EXPIRATION_MS,
@@ -42,7 +40,6 @@ import {
 import {
   DuplicateInviteError,
   InviteNotFoundError,
-  LicenseLimitError,
   OrganizationNotFoundError,
 } from "../../invites/errors";
 import {
@@ -51,6 +48,8 @@ import {
   isCustomRole,
   ENTERPRISE_FEATURE_ERRORS,
 } from "../enterprise";
+import { LimitExceededError } from "../../license-enforcement/errors";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { skipPermissionCheck } from "../rbac";
 import { checkOrganizationPermission, checkTeamPermission } from "../rbac";
 import { signUpDataSchema } from "./onboarding";
@@ -634,6 +633,7 @@ export const organizationRouter = createTRPCRouter({
     .input(
       z.object({
         organizationId: z.string(),
+        includeDeactivated: z.boolean().optional(),
       }),
     )
     .use(checkOrganizationPermission("organization:view"))
@@ -652,6 +652,9 @@ export const organizationRouter = createTRPCRouter({
         },
         include: {
           members: {
+            ...(!input.includeDeactivated
+              ? { where: { user: { deactivatedAt: null } } }
+              : {}),
             include: {
               user: {
                 include: {
@@ -804,7 +807,16 @@ export const organizationRouter = createTRPCRouter({
           user: ctx.session.user,
         });
       } catch (error) {
-        if (error instanceof LicenseLimitError) {
+        if (error instanceof LimitExceededError) {
+          void getApp()
+            .usageLimits.notifyResourceLimitReached({
+              organizationId: input.organizationId,
+              limitType: error.limitType,
+              current: error.current,
+              max: error.max,
+            })
+            .catch(captureException);
+
           throw new TRPCError({
             code: "FORBIDDEN",
             message: error.message,
@@ -956,6 +968,15 @@ export const organizationRouter = createTRPCRouter({
       const createdRecords = inviteRecords.filter(
         (r): r is NonNullable<typeof r> => r !== null,
       );
+
+      if (createdRecords.length > 0) {
+        trackServerEvent({
+          userId: ctx.session.user.id,
+          event: "team_member_invited",
+          properties: { inviteCount: createdRecords.length },
+        });
+      }
+
       const invites = await Promise.all(
         createdRecords.map(async (record) => {
           const { emailNotSent } = await inviteService.trySendInviteEmail({
@@ -1204,7 +1225,16 @@ export const organizationRouter = createTRPCRouter({
 
         return results;
       } catch (error) {
-        if (error instanceof LicenseLimitError) {
+        if (error instanceof LimitExceededError) {
+          void getApp()
+            .usageLimits.notifyResourceLimitReached({
+              organizationId: input.organizationId,
+              limitType: error.limitType,
+              current: error.current,
+              max: error.max,
+            })
+            .catch(captureException);
+
           throw new TRPCError({
             code: "FORBIDDEN",
             message: error.message,
@@ -1267,7 +1297,16 @@ export const organizationRouter = createTRPCRouter({
             message: error.message,
           });
         }
-        if (error instanceof LicenseLimitError) {
+        if (error instanceof LimitExceededError) {
+          void getApp()
+            .usageLimits.notifyResourceLimitReached({
+              organizationId: input.organizationId,
+              limitType: error.limitType,
+              current: error.current,
+              max: error.max,
+            })
+            .catch(captureException);
+
           throw new TRPCError({
             code: "FORBIDDEN",
             message: error.message,
@@ -1792,6 +1831,7 @@ export const organizationRouter = createTRPCRouter({
 
       const users = await prisma.user.findMany({
         where: {
+          deactivatedAt: null,
           orgMemberships: {
             some: {
               organizationId: input.organizationId,

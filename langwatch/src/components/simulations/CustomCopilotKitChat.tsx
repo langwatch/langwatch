@@ -4,7 +4,6 @@ import { CopilotChat } from "@copilotkit/react-ui";
 import {
   type ActionExecutionMessage,
   type ResultMessage,
-  Role,
   type TextMessage,
 } from "@copilotkit/runtime-client-gql";
 import { useEffect, useMemo } from "react";
@@ -110,18 +109,18 @@ function CustomCopilotKitChatInner({
 
         return (
           <VStack
-            align={message_.role === Role.Assistant ? "flex-start" : "flex-end"}
+            align={message_.role === "assistant" ? "flex-start" : "flex-end"}
             css={fadeInCss}
           >
-            {message_.role === Role.Assistant && (
+            {message_.role === "assistant" && (
               <Markdown className="markdown">{message_.content}</Markdown>
             )}
-            {UserMessage && message_.role === Role.User && (
+            {UserMessage && message_.role === "user" && (
               <UserMessage message={message_.content} rawData={message} />
             )}
             {!smallerView &&
               traceId &&
-              message_.role === Role.Assistant && (
+              message_.role === "assistant" && (
                 <TraceMessage traceId={traceId} />
               )}
           </VStack>

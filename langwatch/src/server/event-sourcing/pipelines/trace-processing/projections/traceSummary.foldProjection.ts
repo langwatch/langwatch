@@ -1,4 +1,5 @@
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
+import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
 import {
   enrichRagContextIds,
   SpanNormalizationPipelineService,
@@ -25,7 +26,7 @@ import type {
 import {
   isLogRecordReceivedEvent,
   isMetricRecordReceivedEvent,
-  isSatisfactionScoreAssignedEvent,
+  isOriginResolvedEvent,
   isSpanReceivedEvent,
   isTopicAssignedEvent,
 } from "../schemas/events";
@@ -317,9 +318,13 @@ function extractAttributes(span: NormalizedSpan): Record<string, string> {
 
   for (const [key, value] of Object.entries(resourceAttrs)) {
     if (STANDARD_RESOURCE_PREFIXES.some((p) => key.startsWith(p))) continue;
-    if (typeof value === "string") result[key] = value;
+    // Normalize langwatch.metadata.* resource attributes to metadata.* canonical form
+    const normalizedKey = key.startsWith("langwatch.metadata.")
+      ? key.replace("langwatch.metadata.", "metadata.")
+      : key;
+    if (typeof value === "string") result[normalizedKey] = value;
     else if (typeof value === "number" || typeof value === "boolean")
-      result[key] = String(value);
+      result[normalizedKey] = String(value);
   }
 
   for (const [source, dest] of SPAN_ATTR_MAPPINGS) {
@@ -334,6 +339,11 @@ function extractAttributes(span: NormalizedSpan): Record<string, string> {
   if (typeof labels === "string") result["langwatch.labels"] = labels;
   else if (Array.isArray(labels))
     result["langwatch.labels"] = JSON.stringify(labels);
+
+  const promptId = stringAttr(spanAttrs, "langwatch.prompt.id");
+  if (promptId && promptId.includes(":")) {
+    result["langwatch.prompt.id"] = promptId;
+  }
 
   for (const [key, value] of Object.entries(spanAttrs)) {
     if (!key.startsWith("metadata.")) continue;
@@ -461,6 +471,12 @@ function hoistOrigin(
       }
     } else if (state.attributes["langwatch.origin"]) {
       mergedAttributes["langwatch.origin"] = state.attributes["langwatch.origin"];
+    } else if (mergedAttributes["sdk.name"]) {
+      // SDK heuristic: sdk.name present but no explicit origin and no
+      // legacy markers → old SDK that doesn't tag origin. Old SDK
+      // evaluations/simulations are already caught by legacy rules above,
+      // so what's left must be a regular application trace.
+      mergedAttributes["langwatch.origin"] = "application";
     }
   }
 }
@@ -693,6 +709,22 @@ function accumulateAttributes({
     if (union.length > 0) merged["langwatch.labels"] = JSON.stringify(union);
   }
 
+  // Prompt IDs: union across spans
+  const existingPromptIds = state.attributes["langwatch.prompt_ids"];
+  const newPromptId = spanAttrs["langwatch.prompt.id"];
+  if (existingPromptIds || newPromptId) {
+    const union = [
+      ...new Set([
+        ...parseJsonStringArray(existingPromptIds),
+        ...(newPromptId ? [newPromptId] : []),
+      ]),
+    ];
+    if (union.length > 0)
+      merged["langwatch.prompt_ids"] = JSON.stringify(union);
+  }
+  // Remove the per-span key so it doesn't leak into trace-level attributes
+  delete merged["langwatch.prompt.id"];
+
   // Metadata: deep-merge JSON objects, first-wins for primitives
   for (const key of Object.keys(merged)) {
     if (!key.startsWith("metadata.")) continue;
@@ -741,9 +773,10 @@ function accumulateAttributes({
 
 // ─── Main composition ───────────────────────────────────────────────
 
-const spanNormalizationPipelineService =
-  SpanNormalizationPipelineService.create();
-const traceIOExtractionService = TraceIOExtractionService.create();
+const spanNormalizationPipelineService = new SpanNormalizationPipelineService(
+  new CanonicalizeSpanAttributesService(),
+);
+const traceIOExtractionService = new TraceIOExtractionService();
 
 /** @internal Exported for unit testing */
 export function applySpanToSummary({
@@ -824,12 +857,11 @@ export function createTraceSummaryFoldProjection({
         outputFromRootSpan: false,
         outputSpanEndTimeMs: 0,
         blockedByGuardrail: false,
-        satisfactionScore: null,
         topicId: null,
         subTopicId: null,
         hasAnnotation: null,
         attributes: {},
-        occurredAt: Date.now(),
+        occurredAt: 0,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
@@ -861,14 +893,6 @@ export function createTraceSummaryFoldProjection({
           ...state,
           topicId: event.data.topicId ?? state.topicId,
           subTopicId: event.data.subtopicId ?? state.subTopicId,
-          updatedAt: Date.now(),
-        };
-      }
-
-      if (isSatisfactionScoreAssignedEvent(event)) {
-        return {
-          ...state,
-          satisfactionScore: event.data.satisfactionScore,
           updatedAt: Date.now(),
         };
       }
@@ -949,6 +973,22 @@ export function createTraceSummaryFoldProjection({
           traceId: state.traceId || event.data.traceId,
           timeToFirstTokenMs,
           attributes: mergedAttributes,
+          updatedAt: Date.now(),
+        };
+      }
+
+      if (isOriginResolvedEvent(event)) {
+        const currentOrigin = state.attributes["langwatch.origin"];
+        if (currentOrigin) {
+          // Explicit origin already set — do not override
+          return state;
+        }
+        return {
+          ...state,
+          attributes: {
+            ...state.attributes,
+            "langwatch.origin": event.data.origin,
+          },
           updatedAt: Date.now(),
         };
       }

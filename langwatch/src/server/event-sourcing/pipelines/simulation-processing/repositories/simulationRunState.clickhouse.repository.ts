@@ -36,6 +36,7 @@ interface ClickHouseSimulationRunRecord {
   Status: string;
   Name: string | null;
   Description: string | null;
+  Metadata: string | null;
   "Messages.Id": string[];
   "Messages.Role": string[];
   "Messages.Content": string[];
@@ -49,6 +50,7 @@ interface ClickHouseSimulationRunRecord {
   Error: string | null;
   DurationMs: string | null;
   StartedAt: number | null;
+  QueuedAt: number | null;
   CreatedAt: number;
   UpdatedAt: number;
   FinishedAt: number | null;
@@ -58,7 +60,7 @@ interface ClickHouseSimulationRunRecord {
 
 type ClickHouseSimulationRunWriteRecord = WithDateWrites<
   ClickHouseSimulationRunRecord,
-  "StartedAt" | "CreatedAt" | "UpdatedAt" | "FinishedAt" | "ArchivedAt" | "LastSnapshotOccurredAt"
+  "StartedAt" | "QueuedAt" | "CreatedAt" | "UpdatedAt" | "FinishedAt" | "ArchivedAt" | "LastSnapshotOccurredAt"
 >;
 
 export class SimulationRunStateRepositoryClickHouse<
@@ -79,6 +81,7 @@ export class SimulationRunStateRepositoryClickHouse<
       Status: record.Status,
       Name: record.Name,
       Description: record.Description,
+      Metadata: record.Metadata,
       Messages: ids.map((Id, i) => ({
         Id,
         Role: record["Messages.Role"]?.[i] ?? "",
@@ -94,6 +97,7 @@ export class SimulationRunStateRepositoryClickHouse<
       Error: record.Error,
       DurationMs: record.DurationMs ? parseInt(record.DurationMs, 10) : null,
       StartedAt: record.StartedAt === null ? null : Number(record.StartedAt),
+      QueuedAt: record.QueuedAt === null || record.QueuedAt === undefined ? null : Number(record.QueuedAt),
       CreatedAt: Number(record.CreatedAt),
       UpdatedAt: Number(record.UpdatedAt),
       FinishedAt: record.FinishedAt === null ? null : Number(record.FinishedAt),
@@ -120,6 +124,7 @@ export class SimulationRunStateRepositoryClickHouse<
       Status: data.Status,
       Name: data.Name,
       Description: data.Description,
+      Metadata: data.Metadata,
       "Messages.Id": data.Messages.map((m) => m.Id),
       "Messages.Role": data.Messages.map((m) => m.Role),
       "Messages.Content": data.Messages.map((m) => m.Content),
@@ -133,6 +138,7 @@ export class SimulationRunStateRepositoryClickHouse<
       Error: data.Error,
       DurationMs: data.DurationMs?.toString() ?? null,
       StartedAt: new Date(data.StartedAt ?? data.CreatedAt),
+      QueuedAt: data.QueuedAt != null ? new Date(data.QueuedAt) : null,
       CreatedAt: data.CreatedAt != null ? new Date(data.CreatedAt) : new Date(),
       UpdatedAt: new Date(data.UpdatedAt),
       FinishedAt: data.FinishedAt != null ? new Date(data.FinishedAt) : null,
@@ -157,13 +163,14 @@ export class SimulationRunStateRepositoryClickHouse<
         query: `
           SELECT
             ProjectionId, TenantId, ScenarioRunId, ScenarioId, BatchRunId, ScenarioSetId,
-            Version, Status, Name, Description,
+            Version, Status, Name, Description, Metadata,
             \`Messages.Id\`, \`Messages.Role\`, \`Messages.Content\`,
             \`Messages.TraceId\`, \`Messages.Rest\`,
             TraceIds,
             Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
             toString(DurationMs) AS DurationMs,
             toUnixTimestamp64Milli(StartedAt) AS StartedAt,
+            if(QueuedAt IS NOT NULL, toUnixTimestamp64Milli(QueuedAt), NULL) AS QueuedAt,
             toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
             toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
             toUnixTimestamp64Milli(FinishedAt) AS FinishedAt,
@@ -176,6 +183,7 @@ export class SimulationRunStateRepositoryClickHouse<
         `,
         query_params: { tenantId: context.tenantId, scenarioRunId },
         format: "JSONEachRow",
+        clickhouse_settings: { select_sequential_consistency: "1" },
       });
 
       const rows = await result.json<ClickHouseSimulationRunRecord>();
@@ -250,8 +258,6 @@ export class SimulationRunStateRepositoryClickHouse<
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
 
-      logger.debug({ tenantId: context.tenantId, scenarioRunId, projectionId: projection.id },
-        "Stored simulation run state projection to ClickHouse");
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
