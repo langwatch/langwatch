@@ -64,8 +64,9 @@ export function ScenarioGridCard({
           color="red.500"
           cursor={isCancelling ? "default" : "pointer"}
           opacity={isCancelling ? 0.6 : 0}
+          pointerEvents={isCancelling ? "auto" : "none"}
           transition="opacity 0.15s"
-          _groupHover={{ opacity: isCancelling ? 0.6 : 1 }}
+          _groupHover={isCancelling ? { opacity: 0.6 } : { opacity: 1, pointerEvents: "auto" }}
           _hover={isCancelling ? undefined : { bg: "red.50" }}
           position="absolute"
           top={2}

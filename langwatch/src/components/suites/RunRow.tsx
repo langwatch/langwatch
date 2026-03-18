@@ -141,8 +141,9 @@ export function RunRow({
             cursor={isCancellingBatch ? "default" : "pointer"}
             flexShrink={0}
             opacity={isCancellingBatch ? 0.6 : 0}
+            pointerEvents={isCancellingBatch ? "auto" : "none"}
             transition="opacity 0.15s"
-            _groupHover={{ opacity: isCancellingBatch ? 0.6 : 1 }}
+            _groupHover={isCancellingBatch ? { opacity: 0.6 } : { opacity: 1, pointerEvents: "auto" }}
             _hover={isCancellingBatch ? undefined : { bg: "red.50" }}
             onClick={(e: React.MouseEvent) => {
               e.stopPropagation();
