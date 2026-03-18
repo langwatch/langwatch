@@ -50,6 +50,7 @@ export interface MinimalJob {
   id?: string | null;
   data: ScenarioJob;
   timestamp?: number;
+  processedOn?: number;
 }
 
 /** Parameters for normalizing a single BullMQ job into a ScenarioRunData row. */
@@ -73,7 +74,7 @@ export function normalizeJob({ job, state }: NormalizeJobParams): ScenarioRunDat
 
   const status = mapBullMQStateToStatus({
     state,
-    jobTimestamp: job.timestamp,
+    jobTimestamp: job.processedOn ?? job.timestamp,
   });
 
   return {
@@ -107,7 +108,7 @@ export function normalizeJob({ job, state }: NormalizeJobParams): ScenarioRunDat
  */
 export interface ScenarioQueueAdapter {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  getJobs(states: any): Promise<Array<{ id?: string | null; data: any; timestamp?: number }>>;
+  getJobs(states: any): Promise<Array<{ id?: string | null; data: any; timestamp?: number; processedOn?: number }>>;
 }
 
 type JobState = "waiting" | "active" | "completed" | "failed";
@@ -125,7 +126,7 @@ const STATE_PRIORITY: Record<JobState, number> = {
  * when a job moves between states. Higher-priority state wins.
  */
 function collapseJobsById(params: {
-  jobsByState: Array<{ jobs: Array<{ id?: string | null; data: unknown; timestamp?: number }>; state: JobState }>;
+  jobsByState: Array<{ jobs: Array<{ id?: string | null; data: unknown; timestamp?: number; processedOn?: number }>; state: JobState }>;
 }): Array<{ job: MinimalJob; state: JobState }> {
   const byId = new Map<string, { job: MinimalJob; state: JobState }>();
 

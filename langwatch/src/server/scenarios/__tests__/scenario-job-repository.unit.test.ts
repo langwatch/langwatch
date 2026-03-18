@@ -170,12 +170,35 @@ describe("normalizeJob()", () => {
     });
   });
 
-  describe("given an active BullMQ job with a stale timestamp", () => {
+  describe("given an active BullMQ job with a stale processedOn", () => {
+    const data = makeJobData();
+    const staleProcessedOn = Date.now() - STALL_THRESHOLD_MS - 1000;
+    const job = makeJob({ data, processedOn: staleProcessedOn });
+
+    it("returns STALLED status", () => {
+      const result = normalizeJob({ job, state: "active" });
+      expect(result?.status).toBe(ScenarioRunStatus.STALLED);
+    });
+  });
+
+  describe("given an active BullMQ job that waited in queue longer than threshold", () => {
+    const data = makeJobData();
+    const oldEnqueueTime = Date.now() - STALL_THRESHOLD_MS - 60_000;
+    const recentProcessedOn = Date.now() - 5_000;
+    const job = makeJob({ data, timestamp: oldEnqueueTime, processedOn: recentProcessedOn });
+
+    it("returns RUNNING because processedOn is recent", () => {
+      const result = normalizeJob({ job, state: "active" });
+      expect(result?.status).toBe(ScenarioRunStatus.RUNNING);
+    });
+  });
+
+  describe("given an active BullMQ job with stale timestamp but no processedOn", () => {
     const data = makeJobData();
     const staleTimestamp = Date.now() - STALL_THRESHOLD_MS - 1000;
     const job = makeJob({ data, timestamp: staleTimestamp });
 
-    it("returns STALLED status", () => {
+    it("falls back to timestamp and returns STALLED", () => {
       const result = normalizeJob({ job, state: "active" });
       expect(result?.status).toBe(ScenarioRunStatus.STALLED);
     });
