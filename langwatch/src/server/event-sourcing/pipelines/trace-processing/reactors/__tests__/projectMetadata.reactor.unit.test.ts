@@ -113,10 +113,10 @@ describe("createProjectMetadataReactor()", () => {
 
       await reactor.handle(event, context);
 
-      expect(mockProjects.updateMetadata).toHaveBeenCalledWith(
-        tenantId,
-        expect.objectContaining({ firstMessage: true }),
-      );
+      expect(mockProjects.updateMetadata).toHaveBeenCalledWith({
+        id: tenantId,
+        data: expect.objectContaining({ firstMessage: true }),
+      });
     });
 
     it("sets integrated to true for non-optimization-studio traces", async () => {
@@ -126,10 +126,10 @@ describe("createProjectMetadataReactor()", () => {
 
       await reactor.handle(event, context);
 
-      expect(mockProjects.updateMetadata).toHaveBeenCalledWith(
-        tenantId,
-        expect.objectContaining({ integrated: true }),
-      );
+      expect(mockProjects.updateMetadata).toHaveBeenCalledWith({
+        id: tenantId,
+        data: expect.objectContaining({ integrated: true }),
+      });
     });
   });
 
@@ -153,10 +153,10 @@ describe("createProjectMetadataReactor()", () => {
 
       await reactor.handle(event, context);
 
-      expect(mockProjects.updateMetadata).toHaveBeenCalledWith(
-        tenantId,
-        expect.objectContaining({ language: "python" }),
-      );
+      expect(mockProjects.updateMetadata).toHaveBeenCalledWith({
+        id: tenantId,
+        data: expect.objectContaining({ language: "python" }),
+      });
     });
   });
 
@@ -180,10 +180,10 @@ describe("createProjectMetadataReactor()", () => {
 
       await reactor.handle(event, context);
 
-      expect(mockProjects.updateMetadata).toHaveBeenCalledWith(
-        tenantId,
-        expect.objectContaining({ language: "typescript" }),
-      );
+      expect(mockProjects.updateMetadata).toHaveBeenCalledWith({
+        id: tenantId,
+        data: expect.objectContaining({ language: "typescript" }),
+      });
     });
   });
 
@@ -207,10 +207,10 @@ describe("createProjectMetadataReactor()", () => {
 
       await reactor.handle(event, context);
 
-      expect(mockProjects.updateMetadata).toHaveBeenCalledWith(
-        tenantId,
-        expect.objectContaining({ language: "other" }),
-      );
+      expect(mockProjects.updateMetadata).toHaveBeenCalledWith({
+        id: tenantId,
+        data: expect.objectContaining({ language: "other" }),
+      });
     });
   });
 
@@ -270,10 +270,10 @@ describe("createProjectMetadataReactor()", () => {
 
       await reactor.handle(event, context);
 
-      expect(mockProjects.updateMetadata).toHaveBeenCalledWith(
-        tenantId,
-        expect.objectContaining({ integrated: false }),
-      );
+      expect(mockProjects.updateMetadata).toHaveBeenCalledWith({
+        id: tenantId,
+        data: expect.objectContaining({ integrated: false }),
+      });
     });
 
     it("sets language to 'other'", async () => {
@@ -286,10 +286,10 @@ describe("createProjectMetadataReactor()", () => {
 
       await reactor.handle(event, context);
 
-      expect(mockProjects.updateMetadata).toHaveBeenCalledWith(
-        tenantId,
-        expect.objectContaining({ language: "other" }),
-      );
+      expect(mockProjects.updateMetadata).toHaveBeenCalledWith({
+        id: tenantId,
+        data: expect.objectContaining({ language: "other" }),
+      });
     });
   });
 
