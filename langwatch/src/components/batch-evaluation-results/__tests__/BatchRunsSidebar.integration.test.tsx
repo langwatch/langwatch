@@ -32,7 +32,7 @@ const createRun = ({
 }): BatchRunSummary => ({
   runId,
   workflowVersion: commitMessage
-    ? { id: `wv-${runId}`, version: 1, commitMessage }
+    ? { id: `wv-${runId}`, version: "1", commitMessage }
     : null,
   timestamps: {
     createdAt,
