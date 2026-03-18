@@ -66,13 +66,12 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
         px: { base: 5, md: 10 },
       }
     : {
-        w: { base: "100%", md: "480px" },
-        maxW: "480px",
-        px: 6,
+        maxW: { base: "100%", md: "720px", xl: "840px" },
+        px: { base: 4, md: 8 },
       };
 
   return (
-    <Box w="full" minH="100dvh" background="bg.page" position="relative">
+    <Box w="full" minH="100dvh" background="bg.subtle" position="relative">
       <OnboardingMeshBackground />
       {showBackButton && onBack && (
         <HStack position="fixed" top={3} left={3} zIndex={99}>
@@ -141,13 +140,14 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
         transition={{ duration: 0.5, ease: "easeOut" }}
       >
         <LightMode>
-          <FullLogo width={140} />
+          <FullLogo width={175} />
         </LightMode>
       </MotionCenter>
 
       <MotionContainer
         width="full"
         mx="auto"
+        mt={"10"}
         pb={16}
         {...containerWidthProps}
         {...(isFullWidth ? { fluid: true } : {})}
@@ -156,9 +156,9 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
         transition={{ duration: 0.5, ease: "easeOut", delay: 0.1 }}
       >
         <VStack gap={8} align="stretch">
-          <VStack gap={1} align="center" textAlign="center">
+          <VStack gap={1} align="start">
             <Text
-              textStyle={{ base: "2xl", md: "3xl" }}
+              textStyle="2xl"
               fontWeight="bold"
               color="fg.DEFAULT"
               letterSpacing="-0.02em"

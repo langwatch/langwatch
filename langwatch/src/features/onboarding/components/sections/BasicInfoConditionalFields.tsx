@@ -1,5 +1,5 @@
-import { Field, NativeSelect, VStack } from "@chakra-ui/react";
-import { useCollapse } from "react-collapsed";
+import { Field, NativeSelect, SegmentGroup, VStack } from "@chakra-ui/react";
+import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { useAnalytics } from "react-contextual-analytics";
 import { IconRadioCardGroup } from "../../../../components/forms/IconRadioCardGroup";
@@ -43,10 +43,16 @@ export const BasicInfoConditionalFields: React.FC<
   const [phoneIsValid, setLocalPhoneIsValid] = useState<boolean>(true);
   const { emit } = useAnalytics({ usageStyle });
 
-  const { getCollapseProps } = useCollapse({ isExpanded: showFields });
-
   return (
-    <div {...getCollapseProps()} style={{ ...getCollapseProps().style, width: "100%" }}>
+    <AnimatePresence>
+      {showFields && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          exit={{ opacity: 0, height: 0 }}
+          transition={{ duration: 0.3, ease: "easeInOut" }}
+          style={{ width: "100%", overflow: "hidden" }}
+        >
       <VStack gap={6} align="stretch" pt={4} w="full" minW="0">
         <Field.Root
           colorPalette="orange"
@@ -71,18 +77,31 @@ export const BasicInfoConditionalFields: React.FC<
 
         <Field.Root colorPalette="orange" w="full">
           <Field.Label>{"How large is your company?"}</Field.Label>
-          <NativeSelect.Root
+          <SegmentGroup.Root
             size="sm"
             colorPalette="orange"
+            value={companySize}
+            onValueChange={({ value }) => {
+              setCompanySize(value as CompanySize);
+              emit("selected", "company_size", { value });
+            }}
+            display={{ base: "none", md: "flex" }}
           >
+            <SegmentGroup.Indicator />
+            <SegmentGroup.Items
+              items={companySizeItems.map((item) => ({
+                label: item.title,
+                value: item.value,
+              }))}
+            />
+          </SegmentGroup.Root>
+          <NativeSelect.Root size="sm" colorPalette="orange" display={{ base: "flex", md: "none" }}>
             <NativeSelect.Field
               placeholder="Select company size"
               value={companySize}
               onChange={(e) => {
                 setCompanySize(e.target.value as CompanySize);
-                emit("selected", "company_size", {
-                  value: e.target.value,
-                });
+                emit("selected", "company_size", { value: e.target.value });
               }}
             >
               {companySizeItems.map((item) => (
@@ -110,6 +129,8 @@ export const BasicInfoConditionalFields: React.FC<
           />
         </Field.Root>
       </VStack>
-    </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 };
