@@ -68,7 +68,7 @@ describe("<RunSummaryCounts/>", () => {
       expect(screen.getByText("5 passed")).toBeInTheDocument();
       expect(screen.getByText("1 failed")).toBeInTheDocument();
       expect(screen.getByText("2 stalled")).toBeInTheDocument();
-      expect(screen.getByText("1 skipped")).toBeInTheDocument();
+      expect(screen.getByText("1 cancelled")).toBeInTheDocument();
     });
   });
 
@@ -87,7 +87,7 @@ describe("<RunSummaryCounts/>", () => {
       );
 
       expect(screen.queryByText(/stalled/)).not.toBeInTheDocument();
-      expect(screen.queryByText(/skipped/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/cancelled/)).not.toBeInTheDocument();
     });
   });
 
@@ -112,7 +112,7 @@ describe("<RunSummaryCounts/>", () => {
       expect(screen.queryByText(/passed/)).not.toBeInTheDocument();
       expect(screen.queryByText(/failed/)).not.toBeInTheDocument();
       expect(screen.queryByText(/stalled/)).not.toBeInTheDocument();
-      expect(screen.queryByText(/skipped/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/cancelled/)).not.toBeInTheDocument();
     });
   });
 });

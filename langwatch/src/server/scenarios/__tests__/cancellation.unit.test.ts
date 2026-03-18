@@ -149,11 +149,13 @@ describe("ScenarioCancellationService", () => {
       });
     });
 
-    describe("when the job is active and Redis is unavailable", () => {
-      let result: { cancelled: boolean };
+    describe("when the job is active and Redis is unavailable (orphaned run in projection)", () => {
+      let result: { cancelled: boolean; method?: string };
+      let mockSaveScenarioEvent: ReturnType<typeof vi.fn>;
 
       beforeEach(async () => {
-        const { deps, mockGetRunsForBatch, mockRemoveQueuedJob, mockSignalCancel } = createMockDeps();
+        const { deps, mockGetRunsForBatch, mockRemoveQueuedJob, mockSignalCancel, mockSaveScenarioEvent: saveFn } = createMockDeps();
+        mockSaveScenarioEvent = saveFn;
         stubRunStatus(mockGetRunsForBatch, ScenarioRunStatus.IN_PROGRESS);
         mockRemoveQueuedJob.mockResolvedValue(false);
         mockSignalCancel.mockResolvedValue(false);
@@ -162,8 +164,17 @@ describe("ScenarioCancellationService", () => {
         result = await service.cancelJob(defaultJobParams);
       });
 
-      it("returns cancelled: false", () => {
-        expect(result).toEqual({ cancelled: false });
+      it("force-cancels the orphaned run via event write", () => {
+        expect(mockSaveScenarioEvent).toHaveBeenCalledWith(
+          expect.objectContaining({
+            projectId: "proj1",
+            status: ScenarioRunStatus.CANCELLED,
+          }),
+        );
+      });
+
+      it("returns cancelled: true with method removed", () => {
+        expect(result).toEqual({ cancelled: true, method: "removed" });
       });
     });
 

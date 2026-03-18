@@ -221,7 +221,7 @@ describe("simulationRunStateFoldProjection", () => {
       expect(state.Status).toBe("IN_PROGRESS");
       expect(state.StartedAt).toBe(1000);
       expect(state.CreatedAt).toBe(FAKE_NOW);
-      expect(state.UpdatedAt).toBe(FAKE_NOW);
+      expect(state.UpdatedAt).toBe(1000); // event.occurredAt
     });
   });
 
@@ -240,7 +240,7 @@ describe("simulationRunStateFoldProjection", () => {
         { Id: "", Role: "assistant", Content: "hi", TraceId: "", Rest: "" },
       ]);
       expect(state.TraceIds).toEqual(["trace-1", "trace-2"]);
-      expect(state.UpdatedAt).toBe(FAKE_NOW);
+      expect(state.UpdatedAt).toBe(2000); // MessageSnapshot occurredAt
     });
 
     it("updates Status when provided", () => {
@@ -279,7 +279,7 @@ describe("simulationRunStateFoldProjection", () => {
       expect(state.Messages).toEqual([
         { Id: "", Role: "user", Content: "second", TraceId: "", Rest: "" },
       ]);
-      expect(state.UpdatedAt).toBe(FAKE_NOW);
+      expect(state.UpdatedAt).toBe(2000); // newer snapshot's occurredAt (older ignored)
     });
   });
 
@@ -371,8 +371,8 @@ describe("simulationRunStateFoldProjection", () => {
         createRunDeletedEvent(),
       ]);
 
-      expect(state.ArchivedAt).toBe(FAKE_NOW);
-      expect(state.UpdatedAt).toBe(FAKE_NOW);
+      expect(state.ArchivedAt).toBe(4000); // RunDeleted occurredAt
+      expect(state.UpdatedAt).toBe(4000); // RunDeleted occurredAt
     });
   });
 
@@ -386,7 +386,7 @@ describe("simulationRunStateFoldProjection", () => {
       expect(state.Messages).toEqual([
         { Id: "msg-1", Role: "user", Content: "", TraceId: "", Rest: "" },
       ]);
-      expect(state.UpdatedAt).toBe(FAKE_NOW);
+      expect(state.UpdatedAt).toBe(1500); // TextMessageStart occurredAt
     });
 
     it("transitions PENDING to IN_PROGRESS", () => {

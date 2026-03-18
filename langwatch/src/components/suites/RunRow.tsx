@@ -17,7 +17,6 @@ import type { BatchRun, BatchRunSummary } from "./run-history-transforms";
 import { computeIterationMap, getScenarioDisplayNames } from "./run-history-transforms";
 import { ScenarioRunContent } from "./ScenarioRunContent";
 import { RunSummaryCounts } from "./RunSummaryCounts";
-import { SummaryStatusIcon } from "./SummaryStatusIcon";
 import { isCancellableStatus } from "./useCancelScenarioRun";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import type { ViewMode } from "./useRunHistoryStore";
@@ -161,7 +160,6 @@ export function RunRow({
             <Text fontSize="xs">Cancel All</Text>
           </HStack>
         )}
-        <SummaryStatusIcon summary={summary} />
         <RunSummaryCounts summary={summary} />
       </HStack>
 

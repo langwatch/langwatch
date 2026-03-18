@@ -66,7 +66,7 @@ const RUN_COLUMNS = `
  */
 const LIST_COLUMNS = `
   ScenarioRunId, ScenarioId, BatchRunId, ScenarioSetId,
-  Status, Name, Description,
+  Status, Name, Description, Metadata,
   arraySlice(\`Messages.Id\`, 1, 6) AS \`Messages.Id\`,
   arraySlice(\`Messages.Role\`, 1, 6) AS \`Messages.Role\`,
   arraySlice(\`Messages.Content\`, 1, 6) AS \`Messages.Content\`,
@@ -84,6 +84,8 @@ const LIST_COLUMNS = `
 const PREVIEW_COLUMNS = `
   ScenarioRunId, BatchRunId, Name, Description, Status,
   toString(DurationMs) AS DurationMs,
+  toString(toUnixTimestamp64Milli(UpdatedAt)) AS UpdatedAt,
+  toString(toUnixTimestamp64Milli(FinishedAt)) AS FinishedAt,
   arraySlice(\`Messages.Role\`, 1, 4) AS MessagePreviewRoles,
   arraySlice(\`Messages.Content\`, 1, 4) AS MessagePreviewContents` as const;
 
@@ -97,12 +99,12 @@ const DEDUP_PREVIEW_COLUMNS = `
   TenantId, ScenarioSetId, BatchRunId, ScenarioRunId,
   Status, Name, Description,
   \`Messages.Role\`, \`Messages.Content\`,
-  DurationMs, UpdatedAt, CreatedAt, ArchivedAt` as const;
+  DurationMs, UpdatedAt, CreatedAt, FinishedAt, ArchivedAt` as const;
 
 /** Inner subquery columns for list-view queries (getRunsForBatchIds) */
 const DEDUP_LIST_COLUMNS = `
   TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, ScenarioId,
-  Status, Name, Description,
+  Status, Name, Description, Metadata,
   \`Messages.Id\`, \`Messages.Role\`, \`Messages.Content\`,
   TraceIds, Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
   DurationMs, UpdatedAt, CreatedAt, FinishedAt, ArchivedAt` as const;
@@ -308,6 +310,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       Description: string | null;
       Status: string;
       DurationMs: string | null;
+      UpdatedAt: string;
+      FinishedAt: string | null;
       MessagePreviewRoles: string[];
       MessagePreviewContents: string[];
     }>(
@@ -344,11 +348,11 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       const items = (itemsByBatch.get(b.BatchRunId) ?? []).map((r) => {
         const baseStatus = mapStatus(r.Status);
         const durationMs = r.DurationMs != null ? parseInt(r.DurationMs, 10) : 0;
+        const perRunUpdatedAt = Number(r.UpdatedAt);
+        const hasFinished = r.FinishedAt != null && Number(r.FinishedAt) > 0;
         const resolvedStatus = resolveRunStatus({
-          finishedStatus: ["SUCCESS","FAILED","FAILURE","ERROR","CANCELLED"].includes(r.Status)
-            ? baseStatus
-            : undefined,
-          lastEventTimestamp: lastUpdatedAt,
+          finishedStatus: hasFinished ? baseStatus : undefined,
+          lastEventTimestamp: perRunUpdatedAt,
           now,
         });
         return {
