@@ -117,13 +117,13 @@ export function CodePreview({
             transition="all 0.3s ease"
             borderRadius="xl"
             border="1px solid"
-            borderColor="rgba(255,255,255,0.18)"
-            bg="rgba(255,255,255,0.04)"
+            borderColor="gray.200"
+            bg="white/60"
             backdropFilter="blur(20px) saturate(1.3)"
-            boxShadow="0 4px 30px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.12)"
+            boxShadow="0 4px 30px rgba(0,0,0,0.06), inset 0 1px 0 white"
             overflow="hidden"
           >
-            <CodeBlock.Header display="flex" justifyContent="space-between" borderColor="rgba(255,255,255,0.10)">
+            <CodeBlock.Header display="flex" justifyContent="space-between" borderColor="gray.200">
               <CodeBlock.Title fontSize="xs" pt={2}>
                 {languageIconUrl ? (
                   <Icon size="xs">

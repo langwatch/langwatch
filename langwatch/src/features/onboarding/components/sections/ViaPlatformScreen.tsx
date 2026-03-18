@@ -11,6 +11,7 @@ import {
 import { useRouter } from "next/router";
 import type React from "react";
 import { ArrowRight } from "react-feather";
+import { Tooltip } from "../../../../components/ui/tooltip";
 import { useActiveProject } from "../../contexts/ActiveProjectContext";
 
 interface CapabilityProps {
@@ -62,17 +63,18 @@ function CapabilityCard({
       align="start"
       gap={3}
       p={4}
+      flex={1}
       borderRadius="xl"
       border="1px solid"
-      borderColor="rgba(255,255,255,0.18)"
-      bg="rgba(255,255,255,0.06)"
+      borderColor="gray.200"
+      bg="white/70"
       backdropFilter="blur(20px) saturate(1.3)"
-      boxShadow="0 2px 16px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.10)"
+      boxShadow="0 2px 16px rgba(0,0,0,0.04), inset 0 1px 0 white"
       transition="all 0.2s ease"
       _hover={{
-        borderColor: "rgba(255,255,255,0.28)",
+        borderColor: "gray.300",
         boxShadow:
-          "0 6px 28px rgba(0,0,0,0.07), inset 0 1px 0 rgba(255,255,255,0.14)",
+          "0 6px 28px rgba(0,0,0,0.07), inset 0 1px 0 white",
         transform: "translateY(-1px)",
       }}
     >
@@ -124,7 +126,7 @@ export function ViaPlatformScreen(): React.ReactElement {
           gap={3}
         >
           {capabilities.map((cap) => (
-            <GridItem key={cap.title}>
+            <GridItem key={cap.title} display="flex">
               <CapabilityCard {...cap} />
             </GridItem>
           ))}
@@ -157,24 +159,38 @@ export function ViaPlatformScreen(): React.ReactElement {
 
       {project?.slug && (
         <Box position="fixed" right="24px" bottom="24px" zIndex={11}>
-          <Button
-            onClick={() => void router.push(`/${project.slug}`)}
-            borderRadius="full"
-            colorPalette="orange"
-            px={{ base: 4, md: 6 }}
-            py={2}
-            boxShadow="0 4px 24px rgba(237,137,38,0.20)"
-            _hover={{
-              transform: "translateY(-1px)",
-              boxShadow: "0 6px 32px rgba(237,137,38,0.28)",
-            }}
-            transition="all 0.2s ease"
+          <Tooltip
+            content="Continue to LangWatch — skip onboarding"
+            positioning={{ placement: "left" }}
+            showArrow
+            openDelay={0}
           >
-            <HStack gap={2}>
-              <Text>Continue to LangWatch</Text>
-              <ArrowRight size={16} />
-            </HStack>
-          </Button>
+            <Button
+              onClick={() => void router.push(`/${project.slug}`)}
+              aria-label="Continue to LangWatch"
+              borderRadius="full"
+              variant="ghost"
+              colorPalette="gray"
+              bg="white/50"
+              backdropFilter="blur(20px) saturate(1.3)"
+              _hover={{
+                bg: "white/70",
+                transform: "translateY(-1px)",
+              }}
+              borderWidth="1px"
+              borderColor="gray.200"
+              boxShadow="0 4px 24px rgba(0,0,0,0.06), inset 0 1px 0 white"
+              px={{ base: 2, md: 4 }}
+              py={2}
+            >
+              <HStack gap={{ base: 0, md: 2 }}>
+                <Text display={{ base: "none", md: "inline" }}>
+                  Continue to LangWatch
+                </Text>
+                <ArrowRight size={16} />
+              </HStack>
+            </Button>
+          </Tooltip>
         </Box>
       )}
     </>

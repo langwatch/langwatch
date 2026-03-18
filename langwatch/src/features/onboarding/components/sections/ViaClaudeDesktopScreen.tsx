@@ -133,15 +133,15 @@ export function ViaClaudeDesktopScreen(): React.ReactElement {
               borderRadius="xl"
               overflow="hidden"
               border="1px solid"
-              borderColor="rgba(255,255,255,0.18)"
-              bg="rgba(255,255,255,0.06)"
+              borderColor="gray.200"
+              bg="white/70"
               backdropFilter="blur(20px) saturate(1.3)"
-              boxShadow="0 2px 16px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.10)"
+              boxShadow="0 2px 16px rgba(0,0,0,0.04), inset 0 1px 0 white"
               transition="all 0.2s ease"
               _hover={{
-                borderColor: "rgba(255,255,255,0.28)",
+                borderColor: "gray.300",
                 boxShadow:
-                  "0 6px 28px rgba(0,0,0,0.07), inset 0 1px 0 rgba(255,255,255,0.14)",
+                  "0 6px 28px rgba(0,0,0,0.07), inset 0 1px 0 white",
               }}
             >
               <Box
@@ -161,7 +161,7 @@ export function ViaClaudeDesktopScreen(): React.ReactElement {
                 position="absolute"
                 top={2}
                 right={2}
-                bg="rgba(255,255,255,0.06)"
+                bg="white/70"
                 backdropFilter="blur(16px) saturate(1.3)"
                 borderRadius="lg"
                 p={0.5}
@@ -177,9 +177,9 @@ export function ViaClaudeDesktopScreen(): React.ReactElement {
                     onClick={() => void handleCopy()}
                     aria-label="Copy MCP config"
                     colorPalette={copied ? "green" : "gray"}
-                    bg="rgba(255,255,255,0.10)"
+                    bg="white/50"
                     borderRadius="md"
-                    _hover={{ bg: "rgba(255,255,255,0.18)" }}
+                    _hover={{ bg: "white/80" }}
                   >
                     {copied ? <Check size={14} /> : <Clipboard size={14} />}
                   </Button>
@@ -214,10 +214,10 @@ export function ViaClaudeDesktopScreen(): React.ReactElement {
         <Box
           borderRadius="xl"
           border="1px solid"
-          borderColor="rgba(255,255,255,0.18)"
-          bg="rgba(255,255,255,0.06)"
+          borderColor="gray.200"
+          bg="white/70"
           backdropFilter="blur(20px) saturate(1.3)"
-          boxShadow="0 2px 16px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.10)"
+          boxShadow="0 2px 16px rgba(0,0,0,0.04), inset 0 1px 0 white"
           p={5}
         >
           <Text fontSize="xs" color="fg.muted" lineHeight="tall">
@@ -242,15 +242,15 @@ export function ViaClaudeDesktopScreen(): React.ReactElement {
               borderRadius="full"
               variant="ghost"
               colorPalette="gray"
-              bg="rgba(255,255,255,0.08)"
+              bg="white/50"
               backdropFilter="blur(20px) saturate(1.3)"
               _hover={{
-                bg: "rgba(255,255,255,0.14)",
+                bg: "white/70",
                 transform: "translateY(-1px)",
               }}
               borderWidth="1px"
-              borderColor="rgba(255,255,255,0.18)"
-              boxShadow="0 4px 24px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.10)"
+              borderColor="gray.200"
+              boxShadow="0 4px 24px rgba(0,0,0,0.06), inset 0 1px 0 white"
               px={{ base: 2, md: 4 }}
               py={2}
             >

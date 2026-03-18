@@ -107,18 +107,18 @@ function TabButton({
       fontSize="sm"
       fontWeight={active ? "semibold" : "medium"}
       color={active ? "fg.DEFAULT" : "fg.muted"}
-      bg={active ? "rgba(255,255,255,0.14)" : "transparent"}
+      bg={active ? "rgba(0,0,0,0.06)" : "transparent"}
       backdropFilter={active ? "blur(20px) saturate(1.3)" : undefined}
       boxShadow={
         active
-          ? "0 2px 12px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.14)"
+          ? "0 2px 12px rgba(0,0,0,0.06), inset 0 1px 0 white"
           : undefined
       }
       border="1px solid"
-      borderColor={active ? "rgba(255,255,255,0.22)" : "transparent"}
+      borderColor={active ? "rgba(0,0,0,0.10)" : "transparent"}
       transition="all 0.2s ease"
       _hover={{
-        bg: active ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.08)",
+        bg: active ? "rgba(0,0,0,0.07)" : "rgba(0,0,0,0.04)",
       }}
       letterSpacing="-0.01em"
     >
@@ -170,9 +170,9 @@ function InlineCopyButton({
         aria-label={`Copy ${label.toLowerCase()}`}
         colorPalette={copied ? "green" : "gray"}
         backdropFilter="blur(8px)"
-        bg="rgba(255,255,255,0.08)"
+        bg="white/50"
         borderRadius="lg"
-        _hover={{ bg: "rgba(255,255,255,0.15)" }}
+        _hover={{ bg: "white/70" }}
         flexShrink={0}
         gap={1.5}
       >
@@ -192,20 +192,20 @@ function glassCard({
     border: "1px solid",
     borderColor: highlight
       ? "rgba(237,137,38,0.25)"
-      : "rgba(255,255,255,0.18)",
-    bg: highlight ? "rgba(237,137,38,0.08)" : "rgba(255,255,255,0.06)",
+      : "rgba(0,0,0,0.08)",
+    bg: highlight ? "rgba(237,137,38,0.08)" : "rgba(0,0,0,0.03)",
     backdropFilter: "blur(20px) saturate(1.3)",
     boxShadow: highlight
-      ? "0 4px 24px rgba(237,137,38,0.08), inset 0 1px 0 rgba(255,255,255,0.10)"
-      : "0 2px 16px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.10)",
+      ? "0 4px 24px rgba(237,137,38,0.08), inset 0 1px 0 white"
+      : "0 2px 16px rgba(0,0,0,0.04), inset 0 1px 0 white",
     transition: "all 0.2s ease",
     _hover: {
       borderColor: highlight
         ? "rgba(237,137,38,0.35)"
-        : "rgba(255,255,255,0.28)",
+        : "rgba(0,0,0,0.14)",
       boxShadow: highlight
-        ? "0 6px 32px rgba(237,137,38,0.12), inset 0 1px 0 rgba(255,255,255,0.14)"
-        : "0 6px 28px rgba(0,0,0,0.07), inset 0 1px 0 rgba(255,255,255,0.14)",
+        ? "0 6px 32px rgba(237,137,38,0.12), inset 0 1px 0 white"
+        : "0 6px 28px rgba(0,0,0,0.07), inset 0 1px 0 white",
       transform: "translateY(-1px)",
     },
   };
@@ -274,9 +274,9 @@ function SkillRow({
         px={3}
         py={2}
         borderRadius="lg"
-        bg="rgba(255,255,255,0.04)"
+        bg="white/60"
         border="1px solid"
-        borderColor="rgba(255,255,255,0.10)"
+        borderColor="gray.200"
       >
         <Text fontSize="xs" color="fg.muted">
           Then use
@@ -341,10 +341,10 @@ function McpTab({
       <Box
         borderRadius="xl"
         border="1px solid"
-        borderColor="rgba(255,255,255,0.18)"
-        bg="rgba(255,255,255,0.06)"
+        borderColor="gray.200"
+        bg="white/70"
         backdropFilter="blur(20px) saturate(1.3)"
-        boxShadow="0 2px 16px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.10)"
+        boxShadow="0 2px 16px rgba(0,0,0,0.04), inset 0 1px 0 white"
         p={5}
       >
         <Text fontSize="xs" color="fg.muted" lineHeight="tall">
@@ -386,10 +386,10 @@ export function ViaClaudeCodeScreen(): React.ReactElement {
           py={1.5}
           borderRadius="xl"
           border="1px solid"
-          borderColor="rgba(255,255,255,0.18)"
-          bg="rgba(255,255,255,0.06)"
+          borderColor="gray.200"
+          bg="white/70"
           backdropFilter="blur(20px) saturate(1.3)"
-          boxShadow="0 2px 16px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.10)"
+          boxShadow="0 2px 16px rgba(0,0,0,0.04), inset 0 1px 0 white"
         >
           <TabButton
             label="Prompt"
@@ -458,15 +458,15 @@ export function ViaClaudeCodeScreen(): React.ReactElement {
               borderRadius="full"
               variant="ghost"
               colorPalette="gray"
-              bg="rgba(255,255,255,0.08)"
+              bg="white/50"
               backdropFilter="blur(20px) saturate(1.3)"
               _hover={{
-                bg: "rgba(255,255,255,0.14)",
+                bg: "white/70",
                 transform: "translateY(-1px)",
               }}
               borderWidth="1px"
-              borderColor="rgba(255,255,255,0.18)"
-              boxShadow="0 4px 24px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.10)"
+              borderColor="gray.200"
+              boxShadow="0 4px 24px rgba(0,0,0,0.06), inset 0 1px 0 white"
               px={{ base: 2, md: 4 }}
               py={2}
             >
