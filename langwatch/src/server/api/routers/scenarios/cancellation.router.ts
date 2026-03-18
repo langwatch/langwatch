@@ -80,11 +80,14 @@ function createSignalCancel(): CancellationServiceDeps["signalCancel"] {
       const data = j.data as Record<string, unknown> | undefined;
       return data?.scenarioRunId === scenarioRunId && data?.projectId === projectId;
     });
-    const bullmqJobId = job?.id ?? scenarioRunId;
+
+    // Only signal if the job is actually active — otherwise the signal
+    // fires into the void and prevents the force-cancel fallback.
+    if (!job) return false;
 
     return publishCancellation({
       publisher,
-      message: { jobId: bullmqJobId, projectId, scenarioRunId, batchRunId },
+      message: { jobId: job.id ?? scenarioRunId, projectId, scenarioRunId, batchRunId },
     });
   };
 }
