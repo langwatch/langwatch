@@ -112,8 +112,9 @@ export function LLMModelCost(props: { projectId?: string }) {
                       height="32px"
                       lineHeight="22px"
                       borderRadius="6px"
-                      border="1px solid #EEE"
-                      background="gray.50"
+                      border="1px solid"
+                      borderColor="border"
+                      bg="bg.subtle"
                       paddingY={1}
                       paddingX={2}
                     >

@@ -49,7 +49,7 @@ function ResourceLimitsCard({
   messagesLabel?: string;
 }) {
   return (
-    <Card.Root borderWidth={1} borderColor="gray.200">
+    <Card.Root borderWidth={1} borderColor="border">
       <Card.Body paddingY={5} paddingX={6}>
         <VStack align="stretch" gap={5}>
           <Flex justifyContent="space-between" alignItems="flex-start">
@@ -69,11 +69,11 @@ function ResourceLimitsCard({
                   {planLabel}
                 </Badge>
               </HStack>
-              <Text color="gray.500" fontSize="sm">
+              <Text color="fg.muted" fontSize="sm">
                 {subtitle}
               </Text>
             </VStack>
-            <Button asChild variant="ghost" size="sm" color="gray.600">
+            <Button asChild variant="ghost" size="sm" color="fg.muted">
               <Link href={actionHref}>
                 {actionLabel} <ArrowRight size={14} />
               </Link>
@@ -151,7 +151,7 @@ function Usage() {
         <Flex justifyContent="space-between" alignItems="flex-start">
           <VStack align="start" gap={1}>
             <Heading size="xl">Usage</Heading>
-            <Text color="gray.500" fontSize="sm">
+            <Text color="fg.muted" fontSize="sm">
               Monitor your resource consumption and plan limits
             </Text>
           </VStack>
@@ -174,7 +174,7 @@ function Usage() {
 
         {/* Self-hosted: Loading state */}
         {isLoadingLimits && (
-          <Card.Root borderWidth={1} borderColor="gray.200">
+          <Card.Root borderWidth={1} borderColor="border">
             <Card.Body paddingY={5} paddingX={6}>
               <VStack align="start" gap={4}>
                 <Text fontWeight="semibold" fontSize="lg">Resource Limits</Text>
@@ -187,9 +187,9 @@ function Usage() {
 
         {/* Self-hosted: Error state */}
         {hasLimitsError && (
-          <Card.Root borderWidth={1} borderColor="red.200" backgroundColor="red.50">
+          <Card.Root borderWidth={1} colorPalette="red" borderColor="colorPalette.muted" bg="colorPalette.subtle">
             <Card.Body paddingY={5} paddingX={6}>
-              <Text color="red.600" fontSize="sm">
+              <Text color="colorPalette.fg" fontSize="sm">
                 Unable to load resource limits. Please refresh the page or
                 contact support if the issue persists.
               </Text>
