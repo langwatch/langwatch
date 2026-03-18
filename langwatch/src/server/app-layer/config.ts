@@ -32,6 +32,10 @@ export interface AppConfig {
   // undefined: backward-compatible "all" mode
   processRole?: ProcessRole;
 
+  // Customer.io nurturing
+  customerIoApiKey?: string;
+  customerIoRegion?: "us" | "eu";
+
   // SaaS mode
   isSaas?: boolean;
 
@@ -63,6 +67,8 @@ export function createAppConfigFromEnv(overrides?: {
     hubspotPortalId: env.HUBSPOT_PORTAL_ID,
     hubspotReachedLimitFormId: env.HUBSPOT_REACHED_LIMIT_FORM_ID,
     hubspotFormId: env.HUBSPOT_FORM_ID,
+    customerIoApiKey: env.CUSTOMER_IO_API_KEY,
+    customerIoRegion: env.CUSTOMER_IO_REGION,
     enableEventSourcing: env.ENABLE_EVENT_SOURCING,
     processRole: overrides?.processRole,
     isSaas: env.IS_SAAS,
