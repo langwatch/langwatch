@@ -149,6 +149,9 @@ export class SuiteRunService {
           batchRunId,
           scenarioSetId: setId,
           name: scenarioNameMap.get(item.scenarioId),
+          metadata: {
+            langwatch: { targetReferenceId: item.target.referenceId },
+          },
           occurredAt: now,
         }),
       ),
