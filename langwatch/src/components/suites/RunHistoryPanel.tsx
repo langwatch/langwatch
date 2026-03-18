@@ -133,7 +133,7 @@ export function RunHistoryPanel({
     (scenarioRun: ScenarioRunData): string | null => {
       const refId = scenarioRun.metadata?.langwatch?.targetReferenceId;
       if (!refId) return null;
-      return targetNameMap.get(refId) ?? null;
+      return targetNameMap.get(refId) ?? refId;
     },
     [targetNameMap],
   );
