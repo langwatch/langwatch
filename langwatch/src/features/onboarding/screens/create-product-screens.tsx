@@ -37,7 +37,7 @@ export const useCreateProductScreens = ({
       [ProductScreenIndex.VIA_CLAUDE_CODE]: {
         id: "via-claude-code",
         required: false,
-        heading: "Via Claude Code",
+        heading: "Via Coding Agent",
         widthVariant: "full",
         component: ViaClaudeCodeScreen,
       },
@@ -52,7 +52,7 @@ export const useCreateProductScreens = ({
       [ProductScreenIndex.VIA_CLAUDE_DESKTOP]: {
         id: "via-claude-desktop",
         required: false,
-        heading: "Via Claude Desktop",
+        heading: "Via Desktop App",
         widthVariant: "full",
         component: ViaClaudeDesktopScreen,
       },

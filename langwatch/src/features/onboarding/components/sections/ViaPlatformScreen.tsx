@@ -1,4 +1,4 @@
-import { Box, Button, Grid, GridItem, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Grid, GridItem, HStack, Text, VStack } from "@chakra-ui/react";
 import {
   Activity,
   BookOpen,
@@ -8,16 +8,17 @@ import {
   Settings,
   Shield,
 } from "lucide-react";
-import { useRouter } from "next/router";
 import type React from "react";
-import { ArrowRight } from "react-feather";
-import { Tooltip } from "../../../../components/ui/tooltip";
 import { useActiveProject } from "../../contexts/ActiveProjectContext";
 
 interface CapabilityProps {
   icon: LucideIcon;
   title: string;
   description: string;
+  /** URL path. If starts with "/" it's appended to project slug, otherwise used as-is. */
+  path: string;
+  /** If true, path is absolute and not prefixed with project slug. */
+  absolute?: boolean;
 }
 
 const capabilities: CapabilityProps[] = [
@@ -25,31 +26,38 @@ const capabilities: CapabilityProps[] = [
     icon: Activity,
     title: "Traces & Analytics",
     description: "Monitor LLM calls, latency, costs, and user interactions",
+    path: "/messages",
   },
   {
     icon: Shield,
     title: "Evaluations",
     description: "Set up automated quality checks on your LLM outputs",
+    path: "/evaluations",
   },
   {
     icon: MessageSquareText,
     title: "Prompts",
     description: "Version, test, and manage your prompts from the dashboard",
+    path: "/prompts",
   },
   {
     icon: FlaskConical,
     title: "Scenarios",
     description: "Create test scenarios to validate agent behavior",
+    path: "/simulations",
   },
   {
     icon: BookOpen,
     title: "Datasets",
     description: "Build and curate datasets for evaluation and fine-tuning",
+    path: "/datasets",
   },
   {
     icon: Settings,
     title: "Model Providers",
     description: "Configure API keys for the models you use",
+    path: "/settings/model-providers",
+    absolute: true,
   },
 ];
 
@@ -57,9 +65,11 @@ function CapabilityCard({
   icon: Icon,
   title,
   description,
-}: CapabilityProps): React.ReactElement {
+  href,
+}: CapabilityProps & { href: string }): React.ReactElement {
   return (
     <HStack
+      asChild
       align="start"
       gap={3}
       p={4}
@@ -71,13 +81,16 @@ function CapabilityCard({
       backdropFilter="blur(20px) saturate(1.3)"
       boxShadow="0 2px 16px rgba(0,0,0,0.04), inset 0 1px 0 white"
       transition="all 0.2s ease"
+      cursor="pointer"
       _hover={{
         borderColor: "gray.300",
         boxShadow:
           "0 6px 28px rgba(0,0,0,0.07), inset 0 1px 0 white",
         transform: "translateY(-1px)",
+        textDecoration: "none",
       }}
     >
+    <a href={href} style={{ textDecoration: "none", color: "inherit" }}>
       <Box
         flexShrink={0}
         p={2}
@@ -105,12 +118,12 @@ function CapabilityCard({
           {description}
         </Text>
       </VStack>
+    </a>
     </HStack>
   );
 }
 
 export function ViaPlatformScreen(): React.ReactElement {
-  const router = useRouter();
   const { project } = useActiveProject();
 
   return (
@@ -127,72 +140,40 @@ export function ViaPlatformScreen(): React.ReactElement {
         >
           {capabilities.map((cap) => (
             <GridItem key={cap.title} display="flex">
-              <CapabilityCard {...cap} />
+              <CapabilityCard
+                {...cap}
+                href={
+                  cap.absolute
+                    ? cap.path
+                    : project?.slug
+                      ? `/${project.slug}${cap.path}`
+                      : "#"
+                }
+              />
             </GridItem>
           ))}
         </Grid>
 
-        <Box pt={2} display="flex" justifyContent="center">
-          {project?.slug && (
-            <Button
-              onClick={() => void router.push(`/${project.slug}`)}
-              colorPalette="orange"
-              borderRadius="xl"
-              px={8}
-              py={2}
-              size="lg"
-              boxShadow="0 4px 24px rgba(237,137,38,0.20)"
-              _hover={{
-                transform: "translateY(-1px)",
-                boxShadow: "0 6px 32px rgba(237,137,38,0.28)",
-              }}
-              transition="all 0.2s ease"
-            >
-              <HStack gap={2}>
-                <Text>Enter the Platform</Text>
-                <ArrowRight size={16} />
-              </HStack>
-            </Button>
-          )}
-        </Box>
+        <HStack justify="center" pt={2}>
+          <a
+            href="https://docs.langwatch.ai"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "4px",
+              fontSize: "13px",
+              color: "#51676C",
+              textDecoration: "none",
+            }}
+          >
+            Read the docs
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>
+          </a>
+        </HStack>
       </VStack>
 
-      {project?.slug && (
-        <Box position="fixed" right="24px" bottom="24px" zIndex={11}>
-          <Tooltip
-            content="Continue to LangWatch — skip onboarding"
-            positioning={{ placement: "left" }}
-            showArrow
-            openDelay={0}
-          >
-            <Button
-              onClick={() => void router.push(`/${project.slug}`)}
-              aria-label="Continue to LangWatch"
-              borderRadius="full"
-              variant="ghost"
-              colorPalette="gray"
-              bg="white/50"
-              backdropFilter="blur(20px) saturate(1.3)"
-              _hover={{
-                bg: "white/70",
-                transform: "translateY(-1px)",
-              }}
-              borderWidth="1px"
-              borderColor="gray.200"
-              boxShadow="0 4px 24px rgba(0,0,0,0.06), inset 0 1px 0 white"
-              px={{ base: 2, md: 4 }}
-              py={2}
-            >
-              <HStack gap={{ base: 0, md: 2 }}>
-                <Text display={{ base: "none", md: "inline" }}>
-                  Continue to LangWatch
-                </Text>
-                <ArrowRight size={16} />
-              </HStack>
-            </Button>
-          </Tooltip>
-        </Box>
-      )}
     </>
   );
 }

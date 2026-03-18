@@ -1,48 +1,52 @@
-import {
-  Box,
-  Card,
-  Grid,
-  GridItem,
-  Icon,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
-import { Code, MessageSquare, Monitor, Terminal } from "lucide-react";
+import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { ArrowRight, Code, MessageSquare, Monitor, Terminal } from "lucide-react";
+import { motion } from "motion/react";
 import type React from "react";
 import type { ProductSelection } from "../../types/types";
+
+const MotionBox = motion(Box);
 
 interface ProductOption {
   key: ProductSelection;
   title: string;
   description: string;
   icon: typeof Terminal;
+  gradient: string;
 }
 
 const productOptions: ProductOption[] = [
   {
     key: "via-claude-code",
-    title: "Via Claude Code",
+    title: "Via Coding Agent",
     description:
-      "Set up LangWatch using Claude Code CLI with prompts, skills, or MCP",
+      "Set up with prompts, skills, or MCP — works with Claude Code, Cursor, Windsurf, and more",
     icon: Terminal,
+    gradient:
+      "linear-gradient(135deg, rgba(237,137,38,0.06) 0%, transparent 50%)",
   },
   {
     key: "via-platform",
     title: "Via the Platform",
-    description: "Configure directly through the LangWatch dashboard",
+    description: "Configure everything directly from the LangWatch dashboard",
     icon: Monitor,
+    gradient:
+      "linear-gradient(135deg, rgba(49,130,206,0.05) 0%, transparent 50%)",
   },
   {
     key: "via-claude-desktop",
-    title: "Via Claude Desktop",
-    description: "Connect via MCP server in Claude Desktop",
+    title: "Via Desktop App",
+    description: "Connect via MCP — works with Claude Desktop, ChatGPT, and more",
     icon: MessageSquare,
+    gradient:
+      "linear-gradient(135deg, rgba(128,90,213,0.05) 0%, transparent 50%)",
   },
   {
     key: "manually",
     title: "Manually",
-    description: "Integrate LangWatch SDK into your codebase manually",
+    description: "Integrate the LangWatch SDK directly into your codebase",
     icon: Code,
+    gradient:
+      "linear-gradient(135deg, rgba(56,161,105,0.05) 0%, transparent 50%)",
   },
 ];
 
@@ -54,63 +58,105 @@ export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
   onSelectProduct,
 }) => {
   return (
-    <Grid
-      templateColumns={{ base: "repeat(1, 1fr)", md: "repeat(2, 1fr)" }}
-      gap={4}
-    >
-      {productOptions.map((opt) => (
-        <GridItem key={opt.key}>
-          <Card.Root asChild h="full">
+    <VStack gap={3} align="stretch" w="full" maxW="520px" mx="auto">
+      {productOptions.map((opt, i) => (
+        <MotionBox
+          as="button"
+          key={opt.key}
+          w="full"
+          position="relative"
+          overflow="hidden"
+          borderRadius="2xl"
+          bg="white/80"
+          border="1px solid"
+          borderColor="gray.200"
+          boxShadow="0 1px 3px rgba(0,0,0,0.04)"
+          backdropFilter="blur(20px) saturate(1.3)"
+          px={6}
+          py={5}
+          cursor="pointer"
+          role="button"
+          tabIndex={0}
+          onClick={() => onSelectProduct(opt.key)}
+          textAlign="left"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: i * 0.08, ease: "easeOut" }}
+          whileHover={{
+            y: -3,
+            boxShadow:
+              "0 12px 40px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04)",
+            borderColor: "var(--chakra-colors-orange-200)",
+          }}
+          whileTap={{ scale: 0.98 }}
+        >
+          {/* Gradient overlay */}
+          <Box
+            position="absolute"
+            inset={0}
+            style={{ background: opt.gradient }}
+            opacity={0.5}
+            transition="opacity 0.3s ease"
+            pointerEvents="none"
+            css={{
+              "button:hover &": { opacity: 1 },
+            }}
+          />
+
+          <HStack gap={5} align="center" position="relative">
             <Box
-              as="button"
-              w="full"
-              h="full"
-              borderRadius="2xl"
-              bg="bg.panel"
+              flexShrink={0}
+              p={3}
+              borderRadius="xl"
+              bg="rgba(237,137,38,0.08)"
               border="1px solid"
-              borderColor="border.muted"
-              boxShadow="xs"
-              p={8}
-              cursor="pointer"
-              transition="all 0.2s ease-in-out"
-              _hover={{
-                boxShadow: "sm",
-                transform: "translateY(-2px)",
-                borderColor: "border.emphasized",
+              borderColor="rgba(237,137,38,0.12)"
+              transition="all 0.25s ease"
+              css={{
+                "button:hover &": {
+                  background: "rgba(237,137,38,0.14)",
+                  borderColor: "rgba(237,137,38,0.22)",
+                  transform: "scale(1.05)",
+                },
               }}
-              role="button"
-              tabIndex={0}
-              onClick={() => onSelectProduct(opt.key)}
             >
-              <VStack gap={4} align="center" h="full">
-                <Box p={3} borderRadius="xl" bg="orange.50">
-                  <Icon color="orange.500" boxSize={6}>
-                    <opt.icon strokeWidth={1.75} />
-                  </Icon>
-                </Box>
-                <VStack gap={1}>
-                  <Text
-                    textStyle="md"
-                    fontWeight="semibold"
-                    color="fg.DEFAULT"
-                    textAlign="center"
-                  >
-                    {opt.title}
-                  </Text>
-                  <Text
-                    fontSize="sm"
-                    color="fg.muted"
-                    textAlign="center"
-                    lineHeight="tall"
-                  >
-                    {opt.description}
-                  </Text>
-                </VStack>
-              </VStack>
+              <Icon color="orange.500" boxSize={6}>
+                <opt.icon strokeWidth={1.5} />
+              </Icon>
             </Box>
-          </Card.Root>
-        </GridItem>
+
+            <VStack gap={0.5} align="start" flex={1}>
+              <Text
+                fontSize="md"
+                fontWeight="semibold"
+                color="fg.DEFAULT"
+                letterSpacing="-0.01em"
+              >
+                {opt.title}
+              </Text>
+              <Text fontSize="sm" color="fg.muted" lineHeight="tall">
+                {opt.description}
+              </Text>
+            </VStack>
+
+            <Box
+              flexShrink={0}
+              color="fg.muted"
+              opacity={0}
+              transform="translateX(-6px)"
+              transition="all 0.25s ease"
+              css={{
+                "button:hover &": {
+                  opacity: 0.5,
+                  transform: "translateX(0)",
+                },
+              }}
+            >
+              <ArrowRight size={18} />
+            </Box>
+          </HStack>
+        </MotionBox>
       ))}
-    </Grid>
+    </VStack>
   );
 };

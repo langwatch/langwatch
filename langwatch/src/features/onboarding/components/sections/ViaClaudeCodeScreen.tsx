@@ -66,25 +66,49 @@ const SKILLS: SkillItem[] = [
   },
 ];
 
-function buildCliCommand({
+interface EditorPath {
+  editor: string;
+  path: string;
+}
+
+const EDITOR_PATHS: EditorPath[] = [
+  { editor: "Claude Code", path: ".claude/settings.json" },
+  { editor: "Cursor", path: ".cursor/mcp.json" },
+  { editor: "Windsurf", path: "~/.codeium/windsurf/mcp_config.json" },
+  {
+    editor: "Claude Desktop",
+    path: "~/Library/Application Support/Claude/claude_desktop_config.json",
+  },
+];
+
+function buildMcpJson({
   apiKey,
   endpoint,
 }: {
   apiKey: string;
   endpoint: string | undefined;
 }): string {
-  const parts = [
-    "claude mcp add langwatch",
-    "--",
-    "npx -y @langwatch/mcp-server",
-    `--apiKey ${apiKey}`,
-  ];
+  const env: Record<string, string> = {
+    LANGWATCH_API_KEY: apiKey,
+  };
 
   if (endpoint && endpoint !== CLOUD_ENDPOINT) {
-    parts.push(`--endpoint ${endpoint}`);
+    env.LANGWATCH_ENDPOINT = endpoint;
   }
 
-  return parts.join(" ");
+  return JSON.stringify(
+    {
+      mcpServers: {
+        langwatch: {
+          command: "npx",
+          args: ["-y", "@langwatch/mcp-server"],
+          env,
+        },
+      },
+    },
+    null,
+    2,
+  );
 }
 
 function TabButton({
@@ -107,18 +131,18 @@ function TabButton({
       fontSize="sm"
       fontWeight={active ? "semibold" : "medium"}
       color={active ? "fg.DEFAULT" : "fg.muted"}
-      bg={active ? "rgba(0,0,0,0.06)" : "transparent"}
+      bg={active ? "white" : "transparent"}
       backdropFilter={active ? "blur(20px) saturate(1.3)" : undefined}
       boxShadow={
         active
-          ? "0 2px 12px rgba(0,0,0,0.06), inset 0 1px 0 white"
+          ? "0 2px 8px rgba(0,0,0,0.06), inset 0 1px 0 white"
           : undefined
       }
       border="1px solid"
-      borderColor={active ? "rgba(0,0,0,0.10)" : "transparent"}
+      borderColor={active ? "gray.200" : "transparent"}
       transition="all 0.2s ease"
       _hover={{
-        bg: active ? "rgba(0,0,0,0.07)" : "rgba(0,0,0,0.04)",
+        bg: active ? "white" : "gray.50",
       }}
       letterSpacing="-0.01em"
     >
@@ -190,21 +214,17 @@ function glassCard({
   return {
     borderRadius: "xl",
     border: "1px solid",
-    borderColor: highlight
-      ? "rgba(237,137,38,0.25)"
-      : "rgba(0,0,0,0.08)",
-    bg: highlight ? "rgba(237,137,38,0.08)" : "rgba(0,0,0,0.03)",
+    borderColor: highlight ? "orange.200" : "gray.200",
+    bg: highlight ? "orange.50" : "white/70",
     backdropFilter: "blur(20px) saturate(1.3)",
     boxShadow: highlight
-      ? "0 4px 24px rgba(237,137,38,0.08), inset 0 1px 0 white"
-      : "0 2px 16px rgba(0,0,0,0.04), inset 0 1px 0 white",
+      ? "0 0 0 1px rgba(237,137,38,0.08), 0 4px 24px rgba(237,137,38,0.12), inset 0 1px 0 white"
+      : "0 1px 3px rgba(0,0,0,0.04), inset 0 1px 0 white",
     transition: "all 0.2s ease",
     _hover: {
-      borderColor: highlight
-        ? "rgba(237,137,38,0.35)"
-        : "rgba(0,0,0,0.14)",
+      borderColor: highlight ? "orange.300" : "gray.300",
       boxShadow: highlight
-        ? "0 6px 32px rgba(237,137,38,0.12), inset 0 1px 0 white"
+        ? "0 0 0 1px rgba(237,137,38,0.12), 0 8px 32px rgba(237,137,38,0.18), inset 0 1px 0 white"
         : "0 6px 28px rgba(0,0,0,0.07), inset 0 1px 0 white",
       transform: "translateY(-1px)",
     },
@@ -290,7 +310,7 @@ function SkillRow({
           {skill.slashCommand}
         </Text>
         <Text fontSize="xs" color="fg.muted">
-          in Claude Code
+          in your coding agent
         </Text>
       </HStack>
     </VStack>
@@ -298,9 +318,9 @@ function SkillRow({
 }
 
 function McpTab({
-  cliCommand,
+  mcpJson,
 }: {
-  cliCommand: string;
+  mcpJson: string;
 }): React.ReactElement {
   return (
     <VStack align="stretch" gap={4}>
@@ -308,50 +328,69 @@ function McpTab({
         <Text as="span" fontWeight="semibold" color="fg.DEFAULT">
           Live connection.
         </Text>{" "}
-        Run this command to give Claude Code direct access to your LangWatch
-        dashboard — search traces, manage prompts, and more.
+        Give your agent direct access to your LangWatch dashboard — search
+        traces, manage prompts, and more.
       </Text>
 
-      <HStack
-        gap={3}
-        px={5}
-        py={4}
+      {/* JSON config */}
+      <Box
+        position="relative"
+        overflow="hidden"
         {...glassCard({ highlight: false })}
       >
-        <Terminal
-          size={16}
-          color="var(--chakra-colors-fg-muted)"
-          style={{ flexShrink: 0 }}
-        />
-        <Text
-          fontSize="sm"
+        <Box
+          as="pre"
+          px={5}
+          py={4}
+          pr={14}
+          fontSize="xs"
           fontFamily="mono"
           color="fg.DEFAULT"
-          fontWeight="medium"
-          flex={1}
-          overflow="hidden"
-          textOverflow="ellipsis"
-          whiteSpace="nowrap"
+          lineHeight="tall"
+          overflowX="auto"
+          whiteSpace="pre"
         >
-          {cliCommand}
-        </Text>
-        <InlineCopyButton text={cliCommand} label="Command" />
-      </HStack>
+          {mcpJson}
+        </Box>
+        <Box position="absolute" top={3} right={3}>
+          <InlineCopyButton text={mcpJson} label="Config" />
+        </Box>
+      </Box>
 
-      <Box
+      {/* Where to paste */}
+      <VStack
+        align="stretch"
+        gap={0}
         borderRadius="xl"
         border="1px solid"
         borderColor="gray.200"
         bg="white/70"
-        backdropFilter="blur(20px) saturate(1.3)"
-        boxShadow="0 2px 16px rgba(0,0,0,0.04), inset 0 1px 0 white"
-        p={5}
+        boxShadow="0 1px 3px rgba(0,0,0,0.04), inset 0 1px 0 white"
+        overflow="hidden"
       >
-        <Text fontSize="xs" color="fg.muted" lineHeight="tall">
-          Once connected, Claude Code can search traces, manage prompts, run
-          scenarios, configure evaluators, and more — all from your terminal.
-        </Text>
-      </Box>
+        <Box px={4} py={3} borderBottom="1px solid" borderColor="gray.100">
+          <Text fontSize="xs" fontWeight="semibold" color="fg.DEFAULT">
+            Add this to your editor&apos;s MCP config
+          </Text>
+        </Box>
+        {EDITOR_PATHS.map((ep, i) => (
+          <HStack
+            key={ep.editor}
+            px={4}
+            py={2.5}
+            justify="space-between"
+            borderBottom={i < EDITOR_PATHS.length - 1 ? "1px solid" : undefined}
+            borderColor="gray.100"
+          >
+            <Text fontSize="xs" color="fg.muted" fontWeight="medium">
+              {ep.editor}
+            </Text>
+            <Text fontSize="xs" fontFamily="mono" color="fg.DEFAULT">
+              {ep.path}
+            </Text>
+          </HStack>
+        ))}
+      </VStack>
     </VStack>
   );
 }
@@ -365,9 +404,9 @@ export function ViaClaudeCodeScreen(): React.ReactElement {
   const effectiveApiKey = project?.apiKey ?? "";
   const effectiveEndpoint = publicEnv.data?.BASE_HOST;
 
-  const cliCommand = useMemo(
+  const mcpJson = useMemo(
     () =>
-      buildCliCommand({ apiKey: effectiveApiKey, endpoint: effectiveEndpoint }),
+      buildMcpJson({ apiKey: effectiveApiKey, endpoint: effectiveEndpoint }),
     [effectiveApiKey, effectiveEndpoint],
   );
 
@@ -375,7 +414,7 @@ export function ViaClaudeCodeScreen(): React.ReactElement {
     <>
       <VStack align="stretch" gap={6} mb={20} maxW="640px" mx="auto">
         <Text fontSize="xs" color="fg.muted" lineHeight="tall" textAlign="center">
-          Pick how you want to work with LangWatch in Claude Code.
+          Pick how you want to work with LangWatch in your coding agent.
         </Text>
 
         <HStack
@@ -414,7 +453,7 @@ export function ViaClaudeCodeScreen(): React.ReactElement {
               <Text as="span" fontWeight="semibold" color="fg.DEFAULT">
                 Zero setup.
               </Text>{" "}
-              Copy a prompt, paste it into Claude Code, and it handles
+              Copy a prompt, paste it into your coding agent, and it handles
               everything from there.
             </Text>
             {SKILLS.map((skill) => (
@@ -433,7 +472,7 @@ export function ViaClaudeCodeScreen(): React.ReactElement {
               <Text as="span" fontFamily="mono" fontWeight="semibold" color="orange.400">
                 /command
               </Text>{" "}
-              in Claude Code whenever you need it.
+              in your coding agent whenever you need it.
             </Text>
             {SKILLS.map((skill) => (
               <SkillRow key={skill.id} skill={skill} />
@@ -441,45 +480,9 @@ export function ViaClaudeCodeScreen(): React.ReactElement {
           </VStack>
         )}
 
-        {activeTab === "mcp" && <McpTab cliCommand={cliCommand} />}
+        {activeTab === "mcp" && <McpTab mcpJson={mcpJson} />}
       </VStack>
 
-      {project?.slug && (
-        <Box position="fixed" right="24px" bottom="24px" zIndex={11}>
-          <Tooltip
-            content="Continue to LangWatch — skip onboarding"
-            positioning={{ placement: "left" }}
-            showArrow
-            openDelay={0}
-          >
-            <Button
-              onClick={() => void router.push(`/${project.slug}`)}
-              aria-label="Continue to LangWatch"
-              borderRadius="full"
-              variant="ghost"
-              colorPalette="gray"
-              bg="white/50"
-              backdropFilter="blur(20px) saturate(1.3)"
-              _hover={{
-                bg: "white/70",
-                transform: "translateY(-1px)",
-              }}
-              borderWidth="1px"
-              borderColor="gray.200"
-              boxShadow="0 4px 24px rgba(0,0,0,0.06), inset 0 1px 0 white"
-              px={{ base: 2, md: 4 }}
-              py={2}
-            >
-              <HStack gap={{ base: 0, md: 2 }}>
-                <Text display={{ base: "none", md: "inline" }}>
-                  Continue to LangWatch
-                </Text>
-                <ArrowRight size={16} />
-              </HStack>
-            </Button>
-          </Tooltip>
-        </Box>
-      )}
     </>
   );
 }

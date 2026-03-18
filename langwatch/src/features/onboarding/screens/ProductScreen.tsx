@@ -70,6 +70,7 @@ export const ProductScreen: React.FC = () => {
         widthVariant={currentScreen.widthVariant ?? "narrow"}
         showBackButton={canGoBack}
         onBack={() => navigation.prevScreen()}
+        skipHref={activeProject?.slug ? `/${activeProject.slug}` : undefined}
       >
         <Box w="full">
           <ActiveProjectProvider

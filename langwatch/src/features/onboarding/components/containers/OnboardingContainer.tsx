@@ -41,6 +41,10 @@ interface OnboardingContainerProps extends React.PropsWithChildren {
    * Callback when back button is clicked. Single Responsibility: back navigation handler.
    */
   onBack?: () => void;
+  /**
+   * If provided, shows a "Skip" link in the top-right nav to skip onboarding.
+   */
+  skipHref?: string;
 }
 
 export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
@@ -52,6 +56,7 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
   widthVariant = "narrow",
   showBackButton,
   onBack,
+  skipHref,
 }) => {
   const { emit } = useAnalytics();
   const isFullWidth = widthVariant === "full";
@@ -101,6 +106,32 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
           </IconButton>
         </Tooltip>
       </HStack>
+
+      {skipHref && (
+        <Box position="fixed" right="24px" bottom="24px" zIndex={11}>
+          <a
+            href={skipHref}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "8px 16px",
+              borderRadius: "9999px",
+              fontSize: "13px",
+              fontWeight: 500,
+              color: "#51676C",
+              background: "white",
+              border: "1px solid #E0E2E6",
+              boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
+              textDecoration: "none",
+              cursor: "pointer",
+            }}
+          >
+            Continue to LangWatch
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+          </a>
+        </Box>
+      )}
 
       <MotionCenter
         pt={compressedHeader ? "6vh" : "10vh"}
