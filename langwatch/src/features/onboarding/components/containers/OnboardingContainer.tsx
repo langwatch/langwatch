@@ -14,6 +14,7 @@ import { useAnalytics } from "react-contextual-analytics";
 import { FullLogo } from "~/components/icons/FullLogo";
 import { LightMode } from "~/components/ui/color-mode";
 import { Tooltip } from "~/components/ui/tooltip";
+import { OnboardingMeshBackground } from "../OnboardingMeshBackground";
 import SpookyScarySkeleton from "../SpookyScarySkeleton";
 
 const MotionCenter = motion(Center);
@@ -66,7 +67,8 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
       };
 
   return (
-    <Box w="full" minH="100dvh" background="bg.page">
+    <Box w="full" minH="100dvh" background="bg.page" position="relative">
+      <OnboardingMeshBackground />
       {showBackButton && onBack && (
         <HStack position="fixed" top={3} left={3} zIndex={99}>
           <Tooltip content="Back">
