@@ -21,6 +21,7 @@ import {
 import type { WorkflowVersion } from "@prisma/client";
 import { GitCompare, X } from "lucide-react";
 
+import { useMemo } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import { FormatMoney } from "~/optimization_studio/components/FormatMoney";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
@@ -150,6 +151,20 @@ export function BatchRunsSidebar({
 }: BatchRunsSidebarProps) {
   const canCompare = runs.length >= 2;
 
+  // Sort runs newest-first for display, and build a chronological index map
+  // so "Run #N" numbering stays stable (Run #1 = oldest, Run #N = newest)
+  const { sortedRuns, chronologicalIndexMap } = useMemo(() => {
+    const sorted = [...runs].sort(
+      (a, b) => b.timestamps.createdAt - a.timestamps.createdAt,
+    );
+    const chronological = [...runs].sort(
+      (a, b) => a.timestamps.createdAt - b.timestamps.createdAt,
+    );
+    const indexMap = new Map<string, number>();
+    chronological.forEach((run, i) => indexMap.set(run.runId, i));
+    return { sortedRuns: sorted, chronologicalIndexMap: indexMap };
+  }, [runs]);
+
   // Handle click with shift key for compare mode
   const handleRunClick = (runId: string, event: React.MouseEvent) => {
     // Prevent text selection on shift+click
@@ -271,16 +286,18 @@ export function BatchRunsSidebar({
       <VStack gap={0.5} align="stretch" paddingX={2}>
         {!isLoading &&
           !error &&
-          runs.map((run, index) => {
+          sortedRuns.map((run) => {
             const isSelected = selectedRunId === run.runId;
             const isFinished = isRunFinished(run.timestamps);
             const _runCost =
               (run.summary.datasetCost ?? 0) +
               (run.summary.evaluationsCost ?? 0);
 
+            const chronologicalIndex =
+              chronologicalIndexMap.get(run.runId) ?? 0;
             const runName = getRunDisplayName({
               commitMessage: run.workflowVersion?.commitMessage,
-              index,
+              index: chronologicalIndex,
             });
 
             // Build summary line: evaluator scores + cost (filter out "-" values)
