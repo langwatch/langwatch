@@ -14,4 +14,11 @@ export class PrismaProjectRepository implements ProjectRepository {
       include: { team: true },
     });
   }
+
+  async updateMetadata(
+    id: string,
+    data: { firstMessage: boolean; integrated: boolean; language: string },
+  ): Promise<void> {
+    await this.prisma.project.update({ where: { id }, data });
+  }
 }

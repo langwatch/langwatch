@@ -61,6 +61,7 @@ import { MetricRecordAppendStore } from "./pipelines/trace-processing/projection
 import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
 import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
 import { createCustomEvaluationSyncReactor } from "./pipelines/trace-processing/reactors/customEvaluationSync.reactor";
+import { createProjectMetadataReactor } from "./pipelines/trace-processing/reactors/projectMetadata.reactor";
 import {
   createEvaluationTriggerReactor,
   createDeferredEvaluationHandler,
@@ -195,6 +196,10 @@ export class PipelineRegistry {
       hasRedis: !!this.deps.eventSourcing.redisConnection,
     });
 
+    const projectMetadataReactor = createProjectMetadataReactor({
+      projects: this.deps.projects,
+    });
+
     if (!this.deps.clickhouse) {
       logger.warn(
         "ClickHouse client not provided, log and metric record writes will be no-ops using NullRepository implementations",
@@ -217,6 +222,7 @@ export class PipelineRegistry {
         evaluationTriggerReactor,
         customEvaluationSyncReactor,
         traceUpdateBroadcastReactor,
+        projectMetadataReactor,
         spanStorageBroadcastReactor,
       }),
     );
