@@ -31,6 +31,7 @@ import { isTeamRoleAllowedForOrganizationRole, type TeamRoleValue } from "~/util
 import { slugify } from "~/utils/slugify";
 import { getApp } from "~/server/app-layer/app";
 import { trackServerEvent } from "~/server/posthog";
+import { fireTeamMemberInvitedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
 import { elasticsearchMigrate } from "../../../tasks/elasticMigrate";
 import {
   INVITE_EXPIRATION_MS,
@@ -975,6 +976,15 @@ export const organizationRouter = createTRPCRouter({
           event: "team_member_invited",
           properties: { inviteCount: createdRecords.length },
         });
+
+        const memberCount = organization.members.length + createdRecords.length;
+        for (const record of createdRecords) {
+          fireTeamMemberInvitedNurturing({
+            userId: ctx.session.user.id,
+            teamMemberCount: memberCount,
+            role: record.invite.role,
+          });
+        }
       }
 
       const invites = await Promise.all(

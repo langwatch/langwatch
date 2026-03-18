@@ -48,6 +48,12 @@ vi.mock("~/server/app-layer/app", () => ({
       sendSlackSignupEvent: mockSendSlackSignupEvent,
       sendHubspotSignupForm: mockSendHubspotSignupForm,
     },
+    nurturing: {
+      identifyUser: vi.fn().mockResolvedValue(undefined),
+      trackEvent: vi.fn().mockResolvedValue(undefined),
+      groupUser: vi.fn().mockResolvedValue(undefined),
+      batch: vi.fn().mockResolvedValue(undefined),
+    },
   }),
 }));
 
