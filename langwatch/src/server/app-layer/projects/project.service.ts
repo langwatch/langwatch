@@ -69,7 +69,9 @@ export class ProjectService {
         { projectId, error },
         "Failed to resolve org admin — returning null resolution",
       );
-      captureException(error);
+      captureException(new Error("Failed to resolve org admin"), {
+        extra: { projectId, error },
+      });
       return NULL_RESOLUTION;
     }
   }

@@ -35,9 +35,9 @@ export type NurturingServiceOptions = {
 /**
  * Wraps the Customer.io Pipelines API with fire-and-forget semantics.
  *
- * The service either exists (API key configured) or is not created at all.
  * Callers use optional chaining (`nurturing?.identifyUser(...)`) when the
  * service may be absent (e.g. self-hosted without Customer.io).
+ * Defense-in-depth: methods silently no-op if the API key is missing.
  */
 export class NurturingService {
   private readonly apiKey: string | undefined;
@@ -46,8 +46,11 @@ export class NurturingService {
 
   private constructor(options: NurturingServiceOptions) {
     this.apiKey = options.config.customerIoApiKey;
-    const region = options.config.customerIoRegion as Region | undefined;
-    this.baseUrl = region ? REGIONAL_ENDPOINTS[region] : REGIONAL_ENDPOINTS.eu;
+    const region = options.config.customerIoRegion;
+    this.baseUrl =
+      region && region in REGIONAL_ENDPOINTS
+        ? REGIONAL_ENDPOINTS[region as Region]
+        : REGIONAL_ENDPOINTS.eu;
     this.fetchFn =
       options.fetchFn ?? ((...args) => fetch(...args)) as typeof fetch;
   }
@@ -156,11 +159,15 @@ export class NurturingService {
 
       if (!response.ok) {
         const responseBody = await response.text().catch(() => "<unreadable>");
+        const safeResponseBody = responseBody.slice(0, 256);
         logger.error(
-          { path, status: response.status, responseBody },
+          { path, status: response.status, responseBody: safeResponseBody },
           `Customer.io ${path} failed: HTTP ${response.status}`,
         );
-        captureException(new Error(`Customer.io ${path} failed: ${response.status} — ${responseBody}`));
+        captureException(
+          new Error(`Customer.io ${path} failed: HTTP ${response.status}`),
+          { extra: { path, status: response.status } },
+        );
       }
     } catch (error) {
       logger.error({ error, path }, `Failed to send Customer.io ${path} call`);

@@ -254,7 +254,6 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     evaluations: { runs: evaluations.runs, execution: evaluations.execution },
     esSync: { esClient, traceIndex: TRACE_INDEX, traceIndexId, prisma },
     usageReportingService,
-    nurturing,
   });
   const commands = registry.registerAll();
 
