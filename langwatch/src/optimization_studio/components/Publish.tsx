@@ -236,11 +236,10 @@ function PublishMenu({
     }),
   );
 
-  const { currentVersion, canSaveNewVersion, versionToBeEvaluated } =
-    useVersionState({
-      project,
-      allowSaveIfAutoSaveIsCurrentButNotLatest: false,
-    });
+  const { canSaveNewVersion, versionToBeEvaluated } = useVersionState({
+    project,
+    allowSaveIfAutoSaveIsCurrentButNotLatest: false,
+  });
   const router = useRouter();
   const trpc = api.useContext();
 
@@ -495,7 +494,6 @@ function PublishModalContent({
 
   const {
     versions,
-    currentVersion,
     canSaveNewVersion: canSave,
     versionToBeEvaluated,
   } = useVersionState({
