@@ -64,10 +64,26 @@ export function SelectableIconCard(
         onClick={onClick}
         cursor="pointer"
         borderWidth={selected ? "2px" : "1px"}
-        borderColor={selected ? selectedBorderColor : borderColor}
-        bg={selected ? selectedBg : "bg.panel"}
-        boxShadow={selected ? undefined : "2xs"}
+        borderColor={
+          selected ? selectedBorderColor : "rgba(255,255,255,0.18)"
+        }
+        bg={selected ? selectedBg : "rgba(255,255,255,0.06)"}
+        backdropFilter="blur(16px) saturate(1.3)"
+        boxShadow={
+          selected
+            ? undefined
+            : "0 2px 12px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.08)"
+        }
         transition="all 0.2s ease"
+        _hover={{
+          borderColor: selected
+            ? selectedBorderColor
+            : "rgba(255,255,255,0.28)",
+          boxShadow: selected
+            ? undefined
+            : "0 4px 20px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.12)",
+          transform: "translateY(-1px)",
+        }}
         aspectRatio="1 / 1"
         display="flex"
         maxW={size === "sm" ? "75px" : "100px"}
