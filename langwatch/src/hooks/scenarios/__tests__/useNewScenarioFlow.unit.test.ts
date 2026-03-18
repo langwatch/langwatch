@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Integration tests for the useNewScenarioFlow hook.
+ * Unit tests for the useNewScenarioFlow hook.
  *
  * Covers the @integration scenarios from welcome-screens.feature:
  * - Show welcome screen on first scenario creation (no scenarios)
