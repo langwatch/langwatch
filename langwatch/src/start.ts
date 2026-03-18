@@ -125,8 +125,10 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
     }
   });
 
+  type UpgradeHandler = (req: IncomingMessage, socket: Duplex, head: Buffer) => void;
+
   const upgradeListener =
-    (defaultHandler: (req: any, socket: any, head: Buffer) => any) =>
+    (defaultHandler: UpgradeHandler) =>
     (req: IncomingMessage, socket: Duplex, head: Buffer) => {
       const parsedUrl = parse(req.url ?? "", true);
 
@@ -147,7 +149,7 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
   server.on = (event, handler) => {
     if (event === "upgrade") {
       server.off("upgrade", initialHandler);
-      return originalOn(event, upgradeListener(handler));
+      return originalOn(event, upgradeListener(handler as UpgradeHandler));
     }
     return originalOn(event, handler);
   };

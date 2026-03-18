@@ -78,7 +78,7 @@ ${dataset}`,
   const model = await getVercelAIModel(projectId);
   const result = streamText({
     model,
-    messages: convertToModelMessages(messages),
+    messages: await convertToModelMessages(messages),
     tools: tools(dataset),
     toolChoice: "required",
     maxOutputTokens: 4096 * 4,

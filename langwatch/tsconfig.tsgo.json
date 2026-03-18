@@ -49,9 +49,11 @@
 	"exclude": [
 		"node_modules",
 		"saas-src/**/*",
+		"packages/**/*",
 		".next",
 		".next-saas",
 		"**/*.snippet.*",
-		"src/**/codegen/snippets/**/*"
+		"src/**/codegen/snippets/**/*",
+		"src/server/scenarios/**/*"
 	]
 }

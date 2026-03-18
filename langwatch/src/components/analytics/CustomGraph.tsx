@@ -36,7 +36,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { Payload } from "recharts/types/component/DefaultTooltipContent";
+import type { Formatter, Payload } from "recharts/types/component/DefaultTooltipContent";
 import { useRouter } from "next/router";
 import type { z } from "zod";
 import type { FilterField } from "~/server/filters/types";
@@ -530,13 +530,13 @@ const CustomGraph_ = React.memo(
 
       return format(new Date(date), "MMM d");
     };
-    const tooltipValueFormatter = (
-      value: number | string,
-      _: string,
-      payload: Payload<any, any>,
+    const tooltipValueFormatter: Formatter = (
+      value,
+      _name,
+      payload,
     ) => {
       if (payload.dataKey === "date") {
-        return formatDate(value as string);
+        return formatDate(String(value));
       }
 
       const { series } = getSeries(
@@ -545,7 +545,7 @@ const CustomGraph_ = React.memo(
       );
       const metric = series?.metric && getMetric(series.metric);
 
-      return formatWith(metric?.format, value as number);
+      return formatWith(metric?.format, Number(value));
     };
 
     const container = (child: React.ReactNode) => {
