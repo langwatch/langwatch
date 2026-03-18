@@ -66,7 +66,7 @@ const RUN_COLUMNS = `
  */
 const LIST_COLUMNS = `
   ScenarioRunId, ScenarioId, BatchRunId, ScenarioSetId,
-  Status, Name, Description,
+  Status, Name, Description, Metadata,
   arraySlice(\`Messages.Id\`, 1, 6) AS \`Messages.Id\`,
   arraySlice(\`Messages.Role\`, 1, 6) AS \`Messages.Role\`,
   arraySlice(\`Messages.Content\`, 1, 6) AS \`Messages.Content\`,
@@ -104,7 +104,7 @@ const DEDUP_PREVIEW_COLUMNS = `
 /** Inner subquery columns for list-view queries (getRunsForBatchIds) */
 const DEDUP_LIST_COLUMNS = `
   TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, ScenarioId,
-  Status, Name, Description,
+  Status, Name, Description, Metadata,
   \`Messages.Id\`, \`Messages.Role\`, \`Messages.Content\`,
   TraceIds, Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
   DurationMs, UpdatedAt, CreatedAt, FinishedAt, ArchivedAt` as const;
