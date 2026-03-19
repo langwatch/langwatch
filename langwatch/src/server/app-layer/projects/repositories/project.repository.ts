@@ -7,10 +7,17 @@ export type UpdateProjectMetadataInput = {
   data: { firstMessage: boolean; integrated: boolean; language: string };
 };
 
+export interface ProjectWithOrgAdmin {
+  firstMessage: boolean;
+  organizationId: string | null;
+  adminUserId: string | null;
+}
+
 export interface ProjectRepository {
   getById(id: string): Promise<Project | null>;
   getWithTeam(id: string): Promise<ProjectWithTeam | null>;
   updateMetadata({ id, data }: UpdateProjectMetadataInput): Promise<void>;
+  getWithOrgAdmin(id: string): Promise<ProjectWithOrgAdmin | null>;
 }
 
 export class NullProjectRepository implements ProjectRepository {
@@ -24,5 +31,9 @@ export class NullProjectRepository implements ProjectRepository {
 
   async updateMetadata(_input: UpdateProjectMetadataInput): Promise<void> {
     // no-op
+  }
+
+  async getWithOrgAdmin(_id: string): Promise<ProjectWithOrgAdmin | null> {
+    return null;
   }
 }

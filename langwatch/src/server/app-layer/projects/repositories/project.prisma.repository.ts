@@ -1,5 +1,10 @@
 import type { PrismaClient, Project } from "@prisma/client";
-import type { ProjectRepository, ProjectWithTeam, UpdateProjectMetadataInput } from "./project.repository";
+import type {
+  ProjectRepository,
+  ProjectWithOrgAdmin,
+  ProjectWithTeam,
+  UpdateProjectMetadataInput,
+} from "./project.repository";
 
 export class PrismaProjectRepository implements ProjectRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -17,5 +22,38 @@ export class PrismaProjectRepository implements ProjectRepository {
 
   async updateMetadata({ id, data }: UpdateProjectMetadataInput): Promise<void> {
     await this.prisma.project.update({ where: { id }, data });
+  }
+
+  async getWithOrgAdmin(id: string): Promise<ProjectWithOrgAdmin | null> {
+    const project = await this.prisma.project.findUnique({
+      where: { id },
+      select: {
+        firstMessage: true,
+        team: {
+          select: {
+            organization: {
+              select: {
+                id: true,
+                members: {
+                  where: { role: "ADMIN" },
+                  select: { userId: true },
+                  orderBy: { createdAt: "asc" },
+                  take: 1,
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!project) return null;
+
+    const org = project.team?.organization;
+    return {
+      firstMessage: project.firstMessage,
+      organizationId: org?.id ?? null,
+      adminUserId: org?.members?.[0]?.userId ?? null,
+    };
   }
 }
