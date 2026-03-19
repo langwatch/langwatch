@@ -70,7 +70,7 @@ export function createCustomerIoEvaluationSyncReactor(
           return;
         }
 
-        const now = new Date().toISOString();
+        const now = new Date(event.occurredAt).toISOString();
 
         const existingCount = await deps.evaluationCountFn(organizationId);
         if (existingCount === null) {

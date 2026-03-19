@@ -108,6 +108,21 @@ describe("customerIoDailyUsageSync reactor", () => {
     vi.useRealTimers();
   });
 
+  describe("makeJobId", () => {
+    it("returns cio-daily-usage-{tenantId}", () => {
+      const deps = createDeps();
+      const reactor = createCustomerIoDailyUsageSyncReactor(deps);
+      const event = createEvent("project-42");
+
+      const jobId = reactor.options!.makeJobId!({
+        event,
+        foldState: createFoldState(),
+      });
+
+      expect(jobId).toBe("cio-daily-usage-project-42");
+    });
+  });
+
   describe("given the projectDailySdkUsage fold has completed for a project", () => {
     describe("when the daily usage sync reactor runs", () => {
       it("identifies user with trace_count as cumulative total", async () => {

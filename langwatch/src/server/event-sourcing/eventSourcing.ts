@@ -21,6 +21,7 @@ import { BILLING_REPORTING_PIPELINE_NAME } from "./pipelines/billing-reporting/p
 import { createBillingMeterDispatchReactor } from "./projections/global/billingMeterDispatch.reactor";
 import { orgBillableEventsMeterProjection } from "./projections/global/orgBillableEventsMeter.mapProjection";
 import type { ReactorDefinition } from "./reactors/reactor.types";
+import { ConfigurationError } from "./services/errorHandling";
 
 import { projectDailySdkUsageProjection } from "./projections/global/projectDailySdkUsage.foldProjection";
 import { ProjectionRegistry } from "./projections/projectionRegistry";
@@ -148,11 +149,15 @@ export class EventSourcing {
     try {
       this.projectionRegistry.registerReactor(foldName, reactor);
     } catch (error) {
-      // Fold not registered — skip silently
-      logger.debug(
-        { foldName, reactorName: reactor.name },
-        "Skipping global fold reactor — fold not registered",
-      );
+      // Only suppress "fold not registered" errors — let wiring bugs (duplicates, etc.) fail fast
+      if (error instanceof ConfigurationError && error.message.includes("fold not registered")) {
+        logger.debug(
+          { foldName, reactorName: reactor.name },
+          "Skipping global fold reactor — fold not registered",
+        );
+        return;
+      }
+      throw error;
     }
   }
 
