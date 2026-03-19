@@ -49,10 +49,13 @@ interface Scenario {
   labels: string[];
 }
 
+/** Agent types that can be used as suite targets (must be in suiteTargetSchema). */
+const supportedAgentTypes = new Set<string>(["http", "code"]);
+
 interface Agent {
   id: string;
   name: string;
-  type: "http" | "code" | string;
+  type: string;
 }
 
 interface Prompt {
@@ -122,9 +125,8 @@ export function useSuiteForm({
     const result: AvailableTarget[] = [];
     if (agents) {
       for (const agent of agents) {
-        // Only http and code agents are supported as suite targets
-        if (agent.type !== "http" && agent.type !== "code") continue;
-        result.push({ name: agent.name, type: agent.type, referenceId: agent.id });
+        if (!supportedAgentTypes.has(agent.type)) continue;
+        result.push({ name: agent.name, type: agent.type as SuiteTarget["type"], referenceId: agent.id });
       }
     }
     if (prompts) {
