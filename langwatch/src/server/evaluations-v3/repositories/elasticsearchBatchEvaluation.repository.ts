@@ -149,7 +149,7 @@ export const createElasticsearchBatchEvaluationRepository =
           }
         }
 
-        // Merge targets (by id)
+        // Merge targets (by id) — keep in sync with mergeTargetsJson in experimentRunState.foldProjection.ts
         if (params.targets != null && params.targets.size() > 0) {
           if (ctx._source.targets == null) {
             ctx._source.targets = [];

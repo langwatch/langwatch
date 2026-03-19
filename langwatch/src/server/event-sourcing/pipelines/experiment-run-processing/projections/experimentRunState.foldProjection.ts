@@ -47,6 +47,7 @@ export interface ExperimentRunState extends Projection<ExperimentRunStateData> {
   data: ExperimentRunStateData;
 }
 
+// Keep in sync with the Painless merge script in elasticsearchBatchEvaluation.repository.ts
 function mergeTargetsJson(
   existingJson: string,
   incoming: Array<{ id: string; [k: string]: unknown }>,
