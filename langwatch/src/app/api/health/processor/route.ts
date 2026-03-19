@@ -200,19 +200,26 @@ const checkTraceWithRetry = async (
 ): Promise<Response> => {
   const startTime = Date.now();
   const timeoutMs = 60 * 1000; // 60 seconds timeout
-  const retryIntervalMs = 5000; // 5 seconds interval
+  const retryIntervalMs = 2000; // 2 seconds between polls
 
   while (Date.now() - startTime < timeoutMs) {
     await sleep(retryIntervalMs);
 
-    const traceResponse = await fetch(`${env.BASE_HOST}/api/trace/${traceId}`, {
-      headers: {
-        "X-Auth-Token": authToken,
-      },
-    });
+    try {
+      const traceResponse = await fetch(
+        `${env.BASE_HOST}/api/trace/${traceId}`,
+        {
+          headers: {
+            "X-Auth-Token": authToken,
+          },
+        },
+      );
 
-    if (traceResponse.ok) {
-      return traceResponse;
+      if (traceResponse.ok) {
+        return traceResponse;
+      }
+    } catch {
+      // Network error — continue to next poll
     }
   }
 

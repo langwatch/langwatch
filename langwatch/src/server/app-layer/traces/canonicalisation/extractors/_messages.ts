@@ -27,6 +27,13 @@ export const extractMessageContentText = (message: unknown): string | null => {
     if (texts.length > 0) return texts.join("\n");
   }
 
+  // Object with numeric keys (reconstructed from flattened OTEL attributes like
+  // gen_ai.prompt.0.content.0.text → {"0": {"text": "..."}} instead of [{"text": "..."}])
+  if (isObjectWithNumericKeys(msg.content)) {
+    const texts = extractTextsFromParts(numericKeysToArray(msg.content));
+    if (texts.length > 0) return texts.join("\n");
+  }
+
   // Parts array (Mastra / Vercel AI SDK)
   if (Array.isArray(msg.parts)) {
     const texts = extractTextsFromParts(msg.parts);
@@ -207,4 +214,32 @@ export const normalizeToMessages = (
     );
   }
   return [{ role: defaultRole, content: raw }];
+};
+
+// ─────────────────────────────────────────────────────────────────────────
+// Numeric-key object helpers (for reconstructed OTEL attributes)
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * Checks if a value is a non-array object whose keys are all non-negative
+ * integer strings (e.g. {"0": ..., "1": ...}).  This pattern arises when
+ * `safeUnflatten` reconstructs flattened OTEL attribute paths like
+ * `gen_ai.prompt.0.content.0.text` — the inner numeric segments become
+ * object keys instead of array indices.
+ */
+const isObjectWithNumericKeys = (v: unknown): v is Record<string, unknown> => {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return false;
+  const keys = Object.keys(v);
+  return keys.length > 0 && keys.every((k) => /^\d+$/.test(k));
+};
+
+/**
+ * Converts an object with consecutive numeric keys into an array,
+ * preserving index order.
+ */
+const numericKeysToArray = (obj: Record<string, unknown>): unknown[] => {
+  const entries = Object.entries(obj).sort(
+    ([a], [b]) => Number(a) - Number(b),
+  );
+  return entries.map(([, v]) => v);
 };
