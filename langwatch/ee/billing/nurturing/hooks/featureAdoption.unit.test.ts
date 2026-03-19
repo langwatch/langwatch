@@ -231,6 +231,30 @@ describe("Feature adoption hooks", () => {
         expect(mockNurturing.trackEvent).not.toHaveBeenCalled();
       });
     });
+
+    describe("when Customer.io API is unavailable", () => {
+      it("does not throw (fire-and-forget)", async () => {
+        const { captureException } = await import(
+          "../../../../src/utils/posthogErrorCapture"
+        );
+        mockNurturing.identifyUser.mockRejectedValueOnce(
+          new Error("CIO unavailable"),
+        );
+
+        expect(() =>
+          fireScenarioCreatedNurturing({
+            userId: "user-1",
+            scenarioCount: 7,
+            scenarioId: "sc-1",
+            projectId: "proj-1",
+          }),
+        ).not.toThrow();
+
+        await vi.waitFor(() => {
+          expect(captureException).toHaveBeenCalled();
+        });
+      });
+    });
   });
 
   describe("fireExperimentRanNurturing()", () => {
@@ -271,6 +295,29 @@ describe("Feature adoption hooks", () => {
         });
 
         expect(mockNurturing.trackEvent).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when Customer.io API is unavailable", () => {
+      it("does not throw (fire-and-forget)", async () => {
+        const { captureException } = await import(
+          "../../../../src/utils/posthogErrorCapture"
+        );
+        mockNurturing.trackEvent.mockRejectedValueOnce(
+          new Error("CIO unavailable"),
+        );
+
+        expect(() =>
+          fireExperimentRanNurturing({
+            userId: "user-1",
+            experimentId: "exp-1",
+            projectId: "proj-1",
+          }),
+        ).not.toThrow();
+
+        await vi.waitFor(() => {
+          expect(captureException).toHaveBeenCalled();
+        });
       });
     });
   });

@@ -23,7 +23,7 @@ let lastSweepAt = 0;
  * Evicts entries older than ONE_HOUR_MS from the debounce cache.
  * Only runs at most once per hour to keep per-call cost constant.
  */
-function sweepExpiredEntries(now: number): void {
+function sweepExpiredEntries({ now }: { now: number }): void {
   if (now - lastSweepAt < ONE_HOUR_MS) return;
   for (const [cachedUserId, sentAt] of lastActivitySentAt) {
     if (now - sentAt >= ONE_HOUR_MS) {
@@ -44,22 +44,28 @@ export function fireActivityTrackingNurturing({
 }: {
   userId: string;
 }): void {
+  const nurturing = getApp().nurturing;
+  if (!nurturing) return;
+
   const now = Date.now();
-  sweepExpiredEntries(now);
+  sweepExpiredEntries({ now });
   const lastSent = lastActivitySentAt.get(userId);
 
-  if (lastSent && now - lastSent < ONE_HOUR_MS) {
+  if (lastSent !== undefined && now - lastSent < ONE_HOUR_MS) {
     return;
   }
 
   lastActivitySentAt.set(userId, now);
 
-  void getApp()
-    .nurturing?.identifyUser({
+  void nurturing
+    .identifyUser({
       userId,
       traits: { last_active_at: new Date(now).toISOString() },
     })
-    ?.catch(captureException);
+    .catch((error) => {
+      lastActivitySentAt.delete(userId);
+      captureException(error);
+    });
 }
 
 /**

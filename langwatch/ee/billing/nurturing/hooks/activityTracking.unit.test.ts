@@ -164,6 +164,24 @@ describe("Activity tracking hook", () => {
           expect(captureException).toHaveBeenCalled();
         });
       });
+
+      it("clears the cache entry on rejection so the next call can retry", async () => {
+        mockNurturing.identifyUser.mockRejectedValueOnce(
+          new Error("CIO unavailable"),
+        );
+
+        fireActivityTrackingNurturing({ userId: "user-1" });
+        expect(getActivityTrackingCacheSize()).toBe(1);
+
+        await vi.waitFor(() => {
+          expect(getActivityTrackingCacheSize()).toBe(0);
+        });
+
+        // Next call should succeed and re-add to cache
+        mockNurturing.identifyUser.mockResolvedValueOnce(undefined);
+        fireActivityTrackingNurturing({ userId: "user-1" });
+        expect(mockNurturing.identifyUser).toHaveBeenCalledTimes(2);
+      });
     });
   });
 
@@ -179,6 +197,12 @@ describe("Activity tracking hook", () => {
         fireActivityTrackingNurturing({ userId: "user-1" });
 
         expect(mockNurturing.identifyUser).not.toHaveBeenCalled();
+      });
+
+      it("does not populate the debounce cache", () => {
+        fireActivityTrackingNurturing({ userId: "user-1" });
+
+        expect(getActivityTrackingCacheSize()).toBe(0);
       });
     });
   });
