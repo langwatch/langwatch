@@ -124,6 +124,7 @@ export function OptimizeModalContent({
     setLastCommittedWorkflow,
     setCurrentVersionId,
     currentVersionId,
+    checkCanCommitNewVersion,
   } = useWorkflowStore(
     ({
       workflow_id: workflowId,
@@ -136,6 +137,7 @@ export function OptimizeModalContent({
       setLastCommittedWorkflow,
       setCurrentVersionId,
       currentVersionId,
+      checkCanCommitNewVersion,
     }) => ({
       workflowId,
       getWorkflow,
@@ -147,6 +149,7 @@ export function OptimizeModalContent({
       setLastCommittedWorkflow,
       setCurrentVersionId,
       currentVersionId,
+      checkCanCommitNewVersion,
     }),
   );
 
@@ -189,7 +192,7 @@ export function OptimizeModalContent({
     },
   );
 
-  const { versions, canSaveNewVersion: canSave } =
+  const { versions } =
     useVersionState({
       project,
       form: form as unknown as UseFormReturn<{
@@ -198,6 +201,7 @@ export function OptimizeModalContent({
       }>,
       allowSaveIfAutoSaveIsCurrentButNotLatest: false,
     });
+  const canSave = checkCanCommitNewVersion();
 
   const commitVersion = api.workflow.commitVersion.useMutation();
   const { startOptimizationExecution } = useOptimizationExecution();
