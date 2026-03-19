@@ -1,5 +1,10 @@
-import { brotliDecompressSync, gunzipSync, inflateSync } from "node:zlib";
+import { brotliDecompress, gunzip, inflate } from "node:zlib";
+import { promisify } from "node:util";
 import type { NextRequest } from "next/server";
+
+const gunzipAsync = promisify(gunzip);
+const inflateAsync = promisify(inflate);
+const brotliDecompressAsync = promisify(brotliDecompress);
 
 function toArrayBuffer(buf: Buffer): ArrayBuffer {
   return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
@@ -19,15 +24,15 @@ export async function readBody(req: NextRequest): Promise<ArrayBuffer> {
   }
 
   if (encoding === "gzip") {
-    return toArrayBuffer(gunzipSync(Buffer.from(raw)));
+    return toArrayBuffer(await gunzipAsync(Buffer.from(raw)));
   }
 
   if (encoding === "deflate") {
-    return toArrayBuffer(inflateSync(Buffer.from(raw)));
+    return toArrayBuffer(await inflateAsync(Buffer.from(raw)));
   }
 
   if (encoding === "br") {
-    return toArrayBuffer(brotliDecompressSync(Buffer.from(raw)));
+    return toArrayBuffer(await brotliDecompressAsync(Buffer.from(raw)));
   }
 
   throw new Error(`Unsupported Content-Encoding: ${encoding}`);
