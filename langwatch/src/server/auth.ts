@@ -26,6 +26,7 @@ import { dependencies } from "../injection/dependencies.server";
 import { getNextAuthSessionToken } from "../utils/auth";
 import { createLogger } from "../utils/logger/server";
 import { captureException } from "../utils/posthogErrorCapture";
+import { fireActivityTrackingNurturing } from "../../ee/billing/nurturing/hooks/activityTracking";
 
 const logger = createLogger("langwatch:auth");
 
@@ -77,6 +78,8 @@ export const authOptions = (
           throw new Error("User not found");
         }
 
+        fireActivityTrackingNurturing({ userId: user_.id });
+
         return {
           ...session,
           user: {
@@ -86,6 +89,8 @@ export const authOptions = (
           },
         };
       }
+
+      fireActivityTrackingNurturing({ userId: user.id });
 
       return {
         ...session,
