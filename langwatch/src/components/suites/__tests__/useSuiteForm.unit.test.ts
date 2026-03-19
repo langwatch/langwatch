@@ -466,19 +466,21 @@ describe("useSuiteForm()", () => {
       });
     });
 
-    describe("when a workflow agent is provided", () => {
-      it("maps it with type 'http' (non-code agents default to http)", () => {
+    describe("when an unsupported agent type is provided", () => {
+      it("excludes workflow agents from available targets", () => {
         const { result } = renderHook(() =>
           useSuiteForm({
             ...baseParams,
             agents: [
-              { id: "agent_1", name: "Workflow Agent", type: "workflow" },
+              { id: "agent_1", name: "HTTP Agent", type: "http" },
+              { id: "agent_2", name: "Workflow Agent", type: "workflow" },
+              { id: "agent_3", name: "Signature Agent", type: "signature" },
             ],
           }),
         );
 
         expect(result.current.availableTargets).toEqual([
-          { name: "Workflow Agent", type: "http", referenceId: "agent_1" },
+          { name: "HTTP Agent", type: "http", referenceId: "agent_1" },
           { name: "test-prompt", type: "prompt", referenceId: "prompt_1" },
         ]);
       });
