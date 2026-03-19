@@ -7,12 +7,20 @@ const {
   mockCaptureException,
   mockSendSlackSignupEvent,
   mockSendHubspotSignupForm,
+  mockIdentifyUser,
+  mockTrackEvent,
+  mockGroupUser,
+  mockBatch,
 } = vi.hoisted(() => ({
   mockCreateAndAssign: vi.fn(),
   mockCreateProject: vi.fn(),
   mockCaptureException: vi.fn(),
   mockSendSlackSignupEvent: vi.fn(),
   mockSendHubspotSignupForm: vi.fn(),
+  mockIdentifyUser: vi.fn().mockResolvedValue(undefined),
+  mockTrackEvent: vi.fn().mockResolvedValue(undefined),
+  mockGroupUser: vi.fn().mockResolvedValue(undefined),
+  mockBatch: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("../../rbac", async (importOriginal) => {
@@ -47,6 +55,12 @@ vi.mock("~/server/app-layer/app", () => ({
     notifications: {
       sendSlackSignupEvent: mockSendSlackSignupEvent,
       sendHubspotSignupForm: mockSendHubspotSignupForm,
+    },
+    nurturing: {
+      identifyUser: mockIdentifyUser,
+      trackEvent: mockTrackEvent,
+      groupUser: mockGroupUser,
+      batch: mockBatch,
     },
   }),
 }));
