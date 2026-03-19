@@ -84,7 +84,7 @@ export const createElasticsearchBatchEvaluationRepository =
     const upsertResults = async (
       params: UpsertResultsParams,
     ): Promise<void> => {
-      const { projectId, experimentId, runId, dataset, evaluations, progress } =
+      const { projectId, experimentId, runId, dataset, evaluations, progress, targets } =
         params;
 
       const id = batchEvaluationId({ projectId, experimentId, runId });
@@ -149,6 +149,25 @@ export const createElasticsearchBatchEvaluationRepository =
           }
         }
 
+        // Merge targets (by id)
+        if (params.targets != null && params.targets.size() > 0) {
+          if (ctx._source.targets == null) {
+            ctx._source.targets = [];
+          }
+          for (newTarget in params.targets) {
+            boolean exists = false;
+            for (t in ctx._source.targets) {
+              if (t.id == newTarget.id) {
+                exists = true;
+                break;
+              }
+            }
+            if (!exists) {
+              ctx._source.targets.add(newTarget);
+            }
+          }
+        }
+
         // Update timestamps and progress
         ctx._source.timestamps.updated_at = params.updated_at;
         if (params.progress != null) {
@@ -158,6 +177,7 @@ export const createElasticsearchBatchEvaluationRepository =
         params: {
           dataset: truncatedDataset,
           evaluations: truncatedEvaluations,
+          targets: targets ?? null,
           updated_at: now,
           progress: progress ?? null,
         },
