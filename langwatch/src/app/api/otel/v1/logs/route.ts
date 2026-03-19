@@ -181,6 +181,9 @@ async function handleLogsRequest(req: NextRequest) {
           piiRedactionLevel: project.piiRedactionLevel,
         });
       }
+      if (project.disableElasticSearchTraceWriting) {
+        return NextResponse.json({ message: "OK" });
+      }
 
       const tracesGeneratedFromLogs =
         await openTelemetryLogsRequestToTracesForCollection(logRequest);

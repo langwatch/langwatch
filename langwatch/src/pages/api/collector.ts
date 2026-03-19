@@ -573,6 +573,10 @@ async function handleCollectorRequest(
     }
   }
 
+  if (project.disableElasticSearchTraceWriting) {
+    return res.status(200).json({ message: "Trace received successfully." });
+  }
+
   const forceSync = req.query.force_sync === "true";
   const contentLength = req.headers["content-length"];
   await scheduleTraceCollectionWithFallback(
