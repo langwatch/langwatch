@@ -12,10 +12,21 @@ interface BufferedBatch {
   clickhouse_settings?: CHSettings;
 }
 
-function isFieldTooLongError(err: unknown): boolean {
+function isSplittableError(err: unknown): boolean {
+  if (err instanceof RangeError && err.message.includes("Invalid string length")) {
+    return true;
+  }
   const msg = err instanceof Error ? err.message : String(err);
   return msg.includes("Field value too long");
 }
+
+function isMemoryLimitError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return msg.includes("memory limit exceeded") || msg.includes("OvercommitTracker");
+}
+
+const CH_MEMORY_RETRY_ATTEMPTS = 5;
+const CH_MEMORY_BASE_DELAY_MS = 5_000;
 
 /**
  * Wraps a ClickHouse client to buffer `insert()` calls by table
@@ -40,21 +51,32 @@ export function createBatchingClickHouseClient(
     format: string,
     settings?: CHSettings,
   ): Promise<void> {
-    try {
-      await inner.insert({
-        table,
-        values,
-        format: format as any,
-        clickhouse_settings: settings,
-      });
-    } catch (err) {
-      if (isFieldTooLongError(err) && values.length > 1) {
-        const mid = Math.ceil(values.length / 2);
-        await insertWithRetry(table, values.slice(0, mid), format, settings);
-        await insertWithRetry(table, values.slice(mid), format, settings);
+    for (let attempt = 0; attempt <= CH_MEMORY_RETRY_ATTEMPTS; attempt++) {
+      try {
+        await inner.insert({
+          table,
+          values,
+          format: format as any,
+          clickhouse_settings: settings,
+        });
         return;
+      } catch (err) {
+        if (isSplittableError(err) && values.length > 1) {
+          const mid = Math.ceil(values.length / 2);
+          await insertWithRetry(table, values.slice(0, mid), format, settings);
+          await insertWithRetry(table, values.slice(mid), format, settings);
+          return;
+        }
+        if (isMemoryLimitError(err) && attempt < CH_MEMORY_RETRY_ATTEMPTS) {
+          const delay = CH_MEMORY_BASE_DELAY_MS * 2 ** attempt;
+          console.warn(
+            `[CH] Memory limit on ${table} (${values.length} rows), retrying in ${delay / 1000}s (attempt ${attempt + 1}/${CH_MEMORY_RETRY_ATTEMPTS})`,
+          );
+          await new Promise((r) => setTimeout(r, delay));
+          continue;
+        }
+        throw err;
       }
-      throw err;
     }
   }
 
@@ -70,9 +92,9 @@ export function createBatchingClickHouseClient(
   }
 
   async function flushAll(): Promise<void> {
-    await Promise.all(
-      [...buffers.keys()].map((table) => flushTable(table)),
-    );
+    for (const table of buffers.keys()) {
+      await flushTable(table);
+    }
   }
 
   const handler: ProxyHandler<ClickHouseClient> = {
