@@ -115,6 +115,7 @@ class CompetitorLLMFunctionCallEvaluator(
         )
         response = litellm.completion(
             model=litellm_model,
+            max_tokens=1024,
             messages=messages,
             tools=[
                 {
@@ -127,7 +128,7 @@ class CompetitorLLMFunctionCallEvaluator(
                             "properties": {
                                 "reasoning": {
                                     "type": "string",
-                                    "description": "Explain why you think the competitor was or was not mentioned.",
+                                    "description": "A concise explanation in 1-2 sentences. Do not repeat or echo the input content.",
                                 },
                                 "confidence": {
                                     "type": "number",

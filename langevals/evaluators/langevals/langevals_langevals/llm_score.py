@@ -100,6 +100,7 @@ class CustomLLMScoreEvaluator(
         else:
             response = litellm.completion(
                 model=self.settings.model,
+                max_tokens=1024,
                 messages=[
                     {
                         "role": "system",
@@ -121,7 +122,7 @@ class CustomLLMScoreEvaluator(
                                 "properties": {
                                     "reasoning": {
                                         "type": "string",
-                                        "description": "use this field to break down the task and explain your reasoning in multiple sub-scores, using it to combine into a final score",
+                                        "description": "A concise reasoning for your score in 1-3 sentences. Break down sub-scores briefly. Do not repeat or echo the input content.",
                                     },
                                     "final_score": {
                                         "type": "number",
@@ -144,8 +145,12 @@ class CustomLLMScoreEvaluator(
             )
             cost = completion_cost(completion_response=response)
 
+        reasoning = arguments["reasoning"]
+        if len(reasoning) > 2000:
+            reasoning = reasoning[:2000] + "..."
+
         return CustomLLMScoreResult(
             score=arguments["final_score"],
-            details=arguments["reasoning"],
+            details=reasoning,
             cost=Money(amount=cost, currency="USD") if cost else None,
         )

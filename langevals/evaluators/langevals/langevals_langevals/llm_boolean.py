@@ -105,6 +105,7 @@ class CustomLLMBooleanEvaluator(
         else:
             response = litellm.completion(
                 model=self.settings.model,
+                max_tokens=1024,
                 messages=[
                     {
                         "role": "system",
@@ -126,11 +127,11 @@ class CustomLLMBooleanEvaluator(
                                 "properties": {
                                     "reasoning": {
                                         "type": "string",
-                                        "description": "use this field to ponder and write a short reasoning behind the decision written before a result is actually given",
+                                        "description": "A concise reasoning for your decision in 1-2 sentences. Do not repeat or echo the input content.",
                                     },
                                     "passed": {
                                         "type": "boolean",
-                                        "description": "your final veredict, reply true or false if the content passes the test or not",
+                                        "description": "your final verdict, reply true or false if the content passes the test or not",
                                     },
                                 },
                                 "required": ["reasoning", "passed"],
@@ -149,9 +150,13 @@ class CustomLLMBooleanEvaluator(
             )
             cost = completion_cost(completion_response=response)
 
+        reasoning = arguments["reasoning"]
+        if len(reasoning) > 2000:
+            reasoning = reasoning[:2000] + "..."
+
         return CustomLLMBooleanResult(
             score=1 if arguments["passed"] else 0,
             passed=arguments["passed"],
-            details=arguments["reasoning"],
+            details=reasoning,
             cost=Money(amount=cost, currency="USD") if cost else None,
         )

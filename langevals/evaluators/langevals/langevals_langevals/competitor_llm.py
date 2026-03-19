@@ -110,6 +110,7 @@ class CompetitorLLMEvaluator(
         )
         response = litellm.completion(
             model=litellm_model,
+            max_tokens=1024,
             messages=messages,
             tools=[
                 {
@@ -122,7 +123,7 @@ class CompetitorLLMEvaluator(
                             "properties": {
                                 "reasoning": {
                                     "type": "string",
-                                    "description": "Use this field to ponder and write the reasoning behind the decision written before a result is actually given",
+                                    "description": "A concise explanation in 1-2 sentences. Do not repeat or echo the input content.",
                                 },
                                 "competitor_mentioned": {
                                     "type": "boolean",

@@ -753,6 +753,38 @@ const esSpansToDatasetSpans = (spans: Span[]): DatasetSpan[] => {
   }
 };
 
+/**
+ * Serialize a value for dataset storage. If the value looks like a ChatMessage
+ * array (objects with role/content), extract only the text content to avoid
+ * leaking verbose tool_call JSON into evaluator inputs.
+ */
+const serializeValueForDataset = (value: unknown): string => {
+  if (Array.isArray(value) && value.length > 0 && typeof value[0] === "object" && value[0] !== null) {
+    const first = value[0] as Record<string, unknown>;
+    if ("role" in first && "content" in first) {
+      // Looks like a ChatMessage array — extract text content only
+      const texts: string[] = [];
+      for (const msg of value) {
+        const m = msg as Record<string, unknown>;
+        if (typeof m.content === "string") {
+          texts.push(m.content);
+        } else if (Array.isArray(m.content)) {
+          for (const part of m.content) {
+            const p = part as Record<string, unknown>;
+            if (p.type === "text" && typeof p.text === "string") {
+              texts.push(p.text);
+            }
+          }
+        }
+      }
+      if (texts.length > 0) {
+        return texts.join("\n");
+      }
+    }
+  }
+  return JSON.stringify(value);
+};
+
 export const mapTraceToDatasetEntry = (
   trace: TraceWithAnnotations,
   mapping: Record<
@@ -805,7 +837,7 @@ export const mapTraceToDatasetEntry = (
           return [
             column,
             typeof value !== "string" && typeof value !== "number"
-              ? JSON.stringify(value)
+              ? serializeValueForDataset(value)
               : value,
           ];
         },

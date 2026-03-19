@@ -114,6 +114,7 @@ class CustomLLMCategoryEvaluator(
         cost = None
         response = litellm.completion(
             model=self.settings.model,
+            max_tokens=1024,
             messages=[
                 {
                     "role": "system",
@@ -135,7 +136,7 @@ class CustomLLMCategoryEvaluator(
                             "properties": {
                                 "reasoning": {
                                     "type": "string",
-                                    "description": "use this field to ponder and write a short reasoning behind the decision written before a result is actually given",
+                                    "description": "A concise reasoning for your categorization in 1-2 sentences. Do not repeat or echo the input content.",
                                 },
                                 "label": {
                                     "type": "string",
@@ -162,8 +163,12 @@ class CustomLLMCategoryEvaluator(
         )
         cost = completion_cost(completion_response=response)
 
+        reasoning = arguments["reasoning"]
+        if len(reasoning) > 2000:
+            reasoning = reasoning[:2000] + "..."
+
         return CustomLLMCategoryResult(
             label=arguments["label"],
-            details=arguments["reasoning"],
+            details=reasoning,
             cost=Money(amount=cost, currency="USD") if cost else None,
         )
