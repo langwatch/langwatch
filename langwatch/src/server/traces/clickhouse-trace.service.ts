@@ -1245,9 +1245,9 @@ export class ClickHouseTraceService {
         };
 
         // Run count + data queries in parallel.
-        // No FINAL (blows up RAM) and no subquery (materialises everything).
-        // Flat LIMIT 1 BY deduplicates as a streaming post-filter on the
-        // sorted output — cheap and correct for recent unmerged rows.
+        // Two-phase data query: inner subquery finds the target TraceIds using
+        // only lightweight columns (so the sort fits in memory), then the outer
+        // query fetches full data for just those IDs.
         // uniq() uses HyperLogLog (~2 % error) which is fine for pagination.
         const [countResult, summaryResult] = await Promise.all([
           this.clickHouseClient.query({
@@ -1291,13 +1291,20 @@ export class ClickHouseTraceService {
                 toUnixTimestamp64Milli(ts.UpdatedAt) AS ts_UpdatedAt
               FROM trace_summaries ts
               WHERE ts.TenantId = {tenantId:String}
-                AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
-                AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
-                ${extraFilters}
-                ${cursorCondition}
+                AND ts.TraceId IN (
+                  SELECT ts.TraceId
+                  FROM trace_summaries ts
+                  WHERE ts.TenantId = {tenantId:String}
+                    AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
+                    AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
+                    ${extraFilters}
+                    ${cursorCondition}
+                  ORDER BY ts.OccurredAt ${orderDirection}, ts.TraceId ${orderDirection}, ts.UpdatedAt DESC
+                  LIMIT 1 BY ts.TraceId
+                  LIMIT {pageSize:UInt32}
+                )
               ORDER BY ts.OccurredAt ${orderDirection}, ts.TraceId ${orderDirection}, ts.UpdatedAt DESC
               LIMIT 1 BY ts.TraceId
-              LIMIT {pageSize:UInt32}
             `,
             query_params: {
               ...sharedParams,
