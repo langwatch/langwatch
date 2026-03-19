@@ -36,6 +36,10 @@ function normalizeSpanIds(span: OtlpSpan): NormalizedIdSpan {
   };
 }
 
+export interface TraceRequestCollectionResult {
+  rejectedSpans: number;
+}
+
 export interface TraceRequestCollectionDeps {
   dedup: SpanDedupService;
   recordSpan: (data: RecordSpanCommandData) => Promise<void>;
@@ -66,7 +70,7 @@ export class TraceRequestCollectionService {
     tenantId: string,
     traceRequest: IExportTraceServiceRequest,
     piiRedactionLevel: PIIRedactionLevel,
-  ): Promise<void> {
+  ): Promise<TraceRequestCollectionResult> {
     return await this.tracer.withActiveSpan(
       "TraceRequestCollectionService.handleOtlpTraceRequest",
       {
@@ -127,6 +131,10 @@ export class TraceRequestCollectionService {
         span.setAttribute("spans.ingestion.failures", ingestionFailureCount);
         span.setAttribute("spans.ingestion.drops", droppedSpanCount);
         span.setAttribute("spans.ingestion.deduped", dedupedSpanCount);
+
+        return {
+          rejectedSpans: droppedSpanCount + ingestionFailureCount,
+        };
       },
     );
   }
