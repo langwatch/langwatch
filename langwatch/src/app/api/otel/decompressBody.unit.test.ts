@@ -1,4 +1,4 @@
-import { gzipSync, deflateSync } from "node:zlib";
+import { brotliCompressSync, deflateSync, gzipSync } from "node:zlib";
 import { NextRequest } from "next/server";
 import { describe, expect, it } from "vitest";
 import { readBody } from "./decompressBody";
@@ -14,9 +14,22 @@ describe("readBody", () => {
       });
 
       const result = await readBody(req);
-      const text = Buffer.from(result).toString("utf-8");
 
-      expect(text).toBe(payload);
+      expect(Buffer.from(result).toString("utf-8")).toBe(payload);
+    });
+  });
+
+  describe("when Content-Encoding is identity", () => {
+    it("returns the raw body unchanged", async () => {
+      const req = new NextRequest("http://localhost/api/otel/v1/traces", {
+        method: "POST",
+        body: payload,
+        headers: { "Content-Encoding": "identity" },
+      });
+
+      const result = await readBody(req);
+
+      expect(Buffer.from(result).toString("utf-8")).toBe(payload);
     });
   });
 
@@ -27,15 +40,27 @@ describe("readBody", () => {
       const req = new NextRequest("http://localhost/api/otel/v1/traces", {
         method: "POST",
         body: compressed,
-        headers: {
-          "Content-Encoding": "gzip",
-        },
+        headers: { "Content-Encoding": "gzip" },
       });
 
       const result = await readBody(req);
-      const text = Buffer.from(result).toString("utf-8");
 
-      expect(text).toBe(payload);
+      expect(Buffer.from(result).toString("utf-8")).toBe(payload);
+    });
+
+    it("preserves binary protobuf data after decompression", async () => {
+      const binaryData = new Uint8Array([0x0a, 0x12, 0x08, 0x00, 0xff, 0xfe]);
+      const compressed = gzipSync(Buffer.from(binaryData));
+
+      const req = new NextRequest("http://localhost/api/otel/v1/traces", {
+        method: "POST",
+        body: compressed,
+        headers: { "Content-Encoding": "gzip" },
+      });
+
+      const result = await readBody(req);
+
+      expect(new Uint8Array(result)).toEqual(binaryData);
     });
   });
 
@@ -46,35 +71,42 @@ describe("readBody", () => {
       const req = new NextRequest("http://localhost/api/otel/v1/traces", {
         method: "POST",
         body: compressed,
-        headers: {
-          "Content-Encoding": "deflate",
-        },
+        headers: { "Content-Encoding": "deflate" },
       });
 
       const result = await readBody(req);
-      const text = Buffer.from(result).toString("utf-8");
 
-      expect(text).toBe(payload);
+      expect(Buffer.from(result).toString("utf-8")).toBe(payload);
     });
   });
 
-  describe("when Content-Encoding is gzip", () => {
-    it("preserves binary protobuf data after decompression", async () => {
-      const binaryData = new Uint8Array([0x0a, 0x12, 0x08, 0x00, 0xff, 0xfe]);
-      const compressed = gzipSync(Buffer.from(binaryData));
+  describe("when Content-Encoding is br", () => {
+    it("decompresses the body", async () => {
+      const compressed = brotliCompressSync(Buffer.from(payload));
 
       const req = new NextRequest("http://localhost/api/otel/v1/traces", {
         method: "POST",
         body: compressed,
-        headers: {
-          "Content-Encoding": "gzip",
-        },
+        headers: { "Content-Encoding": "br" },
       });
 
       const result = await readBody(req);
-      const resultArray = new Uint8Array(result);
 
-      expect(resultArray).toEqual(binaryData);
+      expect(Buffer.from(result).toString("utf-8")).toBe(payload);
+    });
+  });
+
+  describe("when Content-Encoding is unsupported", () => {
+    it("throws an error", async () => {
+      const req = new NextRequest("http://localhost/api/otel/v1/traces", {
+        method: "POST",
+        body: payload,
+        headers: { "Content-Encoding": "zstd" },
+      });
+
+      await expect(readBody(req)).rejects.toThrow(
+        "Unsupported Content-Encoding: zstd",
+      );
     });
   });
 });

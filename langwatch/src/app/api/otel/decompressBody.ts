@@ -1,23 +1,34 @@
-import { gunzipSync, inflateSync } from "node:zlib";
+import { brotliDecompressSync, gunzipSync, inflateSync } from "node:zlib";
 import type { NextRequest } from "next/server";
 
+function toArrayBuffer(buf: Buffer): ArrayBuffer {
+  return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+}
+
 /**
- * Reads the request body, decompressing it if Content-Encoding is gzip or deflate.
- * OTEL SDKs send compressed bodies when `compression: true` is configured.
+ * Reads the request body, decompressing based on Content-Encoding.
+ * Supports gzip (OTEL standard), deflate, and brotli.
+ * Throws on unsupported encodings to surface misconfiguration early.
  */
 export async function readBody(req: NextRequest): Promise<ArrayBuffer> {
   const raw = await req.arrayBuffer();
   const encoding = req.headers.get("content-encoding");
 
+  if (!encoding || encoding === "identity") {
+    return raw;
+  }
+
   if (encoding === "gzip") {
-    const buf = gunzipSync(Buffer.from(raw));
-    return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+    return toArrayBuffer(gunzipSync(Buffer.from(raw)));
   }
 
   if (encoding === "deflate") {
-    const buf = inflateSync(Buffer.from(raw));
-    return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+    return toArrayBuffer(inflateSync(Buffer.from(raw)));
   }
 
-  return raw;
+  if (encoding === "br") {
+    return toArrayBuffer(brotliDecompressSync(Buffer.from(raw)));
+  }
+
+  throw new Error(`Unsupported Content-Encoding: ${encoding}`);
 }
