@@ -461,7 +461,7 @@ function MainPanel({
   if (error) {
     return (
       <VStack gap={4} align="center" py={8}>
-        <Text color="red.500">Error loading suites</Text>
+        <Text color="red.500">Error loading run plans</Text>
         <Text fontSize="sm" color="fg.muted">
           {error.message}
         </Text>

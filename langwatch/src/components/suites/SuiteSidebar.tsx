@@ -512,7 +512,7 @@ function SuiteListItem({
             </Box>
             <Box
               as="button"
-              aria-label="Suite options"
+              aria-label="Run plan options"
               data-testid="suite-menu-button"
               onClick={(e: React.MouseEvent) => {
                 e.stopPropagation();
