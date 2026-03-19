@@ -329,7 +329,7 @@ export class SuiteService {
       scenarioRows.map((r) => [r.id, r.name]),
     );
 
-    const agentIds = targets.filter((t) => t.type === "http" || t.type === "code").map((t) => t.referenceId);
+    const agentIds = targets.filter((t) => t.type !== "prompt").map((t) => t.referenceId);
     const promptIds = targets.filter((t) => t.type === "prompt").map((t) => t.referenceId);
 
     const agentRows = agentIds.length > 0
@@ -483,8 +483,8 @@ export class SuiteService {
   }): Promise<ResolvedTargetReferences> {
     const { targets, projectId, organizationId } = params;
 
-    // Partition targets by type (parseSuiteTargets validates types upstream)
-    const agentTargets = targets.filter((t) => t.type === "http" || t.type === "code");
+    // Partition targets: anything that isn't a prompt is an agent (all agent types live in the Agent table)
+    const agentTargets = targets.filter((t) => t.type !== "prompt");
     const promptTargets = targets.filter((t) => t.type === "prompt");
 
     // Batch agent targets (both HTTP and code agents live in the Agent table)
