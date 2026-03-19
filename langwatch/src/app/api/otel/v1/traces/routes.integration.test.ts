@@ -1,3 +1,4 @@
+import { gzipSync, deflateSync } from "node:zlib";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
 import type { Project } from "@prisma/client";
 import type { Worker } from "bullmq";
@@ -337,5 +338,72 @@ describe("opentelemetry traces receiver", () => {
     );
 
     expect(response.status).toBe(200);
+  });
+
+  describe("when compression is enabled", () => {
+    it("accepts gzip-compressed protobuf", async () => {
+      const encodedMessage = traceRequestType.encode(request).finish();
+      const compressed = new Uint8Array(gzipSync(Buffer.from(encodedMessage)));
+      const blob = new Blob([compressed], {
+        type: "application/x-protobuf",
+      });
+
+      const response = await POST(
+        new NextRequest("http://localhost:5560/api/otel/v1/trace", {
+          method: "POST",
+          body: blob,
+          headers: {
+            "Content-Type": "application/x-protobuf",
+            "Content-Encoding": "gzip",
+            Authorization: `Bearer ${project?.apiKey}`,
+          },
+        }),
+      );
+
+      expect(response.status).toBe(200);
+    });
+
+    it("accepts gzip-compressed JSON", async () => {
+      const compressed = new Uint8Array(
+        gzipSync(Buffer.from(JSON.stringify(request), "utf-8")),
+      );
+      const blob = new Blob([compressed], { type: "application/json" });
+
+      const response = await POST(
+        new NextRequest("http://localhost:5560/api/otel/v1/trace", {
+          method: "POST",
+          body: blob,
+          headers: {
+            "Content-Type": "application/json",
+            "Content-Encoding": "gzip",
+            Authorization: `Bearer ${project?.apiKey}`,
+          },
+        }),
+      );
+
+      expect(response.status).toBe(200);
+    });
+
+    it("accepts deflate-compressed protobuf", async () => {
+      const encodedMessage = traceRequestType.encode(request).finish();
+      const compressed = new Uint8Array(deflateSync(Buffer.from(encodedMessage)));
+      const blob = new Blob([compressed], {
+        type: "application/x-protobuf",
+      });
+
+      const response = await POST(
+        new NextRequest("http://localhost:5560/api/otel/v1/trace", {
+          method: "POST",
+          body: blob,
+          headers: {
+            "Content-Type": "application/x-protobuf",
+            "Content-Encoding": "deflate",
+            Authorization: `Bearer ${project?.apiKey}`,
+          },
+        }),
+      );
+
+      expect(response.status).toBe(200);
+    });
   });
 });

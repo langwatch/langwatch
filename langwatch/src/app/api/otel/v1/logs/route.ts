@@ -11,6 +11,7 @@ import {
 } from "~/server/background/workers/collectorWorker";
 import { openTelemetryLogsRequestToTracesForCollection } from "~/server/tracer/otel.logs";
 import { captureException } from "~/utils/posthogErrorCapture";
+import { readBody } from "../../decompressBody";
 import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
 import { withAppRouterTracer } from "../../../../../middleware/app-router-tracer";
 import { getApp } from "../../../../../server/app-layer/app";
@@ -125,7 +126,7 @@ async function handleLogsRequest(req: NextRequest) {
 
       span.setAttribute("langwatch.project.id", project.id);
 
-      const body = await req.arrayBuffer();
+      const body = await readBody(req);
       let logRequest: IExportLogsServiceRequest;
       try {
         if (contentType === "application/json") {

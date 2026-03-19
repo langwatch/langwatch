@@ -5,6 +5,7 @@ import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root"
 import { getLangWatchTracer } from "langwatch";
 import { type NextRequest, NextResponse } from "next/server";
 import { captureException } from "~/utils/posthogErrorCapture";
+import { readBody } from "../../decompressBody";
 import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
 import { withAppRouterTracer } from "../../../../../middleware/app-router-tracer";
 import {
@@ -139,7 +140,7 @@ async function handleTracesRequest(req: NextRequest) {
 
       span.setAttribute("langwatch.project.id", project.id);
 
-      const body = await req.arrayBuffer();
+      const body = await readBody(req);
 
       // Handle empty body gracefully - protobuf decode throws on empty input.
       // OTEL SDKs may send empty requests during shutdown/flush cycles.
