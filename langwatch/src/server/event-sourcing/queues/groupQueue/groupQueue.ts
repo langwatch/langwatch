@@ -42,7 +42,7 @@ const GROUP_QUEUE_CONFIG = {
   /** TTL for the active key (safety net for crashes), in seconds */
   activeTtlSec: 300,
   /** BRPOP timeout in seconds (fallback polling interval) */
-  signalTimeoutSec: 1,
+  signalTimeoutSec: 5,
   /** Interval for collecting queue metrics in milliseconds */
   metricsIntervalMs: 15000,
   /** Maximum time to wait for graceful shutdown in milliseconds */
@@ -655,6 +655,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     this.shutdownRequested = true;
     this.metricsCollector?.stop();
     this.dispatcher?.requestShutdown();
+    // Wake the BRPOP so the dispatcher exits immediately
+    await this.redisConnection
+      .lpush(this.scripts.getSignalKey(), "1")
+      .catch(() => {});
     this.logger.debug(
       { queueName: this.queueName },
       "Closing group queue processor",
