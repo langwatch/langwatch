@@ -32,7 +32,7 @@ export const scenarioJobSchema = z.object({
   /** Human-readable scenario name for display in queued job rows. */
   scenarioName: z.string().optional(),
   target: z.object({
-    type: z.enum(["prompt", "http", "code"]),
+    type: z.enum(["prompt", "http", "code", "workflow"]),
     referenceId: z.string(),
   }),
   setId: z.string(),

@@ -12,6 +12,7 @@ import {
   SerializedCodeAgentAdapter,
   SerializedHttpAgentAdapter,
   SerializedPromptConfigAdapter,
+  SerializedWorkflowAdapter,
 } from "../serialized.adapters";
 
 describe("createAdapter", () => {
@@ -80,6 +81,26 @@ describe("createAdapter", () => {
     });
   });
 
+  describe("workflow adapter", () => {
+    it("creates SerializedWorkflowAdapter for workflow type", () => {
+      const adapterData: TargetAdapterData = {
+        type: "workflow",
+        agentId: "agent_wf_123",
+        workflowDsl: { nodes: [], edges: [] },
+        entryInputs: [{ identifier: "input", type: "str" }],
+        endOutputs: [{ identifier: "output", type: "str" }],
+      };
+
+      const adapter = createAdapter({
+        adapterData,
+        modelParams: defaultModelParams,
+        nlpServiceUrl,
+      });
+
+      expect(adapter).toBeInstanceOf(SerializedWorkflowAdapter);
+    });
+  });
+
   describe("unknown adapter type", () => {
     it("throws descriptive error for unknown adapter type", () => {
       const adapterData = {
@@ -107,6 +128,10 @@ describe("createAdapter", () => {
 
     it("has factory for code type", () => {
       expect(SERIALIZED_ADAPTER_FACTORIES["code"]).toBeDefined();
+    });
+
+    it("has factory for workflow type", () => {
+      expect(SERIALIZED_ADAPTER_FACTORIES["workflow"]).toBeDefined();
     });
   });
 });
