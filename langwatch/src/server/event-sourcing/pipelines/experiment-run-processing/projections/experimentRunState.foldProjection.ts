@@ -140,6 +140,7 @@ function apply(
       Progress: progress,
       TotalCost: totalCost,
       TotalDurationMs: totalDurationMs,
+      Targets: mergeTargetsJson(state.Targets, event.data.targets ?? []),
       UpdatedAt: Date.now(),
     };
   }

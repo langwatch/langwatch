@@ -43,6 +43,7 @@ const config: ExperimentRunCommandConfig<
     duration: commandData.duration,
     error: commandData.error,
     traceId: commandData.traceId,
+    targets: commandData.targets,
   }),
   getLogContext: (commandData) => ({
     index: commandData.index,
