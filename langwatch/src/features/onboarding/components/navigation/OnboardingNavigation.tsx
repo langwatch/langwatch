@@ -1,5 +1,4 @@
-import { Button, HStack, Icon, VStack } from "@chakra-ui/react";
-import { SkipForward } from "lucide-react";
+import { Button, HStack, VStack } from "@chakra-ui/react";
 import React from "react";
 import { useAnalytics } from "react-contextual-analytics";
 
@@ -32,14 +31,15 @@ export const OnboardingNavigation = <T extends number = number>({
   const buttonText = isLastScreen ? "Finish" : "Next";
 
   return (
-    <VStack gap={3} w="full" pt={4}>
+    <VStack gap={3} w="full" pt={2}>
       <Button
         colorPalette="orange"
         variant="solid"
         size="lg"
         w="full"
-        borderRadius="xl"
+        borderRadius="10px"
         fontWeight="600"
+        h="44px"
         onClick={() => {
           emit("clicked", isLastScreen ? "finish" : "next", {
             currentScreenIndex,
@@ -54,14 +54,16 @@ export const OnboardingNavigation = <T extends number = number>({
         {buttonText}
       </Button>
 
-      <HStack justify="center" w="full" gap={3}>
+      <HStack justify="center" w="full" gap={1}>
         {!isFirstScreen && (
           <Button
             variant="ghost"
             size="sm"
-            color="fg.muted"
-            fontWeight="normal"
-            _hover={{ color: "fg.DEFAULT" }}
+            color="fg.subtle"
+            fontWeight="semibold"
+            fontSize="14px"
+            borderRadius="8px"
+            _hover={{ color: "fg.DEFAULT", bg: "blackAlpha.50" }}
             onClick={() => {
               emit("clicked", "previous", { currentScreenIndex });
               onPrev();
@@ -75,9 +77,11 @@ export const OnboardingNavigation = <T extends number = number>({
           <Button
             variant="ghost"
             size="sm"
-            color="fg.muted"
-            fontWeight="normal"
-            _hover={{ color: "fg.DEFAULT" }}
+            color="fg.subtle"
+            fontWeight="semibold"
+            fontSize="14px"
+            borderRadius="8px"
+            _hover={{ color: "fg.DEFAULT", bg: "blackAlpha.50" }}
             onClick={() => {
               emit("clicked", isLastScreen ? "finish" : "skip", {
                 currentScreenIndex,
@@ -88,9 +92,6 @@ export const OnboardingNavigation = <T extends number = number>({
             disabled={isSubmitting}
           >
             Skip
-            <Icon size="xs">
-              <SkipForward />
-            </Icon>
           </Button>
         )}
       </HStack>

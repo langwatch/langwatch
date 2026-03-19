@@ -1,4 +1,5 @@
 import { Box, HStack, VStack } from "@chakra-ui/react";
+import { AnimatePresence, motion } from "motion/react";
 import { useRouter } from "next/router";
 import type React from "react";
 import { useEffect, useState } from "react";
@@ -31,6 +32,7 @@ export const WelcomeScreen: React.FC = () => {
 
   const {
     currentScreenIndex,
+    direction,
     flow,
     navigation,
     getFormData,
@@ -136,55 +138,95 @@ export const WelcomeScreen: React.FC = () => {
         title={currentScreen?.heading ?? "Welcome aboard"}
         subTitle={currentScreen?.subHeading}
       >
-        <VStack gap={6} align="stretch" position="relative" minH="360px" w="full" minW="0">
-          <AnalyticsBoundary
-            key={currentScreenIndex}
-            name={currentScreen?.id ?? "unknown"}
-            attributes={{
-              screenIndex: currentVisibleIndex,
-              variant: flow.variant,
-              total: flow.total,
-              isFirst: isFirstScreen,
-              isLast: isLastScreen,
-            }}
-            sendViewedEvent
-          >
-            <OnboardingFormProvider value={formContextValue}>
-              <fieldset
-                disabled={pendingOrSuccessful}
-                style={{ width: "100%", minWidth: 0 }}
+        <VStack gap={5} align="stretch" w="full" minW="0">
+          <Box position="relative" overflow="hidden">
+            <AnimatePresence
+              mode="popLayout"
+              custom={direction}
+              initial={false}
+            >
+              <motion.div
+                key={currentScreenIndex}
+                custom={direction}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                layout
+                variants={{
+                  enter: (dir: number) => ({
+                    opacity: 0,
+                    x: dir > 0 ? 30 : -30,
+                    filter: "blur(3px)",
+                  }),
+                  center: {
+                    opacity: 1,
+                    x: 0,
+                    filter: "blur(0px)",
+                  },
+                  exit: (dir: number) => ({
+                    opacity: 0,
+                    x: dir > 0 ? -30 : 30,
+                    filter: "blur(3px)",
+                    position: "absolute" as const,
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                  }),
+                }}
+                transition={{
+                  duration: 0.3,
+                  ease: [0.32, 0.72, 0, 1],
+                }}
+                style={{ width: "100%" }}
               >
-                {currentScreen?.component ? (
-                  <currentScreen.component />
-                ) : null}
-              </fieldset>
-            </OnboardingFormProvider>
-          </AnalyticsBoundary>
+                <AnalyticsBoundary
+                  name={currentScreen?.id ?? "unknown"}
+                  attributes={{
+                    screenIndex: currentVisibleIndex,
+                    variant: flow.variant,
+                    total: flow.total,
+                    isFirst: isFirstScreen,
+                    isLast: isLastScreen,
+                  }}
+                  sendViewedEvent
+                >
+                  <OnboardingFormProvider value={formContextValue}>
+                    <fieldset
+                      disabled={pendingOrSuccessful}
+                      style={{ width: "100%", minWidth: 0 }}
+                    >
+                      {currentScreen?.component ? (
+                        <currentScreen.component />
+                      ) : null}
+                    </fieldset>
+                  </OnboardingFormProvider>
+                </AnalyticsBoundary>
+              </motion.div>
+            </AnimatePresence>
+          </Box>
 
-          <OnboardingNavigation
-            currentScreenIndex={currentScreenIndex}
-            onPrev={navigation.prevScreen}
-            onNext={navigation.nextScreen}
-            onSkip={navigation.skipScreen}
-            canProceed={navigation.canProceed()}
-            isSkippable={!currentScreen?.required}
-            isSubmitting={pendingOrSuccessful}
-            onFinish={handleFinalizeSubmit}
-            isFirstScreen={isFirstScreen}
-            isLastScreen={isLastScreen}
-          />
+          <motion.div layout transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}>
+            <OnboardingNavigation
+              currentScreenIndex={currentScreenIndex}
+              onPrev={navigation.prevScreen}
+              onNext={navigation.nextScreen}
+              onSkip={navigation.skipScreen}
+              canProceed={navigation.canProceed()}
+              isSkippable={!currentScreen?.required}
+              isSubmitting={pendingOrSuccessful}
+              onFinish={handleFinalizeSubmit}
+              isFirstScreen={isFirstScreen}
+              isLastScreen={isLastScreen}
+            />
+          </motion.div>
 
-          <HStack justify="center" gap={1}>
-            {flow.visibleScreens.map((_, idx) => (
-              <Box
-                key={idx}
-                w="20px"
-                display="flex"
-                justifyContent="center"
-              >
+          <motion.div layout transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}>
+            <HStack justify="center" gap={1.5}>
+              {flow.visibleScreens.map((_, idx) => (
                 <Box
-                  w={currentVisibleIndex === idx ? "20px" : "6px"}
-                  h="6px"
+                  key={idx}
+                  w={currentVisibleIndex === idx ? "16px" : "5px"}
+                  h="5px"
                   borderRadius="full"
                   bg={
                     currentVisibleIndex === idx
@@ -195,9 +237,9 @@ export const WelcomeScreen: React.FC = () => {
                   }
                   transition="all 0.3s ease"
                 />
-              </Box>
-            ))}
-          </HStack>
+              ))}
+            </HStack>
+          </motion.div>
         </VStack>
       </OnboardingContainer>
     </AnalyticsBoundary>

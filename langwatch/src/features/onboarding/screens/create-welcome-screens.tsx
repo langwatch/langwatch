@@ -40,14 +40,15 @@ const OrganizationScreen: React.FC = () => {
   const { emit } = useAnalytics();
 
   return (
-    <VStack gap={6} align="stretch" w="full" minW="0">
+    <VStack gap={5} align="stretch" w="full" minW="0">
       <Field.Root colorPalette="orange" w="full">
         <Input
           autoFocus
           size="lg"
           variant="outline"
           placeholder="Company or your name"
-          borderRadius="xl"
+          borderRadius="10px"
+          h="44px"
           value={organizationName}
           onChange={(e) => setOrganizationName(e.target.value)}
         />
@@ -56,7 +57,7 @@ const OrganizationScreen: React.FC = () => {
 
       <Field.Root colorPalette="orange">
         <Checkbox.Root
-          size="md"
+          size="sm"
           variant="subtle"
           checked={agreement}
           onCheckedChange={(details) => {
@@ -69,12 +70,12 @@ const OrganizationScreen: React.FC = () => {
           <Checkbox.Control>
             <Checkbox.Indicator />
           </Checkbox.Control>
-          <Checkbox.Label fontWeight="normal" fontSize="sm">
+          <Checkbox.Label fontWeight="normal" fontSize="13px" color="fg.muted">
             {"I agree to the LangWatch "}
             <Link
               href="https://langwatch.ai/legal/terms-conditions"
               isExternal
-              fontWeight="semibold"
+              fontWeight="medium"
               variant="underline"
             >
               {"Terms of Service"}

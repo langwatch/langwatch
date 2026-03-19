@@ -87,6 +87,7 @@ export const BasicInfoConditionalFields: React.FC<
               }
             }}
             direction="horizontal"
+            maxColumns={3}
           />
         </Field.Root>
 
