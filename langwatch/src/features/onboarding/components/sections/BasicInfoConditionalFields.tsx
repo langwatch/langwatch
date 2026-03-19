@@ -1,4 +1,4 @@
-import { Field, NativeSelect, SegmentGroup, VStack } from "@chakra-ui/react";
+import { Field, VStack } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { useAnalytics } from "react-contextual-analytics";
@@ -77,41 +77,17 @@ export const BasicInfoConditionalFields: React.FC<
 
         <Field.Root colorPalette="orange" w="full">
           <Field.Label>{"How large is your company?"}</Field.Label>
-          <SegmentGroup.Root
-            size="sm"
-            colorPalette="orange"
+          <IconRadioCardGroup<CompanySize>
+            items={companySizeItems}
             value={companySize}
-            onValueChange={({ value }) => {
-              setCompanySize(value as CompanySize);
-              emit("selected", "company_size", { value });
+            onChange={(value) => {
+              if (value) {
+                setCompanySize(value);
+                emit("selected", "company_size", { value });
+              }
             }}
-            display={{ base: "none", md: "flex" }}
-          >
-            <SegmentGroup.Indicator />
-            <SegmentGroup.Items
-              items={companySizeItems.map((item) => ({
-                label: item.title,
-                value: item.value,
-              }))}
-            />
-          </SegmentGroup.Root>
-          <NativeSelect.Root size="sm" colorPalette="orange" display={{ base: "flex", md: "none" }}>
-            <NativeSelect.Field
-              placeholder="Select company size"
-              value={companySize}
-              onChange={(e) => {
-                setCompanySize(e.target.value as CompanySize);
-                emit("selected", "company_size", { value: e.target.value });
-              }}
-            >
-              {companySizeItems.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.title}
-                </option>
-              ))}
-            </NativeSelect.Field>
-            <NativeSelect.Indicator />
-          </NativeSelect.Root>
+            direction="horizontal"
+          />
         </Field.Root>
 
         <Field.Root colorPalette="orange" w="full">

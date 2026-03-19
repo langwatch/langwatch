@@ -191,6 +191,7 @@ export function PhoneNumberInput(
             onChange={(e) => handleCountryChange(e.target.value as CountryCode)}
             color="transparent"
             textShadow="0 0 0 transparent"
+            bg="bg.surface"
           >
             {(() => {
               const renderOption = (code: CountryCode) => {
