@@ -14,6 +14,7 @@ interface IconRadioCardGroupProps<T extends string = string> {
   direction?: "horizontal" | "vertical";
   size?: "sm" | "md" | "lg";
   variant?: "outline";
+  maxColumns?: number;
 }
 
 export const IconRadioCardGroup = <T extends string = string>({
@@ -21,6 +22,7 @@ export const IconRadioCardGroup = <T extends string = string>({
   value,
   onChange,
   direction: layout = "horizontal",
+  maxColumns,
 }: IconRadioCardGroupProps<T>) => {
   const isHorizontal = layout === "horizontal";
 
@@ -36,14 +38,13 @@ export const IconRadioCardGroup = <T extends string = string>({
         onClick={() => onChange(isSelected ? undefined : item.value)}
         cursor="pointer"
         borderWidth="1px"
-        borderColor={isSelected ? "orange.400" : "border.emphasized"}
-        borderRadius="lg"
-        bg={isSelected ? "orange.subtle" : "bg.surface"}
+        borderColor={isSelected ? "orange.400" : "rgba(0,0,0,0.08)"}
+        borderRadius="10px"
+        bg={isSelected ? "orange.subtle" : "white"}
         p="3"
         transition="border-color 0.15s ease, background 0.15s ease"
         _hover={{
-          borderColor: isSelected ? "orange.400" : "border.emphasized",
-          bg: isSelected ? "orange.subtle" : "bg.muted",
+          borderColor: isSelected ? "orange.400" : "rgba(0,0,0,0.14)",
         }}
         w="full"
         minW="0"
@@ -90,11 +91,12 @@ export const IconRadioCardGroup = <T extends string = string>({
   };
 
   if (isHorizontal) {
+    const cols = maxColumns ? Math.min(items.length, maxColumns) : items.length;
     return (
       <Grid
         templateColumns={{
           base: "1fr",
-          md: `repeat(${items.length}, minmax(0, 1fr))`,
+          md: `repeat(${cols}, minmax(0, 1fr))`,
         }}
         gap="2"
         w="full"

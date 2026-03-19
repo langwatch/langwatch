@@ -10,8 +10,10 @@ export const OnboardingMeshBackground: React.FC = () => (
     zIndex={0}
     style={{
       contain: "layout paint",
-      background:
-        "linear-gradient(180deg, rgba(237,137,38,0.09) 0%, rgba(237,137,38,0.03) 35%, transparent 60%)",
+      background: [
+        "radial-gradient(ellipse 80% 50% at 50% -10%, rgba(237,137,38,0.06) 0%, transparent 70%)",
+        "radial-gradient(ellipse 60% 40% at 70% 100%, rgba(237,137,38,0.02) 0%, transparent 60%)",
+      ].join(", "),
     }}
   />
 );
