@@ -481,6 +481,7 @@ async function handleCollectorRequest(
   }
 
   let rejectedSpans = 0;
+  let rejectionErrors: string[] = [];
   if (project.featureEventSourcingTraceIngestion) {
     try {
       const resource = CollectorSpanUtils.buildResource({
@@ -506,6 +507,9 @@ async function handleCollectorRequest(
         (r): r is PromiseRejectedResult => r.status === "rejected",
       );
       rejectedSpans = failures.length;
+      rejectionErrors = failures.map((f) =>
+        f.reason instanceof Error ? f.reason.message : String(f.reason),
+      );
       if (failures.length > 0) {
         logger.error(
           {
@@ -601,10 +605,7 @@ async function handleCollectorRequest(
     message: "Trace received successfully.",
     partialSuccess: {
       rejectedSpans,
-      errorMessage:
-        rejectedSpans > 0
-          ? `${rejectedSpans} span(s) failed validation or ingestion`
-          : "",
+      errorMessage: rejectionErrors.join("; "),
     },
   });
 }

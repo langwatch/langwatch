@@ -197,7 +197,7 @@ async function handleTracesRequest(req: NextRequest) {
       }
 
       // For ClickHouse, ingest raw OTEL spans directly (bypasses otel.traces.ts transformation)
-      let collectionResult: { rejectedSpans: number } | undefined;
+      let collectionResult: { rejectedSpans: number; errorMessage: string } | undefined;
       if (project.featureEventSourcingTraceIngestion) {
         collectionResult =
           await getApp().traces.collection.handleOtlpTraceRequest(
@@ -207,15 +207,11 @@ async function handleTracesRequest(req: NextRequest) {
           );
       }
       if (project.disableElasticSearchTraceWriting) {
-        const rejectedSpans = collectionResult?.rejectedSpans ?? 0;
         return NextResponse.json({
           message: "Trace received successfully.",
           partialSuccess: {
-            rejectedSpans,
-            errorMessage:
-              rejectedSpans > 0
-                ? `${rejectedSpans} span(s) failed validation or ingestion`
-                : "",
+            rejectedSpans: collectionResult?.rejectedSpans ?? 0,
+            errorMessage: collectionResult?.errorMessage ?? "",
           },
         });
       }
@@ -304,15 +300,11 @@ async function handleTracesRequest(req: NextRequest) {
         },
       );
 
-      const rejectedSpans = collectionResult?.rejectedSpans ?? 0;
       return NextResponse.json({
         message: "Trace received successfully.",
         partialSuccess: {
-          rejectedSpans,
-          errorMessage:
-            rejectedSpans > 0
-              ? `${rejectedSpans} span(s) failed validation or ingestion`
-              : "",
+          rejectedSpans: collectionResult?.rejectedSpans ?? 0,
+          errorMessage: collectionResult?.errorMessage ?? "",
         },
       });
     },

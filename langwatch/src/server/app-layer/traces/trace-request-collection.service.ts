@@ -38,6 +38,7 @@ function normalizeSpanIds(span: OtlpSpan): NormalizedIdSpan {
 
 export interface TraceRequestCollectionResult {
   rejectedSpans: number;
+  errorMessage: string;
 }
 
 export interface TraceRequestCollectionDeps {
@@ -85,6 +86,7 @@ export class TraceRequestCollectionService {
         let droppedSpanCount = 0;
         let dedupedSpanCount = 0;
         let ingestionFailureCount = 0;
+        const errors: string[] = [];
 
         for (const resourceSpan of traceRequest.resourceSpans ?? []) {
           const resource = resourceSpan?.resource;
@@ -117,11 +119,14 @@ export class TraceRequestCollectionService {
                 otelSpanRef: span,
               });
 
-              switch (result) {
+              switch (result.status) {
                 case "collected": collectedSpanCount++; break;
                 case "dropped":   droppedSpanCount++;   break;
                 case "deduped":   dedupedSpanCount++;   break;
                 case "failed":    ingestionFailureCount++; break;
+              }
+              if (result.error) {
+                errors.push(result.error);
               }
             }
           }
@@ -132,8 +137,10 @@ export class TraceRequestCollectionService {
         span.setAttribute("spans.ingestion.drops", droppedSpanCount);
         span.setAttribute("spans.ingestion.deduped", dedupedSpanCount);
 
+        const rejectedSpans = droppedSpanCount + ingestionFailureCount;
         return {
-          rejectedSpans: droppedSpanCount + ingestionFailureCount,
+          rejectedSpans,
+          errorMessage: errors.join("; "),
         };
       },
     );
@@ -153,7 +160,7 @@ export class TraceRequestCollectionService {
     scope: import("../../event-sourcing/pipelines/trace-processing/schemas/otlp").OtlpInstrumentationScope | null;
     piiRedactionLevel: PIIRedactionLevel;
     otelSpanRef: import("@opentelemetry/api").Span;
-  }): Promise<"collected" | "dropped" | "deduped" | "failed"> {
+  }): Promise<{ status: "collected" | "dropped" | "deduped" | "failed"; error?: string }> {
     const spanParseResult = spanSchema.safeParse(otelSpan);
     if (!spanParseResult.success) {
       this.logger.warn(
@@ -162,7 +169,10 @@ export class TraceRequestCollectionService {
       );
     }
     if (!spanParseResult.data) {
-      return "dropped";
+      return {
+        status: "dropped",
+        error: `span validation failed: ${spanParseResult.error?.message ?? "unknown"}`,
+      };
     }
 
     const normalizedSpan = normalizeSpanIds(spanParseResult.data);
@@ -175,7 +185,7 @@ export class TraceRequestCollectionService {
         normalizedSpan.spanId,
       );
       if (lockResult === false) {
-        return "deduped";
+        return { status: "deduped" };
       }
       lockAcquired = lockResult === true;
 
@@ -194,7 +204,7 @@ export class TraceRequestCollectionService {
         normalizedSpan.spanId,
       );
 
-      return "collected";
+      return { status: "collected" };
     } catch (error) {
       if (lockAcquired) {
         await this.deps.dedup.tryReleaseOnFailure(
@@ -218,7 +228,10 @@ export class TraceRequestCollectionService {
         },
         "Error converting raw OTEL span",
       );
-      return "failed";
+      return {
+        status: "failed",
+        error: error instanceof Error ? error.message : String(error),
+      };
     }
   }
 }
