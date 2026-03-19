@@ -19,7 +19,7 @@ const baseParams = {
     { id: "scen_2", name: "Policy violation", labels: ["safety"] },
     { id: "scen_3", name: "Happy path checkout", labels: ["billing"] },
   ],
-  agents: [{ id: "agent_1", name: "Prod Agent" }],
+  agents: [{ id: "agent_1", name: "Prod Agent", type: "http" }],
   prompts: [{ id: "prompt_1", handle: "test-prompt" }],
 };
 
@@ -446,6 +446,44 @@ describe("useSuiteForm()", () => {
       });
     });
 
+    describe("when a code agent is provided", () => {
+      it("maps it with type 'code' instead of 'http'", () => {
+        const { result } = renderHook(() =>
+          useSuiteForm({
+            ...baseParams,
+            agents: [
+              { id: "agent_1", name: "Prod Agent", type: "http" },
+              { id: "agent_2", name: "Code Agent", type: "code" },
+            ],
+          }),
+        );
+
+        expect(result.current.availableTargets).toEqual([
+          { name: "Prod Agent", type: "http", referenceId: "agent_1" },
+          { name: "Code Agent", type: "code", referenceId: "agent_2" },
+          { name: "test-prompt", type: "prompt", referenceId: "prompt_1" },
+        ]);
+      });
+    });
+
+    describe("when a workflow agent is provided", () => {
+      it("maps it with type 'http' (non-code agents default to http)", () => {
+        const { result } = renderHook(() =>
+          useSuiteForm({
+            ...baseParams,
+            agents: [
+              { id: "agent_1", name: "Workflow Agent", type: "workflow" },
+            ],
+          }),
+        );
+
+        expect(result.current.availableTargets).toEqual([
+          { name: "Workflow Agent", type: "http", referenceId: "agent_1" },
+          { name: "test-prompt", type: "prompt", referenceId: "prompt_1" },
+        ]);
+      });
+    });
+
     describe("when a prompt has no handle", () => {
       it("falls back to prompt id as the name", () => {
         const { result } = renderHook(() =>
@@ -515,7 +553,7 @@ describe("useSuiteForm()", () => {
         const { result } = renderHook(() =>
           useSuiteForm({
             ...baseParams,
-            agents: [{ id: "agent_1", name: "Prod Agent" }],
+            agents: [{ id: "agent_1", name: "Prod Agent", type: "http" }],
             prompts: undefined,
             suite: {
               id: "suite_1",

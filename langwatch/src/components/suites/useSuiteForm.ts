@@ -52,6 +52,7 @@ interface Scenario {
 interface Agent {
   id: string;
   name: string;
+  type: "http" | "code" | string;
 }
 
 interface Prompt {
@@ -61,7 +62,7 @@ interface Prompt {
 
 interface AvailableTarget {
   name: string;
-  type: "http" | "prompt";
+  type: "http" | "prompt" | "code";
   referenceId: string;
 }
 
@@ -121,7 +122,8 @@ export function useSuiteForm({
     const result: AvailableTarget[] = [];
     if (agents) {
       for (const agent of agents) {
-        result.push({ name: agent.name, type: "http", referenceId: agent.id });
+        const agentTargetType = agent.type === "code" ? "code" : "http";
+        result.push({ name: agent.name, type: agentTargetType, referenceId: agent.id });
       }
     }
     if (prompts) {
