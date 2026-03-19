@@ -66,7 +66,7 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
         px: { base: 5, md: 10 },
       }
     : {
-        maxW: { base: "100%", md: "720px", xl: "840px" },
+        maxW: { base: "100%", md: "560px", xl: "640px" },
         px: { base: 4, md: 8 },
       };
 
@@ -156,7 +156,7 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
         transition={{ duration: 0.5, ease: "easeOut", delay: 0.1 }}
       >
         <VStack gap={8} align="stretch">
-          <VStack gap={1} align="start">
+          <VStack gap={1} align="center" textAlign="center">
             <Text
               textStyle="2xl"
               fontWeight="bold"

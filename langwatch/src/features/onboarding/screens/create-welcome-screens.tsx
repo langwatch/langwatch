@@ -188,7 +188,7 @@ export const useCreateWelcomeScreens = ({
         id: "basic-info",
         required: true,
         heading: "Let's tailor your experience",
-        subHeading: "Who are you building AI applications for?",
+        subHeading: "Tell us a bit about you and your team",
         component: BasicInfoScreen,
       },
       [OnboardingScreenIndex.DESIRES]: {

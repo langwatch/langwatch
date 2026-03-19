@@ -4,7 +4,7 @@ import type React from "react";
 type IconListItem<T> = {
   title: string;
   value: T;
-  icon: React.ComponentType;
+  icon?: React.ComponentType;
 };
 
 interface IconRadioCardGroupProps<T extends string = string> {
@@ -52,14 +52,16 @@ export const IconRadioCardGroup = <T extends string = string>({
         <button type="button">
           <HStack align="center" justify="space-between" w="full" minW="0">
             <HStack align="center" gap="2" minW="0" flex="1">
-              <Icon
-                size="sm"
-                color={isSelected ? "orange.fg" : "fg.muted"}
-                transition="color 0.15s ease"
-                flexShrink={0}
-              >
-                <item.icon />
-              </Icon>
+              {item.icon && (
+                <Icon
+                  size="sm"
+                  color={isSelected ? "orange.fg" : "fg.muted"}
+                  transition="color 0.15s ease"
+                  flexShrink={0}
+                >
+                  <item.icon />
+                </Icon>
+              )}
 
               <Text
                 textStyle="sm"
