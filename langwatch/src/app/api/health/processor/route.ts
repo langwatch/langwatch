@@ -242,7 +242,7 @@ const checkTraceWithRetry = async (
     try {
       const fetchStart = Date.now();
       const traceResponse = await fetch(
-        `${env.BASE_HOST}/api/trace/${traceId}`,
+        `${env.BASE_HOST}/api/traces/${traceId}`,
         {
           headers: {
             "X-Auth-Token": authToken,
