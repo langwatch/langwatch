@@ -36,20 +36,20 @@ export const fixed64Schema = z.union([longBitsSchema, z.string(), z.number()]);
 
 export const bytesSchema = z.instanceof(Uint8Array);
 
-export const idSchema = z.union([
-  z.string(),
-  // Transform Uint8Array to hex string for JSON serialization safety
-  bytesSchema.transform((bytes) => Buffer.from(bytes).toString("hex")),
-  // This is needed, because JSON.stringify converts Uint8Array to an object, lol.
-  z
-    .record(z.string(), z.number())
-    .transform((obj) => {
-      const values = Object.entries(obj)
-        .sort(([a], [b]) => Number(a) - Number(b))
-        .map(([, v]) => v);
-      return Buffer.from(new Uint8Array(values)).toString("hex");
-    }),
-]);
+// Normalize Uint8Array / JSON-serialized Uint8Array to hex string before validating
+export const idSchema = z.preprocess((val) => {
+  if (val instanceof Uint8Array) {
+    return Buffer.from(val).toString("hex");
+  }
+  if (val != null && typeof val === "object") {
+    const obj = val as Record<string, number>;
+    const values = Object.entries(obj)
+      .sort(([a], [b]) => Number(a) - Number(b))
+      .map(([, v]) => v);
+    return Buffer.from(new Uint8Array(values)).toString("hex");
+  }
+  return val;
+}, z.string());
 
 /**
  * AnyValue + friends 🤗
