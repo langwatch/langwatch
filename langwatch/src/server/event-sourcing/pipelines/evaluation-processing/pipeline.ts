@@ -18,6 +18,7 @@ export interface EvaluationProcessingPipelineDeps {
     makeJobId(payload: any): string;
   };
   esSyncReactor: ReactorDefinition<EvaluationProcessingEvent, EvaluationRunData>;
+  customerIoEvaluationSyncReactor?: ReactorDefinition<EvaluationProcessingEvent, EvaluationRunData>;
 }
 
 /**
@@ -33,13 +34,23 @@ export interface EvaluationProcessingPipelineDeps {
  * - completeEvaluation: Records eval result to CH (API handler path)
  */
 export function createEvaluationProcessingPipeline(deps: EvaluationProcessingPipelineDeps) {
-  return definePipeline<EvaluationProcessingEvent>()
+  let builder = definePipeline<EvaluationProcessingEvent>()
     .withName("evaluation_processing")
     .withAggregateType("evaluation")
     .withFoldProjection("evaluationRun", createEvaluationRunFoldProjection({
       store: deps.evalRunStore,
     }))
-    .withReactor("evaluationRun", "evaluationEsSync", deps.esSyncReactor)
+    .withReactor("evaluationRun", "evaluationEsSync", deps.esSyncReactor);
+
+  if (deps.customerIoEvaluationSyncReactor) {
+    builder = builder.withReactor(
+      "evaluationRun",
+      "customerIoEvaluationSync",
+      deps.customerIoEvaluationSyncReactor,
+    );
+  }
+
+  return builder
     .withCommand("executeEvaluation", deps.ExecuteEvaluationCommand, {
       delay: 30_000,
       deduplication: {
