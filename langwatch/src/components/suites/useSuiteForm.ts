@@ -52,7 +52,7 @@ interface Scenario {
 interface Agent {
   id: string;
   name: string;
-  type: string;
+  type: "http" | "code" | string;
 }
 
 interface Prompt {
