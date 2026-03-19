@@ -3,6 +3,11 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { captureException } from "~/utils/posthogErrorCapture";
+import { fireSignupNurturingCalls } from "~/../ee/billing/nurturing/hooks/signupIdentification";
+import {
+  fireProductInterestNurturing,
+  mapProductSelectionToTrait,
+} from "~/../ee/billing/nurturing/hooks/productInterest";
 
 import { skipPermissionCheck } from "../../rbac";
 import { organizationRouter } from "../organization";
@@ -14,6 +19,35 @@ import { signUpDataSchema } from "./schemas/sign-up-data.schema";
  * Router for handling onboarding-related operations.
  */
 export const onboardingRouter = createTRPCRouter({
+  /**
+   * Sets the product_interest trait in Customer.io after the user picks
+   * a flavour on the onboarding "Pick your flavour" screen.
+   *
+   * This is a separate call from signup identification because
+   * initializeOrganization fires BEFORE the flavour screen.
+   * Fire-and-forget: the mutation resolves immediately.
+   */
+  setProductInterest: protectedProcedure
+    .input(
+      z.object({
+        productInterest: z.enum([
+          "observability",
+          "evaluations",
+          "prompt-management",
+          "agent-simulations",
+        ]),
+      }),
+    )
+    .use(skipPermissionCheck)
+    .mutation(({ input, ctx }) => {
+      const traitValue = mapProductSelectionToTrait(input.productInterest);
+      fireProductInterestNurturing({
+        userId: ctx.session.user.id,
+        productInterest: traitValue,
+      });
+      return { success: true };
+    }),
+
   /**
    * Initializes an organization and its associated project.
    *
@@ -89,6 +123,15 @@ export const onboardingRouter = createTRPCRouter({
         } catch (error) {
           captureException(error);
         }
+
+        fireSignupNurturingCalls({
+          userId: ctx.session.user.id,
+          email: ctx.session.user.email,
+          name: ctx.session.user.name,
+          organizationId: orgResult.organization.id,
+          organizationName: orgResult.organization.name,
+          signUpData: input.signUpData,
+        });
 
         // Return success response with team and project slugs
         return {
