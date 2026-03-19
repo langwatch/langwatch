@@ -408,10 +408,9 @@ const dispatchToClickHouse = async (
   batchEvaluation: ESBatchEvaluation,
 ) => {
   const { run_id: runId } = batchEvaluation;
+  const targets = mapEsTargetsToTargets(batchEvaluation.targets ?? []);
 
   try {
-    const targets = mapEsTargetsToTargets(batchEvaluation.targets ?? []);
-
     // Critical: await the start command so the run exists in CH
     await getApp().experimentRuns.startExperimentRun({
       tenantId: project.id,
@@ -444,6 +443,7 @@ const dispatchToClickHouse = async (
         duration: entry.duration ?? undefined,
         error: entry.error ?? undefined,
         traceId: entry.trace_id ?? undefined,
+        targets,
         occurredAt: Date.now(),
       }).catch((err) => {
         logger.warn(
