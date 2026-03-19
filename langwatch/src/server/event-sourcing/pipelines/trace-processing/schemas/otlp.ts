@@ -16,7 +16,7 @@ export type OtlpAnyValue = {
   doubleValue?: number | string | null;
   arrayValue?: OtlpArrayValue | null;
   kvlistValue?: OtlpKeyValueList | null;
-  bytesValue?: Uint8Array | null;
+  bytesValue?: Uint8Array | Record<string, number> | null;
 };
 
 export type OtlpKeyValue = {
@@ -73,7 +73,16 @@ export const anyValueSchema: z.ZodType<OtlpAnyValue> = z.object({
     .lazy(() => keyValueListSchema)
     .optional()
     .nullable(),
-  bytesValue: bytesSchema.optional().nullable(),
+  bytesValue: z.union([
+    bytesSchema,
+    // JSON.stringify converts Uint8Array to {"0":1,"1":2,...} — reconstruct it
+    z.record(z.string(), z.number()).transform((obj) => {
+      const values = Object.entries(obj)
+        .sort(([a], [b]) => Number(a) - Number(b))
+        .map(([, v]) => v);
+      return new Uint8Array(values);
+    }),
+  ]).optional().nullable(),
 });
 
 export const keyValueSchema: z.ZodType<OtlpKeyValue> = z.object({
