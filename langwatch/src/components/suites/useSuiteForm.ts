@@ -16,6 +16,7 @@ import { z } from "zod";
 import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
 import {
   parseSuiteTargets,
+  suiteAgentTargetTypes,
   suiteTargetSchema,
   type SuiteTarget,
 } from "~/server/suites/types";
@@ -49,8 +50,6 @@ interface Scenario {
   labels: string[];
 }
 
-/** Agent types that can be used as suite targets (must be in suiteTargetSchema). */
-const supportedAgentTypes = new Set<string>(["http", "code"]);
 
 interface Agent {
   id: string;
@@ -125,7 +124,7 @@ export function useSuiteForm({
     const result: AvailableTarget[] = [];
     if (agents) {
       for (const agent of agents) {
-        if (!supportedAgentTypes.has(agent.type)) continue;
+        if (!suiteAgentTargetTypes.has(agent.type)) continue;
         result.push({ name: agent.name, type: agent.type as SuiteTarget["type"], referenceId: agent.id });
       }
     }
