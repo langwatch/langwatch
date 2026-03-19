@@ -164,7 +164,11 @@ export const spanSchema = z.object({
   attributes: z.array(keyValueSchema),
   events: z.array(eventSchema).optional().default([]),
   links: z.array(linkSchema).optional().default([]),
-  status: statusSchema,
+  status: statusSchema
+    .nullable()
+    .optional()
+    .default({ message: null, code: null })
+    .transform((v) => v ?? { message: null, code: null }),
   flags: z.number().optional().nullable(),
   droppedAttributesCount: z.number().optional().nullable().default(0),
   droppedEventsCount: z.number().optional().nullable().default(0),

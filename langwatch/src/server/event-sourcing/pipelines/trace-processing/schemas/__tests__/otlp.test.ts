@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bytesSchema, idSchema } from "../otlp";
+import { bytesSchema, idSchema, spanSchema } from "../otlp";
 
 describe("otlp schemas", () => {
   describe("idSchema", () => {
@@ -103,6 +103,81 @@ describe("otlp schemas", () => {
         expect(result.success).toBe(true);
         if (result.success) {
           expect(result.data).toBe("");
+        }
+      });
+    });
+  });
+
+  describe("spanSchema", () => {
+    function makeValidSpan(overrides: Record<string, unknown> = {}) {
+      return {
+        traceId: "aaaa0000000000000000000000000001",
+        spanId: "bbbb000000000001",
+        name: "test-span",
+        kind: 1,
+        startTimeUnixNano: "1700000000000000000",
+        endTimeUnixNano: "1700000001000000000",
+        attributes: [],
+        events: [],
+        links: [],
+        status: { code: null, message: null },
+        droppedAttributesCount: 0,
+        droppedEventsCount: 0,
+        droppedLinksCount: 0,
+        ...overrides,
+      };
+    }
+
+    describe("when status is a valid object", () => {
+      it("accepts status with code and message", () => {
+        const span = makeValidSpan({ status: { code: 1, message: "OK" } });
+
+        const result = spanSchema.safeParse(span);
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.status).toEqual({ code: 1, message: "OK" });
+        }
+      });
+    });
+
+    describe("when status is null (.NET OTEL SDK)", () => {
+      it("accepts null status and defaults to code=null, message=null", () => {
+        const span = makeValidSpan({ status: null });
+
+        const result = spanSchema.safeParse(span);
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.status).toEqual({ code: null, message: null });
+        }
+      });
+    });
+
+    describe("when status is undefined", () => {
+      it("accepts undefined status and defaults to code=null, message=null", () => {
+        const span = makeValidSpan();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        delete (span as any).status;
+
+        const result = spanSchema.safeParse(span);
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.status).toEqual({ code: null, message: null });
+        }
+      });
+    });
+
+    describe("when status has empty object (no code/message)", () => {
+      it("accepts empty status object", () => {
+        const span = makeValidSpan({ status: {} });
+
+        const result = spanSchema.safeParse(span);
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.status).toEqual({});
         }
       });
     });
