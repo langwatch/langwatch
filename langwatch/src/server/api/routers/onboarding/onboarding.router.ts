@@ -4,6 +4,10 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { fireSignupNurturingCalls } from "~/../ee/billing/nurturing/hooks/signupIdentification";
+import {
+  fireProductInterestNurturing,
+  mapProductSelectionToTrait,
+} from "~/../ee/billing/nurturing/hooks/productInterest";
 import { skipPermissionCheck } from "../../rbac";
 import { organizationRouter } from "../organization";
 import { projectRouter } from "../project";
@@ -112,5 +116,35 @@ export const onboardingRouter = createTRPCRouter({
         captureException(error);
         throw error;
       }
+    }),
+
+  /**
+   * Sets the product_interest trait in Customer.io after the user
+   * picks their flavour on the onboarding screen.
+   *
+   * Separate from initializeOrganization because the org is created
+   * BEFORE the flavour selection screen.
+   */
+  setProductInterest: protectedProcedure
+    .input(
+      z.object({
+        productInterest: z.enum([
+          "observability",
+          "evaluations",
+          "prompt-management",
+          "agent-simulations",
+        ]),
+      }),
+    )
+    .use(skipPermissionCheck)
+    .mutation(async ({ ctx, input }) => {
+      const traitValue = mapProductSelectionToTrait(input.productInterest);
+
+      fireProductInterestNurturing({
+        userId: ctx.session.user.id,
+        productInterest: traitValue,
+      });
+
+      return { success: true };
     }),
 });

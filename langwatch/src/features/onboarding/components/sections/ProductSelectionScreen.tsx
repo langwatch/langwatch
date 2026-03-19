@@ -9,6 +9,7 @@ import {
 } from "@chakra-ui/react";
 import { Gavel, GraduationCap, HatGlasses, Telescope } from "lucide-react";
 import type React from "react";
+import { api } from "~/utils/api";
 import type { ProductSelection } from "../../types/types";
 
 type ProductOption =
@@ -61,6 +62,9 @@ interface ProductSelectionScreenProps {
 export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
   onSelectProduct,
 }) => {
+  const setProductInterest =
+    api.onboarding.setProductInterest.useMutation();
+
   return (
     <Box position="relative" minH="60vh">
       <Grid
@@ -93,6 +97,12 @@ export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
                 role="button"
                 tabIndex={0}
                 onClick={() => {
+                  // Fire product interest to Customer.io before any navigation.
+                  // Fire-and-forget: we don't await this; navigation continues immediately.
+                  setProductInterest.mutate({
+                    productInterest: opt.key,
+                  });
+
                   if (opt.key === "agent-simulations") {
                     window.location.href = opt.url;
                     return;
