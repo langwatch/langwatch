@@ -62,7 +62,7 @@ interface Prompt {
 
 interface AvailableTarget {
   name: string;
-  type: "http" | "prompt" | "code";
+  type: SuiteTarget["type"];
   referenceId: string;
 }
 
