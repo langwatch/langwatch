@@ -7,7 +7,7 @@ const inflateAsync = promisify(inflate);
 const brotliDecompressAsync = promisify(brotliDecompress);
 
 function toArrayBuffer(buf: Buffer): ArrayBuffer {
-  return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+  return new Uint8Array(buf).buffer as ArrayBuffer;
 }
 
 /**

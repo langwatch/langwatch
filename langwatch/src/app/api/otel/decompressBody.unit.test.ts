@@ -35,7 +35,7 @@ describe("readBody", () => {
 
   describe("when Content-Encoding is gzip", () => {
     it("decompresses the body", async () => {
-      const compressed = gzipSync(Buffer.from(payload));
+      const compressed = new Uint8Array(gzipSync(Buffer.from(payload)));
 
       const req = new NextRequest("http://localhost/api/otel/v1/traces", {
         method: "POST",
@@ -50,7 +50,7 @@ describe("readBody", () => {
 
     it("preserves binary protobuf data after decompression", async () => {
       const binaryData = new Uint8Array([0x0a, 0x12, 0x08, 0x00, 0xff, 0xfe]);
-      const compressed = gzipSync(Buffer.from(binaryData));
+      const compressed = new Uint8Array(gzipSync(Buffer.from(binaryData)));
 
       const req = new NextRequest("http://localhost/api/otel/v1/traces", {
         method: "POST",
@@ -66,7 +66,7 @@ describe("readBody", () => {
 
   describe("when Content-Encoding is deflate", () => {
     it("decompresses the body", async () => {
-      const compressed = deflateSync(Buffer.from(payload));
+      const compressed = new Uint8Array(deflateSync(Buffer.from(payload)));
 
       const req = new NextRequest("http://localhost/api/otel/v1/traces", {
         method: "POST",
@@ -82,7 +82,7 @@ describe("readBody", () => {
 
   describe("when Content-Encoding is br", () => {
     it("decompresses the body", async () => {
-      const compressed = brotliCompressSync(Buffer.from(payload));
+      const compressed = new Uint8Array(brotliCompressSync(Buffer.from(payload)));
 
       const req = new NextRequest("http://localhost/api/otel/v1/traces", {
         method: "POST",

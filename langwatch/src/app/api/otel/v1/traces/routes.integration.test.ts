@@ -343,7 +343,7 @@ describe("opentelemetry traces receiver", () => {
   describe("when compression is enabled", () => {
     it("accepts gzip-compressed protobuf", async () => {
       const encodedMessage = traceRequestType.encode(request).finish();
-      const compressed = gzipSync(Buffer.from(encodedMessage));
+      const compressed = new Uint8Array(gzipSync(Buffer.from(encodedMessage)));
       const blob = new Blob([compressed], {
         type: "application/x-protobuf",
       });
@@ -364,8 +364,8 @@ describe("opentelemetry traces receiver", () => {
     });
 
     it("accepts gzip-compressed JSON", async () => {
-      const compressed = gzipSync(
-        Buffer.from(JSON.stringify(request), "utf-8"),
+      const compressed = new Uint8Array(
+        gzipSync(Buffer.from(JSON.stringify(request), "utf-8")),
       );
       const blob = new Blob([compressed], { type: "application/json" });
 
@@ -386,7 +386,7 @@ describe("opentelemetry traces receiver", () => {
 
     it("accepts deflate-compressed protobuf", async () => {
       const encodedMessage = traceRequestType.encode(request).finish();
-      const compressed = deflateSync(Buffer.from(encodedMessage));
+      const compressed = new Uint8Array(deflateSync(Buffer.from(encodedMessage)));
       const blob = new Blob([compressed], {
         type: "application/x-protobuf",
       });
