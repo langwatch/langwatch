@@ -113,11 +113,39 @@ export const CodeAgentDataSchema = z.object({
 });
 export type CodeAgentData = z.infer<typeof CodeAgentDataSchema>;
 
+/**
+ * Pre-fetched workflow agent configuration for serialized execution.
+ * Contains the full workflow DSL and entry/end node field definitions.
+ * The DSL is sent directly to the NLP service for execution.
+ */
+export const WorkflowAgentDataSchema = z.object({
+  type: z.literal("workflow"),
+  agentId: z.string(),
+  /** The full workflow DSL object from the published version */
+  workflowDsl: z.record(z.unknown()),
+  /** Input fields from the entry node */
+  entryInputs: z.array(
+    z.object({
+      identifier: z.string(),
+      type: z.string(),
+    })
+  ),
+  /** Output fields from the end node */
+  endOutputs: z.array(
+    z.object({
+      identifier: z.string(),
+      type: z.string(),
+    })
+  ),
+});
+export type WorkflowAgentData = z.infer<typeof WorkflowAgentDataSchema>;
+
 /** Union type for all supported target adapter data */
 export const TargetAdapterDataSchema = z.discriminatedUnion("type", [
   PromptConfigDataSchema,
   HttpAgentDataSchema,
   CodeAgentDataSchema,
+  WorkflowAgentDataSchema,
 ]);
 export type TargetAdapterData = z.infer<typeof TargetAdapterDataSchema>;
 
@@ -177,7 +205,7 @@ export type TelemetryConfig = z.infer<typeof TelemetryConfigSchema>;
 
 /** Target configuration - what to test against */
 export const TargetConfigSchema = z.object({
-  type: z.enum(["prompt", "http", "code"]),
+  type: z.enum(["prompt", "http", "code", "workflow"]),
   referenceId: z.string(),
 });
 export type TargetConfig = z.infer<typeof TargetConfigSchema>;
