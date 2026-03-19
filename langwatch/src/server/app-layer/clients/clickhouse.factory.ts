@@ -1,4 +1,5 @@
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import { createResilientClickHouseClient } from "./clickhouse.resilient";
 
 export interface ClickHouseFactoryOptions {
   url?: string;
@@ -17,8 +18,10 @@ export function createClickHouseClientFromConfig(
     // If not a valid URL, pass the raw string — ClickHouse client may still accept it
   }
 
-  return createClient({
+  const raw = createClient({
     url,
     clickhouse_settings: { date_time_input_format: "best_effort" },
   });
+
+  return createResilientClickHouseClient({ client: raw });
 }
